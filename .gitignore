@@ -10,14 +10,13 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
-/artifacts/*.tgz
+/artifacts/
 __pycache__/
 *.pyc
 *.local
 
 # Editor directories and files
-.vscode/*
-!.vscode/extensions.json
+.vscode/
 .idea
 .DS_Store
 *.suo
