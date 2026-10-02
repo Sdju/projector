@@ -24,6 +24,14 @@ import { applicationIcon, interfaceMode, launchItem, preferences, saveInterface,
 import { listIntegrations } from "./integrations/index.ts";
 import { configureGithub, connectGithub, disconnectGithub, beginGithubLogin, pollGithubLogin, githubRepositories, importGithubProject } from "./integrations/github.ts";
 
+import {
+  closeProjectTerminals,
+  closeTerminalSession,
+  createTerminalSession,
+  listTerminalSessions,
+  terminalRequestAllowed,
+} from "./terminal.ts";
+
 interface SseClient {
   res: ServerResponse;
 }
@@ -166,6 +174,13 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
     const origin = req.headers.origin;
     if (origin && origin !== url.origin) {
       json(res, 403, { error: "Запрос разрешён только со страницы Projector" });
+      return true;
+    }
+    if (
+      /^\/api\/projects\/[^/]+\/terminals(?:\/|$)/.test(path) &&
+      !terminalRequestAllowed(req, false)
+    ) {
+      json(res, 403, { error: "Терминал доступен только со страницы Projector" });
       return true;
     }
     if (path.startsWith("/api/integrations")) {
@@ -391,9 +406,9 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
       return true;
     }
 
-    const projectMatch = path.match(/^\/api\/projects\/([^/]+)(?:\/([^/]+))?$/);
+    const projectMatch = path.match(/^\/api\/projects\/([^/]+)(?:\/([^/]+))?(?:\/([^/]+))?$/);
     if (projectMatch) {
-      const [, id, action] = projectMatch;
+      const [, id, action, sessionId] = projectMatch;
       const projects = await loadProjects();
       const index = projects.findIndex((item) => item.id === id);
       if (index === -1) {
@@ -401,6 +416,26 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
         return true;
       }
       const project = projects[index];
+
+      if (action === "terminals") {
+        if (!sessionId && method === "GET") {
+          json(res, 200, { sessions: listTerminalSessions(id) });
+          return true;
+        }
+        if (!sessionId && method === "POST") {
+          json(res, 201, { session: createTerminalSession(project, await readBody(req)) });
+          return true;
+        }
+        if (sessionId && method === "DELETE") {
+          closeTerminalSession(id, sessionId);
+          json(res, 200, { ok: true });
+          return true;
+        }
+      }
+      if (sessionId) {
+        json(res, 404, { error: "Не найден" });
+        return true;
+      }
 
       if (!action && method === "GET") {
         json(res, 200, { project: withRuntime(project), logs: getLogs(id) });
@@ -421,6 +456,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
 
       if (!action && method === "DELETE") {
         stopProject(id);
+        closeProjectTerminals(id);
         await updateProjects(current => {
           const currentIndex = current.findIndex(item => item.id === id);
           if (currentIndex !== -1) current.splice(currentIndex, 1);

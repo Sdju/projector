@@ -5,6 +5,7 @@ import { handleApi } from "./api.ts";
 import { clearInstance, writeInstance } from "./instance.ts";
 import { APP_PORT, appUrl } from "./paths.ts";
 import { openLauncher } from "./window.ts";
+import { attachTerminalServer } from "./terminal.ts";
 
 let hooksBound = false;
 
@@ -24,6 +25,7 @@ function bindHooks(): void {
 }
 
 function attach(server: ViteDevServer | PreviewServer): void {
+  if (server.httpServer) attachTerminalServer(server.httpServer);
   server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
     void handleApi(req, res).then((handled) => {
       if (!handled) next();

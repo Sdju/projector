@@ -1,5 +1,6 @@
 allowBuilds:
   node-gtk: true
+  node-pty: true
   usocket: false
 packages:
   - packages/*

@@ -10,6 +10,7 @@ import {
   type ProjectDraft,
 } from "../../modules/catalog/index.ts";
 import { LogPane, RunControls, useRunner } from "../../modules/runner/index.ts";
+import { TerminalPane } from "../../modules/terminal/index.ts";
 
 const route = useRoute();
 const router = useRouter();
@@ -105,6 +106,7 @@ async function onRemove(): Promise<void> {
       <ProjectForm v-model="draft" submit-label="сохранить" @inspect="onInspect" @submit="onSave" />
     </div>
 
+    <TerminalPane :key="project.id" :project-id="project.id" />
     <LogPane :lines="logs" />
   </section>
   <section v-else>
