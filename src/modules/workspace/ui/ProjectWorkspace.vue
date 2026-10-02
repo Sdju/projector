@@ -3,7 +3,7 @@ import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch 
 import { workspaceRequest } from "../api.ts";
 import FileTree from "./FileTree.vue";
 import IconSettings from "~icons/lucide/settings";
-import IconArrowLeft from "~icons/lucide/arrow-left";
+import IconRefresh from "~icons/lucide/rotate-cw";
 import { TerminalPane } from "../../terminal/index.ts";
 import type {
   FileContent,
@@ -12,7 +12,7 @@ import type {
   FileComparison,
 } from "../../../../shared/workspace.ts";
 const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
-const props = defineProps<{ projectId: string; projectName: string }>();
+const props = defineProps<{ projectId: string }>();
 const workspaceElement = ref<HTMLElement>();
 const treeWidth = ref<number>();
 const agentWidth = ref<number>();
@@ -285,33 +285,26 @@ onBeforeUnmount(() => {
         <button :class="{ selected: section === 'git' }" @click="section = 'git'">
           Git <span v-if="git.changes.length">{{ git.changes.length }}</span>
         </button>
-        <button
-          class="project-tab"
-          :class="{ selected: section === 'project' }"
-          :aria-pressed="section === 'project'"
-          title="Настройки проекта"
-          aria-label="Настройки проекта"
-          @click="section = 'project'"
-        >
-          <IconSettings aria-hidden="true" />
-        </button>
+        <div class="side-actions">
+          <button
+            v-if="section !== 'project'"
+            title="Обновить обзор"
+            aria-label="Обновить обзор"
+            @click="refresh"
+          >
+            <IconRefresh aria-hidden="true" />
+          </button>
+          <button
+            :class="{ selected: section === 'project' }"
+            :aria-pressed="section === 'project'"
+            title="Настройки проекта"
+            aria-label="Настройки проекта"
+            @click="section = 'project'"
+          >
+            <IconSettings aria-hidden="true" />
+          </button>
+        </div>
       </nav>
-      <div class="side-heading">
-        <router-link to="/projects" class="back" title="Все проекты" aria-label="Все проекты">
-          <IconArrowLeft aria-hidden="true" />
-        </router-link>
-        <span :title="projectName">{{
-          section === "git" ? git.branch || projectName : projectName
-        }}</span>
-        <button
-          v-if="section !== 'project'"
-          title="Обновить обзор"
-          aria-label="Обновить обзор"
-          @click="refresh"
-        >
-          ↻
-        </button>
-      </div>
       <div v-show="section === 'files'" class="side-content">
         <FileTree
           :project-id="projectId"
@@ -508,23 +501,19 @@ onBeforeUnmount(() => {
   color: var(--text);
   border-color: var(--focus);
 }
-.side-tabs .project-tab {
-  display: grid;
-  place-items: center;
+.side-actions {
+  display: flex;
+  gap: 8px;
   margin-left: auto;
   flex-shrink: 0;
 }
-.project-tab svg,
-.back svg {
+.side-actions button {
+  display: grid;
+  place-items: center;
+}
+.side-actions svg {
   width: 14px;
   height: 14px;
-}
-.back {
-  display: flex;
-  color: var(--muted);
-}
-.back:hover {
-  color: var(--text);
 }
 .project-settings {
   padding: 8px 12px 16px;
@@ -532,24 +521,6 @@ onBeforeUnmount(() => {
 .side-tabs span {
   color: var(--run);
   font: 10px var(--mono);
-}
-.side-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
-  gap: 8px;
-  font-size: 11px;
-  color: var(--muted);
-}
-.side-heading span {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.side-heading button {
-  font-size: 18px;
 }
 .side-content {
   flex: 1;

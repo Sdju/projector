@@ -75,11 +75,7 @@ async function onRemove(): Promise<void> {
 
 <template>
   <section v-if="project" class="project-page">
-    <ProjectWorkspace
-      :key="`${project.id}:${project.path}`"
-      :project-id="project.id"
-      :project-name="project.name"
-    >
+    <ProjectWorkspace :key="`${project.id}:${project.path}`" :project-id="project.id">
       <template #project>
         <p v-if="formError" class="msg" role="alert">{{ formError }}</p>
         <ProjectForm
