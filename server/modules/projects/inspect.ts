@@ -57,7 +57,7 @@ export function expandPath(input: string): string {
   return resolve(trimmed);
 }
 
-export async function inspectProject(dir: string): Promise<InspectResult> {
+export async function inspectProject(dir: string, allowDirectory = false): Promise<InspectResult> {
   const path = expandPath(dir);
   const info = await stat(path).catch(() => null);
   if (!info?.isDirectory()) {
@@ -66,6 +66,18 @@ export async function inspectProject(dir: string): Promise<InspectResult> {
 
   const raw = await readFile(resolve(path, "package.json"), "utf8").catch(() => null);
   if (!raw) {
+    if (allowDirectory) {
+      const command = { id: randomUUID(), name: "shell", cmd: "bash" };
+      return {
+        name: basename(path) || path,
+        path,
+        url: "",
+        icon: "",
+        mode: "server",
+        defaultCommandId: command.id,
+        commands: [command],
+      };
+    }
     throw new Error("В папке нет package.json");
   }
 

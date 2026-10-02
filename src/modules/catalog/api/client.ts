@@ -14,6 +14,10 @@ export function fetchProjects(): Promise<{ projects: Project[] }> {
   return request("/api/projects");
 }
 
+export function resolveProject(path: string): Promise<{ project: Project }> {
+  return request("/api/projects/resolve", { method: "POST", body: JSON.stringify({ path }) });
+}
+
 export function fetchProject(id: string): Promise<{ project: Project }> {
   return request(`/api/projects/${id}`);
 }

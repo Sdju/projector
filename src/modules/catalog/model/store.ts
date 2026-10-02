@@ -5,6 +5,7 @@ import {
   fetchProject,
   fetchProjects,
   inspectPath,
+  resolveProject,
   updateProject,
 } from "../api/client.ts";
 import type { ProcessSnapshot, Project, ProjectDraft } from "./types.ts";
@@ -21,11 +22,19 @@ export function useProjects() {
   const error = computed(() => state.error);
 
   async function load(): Promise<void> {
+    const initialIds = new Set(state.projects.map((project) => project.id));
     state.loading = true;
     state.error = "";
     try {
       const data = await fetchProjects();
-      state.projects = data.projects;
+      // A path may be resolved while the initial catalog request is in flight.
+      state.projects = [
+        ...data.projects,
+        ...state.projects.filter(
+          (project) =>
+            !initialIds.has(project.id) && !data.projects.some((item) => item.id === project.id),
+        ),
+      ];
     } catch (err) {
       state.error = err instanceof Error ? err.message : "Не удалось загрузить проекты";
     } finally {
@@ -69,6 +78,12 @@ export function useProjects() {
     else state.projects[index] = project;
   }
 
+  async function openPath(path: string): Promise<Project> {
+    const data = await resolveProject(path);
+    ingest(data.project);
+    return data.project;
+  }
+
   return {
     projects,
     loading,
@@ -81,6 +96,7 @@ export function useProjects() {
     inspect: inspectPath,
     applyRuntime,
     ingest,
+    openPath,
   };
 }
 
