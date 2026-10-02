@@ -63,11 +63,11 @@ vp run server      # только сервер в терминале; повто
 
 ## Переиспользование JS/TS
 
-Нативный UI использует отдельный workspace-пакет [`vio`](packages/vio/README.md) — Vue custom renderer для GTK4. Полная палитра описана в `native/Palette.vue`: обычные `v-for`, `v-if`, `v-model`, bindings и сигналы. `native/palette.ts` — небольшой контроллер для resident/D-Bus; создание, обновление и удаление виджетов выполняет renderer. Пакет `vio` не импортирует Projector и включает отдельный Counter-пример.
+Нативный UI использует отдельный workspace-пакет [`vio`](packages/vio/README.md) — Vue custom renderer для GTK4. Полная палитра описана в `native/modules/desktop/Palette.vue`: обычные `v-for`, `v-if`, `v-model`, bindings и сигналы. `native/modules/desktop/palette.ts` — небольшой контроллер для resident/D-Bus; создание, обновление и удаление виджетов выполняет renderer. Пакет `vio` не импортирует Projector и включает отдельный Counter-пример.
 
-`shared/launcher.ts` содержит общие типы и HTTP-клиент, `shared/launcher-model.ts` — поиск с отменой устаревших ответов, задержку ввода, выбор результата, состояние ошибок и защиту от повторного запуска. Эту модель используют и веб-палитра, и `native/Palette.vue`; отображение остаётся отдельным для DOM и GTK.
+`core/modules/launcher/launcher.ts` содержит общие типы и HTTP-клиент, `core/modules/launcher/launcher-model.ts` — поиск с отменой устаревших ответов, задержку ввода, выбор результата, состояние ошибок и защиту от повторного запуска. Эту модель используют и веб-палитра, и `native/modules/desktop/Palette.vue`; отображение остаётся отдельным для DOM и GTK.
 
-`native/catalog.ts`, `native/tray.ts` и `native/shortcut.ts` содержат системные адаптеры. Сервер вызывает `native/main.ts` через тот же Node, которым он запущен. Для проверки TS GTK-декларации генерируются из установленных библиотек в `node_modules/.node-gtk-types` командой `vp run gtk:types`; сборка выполняет её автоматически.
+`native/modules/desktop/catalog.ts`, `native/modules/desktop/tray.ts` и `native/modules/desktop/shortcut.ts` содержат системные адаптеры. Сервер вызывает `native/app/entry.ts` через тот же Node, которым он запущен. Для проверки TS GTK-декларации генерируются из установленных библиотек в `node_modules/.node-gtk-types` командой `vp run gtk:types`; сборка выполняет её автоматически.
 
 ```bash
 vp run vio:build      # отдельный пакет: ESM + TypeScript declarations
@@ -140,7 +140,7 @@ node tests/launcher-model.test.mjs
 
 ## Интеграции (плагины)
 
-На `/settings` есть раздел «интеграции». Каждая интеграция имеет переключатель, параметры и собственную авторизацию. Общий реестр находится в `server/integrations/index.ts`, реализация GitHub — в `server/integrations/github.ts`.
+На `/settings` есть раздел «интеграции». Каждая интеграция имеет переключатель, параметры и собственную авторизацию. Общий реестр находится в `server/modules/integrations/index.ts`, реализация GitHub — в `server/modules/integrations/github.ts`.
 
 Настройки и учётные данные сохраняются сервером в `$XDG_DATA_HOME/projector/integrations.json` (по умолчанию `~/.local/share/projector/integrations.json`), с правами `0600` и атомарной заменой файла. Токен хранится в этом файле и не возвращается в браузер; `localStorage` для настроек не используется. Существующие настройки интерфейса и модели остаются в `launcher.json` и `providers.json`.
 
@@ -163,3 +163,7 @@ node --test tests/integrations.test.mjs tests/launcher.test.mjs
 ```
 
 Тесты используют временные XDG-каталоги, подмену GitHub API и Git; проверяют обязательную авторизацию, приватные репозитории, пагинацию, Device Flow (ожидание, ограничение частоты, истечение и отмену), права файла, отсутствие токена в публичном API и Git URL, повторный и параллельный импорт.
+
+## Архитектура
+
+Все приложения и библиотека renderer используют FEOD с обязательной проверкой границ. Структура, публичные API и разрешённые зависимости описаны в [docs/architecture.md](docs/architecture.md). Полная проверка: `vp run check`.

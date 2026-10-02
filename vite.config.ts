@@ -1,12 +1,21 @@
 import { fileURLToPath, URL } from "node:url";
 import vue from "@vitejs/plugin-vue";
 import Icons from "unplugin-icons/vite";
-import { defineConfig } from "vite-plus";
+import { defineConfig, type Plugin } from "vite-plus";
+import { checkArchitecture } from "./scripts/check-architecture.mjs";
 import { APP_PORT } from "./core/modules/app-paths/index.ts";
 import { projectorPlugin } from "./server/app/plugin.ts";
 
+function architecturePlugin(): Plugin {
+  function validate() {
+    const { errors } = checkArchitecture();
+    if (errors.length) throw new Error("FEOD architecture violations:\n" + errors.join("\n"));
+  }
+  return { name: "projector-feod", buildStart: validate, handleHotUpdate: validate };
+}
+
 export default defineConfig({
-  plugins: [vue(), Icons({ compiler: "vue3" }), projectorPlugin()],
+  plugins: [architecturePlugin(), vue(), Icons({ compiler: "vue3" }), projectorPlugin()],
   resolve: {
     alias: {
       "@app": fileURLToPath(new URL("./src/app", import.meta.url)),
