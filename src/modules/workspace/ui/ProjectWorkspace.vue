@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { workspaceRequest } from "../api.ts";
+import { relocatedPath } from "../../../../core/modules/workspace/index.ts";
 import FileTree from "./FileTree.vue";
 import GitChangesTree from "./GitChangesTree.vue";
 import IconSettings from "~icons/lucide/settings";
@@ -264,6 +265,25 @@ async function refresh() {
   if (active.value)
     void openFile(active.value.path, active.value.line, active.value.column, active.value.staged);
 }
+function entryMoved(source: string, destination: string) {
+  ++fileGeneration;
+  loading.value = false;
+  for (const tab of [...tabs.value]) {
+    const path = relocatedPath(tab.path, source, destination);
+    if (path === tab.path) continue;
+    if (tab.staged !== undefined) {
+      closeTab(tab.key);
+      continue;
+    }
+    const wasActive = tab.key === activeKey.value;
+    tab.path = path;
+    tab.key = `${path}:file`;
+    if (wasActive) activeKey.value = tab.key;
+  }
+  revision.value++;
+  void loadGit();
+  if (query.value.trim()) void search();
+}
 onBeforeUnmount(() => {
   stopResize?.();
   sizeObserver?.disconnect();
@@ -312,6 +332,7 @@ onBeforeUnmount(() => {
           :selected="active?.path ?? ''"
           :revision="revision"
           @open="openFile($event)"
+          @moved="entryMoved"
         />
       </div>
       <div v-show="section === 'search'" class="side-content search-panel">

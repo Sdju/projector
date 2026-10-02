@@ -23,6 +23,7 @@ import {
   searchProject,
   projectGit,
   projectComparison,
+  moveProjectEntry,
 } from "../../../../modules/workspace/index.ts";
 import { json, readBody, asString } from "../../../../modules/transport/index.ts";
 
@@ -53,6 +54,17 @@ export async function handleProjectsProjectActions({
       return true;
     }
     const project = projects[index];
+
+    if (action === "workspace" && sessionId === "move" && method === "POST") {
+      if (!terminalRequestAllowed(req, true))
+        throw new HttpError(403, "Перенос доступен только со страницы Projector");
+      const body = await readBody(req);
+      if (typeof body.path !== "string" || typeof body.directory !== "string")
+        throw new HttpError(400, "Укажите файл и папку назначения");
+      res.setHeader("Cache-Control", "no-store");
+      json(res, 200, await moveProjectEntry(project.path, body.path, body.directory));
+      return true;
+    }
 
     if (action === "workspace" && method === "GET") {
       if (!terminalRequestAllowed(req, false))

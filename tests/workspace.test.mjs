@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdtemp, mkdir, writeFile, rm, symlink } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, rm, symlink, readFile, lstat } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
@@ -10,9 +10,88 @@ import {
   searchProject,
   projectGit,
   projectComparison,
+  moveProjectEntry,
 } from "../server/modules/workspace/index.ts";
+import { moveDestination, parentPath, relocatedPath } from "../core/modules/workspace/index.ts";
 const root = await mkdtemp(join(tmpdir(), "projector-workspace-"));
 const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
+test("tree move destinations and open-file paths respect directory boundaries", () => {
+  assert.equal(parentPath("src/nested/file.ts"), "src/nested");
+  assert.equal(parentPath("file.ts"), "");
+  assert.equal(moveDestination("src/file.ts", ""), "file.ts");
+  assert.equal(moveDestination("src/file.ts", "docs"), "docs/file.ts");
+  for (const [source, target] of [
+    ["", "src"],
+    ["src", "src"],
+    ["src", "src/nested"],
+    ["src/file.ts", "src"],
+  ])
+    assert.equal(moveDestination(source, target), undefined);
+  assert.equal(moveDestination("src", "src-other"), "src-other/src");
+  assert.equal(relocatedPath("src/nested/file.ts", "src", "docs/src"), "docs/src/nested/file.ts");
+  assert.equal(relocatedPath("src-other/file.ts", "src", "docs/src"), "src-other/file.ts");
+});
+
+test("moves preserve contents, never overwrite, and reject self, traversal, excluded and symlink paths", async () => {
+  const base = await mkdtemp(join(tmpdir(), "projector-move-"));
+  try {
+    for (const folder of ["src/nested", "docs", "other", ".git", "node_modules"])
+      await mkdir(join(base, folder), { recursive: true });
+    await writeFile(join(base, "src/nested/файл с пробелом.ts"), "preserved");
+    await writeFile(join(base, "docs/collision"), "destination");
+    await writeFile(join(base, "src/collision"), "source");
+    await symlink(join(base, "docs"), join(base, "alias"));
+    await symlink("/etc", join(base, "external"));
+    await symlink(join(base, "missing"), join(base, "docs/dangling"));
+    await writeFile(join(base, "src/dangling"), "keep");
+    assert.deepEqual(await moveProjectEntry(base, "src/nested/файл с пробелом.ts", "docs"), {
+      source: "src/nested/файл с пробелом.ts",
+      destination: "docs/файл с пробелом.ts",
+    });
+    assert.equal(await readFile(join(base, "docs/файл с пробелом.ts"), "utf8"), "preserved");
+    await moveProjectEntry(base, "docs/файл с пробелом.ts", "");
+    assert.equal(await readFile(join(base, "файл с пробелом.ts"), "utf8"), "preserved");
+    await assert.rejects(moveProjectEntry(base, "src/collision", "docs"), { status: 409 });
+    assert.equal(await readFile(join(base, "src/collision"), "utf8"), "source");
+    assert.equal(await readFile(join(base, "docs/collision"), "utf8"), "destination");
+    await assert.rejects(moveProjectEntry(base, "src/dangling", "docs"), { status: 409 });
+    for (const [source, target, status] of [
+      ["", "docs", 400],
+      ["src", "src/nested", 400],
+      ["src", "src", 400],
+      ["src/collision", "src", 400],
+      ["../outside", "docs", 403],
+      ["/etc/passwd", "docs", 403],
+      ["src/collision", "../outside", 403],
+      ["src/collision", "alias", 403],
+      ["alias/collision", "other", 403],
+      ["src/collision", "external", 403],
+      ["src/collision", ".git", 403],
+      ["node_modules", "docs", 403],
+      ["src/./collision", "docs", 403],
+      ["src/collision", "src/dangling", 400],
+    ])
+      await assert.rejects(moveProjectEntry(base, source, target), { status });
+    await moveProjectEntry(base, "src", "other");
+    assert.ok((await lstat(join(base, "other/src/nested"))).isDirectory());
+    assert.equal(await readFile(join(base, "other/src/collision"), "utf8"), "source");
+    await writeFile(join(base, "docs/race"), "one");
+    await writeFile(join(base, "other/race"), "two");
+    const results = await Promise.allSettled([
+      moveProjectEntry(base, "docs/race", ""),
+      moveProjectEntry(base, "other/race", ""),
+    ]);
+    assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+    assert.equal(results.find((result) => result.status === "rejected").reason.status, 409);
+    const winner = await readFile(join(base, "race"), "utf8");
+    assert.equal(
+      await readFile(join(base, winner === "one" ? "other/race" : "docs/race"), "utf8"),
+      winner === "one" ? "two" : "one",
+    );
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
 test("workspace tree, bounded reading, traversal and symlink containment, literal search", async () => {
   try {
     await mkdir(join(root, "src"));
@@ -156,6 +235,27 @@ test("workspace HTTP routes resolve catalog projects and reject foreign origins 
     });
     assert.equal(foreignFolder, 403);
     assert.equal((await fetch(`${base}/api/projects/missing/workspace/tree`)).status, 404);
+    const move = (body, origin = base) =>
+      fetch(`${route}/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: origin },
+        body: JSON.stringify(body),
+      });
+    assert.equal(
+      (await move({ path: "sample.ts", directory: "projector" }, "https://foreign.test")).status,
+      403,
+    );
+    assert.equal((await move({ directory: "projector" })).status, 400);
+    assert.equal((await move({ path: "../sample.ts", directory: "projector" })).status, 403);
+    const moved = await move({ path: "sample.ts", directory: "projector" });
+    assert.equal(moved.status, 200);
+    assert.equal(moved.headers.get("cache-control"), "no-store");
+    assert.deepEqual(await moved.json(), {
+      source: "sample.ts",
+      destination: "projector/sample.ts",
+    });
+    assert.equal((await fetch(`${route}/file?path=projector/sample.ts`)).status, 200);
+    assert.equal((await fetch(`${route}/file?path=sample.ts`)).status, 400);
   } finally {
     await new Promise((resolve) => server.close(resolve));
     await rm(directory, { recursive: true, force: true });

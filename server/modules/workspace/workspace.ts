@@ -1,8 +1,9 @@
 import { execFile } from "node:child_process";
-import { open, readdir, realpath } from "node:fs/promises";
+import { lstat, open, readdir, realpath } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 import { HttpError } from "../http/index.ts";
+import { moveDestination } from "../../../core/modules/workspace/index.ts";
 import type {
   FileComparison,
   GitOverview,
@@ -73,6 +74,54 @@ export async function listProjectDirectory(root: string, path = "") {
     })),
     truncated: entries.length > 1000,
   };
+}
+export async function moveProjectEntry(root: string, path: string, directory: string) {
+  // Mutations only accept canonical visible tree entries, never symlink aliases.
+  for (const value of [path, directory]) {
+    validatePath(value);
+    if (value && value.split("/").some((part) => !part || part === "." || excluded.has(part)))
+      throw new HttpError(403, "Перенос доступен только для файлов дерева проекта");
+    if (value.includes("\\")) throw new HttpError(403, "Некорректный путь");
+  }
+  const destination = moveDestination(path, directory);
+  if (!destination) throw new HttpError(400, "Нельзя перенести в ту же папку или внутрь себя");
+  const base = await realpath(root);
+  const source = await location(base, path);
+  const targetDirectory = await location(base, directory);
+  if (source !== resolve(base, path) || targetDirectory !== resolve(base, directory))
+    throw new HttpError(403, "Перенос через символические ссылки недоступен");
+  const info = await lstat(source);
+  if (!info.isFile() && !info.isDirectory()) throw new HttpError(400, "Выберите файл или папку");
+  if (!(await lstat(targetDirectory)).isDirectory())
+    throw new HttpError(400, "Выберите папку назначения");
+  const target = resolve(base, destination);
+  const exists = async () =>
+    lstat(target).then(
+      () => true,
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return false;
+        throw error;
+      },
+    );
+  if (await exists()) throw new HttpError(409, "В папке назначения уже есть запись с таким именем");
+  try {
+    // GNU mv uses a no-replace rename, preventing overwrite even if a destination
+    // appears after the check. No copy fallback: a failed move leaves the source intact.
+    await exec("mv", ["--no-clobber", "--no-target-directory", "--no-copy", "--", source, target]);
+  } catch (error) {
+    if (await exists())
+      throw new HttpError(409, "В папке назначения уже есть запись с таким именем");
+    throw error;
+  }
+  const remains = await lstat(source).then(
+    () => true,
+    (error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return false;
+      throw error;
+    },
+  );
+  if (remains) throw new HttpError(409, "Не удалось перенести: запись назначения уже существует");
+  return { source: path, destination };
 }
 export async function searchProject(root: string, query: string) {
   if (!query.trim()) return { hits: [], truncated: false };
