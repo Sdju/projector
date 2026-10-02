@@ -54,7 +54,7 @@ class TrayMenu extends Interface {
   private actions: Map<number, () => void>;
   private items = new Map<number, Properties>([
     [0, { "children-display": new dbus.Variant("s", "submenu") }], [1, item("Открыть поиск")],
-    [2, item("Проекты")], [3, item("Настройки")], [4, { type: new dbus.Variant("s", "separator") }], [5, item("Выйти из Projector")],
+    [2, item("Проекты")], [3, item("Настройки")], [4, { type: new dbus.Variant("s", "separator") }], [6, item("Перезапустить")], [5, item("Выйти из Projector")],
   ]);
   constructor(actions: Map<number, () => void>) { super("com.canonical.dbusmenu"); this.actions = actions; }
   private properties(id: number, names: string[]): Properties {
@@ -63,7 +63,7 @@ class TrayMenu extends Interface {
     return Object.fromEntries(Object.entries(props).filter(([name]) => !names.length || names.includes(name)));
   }
   private layout(id: number, depth: number, names: string[]): Layout {
-    return [id, this.properties(id, names), id === 0 && depth !== 0 ? [1, 2, 3, 4, 5].map(child => new dbus.Variant("(ia{sv}av)", this.layout(child, depth - 1, names))) : []];
+    return [id, this.properties(id, names), id === 0 && depth !== 0 ? [1, 2, 3, 4, 6, 5].map(child => new dbus.Variant("(ia{sv}av)", this.layout(child, depth - 1, names))) : []];
   }
   GetLayout(id: number, depth: number, names: string[]) { return [1, this.layout(id, depth, names)]; }
   GetGroupProperties(ids: number[], names: string[]) { return ids.filter(id => this.items.has(id)).map(id => [id, this.properties(id, names)]); }
@@ -90,9 +90,9 @@ TrayMenu.configureMembers({
   signals: { LayoutUpdated: { signature: "ui" }, ItemsPropertiesUpdated: { signature: "a(ia{sv})a(ias)" } },
 });
 
-export async function startTray(bus: dbus.MessageBus, activate: () => void, openPage: (path: string) => void, quit: () => void) {
+export async function startTray(bus: dbus.MessageBus, activate: () => void, openPage: (path: string) => void, quit: () => void, restart: () => void) {
   const sni = new StatusNotifier(activate);
-  const menu = new TrayMenu(new Map([[1, activate], [2, () => openPage("/projects")], [3, () => openPage("/settings")], [5, quit]]));
+  const menu = new TrayMenu(new Map([[1, activate], [2, () => openPage("/projects")], [3, () => openPage("/settings")], [5, quit], [6, restart]]));
   bus.export("/StatusNotifierItem", sni);
   bus.export("/Menu", menu);
   const unwatch = await watchName(bus, "org.kde.StatusNotifierWatcher", async () => {

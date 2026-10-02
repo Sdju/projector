@@ -9,6 +9,7 @@ interface PaletteController {
   invokeSelected(toggle?: boolean): Promise<void>;
   openPage(path: string): void;
   quitProjector(): Promise<void>;
+  restartProjector(): Promise<void>;
 }
 export class Palette {
   private app: VioApp;
@@ -23,5 +24,6 @@ export class Palette {
   invokeSelected(toggle = false) { return this.controller.invokeSelected(toggle); }
   openPage(path: string) { this.controller.openPage(path); }
   quitProjector() { return this.controller.quitProjector(); }
+  restartProjector() { return this.controller.restartProjector(); }
   dispose() { this.app.unmount(); }
 }

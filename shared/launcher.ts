@@ -31,6 +31,7 @@ export function createLauncherClient(baseUrl = "") {
     hide: () => request<{ ok: boolean }>("/api/app/hide", {}),
     open: (toggle = false) => request<{ ok: boolean }>("/api/app/open", { toggle }),
     quit: () => request<{ ok: boolean }>("/api/app/quit", {}),
+    restart: () => request<{ ok: boolean }>("/api/app/restart", {}),
   };
 }
 export type LauncherClient = ReturnType<typeof createLauncherClient>;

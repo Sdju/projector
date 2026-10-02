@@ -83,6 +83,13 @@ async function quitProjector() {
   try { await client.quit(); }
   catch (error) { await show(); model.reportError(error); }
 }
+async function restartProjector() {
+  if (opening) return;
+  opening = true;
+  try { await client.restart(); }
+  catch (error) { await show(); model.reportError(error); }
+  finally { opening = false; }
+}
 function keyPressed(keyval: number) {
   if (keyval === Gdk.KEY_Escape) return hide();
   if (keyval === Gdk.KEY_Down || keyval === Gdk.KEY_Up) {
@@ -102,7 +109,7 @@ function keyPressed(keyval: number) {
 }
 function rowActivated(row: RowWidget) { void launch(row.getIndex()); }
 onUnmounted(() => { clearTimeout(blurTimer); unsubscribe(); model.dispose(); icons.clear(); });
-defineExpose({ show, hide, toggle, invokeSelected, openPage, quitProjector });
+defineExpose({ show, hide, toggle, invokeSelected, openPage, quitProjector, restartProjector });
 </script>
 
 <template>

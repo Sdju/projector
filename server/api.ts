@@ -18,6 +18,7 @@ import { pickFolder } from "./pick-folder.ts";
 import { basename } from "node:path";
 import { runInstallerAgent } from "./qwen/agent.ts";
 import { HttpError } from "./qwen/http.ts";
+import { restartProjector } from "./restart.ts";
 import {
   envFallbackFromProcess,
   loadPublicProviders,
@@ -303,6 +304,15 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
     if (path === "/api/app/hide" && method === "POST") {
       hidePalette();
       json(res, 200, { ok: true });
+      return true;
+    }
+
+    if (path === "/api/app/restart" && method === "POST") {
+      if (!terminalRequestAllowed(req, false))
+        throw new HttpError(403, "Перезапуск доступен только со страницы Projector");
+      await restartProjector(appUrl());
+      json(res, 200, { ok: true });
+      setTimeout(() => process.exit(0), 100).unref();
       return true;
     }
 

@@ -54,7 +54,13 @@ export async function runResident(baseUrl: string, action: DesktopAction) {
     try { return JSON.parse(await readFile(join(dataDir(), "launcher.json"), "utf8")).shortcut ?? "Ctrl+Alt+Space"; }
     catch { return "Ctrl+Alt+Space"; }
   }, () => { void palette.invokeSelected(true); });
-  const removeTray = await startTray(bus, () => { void palette.invokeSelected(); }, path => palette.openPage(path), () => { void palette.quitProjector(); });
+  const removeTray = await startTray(
+    bus,
+    () => { void palette.invokeSelected(); },
+    path => palette.openPage(path),
+    () => { void palette.quitProjector(); },
+    () => { void palette.restartProjector(); },
+  );
   await shortcut.start().catch(error => console.error("Хоткей:", error.message));
   async function stop() {
     if (stopping) return;
