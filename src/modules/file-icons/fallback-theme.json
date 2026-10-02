@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "name": "Projector Fallback",
+  "palette": { "muted": "#a6adc8", "blue": "#89b4fa" },
+  "icons": {
+    "file": { "src": "/file-icons/icons/file.svg", "color": "muted" },
+    "folder": { "src": "/file-icons/icons/folder.svg", "color": "blue" },
+    "folder-open": { "src": "/file-icons/icons/folder-open.svg", "color": "blue" }
+  },
+  "defaults": { "file": "file", "directory": "folder", "expandedDirectory": "folder-open" },
+  "rules": []
+}

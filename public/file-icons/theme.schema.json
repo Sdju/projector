@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "palette": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^#[\\da-f]{6}$"
+      }
+    },
+    "icons": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "src": {
+            "type": "string",
+            "pattern": "^\\/file-icons\\/(?:[\\w-]+\\/)*[\\w.-]+\\.svg$"
+          },
+          "color": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["src", "color"],
+        "additionalProperties": false
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "directory": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expandedDirectory": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["file", "directory", "expandedDirectory"],
+      "additionalProperties": false
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["file", "directory"]
+          },
+          "names": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          },
+          "extensions": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          },
+          "patterns": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          },
+          "paths": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          },
+          "caseSensitive": {
+            "type": "boolean"
+          },
+          "icon": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expandedIcon": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["id", "kind", "icon"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["version", "name", "palette", "icons", "defaults", "rules"],
+  "additionalProperties": false
+}
