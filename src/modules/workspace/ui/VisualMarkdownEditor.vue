@@ -180,12 +180,21 @@ function setContent(content: string) {
   }
 }
 watch(() => props.content, setContent);
-function followLink(event: MouseEvent) {
-  const link = (event.target as HTMLElement).closest("a");
-  if (!link) return;
-  // A normal click positions the caret; Ctrl/Cmd+click follows the link.
+function linkMouseDown(event: MouseEvent) {
+  if (event.button !== 0 || (!event.ctrlKey && !event.metaKey)) return;
+  if (!(event.target instanceof Element) || !event.target.closest("a")) return;
+  // Keep the editor selection and its floating link tooltip in place until click.
   event.preventDefault();
-  if (!event.ctrlKey && !event.metaKey) return;
+  event.stopPropagation();
+}
+function followLink(event: MouseEvent) {
+  if (!(event.target instanceof Element) || event.button !== 0) return;
+  const link = event.target.closest("a");
+  if (!link) return;
+  // Document text stays editable; the floating preview is already a navigation control.
+  event.preventDefault();
+  if (!event.ctrlKey && !event.metaKey && !link.closest(".milkdown-link-preview")) return;
+  event.stopPropagation();
   const href = link.getAttribute("href") ?? "";
   const path = link.dataset.workspacePath ?? markdownPath(href, props.path);
   if (path) emit("open", path);
@@ -201,7 +210,8 @@ function followLink(event: MouseEvent) {
           .replace(/\s+/g, "-") === slug,
     );
     heading?.scrollIntoView({ block: "start", behavior: "smooth" });
-  } else if (/^https?:|^mailto:/i.test(href)) window.open(href, "_blank", "noopener,noreferrer");
+  } else if (/^(https?:|mailto:|\/\/)/i.test(href))
+    window.open(href, "_blank", "noopener,noreferrer");
 }
 onBeforeUnmount(() => {
   disposed = true;
@@ -211,7 +221,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="visual-markdown" @click="followLink">
+  <div class="visual-markdown" @mousedown.capture="linkMouseDown" @click.capture="followLink">
     <p v-if="loading" class="editor-loading" role="status">Открываю документ…</p>
     <div ref="root" class="visual-markdown-root" />
   </div>
