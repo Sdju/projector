@@ -8,6 +8,7 @@ export { default as PathBar } from "./ui/PathBar.vue";
 
 export { pickFolder } from "./api/client.ts";
 export { previewIconUrl } from "./api/client.ts";
+export { projectIconUrl } from "./api/client.ts";
 
 export { shortPath } from "./format.ts";
 export { projectRoute, projectPathFromParams } from "./project-route.ts";

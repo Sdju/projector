@@ -66,7 +66,6 @@ function showSearch() {
   focusSearch();
 }
 onMounted(() => {
-  document.title = "Projector — поиск";
   focusSearch();
   window.addEventListener("focus", focusSearch);
   window.addEventListener("projector:show", showSearch);

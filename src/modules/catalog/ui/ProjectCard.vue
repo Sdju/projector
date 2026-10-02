@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { projectIconUrl } from "../api/client.ts";
 import { shortPath, statusLabel } from "../format.ts";
 import type { Project } from "../model/types.ts";
 
@@ -15,7 +16,7 @@ const busy = computed(() => status.value === "running" || status.value === "star
   <article class="card" :class="status">
     <div class="top">
       <span class="dot" :class="status" />
-      <img class="icon" :src="`/api/projects/${project.id}/icon`" alt="" />
+      <img class="icon" :src="projectIconUrl(project)" alt="" />
       <h2>{{ project.name }}</h2>
       <p class="path">{{ shortPath(project.path) }}</p>
       <span class="meta">{{ statusLabel(status) }}</span>

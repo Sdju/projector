@@ -5,9 +5,11 @@ import {
   PathBar,
   useProjects,
   projectRoute,
-  projectPathFromParams,
+  projectIconUrl,
+  type Project,
 } from "../../modules/catalog/index.ts";
 
+defineProps<{ currentProject?: Project }>();
 const { projects } = useProjects();
 const route = useRoute();
 const router = useRouter();
@@ -15,13 +17,6 @@ const running = computed(
   () => projects.value.filter((item) => item.runtime?.status === "running").length,
 );
 
-const currentProject = computed(() =>
-  route.name === "project"
-    ? projects.value.find(
-        (project) => project.path === projectPathFromParams(route.params.projectPath),
-      )
-    : undefined,
-);
 async function navigatePath(path: string) {
   await router.push(projectRoute(path));
 }
@@ -35,7 +30,21 @@ async function navigatePath(path: string) {
     @drop.prevent
   >
     <header class="top">
-      <router-link class="brand" to="/">projector</router-link>
+      <router-link
+        class="brand"
+        :class="{ 'project-brand': currentProject }"
+        to="/"
+        :title="currentProject ? `${currentProject.name} — открыть поиск` : 'Открыть поиск'"
+      >
+        <img
+          v-if="currentProject"
+          :src="projectIconUrl(currentProject)"
+          alt=""
+          width="22"
+          height="22"
+        />
+        <span>{{ currentProject?.name ?? "projector" }}</span>
+      </router-link>
       <PathBar
         v-if="currentProject"
         :key="currentProject.id"
@@ -77,11 +86,36 @@ async function navigatePath(path: string) {
 }
 
 .brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex-shrink: 0;
   font-size: 12px;
   letter-spacing: 0.16em;
   text-transform: lowercase;
   color: var(--muted);
+}
+
+.brand.project-brand {
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: min(30vw, 320px);
+  font-size: 14px;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--text);
+}
+
+.brand span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brand img {
+  flex-shrink: 0;
+  object-fit: contain;
+  border-radius: 4px;
 }
 
 .nav {

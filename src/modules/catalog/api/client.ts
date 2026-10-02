@@ -49,6 +49,15 @@ export function previewIconUrl(path: string): string {
   return `/api/preview-icon?path=${encodeURIComponent(path)}`;
 }
 
+export function projectIconUrl(project: Project): string {
+  const revision = new URLSearchParams({
+    path: project.path,
+    name: project.name,
+    icon: project.icon ?? "",
+  });
+  return `/api/projects/${encodeURIComponent(project.id)}/icon?${revision}`;
+}
+
 export async function fetchDirectories(
   path: string,
   complete = false,

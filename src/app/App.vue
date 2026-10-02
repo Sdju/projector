@@ -1,17 +1,42 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from "vue";
+import { computed, onMounted, onUnmounted, watchEffect } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { isLauncherWindow } from "../modules/launcher/index.ts";
-import { useProjects } from "../modules/catalog/index.ts";
+import { useProjects, projectPathFromParams, projectIconUrl } from "../modules/catalog/index.ts";
 import { useRunner } from "../modules/runner/index.ts";
 import { CommandPalette, provideIdeCommands } from "../modules/ide/index.ts";
 import AppShell from "./layouts/AppShell.vue";
 
 const { error: commandError } = provideIdeCommands();
-const { load } = useProjects();
+const { load, projects } = useProjects();
 const { connect } = useRunner();
 const route = useRoute();
 const router = useRouter();
+const currentProject = computed(() =>
+  route.name === "project"
+    ? projects.value.find(
+        (project) => project.path === projectPathFromParams(route.params.projectPath),
+      )
+    : undefined,
+);
+watchEffect(() => {
+  const project = currentProject.value;
+  const page =
+    route.name === "launcher"
+      ? "поиск"
+      : route.name === "home"
+        ? "проекты"
+        : route.name === "settings"
+          ? "настройки"
+          : "проект";
+  document.title = project ? `${project.name} — Projector` : `Projector — ${page}`;
+  const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+  if (favicon) {
+    // The project endpoint can return SVG, ICO, PNG or another image format.
+    favicon.removeAttribute("type");
+    favicon.href = project ? projectIconUrl(project) : "/favicon.svg";
+  }
+});
 let blurTimer: ReturnType<typeof setTimeout> | undefined;
 function cancelHide() {
   clearTimeout(blurTimer);
@@ -50,7 +75,7 @@ onUnmounted(() => {
     {{ commandError }}<button aria-label="Закрыть сообщение" @click="commandError = ''">×</button>
   </div>
   <router-view v-if="route.name === 'launcher'" />
-  <AppShell v-else>
+  <AppShell v-else :current-project="currentProject">
     <router-view />
   </AppShell>
 </template>
