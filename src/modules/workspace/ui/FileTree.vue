@@ -139,7 +139,7 @@ async function drop(event: DragEvent, entry?: FileEntry) {
     class="tree"
     :class="{ 'tree-root': depth === 0, 'root-target': depth === 0 && target === '' }"
     :aria-label="path || 'Файлы проекта'"
-    :aria-busy="busy"
+    :aria-busy="busy || loading"
     @dragover.stop="dragOver($event)"
     @drop.stop="drop($event)"
     @dragleave="dragLeave"
@@ -155,7 +155,6 @@ async function drop(event: DragEvent, entry?: FileEntry) {
     <li v-if="depth === 0 && busy" class="notice" role="status">перенос…</li>
     <li v-if="depth === 0 && moveError" class="notice error" role="alert">{{ moveError }}</li>
     <li v-if="depth === 0 && message" class="notice" role="status">{{ message }}</li>
-    <li v-if="loading" class="notice">загрузка…</li>
     <li v-if="error" class="notice error" role="alert">{{ error }}</li>
     <li v-if="depth === 0 && themeError" class="notice error" role="status">{{ themeError }}</li>
     <li v-for="{ entry, icon } in rows" :key="entry.path">
@@ -196,7 +195,6 @@ async function drop(event: DragEvent, entry?: FileEntry) {
         @moved="(source, destination) => emit('moved', source, destination)"
       />
     </li>
-    <li v-if="!loading && !error && !entries.length" class="notice">пустая папка</li>
     <li v-if="truncated" class="notice">показаны первые 1000 записей</li>
     <li v-if="depth === 0" class="root-space" aria-hidden="true"></li>
   </ul>
