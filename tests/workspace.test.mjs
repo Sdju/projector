@@ -534,3 +534,29 @@ test("path bar lists real directories and symlinks, completes prefixes and rejec
     await rm(base, { recursive: true, force: true });
   }
 });
+
+test("Git tree backgrounds aggregate nested changes, renames, deletions and conflicts without prefix collisions", async () => {
+  const { gitTreeDecorations } = await import("../core/modules/workspace/index.ts");
+  const change = (path, index = " ", worktree = "M", originalPath) => ({ path, index, worktree, originalPath });
+  const changes = [change("src/deep/edit.ts"), change("src/new.ts", "?", "?"), change("src-other/clean.ts", " ", " "),
+    change("new/folder/file.txt", "A", "M"), change("deleted/old.txt", "D", " "),
+    change("destination/moved.ts", "R", " ", "source/moved.ts"), change("conflicts/a.txt", "U", "U"),
+    change("conflicts/b.txt", "?", "?"), change("ignored/file", "!", "!")];
+  const before = structuredClone(changes);
+  const decorations = gitTreeDecorations(changes);
+  assert.equal(decorations.get("src"), "modified");
+  assert.equal(decorations.get("src/deep"), "modified");
+  assert.equal(decorations.get("src/deep/edit.ts"), "modified");
+  assert.equal(decorations.get("src/new.ts"), "added");
+  assert.equal(decorations.has("src-other"), false);
+  assert.equal(decorations.get("new/folder"), "added");
+  assert.equal(decorations.get("deleted"), "deleted");
+  assert.equal(decorations.get("source"), "deleted");
+  assert.equal(decorations.get("destination"), "modified");
+  assert.equal(decorations.get("conflicts"), "conflict");
+  assert.equal(decorations.has("ignored"), false);
+  assert.equal(gitTreeDecorations([change("file", "A", "A")]).get("file"), "conflict");
+  assert.equal(gitTreeDecorations([change("file", "D", "D")]).get("file"), "conflict");
+  assert.equal(gitTreeDecorations([]).size, 0);
+  assert.deepEqual(changes, before);
+});

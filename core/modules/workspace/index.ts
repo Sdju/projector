@@ -5,3 +5,5 @@ export type { FileEntry } from "./contract.ts";
 export type { FileContent } from "./contract.ts";
 export type { ArchiveContent, ArchiveEntry } from "./contract.ts";
 export { parentPath, moveDestination, relocatedPath } from "./paths.ts";
+export { gitTreeDecorations } from "./git-decorations.ts";
+export type { GitDecoration } from "./git-decorations.ts";
