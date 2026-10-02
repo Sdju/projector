@@ -565,6 +565,7 @@ watch(
   () => {
     ++fileGeneration;
     ++gitGeneration;
+    git.value = { available: false, branch: "", changes: [] };
     ++searchGeneration;
     searchAbort?.abort();
     clearTimeout(searchTimer);
@@ -686,6 +687,7 @@ onBeforeUnmount(() => {
           :project-id="projectId"
           :selected="active?.path ?? ''"
           :revision="revision"
+          :git-changes="git.changes"
           @open="openFile($event)"
           @moved="entryMoved"
         />

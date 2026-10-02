@@ -1,5 +1,15 @@
 <script setup lang="ts">
-import { computed, inject, nextTick, onBeforeUnmount, provide, ref, useId, watch } from "vue";
+import {
+  computed,
+  inject,
+  nextTick,
+  onBeforeUnmount,
+  provide,
+  ref,
+  useId,
+  watch,
+  type ComputedRef,
+} from "vue";
 import { useCommandScope, commandArgs } from "../../../common/utilities/commands.ts";
 import ContextMenu from "../../../common/ui/ContextMenu.vue";
 import EntryDialog from "../../../common/ui/EntryDialog.vue";
@@ -16,6 +26,9 @@ import {
   topLevelTreePaths,
 } from "../tree-selection.ts";
 import {
+  gitTreeDecorations,
+  type GitDecoration,
+  type GitOverview,
   moveDestination,
   parentPath,
   relocatedPath,
@@ -28,6 +41,7 @@ const props = withDefaults(
     selected: string;
     depth?: number;
     revision: number;
+    gitChanges?: GitOverview["changes"];
     beforeChange?: (path: string) => Promise<boolean>;
   }>(),
   { path: "", depth: 0 },
@@ -39,6 +53,17 @@ const emit = defineEmits<{
   deleted: [path: string];
 }>();
 const entries = ref<FileEntry[]>([]);
+const gitDecorations =
+  props.depth === 0
+    ? computed(() => gitTreeDecorations(props.gitChanges ?? []))
+    : inject<ComputedRef<Map<string, GitDecoration>>>("workspace-tree-git")!;
+if (props.depth === 0) provide("workspace-tree-git", gitDecorations);
+const gitLabels: Record<GitDecoration, string> = {
+  added: "Новые записи Git",
+  modified: "Есть изменения Git",
+  deleted: "Удалённые записи Git",
+  conflict: "Конфликт Git",
+};
 const drag = props.depth === 0 ? createTreeDrag() : inject(treeDragKey)!;
 if (props.depth === 0) provide(treeDragKey, drag);
 const selection = props.depth === 0 ? createTreeSelection() : inject(treeSelectionKey)!;
@@ -537,6 +562,7 @@ const { resolver, error: themeError } = useFileIconTheme();
 const rows = computed(() =>
   entries.value.map((entry) => ({
     entry,
+    decoration: gitDecorations.value.get(entry.path),
     icon: resolver.value.resolve(entry, expanded.value.has(entry.path)),
   })),
 );
@@ -709,17 +735,19 @@ defineExpose({ reveal });
     <li v-if="depth === 0 && message" class="notice" role="status">{{ message }}</li>
     <li v-if="error" class="notice error" role="alert">{{ error }}</li>
     <li v-if="depth === 0 && themeError" class="notice error" role="status">{{ themeError }}</li>
-    <li v-for="{ entry, icon } in rows" :key="entry.path" role="none">
+    <li v-for="{ entry, icon, decoration } in rows" :key="entry.path" role="none">
       <button
         :class="{
+          'git-changed': !!decoration,
           selected: selection.paths.value.has(entry.path),
           dragging: selection.dragged.value.includes(entry.path) && !!source,
           'drop-target': entry.directory && target === entry.path,
         }"
         :draggable="!busy"
         :data-path="entry.path"
+        :data-git-status="decoration"
         :style="{ paddingLeft: `${12 + depth * 14}px` }"
-        :title="entry.path"
+        :title="decoration ? `${entry.path} · ${gitLabels[decoration]}` : entry.path"
         :aria-selected="selection.paths.value.has(entry.path)"
         role="treeitem"
         :aria-level="depth + 1"
@@ -807,6 +835,22 @@ button {
   text-align: left;
   padding: 5px 10px;
   color: var(--muted);
+}
+button.git-changed {
+  --git-tint: #d6b46f;
+  box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--git-tint) 11%, transparent);
+}
+button[data-git-status="added"] {
+  --git-tint: var(--run);
+}
+button[data-git-status="deleted"] {
+  --git-tint: var(--err);
+}
+button[data-git-status="conflict"] {
+  --git-tint: #e58e80;
+}
+button.git-changed.selected {
+  box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--git-tint) 18%, transparent);
 }
 button:hover {
   background: var(--bg-2);
