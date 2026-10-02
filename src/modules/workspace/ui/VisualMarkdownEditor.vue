@@ -249,7 +249,8 @@ onBeforeUnmount(() => {
   --crepe-color-surface-low: #20201c;
   --crepe-color-on-surface: var(--text);
   --crepe-color-on-surface-variant: var(--muted);
-  --crepe-color-outline: var(--line);
+  /* Crepe also uses outline for icons, input carets and drag handles. */
+  --crepe-color-outline: #b8b8ae;
   --crepe-color-primary: #a4c7e8;
   --crepe-color-secondary: #30302b;
   --crepe-color-on-secondary: var(--text);
@@ -271,6 +272,9 @@ onBeforeUnmount(() => {
   padding: 28px clamp(32px, 4vw, 56px) 80px;
   line-height: 1.8;
   outline: none;
+}
+.visual-markdown :deep(.ProseMirror-focused) {
+  --prosemirror-virtual-cursor-color: var(--text);
 }
 .visual-markdown :deep(.ProseMirror h1),
 .visual-markdown :deep(.ProseMirror h2) {
