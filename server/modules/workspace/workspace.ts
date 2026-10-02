@@ -2,16 +2,20 @@ import { execFile } from "node:child_process";
 import { lstat, open, readdir, realpath } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
+import { fileURLToPath } from "node:url";
 import { HttpError } from "../http/index.ts";
 import { moveDestination } from "../../../core/modules/workspace/index.ts";
 import type {
   FileComparison,
   GitOverview,
   SearchHit,
+  FileContent,
+  ArchiveContent,
 } from "../../../core/modules/workspace/index.ts";
 
 const exec = promisify(execFile);
 const MAX_BYTES = 1024 * 1024;
+const archiveHelper = fileURLToPath(new URL("./archive.py", import.meta.url));
 const excluded = new Set([
   ".git",
   "node_modules",
@@ -58,6 +62,28 @@ export async function readProjectFile(root: string, path: string) {
   } finally {
     await file.close();
   }
+}
+export async function previewProjectFile(root: string, path: string): Promise<FileContent> {
+  if (!/\.(?:tar|tgz|gz|gzip|bz2|tbz2?|xz|txz|zip)$/i.test(path))
+    return readProjectFile(root, path);
+  const full = await location(root, path);
+  const info = await lstat(full);
+  if (!info.isFile()) throw new HttpError(400, "Выберите файл");
+  let stdout: string;
+  try {
+    ({ stdout } = await exec("python3", ["-I", archiveHelper, full, path], {
+      timeout: 15000,
+      maxBuffer: 8 * MAX_BYTES,
+      env: { ...process.env, PYTHONNOUSERSITE: "1" },
+    }));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT")
+      throw new HttpError(503, "Для просмотра архивов нужен Python 3");
+    throw new HttpError(413, "Архив слишком большой или превышено время просмотра");
+  }
+  const data = JSON.parse(stdout) as ArchiveContent & { error?: string; status?: number };
+  if (data.error) throw new HttpError(data.status ?? 422, data.error);
+  return { path, content: "", archive: data };
 }
 export async function listProjectDirectory(root: string, path = "") {
   const full = await location(root, path);

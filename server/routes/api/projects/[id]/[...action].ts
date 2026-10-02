@@ -19,7 +19,7 @@ import {
 } from "../../../../modules/terminal/index.ts";
 import {
   listProjectDirectory,
-  readProjectFile,
+  previewProjectFile,
   searchProject,
   projectGit,
   projectComparison,
@@ -72,7 +72,8 @@ export async function handleProjectsProjectActions({
       res.setHeader("Cache-Control", "no-store");
       const filePath = url.searchParams.get("path") ?? "";
       if (sessionId === "tree") json(res, 200, await listProjectDirectory(project.path, filePath));
-      else if (sessionId === "file") json(res, 200, await readProjectFile(project.path, filePath));
+      else if (sessionId === "file")
+        json(res, 200, await previewProjectFile(project.path, filePath));
       else if (sessionId === "search")
         json(res, 200, await searchProject(project.path, url.searchParams.get("q") ?? ""));
       else if (sessionId === "git") json(res, 200, await projectGit(project.path));

@@ -4,6 +4,7 @@ import { workspaceRequest } from "../api.ts";
 import { relocatedPath } from "../../../../core/modules/workspace/index.ts";
 import FileTree from "./FileTree.vue";
 import GitChangesTree from "./GitChangesTree.vue";
+import ArchiveViewer from "./ArchiveViewer.vue";
 import IconSettings from "~icons/lucide/settings";
 import IconRefresh from "~icons/lucide/rotate-cw";
 import { TerminalPane } from "../../terminal/index.ts";
@@ -154,6 +155,7 @@ async function openFile(path: string, line?: number, column?: number, staged?: b
     const file: OpenFile = {
       path,
       content: "modified" in data ? data.modified : data.content,
+      archive: "archive" in data ? data.archive : undefined,
       original: "original" in data ? data.original : undefined,
       staged,
       line,
@@ -437,8 +439,9 @@ onBeforeUnmount(() => {
       <p v-if="fileError" class="file-error" role="alert">{{ fileError }}</p>
       <div class="editor-body" :aria-busy="loading">
         <p v-if="loading" class="loading" role="status">читаю файл…</p>
+        <ArchiveViewer v-if="active?.archive" :key="active.key" :archive="active.archive" />
         <CodeViewer
-          v-if="active"
+          v-else-if="active"
           :path="active.path"
           :content="active.content"
           :original="active.original"

@@ -7,6 +7,20 @@ export interface FileEntry {
 export interface FileContent {
   path: string;
   content: string;
+  archive?: ArchiveContent;
+}
+export interface ArchiveEntry {
+  path: string;
+  type: "file" | "directory" | "symlink" | "hardlink" | "other";
+  size: number;
+  modified?: string;
+  link?: string;
+}
+export interface ArchiveContent {
+  format: string;
+  size: number;
+  entries: ArchiveEntry[];
+  truncated: boolean;
 }
 export interface SearchHit {
   path: string;

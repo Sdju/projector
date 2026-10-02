@@ -208,6 +208,8 @@ test("workspace HTTP routes resolve catalog projects and reject foreign origins 
   process.env.XDG_DATA_HOME = directory;
   await mkdir(join(directory, "projector"));
   await writeFile(join(directory, "sample.ts"), "const sample = true;\n");
+  const { gzipSync } = await import("node:zlib");
+  await writeFile(join(directory, "sample.ts.gz"), gzipSync("const sample = true;\n"));
   await writeFile(
     join(directory, "projector/projects.json"),
     JSON.stringify({
@@ -231,6 +233,12 @@ test("workspace HTTP routes resolve catalog projects and reject foreign origins 
     assert.equal(file.status, 200);
     assert.equal(file.headers.get("cache-control"), "no-store");
     assert.equal((await file.json()).content, "const sample = true;\n");
+    const archive = await fetch(`${route}/file?path=sample.ts.gz`);
+    assert.equal(archive.status, 200);
+    assert.equal(archive.headers.get("cache-control"), "no-store");
+    const preview = await archive.json();
+    assert.equal(preview.archive.format, "GZIP");
+    assert.deepEqual(preview.archive.entries, [{ path: "sample.ts", type: "file", size: 21 }]);
     assert.ok(
       (await (await fetch(`${route}/tree`)).json()).entries.some(
         (entry) => entry.path === "sample.ts",
