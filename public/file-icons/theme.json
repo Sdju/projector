@@ -199,6 +199,10 @@
     "ignore": {
       "src": "/file-icons/icons/ignore.svg",
       "color": "muted"
+    },
+    "executable": {
+      "src": "/file-icons/icons/executable.svg",
+      "color": "green"
     }
   },
   "defaults": {
@@ -208,15 +212,36 @@
   },
   "rules": [
     {
+      "id": "file-executable",
+      "kind": "file",
+      "executable": true,
+      "icon": "executable"
+    },
+    {
       "id": "directory-source-1",
       "kind": "directory",
-      "names": ["src", "source", "lib", "shared", "server", "app", "native"],
+      "names": [
+        "src",
+        "source",
+        "lib",
+        "shared",
+        "server",
+        "app",
+        "native",
+        "core",
+        "client",
+        "frontend",
+        "backend",
+        "pages",
+        "routes",
+        "api"
+      ],
       "icon": "source"
     },
     {
       "id": "directory-components-2",
       "kind": "directory",
-      "names": ["components", "ui", "modules", "packages"],
+      "names": ["components", "ui", "modules", "packages", "workspace", "features", "common"],
       "icon": "components"
     },
     {
@@ -228,7 +253,17 @@
     {
       "id": "directory-assets-4",
       "kind": "directory",
-      "names": ["assets", "public", "images", "media", "audio", "fonts"],
+      "names": [
+        "assets",
+        "public",
+        "images",
+        "media",
+        "audio",
+        "fonts",
+        "resources",
+        "icons",
+        "static"
+      ],
       "icon": "assets"
     },
     {
@@ -248,6 +283,18 @@
       "kind": "directory",
       "names": ["node_modules", "dist", "build", "vendor"],
       "icon": "package"
+    },
+    {
+      "id": "directory-docs",
+      "kind": "directory",
+      "names": ["docs", "doc", "documentation"],
+      "icon": "markdown"
+    },
+    {
+      "id": "directory-tools",
+      "kind": "directory",
+      "names": ["scripts", "bin", "cli", "tools"],
+      "icon": "shell"
     },
     {
       "id": "file-package-8",

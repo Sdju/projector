@@ -2,6 +2,7 @@ export interface FileEntry {
   name: string;
   path: string;
   directory: boolean;
+  executable?: boolean;
 }
 export interface FileContent {
   path: string;
@@ -18,6 +19,7 @@ export interface GitChange {
   originalPath?: string;
   index: string;
   worktree: string;
+  executable?: boolean;
 }
 export interface GitOverview {
   available: boolean;

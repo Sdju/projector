@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdtemp, mkdir, writeFile, rm, symlink, readFile, lstat } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, rm, symlink, readFile, lstat, chmod } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
@@ -15,6 +15,52 @@ import {
 import { moveDestination, parentPath, relocatedPath } from "../core/modules/workspace/index.ts";
 const root = await mkdtemp(join(tmpdir(), "projector-workspace-"));
 const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
+test("file tree and Git changes report execute bits for files, including chmod-only changes", async () => {
+  const base = await mkdtemp(join(tmpdir(), "projector-executable-"));
+  const runGit = (...args) => execFileSync("git", ["-C", base, ...args]);
+  try {
+    await mkdir(join(base, "folder"), { mode: 0o755 });
+    for (const [name, mode] of [
+      ["plain.ts", 0o644],
+      ["run", 0o755],
+      ["group-only", 0o610],
+      ["other-only", 0o601],
+    ]) {
+      await writeFile(join(base, name), "test\n");
+      await chmod(join(base, name), mode);
+    }
+    const entries = (await listProjectDirectory(base)).entries;
+    assert.equal(entries.find((entry) => entry.name === "folder").executable, false);
+    assert.equal(entries.find((entry) => entry.name === "plain.ts").executable, false);
+    for (const name of ["run", "group-only", "other-only"])
+      assert.equal(entries.find((entry) => entry.name === name).executable, true, name);
+    runGit("init", "-q");
+    const untracked = (await projectGit(base)).changes;
+    assert.equal(untracked.find((entry) => entry.path === "run").executable, true);
+    runGit("config", "user.name", "Test");
+    runGit("config", "user.email", "test@example.test");
+    runGit("config", "core.filemode", "true");
+    runGit("add", "plain.ts");
+    runGit("commit", "-qm", "initial");
+    await chmod(join(base, "plain.ts"), 0o755);
+    assert.equal(
+      (await projectGit(base)).changes.find((entry) => entry.path === "plain.ts").executable,
+      true,
+    );
+    await chmod(join(base, "run"), 0o644);
+    assert.equal(
+      (await listProjectDirectory(base)).entries.find((entry) => entry.name === "run").executable,
+      false,
+    );
+    await rm(join(base, "plain.ts"));
+    assert.equal(
+      (await projectGit(base)).changes.find((entry) => entry.path === "plain.ts").executable,
+      false,
+    );
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
 test("tree move destinations and open-file paths respect directory boundaries", () => {
   assert.equal(parentPath("src/nested/file.ts"), "src/nested");
   assert.equal(parentPath("file.ts"), "");

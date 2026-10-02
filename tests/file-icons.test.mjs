@@ -8,6 +8,27 @@ const theme = JSON.parse(
 );
 const resolver = createFileIconResolver(theme);
 const entry = (name, directory = false, path = name) => ({ name, directory, path });
+test("executable files take priority over names and extensions; directories keep folder icons", () => {
+  for (const name of ["run", "package.json", "script.ts", "test.spec.ts"])
+    assert.equal(resolver.resolve({ ...entry(name), executable: true }).id, "executable", name);
+  assert.equal(resolver.resolve({ ...entry("script.ts"), executable: false }).id, "typescript");
+  assert.equal(resolver.resolve({ ...entry("src", true), executable: true }).id, "folder");
+  const custom = structuredClone(theme);
+  custom.rules.unshift({
+    id: "executable-typescript",
+    kind: "file",
+    extensions: ["ts"],
+    executable: true,
+    icon: "shell",
+  });
+  const resolve = createFileIconResolver(custom).resolve;
+  assert.equal(resolve({ ...entry("script.ts"), executable: true }).id, "shell");
+  assert.equal(resolve(entry("script.ts")).id, "typescript");
+  assert.equal(resolve({ ...entry("run"), executable: true }).id, "executable");
+  custom.rules[0].kind = "directory";
+  delete custom.rules[0].extensions;
+  assert.throws(() => createFileIconResolver(custom));
+});
 
 test("shipped theme covers specific names, dotfiles, compound suffixes and common languages", () => {
   for (const [name, id] of [
@@ -34,7 +55,8 @@ test("shipped theme covers specific names, dotfiles, compound suffixes and commo
 
 test("directories never match file rules; expansion uses configured fallback and category colors", () => {
   assert.equal(resolver.resolve(entry("image.png", true)).id, "folder");
-  assert.equal(resolver.resolve(entry("src", true)).id, "source");
+  assert.equal(resolver.resolve(entry("src", true)).id, "folder");
+  assert.equal(resolver.resolve(entry("src", true)).badge.id, "source");
   assert.equal(resolver.resolve(entry("unknown", true), true).id, "folder-open");
   const custom = structuredClone(theme);
   custom.rules.unshift({
@@ -45,10 +67,34 @@ test("directories never match file rules; expansion uses configured fallback and
   });
   const resolve = createFileIconResolver(custom).resolve;
   assert.equal(resolve(entry("docs", true), true).color, theme.palette.lavender);
+  assert.equal(resolve(entry("docs", true), true).badge.color, theme.palette.lavender);
   custom.rules[0].expandedIcon = "image";
   const expanded = createFileIconResolver(custom).resolve(entry("docs", true), true);
-  assert.equal(expanded.id, "image");
+  assert.equal(expanded.id, "folder-open");
+  assert.equal(expanded.badge.id, "image");
   assert.equal(expanded.color, theme.palette.pink);
+  assert.equal(expanded.badge.color, theme.palette.pink);
+});
+
+test("directory badges survive expansion, while ordinary folders and files have no badge", () => {
+  for (const [name, badge] of [
+    ["src", "source"],
+    ["ui", "components"],
+    ["tests", "tests"],
+    ["public", "assets"],
+    ["docs", "markdown"],
+    ["scripts", "shell"],
+  ]) {
+    const closed = resolver.resolve(entry(name, true));
+    const opened = resolver.resolve(entry(name, true), true);
+    assert.equal(closed.id, "folder", name);
+    assert.equal(opened.id, "folder-open", name);
+    assert.equal(closed.badge.id, badge, name);
+    assert.deepEqual(opened.badge, closed.badge, name);
+  }
+  assert.equal(resolver.resolve(entry("unknown", true)).badge, undefined);
+  assert.equal(resolver.resolve(entry("unknown", true), true).badge, undefined);
+  assert.equal(resolver.resolve(entry("test.spec.ts")).badge, undefined);
 });
 
 test("first matching rule wins and new types work entirely through configuration", () => {

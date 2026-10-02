@@ -12,12 +12,23 @@ const ruleSchema = z
     patterns: names.optional(),
     paths: names.optional(),
     caseSensitive: z.boolean().optional(),
+    executable: z.boolean().optional(),
     icon: iconId,
     expandedIcon: iconId.optional(),
   })
-  .refine((rule) => Boolean(rule.names || rule.extensions || rule.patterns || rule.paths), {
-    message: "A rule needs names, extensions, patterns or paths",
-  });
+  .refine(
+    (rule) =>
+      Boolean(
+        rule.names ||
+        rule.extensions ||
+        rule.patterns ||
+        rule.paths ||
+        rule.executable !== undefined,
+      ),
+    {
+      message: "A rule needs names, extensions, patterns, paths or executable",
+    },
+  );
 
 export const fileIconThemeSchema = z
   .strictObject({
@@ -70,6 +81,12 @@ export const fileIconThemeSchema = z
           path: ["rules", index, "extensions"],
           message: "Extensions only apply to files",
         });
+      if (rule.kind === "directory" && rule.executable !== undefined)
+        context.addIssue({
+          code: "custom",
+          path: ["rules", index, "executable"],
+          message: "Executable only applies to files",
+        });
     });
   });
 
@@ -78,12 +95,14 @@ export interface IconEntry {
   name: string;
   path: string;
   directory: boolean;
+  executable?: boolean;
 }
 export interface ResolvedFileIcon {
   id: string;
   src: string;
   color: string;
   ruleId?: string;
+  badge?: { id: string; src: string; color: string };
 }
 
 // * and ? stay inside a path segment; ** crosses folders; **/ also matches zero folders.
@@ -117,9 +136,15 @@ export function createFileIconResolver(input: unknown) {
       rule,
       matches(entry: IconEntry) {
         if (entry.directory !== (rule.kind === "directory")) return false;
+        if (rule.executable !== undefined && rule.executable !== !!entry.executable) return false;
         const name = normalize(entry.name);
         const path = entry.path.replaceAll("\\", "/").replace(/^\.\//, "");
         return (
+          (rule.executable !== undefined &&
+            !rule.names &&
+            !rule.extensions &&
+            !rule.patterns &&
+            !rule.paths) ||
           names.has(name) ||
           extensions?.some((ext) => name.length > ext.length + 1 && name.endsWith(`.${ext}`)) ||
           patterns?.some((pattern) => pattern.test(entry.name)) ||
@@ -132,19 +157,42 @@ export function createFileIconResolver(input: unknown) {
     name: theme.name,
     resolve(this: void, entry: IconEntry, expanded = false): ResolvedFileIcon {
       const rule = rules.find((rule) => rule.matches(entry))?.rule;
-      const closed =
-        rule?.icon ?? (entry.directory ? theme.defaults.directory : theme.defaults.file);
-      const id =
-        entry.directory && expanded
-          ? (rule?.expandedIcon ?? theme.defaults.expandedDirectory)
-          : closed;
+      if (entry.directory) {
+        const id = expanded ? theme.defaults.expandedDirectory : theme.defaults.directory;
+        const badgeId = expanded ? (rule?.expandedIcon ?? rule?.icon) : rule?.icon;
+        const badge =
+          badgeId &&
+          badgeId !== id &&
+          badgeId !== theme.defaults.directory &&
+          badgeId !== theme.defaults.expandedDirectory
+            ? theme.icons[badgeId]
+            : undefined;
+        const icon = theme.icons[id];
+        const color = badge?.color ?? icon.color;
+        return {
+          id,
+          src: icon.src,
+          color: theme.palette[color] ?? color,
+          ruleId: rule?.id,
+          ...(badge && badgeId
+            ? {
+                badge: {
+                  id: badgeId,
+                  src: badge.src,
+                  color: theme.palette[badge.color] ?? badge.color,
+                },
+              }
+            : {}),
+        };
+      }
+      const id = rule?.icon ?? theme.defaults.file;
       const icon = theme.icons[id];
-      // Opening a folder keeps its category color unless the rule supplies a separate icon.
-      const color =
-        entry.directory && expanded && rule && !rule.expandedIcon
-          ? theme.icons[closed].color
-          : icon.color;
-      return { id, src: icon.src, color: theme.palette[color] ?? color, ruleId: rule?.id };
+      return {
+        id,
+        src: icon.src,
+        color: theme.palette[icon.color] ?? icon.color,
+        ruleId: rule?.id,
+      };
     },
   };
 }

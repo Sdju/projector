@@ -56,7 +56,11 @@ const rows = computed(() => {
     .map((entry) => ({
       ...entry,
       icon: resolver.value.resolve(
-        { ...entry, name: entry.name.split("/").at(-1)! },
+        {
+          ...entry,
+          name: entry.name.split("/").at(-1)!,
+          executable: !entry.directory && entry.changes[0]!.executable,
+        },
         !collapsed.value.has(entry.path),
       ),
       change: entry.changes[0]!,

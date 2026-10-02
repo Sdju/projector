@@ -67,11 +67,19 @@ export async function listProjectDirectory(root: string, path = "") {
       (a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name),
     );
   return {
-    entries: entries.slice(0, 1000).map((entry) => ({
-      name: entry.name,
-      path: path ? `${path}/${entry.name}` : entry.name,
-      directory: entry.isDirectory(),
-    })),
+    entries: await Promise.all(
+      entries.slice(0, 1000).map(async (entry) => ({
+        name: entry.name,
+        path: path ? `${path}/${entry.name}` : entry.name,
+        directory: entry.isDirectory(),
+        executable:
+          entry.isFile() &&
+          (await lstat(resolve(full, entry.name)).then(
+            (info) => info.isFile() && !!(info.mode & 0o111),
+            () => false,
+          )),
+      })),
+    ),
     truncated: entries.length > 1000,
   };
 }
@@ -212,6 +220,13 @@ export async function projectGit(root: string): Promise<GitOverview> {
       worktree: row[1],
     });
   }
+  await Promise.all(
+    changes.map(async (change) => {
+      change.executable = await location(root, change.path)
+        .then((full) => lstat(full).then((info) => info.isFile() && !!(info.mode & 0o111)))
+        .catch(() => false);
+    }),
+  );
   return { available: true, branch, changes };
 }
 async function gitText(root: string, ref: string, path: string) {
