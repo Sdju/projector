@@ -127,6 +127,15 @@ export function bindTerminalLinks(
   let timer: ReturnType<typeof setTimeout> | undefined;
   let dirty = true;
   let previousCell = "";
+  function linkUnderPointer(event: MouseEvent): HoverLink | undefined {
+    const rect = screen.getBoundingClientRect();
+    const width = rect.width / terminal.cols;
+    const height = rect.height / terminal.rows;
+    const x = Math.floor((event.clientX - rect.left) / width);
+    const y = Math.floor((event.clientY - rect.top) / height);
+    if (x < 0 || y < 0 || x >= terminal.cols || y >= terminal.rows) return;
+    return linkAt(terminal, x, y);
+  }
   function clear() {
     clearTimeout(timer);
     timer = undefined;
@@ -198,11 +207,12 @@ export function bindTerminalLinks(
     else clear();
   }
   function down(event: MouseEvent) {
-    if (event.button !== 0 || !event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (event.button !== 0 || event.shiftKey || event.altKey) return;
     move(event);
-    refresh(true);
-    if (!hovered) return;
-    pressed = hovered.link;
+    const target = linkUnderPointer(event);
+    if (!target || (!event.ctrlKey && !target.link.web)) return;
+    if (event.ctrlKey) refresh(true);
+    pressed = target.link;
     event.preventDefault();
     event.stopImmediatePropagation();
   }
@@ -212,10 +222,10 @@ export function bindTerminalLinks(
     pressed = undefined;
     event.preventDefault();
     event.stopImmediatePropagation();
-    if (event.button !== 0 || !event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (event.button !== 0 || event.shiftKey || event.altKey) return;
     move(event);
-    refresh(true);
-    if (hovered?.link.path === link.path && hovered.link.start === link.start) open(link);
+    const target = linkUnderPointer(event);
+    if (target?.link.path === link.path && target.link.start === link.start) open(link);
   }
   const bindings: [EventTarget, string, EventListener, boolean][] = [
     [element, "mousemove", move as EventListener, true],

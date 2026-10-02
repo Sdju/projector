@@ -13,6 +13,7 @@ import IconFinishFlag from "../../../common/ui/IconFinishFlag.vue";
 import IconFailed from "~icons/lucide/circle-slash";
 import IconRestart from "~icons/lucide/rotate-ccw";
 import WorkspaceTabs from "../../../common/ui/WorkspaceTabs.vue";
+import { openExternalLink } from "../../../common/utilities/open-external-link.ts";
 import { deferTerminalText } from "../lib/keyboard.ts";
 import { bindTerminalInput } from "../lib/input.ts";
 import { bindTerminalLinks, type TerminalLink } from "../lib/links.ts";
@@ -141,7 +142,7 @@ async function request<T>(projectId: string, suffix = "", init?: RequestInit): P
 }
 
 async function openTerminalLink(link: TerminalLink) {
-  if (link.web) { window.open(link.path, "_blank", "noopener,noreferrer"); return; }
+  if (link.web) { openExternalLink(link.path); return; }
   const projectId = props.projectId;
   const sessionId = activeId.value;
   if (!sessionId) return;
@@ -530,6 +531,20 @@ onMounted(() => {
     fontSize: 13,
     scrollback: 5000,
     allowProposedApi: false,
+    linkHandler: {
+      activate: (event, value) => {
+        let url: URL;
+        try {
+          url = new URL(value);
+        } catch {
+          return;
+        }
+        if (url.protocol !== "http:" && url.protocol !== "https:") return;
+        event.preventDefault();
+        event.stopPropagation();
+        openExternalLink(url.href);
+      },
+    },
     theme: {
       background: "#171815",
       foreground: "#d6d3ca",
