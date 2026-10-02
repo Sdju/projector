@@ -2,6 +2,7 @@
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { workspaceRequest } from "../api.ts";
 import FileTree from "./FileTree.vue";
+import GitChangesTree from "./GitChangesTree.vue";
 import IconSettings from "~icons/lucide/settings";
 import IconRefresh from "~icons/lucide/rotate-cw";
 import { TerminalPane } from "../../terminal/index.ts";
@@ -360,16 +361,14 @@ onBeforeUnmount(() => {
           <h3 v-if="group.rows.length">
             {{ group.label }} <span>{{ group.rows.length }}</span>
           </h3>
-          <button
-            v-for="change in group.rows"
-            :key="change.path"
-            class="change"
-            :title="change.originalPath ? `${change.originalPath} → ${change.path}` : change.path"
-            @click="openFile(change.path, undefined, undefined, group.staged)"
-          >
-            <span>{{ change.path }}</span
-            ><b>{{ group.staged ? change.index : change.worktree }}</b>
-          </button>
+          <GitChangesTree
+            v-if="group.rows.length"
+            :key="`${projectId}:${group.staged}`"
+            :changes="group.rows"
+            :staged="group.staged"
+            :selected="active?.staged === group.staged ? active.path : ''"
+            @open="openFile($event, undefined, undefined, group.staged)"
+          />
         </template>
       </div>
       <div v-if="section === 'project'" class="side-content project-settings">
@@ -548,8 +547,7 @@ onBeforeUnmount(() => {
   text-align: left;
   border-bottom: 1px solid #21211e;
 }
-.result:hover,
-.change:hover {
+.result:hover {
   background: #242420;
 }
 .result-path {
@@ -577,24 +575,6 @@ h3 {
 h3 span {
   margin-left: 6px;
   color: var(--faint);
-}
-.change {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 6px 12px;
-  width: 100%;
-  text-align: left;
-  font-size: 12px;
-}
-.change span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.change b {
-  font: 11px var(--mono);
-  color: var(--run);
 }
 .file-tabs {
   display: flex;
