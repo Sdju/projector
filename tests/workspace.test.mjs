@@ -25,7 +25,21 @@ import {
   saveProjectMarkdown,
   readProjectImage,
 } from "../server/modules/workspace/index.ts";
+import { projectRelativePath, previewBrowserFile } from "../src/modules/workspace/file-drop.ts";
 import { moveDestination, parentPath, relocatedPath } from "../core/modules/workspace/index.ts";
+test("file drops preserve external contents and distinguish project paths", async () => {
+  assert.equal(projectRelativePath("/tmp/project", "/tmp/project/README.md"), "README.md");
+  assert.equal(projectRelativePath("/tmp/project/", "/tmp/project/src/file.ts"), "src/file.ts");
+  assert.equal(projectRelativePath("/tmp/project", "/tmp/project-other/file.ts"), undefined);
+  const file = new File(["# External\n"], "external.md");
+  assert.deepEqual(await previewBrowserFile(file), { path: "external.md", content: "# External\n" });
+  await assert.rejects(previewBrowserFile(new File(["a\0b"], "binary.bin")), /Бинарный файл/);
+  await assert.rejects(previewBrowserFile(new File([new Uint8Array(1024 * 1024 + 1)], "large.txt")), /больше 1 МБ/);
+  const image = await previewBrowserFile(new File(["<svg xmlns='http:\/\/www.w3.org/2000/svg'/>"] , "external.svg"));
+  assert.ok(image.image.startsWith("blob:"));
+  URL.revokeObjectURL(image.image);
+});
+
 const root = await mkdtemp(join(tmpdir(), "projector-workspace-"));
 const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
 test("entry actions create, copy, rename and trash without overwriting or escaping the project", async () => {
@@ -317,6 +331,10 @@ test("workspace HTTP routes resolve catalog projects and reject foreign origins 
   const { createServer, request: httpRequest } = await import("node:http");
   const { once } = await import("node:events");
   const directory = await mkdtemp(join(tmpdir(), "projector-workspace-api-"));
+  const externalDirectory = await mkdtemp(join(tmpdir(), "projector-external-preview-"));
+  const externalPath = join(externalDirectory, "outside.txt");
+  await writeFile(externalPath, "External file contents\n");
+  await writeFile(join(externalDirectory, "outside.svg"), "<svg xmlns='http://www.w3.org/2000/svg'/>");
   process.env.XDG_DATA_HOME = directory;
   await mkdir(join(directory, "projector"));
   await writeFile(join(directory, "sample.ts"), "const sample = true;\n");
@@ -342,6 +360,18 @@ test("workspace HTTP routes resolve catalog projects and reject foreign origins 
   const base = `http://127.0.0.1:${server.address().port}`;
   const route = `${base}/api/projects/workspace-test/workspace`;
   try {
+    const external = await fetch(`${route}/external?path=${encodeURIComponent(externalPath)}`);
+    assert.equal(external.status, 200);
+    assert.deepEqual(await external.json(), { path: externalPath, content: "External file contents\n" });
+    assert.equal((await fetch(`${route}/external?path=relative.txt`)).status, 400);
+    assert.equal((await fetch(`${route}/external?path=${encodeURIComponent(externalPath)}`, {headers:{Origin:"https://foreign.test"}})).status, 403);
+    const imagePath = join(externalDirectory, "outside.svg");
+    const imagePreview = await (await fetch(`${route}/external?path=${encodeURIComponent(imagePath)}`)).json();
+    assert.equal(imagePreview.image, true);
+    const image = await fetch(`${route}/external-asset?path=${encodeURIComponent(imagePath)}`);
+    assert.equal(image.headers.get("content-type"), "image/svg+xml");
+    assert.equal(image.headers.get("x-content-type-options"), "nosniff");
+    assert.match(await image.text(), /<svg/);
     const file = await fetch(`${route}/file?path=sample.ts`);
     assert.equal(file.status, 200);
     assert.equal(file.headers.get("cache-control"), "no-store");
@@ -468,6 +498,7 @@ test("workspace HTTP routes resolve catalog projects and reject foreign origins 
   } finally {
     await new Promise((resolve) => server.close(resolve));
     await rm(directory, { recursive: true, force: true });
+    await rm(externalDirectory, { recursive: true, force: true });
   }
 });
 

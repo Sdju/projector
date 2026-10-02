@@ -21,6 +21,8 @@ import {
 } from "../../../../modules/terminal/index.ts";
 import {
   listProjectDirectory,
+  previewExternalFile,
+  readExternalImage,
   previewProjectFile,
   searchProject,
   projectGit,
@@ -117,8 +119,10 @@ export async function handleProjectsProjectActions({
         throw new HttpError(403, "Обзор доступен только со страницы Projector");
       res.setHeader("Cache-Control", "no-store");
       const filePath = url.searchParams.get("path") ?? "";
-      if (sessionId === "asset") {
-        const image = await readProjectImage(project.path, filePath);
+      if (sessionId === "asset" || sessionId === "external-asset") {
+        const image = sessionId === "external-asset"
+          ? await readExternalImage(filePath)
+          : await readProjectImage(project.path, filePath);
         res.setHeader("Content-Type", image.type);
         res.setHeader("X-Content-Type-Options", "nosniff");
         res.setHeader(
@@ -128,7 +132,8 @@ export async function handleProjectsProjectActions({
         res.end(image.content);
         return true;
       }
-      if (sessionId === "root") json(res, 200, { root: project.path });
+      if (sessionId === "external") json(res, 200, await previewExternalFile(filePath));
+      else if (sessionId === "root") json(res, 200, { root: project.path });
       else if (sessionId === "tree")
         json(res, 200, await listProjectDirectory(project.path, filePath));
       else if (sessionId === "file")

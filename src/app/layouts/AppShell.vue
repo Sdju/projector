@@ -1,14 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import { isFileDrag, pathsFromDataTransfer } from "../../modules/path-drop/index.ts";
-import { useAddSession } from "../../modules/project-composer/index.ts";
+import { computed } from "vue";
+import { useRoute } from "vue-router";
 import { PathBar, useProjects } from "../../modules/catalog/index.ts";
 
 const { projects, save } = useProjects();
-const add = useAddSession();
 const route = useRoute();
-const router = useRouter();
 const running = computed(
   () => projects.value.filter((item) => item.runtime?.status === "running").length,
 );
@@ -23,51 +19,14 @@ async function navigatePath(path: string) {
     await save(currentProject.value.id, { path });
 }
 
-const dragging = ref(false);
-let dragDepth = 0;
-
-function onDragEnter(event: DragEvent): void {
-  if (!isFileDrag(event.dataTransfer)) return;
-  event.preventDefault();
-  dragDepth += 1;
-  dragging.value = true;
-}
-
-function onDragOver(event: DragEvent): void {
-  if (!isFileDrag(event.dataTransfer)) return;
-  event.preventDefault();
-  if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
-}
-
-function onDragLeave(event: DragEvent): void {
-  if (!isFileDrag(event.dataTransfer)) return;
-  event.preventDefault();
-  dragDepth = Math.max(0, dragDepth - 1);
-  if (dragDepth === 0) dragging.value = false;
-}
-
-async function onDrop(event: DragEvent): Promise<void> {
-  if (event.dataTransfer?.types.includes("application/x-projector-tab")) {
-    event.preventDefault();
-    return;
-  }
-  event.preventDefault();
-  dragDepth = 0;
-  dragging.value = false;
-  const paths = pathsFromDataTransfer(event.dataTransfer);
-  if (route.path !== "/projects") await router.push("/projects");
-  await add.fromPaths(paths);
-}
 </script>
 
 <template>
   <div
     class="shell"
-    :class="{ dragging, workspace: route.name === 'project' }"
-    @dragenter="onDragEnter"
-    @dragover="onDragOver"
-    @dragleave="onDragLeave"
-    @drop="onDrop"
+    :class="{ workspace: route.name === 'project' }"
+    @dragover.prevent
+    @drop.prevent
   >
     <header class="top">
       <router-link class="brand" to="/">projector</router-link>
@@ -87,7 +46,6 @@ async function onDrop(event: DragEvent): Promise<void> {
     <main>
       <slot />
     </main>
-    <div v-if="dragging" class="veil">бросьте папку — добавим проект</div>
   </div>
 </template>
 
@@ -137,22 +95,6 @@ async function onDrop(event: DragEvent): Promise<void> {
   color: var(--muted);
 }
 
-.veil {
-  position: fixed;
-  inset: 12px;
-  display: grid;
-  place-items: center;
-  border: 1px dashed var(--focus);
-  background: color-mix(in srgb, var(--bg) 82%, transparent);
-  color: var(--text);
-  font-size: 15px;
-  pointer-events: none;
-  z-index: 20;
-}
-
-.dragging main {
-  opacity: 0.35;
-}
 .shell.workspace {
   width: calc(100% - 32px);
   max-width: 2400px;

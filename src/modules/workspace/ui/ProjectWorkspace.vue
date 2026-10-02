@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { workspaceRequest, saveWorkspaceMarkdown } from "../api.ts";
+import { isFileDrag, pathsFromDataTransfer } from "../../path-drop/index.ts";
+import { projectRelativePath, previewBrowserFile } from "../file-drop.ts";
+import { treeDragType } from "../tree-drag.ts";
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from "vue-router";
 import { relocatedPath } from "../../../../core/modules/workspace/index.ts";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
@@ -135,6 +138,7 @@ function tabActions(id: string): ContextMenuItem[] {
     {
       id: "reveal",
       label: "Показать в дереве файлов",
+      disabled: !!file.external,
       run: async () => {
         section.value = "files";
         fileTree.value?.reveal(file.path);
@@ -177,6 +181,9 @@ const gitLoading = ref(false);
 const fileError = ref("");
 const loading = ref(false);
 interface OpenFile extends FileContent {
+  external?: boolean;
+  image?: string;
+  localFile?: File;
   original?: string;
   staged?: boolean;
   line?: number;
@@ -188,7 +195,7 @@ interface OpenFile extends FileContent {
   saveError?: string;
 }
 const isMarkdown = (file: OpenFile) =>
-  file.original === undefined && /\.(?:md|markdown)$/i.test(file.path);
+  !file.external && file.original === undefined && /\.(?:md|markdown)$/i.test(file.path);
 const isDirty = (file: OpenFile) => file.draft !== undefined && file.draft !== file.content;
 const tabs = ref<OpenFile[]>([]);
 const activeKey = ref("");
@@ -224,8 +231,9 @@ async function openFile(
   column?: number,
   staged?: boolean,
   reload = false,
+  external = false,
 ) {
-  const key = `${path}:${staged === undefined ? "file" : staged ? "index" : "working"}`;
+  const key = `${external ? "external:" : ""}${path}:${staged === undefined ? "file" : staged ? "index" : "working"}`;
   const existing = tabs.value.find((tab) => tab.key === key);
   if (existing && (!reload || isDirty(existing) || existing.saving)) {
     selectTab(key);
@@ -240,13 +248,17 @@ async function openFile(
   try {
     const data =
       staged === undefined
-        ? await workspaceRequest<FileContent>(props.projectId, "file", { path })
+        ? await workspaceRequest<FileContent & { image?: boolean }>(props.projectId, external ? "external" : "file", { path })
         : await workspaceRequest<FileComparison>(props.projectId, "diff", {
             path,
             staged: String(staged),
           });
     if (generation !== fileGeneration) return;
     const file: OpenFile = {
+      external,
+      image: "image" in data && data.image
+        ? `/api/projects/${encodeURIComponent(props.projectId)}/workspace/external-asset?${new URLSearchParams({ path })}`
+        : undefined,
       path,
       content: "modified" in data ? data.modified : data.content,
       archive: "archive" in data ? data.archive : undefined,
@@ -268,6 +280,92 @@ async function openFile(
     if (generation === fileGeneration) loading.value = false;
   }
 }
+const draggingFiles = ref(false);
+let dropGeneration = 0;
+function fileDrag(event: DragEvent) {
+  if (!isFileDrag(event.dataTransfer) && !event.dataTransfer?.types.includes(treeDragType)) return;
+  event.preventDefault();
+  draggingFiles.value = true;
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+}
+function releasePreview(file: OpenFile) {
+  if (file.image?.startsWith("blob:")) URL.revokeObjectURL(file.image);
+}
+async function openBrowserFile(source: File, reload = false) {
+  const key = `browser:${source.name}:${source.size}:${source.lastModified}`;
+  if (!reload && tabs.value.some((tab) => tab.key === key)) {
+    selectTab(key);
+    return;
+  }
+  const generation = ++fileGeneration;
+  loading.value = true;
+  fileError.value = "";
+  try {
+    const data = await previewBrowserFile(source);
+    if (generation !== fileGeneration) {
+      if (data.image) URL.revokeObjectURL(data.image);
+      return;
+    }
+    const file: OpenFile = { ...data, key, external: true, localFile: source };
+    const previous = tabs.value.findIndex((tab) => tab.key === key);
+    if (previous === -1) tabs.value.push(file);
+    else {
+      releasePreview(tabs.value[previous]!);
+      tabs.value[previous] = file;
+    }
+    selectTab(key);
+  } catch (err) {
+    if (generation === fileGeneration)
+      fileError.value = err instanceof Error ? err.message : "Не удалось открыть файл";
+  } finally {
+    if (generation === fileGeneration) loading.value = false;
+  }
+}
+async function dropFiles(event: DragEvent) {
+  draggingFiles.value = false;
+  event.preventDefault();
+  const data = event.dataTransfer;
+  if (!data || (!isFileDrag(data) && !data.types.includes(treeDragType))) return;
+  const generation = ++dropGeneration;
+  const projectId = props.projectId;
+  const paths = pathsFromDataTransfer(data);
+  const files = [...data.files];
+  const directories = [...data.items].some((item) => item.webkitGetAsEntry?.()?.isDirectory);
+  const tree = data.getData(treeDragType);
+  const current = () => generation === dropGeneration && projectId === props.projectId;
+  fileError.value = "";
+  try {
+    if (tree) {
+      const entry = JSON.parse(tree) as { projectId: string; path: string };
+      if (entry.projectId === projectId) {
+        await openFile(entry.path);
+        return;
+      }
+      const response = await fetch(`/api/projects/${encodeURIComponent(entry.projectId)}`);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Не удалось прочитать проект");
+      paths.push(`${result.project.path.replace(/\/+$/, "")}/${entry.path}`);
+    }
+    if (paths.length) {
+      const { root } = await workspaceRequest<{ root: string }>(projectId, "root");
+      for (const path of paths) {
+        if (!current()) return;
+        const relative = projectRelativePath(root, path);
+        await openFile(relative ?? path, undefined, undefined, undefined, false, relative === undefined);
+      }
+    } else {
+      if (directories) throw new Error("Бросьте файл, чтобы открыть его в редакторе");
+      for (const file of files) {
+        if (!current()) return;
+        await openBrowserFile(file);
+      }
+      if (!files.length) throw new Error("Не удалось прочитать перетащенный файл");
+    }
+  } catch (err) {
+    if (current()) fileError.value = err instanceof Error ? err.message : "Не удалось открыть файл";
+  }
+}
+
 async function closeTab(key: string) {
   const tab = tabs.value.find((file) => file.key === key);
   if (!tab) return;
@@ -278,6 +376,7 @@ async function closeTab(key: string) {
   }
   const index = tabs.value.indexOf(tab);
   if (index === -1) return;
+  releasePreview(tab);
   tabs.value.splice(index, 1);
   if (key === activeKey.value)
     activeKey.value = tabs.value[Math.min(index, tabs.value.length - 1)]?.key ?? "";
@@ -405,6 +504,9 @@ watch(
     ++searchGeneration;
     searchAbort?.abort();
     clearTimeout(searchTimer);
+    ++dropGeneration;
+    draggingFiles.value = false;
+    tabs.value.forEach(releasePreview);
     tabs.value = [];
     activeKey.value = "";
     fileError.value = "";
@@ -422,13 +524,15 @@ async function refresh() {
   revision.value++;
   await loadGit();
   if (section.value === "search") await search();
-  if (active.value)
+  if (active.value?.localFile) void openBrowserFile(active.value.localFile, true);
+  else if (active.value)
     void openFile(
       active.value.path,
       active.value.line,
       active.value.column,
       active.value.staged,
       true,
+      !!active.value.external,
     );
 }
 function entryMoved(source: string, destination: string) {
@@ -451,6 +555,8 @@ function entryMoved(source: string, destination: string) {
   if (query.value.trim()) void search();
 }
 onBeforeUnmount(() => {
+  ++dropGeneration;
+  tabs.value.forEach(releasePreview);
   window.removeEventListener("beforeunload", beforeUnload);
   window.removeEventListener("blur", windowBlur);
   stopResize?.();
@@ -583,11 +689,16 @@ onBeforeUnmount(() => {
     <section
       class="editor-pane"
       aria-label="Файлы и изменения"
+      @dragenter.stop="fileDrag"
+      @dragover.stop="fileDrag"
+      @dragleave.stop="!($event.currentTarget as HTMLElement).contains($event.relatedTarget as Node) && (draggingFiles = false)"
+      @drop.stop="dropFiles"
       @keydown.ctrl.s.prevent="saveMarkdown()"
       @keydown.meta.s.prevent="saveMarkdown()"
       @keydown.ctrl.shift.m.prevent="toggleMarkdownSource"
       @keydown.meta.shift.m.prevent="toggleMarkdownSource"
     >
+      <div v-if="draggingFiles" class="file-drop-hint">Бросьте файл — откроем его</div>
       <WorkspaceTabs
         v-if="tabs.length"
         :tabs="fileTabs"
@@ -601,15 +712,18 @@ onBeforeUnmount(() => {
         @reorder="reorderTabs"
       />
       <div v-if="active" class="breadcrumb">
-        <span>{{ active.path }}</span
-        ><span v-if="active.original !== undefined">{{
+        <span>{{ active.path }}</span>
+        <span v-if="active.external">только просмотр</span>
+        <span v-if="active.original !== undefined">{{
           active.staged ? "HEAD → index" : "index → рабочий файл"
         }}</span>
       </div>
       <p v-if="fileError" class="file-error" role="alert">{{ fileError }}</p>
       <div class="editor-body" :aria-busy="loading">
         <p v-if="loading" class="loading" role="status">читаю файл…</p>
-        <ArchiveViewer v-if="active?.archive" :key="active.key" :archive="active.archive" />
+        <p v-if="!active && !loading" class="loading">Откройте файл из дерева или перетащите его сюда</p>
+        <img v-if="active?.image" class="image-preview" :src="active.image" :alt="active.path" />
+        <ArchiveViewer v-else-if="active?.archive" :key="active.key" :archive="active.archive" />
         <MarkdownViewer
           v-else-if="active && isMarkdown(active)"
           :key="active.key"
@@ -654,6 +768,26 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.file-drop-hint {
+  position: absolute;
+  inset: 4px;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--focus);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  color: var(--text);
+  pointer-events: none;
+}
+.image-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  margin: auto;
+}
+
+
 .workspace {
   display: grid;
   grid-template-columns:
@@ -668,6 +802,7 @@ onBeforeUnmount(() => {
 .sidebar,
 .agent-pane,
 .editor-pane {
+  position: relative;
   min-width: 0;
   min-height: 0;
   display: flex;
