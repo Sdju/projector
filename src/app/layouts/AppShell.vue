@@ -47,6 +47,10 @@ function onDragLeave(event: DragEvent): void {
 }
 
 async function onDrop(event: DragEvent): Promise<void> {
+  if (event.dataTransfer?.types.includes("application/x-projector-tab")) {
+    event.preventDefault();
+    return;
+  }
   event.preventDefault();
   dragDepth = 0;
   dragging.value = false;

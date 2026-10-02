@@ -2,6 +2,7 @@
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { workspaceRequest } from "../api.ts";
 import { relocatedPath } from "../../../../core/modules/workspace/index.ts";
+import WorkspaceTabs from "../../../common/ui/WorkspaceTabs.vue";
 import FileTree from "./FileTree.vue";
 import GitChangesTree from "./GitChangesTree.vue";
 import ArchiveViewer from "./ArchiveViewer.vue";
@@ -126,6 +127,17 @@ interface OpenFile extends FileContent {
 }
 const tabs = ref<OpenFile[]>([]);
 const activeKey = ref("");
+const fileTabs = computed(() =>
+  tabs.value.map((tab) => ({
+    id: tab.key,
+    label: `${tab.path.split("/").at(-1)}${tab.original !== undefined ? (tab.staged ? " · index" : " · diff") : ""}`,
+    title: tab.path,
+  })),
+);
+function reorderTabs(ids: string[]) {
+  const files = new Map(tabs.value.map((tab) => [tab.key, tab]));
+  tabs.value = ids.map((id) => files.get(id)!);
+}
 const active = computed(() => tabs.value.find((file) => file.key === activeKey.value));
 const stagedChanges = computed(() =>
   git.value.changes.filter((change) => change.index !== " " && change.index !== "?"),
@@ -408,28 +420,15 @@ onBeforeUnmount(() => {
       @keydown="resizeKey($event, 'tree')"
     />
     <section class="editor-pane" aria-label="Файлы и изменения">
-      <div v-if="tabs.length" class="file-tabs" role="tablist" aria-label="Открытые файлы">
-        <div
-          v-for="tab in tabs"
-          :key="tab.key"
-          class="file-tab"
-          :class="{ selected: tab.key === activeKey }"
-        >
-          <button
-            role="tab"
-            :aria-selected="tab.key === activeKey"
-            :title="tab.path"
-            @click="selectTab(tab.key)"
-          >
-            {{ tab.path.split("/").at(-1)
-            }}<span v-if="tab.original !== undefined">
-              · {{ tab.staged ? "index" : "diff" }}</span
-            ></button
-          ><button class="close" :aria-label="`Закрыть ${tab.path}`" @click="closeTab(tab.key)">
-            ×
-          </button>
-        </div>
-      </div>
+      <WorkspaceTabs
+        v-if="tabs.length"
+        :tabs="fileTabs"
+        :active-id="activeKey"
+        label="Открытые файлы"
+        @select="selectTab"
+        @close="closeTab"
+        @reorder="reorderTabs"
+      />
       <div v-if="active" class="breadcrumb">
         <span>{{ active.path }}</span
         ><span v-if="active.original !== undefined">{{
@@ -598,43 +597,6 @@ h3 {
 }
 h3 span {
   margin-left: 6px;
-  color: var(--faint);
-}
-.file-tabs {
-  display: flex;
-  height: 40px;
-  flex-shrink: 0;
-  overflow-x: auto;
-  background: #141412;
-  border-bottom: 1px solid var(--line);
-}
-.file-tab {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  border-right: 1px solid var(--line);
-  border-top: 2px solid transparent;
-  padding: 0 8px 0 12px;
-  gap: 10px;
-}
-.file-tab.selected {
-  border-top-color: var(--focus);
-  background: var(--bg);
-}
-.file-tab button {
-  font-size: 12px;
-  color: var(--muted);
-}
-.file-tab.selected button {
-  color: var(--text);
-}
-.file-tab span {
-  color: var(--faint);
-  font-size: 10px;
-}
-.file-tab .close {
-  padding: 4px;
-  font-size: 16px;
   color: var(--faint);
 }
 .breadcrumb {

@@ -13,7 +13,7 @@ import IconMinimize from "~icons/lucide/minimize-2";
 import IconFinishFlag from "../../../common/ui/IconFinishFlag.vue";
 import IconFailed from "~icons/lucide/circle-slash";
 import IconRestart from "~icons/lucide/rotate-ccw";
-import IconClose from "~icons/lucide/x";
+import WorkspaceTabs from "../../../common/ui/WorkspaceTabs.vue";
 import { deferTerminalText } from "../lib/keyboard.ts";
 import { bindTerminalInput } from "../lib/input.ts";
 import type {
@@ -27,6 +27,52 @@ const props = defineProps<{ projectId: string; embedded?: boolean }>();
 const container = ref<HTMLElement>();
 const sessions = ref<TerminalSession[]>([]);
 const activeId = ref("");
+const sessionNumbers = new Map<string, number>();
+let nextSessionNumber = 1;
+function sessionName(session: TerminalSession): string {
+  if (!sessionNumbers.has(session.id)) sessionNumbers.set(session.id, nextSessionNumber++);
+  return session.customTitle ?? `${session.title} ${sessionNumbers.get(session.id)}`;
+}
+const terminalTabs = computed(() =>
+  sessions.value.map((session) => ({
+    id: session.id,
+    label: sessionName(session),
+    title: `${sessionLabel(session)}${session.status === "running" ? (session.activity?.state === "idle" ? " · ожидает ввода" : " · есть работающие процессы") : ""} · Двойной щелчок: переименовать`,
+  })),
+);
+function replaceSessions(incoming: TerminalSession[]) {
+  for (const session of incoming) sessionName(session);
+  const order = new Map(sessions.value.map((session, index) => [session.id, index]));
+  sessions.value = incoming.sort(
+    (a, b) => (order.get(a.id) ?? Infinity) - (order.get(b.id) ?? Infinity),
+  );
+}
+function reorderSessions(ids: string[]) {
+  const items = new Map(sessions.value.map((session) => [session.id, session]));
+  sessions.value = ids.map((id) => items.get(id)!);
+}
+async function renameSession(id: string, title: string) {
+  ++listGeneration;
+  const projectId = props.projectId;
+  error.value = "";
+  try {
+    const { session } = await request<{ session: TerminalSession }>(
+      projectId,
+      `/${encodeURIComponent(id)}`,
+      {
+        method: "POST",
+        body: JSON.stringify({ action: "rename", title }),
+      },
+    );
+    if (!destroyed && projectId === props.projectId) {
+      ++listGeneration;
+      updateSession(session);
+    }
+  } catch (err) {
+    if (!destroyed && projectId === props.projectId)
+      error.value = err instanceof Error ? err.message : "Не удалось переименовать терминал";
+  }
+}
 const error = ref("");
 const busy = ref(false);
 const pendingClose = ref<TerminalSession | null>(null);
@@ -159,7 +205,7 @@ function connect(): void {
               retryDelay = 500;
               connection.value = "connected";
               fitTerminal();
-              terminal?.focus();
+              if (!document.activeElement?.matches(".tab-rename")) terminal?.focus();
               resolve();
             });
           } else if (message.type === "output")
@@ -193,7 +239,7 @@ function connect(): void {
       try {
         const data = await request<{ sessions: TerminalSession[] }>(props.projectId);
         if (currentGeneration !== generation || destroyed) return;
-        sessions.value = data.sessions;
+        replaceSessions(data.sessions);
         if (data.sessions.some((item) => item.id === activeId.value)) connect();
         else activeId.value = data.sessions[0]?.id ?? "";
       } catch {
@@ -210,7 +256,7 @@ async function loadSessions(): Promise<void> {
   try {
     const data = await request<{ sessions: TerminalSession[] }>(projectId);
     if (destroyed || props.projectId !== projectId || current !== listGeneration) return;
-    sessions.value = data.sessions;
+    replaceSessions(data.sessions);
     if (!data.sessions.some((item) => item.id === activeId.value)) {
       const remembered = rememberedSession();
       activeId.value =
@@ -253,8 +299,8 @@ async function create(program: TerminalProgram): Promise<void> {
 function failed(session: TerminalSession): boolean {
   return session.status === "exited" && !session.stopRequested && session.exitCode !== 0;
 }
-function sessionLabel(session: TerminalSession, index: number): string {
-  const label = `${session.title} ${index + 1}`;
+function sessionLabel(session: TerminalSession): string {
+  const label = sessionName(session);
   if (session.status === "exited")
     return `${label} · ${failed(session) ? "ошибка" : "завершён"} · код ${session.exitCode ?? "—"}`;
   return session.stopRequested ? `${label} · завершаю` : label;
@@ -287,6 +333,7 @@ async function sessionAction(action: "stop" | "restart"): Promise<void> {
         (item) => item.id !== previous.id && item.id !== data.session.id,
       );
       sessions.value.splice(Math.min(position, sessions.value.length), 0, data.session);
+      sessionNumbers.set(data.session.id, sessionNumbers.get(previous.id) ?? nextSessionNumber++);
       activeId.value = data.session.id;
     }
   } catch (err) {
@@ -336,15 +383,6 @@ async function closeSession(id: string, confirmation?: string): Promise<void> {
   }
 }
 
-function closeOnMiddleClick(event: MouseEvent, id: string) {
-  if (event.button !== 1) return;
-  event.preventDefault();
-  void closeSession(id);
-}
-function preventMiddleScroll(event: MouseEvent) {
-  if (event.button === 1) event.preventDefault();
-}
-
 watch(pendingClose, async (session) => {
   await nextTick();
   if (session && closeDialog.value && !closeDialog.value.open) closeDialog.value.showModal();
@@ -368,6 +406,8 @@ watch(
     pendingClose.value = null;
     activeId.value = "";
     sessions.value = [];
+    sessionNumbers.clear();
+    nextSessionNumber = 1;
     terminal?.reset();
     void loadSessions();
   },
@@ -531,42 +571,31 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </header>
-    <div v-if="sessions.length" class="tabs" role="tablist" aria-label="Сессии терминала">
-      <div
-        v-for="(session, index) in sessions"
-        :key="session.id"
-        class="session-tab"
-        @auxclick="closeOnMiddleClick($event, session.id)"
-        @mousedown="preventMiddleScroll"
-        :class="{ selected: session.id === activeId }"
-      >
-        <button
-          role="tab"
-          :aria-selected="session.id === activeId"
-          :aria-label="sessionLabel(session, index)"
-          :title="`${sessionLabel(session, index)}${session.status === 'running' ? (session.activity?.state === 'idle' ? ' · ожидает ввода' : ' · есть работающие процессы') : ''}`"
-          @click="activeId = session.id"
-        >
-          <IconFailed v-if="failed(session)" class="session-state failed" aria-hidden="true" />
-          <IconFinishFlag
-            v-else-if="session.status === 'exited'"
-            class="session-state"
-            aria-hidden="true"
-          />
-          {{ session.title }} {{ index + 1 }}
-        </button>
-        <button
-          v-if="session.id === activeId"
-          class="tab-close"
-          :disabled="busy"
-          :title="`Удалить сессию ${session.title} ${index + 1}`"
-          :aria-label="`Удалить сессию ${session.title} ${index + 1}`"
-          @click="closeSession(session.id)"
-        >
-          <IconClose aria-hidden="true" />
-        </button>
-      </div>
-    </div>
+    <WorkspaceTabs
+      v-if="sessions.length"
+      :tabs="terminalTabs"
+      :active-id="activeId"
+      label="Сессии терминала"
+      renameable
+      :disabled="busy"
+      @select="activeId = $event"
+      @close="closeSession"
+      @reorder="reorderSessions"
+      @rename="renameSession"
+    >
+      <template #icon="{ tab }">
+        <IconFailed
+          v-if="sessions.find((session) => session.id === tab.id && failed(session))"
+          class="session-state failed"
+          aria-hidden="true"
+        />
+        <IconFinishFlag
+          v-else-if="sessions.find((session) => session.id === tab.id)?.status === 'exited'"
+          class="session-state"
+          aria-hidden="true"
+        />
+      </template>
+    </WorkspaceTabs>
     <slot name="status" />
     <p v-if="statusText" class="status" role="status">{{ statusText }}</p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
@@ -656,54 +685,14 @@ header {
   width: 15px;
   height: 15px;
 }
-.tabs {
-  display: flex;
-  gap: 4px;
-  overflow-x: auto;
-  padding: 8px 12px 0;
-}
-.tabs button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  padding: 5px 9px;
-  border: 0;
-  font: 12px var(--mono);
-  color: var(--muted);
-}
 .session-state {
   width: 14px;
   height: 14px;
+  flex-shrink: 0;
   color: var(--muted);
 }
 .session-state.failed {
   color: var(--err);
-}
-.session-tab {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  border: 1px solid transparent;
-  border-radius: 3px;
-}
-.session-tab.selected {
-  border-color: var(--line);
-  color: var(--text);
-}
-.tabs .tab-close {
-  padding: 5px;
-  color: var(--faint);
-}
-.tab-close svg {
-  width: 12px;
-  height: 12px;
-}
-.tab-close:hover:not(:disabled) {
-  color: var(--err);
-}
-.session-tab:hover {
-  background: var(--bg-2);
 }
 .close-dialog {
   width: min(440px, calc(100vw - 40px));
