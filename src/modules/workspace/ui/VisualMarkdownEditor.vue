@@ -182,7 +182,13 @@ function setContent(content: string) {
 watch(() => props.content, setContent);
 function linkMouseDown(event: MouseEvent) {
   if (event.button !== 0 || (!event.ctrlKey && !event.metaKey)) return;
-  if (!(event.target instanceof Element) || !event.target.closest("a")) return;
+  if (!(event.target instanceof Element)) return;
+  const link = event.target.closest("a");
+  if (!link) return;
+  if (/^(https?:|mailto:|\/\/)/i.test(link.getAttribute("href") ?? "")) {
+    event.stopPropagation();
+    return;
+  }
   // Keep the editor selection and its floating link tooltip in place until click.
   event.preventDefault();
   event.stopPropagation();
@@ -191,11 +197,20 @@ function followLink(event: MouseEvent) {
   if (!(event.target instanceof Element) || event.button !== 0) return;
   const link = event.target.closest("a");
   if (!link) return;
+  const href = link.getAttribute("href") ?? "";
+  const preview = !!link.closest(".milkdown-link-preview");
+  const external = /^(https?:|mailto:|\/\/)/i.test(href);
+  if (external && (event.ctrlKey || event.metaKey || preview)) {
+    // Preserve the browser's native anchor navigation and its user gesture.
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    event.stopPropagation();
+    return;
+  }
   // Document text stays editable; the floating preview is already a navigation control.
   event.preventDefault();
-  if (!event.ctrlKey && !event.metaKey && !link.closest(".milkdown-link-preview")) return;
+  if (!event.ctrlKey && !event.metaKey && !preview) return;
   event.stopPropagation();
-  const href = link.getAttribute("href") ?? "";
   const path = link.dataset.workspacePath ?? markdownPath(href, props.path);
   if (path) emit("open", path);
   else if (href.startsWith("#")) {
@@ -210,8 +225,7 @@ function followLink(event: MouseEvent) {
           .replace(/\s+/g, "-") === slug,
     );
     heading?.scrollIntoView({ block: "start", behavior: "smooth" });
-  } else if (/^(https?:|mailto:|\/\/)/i.test(href))
-    window.open(href, "_blank", "noopener,noreferrer");
+  }
 }
 onBeforeUnmount(() => {
   disposed = true;

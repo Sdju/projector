@@ -149,13 +149,13 @@ test(
       editor.querySelector('a[href="./hello%20world.md"]').dispatchEvent(new MouseEvent('click', {bubbles:true,cancelable:true,metaKey:true}));
       editor.querySelector('.markdown-html a strong').dispatchEvent(new MouseEvent('click', {bubbles:true,cancelable:true,ctrlKey:true}));
       check(opened.join('|') === 'README.md|docs/guide/start.md|docs/hello world.md|package.json', 'Relative, encoded and HTML paths must resolve against the current document');
-      const external = []; const originalOpen = window.open;
-      window.open = (...args) => { external.push(args); return null; };
-      try {
+      {
         for (const href of ['https://example.com/docs', 'http://example.com', '//example.com/docs']) {
-          editor.querySelector('a[href="'+href+'"]').dispatchEvent(new MouseEvent('click', {bubbles:true,cancelable:true,ctrlKey:true}));
+          const link = editor.querySelector('a[href="'+href+'"]');
+          const click = new MouseEvent('click', {bubbles:true,cancelable:true,ctrlKey:true});
+          link.dispatchEvent(click);
+          check(link.target === '_blank' && link.rel === 'noopener noreferrer' && !click.defaultPrevented, 'HTTP(S) Ctrl+click must use the browser native new-tab link action');
         }
-        check(external.length === 3 && external.every(args => args[1] === '_blank' && args[2] === 'noopener,noreferrer'), 'HTTP(S) links must open in a new tab');
         const preview = document.querySelector('.milkdown-link-preview');
         check(preview, 'The editor link preview must exist');
         // Its anchor is outside the editable document and should follow a plain click.
@@ -163,10 +163,11 @@ test(
         previewLink.dispatchEvent(new MouseEvent('click', {bubbles:true,cancelable:true}));
         check(opened.at(-1) === 'preview.md', 'A relative link in the floating preview must open inside the project');
         previewLink.href = 'https://example.com/preview';
-        previewLink.dispatchEvent(new MouseEvent('click', {bubbles:true,cancelable:true}));
-        check(external.at(-1)[0] === 'https://example.com/preview', 'An HTTP preview link must open in a new tab');
+        const previewClick = new MouseEvent('click', {bubbles:true,cancelable:true});
+        previewLink.dispatchEvent(previewClick);
+        check(previewLink.target === '_blank' && previewLink.rel === 'noopener noreferrer' && !previewClick.defaultPrevented, 'An HTTP preview link must use the browser native new-tab link action');
         previewLink.remove();
-      } finally { window.open = originalOpen; }
+      }
       check(changes === linkChanges && content.value === links, 'Following links must not edit the Markdown');
       content.value = '# From source\\n\\nNew **text**.\\n'; await nextTick();
       check(editor.querySelector('h1').textContent === 'From source', 'Source changes must update the visual document');
