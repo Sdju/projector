@@ -62,7 +62,11 @@ test("file drops preserve external contents and distinguish project paths", asyn
   assert.deepEqual(await previewBrowserFile(file), { path: "external.md", content: "# External\n" });
   await assert.rejects(previewBrowserFile(new File(["a\0b"], "binary.bin")), /Бинарный файл/);
   await assert.rejects(previewBrowserFile(new File([new Uint8Array(1024 * 1024 + 1)], "large.txt")), /больше 1 МБ/);
-  const image = await previewBrowserFile(new File(["<svg xmlns='http:\/\/www.w3.org/2000/svg'/>"] , "external.svg"));
+  const svg = "<svg xmlns='http://www.w3.org/2000/svg'/>";
+  assert.deepEqual(await previewBrowserFile(new File([svg], "external.SVG")), {
+    path: "external.SVG", content: svg,
+  });
+  const image = await previewBrowserFile(new File([new Uint8Array([137, 80, 78, 71])], "external.png"));
   assert.ok(image.image.startsWith("blob:"));
   URL.revokeObjectURL(image.image);
 });
@@ -405,7 +409,7 @@ test("workspace HTTP routes resolve catalog projects and reject foreign origins 
     assert.equal((await fetch(`${route}/external?path=${encodeURIComponent(externalPath)}`, {headers:{Origin:"https://foreign.test"}})).status, 403);
     const imagePath = join(externalDirectory, "outside.svg");
     const imagePreview = await (await fetch(`${route}/external?path=${encodeURIComponent(imagePath)}`)).json();
-    assert.equal(imagePreview.image, true);
+    assert.deepEqual(imagePreview, { path: imagePath, content: "<svg xmlns='http://www.w3.org/2000/svg'/>" });
     const image = await fetch(`${route}/external-asset?path=${encodeURIComponent(imagePath)}`);
     assert.equal(image.headers.get("content-type"), "image/svg+xml");
     assert.equal(image.headers.get("x-content-type-options"), "nosniff");

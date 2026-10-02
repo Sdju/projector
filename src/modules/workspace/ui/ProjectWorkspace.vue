@@ -31,6 +31,7 @@ import type {
 } from "../../../../core/modules/workspace/index.ts";
 const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
 const MarkdownViewer = defineAsyncComponent(() => import("./MarkdownViewer.vue"));
+const SvgViewer = defineAsyncComponent(() => import("./SvgViewer.vue"));
 const props = defineProps<{ projectId: string }>();
 const workspaceElement = ref<HTMLElement>();
 const treeWidth = ref<number>();
@@ -1112,6 +1113,17 @@ onBeforeUnmount(() => {
           :alt="active.path"
         />
         <ArchiveViewer v-else-if="active?.archive" :key="active.key" :archive="active.archive" />
+        <SvgViewer
+          v-else-if="active && /\.svg$/i.test(active.path) && active.original === undefined"
+          :key="active.key"
+          :path="active.path"
+          :content="active.draft ?? active.content"
+          :editable="isEditable(active)"
+          :line="active.line"
+          :column="active.column"
+          @change="active.draft = $event"
+          @save="saveFile"
+        />
         <MarkdownViewer
           v-else-if="active && isMarkdown(active)"
           :key="active.key"

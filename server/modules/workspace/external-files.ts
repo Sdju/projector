@@ -11,11 +11,11 @@ async function externalLocation(path: string) {
 }
 export async function previewExternalFile(path: string) {
   const { root, name } = await externalLocation(path);
-  if (/\.(?:png|jpe?g|gif|webp|avif|svg)$/i.test(name)) {
+  if (/\.(?:png|jpe?g|gif|webp|avif)$/i.test(name)) {
     await readProjectImage(root, name);
     return { path, content: "", image: true };
   }
-  return { ...await previewProjectFile(root, name), path };
+  return { ...(await previewProjectFile(root, name)), path };
 }
 export async function readExternalImage(path: string) {
   const { root, name } = await externalLocation(path);

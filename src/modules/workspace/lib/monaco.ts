@@ -122,6 +122,7 @@ export function language(path: string) {
     mjs: "javascript",
     cjs: "javascript",
     vue: "html",
+    svg: "html",
     svelte: "html",
     md: "markdown",
     yml: "yaml",

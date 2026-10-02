@@ -5,7 +5,7 @@ export function projectRelativePath(root: string, path: string): string | undefi
   return path.startsWith(prefix) ? path.slice(prefix.length) : undefined;
 }
 export async function previewBrowserFile(file: File): Promise<FileContent & { image?: string }> {
-  const image = /\.(?:png|jpe?g|gif|webp|avif|svg)$/i.test(file.name);
+  const image = /\.(?:png|jpe?g|gif|webp|avif)$/i.test(file.name);
   const limit = (image ? 8 : 1) * 1024 * 1024;
   if (file.size > limit) throw new Error(`Файл больше ${image ? 8 : 1} МБ`);
   if (image) return { path: file.name, content: "", image: URL.createObjectURL(file) };
