@@ -62,8 +62,8 @@ test(
     import MarkdownViewer from '/src/modules/workspace/ui/MarkdownViewer.vue';
     import {createCommandService, defaultKeybindings} from '/core/modules/ide/index.ts';
     const initial = "# Title\\r\\n\\r\\nA **bold** paragraph.\\r\\n\\r\\n![Alt text](../image.png)\\r\\n\\r\\n| A | B |\\r\\n| - | - |\\r\\n| One | Two |\\r\\n\\r\\n~~~js\\r\\nconst value = 1;\\r\\n~~~\\r\\n\\r\\n\\u003cdetails>\\u003csummary>More\\u003c/summary>Raw HTML\\u003c/details>\\r\\n\\r\\n\\u003cscript>window.unsafeMarkdown = true\\u003c/script>\\r\\n";
-    const content = ref(initial); let changes = 0; let failure = ''; let saves = 0; let saved = '';
-    const app = createApp({ render: () => h(MarkdownViewer, { mode: 'document', path: 'docs/test.md', projectId: 'test', content: content.value, onSave: () => { saves++; saved = content.value; }, onChange: value => { changes++; content.value = value; }, onError: message => failure = message }) });
+    const content = ref(initial); let changes = 0; let failure = ''; let saves = 0; let saved = ''; const opened = [];
+    const app = createApp({ render: () => h(MarkdownViewer, { mode: 'document', path: 'docs/test.md', projectId: 'test', content: content.value, onSave: () => { saves++; saved = content.value; }, onChange: value => { changes++; content.value = value; }, onOpen: path => opened.push(path), onError: message => failure = message }) });
     app.mount('#editor');
     const sdk = createCommandService(defaultKeybindings);
     const scope = sdk.createScope('editor', () => ({surface:'editor'}));
@@ -107,6 +107,41 @@ test(
       editor.dispatchEvent(new KeyboardEvent('keydown', {key:'z', code:'KeyZ', ctrlKey:true, bubbles:true,cancelable:true}));
       await Promise.resolve(); await nextTick();
       check(content.value === initial, 'Undo must restore the original Markdown byte for byte');
+      const links = '# Links\\n\\n[**Local**](../README.md) [Nested](guide/start.md) [Encoded](./hello%20world.md) [Web](https://example.com/docs) [HTTP](http://example.com) [Protocol relative](//example.com/docs)\\n\\n<div><a href="../package.json"><strong>HTML link</strong></a></div>\\n';
+      content.value = links; await nextTick();
+      const linkChanges = changes;
+      const local = editor.querySelector('a[href="../README.md"]');
+      check(local, 'Relative Markdown links must render');
+      local.dispatchEvent(new MouseEvent('click', {bubbles:true,cancelable:true}));
+      check(opened.length === 0, 'Ordinary click must keep document links editable');
+      // An editor/node-view listener must not swallow navigation before our handler runs.
+      local.addEventListener('click', event => event.stopPropagation());
+      local.dispatchEvent(new MouseEvent('mousedown', {bubbles:true,cancelable:true,ctrlKey:true,button:0}));
+      local.dispatchEvent(new MouseEvent('click', {bubbles:true,cancelable:true,ctrlKey:true,button:0}));
+      check(opened.join() === 'README.md', 'Ctrl+click on link text must open the project file once');
+      editor.querySelector('a[href="guide/start.md"]').dispatchEvent(new MouseEvent('click', {bubbles:true,cancelable:true,ctrlKey:true}));
+      editor.querySelector('a[href="./hello%20world.md"]').dispatchEvent(new MouseEvent('click', {bubbles:true,cancelable:true,metaKey:true}));
+      editor.querySelector('.markdown-html a strong').dispatchEvent(new MouseEvent('click', {bubbles:true,cancelable:true,ctrlKey:true}));
+      check(opened.join('|') === 'README.md|docs/guide/start.md|docs/hello world.md|package.json', 'Relative, encoded and HTML paths must resolve against the current document');
+      const external = []; const originalOpen = window.open;
+      window.open = (...args) => { external.push(args); return null; };
+      try {
+        for (const href of ['https://example.com/docs', 'http://example.com', '//example.com/docs']) {
+          editor.querySelector('a[href="'+href+'"]').dispatchEvent(new MouseEvent('click', {bubbles:true,cancelable:true,ctrlKey:true}));
+        }
+        check(external.length === 3 && external.every(args => args[1] === '_blank' && args[2] === 'noopener,noreferrer'), 'HTTP(S) links must open in a new tab');
+        const preview = document.querySelector('.milkdown-link-preview');
+        check(preview, 'The editor link preview must exist');
+        // Its anchor is outside the editable document and should follow a plain click.
+        const previewLink = document.createElement('a'); previewLink.href = '../preview.md'; preview.append(previewLink);
+        previewLink.dispatchEvent(new MouseEvent('click', {bubbles:true,cancelable:true}));
+        check(opened.at(-1) === 'preview.md', 'A relative link in the floating preview must open inside the project');
+        previewLink.href = 'https://example.com/preview';
+        previewLink.dispatchEvent(new MouseEvent('click', {bubbles:true,cancelable:true}));
+        check(external.at(-1)[0] === 'https://example.com/preview', 'An HTTP preview link must open in a new tab');
+        previewLink.remove();
+      } finally { window.open = originalOpen; }
+      check(changes === linkChanges && content.value === links, 'Following links must not edit the Markdown');
       content.value = '# From source\\n\\nNew **text**.\\n'; await nextTick();
       check(editor.querySelector('h1').textContent === 'From source', 'Source changes must update the visual document');
       check(editor.querySelector('strong').textContent === 'text', 'Source formatting must render');
