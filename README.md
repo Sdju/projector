@@ -16,13 +16,19 @@ Projector пока устанавливается из исходников. П�
 * `git`, `rg` (ripgrep) и GNU `mv` для работы с проектами.
 * `xdg-open` для открытия браузера; для режима отдельного веб-окна — Chromium, `xdotool` и `xprop`.
 
-Скачайте исходники, откройте терминал в папке Projector и выполните:
+Скачайте первый выпуск и установите зависимости:
 
 ```bash
-vp install
+git clone --branch v0.1.0 https://github.com/Sdju/projector.git
+cd projector
+vp install --frozen-lockfile
 vp run build
 ./bin/projector
 ```
+
+Исходники также доступны в [GitHub Releases](https://github.com/Sdju/projector/releases).
+Сборка проверяет код и создаёт веб-ресурсы; запуск пока использует `vp dev`
+из этой папки. Отдельного бинарного установщика в версии 0.1.0 нет.
 
 Откроется окно поиска приложений и проектов. Чтобы использовать Projector в обычном браузере:
 
@@ -67,3 +73,10 @@ projector quit       # завершить Projector и запущенные им
 Настройки и список проектов сохраняются в `~/.local/share/projector` или `$XDG_DATA_HOME/projector`, если эта переменная задана.
 
 Подробнее: [использование](docs/usage.md) и [подключение GitHub](docs/integrations.md). Инструкции для разработки находятся в [AGENTS.md](AGENTS.md).
+
+## Разработка и лицензия
+
+[Правила участия](CONTRIBUTING.md), [изменения в выпусках](CHANGELOG.md).
+Projector распространяется по лицензии [MIT](LICENSE). Лицензии включённых
+иконок приведены в [NOTICE](public/file-icons/NOTICE.md); пакет `vio` содержит
+свой [LICENSE](packages/vio/LICENSE).

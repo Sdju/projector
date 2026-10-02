@@ -28,3 +28,11 @@ __pycache__/
 
 # Recoverable deletions made by the workspace explorer
 .projector-trash/
+
+# Local credentials and runtime data
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+/data/

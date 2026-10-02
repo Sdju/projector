@@ -1,0 +1,39 @@
+name: Check
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GDK_BACKEND: x11
+      GSK_RENDERER: cairo
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3 pkg-config libgtk-4-dev libgirepository1.0-dev gir1.2-gtk-4.0 gir1.2-glib-2.0 ripgrep xvfb dbus-x11
+      - uses: voidzero-dev/setup-vp@v1.21.1
+        with:
+          node-version-file: .node-version
+          cache: true
+      - name: Install locked dependencies
+        run: vp install --frozen-lockfile
+      - name: Tests, architecture, types and build
+        run: vp run check
+      - name: Real GTK widgets
+        run: dbus-run-session -- xvfb-run -a vp run vio:gtk-test
