@@ -270,7 +270,7 @@ test(
     });
     server.listen(0, "127.0.0.1");
     await once(server, "listening");
-    const { stdout } = await promisify(execFile)(
+    const { stdout, stderr } = await promisify(execFile)(
       chromium,
       [
         "--headless",
@@ -286,6 +286,6 @@ test(
       ],
       { timeout: 20000, maxBuffer: 1024 * 1024 },
     );
-    assert.equal(stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1], "PASS");
+    assert.equal(stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1], "PASS", `Browser input regression failed:\n${stdout.slice(-4000)}\n${stderr.slice(-2000)}`);
   },
 );

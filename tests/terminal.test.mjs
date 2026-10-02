@@ -46,7 +46,9 @@ await test("mouse encoding survives snapshots, fragmented modes, disable, RIS an
 
 const root = await mkdtemp(join(tmpdir(), "projector-terminal-"));
 process.env.XDG_DATA_HOME = root;
-process.env.SHELL = "/bin/bash";
+// Keep PTY probes independent of the runner's interactive shell startup files.
+process.env.SHELL = join(root, "test-shell");
+await writeFile(process.env.SHELL, '#!/bin/sh\nexec /bin/bash --noprofile --norc "$@"\n', { mode: 0o700 });
 await mkdir(join(root, "projector"));
 const project = {
   id: "terminal-probe",

@@ -21,6 +21,7 @@ jobs:
     env:
       GDK_BACKEND: x11
       GSK_RENDERER: cairo
+      CHROMIUM_BIN: /usr/bin/google-chrome
     steps:
       - uses: actions/checkout@v7.0.1
       - name: Install native dependencies

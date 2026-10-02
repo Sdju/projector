@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 const execute = promisify(execFile);
 export function moveNoReplace(source: string, target: string) {
   return execute("mv", [
-    "--no-clobber",
+    "--update=none",
     "--no-target-directory",
     "--no-copy",
     "--",

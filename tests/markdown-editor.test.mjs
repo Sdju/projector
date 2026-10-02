@@ -177,7 +177,7 @@ test(
   </script>`;
     await server.listen();
     const port = server.httpServer.address().port;
-    const { stdout } = await promisify(execFile)(
+    const { stdout, stderr } = await promisify(execFile)(
       chromium,
       [
         "--headless",
@@ -193,6 +193,6 @@ test(
       ],
       { timeout: 50000, maxBuffer: 2 * 1024 * 1024 },
     );
-    assert.equal(stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1], "PASS");
+    assert.equal(stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1], "PASS", `Markdown browser regression failed:\n${stdout.slice(-4000)}\n${stderr.slice(-2000)}`);
   },
 );
