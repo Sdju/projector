@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { lstat, open, readdir, realpath, rename, unlink } from "node:fs/promises";
+import { lstat, open, readdir, realpath, rename, unlink, mkdir, cp, rm } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
@@ -19,6 +19,7 @@ const MAX_BYTES = 1024 * 1024;
 const archiveHelper = fileURLToPath(new URL("./archive.py", import.meta.url));
 const excluded = new Set([
   ".git",
+  ".projector-trash",
   "node_modules",
   "dist",
   "build",
@@ -198,7 +199,12 @@ export async function listProjectDirectory(root: string, path = "") {
     truncated: entries.length > 1000,
   };
 }
-export async function moveProjectEntry(root: string, path: string, directory: string) {
+export async function moveProjectEntry(
+  root: string,
+  path: string,
+  directory: string,
+  name?: string,
+) {
   // Mutations only accept canonical visible tree entries, never symlink aliases.
   for (const value of [path, directory]) {
     validatePath(value);
@@ -206,7 +212,15 @@ export async function moveProjectEntry(root: string, path: string, directory: st
       throw new HttpError(403, "Перенос доступен только для файлов дерева проекта");
     if (value.includes("\\")) throw new HttpError(403, "Некорректный путь");
   }
-  const destination = moveDestination(path, directory);
+  if (name !== undefined) validateEntryName(name);
+  const destination =
+    name === undefined
+      ? moveDestination(path, directory)
+      : directory
+        ? `${directory}/${name}`
+        : name;
+  if (destination && (destination === path || destination.startsWith(path + "/")))
+    throw new HttpError(400, "Нельзя перенести в ту же папку или внутрь себя");
   if (!destination) throw new HttpError(400, "Нельзя перенести в ту же папку или внутрь себя");
   const base = await realpath(root);
   const source = await location(base, path);
@@ -245,6 +259,98 @@ export async function moveProjectEntry(root: string, path: string, directory: st
   );
   if (remains) throw new HttpError(409, "Не удалось перенести: запись назначения уже существует");
   return { source: path, destination };
+}
+function validateEntryName(name: string) {
+  if (!name.trim() || name === "." || name === ".." || /[/\\\0]/.test(name) || excluded.has(name))
+    throw new HttpError(400, "Укажите имя без разделителей пути");
+}
+async function mutationLocation(root: string, path: string, allowRoot = false) {
+  validatePath(path);
+  if (
+    (!path && !allowRoot) ||
+    path.includes("\\") ||
+    (path && path.split("/").some((part) => !part || part === "." || excluded.has(part)))
+  )
+    throw new HttpError(403, "Выберите запись дерева проекта");
+  const base = await realpath(root);
+  const full = await location(base, path);
+  if (full !== resolve(base, path))
+    throw new HttpError(403, "Операции через символические ссылки недоступны");
+  return full;
+}
+export async function mutateProjectEntry(
+  root: string,
+  action: string,
+  path: string,
+  directory = "",
+  name = "",
+) {
+  if (action === "rename") {
+    validateEntryName(name);
+    await mutationLocation(root, path);
+    return moveProjectEntry(root, path, path.split("/").slice(0, -1).join("/"), name);
+  }
+  if (action === "delete") {
+    const source = await mutationLocation(root, path);
+    // Keep deleted entries on disk so accidental deletion is recoverable.
+    const base = await realpath(root);
+    const trash = resolve(base, ".projector-trash");
+    await mkdir(trash, { recursive: true, mode: 0o700 });
+    if ((await realpath(trash)) !== trash) throw new HttpError(403, "Некорректная папка корзины");
+    await rename(source, resolve(trash, `${randomUUID()}-${path.split("/").at(-1)}`));
+    return { source: path };
+  }
+  if (!["create-file", "create-directory", "copy"].includes(action))
+    throw new HttpError(400, "Неизвестное действие");
+  validateEntryName(name);
+  const parent = await mutationLocation(root, directory, true);
+  if (!(await lstat(parent)).isDirectory()) throw new HttpError(400, "Выберите папку назначения");
+  const destination = directory ? `${directory}/${name}` : name;
+  const target = resolve(parent, name);
+  try {
+    if (action === "create-file") {
+      const file = await open(target, "wx");
+      await file.close();
+    } else if (action === "create-directory") await mkdir(target);
+    else {
+      const source = await mutationLocation(root, path);
+      if (destination === path || destination.startsWith(path + "/"))
+        throw new HttpError(400, "Нельзя копировать запись внутрь себя");
+      // Stage the complete copy before publishing; never overwrite a destination.
+      const temporary = resolve(parent, `.projector-${randomUUID()}.tmp`);
+      try {
+        await cp(source, temporary, {
+          recursive: true,
+          dereference: false,
+          verbatimSymlinks: true,
+          force: false,
+          errorOnExist: true,
+        });
+        await exec("mv", [
+          "--no-clobber",
+          "--no-target-directory",
+          "--no-copy",
+          "--",
+          temporary,
+          target,
+        ]);
+        if (
+          await lstat(temporary).then(
+            () => true,
+            () => false,
+          )
+        )
+          throw new HttpError(409, "Запись с таким именем уже существует");
+      } finally {
+        await rm(temporary, { recursive: true, force: true });
+      }
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST")
+      throw new HttpError(409, "Запись с таким именем уже существует");
+    throw error;
+  }
+  return { destination };
 }
 export async function searchProject(root: string, query: string) {
   if (!query.trim()) return { hits: [], truncated: false };
@@ -328,6 +434,7 @@ export async function projectGit(root: string): Promise<GitOverview> {
     const rename = /[RC]/.test(row.slice(0, 2));
     const original = rename ? rows[++i] : undefined;
     if (!path.startsWith(prefix)) continue;
+    if (path.slice(prefix.length).split("/").includes(".projector-trash")) continue;
     changes.push({
       path: path.slice(prefix.length),
       originalPath: original?.startsWith(prefix) ? original.slice(prefix.length) : undefined,

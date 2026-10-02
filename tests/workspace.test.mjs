@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdtemp, mkdir, writeFile, rm, symlink, readFile, lstat, chmod } from "node:fs/promises";
+import {
+  mkdtemp,
+  mkdir,
+  writeFile,
+  rm,
+  readdir,
+  symlink,
+  readFile,
+  lstat,
+  chmod,
+} from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
@@ -11,12 +21,76 @@ import {
   projectGit,
   projectComparison,
   moveProjectEntry,
+  mutateProjectEntry,
   saveProjectMarkdown,
   readProjectImage,
 } from "../server/modules/workspace/index.ts";
 import { moveDestination, parentPath, relocatedPath } from "../core/modules/workspace/index.ts";
 const root = await mkdtemp(join(tmpdir(), "projector-workspace-"));
 const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
+test("entry actions create, copy, rename and trash without overwriting or escaping the project", async () => {
+  const base = await mkdtemp(join(tmpdir(), "projector-entries-"));
+  try {
+    await mutateProjectEntry(base, "create-directory", "", "", "folder");
+    await mutateProjectEntry(base, "create-file", "", "folder", "note.md");
+    await writeFile(join(base, "folder/note.md"), "draft");
+    assert.deepEqual(await mutateProjectEntry(base, "rename", "folder/note.md", "", "new.md"), {
+      source: "folder/note.md",
+      destination: "folder/new.md",
+    });
+    await mutateProjectEntry(base, "copy", "folder", "", "copy");
+    assert.equal(await readFile(join(base, "copy/new.md"), "utf8"), "draft");
+    for (const action of ["create-file", "create-directory", "copy"])
+      await assert.rejects(mutateProjectEntry(base, action, "folder", "", "copy"), { status: 409 });
+    await assert.rejects(mutateProjectEntry(base, "copy", "folder", "folder", "child"), {
+      status: 400,
+    });
+    await mutateProjectEntry(base, "create-file", "", "folder", "other.md");
+    await assert.rejects(mutateProjectEntry(base, "rename", "folder/new.md", "", "other.md"), {
+      status: 409,
+    });
+    await symlink(base, join(base, "alias"));
+    for (const action of ["rename", "delete", "copy"])
+      for (const path of ["", "../outside", "alias", "alias/folder", ".git/config"])
+        await assert.rejects(mutateProjectEntry(base, action, path, "", "valid"), { status: 403 });
+    for (const name of [
+      "../outside",
+      "a/b",
+      "a\\b",
+      ".",
+      "..",
+      ".git",
+      ".projector-trash",
+      "\0",
+      "   ",
+    ])
+      await assert.rejects(mutateProjectEntry(base, "create-file", "", "", name), { status: 400 });
+    await assert.rejects(mutateProjectEntry(base, "create-file", "", "alias", "valid"), {
+      status: 403,
+    });
+    execFileSync("git", ["-C", base, "init", "-q"]);
+    await mutateProjectEntry(base, "delete", "folder");
+    const trashed = await readdir(join(base, ".projector-trash"));
+    assert.equal(trashed.length, 1);
+    assert.ok(
+      (await projectGit(base)).changes.every((change) => !change.path.includes(".projector-trash")),
+    );
+    assert.equal(
+      await readFile(join(base, ".projector-trash", trashed[0], "new.md"), "utf8"),
+      "draft",
+    );
+    assert.deepEqual(
+      (await listProjectDirectory(base)).entries.map((entry) => entry.name),
+      ["copy"],
+    );
+    await rm(join(base, ".projector-trash"), { recursive: true });
+    await symlink(tmpdir(), join(base, ".projector-trash"));
+    await assert.rejects(mutateProjectEntry(base, "delete", "copy"), { status: 403 });
+    assert.equal(await readFile(join(base, "copy/new.md"), "utf8"), "draft");
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
 test("Markdown saves preserve text and mode, reject stale drafts and contain writes", async () => {
   const base = await mkdtemp(join(tmpdir(), "projector-markdown-"));
   try {
@@ -352,6 +426,24 @@ test("workspace HTTP routes resolve catalog projects and reject foreign origins 
     });
     assert.equal(foreignFolder, 403);
     assert.equal((await fetch(`${base}/api/projects/missing/workspace/tree`)).status, 404);
+    const entry = (body, origin = base) =>
+      fetch(`${route}/entry`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: origin },
+        body: JSON.stringify(body),
+      });
+    const creation = { action: "create-file", path: "", directory: "", name: "created.md" };
+    assert.equal((await entry(creation, "https://foreign.test")).status, 403);
+    assert.equal((await entry({ action: "delete" })).status, 400);
+    assert.equal((await entry(creation)).status, 200);
+    assert.equal((await entry(creation)).status, 409);
+    assert.equal(
+      (await entry({ ...creation, action: "rename", path: "created.md", name: "renamed.md" }))
+        .status,
+      200,
+    );
+    assert.equal((await entry({ ...creation, action: "delete", path: "renamed.md" })).status, 200);
+    assert.equal((await fetch(`${route}/root`)).status, 200);
     const move = (body, origin = base) =>
       fetch(`${route}/move`, {
         method: "POST",

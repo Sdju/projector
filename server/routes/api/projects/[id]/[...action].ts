@@ -25,6 +25,7 @@ import {
   projectGit,
   projectComparison,
   moveProjectEntry,
+  mutateProjectEntry,
   saveProjectMarkdown,
   readProjectImage,
 } from "../../../../modules/workspace/index.ts";
@@ -88,6 +89,28 @@ export async function handleProjectsProjectActions({
       return true;
     }
 
+    if (action === "workspace" && sessionId === "entry" && method === "POST") {
+      if (!terminalRequestAllowed(req, true))
+        throw new HttpError(403, "Операции доступны только со страницы Projector");
+      const body = await readBody(req);
+      for (const key of ["action", "path", "directory", "name"])
+        if (typeof body[key] !== "string")
+          throw new HttpError(400, "Некорректные параметры операции");
+      res.setHeader("Cache-Control", "no-store");
+      json(
+        res,
+        200,
+        await mutateProjectEntry(
+          project.path,
+          body.action as string,
+          body.path as string,
+          body.directory as string,
+          body.name as string,
+        ),
+      );
+      return true;
+    }
+
     if (action === "workspace" && method === "GET") {
       if (!terminalRequestAllowed(req, false))
         throw new HttpError(403, "Обзор доступен только со страницы Projector");
@@ -104,7 +127,9 @@ export async function handleProjectsProjectActions({
         res.end(image.content);
         return true;
       }
-      if (sessionId === "tree") json(res, 200, await listProjectDirectory(project.path, filePath));
+      if (sessionId === "root") json(res, 200, { root: project.path });
+      else if (sessionId === "tree")
+        json(res, 200, await listProjectDirectory(project.path, filePath));
       else if (sessionId === "file")
         json(res, 200, await previewProjectFile(project.path, filePath));
       else if (sessionId === "search")

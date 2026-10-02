@@ -39,3 +39,20 @@ export async function moveWorkspaceEntry(projectId: string, path: string, direct
   if (!response.ok) throw new Error(data.error || "Не удалось перенести запись");
   return data as { source: string; destination: string };
 }
+
+export async function mutateWorkspaceEntry(
+  projectId: string,
+  action: string,
+  path = "",
+  directory = "",
+  name = "",
+) {
+  const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}/workspace/entry`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, path, directory, name }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Не удалось выполнить действие");
+  return data as { source?: string; destination?: string };
+}
