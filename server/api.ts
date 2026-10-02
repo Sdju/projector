@@ -7,6 +7,7 @@ import { loadProjects, updateProjects } from "./store.ts";
 import type { LaunchMode, Project, ProjectCommand } from "./types.ts";
 import { appUrl, projectAppUrl } from "./paths.ts";
 import { iconContentType, letterIconSvg, resolveProjectIcon } from "./favicon.ts";
+import { listDirectories } from "./directories.ts";
 import { pickFolder } from "./pick-folder.ts";
 import { basename } from "node:path";
 import { runInstallerAgent } from "./qwen/agent.ts";
@@ -220,6 +221,13 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
         json(res, 201, { project: withRuntime(result.project) });
         return true;
       }
+    }
+
+    if (path === "/api/directories" && method === "GET") {
+      if (!terminalRequestAllowed(req, false)) throw new HttpError(403, "Папки доступны только со страницы Projector");
+      res.setHeader("Cache-Control", "no-store");
+      json(res, 200, await listDirectories(url.searchParams.get("path") ?? "", url.searchParams.get("complete") === "true"));
+      return true;
     }
 
     if (path === "/api/health" && method === "GET") {

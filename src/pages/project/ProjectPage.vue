@@ -34,7 +34,7 @@ function toDraft(item: Project): ProjectDraft {
 }
 
 watch(
-  () => project.value?.id,
+  () => [project.value?.id, project.value?.path],
   () => {
     draft.value = project.value ? toDraft(project.value) : null;
     formError.value = "";
@@ -76,7 +76,7 @@ async function onRemove(): Promise<void> {
 <template>
   <section v-if="project" class="project-page">
     <ProjectWorkspace
-      :key="project.id"
+      :key="`${project.id}:${project.path}`"
       :project-id="project.id"
       :project-name="project.name"
     >

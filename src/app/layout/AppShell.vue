@@ -3,15 +3,25 @@ import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { isFileDrag, pathsFromDataTransfer } from "../../common/lib/drop-paths.ts";
 import { useAddSession } from "../../modules/catalog/model/add-session.ts";
-import { useProjects } from "../../modules/catalog/index.ts";
+import { PathBar, useProjects } from "../../modules/catalog/index.ts";
 
-const { projects } = useProjects();
+const { projects, save } = useProjects();
 const add = useAddSession();
 const route = useRoute();
 const router = useRouter();
 const running = computed(
   () => projects.value.filter((item) => item.runtime?.status === "running").length,
 );
+
+const currentProject = computed(() =>
+  route.name === "project"
+    ? projects.value.find((project) => project.id === String(route.params.id))
+    : undefined,
+);
+async function navigatePath(path: string) {
+  if (currentProject.value && currentProject.value.path !== path)
+    await save(currentProject.value.id, { path });
+}
 
 const dragging = ref(false);
 let dragDepth = 0;
@@ -57,6 +67,13 @@ async function onDrop(event: DragEvent): Promise<void> {
   >
     <header class="top">
       <router-link class="brand" to="/">projector</router-link>
+      <PathBar
+        v-if="currentProject"
+        :key="currentProject.id"
+        class="header-path"
+        :path="currentProject.path"
+        :navigate="navigatePath"
+      />
       <nav class="nav">
         <router-link to="/projects">проекты</router-link>
         <router-link to="/settings">настройки</router-link>
@@ -84,9 +101,15 @@ async function onDrop(event: DragEvent): Promise<void> {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 14px;
+  gap: 18px;
+}
+
+.header-path {
+  flex: 1;
 }
 
 .brand {
+  flex-shrink: 0;
   font-size: 12px;
   letter-spacing: 0.16em;
   text-transform: lowercase;
@@ -94,6 +117,7 @@ async function onDrop(event: DragEvent): Promise<void> {
 }
 
 .nav {
+  flex-shrink: 0;
   display: flex;
   gap: 12px;
   align-items: baseline;
@@ -129,5 +153,16 @@ async function onDrop(event: DragEvent): Promise<void> {
   width: calc(100% - 32px);
   max-width: 2400px;
   padding-bottom: 16px;
+}
+@media (max-width: 600px) {
+  .top {
+    gap: 8px;
+  }
+  .nav {
+    gap: 7px;
+  }
+  .brand {
+    letter-spacing: 0.06em;
+  }
 }
 </style>

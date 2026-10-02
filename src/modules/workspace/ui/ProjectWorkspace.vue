@@ -460,7 +460,7 @@ onBeforeUnmount(() => {
     4px var(--agent-width, clamp(370px, 34vw, 680px));
   border: 1px solid var(--line);
   border-radius: 5px;
-  height: calc(100dvh - 68px);
+  height: calc(100dvh - 84px);
   min-height: 440px;
   overflow: hidden;
 }

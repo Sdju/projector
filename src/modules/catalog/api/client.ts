@@ -44,3 +44,13 @@ export function pickFolder(): Promise<{ path: string | null; cancelled: boolean 
 export function previewIconUrl(path: string): string {
   return `/api/preview-icon?path=${encodeURIComponent(path)}`;
 }
+
+export async function fetchDirectories(
+  path: string,
+  complete = false,
+  signal?: AbortSignal,
+): Promise<import("../../../../shared/directories.ts").DirectoryListing> {
+  return request(`/api/directories?${new URLSearchParams({ path, complete: String(complete) })}`, {
+    signal,
+  });
+}

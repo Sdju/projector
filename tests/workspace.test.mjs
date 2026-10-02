@@ -135,9 +135,62 @@ test("workspace HTTP routes resolve catalog projects and reject foreign origins 
       request.end();
     });
     assert.equal(foreignStatus, 403);
+    const folders = `${base}/api/directories?${new URLSearchParams({ path: directory })}`;
+    const folderResponse = await fetch(folders);
+    assert.equal(folderResponse.status, 200);
+    assert.equal(folderResponse.headers.get("cache-control"), "no-store");
+    assert.deepEqual((await folderResponse.json()).entries, [
+      { name: "projector", path: join(directory, "projector") },
+    ]);
+    assert.equal(
+      (await fetch(folders, { headers: { Origin: "https://foreign.test" } })).status,
+      403,
+    );
+    const foreignFolder = await new Promise((resolve, reject) => {
+      const request = httpRequest(folders, { headers: { Host: "foreign.test" } }, (response) => {
+        response.resume();
+        resolve(response.statusCode);
+      });
+      request.on("error", reject);
+      request.end();
+    });
+    assert.equal(foreignFolder, 403);
     assert.equal((await fetch(`${base}/api/projects/missing/workspace/tree`)).status, 404);
   } finally {
     await new Promise((resolve) => server.close(resolve));
     await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("path bar lists real directories and symlinks, completes prefixes and rejects invalid paths", async () => {
+  const { listDirectories } = await import("../server/directories.ts");
+  const base = await mkdtemp(join(tmpdir(), "projector-directories-"));
+  try {
+    await mkdir(join(base, "alpha"));
+    await mkdir(join(base, "alphabet"));
+    await mkdir(join(base, "with space"));
+    await mkdir(join(base, ".hidden"));
+    await writeFile(join(base, "a-file"), "text");
+    await symlink(join(base, "alpha"), join(base, "alias"));
+    await symlink(join(base, "missing"), join(base, "broken"));
+    const listing = await listDirectories(base);
+    assert.equal(listing.path, base);
+    assert.deepEqual(
+      listing.entries.map((row) => row.name),
+      [".hidden", "alias", "alpha", "alphabet", "with space"],
+    );
+    const completions = await listDirectories(`${base}/alph`, true);
+    assert.deepEqual(
+      completions.entries.map((row) => row.path),
+      [join(base, "alpha"), join(base, "alphabet")],
+    );
+    assert.equal((await listDirectories(`${base}/`, true)).entries.length, 5);
+    assert.equal((await listDirectories(join(base, "with space"))).entries.length, 0);
+    await assert.rejects(listDirectories("relative/path"), { status: 400 });
+    await assert.rejects(listDirectories(`${base}\0`), { status: 400 });
+    await assert.rejects(listDirectories(join(base, "a-file")), { status: 400 });
+    await assert.rejects(listDirectories(join(base, "missing")), { status: 400 });
+  } finally {
+    await rm(base, { recursive: true, force: true });
   }
 });
