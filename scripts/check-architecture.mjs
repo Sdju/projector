@@ -32,6 +32,18 @@ export function boundaryError(from, to, base = projectRoot) {
   const source = classify(from, base);
   const target = classify(to, base);
   if (!target.root) return "Local dependency is outside the configured FEOD roots";
+  if (
+    (source.root === "src" ||
+      (source.root === "core" &&
+        !["app-paths", "os"].includes(
+          relative(resolve(base, "core/modules"), source.absolute).split(sep)[0],
+        ))) &&
+    target.root === "core" &&
+    ["app-paths", "os"].includes(
+      relative(resolve(base, "core/modules"), target.absolute).split(sep)[0],
+    )
+  )
+    return "Browser/domain code cannot consume Node OS infrastructure";
   if (target.layer === "globals") return "Globals are ambient declarations and cannot be imported";
   if (!source.root)
     return target.layer === "app" || target.layer === "modules"
@@ -81,11 +93,36 @@ export function importsOf(code, file) {
           (ts.isIdentifier(node.expression) && node.expression.text === "require"))
       ) {
         specifier = node.arguments[0];
+        // Native loaders use a literal file URL so config bundling cannot hoist GI
+        // imports into Vite. Resolve the URL as a normal dependency; no arbitrary imports.
+        if (
+          node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+          specifier &&
+          ts.isPropertyAccessExpression(specifier) &&
+          specifier.name.text === "href" &&
+          ts.isNewExpression(specifier.expression) &&
+          ts.isIdentifier(specifier.expression.expression) &&
+          specifier.expression.expression.text === "URL"
+        ) {
+          const args = specifier.expression.arguments;
+          if (
+            args?.length === 2 &&
+            ts.isStringLiteralLike(args[0]) &&
+            args[0].text.startsWith(".") &&
+            args[1].getText(ast) === "import.meta.url"
+          )
+            specifier = args[0];
+        }
         if (!specifier || !ts.isStringLiteralLike(specifier))
           imports.push({ error: "Computed imports/require bypass architecture boundaries" });
       }
       if (specifier && ts.isStringLiteralLike(specifier))
-        imports.push({ specifier: specifier.text });
+        imports.push({
+          specifier: specifier.text,
+          typeOnly: Boolean(
+            node.isTypeOnly || node.importClause?.isTypeOnly || ts.isImportTypeNode(node),
+          ),
+        });
       ts.forEachChild(node, visit);
     }
     visit(ast);
@@ -173,21 +210,29 @@ export function checkArchitecture() {
     if (own.module && !existsSync(join(own.module, "index.ts")) && !extname(own.module))
       report("Module must have a public index.ts");
     if (!/\.(?:[cm]?js|tsx?|vue)$/.test(file)) continue;
+    const code = readFileSync(file, "utf8");
+    if (
+      !inside(file, join(projectRoot, "core/modules/os/modules/linux")) &&
+      /["'`]\/proc(?:\/|["'`])|["'](?:xdotool|xprop|wmctrl|org\.kde\.[^"']*)["']/.test(code)
+    )
+      report("Linux-specific operations must live in the os Linux adapter");
     for (const dependency of importsOf(readFileSync(file, "utf8"), file)) {
       if (dependency.error) {
         report(dependency.error);
         continue;
       }
       const specifier = dependency.specifier;
-      // Only the Node app-paths module is allowed platform dependencies in core.
+      // Node-only infrastructure is confined to app-paths and os.
       if (
-        (own.root === "src" || (own.root === "core" && !file.includes("/app-paths/"))) &&
+        (own.root === "src" ||
+          (own.root === "core" &&
+            !file.includes("/app-paths/") &&
+            !file.includes("/modules/os/"))) &&
         (/^node:/.test(specifier) ||
           ["node-gtk", "dbus-next", "node-pty", "ws"].includes(specifier))
       )
         report(`Platform dependency in browser/domain code: ${specifier}`);
-      if (own.root === "src" && specifier.includes("app-paths"))
-        report("Browser cannot consume Node app-paths");
+
       const target = resolveImport(file, specifier);
       if (!target) continue;
       if (target.error) {
@@ -197,7 +242,12 @@ export function checkArchitecture() {
       const error = boundaryError(file, target);
       if (error) report(`${error}: ${specifier}`);
       const targetOwner = classify(target).module;
-      if (own.module && targetOwner && own.module !== targetOwner) {
+      if (
+        own.module &&
+        targetOwner &&
+        own.module !== targetOwner &&
+        !(dependency.typeOnly && inside(own.module, targetOwner))
+      ) {
         if (!graph.has(own.module)) graph.set(own.module, new Set());
         graph.get(own.module).add(targetOwner);
       }

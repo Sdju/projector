@@ -1,45 +1,8 @@
 import { createHash } from "node:crypto";
-import { readdirSync, readFileSync } from "node:fs";
+import { os } from "../../../core/modules/os/index.ts";
 import type { TerminalActivity, TerminalSession } from "../../../core/modules/terminal/index.ts";
 
-interface ProcessInfo {
-  pid: number;
-  parent: number;
-  name: string;
-  started: string;
-  state: string;
-  group: number;
-  foreground: number;
-}
-export function readTerminalProcesses(): ProcessInfo[] | null {
-  if (process.platform !== "linux") return null;
-  try {
-    return readdirSync("/proc")
-      .filter((name) => /^\d+$/.test(name))
-      .flatMap((name) => {
-        try {
-          const stat = readFileSync(`/proc/${name}/stat`, "utf8");
-          const end = stat.lastIndexOf(")");
-          const fields = stat.slice(end + 2).split(" ");
-          return [
-            {
-              pid: Number(name),
-              parent: Number(fields[1]),
-              name: stat.slice(stat.indexOf("(") + 1, end),
-              started: fields[19],
-              state: fields[0],
-              group: Number(fields[2]),
-              foreground: Number(fields[5]),
-            },
-          ];
-        } catch {
-          return [];
-        }
-      });
-  } catch {
-    return null;
-  }
-}
+export const readTerminalProcesses = () => os.processes.list();
 export function terminalActivity(
   info: TerminalSession,
   processes: ReturnType<typeof readTerminalProcesses>,

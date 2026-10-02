@@ -1,13 +1,13 @@
 import { execFileSync, spawn } from "node:child_process";
 import { accessSync, constants, mkdirSync, openSync } from "node:fs";
 import { open, readFile, unlink } from "node:fs/promises";
-import { homedir } from "node:os";
+import { os } from "../../core/modules/os/index.ts";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const APP_URL = "http://localhost:4177";
-const DATA_DIR = join(process.env.XDG_DATA_HOME ?? join(homedir(), ".local/share"), "projector");
+const DATA_DIR = join(os.dataHome(), "projector");
 const LOCK_PATH = join(DATA_DIR, "launch.lock");
 const serverOnly = process.argv.includes("--server");
 const args = process.argv.slice(2);
@@ -40,7 +40,7 @@ function isExecutable(path) {
 }
 
 function findVp() {
-  const candidates = [process.env.VP, join(homedir(), ".vite-plus/bin/vp"), "vp"].filter(Boolean);
+  const candidates = [process.env.VP, join(os.toolchainBin(), "vp"), "vp"].filter(Boolean);
   for (const bin of candidates) {
     if (bin.includes("/") && isExecutable(bin)) return bin;
     try {
@@ -109,7 +109,7 @@ async function waitUntilReady(timeoutMs = 30000) {
 }
 
 function childEnv() {
-  const vpBin = join(homedir(), ".vite-plus/bin");
+  const vpBin = os.toolchainBin();
   return {
     ...process.env,
     PATH: `${vpBin}:${process.env.PATH ?? "/usr/bin"}`,

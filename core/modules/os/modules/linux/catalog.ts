@@ -1,6 +1,6 @@
 import Gio from "gi:Gio-2.0";
 import GioUnix from "gi:GioUnix-2.0";
-import type { LaunchItem } from "../../../core/modules/launcher/index.ts";
+import type { LaunchItem } from "../../../launcher/index.ts";
 
 export function desktopApp(id: string) {
   const app = GioUnix.DesktopAppInfo.new(id);

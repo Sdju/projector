@@ -1,7 +1,8 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdir, mkdtemp, writeFile, rm, rename, lstat, rmdir } from "node:fs/promises";
-import { tmpdir, homedir } from "node:os";
+import { tmpdir } from "node:os";
+import { os } from "../../../core/modules/os/index.ts";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { integrationConfig, updateIntegration } from "./store.ts";
@@ -11,7 +12,7 @@ import { loadProjects, updateProjects } from "../projects/index.ts";
 import type { Project } from "../projects/index.ts";
 
 const exec = promisify(execFile);
-const DEFAULT_DIRECTORY = join(homedir(), "Projects");
+const DEFAULT_DIRECTORY = join(os.homeDirectory(), "Projects");
 interface DeviceSession {
   id: string;
   code: string;

@@ -6,7 +6,7 @@
     },
     "server": {
       "kind": "backend",
-      "dependencies": ["core", "native/modules/system-bus"]
+      "dependencies": ["core"]
     },
     "native": {
       "kind": "frontend",

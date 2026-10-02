@@ -1,4 +1,4 @@
-import { homedir } from "node:os";
+import { os } from "../os/index.ts";
 import { join } from "node:path";
 
 export const APP_PORT = 4177;
@@ -15,7 +15,7 @@ export function projectAppUrl(id: string): string {
 }
 
 export function dataDir(): string {
-  const root = process.env.XDG_DATA_HOME ?? join(homedir(), ".local/share");
+  const root = os.dataHome();
   return join(root, APP_NAME);
 }
 

@@ -1,6 +1,6 @@
 import type dbus from "dbus-next";
-import type { ShortcutStatus } from "../../../core/modules/launcher/index.ts";
-import { call, watchName } from "../system-bus/index.ts";
+import type { ShortcutStatus } from "../../../launcher/index.ts";
+import { call, watchName } from "./bus.ts";
 
 const keys: Record<string, number> = {
   "Ctrl+Alt+Space": 0x0c000020,

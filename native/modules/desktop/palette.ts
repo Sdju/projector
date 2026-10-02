@@ -14,8 +14,8 @@ interface PaletteController {
 export class Palette {
   private app: VioApp;
   private controller: PaletteController;
-  constructor(baseUrl: string) {
-    this.app = createApp(PaletteComponent, { baseUrl });
+  constructor(baseUrl: string, applicationIcon: (id: string) => object | null) {
+    this.app = createApp(PaletteComponent, { baseUrl, applicationIcon });
     this.controller = this.app.mount() as unknown as PaletteController;
   }
   show() {

@@ -77,3 +77,29 @@ test("module cycles are rejected while a shared dependency stays acyclic", () =>
     1,
   );
 });
+
+test("OS is Node-only and Linux implementation is private to its facade", () => {
+  for (const consumer of ["src/modules/workspace/index.ts", "core/modules/launcher/index.ts"]) {
+    assert.match(boundaryError(consumer, "core/modules/os/index.ts"), /Node OS/);
+  }
+  for (const consumer of [
+    "server/modules/terminal/index.ts",
+    "native/modules/desktop/index.ts",
+    "cli/app/launch.mjs",
+  ]) {
+    assert.equal(boundaryError(consumer, "core/modules/os/index.ts"), undefined);
+    assert.match(boundaryError(consumer, "core/modules/os/modules/linux/index.ts"), /private/);
+  }
+});
+
+test("literal native file-URL imports are checked, arbitrary URLs cannot bypass boundaries", () => {
+  const result = importsOf(
+    'const x = import(new URL("./catalog.ts", import.meta.url).href); const y = import(new URL(path, import.meta.url).href); const z = import(new URL("./catalog.ts", otherBase).href)',
+    "loader.ts",
+  );
+  assert.deepEqual(
+    result.filter((r) => r.specifier).map((r) => r.specifier),
+    ["./catalog.ts"],
+  );
+  assert.equal(result.filter((r) => r.error).length, 2);
+});

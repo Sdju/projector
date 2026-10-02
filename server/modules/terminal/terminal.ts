@@ -1,8 +1,8 @@
 import { readTerminalProcesses, terminalActivity } from "./terminal-activity.ts";
 import { randomUUID } from "node:crypto";
-import { readFile, readlink } from "node:fs/promises";
 import { resolveTerminalPath } from "./link-files.ts";
-import { readdirSync, readFileSync, rmSync } from "node:fs";
+import { rmSync } from "node:fs";
+import { os } from "../../../core/modules/os/index.ts";
 import { saveDroppedFile } from "./drop-files.ts";
 import { HttpError } from "../http/index.ts";
 import type { IncomingMessage, Server } from "node:http";
@@ -164,56 +164,23 @@ export function terminalSessionSnapshot(
 
 export async function resolveTerminalFile(project: Project, id: string, path: string) {
   const session = state.sessions.get(id);
-  if (!session || session.info.projectId !== project.id) throw new HttpError(404, "Терминал не найден");
-  let cwd = project.path;
-  if (session.info.status === "running") {
-    try {
-      // Foreground jobs can change directory independently of their parent shell.
-      const stat = await readFile(`/proc/${session.info.pid}/stat`, "utf8");
-      const foreground = Number(stat.slice(stat.lastIndexOf(")") + 2).split(" ")[5]);
-      cwd = await readlink(`/proc/${foreground > 0 ? foreground : session.info.pid}/cwd`);
-    } catch {
-      try { cwd = await readlink(`/proc/${session.info.pid}/cwd`); } catch { /* Exited or unavailable /proc. */ }
-    }
-  }
+  if (!session || session.info.projectId !== project.id)
+    throw new HttpError(404, "Терминал не найден");
+  const cwd =
+    session.info.status === "running"
+      ? await os.processes.workingDirectory(session.info.pid, project.path)
+      : project.path;
   return resolveTerminalPath(path, project.path, cwd);
 }
 
-// Capture descendants before stopping the shell; interactive jobs have their own
-// process groups and would otherwise survive killing only the PTY leader.
-function descendants(pid: number): Array<{ pid: number; started: string }> {
-  if (process.platform !== "linux") return [];
-  const processes = readdirSync("/proc")
-    .filter((name) => /^\d+$/.test(name))
-    .flatMap((name) => {
-      try {
-        const stat = readFileSync(`/proc/${name}/stat`, "utf8");
-        const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
-        return [{ pid: Number(name), parent: Number(fields[1]), started: fields[19] }];
-      } catch {
-        return [];
-      }
-    });
-  const family = new Set([pid]);
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const entry of processes) {
-      if (family.has(entry.parent) && !family.has(entry.pid)) {
-        family.add(entry.pid);
-        changed = true;
-      }
-    }
-  }
-  return processes.filter((entry) => family.has(entry.pid));
-}
+const descendants = (pid: number) => os.processes.descendants(pid);
 
 function terminate(session: Session, immediate = false): void {
   if (session.info.status !== "running") return;
   const family = descendants(session.pty.pid);
   for (const entry of family.reverse()) {
     try {
-      process.kill(entry.pid, immediate ? "SIGKILL" : "SIGTERM");
+      os.processes.signal(entry.pid, immediate ? "SIGKILL" : "SIGTERM");
     } catch {
       /* Already exited. */
     }
@@ -227,26 +194,18 @@ function terminate(session: Session, immediate = false): void {
   const timer = setTimeout(() => {
     for (const entry of family) {
       try {
-        const stat = readFileSync(`/proc/${entry.pid}/stat`, "utf8");
-        if (stat.slice(stat.lastIndexOf(")") + 2).split(" ")[19] === entry.started) {
+        if (os.processes.identity(entry.pid) === entry.started) {
           for (const child of descendants(entry.pid).reverse()) {
             try {
-              process.kill(child.pid, "SIGKILL");
+              os.processes.signal(child.pid, "SIGKILL");
             } catch {
               /* Already exited. */
             }
           }
-          process.kill(entry.pid, "SIGKILL");
+          os.processes.signal(entry.pid, "SIGKILL");
         }
       } catch {
         /* Already exited; never kill a reused pid. */
-      }
-    }
-    if (process.platform !== "linux" && session.info.status === "running") {
-      try {
-        session.pty.kill("SIGKILL");
-      } catch {
-        /* Already exited. */
       }
     }
   }, 1500);
@@ -271,7 +230,8 @@ export async function uploadTerminalFile(
   const session = state.sessions.get(id);
   if (!session || session.info.projectId !== projectId)
     throw new HttpError(404, "Терминал не найден");
-  const available = () => !session.disposed && session.info.status === "running" && !session.info.stopRequested;
+  const available = () =>
+    !session.disposed && session.info.status === "running" && !session.info.stopRequested;
   if (!available()) throw new HttpError(409, "Терминал больше не принимает файлы");
   return saveDroppedFile(req, name, available, (directory) => {
     (session.droppedDirectories ??= new Set()).add(directory);
@@ -329,7 +289,7 @@ export function createTerminalSession(
   delete env.NO_COLOR;
   env.TERM = "xterm-256color";
   env.COLORTERM = "truecolor";
-  const shell = process.env.SHELL || "/bin/bash";
+  const shell = os.shell();
   const args = command
     ? ["-c", command.cmd]
     : program === "shell"

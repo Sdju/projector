@@ -1,7 +1,7 @@
 import dbus from "dbus-next";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { call, watchName } from "../system-bus/index.ts";
+import { call, watchName } from "./bus.ts";
 
 const { Interface, ACCESS_READ } = dbus.interface;
 type Properties = Record<string, dbus.Variant>;
@@ -19,7 +19,7 @@ class StatusNotifier extends Interface {
   Title = "Projector";
   Status = "Active";
   WindowId = 0;
-  IconName = fileURLToPath(new URL("../../../resources/icons/64.png", import.meta.url));
+  IconName = fileURLToPath(new URL("../../../../../resources/icons/64.png", import.meta.url));
   IconThemePath = dirname(this.IconName);
   IconPixmap = [];
   OverlayIconName = "";

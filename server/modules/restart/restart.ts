@@ -2,35 +2,14 @@ import { spawn } from "node:child_process";
 import { closeSync, mkdirSync, openSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { sessionBus, call } from "../../../native/modules/system-bus/index.ts";
+import { os } from "../../../core/modules/os/index.ts";
 import { dataDir } from "../../../core/modules/app-paths/index.ts";
 import { quitDesktop } from "../window/index.ts";
 
 const host = globalThis as typeof globalThis & { projectorRestart?: Promise<void> };
 
-async function desktopPid(): Promise<number | undefined> {
-  if (!process.env.DBUS_SESSION_BUS_ADDRESS) return;
-  const bus = sessionBus();
-  try {
-    const reply = await call(
-      bus,
-      "org.freedesktop.DBus",
-      "/org/freedesktop/DBus",
-      "org.freedesktop.DBus",
-      "GetConnectionUnixProcessID",
-      "s",
-      ["dev.projector.Launcher"],
-    );
-    return reply?.body[0] as number | undefined;
-  } catch {
-    return;
-  } finally {
-    bus.disconnect();
-  }
-}
-
 async function prepareRestart(url: string): Promise<void> {
-  const nativePid = await desktopPid();
+  const nativePid = await os.desktopPid("dev.projector.Launcher");
   mkdirSync(dataDir(), { recursive: true });
   const log = openSync(join(dataDir(), "server.log"), "a");
   const child = (() => {

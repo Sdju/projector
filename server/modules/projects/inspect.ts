@@ -1,5 +1,5 @@
 import { readdir, readFile, stat } from "node:fs/promises";
-import { homedir } from "node:os";
+import { os } from "../../../core/modules/os/index.ts";
 import { basename, join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { findFavicon } from "./favicon.ts";
@@ -52,8 +52,8 @@ function toCommand(name: string, prefix: string): ProjectCommand {
 
 export function expandPath(input: string): string {
   const trimmed = input.trim();
-  if (trimmed === "~") return homedir();
-  if (trimmed.startsWith("~/")) return resolve(join(homedir(), trimmed.slice(2)));
+  if (trimmed === "~") return os.homeDirectory();
+  if (trimmed.startsWith("~/")) return resolve(join(os.homeDirectory(), trimmed.slice(2)));
   return resolve(trimmed);
 }
 

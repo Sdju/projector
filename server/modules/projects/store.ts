@@ -1,11 +1,10 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
+import { dataDir } from "../../../core/modules/app-paths/index.ts";
 import { dirname, join } from "node:path";
 import type { Project } from "./types.ts";
 
 function storePath(): string {
-  const root = process.env.XDG_DATA_HOME ?? join(homedir(), ".local/share");
-  return join(root, "projector", "projects.json");
+  return join(dataDir(), "projects.json");
 }
 
 export async function loadProjects(): Promise<Project[]> {

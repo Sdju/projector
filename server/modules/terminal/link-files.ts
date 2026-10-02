@@ -1,12 +1,12 @@
 import { realpath, stat } from "node:fs/promises";
-import { homedir } from "node:os";
+import { os } from "../../../core/modules/os/index.ts";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { HttpError } from "../http/index.ts";
 
 export async function resolveTerminalPath(path: string, projectRoot: string, cwd: string) {
   if (!path || path.length > 4096 || /[\x00-\x1f\x7f]/.test(path))
     throw new HttpError(400, "Некорректный путь к файлу");
-  const expanded = path.startsWith("~/") ? resolve(homedir(), path.slice(2)) : path;
+  const expanded = path.startsWith("~/") ? resolve(os.homeDirectory(), path.slice(2)) : path;
   const candidates = isAbsolute(expanded)
     ? [expanded]
     : [resolve(cwd, expanded), resolve(projectRoot, expanded)];

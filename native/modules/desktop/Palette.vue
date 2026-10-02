@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import Gdk from "gi:Gdk-4.0";
 import GLib from "gi:GLib-2.0";
-import Gio from "gi:Gio-2.0";
-import { spawn } from "node:child_process";
+import { os } from "../../../core/modules/os/index.ts";
 import {
   computed,
   shallowRef,
@@ -28,9 +27,8 @@ import {
 } from "vio";
 import { createLauncherClient, type LaunchItem } from "../../../core/modules/launcher/index.ts";
 import { createLauncherModel } from "../../../core/modules/launcher/index.ts";
-import { desktopApp } from "./catalog.ts";
 
-const props = defineProps<{ baseUrl: string }>();
+const props = defineProps<{ baseUrl: string; applicationIcon: (id: string) => object | null }>();
 GLib.setPrgname("projector-launcher");
 GLib.setApplicationName("Projector");
 const client = createLauncherClient(props.baseUrl);
@@ -61,7 +59,7 @@ function appIcon(item: LaunchItem) {
   if (item.kind !== "application") return null;
   if (!icons.has(item.id)) {
     try {
-      const icon = desktopApp(item.id.slice(4)).getIcon();
+      const icon = props.applicationIcon(item.id.slice(4));
       icons.set(item.id, icon ? markRaw(icon) : null);
     } catch {
       icons.set(item.id, null);
@@ -104,10 +102,7 @@ async function focusWindow() {
   try {
     const { default: GdkX11 } = await import("gi:GdkX11-4.0");
     if (surface instanceof GdkX11.X11Surface) {
-      const child = spawn("xdotool", ["windowactivate", "--sync", String(surface.getXid())], {
-        stdio: "ignore",
-      });
-      child.on("error", () => {});
+      os.windows.activate(surface.getXid());
     }
   } catch {
     /* Wayland uses compositor activation. */
@@ -130,7 +125,7 @@ async function invokeSelected(toggle = false) {
   }
 }
 function openPage(path: string) {
-  Gio.AppInfo.launchDefaultForUri(props.baseUrl + path, null);
+  os.windows.openBrowser(props.baseUrl + path);
 }
 async function quitProjector() {
   try {

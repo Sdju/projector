@@ -1,3 +1,4 @@
+import { os } from "../../../core/modules/os/index.ts";
 import { execFile } from "node:child_process";
 import { lstat, open, readdir, realpath, rename, unlink, mkdir, cp, rm } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep, dirname } from "node:path";
@@ -135,10 +136,9 @@ export async function previewProjectFile(root: string, path: string): Promise<Fi
   if (!info.isFile()) throw new HttpError(400, "Выберите файл");
   let stdout: string;
   try {
-    ({ stdout } = await exec("python3", ["-I", archiveHelper, full, path], {
+    ({ stdout } = await os.tools.runPython(archiveHelper, [full, path], {
       timeout: 15000,
       maxBuffer: 8 * MAX_BYTES,
-      env: { ...process.env, PYTHONNOUSERSITE: "1" },
     }));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT")
@@ -244,7 +244,7 @@ export async function moveProjectEntry(
   try {
     // GNU mv uses a no-replace rename, preventing overwrite even if a destination
     // appears after the check. No copy fallback: a failed move leaves the source intact.
-    await exec("mv", ["--no-clobber", "--no-target-directory", "--no-copy", "--", source, target]);
+    await os.tools.moveNoReplace(source, target);
   } catch (error) {
     if (await exists())
       throw new HttpError(409, "В папке назначения уже есть запись с таким именем");
@@ -326,14 +326,7 @@ export async function mutateProjectEntry(
           force: false,
           errorOnExist: true,
         });
-        await exec("mv", [
-          "--no-clobber",
-          "--no-target-directory",
-          "--no-copy",
-          "--",
-          temporary,
-          target,
-        ]);
+        await os.tools.moveNoReplace(temporary, target);
         if (
           await lstat(temporary).then(
             () => true,
@@ -358,8 +351,7 @@ export async function searchProject(root: string, query: string) {
   const base = await realpath(root);
   let output: string;
   try {
-    const result = await exec(
-      "rg",
+    const result = await os.tools.searchFiles(
       [
         "--json",
         "--hidden",

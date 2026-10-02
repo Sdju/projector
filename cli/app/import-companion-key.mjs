@@ -1,18 +1,16 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { homedir } from "node:os";
+import { os } from "../../core/modules/os/index.ts";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 
 const PREFIX = "enc:v1:";
 const ALGORITHM = "aes-256-gcm";
 const COMPANION = "ai-companion/openai-provider-keys/v1";
 const PROJECTOR = "projector/openai-provider-keys/v1";
-const SOURCE = "/run/media/zede/general/pr/playground/fortth-new/ai-companion/data/providers.json";
-const TARGET = join(
-  process.env.XDG_DATA_HOME ?? join(homedir(), ".local/share"),
-  "projector",
-  "providers.json",
-);
+const SOURCE = process.argv[2];
+if (!SOURCE)
+  throw new Error("Укажите путь к providers.json: node cli/app/import-companion-key.mjs <path>");
+const TARGET = join(os.dataHome(), "projector", "providers.json");
 
 function deriveKey(secret) {
   return createHash("sha256").update(secret).digest();
