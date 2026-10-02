@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "es2023",
+    "module": "esnext",
+    "lib": ["ES2023", "DOM"],
+    "types": ["vite/client", "node"],
+    "allowArbitraryExtensions": true,
+    "skipLibCheck": true,
+    "jsx": "preserve",
+    "jsxImportSource": "vue",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "paths": { "node-gtk": ["./node_modules/.node-gtk-types/node-gtk.d.ts"] }
+  },
+  "include": ["src", "server", "shared", "native", "node_modules/.node-gtk-types/node-gtk.d.ts", "env.d.ts"]
+}

@@ -1,0 +1,50 @@
+{
+  "name": "vio",
+  "version": "0.1.0",
+  "description": "Vue custom renderer for native GTK4 applications on Node.js",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "examples"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./core": {
+      "types": "./dist/core.d.mts",
+      "import": "./dist/core.mjs"
+    },
+    "./compiler": {
+      "types": "./dist/compiler.d.mts",
+      "import": "./dist/compiler.mjs"
+    },
+    "./register": "./dist/register.mjs"
+  },
+  "scripts": {
+    "build": "node-gtk generate-types Gtk-4.0 --no-docs && tsdown",
+    "test": "node tests/renderer.test.mjs && node tests/compiler.test.mjs",
+    "demo": "node --import vio/register examples/counter.ts",
+    "gtk:types": "node-gtk generate-types Gtk-4.0 --no-docs",
+    "test:gtk": "node --import vio/register tests/gtk.test.mjs"
+  },
+  "dependencies": {
+    "@vue/runtime-core": "^3.5.43",
+    "@vue/compiler-sfc": "^3.5.43"
+  },
+  "peerDependencies": {
+    "node-gtk": "^4.1.1"
+  },
+  "devDependencies": {
+    "tsdown": "^0.21.0",
+    "typescript": "~6.0.2",
+    "@types/node": "^26.6.2"
+  }
+}

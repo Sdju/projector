@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "strict": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "paths": { "node-gtk": ["./node_modules/.node-gtk-types/node-gtk.d.ts"] }
+  },
+  "include": ["src", "node_modules/.node-gtk-types/node-gtk.d.ts"]
+}

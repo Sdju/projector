@@ -1,0 +1,42 @@
+{
+  "name": "projector",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vp dev",
+    "build": "vp run gtk:types && vp run vio:build && vue-tsc --noEmit && vp build",
+    "preview": "vp preview",
+    "gtk:types": "node-gtk generate-types Gtk-4.0 GdkX11-4.0 GioUnix-2.0 --no-docs",
+    "test": "vp run vio:test && node --test tests/launcher.test.mjs tests/integrations.test.mjs && node tests/launcher-model.test.mjs",
+    "vio:build": "vp run --filter vio build",
+    "vio:test": "vp run --filter vio test",
+    "vio:demo": "vp run --filter vio demo",
+    "vio:gtk-test": "vp run --filter vio test:gtk"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "@vitejs/plugin-vue": "^6.0.9",
+    "typescript": "~6.0.2",
+    "vite": "catalog:",
+    "vite-plus": "catalog:",
+    "vue-tsc": "^3.3.11"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.6.0",
+      "onFail": "download"
+    }
+  },
+  "dependencies": {
+    "@ai-sdk/openai-compatible": "^3.0.54",
+    "ai": "^7.0.112",
+    "dbus-next": "0.10.2",
+    "node-gtk": "4.1.1",
+    "vio": "workspace:*",
+    "vue": "^3.5.43",
+    "vue-router": "^5.3.1",
+    "zod": "^4.6.5"
+  }
+}

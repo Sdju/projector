@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+export PATH="${HOME}/.vite-plus/bin:${ROOT}/node_modules/.bin:/usr/local/bin:/usr/bin:/bin:${PATH}"
+cd "$ROOT"
+
+if [[ -x "${HOME}/.vite-plus/bin/node" ]]; then
+  exec "${HOME}/.vite-plus/bin/node" "$ROOT/scripts/launch.mjs" "$@"
+fi
+
+if command -v node >/dev/null 2>&1; then
+  exec node "$ROOT/scripts/launch.mjs" "$@"
+fi
+
+echo "Нужны vp или node в PATH" >&2
+exit 1

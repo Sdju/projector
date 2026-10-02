@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+export PATH="${HOME}/.vite-plus/bin:${ROOT}/node_modules/.bin:/usr/local/bin:/usr/bin:/bin:${PATH}"
+cd "$ROOT"
+
+if [[ -x "${HOME}/.vite-plus/bin/node" ]]; then
+  exec "${HOME}/.vite-plus/bin/node" "$ROOT/scripts/install-desktop.mjs" "$@"
+fi
+
+exec node "$ROOT/scripts/install-desktop.mjs" "$@"
