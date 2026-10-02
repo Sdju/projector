@@ -10,6 +10,7 @@ import { openBrowser, openWindow } from "../../../../modules/window/index.ts";
 
 import {
   closeProjectTerminals,
+  renameTerminalSession,
   terminalSessionSnapshot,
   stopTerminalSession,
   closeTerminalSession,
@@ -104,7 +105,11 @@ export async function handleProjectsProjectActions({
         const previous = listTerminalSessions(id).find((item) => item.id === sessionId);
         if (!previous) throw new HttpError(404, "Терминал не найден");
         const body = await readBody(req);
-        if (body.action === "stop") {
+        if (body.action === "rename") {
+          if (typeof body.title !== "string" || !body.title.trim() || body.title.trim().length > 80)
+            throw new HttpError(400, "Название должно содержать от 1 до 80 символов");
+          json(res, 200, { session: renameTerminalSession(id, sessionId, body.title.trim()) });
+        } else if (body.action === "stop") {
           const running = getSnapshot(id);
           if (previous.commandId && running.pid === previous.pid && running.status === "running")
             stopProject(id);

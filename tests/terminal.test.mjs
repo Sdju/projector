@@ -416,6 +416,15 @@ print('RAW_HEX=' + data.hex(), flush=True)
     200,
     "stop is idempotent",
   );
+  const renamed = await request(`/${shell.id}`, "POST", {
+    action: "rename",
+    title: "  Build logs  ",
+  });
+  assert.equal(renamed.status, 200);
+  assert.equal((await renamed.json()).session.customTitle, "Build logs");
+  assert.equal((await (await request(`/${shell.id}`)).json()).session.customTitle, "Build logs");
+  for (const title of ["", "   ", "x".repeat(81), 42])
+    assert.equal((await request(`/${shell.id}`, "POST", { action: "rename", title })).status, 400);
   const neighbor = (await (await request("", "POST", { program: "shell" })).json()).session;
   const restart = await request(`/${shell.id}`, "POST", { action: "restart" });
   assert.equal(restart.status, 201, await restart.clone().text());
@@ -426,6 +435,7 @@ print('RAW_HEX=' + data.hex(), flush=True)
     "restart retains tab order",
   );
   assert.equal((await request(`/${neighbor.id}`, "DELETE")).status, 200);
+  assert.equal(fresh.customTitle, "Build logs", "restart retains custom tab name");
   assert.equal(fresh.program, "shell");
   assert.equal(fresh.status, "running");
   assert.equal(fresh.cols, 100);

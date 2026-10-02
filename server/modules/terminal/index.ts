@@ -8,3 +8,5 @@ export { terminalRequestAllowed } from "./terminal.ts";
 export { attachTerminalServer } from "./terminal.ts";
 
 export { trackMouseEncoding } from "./terminal-mouse.ts";
+
+export { renameTerminalSession } from "./terminal.ts";

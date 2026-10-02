@@ -133,6 +133,18 @@ export function listTerminalSessions(projectId: string): TerminalSession[] {
     }));
 }
 
+export function renameTerminalSession(
+  projectId: string,
+  id: string,
+  title: string,
+): TerminalSession {
+  const session = state.sessions.get(id);
+  if (!session || session.info.projectId !== projectId) throw new Error("Терминал не найден");
+  session.info.customTitle = title;
+  broadcast(session, { type: "status", session: { ...session.info } });
+  return { ...session.info };
+}
+
 export function terminalSessionSnapshot(
   projectId: string,
   id: string,
@@ -300,6 +312,7 @@ export function createTerminalSession(
       projectId: project.id,
       program,
       commandId: command?.id,
+      customTitle: previous?.info.customTitle,
       title:
         command?.name ??
         (program === "shell" ? "Shell" : program === "codex" ? "Codex" : "Claude Code"),
