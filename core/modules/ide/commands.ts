@@ -1,3 +1,5 @@
+import { commandHelp } from "./command-help.ts";
+
 export type ContextValue = string | boolean | number | null;
 export type CommandContext = Record<string, ContextValue>;
 export interface Keybinding {
@@ -18,6 +20,8 @@ export interface KeyStroke {
   repeat?: boolean;
 }
 export interface CommandRegistration {
+  description?: string;
+  arguments?: Record<string, string>;
   palette?: boolean;
   id: string;
   title: string;
@@ -25,6 +29,8 @@ export interface CommandRegistration {
   enabled?: (args?: unknown) => boolean;
 }
 export interface CommandInfo {
+  description: string;
+  arguments: Record<string, string>;
   palette?: boolean;
   id: string;
   title: string;
@@ -120,6 +126,8 @@ export function createCommandService(defaults: Keybinding[] = []) {
     return {
       id,
       title: command.title,
+      description: command.description ?? commandHelp(id).description,
+      arguments: { ...(command.arguments ?? commandHelp(id).arguments) },
       ...(command.palette === false ? { palette: false } : {}),
       scope,
       enabled: command.enabled?.(args) ?? true,
@@ -190,6 +198,7 @@ export function createCommandService(defaults: Keybinding[] = []) {
   }
   return {
     createScope,
+    describeCommand: describe,
     executeCommand,
     getCommands: () =>
       [...scopes.keys()].flatMap((scope) =>

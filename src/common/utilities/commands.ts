@@ -4,6 +4,8 @@ export interface CommandScope {
   id: string;
   activate(): void;
   registerCommand(command: {
+    description?: string;
+    arguments?: Record<string, string>;
     palette?: boolean;
     id: string;
     title: string;

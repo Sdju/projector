@@ -41,6 +41,8 @@ function showContext(event: MouseEvent | KeyboardEvent, tab: Tab) {
 const commands = useCommandScope(`tabs:${useId()}`, () => ({
   surface: "tabs",
   namespace: props.commandNamespace,
+  activeTab: props.activeId,
+  tabs: JSON.stringify(props.tabs.map(({ id, label }) => ({ id, label }))),
   projectId: props.projectId,
   busy: !!props.disabled,
 }));
