@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
@@ -10,6 +10,9 @@ import IconCodex from "~icons/simple-icons/openai";
 import IconClaude from "~icons/simple-icons/claude";
 import IconMaximize from "~icons/lucide/maximize-2";
 import IconMinimize from "~icons/lucide/minimize-2";
+import IconFinishFlag from "../../../common/ui/IconFinishFlag.vue";
+import IconFailed from "~icons/lucide/circle-slash";
+import IconRestart from "~icons/lucide/rotate-ccw";
 import IconClose from "~icons/lucide/x";
 import { deferTerminalText } from "../lib/keyboard.ts";
 import { bindTerminalInput } from "../lib/input.ts";
@@ -26,12 +29,17 @@ const sessions = ref<TerminalSession[]>([]);
 const activeId = ref("");
 const error = ref("");
 const busy = ref(false);
+const pendingClose = ref<TerminalSession | null>(null);
+const closeDialog = ref<HTMLDialogElement>();
+const closeTitle = useId();
 const expanded = ref(false);
 const connection = ref<"offline" | "connecting" | "connected">("offline");
 const active = computed(() => sessions.value.find((session) => session.id === activeId.value));
 const statusText = computed(() => {
   if (!active.value) return "";
-  if (active.value.status === "exited") return `завершён · код ${active.value.exitCode ?? "—"}`;
+  if (active.value.status === "exited")
+    return `${failed(active.value) ? "ошибка" : "завершён"} · код ${active.value.exitCode ?? "—"}`;
+  if (active.value.stopRequested) return "завершаю…";
   return connection.value === "connected"
     ? ""
     : connection.value === "connecting"
@@ -42,11 +50,13 @@ let terminal: Terminal | undefined;
 let fit: FitAddon | undefined;
 let observer: ResizeObserver | undefined;
 let socket: WebSocket | undefined;
+let refreshTimer: ReturnType<typeof setInterval> | undefined;
 let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 let retryDelay = 500;
 let destroyed = false;
 let ready = false;
 let generation = 0;
+let listGeneration = 0;
 let resizeFrame = 0;
 let rendering = Promise.resolve();
 
@@ -55,6 +65,14 @@ function rememberedSession(): string {
     return sessionStorage.getItem(`projector:terminal:${props.projectId}`) ?? "";
   } catch {
     return "";
+  }
+}
+
+class TerminalRequestError extends Error {
+  readonly session?: TerminalSession;
+  constructor(message: string, session?: TerminalSession) {
+    super(message);
+    this.session = session;
   }
 }
 
@@ -67,7 +85,7 @@ async function request<T>(projectId: string, suffix = "", init?: RequestInit): P
     },
   );
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "Ошибка терминала");
+  if (!response.ok) throw new TerminalRequestError(data.error || "Ошибка терминала", data.session);
   return data as T;
 }
 
@@ -187,10 +205,11 @@ function connect(): void {
 }
 
 async function loadSessions(): Promise<void> {
+  const current = ++listGeneration;
   const projectId = props.projectId;
   try {
     const data = await request<{ sessions: TerminalSession[] }>(projectId);
-    if (destroyed || props.projectId !== projectId) return;
+    if (destroyed || props.projectId !== projectId || current !== listGeneration) return;
     sessions.value = data.sessions;
     if (!data.sessions.some((item) => item.id === activeId.value)) {
       const remembered = rememberedSession();
@@ -231,21 +250,105 @@ async function create(program: TerminalProgram): Promise<void> {
   }
 }
 
-async function closeActive(): Promise<void> {
-  if (!activeId.value || busy.value) return;
+function failed(session: TerminalSession): boolean {
+  return session.status === "exited" && !session.stopRequested && session.exitCode !== 0;
+}
+function sessionLabel(session: TerminalSession, index: number): string {
+  const label = `${session.title} ${index + 1}`;
+  if (session.status === "exited")
+    return `${label} · ${failed(session) ? "ошибка" : "завершён"} · код ${session.exitCode ?? "—"}`;
+  return session.stopRequested ? `${label} · завершаю` : label;
+}
+async function sessionAction(action: "stop" | "restart"): Promise<void> {
+  if (!active.value || busy.value) return;
+  ++listGeneration;
+  const previous = active.value;
+  const position = sessions.value.findIndex((item) => item.id === previous.id);
+  const projectId = props.projectId;
   busy.value = true;
   error.value = "";
-  const id = activeId.value;
   try {
-    await request(props.projectId, `/${encodeURIComponent(id)}`, { method: "DELETE" });
-    sessions.value = sessions.value.filter((item) => item.id !== id);
-    if (activeId.value === id) activeId.value = sessions.value[0]?.id ?? "";
+    const data = await request<{ session: TerminalSession }>(
+      projectId,
+      `/${encodeURIComponent(previous.id)}`,
+      {
+        method: "POST",
+        body: JSON.stringify({ action }),
+      },
+    );
+    if (destroyed || projectId !== props.projectId) return;
+    ++listGeneration;
+    if (action === "stop") {
+      // An exit status may have arrived over the socket before this HTTP response.
+      if (sessions.value.find((item) => item.id === previous.id)?.status !== "exited")
+        updateSession(data.session);
+    } else {
+      sessions.value = sessions.value.filter(
+        (item) => item.id !== previous.id && item.id !== data.session.id,
+      );
+      sessions.value.splice(Math.min(position, sessions.value.length), 0, data.session);
+      activeId.value = data.session.id;
+    }
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Не удалось закрыть терминал";
+    if (!destroyed && projectId === props.projectId)
+      error.value = err instanceof Error ? err.message : "Не удалось изменить сессию";
   } finally {
     busy.value = false;
   }
 }
+
+async function closeSession(id: string, confirmation?: string): Promise<void> {
+  if (busy.value) return;
+  ++listGeneration;
+  busy.value = true;
+  error.value = "";
+  const projectId = props.projectId;
+  const index = sessions.value.findIndex((item) => item.id === id);
+  try {
+    if (!confirmation) {
+      const { session } = await request<{ session: TerminalSession }>(
+        projectId,
+        `/${encodeURIComponent(id)}`,
+      );
+      if (destroyed || projectId !== props.projectId) return;
+      if (session.activity?.state !== "idle") {
+        pendingClose.value = session;
+        return;
+      }
+    }
+    await request(projectId, `/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      body: JSON.stringify({ confirmation }),
+    });
+    if (destroyed || projectId !== props.projectId) return;
+    ++listGeneration;
+    pendingClose.value = null;
+    sessions.value = sessions.value.filter((item) => item.id !== id);
+    if (activeId.value === id)
+      activeId.value = sessions.value[Math.min(index, sessions.value.length - 1)]?.id ?? "";
+  } catch (err) {
+    if (!destroyed && projectId === props.projectId) {
+      if (err instanceof TerminalRequestError && err.session) pendingClose.value = err.session;
+      else error.value = err instanceof Error ? err.message : "Не удалось удалить сессию";
+    }
+  } finally {
+    busy.value = false;
+  }
+}
+
+function closeOnMiddleClick(event: MouseEvent, id: string) {
+  if (event.button !== 1) return;
+  event.preventDefault();
+  void closeSession(id);
+}
+function preventMiddleScroll(event: MouseEvent) {
+  if (event.button === 1) event.preventDefault();
+}
+
+watch(pendingClose, async (session) => {
+  await nextTick();
+  if (session && closeDialog.value && !closeDialog.value.open) closeDialog.value.showModal();
+});
 
 watch(activeId, () => {
   if (activeId.value) {
@@ -262,6 +365,7 @@ watch(
   () => props.projectId,
   () => {
     disconnect();
+    pendingClose.value = null;
     activeId.value = "";
     sessions.value = [];
     terminal?.reset();
@@ -299,7 +403,11 @@ onMounted(() => {
     new WebLinksAddon((_event, url) => window.open(url, "_blank", "noopener,noreferrer")),
   );
   terminal.open(container.value!);
-  bindTerminalInput(terminal, send, () => ready && active.value?.status === "running");
+  bindTerminalInput(
+    terminal,
+    send,
+    () => ready && active.value?.status === "running" && !active.value.stopRequested,
+  );
   terminal.attachCustomKeyEventHandler((event) => {
     if (event.type === "keydown" && event.ctrlKey && event.shiftKey && event.code === "KeyC") {
       const selection = terminal?.getSelection();
@@ -334,10 +442,14 @@ onMounted(() => {
   });
   window.addEventListener("projector:terminal-started", terminalStarted);
   void loadSessions();
+  refreshTimer = setInterval(() => {
+    if (!document.hidden && !busy.value) void loadSessions();
+  }, 3000);
 });
 onBeforeUnmount(() => {
   window.removeEventListener("projector:terminal-started", terminalStarted);
   destroyed = true;
+  clearInterval(refreshTimer);
   disconnect();
   cancelAnimationFrame(resizeFrame);
   observer?.disconnect();
@@ -386,6 +498,27 @@ onBeforeUnmount(() => {
         </div>
         <div class="view-actions">
           <UiButton
+            v-if="active?.status === 'running'"
+            class="icon-button"
+            variant="chip"
+            :disabled="busy || active.stopRequested"
+            title="Завершить сессию"
+            aria-label="Завершить сессию"
+            @click="sessionAction('stop')"
+            ><IconFinishFlag aria-hidden="true"
+          /></UiButton>
+          <UiButton
+            v-else-if="active"
+            class="icon-button"
+            variant="chip"
+            :disabled="busy"
+            title="Перезапустить сессию"
+            aria-label="Перезапустить сессию"
+            @click="sessionAction('restart')"
+            ><IconRestart aria-hidden="true"
+          /></UiButton>
+
+          <UiButton
             class="icon-button"
             variant="chip"
             :title="expanded ? 'Свернуть терминал' : 'Развернуть терминал'"
@@ -395,34 +528,80 @@ onBeforeUnmount(() => {
               v-else
               aria-hidden="true"
           /></UiButton>
-          <UiButton
-            v-if="active"
-            class="icon-button"
-            variant="danger"
-            :disabled="busy"
-            title="Закрыть сессию"
-            aria-label="Закрыть сессию"
-            @click="closeActive"
-            ><IconClose aria-hidden="true"
-          /></UiButton>
         </div>
       </div>
     </header>
     <div v-if="sessions.length" class="tabs" role="tablist" aria-label="Сессии терминала">
-      <button
+      <div
         v-for="(session, index) in sessions"
         :key="session.id"
-        role="tab"
-        :aria-selected="session.id === activeId"
+        class="session-tab"
+        @auxclick="closeOnMiddleClick($event, session.id)"
+        @mousedown="preventMiddleScroll"
         :class="{ selected: session.id === activeId }"
-        @click="activeId = session.id"
       >
-        {{ session.title }} {{ index + 1 }}{{ session.status === "exited" ? " · завершён" : "" }}
-      </button>
+        <button
+          role="tab"
+          :aria-selected="session.id === activeId"
+          :aria-label="sessionLabel(session, index)"
+          :title="`${sessionLabel(session, index)}${session.status === 'running' ? (session.activity?.state === 'idle' ? ' · ожидает ввода' : ' · есть работающие процессы') : ''}`"
+          @click="activeId = session.id"
+        >
+          <IconFailed v-if="failed(session)" class="session-state failed" aria-hidden="true" />
+          <IconFinishFlag
+            v-else-if="session.status === 'exited'"
+            class="session-state"
+            aria-hidden="true"
+          />
+          {{ session.title }} {{ index + 1 }}
+        </button>
+        <button
+          v-if="session.id === activeId"
+          class="tab-close"
+          :disabled="busy"
+          :title="`Удалить сессию ${session.title} ${index + 1}`"
+          :aria-label="`Удалить сессию ${session.title} ${index + 1}`"
+          @click="closeSession(session.id)"
+        >
+          <IconClose aria-hidden="true" />
+        </button>
+      </div>
     </div>
     <slot name="status" />
     <p v-if="statusText" class="status" role="status">{{ statusText }}</p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <dialog
+      v-if="pendingClose"
+      ref="closeDialog"
+      class="close-dialog"
+      :aria-labelledby="closeTitle"
+      @cancel.prevent="!busy && (pendingClose = null)"
+    >
+      <h2 :id="closeTitle">Прервать процессы и закрыть вкладку?</h2>
+      <p>
+        {{ pendingClose.title }} ·
+        {{
+          pendingClose.activity?.state === "unknown"
+            ? "Не удалось определить, простаивает ли терминал."
+            : "В терминале работают процессы:"
+        }}
+      </p>
+      <ul v-if="pendingClose.activity?.processes.length">
+        <li v-for="process in pendingClose.activity.processes" :key="process.pid">
+          <span>{{ process.name }}</span
+          ><span class="process-pid">PID {{ process.pid }}</span>
+        </li>
+      </ul>
+      <div class="dialog-actions">
+        <UiButton autofocus :disabled="busy" @click="pendingClose = null">Отмена</UiButton>
+        <UiButton
+          variant="danger"
+          :disabled="busy"
+          @click="closeSession(pendingClose!.id, pendingClose!.activity?.confirmation)"
+          >Прервать и закрыть</UiButton
+        >
+      </div>
+    </dialog>
     <div class="screen-wrap">
       <div ref="container" class="screen" :class="{ inactive: !active }" />
     </div>
@@ -484,16 +663,92 @@ header {
   padding: 8px 12px 0;
 }
 .tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   flex-shrink: 0;
   padding: 5px 9px;
-  border: 1px solid transparent;
-  border-radius: 3px;
+  border: 0;
   font: 12px var(--mono);
   color: var(--muted);
 }
-.tabs button.selected {
+.session-state {
+  width: 14px;
+  height: 14px;
+  color: var(--muted);
+}
+.session-state.failed {
+  color: var(--err);
+}
+.session-tab {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  border-radius: 3px;
+}
+.session-tab.selected {
   border-color: var(--line);
   color: var(--text);
+}
+.tabs .tab-close {
+  padding: 5px;
+  color: var(--faint);
+}
+.tab-close svg {
+  width: 12px;
+  height: 12px;
+}
+.tab-close:hover:not(:disabled) {
+  color: var(--err);
+}
+.session-tab:hover {
+  background: var(--bg-2);
+}
+.close-dialog {
+  width: min(440px, calc(100vw - 40px));
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg-2);
+  color: var(--text);
+  box-shadow: 0 20px 60px #0008;
+}
+.close-dialog::backdrop {
+  background: #0009;
+}
+.close-dialog h2 {
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-weight: 500;
+}
+.close-dialog p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.close-dialog ul {
+  list-style: none;
+  padding: 0;
+  max-height: 180px;
+  overflow: auto;
+}
+.close-dialog li {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 7px 0;
+  font: 12px var(--mono);
+}
+.process-pid {
+  color: var(--faint);
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+  font-size: 12px;
 }
 .screen-wrap {
   position: relative;

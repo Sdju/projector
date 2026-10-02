@@ -90,6 +90,10 @@ async function until(predicate, description) {
   assert.fail(`Timed out: ${description}`);
 }
 async function request(suffix = "", method = "GET", body, headers = {}) {
+  if (method === "DELETE" && body === undefined) {
+    const current = await request(suffix);
+    if (current.ok) body = { confirmation: (await current.json()).session.activity.confirmation };
+  }
   return fetch(`${base}/api/projects/${project.id}/terminals${suffix}`, {
     method,
     headers: { Origin: base, "Content-Type": "application/json", ...headers },
@@ -305,7 +309,33 @@ print('RAW_HEX=' + data.hex(), flush=True)
   );
   await until(() => getSnapshot(project.id).exitCode === 7, "launch exit code");
   assert.equal(getSnapshot(project.id).status, "error");
-  assert.equal((await request(`/${commandSession.id}`, "DELETE")).status, 200);
+  const commandRestart = await request(`/${commandSession.id}`, "POST", { action: "restart" });
+  assert.equal(commandRestart.status, 201, await commandRestart.clone().text());
+  const restartedCommand = (await commandRestart.json()).session;
+  assert.equal(restartedCommand.commandId, "dev");
+  assert.notEqual(restartedCommand.id, commandSession.id);
+  assert.equal(getSnapshot(project.id).pid, restartedCommand.pid);
+  assert.equal(getSnapshot(project.id).status, "running");
+  assert.ok(!listTerminalSessions(project.id).some((item) => item.id === commandSession.id));
+  assert.equal(
+    (await request(`/${restartedCommand.id}`, "POST", { action: "restart" })).status,
+    409,
+  );
+  const restartedOutput = await connect(restartedCommand.id);
+  await until(
+    () => restartedOutput.output().includes("RUN_PTY"),
+    "command restart preserves launch recipe",
+  );
+  assert.equal((await request(`/${restartedCommand.id}`, "POST", { action: "stop" })).status, 200);
+  await until(
+    () => getSnapshot(project.id).status === "idle",
+    "terminal stop updates project status",
+  );
+  assert.equal(
+    listTerminalSessions(project.id).find((item) => item.id === restartedCommand.id).stopRequested,
+    true,
+  );
+  assert.equal((await request(`/${restartedCommand.id}`, "DELETE")).status, 200);
   assert.equal((await run("start", { commandId: "wait" })).status, 200);
   const waitSession = listTerminalSessions(project.id).find((item) => item.commandId === "wait");
   assert.equal((await run("stop")).status, 200);
@@ -316,6 +346,112 @@ print('RAW_HEX=' + data.hex(), flush=True)
   );
   assert.equal((await request(`/${waitSession.id}`, "DELETE")).status, 200);
   assert.equal((await request("", "POST", { commandId: "missing" })).status, 400);
+  const shell = (
+    await (await request("", "POST", { program: "shell", cols: 100, rows: 30 })).json()
+  ).session;
+  const shellOutput = await connect(shell.id);
+  await until(
+    async () => (await (await request(`/${shell.id}`)).json()).session.activity.state === "idle",
+    "Bash prompt is idle",
+  );
+  shellOutput.send({ type: "input", data: "sleep 60\r" });
+  await until(
+    async () =>
+      (await (await request(`/${shell.id}`)).json()).session.activity.processes.some(
+        (item) => item.name === "sleep",
+      ),
+    "foreground process is busy",
+  );
+  assert.equal((await request(`/${shell.id}`, "DELETE", {})).status, 409);
+  shellOutput.send({ type: "input", data: "\u0003" });
+  await until(
+    async () => (await (await request(`/${shell.id}`)).json()).session.activity.state === "idle",
+    "shell idles after foreground job stops",
+  );
+  shellOutput.send({ type: "input", data: "sleep 60 &\r" });
+  await until(
+    async () =>
+      (await (await request(`/${shell.id}`)).json()).session.activity.processes.some(
+        (item) => item.name === "sleep",
+      ),
+    "background process is busy even at a prompt",
+  );
+  const blockedWork = await request(`/${shell.id}`, "DELETE", {});
+  assert.equal(blockedWork.status, 409);
+  const oldConfirmation = (await blockedWork.json()).session.activity.confirmation;
+  assert.equal((await request(`/${shell.id}`, "DELETE", { confirmation: "invalid" })).status, 409);
+  shellOutput.send({ type: "input", data: "sleep 60 &\r" });
+  await until(
+    async () =>
+      (await (await request(`/${shell.id}`)).json()).session.activity.processes.filter(
+        (item) => item.name === "sleep",
+      ).length === 2,
+    "a new process invalidates approval",
+  );
+  assert.equal(
+    (await request(`/${shell.id}`, "DELETE", { confirmation: oldConfirmation })).status,
+    409,
+  );
+  shellOutput.send({ type: "input", data: "kill $(jobs -p)\r" });
+  await until(
+    async () => (await (await request(`/${shell.id}`)).json()).session.activity.state === "idle",
+    "shell idles after background jobs stop",
+  );
+
+  shellOutput.send({ type: "input", data: "printf 'KEPT_OUTPUT\\n'\r" });
+  await until(() => shellOutput.output().includes("KEPT_OUTPUT"), "shell stop probe output");
+  assert.equal((await request(`/${shell.id}`, "POST", { action: "stop" })).status, 200);
+  await until(
+    () =>
+      listTerminalSessions(project.id).find((item) => item.id === shell.id)?.status === "exited",
+    "shell stops without deleting tab",
+  );
+  const retained = await connect(shell.id);
+  assert.ok(
+    retained.output().includes("KEPT_OUTPUT"),
+    "stopped session retains output on reconnect",
+  );
+  assert.equal(
+    (await request(`/${shell.id}`, "POST", { action: "stop" })).status,
+    200,
+    "stop is idempotent",
+  );
+  const neighbor = (await (await request("", "POST", { program: "shell" })).json()).session;
+  const restart = await request(`/${shell.id}`, "POST", { action: "restart" });
+  assert.equal(restart.status, 201, await restart.clone().text());
+  const fresh = (await restart.json()).session;
+  assert.deepEqual(
+    listTerminalSessions(project.id).map((item) => item.id),
+    [fresh.id, neighbor.id],
+    "restart retains tab order",
+  );
+  assert.equal((await request(`/${neighbor.id}`, "DELETE")).status, 200);
+  assert.equal(fresh.program, "shell");
+  assert.equal(fresh.status, "running");
+  assert.equal(fresh.cols, 100);
+  assert.equal(fresh.rows, 30);
+  assert.equal(fresh.stopRequested, undefined);
+  assert.ok(!listTerminalSessions(project.id).some((item) => item.id === shell.id));
+  assert.equal((await request(`/${fresh.id}`, "POST", { action: "invalid" })).status, 400);
+  assert.equal((await request("/missing", "POST", { action: "restart" })).status, 404);
+  const freshOutput = await connect(fresh.id);
+  freshOutput.send({ type: "input", data: "exit 0\r" });
+  await until(
+    () => listTerminalSessions(project.id).find((item) => item.id === fresh.id)?.exitCode === 0,
+    "restarted shell accepts input and exits successfully",
+  );
+  assert.equal((await request(`/${fresh.id}`, "DELETE")).status, 200);
+  const idleShell = (await (await request("", "POST", { program: "shell" })).json()).session;
+  await until(
+    async () =>
+      (await (await request(`/${idleShell.id}`)).json()).session.activity.state === "idle",
+    "another idle Bash prompt",
+  );
+  assert.equal(
+    (await request(`/${idleShell.id}`, "DELETE", {})).status,
+    200,
+    "idle shell closes without confirmation",
+  );
   assert.deepEqual(listTerminalSessions(project.id), []);
 });
 

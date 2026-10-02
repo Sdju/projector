@@ -1,5 +1,11 @@
 export type TerminalProgram = "shell" | "codex" | "claude";
 
+export interface TerminalActivity {
+  state: "idle" | "busy" | "unknown";
+  processes: { pid: number; name: string }[];
+  confirmation: string;
+}
+
 export interface TerminalSession {
   id: string;
   projectId: string;
@@ -11,6 +17,8 @@ export interface TerminalSession {
   rows: number;
   status: "running" | "exited";
   exitCode: number | null;
+  stopRequested?: boolean;
+  activity?: TerminalActivity;
   startedAt: string;
 }
 

@@ -2,7 +2,13 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { createReadStream } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { inspectProject, expandPath } from "./inspect.ts";
-import { getSnapshot, listSnapshots, onProcessEvent, startProject, stopProject } from "./processes.ts";
+import {
+  getSnapshot,
+  listSnapshots,
+  onProcessEvent,
+  startProject,
+  stopProject,
+} from "./processes.ts";
 import { loadProjects, updateProjects } from "./store.ts";
 import type { LaunchMode, Project, ProjectCommand } from "./types.ts";
 import { appUrl, projectAppUrl } from "./paths.ts";
@@ -19,21 +25,54 @@ import {
   setActiveProvider,
 } from "./qwen/provider-store.ts";
 import type { AgentHistoryTurn, OpenAIProviderWrite } from "./qwen/types.ts";
-import { openBrowser, openLauncher, hidePalette, openWindow, startTray, quitDesktop } from "./window.ts";
-import { applicationIcon, interfaceMode, launchItem, preferences, saveInterface, searchLauncher, shortcuts, checkShortcut, shortcutStatus } from "./launcher.ts";
+import {
+  openBrowser,
+  openLauncher,
+  hidePalette,
+  openWindow,
+  startTray,
+  quitDesktop,
+} from "./window.ts";
+import {
+  applicationIcon,
+  interfaceMode,
+  launchItem,
+  preferences,
+  saveInterface,
+  searchLauncher,
+  shortcuts,
+  checkShortcut,
+  shortcutStatus,
+} from "./launcher.ts";
 
 import { listIntegrations } from "./integrations/index.ts";
-import { configureGithub, connectGithub, disconnectGithub, beginGithubLogin, pollGithubLogin, githubRepositories, importGithubProject } from "./integrations/github.ts";
+import {
+  configureGithub,
+  connectGithub,
+  disconnectGithub,
+  beginGithubLogin,
+  pollGithubLogin,
+  githubRepositories,
+  importGithubProject,
+} from "./integrations/github.ts";
 
 import {
   closeProjectTerminals,
+  terminalSessionSnapshot,
+  stopTerminalSession,
   closeTerminalSession,
   createTerminalSession,
   listTerminalSessions,
   terminalRequestAllowed,
 } from "./terminal.ts";
 
-import { listProjectDirectory, readProjectFile, searchProject, projectGit, projectComparison } from "./workspace.ts";
+import {
+  listProjectDirectory,
+  readProjectFile,
+  searchProject,
+  projectGit,
+  projectComparison,
+} from "./workspace.ts";
 
 interface SseClient {
   res: ServerResponse;
@@ -226,7 +265,14 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
     if (path === "/api/directories" && method === "GET") {
       if (!terminalRequestAllowed(req, false)) throw new HttpError(403, "Папки доступны только со страницы Projector");
       res.setHeader("Cache-Control", "no-store");
-      json(res, 200, await listDirectories(url.searchParams.get("path") ?? "", url.searchParams.get("complete") === "true"));
+      json(
+        res,
+        200,
+        await listDirectories(
+          url.searchParams.get("path") ?? "",
+          url.searchParams.get("complete") === "true",
+        ),
+      );
       return true;
     }
 
@@ -242,9 +288,13 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
         json(res, 200, { ok: true });
         return true;
       }
-      const mode = await openLauncher(appUrl(), body.mode ? interfaceMode(body.mode) : undefined, body.toggle === true);
+      const mode = await openLauncher(
+        appUrl(),
+        body.mode ? interfaceMode(body.mode) : undefined,
+        body.toggle === true,
+      );
       if (mode === "window") {
-        for (const client of sseClients) client.res.write('event: launcher-show\ndata: {}\n\n');
+        for (const client of sseClients) client.res.write("event: launcher-show\ndata: {}\n\n");
       }
       json(res, 200, { ok: true, url: appUrl(), mode });
       return true;
@@ -265,7 +315,11 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
 
     if (path === "/api/launcher/settings" && method === "GET") {
       const prefs = await preferences();
-      json(res, 200, { mode: prefs.mode, shortcut: prefs.shortcut, hotkey: await shortcutStatus() });
+      json(res, 200, {
+        mode: prefs.mode,
+        shortcut: prefs.shortcut,
+        hotkey: await shortcutStatus(),
+      });
       return true;
     }
     if (path === "/api/launcher/settings" && method === "PUT") {
@@ -411,7 +465,9 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
       const body = await readBody(req);
       const project = normalizeProject(body);
       if (!project.path) throw new Error("Укажите путь к проекту");
-      await updateProjects(projects => { projects.unshift(project); });
+      await updateProjects((projects) => {
+        projects.unshift(project);
+      });
       json(res, 201, { project: withRuntime(project) });
       return true;
     }
@@ -435,7 +491,16 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
         else if (sessionId === "file") json(res, 200, await readProjectFile(project.path, filePath));
         else if (sessionId === "search") json(res, 200, await searchProject(project.path, url.searchParams.get("q") ?? ""));
         else if (sessionId === "git") json(res, 200, await projectGit(project.path));
-        else if (sessionId === "diff") json(res, 200, await projectComparison(project.path, filePath, url.searchParams.get("staged") === "true"));
+        else if (sessionId === "diff")
+          json(
+            res,
+            200,
+            await projectComparison(
+              project.path,
+              filePath,
+              url.searchParams.get("staged") === "true",
+            ),
+          );
         else json(res, 404, { error: "Не найден" });
         return true;
       }
@@ -449,7 +514,57 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
           json(res, 201, { session: createTerminalSession(project, await readBody(req)) });
           return true;
         }
+        if (sessionId && method === "POST") {
+          const previous = listTerminalSessions(id).find((item) => item.id === sessionId);
+          if (!previous) throw new HttpError(404, "Терминал не найден");
+          const body = await readBody(req);
+          if (body.action === "stop") {
+            const running = getSnapshot(id);
+            if (previous.commandId && running.pid === previous.pid && running.status === "running")
+              stopProject(id);
+            else stopTerminalSession(id, sessionId);
+            json(res, 200, {
+              session: listTerminalSessions(id).find((item) => item.id === sessionId),
+            });
+          } else if (body.action === "restart") {
+            if (previous.status !== "exited") throw new HttpError(409, "Сначала завершите сессию");
+            let session;
+            if (previous.commandId) {
+              if (!project.commands.some((command) => command.id === previous.commandId))
+                throw new HttpError(400, "Команда проекта больше не существует");
+              const running = startProject(project, previous.commandId, "server", previous.id);
+              session = listTerminalSessions(id).find((item) => item.pid === running.pid);
+            } else {
+              session = createTerminalSession(
+                project,
+                { program: previous.program },
+                undefined,
+                previous.id,
+              );
+            }
+            json(res, 201, { session });
+          } else throw new HttpError(400, "Неизвестное действие с сессией");
+          return true;
+        }
+        if (sessionId && method === "GET") {
+          const session = terminalSessionSnapshot(id, sessionId);
+          if (!session) throw new HttpError(404, "Терминал не найден");
+          res.setHeader("Cache-Control", "no-store");
+          json(res, 200, { session });
+          return true;
+        }
         if (sessionId && method === "DELETE") {
+          const body = await readBody(req);
+          const session = terminalSessionSnapshot(id, sessionId);
+          if (session) {
+            if (
+              session.activity?.state !== "idle" &&
+              body.confirmation !== session.activity?.confirmation
+            ) {
+              json(res, 409, { error: "Подтвердите прерывание процессов", session });
+              return true;
+            }
+          }
           closeTerminalSession(id, sessionId);
           json(res, 200, { ok: true });
           return true;
@@ -468,8 +583,8 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
       if (!action && method === "PATCH") {
         const body = await readBody(req);
         const next = normalizeProject({ ...project, ...body }, project);
-        await updateProjects(current => {
-          const currentIndex = current.findIndex(item => item.id === id);
+        await updateProjects((current) => {
+          const currentIndex = current.findIndex((item) => item.id === id);
           if (currentIndex === -1) throw new HttpError(404, "Проект не найден");
           current[currentIndex] = next;
         });
@@ -480,8 +595,8 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
       if (!action && method === "DELETE") {
         stopProject(id);
         closeProjectTerminals(id);
-        await updateProjects(current => {
-          const currentIndex = current.findIndex(item => item.id === id);
+        await updateProjects((current) => {
+          const currentIndex = current.findIndex((item) => item.id === id);
           if (currentIndex !== -1) current.splice(currentIndex, 1);
         });
         json(res, 200, { ok: true });
@@ -490,7 +605,11 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
 
       if (action === "start" && method === "POST") {
         const body = await readBody(req);
-        const runtime = startProject(project, asString(body.commandId) || undefined, parseMode(body.mode));
+        const runtime = startProject(
+          project,
+          asString(body.commandId) || undefined,
+          parseMode(body.mode),
+        );
         json(res, 200, { runtime });
         return true;
       }
@@ -528,8 +647,6 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
         res.end(launchHtml(project, target));
         return true;
       }
-
-
     }
 
     json(res, 404, { error: "Не найден" });

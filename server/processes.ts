@@ -109,9 +109,13 @@ export function startProject(
   project: Project,
   commandId?: string,
   mode?: LaunchMode,
+  replacingId?: string,
 ): ProcessSnapshot {
   const current = sessions.get(project.id);
-  if (current && (current.status === "running" || current.status === "starting")) {
+  if (
+    current &&
+    (current.status === "running" || current.status === "starting" || current.status === "stopping")
+  ) {
     throw new Error("Проект уже запущен");
   }
 
@@ -132,6 +136,7 @@ export function startProject(
         emit("status", snapshot(session));
       },
     },
+    replacingId,
   );
   session = {
     project,

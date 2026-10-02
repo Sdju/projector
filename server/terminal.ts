@@ -1,3 +1,4 @@
+import { readTerminalProcesses, terminalActivity } from "./terminal-activity.ts";
 import { randomUUID } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import type { IncomingMessage, Server } from "node:http";
@@ -123,9 +124,25 @@ function flow(session: Session): void {
 }
 
 export function listTerminalSessions(projectId: string): TerminalSession[] {
+  const processes = readTerminalProcesses();
   return [...state.sessions.values()]
     .filter((session) => session.info.projectId === projectId)
-    .map((session) => ({ ...session.info }));
+    .map((session) => ({
+      ...session.info,
+      activity: terminalActivity(session.info, processes),
+    }));
+}
+
+export function terminalSessionSnapshot(
+  projectId: string,
+  id: string,
+): TerminalSession | undefined {
+  const session = state.sessions.get(id);
+  if (!session || session.info.projectId !== projectId) return;
+  return {
+    ...session.info,
+    activity: terminalActivity(session.info, readTerminalProcesses()),
+  };
 }
 
 // Capture descendants before stopping the shell; interactive jobs have their own
@@ -205,6 +222,9 @@ function terminate(session: Session, immediate = false): void {
 export function stopTerminalSession(projectId: string, id: string): void {
   const session = state.sessions.get(id);
   if (!session || session.info.projectId !== projectId) throw new Error("Терминал не найден");
+  if (session.info.status === "exited" || session.info.stopRequested) return;
+  session.info.stopRequested = true;
+  broadcast(session, { type: "status", session: { ...session.info } });
   terminate(session);
 }
 
@@ -228,8 +248,13 @@ export function createTerminalSession(
   project: Project,
   input: Record<string, unknown>,
   observer?: { output: (data: string) => void; exit: (code: number) => void },
+  replacingId?: string,
 ): TerminalSession {
-  if (state.sessions.size >= MAX_SESSIONS)
+  const previous = replacingId ? state.sessions.get(replacingId) : undefined;
+  if (replacingId && (!previous || previous.info.projectId !== project.id))
+    throw new Error("Терминал не найден");
+  if (previous && previous.info.status !== "exited") throw new Error("Сначала завершите сессию");
+  if (!previous && state.sessions.size >= MAX_SESSIONS)
     throw new Error("Лимит терминалов: закройте ненужные сессии");
   const program = (input.program ?? "shell") as TerminalProgram;
   if (!["shell", "codex", "claude"].includes(program)) throw new Error("Неизвестная программа");
@@ -238,7 +263,10 @@ export function createTerminalSession(
       ? undefined
       : project.commands.find((item) => item.id === input.commandId);
   if (input.commandId !== undefined && !command) throw new Error("Команда не найдена");
-  const dimensions = size(input.cols ?? 80, input.rows ?? 24);
+  const dimensions = size(
+    input.cols ?? previous?.info.cols ?? 80,
+    input.rows ?? previous?.info.rows ?? 24,
+  );
   const env = Object.fromEntries(
     Object.entries(process.env).filter(
       (entry): entry is [string, string] => entry[1] !== undefined,
@@ -325,6 +353,16 @@ export function createTerminalSession(
       stopAll();
       process.exit(0);
     });
+  }
+  if (previous) {
+    const ordered = [...state.sessions.entries()]
+      .filter(([id]) => id !== session.info.id)
+      .map(([id, item]) =>
+        id === previous.info.id ? ([session.info.id, session] as const) : ([id, item] as const),
+      );
+    closeTerminalSession(project.id, previous.info.id);
+    state.sessions.clear();
+    for (const [id, item] of ordered) state.sessions.set(id, item);
   }
   return { ...session.info };
 }
