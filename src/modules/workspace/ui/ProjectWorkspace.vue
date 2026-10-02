@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useSessionSnapshot, workspaceSessionSchema, type WorkspaceSession } from "../session.ts";
-import { workspaceRequest, saveWorkspaceMarkdown, mutateWorkspaceGit } from "../api.ts";
+import { workspaceRequest, saveWorkspaceFile, mutateWorkspaceGit } from "../api.ts";
 import { isFileDrag, pathsFromDataTransfer } from "../../path-drop/index.ts";
 import { projectRelativePath, previewBrowserFile } from "../file-drop.ts";
 import { treeDragType } from "../tree-drag.ts";
@@ -124,7 +124,7 @@ async function prepareEntryChange(path: string) {
   const affected = tabs.value.filter(
     (tab) => !tab.virtual && (tab.path === path || tab.path.startsWith(path + "/")),
   );
-  return (await Promise.all(affected.map((tab) => saveMarkdown(tab)))).every(Boolean);
+  return (await Promise.all(affected.map((tab) => saveFile(tab)))).every(Boolean);
 }
 async function closeManyTabs(ids: string[]) {
   for (const id of ids) {
@@ -153,9 +153,9 @@ registerEditor(
   "Сохранить",
   async (args) => {
     const file = commandFile(args)!;
-    if (!(await saveMarkdown(file))) throw new Error(file.saveError || "Не удалось сохранить файл");
+    if (!(await saveFile(file))) throw new Error(file.saveError || "Не удалось сохранить файл");
   },
-  (args) => !!commandFile(args) && isMarkdown(commandFile(args)!),
+  (args) => !!commandFile(args) && isEditable(commandFile(args)!),
 );
 registerEditor(
   "ide.editor.file.reveal",
@@ -250,11 +250,10 @@ interface OpenFile extends FileContent {
   saving?: boolean;
   saveError?: string;
 }
+const isEditable = (file: OpenFile) =>
+  !file.virtual && !file.external && !file.image && !file.archive && file.original === undefined;
 const isMarkdown = (file: OpenFile) =>
-  !file.virtual &&
-  !file.external &&
-  file.original === undefined &&
-  /\.(?:md|markdown)$/i.test(file.path);
+  isEditable(file) && /\.(?:md|markdown)$/i.test(file.path);
 const isDirty = (file: OpenFile) =>
   !file.virtual && file.draft !== undefined && file.draft !== file.content;
 const tabs = ref<OpenFile[]>([]);
@@ -663,7 +662,7 @@ async function dropFiles(event: DragEvent) {
 async function closeTab(key: string) {
   const tab = tabs.value.find((file) => file.key === key);
   if (!tab) return;
-  if (!(await saveMarkdown(tab))) {
+  if (!(await saveFile(tab))) {
     activeKey.value = tab.key;
     if (!window.confirm(`Не удалось сохранить ${tab.path}. Закрыть без сохранения изменений?`))
       return;
@@ -676,15 +675,15 @@ async function closeTab(key: string) {
     activeKey.value = tabs.value[Math.min(index, tabs.value.length - 1)]?.key ?? "";
 }
 function selectTab(key: string) {
-  if (key !== activeKey.value) void saveMarkdown();
+  if (key !== activeKey.value) void saveFile();
   ++fileGeneration;
   loading.value = false;
   fileError.value = "";
   activeKey.value = key;
 }
 const pendingSaves = new Map<OpenFile, Promise<boolean>>();
-function saveMarkdown(file = active.value): Promise<boolean> {
-  if (!file || !isMarkdown(file)) return Promise.resolve(true);
+function saveFile(file = active.value): Promise<boolean> {
+  if (!file || !isEditable(file)) return Promise.resolve(true);
   const pending = pendingSaves.get(file);
   if (pending) return pending;
   if (!isDirty(file)) return Promise.resolve(true);
@@ -696,7 +695,7 @@ function saveMarkdown(file = active.value): Promise<boolean> {
       // If a second blur/save arrives during a write, include the latest draft.
       while (isDirty(file)) {
         const content = file.draft!;
-        await saveWorkspaceMarkdown(projectId, file.path, content, file.content);
+        await saveWorkspaceFile(projectId, file.path, content, file.content);
         file.content = content;
       }
       void loadGit();
@@ -713,14 +712,14 @@ function saveMarkdown(file = active.value): Promise<boolean> {
   return operation;
 }
 async function canLeave() {
-  const results = await Promise.all(tabs.value.map((file) => saveMarkdown(file)));
+  const results = await Promise.all(tabs.value.map((file) => saveFile(file)));
   if (results.every(Boolean)) return true;
-  return window.confirm("Не удалось сохранить изменения Markdown. Уйти без сохранения?");
+  return window.confirm("Не удалось сохранить изменения файлов. Уйти без сохранения?");
 }
 onBeforeRouteLeave(canLeave);
 onBeforeRouteUpdate((to, from) => to.path === from.path || canLeave());
 function windowBlur() {
-  for (const file of tabs.value) void saveMarkdown(file);
+  for (const file of tabs.value) void saveFile(file);
 }
 function toggleMarkdownSource() {
   const file = active.value;
@@ -1096,6 +1095,9 @@ onBeforeUnmount(() => {
         }}</span>
       </div>
       <p v-if="fileError" class="file-error" role="alert">{{ fileError }}</p>
+      <p v-if="active?.saveError && !isMarkdown(active)" class="file-error" role="alert">
+        {{ active.saveError }}
+      </p>
       <div class="editor-body" :aria-busy="loading">
         <p v-if="loading" class="loading" role="status">читаю файл…</p>
         <p v-if="!active && !loading" class="loading">
@@ -1121,13 +1123,16 @@ onBeforeUnmount(() => {
           :column="active.column"
           @change="active.draft = $event"
           @mode="active.markdownMode = $event"
-          @save="saveMarkdown"
+          @save="saveFile"
           @open="openFile($event)"
         />
         <CodeViewer
           v-else-if="active"
           :path="active.path"
-          :content="active.content"
+          :content="active.draft ?? active.content"
+          :editable="isEditable(active)"
+          @change="active.draft = $event"
+          @save="saveFile"
           :original="active.original"
           :line="active.line"
           :column="active.column"

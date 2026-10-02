@@ -13,7 +13,7 @@ export async function workspaceRequest<T>(
   return data as T;
 }
 
-export async function saveWorkspaceMarkdown(
+export async function saveWorkspaceFile(
   projectId: string,
   path: string,
   content: string,

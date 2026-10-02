@@ -57,6 +57,12 @@ function render() {
   }
   reveal();
 }
+function focusOut(event: FocusEvent) {
+  if (!props.editable) return;
+  const target = event.relatedTarget;
+  if (target instanceof Node && container.value?.contains(target)) return;
+  emit("save");
+}
 function reveal() {
   if (!editor || !props.line) return;
   const target = "getModifiedEditor" in editor ? editor.getModifiedEditor() : editor;
@@ -85,7 +91,8 @@ onBeforeUnmount(() => {
   <div
     ref="container"
     class="code-viewer"
-    :aria-label="editable ? 'Редактор Markdown' : 'Просмотр кода'"
+    @focusout="focusOut"
+    :aria-label="editable ? 'Редактор файла' : 'Просмотр кода'"
   />
 </template>
 <style scoped>
