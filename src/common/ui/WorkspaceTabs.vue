@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
+import ContextMenu from "./ContextMenu.vue";
+import type { ContextMenuItem } from "./context-menu.ts";
 import IconClose from "~icons/lucide/x";
 
 interface Tab {
@@ -16,13 +18,78 @@ const props = defineProps<{
   label: string;
   renameable?: boolean;
   disabled?: boolean;
+  actions?: (id: string) => ContextMenuItem[];
+  closeSaved?: boolean;
 }>();
 const emit = defineEmits<{
   select: [id: string];
   close: [id: string];
+  closeMany: [ids: string[]];
   reorder: [ids: string[]];
   rename: [id: string, label: string];
 }>();
+const menu = ref<InstanceType<typeof ContextMenu>>();
+const contextId = ref("");
+function showContext(event: MouseEvent | KeyboardEvent, tab: Tab) {
+  contextId.value = tab.id;
+  void menu.value?.open(event);
+}
+const menuItems = computed<ContextMenuItem[]>(() => {
+  const tab = props.tabs.find((tab) => tab.id === contextId.value);
+  if (!tab) return [];
+  const index = props.tabs.indexOf(tab);
+  const closeGroup = (ids: string[]) => emit("closeMany", ids);
+  const items: ContextMenuItem[] = [
+    { id: "close", label: "Закрыть", run: () => emit("close", tab.id) },
+    {
+      id: "close-others",
+      label: "Закрыть остальные",
+      disabled: props.tabs.length < 2,
+      run: () => closeGroup(props.tabs.filter((item) => item.id !== tab.id).map((item) => item.id)),
+    },
+    {
+      id: "close-left",
+      label: "Закрыть слева",
+      disabled: index === 0,
+      run: () => closeGroup(props.tabs.slice(0, index).map((item) => item.id)),
+    },
+    {
+      id: "close-right",
+      label: "Закрыть справа",
+      disabled: index === props.tabs.length - 1,
+      run: () => closeGroup(props.tabs.slice(index + 1).map((item) => item.id)),
+    },
+    {
+      id: "close-all",
+      label: "Закрыть все",
+      run: () => closeGroup(props.tabs.map((item) => item.id)),
+    },
+  ];
+  if (props.closeSaved)
+    items.push({
+      id: "close-saved",
+      label: "Закрыть сохранённые",
+      disabled: !props.tabs.some((item) => !item.dirty && !item.saving),
+      run: () =>
+        closeGroup(props.tabs.filter((item) => !item.dirty && !item.saving).map((item) => item.id)),
+    });
+  if (props.renameable)
+    items.push({
+      id: "rename",
+      label: "Переименовать…",
+      separator: true,
+      shortcut: "F2",
+      run: () => startRename(tab),
+    });
+  items.push(...(props.actions?.(tab.id) ?? []));
+  return items.map((item) => ({ ...item, disabled: props.disabled || item.disabled }));
+});
+watch(
+  () => props.disabled,
+  (disabled) => {
+    if (disabled) menu.value?.close(false);
+  },
+);
 const strip = ref<HTMLElement>();
 const editing = ref("");
 const draft = ref("");
@@ -94,6 +161,13 @@ function drop(event: DragEvent, id?: string) {
   endDrag();
 }
 function navigate(event: KeyboardEvent, id: string) {
+  if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+    showContext(
+      event,
+      props.tabs.find((tab) => tab.id === id)!,
+    );
+    return;
+  }
   const index = props.tabs.findIndex((tab) => tab.id === id);
   let next = index;
   if (event.key === "ArrowRight") next = (index + 1) % props.tabs.length;
@@ -121,6 +195,7 @@ watch(
 watch(
   () => props.tabs,
   () => {
+    if (!props.tabs.some((tab) => tab.id === contextId.value)) menu.value?.close(false);
     if (!props.tabs.some((tab) => tab.id === editing.value)) editing.value = "";
     if (!props.tabs.some((tab) => tab.id === dragging.value)) endDrag();
   },
@@ -151,6 +226,7 @@ watch(
         'drop-after': tab.id === target && after && tab.id !== dragging,
       }"
       :draggable="!disabled && editing !== tab.id"
+      @contextmenu.stop="showContext($event, tab)"
       @dragstart.stop="dragStart($event, tab.id)"
       @dragover.stop="dragOver($event, tab.id)"
       @drop.stop="drop($event, tab.id)"
@@ -209,6 +285,7 @@ watch(
       </button>
     </div>
   </div>
+  <ContextMenu ref="menu" :items="menuItems" :label="`Действия: ${label}`" />
 </template>
 
 <style scoped>

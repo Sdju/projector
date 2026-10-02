@@ -3,6 +3,7 @@ import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch 
 import { workspaceRequest, saveWorkspaceMarkdown } from "../api.ts";
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from "vue-router";
 import { relocatedPath } from "../../../../core/modules/workspace/index.ts";
+import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import WorkspaceTabs from "../../../common/ui/WorkspaceTabs.vue";
 import FileTree from "./FileTree.vue";
 import GitChangesTree from "./GitChangesTree.vue";
@@ -106,6 +107,61 @@ function resizeKey(event: KeyboardEvent, pane: "tree" | "agent") {
         element.clientWidth - element.querySelector(".sidebar")!.clientWidth - 268,
       ),
     );
+}
+const fileTree = ref<InstanceType<typeof FileTree>>();
+async function prepareEntryChange(path: string) {
+  const affected = tabs.value.filter((tab) => tab.path === path || tab.path.startsWith(path + "/"));
+  return (await Promise.all(affected.map((tab) => saveMarkdown(tab)))).every(Boolean);
+}
+async function closeManyTabs(ids: string[]) {
+  for (const id of ids) {
+    await closeTab(id);
+    if (tabs.value.some((tab) => tab.key === id)) break;
+  }
+}
+function tabActions(id: string): ContextMenuItem[] {
+  const file = tabs.value.find((tab) => tab.key === id)!;
+  return [
+    {
+      id: "save",
+      label: "Сохранить",
+      shortcut: "Ctrl+S",
+      separator: true,
+      disabled: !isMarkdown(file) || !isDirty(file),
+      run: async () => {
+        await saveMarkdown(file);
+      },
+    },
+    {
+      id: "reveal",
+      label: "Показать в дереве файлов",
+      run: async () => {
+        section.value = "files";
+        fileTree.value?.reveal(file.path);
+      },
+    },
+    {
+      id: "copy-path",
+      label: "Копировать относительный путь",
+      run: async () => {
+        try {
+          await navigator.clipboard.writeText(file.path);
+        } catch {
+          fileError.value = "Не удалось скопировать путь";
+        }
+      },
+    },
+  ];
+}
+function entryDeleted(path: string) {
+  ++fileGeneration;
+  loading.value = false;
+  tabs.value = tabs.value.filter((tab) => tab.path !== path && !tab.path.startsWith(path + "/"));
+  if (!tabs.value.some((tab) => tab.key === activeKey.value))
+    activeKey.value = tabs.value.at(-1)?.key ?? "";
+  revision.value++;
+  void loadGit();
+  if (query.value.trim()) void search();
 }
 const section = ref<"files" | "search" | "git" | "project">("files");
 const revision = ref(0);
@@ -440,6 +496,13 @@ onBeforeUnmount(() => {
       </nav>
       <div v-show="section === 'files'" class="side-content">
         <FileTree
+          ref="fileTree"
+          :before-change="prepareEntryChange"
+          @changed="
+            revision++;
+            loadGit();
+          "
+          @deleted="entryDeleted"
           :project-id="projectId"
           :selected="active?.path ?? ''"
           :revision="revision"
@@ -530,6 +593,9 @@ onBeforeUnmount(() => {
         :tabs="fileTabs"
         :active-id="activeKey"
         label="Открытые файлы"
+        close-saved
+        :actions="tabActions"
+        @close-many="closeManyTabs"
         @select="selectTab"
         @close="closeTab"
         @reorder="reorderTabs"

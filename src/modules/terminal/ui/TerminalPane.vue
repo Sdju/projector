@@ -344,6 +344,32 @@ async function sessionAction(action: "stop" | "restart"): Promise<void> {
   }
 }
 
+let closeQueue: string[] = [];
+async function closeManySessions(ids: string[]) {
+  closeQueue = [...ids];
+  await drainCloseQueue();
+}
+async function drainCloseQueue() {
+  while (closeQueue.length && !destroyed) {
+    const id = closeQueue[0]!;
+    if (sessions.value.some((session) => session.id === id)) {
+      await closeSession(id);
+      if (sessions.value.some((session) => session.id === id)) return;
+    }
+    closeQueue.shift();
+  }
+}
+function cancelClose() {
+  if (busy.value) return;
+  closeQueue = [];
+  pendingClose.value = null;
+}
+async function confirmClose() {
+  const session = pendingClose.value;
+  if (!session) return;
+  await closeSession(session.id, session.activity?.confirmation);
+  if (!sessions.value.some((item) => item.id === session.id)) await drainCloseQueue();
+}
 async function closeSession(id: string, confirmation?: string): Promise<void> {
   if (busy.value) return;
   ++listGeneration;
@@ -403,6 +429,7 @@ watch(
   () => props.projectId,
   () => {
     disconnect();
+    closeQueue = [];
     pendingClose.value = null;
     activeId.value = "";
     sessions.value = [];
@@ -580,6 +607,7 @@ onBeforeUnmount(() => {
       :disabled="busy"
       @select="activeId = $event"
       @close="closeSession"
+      @close-many="closeManySessions"
       @reorder="reorderSessions"
       @rename="renameSession"
     >
@@ -604,7 +632,7 @@ onBeforeUnmount(() => {
       ref="closeDialog"
       class="close-dialog"
       :aria-labelledby="closeTitle"
-      @cancel.prevent="!busy && (pendingClose = null)"
+      @cancel.prevent="cancelClose"
     >
       <h2 :id="closeTitle">Прервать процессы и закрыть вкладку?</h2>
       <p>
@@ -622,11 +650,8 @@ onBeforeUnmount(() => {
         </li>
       </ul>
       <div class="dialog-actions">
-        <UiButton autofocus :disabled="busy" @click="pendingClose = null">Отмена</UiButton>
-        <UiButton
-          variant="danger"
-          :disabled="busy"
-          @click="closeSession(pendingClose!.id, pendingClose!.activity?.confirmation)"
+        <UiButton autofocus :disabled="busy" @click="cancelClose">Отмена</UiButton>
+        <UiButton variant="danger" :disabled="busy" @click="confirmClose"
           >Прервать и закрыть</UiButton
         >
       </div>
