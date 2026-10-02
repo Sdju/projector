@@ -269,7 +269,8 @@ export function createTerminalSession(
   if (!previous && state.sessions.size >= MAX_SESSIONS)
     throw new Error("Лимит терминалов: закройте ненужные сессии");
   const program = (input.program ?? "shell") as TerminalProgram;
-  if (!["shell", "codex", "claude"].includes(program)) throw new Error("Неизвестная программа");
+  if (!["shell", "codex", "claude", "opencode"].includes(program))
+    throw new Error("Неизвестная программа");
   const command =
     input.commandId === undefined
       ? undefined
@@ -315,7 +316,7 @@ export function createTerminalSession(
       customTitle: previous?.info.customTitle,
       title:
         command?.name ??
-        (program === "shell" ? "Shell" : program === "codex" ? "Codex" : "Claude Code"),
+        { shell: "Shell", codex: "Codex", claude: "Claude Code", opencode: "OpenCode" }[program],
       pid: child.pid,
       ...dimensions,
       status: "running",

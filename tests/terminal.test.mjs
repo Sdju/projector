@@ -140,6 +140,41 @@ await test("real PTY: input, Unicode, resize, interrupt, reconnect, alternate sc
     await new Promise((resolve) => server.close(resolve));
     await rm(root, { recursive: true, force: true });
   });
+  await t.test("OpenCode uses project cwd and an interactive PTY, reconnects and restarts", async () => {
+    const bin = join(root, "bin");
+    await mkdir(bin);
+    await writeFile(join(bin, "opencode"),
+      '#!/bin/sh\ntest -t 0 && test -t 1 || exit 1\nprintf "OPENCODE_READY:%s\\n" "$PWD"\nread value\nprintf "OPENCODE_INPUT:%s\\n" "$value"\n',
+      { mode: 0o700 });
+    const previousPath = process.env.PATH;
+    process.env.PATH = `${bin}:${previousPath}`;
+    try {
+      const created = await request("", "POST", { program: "opencode" });
+      assert.equal(created.status, 201, await created.clone().text());
+      const { session } = await created.json();
+      assert.equal(session.program, "opencode");
+      assert.equal(session.title, "OpenCode");
+      const first = await connect(session.id);
+      await until(() => first.output().includes(`OPENCODE_READY:${root}`), "OpenCode PTY and cwd");
+      first.client.close();
+      await once(first.client, "close");
+      const reconnected = await connect(session.id);
+      assert.ok(reconnected.output().includes(`OPENCODE_READY:${root}`));
+      reconnected.send({ type: "input", data: "привет OpenCode\r" });
+      await until(() => reconnected.output().includes("OPENCODE_INPUT:привет OpenCode"), "OpenCode input");
+      await until(() => listTerminalSessions(project.id).find(item => item.id === session.id)?.exitCode === 0, "OpenCode exit");
+      const restarted = await request(`/${session.id}`, "POST", { action: "restart" });
+      assert.equal(restarted.status, 201, await restarted.clone().text());
+      const fresh = (await restarted.json()).session;
+      assert.equal(fresh.program, "opencode");
+      assert.equal(fresh.title, "OpenCode");
+      const output = await connect(fresh.id);
+      await until(() => output.output().includes(`OPENCODE_READY:${root}`), "OpenCode restart");
+      assert.equal((await request(`/${fresh.id}`, "DELETE")).status, 200);
+    } finally {
+      process.env.PATH = previousPath;
+    }
+  });
   const droppedSession = (await (await request("", "POST", { program: "shell" })).json()).session;
   const uploadUrl = `${base}/api/projects/${project.id}/terminals/${droppedSession.id}`;
   const content = Buffer.from([0, 255, 10, 13, 65]);

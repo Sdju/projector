@@ -7,6 +7,7 @@ import UiButton from "../../../common/ui/UiButton.vue";
 import IconTerminal from "~icons/lucide/terminal";
 import IconCodex from "~icons/simple-icons/openai";
 import IconClaude from "~icons/simple-icons/claude";
+import IconOpenCode from "~icons/simple-icons/opencode";
 import IconMaximize from "~icons/lucide/maximize-2";
 import IconMinimize from "~icons/lucide/minimize-2";
 import IconFinishFlag from "../../../common/ui/IconFinishFlag.vue";
@@ -648,6 +649,15 @@ onBeforeUnmount(() => {
             aria-label="Новый Claude Code"
             @click="create('claude')"
             ><IconClaude aria-hidden="true"
+          /></UiButton>
+          <UiButton
+            class="icon-button"
+            variant="chip"
+            :disabled="busy"
+            title="Новый OpenCode"
+            aria-label="Новый OpenCode"
+            @click="create('opencode')"
+            ><IconOpenCode aria-hidden="true"
           /></UiButton>
         </div>
         <div class="view-actions">
