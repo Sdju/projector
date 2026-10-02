@@ -5,5 +5,7 @@ export interface ContextMenuItem {
   disabled?: boolean;
   danger?: boolean;
   separator?: boolean;
+  command?: string;
+  args?: unknown;
   run: () => void | Promise<void>;
 }

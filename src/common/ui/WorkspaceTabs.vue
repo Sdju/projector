@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, ref, useId, watch } from "vue";
+import { useCommandScope, commandArgs } from "../utilities/commands.ts";
 import ContextMenu from "./ContextMenu.vue";
 import type { ContextMenuItem } from "./context-menu.ts";
 import IconClose from "~icons/lucide/x";
@@ -20,67 +21,167 @@ const props = defineProps<{
   disabled?: boolean;
   actions?: (id: string) => ContextMenuItem[];
   closeSaved?: boolean;
-}>();
-const emit = defineEmits<{
-  select: [id: string];
-  close: [id: string];
-  closeMany: [ids: string[]];
-  reorder: [ids: string[]];
-  rename: [id: string, label: string];
+  commandNamespace: string;
+  projectId: string;
+  commandHandlers: {
+    select: (id: string) => unknown;
+    close: (id: string) => unknown;
+    closeMany: (ids: string[]) => unknown;
+    reorder: (ids: string[]) => unknown;
+    rename?: (id: string, label: string) => unknown;
+  };
 }>();
 const menu = ref<InstanceType<typeof ContextMenu>>();
 const contextId = ref("");
 function showContext(event: MouseEvent | KeyboardEvent, tab: Tab) {
   contextId.value = tab.id;
+  commands.scope.activate();
   void menu.value?.open(event);
 }
+const commands = useCommandScope(`tabs:${useId()}`, () => ({
+  surface: "tabs",
+  namespace: props.commandNamespace,
+  projectId: props.projectId,
+  busy: !!props.disabled,
+}));
+const commandId = (action: string) => `${props.commandNamespace}.${action}`;
+function findTab(value?: unknown) {
+  const args = commandArgs(value);
+  if (args.id !== undefined && typeof args.id !== "string")
+    throw new Error("id должен быть строкой");
+  return props.tabs.find((tab) => tab.id === (args.id ?? (contextId.value || props.activeId)));
+}
+const register = (
+  action: string,
+  title: string,
+  run: (args?: unknown) => unknown,
+  enabled: (args?: unknown) => boolean = () => true,
+) =>
+  commands.scope.registerCommand({
+    id: commandId(action),
+    title,
+    run,
+    enabled: (args) => !props.disabled && enabled(args),
+  });
+const hasTab = (args?: unknown) => !!findTab(args);
+register(
+  "select",
+  "Открыть вкладку",
+  (args) => props.commandHandlers.select(findTab(args)!.id),
+  hasTab,
+);
+register("close", "Закрыть", (args) => props.commandHandlers.close(findTab(args)!.id), hasTab);
+register(
+  "closeOthers",
+  "Закрыть остальные",
+  (args) =>
+    props.commandHandlers.closeMany(
+      props.tabs.filter((tab) => tab.id !== findTab(args)!.id).map((tab) => tab.id),
+    ),
+  (args) => hasTab(args) && props.tabs.length > 1,
+);
+register(
+  "closeLeft",
+  "Закрыть слева",
+  (args) =>
+    props.commandHandlers.closeMany(
+      props.tabs.slice(0, props.tabs.indexOf(findTab(args)!)).map((tab) => tab.id),
+    ),
+  (args) => hasTab(args) && props.tabs.indexOf(findTab(args)!) > 0,
+);
+register(
+  "closeRight",
+  "Закрыть справа",
+  (args) =>
+    props.commandHandlers.closeMany(
+      props.tabs.slice(props.tabs.indexOf(findTab(args)!) + 1).map((tab) => tab.id),
+    ),
+  (args) => hasTab(args) && props.tabs.indexOf(findTab(args)!) < props.tabs.length - 1,
+);
+register(
+  "closeAll",
+  "Закрыть все",
+  () => props.commandHandlers.closeMany(props.tabs.map((tab) => tab.id)),
+  () => !!props.tabs.length,
+);
+register(
+  "closeSaved",
+  "Закрыть сохранённые",
+  () =>
+    props.commandHandlers.closeMany(
+      props.tabs.filter((tab) => !tab.dirty && !tab.saving).map((tab) => tab.id),
+    ),
+  () => !!props.closeSaved && props.tabs.some((tab) => !tab.dirty && !tab.saving),
+);
+register(
+  "rename",
+  "Переименовать…",
+  (value) => {
+    const args = commandArgs(value);
+    const tab = findTab(value)!;
+    if (args.label === undefined) return startRename(tab);
+    if (typeof args.label !== "string" || !args.label.trim())
+      throw new Error("Укажите label вкладки");
+    return props.commandHandlers.rename?.(tab.id, args.label.trim());
+  },
+  (args) => !!props.renameable && hasTab(args),
+);
+register("reorder", "Переставить вкладки", (value) => {
+  const { ids } = commandArgs(value);
+  if (
+    !Array.isArray(ids) ||
+    ids.length !== props.tabs.length ||
+    new Set(ids).size !== ids.length ||
+    ids.some((id) => typeof id !== "string" || !props.tabs.some((tab) => tab.id === id))
+  )
+    throw new Error("Укажите все id вкладок без повторений");
+  return props.commandHandlers.reorder(ids);
+});
+for (const action of ["next", "previous", "first", "last"])
+  register(
+    action,
+    "Перейти к вкладке",
+    (args) => {
+      const index = props.tabs.indexOf(findTab(args)!);
+      const next =
+        action === "first"
+          ? 0
+          : action === "last"
+            ? props.tabs.length - 1
+            : (index + (action === "next" ? 1 : props.tabs.length - 1)) % props.tabs.length;
+      const tab = props.tabs[next]!;
+      const result = props.commandHandlers.select(tab.id);
+      strip.value?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
+      return result;
+    },
+    hasTab,
+  );
+register(
+  "contextMenu",
+  "Открыть меню вкладки",
+  (args) => {
+    const tab = findTab(args)!;
+    contextId.value = tab.id;
+    const index = props.tabs.indexOf(tab);
+    const target = strip.value?.querySelectorAll<HTMLElement>('[role="tab"]')[index];
+    if (target) return menu.value?.openForElement(target);
+  },
+  hasTab,
+);
 const menuItems = computed<ContextMenuItem[]>(() => {
-  const tab = props.tabs.find((tab) => tab.id === contextId.value);
+  const tab = findTab();
   if (!tab) return [];
-  const index = props.tabs.indexOf(tab);
-  const closeGroup = (ids: string[]) => emit("closeMany", ids);
+  const item = (action: string, options: { separator?: boolean } = {}) =>
+    commands.item(commandId(action), { id: tab.id }, options);
   const items: ContextMenuItem[] = [
-    { id: "close", label: "Закрыть", run: () => emit("close", tab.id) },
-    {
-      id: "close-others",
-      label: "Закрыть остальные",
-      disabled: props.tabs.length < 2,
-      run: () => closeGroup(props.tabs.filter((item) => item.id !== tab.id).map((item) => item.id)),
-    },
-    {
-      id: "close-left",
-      label: "Закрыть слева",
-      disabled: index === 0,
-      run: () => closeGroup(props.tabs.slice(0, index).map((item) => item.id)),
-    },
-    {
-      id: "close-right",
-      label: "Закрыть справа",
-      disabled: index === props.tabs.length - 1,
-      run: () => closeGroup(props.tabs.slice(index + 1).map((item) => item.id)),
-    },
-    {
-      id: "close-all",
-      label: "Закрыть все",
-      run: () => closeGroup(props.tabs.map((item) => item.id)),
-    },
-  ];
-  if (props.closeSaved)
-    items.push({
-      id: "close-saved",
-      label: "Закрыть сохранённые",
-      disabled: !props.tabs.some((item) => !item.dirty && !item.saving),
-      run: () =>
-        closeGroup(props.tabs.filter((item) => !item.dirty && !item.saving).map((item) => item.id)),
-    });
-  if (props.renameable)
-    items.push({
-      id: "rename",
-      label: "Переименовать…",
-      separator: true,
-      shortcut: "F2",
-      run: () => startRename(tab),
-    });
+    "close",
+    "closeOthers",
+    "closeLeft",
+    "closeRight",
+    "closeAll",
+  ].map((action) => item(action));
+  if (props.closeSaved) items.push(item("closeSaved"));
+  if (props.renameable) items.push(item("rename", { separator: true }));
   items.push(...(props.actions?.(tab.id) ?? []));
   return items.map((item) => ({ ...item, disabled: props.disabled || item.disabled }));
 });
@@ -111,12 +212,12 @@ function finishRename(save: boolean) {
   editing.value = "";
   const label = draft.value.trim();
   if (id && save && label && label !== props.tabs.find((tab) => tab.id === id)?.label)
-    emit("rename", id, label);
+    commands.run(commandId("rename"), { id, label });
 }
 function middleClick(event: MouseEvent, id: string) {
   if (event.button !== 1) return;
   event.preventDefault();
-  if (!props.disabled) emit("close", id);
+  if (!props.disabled) commands.run(commandId("close"), { id });
 }
 function dragStart(event: DragEvent, id: string) {
   if (editing.value || props.disabled || !event.dataTransfer) {
@@ -156,32 +257,17 @@ function drop(event: DragEvent, id?: string) {
       0,
       dragging.value,
     );
-    emit("reorder", ids);
+    commands.run(commandId("reorder"), { ids });
   }
   endDrag();
 }
 function navigate(event: KeyboardEvent, id: string) {
-  if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
-    showContext(
-      event,
-      props.tabs.find((tab) => tab.id === id)!,
-    );
-    return;
-  }
-  const index = props.tabs.findIndex((tab) => tab.id === id);
-  let next = index;
-  if (event.key === "ArrowRight") next = (index + 1) % props.tabs.length;
-  else if (event.key === "ArrowLeft") next = (index + props.tabs.length - 1) % props.tabs.length;
-  else if (event.key === "Home") next = 0;
-  else if (event.key === "End") next = props.tabs.length - 1;
-  else if (event.key === "F2" && props.renameable) {
-    event.preventDefault();
-    void startRename(props.tabs[index]!);
-    return;
-  } else return;
-  event.preventDefault();
-  emit("select", props.tabs[next]!.id);
-  strip.value?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
+  contextId.value = id;
+  commands.keydown(event);
+}
+function activateTab(id: string) {
+  contextId.value = id;
+  commands.scope.activate();
 }
 watch(
   () => props.activeId,
@@ -254,8 +340,9 @@ watch(
         :aria-selected="tab.id === activeId"
         :tabindex="tab.id === activeId ? 0 : -1"
         :title="tab.title ?? tab.label"
-        @click="emit('select', tab.id)"
-        @dblclick="startRename(tab)"
+        @focus="activateTab(tab.id)"
+        @click="commands.run(commandId('select'), { id: tab.id })"
+        @dblclick="renameable && commands.run(commandId('rename'), { id: tab.id })"
         @keydown="navigate($event, tab.id)"
       >
         <slot name="icon" :tab="tab" /><span>{{ tab.label }}</span>
@@ -265,7 +352,7 @@ watch(
         :disabled="disabled"
         :title="`Закрыть ${tab.label}`"
         :aria-label="`Закрыть ${tab.label}`"
-        @click.stop="emit('close', tab.id)"
+        @click.stop="commands.run(commandId('close'), { id: tab.id })"
         @dblclick.stop
       >
         <span

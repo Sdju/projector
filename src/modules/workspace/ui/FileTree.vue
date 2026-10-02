@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, inject, nextTick, onBeforeUnmount, provide, ref, watch } from "vue";
+import { computed, inject, nextTick, onBeforeUnmount, provide, ref, useId, watch } from "vue";
+import { useCommandScope, commandArgs } from "../../../common/utilities/commands.ts";
 import ContextMenu from "../../../common/ui/ContextMenu.vue";
 import EntryDialog from "../../../common/ui/EntryDialog.vue";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
@@ -48,14 +49,44 @@ const showContext: OpenContext =
           return;
         }
         contextEntry.value = entry;
+        treeCommands.scope.activate();
         void menu.value?.open(event);
       }
     : inject<OpenContext>("workspace-context")!;
 if (props.depth === 0) provide("workspace-context", showContext);
-function requestAction(action: string, initial = "") {
-  const entry = contextEntry.value;
-  const directory = entry?.directory ? entry.path : parentPath(entry?.path ?? "");
-  operation.value = { action, path: entry?.path ?? "", directory, projectId: props.projectId };
+function resolveEntry(value?: unknown): FileEntry | undefined {
+  const args = commandArgs(value);
+  if (args.path === undefined) return contextEntry.value;
+  if (typeof args.path !== "string") throw new Error("path должен быть строкой");
+  if (!args.path) return undefined;
+  return {
+    path: args.path,
+    name: args.path.split("/").at(-1)!,
+    directory: args.kind === "directory",
+  };
+}
+async function requestAction(action: string, initial = "", value?: unknown) {
+  const args = commandArgs(value);
+  const entry = resolveEntry(value);
+  if (args.directory !== undefined && typeof args.directory !== "string")
+    throw new Error("directory должен быть строкой");
+  const directory =
+    typeof args.directory === "string"
+      ? args.directory
+      : entry?.directory
+        ? entry.path
+        : parentPath(entry?.path ?? "");
+  const op = { action, path: entry?.path ?? "", directory, projectId: props.projectId };
+  if (args.name !== undefined && typeof args.name !== "string")
+    throw new Error("name должен быть строкой");
+  if (args.confirm !== undefined && typeof args.confirm !== "boolean")
+    throw new Error("confirm должен быть boolean");
+  if (
+    (action !== "delete" && typeof args.name === "string") ||
+    (action === "delete" && args.confirm === true)
+  )
+    return runOperation(typeof args.name === "string" ? args.name : "", op, false);
+  operation.value = op;
   const titles: Record<string, string> = {
     "create-file": "Новый файл",
     "create-directory": "Новая папка",
@@ -75,8 +106,7 @@ function requestAction(action: string, initial = "") {
     }),
   );
 }
-async function runOperation(name: string) {
-  const op = operation.value;
+async function runOperation(name: string, op = operation.value, interactive = true) {
   if (!op) return;
   busy.value = true;
   moveError.value = "";
@@ -95,7 +125,7 @@ async function runOperation(name: string) {
       op.action === "copy" ? parentPath(op.path) : op.directory,
       name,
     );
-    dialog.value?.close();
+    if (interactive) dialog.value?.close();
     if (op.projectId !== props.projectId) return;
     if (op.action === "rename") {
       expanded.value = new Set(
@@ -120,18 +150,26 @@ async function runOperation(name: string) {
       if (op.action === "create-file") emit("open", result.destination!);
     }
     message.value = "Готово";
+    return result;
   } catch (error) {
+    if (!interactive) throw error;
     dialog.value?.fail(error instanceof Error ? error.message : "Не удалось выполнить действие");
   } finally {
     busy.value = false;
   }
 }
-async function paste() {
+async function paste(value?: unknown) {
+  const args = commandArgs(value);
+  if (args.directory !== undefined && typeof args.directory !== "string")
+    throw new Error("directory должен быть строкой");
   const clip = clipboard.value;
   if (!clip) return;
-  const directory = contextEntry.value?.directory
-    ? contextEntry.value.path
-    : parentPath(contextEntry.value?.path ?? "");
+  const directory =
+    typeof args.directory === "string"
+      ? args.directory
+      : contextEntry.value?.directory
+        ? contextEntry.value.path
+        : parentPath(contextEntry.value?.path ?? "");
   busy.value = true;
   moveError.value = "";
   const projectId = props.projectId;
@@ -157,127 +195,181 @@ async function paste() {
       clipboard.value = undefined;
     } else emit("changed");
     message.value = "Готово";
+    return result;
   } catch (error) {
     moveError.value = error instanceof Error ? error.message : "Не удалось вставить";
+    throw error;
   } finally {
     busy.value = false;
   }
 }
-async function copyPath(relative: boolean) {
+async function copyPath(relative: boolean, value?: unknown) {
   try {
-    const path = contextEntry.value?.path ?? "";
+    const path = resolveEntry(value)?.path ?? "";
     if (relative) await navigator.clipboard.writeText(path || ".");
     else {
       const data = await workspaceRequest<{ root: string }>(props.projectId, "root");
       await navigator.clipboard.writeText(data.root + (path ? "/" + path : ""));
     }
-  } catch {
+  } catch (error) {
     moveError.value = "Не удалось скопировать путь в буфер обмена";
+    throw error;
   }
+}
+const localCommands =
+  props.depth === 0
+    ? useCommandScope(`fileTree:${useId()}`, () => ({
+        surface: "fileTree",
+        projectId: props.projectId,
+        entryKind: contextEntry.value
+          ? contextEntry.value.directory
+            ? "directory"
+            : "file"
+          : "root",
+        busy: drag.busy.value,
+        clipboard: !!clipboard.value,
+      }))
+    : undefined;
+const treeCommands =
+  localCommands ?? inject<NonNullable<typeof localCommands>>("workspace-tree-commands")!;
+if (props.depth === 0) {
+  provide("workspace-tree-commands", treeCommands);
+  const register = (
+    id: string,
+    title: string,
+    run: (args?: unknown) => unknown,
+    enabled: (args?: unknown) => boolean = () => true,
+  ) =>
+    treeCommands.scope.registerCommand({
+      id: `ide.fileTree.${id}`,
+      title,
+      run,
+      enabled: (args) => !drag.busy.value && enabled(args),
+    });
+  const hasEntry = (args?: unknown) => !!resolveEntry(args);
+  register(
+    "file.open",
+    "Открыть",
+    (args) => emit("open", resolveEntry(args)!.path),
+    (args) => !!resolveEntry(args) && !resolveEntry(args)!.directory,
+  );
+  register("file.create", "Новый файл…", (args) => requestAction("create-file", "", args));
+  register("directory.create", "Новая папка…", (args) =>
+    requestAction("create-directory", "", args),
+  );
+  for (const kind of ["file", "directory"])
+    register(
+      `${kind}.rename`,
+      "Переименовать…",
+      (args) => requestAction("rename", resolveEntry(args)!.name, args),
+      hasEntry,
+    );
+  register(
+    "entry.cut",
+    "Вырезать",
+    (args) => {
+      clipboard.value = { path: resolveEntry(args)!.path, cut: true };
+    },
+    hasEntry,
+  );
+  register(
+    "entry.copy",
+    "Копировать",
+    (args) => {
+      clipboard.value = { path: resolveEntry(args)!.path, cut: false };
+    },
+    hasEntry,
+  );
+  register(
+    "entry.duplicate",
+    "Дублировать…",
+    (args) =>
+      requestAction("copy", resolveEntry(args)!.name.replace(/(\.[^.]*)?$/, " copy$1"), args),
+    hasEntry,
+  );
+  register("entry.paste", "Вставить", paste, () => !!clipboard.value);
+  register("entry.copyRelativePath", "Копировать относительный путь", (args) =>
+    copyPath(true, args),
+  );
+  register("entry.copyPath", "Копировать полный путь", (args) => copyPath(false, args));
+  register(
+    "directory.toggle",
+    "Развернуть / свернуть папку",
+    (args) => toggle(resolveEntry(args)!.path),
+    (args) => !!resolveEntry(args)?.directory,
+  );
+  register("collapseAll", "Свернуть все папки", () => expanded.value.clear());
+  register("refresh", "Обновить", () => emit("changed"));
+  register("entry.delete", "Удалить…", (args) => requestAction("delete", "", args), hasEntry);
+  register("contextMenu", "Открыть меню", () => {
+    const target = tree.value?.querySelector<HTMLElement>(
+      contextEntry.value
+        ? `button[data-path="${CSS.escape(contextEntry.value.path)}"]`
+        : ".root-label",
+    );
+    if (!target) return;
+    return menu.value?.openForElement(target);
+  });
 }
 const menuItems = computed<ContextMenuItem[]>(() => {
   const entry = contextEntry.value;
+  const item = (
+    id: string,
+    options: { separator?: boolean; danger?: boolean; label?: string } = {},
+  ) => treeCommands.item(`ide.fileTree.${id}`, undefined, options);
   const items: ContextMenuItem[] = [];
-  if (entry && !entry.directory)
-    items.push({ id: "open", label: "Открыть", run: () => emit("open", entry.path) });
-  if (!entry || entry.directory)
-    items.push(
-      { id: "new-file", label: "Новый файл…", run: () => requestAction("create-file") },
-      { id: "new-directory", label: "Новая папка…", run: () => requestAction("create-directory") },
-    );
+  if (entry && !entry.directory) items.push(item("file.open"));
+  if (!entry || entry.directory) items.push(item("file.create"), item("directory.create"));
   if (entry)
     items.push(
-      {
-        id: "rename",
-        label: "Переименовать…",
-        shortcut: "F2",
-        separator: true,
-        run: () => requestAction("rename", entry.name),
-      },
-      {
-        id: "cut",
-        label: "Вырезать",
-        shortcut: "Ctrl+X",
-        run: () => {
-          clipboard.value = { path: entry.path, cut: true };
-        },
-      },
-      {
-        id: "copy",
-        label: "Копировать",
-        shortcut: "Ctrl+C",
-        run: () => {
-          clipboard.value = { path: entry.path, cut: false };
-        },
-      },
-      {
-        id: "duplicate",
-        label: "Дублировать…",
-        run: () => requestAction("copy", entry.name.replace(/(\.[^.]*)?$/, " copy$1")),
-      },
+      item(`${entry.directory ? "directory" : "file"}.rename`, { separator: true }),
+      item("entry.cut"),
+      item("entry.copy"),
+      item("entry.duplicate"),
     );
   items.push(
-    { id: "paste", label: "Вставить", shortcut: "Ctrl+V", disabled: !clipboard.value, run: paste },
-    {
-      id: "relative",
-      label: "Копировать относительный путь",
-      separator: true,
-      run: () => copyPath(true),
-    },
-    { id: "absolute", label: "Копировать полный путь", run: () => copyPath(false) },
+    item("entry.paste"),
+    item("entry.copyRelativePath", { separator: true }),
+    item("entry.copyPath"),
   );
   if (entry?.directory)
-    items.push({
-      id: "collapse",
-      label: expanded.value.has(entry.path) ? "Свернуть папку" : "Развернуть папку",
-      run: () => toggle(entry.path),
-    });
-  if (!entry)
-    items.push({
-      id: "collapse-all",
-      label: "Свернуть все папки",
-      run: () => expanded.value.clear(),
-    });
-  items.push({ id: "refresh", label: "Обновить", run: () => emit("changed") });
-  if (entry)
-    items.push({
-      id: "delete",
-      label: "Удалить…",
-      shortcut: "Delete",
-      danger: true,
-      separator: true,
-      run: () => requestAction("delete"),
-    });
+    items.push(
+      item("directory.toggle", {
+        label: expanded.value.has(entry.path) ? "Свернуть папку" : "Развернуть папку",
+      }),
+    );
+  if (!entry) items.push(item("collapseAll"));
+  items.push(item("refresh"));
+  if (entry) items.push(item("entry.delete", { danger: true, separator: true }));
   return items;
 });
 function entryKey(event: KeyboardEvent, entry?: FileEntry) {
-  if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
-    showContext(event, entry);
-    return;
-  }
   if (props.depth !== 0) {
-    const handler = injectEntryKey;
-    handler?.(event, entry);
+    injectEntryKey?.(event, entry);
     return;
   }
-  if (busy.value) return;
   contextEntry.value = entry;
-  const command = event.ctrlKey || event.metaKey;
-  if (event.key === "F2" && entry) requestAction("rename", entry.name);
-  else if (event.key === "Delete" && entry) requestAction("delete");
-  else if (command && event.key.toLowerCase() === "c" && entry)
-    clipboard.value = { path: entry.path, cut: false };
-  else if (command && event.key.toLowerCase() === "x" && entry)
-    clipboard.value = { path: entry.path, cut: true };
-  else if (command && event.key.toLowerCase() === "v") void paste();
-  else return;
-  event.preventDefault();
-  event.stopPropagation();
+  treeCommands.scope.activate();
+  treeCommands.keydown(event);
+}
+function activateEntry(entry?: FileEntry) {
+  if (props.depth !== 0) {
+    injectActivateEntry?.(entry);
+    return;
+  }
+  contextEntry.value = entry;
+  treeCommands.scope.activate();
 }
 const injectEntryKey = props.depth
   ? inject<(event: KeyboardEvent, entry?: FileEntry) => void>("workspace-entry-key")
   : undefined;
-if (props.depth === 0) provide("workspace-entry-key", entryKey);
+const injectActivateEntry = props.depth
+  ? inject<(entry?: FileEntry) => void>("workspace-entry-focus")
+  : undefined;
+if (props.depth === 0) {
+  provide("workspace-entry-key", entryKey);
+  provide("workspace-entry-focus", activateEntry);
+}
 const { source, target, busy, expanded, error: moveError, message } = drag;
 if (props.depth === 0) {
   watch(
@@ -442,6 +534,7 @@ defineExpose({ reveal });
       title="Корень проекта"
       tabindex="0"
       @contextmenu.stop="showContext($event)"
+      @focus="activateEntry()"
       @keydown.stop="entryKey($event)"
     >
       Корень проекта
@@ -465,7 +558,13 @@ defineExpose({ reveal });
         :aria-expanded="entry.directory ? expanded.has(entry.path) : undefined"
         @contextmenu.stop="showContext($event, entry)"
         @keydown.stop="entryKey($event, entry)"
-        @click="entry.directory ? toggle(entry.path) : emit('open', entry.path)"
+        @focus="activateEntry(entry)"
+        @click="
+          activateEntry(entry);
+          treeCommands.run(
+            entry.directory ? 'ide.fileTree.directory.toggle' : 'ide.fileTree.file.open',
+          );
+        "
         @dragstart.stop="startDrag($event, entry)"
         @dragend.stop="drag.clear()"
         @dragover.stop="dragOver($event, entry)"
@@ -498,7 +597,7 @@ defineExpose({ reveal });
     <li v-if="depth === 0" class="root-space" @contextmenu.stop="showContext($event)"></li>
   </ul>
   <ContextMenu v-if="depth === 0" ref="menu" :items="menuItems" label="Действия с файлами" />
-  <EntryDialog v-if="depth === 0" ref="dialog" @submit="runOperation" />
+  <EntryDialog v-if="depth === 0" ref="dialog" @submit="runOperation($event)" />
 </template>
 <style scoped>
 .tree {

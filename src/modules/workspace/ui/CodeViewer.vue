@@ -53,7 +53,6 @@ function render() {
     editor.restoreViewState(views.get(props.path) ?? null);
     if (props.editable) {
       editor.onDidChangeModelContent(() => emit("change", modified.getValue()));
-      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => emit("save"));
     }
   }
   reveal();

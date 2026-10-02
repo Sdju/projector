@@ -16,11 +16,11 @@ function close(focus = true) {
   restoreFocus = focus;
   menu.value?.hidePopover();
 }
-async function open(event: MouseEvent | KeyboardEvent) {
+async function open(event: MouseEvent | KeyboardEvent, source?: HTMLElement) {
   event.preventDefault();
   event.stopPropagation();
   restoreFocus = false;
-  trigger = event.currentTarget as HTMLElement;
+  trigger = source ?? (event.currentTarget as HTMLElement);
   const bounds = trigger.getBoundingClientRect();
   trigger = trigger.querySelector<HTMLButtonElement>('[role="tab"]') ?? trigger;
   const pointer = event instanceof MouseEvent && (event.clientX !== 0 || event.clientY !== 0);
@@ -98,7 +98,10 @@ onBeforeUnmount(() => {
   window.removeEventListener("blur", dismiss);
   window.removeEventListener("scroll", dismiss, true);
 });
-defineExpose({ open, close });
+function openForElement(element: HTMLElement) {
+  return open(new KeyboardEvent("keydown"), element);
+}
+defineExpose({ open, openForElement, close });
 </script>
 <template>
   <Teleport to="body">
@@ -121,6 +124,7 @@ defineExpose({ open, close });
         <div v-if="item.separator" role="separator" class="menu-separator" />
         <button
           role="menuitem"
+          :data-command="item.command"
           :disabled="item.disabled"
           :class="{ danger: item.danger }"
           @click="activate(item)"

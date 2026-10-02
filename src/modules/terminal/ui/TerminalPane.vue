@@ -653,13 +653,17 @@ onBeforeUnmount(() => {
       :tabs="terminalTabs"
       :active-id="activeId"
       label="Сессии терминала"
+      command-namespace="ide.terminal.tabs"
+      :project-id="projectId"
+      :command-handlers="{
+        select: (id) => activeId = id,
+        close: closeSession,
+        closeMany: closeManySessions,
+        reorder: reorderSessions,
+        rename: renameSession,
+      }"
       renameable
       :disabled="busy"
-      @select="activeId = $event"
-      @close="closeSession"
-      @close-many="closeManySessions"
-      @reorder="reorderSessions"
-      @rename="renameSession"
     >
       <template #icon="{ tab }">
         <IconFailed

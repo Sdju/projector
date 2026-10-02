@@ -28,13 +28,7 @@ function focusOut(event: FocusEvent) {
 </script>
 
 <template>
-  <section
-    class="markdown-viewer"
-    aria-label="Документ Markdown"
-    @focusout="focusOut"
-    @keydown.ctrl.s.prevent="emit('save')"
-    @keydown.meta.s.prevent="emit('save')"
-  >
+  <section class="markdown-viewer" aria-label="Документ Markdown" @focusout="focusOut">
     <p v-if="error" class="save-error" role="alert">{{ error }}</p>
     <p v-if="editorError && mode === 'document'" class="save-error" role="alert">
       {{ editorError }} <button @click="emit('mode', 'source')">Открыть исходник</button>

@@ -60,10 +60,18 @@ test(
     const html = `<!doctype html><div id="editor"></div><button id="outside">Outside editor</button><pre id="result">WAITING</pre><script type="module">
     import { createApp, h, nextTick, ref } from 'vue';
     import MarkdownViewer from '/src/modules/workspace/ui/MarkdownViewer.vue';
+    import {createCommandService, defaultKeybindings} from '/core/modules/ide/index.ts';
     const initial = "# Title\\r\\n\\r\\nA **bold** paragraph.\\r\\n\\r\\n![Alt text](../image.png)\\r\\n\\r\\n| A | B |\\r\\n| - | - |\\r\\n| One | Two |\\r\\n\\r\\n~~~js\\r\\nconst value = 1;\\r\\n~~~\\r\\n\\r\\n\\u003cdetails>\\u003csummary>More\\u003c/summary>Raw HTML\\u003c/details>\\r\\n\\r\\n\\u003cscript>window.unsafeMarkdown = true\\u003c/script>\\r\\n";
     const content = ref(initial); let changes = 0; let failure = ''; let saves = 0; let saved = '';
     const app = createApp({ render: () => h(MarkdownViewer, { mode: 'document', path: 'docs/test.md', projectId: 'test', content: content.value, onSave: () => { saves++; saved = content.value; }, onChange: value => { changes++; content.value = value; }, onError: message => failure = message }) });
     app.mount('#editor');
+    const sdk = createCommandService(defaultKeybindings);
+    const scope = sdk.createScope('editor', () => ({surface:'editor'}));
+    scope.registerCommand({id:'ide.editor.file.save',title:'Save',run:() => {saves++; saved=content.value;}});
+    document.getElementById('editor').addEventListener('keydown', event => {
+      const binding=scope.resolveKeybinding(event,true);
+      if(binding){event.preventDefault();event.stopPropagation();void scope.executeCommand(binding.command,binding.args);}
+    },true);
     const check = (condition, message) => { if (!condition) throw new Error(message); };
     const wait = async (predicate) => { for (let n = 0; n < 200; n++) { if (failure) throw new Error(failure); if (predicate()) return; await new Promise(r => setTimeout(r, 20)); } throw new Error('Editor did not become ready'); };
     try {
@@ -84,8 +92,13 @@ test(
       check(content.value.startsWith('# Title edited'), 'The draft must update in the same transaction, before Ctrl+S or unmount');
       editor.dispatchEvent(new KeyboardEvent('keydown', {key:'s', code:'KeyS', ctrlKey:true, bubbles:true, cancelable:true}));
       check(saved === content.value && saves === 1, 'Ctrl+S must save the latest visual edit');
+      sdk.setKeybindings([{key:'Mod+Shift+S',command:'ide.editor.file.save',allowInput:true}]);
+      editor.dispatchEvent(new KeyboardEvent('keydown',{key:'s',ctrlKey:true,bubbles:true,cancelable:true}));
+      check(saves===1,'The old Ctrl+S binding must stop saving after a remap');
+      editor.dispatchEvent(new KeyboardEvent('keydown',{key:'s',ctrlKey:true,shiftKey:true,bubbles:true,cancelable:true}));
+      check(saves===2 && saved===content.value,'The remapped shortcut must save the current draft');
       document.getElementById('outside').focus();
-      check(saved === content.value && saves === 2, 'Losing focus must save without a button');
+      check(saved === content.value && saves === 3, 'Losing focus must save without a button');
       editor.focus();
       check(content.value.includes('![Alt text](../image.png)'), 'Image path and alt text must survive an edit elsewhere');
       check(content.value.includes('<details><summary>More</summary>Raw HTML</details>'), 'Raw HTML must survive edits');

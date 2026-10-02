@@ -4,8 +4,10 @@ import { useRoute, useRouter } from "vue-router";
 import { isLauncherWindow } from "../modules/launcher/index.ts";
 import { useProjects } from "../modules/catalog/index.ts";
 import { useRunner } from "../modules/runner/index.ts";
+import { provideIdeCommands } from "../modules/ide/index.ts";
 import AppShell from "./layouts/AppShell.vue";
 
+const { error: commandError } = provideIdeCommands();
 const { load } = useProjects();
 const { connect } = useRunner();
 const route = useRoute();
@@ -43,8 +45,30 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <div v-if="commandError" class="command-error" role="alert">
+    {{ commandError }}<button aria-label="Закрыть сообщение" @click="commandError = ''">×</button>
+  </div>
   <router-view v-if="route.name === 'launcher'" />
   <AppShell v-else>
     <router-view />
   </AppShell>
 </template>
+
+<style scoped>
+.command-error {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1000;
+  max-width: min(480px, calc(100vw - 32px));
+  padding: 12px 16px;
+  background: var(--bg-2);
+  border: 1px solid var(--err);
+  color: var(--err);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.command-error button {
+  margin-left: 16px;
+}
+</style>

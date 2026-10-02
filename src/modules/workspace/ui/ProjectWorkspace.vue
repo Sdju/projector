@@ -7,10 +7,13 @@ import { treeDragType } from "../tree-drag.ts";
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from "vue-router";
 import { relocatedPath } from "../../../../core/modules/workspace/index.ts";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
+import { useCommandScope, commandArgs } from "../../../common/utilities/commands.ts";
 import WorkspaceTabs from "../../../common/ui/WorkspaceTabs.vue";
 import FileTree from "./FileTree.vue";
 import GitChangesTree from "./GitChangesTree.vue";
 import ArchiveViewer from "./ArchiveViewer.vue";
+import { KeybindingsEditor } from "../../ide/index.ts";
+import IconKeyboard from "~icons/lucide/keyboard";
 import IconSettings from "~icons/lucide/settings";
 import IconRefresh from "~icons/lucide/rotate-cw";
 import { TerminalPane } from "../../terminal/index.ts";
@@ -113,7 +116,9 @@ function resizeKey(event: KeyboardEvent, pane: "tree" | "agent") {
 }
 const fileTree = ref<InstanceType<typeof FileTree>>();
 async function prepareEntryChange(path: string) {
-  const affected = tabs.value.filter((tab) => tab.path === path || tab.path.startsWith(path + "/"));
+  const affected = tabs.value.filter(
+    (tab) => !tab.virtual && (tab.path === path || tab.path.startsWith(path + "/")),
+  );
   return (await Promise.all(affected.map((tab) => saveMarkdown(tab)))).every(Boolean);
 }
 async function closeManyTabs(ids: string[]) {
@@ -122,45 +127,81 @@ async function closeManyTabs(ids: string[]) {
     if (tabs.value.some((tab) => tab.key === id)) break;
   }
 }
+const editorCommands = useCommandScope(`editor:${props.projectId}`, () => ({
+  surface: "editor",
+  projectId: props.projectId,
+}));
+function commandFile(value?: unknown) {
+  const args = commandArgs(value);
+  if (args.id !== undefined && typeof args.id !== "string")
+    throw new Error("id должен быть строкой");
+  return tabs.value.find((tab) => !tab.virtual && tab.key === (args.id ?? activeKey.value));
+}
+const registerEditor = (
+  id: string,
+  title: string,
+  run: (args?: unknown) => unknown,
+  enabled: (args?: unknown) => boolean,
+) => editorCommands.scope.registerCommand({ id, title, run, enabled });
+registerEditor(
+  "ide.editor.file.save",
+  "Сохранить",
+  async (args) => {
+    const file = commandFile(args)!;
+    if (!(await saveMarkdown(file))) throw new Error(file.saveError || "Не удалось сохранить файл");
+  },
+  (args) => !!commandFile(args) && isMarkdown(commandFile(args)!),
+);
+registerEditor(
+  "ide.editor.file.reveal",
+  "Показать в дереве файлов",
+  (args) => {
+    section.value = "files";
+    fileTree.value?.reveal(commandFile(args)!.path);
+  },
+  (args) => !!commandFile(args) && !commandFile(args)!.external,
+);
+registerEditor(
+  "ide.editor.file.copyRelativePath",
+  "Копировать относительный путь",
+  (args) => navigator.clipboard.writeText(commandFile(args)!.path),
+  (args) => !!commandFile(args),
+);
+registerEditor(
+  "ide.editor.markdown.toggleSource",
+  "Переключить исходник Markdown",
+  () => toggleMarkdownSource(),
+  () => !!active.value && isMarkdown(active.value),
+);
 function tabActions(id: string): ContextMenuItem[] {
-  const file = tabs.value.find((tab) => tab.key === id)!;
+  if (tabs.value.find((tab) => tab.key === id)?.virtual) return [];
   return [
-    {
-      id: "save",
-      label: "Сохранить",
-      shortcut: "Ctrl+S",
-      separator: true,
-      disabled: !isMarkdown(file) || !isDirty(file),
-      run: async () => {
-        await saveMarkdown(file);
-      },
-    },
-    {
-      id: "reveal",
-      label: "Показать в дереве файлов",
-      disabled: !!file.external,
-      run: async () => {
-        section.value = "files";
-        fileTree.value?.reveal(file.path);
-      },
-    },
-    {
-      id: "copy-path",
-      label: "Копировать относительный путь",
-      run: async () => {
-        try {
-          await navigator.clipboard.writeText(file.path);
-        } catch {
-          fileError.value = "Не удалось скопировать путь";
-        }
-      },
-    },
+    editorCommands.item("ide.editor.file.save", { id }, { separator: true }),
+    editorCommands.item("ide.editor.file.reveal", { id }),
+    editorCommands.item("ide.editor.file.copyRelativePath", { id }),
   ];
+}
+registerEditor(
+  "ide.workbench.keybindings.open",
+  "Открыть горячие клавиши",
+  () => {
+    const key = "settings:keybindings";
+    if (!tabs.value.some((tab) => tab.key === key))
+      tabs.value.push({ key, virtual: "keybindings", path: "Горячие клавиши", content: "" });
+    selectTab(key);
+  },
+  () => true,
+);
+function editorFocus(event: FocusEvent) {
+  if (!(event.target as Element)?.closest(".workspace-tabs, .keybindings-editor"))
+    editorCommands.scope.activate();
 }
 function entryDeleted(path: string) {
   ++fileGeneration;
   loading.value = false;
-  tabs.value = tabs.value.filter((tab) => tab.path !== path && !tab.path.startsWith(path + "/"));
+  tabs.value = tabs.value.filter(
+    (tab) => tab.virtual || (tab.path !== path && !tab.path.startsWith(path + "/")),
+  );
   if (!tabs.value.some((tab) => tab.key === activeKey.value))
     activeKey.value = tabs.value.at(-1)?.key ?? "";
   revision.value++;
@@ -181,6 +222,7 @@ const gitLoading = ref(false);
 const fileError = ref("");
 const loading = ref(false);
 interface OpenFile extends FileContent {
+  virtual?: "keybindings";
   external?: boolean;
   image?: string;
   localFile?: File;
@@ -195,15 +237,25 @@ interface OpenFile extends FileContent {
   saveError?: string;
 }
 const isMarkdown = (file: OpenFile) =>
-  !file.external && file.original === undefined && /\.(?:md|markdown)$/i.test(file.path);
-const isDirty = (file: OpenFile) => file.draft !== undefined && file.draft !== file.content;
+  !file.virtual &&
+  !file.external &&
+  file.original === undefined &&
+  /\.(?:md|markdown)$/i.test(file.path);
+const isDirty = (file: OpenFile) =>
+  !file.virtual && file.draft !== undefined && file.draft !== file.content;
 const tabs = ref<OpenFile[]>([]);
 const activeKey = ref("");
 const fileTabs = computed(() =>
   tabs.value.map((tab) => ({
     id: tab.key,
-    label: `${tab.path.split("/").at(-1)}${tab.original !== undefined ? (tab.staged ? " · index" : " · diff") : ""}`,
-    title: tab.saveError ? `${tab.path} · ${tab.saveError}` : tab.path,
+    label: tab.virtual
+      ? "Горячие клавиши"
+      : `${tab.path.split("/").at(-1)}${tab.original !== undefined ? (tab.staged ? " · index" : " · diff") : ""}`,
+    title: tab.virtual
+      ? "Настройки горячих клавиш"
+      : tab.saveError
+        ? `${tab.path} · ${tab.saveError}`
+        : tab.path,
     dirty: isDirty(tab),
     saving: !!tab.saving,
     error: !!tab.saveError,
@@ -248,7 +300,11 @@ async function openFile(
   try {
     const data =
       staged === undefined
-        ? await workspaceRequest<FileContent & { image?: boolean }>(props.projectId, external ? "external" : "file", { path })
+        ? await workspaceRequest<FileContent & { image?: boolean }>(
+            props.projectId,
+            external ? "external" : "file",
+            { path },
+          )
         : await workspaceRequest<FileComparison>(props.projectId, "diff", {
             path,
             staged: String(staged),
@@ -256,9 +312,10 @@ async function openFile(
     if (generation !== fileGeneration) return;
     const file: OpenFile = {
       external,
-      image: "image" in data && data.image
-        ? `/api/projects/${encodeURIComponent(props.projectId)}/workspace/external-asset?${new URLSearchParams({ path })}`
-        : undefined,
+      image:
+        "image" in data && data.image
+          ? `/api/projects/${encodeURIComponent(props.projectId)}/workspace/external-asset?${new URLSearchParams({ path })}`
+          : undefined,
       path,
       content: "modified" in data ? data.modified : data.content,
       archive: "archive" in data ? data.archive : undefined,
@@ -351,7 +408,14 @@ async function dropFiles(event: DragEvent) {
       for (const path of paths) {
         if (!current()) return;
         const relative = projectRelativePath(root, path);
-        await openFile(relative ?? path, undefined, undefined, undefined, false, relative === undefined);
+        await openFile(
+          relative ?? path,
+          undefined,
+          undefined,
+          undefined,
+          false,
+          relative === undefined,
+        );
       }
     } else {
       if (directories) throw new Error("Бросьте файл, чтобы открыть его в редакторе");
@@ -524,6 +588,7 @@ async function refresh() {
   revision.value++;
   await loadGit();
   if (section.value === "search") await search();
+  if (active.value?.virtual) return;
   if (active.value?.localFile) void openBrowserFile(active.value.localFile, true);
   else if (active.value)
     void openFile(
@@ -539,6 +604,7 @@ function entryMoved(source: string, destination: string) {
   ++fileGeneration;
   loading.value = false;
   for (const tab of [...tabs.value]) {
+    if (tab.virtual) continue;
     const path = relocatedPath(tab.path, source, destination);
     if (path === tab.path) continue;
     if (tab.staged !== undefined) {
@@ -581,6 +647,14 @@ onBeforeUnmount(() => {
           Git <span v-if="git.changes.length">{{ git.changes.length }}</span>
         </button>
         <div class="side-actions">
+          <button
+            title="Горячие клавиши"
+            aria-label="Горячие клавиши"
+            data-command="ide.workbench.keybindings.open"
+            @click="editorCommands.run('ide.workbench.keybindings.open')"
+          >
+            <IconKeyboard aria-hidden="true" />
+          </button>
           <button
             v-if="section !== 'project'"
             title="Обновить обзор"
@@ -691,12 +765,15 @@ onBeforeUnmount(() => {
       aria-label="Файлы и изменения"
       @dragenter.stop="fileDrag"
       @dragover.stop="fileDrag"
-      @dragleave.stop="!($event.currentTarget as HTMLElement).contains($event.relatedTarget as Node) && (draggingFiles = false)"
+      @dragleave.stop="
+        !($event.currentTarget as HTMLElement).contains($event.relatedTarget as Node) &&
+        (draggingFiles = false)
+      "
       @drop.stop="dropFiles"
-      @keydown.ctrl.s.prevent="saveMarkdown()"
-      @keydown.meta.s.prevent="saveMarkdown()"
-      @keydown.ctrl.shift.m.prevent="toggleMarkdownSource"
-      @keydown.meta.shift.m.prevent="toggleMarkdownSource"
+      @focusin="editorFocus"
+      @keydown.capture="
+        !($event.target as Element).closest('.keybindings-editor') && editorCommands.keydown($event)
+      "
     >
       <div v-if="draggingFiles" class="file-drop-hint">Бросьте файл — откроем его</div>
       <WorkspaceTabs
@@ -704,15 +781,20 @@ onBeforeUnmount(() => {
         :tabs="fileTabs"
         :active-id="activeKey"
         label="Открытые файлы"
+        command-namespace="ide.editor.tabs"
+        :project-id="projectId"
+        :command-handlers="{
+          select: selectTab,
+          close: closeTab,
+          closeMany: closeManyTabs,
+          reorder: reorderTabs,
+        }"
         close-saved
         :actions="tabActions"
-        @close-many="closeManyTabs"
-        @select="selectTab"
-        @close="closeTab"
-        @reorder="reorderTabs"
       />
       <div v-if="active" class="breadcrumb">
         <span>{{ active.path }}</span>
+        <span v-if="active.virtual">настройки IDE</span>
         <span v-if="active.external">только просмотр</span>
         <span v-if="active.original !== undefined">{{
           active.staged ? "HEAD → index" : "index → рабочий файл"
@@ -721,8 +803,16 @@ onBeforeUnmount(() => {
       <p v-if="fileError" class="file-error" role="alert">{{ fileError }}</p>
       <div class="editor-body" :aria-busy="loading">
         <p v-if="loading" class="loading" role="status">читаю файл…</p>
-        <p v-if="!active && !loading" class="loading">Откройте файл из дерева или перетащите его сюда</p>
-        <img v-if="active?.image" class="image-preview" :src="active.image" :alt="active.path" />
+        <p v-if="!active && !loading" class="loading">
+          Откройте файл из дерева или перетащите его сюда
+        </p>
+        <KeybindingsEditor v-if="active?.virtual === 'keybindings'" />
+        <img
+          v-else-if="active?.image"
+          class="image-preview"
+          :src="active.image"
+          :alt="active.path"
+        />
         <ArchiveViewer v-else-if="active?.archive" :key="active.key" :archive="active.archive" />
         <MarkdownViewer
           v-else-if="active && isMarkdown(active)"
@@ -786,7 +876,6 @@ onBeforeUnmount(() => {
   object-fit: contain;
   margin: auto;
 }
-
 
 .workspace {
   display: grid;
