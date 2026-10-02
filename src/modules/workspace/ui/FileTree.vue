@@ -10,6 +10,12 @@ import { useFileIconTheme } from "../../file-icons/index.ts";
 import { workspaceRequest, moveWorkspaceEntry, mutateWorkspaceEntry } from "../api.ts";
 import { createTreeDrag, treeDragKey, treeDragType } from "../tree-drag.ts";
 import {
+  createTreeSelection,
+  treeSelectionKey,
+  selectTreeRange,
+  topLevelTreePaths,
+} from "../tree-selection.ts";
+import {
   moveDestination,
   parentPath,
   relocatedPath,
@@ -35,11 +41,19 @@ const emit = defineEmits<{
 const entries = ref<FileEntry[]>([]);
 const drag = props.depth === 0 ? createTreeDrag() : inject(treeDragKey)!;
 if (props.depth === 0) provide(treeDragKey, drag);
+const selection = props.depth === 0 ? createTreeSelection() : inject(treeSelectionKey)!;
+if (props.depth === 0) provide(treeSelectionKey, selection);
 const menu = ref<InstanceType<typeof ContextMenu>>();
 const dialog = ref<InstanceType<typeof EntryDialog>>();
 const contextEntry = ref<FileEntry>();
-const clipboard = ref<{ path: string; cut: boolean }>();
-const operation = ref<{ action: string; path: string; directory: string; projectId: string }>();
+const clipboard = ref<{ paths: string[]; cut: boolean }>();
+const operation = ref<{
+  action: string;
+  path: string;
+  directory: string;
+  projectId: string;
+  paths?: string[];
+}>();
 type OpenContext = (event: MouseEvent | KeyboardEvent, entry?: FileEntry) => void;
 const showContext: OpenContext =
   props.depth === 0
@@ -48,6 +62,8 @@ const showContext: OpenContext =
           event.preventDefault();
           return;
         }
+        if (entry && !selection.paths.value.has(entry.path)) selection.replace(entry.path);
+        if (!entry) selection.replace();
         contextEntry.value = entry;
         treeCommands.scope.activate();
         void menu.value?.open(event);
@@ -65,6 +81,13 @@ function resolveEntry(value?: unknown): FileEntry | undefined {
     directory: args.kind === "directory",
   };
 }
+function actionPaths(value?: unknown) {
+  if (commandArgs(value).path !== undefined) {
+    const entry = resolveEntry(value);
+    return entry ? [entry.path] : [];
+  }
+  return topLevelTreePaths(selection.paths.value);
+}
 async function requestAction(action: string, initial = "", value?: unknown) {
   const args = commandArgs(value);
   const entry = resolveEntry(value);
@@ -76,7 +99,13 @@ async function requestAction(action: string, initial = "", value?: unknown) {
       : entry?.directory
         ? entry.path
         : parentPath(entry?.path ?? "");
-  const op = { action, path: entry?.path ?? "", directory, projectId: props.projectId };
+  const op = {
+    action,
+    path: entry?.path ?? "",
+    directory,
+    projectId: props.projectId,
+    paths: action === "delete" ? actionPaths(value) : undefined,
+  };
   if (args.name !== undefined && typeof args.name !== "string")
     throw new Error("name должен быть строкой");
   if (args.confirm !== undefined && typeof args.confirm !== "boolean")
@@ -101,7 +130,7 @@ async function requestAction(action: string, initial = "", value?: unknown) {
       confirm: action === "delete",
       description:
         action === "delete"
-          ? `${entry?.path}. Запись будет перемещена в .projector-trash в корне проекта.`
+          ? `${op.paths?.join(", ")}. Записи будут перемещены в .projector-trash в корне проекта.`
           : undefined,
     }),
   );
@@ -112,39 +141,49 @@ async function runOperation(name: string, op = operation.value, interactive = tr
   moveError.value = "";
   message.value = "";
   try {
-    if (
-      ["rename", "delete"].includes(op.action) &&
-      props.beforeChange &&
-      !(await props.beforeChange(op.path))
-    )
-      throw new Error("Сначала сохраните изменения открытых файлов");
-    const result = await mutateWorkspaceEntry(
-      op.projectId,
-      op.action,
-      op.path,
-      op.action === "copy" ? parentPath(op.path) : op.directory,
-      name,
-    );
+    const paths = op.paths ?? [op.path];
+    if (["rename", "delete"].includes(op.action) && props.beforeChange)
+      for (const path of paths)
+        if (!(await props.beforeChange(path)))
+          throw new Error("Сначала сохраните изменения открытых файлов");
+    let result: Awaited<ReturnType<typeof mutateWorkspaceEntry>> = {};
+    for (const path of paths) {
+      result = await mutateWorkspaceEntry(
+        op.projectId,
+        op.action,
+        path,
+        op.action === "copy" ? parentPath(path) : op.directory,
+        name,
+      );
+      if (op.projectId !== props.projectId) return;
+      if (op.action === "delete") {
+        selection.relocate(path);
+        expanded.value = new Set(
+          [...expanded.value].filter((p) => p !== path && !p.startsWith(path + "/")),
+        );
+        if (clipboard.value) {
+          clipboard.value.paths = clipboard.value.paths.filter(
+            (p) => p !== path && !p.startsWith(path + "/"),
+          );
+          if (!clipboard.value.paths.length) clipboard.value = undefined;
+        }
+        if (op.paths) op.paths = op.paths.filter((pending) => pending !== path);
+        emit("deleted", path);
+      }
+    }
     if (interactive) dialog.value?.close();
     if (op.projectId !== props.projectId) return;
     if (op.action === "rename") {
       expanded.value = new Set(
         [...expanded.value].map((path) => relocatedPath(path, op.path, result.destination!)),
       );
+      selection.relocate(op.path, result.destination!);
       if (clipboard.value)
-        clipboard.value.path = relocatedPath(clipboard.value.path, op.path, result.destination!);
+        clipboard.value.paths = clipboard.value.paths.map((path) =>
+          relocatedPath(path, op.path, result.destination!),
+        );
       emit("moved", op.path, result.destination!);
-    } else if (op.action === "delete") {
-      expanded.value = new Set(
-        [...expanded.value].filter((path) => path !== op.path && !path.startsWith(op.path + "/")),
-      );
-      if (
-        clipboard.value &&
-        (clipboard.value.path === op.path || clipboard.value.path.startsWith(op.path + "/"))
-      )
-        clipboard.value = undefined;
-      emit("deleted", op.path);
-    } else {
+    } else if (op.action !== "delete") {
       if (op.directory) expanded.value.add(op.directory);
       emit("changed");
       if (op.action === "create-file") emit("open", result.destination!);
@@ -174,26 +213,27 @@ async function paste(value?: unknown) {
   moveError.value = "";
   const projectId = props.projectId;
   try {
-    if (clip.cut && props.beforeChange && !(await props.beforeChange(clip.path)))
-      throw new Error("Сначала сохраните изменения открытых файлов");
-    const result = clip.cut
-      ? await moveWorkspaceEntry(projectId, clip.path, directory)
-      : await mutateWorkspaceEntry(
-          projectId,
-          "copy",
-          clip.path,
-          directory,
-          clip.path.split("/").at(-1)!,
+    if (clip.cut && props.beforeChange)
+      for (const path of clip.paths)
+        if (!(await props.beforeChange(path)))
+          throw new Error("Сначала сохраните изменения открытых файлов");
+    let result;
+    for (const path of [...clip.paths]) {
+      result = clip.cut
+        ? await moveWorkspaceEntry(projectId, path, directory)
+        : await mutateWorkspaceEntry(projectId, "copy", path, directory, path.split("/").at(-1)!);
+      if (projectId !== props.projectId) return;
+      if (directory) expanded.value.add(directory);
+      if (clip.cut) {
+        expanded.value = new Set(
+          [...expanded.value].map((p) => relocatedPath(p, path, result!.destination!)),
         );
-    if (projectId !== props.projectId) return;
-    if (directory) expanded.value.add(directory);
-    if (clip.cut) {
-      expanded.value = new Set(
-        [...expanded.value].map((path) => relocatedPath(path, clip.path, result.destination!)),
-      );
-      emit("moved", clip.path, result.destination!);
-      clipboard.value = undefined;
-    } else emit("changed");
+        selection.relocate(path, result.destination!);
+        clip.paths = clip.paths.filter((p) => p !== path);
+        if (!clip.paths.length) clipboard.value = undefined;
+        emit("moved", path, result.destination!);
+      } else emit("changed");
+    }
     message.value = "Готово";
     return result;
   } catch (error) {
@@ -205,11 +245,14 @@ async function paste(value?: unknown) {
 }
 async function copyPath(relative: boolean, value?: unknown) {
   try {
-    const path = resolveEntry(value)?.path ?? "";
-    if (relative) await navigator.clipboard.writeText(path || ".");
+    const paths = actionPaths(value);
+    if (!paths.length) paths.push("");
+    if (relative) await navigator.clipboard.writeText(paths.map((path) => path || ".").join("\n"));
     else {
       const data = await workspaceRequest<{ root: string }>(props.projectId, "root");
-      await navigator.clipboard.writeText(data.root + (path ? "/" + path : ""));
+      await navigator.clipboard.writeText(
+        paths.map((path) => data.root + (path ? "/" + path : "")).join("\n"),
+      );
     }
   } catch (error) {
     moveError.value = "Не удалось скопировать путь в буфер обмена";
@@ -246,7 +289,11 @@ if (props.depth === 0) {
       run,
       enabled: (args) => !drag.busy.value && enabled(args),
     });
-  const hasEntry = (args?: unknown) => !!resolveEntry(args);
+  const hasEntry = (args?: unknown) => !!resolveEntry(args) && actionPaths(args).length > 0;
+  const singleEntry = (args?: unknown) =>
+    hasEntry(args) &&
+    actionPaths(args).length === 1 &&
+    (commandArgs(args).path !== undefined || selection.paths.value.size <= 1);
   register(
     "file.open",
     "Открыть",
@@ -262,13 +309,13 @@ if (props.depth === 0) {
       `${kind}.rename`,
       "Переименовать…",
       (args) => requestAction("rename", resolveEntry(args)!.name, args),
-      hasEntry,
+      singleEntry,
     );
   register(
     "entry.cut",
     "Вырезать",
     (args) => {
-      clipboard.value = { path: resolveEntry(args)!.path, cut: true };
+      clipboard.value = { paths: actionPaths(args), cut: true };
     },
     hasEntry,
   );
@@ -276,7 +323,7 @@ if (props.depth === 0) {
     "entry.copy",
     "Копировать",
     (args) => {
-      clipboard.value = { path: resolveEntry(args)!.path, cut: false };
+      clipboard.value = { paths: actionPaths(args), cut: false };
     },
     hasEntry,
   );
@@ -285,7 +332,7 @@ if (props.depth === 0) {
     "Дублировать…",
     (args) =>
       requestAction("copy", resolveEntry(args)!.name.replace(/(\.[^.]*)?$/, " copy$1"), args),
-    hasEntry,
+    singleEntry,
   );
   register("entry.paste", "Вставить", paste, () => !!clipboard.value);
   register("entry.copyRelativePath", "Копировать относительный путь", (args) =>
@@ -343,6 +390,35 @@ const menuItems = computed<ContextMenuItem[]>(() => {
   if (entry) items.push(item("entry.delete", { danger: true, separator: true }));
   return items;
 });
+function visibleRows() {
+  return [...(tree.value?.querySelectorAll<HTMLButtonElement>("button[data-path]") ?? [])];
+}
+function selectEntry(event: MouseEvent | KeyboardEvent, entry: FileEntry) {
+  const result = selectTreeRange(
+    selection.paths.value,
+    selection.anchor.value,
+    entry.path,
+    visibleRows().map((row) => row.dataset.path!),
+    event,
+  );
+  selection.paths.value = result.paths;
+  selection.anchor.value = result.anchor;
+}
+function clickEntry(event: MouseEvent, entry: FileEntry) {
+  if (props.depth !== 0) {
+    injectClickEntry!(event, entry);
+    return;
+  }
+  if (busy.value) return;
+  activateEntry(entry);
+  selectEntry(event, entry);
+  if (event.shiftKey || event.ctrlKey || event.metaKey) return;
+  treeCommands.run(entry.directory ? "ide.fileTree.directory.toggle" : "ide.fileTree.file.open");
+}
+const injectClickEntry = props.depth
+  ? inject<(event: MouseEvent, entry: FileEntry) => void>("workspace-entry-click")
+  : undefined;
+if (props.depth === 0) provide("workspace-entry-click", clickEntry);
 function entryKey(event: KeyboardEvent, entry?: FileEntry) {
   if (props.depth !== 0) {
     injectEntryKey?.(event, entry);
@@ -350,6 +426,68 @@ function entryKey(event: KeyboardEvent, entry?: FileEntry) {
   }
   contextEntry.value = entry;
   treeCommands.scope.activate();
+  if (busy.value) {
+    event.preventDefault();
+    return;
+  }
+  const mod = event.ctrlKey || event.metaKey;
+  if (mod && event.key.toLowerCase() === "a") {
+    event.preventDefault();
+    const rows = visibleRows();
+    selection.paths.value = new Set(rows.map((row) => row.dataset.path!));
+    if (!selection.anchor.value)
+      selection.anchor.value = entry?.path ?? rows[0]?.dataset.path ?? "";
+    return;
+  }
+  if (event.key === "Escape") {
+    event.preventDefault();
+    selection.replace();
+    return;
+  }
+  if (
+    entry &&
+    ["ArrowUp", "ArrowDown", "Home", "End", "ArrowLeft", "ArrowRight", " "].includes(event.key)
+  ) {
+    event.preventDefault();
+    if (event.key === " ") {
+      selectEntry(event, entry);
+      return;
+    }
+    const rows = visibleRows();
+    const index = rows.findIndex((row) => row.dataset.path === entry.path);
+    let next = index;
+    if (event.key === "ArrowDown") next = Math.min(rows.length - 1, index + 1);
+    if (event.key === "ArrowUp") next = Math.max(0, index - 1);
+    if (event.key === "Home") next = 0;
+    if (event.key === "End") next = rows.length - 1;
+    if (event.key === "ArrowRight") {
+      if (!entry.directory) return;
+      if (!expanded.value.has(entry.path)) {
+        toggle(entry.path);
+        return;
+      }
+      if (rows[index + 1]?.dataset.path?.startsWith(entry.path + "/")) next = index + 1;
+    }
+    if (event.key === "ArrowLeft") {
+      if (entry.directory && expanded.value.has(entry.path)) {
+        toggle(entry.path);
+        return;
+      }
+      next = rows.findIndex((row) => row.dataset.path === parentPath(entry.path));
+    }
+    const row = rows[next];
+    if (row) {
+      if (!mod || event.shiftKey)
+        selectEntry(event, {
+          path: row.dataset.path!,
+          name: "",
+          directory: row.getAttribute("aria-expanded") !== null,
+        });
+      row.focus();
+      row.scrollIntoView({ block: "nearest" });
+    }
+    return;
+  }
   treeCommands.keydown(event);
 }
 function activateEntry(entry?: FileEntry) {
@@ -378,11 +516,20 @@ if (props.depth === 0) {
       menu.value?.close(false);
       dialog.value?.close();
       clipboard.value = undefined;
+      selection.replace();
+      selection.dragged.value = [];
       drag.clear();
       expanded.value.clear();
       moveError.value = "";
       message.value = "";
     },
+  );
+  watch(
+    () => props.selected,
+    (path) => {
+      if (path && !selection.paths.value.has(path)) selection.replace(path);
+    },
+    { immediate: true },
   );
   onBeforeUnmount(() => drag.clear());
 }
@@ -410,6 +557,9 @@ watch(
         { path: props.path },
       );
       if (current !== generation) return;
+      const remaining = new Set(data.entries.map((entry) => entry.path));
+      for (const entry of entries.value)
+        if (!remaining.has(entry.path)) selection.relocate(entry.path);
       entries.value = data.entries;
       truncated.value = data.truncated;
     } catch (err) {
@@ -429,11 +579,17 @@ function startDrag(event: DragEvent, entry: FileEntry) {
     event.preventDefault();
     return;
   }
+  if (!selection.paths.value.has(entry.path)) selection.replace(entry.path);
+  selection.dragged.value = topLevelTreePaths(selection.paths.value);
   source.value = entry.path;
   event.dataTransfer.effectAllowed = "copyMove";
   event.dataTransfer.setData(
     treeDragType,
-    JSON.stringify({ projectId: props.projectId, path: entry.path }),
+    JSON.stringify({
+      projectId: props.projectId,
+      path: entry.path,
+      paths: selection.dragged.value,
+    }),
   );
 }
 function destinationFor(entry?: FileEntry) {
@@ -443,7 +599,7 @@ function dragOver(event: DragEvent, entry?: FileEntry) {
   if (!source.value || busy.value || !event.dataTransfer?.types.includes(treeDragType)) return;
   event.preventDefault();
   const directory = destinationFor(entry);
-  const valid = !!moveDestination(source.value, directory);
+  const valid = selection.dragged.value.every((path) => !!moveDestination(path, directory));
   event.dataTransfer.dropEffect = valid ? "move" : "none";
   drag.hover(valid ? directory : undefined, valid && !!entry?.directory);
 }
@@ -455,8 +611,8 @@ async function drop(event: DragEvent, entry?: FileEntry) {
   if (!source.value || busy.value || !event.dataTransfer?.types.includes(treeDragType)) return;
   event.preventDefault();
   const directory = destinationFor(entry);
-  const path = source.value;
-  if (!moveDestination(path, directory)) {
+  const paths = [...selection.dragged.value];
+  if (!paths.length || paths.some((path) => !moveDestination(path, directory))) {
     drag.clear();
     return;
   }
@@ -466,16 +622,21 @@ async function drop(event: DragEvent, entry?: FileEntry) {
   busy.value = true;
   drag.clear();
   try {
-    if (props.beforeChange && !(await props.beforeChange(path)))
-      throw new Error("Сначала сохраните изменения открытых файлов");
-    const result = await moveWorkspaceEntry(projectId, path, directory);
-    if (projectId !== props.projectId) return;
-    expanded.value = new Set(
-      [...expanded.value].map((value) => relocatedPath(value, result.source, result.destination)),
-    );
-    if (directory) expanded.value.add(directory);
-    message.value = `Перенесено: ${result.source} → ${result.destination}`;
-    emit("moved", result.source, result.destination);
+    if (props.beforeChange)
+      for (const path of paths)
+        if (!(await props.beforeChange(path)))
+          throw new Error("Сначала сохраните изменения открытых файлов");
+    for (const path of paths) {
+      const result = await moveWorkspaceEntry(projectId, path, directory);
+      if (projectId !== props.projectId) return;
+      expanded.value = new Set(
+        [...expanded.value].map((value) => relocatedPath(value, result.source, result.destination)),
+      );
+      selection.relocate(result.source, result.destination);
+      if (directory) expanded.value.add(directory);
+      emit("moved", result.source, result.destination);
+    }
+    message.value = `Перенесено записей: ${paths.length}`;
   } catch (err) {
     if (projectId === props.projectId)
       moveError.value = err instanceof Error ? err.message : "Не удалось перенести запись";
@@ -486,6 +647,7 @@ async function drop(event: DragEvent, entry?: FileEntry) {
 let revealObserver: MutationObserver | undefined;
 let revealTimer: ReturnType<typeof setTimeout> | undefined;
 function reveal(path: string) {
+  selection.replace(path);
   const parts = path.split("/");
   for (let i = 1; i < parts.length; i++) expanded.value.add(parts.slice(0, i).join("/"));
   revealObserver?.disconnect();
@@ -520,6 +682,8 @@ defineExpose({ reveal });
     ref="tree"
     class="tree"
     :class="{ 'tree-root': depth === 0, 'root-target': depth === 0 && target === '' }"
+    :role="depth === 0 ? 'tree' : 'group'"
+    :aria-multiselectable="depth === 0 ? true : undefined"
     :aria-label="path || 'Файлы проекта'"
     :aria-busy="busy || loading"
     @dragover.stop="dragOver($event)"
@@ -530,6 +694,7 @@ defineExpose({ reveal });
     <li
       v-if="depth === 0"
       class="root-label"
+      @click="selection.replace()"
       :class="{ 'drop-target': target === '' }"
       title="Корень проекта"
       tabindex="0"
@@ -544,27 +709,25 @@ defineExpose({ reveal });
     <li v-if="depth === 0 && message" class="notice" role="status">{{ message }}</li>
     <li v-if="error" class="notice error" role="alert">{{ error }}</li>
     <li v-if="depth === 0 && themeError" class="notice error" role="status">{{ themeError }}</li>
-    <li v-for="{ entry, icon } in rows" :key="entry.path">
+    <li v-for="{ entry, icon } in rows" :key="entry.path" role="none">
       <button
         :class="{
-          selected: !entry.directory && entry.path === selected,
-          dragging: source === entry.path,
+          selected: selection.paths.value.has(entry.path),
+          dragging: selection.dragged.value.includes(entry.path) && !!source,
           'drop-target': entry.directory && target === entry.path,
         }"
         :draggable="!busy"
         :data-path="entry.path"
         :style="{ paddingLeft: `${12 + depth * 14}px` }"
         :title="entry.path"
+        :aria-selected="selection.paths.value.has(entry.path)"
+        role="treeitem"
+        :aria-level="depth + 1"
         :aria-expanded="entry.directory ? expanded.has(entry.path) : undefined"
         @contextmenu.stop="showContext($event, entry)"
         @keydown.stop="entryKey($event, entry)"
         @focus="activateEntry(entry)"
-        @click="
-          activateEntry(entry);
-          treeCommands.run(
-            entry.directory ? 'ide.fileTree.directory.toggle' : 'ide.fileTree.file.open',
-          );
-        "
+        @click="clickEntry($event, entry)"
         @dragstart.stop="startDrag($event, entry)"
         @dragend.stop="drag.clear()"
         @dragover.stop="dragOver($event, entry)"
@@ -594,7 +757,12 @@ defineExpose({ reveal });
       />
     </li>
     <li v-if="truncated" class="notice">показаны первые 1000 записей</li>
-    <li v-if="depth === 0" class="root-space" @contextmenu.stop="showContext($event)"></li>
+    <li
+      v-if="depth === 0"
+      class="root-space"
+      @click="selection.replace()"
+      @contextmenu.stop="showContext($event)"
+    ></li>
   </ul>
   <ContextMenu v-if="depth === 0" ref="menu" :items="menuItems" label="Действия с файлами" />
   <EntryDialog v-if="depth === 0" ref="dialog" @submit="runOperation($event)" />
@@ -605,6 +773,7 @@ defineExpose({ reveal });
   padding: 0;
   margin: 0;
   font-size: 12px;
+  user-select: none;
 }
 .tree-root {
   min-height: 100%;
