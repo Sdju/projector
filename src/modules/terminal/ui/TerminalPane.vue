@@ -5,6 +5,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import "@xterm/xterm/css/xterm.css";
 import UiButton from "../../../common/ui/UiButton.vue";
+import { deferTerminalText } from "../lib/keyboard.ts";
 import type {
   TerminalClientMessage,
   TerminalProgram,
@@ -309,6 +310,10 @@ onMounted(() => {
         });
       return false;
     }
+    // Fcitx virtual layouts can translate a US keydown only in keypress.
+    // Let xterm's text/composition handlers receive the translated character
+    // instead of sending the physical layout's lowercase letter immediately.
+    if (deferTerminalText(event)) return false;
     return true;
   });
   observer = new ResizeObserver(scheduleFit);

@@ -8,7 +8,7 @@
     "build": "vp run gtk:types && vp run vio:build && vue-tsc --noEmit && vp build",
     "preview": "vp preview",
     "gtk:types": "node-gtk generate-types Gtk-4.0 GdkX11-4.0 GioUnix-2.0 --no-docs",
-    "test": "vp run vio:test && node --test tests/launcher.test.mjs tests/integrations.test.mjs tests/terminal.test.mjs && node tests/launcher-model.test.mjs",
+    "test": "vp run vio:test && node --test tests/launcher.test.mjs tests/integrations.test.mjs tests/terminal.test.mjs tests/terminal-input.test.mjs && node tests/launcher-model.test.mjs",
     "vio:build": "vp run --filter vio build",
     "vio:test": "vp run --filter vio test",
     "vio:demo": "vp run --filter vio demo",
