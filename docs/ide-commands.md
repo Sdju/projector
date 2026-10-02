@@ -76,9 +76,8 @@ The settings endpoint is `GET /api/ide/keybindings` and same-origin `PUT /api/id
 ## Next migration slices
 
 1. Move the remaining explicit terminal, search, Git and project actions onto commands; keep process and filesystem services behind adapters.
-2. Add a command palette using registry discovery.
-3. Add typed per-command argument/result contracts, contribution metadata, and richer context conditions; add key chords only when a real workflow needs them.
-4. Reuse the core registry from native/CLI hosts with their own focus and presentation adapters. A remote automation transport will need its own authorization and argument validation.
+2. Add typed per-command argument/result contracts, contribution metadata, and richer context conditions; add key chords only when a real workflow needs them.
+3. Reuse the core registry from native/CLI hosts with their own focus and presentation adapters. A remote automation transport will need its own authorization and argument validation.
 
 Automatic saves, drag-and-drop transfer internals, editor text/formatting keymaps, terminal PTY input and system launcher shortcuts are not all migrated in this slice. The SDK is currently in-process; there is no arbitrary command-execution HTTP endpoint.
 
@@ -91,3 +90,17 @@ The keyboard button in the project sidebar executes `ide.workbench.keybindings.o
 The editor discovers registered commands and default/user bindings from the SDK. Search matches titles, IDs, shortcuts and context conditions. Click a shortcut or the pencil to record a replacement; Tab moves to Save/Cancel, Escape cancels. The remove and reset buttons unbind a row or restore all default bindings of that command. Editing one row preserves the command's other rules, conditions, arguments and input-focus setting. Changes persist through `saveKeybindings`, then take effect immediately. Save errors stay visible and retain the previous live binding. The checkbox filters user overrides.
 
 Settings actions are commands too: `ide.keybindings.edit`, `.remove`, `.reset` take `{ command, index }` for a visible row, and `.save` accepts the recorded shortcut. Their scope has `{ surface: 'keybindings' }`. `getDefaultKeybindings()` returns a detached copy of the defaults for reset/edit tools. Keyboard recording is isolated from editor commands so recording does not invoke the action being assigned.
+
+## Command center
+
+`Ctrl+Shift+P` (`Cmd+Shift+P` on macOS) or `F1` opens the command center through `ide.workbench.commandPalette.open`. Both are default keybinding rules and can be changed in the keyboard shortcuts tab. The workbench scope handles this shortcut before embedded editors or terminal input, while name dialogs and shortcut recording retain their own keys.
+
+The palette searches command titles, IDs and areas, supports Arrow Up/Down, Enter, Escape and mouse selection, and restores focus on cancellation. It captures the originating SDK scope before focusing its input. Duplicate registrations prefer the originating scope and commands from other projects are excluded. Selection executes the stored command ID with its explicit scope; the SDK rechecks availability and reports failures through the host notification. Commands unavailable in the captured context remain visible but cannot be selected for execution.
+
+`getActiveScope()` exposes the originating scope to command surfaces. Register `palette: false` for commands that require arguments supplied only by another UI, such as tab reorder and shortcut-row edits. Such commands remain in the SDK and keyboard settings, but are omitted from the command center.
+
+To open it directly from an SDK client:
+
+```js
+await ide.executeCommand('ide.workbench.commandPalette.open', undefined, { scope: 'workbench' });
+```
