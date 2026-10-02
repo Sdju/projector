@@ -6,6 +6,9 @@ interface Tab {
   id: string;
   label: string;
   title?: string;
+  dirty?: boolean;
+  saving?: boolean;
+  error?: boolean;
 }
 const props = defineProps<{
   tabs: Tab[];
@@ -140,6 +143,9 @@ watch(
       class="workspace-tab"
       :class="{
         selected: tab.id === activeId,
+        dirty: tab.dirty,
+        saving: tab.saving,
+        error: tab.error,
         dragging: tab.id === dragging,
         'drop-before': tab.id === target && !after && tab.id !== dragging,
         'drop-after': tab.id === target && after && tab.id !== dragging,
@@ -186,7 +192,20 @@ watch(
         @click.stop="emit('close', tab.id)"
         @dblclick.stop
       >
-        <IconClose aria-hidden="true" />
+        <span
+          v-if="tab.dirty || tab.saving"
+          class="tab-state"
+          :class="{ spinning: tab.saving }"
+          role="status"
+          :aria-label="
+            tab.saving ? 'Сохраняется' : tab.error ? 'Не удалось сохранить' : 'Не сохранено'
+          "
+        />
+        <IconClose
+          class="close-icon"
+          :class="{ 'has-state': tab.dirty || tab.saving }"
+          aria-hidden="true"
+        />
       </button>
     </div>
   </div>
@@ -242,6 +261,7 @@ watch(
   color: var(--text);
 }
 .tab-close {
+  position: relative;
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -249,6 +269,45 @@ watch(
   border-radius: 3px;
   color: var(--faint);
   opacity: 0;
+}
+.tab-state {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text);
+  position: absolute;
+}
+.error .tab-state {
+  background: var(--err);
+}
+.tab-state.spinning {
+  width: 12px;
+  height: 12px;
+  background: transparent;
+  border: 1.5px solid var(--faint);
+  border-top-color: var(--text);
+  animation: tab-spin 0.8s linear infinite;
+}
+.close-icon.has-state {
+  visibility: hidden;
+}
+.tab-close:hover .close-icon.has-state {
+  visibility: visible;
+}
+.tab-close:hover .tab-state:not(.spinning) {
+  visibility: hidden;
+}
+.saving .tab-close:hover .close-icon {
+  visibility: hidden;
+}
+.dirty .tab-close,
+.saving .tab-close {
+  opacity: 1;
+}
+@keyframes tab-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .tab-close svg {
   width: 14px;

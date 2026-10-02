@@ -127,7 +127,7 @@ interface OpenFile extends FileContent {
   column?: number;
   key: string;
   draft?: string;
-  markdownMode?: "preview" | "edit" | "split";
+  markdownMode?: "document" | "source";
   saving?: boolean;
   saveError?: string;
 }
@@ -139,8 +139,11 @@ const activeKey = ref("");
 const fileTabs = computed(() =>
   tabs.value.map((tab) => ({
     id: tab.key,
-    label: `${tab.path.split("/").at(-1)}${isDirty(tab) ? " •" : ""}${tab.original !== undefined ? (tab.staged ? " · index" : " · diff") : ""}`,
-    title: tab.path,
+    label: `${tab.path.split("/").at(-1)}${tab.original !== undefined ? (tab.staged ? " · index" : " · diff") : ""}`,
+    title: tab.saveError ? `${tab.path} · ${tab.saveError}` : tab.path,
+    dirty: isDirty(tab),
+    saving: !!tab.saving,
+    error: !!tab.saveError,
   })),
 );
 function reorderTabs(ids: string[]) {
@@ -172,7 +175,7 @@ async function openFile(
     selectTab(key);
     existing.line = line;
     existing.column = column;
-    if (line && isMarkdown(existing)) existing.markdownMode = "edit";
+    if (line && isMarkdown(existing)) existing.markdownMode = "source";
     return;
   }
   const generation = ++fileGeneration;
@@ -196,12 +199,12 @@ async function openFile(
       line,
       column,
       key,
-      markdownMode: line ? "edit" : (existing?.markdownMode ?? "preview"),
+      markdownMode: line ? "source" : (existing?.markdownMode ?? "document"),
     };
     const index = tabs.value.findIndex((tab) => tab.key === key);
     if (index === -1) tabs.value.push(file);
     else tabs.value[index] = file;
-    activeKey.value = key;
+    selectTab(key);
   } catch (err) {
     if (generation === fileGeneration)
       fileError.value = err instanceof Error ? err.message : "Не удалось открыть файл";
@@ -209,52 +212,81 @@ async function openFile(
     if (generation === fileGeneration) loading.value = false;
   }
 }
-function closeTab(key: string) {
-  const index = tabs.value.findIndex((tab) => tab.key === key);
-  const tab = tabs.value[index];
-  if (!tab || tab.saving) return;
-  if (isDirty(tab) && !window.confirm(`Закрыть ${tab.path} без сохранения изменений?`)) return;
+async function closeTab(key: string) {
+  const tab = tabs.value.find((file) => file.key === key);
+  if (!tab) return;
+  if (!(await saveMarkdown(tab))) {
+    activeKey.value = tab.key;
+    if (!window.confirm(`Не удалось сохранить ${tab.path}. Закрыть без сохранения изменений?`))
+      return;
+  }
+  const index = tabs.value.indexOf(tab);
+  if (index === -1) return;
   tabs.value.splice(index, 1);
   if (key === activeKey.value)
     activeKey.value = tabs.value[Math.min(index, tabs.value.length - 1)]?.key ?? "";
 }
 function selectTab(key: string) {
+  if (key !== activeKey.value) void saveMarkdown();
   ++fileGeneration;
   loading.value = false;
   fileError.value = "";
   activeKey.value = key;
 }
-async function saveMarkdown() {
-  const file = active.value;
-  if (!file || !isMarkdown(file) || !isDirty(file) || file.saving) return;
-  const content = file.draft!;
+const pendingSaves = new Map<OpenFile, Promise<boolean>>();
+function saveMarkdown(file = active.value): Promise<boolean> {
+  if (!file || !isMarkdown(file)) return Promise.resolve(true);
+  const pending = pendingSaves.get(file);
+  if (pending) return pending;
+  if (!isDirty(file)) return Promise.resolve(true);
   file.saving = true;
   file.saveError = "";
-  try {
-    await saveWorkspaceMarkdown(props.projectId, file.path, content, file.content);
-    file.content = content;
-    void loadGit();
-  } catch (error) {
-    file.saveError = error instanceof Error ? error.message : "Не удалось сохранить файл";
-  } finally {
-    file.saving = false;
-  }
+  const projectId = props.projectId;
+  const operation = (async () => {
+    try {
+      // If a second blur/save arrives during a write, include the latest draft.
+      while (isDirty(file)) {
+        const content = file.draft!;
+        await saveWorkspaceMarkdown(projectId, file.path, content, file.content);
+        file.content = content;
+      }
+      void loadGit();
+      return true;
+    } catch (error) {
+      file.saveError = error instanceof Error ? error.message : "Не удалось сохранить файл";
+      return false;
+    } finally {
+      file.saving = false;
+      pendingSaves.delete(file);
+    }
+  })();
+  pendingSaves.set(file, operation);
+  return operation;
 }
-function canLeave() {
-  if (tabs.value.some((file) => file.saving)) return false;
-  return (
-    !tabs.value.some(isDirty) ||
-    window.confirm("Есть несохранённые изменения Markdown. Уйти без сохранения?")
-  );
+async function canLeave() {
+  const results = await Promise.all(tabs.value.map((file) => saveMarkdown(file)));
+  if (results.every(Boolean)) return true;
+  return window.confirm("Не удалось сохранить изменения Markdown. Уйти без сохранения?");
 }
 onBeforeRouteLeave(canLeave);
 onBeforeRouteUpdate((to, from) => to.params.id === from.params.id || canLeave());
+function windowBlur() {
+  for (const file of tabs.value) void saveMarkdown(file);
+}
+function toggleMarkdownSource() {
+  const file = active.value;
+  if (file && isMarkdown(file))
+    file.markdownMode = file.markdownMode === "source" ? "document" : "source";
+}
 function beforeUnload(event: BeforeUnloadEvent) {
   if (!tabs.value.some((file) => isDirty(file) || file.saving)) return;
   event.preventDefault();
   event.returnValue = "";
 }
-onMounted(() => window.addEventListener("beforeunload", beforeUnload));
+onMounted(() => {
+  window.addEventListener("beforeunload", beforeUnload);
+  window.addEventListener("blur", windowBlur);
+});
 async function loadGit() {
   const generation = ++gitGeneration;
   gitLoading.value = true;
@@ -364,6 +396,7 @@ function entryMoved(source: string, destination: string) {
 }
 onBeforeUnmount(() => {
   window.removeEventListener("beforeunload", beforeUnload);
+  window.removeEventListener("blur", windowBlur);
   stopResize?.();
   sizeObserver?.disconnect();
   ++fileGeneration;
@@ -484,7 +517,14 @@ onBeforeUnmount(() => {
       @pointerdown="resizePane($event, 'tree')"
       @keydown="resizeKey($event, 'tree')"
     />
-    <section class="editor-pane" aria-label="Файлы и изменения">
+    <section
+      class="editor-pane"
+      aria-label="Файлы и изменения"
+      @keydown.ctrl.s.prevent="saveMarkdown()"
+      @keydown.meta.s.prevent="saveMarkdown()"
+      @keydown.ctrl.shift.m.prevent="toggleMarkdownSource"
+      @keydown.meta.shift.m.prevent="toggleMarkdownSource"
+    >
       <WorkspaceTabs
         v-if="tabs.length"
         :tabs="fileTabs"
@@ -510,9 +550,7 @@ onBeforeUnmount(() => {
           :project-id="projectId"
           :path="active.path"
           :content="active.draft ?? active.content"
-          :mode="active.markdownMode ?? 'preview'"
-          :dirty="isDirty(active)"
-          :saving="!!active.saving"
+          :mode="active.markdownMode ?? 'document'"
           :error="active.saveError"
           :line="active.line"
           :column="active.column"
