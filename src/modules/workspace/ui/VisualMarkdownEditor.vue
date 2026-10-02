@@ -276,6 +276,10 @@ onBeforeUnmount(() => {
 .visual-markdown :deep(.ProseMirror-focused) {
   --prosemirror-virtual-cursor-color: var(--text);
 }
+.visual-markdown :deep(.prosemirror-virtual-cursor) {
+  /* Positioned blocks such as quotes must not paint over the caret. */
+  z-index: 1;
+}
 .visual-markdown :deep(.ProseMirror h1),
 .visual-markdown :deep(.ProseMirror h2) {
   padding-bottom: 0.35em;

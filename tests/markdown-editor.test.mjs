@@ -59,6 +59,7 @@ test(
     });
     const html = `<!doctype html><div id="editor"></div><button id="outside">Outside editor</button><pre id="result">WAITING</pre><script type="module">
     import { createApp, h, nextTick, ref } from 'vue';
+    import '/src/app/styles.css';
     import MarkdownViewer from '/src/modules/workspace/ui/MarkdownViewer.vue';
     import {createCommandService, defaultKeybindings} from '/core/modules/ide/index.ts';
     const initial = "# Title\\r\\n\\r\\nA **bold** paragraph.\\r\\n\\r\\n![Alt text](../image.png)\\r\\n\\r\\n| A | B |\\r\\n| - | - |\\r\\n| One | Two |\\r\\n\\r\\n~~~js\\r\\nconst value = 1;\\r\\n~~~\\r\\n\\r\\n\\u003cdetails>\\u003csummary>More\\u003c/summary>Raw HTML\\u003c/details>\\r\\n\\r\\n\\u003cscript>window.unsafeMarkdown = true\\u003c/script>\\r\\n";
@@ -81,6 +82,31 @@ test(
       check(!document.querySelector('.markdown-toolbar'), 'There must be no upper toolbar');
       check(editor.contentEditable === 'true', 'The formatted document must be editable');
       check(editor.querySelector('strong').textContent === 'bold', 'Bold must render visually');
+      // Reproduce the paint-order failure with an opaque, positioned quote.
+      content.value = '> Quote text\\n\\n> > Nested quote\\n'; await nextTick();
+      const quoteSelection = window.getSelection();
+      for (const quote of editor.querySelectorAll('blockquote')) {
+        const paragraph = quote.querySelector('p');
+        const quoteRange = document.createRange();
+        quoteRange.setStart(paragraph.firstChild, 3); quoteRange.collapse(true);
+        quoteSelection.removeAllRanges(); quoteSelection.addRange(quoteRange); editor.focus();
+        await wait(() => {
+          const caret = editor.querySelector('.prosemirror-virtual-cursor');
+          if (!caret) return false;
+          const cursorRect = caret.getBoundingClientRect();
+          const textRect = quoteRange.getBoundingClientRect();
+          return Math.abs(cursorRect.x - textRect.x) < 3 && Math.abs(cursorRect.y - textRect.y) < 3;
+        });
+        const caret = editor.querySelector('.prosemirror-virtual-cursor');
+        // Hit-test the actual paint order, temporarily enabling pointer events.
+        caret.style.pointerEvents = 'auto';
+        try {
+          const rect = caret.getBoundingClientRect();
+          check(document.elementFromPoint(rect.x + 1, rect.y + 5) === caret, 'The caret must paint above quote backgrounds, including nested quotes');
+        } finally { caret.style.removeProperty('pointer-events'); }
+      }
+      content.value = initial; await nextTick();
+      changes = 0;
       const image = editor.querySelector('img:not(.ProseMirror-separator)');
       check(image && image.getAttribute('src').includes('workspace/asset?path=image.png'), 'Local image must render through the project asset endpoint');
       check(!window.unsafeMarkdown && !editor.querySelector('script'), 'Embedded scripts must not execute');
