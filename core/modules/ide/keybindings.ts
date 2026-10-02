@@ -1,0 +1,38 @@
+import type { Keybinding } from "./commands.ts";
+const tree = { surface: "fileTree" };
+export const defaultKeybindings: Keybinding[] = [
+  { key: "F2", command: "ide.fileTree.file.rename", when: { ...tree, entryKind: "file" } },
+  {
+    key: "F2",
+    command: "ide.fileTree.directory.rename",
+    when: { ...tree, entryKind: "directory" },
+  },
+  { key: "Delete", command: "ide.fileTree.entry.delete", when: tree },
+  { key: "Mod+C", command: "ide.fileTree.entry.copy", when: tree },
+  { key: "Mod+X", command: "ide.fileTree.entry.cut", when: tree },
+  { key: "Mod+V", command: "ide.fileTree.entry.paste", when: tree },
+  { key: "Enter", command: "ide.fileTree.file.open", when: { ...tree, entryKind: "file" } },
+  {
+    key: "Enter",
+    command: "ide.fileTree.directory.toggle",
+    when: { ...tree, entryKind: "directory" },
+  },
+  { key: "Shift+F10", command: "ide.fileTree.contextMenu", when: tree },
+  { key: "ContextMenu", command: "ide.fileTree.contextMenu", when: tree },
+  ...["ide.editor.tabs", "ide.terminal.tabs"].flatMap((prefix): Keybinding[] => [
+    { key: "ArrowRight", command: `${prefix}.next` },
+    { key: "ArrowLeft", command: `${prefix}.previous` },
+    { key: "Home", command: `${prefix}.first` },
+    { key: "End", command: `${prefix}.last` },
+    { key: "Shift+F10", command: `${prefix}.contextMenu` },
+    { key: "ContextMenu", command: `${prefix}.contextMenu` },
+  ]),
+  { key: "F2", command: "ide.terminal.tabs.rename" },
+  { key: "Mod+S", command: "ide.editor.file.save", when: { surface: "editor" }, allowInput: true },
+  {
+    key: "Mod+Shift+M",
+    command: "ide.editor.markdown.toggleSource",
+    when: { surface: "editor" },
+    allowInput: true,
+  },
+];

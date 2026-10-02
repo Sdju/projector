@@ -23,7 +23,9 @@ import { handlePickFolder } from "../routes/api/pick-folder.ts";
 import { handlePreviewIcon } from "../routes/api/preview-icon.ts";
 import { handleProjectsIndex } from "../routes/api/projects/index.ts";
 import { handleProjectsProjectActions } from "../routes/api/projects/[id]/[...action].ts";
+import { handleIdeKeybindings } from "../routes/api/ide/keybindings.ts";
 const routes = [
+  handleIdeKeybindings,
   handleIntegrationsActions,
   handleDirectories,
   handleHealth,
