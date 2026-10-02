@@ -8,3 +8,5 @@ export type {
 } from "./commands.ts";
 export { defaultKeybindings } from "./keybindings.ts";
 export { editKeybinding, recordedKey } from "./keybinding-editor.ts";
+export { paletteCommands } from "./palette.ts";
+export type { PaletteCommand } from "./palette.ts";

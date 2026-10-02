@@ -18,12 +18,14 @@ export interface KeyStroke {
   repeat?: boolean;
 }
 export interface CommandRegistration {
+  palette?: boolean;
   id: string;
   title: string;
   run: (args?: unknown) => unknown;
   enabled?: (args?: unknown) => boolean;
 }
 export interface CommandInfo {
+  palette?: boolean;
   id: string;
   title: string;
   scope: string;
@@ -118,6 +120,7 @@ export function createCommandService(defaults: Keybinding[] = []) {
     return {
       id,
       title: command.title,
+      ...(command.palette === false ? { palette: false } : {}),
       scope,
       enabled: command.enabled?.(args) ?? true,
       shortcut: bindings()
@@ -192,6 +195,7 @@ export function createCommandService(defaults: Keybinding[] = []) {
       [...scopes.keys()].flatMap((scope) =>
         [...scopes.get(scope)!.commands.keys()].map((id) => describe(scope, id)!),
       ),
+    getActiveScope: () => activeScope,
     getScopes: () => [...scopes.entries()].map(([id, scope]) => ({ id, context: scope.context() })),
     getKeybindings: () => structuredClone(bindings()),
     getDefaultKeybindings: () => structuredClone(defaults),

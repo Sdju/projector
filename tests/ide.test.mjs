@@ -214,3 +214,81 @@ test("shortcut recorder ignores modifiers, composition and repeats, and recorded
     assert.equal(matchesKey(parseKeybindings([{ command: "test", key }])[0].key, event), true);
   }
 });
+
+test("command palette preserves originating scope, chooses project commands and searches IDs and titles", async () => {
+  const { paletteCommands } = await import("../core/modules/ide/index.ts");
+  const sdk = createCommandService(defaultKeybindings);
+  const a = sdk.createScope("tree-a", () => ({ surface: "fileTree", projectId: "a" }));
+  const b = sdk.createScope("tree-b", () => ({ surface: "fileTree", projectId: "b" }));
+  const editor = sdk.createScope("editor-a", () => ({ surface: "editor", projectId: "a" }));
+  const global = sdk.createScope("workbench", () => ({ surface: "workbench" }));
+  for (const scope of [a, b])
+    scope.registerCommand({ id: "file.rename", title: "Переименовать", run: () => scope.id });
+  editor.registerCommand({
+    id: "file.save",
+    title: "Сохранить",
+    enabled: () => false,
+    run: () => {},
+  });
+  editor.registerCommand({
+    id: "private.reorder",
+    title: "Private",
+    palette: false,
+    run: () => {},
+  });
+  global.registerCommand({
+    id: "ide.workbench.commandPalette.open",
+    title: "Командный центр",
+    run: () => sdk.getActiveScope(),
+  });
+  a.activate();
+  assert.equal(
+    global.resolveKeybinding({ key: "p", ctrlKey: true, shiftKey: true }, true).command,
+    "ide.workbench.commandPalette.open",
+  );
+  assert.equal(
+    global.resolveKeybinding({ key: "F1" }, true).command,
+    "ide.workbench.commandPalette.open",
+  );
+  assert.equal(await global.executeCommand("ide.workbench.commandPalette.open"), "tree-a");
+  const commands = paletteCommands(sdk.getCommands(), sdk.getScopes(), sdk.getActiveScope());
+  assert.equal(commands.find((command) => command.id === "file.rename").scope, "tree-a");
+  assert.equal(
+    commands.some((command) => command.scope === "tree-b"),
+    false,
+  );
+  assert.equal(
+    commands.some((command) => command.id === "private.reorder"),
+    false,
+  );
+  assert.equal(commands.at(-1).id, "file.save");
+  assert.equal(
+    paletteCommands(sdk.getCommands(), sdk.getScopes(), "tree-a", "> Файлы переименовать")[0].id,
+    "file.rename",
+  );
+  assert.equal(
+    paletteCommands(sdk.getCommands(), sdk.getScopes(), "tree-a", "file.rename")[0].scope,
+    "tree-a",
+  );
+  assert.deepEqual(paletteCommands(sdk.getCommands(), sdk.getScopes(), "tree-a", "missing"), []);
+  assert.equal(
+    await sdk.executeCommand(commands[0].id, undefined, { scope: commands[0].scope }),
+    "tree-a",
+  );
+  await assert.rejects(
+    sdk.executeCommand("file.save", undefined, { scope: "editor-a" }),
+    /недоступна/,
+  );
+  sdk.setKeybindings([
+    { command: "ide.workbench.commandPalette.open", key: "F6", allowInput: true },
+  ]);
+  assert.equal(global.resolveKeybinding({ key: "F1" }, true), undefined);
+  assert.equal(
+    global.resolveKeybinding({ key: "p", ctrlKey: true, shiftKey: true }, true),
+    undefined,
+  );
+  assert.equal(
+    global.resolveKeybinding({ key: "F6" }, true).command,
+    "ide.workbench.commandPalette.open",
+  );
+});

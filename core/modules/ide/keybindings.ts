@@ -1,6 +1,8 @@
 import type { Keybinding } from "./commands.ts";
 const tree = { surface: "fileTree" };
 export const defaultKeybindings: Keybinding[] = [
+  { key: "Mod+Shift+P", command: "ide.workbench.commandPalette.open", allowInput: true },
+  { key: "F1", command: "ide.workbench.commandPalette.open", allowInput: true },
   { key: "F2", command: "ide.fileTree.file.rename", when: { ...tree, entryKind: "file" } },
   {
     key: "F2",
