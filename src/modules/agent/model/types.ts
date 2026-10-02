@@ -19,7 +19,17 @@ export interface AgentHistoryTurn {
   content: string;
 }
 
+export interface AgentCommandRequest {
+  id: string;
+  operation: "list" | "describe" | "execute";
+  query?: string;
+  command?: string;
+  scope?: string;
+  args?: unknown;
+}
+
 export type AgentEvent =
+  | { event: "command-request"; data: AgentCommandRequest }
   | { event: "status"; data: { phase: string; provider?: string; model?: string } }
   | { event: "text"; data: { text: string } }
   | { event: "tool"; data: { id: string; name: string; input: unknown } }

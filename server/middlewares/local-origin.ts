@@ -9,10 +9,11 @@ export function localOrigin({ req, res, url, path }: RouteContext): boolean {
     return false;
   }
   if (
-    /^\/api\/projects\/[^/]+\/terminals(?:\/|$)/.test(path) &&
+    (/^\/api\/projects\/[^/]+\/terminals(?:\/|$)/.test(path) ||
+      /^\/api\/agent(?:\/|$)/.test(path)) &&
     !terminalRequestAllowed(req, false)
   ) {
-    json(res, 403, { error: "Терминал доступен только со страницы Projector" });
+    json(res, 403, { error: "Операция доступна только через локальный Projector" });
     return false;
   }
   return true;

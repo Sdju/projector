@@ -1,3 +1,5 @@
+import { os } from "../../../core/modules/os/index.ts";
+import type { CommandRequest } from "./command-bridge.ts";
 import { randomUUID } from "node:crypto";
 import type { Dirent } from "node:fs";
 import { readdir, readFile, stat } from "node:fs/promises";
@@ -63,6 +65,9 @@ const CONFIG_KIND: [string, string][] = [
 
 export interface AgentToolContext {
   onProject: (project: Project) => void;
+  commands?: (request: CommandRequest) => Promise<unknown>;
+  cwd?: string;
+  signal?: AbortSignal;
 }
 
 interface FoundApp {
@@ -223,7 +228,50 @@ async function addFromPath(
 }
 
 export function createAgentTools(context: AgentToolContext) {
+  const described = new Set<string>();
+  const commands = (request: CommandRequest) => {
+    if (!context.commands) throw new Error("Откройте чат агента в проекте для доступа к командам");
+    return context.commands(request);
+  };
   return {
+    list_commands: tool({
+      description:
+        "Найти существующие команды Projector и их области (scope). Пустой query возвращает весь каталог текущего проекта.",
+      inputSchema: z.object({ query: z.string().optional() }),
+      execute: ({ query }) => commands({ operation: "list", query }),
+    }),
+    describe_command: tool({
+      description: "Получить описание, аргументы и контекст команды перед вызовом.",
+      inputSchema: z.object({ command: z.string(), scope: z.string() }),
+      execute: async ({ command, scope }) => {
+        const result = await commands({ operation: "describe", command, scope });
+        described.add(`${scope}\n${command}`);
+        return result;
+      },
+    }),
+    execute_command: tool({
+      description: "Вызвать ранее описанную команду Projector в явной области scope.",
+      inputSchema: z.object({
+        command: z.string(),
+        scope: z.string(),
+        args: z.record(z.string(), z.unknown()).optional(),
+      }),
+      execute: ({ command, scope, args }) => {
+        if (!described.has(`${scope}\n${command}`))
+          throw new Error("Сначала вызови describe_command");
+        return commands({ operation: "execute", command, scope, args });
+      },
+    }),
+    bash: tool({
+      description:
+        "Выполнить Bash на машине пользователя. Возвращает stdout, stderr, exitCode; лимит 30 секунд. cwd по умолчанию — открытый проект.",
+      inputSchema: z.object({ command: z.string().min(1), cwd: z.string().optional() }),
+      execute: ({ command, cwd }) =>
+        os.tools.runBash(command, {
+          cwd: expandPath(cwd || context.cwd || os.homeDirectory()),
+          signal: context.signal,
+        }),
+    }),
     list_projects: tool({
       description: "Список уже добавленных в projector проектов.",
       inputSchema: z.object({}),
@@ -327,7 +375,19 @@ export function createAgentTools(context: AgentToolContext) {
   };
 }
 
-export const AGENT_SYSTEM_PROMPT = `Ты агент Projector. Добавляешь локальные приложения в каталог без ручной формы.
+export const AGENT_SYSTEM_PROMPT = `Ты агент Projector. Помогаешь управлять открытым проектом, файлами, вкладками и каталогом приложений.
+
+Система команд:
+- Сначала list_commands с поиском по задаче. Каталог живой, scope относится к конкретной панели текущего проекта.
+- Затем describe_command с точными command и scope: прочитай аргументы и текущий контекст.
+- Только после описания execute_command с теми же command и scope и нужными args. Не выдумывай команды и аргументы.
+- enabled в каталоге относится к текущему UI-контексту; явные args могут изменить доступность. При вызове SDK проверяет её заново.
+- Для файлов, вкладок и Git предпочитай команды Projector. Для чтения, анализа и задач без команды используй bash.
+- bash выполняется на машине пользователя в корне проекта (cwd можно задать явно), ограничен 30 секундами и объёмом вывода. Не запускай фоновые процессы. Учитывай exitCode и terminated.
+- Выполняй только действия, относящиеся к запросу пользователя. Не удаляй данные и не откатывай изменения без его явной просьбы. Не читай и не показывай секреты.
+- Результат команды означает завершение её обработчика; открытый диалог ещё требует действий пользователя.
+
+Добавление приложений:
 
 Как работать:
 1. Если дан каталог с несколькими проектами — сразу find_projects (depth 4 для /pr и похожих корней).

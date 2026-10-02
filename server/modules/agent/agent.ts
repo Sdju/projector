@@ -1,4 +1,5 @@
 import { isStepCount, streamText, type ModelMessage } from "ai";
+import type { CommandRequest } from "./command-bridge.ts";
 import type { Project } from "../projects/index.ts";
 import { AGENT_SYSTEM_PROMPT, createAgentTools } from "./agent-tools.ts";
 import { createQwenOpenAI } from "../providers/index.ts";
@@ -6,6 +7,7 @@ import { envFallbackFromProcess, resolveOpenAIProvider } from "../providers/inde
 import type { AgentHistoryTurn } from "../providers/index.ts";
 
 export type AgentEventName =
+  | "command-request"
   | "status"
   | "text"
   | "tool"
@@ -18,6 +20,8 @@ export type AgentEmitter = (event: AgentEventName, data: unknown) => void;
 
 export async function runInstallerAgent(options: {
   message: string;
+  cwd?: string;
+  commands?: (request: CommandRequest) => Promise<unknown>;
   history?: AgentHistoryTurn[];
   providerId?: string;
   abort?: AbortSignal;
@@ -36,6 +40,9 @@ export async function runInstallerAgent(options: {
 
   const added: Project[] = [];
   const tools = createAgentTools({
+    cwd: options.cwd,
+    commands: options.commands,
+    signal: options.abort,
     onProject: (project) => {
       added.push(project);
       options.emit("project", project);
@@ -59,10 +66,10 @@ export async function runInstallerAgent(options: {
 
   const result = streamText({
     model,
-    system: AGENT_SYSTEM_PROMPT,
+    system: AGENT_SYSTEM_PROMPT + (options.cwd ? `\nТекущий проект: ${options.cwd}` : ""),
     messages,
     tools,
-    stopWhen: isStepCount(8),
+    stopWhen: isStepCount(16),
     abortSignal: options.abort,
     providerOptions: {
       qwenOpenai: {

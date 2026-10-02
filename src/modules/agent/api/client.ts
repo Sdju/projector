@@ -1,4 +1,4 @@
-import type { AgentEvent, AgentHistoryTurn } from "../model/types.ts";
+import type { AgentEvent, AgentHistoryTurn, AgentCommandRequest } from "../model/types.ts";
 
 function parseSse(buffer: string): { events: AgentEvent[]; rest: string } {
   const events: AgentEvent[] = [];
@@ -26,11 +26,20 @@ export async function streamAgent(
   history: AgentHistoryTurn[],
   onEvent: (event: AgentEvent) => void,
   signal?: AbortSignal,
+  options: {
+    projectId?: string;
+    commands?: (request: AgentCommandRequest) => Promise<unknown>;
+  } = {},
 ): Promise<void> {
   const response = await fetch("/api/agent", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify({
+      message,
+      history,
+      projectId: options.projectId,
+      commandBridge: !!options.commands,
+    }),
     signal,
   });
   if (!response.ok || !response.body) {
@@ -38,6 +47,23 @@ export async function streamAgent(
     throw new Error(payload?.error || "Агент недоступен");
   }
 
+  async function handle(event: AgentEvent) {
+    if (event.event !== "command-request") return onEvent(event);
+    let result: { output?: unknown; error?: string };
+    try {
+      if (!options.commands) throw new Error("Команды недоступны в этом чате");
+      result = { output: await options.commands(event.data) };
+    } catch (error) {
+      result = { error: error instanceof Error ? error.message : String(error) };
+    }
+    const reply = await fetch("/api/agent/tool-result", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: event.data.id, ...result }),
+      signal,
+    });
+    if (!reply.ok) throw new Error("Не удалось передать результат команды агенту");
+  }
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -47,10 +73,10 @@ export async function streamAgent(
     buffer += decoder.decode(value, { stream: true });
     const parsed = parseSse(buffer);
     buffer = parsed.rest;
-    for (const event of parsed.events) onEvent(event);
+    for (const event of parsed.events) await handle(event);
   }
   if (buffer.trim()) {
     const parsed = parseSse(`${buffer}\n\n`);
-    for (const event of parsed.events) onEvent(event);
+    for (const event of parsed.events) await handle(event);
   }
 }
