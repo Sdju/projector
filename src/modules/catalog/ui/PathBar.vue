@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from "vue";
 import IconChevronRight from "~icons/lucide/chevron-right";
 import IconFolder from "~icons/lucide/folder";
 import { fetchDirectories } from "../api/client.ts";
-import type { DirectoryEntry } from "../../../../shared/directories.ts";
+import type { DirectoryEntry } from "../../../../core/modules/directories/index.ts";
 
 const props = defineProps<{ path: string; navigate: (path: string) => Promise<void> }>();
 const root = ref<HTMLElement>();

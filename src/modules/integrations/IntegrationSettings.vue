@@ -190,9 +190,7 @@ function disconnect() {
               placeholder="github_pat_…"
               required
           /></label>
-          <UiButton type="submit" :disabled="busy || !token.trim()"
-            >подключить GitHub</UiButton
-          >
+          <UiButton type="submit" :disabled="busy || !token.trim()">подключить GitHub</UiButton>
         </form>
       </details>
       <router-link v-if="github.enabled && github.connected" to="/projects" class="link"

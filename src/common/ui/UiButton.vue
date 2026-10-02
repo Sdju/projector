@@ -27,7 +27,9 @@ defineProps<{
   border-radius: 3px;
   padding: 6px 10px;
   color: var(--text);
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 
 .btn:hover:not(:disabled) {

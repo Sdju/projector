@@ -1,5 +1,5 @@
 import type { Terminal } from "@xterm/xterm";
-import type { TerminalClientMessage } from "../../../../shared/terminal.ts";
+import type { TerminalClientMessage } from "../../../../core/modules/terminal/index.ts";
 
 /** Keep IME/text in UTF-8 and legacy mouse reports in their original bytes. */
 export function bindTerminalInput(

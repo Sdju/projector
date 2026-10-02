@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { shortPath, statusLabel } from "../../../common/lib/format.ts";
+import { shortPath, statusLabel } from "../format.ts";
 import type { Project } from "../model/types.ts";
 
 const props = defineProps<{

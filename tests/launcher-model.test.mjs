@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createLauncherModel } from "../shared/launcher-model.ts";
-import { createLauncherClient } from "../shared/launcher.ts";
+import { createLauncherModel } from "../core/modules/launcher/index.ts";
+import { createLauncherClient } from "../core/modules/launcher/index.ts";
 
 const item = id => ({ id, name: id, description: "", keywords: "", kind: "application" });
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };

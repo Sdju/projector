@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile, access } from "node:fs/promises";
 import { test } from "node:test";
-import { createFileIconResolver } from "../shared/file-icons.ts";
+import { createFileIconResolver } from "../core/modules/file-icons/index.ts";
 
 const theme = JSON.parse(
   await readFile(new URL("../public/file-icons/theme.json", import.meta.url)),

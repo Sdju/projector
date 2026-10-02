@@ -6,11 +6,11 @@ export PATH="${HOME}/.vite-plus/bin:${ROOT}/node_modules/.bin:/usr/local/bin:/us
 cd "$ROOT"
 
 if [[ -x "${HOME}/.vite-plus/bin/node" ]]; then
-  exec "${HOME}/.vite-plus/bin/node" "$ROOT/scripts/launch.mjs" "$@"
+  exec "${HOME}/.vite-plus/bin/node" "$ROOT/cli/app/launch.mjs" "$@"
 fi
 
 if command -v node >/dev/null 2>&1; then
-  exec node "$ROOT/scripts/launch.mjs" "$@"
+  exec node "$ROOT/cli/app/launch.mjs" "$@"
 fi
 
 echo "Нужны vp или node в PATH" >&2

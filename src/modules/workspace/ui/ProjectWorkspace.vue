@@ -10,7 +10,7 @@ import type {
   SearchHit,
   GitOverview,
   FileComparison,
-} from "../../../../shared/workspace.ts";
+} from "../../../../core/modules/workspace/index.ts";
 const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
 const props = defineProps<{ projectId: string }>();
 const workspaceElement = ref<HTMLElement>();

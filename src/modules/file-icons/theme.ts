@@ -1,6 +1,6 @@
 import { readonly, shallowRef, ref } from "vue";
 import defaults from "./fallback-theme.json";
-import { createFileIconResolver } from "../../../shared/file-icons.ts";
+import { createFileIconResolver } from "../../../core/modules/file-icons/index.ts";
 
 const resolver = shallowRef(createFileIconResolver(defaults));
 const error = ref("");

@@ -92,7 +92,7 @@ await test("GitHub integration persists authorization and imports authenticated 
     return { on() {} };
   };
   syncBuiltinESMExports();
-  const { handleApi } = await import("../server/api.ts");
+  const { handleApi } = await import("../server/app/api.ts");
   const server = createServer((req, res) => {
     void handleApi(req, res);
   });
@@ -147,7 +147,7 @@ await test("GitHub integration persists authorization and imports authenticated 
   );
   assert.equal((await stat(file)).mode & 0o777, 0o600);
   assert.equal((await request("")).headers.get("cache-control"), "no-store");
-  const reloaded = await import("../server/integrations/store.ts?reload-check");
+  const reloaded = await import("../server/modules/integrations/store.ts?reload-check");
   assert.equal((await reloaded.integrationConfig("github")).credentials.login, "octocat");
   assert.equal((await request("/github/repositories?page=0")).status, 400);
   const firstPage = (await request("/github/repositories")).data;

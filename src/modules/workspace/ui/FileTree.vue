@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import IconChevronRight from "~icons/lucide/chevron-right";
-import FileIcon from "../../file-icons/FileIcon.vue";
-import { useFileIconTheme } from "../../file-icons/theme.ts";
+import { FileIcon } from "../../file-icons/index.ts";
+import { useFileIconTheme } from "../../file-icons/index.ts";
 import { workspaceRequest } from "../api.ts";
-import type { FileEntry } from "../../../../shared/workspace.ts";
+import type { FileEntry } from "../../../../core/modules/workspace/index.ts";
 const props = withDefaults(
   defineProps<{
     projectId: string;

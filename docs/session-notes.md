@@ -12,29 +12,29 @@ Projector — узкая альтернатива Raycast: прежде всег
 
 | Место | Ответственность |
 | --- | --- |
-| `bin/projector`, `scripts/launch.mjs` | CLI, поиск Node/vp, блокировка запуска, повторное использование сервера |
-| `vite.config.ts`, `server/plugin.ts` | Vite и локальный API в dev и preview |
-| `server/launcher.ts` | Общий поиск, настройки режима/хоткея, история и запуск |
-| `native/main.ts`, `native/catalog.ts`, `native/Palette.vue`, `native/palette.ts`, `native/resident.ts` | Node CLI, каталог GIO, запуск `.desktop`, иконки, резидентное GTK4-окно |
+| `bin/projector`, `cli/app/launch.mjs` | CLI, поиск Node/vp, блокировка запуска, повторное использование сервера |
+| `vite.config.ts`, `server/app/plugin.ts` | Vite и локальный API в dev и preview |
+| `server/modules/launcher/launcher.ts` | Общий поиск, настройки режима/хоткея, история и запуск |
+| `native/app/entry.ts`, `native/modules/desktop/catalog.ts`, `native/modules/desktop/Palette.vue`, `native/modules/desktop/palette.ts`, `native/modules/desktop/resident.ts` | Node CLI, каталог GIO, запуск `.desktop`, иконки, резидентное GTK4-окно |
 | `packages/vio` | Независимый Vue custom renderer для GTK4, компоненты, SFC loader, CSS и тесты |
-| `native/tray.ts`, `native/shortcut.ts`, `native/bus.ts` | StatusNotifierItem/DBusMenu и KDE kglobalaccel через dbus-next |
-| `shared/launcher.ts`, `shared/launcher-model.ts` | Общие типы, HTTP-клиент и модель поведения для Vue и GTK |
-| `server/window.ts` | Вызов нативного окна, Chromium, скрытие/активация в X11 |
-| `src/pages/launcher/LauncherPage.vue` | Веб-палитра |
+| `native/modules/desktop/tray.ts`, `native/modules/desktop/shortcut.ts`, `native/modules/system-bus/bus.ts` | StatusNotifierItem/DBusMenu и KDE kglobalaccel через dbus-next |
+| `core/modules/launcher/launcher.ts`, `core/modules/launcher/launcher-model.ts` | Общие типы, HTTP-клиент и модель поведения для Vue и GTK |
+| `server/modules/window/window.ts` | Вызов нативного окна, Chromium, скрытие/активация в X11 |
+| `src/pages/index.vue` | Веб-палитра |
 | `src/app/App.vue`, `src/common/lib/launcher-surface.ts` | Потеря фокуса, возврат к поиску и сохранение идентичности app-окна |
-| `server/processes.ts` | Владение процессами проектов, логи и состояние запусков |
+| `server/modules/processes/processes.ts` | Владение процессами проектов, логи и состояние запусков |
 
 Сервер слушает `localhost:4177`. CLI проверяет `/api/health`, использует `launch.lock` и при повторном вызове отправляет запрос работающему серверу. Обычный запуск сейчас поднимает **`vp dev`**, а не собранное самостоятельное приложение. `vp run build` проверяет типы и собирает фронтенд; это ещё не упаковка desktop-продукта.
 
 GTK работает отдельным Node.js 24 / TypeScript-процессом через `node-gtk`. Резидентный процесс владеет D-Bus именем `dev.projector.Launcher` и экспортирует `dev.projector.Launcher.Control.Command` на `/dev/projector/Launcher`; повторный CLI-вызов обращается к нему. GLib MainLoop сохраняет процесс при скрытом окне: он обслуживает трей и хоткей. Команда `tray` не показывает окно и также обновляет регистрацию хоткея. Ответ `READY` служит подтверждением для сервера. Python больше не используется.
 
-Общий модуль `shared/launcher-model.ts` отвечает за поиск, дебаунс, отмену устаревших ответов, выбор и запуск. Vue и GTK подписываются на одну модель и используют HTTP-клиент из `shared/launcher.ts`. Native-компоненты не импортируют Vue. GIO helper остаётся отдельным процессом, чтобы нативные биндинги и GTK main loop не вмешивались в Vite.
+Общий модуль `core/modules/launcher/launcher-model.ts` отвечает за поиск, дебаунс, отмену устаревших ответов, выбор и запуск. Vue и GTK подписываются на одну модель и используют HTTP-клиент из `core/modules/launcher/launcher.ts`. Native-компоненты не импортируют Vue. GIO helper остаётся отдельным процессом, чтобы нативные биндинги и GTK main loop не вмешивались в Vite.
 
 Прямой экспорт D-Bus через `Gio.DBusInterfaceVTable` в node-gtk 4.1.1 аварийно завершает процесс при присваивании callback. Поэтому весь D-Bus обслуживает dbus-next. usocket — необязательный нативный модуль, его сборка отключена. GTK-типы генерируются из typelibs перед build; генератор ошибочно объявляет `Gtk.Window.isActive` boolean вместо метода, что учтено публичным структурным WindowWidget в vio.
 
-Нативная палитра теперь Vue SFC (`native/Palette.vue`). `vio` использует `@vue/runtime-core.createRenderer`, без runtime-dom. Reconciler в `vio/core` отделён от GTK driver: keyed moves сохраняют нативные объекты, comments/fragment anchors остаются виртуальными, handlers заменяются без повторных подключений и отключаются на unmount. `vio/register` устанавливает GI и SFC loaders; путь к нему разрешается абсолютно в server/desktop.ts. Соберите пакет `vp run vio:build` перед native-запуском после checkout/install. Основная build-команда делает это автоматически.
+Нативная палитра теперь Vue SFC (`native/modules/desktop/Palette.vue`). `vio` использует `@vue/runtime-core.createRenderer`, без runtime-dom. Reconciler в `vio/core` отделён от GTK driver: keyed moves сохраняют нативные объекты, comments/fragment anchors остаются виртуальными, handlers заменяются без повторных подключений и отключаются на unmount. `vio/register` устанавливает GI и SFC loaders; путь к нему разрешается абсолютно в server/modules/window/desktop.ts. Соберите пакет `vp run vio:build` перед native-запуском после checkout/install. Основная build-команда делает это автоматически.
 
-SFC styles применяются через CSS provider с cleanup в Vue scope; scoped attributes заменяются GTK classes. Обёртка setup обязана иметь два аргумента: Vue проверяет setup.length для создания expose/slots context. GTK declarations генерируются отдельно в node_modules каждого пакета; публичные декларации vio не требуют местных .gir файлов. Native HMR пока отсутствует: перезапускайте только нативный процесс (`node --import vio/register native/main.ts native http://localhost:4177 quit`), затем обычный `./bin/projector --native`; не вызывайте `projector quit` ради перезапуска UI.
+SFC styles применяются через CSS provider с cleanup в Vue scope; scoped attributes заменяются GTK classes. Обёртка setup обязана иметь два аргумента: Vue проверяет setup.length для создания expose/slots context. GTK declarations генерируются отдельно в node_modules каждого пакета; публичные декларации vio не требуют местных .gir файлов. Native HMR пока отсутствует: перезапускайте только нативный процесс (`node --import vio/register native/app/entry.ts native http://localhost:4177 quit`), затем обычный `./bin/projector --native`; не вызывайте `projector quit` ради перезапуска UI.
 
 ## Нюансы, которые уже приводили к ошибкам
 
@@ -47,7 +47,7 @@ SFC styles применяются через CSS provider с cleanup в Vue scop
 
 ## Хоткей, окружение и данные
 
-Автоматическая регистрация хоткея реализована для KDE через session D-Bus. В `native/shortcut.ts` используются Qt-коды клавиш и флаги `SetPresent | NoAutoloading` (6): пользовательская настройка должна иметь приоритет над старым назначением KDE. Проверка доступности считает собственное существующее назначение допустимым, но не забирает чужое. При завершении вызывается `setInactive`. Настройки показывают реальное состояние регистрации.
+Автоматическая регистрация хоткея реализована для KDE через session D-Bus. В `native/modules/desktop/shortcut.ts` используются Qt-коды клавиш и флаги `SetPresent | NoAutoloading` (6): пользовательская настройка должна иметь приоритет над старым назначением KDE. Проверка доступности считает собственное существующее назначение допустимым, но не забирает чужое. При завершении вызывается `setInactive`. Настройки показывают реальное состояние регистрации.
 
 Поддержаны `Ctrl+Alt+Space`, `Super+Space`, `Alt+Space` и отключение. В других окружениях пользователь назначает `projector toggle` средствами рабочего стола. Автозапуск **не устанавливается** автоматически; для него предназначена команда `projector --tray`.
 

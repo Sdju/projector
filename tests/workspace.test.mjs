@@ -10,7 +10,7 @@ import {
   searchProject,
   projectGit,
   projectComparison,
-} from "../server/workspace.ts";
+} from "../server/modules/workspace/index.ts";
 const root = await mkdtemp(join(tmpdir(), "projector-workspace-"));
 const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
 test("workspace tree, bounded reading, traversal and symlink containment, literal search", async () => {
@@ -91,7 +91,7 @@ test("workspace HTTP routes resolve catalog projects and reject foreign origins 
       ],
     }),
   );
-  const { handleApi } = await import("../server/api.ts");
+  const { handleApi } = await import("../server/app/api.ts");
   const server = createServer((req, res) => {
     void handleApi(req, res).then((handled) => {
       if (!handled) res.writeHead(404).end();
@@ -163,7 +163,7 @@ test("workspace HTTP routes resolve catalog projects and reject foreign origins 
 });
 
 test("path bar lists real directories and symlinks, completes prefixes and rejects invalid paths", async () => {
-  const { listDirectories } = await import("../server/directories.ts");
+  const { listDirectories } = await import("../server/modules/directories/index.ts");
   const base = await mkdtemp(join(tmpdir(), "projector-directories-"));
   try {
     await mkdir(join(base, "alpha"));

@@ -2,8 +2,8 @@ import { fileURLToPath, URL } from "node:url";
 import vue from "@vitejs/plugin-vue";
 import Icons from "unplugin-icons/vite";
 import { defineConfig } from "vite-plus";
-import { APP_PORT } from "./server/paths.ts";
-import { projectorPlugin } from "./server/plugin.ts";
+import { APP_PORT } from "./core/modules/app-paths/index.ts";
+import { projectorPlugin } from "./server/app/plugin.ts";
 
 export default defineConfig({
   plugins: [vue(), Icons({ compiler: "vue3" }), projectorPlugin()],
@@ -13,7 +13,7 @@ export default defineConfig({
       "@pages": fileURLToPath(new URL("./src/pages", import.meta.url)),
       "@modules": fileURLToPath(new URL("./src/modules", import.meta.url)),
       "@common": fileURLToPath(new URL("./src/common", import.meta.url)),
-      "@shared": fileURLToPath(new URL("./shared", import.meta.url)),
+      "@core": fileURLToPath(new URL("./core/modules", import.meta.url)),
     },
   },
   server: {

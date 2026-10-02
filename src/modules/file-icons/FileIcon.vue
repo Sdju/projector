@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ResolvedFileIcon } from "../../../shared/file-icons.ts";
+import type { ResolvedFileIcon } from "../../../core/modules/file-icons/index.ts";
 defineProps<{ icon: ResolvedFileIcon }>();
 </script>
 

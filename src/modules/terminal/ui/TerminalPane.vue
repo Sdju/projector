@@ -21,7 +21,7 @@ import type {
   TerminalProgram,
   TerminalServerMessage,
   TerminalSession,
-} from "../../../../shared/terminal.ts";
+} from "../../../../core/modules/terminal/index.ts";
 
 const props = defineProps<{ projectId: string; embedded?: boolean }>();
 const container = ref<HTMLElement>();

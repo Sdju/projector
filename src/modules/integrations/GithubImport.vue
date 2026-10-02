@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import UiButton from "../../common/ui/UiButton.vue";
-import { useProjects } from "../catalog/model/store.ts";
-import type { Project } from "../catalog/model/types.ts";
+import { useProjects } from "../catalog/index.ts";
+import type { Project } from "../catalog/index.ts";
 import { fetchIntegrations, integrationRequest } from "./client.ts";
 import type { Integration, Repository } from "./client.ts";
 const github = ref<Integration | null>(null);

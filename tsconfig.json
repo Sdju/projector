@@ -17,7 +17,14 @@
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
-    "paths": { "node-gtk": ["./node_modules/.node-gtk-types/node-gtk.d.ts"] }
+    "paths": {
+      "node-gtk": ["./node_modules/.node-gtk-types/node-gtk.d.ts"],
+      "@app/*": ["./src/app/*"],
+      "@pages/*": ["./src/pages/*"],
+      "@modules/*": ["./src/modules/*"],
+      "@common/*": ["./src/common/*"],
+      "@core/*": ["./core/modules/*"]
+    }
   },
-  "include": ["src", "server", "shared", "native", "node_modules/.node-gtk-types/node-gtk.d.ts", "env.d.ts"]
+  "include": ["src", "server", "native", "node_modules/.node-gtk-types/node-gtk.d.ts", "core"]
 }

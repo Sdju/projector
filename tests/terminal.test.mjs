@@ -8,7 +8,7 @@ import { once } from "node:events";
 import { WebSocket } from "ws";
 import headless from "@xterm/headless";
 import serialization from "@xterm/addon-serialize";
-import { trackMouseEncoding } from "../server/terminal-mouse.ts";
+import { trackMouseEncoding } from "../server/modules/terminal/index.ts";
 
 await test("mouse encoding survives snapshots, fragmented modes, disable, RIS and retained sessions", async () => {
   const screen = new headless.Terminal({ allowProposedApi: true });
@@ -67,9 +67,9 @@ const project = {
   createdAt: "",
 };
 await writeFile(join(root, "projector/projects.json"), JSON.stringify({ projects: [project] }));
-const { handleApi } = await import("../server/api.ts");
+const { handleApi } = await import("../server/app/api.ts");
 const { attachTerminalServer, listTerminalSessions, closeTerminalSession } =
-  await import("../server/terminal.ts");
+  await import("../server/modules/terminal/index.ts");
 const server = createServer((req, res) => {
   void handleApi(req, res).then((handled) => {
     if (!handled) res.writeHead(404).end();
@@ -224,7 +224,7 @@ print('RAW_HEX=' + data.hex(), flush=True)
   );
   const other = await (await request("", "POST", { program: "shell" })).json();
   assert.notEqual(other.session.pid, session.pid);
-  const reloaded = await import("../server/terminal.ts?reload-test");
+  const reloaded = await import("../server/modules/terminal/terminal.ts?reload-test");
   assert.equal(reloaded.listTerminalSessions(project.id).length, 2);
   const floodSession = await (await request("", "POST", { program: "shell" })).json();
   const flood = await connect(floodSession.session.id, false);
@@ -275,7 +275,7 @@ print('RAW_HEX=' + data.hex(), flush=True)
     return !stat || stat.slice(stat.lastIndexOf(")") + 2).startsWith("Z ");
   }, "background child terminated");
   // Project commands use the same interactive PTY and reconnectable screen as shells.
-  const { getSnapshot } = await import("../server/processes.ts");
+  const { getSnapshot } = await import("../server/modules/processes/index.ts");
   const run = (action, body) =>
     fetch(`${base}/api/projects/${project.id}/${action}`, {
       method: "POST",

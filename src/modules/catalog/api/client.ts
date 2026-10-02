@@ -49,7 +49,7 @@ export async function fetchDirectories(
   path: string,
   complete = false,
   signal?: AbortSignal,
-): Promise<import("../../../../shared/directories.ts").DirectoryListing> {
+): Promise<import("../../../../core/modules/directories/index.ts").DirectoryListing> {
   return request(`/api/directories?${new URLSearchParams({ path, complete: String(complete) })}`, {
     signal,
   });

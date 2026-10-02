@@ -6,7 +6,7 @@ export PATH="${HOME}/.vite-plus/bin:${ROOT}/node_modules/.bin:/usr/local/bin:/us
 cd "$ROOT"
 
 if [[ -x "${HOME}/.vite-plus/bin/node" ]]; then
-  exec "${HOME}/.vite-plus/bin/node" "$ROOT/scripts/install-desktop.mjs" "$@"
+  exec "${HOME}/.vite-plus/bin/node" "$ROOT/cli/app/install-desktop.mjs" "$@"
 fi
 
-exec node "$ROOT/scripts/install-desktop.mjs" "$@"
+exec node "$ROOT/cli/app/install-desktop.mjs" "$@"

@@ -1,0 +1,10 @@
+export { closeProjectTerminals } from "./terminal.ts";
+export { terminalSessionSnapshot } from "./terminal.ts";
+export { stopTerminalSession } from "./terminal.ts";
+export { closeTerminalSession } from "./terminal.ts";
+export { createTerminalSession } from "./terminal.ts";
+export { listTerminalSessions } from "./terminal.ts";
+export { terminalRequestAllowed } from "./terminal.ts";
+export { attachTerminalServer } from "./terminal.ts";
+
+export { trackMouseEncoding } from "./terminal-mouse.ts";

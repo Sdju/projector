@@ -1,8 +1,8 @@
 import { createRouter, createWebHistory } from "vue-router";
-import HomePage from "../pages/home/HomePage.vue";
-import ProjectPage from "../pages/project/ProjectPage.vue";
-import SettingsPage from "../pages/settings/SettingsPage.vue";
-import LauncherPage from "../pages/launcher/LauncherPage.vue";
+import HomePage from "../pages/projects/index.vue";
+import ProjectPage from "../pages/projects/[id].vue";
+import SettingsPage from "../pages/settings.vue";
+import LauncherPage from "../pages/index.vue";
 
 export const router = createRouter({
   history: createWebHistory(),

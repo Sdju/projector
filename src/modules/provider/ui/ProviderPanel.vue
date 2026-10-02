@@ -58,7 +58,10 @@ function keyDraft(): string {
 
     <div v-if="selected" class="form">
       <UiField label="имя">
-        <input :value="selected.name" @input="patchProvider(selected.id, { name: ($event.target as HTMLInputElement).value })" />
+        <input
+          :value="selected.name"
+          @input="patchProvider(selected.id, { name: ($event.target as HTMLInputElement).value })"
+        />
       </UiField>
       <UiField label="url">
         <input
@@ -81,11 +84,15 @@ function keyDraft(): string {
           :value="keyDraft()"
           type="password"
           autocomplete="off"
-          :placeholder="selected.hasApiKey ? 'ключ сохранён — введите чтобы заменить' : 'DASHSCOPE / QWENCLOUD'"
+          :placeholder="
+            selected.hasApiKey ? 'ключ сохранён — введите чтобы заменить' : 'DASHSCOPE / QWENCLOUD'
+          "
           @input="setKeyDraft(selected.id, ($event.target as HTMLInputElement).value)"
         />
       </UiField>
-      <p class="hint">Ключ шифруется на диске (AES). Можно задать DASHSCOPE_API_KEY / OPENAI_URL в окружении.</p>
+      <p class="hint">
+        Ключ шифруется на диске (AES). Можно задать DASHSCOPE_API_KEY / OPENAI_URL в окружении.
+      </p>
       <div class="row">
         <UiButton
           variant="chip"

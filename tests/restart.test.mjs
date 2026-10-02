@@ -4,8 +4,8 @@ import { once } from "node:events";
 import { createServer, request } from "node:http";
 import { setTimeout as sleep } from "node:timers/promises";
 import { test } from "node:test";
-import { restartAfterExit, waitForProcessExit } from "../scripts/restart.mjs";
-import { handleApi } from "../server/api.ts";
+import { restartAfterExit, waitForProcessExit } from "../cli/app/restart.mjs";
+import { handleApi } from "../server/app/api.ts";
 
 async function sleeper(t) {
   const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });

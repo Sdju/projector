@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { isLauncherWindow } from "../common/lib/launcher-surface.ts";
+import { isLauncherWindow } from "../modules/launcher/index.ts";
 import { useProjects } from "../modules/catalog/index.ts";
 import { useRunner } from "../modules/runner/index.ts";
-import AppShell from "./layout/AppShell.vue";
+import AppShell from "./layouts/AppShell.vue";
 
 const { load } = useProjects();
 const { connect } = useRunner();

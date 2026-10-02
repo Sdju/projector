@@ -24,9 +24,9 @@ if (process.argv.includes("--prepare")) {
   console.log(JSON.stringify({ root, data }));
 } else {
   process.env.XDG_DATA_HOME = data;
-  const { searchLauncher, matchScore } = await import("../server/launcher.ts");
-  const { handleApi } = await import("../server/api.ts");
-  const { getSnapshot } = await import("../server/processes.ts");
+  const { searchLauncher, matchScore } = await import("../server/modules/launcher/index.ts");
+  const { handleApi } = await import("../server/app/api.ts");
+  const { getSnapshot } = await import("../server/modules/processes/index.ts");
   const server = createServer((req, res) => { void handleApi(req, res); });
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -82,7 +82,7 @@ if (process.argv.includes("--prepare")) {
     assert.equal(runtime.commandId, "dev");
     assert.equal(runtime.status, "idle");
     assert.equal(runtime.exitCode, 0);
-    const reloaded = await import("../server/processes.ts?reload-check");
+    const reloaded = await import("../server/modules/processes/processes.ts?reload-check");
     assert.equal(reloaded.getSnapshot("probe-project").commandId, "dev");
     assert.equal(reloaded.getSnapshot("probe-project").exitCode, 0);
   });
