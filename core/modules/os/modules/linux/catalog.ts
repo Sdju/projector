@@ -13,12 +13,14 @@ export function listApplications(): LaunchItem[] {
     .map((app) => {
       const id = app.getId()!;
       const desktop = GioUnix.DesktopAppInfo.new(id);
+      // GLib 2.80 moved this class from Gio; older typelibs incorrectly expose
+      // its instance methods as static in generated GioUnix declarations.
+      const keywordApp = desktop as (typeof desktop & { getKeywords(): string[] | null });
       return {
         id: `app:${id}`,
         name: app.getDisplayName(),
         description: app.getDescription() || "приложение",
-        // Older GioUnix typelibs misclassify getKeywords as a static method.
-        keywords: [app.getExecutable() || "", ...(desktop?.getLocaleString("Keywords") || "").split(";")].join(" "),
+        keywords: [app.getExecutable() || "", ...(keywordApp?.getKeywords() || [])].join(" "),
         kind: "application",
         icon: `/api/launcher/icon?id=${encodeURIComponent(id)}`,
       };
