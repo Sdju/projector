@@ -199,6 +199,19 @@ print('RAW_HEX=' + data.hex(), flush=True)
       first.output().includes(root),
     "interactive input and cwd",
   );
+  await mkdir(join(root, "nested"));
+  await writeFile(join(root, "nested/local.ts"), "const local = true;\n");
+  await writeFile(join(root, "root.md"), "# Root\n");
+  first.send({ type: "input", data: "cd nested; printf 'LINK_CWD_%s\\n' READY\r" });
+  await until(() => first.output().includes("LINK_CWD_READY"), "shell changed cwd for links");
+  const linkRequest = path => request(`/${session.id}?${new URLSearchParams({link:path})}`);
+  assert.deepEqual(await (await linkRequest("local.ts")).json(), {path:"nested/local.ts",external:false});
+  assert.deepEqual(await (await linkRequest("root.md")).json(), {path:"root.md",external:false});
+  assert.equal((await linkRequest("missing.ts")).status, 404);
+  assert.equal((await request(`/${session.id}?link=local.ts`, "GET", undefined, {Origin:"https://evil.example"})).status, 403);
+  assert.equal((await request('/missing-session?link=local.ts')).status, 404);
+  first.send({ type: "input", data: "cd ..; printf 'LINK_BACK_%s\\n' READY\r" });
+  await until(() => first.output().includes("LINK_BACK_READY"), "restore shell cwd after links");
   first.send({ type: "resize", cols: 112, rows: 35 });
   await until(
     () =>

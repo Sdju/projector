@@ -10,6 +10,48 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import ts from "typescript";
 import { terminalTextForPaths } from "../src/modules/terminal/lib/drop.ts";
+import { terminalLinks } from "../src/modules/terminal/lib/links.ts";
+import { resolveTerminalPath } from "../server/modules/terminal/link-files.ts";
+import { mkdir, writeFile, symlink } from "node:fs/promises";
+
+test("terminal links parse paths, diagnostic locations, quoted names and URLs", () => {
+  const text = 'src/main.ts:12:3 ./README.md ../file.js(9,2) "/tmp/with spaces.txt":4 `docs/русский.md` https://example.com/a?b=1 /tmp/test.ts, file:///tmp/a%20b.md';
+  const links = terminalLinks(text);
+  assert.deepEqual(links.map(({path,line,column,web}) => ({path,line,column,web})), [
+    {path:'src/main.ts',line:12,column:3,web:undefined},
+    {path:'./README.md',line:undefined,column:undefined,web:undefined},
+    {path:'../file.js',line:9,column:2,web:undefined},
+    {path:'/tmp/with spaces.txt',line:4,column:undefined,web:undefined},
+    {path:'docs/русский.md',line:undefined,column:undefined,web:undefined},
+    {path:'https://example.com/a?b=1',line:undefined,column:undefined,web:true},
+    {path:'/tmp/test.ts',line:undefined,column:undefined,web:undefined},
+    {path:'/tmp/a b.md',line:undefined,column:undefined,web:undefined},
+  ]);
+  assert.equal(text.slice(links[0].start, links[0].end), 'src/main.ts:12:3');
+  assert.deepEqual(terminalLinks('Dockerfile .env .gitignore main.ts(12, 3)').map(link => [link.path, link.line, link.column]), [
+    ['Dockerfile',undefined,undefined], ['.env',undefined,undefined], ['.gitignore',undefined,undefined], ['main.ts',12,3],
+  ]);
+  assert.deepEqual(terminalLinks('hello 1.2.3 12:30 javascript:alert(1) data:text/plain / //host/path'), []);
+});
+
+test("terminal file resolution uses cwd, project fallback and canonical external paths", async t => {
+  const root = await mkdtemp(join(tmpdir(), 'projector-link-path-'));
+  t.after(() => rm(root, {recursive:true,force:true}));
+  const project = join(root,'project'); const cwd = join(project,'nested');
+  await mkdir(cwd,{recursive:true});
+  await writeFile(join(cwd,'local.ts'),'local');
+  await writeFile(join(project,'README.md'),'readme');
+  const outside = join(root,'outside.txt'); await writeFile(outside,'external');
+  await symlink(outside,join(project,'linked.txt'));
+  assert.deepEqual(await resolveTerminalPath('local.ts',project,cwd), {path:'nested/local.ts',external:false});
+  assert.deepEqual(await resolveTerminalPath('README.md',project,cwd), {path:'README.md',external:false});
+  assert.deepEqual(await resolveTerminalPath('../README.md',project,cwd), {path:'README.md',external:false});
+  assert.deepEqual(await resolveTerminalPath(outside,project,cwd), {path:outside,external:true});
+  assert.deepEqual(await resolveTerminalPath('linked.txt',project,cwd), {path:outside,external:true});
+  await assert.rejects(resolveTerminalPath('missing.ts',project,cwd), /не найден/);
+  await assert.rejects(resolveTerminalPath(cwd,project,cwd), /не найден/);
+  await assert.rejects(resolveTerminalPath('bad\0.ts',project,cwd), /Некорректный/);
+});
 
 test("dropped paths survive shell quoting without command execution or Enter", async () => {
   const paths = ["/tmp/файл с пробелами", "/tmp/a'b", "/tmp/$(echo INJECTED);`echo BAD`", "/tmp/a\\b", "/tmp/line\nnext\r\x1b"];
@@ -42,6 +84,10 @@ test(
       await readFile(new URL("../src/modules/terminal/lib/input.ts", import.meta.url), "utf8"),
       { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
     ).outputText;
+    const links = ts.transpileModule(
+      await readFile(new URL("../src/modules/terminal/lib/links.ts", import.meta.url), "utf8"),
+      { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
+    ).outputText;
     const dropPaths = ts.transpileModule(
       await readFile(new URL("../src/modules/path-drop/drop-paths.ts", import.meta.url), "utf8"),
       { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
@@ -55,6 +101,7 @@ test(
     import { deferTerminalText } from '/keyboard.js';
     import { bindTerminalInput } from '/forwarding.js';
     import { droppedTerminalPaths, terminalTextForPaths } from '/drop.js';
+    import { bindTerminalLinks } from '/links.js';
     try {
       const term = new Terminal({cols: 160});
       term.open(document.getElementById('terminal'));
@@ -160,6 +207,52 @@ test(
         return '/tmp/upload/dropped.txt';
       });
       if (uploaded[0] !== '/tmp/upload/dropped.txt') throw new Error('File-only drop fallback');
+      const opened = [];
+      const linkBinding = bindTerminalLinks(term, link => opened.push(link));
+      await write('\\x1bcsrc/main.ts:12:3 https://example.com/docs\\r\\n');
+      const buffer = term.buffer.active;
+      const getLine = buffer.getLine.bind(buffer); let reads = 0;
+      buffer.getLine = index => { reads++; return getLine(index); };
+      const linkRect = screen.getBoundingClientRect();
+      const at = col => ({clientX:linkRect.left + linkRect.width/term.cols*(col+0.5),clientY:linkRect.top+linkRect.height/term.rows*0.5,bubbles:true,cancelable:true});
+      const tick = () => new Promise(resolve => setTimeout(resolve, 50));
+      for (let col=0;col<12;col++) screen.dispatchEvent(new MouseEvent('mousemove',at(col)));
+      await tick();
+      if(reads) throw new Error('Hover without Ctrl must not read terminal buffer: '+reads);
+      window.dispatchEvent(new KeyboardEvent('keydown',{key:'Control',ctrlKey:true,bubbles:true}));
+      await tick();
+      if(!reads || screen.style.cursor!=='pointer') throw new Error('Ctrl pressed over stationary pointer must discover the link');
+      // Full-screen CLI mouse reporting must not receive the file navigation click.
+      await write('\\x1b[?1000h\\x1b[?1006h'); frames.length=0;
+      screen.dispatchEvent(new MouseEvent('mousedown',{...at(5),button:0,buttons:1,ctrlKey:true}));
+      screen.dispatchEvent(new MouseEvent('mouseup',{...at(5),button:0,buttons:0,ctrlKey:true}));
+      if(frames.length || opened.length!==1 || opened[0].path!=='src/main.ts' || opened[0].line!==12 || opened[0].column!==3) throw new Error('Ctrl+click must open file location without PTY input: '+JSON.stringify({frames,opened}));
+      window.dispatchEvent(new KeyboardEvent('keyup',{key:'Control',ctrlKey:false,bubbles:true}));
+      const idleReads=reads;
+      await write('\\r\\nbackground output'); await tick();
+      if(reads!==idleReads || screen.style.cursor==='pointer') throw new Error('Output and Ctrl release must disable scanning and highlight');
+      screen.dispatchEvent(new MouseEvent('mousemove',{...at(22),ctrlKey:true})); await tick();
+      screen.dispatchEvent(new MouseEvent('mousedown',{...at(22),button:0,buttons:1,ctrlKey:true}));
+      screen.dispatchEvent(new MouseEvent('mouseup',{...at(22),button:0,buttons:0,ctrlKey:true}));
+      if(opened.length!==2 || !opened[1].web || opened[1].path!=='https://example.com/docs') throw new Error('Ctrl+click must recognize HTTP URLs');
+      term.element.dispatchEvent(new MouseEvent('mouseleave')); await tick();
+      const leaveReads=reads;
+      await write('\\r\\nmore background output'); await tick();
+      if(reads!==leaveReads) throw new Error('Leaving xterm must disable scanning');
+      // Unicode cells and soft wraps must map character offsets back to screen cells.
+      await write('\\x1bc'); term.resize(20,24);
+      await write('界🙂 e\\u0301 src/very-long-filename.ts:7:2');
+      const wrappedRect=screen.getBoundingClientRect();
+      const wrapPoint={clientX:wrappedRect.left+wrappedRect.width/term.cols*3.5,clientY:wrappedRect.top+wrappedRect.height/term.rows*1.5,bubbles:true,cancelable:true,ctrlKey:true};
+      screen.dispatchEvent(new MouseEvent('mousemove',wrapPoint)); await tick();
+      screen.dispatchEvent(new MouseEvent('mousedown',{...wrapPoint,button:0,buttons:1}));
+      screen.dispatchEvent(new MouseEvent('mouseup',{...wrapPoint,button:0,buttons:0}));
+      if(opened.at(-1).path!=='src/very-long-filename.ts' || opened.at(-1).line!==7) throw new Error('Wrapped paths after wide/combining characters must open');
+      window.dispatchEvent(new Event('blur'));
+      const blurReads=reads;
+      await write('\\r\\noutput while unfocused'); await tick();
+      if(reads!==blurReads || screen.style.cursor==='pointer') throw new Error('Window blur must disable parsing and highlight');
+      linkBinding.dispose();
       term.dispose();
       document.getElementById('result').textContent = 'PASS';
     } catch (error) { document.getElementById('result').textContent = 'FAIL: ' + error.stack; }
@@ -169,7 +262,7 @@ test(
         "Content-Type",
         req.url === "/" ? "text/html; charset=utf-8" : "text/javascript; charset=utf-8",
       );
-      res.end(req.url === "/xterm.js" ? xterm : req.url === "/keyboard.js" ? keyboard : req.url === "/forwarding.js" ? forwarding : req.url === "/drop-paths.js" ? dropPaths : req.url === "/drop.js" ? drop : html);
+      res.end(req.url === "/xterm.js" ? xterm : req.url === "/keyboard.js" ? keyboard : req.url === "/forwarding.js" ? forwarding : req.url === "/links.js" ? links : req.url === "/drop-paths.js" ? dropPaths : req.url === "/drop.js" ? drop : html);
     });
     t.after(async () => {
       await new Promise((resolve) => server.close(resolve));
@@ -187,7 +280,7 @@ test(
         "--no-first-run",
         "--no-default-browser-check",
         `--user-data-dir=${profile}`,
-        "--virtual-time-budget=2000",
+        "--virtual-time-budget=5000",
         "--dump-dom",
         `http://127.0.0.1:${server.address().port}/`,
       ],
