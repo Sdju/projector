@@ -19,7 +19,14 @@ const project = {
   icon: "",
   mode: "server",
   defaultCommandId: "dev",
-  commands: [{ id: "dev", name: "dev", cmd: "true" }],
+  commands: [
+    {
+      id: "dev",
+      name: "dev",
+      cmd: `test -t 0 && test -t 1 && printf 'RUN_%s\\nhttp://127.0.0.1:43210/\\n' PTY; read value; printf 'INPUT_%s\\n' "$value"; exit 7`,
+    },
+    { id: "wait", name: "wait", cmd: "sleep 60" },
+  ],
   createdAt: "",
 };
 await writeFile(join(root, "projector/projects.json"), JSON.stringify({ projects: [project] }));
@@ -189,6 +196,52 @@ await test("real PTY: input, Unicode, resize, interrupt, reconnect, alternate sc
     const stat = await readFile(`/proc/${childPid}/stat`, "utf8").catch(() => "");
     return !stat || stat.slice(stat.lastIndexOf(")") + 2).startsWith("Z ");
   }, "background child terminated");
+  // Project commands use the same interactive PTY and reconnectable screen as shells.
+  const { getSnapshot } = await import("../server/processes.ts");
+  const run = (action, body) =>
+    fetch(`${base}/api/projects/${project.id}/${action}`, {
+      method: "POST",
+      headers: { Origin: base, "Content-Type": "application/json" },
+      body: JSON.stringify(body ?? {}),
+    });
+  const started = await run("start", { commandId: "dev" });
+  assert.equal(started.status, 200, await started.clone().text());
+  const commandSession = listTerminalSessions(project.id).find((item) => item.commandId === "dev");
+  assert.ok(commandSession);
+  assert.equal(getSnapshot(project.id).pid, commandSession.pid);
+  const commandTerminal = await connect(commandSession.id);
+  await until(() => commandTerminal.output().includes("RUN_PTY"), "launch output in terminal");
+  await until(
+    () => getSnapshot(project.id).url === "http://localhost:43210/",
+    "launch URL detected",
+  );
+  assert.equal(
+    (await run("start", { commandId: "wait" })).status,
+    400,
+    "duplicate launch rejected",
+  );
+  commandTerminal.client.close();
+  await once(commandTerminal.client, "close");
+  const restoredCommand = await connect(commandSession.id);
+  assert.ok(restoredCommand.output().includes("RUN_PTY"), "launch output survives reconnect");
+  restoredCommand.send({ type: "input", data: "hello\r" });
+  await until(
+    () => restoredCommand.output().includes("INPUT_hello"),
+    "launched command accepts input",
+  );
+  await until(() => getSnapshot(project.id).exitCode === 7, "launch exit code");
+  assert.equal(getSnapshot(project.id).status, "error");
+  assert.equal((await request(`/${commandSession.id}`, "DELETE")).status, 200);
+  assert.equal((await run("start", { commandId: "wait" })).status, 200);
+  const waitSession = listTerminalSessions(project.id).find((item) => item.commandId === "wait");
+  assert.equal((await run("stop")).status, 200);
+  await until(() => getSnapshot(project.id).status === "idle", "stop terminates command PTY");
+  assert.equal(
+    listTerminalSessions(project.id).find((item) => item.id === waitSession.id).status,
+    "exited",
+  );
+  assert.equal((await request(`/${waitSession.id}`, "DELETE")).status, 200);
+  assert.equal((await request("", "POST", { commandId: "missing" })).status, 400);
   assert.deepEqual(listTerminalSessions(project.id), []);
 });
 

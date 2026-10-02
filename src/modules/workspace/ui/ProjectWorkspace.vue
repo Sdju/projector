@@ -2,9 +2,9 @@
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { workspaceRequest } from "../api.ts";
 import FileTree from "./FileTree.vue";
+import IconSettings from "~icons/lucide/settings";
+import IconArrowLeft from "~icons/lucide/arrow-left";
 import { TerminalPane } from "../../terminal/index.ts";
-import { LogPane } from "../../runner/index.ts";
-import type { LogLine } from "../../catalog/index.ts";
 import type {
   FileContent,
   SearchHit,
@@ -12,7 +12,7 @@ import type {
   FileComparison,
 } from "../../../../shared/workspace.ts";
 const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
-const props = defineProps<{ projectId: string; projectName: string; logs: LogLine[] }>();
+const props = defineProps<{ projectId: string; projectName: string }>();
 const workspaceElement = ref<HTMLElement>();
 const treeWidth = ref<number>();
 const agentWidth = ref<number>();
@@ -101,8 +101,7 @@ function resizeKey(event: KeyboardEvent, pane: "tree" | "agent") {
       ),
     );
 }
-const section = ref<"files" | "search" | "git">("files");
-const right = ref<"terminal" | "logs">("terminal");
+const section = ref<"files" | "search" | "git" | "project">("files");
 const revision = ref(0);
 const query = ref("");
 const hits = ref<SearchHit[]>([]);
@@ -286,16 +285,32 @@ onBeforeUnmount(() => {
         <button :class="{ selected: section === 'git' }" @click="section = 'git'">
           Git <span v-if="git.changes.length">{{ git.changes.length }}</span>
         </button>
+        <button
+          class="project-tab"
+          :class="{ selected: section === 'project' }"
+          :aria-pressed="section === 'project'"
+          title="Настройки проекта"
+          aria-label="Настройки проекта"
+          @click="section = 'project'"
+        >
+          <IconSettings aria-hidden="true" />
+        </button>
       </nav>
       <div class="side-heading">
+        <router-link to="/projects" class="back" title="Все проекты" aria-label="Все проекты">
+          <IconArrowLeft aria-hidden="true" />
+        </router-link>
         <span :title="projectName">{{
-          section === "git"
-            ? git.branch || "Git changes"
-            : section === "search"
-              ? "Поиск по содержимому"
-              : projectName
-        }}</span
-        ><button title="Обновить обзор" aria-label="Обновить обзор" @click="refresh">↻</button>
+          section === "git" ? git.branch || projectName : projectName
+        }}</span>
+        <button
+          v-if="section !== 'project'"
+          title="Обновить обзор"
+          aria-label="Обновить обзор"
+          @click="refresh"
+        >
+          ↻
+        </button>
       </div>
       <div v-show="section === 'files'" class="side-content">
         <FileTree
@@ -315,7 +330,6 @@ onBeforeUnmount(() => {
             maxlength="200"
           />
         </form>
-        <p class="hint">Текст · без учёта регистра · с учётом .gitignore</p>
         <p v-if="searching" class="notice" role="status">поиск…</p>
         <p v-if="searchError" class="notice error" role="alert">{{ searchError }}</p>
         <p v-if="searched" class="notice">
@@ -365,7 +379,9 @@ onBeforeUnmount(() => {
           </button>
         </template>
       </div>
-      <footer class="side-footer">обзор проекта · только чтение</footer>
+      <div v-if="section === 'project'" class="side-content project-settings">
+        <slot name="project" />
+      </div>
     </aside>
     <div
       class="resize-handle tree-resize"
@@ -377,7 +393,7 @@ onBeforeUnmount(() => {
       @keydown="resizeKey($event, 'tree')"
     />
     <section class="editor-pane" aria-label="Файлы и изменения">
-      <div class="file-tabs" role="tablist" aria-label="Открытые файлы">
+      <div v-if="tabs.length" class="file-tabs" role="tablist" aria-label="Открытые файлы">
         <div
           v-for="tab in tabs"
           :key="tab.key"
@@ -398,16 +414,11 @@ onBeforeUnmount(() => {
             ×
           </button>
         </div>
-        <span v-if="!tabs.length" class="tab-placeholder">Обзор</span>
       </div>
       <div v-if="active" class="breadcrumb">
         <span>{{ active.path }}</span
-        ><span>{{
-          active.original !== undefined
-            ? active.staged
-              ? "HEAD → index"
-              : "index → рабочий файл"
-            : "только чтение"
+        ><span v-if="active.original !== undefined">{{
+          active.staged ? "HEAD → index" : "index → рабочий файл"
         }}</span>
       </div>
       <p v-if="fileError" class="file-error" role="alert">{{ fileError }}</p>
@@ -421,14 +432,6 @@ onBeforeUnmount(() => {
           :line="active.line"
           :column="active.column"
         />
-        <div v-else class="welcome">
-          <span class="welcome-icon">⌘</span>
-          <h2>Проект перед глазами</h2>
-          <p>
-            Откройте файл в дереве, найдите нужный код<br />или посмотрите изменения агента в Git.
-          </p>
-          <span>Разработка — в терминале справа.</span>
-        </div>
       </div>
     </section>
     <div
@@ -441,20 +444,10 @@ onBeforeUnmount(() => {
       @keydown="resizeKey($event, 'agent')"
     />
     <aside class="agent-pane" aria-label="Агент и терминал">
-      <nav class="side-tabs">
-        <button :class="{ selected: right === 'terminal' }" @click="right = 'terminal'">
-          Агент / терминал</button
-        ><button :class="{ selected: right === 'logs' }" @click="right = 'logs'">
-          Логи запуска
-        </button>
-      </nav>
-      <TerminalPane
-        v-show="right === 'terminal'"
-        :key="projectId"
-        :project-id="projectId"
-        embedded
-      />
-      <div v-show="right === 'logs'" class="run-logs"><LogPane :lines="logs" /></div>
+      <TerminalPane :key="projectId" :project-id="projectId" embedded>
+        <template #actions><slot name="terminal-actions" /></template>
+        <template #status><slot name="terminal-status" /></template>
+      </TerminalPane>
     </aside>
   </div>
 </template>
@@ -467,7 +460,7 @@ onBeforeUnmount(() => {
     4px var(--agent-width, clamp(370px, 34vw, 680px));
   border: 1px solid var(--line);
   border-radius: 5px;
-  height: calc(100dvh - 178px);
+  height: calc(100dvh - 68px);
   min-height: 440px;
   overflow: hidden;
 }
@@ -515,6 +508,27 @@ onBeforeUnmount(() => {
   color: var(--text);
   border-color: var(--focus);
 }
+.side-tabs .project-tab {
+  display: grid;
+  place-items: center;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.project-tab svg,
+.back svg {
+  width: 14px;
+  height: 14px;
+}
+.back {
+  display: flex;
+  color: var(--muted);
+}
+.back:hover {
+  color: var(--text);
+}
+.project-settings {
+  padding: 8px 12px 16px;
+}
 .side-tabs span {
   color: var(--run);
   font: 10px var(--mono);
@@ -529,6 +543,7 @@ onBeforeUnmount(() => {
   color: var(--muted);
 }
 .side-heading span {
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -541,27 +556,16 @@ onBeforeUnmount(() => {
   min-height: 0;
   overflow: auto;
 }
-.side-footer {
-  padding: 8px 12px;
-  font-size: 10px;
-  color: var(--faint);
-  border-top: 1px solid var(--line);
-}
 .search-panel form {
   margin: 2px 10px 8px;
 }
 .search-panel input {
   font-size: 12px;
 }
-.notice,
-.hint {
+.notice {
   padding: 0 12px;
   color: var(--muted);
   font-size: 12px;
-}
-.hint {
-  font-size: 10px;
-  color: var(--faint);
 }
 .error {
   color: var(--err);
@@ -658,11 +662,6 @@ h3 span {
   font-size: 16px;
   color: var(--faint);
 }
-.tab-placeholder {
-  margin: auto 12px;
-  font-size: 12px;
-  color: var(--faint);
-}
 .breadcrumb {
   display: flex;
   justify-content: space-between;
@@ -702,41 +701,6 @@ h3 span {
   padding: 6px 12px;
   color: var(--muted);
   font-size: 12px;
-}
-.welcome {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 24px;
-}
-.welcome-icon {
-  font-size: 46px;
-  color: #393932;
-}
-.welcome h2 {
-  font-size: 18px;
-  font-weight: 400;
-  letter-spacing: -0.02em;
-  margin: 12px 0 0;
-}
-.welcome p {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.8;
-}
-.welcome > span:last-child {
-  margin-top: 14px;
-  color: var(--faint);
-  font-size: 11px;
-}
-.run-logs {
-  overflow: auto;
-  padding: 0 12px;
-  flex: 1;
-  min-height: 0;
 }
 @media (max-width: 1050px) {
   .workspace {

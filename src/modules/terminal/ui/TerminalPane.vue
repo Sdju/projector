@@ -5,6 +5,12 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import "@xterm/xterm/css/xterm.css";
 import UiButton from "../../../common/ui/UiButton.vue";
+import IconTerminal from "~icons/lucide/terminal";
+import IconCodex from "~icons/simple-icons/openai";
+import IconClaude from "~icons/simple-icons/claude";
+import IconMaximize from "~icons/lucide/maximize-2";
+import IconMinimize from "~icons/lucide/minimize-2";
+import IconClose from "~icons/lucide/x";
 import { deferTerminalText } from "../lib/keyboard.ts";
 import type {
   TerminalClientMessage,
@@ -26,7 +32,7 @@ const statusText = computed(() => {
   if (!active.value) return "";
   if (active.value.status === "exited") return `завершён · код ${active.value.exitCode ?? "—"}`;
   return connection.value === "connected"
-    ? "подключён"
+    ? ""
     : connection.value === "connecting"
       ? "подключение…"
       : "нет соединения";
@@ -196,6 +202,14 @@ async function loadSessions(): Promise<void> {
   }
 }
 
+async function terminalStarted(event: Event): Promise<void> {
+  const detail = (event as CustomEvent<{ projectId: string; sessionId: string }>).detail;
+  if (detail.projectId !== props.projectId) return;
+  await loadSessions();
+  if (!destroyed && sessions.value.some((session) => session.id === detail.sessionId))
+    activeId.value = detail.sessionId;
+}
+
 async function create(program: TerminalProgram): Promise<void> {
   busy.value = true;
   error.value = "";
@@ -322,9 +336,11 @@ onMounted(() => {
   void document.fonts.ready.then(() => {
     if (!destroyed) scheduleFit();
   });
+  window.addEventListener("projector:terminal-started", terminalStarted);
   void loadSessions();
 });
 onBeforeUnmount(() => {
+  window.removeEventListener("projector:terminal-started", terminalStarted);
   destroyed = true;
   disconnect();
   cancelAnimationFrame(resizeFrame);
@@ -341,18 +357,59 @@ onBeforeUnmount(() => {
     @keydown="escapeFullscreen"
   >
     <header>
-      <span class="label">терминал</span>
-      <span class="status" role="status">{{ statusText }}</span>
       <div class="actions">
-        <UiButton variant="chip" :disabled="busy" @click="create('shell')">+ shell</UiButton>
-        <UiButton variant="chip" :disabled="busy" @click="create('codex')">+ Codex</UiButton>
-        <UiButton variant="chip" :disabled="busy" @click="create('claude')">+ Claude Code</UiButton>
-        <UiButton variant="chip" @click="expanded = !expanded">{{
-          expanded ? "свернуть" : "развернуть"
-        }}</UiButton>
-        <UiButton v-if="active" variant="danger" :disabled="busy" @click="closeActive"
-          >закрыть сессию</UiButton
-        >
+        <slot name="actions" />
+        <div class="session-actions" role="group" aria-label="Новая терминальная сессия">
+          <UiButton
+            class="icon-button"
+            variant="chip"
+            :disabled="busy"
+            title="Новый shell"
+            aria-label="Новый shell"
+            @click="create('shell')"
+            ><IconTerminal aria-hidden="true"
+          /></UiButton>
+          <UiButton
+            class="icon-button"
+            variant="chip"
+            :disabled="busy"
+            title="Новый Codex"
+            aria-label="Новый Codex"
+            @click="create('codex')"
+            ><IconCodex aria-hidden="true"
+          /></UiButton>
+          <UiButton
+            class="icon-button"
+            variant="chip"
+            :disabled="busy"
+            title="Новый Claude Code"
+            aria-label="Новый Claude Code"
+            @click="create('claude')"
+            ><IconClaude aria-hidden="true"
+          /></UiButton>
+        </div>
+        <div class="view-actions">
+          <UiButton
+            class="icon-button"
+            variant="chip"
+            :title="expanded ? 'Свернуть терминал' : 'Развернуть терминал'"
+            :aria-label="expanded ? 'Свернуть терминал' : 'Развернуть терминал'"
+            @click="expanded = !expanded"
+            ><IconMinimize v-if="expanded" aria-hidden="true" /><IconMaximize
+              v-else
+              aria-hidden="true"
+          /></UiButton>
+          <UiButton
+            v-if="active"
+            class="icon-button"
+            variant="danger"
+            :disabled="busy"
+            title="Закрыть сессию"
+            aria-label="Закрыть сессию"
+            @click="closeActive"
+            ><IconClose aria-hidden="true"
+          /></UiButton>
+        </div>
       </div>
     </header>
     <div v-if="sessions.length" class="tabs" role="tablist" aria-label="Сессии терминала">
@@ -367,15 +424,12 @@ onBeforeUnmount(() => {
         {{ session.title }} {{ index + 1 }}{{ session.status === "exited" ? " · завершён" : "" }}
       </button>
     </div>
+    <slot name="status" />
+    <p v-if="statusText" class="status" role="status">{{ statusText }}</p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <div class="screen-wrap">
       <div ref="container" class="screen" :class="{ inactive: !active }" />
-      <div v-if="!active" class="empty">Откройте shell, Codex или Claude Code в папке проекта.</div>
     </div>
-    <footer>
-      Ctrl+C — прервать · Ctrl+Shift+C/V — копировать / вставить · закрытие страницы сохраняет
-      сессию
-    </footer>
   </section>
 </template>
 
@@ -395,21 +449,37 @@ header {
   padding: 10px 12px;
   border-bottom: 1px solid var(--line);
 }
-.label {
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
 .status {
+  margin: 0;
+  padding: 4px 12px;
   font-size: 11px;
   color: var(--faint);
 }
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+.session-actions,
+.view-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.view-actions {
   margin-left: auto;
+}
+.icon-button {
+  width: 28px;
+  height: 28px;
+  padding: 5px;
+  justify-content: center;
+}
+.icon-button svg {
+  width: 15px;
+  height: 15px;
 }
 .tabs {
   display: flex;
@@ -439,27 +509,11 @@ header {
 .screen.inactive {
   visibility: hidden;
 }
-.empty {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  text-align: center;
-  padding: 24px;
-  color: var(--muted);
-  font-size: 13px;
-}
 .error {
   margin: 0;
   padding: 10px 12px;
   color: var(--err);
   font-size: 12px;
-}
-footer {
-  padding: 8px 12px;
-  border-top: 1px solid var(--line);
-  color: var(--faint);
-  font-size: 11px;
 }
 .expanded {
   position: fixed;
@@ -495,14 +549,5 @@ footer {
 }
 .embedded header {
   gap: 6px;
-}
-.embedded .label {
-  display: none;
-}
-.embedded .actions {
-  margin-left: 0;
-}
-.embedded footer {
-  font-size: 10px;
 }
 </style>

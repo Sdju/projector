@@ -7,6 +7,7 @@ import type { LaunchMode, ProjectDraft } from "../model/types.ts";
 const props = defineProps<{
   modelValue: ProjectDraft;
   submitLabel: string;
+  compact?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -67,7 +68,7 @@ function onInspect(): void {
 </script>
 
 <template>
-  <form class="form" @submit.prevent="emit('submit')">
+  <form class="form" :class="{ compact }" @submit.prevent="emit('submit')">
     <UiField label="путь">
       <div class="row">
         <input v-model="draft.path" placeholder="/home/…/проект" spellcheck="false" />
@@ -98,17 +99,24 @@ function onInspect(): void {
     <UiField label="команды">
       <div class="commands">
         <div v-for="command in draft.commands" :key="command.id" class="command">
-          <input v-model="command.name" class="name" placeholder="dev" />
-          <input v-model="command.cmd" placeholder="pnpm dev" spellcheck="false" />
+          <input v-model="command.name" class="name" placeholder="dev" aria-label="Имя команды" />
+          <input
+            v-model="command.cmd"
+            class="command-text"
+            aria-label="Команда запуска"
+            placeholder="pnpm dev"
+            spellcheck="false"
+          />
           <label class="def">
-            <input
-              v-model="draft.defaultCommandId"
-              type="radio"
-              :value="command.id"
-            />
+            <input v-model="draft.defaultCommandId" type="radio" :value="command.id" />
             осн.
           </label>
-          <UiButton variant="ghost" @click="removeCommand(command.id)">×</UiButton>
+          <UiButton
+            variant="ghost"
+            :aria-label="`Удалить команду ${command.name}`"
+            @click="removeCommand(command.id)"
+            >×</UiButton
+          >
         </div>
         <UiButton variant="ghost" @click="addCommand">+ команда</UiButton>
       </div>
@@ -174,5 +182,39 @@ function onInspect(): void {
 .actions {
   display: flex;
   justify-content: flex-end;
+}
+.compact {
+  gap: 14px;
+}
+.compact input {
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+.compact .row {
+  flex-wrap: wrap;
+}
+.compact .row > input {
+  flex-basis: 100%;
+}
+.compact .row > button,
+.compact .commands > button,
+.compact .actions > button {
+  font-size: 12px;
+  padding: 5px 8px;
+}
+.compact .command {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.compact .command-text {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  font-family: var(--mono);
+}
+.compact .actions {
+  justify-content: flex-start;
 }
 </style>

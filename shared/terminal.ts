@@ -5,6 +5,7 @@ export interface TerminalSession {
   projectId: string;
   program: TerminalProgram;
   title: string;
+  commandId?: string;
   pid: number;
   cols: number;
   rows: number;

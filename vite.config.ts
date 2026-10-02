@@ -1,11 +1,12 @@
 import { fileURLToPath, URL } from "node:url";
 import vue from "@vitejs/plugin-vue";
+import Icons from "unplugin-icons/vite";
 import { defineConfig } from "vite-plus";
 import { APP_PORT } from "./server/paths.ts";
 import { projectorPlugin } from "./server/plugin.ts";
 
 export default defineConfig({
-  plugins: [vue(), projectorPlugin()],
+  plugins: [vue(), Icons({ compiler: "vue3" }), projectorPlugin()],
   resolve: {
     alias: {
       "@app": fileURLToPath(new URL("./src/app", import.meta.url)),

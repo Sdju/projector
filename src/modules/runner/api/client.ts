@@ -1,4 +1,4 @@
-import type { LaunchMode, LogLine, ProcessSnapshot } from "../../catalog/index.ts";
+import type { LaunchMode, ProcessSnapshot } from "../../catalog/index.ts";
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -30,8 +30,4 @@ export function openProject(id: string, mode: LaunchMode): Promise<{ url: string
     method: "POST",
     body: JSON.stringify({ mode }),
   });
-}
-
-export function fetchLogs(id: string): Promise<{ logs: LogLine[] }> {
-  return request(`/api/projects/${id}/logs`);
 }

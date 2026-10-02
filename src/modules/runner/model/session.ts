@@ -1,9 +1,8 @@
 import { computed, reactive } from "vue";
-import { useProjects, type LogLine, type ProcessSnapshot } from "../../catalog/index.ts";
-import { fetchLogs, openProject, startProject, stopProject } from "../api/client.ts";
+import { useProjects, type ProcessSnapshot } from "../../catalog/index.ts";
+import { openProject, startProject, stopProject } from "../api/client.ts";
 
 const state = reactive({
-  logs: {} as Record<string, LogLine[]>,
   error: "",
 });
 
@@ -13,42 +12,31 @@ export function useRunner() {
   const catalog = useProjects();
   const error = computed(() => state.error);
 
-  function logsFor(id: string): LogLine[] {
-    return state.logs[id] ?? [];
-  }
-
   function applyStatus(snapshot: ProcessSnapshot): void {
     catalog.applyRuntime(snapshot);
-  }
-
-  function appendLog(line: LogLine): void {
-    const current = state.logs[line.projectId] ?? [];
-    current.push(line);
-    if (current.length > 800) current.splice(0, current.length - 800);
-    state.logs[line.projectId] = current;
-  }
-
-  async function hydrate(id: string): Promise<void> {
-    const data = await fetchLogs(id);
-    state.logs[id] = data.logs;
   }
 
   function connect(): void {
     if (connected) return;
     connected = true;
     const source = new EventSource("/api/events");
-    source.addEventListener("launcher-show", () => window.dispatchEvent(new Event("projector:show")));
+    source.addEventListener("launcher-show", () =>
+      window.dispatchEvent(new Event("projector:show")),
+    );
     source.addEventListener("status", (event) => {
       applyStatus(JSON.parse((event as MessageEvent).data) as ProcessSnapshot);
     });
-    source.addEventListener("log", (event) => {
-      appendLog(JSON.parse((event as MessageEvent).data) as LogLine);
+    source.addEventListener("terminal-started", (event) => {
+      window.dispatchEvent(
+        new CustomEvent("projector:terminal-started", {
+          detail: JSON.parse((event as MessageEvent).data),
+        }),
+      );
     });
   }
 
   async function start(id: string, commandId?: string, mode?: "server" | "window"): Promise<void> {
     state.error = "";
-    state.logs[id] = [];
     try {
       const data = await startProject(id, commandId, mode);
       applyStatus(data.runtime);
@@ -76,5 +64,5 @@ export function useRunner() {
     }
   }
 
-  return { error, logsFor, connect, hydrate, start, stop, open };
+  return { error, connect, start, stop, open };
 }

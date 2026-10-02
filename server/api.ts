@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { createReadStream } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { inspectProject, expandPath } from "./inspect.ts";
-import { getLogs, getSnapshot, listSnapshots, onProcessEvent, startProject, stopProject } from "./processes.ts";
+import { getSnapshot, listSnapshots, onProcessEvent, startProject, stopProject } from "./processes.ts";
 import { loadProjects, updateProjects } from "./store.ts";
 import type { LaunchMode, Project, ProjectCommand } from "./types.ts";
 import { appUrl, projectAppUrl } from "./paths.ts";
@@ -453,7 +453,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
       }
 
       if (!action && method === "GET") {
-        json(res, 200, { project: withRuntime(project), logs: getLogs(id) });
+        json(res, 200, { project: withRuntime(project) });
         return true;
       }
 
@@ -521,10 +521,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
         return true;
       }
 
-      if (action === "logs" && method === "GET") {
-        json(res, 200, { logs: getLogs(id) });
-        return true;
-      }
+
     }
 
     json(res, 404, { error: "Не найден" });

@@ -75,7 +75,7 @@ if (process.argv.includes("--prepare")) {
     assert.equal((await searchLauncher("")).items[0].id, "app:projector probe.desktop");
     assert.equal((await request("/api/launcher/launch", "POST", { id: "project:probe-project" })).status, 200);
     const deadline = Date.now() + 3000;
-    while (getSnapshot("probe-project").status === "starting" && Date.now() < deadline) {
+    while (["starting", "running"].includes(getSnapshot("probe-project").status) && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
     const runtime = getSnapshot("probe-project");

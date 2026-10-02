@@ -199,6 +199,12 @@ function terminate(session: Session, immediate = false): void {
   timer.unref();
 }
 
+export function stopTerminalSession(projectId: string, id: string): void {
+  const session = state.sessions.get(id);
+  if (!session || session.info.projectId !== projectId) throw new Error("Терминал не найден");
+  terminate(session);
+}
+
 export function closeTerminalSession(projectId: string, id: string): void {
   const session = state.sessions.get(id);
   if (!session || session.info.projectId !== projectId) throw new Error("Терминал не найден");
@@ -218,11 +224,17 @@ export function closeProjectTerminals(projectId: string): void {
 export function createTerminalSession(
   project: Project,
   input: Record<string, unknown>,
+  observer?: { output: (data: string) => void; exit: (code: number) => void },
 ): TerminalSession {
   if (state.sessions.size >= MAX_SESSIONS)
     throw new Error("Лимит терминалов: закройте ненужные сессии");
   const program = (input.program ?? "shell") as TerminalProgram;
   if (!["shell", "codex", "claude"].includes(program)) throw new Error("Неизвестная программа");
+  const command =
+    input.commandId === undefined
+      ? undefined
+      : project.commands.find((item) => item.id === input.commandId);
+  if (input.commandId !== undefined && !command) throw new Error("Команда не найдена");
   const dimensions = size(input.cols ?? 80, input.rows ?? 24);
   const env = Object.fromEntries(
     Object.entries(process.env).filter(
@@ -235,7 +247,11 @@ export function createTerminalSession(
   env.TERM = "xterm-256color";
   env.COLORTERM = "truecolor";
   const shell = process.env.SHELL || "/bin/bash";
-  const args = program === "shell" ? ["-i"] : ["-i", "-c", `exec ${program}`];
+  const args = command
+    ? ["-c", command.cmd]
+    : program === "shell"
+      ? ["-i"]
+      : ["-i", "-c", `exec ${program}`];
   const screen = new Terminal({ ...dimensions, scrollback: 5000, allowProposedApi: true });
   const serialize = new SerializeAddon();
   screen.loadAddon(serialize);
@@ -251,7 +267,10 @@ export function createTerminalSession(
       id: randomUUID(),
       projectId: project.id,
       program,
-      title: program === "shell" ? "Shell" : program === "codex" ? "Codex" : "Claude Code",
+      commandId: command?.id,
+      title:
+        command?.name ??
+        (program === "shell" ? "Shell" : program === "codex" ? "Codex" : "Claude Code"),
       pid: child.pid,
       ...dimensions,
       status: "running",
@@ -272,6 +291,7 @@ export function createTerminalSession(
   // one ordered stream, including alternate screen and cursor state.
   child.onData((data) => {
     if (session.disposed) return;
+    observer?.output(data);
     session.queued += data.length;
     flow(session);
     screen.write(data, () => {
@@ -282,6 +302,7 @@ export function createTerminalSession(
   child.onExit(({ exitCode }) => {
     session.info.status = "exited";
     session.info.exitCode = exitCode;
+    observer?.exit(exitCode);
     if (!session.disposed)
       screen.write("", () => broadcast(session, { type: "status", session: { ...session.info } }));
   });

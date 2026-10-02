@@ -41,10 +41,3 @@ export interface ProjectDraft {
   defaultCommandId: string;
   commands: ProjectCommand[];
 }
-
-export interface LogLine {
-  projectId: string;
-  stream: "stdout" | "stderr" | "system";
-  text: string;
-  at: string;
-}
