@@ -1,11 +1,17 @@
-import { inject, onBeforeUnmount, provide, ref, type InjectionKey, type Ref } from "vue";
+import { inject, onBeforeUnmount, onMounted, provide, ref, type InjectionKey, type Ref } from "vue";
 import {
   createCommandService,
   defaultKeybindings,
   parseKeybindings,
   type Keybinding,
+  paletteCommands,
+  type PaletteCommand,
 } from "../../../core/modules/ide/index.ts";
 import { commandHostKey } from "../../common/utilities/commands.ts";
+interface PaletteSession {
+  commands: PaletteCommand[];
+  trigger: HTMLElement | null;
+}
 const ideKey: InjectionKey<{
   api: ReturnType<typeof createCommandService> & {
     reloadKeybindings: () => Promise<{
@@ -15,6 +21,8 @@ const ideKey: InjectionKey<{
     saveKeybindings: (bindings: unknown) => Promise<unknown>;
   };
   revision: Ref<number>;
+  palette: Ref<PaletteSession | null>;
+  reportError: (value: unknown) => void;
 }> = Symbol("ide");
 export function useIdeCommands() {
   const host = inject(ideKey);
@@ -25,13 +33,43 @@ export function provideIdeCommands() {
   const sdk = createCommandService(defaultKeybindings);
   const revision = ref(0);
   const error = ref("");
+  const palette = ref<PaletteSession | null>(null);
+  const reportError = (value: unknown) => {
+    error.value = value instanceof Error ? value.message : "Не удалось выполнить команду";
+  };
+  const workbench = sdk.createScope("workbench", () => ({ surface: "workbench" }));
+  workbench.registerCommand({
+    id: "ide.workbench.commandPalette.open",
+    title: "Открыть командный центр",
+    enabled: () => !!palette.value || !document.querySelector("dialog[open]"),
+    run: () => {
+      if (palette.value) return;
+      palette.value = {
+        commands: paletteCommands(sdk.getCommands(), sdk.getScopes(), sdk.getActiveScope()),
+        trigger: document.activeElement instanceof HTMLElement ? document.activeElement : null,
+      };
+    },
+  });
+  function globalKeydown(event: KeyboardEvent) {
+    if (event.defaultPrevented || (document.querySelector("dialog[open]") && !palette.value))
+      return;
+    const target = event.target;
+    const inputFocus =
+      target instanceof Element &&
+      !!target.closest('input,textarea,select,[contenteditable="true"]');
+    const binding = workbench.resolveKeybinding(event, inputFocus);
+    if (!binding) return;
+    event.preventDefault();
+    event.stopPropagation();
+    // Calling this scope explicitly preserves the originating workspace scope.
+    void workbench.executeCommand(binding.command, binding.args).catch(reportError);
+  }
+  onMounted(() => window.addEventListener("keydown", globalKeydown, true));
   const unsubscribe = sdk.subscribe(() => revision.value++);
   provide(commandHostKey, {
     revision,
     createScope: sdk.createScope,
-    reportError: (value) => {
-      error.value = value instanceof Error ? value.message : "Не удалось выполнить команду";
-    },
+    reportError,
   });
   async function reloadKeybindings() {
     const response = await fetch("/api/ide/keybindings");
@@ -54,7 +92,7 @@ export function provideIdeCommands() {
     return data;
   }
   const api = { ...sdk, reloadKeybindings, saveKeybindings };
-  provide(ideKey, { api, revision });
+  provide(ideKey, { api, revision, palette, reportError });
   const browser = window as unknown as { projector?: { ide?: typeof api } };
   const previous = browser.projector?.ide;
   browser.projector ??= {};
@@ -64,6 +102,8 @@ export function provideIdeCommands() {
   });
   onBeforeUnmount(() => {
     unsubscribe();
+    window.removeEventListener("keydown", globalKeydown, true);
+    workbench.dispose();
     if (browser.projector?.ide === api) browser.projector.ide = previous;
   });
   return { error };

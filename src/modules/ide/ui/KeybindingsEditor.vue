@@ -104,6 +104,7 @@ for (const [action, title, run] of [
 ] as const)
   commands.scope.registerCommand({
     id: `ide.keybindings.${action}`,
+    palette: false,
     title,
     run,
     enabled: () => !busy.value,

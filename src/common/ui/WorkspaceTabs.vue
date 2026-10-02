@@ -59,6 +59,7 @@ const register = (
 ) =>
   commands.scope.registerCommand({
     id: commandId(action),
+    palette: action !== "reorder",
     title,
     run,
     enabled: (args) => !props.disabled && enabled(args),

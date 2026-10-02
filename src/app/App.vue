@@ -4,7 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import { isLauncherWindow } from "../modules/launcher/index.ts";
 import { useProjects } from "../modules/catalog/index.ts";
 import { useRunner } from "../modules/runner/index.ts";
-import { provideIdeCommands } from "../modules/ide/index.ts";
+import { CommandPalette, provideIdeCommands } from "../modules/ide/index.ts";
 import AppShell from "./layouts/AppShell.vue";
 
 const { error: commandError } = provideIdeCommands();
@@ -45,6 +45,7 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <CommandPalette />
   <div v-if="commandError" class="command-error" role="alert">
     {{ commandError }}<button aria-label="Закрыть сообщение" @click="commandError = ''">×</button>
   </div>
