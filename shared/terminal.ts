@@ -15,7 +15,7 @@ export interface TerminalSession {
 }
 
 export type TerminalClientMessage =
-  | { type: "input"; data: string }
+  | { type: "input"; data: string; encoding?: "binary" }
   | { type: "ack"; length: number }
   | { type: "resize"; cols: number; rows: number };
 

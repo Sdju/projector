@@ -14,6 +14,7 @@ import type {
 } from "../shared/terminal.ts";
 import { loadProjects } from "./store.ts";
 import type { Project } from "./types.ts";
+import { trackMouseEncoding } from "./terminal-mouse.ts";
 
 const { Terminal } = headless;
 const { SerializeAddon } = serialization;
@@ -25,6 +26,7 @@ interface Session {
   pty: IPty;
   screen: InstanceType<typeof Terminal>;
   serialize: InstanceType<typeof SerializeAddon>;
+  mouseEncoding: ReturnType<typeof trackMouseEncoding>;
   clients: Set<WebSocket>;
   pending: Map<WebSocket, number>;
   queued: number;
@@ -48,6 +50,7 @@ for (const session of state.sessions.values()) {
   session.pending ??= new Map();
   session.queued ??= 0;
   session.paused ??= false;
+  session.mouseEncoding ??= trackMouseEncoding(session.screen);
 }
 
 export function terminalRequestAllowed(req: IncomingMessage, requireOrigin = true): boolean {
@@ -255,6 +258,7 @@ export function createTerminalSession(
   const screen = new Terminal({ ...dimensions, scrollback: 5000, allowProposedApi: true });
   const serialize = new SerializeAddon();
   screen.loadAddon(serialize);
+  const mouseEncoding = trackMouseEncoding(screen);
   let child: IPty;
   try {
     child = spawn(shell, args, { name: "xterm-256color", ...dimensions, cwd: project.path, env });
@@ -280,6 +284,7 @@ export function createTerminalSession(
     pty: child,
     screen,
     serialize,
+    mouseEncoding,
     clients: new Set(),
     pending: new Map(),
     queued: 0,
@@ -389,11 +394,17 @@ export function attachTerminalServer(server: Server | HttpServer): void {
                 if (
                   session.info.status !== "running" ||
                   typeof message.data !== "string" ||
-                  message.data.length > 32768
+                  message.data.length > 32768 ||
+                  (message.encoding !== undefined && message.encoding !== "binary") ||
+                  (message.encoding === "binary" && /[^\x00-\xff]/.test(message.data))
                 ) {
                   throw new Error("Ввод недоступен");
                 }
-                session.pty.write(message.data);
+                session.pty.write(
+                  message.encoding === "binary"
+                    ? Buffer.from(message.data, "latin1")
+                    : message.data,
+                );
               } else if (message.type === "ack") {
                 if (
                   !Number.isInteger(message.length) ||
@@ -441,7 +452,7 @@ function screenSnapshot(session: Session, client: WebSocket): void {
     send(client, {
       type: "snapshot",
       session: { ...session.info },
-      data: session.serialize.serialize(),
+      data: session.serialize.serialize() + session.mouseEncoding.serialize(),
     });
     session.clients.add(client);
   });

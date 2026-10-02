@@ -12,6 +12,7 @@ import IconMaximize from "~icons/lucide/maximize-2";
 import IconMinimize from "~icons/lucide/minimize-2";
 import IconClose from "~icons/lucide/x";
 import { deferTerminalText } from "../lib/keyboard.ts";
+import { bindTerminalInput } from "../lib/input.ts";
 import type {
   TerminalClientMessage,
   TerminalProgram,
@@ -298,12 +299,7 @@ onMounted(() => {
     new WebLinksAddon((_event, url) => window.open(url, "_blank", "noopener,noreferrer")),
   );
   terminal.open(container.value!);
-  terminal.onData((data) => {
-    if (active.value?.status !== "running") return;
-    // Large clipboard pastes are split below the server's frame limit.
-    for (let offset = 0; offset < data.length; offset += 8192)
-      send({ type: "input", data: data.slice(offset, offset + 8192) });
-  });
+  bindTerminalInput(terminal, send, () => ready && active.value?.status === "running");
   terminal.attachCustomKeyEventHandler((event) => {
     if (event.type === "keydown" && event.ctrlKey && event.shiftKey && event.code === "KeyC") {
       const selection = terminal?.getSelection();

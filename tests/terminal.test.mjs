@@ -6,6 +6,43 @@ import { tmpdir } from "node:os";
 import { createServer, request as httpRequest } from "node:http";
 import { once } from "node:events";
 import { WebSocket } from "ws";
+import headless from "@xterm/headless";
+import serialization from "@xterm/addon-serialize";
+import { trackMouseEncoding } from "../server/terminal-mouse.ts";
+
+await test("mouse encoding survives snapshots, fragmented modes, disable, RIS and retained sessions", async () => {
+  const screen = new headless.Terminal({ allowProposedApi: true });
+  const addon = new serialization.SerializeAddon();
+  screen.loadAddon(addon);
+  const write = (terminal, data) => new Promise((resolve) => terminal.write(data, resolve));
+  await write(screen, "\x1b[?1000h\x1b[?1006h");
+  const mouse = trackMouseEncoding(screen);
+  await write(screen, "");
+  assert.equal(mouse.serialize(), "\x1b[?1006h", "discover retained SGR mode");
+  for (const [sequence, mode] of [
+    ["", 1006],
+    ["\x1b[?1002;1016h", 1016],
+    ["\x1b[?1016l", null],
+    ["\x1b[?1006;1016h", 1016],
+    ["\x1b[?1006l", null],
+    ["\x1b[?1006h\x1bc", null],
+    ["\x1b[?1003;1006h", 1006],
+  ]) {
+    for (const char of sequence) await write(screen, char);
+    const restored = new headless.Terminal({ allowProposedApi: true });
+    await write(restored, addon.serialize() + mouse.serialize());
+    const reports = [];
+    restored.onData((data) => reports.push(data));
+    await write(restored, "\x1b[?1006$p\x1b[?1016$p");
+    assert.deepEqual(reports, [
+      `\x1b[?1006;${mode === 1006 ? 1 : 2}$y`,
+      `\x1b[?1016;${mode === 1016 ? 1 : 2}$y`,
+    ]);
+    assert.equal(restored.modes.mouseTrackingMode, screen.modes.mouseTrackingMode);
+    restored.dispose();
+  }
+  screen.dispose();
+});
 
 const root = await mkdtemp(join(tmpdir(), "projector-terminal-"));
 process.env.XDG_DATA_HOME = root;
@@ -101,6 +138,38 @@ await test("real PTY: input, Unicode, resize, interrupt, reconnect, alternate sc
   assert.equal(create.status, 201, await create.clone().text());
   const { session } = await create.json();
   const first = await connect(session.id);
+  const mouseBytes = Buffer.from([27, 91, 77, 32, 143, 43]);
+  const unicodeBytes = Buffer.from("привет🙂");
+  const expectedBytes = Buffer.concat([mouseBytes, unicodeBytes]);
+  await writeFile(
+    join(root, "read-input.py"),
+    `import os, termios, tty
+saved = termios.tcgetattr(0)
+try:
+ tty.setraw(0)
+ os.write(1, b'RAW_READY')
+ data = b''
+ while len(data) < ${expectedBytes.length}:
+  data += os.read(0, ${expectedBytes.length} - len(data))
+finally:
+ termios.tcsetattr(0, termios.TCSANOW, saved)
+print('RAW_HEX=' + data.hex(), flush=True)
+`,
+  );
+  first.send({ type: "input", data: "python3 read-input.py\r" });
+  await until(() => first.output().includes("RAW_READY"), "raw PTY reader");
+  first.send({ type: "input", data: mouseBytes.toString("latin1"), encoding: "binary" });
+  first.send({ type: "input", data: "привет🙂" });
+  await until(
+    () => first.output().includes(`RAW_HEX=${expectedBytes.toString("hex")}`),
+    "exact mouse bytes and UTF-8 Russian input",
+  );
+  first.send({ type: "input", data: "п", encoding: "binary" });
+  first.send({ type: "input", data: "text", encoding: "unknown" });
+  await until(
+    () => first.messages.filter((message) => message.type === "error").length === 2,
+    "invalid byte input rejected",
+  );
   first.send({
     type: "input",
     data: "test -t 0 && test -t 1 && printf 'PTY_%s\\n' OK; pwd; printf 'Привет_日本語\\n'\r",
@@ -128,7 +197,10 @@ await test("real PTY: input, Unicode, resize, interrupt, reconnect, alternate sc
   first.send({ type: "input", data: "\x03" });
   first.send({ type: "input", data: "printf 'INTERRUPT_%s\\n' OK\r" });
   await until(() => first.output().includes("INTERRUPT_OK"), "Ctrl+C restores prompt");
-  first.send({ type: "input", data: "printf '\\033[?1049h\\033[2J\\033[HALT_SCREEN_%s' OK\r" });
+  first.send({
+    type: "input",
+    data: "printf '\\033[?1049h\\033[?1000h\\033[?1006h\\033[2J\\033[HALT_SCREEN_%s' OK\r",
+  });
   await until(() => first.output().includes("ALT_SCREEN_OK"), "alternate screen");
   first.client.close();
   await once(first.client, "close");
@@ -137,6 +209,8 @@ await test("real PTY: input, Unicode, resize, interrupt, reconnect, alternate sc
   assert.equal(replay.session.pid, session.pid);
   assert.ok(replay.data.includes("ALT_SCREEN_OK"), "current alternate screen survives reconnect");
   assert.ok(replay.data.includes("\x1b[?1049h"), "alternate screen mode restored");
+  assert.ok(replay.data.includes("\x1b[?1000h"), "mouse tracking restored");
+  assert.ok(replay.data.endsWith("\x1b[?1006h"), "SGR mouse encoding restored");
   second.send({ type: "input", data: "printf '\\033[?1049l'; printf 'RESTORED_%s\\n' OK\r" });
   await until(() => second.output().includes("RESTORED_OK"), "input after reconnect");
   second.send({ type: "resize", cols: -1, rows: 0 });

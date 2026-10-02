@@ -15,7 +15,7 @@ const chromium =
   ["/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome"].find(existsSync);
 
 test(
-  "xterm in Chromium: late IME translation, text, controls and composition",
+  "xterm in Chromium: IME, Unicode, controls, mouse protocols and selection",
   {
     skip: chromium ? false : "Set CHROMIUM_BIN to run the browser input regression",
   },
@@ -28,17 +28,27 @@ test(
     const xterm = await readFile(
       new URL("../node_modules/@xterm/xterm/lib/xterm.js", import.meta.url),
     );
-    const html = `<!doctype html><div id="terminal"></div><pre id="result">WAITING</pre>
+    const css = await readFile(new URL("../node_modules/@xterm/xterm/css/xterm.css", import.meta.url), "utf8");
+    const forwarding = ts.transpileModule(
+      await readFile(new URL("../src/modules/terminal/lib/input.ts", import.meta.url), "utf8"),
+      { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
+    ).outputText;
+    const html = `<!doctype html><style>${css}</style><div id="terminal"></div><pre id="result">WAITING</pre>
     <script src="/xterm.js"></script><script type="module">
     import { deferTerminalText } from '/keyboard.js';
+    import { bindTerminalInput } from '/forwarding.js';
     try {
-      const term = new Terminal();
+      const term = new Terminal({cols: 160});
       term.open(document.getElementById('terminal'));
       term.focus();
       term.attachCustomKeyEventHandler(event => !deferTerminalText(event));
       const input = document.querySelector('.xterm-helper-textarea');
       let sent = '';
-      term.onData(data => sent += data);
+      const frames = [];
+      bindTerminalInput(term, message => {
+        frames.push(message);
+        if (!message.encoding) sent += message.data;
+      }, () => true);
       const check = (expected, label) => {
         if (sent !== expected) throw new Error(label + ': expected ' + JSON.stringify(expected) + ', got ' + JSON.stringify(sent));
         sent = '';
@@ -79,6 +89,40 @@ test(
       input.dispatchEvent(new CompositionEvent('compositionend', {data: '你好', bubbles: true}));
       await new Promise(resolve => setTimeout(resolve, 10));
       check('你好', 'Chinese composition');
+      const write = data => new Promise(resolve => term.write(data, resolve));
+      await new Promise(resolve => setTimeout(resolve, 30));
+      const screen = term.element.querySelector('.xterm-screen');
+      const rect = screen.getBoundingClientRect();
+      const point = {clientX: rect.left + rect.width / term.cols * 110.5,
+        clientY: rect.top + rect.height / term.rows * 10.5, bubbles: true, cancelable: true};
+      const click = () => {
+        screen.dispatchEvent(new MouseEvent('mousedown', {...point, button: 0, buttons: 1}));
+        document.dispatchEvent(new MouseEvent('mouseup', {...point, button: 0, buttons: 0}));
+      };
+      await write('\\x1b[?1000h');
+      frames.length = 0; click();
+      screen.dispatchEvent(new WheelEvent('wheel', {...point, deltaY: 120, deltaMode: 0}));
+      if (frames.length < 3 || frames.some(f => f.encoding !== 'binary')) throw new Error('legacy mouse channel: ' + JSON.stringify(frames));
+      if (!frames.some(f => [...f.data].some(c => c.charCodeAt(0) > 127))) throw new Error('legacy high coordinate byte missing');
+      await write('\\x1b[?1006h');
+      frames.length = 0; click();
+      screen.dispatchEvent(new WheelEvent('wheel', {...point, deltaY: -120, deltaMode: 0}));
+      if (!frames.some(f => f.data === '\\x1b[<0;111;11M') || !frames.some(f => f.data === '\\x1b[<0;111;11m') || !frames.some(f => f.data.startsWith('\\x1b[<64;'))) throw new Error('SGR mouse: ' + JSON.stringify(frames));
+      sent = '';
+      key('g', 'п', 'KeyG', 71); check('п', 'Russian with mouse tracking');
+      frames.length = 0;
+      screen.dispatchEvent(new MouseEvent('mousedown', {...point, button: 0, buttons: 1, shiftKey: true}));
+      document.dispatchEvent(new MouseEvent('mouseup', {...point, button: 0, buttons: 0, shiftKey: true}));
+      if (frames.length) throw new Error('Shift selection must not send mouse input');
+      await write('\\x1b[?1000l\\x1b[?1006l');
+      frames.length = 0;
+      screen.dispatchEvent(new WheelEvent('wheel', {...point, deltaY: 120, deltaMode: 0}));
+      if (frames.length) throw new Error('shell scrollback must not send mouse input');
+      sent = ''; frames.length = 0;
+      term.paste('привет🙂'); check('привет🙂', 'Unicode paste after mouse');
+      sent = ''; frames.length = 0;
+      term.paste('a'.repeat(8191) + '🙂привет');
+      if (frames.length !== 2 || frames[0].data.length !== 8191 || frames[1].data !== '🙂привет') throw new Error('split Unicode paste');
       term.dispose();
       document.getElementById('result').textContent = 'PASS';
     } catch (error) { document.getElementById('result').textContent = 'FAIL: ' + error.stack; }
@@ -88,7 +132,7 @@ test(
         "Content-Type",
         req.url === "/" ? "text/html; charset=utf-8" : "text/javascript; charset=utf-8",
       );
-      res.end(req.url === "/xterm.js" ? xterm : req.url === "/keyboard.js" ? keyboard : html);
+      res.end(req.url === "/xterm.js" ? xterm : req.url === "/keyboard.js" ? keyboard : req.url === "/forwarding.js" ? forwarding : html);
     });
     t.after(async () => {
       await new Promise((resolve) => server.close(resolve));
