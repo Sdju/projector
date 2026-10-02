@@ -10,8 +10,8 @@
 | `vite.config.ts`, `server/app` | Vite, композиция локального HTTP API и SSE |
 | `server/modules/launcher`, `server/modules/preferences` | Поиск, история, настройки интерфейса и хоткея |
 | `server/modules/window` | Вызов native, Chromium, активация и скрытие в X11 |
-| `native/app/entry.ts`, `native/modules/desktop` | Каталог GIO, GTK-палитра, resident-процесс, трей и хоткей |
-| `native/modules/system-bus` | D-Bus без загрузки GTK |
+| `native/app/entry.ts`, `native/modules/desktop` | Запуск desktop через OS-адаптер, Vue/GTK-палитра и контроллер |
+| `core/modules/os`, его закрытый `modules/linux` | Выбор ОС, каталоги, процессы, утилиты, X11, GIO, D-Bus, resident, трей и хоткей |
 | `core/modules/launcher` | Общие контракты, HTTP-клиент и модель поведения DOM/GTK-палитры |
 | `packages/vio` | Независимый Vue renderer для GTK4, SFC loader, стили и demo |
 | `server/modules/processes`, `server/modules/terminal` | Процессы проектов, PTY, WebSocket и восстановление экрана |
