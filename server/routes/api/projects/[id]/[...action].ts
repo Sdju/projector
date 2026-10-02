@@ -10,6 +10,7 @@ import { openBrowser, openWindow } from "../../../../modules/window/index.ts";
 
 import {
   closeProjectTerminals,
+  uploadTerminalFile,
   renameTerminalSession,
   terminalSessionSnapshot,
   stopTerminalSession,
@@ -150,6 +151,12 @@ export async function handleProjectsProjectActions({
     }
 
     if (action === "terminals") {
+      if (sessionId && method === "PUT") {
+        if (!terminalRequestAllowed(req, true))
+          throw new HttpError(403, "Загрузка доступна только со страницы Projector");
+        json(res, 201, { path: await uploadTerminalFile(id, sessionId, req, url.searchParams.get("name") ?? "") });
+        return true;
+      }
       if (!sessionId && method === "GET") {
         json(res, 200, { sessions: listTerminalSessions(id) });
         return true;

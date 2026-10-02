@@ -338,7 +338,7 @@ function startDrag(event: DragEvent, entry: FileEntry) {
     return;
   }
   source.value = entry.path;
-  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.effectAllowed = "copyMove";
   event.dataTransfer.setData(
     treeDragType,
     JSON.stringify({ projectId: props.projectId, path: entry.path }),

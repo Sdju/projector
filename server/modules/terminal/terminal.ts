@@ -1,6 +1,8 @@
 import { readTerminalProcesses, terminalActivity } from "./terminal-activity.ts";
 import { randomUUID } from "node:crypto";
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, rmSync } from "node:fs";
+import { saveDroppedFile } from "./drop-files.ts";
+import { HttpError } from "../http/index.ts";
 import type { IncomingMessage, Server } from "node:http";
 import type { Duplex } from "node:stream";
 import type { HttpServer } from "vite";
@@ -33,6 +35,7 @@ interface Session {
   queued: number;
   paused: boolean;
   disposed: boolean;
+  droppedDirectories?: Set<string>;
 }
 
 const host = globalThis as typeof globalThis & {
@@ -240,6 +243,22 @@ export function stopTerminalSession(projectId: string, id: string): void {
   terminate(session);
 }
 
+export async function uploadTerminalFile(
+  projectId: string,
+  id: string,
+  req: IncomingMessage,
+  name: string,
+): Promise<string> {
+  const session = state.sessions.get(id);
+  if (!session || session.info.projectId !== projectId)
+    throw new HttpError(404, "Терминал не найден");
+  const available = () => !session.disposed && session.info.status === "running" && !session.info.stopRequested;
+  if (!available()) throw new HttpError(409, "Терминал больше не принимает файлы");
+  return saveDroppedFile(req, name, available, (directory) => {
+    (session.droppedDirectories ??= new Set()).add(directory);
+  });
+}
+
 export function closeTerminalSession(projectId: string, id: string): void {
   const session = state.sessions.get(id);
   if (!session || session.info.projectId !== projectId) throw new Error("Терминал не найден");
@@ -249,6 +268,8 @@ export function closeTerminalSession(projectId: string, id: string): void {
   session.clients.clear();
   session.screen.dispose();
   state.sessions.delete(id);
+  for (const directory of session.droppedDirectories ?? [])
+    rmSync(directory, { recursive: true, force: true });
 }
 
 export function closeProjectTerminals(projectId: string): void {

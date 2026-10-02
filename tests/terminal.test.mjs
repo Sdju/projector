@@ -138,6 +138,20 @@ await test("real PTY: input, Unicode, resize, interrupt, reconnect, alternate sc
     await new Promise((resolve) => server.close(resolve));
     await rm(root, { recursive: true, force: true });
   });
+  const droppedSession = (await (await request("", "POST", { program: "shell" })).json()).session;
+  const uploadUrl = `${base}/api/projects/${project.id}/terminals/${droppedSession.id}`;
+  const content = Buffer.from([0, 255, 10, 13, 65]);
+  const upload = (name, extra = {}) => fetch(`${uploadUrl}?name=${encodeURIComponent(name)}`, {
+    method: "PUT", headers: { Origin: base, "Content-Type": "application/octet-stream", ...extra }, body: content,
+  });
+  assert.equal((await upload("../escape")).status, 400);
+  assert.equal((await upload("file", { Origin: "https://evil.example" })).status, 403);
+  const uploaded = await upload("файл с ' пробелами.bin");
+  assert.equal(uploaded.status, 201, await uploaded.clone().text());
+  const { path: uploadedPath } = await uploaded.json();
+  assert.deepEqual(await readFile(uploadedPath), content);
+  await request(`/${droppedSession.id}`, "DELETE");
+  await assert.rejects(readFile(uploadedPath), { code: "ENOENT" });
   const create = await request("", "POST", { program: "shell", cols: 90, rows: 30 });
   assert.equal(create.status, 201, await create.clone().text());
   const { session } = await create.json();

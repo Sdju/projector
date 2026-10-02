@@ -9,6 +9,15 @@ import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import ts from "typescript";
+import { terminalTextForPaths } from "../src/modules/terminal/lib/drop.ts";
+
+test("dropped paths survive shell quoting without command execution or Enter", async () => {
+  const paths = ["/tmp/файл с пробелами", "/tmp/a'b", "/tmp/$(echo INJECTED);`echo BAD`", "/tmp/a\\b", "/tmp/line\nnext\r\x1b"];
+  const text = terminalTextForPaths(paths);
+  assert.ok(!/[\r\n\x1b]/.test(text));
+  const { stdout } = await promisify(execFile)("bash", ["-c", `printf '%s\\0' ${text}`]);
+  assert.deepEqual(stdout.split("\0").slice(0, -1), paths);
+});
 
 const chromium =
   process.env.CHROMIUM_BIN ??
@@ -33,10 +42,19 @@ test(
       await readFile(new URL("../src/modules/terminal/lib/input.ts", import.meta.url), "utf8"),
       { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
     ).outputText;
+    const dropPaths = ts.transpileModule(
+      await readFile(new URL("../src/modules/path-drop/drop-paths.ts", import.meta.url), "utf8"),
+      { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
+    ).outputText;
+    const drop = ts.transpileModule(
+      await readFile(new URL("../src/modules/terminal/lib/drop.ts", import.meta.url), "utf8"),
+      { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
+    ).outputText.replace("../../path-drop/index.ts", "/drop-paths.js");
     const html = `<!doctype html><style>${css}</style><div id="terminal"></div><pre id="result">WAITING</pre>
     <script src="/xterm.js"></script><script type="module">
     import { deferTerminalText } from '/keyboard.js';
     import { bindTerminalInput } from '/forwarding.js';
+    import { droppedTerminalPaths, terminalTextForPaths } from '/drop.js';
     try {
       const term = new Terminal({cols: 160});
       term.open(document.getElementById('terminal'));
@@ -123,6 +141,25 @@ test(
       sent = ''; frames.length = 0;
       term.paste('a'.repeat(8191) + '🙂привет');
       if (frames.length !== 2 || frames[0].data.length !== 8191 || frames[1].data !== '🙂привет') throw new Error('split Unicode paste');
+      const treeDrop = new DataTransfer();
+      treeDrop.setData('application/x-projector-tree-entry', JSON.stringify({projectId:'test-project', path:'README.md'}));
+      const treePaths = await droppedTerminalPaths(treeDrop, () => { throw new Error('Unexpected upload'); }, async (projectId, path) => {
+        if (projectId !== 'test-project' || path !== 'README.md') throw new Error('Missing tree payload');
+        return '/project/' + path;
+      });
+      if (treePaths[0] !== '/project/README.md') throw new Error('Relative tree path');
+      const uriDrop = new DataTransfer();
+      uriDrop.setData('text/uri-list', '# comment\\r\\nfile:///tmp/a%20b\\r\\nfile:///tmp/%D1%84%D0%B0%D0%B9%D0%BB');
+      const paths = await droppedTerminalPaths(uriDrop, () => { throw new Error('Unexpected upload'); });
+      if (JSON.stringify(paths) !== JSON.stringify(['/tmp/a b', '/tmp/файл'])) throw new Error('URI drop paths');
+      sent = ''; term.paste(terminalTextForPaths(paths)); check("'/tmp/a b' '/tmp/файл' ", 'dropped paths input');
+      const fileDrop = new DataTransfer();
+      fileDrop.items.add(new File(['contents'], 'dropped.txt'));
+      const uploaded = await droppedTerminalPaths(fileDrop, async file => {
+        if (file.name !== 'dropped.txt' || await file.text() !== 'contents') throw new Error('Missing dropped file contents');
+        return '/tmp/upload/dropped.txt';
+      });
+      if (uploaded[0] !== '/tmp/upload/dropped.txt') throw new Error('File-only drop fallback');
       term.dispose();
       document.getElementById('result').textContent = 'PASS';
     } catch (error) { document.getElementById('result').textContent = 'FAIL: ' + error.stack; }
@@ -132,7 +169,7 @@ test(
         "Content-Type",
         req.url === "/" ? "text/html; charset=utf-8" : "text/javascript; charset=utf-8",
       );
-      res.end(req.url === "/xterm.js" ? xterm : req.url === "/keyboard.js" ? keyboard : req.url === "/forwarding.js" ? forwarding : html);
+      res.end(req.url === "/xterm.js" ? xterm : req.url === "/keyboard.js" ? keyboard : req.url === "/forwarding.js" ? forwarding : req.url === "/drop-paths.js" ? dropPaths : req.url === "/drop.js" ? drop : html);
     });
     t.after(async () => {
       await new Promise((resolve) => server.close(resolve));

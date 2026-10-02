@@ -10,3 +10,5 @@ export { attachTerminalServer } from "./terminal.ts";
 export { trackMouseEncoding } from "./terminal-mouse.ts";
 
 export { renameTerminalSession } from "./terminal.ts";
+
+export { uploadTerminalFile } from "./terminal.ts";

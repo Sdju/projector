@@ -16,6 +16,7 @@ import IconRestart from "~icons/lucide/rotate-ccw";
 import WorkspaceTabs from "../../../common/ui/WorkspaceTabs.vue";
 import { deferTerminalText } from "../lib/keyboard.ts";
 import { bindTerminalInput } from "../lib/input.ts";
+import { droppedTerminalPaths, isTerminalFileDrag, terminalTextForPaths } from "../lib/drop.ts";
 import type {
   TerminalClientMessage,
   TerminalProgram,
@@ -75,6 +76,7 @@ async function renameSession(id: string, title: string) {
 }
 const error = ref("");
 const busy = ref(false);
+const draggingFiles = ref(false);
 const pendingClose = ref<TerminalSession | null>(null);
 const closeDialog = ref<HTMLDialogElement>();
 const closeTitle = useId();
@@ -137,6 +139,54 @@ async function request<T>(projectId: string, suffix = "", init?: RequestInit): P
 
 function send(message: TerminalClientMessage): void {
   if (ready && socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
+}
+
+function dragFiles(event: DragEvent): void {
+  if (!isTerminalFileDrag(event.dataTransfer)) return;
+  event.preventDefault();
+  draggingFiles.value = true;
+  if (event.dataTransfer)
+    event.dataTransfer.dropEffect =
+      ready && active.value?.status === "running" && !active.value.stopRequested ? "copy" : "none";
+}
+
+async function dropFiles(event: DragEvent): Promise<void> {
+  event.preventDefault();
+  draggingFiles.value = false;
+  if (!isTerminalFileDrag(event.dataTransfer)) return;
+  const currentGeneration = generation;
+  const session = active.value;
+  if (!ready || !session || session.status !== "running" || session.stopRequested) {
+    error.value = "Откройте работающий терминал и дождитесь подключения";
+    return;
+  }
+  error.value = "";
+  try {
+    const paths = await droppedTerminalPaths(event.dataTransfer, async (file) => {
+      if (destroyed || currentGeneration !== generation) throw new Error("Терминал переключён");
+      const response = await fetch(
+        `/api/projects/${encodeURIComponent(props.projectId)}/terminals/${encodeURIComponent(session.id)}?name=${encodeURIComponent(file.name)}`,
+        { method: "PUT", headers: { "Content-Type": "application/octet-stream" }, body: file },
+      );
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Не удалось загрузить файл");
+      return result.path as string;
+    }, async (projectId, path) => {
+      const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}`);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Не удалось получить путь проекта");
+      return `${result.project.path.replace(/\/+$/, "")}/${path}`;
+    });
+    if (destroyed || currentGeneration !== generation) return;
+    if (!paths.length) throw new Error("Не удалось получить пути перетащенных файлов");
+    if (!ready || active.value?.status !== "running" || active.value.stopRequested)
+      throw new Error("Терминал больше не принимает ввод");
+    terminal?.paste(terminalTextForPaths(paths));
+    terminal?.focus();
+  } catch (err) {
+    if (!destroyed && currentGeneration === generation)
+      error.value = err instanceof Error ? err.message : "Не удалось вставить файлы";
+  }
 }
 
 function fitTerminal(): void {
@@ -656,7 +706,15 @@ onBeforeUnmount(() => {
         >
       </div>
     </dialog>
-    <div class="screen-wrap">
+    <div
+      class="screen-wrap"
+      data-terminal-drop
+      @dragenter.stop="dragFiles"
+      @dragover.stop="dragFiles"
+      @dragleave.stop="!($event.currentTarget as HTMLElement).contains($event.relatedTarget as Node) && (draggingFiles = false)"
+      @drop.stop="dropFiles"
+    >
+      <div v-if="draggingFiles" class="drop-hint">Бросьте файлы — вставим пути в терминал</div>
       <div ref="container" class="screen" :class="{ inactive: !active }" />
     </div>
   </section>
@@ -766,6 +824,18 @@ header {
 }
 .screen-wrap {
   position: relative;
+}
+.drop-hint {
+  position: absolute;
+  inset: 4px;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  border: 1px dashed var(--focus);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  color: var(--text);
+  font-size: 13px;
 }
 .screen {
   height: 420px;
