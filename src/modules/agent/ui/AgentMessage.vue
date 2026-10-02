@@ -1,0 +1,145 @@
+<script setup lang="ts">
+import { computed } from "vue";
+import { renderChatMarkdown } from "../lib/markdown.ts";
+const props = defineProps<{ text: string }>();
+const html = computed(() => renderChatMarkdown(props.text));
+</script>
+
+<template>
+  <div class="agent-message" v-html="html" />
+</template>
+
+<style scoped>
+.agent-message {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.agent-message :deep(> :first-child) {
+  margin-top: 0;
+}
+.agent-message :deep(> :last-child) {
+  margin-bottom: 0;
+}
+.agent-message :deep(p) {
+  margin: 0 0 12px;
+}
+.agent-message :deep(h1),
+.agent-message :deep(h2),
+.agent-message :deep(h3),
+.agent-message :deep(h4) {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+  margin: 24px 0 10px;
+  letter-spacing: -0.02em;
+}
+.agent-message :deep(h1) {
+  font-size: 20px;
+}
+.agent-message :deep(h2) {
+  font-size: 17px;
+}
+.agent-message :deep(ul),
+.agent-message :deep(ol) {
+  margin: 8px 0 14px;
+  padding-left: 22px;
+}
+.agent-message :deep(li) {
+  padding-left: 3px;
+  margin: 5px 0;
+}
+.agent-message :deep(li::marker) {
+  color: var(--muted);
+}
+.agent-message :deep(li > p) {
+  margin: 0;
+}
+.agent-message :deep(strong) {
+  font-weight: 600;
+  color: #f1eee7;
+}
+.agent-message :deep(a) {
+  color: #c4cdb9;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.agent-message :deep(a:hover) {
+  color: #e3ebd7;
+}
+.agent-message :deep(code) {
+  font: 11px/1.6 var(--mono);
+  background: #24241f;
+  color: #d8d1be;
+  border: 1px solid #30302a;
+  border-radius: 4px;
+  padding: 2px 5px;
+  box-decoration-break: clone;
+}
+.agent-message :deep(pre) {
+  margin: 14px 0;
+  padding: 15px 17px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #141412;
+  overflow-x: auto;
+  max-width: 100%;
+}
+.agent-message :deep(pre code) {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #cccac0;
+  font-size: 12px;
+  white-space: pre;
+}
+.agent-message :deep(blockquote) {
+  border-left: 2px solid #575b4b;
+  margin: 14px 0;
+  padding: 2px 0 2px 16px;
+  color: #b0b0a4;
+}
+.agent-message :deep(hr) {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 22px 0;
+}
+.agent-message :deep(table) {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 14px 0;
+  font-size: 12px;
+}
+.agent-message :deep(th),
+.agent-message :deep(td) {
+  border: 1px solid var(--line);
+  padding: 8px 12px;
+  text-align: left;
+}
+.agent-message :deep(th) {
+  background: #20201c;
+  font-weight: 500;
+}
+.agent-message :deep(.hljs-keyword),
+.agent-message :deep(.hljs-selector-tag) {
+  color: #c4b496;
+}
+.agent-message :deep(.hljs-string),
+.agent-message :deep(.hljs-attr) {
+  color: #a8bf9f;
+}
+.agent-message :deep(.hljs-number),
+.agent-message :deep(.hljs-literal) {
+  color: #c0a2a2;
+}
+.agent-message :deep(.hljs-comment) {
+  color: #76796b;
+}
+.agent-message :deep(.hljs-title),
+.agent-message :deep(.hljs-built_in) {
+  color: #b5c4cd;
+}
+</style>

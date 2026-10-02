@@ -19,6 +19,8 @@ import GitChangesTree from "./GitChangesTree.vue";
 import ArchiveViewer from "./ArchiveViewer.vue";
 import ImageViewport from "./ImageViewport.vue";
 import { KeybindingsEditor } from "../../ide/index.ts";
+import { AgentChat } from "../../agent/index.ts";
+import IconBot from "~icons/lucide/bot";
 import IconKeyboard from "~icons/lucide/keyboard";
 import IconSettings from "~icons/lucide/settings";
 import IconRefresh from "~icons/lucide/rotate-cw";
@@ -211,6 +213,17 @@ registerEditor(
   },
   () => true,
 );
+registerEditor(
+  "ide.workbench.agent.open",
+  "Открыть чат с агентом",
+  () => {
+    const key = "agent:chat";
+    if (!tabs.value.some((tab) => tab.key === key))
+      tabs.value.push({ key, virtual: "agent", path: "Агент", content: "" });
+    selectTab(key);
+  },
+  () => true,
+);
 function editorFocus(event: FocusEvent) {
   if (!(event.target as Element)?.closest(".workspace-tabs, .keybindings-editor"))
     editorCommands.scope.activate();
@@ -241,7 +254,7 @@ const gitLoading = ref(false);
 const fileError = ref("");
 const loading = ref(false);
 interface OpenFile extends FileContent {
-  virtual?: "keybindings";
+  virtual?: "keybindings" | "agent";
   external?: boolean;
   image?: string;
   localFile?: File;
@@ -257,8 +270,7 @@ interface OpenFile extends FileContent {
 }
 const isEditable = (file: OpenFile) =>
   !file.virtual && !file.external && !file.image && !file.archive && file.original === undefined;
-const isMarkdown = (file: OpenFile) =>
-  isEditable(file) && /\.(?:md|markdown)$/i.test(file.path);
+const isMarkdown = (file: OpenFile) => isEditable(file) && /\.(?:md|markdown)$/i.test(file.path);
 const isDirty = (file: OpenFile) =>
   !file.virtual && file.draft !== undefined && file.draft !== file.content;
 const tabs = ref<OpenFile[]>([]);
@@ -291,11 +303,12 @@ async function restoreSession(saved: WorkspaceSession | undefined, generation: n
     for (const tab of saved?.tabs ?? []) {
       if (generation !== sessionGeneration) return;
       if (tab.virtual) {
-        if (!tabs.value.some((file) => file.key === "settings:keybindings"))
+        const key = tab.virtual === "agent" ? "agent:chat" : "settings:keybindings";
+        if (!tabs.value.some((file) => file.key === key))
           tabs.value.push({
-            key: "settings:keybindings",
-            virtual: "keybindings",
-            path: "Горячие клавиши",
+            key,
+            virtual: tab.virtual,
+            path: tab.virtual === "agent" ? "Агент" : "Горячие клавиши",
             content: "",
           });
         continue;
@@ -328,9 +341,11 @@ async function restoreSession(saved: WorkspaceSession | undefined, generation: n
 const fileTabs = computed(() =>
   tabs.value.map((tab) => ({
     id: tab.key,
-    label: tab.virtual ? "Горячие клавиши" : tab.path.split("/").at(-1)!,
+    label: tab.virtual ? tab.path : tab.path.split("/").at(-1)!,
     title: tab.virtual
-      ? "Настройки горячих клавиш"
+      ? tab.virtual === "agent"
+        ? "Чат с агентом Projector"
+        : "Настройки горячих клавиш"
       : tab.saveError
         ? `${tab.path} · ${tab.saveError}`
         : `${tab.path}${tab.original !== undefined ? (tab.staged ? " · HEAD → index" : " · index → рабочий файл") : ""}`,
@@ -879,7 +894,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="workspaceElement" class="workspace" :style="sizes">
+  <div
+    ref="workspaceElement"
+    class="workspace"
+    :class="{ 'chat-active': active?.virtual === 'agent' }"
+    :style="sizes"
+  >
     <aside class="sidebar" aria-label="Обзор проекта">
       <nav class="side-tabs" aria-label="Разделы проекта">
         <button
@@ -911,6 +931,14 @@ onBeforeUnmount(() => {
           <span v-if="git.changes.length" aria-hidden="true">{{ git.changes.length }}</span>
         </button>
         <div class="side-actions">
+          <button
+            title="Чат с агентом"
+            aria-label="Чат с агентом"
+            data-command="ide.workbench.agent.open"
+            @click="editorCommands.run('ide.workbench.agent.open')"
+          >
+            <IconBot aria-hidden="true" />
+          </button>
           <button
             title="Горячие клавиши"
             aria-label="Горячие клавиши"
@@ -1112,9 +1140,9 @@ onBeforeUnmount(() => {
           />
         </template>
       </WorkspaceTabs>
-      <div v-if="active" class="breadcrumb">
+      <div v-if="active && active.virtual !== 'agent'" class="breadcrumb">
         <span>{{ active.path }}</span>
-        <span v-if="active.virtual">настройки IDE</span>
+        <span v-if="active.virtual === 'keybindings'">настройки IDE</span>
         <span v-if="active.external">только просмотр</span>
         <span v-if="active.original !== undefined">{{
           active.staged ? "HEAD → index" : "index → рабочий файл"
@@ -1129,6 +1157,12 @@ onBeforeUnmount(() => {
         <p v-if="!active && !loading" class="loading">
           Откройте файл из дерева или перетащите его сюда
         </p>
+        <AgentChat
+          v-if="tabs.some((tab) => tab.virtual === 'agent')"
+          v-show="active?.virtual === 'agent'"
+          :key="projectId"
+          :project-id="projectId"
+        />
         <KeybindingsEditor v-if="active?.virtual === 'keybindings'" />
         <ImageViewport
           v-else-if="active?.image"
@@ -1164,7 +1198,7 @@ onBeforeUnmount(() => {
           @open="openFile($event)"
         />
         <CodeViewer
-          v-else-if="active"
+          v-else-if="active && !active.virtual"
           :path="active.path"
           :content="active.draft ?? active.content"
           :editable="isEditable(active)"
@@ -1455,6 +1489,16 @@ h3 span {
 @media (max-width: 600px) {
   .workspace {
     grid-template-columns: 145px minmax(0, 1fr);
+  }
+  .workspace.chat-active {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .workspace.chat-active .sidebar {
+    display: none;
+  }
+  .workspace.chat-active .editor-pane {
+    height: calc(100dvh - 85px);
+    min-height: 440px;
   }
   .side-tabs {
     gap: 8px;

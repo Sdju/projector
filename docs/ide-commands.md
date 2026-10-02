@@ -126,3 +126,30 @@ diff stay unavailable until the conflict is resolved. Changes refresh the Git an
 file trees and remove obsolete comparisons. Writes use the same-origin
 `POST /api/projects/:id/workspace/git` adapter with `{ action, path }` or `{ action, paths }` and serialize
 index operations. Paths are restricted to individual changed files within the project.
+
+## Projector chat agent
+
+`ide.workbench.agent.open` opens a single virtual **Агент** tab beside files.
+The sidebar robot button runs the same command. Switching to a file keeps an active
+agent request alive; closing the chat or leaving the project aborts it.
+
+The agent has `list_commands`, `describe_command` and `execute_command` tools.
+Discovery reads the live browser registry for the current project and global
+workbench/keybinding surfaces. Description returns argument documentation, scope
+context and current availability. Execution requires a prior description in the
+same request and calls the existing SDK with an explicit scope. The SDK rechecks
+availability using supplied arguments. Tab scopes expose current tab IDs and labels
+in their context. Extensions can provide `description` and `arguments` in command
+registrations; built-in commands have shared documentation.
+
+The SSE `command-request` event delegates discovery and execution to the originating
+browser. `POST /api/agent/tool-result` returns a result using a single-use random
+request ID. Requests expire after 60 seconds and are removed on disconnect. Other
+projects' scopes and missing/disposed registrations are rejected. Agent HTTP routes
+require a loopback host and reject foreign origins.
+
+The `bash` tool uses the OS adapter and defaults to the current project directory.
+It returns stdout, stderr and exitCode, limits execution to 30 seconds and combined
+output to 256 KiB, and stops the process group on cancellation. Environment variables
+whose names contain KEY, TOKEN, SECRET, PASSWORD or CREDENTIAL are excluded. Bash
+runs with the user's filesystem permissions; it is not an isolated sandbox.
