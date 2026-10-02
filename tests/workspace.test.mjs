@@ -11,10 +11,48 @@ import {
   projectGit,
   projectComparison,
   moveProjectEntry,
+  saveProjectMarkdown,
+  readProjectImage,
 } from "../server/modules/workspace/index.ts";
 import { moveDestination, parentPath, relocatedPath } from "../core/modules/workspace/index.ts";
 const root = await mkdtemp(join(tmpdir(), "projector-workspace-"));
 const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
+test("Markdown saves preserve text and mode, reject stale drafts and contain writes", async () => {
+  const base = await mkdtemp(join(tmpdir(), "projector-markdown-"));
+  try {
+    await writeFile(join(base, "readme.md"), "# Original\r\n", { mode: 0o640 });
+    await saveProjectMarkdown(base, "readme.md", "# Новый текст\r\n", "# Original\r\n");
+    assert.equal(await readFile(join(base, "readme.md"), "utf8"), "# Новый текст\r\n");
+    assert.equal((await lstat(join(base, "readme.md"))).mode & 0o777, 0o640);
+    await assert.rejects(saveProjectMarkdown(base, "readme.md", "stale", "# Original\r\n"), {
+      status: 409,
+    });
+    const competing = await Promise.allSettled([
+      saveProjectMarkdown(base, "readme.md", "first", "# Новый текст\r\n"),
+      saveProjectMarkdown(base, "readme.md", "second", "# Новый текст\r\n"),
+    ]);
+    assert.equal(competing.filter((result) => result.status === "fulfilled").length, 1);
+    assert.equal(competing.find((result) => result.status === "rejected").reason.status, 409);
+    await symlink(join(base, "readme.md"), join(base, "alias.md"));
+    await mkdir(join(base, ".git"));
+    await writeFile(join(base, ".git/config.md"), "protected");
+    for (const path of ["../outside.md", "/tmp/outside.md", "alias.md", ".git/config.md"])
+      await assert.rejects(saveProjectMarkdown(base, path, "test", ""), { status: 403 });
+    await assert.rejects(saveProjectMarkdown(base, "plain.ts", "", ""), { status: 400 });
+    await assert.rejects(saveProjectMarkdown(base, "readme.md", "\0", "first"), { status: 415 });
+    await assert.rejects(saveProjectMarkdown(base, "readme.md", "x".repeat(1024 * 1024 + 1), ""), {
+      status: 413,
+    });
+    await writeFile(join(base, "picture.png"), Buffer.from([137, 80, 78, 71]));
+    const image = await readProjectImage(base, "picture.png");
+    assert.equal(image.type, "image/png");
+    assert.deepEqual(image.content, Buffer.from([137, 80, 78, 71]));
+    await assert.rejects(readProjectImage(base, "readme.md"), { status: 415 });
+    await assert.rejects(readProjectImage(base, "../picture.png"), { status: 403 });
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
 test("file tree and Git changes report execute bits for files, including chmod-only changes", async () => {
   const base = await mkdtemp(join(tmpdir(), "projector-executable-"));
   const runGit = (...args) => execFileSync("git", ["-C", base, ...args]);
@@ -208,6 +246,7 @@ test("workspace HTTP routes resolve catalog projects and reject foreign origins 
   process.env.XDG_DATA_HOME = directory;
   await mkdir(join(directory, "projector"));
   await writeFile(join(directory, "sample.ts"), "const sample = true;\n");
+  await writeFile(join(directory, "sample.md"), "# Original\n");
   const { gzipSync } = await import("node:zlib");
   await writeFile(join(directory, "sample.ts.gz"), gzipSync("const sample = true;\n"));
   await writeFile(
@@ -249,6 +288,30 @@ test("workspace HTTP routes resolve catalog projects and reject foreign origins 
       "sample.ts",
     );
     assert.equal((await (await fetch(`${route}/git`)).json()).available, false);
+    const save = (body, origin = base) =>
+      fetch(`${route}/file`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Origin: origin },
+        body: JSON.stringify(body),
+      });
+    assert.equal(
+      (
+        await save(
+          { path: "sample.md", original: "# Original\n", content: "# Saved\n" },
+          "https://foreign.test",
+        )
+      ).status,
+      403,
+    );
+    assert.equal((await save({ path: "sample.md", content: "# Saved\n" })).status, 400);
+    const saved = await save({ path: "sample.md", original: "# Original\n", content: "# Saved\n" });
+    assert.equal(saved.status, 200);
+    assert.equal(saved.headers.get("cache-control"), "no-store");
+    assert.equal(await readFile(join(directory, "sample.md"), "utf8"), "# Saved\n");
+    assert.equal(
+      (await save({ path: "sample.md", original: "# Original\n", content: "stale" })).status,
+      409,
+    );
     assert.equal((await fetch(`${route}/file?path=../outside`)).status, 403);
     assert.equal(
       (await fetch(`${route}/file?path=sample.ts`, { headers: { Origin: "https://foreign.test" } }))

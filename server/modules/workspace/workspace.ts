@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
-import { lstat, open, readdir, realpath } from "node:fs/promises";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { lstat, open, readdir, realpath, rename, unlink } from "node:fs/promises";
+import { isAbsolute, relative, resolve, sep, dirname } from "node:path";
+import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { HttpError } from "../http/index.ts";
@@ -63,6 +64,68 @@ export async function readProjectFile(root: string, path: string) {
     await file.close();
   }
 }
+const pendingWrites = new Map<string, Promise<unknown>>();
+export async function saveProjectMarkdown(
+  root: string,
+  path: string,
+  content: string,
+  original: string,
+) {
+  validatePath(path);
+  if (!/\.(?:md|markdown)$/i.test(path))
+    throw new HttpError(400, "Редактирование доступно для Markdown");
+  if (
+    path.includes("\\") ||
+    path.split("/").some((part) => !part || part === "." || excluded.has(part))
+  )
+    throw new HttpError(403, "Выберите файл дерева проекта");
+  if (Buffer.byteLength(content) > MAX_BYTES || Buffer.byteLength(original) > MAX_BYTES)
+    throw new HttpError(413, "Файл больше 1 МБ");
+  if (content.includes("\0"))
+    throw new HttpError(415, "Бинарный файл недоступен для редактирования");
+  const base = await realpath(root);
+  const full = await location(base, path);
+  if (full !== resolve(base, path))
+    throw new HttpError(403, "Запись через символические ссылки недоступна");
+  const previous = pendingWrites.get(full);
+  const write = (async () => {
+    await previous?.catch(() => {});
+    if ((await readProjectFile(base, path)).content !== original)
+      throw new HttpError(
+        409,
+        "Файл изменён на диске. Откройте его заново после сохранения копии черновика.",
+      );
+    const info = await lstat(full);
+    if (!info.isFile() || info.nlink > 1)
+      throw new HttpError(403, "Запись связанного файла недоступна");
+    const temporary = resolve(dirname(full), `.projector-${randomUUID()}.tmp`);
+    try {
+      const file = await open(temporary, "wx", info.mode & 0o777);
+      try {
+        await file.writeFile(content, "utf8");
+        await file.chmod(info.mode & 0o777);
+        await file.sync();
+      } finally {
+        await file.close();
+      }
+      if (
+        (await location(base, path)) !== full ||
+        (await readProjectFile(base, path)).content !== original
+      )
+        throw new HttpError(409, "Файл изменён на диске. Черновик не сохранён.");
+      await rename(temporary, full);
+      return { path, content };
+    } finally {
+      await unlink(temporary).catch(() => {});
+    }
+  })();
+  pendingWrites.set(full, write);
+  try {
+    return await write;
+  } finally {
+    if (pendingWrites.get(full) === write) pendingWrites.delete(full);
+  }
+}
 export async function previewProjectFile(root: string, path: string): Promise<FileContent> {
   if (!/\.(?:tar|tgz|gz|gzip|bz2|tbz2?|xz|txz|zip)$/i.test(path))
     return readProjectFile(root, path);
@@ -84,6 +147,32 @@ export async function previewProjectFile(root: string, path: string): Promise<Fi
   const data = JSON.parse(stdout) as ArchiveContent & { error?: string; status?: number };
   if (data.error) throw new HttpError(data.status ?? 422, data.error);
   return { path, content: "", archive: data };
+}
+export async function readProjectImage(root: string, path: string) {
+  const types: Record<string, string> = {
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    gif: "image/gif",
+    webp: "image/webp",
+    avif: "image/avif",
+    svg: "image/svg+xml",
+  };
+  const type = types[path.split(".").at(-1)?.toLowerCase() ?? ""];
+  if (!type) throw new HttpError(415, "Поддерживаются только изображения");
+  const file = await open(await location(root, path), "r");
+  try {
+    const info = await file.stat();
+    if (!info.isFile()) throw new HttpError(400, "Выберите файл");
+    const limit = 8 * MAX_BYTES;
+    if (info.size > limit) throw new HttpError(413, "Изображение больше 8 МБ");
+    const buffer = Buffer.alloc(limit + 1);
+    const { bytesRead } = await file.read(buffer, 0, buffer.length, 0);
+    if (bytesRead > limit) throw new HttpError(413, "Изображение больше 8 МБ");
+    return { type, content: buffer.subarray(0, bytesRead) };
+  } finally {
+    await file.close();
+  }
 }
 export async function listProjectDirectory(root: string, path = "") {
   const full = await location(root, path);

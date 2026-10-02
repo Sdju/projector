@@ -25,6 +25,8 @@ import {
   projectGit,
   projectComparison,
   moveProjectEntry,
+  saveProjectMarkdown,
+  readProjectImage,
 } from "../../../../modules/workspace/index.ts";
 import { json, readBody, asString } from "../../../../modules/transport/index.ts";
 
@@ -56,6 +58,25 @@ export async function handleProjectsProjectActions({
     }
     const project = projects[index];
 
+    if (action === "workspace" && sessionId === "file" && method === "PUT") {
+      if (!terminalRequestAllowed(req, true))
+        throw new HttpError(403, "Сохранение доступно только со страницы Projector");
+      const body = await readBody(req);
+      if (
+        typeof body.path !== "string" ||
+        typeof body.content !== "string" ||
+        typeof body.original !== "string"
+      )
+        throw new HttpError(400, "Укажите путь, текст и исходное содержимое файла");
+      res.setHeader("Cache-Control", "no-store");
+      json(
+        res,
+        200,
+        await saveProjectMarkdown(project.path, body.path, body.content, body.original),
+      );
+      return true;
+    }
+
     if (action === "workspace" && sessionId === "move" && method === "POST") {
       if (!terminalRequestAllowed(req, true))
         throw new HttpError(403, "Перенос доступен только со страницы Projector");
@@ -72,6 +93,17 @@ export async function handleProjectsProjectActions({
         throw new HttpError(403, "Обзор доступен только со страницы Projector");
       res.setHeader("Cache-Control", "no-store");
       const filePath = url.searchParams.get("path") ?? "";
+      if (sessionId === "asset") {
+        const image = await readProjectImage(project.path, filePath);
+        res.setHeader("Content-Type", image.type);
+        res.setHeader("X-Content-Type-Options", "nosniff");
+        res.setHeader(
+          "Content-Security-Policy",
+          "sandbox; default-src 'none'; style-src 'unsafe-inline'",
+        );
+        res.end(image.content);
+        return true;
+      }
       if (sessionId === "tree") json(res, 200, await listProjectDirectory(project.path, filePath));
       else if (sessionId === "file")
         json(res, 200, await previewProjectFile(project.path, filePath));
