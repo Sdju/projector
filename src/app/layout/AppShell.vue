@@ -49,7 +49,7 @@ async function onDrop(event: DragEvent): Promise<void> {
 <template>
   <div
     class="shell"
-    :class="{ dragging }"
+    :class="{ dragging, workspace: route.name === 'project' }"
     @dragenter="onDragEnter"
     @dragover="onDragOver"
     @dragleave="onDragLeave"
@@ -124,5 +124,10 @@ async function onDrop(event: DragEvent): Promise<void> {
 
 .dragging main {
   opacity: 0.35;
+}
+.shell.workspace {
+  width: calc(100% - 32px);
+  max-width: 2400px;
+  padding-bottom: 16px;
 }
 </style>

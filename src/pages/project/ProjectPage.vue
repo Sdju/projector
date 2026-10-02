@@ -9,8 +9,8 @@ import {
   type Project,
   type ProjectDraft,
 } from "../../modules/catalog/index.ts";
-import { LogPane, RunControls, useRunner } from "../../modules/runner/index.ts";
-import { TerminalPane } from "../../modules/terminal/index.ts";
+import { RunControls, useRunner } from "../../modules/runner/index.ts";
+import ProjectWorkspace from "../../modules/workspace/ui/ProjectWorkspace.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -79,7 +79,7 @@ async function onRemove(): Promise<void> {
 </script>
 
 <template>
-  <section v-if="project">
+  <section v-if="project" class="project-page">
     <router-link class="back" to="/projects">← все проекты</router-link>
     <div class="head">
       <div class="title">
@@ -106,8 +106,12 @@ async function onRemove(): Promise<void> {
       <ProjectForm v-model="draft" submit-label="сохранить" @inspect="onInspect" @submit="onSave" />
     </div>
 
-    <TerminalPane :key="project.id" :project-id="project.id" />
-    <LogPane :lines="logs" />
+    <ProjectWorkspace
+      :key="project.id"
+      :project-id="project.id"
+      :project-name="project.name"
+      :logs="logs"
+    />
   </section>
   <section v-else>
     <p class="msg">проект не найден</p>
@@ -116,9 +120,16 @@ async function onRemove(): Promise<void> {
 </template>
 
 <style scoped>
+.project-page :deep(.controls) {
+  margin-bottom: 12px;
+}
+.back {
+  float: right;
+  font-size: 11px;
+}
 .back {
   display: inline-block;
-  margin-bottom: 18px;
+  margin-bottom: 10px;
   color: var(--muted);
   font-size: 13px;
 }
@@ -127,7 +138,7 @@ async function onRemove(): Promise<void> {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 18px;
+  margin-bottom: 10px;
 }
 
 .title {
@@ -154,7 +165,7 @@ async function onRemove(): Promise<void> {
 
 h1 {
   margin: 0;
-  font-size: 30px;
+  font-size: 22px;
   font-weight: 500;
   letter-spacing: -0.03em;
 }

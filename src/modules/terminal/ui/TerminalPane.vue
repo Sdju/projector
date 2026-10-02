@@ -13,7 +13,7 @@ import type {
   TerminalSession,
 } from "../../../../shared/terminal.ts";
 
-const props = defineProps<{ projectId: string }>();
+const props = defineProps<{ projectId: string; embedded?: boolean }>();
 const container = ref<HTMLElement>();
 const sessions = ref<TerminalSession[]>([]);
 const activeId = ref("");
@@ -334,7 +334,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="terminal-pane" :class="{ expanded }" tabindex="-1" @keydown="escapeFullscreen">
+  <section
+    class="terminal-pane"
+    :class="{ expanded, embedded }"
+    tabindex="-1"
+    @keydown="escapeFullscreen"
+  >
     <header>
       <span class="label">терминал</span>
       <span class="status" role="status">{{ statusText }}</span>
@@ -471,5 +476,33 @@ footer {
 }
 .expanded .screen {
   height: 100%;
+}
+.embedded:not(.expanded) {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.embedded:not(.expanded) .screen-wrap {
+  flex: 1;
+  min-height: 0;
+}
+.embedded:not(.expanded) .screen {
+  height: 100%;
+}
+.embedded header {
+  gap: 6px;
+}
+.embedded .label {
+  display: none;
+}
+.embedded .actions {
+  margin-left: 0;
+}
+.embedded footer {
+  font-size: 10px;
 }
 </style>

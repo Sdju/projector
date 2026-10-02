@@ -32,6 +32,8 @@ import {
   terminalRequestAllowed,
 } from "./terminal.ts";
 
+import { listProjectDirectory, readProjectFile, searchProject, projectGit, projectComparison } from "./workspace.ts";
+
 interface SseClient {
   res: ServerResponse;
 }
@@ -416,6 +418,19 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
         return true;
       }
       const project = projects[index];
+
+      if (action === "workspace" && method === "GET") {
+        if (!terminalRequestAllowed(req, false)) throw new HttpError(403, "Обзор доступен только со страницы Projector");
+        res.setHeader("Cache-Control", "no-store");
+        const filePath = url.searchParams.get("path") ?? "";
+        if (sessionId === "tree") json(res, 200, await listProjectDirectory(project.path, filePath));
+        else if (sessionId === "file") json(res, 200, await readProjectFile(project.path, filePath));
+        else if (sessionId === "search") json(res, 200, await searchProject(project.path, url.searchParams.get("q") ?? ""));
+        else if (sessionId === "git") json(res, 200, await projectGit(project.path));
+        else if (sessionId === "diff") json(res, 200, await projectComparison(project.path, filePath, url.searchParams.get("staged") === "true"));
+        else json(res, 404, { error: "Не найден" });
+        return true;
+      }
 
       if (action === "terminals") {
         if (!sessionId && method === "GET") {
