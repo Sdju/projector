@@ -67,15 +67,13 @@ export async function readProjectFile(root: string, path: string) {
   }
 }
 const pendingWrites = new Map<string, Promise<unknown>>();
-export async function saveProjectMarkdown(
+export async function saveProjectFile(
   root: string,
   path: string,
   content: string,
   original: string,
 ) {
   validatePath(path);
-  if (!/\.(?:md|markdown)$/i.test(path))
-    throw new HttpError(400, "Редактирование доступно для Markdown");
   if (
     path.includes("\\") ||
     path.split("/").some((part) => !part || part === "." || excluded.has(part))

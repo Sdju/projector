@@ -23,7 +23,7 @@ import {
   mutateProjectGit,
   moveProjectEntry,
   mutateProjectEntry,
-  saveProjectMarkdown,
+  saveProjectFile,
   readProjectImage,
 } from "../server/modules/workspace/index.ts";
 import { projectRelativePath, previewBrowserFile } from "../src/modules/workspace/file-drop.ts";
@@ -106,19 +106,19 @@ test("entry actions create, copy, rename and trash without overwriting or escapi
     await rm(base, { recursive: true, force: true });
   }
 });
-test("Markdown saves preserve text and mode, reject stale drafts and contain writes", async () => {
+test("Text file saves preserve text and mode, reject stale drafts and contain writes", async () => {
   const base = await mkdtemp(join(tmpdir(), "projector-markdown-"));
   try {
     await writeFile(join(base, "readme.md"), "# Original\r\n", { mode: 0o640 });
-    await saveProjectMarkdown(base, "readme.md", "# Новый текст\r\n", "# Original\r\n");
+    await saveProjectFile(base, "readme.md", "# Новый текст\r\n", "# Original\r\n");
     assert.equal(await readFile(join(base, "readme.md"), "utf8"), "# Новый текст\r\n");
     assert.equal((await lstat(join(base, "readme.md"))).mode & 0o777, 0o640);
-    await assert.rejects(saveProjectMarkdown(base, "readme.md", "stale", "# Original\r\n"), {
+    await assert.rejects(saveProjectFile(base, "readme.md", "stale", "# Original\r\n"), {
       status: 409,
     });
     const competing = await Promise.allSettled([
-      saveProjectMarkdown(base, "readme.md", "first", "# Новый текст\r\n"),
-      saveProjectMarkdown(base, "readme.md", "second", "# Новый текст\r\n"),
+      saveProjectFile(base, "readme.md", "first", "# Новый текст\r\n"),
+      saveProjectFile(base, "readme.md", "second", "# Новый текст\r\n"),
     ]);
     assert.equal(competing.filter((result) => result.status === "fulfilled").length, 1);
     assert.equal(competing.find((result) => result.status === "rejected").reason.status, 409);
@@ -126,10 +126,18 @@ test("Markdown saves preserve text and mode, reject stale drafts and contain wri
     await mkdir(join(base, ".git"));
     await writeFile(join(base, ".git/config.md"), "protected");
     for (const path of ["../outside.md", "/tmp/outside.md", "alias.md", ".git/config.md"])
-      await assert.rejects(saveProjectMarkdown(base, path, "test", ""), { status: 403 });
-    await assert.rejects(saveProjectMarkdown(base, "plain.ts", "", ""), { status: 400 });
-    await assert.rejects(saveProjectMarkdown(base, "readme.md", "\0", "first"), { status: 415 });
-    await assert.rejects(saveProjectMarkdown(base, "readme.md", "x".repeat(1024 * 1024 + 1), ""), {
+      await assert.rejects(saveProjectFile(base, path, "test", ""), { status: 403 });
+    for (const path of ["plain.ts", "settings.json", ".gitignore", "LICENSE"]) {
+      await writeFile(join(base, path), "original\r\n", { mode: 0o750 });
+      await saveProjectFile(base, path, "Изменено\r\n", "original\r\n");
+      assert.equal(await readFile(join(base, path), "utf8"), "Изменено\r\n");
+      assert.equal((await lstat(join(base, path))).mode & 0o777, 0o750);
+      await assert.rejects(saveProjectFile(base, path, "stale", "original\r\n"), { status: 409 });
+    }
+    await writeFile(join(base, "binary.bin"), Buffer.from([0, 1]));
+    await assert.rejects(saveProjectFile(base, "binary.bin", "text", ""), { status: 415 });
+    await assert.rejects(saveProjectFile(base, "readme.md", "\0", "first"), { status: 415 });
+    await assert.rejects(saveProjectFile(base, "readme.md", "x".repeat(1024 * 1024 + 1), ""), {
       status: 413,
     });
     await writeFile(join(base, "picture.png"), Buffer.from([137, 80, 78, 71]));

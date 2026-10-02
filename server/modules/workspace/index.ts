@@ -1,6 +1,6 @@
 export { listProjectDirectory } from "./workspace.ts";
 export { readProjectFile } from "./workspace.ts";
-export { saveProjectMarkdown } from "./workspace.ts";
+export { saveProjectFile } from "./workspace.ts";
 export { readProjectImage } from "./workspace.ts";
 export { previewProjectFile } from "./workspace.ts";
 export { searchProject } from "./workspace.ts";

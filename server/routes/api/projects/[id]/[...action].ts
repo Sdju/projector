@@ -31,7 +31,7 @@ import {
   mutateProjectGit,
   moveProjectEntry,
   mutateProjectEntry,
-  saveProjectMarkdown,
+  saveProjectFile,
   readProjectImage,
 } from "../../../../modules/workspace/index.ts";
 import { json, readBody, asString } from "../../../../modules/transport/index.ts";
@@ -78,7 +78,7 @@ export async function handleProjectsProjectActions({
       json(
         res,
         200,
-        await saveProjectMarkdown(project.path, body.path, body.content, body.original),
+        await saveProjectFile(project.path, body.path, body.content, body.original),
       );
       return true;
     }
