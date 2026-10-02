@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { workspaceRequest } from "../api.ts";
+import { workspaceRequest, saveWorkspaceMarkdown } from "../api.ts";
+import { onBeforeRouteLeave, onBeforeRouteUpdate } from "vue-router";
 import { relocatedPath } from "../../../../core/modules/workspace/index.ts";
 import WorkspaceTabs from "../../../common/ui/WorkspaceTabs.vue";
 import FileTree from "./FileTree.vue";
@@ -16,6 +17,7 @@ import type {
   FileComparison,
 } from "../../../../core/modules/workspace/index.ts";
 const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
+const MarkdownViewer = defineAsyncComponent(() => import("./MarkdownViewer.vue"));
 const props = defineProps<{ projectId: string }>();
 const workspaceElement = ref<HTMLElement>();
 const treeWidth = ref<number>();
@@ -124,13 +126,20 @@ interface OpenFile extends FileContent {
   line?: number;
   column?: number;
   key: string;
+  draft?: string;
+  markdownMode?: "preview" | "edit" | "split";
+  saving?: boolean;
+  saveError?: string;
 }
+const isMarkdown = (file: OpenFile) =>
+  file.original === undefined && /\.(?:md|markdown)$/i.test(file.path);
+const isDirty = (file: OpenFile) => file.draft !== undefined && file.draft !== file.content;
 const tabs = ref<OpenFile[]>([]);
 const activeKey = ref("");
 const fileTabs = computed(() =>
   tabs.value.map((tab) => ({
     id: tab.key,
-    label: `${tab.path.split("/").at(-1)}${tab.original !== undefined ? (tab.staged ? " · index" : " · diff") : ""}`,
+    label: `${tab.path.split("/").at(-1)}${isDirty(tab) ? " •" : ""}${tab.original !== undefined ? (tab.staged ? " · index" : " · diff") : ""}`,
     title: tab.path,
   })),
 );
@@ -150,7 +159,22 @@ let gitGeneration = 0;
 let searchGeneration = 0;
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
 let searchAbort: AbortController | undefined;
-async function openFile(path: string, line?: number, column?: number, staged?: boolean) {
+async function openFile(
+  path: string,
+  line?: number,
+  column?: number,
+  staged?: boolean,
+  reload = false,
+) {
+  const key = `${path}:${staged === undefined ? "file" : staged ? "index" : "working"}`;
+  const existing = tabs.value.find((tab) => tab.key === key);
+  if (existing && (!reload || isDirty(existing) || existing.saving)) {
+    selectTab(key);
+    existing.line = line;
+    existing.column = column;
+    if (line && isMarkdown(existing)) existing.markdownMode = "edit";
+    return;
+  }
   const generation = ++fileGeneration;
   loading.value = true;
   fileError.value = "";
@@ -163,7 +187,6 @@ async function openFile(path: string, line?: number, column?: number, staged?: b
             staged: String(staged),
           });
     if (generation !== fileGeneration) return;
-    const key = `${path}:${staged === undefined ? "file" : staged ? "index" : "working"}`;
     const file: OpenFile = {
       path,
       content: "modified" in data ? data.modified : data.content,
@@ -173,6 +196,7 @@ async function openFile(path: string, line?: number, column?: number, staged?: b
       line,
       column,
       key,
+      markdownMode: line ? "edit" : (existing?.markdownMode ?? "preview"),
     };
     const index = tabs.value.findIndex((tab) => tab.key === key);
     if (index === -1) tabs.value.push(file);
@@ -187,6 +211,9 @@ async function openFile(path: string, line?: number, column?: number, staged?: b
 }
 function closeTab(key: string) {
   const index = tabs.value.findIndex((tab) => tab.key === key);
+  const tab = tabs.value[index];
+  if (!tab || tab.saving) return;
+  if (isDirty(tab) && !window.confirm(`Закрыть ${tab.path} без сохранения изменений?`)) return;
   tabs.value.splice(index, 1);
   if (key === activeKey.value)
     activeKey.value = tabs.value[Math.min(index, tabs.value.length - 1)]?.key ?? "";
@@ -197,6 +224,37 @@ function selectTab(key: string) {
   fileError.value = "";
   activeKey.value = key;
 }
+async function saveMarkdown() {
+  const file = active.value;
+  if (!file || !isMarkdown(file) || !isDirty(file) || file.saving) return;
+  const content = file.draft!;
+  file.saving = true;
+  file.saveError = "";
+  try {
+    await saveWorkspaceMarkdown(props.projectId, file.path, content, file.content);
+    file.content = content;
+    void loadGit();
+  } catch (error) {
+    file.saveError = error instanceof Error ? error.message : "Не удалось сохранить файл";
+  } finally {
+    file.saving = false;
+  }
+}
+function canLeave() {
+  if (tabs.value.some((file) => file.saving)) return false;
+  return (
+    !tabs.value.some(isDirty) ||
+    window.confirm("Есть несохранённые изменения Markdown. Уйти без сохранения?")
+  );
+}
+onBeforeRouteLeave(canLeave);
+onBeforeRouteUpdate((to, from) => to.params.id === from.params.id || canLeave());
+function beforeUnload(event: BeforeUnloadEvent) {
+  if (!tabs.value.some((file) => isDirty(file) || file.saving)) return;
+  event.preventDefault();
+  event.returnValue = "";
+}
+onMounted(() => window.addEventListener("beforeunload", beforeUnload));
 async function loadGit() {
   const generation = ++gitGeneration;
   gitLoading.value = true;
@@ -277,7 +335,13 @@ async function refresh() {
   await loadGit();
   if (section.value === "search") await search();
   if (active.value)
-    void openFile(active.value.path, active.value.line, active.value.column, active.value.staged);
+    void openFile(
+      active.value.path,
+      active.value.line,
+      active.value.column,
+      active.value.staged,
+      true,
+    );
 }
 function entryMoved(source: string, destination: string) {
   ++fileGeneration;
@@ -299,6 +363,7 @@ function entryMoved(source: string, destination: string) {
   if (query.value.trim()) void search();
 }
 onBeforeUnmount(() => {
+  window.removeEventListener("beforeunload", beforeUnload);
   stopResize?.();
   sizeObserver?.disconnect();
   ++fileGeneration;
@@ -439,6 +504,23 @@ onBeforeUnmount(() => {
       <div class="editor-body" :aria-busy="loading">
         <p v-if="loading" class="loading" role="status">читаю файл…</p>
         <ArchiveViewer v-if="active?.archive" :key="active.key" :archive="active.archive" />
+        <MarkdownViewer
+          v-else-if="active && isMarkdown(active)"
+          :key="active.key"
+          :project-id="projectId"
+          :path="active.path"
+          :content="active.draft ?? active.content"
+          :mode="active.markdownMode ?? 'preview'"
+          :dirty="isDirty(active)"
+          :saving="!!active.saving"
+          :error="active.saveError"
+          :line="active.line"
+          :column="active.column"
+          @change="active.draft = $event"
+          @mode="active.markdownMode = $event"
+          @save="saveMarkdown"
+          @open="openFile($event)"
+        />
         <CodeViewer
           v-else-if="active"
           :path="active.path"

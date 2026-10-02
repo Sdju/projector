@@ -7,7 +7,9 @@ const props = defineProps<{
   original?: string;
   line?: number;
   column?: number;
+  editable?: boolean;
 }>();
+const emit = defineEmits<{ change: [content: string]; save: [] }>();
 const container = ref<HTMLElement>();
 let editor: monaco.editor.IStandaloneCodeEditor | monaco.editor.IStandaloneDiffEditor | undefined;
 let models: monaco.editor.ITextModel[] = [];
@@ -22,8 +24,8 @@ function render() {
   activePath = props.path;
   const options: monaco.editor.IStandaloneEditorConstructionOptions = {
     theme: "projector",
-    readOnly: true,
-    domReadOnly: true,
+    readOnly: !props.editable,
+    domReadOnly: !props.editable,
     automaticLayout: true,
     minimap: { enabled: false },
     fontSize: 13,
@@ -31,7 +33,7 @@ function render() {
     scrollBeyondLastLine: false,
     padding: { top: 16 },
     renderLineHighlight: "line",
-    wordWrap: "off",
+    wordWrap: props.editable ? "on" : "off",
     stickyScroll: { enabled: false },
   };
   const modified = monaco.editor.createModel(props.content, language(props.path));
@@ -49,6 +51,10 @@ function render() {
   } else {
     editor = monaco.editor.create(container.value, { ...options, model: modified });
     editor.restoreViewState(views.get(props.path) ?? null);
+    if (props.editable) {
+      editor.onDidChangeModelContent(() => emit("change", modified.getValue()));
+      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => emit("save"));
+    }
   }
   reveal();
 }
@@ -59,7 +65,13 @@ function reveal() {
   target.setPosition({ lineNumber: props.line, column: props.column ?? 1 });
 }
 onMounted(render);
-watch(() => [props.path, props.content, props.original], render);
+watch(() => [props.path, props.original, props.editable], render);
+watch(
+  () => props.content,
+  (content) => {
+    if (models[0] && models[0].getValue() !== content) models[0].setValue(content);
+  },
+);
 watch(() => [props.line, props.column], reveal);
 onBeforeUnmount(() => {
   editor?.dispose();
@@ -67,7 +79,13 @@ onBeforeUnmount(() => {
   views.clear();
 });
 </script>
-<template><div ref="container" class="code-viewer" aria-label="Просмотр кода" /></template>
+<template>
+  <div
+    ref="container"
+    class="code-viewer"
+    :aria-label="editable ? 'Редактор Markdown' : 'Просмотр кода'"
+  />
+</template>
 <style scoped>
 .code-viewer {
   height: 100%;

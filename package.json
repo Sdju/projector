@@ -27,6 +27,10 @@
     "@xterm/xterm": "^6.0.0",
     "ai": "^7.0.112",
     "dbus-next": "0.10.2",
+    "dompurify": "^3.4.16",
+    "highlight.js": "^11.12.0",
+    "markdown-it": "^15.0.2",
+    "markdown-it-task-lists": "^2.1.1",
     "monaco-editor": "^0.57.0",
     "node-gtk": "4.1.1",
     "node-pty": "^1.1.0",
@@ -39,6 +43,7 @@
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.138",
     "@iconify-json/simple-icons": "^1.2.98",
+    "@types/markdown-it": "^14.2.0",
     "@types/node": "^26.6.2",
     "@types/ws": "^8.18.2",
     "@vitejs/plugin-vue": "^6.0.9",
