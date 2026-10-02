@@ -292,3 +292,45 @@ test("command palette preserves originating scope, chooses project commands and 
     "ide.workbench.commandPalette.open",
   );
 });
+
+test("editor themes default, persist, reject unknown values and protect HTTP writes", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "projector-editor-"));
+  const previous = process.env.XDG_DATA_HOME;
+  process.env.XDG_DATA_HOME = directory;
+  const { readEditorSettings, writeEditorSettings } =
+    await import("../server/modules/ide/index.ts");
+  const { createServer } = await import("node:http");
+  const { once } = await import("node:events");
+  const { handleApi } = await import("../server/app/api.ts");
+  const server = createServer((req, res) => void handleApi(req, res));
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(async () => {
+    await new Promise((resolve) => server.close(resolve));
+    if (previous === undefined) delete process.env.XDG_DATA_HOME;
+    else process.env.XDG_DATA_HOME = previous;
+    await rm(directory, { recursive: true, force: true });
+  });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const url = base + "/api/ide/editor";
+  const put = (theme, origin = base) =>
+    fetch(url, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Origin: origin },
+      body: JSON.stringify({ theme }),
+    });
+  assert.deepEqual(await readEditorSettings(), { theme: "projector-soft" });
+  assert.equal((await put("vs", "https://foreign.test")).status, 403);
+  assert.equal((await put("vs")).status, 200);
+  assert.deepEqual(await readEditorSettings(), { theme: "vs" });
+  assert.equal((await put("unknown")).status, 400);
+  assert.deepEqual(await readEditorSettings(), { theme: "vs" });
+  const response = await fetch(url);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await response.json(), { theme: "vs" });
+  await writeEditorSettings("projector-soft");
+  const file = join(directory, "projector", "editor.json");
+  assert.deepEqual(JSON.parse(await readFile(file, "utf8")), { theme: "projector-soft" });
+  await writeFile(file, '{"theme":"removed-theme"}');
+  assert.deepEqual(await readEditorSettings(), { theme: "projector-soft" });
+});

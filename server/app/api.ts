@@ -24,7 +24,9 @@ import { handlePreviewIcon } from "../routes/api/preview-icon.ts";
 import { handleProjectsIndex } from "../routes/api/projects/index.ts";
 import { handleProjectsProjectActions } from "../routes/api/projects/[id]/[...action].ts";
 import { handleIdeKeybindings } from "../routes/api/ide/keybindings.ts";
+import { handleEditorSettings } from "../routes/api/ide/editor.ts";
 const routes = [
+  handleEditorSettings,
   handleIdeKeybindings,
   handleIntegrationsActions,
   handleDirectories,
