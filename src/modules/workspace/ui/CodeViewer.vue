@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref, watch } from "vue";
-import { monaco, language } from "../lib/monaco.ts";
+import { monaco, language, editorTheme, loadEditorTheme } from "../lib/monaco.ts";
 const props = defineProps<{
   path: string;
   content: string;
@@ -23,7 +23,7 @@ function render() {
   models = [];
   activePath = props.path;
   const options: monaco.editor.IStandaloneEditorConstructionOptions = {
-    theme: "projector",
+    theme: editorTheme.value,
     readOnly: !props.editable,
     domReadOnly: !props.editable,
     automaticLayout: true,
@@ -63,7 +63,10 @@ function reveal() {
   target.revealLineInCenter(props.line);
   target.setPosition({ lineNumber: props.line, column: props.column ?? 1 });
 }
-onMounted(render);
+onMounted(() => {
+  render();
+  void loadEditorTheme().catch(() => undefined);
+});
 watch(() => [props.path, props.original, props.editable], render);
 watch(
   () => props.content,

@@ -2,12 +2,14 @@
 import { ProviderPanel } from "../modules/provider/index.ts";
 import { IntegrationSettings } from "../modules/integrations/index.ts";
 import { InterfaceSettings } from "../modules/launcher/index.ts";
+import { EditorSettings } from "../modules/workspace/index.ts";
 </script>
 
 <template>
   <section>
     <router-link class="back" to="/">← поиск</router-link>
     <InterfaceSettings />
+    <EditorSettings />
     <IntegrationSettings />
     <h1>модель</h1>
     <p class="lead">
