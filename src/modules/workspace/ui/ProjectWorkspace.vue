@@ -488,7 +488,7 @@ async function canLeave() {
   return window.confirm("Не удалось сохранить изменения Markdown. Уйти без сохранения?");
 }
 onBeforeRouteLeave(canLeave);
-onBeforeRouteUpdate((to, from) => to.params.id === from.params.id || canLeave());
+onBeforeRouteUpdate((to, from) => to.path === from.path || canLeave());
 function windowBlur() {
   for (const file of tabs.value) void saveMarkdown(file);
 }
@@ -855,7 +855,9 @@ onBeforeUnmount(() => {
         :key="projectId"
         :project-id="projectId"
         embedded
-        @open="(path, line, column, external) => openFile(path, line, column, undefined, false, external)"
+        @open="
+          (path, line, column, external) => openFile(path, line, column, undefined, false, external)
+        "
       >
         <template #actions><slot name="terminal-actions" /></template>
         <template #status><slot name="terminal-status" /></template>

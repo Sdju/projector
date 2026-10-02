@@ -10,3 +10,4 @@ export { pickFolder } from "./api/client.ts";
 export { previewIconUrl } from "./api/client.ts";
 
 export { shortPath } from "./format.ts";
+export { projectRoute, projectPathFromParams } from "./project-route.ts";

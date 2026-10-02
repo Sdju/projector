@@ -5,6 +5,8 @@ import UiButton from "../../common/ui/UiButton.vue";
 import {
   ProjectForm,
   useProjects,
+  projectPathFromParams,
+  projectRoute,
   type Project,
   type ProjectDraft,
 } from "../../modules/catalog/index.ts";
@@ -13,13 +15,43 @@ import { ProjectWorkspace } from "../../modules/workspace/index.ts";
 
 const route = useRoute();
 const router = useRouter();
-const { projects, save, remove, inspect } = useProjects();
+const { projects, save, remove, inspect, openPath } = useProjects();
 const { error } = useRunner();
 
 const draft = ref<ProjectDraft | null>(null);
 const formError = ref("");
 
-const project = computed(() => projects.value.find((item) => item.id === String(route.params.id)));
+const projectId = ref("");
+const opening = ref(false);
+const openError = ref("");
+const project = computed(() => projects.value.find((item) => item.id === projectId.value));
+
+watch(
+  () => projectPathFromParams(route.params.projectPath),
+  async (path, _, onCleanup) => {
+    let active = true;
+    onCleanup(() => {
+      active = false;
+    });
+    projectId.value = "";
+    openError.value = "";
+    opening.value = true;
+    try {
+      const item = await openPath(path);
+      if (active) {
+        projectId.value = item.id;
+        const canonical = projectRoute(item.path);
+        if (route.path !== canonical) await router.replace(canonical);
+      }
+    } catch (err) {
+      if (active)
+        openError.value = err instanceof Error ? err.message : "Не удалось открыть проект";
+    } finally {
+      if (active) opening.value = false;
+    }
+  },
+  { immediate: true },
+);
 
 function toDraft(item: Project): ProjectDraft {
   return {
@@ -59,7 +91,8 @@ async function onSave(): Promise<void> {
   if (!project.value || !draft.value) return;
   formError.value = "";
   try {
-    await save(project.value.id, draft.value);
+    const saved = await save(project.value.id, draft.value);
+    await router.replace(projectRoute(saved.path));
   } catch (err) {
     formError.value = err instanceof Error ? err.message : "Не удалось сохранить";
   }
@@ -99,7 +132,9 @@ async function onRemove(): Promise<void> {
     </ProjectWorkspace>
   </section>
   <section v-else>
-    <p class="msg">проект не найден</p>
+    <p class="msg" :role="openError ? 'alert' : undefined">
+      {{ opening ? "открываю проект…" : openError || "проект не найден" }}
+    </p>
     <router-link to="/projects">назад</router-link>
   </section>
 </template>

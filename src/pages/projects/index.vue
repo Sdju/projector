@@ -6,7 +6,7 @@ import { AddComposer } from "../../modules/project-composer/index.ts";
 import { useRouter } from "vue-router";
 import { GithubImport } from "../../modules/integrations/index.ts";
 import UiButton from "../../common/ui/UiButton.vue";
-import { ProjectCard, useProjects } from "../../modules/catalog/index.ts";
+import { ProjectCard, useProjects, projectRoute } from "../../modules/catalog/index.ts";
 import { RunControls } from "../../modules/runner/index.ts";
 
 const { projects, loading, error } = useProjects();
@@ -38,7 +38,13 @@ async function dropProjects(event: DragEvent) {
 </script>
 
 <template>
-  <section class="project-catalog" @dragenter="dragEnter" @dragover="dragOver" @dragleave="dragLeave" @drop.prevent="dropProjects">
+  <section
+    class="project-catalog"
+    @dragenter="dragEnter"
+    @dragover="dragOver"
+    @dragleave="dragLeave"
+    @drop.prevent="dropProjects"
+  >
     <div v-if="dragging" class="drop-hint">Бросьте папку — добавим проект</div>
     <AddComposer />
     <GithubImport />
@@ -51,13 +57,16 @@ async function dropProjects(event: DragEvent) {
 
     <ProjectCard v-for="project in projects" :key="project.id" :project="project">
       <RunControls :project="project" compact />
-      <UiButton variant="chip" @click="router.push(`/projects/${project.id}`)">ещё</UiButton>
+      <UiButton variant="chip" @click="router.push(projectRoute(project.path))">ещё</UiButton>
     </ProjectCard>
   </section>
 </template>
 
 <style scoped>
-.project-catalog { position: relative; min-height: 240px; }
+.project-catalog {
+  position: relative;
+  min-height: 240px;
+}
 .drop-hint {
   position: absolute;
   inset: 0;

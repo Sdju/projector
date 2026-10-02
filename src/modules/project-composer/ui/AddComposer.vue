@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { shortPath } from "../../catalog/index.ts";
+import { shortPath, projectRoute } from "../../catalog/index.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { AgentDock } from "../../agent/index.ts";
 import { previewIconUrl } from "../../catalog/index.ts";
@@ -119,7 +119,7 @@ function onKeydown(event: KeyboardEvent): void {
       </div>
 
       <div class="actions">
-        <UiButton v-if="existing" variant="solid" @click="router.push(`/projects/${existing.id}`)">
+        <UiButton v-if="existing" variant="solid" @click="router.push(projectRoute(existing.path))">
           открыть
         </UiButton>
         <template v-else>

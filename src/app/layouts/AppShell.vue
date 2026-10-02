@@ -1,24 +1,30 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useRoute } from "vue-router";
-import { PathBar, useProjects } from "../../modules/catalog/index.ts";
+import { useRoute, useRouter } from "vue-router";
+import {
+  PathBar,
+  useProjects,
+  projectRoute,
+  projectPathFromParams,
+} from "../../modules/catalog/index.ts";
 
-const { projects, save } = useProjects();
+const { projects } = useProjects();
 const route = useRoute();
+const router = useRouter();
 const running = computed(
   () => projects.value.filter((item) => item.runtime?.status === "running").length,
 );
 
 const currentProject = computed(() =>
   route.name === "project"
-    ? projects.value.find((project) => project.id === String(route.params.id))
+    ? projects.value.find(
+        (project) => project.path === projectPathFromParams(route.params.projectPath),
+      )
     : undefined,
 );
 async function navigatePath(path: string) {
-  if (currentProject.value && currentProject.value.path !== path)
-    await save(currentProject.value.id, { path });
+  await router.push(projectRoute(path));
 }
-
 </script>
 
 <template>
