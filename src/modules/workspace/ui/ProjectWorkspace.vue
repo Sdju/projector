@@ -851,7 +851,12 @@ onBeforeUnmount(() => {
       @keydown="resizeKey($event, 'agent')"
     />
     <aside class="agent-pane" aria-label="Агент и терминал">
-      <TerminalPane :key="projectId" :project-id="projectId" embedded>
+      <TerminalPane
+        :key="projectId"
+        :project-id="projectId"
+        embedded
+        @open="(path, line, column, external) => openFile(path, line, column, undefined, false, external)"
+      >
         <template #actions><slot name="terminal-actions" /></template>
         <template #status><slot name="terminal-status" /></template>
       </TerminalPane>

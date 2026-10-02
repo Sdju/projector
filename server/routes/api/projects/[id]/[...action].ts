@@ -18,6 +18,7 @@ import {
   createTerminalSession,
   listTerminalSessions,
   terminalRequestAllowed,
+  resolveTerminalFile,
 } from "../../../../modules/terminal/index.ts";
 import {
   listProjectDirectory,
@@ -207,6 +208,12 @@ export async function handleProjectsProjectActions({
         return true;
       }
       if (sessionId && method === "GET") {
+        if (url.searchParams.has("link")) {
+          if (!terminalRequestAllowed(req, false)) throw new HttpError(403, "Открытие доступно только со страницы Projector");
+          res.setHeader("Cache-Control", "no-store");
+          json(res, 200, await resolveTerminalFile(project, sessionId, url.searchParams.get("link") ?? ""));
+          return true;
+        }
         const session = terminalSessionSnapshot(id, sessionId);
         if (!session) throw new HttpError(404, "Терминал не найден");
         res.setHeader("Cache-Control", "no-store");

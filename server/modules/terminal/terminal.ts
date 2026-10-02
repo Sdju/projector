@@ -1,5 +1,7 @@
 import { readTerminalProcesses, terminalActivity } from "./terminal-activity.ts";
 import { randomUUID } from "node:crypto";
+import { readFile, readlink } from "node:fs/promises";
+import { resolveTerminalPath } from "./link-files.ts";
 import { readdirSync, readFileSync, rmSync } from "node:fs";
 import { saveDroppedFile } from "./drop-files.ts";
 import { HttpError } from "../http/index.ts";
@@ -158,6 +160,23 @@ export function terminalSessionSnapshot(
     ...session.info,
     activity: terminalActivity(session.info, readTerminalProcesses()),
   };
+}
+
+export async function resolveTerminalFile(project: Project, id: string, path: string) {
+  const session = state.sessions.get(id);
+  if (!session || session.info.projectId !== project.id) throw new HttpError(404, "Терминал не найден");
+  let cwd = project.path;
+  if (session.info.status === "running") {
+    try {
+      // Foreground jobs can change directory independently of their parent shell.
+      const stat = await readFile(`/proc/${session.info.pid}/stat`, "utf8");
+      const foreground = Number(stat.slice(stat.lastIndexOf(")") + 2).split(" ")[5]);
+      cwd = await readlink(`/proc/${foreground > 0 ? foreground : session.info.pid}/cwd`);
+    } catch {
+      try { cwd = await readlink(`/proc/${session.info.pid}/cwd`); } catch { /* Exited or unavailable /proc. */ }
+    }
+  }
+  return resolveTerminalPath(path, project.path, cwd);
 }
 
 // Capture descendants before stopping the shell; interactive jobs have their own

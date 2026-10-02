@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
-import { Terminal } from "@xterm/xterm";
+import { Terminal, type IDisposable } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import { WebLinksAddon } from "@xterm/addon-web-links";
 import "@xterm/xterm/css/xterm.css";
 import UiButton from "../../../common/ui/UiButton.vue";
 import IconTerminal from "~icons/lucide/terminal";
@@ -16,6 +15,7 @@ import IconRestart from "~icons/lucide/rotate-ccw";
 import WorkspaceTabs from "../../../common/ui/WorkspaceTabs.vue";
 import { deferTerminalText } from "../lib/keyboard.ts";
 import { bindTerminalInput } from "../lib/input.ts";
+import { bindTerminalLinks, type TerminalLink } from "../lib/links.ts";
 import { droppedTerminalPaths, isTerminalFileDrag, terminalTextForPaths } from "../lib/drop.ts";
 import type {
   TerminalClientMessage,
@@ -25,6 +25,7 @@ import type {
 } from "../../../../core/modules/terminal/index.ts";
 
 const props = defineProps<{ projectId: string; embedded?: boolean }>();
+const emit = defineEmits<{ open: [path: string, line: number | undefined, column: number | undefined, external: boolean] }>();
 const container = ref<HTMLElement>();
 const sessions = ref<TerminalSession[]>([]);
 const activeId = ref("");
@@ -95,6 +96,8 @@ const statusText = computed(() => {
       : "нет соединения";
 });
 let terminal: Terminal | undefined;
+let links: IDisposable | undefined;
+let linkGeneration = 0;
 let fit: FitAddon | undefined;
 let observer: ResizeObserver | undefined;
 let socket: WebSocket | undefined;
@@ -135,6 +138,25 @@ async function request<T>(projectId: string, suffix = "", init?: RequestInit): P
   const data = await response.json();
   if (!response.ok) throw new TerminalRequestError(data.error || "Ошибка терминала", data.session);
   return data as T;
+}
+
+async function openTerminalLink(link: TerminalLink) {
+  if (link.web) { window.open(link.path, "_blank", "noopener,noreferrer"); return; }
+  const projectId = props.projectId;
+  const sessionId = activeId.value;
+  if (!sessionId) return;
+  const current = ++linkGeneration;
+  error.value = "";
+  try {
+    const file = await request<{ path: string; external: boolean }>(
+      projectId, `/${encodeURIComponent(sessionId)}?${new URLSearchParams({ link: link.path })}`,
+    );
+    if (!destroyed && current === linkGeneration && projectId === props.projectId && sessionId === activeId.value)
+      emit("open", file.path, link.line, link.column, file.external);
+  } catch (err) {
+    if (!destroyed && current === linkGeneration && projectId === props.projectId && sessionId === activeId.value)
+      error.value = err instanceof Error ? err.message : "Не удалось открыть файл из терминала";
+  }
 }
 
 function send(message: TerminalClientMessage): void {
@@ -465,6 +487,7 @@ watch(pendingClose, async (session) => {
 });
 
 watch(activeId, () => {
+  ++linkGeneration;
   if (activeId.value) {
     try {
       sessionStorage.setItem(`projector:terminal:${props.projectId}`, activeId.value);
@@ -516,10 +539,8 @@ onMounted(() => {
   });
   fit = new FitAddon();
   terminal.loadAddon(fit);
-  terminal.loadAddon(
-    new WebLinksAddon((_event, url) => window.open(url, "_blank", "noopener,noreferrer")),
-  );
   terminal.open(container.value!);
+  links = bindTerminalLinks(terminal, link => { void openTerminalLink(link); });
   bindTerminalInput(
     terminal,
     send,
@@ -570,6 +591,7 @@ onBeforeUnmount(() => {
   disconnect();
   cancelAnimationFrame(resizeFrame);
   observer?.disconnect();
+  links?.dispose();
   terminal?.dispose();
 });
 </script>
