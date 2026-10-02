@@ -20,6 +20,7 @@ import {
   searchProject,
   projectGit,
   projectComparison,
+  mutateProjectGit,
   moveProjectEntry,
   mutateProjectEntry,
   saveProjectMarkdown,
@@ -559,4 +560,131 @@ test("Git tree backgrounds aggregate nested changes, renames, deletions and conf
   assert.equal(gitTreeDecorations([change("file", "D", "D")]).get("file"), "conflict");
   assert.equal(gitTreeDecorations([]).size, 0);
   assert.deepEqual(changes, before);
+});
+
+
+test("Git actions preserve staged content, handle deleted/literal paths and trash untracked files", async () => {
+  const base = await mkdtemp(join(tmpdir(), "projector-git-actions-"));
+  const run = (...args) => execFileSync("git", ["-C", base, ...args], { encoding: "utf8" });
+  try {
+    run("init", "-q"); run("config", "user.name", "Test"); run("config", "user.email", "test@example.test");
+    await writeFile(join(base, "file.txt"), "head");
+    await writeFile(join(base, "other.txt"), "head");
+    run("add", "."); run("commit", "-qm", "initial");
+    await writeFile(join(base, "file.txt"), "index");
+    await mutateProjectGit(base, "stage", "file.txt");
+    await writeFile(join(base, "file.txt"), "working");
+    const partial = await projectGit(base);
+    assert.equal(partial.changes.find((c) => c.path === "file.txt").index, "M");
+    assert.equal(partial.changes.find((c) => c.path === "file.txt").worktree, "M");
+    await mutateProjectGit(base, "discard", "file.txt");
+    assert.equal(await readFile(join(base, "file.txt"), "utf8"), "index");
+    assert.equal(run("show", ":file.txt"), "index");
+    await mutateProjectGit(base, "unstage", "file.txt");
+    assert.equal(run("show", ":file.txt"), "head");
+    assert.equal(await readFile(join(base, "file.txt"), "utf8"), "index");
+    await rm(join(base, "file.txt"));
+    await mutateProjectGit(base, "discard", "file.txt");
+    assert.equal(await readFile(join(base, "file.txt"), "utf8"), "head");
+    await rm(join(base, "file.txt"));
+    await mutateProjectGit(base, "stage", "file.txt");
+    assert.equal((await projectGit(base)).changes.find((c) => c.path === "file.txt").index, "D");
+    await mutateProjectGit(base, "unstage", "file.txt");
+    await mutateProjectGit(base, "discard", "file.txt");
+    await writeFile(join(base, "[literal].txt"), "new");
+    await writeFile(join(base, "literal.txt"), "other");
+    await mutateProjectGit(base, "stage", "[literal].txt");
+    assert.equal((await projectGit(base)).changes.find((c) => c.path === "literal.txt").index, "?");
+    await mutateProjectGit(base, "unstage", "[literal].txt");
+    await mutateProjectGit(base, "discard", "[literal].txt");
+    assert.ok((await readdir(join(base, ".projector-trash"))).some((name) => name.endsWith("-[literal].txt")));
+    run("mv", "other.txt", "renamed.txt");
+    await mutateProjectGit(base, "unstage", "renamed.txt");
+    assert.equal(run("diff", "--cached"), "");
+    assert.equal(await readFile(join(base, "renamed.txt"), "utf8"), "head");
+    for (const path of ["", "../outside", ".git/config", "a/../file.txt"])
+      await assert.rejects(mutateProjectGit(base, "stage", path), { status: 403 });
+    await assert.rejects(mutateProjectGit(base, "reset", "literal.txt"), { status: 400 });
+    await symlink("/tmp", join(base, "escape"));
+    await assert.rejects(mutateProjectGit(base, "stage", "escape"), { status: 403 });
+  } finally { await rm(base, { recursive: true, force: true }); }
+});
+
+test("Git unstage works before the first commit, and index writes serialize", async () => {
+  const base = await mkdtemp(join(tmpdir(), "projector-git-unborn-"));
+  const run = (...args) => execFileSync("git", ["-C", base, ...args], { encoding: "utf8" });
+  try {
+    run("init", "-q");
+    await writeFile(join(base, "a.txt"), "a"); await writeFile(join(base, "b.txt"), "b");
+    await Promise.all([mutateProjectGit(base, "stage", "a.txt"), mutateProjectGit(base, "stage", "b.txt")]);
+    assert.equal(run("ls-files").trim(), "a.txt\nb.txt");
+    await writeFile(join(base, "a.txt"), "modified");
+    await mutateProjectGit(base, "unstage", "a.txt");
+    assert.equal(run("ls-files").trim(), "b.txt");
+    assert.equal(await readFile(join(base, "a.txt"), "utf8"), "modified");
+  } finally { await rm(base, { recursive: true, force: true }); }
+});
+
+
+test("Git mutations stay within nested projects and reject conflict discard", async () => {
+  const base = await mkdtemp(join(tmpdir(), "projector-git-nested-"));
+  const run = (...args) => execFileSync("git", ["-C", base, ...args], { encoding: "utf8" });
+  try {
+    run("init", "-q"); run("config", "user.name", "Test"); run("config", "user.email", "test@example.test");
+    await mkdir(join(base, "nested"));
+    await writeFile(join(base, "outside.txt"), "outside");
+    await writeFile(join(base, "nested/inside.txt"), "inside");
+    run("add", "."); run("commit", "-qm", "initial");
+    await writeFile(join(base, "outside.txt"), "changed outside");
+    await writeFile(join(base, "nested/inside.txt"), "changed inside");
+    await Promise.all([
+      mutateProjectGit(join(base, "nested"), "stage", "inside.txt"),
+      mutateProjectGit(base, "stage", "outside.txt"),
+    ]);
+    await mutateProjectGit(join(base, "nested"), "unstage", "inside.txt");
+    assert.equal(run("diff", "--cached", "--name-only").trim(), "outside.txt");
+    await mutateProjectGit(join(base, "nested"), "discard", "inside.txt");
+    assert.equal(await readFile(join(base, "nested/inside.txt"), "utf8"), "inside");
+    assert.equal(await readFile(join(base, "outside.txt"), "utf8"), "changed outside");
+    await rm(join(base, "nested"), { recursive: true });
+    await mutateProjectGit(base, "discard", "nested/inside.txt");
+    assert.equal(await readFile(join(base, "nested/inside.txt"), "utf8"), "inside");
+    const blob = run("rev-parse", "HEAD:nested/inside.txt").trim();
+    execFileSync("git", ["-C", base, "update-index", "--index-info"], {
+      input: `0 ${"0".repeat(40)}\tnested/inside.txt\n100644 ${blob} 1\tnested/inside.txt\n100644 ${blob} 2\tnested/inside.txt\n100644 ${blob} 3\tnested/inside.txt\n`,
+    });
+    await assert.rejects(mutateProjectGit(base, "discard", "nested/inside.txt"), { status: 409 });
+    await assert.rejects(mutateProjectGit(base, "unstage", "nested/inside.txt"), { status: 409 });
+    await mutateProjectGit(base, "stage", "nested/inside.txt");
+    assert.equal(run("ls-files", "--unmerged"), "");
+  } finally { await rm(base, { recursive: true, force: true }); }
+});
+
+test("Git batch actions validate the whole selection and preserve working contents", async () => {
+  const base = await mkdtemp(join(tmpdir(), "projector-git-batch-"));
+  const run = (...args) => execFileSync("git", ["-C", base, ...args], { encoding: "utf8" });
+  try {
+    run("init", "-q"); run("config", "user.name", "Test"); run("config", "user.email", "test@example.test");
+    await mkdir(join(base, "folder"));
+    for (const path of ["folder/a.txt", "folder/b.txt", "outside.txt"])
+      await writeFile(join(base, path), "head");
+    run("add", "."); run("commit", "-qm", "initial");
+    await writeFile(join(base, "folder/a.txt"), "changed a");
+    await rm(join(base, "folder/b.txt"));
+    await writeFile(join(base, "folder/new.txt"), "new");
+    await writeFile(join(base, "outside.txt"), "outside");
+    await assert.rejects(mutateProjectGit(base, "stage", ["folder/a.txt", "missing.txt"]), { status: 404 });
+    assert.equal(run("diff", "--cached"), "");
+    await assert.rejects(mutateProjectGit(base, "stage", ["folder/a.txt", "../outside"]), { status: 403 });
+    await assert.rejects(mutateProjectGit(base, "stage", []), { status: 400 });
+    await mutateProjectGit(base, "stage", ["folder/a.txt", "folder/b.txt", "folder/new.txt"]);
+    assert.equal(run("diff", "--cached", "--name-only").trim(), "folder/a.txt\nfolder/b.txt\nfolder/new.txt");
+    await writeFile(join(base, "folder/a.txt"), "partially staged");
+    await mutateProjectGit(base, "unstage", ["folder/a.txt", "folder/b.txt", "folder/new.txt"]);
+    assert.equal(run("diff", "--cached"), "");
+    assert.equal(await readFile(join(base, "folder/a.txt"), "utf8"), "partially staged");
+    assert.equal(await readFile(join(base, "folder/new.txt"), "utf8"), "new");
+    assert.equal(await readFile(join(base, "outside.txt"), "utf8"), "outside");
+    assert.equal((await projectGit(base)).changes.find(c => c.path === "folder/b.txt").worktree, "D");
+  } finally { await rm(base, { recursive: true, force: true }); }
 });

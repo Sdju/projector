@@ -443,6 +443,95 @@ export async function projectGit(root: string): Promise<GitOverview> {
   );
   return { available: true, branch, changes };
 }
+// Serialize index writes even when multiple SDK clients act at once.
+const pendingGitWrites = new Map<string, Promise<GitOverview>>();
+export async function mutateProjectGit(
+  root: string,
+  action: string,
+  selection: string | string[],
+): Promise<GitOverview> {
+  if (!["stage", "unstage", "discard"].includes(action))
+    throw new HttpError(400, "Неизвестное действие Git");
+  const paths = [...new Set(Array.isArray(selection) ? selection : [selection])];
+  if (!paths.length || paths.length > 10000 || (action === "discard" && paths.length !== 1))
+    throw new HttpError(400, "Укажите файлы Git");
+  for (const path of paths) {
+    validatePath(path);
+    if (
+      !path ||
+      path.includes("\\") ||
+      path.split("/").some((part) => !part || part === "." || excluded.has(part))
+    )
+      throw new HttpError(403, "Выберите файл проекта");
+  }
+  const base = await realpath(root);
+  const repository = (await git(base, ["rev-parse", "--absolute-git-dir"])).trim();
+  const previous = pendingGitWrites.get(repository);
+  const operation = (async () => {
+    await previous?.catch(() => {});
+    const overview = await projectGit(base);
+    const selected = paths.map((path) => {
+      const change = overview.changes.find((entry) => entry.path === path);
+      if (!change) throw new HttpError(404, "Изменение больше не найдено. Обновите Git.");
+      return change;
+    });
+    const indexPaths = new Set(paths);
+    // Validate the entire selection before changing the shared index.
+    for (const change of selected) {
+      let ancestor = change.path;
+      while (ancestor) {
+        try {
+          await mutationLocation(base, ancestor);
+          break;
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+          ancestor = ancestor.split("/").slice(0, -1).join("/");
+        }
+      }
+      const conflict =
+        change.index === "U" ||
+        change.worktree === "U" ||
+        ["AA", "DD"].includes(change.index + change.worktree);
+      if (action !== "stage" && conflict)
+        throw new HttpError(409, "Сначала разрешите конфликт слияния");
+      if (action === "unstage") {
+        if ([" ", "?"].includes(change.index)) throw new HttpError(409, "Нет изменений Staged");
+        if (change.index === "R") {
+          if (!change.originalPath)
+            throw new HttpError(
+              409,
+              "Переименование пересекает границу проекта. Откройте корень репозитория.",
+            );
+          validatePath(change.originalPath);
+          if (change.originalPath.split("/").some((part) => excluded.has(part)))
+            throw new HttpError(403, "Недоступный путь Git");
+          indexPaths.add(change.originalPath);
+        }
+      } else if (change.worktree === " ") throw new HttpError(409, "Нет рабочих изменений");
+    }
+    if (action === "stage") await git(base, ["add", "--", ...paths]);
+    else if (action === "unstage") {
+      const hasHead = await git(base, ["rev-parse", "--verify", "HEAD"]).then(
+        () => true,
+        () => false,
+      );
+      await git(
+        base,
+        hasHead
+          ? ["restore", "--staged", "--", ...indexPaths]
+          : ["rm", "--cached", "-f", "--", ...indexPaths],
+      );
+    } else if (selected[0]!.index === "?") await mutateProjectEntry(base, "delete", paths[0]!);
+    else await git(base, ["restore", "--worktree", "--", paths[0]!]);
+    return projectGit(base);
+  })();
+  pendingGitWrites.set(repository, operation);
+  try {
+    return await operation;
+  } finally {
+    if (pendingGitWrites.get(repository) === operation) pendingGitWrites.delete(repository);
+  }
+}
 async function gitText(root: string, ref: string, path: string) {
   validatePath(path);
   const prefix = (await git(root, ["rev-parse", "--show-prefix"])).trim();

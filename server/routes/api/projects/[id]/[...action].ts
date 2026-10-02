@@ -28,6 +28,7 @@ import {
   searchProject,
   projectGit,
   projectComparison,
+  mutateProjectGit,
   moveProjectEntry,
   mutateProjectEntry,
   saveProjectMarkdown,
@@ -112,6 +113,19 @@ export async function handleProjectsProjectActions({
           body.name as string,
         ),
       );
+      return true;
+    }
+
+    if (action === "workspace" && sessionId === "git" && method === "POST") {
+      if (!terminalRequestAllowed(req, true))
+        throw new HttpError(403, "Операции доступны только со страницы Projector");
+      const body = await readBody(req);
+      const paths = body.paths ?? body.path;
+      if (typeof body.action !== "string" ||
+        !(typeof paths === "string" || (Array.isArray(paths) && paths.every((path) => typeof path === "string"))))
+        throw new HttpError(400, "Укажите действие Git и пути файлов");
+      res.setHeader("Cache-Control", "no-store");
+      json(res, 200, await mutateProjectGit(project.path, body.action, paths));
       return true;
     }
 
