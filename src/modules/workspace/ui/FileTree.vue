@@ -10,6 +10,7 @@ import {
   watch,
   type ComputedRef,
 } from "vue";
+import { useSessionSnapshot, treeSessionSchema } from "../session.ts";
 import { useCommandScope, commandArgs } from "../../../common/utilities/commands.ts";
 import ContextMenu from "../../../common/ui/ContextMenu.vue";
 import EntryDialog from "../../../common/ui/EntryDialog.vue";
@@ -535,6 +536,12 @@ if (props.depth === 0) {
 }
 const { source, target, busy, expanded, error: moveError, message } = drag;
 if (props.depth === 0) {
+  const session = useSessionSnapshot(
+    () => `projector:tree:v1:${props.projectId}`,
+    () => [...expanded.value],
+    treeSessionSchema,
+  );
+  expanded.value = new Set(session.read() ?? []);
   watch(
     () => props.projectId,
     () => {
@@ -544,7 +551,7 @@ if (props.depth === 0) {
       selection.replace();
       selection.dragged.value = [];
       drag.clear();
-      expanded.value.clear();
+      expanded.value = new Set(session.read() ?? []);
       moveError.value = "";
       message.value = "";
     },

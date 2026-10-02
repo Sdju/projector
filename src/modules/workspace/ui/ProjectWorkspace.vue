@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useSessionSnapshot, workspaceSessionSchema, type WorkspaceSession } from "../session.ts";
 import { workspaceRequest, saveWorkspaceMarkdown } from "../api.ts";
 import { isFileDrag, pathsFromDataTransfer } from "../../path-drop/index.ts";
 import { projectRelativePath, previewBrowserFile } from "../file-drop.ts";
@@ -245,6 +246,68 @@ const isDirty = (file: OpenFile) =>
   !file.virtual && file.draft !== undefined && file.draft !== file.content;
 const tabs = ref<OpenFile[]>([]);
 const activeKey = ref("");
+const restoringSession = ref(false);
+const session = useSessionSnapshot(
+  () => `projector:workspace:v1:${props.projectId}`,
+  () => ({
+    tabs: tabs.value
+      .filter((tab) => !tab.localFile)
+      .map((tab) => ({
+        key: tab.key,
+        path: tab.path,
+        virtual: tab.virtual,
+        external: tab.external,
+        staged: tab.staged,
+        markdownMode: tab.markdownMode,
+      })),
+    activeKey: activeKey.value,
+    section: section.value,
+    treeWidth: treeWidth.value,
+    agentWidth: agentWidth.value,
+  }),
+  workspaceSessionSchema,
+  () => !restoringSession.value,
+);
+let sessionGeneration = 0;
+async function restoreSession(saved: WorkspaceSession | undefined, generation: number) {
+  try {
+    for (const tab of saved?.tabs ?? []) {
+      if (generation !== sessionGeneration) return;
+      if (tab.virtual) {
+        if (!tabs.value.some((file) => file.key === "settings:keybindings"))
+          tabs.value.push({
+            key: "settings:keybindings",
+            virtual: "keybindings",
+            path: "Горячие клавиши",
+            content: "",
+          });
+        continue;
+      }
+      const completed = await openFile(
+        tab.path,
+        undefined,
+        undefined,
+        tab.staged,
+        false,
+        tab.external,
+      );
+      // A project switch or a user opening another file takes precedence over restoration.
+      if (
+        generation !== sessionGeneration ||
+        completed === undefined ||
+        completed !== fileGeneration
+      )
+        return;
+      const file = tabs.value.find((file) => file.key === tab.key);
+      if (file) file.markdownMode = tab.markdownMode;
+    }
+    if (generation === sessionGeneration && tabs.value.some((tab) => tab.key === saved?.activeKey))
+      activeKey.value = saved!.activeKey;
+  } finally {
+    if (generation === sessionGeneration) restoringSession.value = false;
+  }
+}
+
 const fileTabs = computed(() =>
   tabs.value.map((tab) => ({
     id: tab.key,
@@ -292,7 +355,7 @@ async function openFile(
     existing.line = line;
     existing.column = column;
     if (line && isMarkdown(existing)) existing.markdownMode = "source";
-    return;
+    return fileGeneration;
   }
   const generation = ++fileGeneration;
   loading.value = true;
@@ -330,9 +393,12 @@ async function openFile(
     if (index === -1) tabs.value.push(file);
     else tabs.value[index] = file;
     selectTab(key);
+    return fileGeneration;
   } catch (err) {
-    if (generation === fileGeneration)
+    if (generation === fileGeneration) {
       fileError.value = err instanceof Error ? err.message : "Не удалось открыть файл";
+      return generation;
+    }
   } finally {
     if (generation === fileGeneration) loading.value = false;
   }
@@ -563,6 +629,9 @@ watch(query, () => {
 watch(
   () => props.projectId,
   () => {
+    const saved = session.read();
+    const generation = ++sessionGeneration;
+    restoringSession.value = true;
     ++fileGeneration;
     ++gitGeneration;
     git.value = { available: false, branch: "", changes: [] };
@@ -578,7 +647,11 @@ watch(
     loading.value = false;
     query.value = "";
     hits.value = [];
+    section.value = saved?.section ?? "files";
+    treeWidth.value = saved?.treeWidth;
+    agentWidth.value = saved?.agentWidth;
     void loadGit();
+    void restoreSession(saved, generation);
   },
   { immediate: true },
 );
@@ -622,6 +695,7 @@ function entryMoved(source: string, destination: string) {
   if (query.value.trim()) void search();
 }
 onBeforeUnmount(() => {
+  ++sessionGeneration;
   ++dropGeneration;
   tabs.value.forEach(releasePreview);
   window.removeEventListener("beforeunload", beforeUnload);
