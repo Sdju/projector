@@ -25,9 +25,35 @@ import {
   mutateProjectEntry,
   saveProjectFile,
   readProjectImage,
+  previewProjectFile,
 } from "../server/modules/workspace/index.ts";
 import { projectRelativePath, previewBrowserFile } from "../src/modules/workspace/file-drop.ts";
 import { moveDestination, parentPath, relocatedPath } from "../core/modules/workspace/index.ts";
+import { fitImage, zoomImageAt } from "../src/modules/workspace/lib/image-viewport.ts";
+test("image zoom keeps the cursor anchor fixed, including at zoom limits", () => {
+  const initial = { zoom: 2, x: 40, y: -30 };
+  const anchor = { x: 130, y: 75 };
+  for (const requested of [0.0001, 0.5, 4, 100]) {
+    const next = zoomImageAt(initial, requested, anchor.x, anchor.y);
+    assert.ok(next.zoom >= 1 / 64 && next.zoom <= 32);
+    assert.equal((anchor.x - next.x) / next.zoom, (anchor.x - initial.x) / initial.zoom);
+    assert.equal((anchor.y - next.y) / next.zoom, (anchor.y - initial.y) / initial.zoom);
+  }
+  assert.equal(fitImage(2000, 1000, 1048, 548), 0.5);
+  assert.equal(fitImage(200, 100, 1048, 548), 5);
+  assert.equal(fitImage(20, 10, 1048, 548), 32);
+});
+test("incremental image zoom stops at 100% in both directions and can continue afterward", () => {
+  for (const [start, requested] of [[0.99, 1.01], [1.01, 0.99], [0.5, 2], [2, 0.5]]) {
+    const original = { zoom: start, x: 20, y: -40 };
+    const stopped = zoomImageAt(original, requested, 120, 60);
+    assert.equal(stopped.zoom, 1);
+    assert.equal((120 - stopped.x) / stopped.zoom, (120 - original.x) / original.zoom);
+    assert.equal((60 - stopped.y) / stopped.zoom, (60 - original.y) / original.zoom);
+    assert.equal(zoomImageAt(stopped, requested, 120, 60).zoom, requested);
+  }
+  assert.equal(zoomImageAt({ zoom: 0.5, x: 0, y: 0 }, 0.75, 0, 0).zoom, 0.75);
+});
 test("file drops preserve external contents and distinguish project paths", async () => {
   assert.equal(projectRelativePath("/tmp/project", "/tmp/project/README.md"), "README.md");
   assert.equal(projectRelativePath("/tmp/project/", "/tmp/project/src/file.ts"), "src/file.ts");
@@ -144,6 +170,9 @@ test("Text file saves preserve text and mode, reject stale drafts and contain wr
     const image = await readProjectImage(base, "picture.png");
     assert.equal(image.type, "image/png");
     assert.deepEqual(image.content, Buffer.from([137, 80, 78, 71]));
+    assert.deepEqual(await previewProjectFile(base, "picture.png"), {
+      path: "picture.png", content: "", image: true,
+    });
     await assert.rejects(readProjectImage(base, "readme.md"), { status: 415 });
     await assert.rejects(readProjectImage(base, "../picture.png"), { status: 403 });
   } finally {

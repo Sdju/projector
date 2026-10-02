@@ -126,7 +126,11 @@ export async function saveProjectFile(
     if (pendingWrites.get(full) === write) pendingWrites.delete(full);
   }
 }
-export async function previewProjectFile(root: string, path: string): Promise<FileContent> {
+export async function previewProjectFile(root: string, path: string): Promise<FileContent & { image?: boolean }> {
+  if (/\.(?:png|jpe?g|gif|webp|avif)$/i.test(path)) {
+    await readProjectImage(root, path);
+    return { path, content: "", image: true };
+  }
   if (!/\.(?:tar|tgz|gz|gzip|bz2|tbz2?|xz|txz|zip)$/i.test(path))
     return readProjectFile(root, path);
   const full = await location(root, path);

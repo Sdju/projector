@@ -17,6 +17,7 @@ import WorkspaceTabs from "../../../common/ui/WorkspaceTabs.vue";
 import FileTree from "./FileTree.vue";
 import GitChangesTree from "./GitChangesTree.vue";
 import ArchiveViewer from "./ArchiveViewer.vue";
+import ImageViewport from "./ImageViewport.vue";
 import { KeybindingsEditor } from "../../ide/index.ts";
 import IconKeyboard from "~icons/lucide/keyboard";
 import IconSettings from "~icons/lucide/settings";
@@ -540,7 +541,7 @@ async function openFile(
       external,
       image:
         "image" in data && data.image
-          ? `/api/projects/${encodeURIComponent(props.projectId)}/workspace/external-asset?${new URLSearchParams({ path })}`
+          ? `/api/projects/${encodeURIComponent(props.projectId)}/workspace/${external ? "external-asset" : "asset"}?${new URLSearchParams({ path })}`
           : undefined,
       path,
       content: "modified" in data ? data.modified : data.content,
@@ -1104,9 +1105,9 @@ onBeforeUnmount(() => {
           Откройте файл из дерева или перетащите его сюда
         </p>
         <KeybindingsEditor v-if="active?.virtual === 'keybindings'" />
-        <img
+        <ImageViewport
           v-else-if="active?.image"
-          class="image-preview"
+          :key="active.key"
           :src="active.image"
           :alt="active.path"
         />
@@ -1212,13 +1213,6 @@ onBeforeUnmount(() => {
   background: color-mix(in srgb, var(--bg) 82%, transparent);
   color: var(--text);
   pointer-events: none;
-}
-.image-preview {
-  display: block;
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  margin: auto;
 }
 
 .workspace {
