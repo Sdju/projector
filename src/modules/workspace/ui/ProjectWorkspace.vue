@@ -37,7 +37,12 @@ import type {
 const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
 const MarkdownViewer = defineAsyncComponent(() => import("./MarkdownViewer.vue"));
 const SvgViewer = defineAsyncComponent(() => import("./SvgViewer.vue"));
-const props = defineProps<{ projectId: string }>();
+const props = defineProps<{
+  projectId: string;
+  projectSettingsDirty?: boolean;
+  beforeCloseProjectSettings?: () => boolean;
+  saveProjectSettings?: () => void | Promise<void>;
+}>();
 const workspaceElement = ref<HTMLElement>();
 const treeWidth = ref<number>();
 const agentWidth = ref<number>();
@@ -224,6 +229,17 @@ registerEditor(
   },
   () => true,
 );
+function editorKeydown(event: KeyboardEvent) {
+  if (active.value?.virtual === "project" && (event.ctrlKey || event.metaKey)
+    && event.key.toLowerCase() === "s") {
+    event.preventDefault();
+    event.stopPropagation();
+    void props.saveProjectSettings?.();
+    return;
+  }
+  if (!(event.target as Element).closest(".keybindings-editor, .project-settings-form"))
+    editorCommands.keydown(event);
+}
 function editorFocus(event: FocusEvent) {
   if (!(event.target as Element)?.closest(".workspace-tabs, .keybindings-editor"))
     editorCommands.scope.activate();
@@ -240,7 +256,7 @@ function entryDeleted(path: string) {
   void loadGit();
   if (query.value.trim()) void search();
 }
-const section = ref<"files" | "search" | "git" | "project">("files");
+const section = ref<"files" | "search" | "git">("files");
 const revision = ref(0);
 const query = ref("");
 const hits = ref<SearchHit[]>([]);
@@ -254,7 +270,7 @@ const gitLoading = ref(false);
 const fileError = ref("");
 const loading = ref(false);
 interface OpenFile extends FileContent {
-  virtual?: "keybindings" | "agent";
+  virtual?: "keybindings" | "agent" | "project";
   external?: boolean;
   image?: string;
   localFile?: File;
@@ -272,7 +288,24 @@ const isEditable = (file: OpenFile) =>
   !file.virtual && !file.external && !file.image && !file.archive && file.original === undefined;
 const isMarkdown = (file: OpenFile) => isEditable(file) && /\.(?:md|markdown)$/i.test(file.path);
 const isDirty = (file: OpenFile) =>
-  !file.virtual && file.draft !== undefined && file.draft !== file.content;
+  file.virtual === "project"
+    ? !!props.projectSettingsDirty
+    : !file.virtual && file.draft !== undefined && file.draft !== file.content;
+const virtualTabs = {
+  keybindings: {
+    key: "settings:keybindings",
+    path: "Горячие клавиши",
+    title: "Настройки горячих клавиш",
+  },
+  agent: { key: "agent:chat", path: "Агент", title: "Чат с агентом Projector" },
+  project: { key: "settings:project", path: "Настройки проекта", title: "Настройки проекта" },
+};
+function openProjectSettings() {
+  const { key, path } = virtualTabs.project;
+  if (!tabs.value.some((tab) => tab.key === key))
+    tabs.value.push({ key, path, virtual: "project", content: "" });
+  selectTab(key);
+}
 const tabs = ref<OpenFile[]>([]);
 const activeKey = ref("");
 const restoringSession = ref(false);
@@ -303,12 +336,12 @@ async function restoreSession(saved: WorkspaceSession | undefined, generation: n
     for (const tab of saved?.tabs ?? []) {
       if (generation !== sessionGeneration) return;
       if (tab.virtual) {
-        const key = tab.virtual === "agent" ? "agent:chat" : "settings:keybindings";
+        const { key, path } = virtualTabs[tab.virtual];
         if (!tabs.value.some((file) => file.key === key))
           tabs.value.push({
             key,
             virtual: tab.virtual,
-            path: tab.virtual === "agent" ? "Агент" : "Горячие клавиши",
+            path,
             content: "",
           });
         continue;
@@ -333,6 +366,7 @@ async function restoreSession(saved: WorkspaceSession | undefined, generation: n
     }
     if (generation === sessionGeneration && tabs.value.some((tab) => tab.key === saved?.activeKey))
       activeKey.value = saved!.activeKey;
+    if (generation === sessionGeneration && saved?.section === "project") openProjectSettings();
   } finally {
     if (generation === sessionGeneration) restoringSession.value = false;
   }
@@ -343,9 +377,7 @@ const fileTabs = computed(() =>
     id: tab.key,
     label: tab.virtual ? tab.path : tab.path.split("/").at(-1)!,
     title: tab.virtual
-      ? tab.virtual === "agent"
-        ? "Чат с агентом Projector"
-        : "Настройки горячих клавиш"
+      ? virtualTabs[tab.virtual].title
       : tab.saveError
         ? `${tab.path} · ${tab.saveError}`
         : `${tab.path}${tab.original !== undefined ? (tab.staged ? " · HEAD → index" : " · index → рабочий файл") : ""}`,
@@ -682,6 +714,7 @@ async function dropFiles(event: DragEvent) {
 async function closeTab(key: string) {
   const tab = tabs.value.find((file) => file.key === key);
   if (!tab) return;
+  if (tab.virtual === "project" && props.beforeCloseProjectSettings?.() === false) return;
   if (!(await saveFile(tab))) {
     activeKey.value = tab.key;
     if (!window.confirm(`Не удалось сохранить ${tab.path}. Закрыть без сохранения изменений?`))
@@ -830,7 +863,7 @@ watch(
     loading.value = false;
     query.value = "";
     hits.value = [];
-    section.value = saved?.section ?? "files";
+    section.value = saved?.section === "project" ? "files" : (saved?.section ?? "files");
     treeWidth.value = saved?.treeWidth;
     agentWidth.value = saved?.agentWidth;
     void loadGit();
@@ -897,7 +930,7 @@ onBeforeUnmount(() => {
   <div
     ref="workspaceElement"
     class="workspace"
-    :class="{ 'chat-active': active?.virtual === 'agent' }"
+    :class="{ 'chat-active': active?.virtual === 'agent', 'project-settings-active': active?.virtual === 'project' }"
     :style="sizes"
   >
     <aside class="sidebar" aria-label="Обзор проекта">
@@ -948,7 +981,6 @@ onBeforeUnmount(() => {
             <IconKeyboard aria-hidden="true" />
           </button>
           <button
-            v-if="section !== 'project'"
             title="Обновить обзор"
             aria-label="Обновить обзор"
             @click="section === 'git' ? gitCommands.run('ide.git.refresh') : refresh()"
@@ -956,11 +988,11 @@ onBeforeUnmount(() => {
             <IconRefresh aria-hidden="true" />
           </button>
           <button
-            :class="{ selected: section === 'project' }"
-            :aria-pressed="section === 'project'"
+            :class="{ selected: active?.virtual === 'project' }"
+            :aria-pressed="active?.virtual === 'project'"
             title="Настройки проекта"
             aria-label="Настройки проекта"
-            @click="section = 'project'"
+            @click="openProjectSettings"
           >
             <IconSettings aria-hidden="true" />
           </button>
@@ -1087,9 +1119,6 @@ onBeforeUnmount(() => {
         </template>
         <ContextMenu ref="gitMenu" :items="gitMenuItems" label="Действия Git" />
       </div>
-      <div v-if="section === 'project'" class="side-content project-settings">
-        <slot name="project" />
-      </div>
     </aside>
     <div
       class="resize-handle tree-resize"
@@ -1111,9 +1140,7 @@ onBeforeUnmount(() => {
       "
       @drop.stop="dropFiles"
       @focusin="editorFocus"
-      @keydown.capture="
-        !($event.target as Element).closest('.keybindings-editor') && editorCommands.keydown($event)
-      "
+      @keydown.capture="editorKeydown"
     >
       <div v-if="draggingFiles" class="file-drop-hint">Бросьте файл — откроем его</div>
       <WorkspaceTabs
@@ -1163,6 +1190,13 @@ onBeforeUnmount(() => {
           :key="projectId"
           :project-id="projectId"
         />
+        <div
+          v-if="tabs.some((tab) => tab.virtual === 'project')"
+          v-show="active?.virtual === 'project'"
+          class="project-settings"
+        >
+          <slot name="project" />
+        </div>
         <KeybindingsEditor v-if="active?.virtual === 'keybindings'" />
         <ImageViewport
           v-else-if="active?.image"
@@ -1364,7 +1398,10 @@ onBeforeUnmount(() => {
   fill: currentColor;
 }
 .project-settings {
-  padding: 8px 12px 16px;
+  container-type: inline-size;
+  height: 100%;
+  overflow: auto;
+  padding: 16px;
 }
 .side-tabs span {
   color: var(--run);
@@ -1490,13 +1527,16 @@ h3 span {
   .workspace {
     grid-template-columns: 145px minmax(0, 1fr);
   }
-  .workspace.chat-active {
+  .workspace.chat-active,
+  .workspace.project-settings-active {
     grid-template-columns: minmax(0, 1fr);
   }
-  .workspace.chat-active .sidebar {
+  .workspace.chat-active .sidebar,
+  .workspace.project-settings-active .sidebar {
     display: none;
   }
-  .workspace.chat-active .editor-pane {
+  .workspace.chat-active .editor-pane,
+  .workspace.project-settings-active .editor-pane {
     height: calc(100dvh - 85px);
     min-height: 440px;
   }

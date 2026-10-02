@@ -57,6 +57,22 @@ export function expandPath(input: string): string {
   return resolve(trimmed);
 }
 
+/** Read script definitions without executing them or replacing project settings. */
+export async function inspectProjectCommands(dir: string): Promise<ProjectCommand[]> {
+  const path = expandPath(dir);
+  const info = await stat(path).catch(() => null);
+  if (!info?.isDirectory()) throw new Error("Папка не найдена");
+  const raw = await readFile(resolve(path, "package.json"), "utf8").catch(() => null);
+  if (!raw) return [];
+  const pkg = JSON.parse(raw) as { scripts?: Record<string, unknown> };
+  const scripts = pkg.scripts ?? {};
+  const prefix = commandPrefix(await detectPm(path));
+  const names = [...PREFERRED.filter((name) => name in scripts),
+    ...Object.keys(scripts).filter((name) => !PREFERRED.includes(name))];
+  return names.filter((name) => typeof scripts[name] === "string" && scripts[name].trim())
+    .map((name) => toCommand(name, prefix));
+}
+
 export async function inspectProject(dir: string, allowDirectory = false): Promise<InspectResult> {
   const path = expandPath(dir);
   const info = await stat(path).catch(() => null);

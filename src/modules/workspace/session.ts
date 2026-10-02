@@ -5,7 +5,7 @@ import { z } from "zod";
 const tabSchema = z.object({
   key: z.string(),
   path: z.string(),
-  virtual: z.enum(["keybindings", "agent"]).optional(),
+  virtual: z.enum(["keybindings", "agent", "project"]).optional(),
   external: z.boolean().optional(),
   staged: z.boolean().optional(),
   markdownMode: z.enum(["document", "source"]).optional(),

@@ -101,3 +101,53 @@ test("opening a path reuses saved settings and resolves arbitrary directories on
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("settings import preserves custom commands and does not duplicate scripts", async () => {
+  const { missingCommands, projectDraft, settingsError } = await import("../src/modules/catalog/model/project-settings.ts");
+  const project = {
+    name: "App", path: "/tmp/app", icon: "", url: "", mode: "server",
+    defaultCommandId: "custom", commands: [{ id: "custom", name: "develop", cmd: "pnpm dev" }],
+  };
+  const draft = projectDraft(project);
+  const found = [
+    { id: "dev", name: "dev", cmd: "pnpm dev" },
+    { id: "custom-name", name: "develop", cmd: "npm run develop" },
+    { id: "build", name: "build", cmd: "pnpm build" },
+  ];
+  draft.commands.push(...missingCommands(draft.commands, found));
+  assert.deepEqual(draft.commands.map((command) => command.id), ["custom", "build"]);
+  assert.equal(draft.defaultCommandId, "custom");
+  assert.equal(project.commands.length, 1);
+  assert.equal(settingsError(draft), "");
+  assert.match(settingsError({ ...draft, mode: "window" }), /адрес/);
+  assert.match(settingsError({ ...draft, url: "javascript:alert(1)" }), /http/);
+  assert.match(settingsError({ ...draft, commands: [{ id: "custom", name: "dev", cmd: " " }] }), /команда запуска/);
+});
+
+test("command discovery reads all actual scripts without running them or inventing commands", async () => {
+  const { inspectProjectCommands } = await import("../server/modules/projects/index.ts");
+  const { normalizeProject } = await import("../server/modules/project-presentation/index.ts");
+  const root = await mkdtemp(join(tmpdir(), "projector-settings-"));
+  try {
+    assert.deepEqual(await inspectProjectCommands(root), []);
+    await writeFile(join(root, "pnpm-lock.yaml"), "");
+    await writeFile(join(root, "package.json"), JSON.stringify({ scripts: {
+      test: "node --test", dev: "touch should-never-run", build: "vite build", empty: "", invalid: 12,
+    }}));
+    const commands = await inspectProjectCommands(root);
+    assert.deepEqual(commands.map(({ name, cmd }) => [name, cmd]), [
+      ["dev", "pnpm dev"], ["test", "pnpm test"], ["build", "pnpm build"],
+    ]);
+    const { readdir } = await import("node:fs/promises");
+    assert.equal((await readdir(root)).includes("should-never-run"), false);
+    await writeFile(join(root, "package.json"), '{}');
+    assert.deepEqual(await inspectProjectCommands(root), []);
+    await assert.rejects(inspectProjectCommands(join(root, "missing")), /Папка не найдена/);
+    const project = normalizeProject({ name: "App", path: root, icon: "old.svg", commands });
+    const saved = normalizeProject({ ...project, icon: "" }, project);
+    assert.equal(saved.icon, "");
+    assert.equal(saved.id, project.id);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

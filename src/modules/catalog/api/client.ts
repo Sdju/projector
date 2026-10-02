@@ -1,4 +1,4 @@
-import type { Project, ProjectDraft } from "../model/types.ts";
+import type { Project, ProjectDraft, ProjectCommand } from "../model/types.ts";
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -66,4 +66,8 @@ export async function fetchDirectories(
   return request(`/api/directories?${new URLSearchParams({ path, complete: String(complete) })}`, {
     signal,
   });
+}
+
+export function inspectCommands(path: string): Promise<{ commands: ProjectCommand[] }> {
+  return request("/api/inspect/commands", { method: "POST", body: JSON.stringify({ path }) });
 }

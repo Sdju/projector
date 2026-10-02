@@ -1,4 +1,4 @@
-export { inspectProject } from "./inspect.ts";
+export { inspectProject, inspectProjectCommands } from "./inspect.ts";
 export { expandPath } from "./inspect.ts";
 
 export { loadProjects } from "./store.ts";

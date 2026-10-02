@@ -12,3 +12,5 @@ export { projectIconUrl } from "./api/client.ts";
 
 export { shortPath } from "./format.ts";
 export { projectRoute, projectPathFromParams } from "./project-route.ts";
+
+export { default as ProjectSettings } from "./ui/ProjectSettings.vue";

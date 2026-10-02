@@ -70,7 +70,7 @@ export function normalizeProject(input: Record<string, unknown>, current?: Proje
     name: asString(input.name) || "без имени",
     path: asString(input.path),
     url: asString(input.url),
-    icon: asString(input.icon) || current?.icon || "",
+    icon: asString(input.icon),
     mode: parseMode(input.mode),
     defaultCommandId: commands.some((item) => item.id === defaultCommandId)
       ? defaultCommandId
