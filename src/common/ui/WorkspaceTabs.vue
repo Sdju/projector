@@ -58,14 +58,14 @@ function dragStart(event: DragEvent, id: string) {
   event.dataTransfer.setData("application/x-projector-tab", id);
   event.dataTransfer.setData("text/plain", props.tabs.find((tab) => tab.id === id)?.label ?? id);
 }
-function dragOver(event: DragEvent, id: string) {
+function dragOver(event: DragEvent, id?: string) {
   if (!dragging.value || props.disabled) return;
   event.preventDefault();
   if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
   const element = event.currentTarget as HTMLElement;
   const bounds = element.getBoundingClientRect();
-  target.value = id;
-  after.value = event.clientX > bounds.left + bounds.width / 2;
+  target.value = id ?? props.tabs.at(-1)?.id ?? "";
+  after.value = id === undefined || event.clientX > bounds.left + bounds.width / 2;
   const container = strip.value!;
   const viewport = container.getBoundingClientRect();
   if (event.clientX < viewport.left + 32) container.scrollLeft -= 24;
@@ -75,12 +75,17 @@ function endDrag() {
   dragging.value = "";
   target.value = "";
 }
-function drop(event: DragEvent, id: string) {
+function drop(event: DragEvent, id?: string) {
   if (!dragging.value) return;
   event.preventDefault();
-  if (id !== dragging.value && !props.disabled) {
+  const destination = id ?? props.tabs.at(-1)?.id;
+  if (destination && destination !== dragging.value && !props.disabled) {
     const ids = props.tabs.map((tab) => tab.id).filter((key) => key !== dragging.value);
-    ids.splice(ids.indexOf(id) + (after.value ? 1 : 0), 0, dragging.value);
+    ids.splice(
+      ids.indexOf(destination) + (id === undefined || after.value ? 1 : 0),
+      0,
+      dragging.value,
+    );
     emit("reorder", ids);
   }
   endDrag();
@@ -125,6 +130,8 @@ watch(
     class="workspace-tabs"
     role="tablist"
     :aria-label="label"
+    @dragover.self.stop="dragOver($event)"
+    @drop.self.stop="drop($event)"
     @dragleave="!strip?.contains($event.relatedTarget as Node) && (target = '')"
   >
     <div
