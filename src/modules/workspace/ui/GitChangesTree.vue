@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import IconPlus from "~icons/lucide/plus";
+import IconMinus from "~icons/lucide/minus";
 import IconChevronRight from "~icons/lucide/chevron-right";
 import { FileIcon, useFileIconTheme } from "../../file-icons/index.ts";
 import type { GitOverview } from "../../../../core/modules/workspace/index.ts";
@@ -12,10 +14,17 @@ const props = withDefaults(
     selected: string;
     path?: string;
     depth?: number;
+    disabled?: boolean;
+    canToggle: (path: string) => boolean;
   }>(),
   { path: "", depth: 0 },
 );
-const emit = defineEmits<{ open: [path: string] }>();
+const emit = defineEmits<{
+  open: [path: string];
+  target: [path: string];
+  change: [path: string];
+  context: [event: MouseEvent | KeyboardEvent, path: string];
+}>();
 const collapsed = ref(new Set<string>());
 const { resolver } = useFileIconTheme();
 const rows = computed(() => {
@@ -78,30 +87,51 @@ function toggle(path: string) {
     :aria-label="path || (staged ? 'Подготовленные изменения' : 'Рабочие изменения')"
   >
     <li v-for="entry in rows" :key="entry.path">
-      <button
+      <div
+        class="git-row"
         :class="{ selected: !entry.directory && selected === entry.path }"
-        :style="{ paddingLeft: `${12 + depth * 14}px` }"
-        :data-path="entry.path"
-        :title="
-          !entry.directory && entry.change.originalPath
-            ? `${entry.change.originalPath} → ${entry.path}`
-            : entry.path
-        "
-        :aria-expanded="entry.directory ? !collapsed.has(entry.path) : undefined"
-        :aria-current="!entry.directory && selected === entry.path ? 'true' : undefined"
-        @click="entry.directory ? toggle(entry.path) : emit('open', entry.path)"
+        @contextmenu="emit('context', $event, entry.path)"
+        @keydown.shift.f10.prevent="emit('context', $event, entry.path)"
       >
-        <span class="glyph" aria-hidden="true">
-          <IconChevronRight
-            v-if="entry.directory"
-            :class="{ expanded: !collapsed.has(entry.path) }"
-          />
-        </span>
-        <FileIcon :icon="entry.icon" />
-        <span class="name">{{ entry.name }}</span>
-        <span v-if="entry.directory" class="count">{{ entry.changes.length }}</span>
-        <b v-else class="status">{{ staged ? entry.change.index : entry.change.worktree }}</b>
-      </button>
+        <button
+          class="entry"
+          :disabled="disabled"
+          :class="{ selected: !entry.directory && selected === entry.path }"
+          :style="{ paddingLeft: `${12 + depth * 14}px` }"
+          :data-path="entry.path"
+          :title="
+            !entry.directory && entry.change.originalPath
+              ? `${entry.change.originalPath} → ${entry.path}`
+              : entry.path
+          "
+          :aria-expanded="entry.directory ? !collapsed.has(entry.path) : undefined"
+          :aria-current="!entry.directory && selected === entry.path ? 'true' : undefined"
+          @focus="emit('target', entry.path)"
+          @click="entry.directory ? toggle(entry.path) : emit('open', entry.path)"
+        >
+          <span class="glyph" aria-hidden="true">
+            <IconChevronRight
+              v-if="entry.directory"
+              :class="{ expanded: !collapsed.has(entry.path) }"
+            />
+          </span>
+          <FileIcon :icon="entry.icon" />
+          <span class="name">{{ entry.name }}</span>
+          <span v-if="entry.directory" class="count">{{ entry.changes.length }}</span>
+          <b v-else class="status">{{ staged ? entry.change.index : entry.change.worktree }}</b>
+        </button>
+        <button
+          class="git-action"
+          :disabled="disabled || !canToggle(entry.path)"
+          :title="staged ? 'Убрать из Staged' : 'Отметить Staged'"
+          :aria-label="`${staged ? 'Убрать из Staged' : 'Отметить Staged'}: ${entry.path}`"
+          :data-command="staged ? 'ide.git.unstage' : 'ide.git.stage'"
+          @focus="emit('target', entry.path)"
+          @click.stop="emit('change', entry.path)"
+        >
+          <IconMinus v-if="staged" aria-hidden="true" /><IconPlus v-else aria-hidden="true" />
+        </button>
+      </div>
       <GitChangesTree
         v-if="entry.directory"
         v-show="!collapsed.has(entry.path)"
@@ -109,8 +139,13 @@ function toggle(path: string) {
         :path="entry.path"
         :depth="depth + 1"
         :staged="staged"
+        :disabled="disabled"
+        :can-toggle="canToggle"
         :selected="selected"
+        @change="emit('change', $event)"
         @open="emit('open', $event)"
+        @target="emit('target', $event)"
+        @context="(event, path) => emit('context', event, path)"
       />
     </li>
   </ul>
@@ -123,8 +158,21 @@ function toggle(path: string) {
   margin: 0;
   font-size: 12px;
 }
-button {
-  width: 100%;
+.git-row {
+  display: flex;
+  align-items: center;
+  padding-right: 8px;
+}
+.git-row:hover,
+.git-row:focus-within {
+  background: var(--bg-2);
+}
+.git-row.selected {
+  background: #282820;
+}
+.entry {
+  flex: 1;
+  min-width: 0;
   display: flex;
   gap: 6px;
   align-items: center;
@@ -132,13 +180,47 @@ button {
   padding: 5px 10px;
   color: var(--muted);
 }
-button:hover {
+.entry:hover {
   background: var(--bg-2);
   color: var(--text);
 }
-button.selected {
+.entry.selected {
   background: #282820;
   color: var(--text);
+}
+.git-action {
+  display: grid;
+  place-items: center;
+  padding: 3px;
+  border-radius: 3px;
+  color: var(--muted);
+  opacity: 0;
+  flex-shrink: 0;
+}
+.git-action svg {
+  width: 14px;
+  height: 14px;
+}
+.git-row:hover .git-action,
+.git-row:focus-within .git-action {
+  opacity: 1;
+}
+.git-action:hover:not(:disabled) {
+  background: #ffffff12;
+  color: var(--text);
+}
+.git-action:disabled {
+  opacity: 0.35;
+}
+.entry:focus-visible,
+.git-action:focus-visible {
+  outline: 1px solid var(--focus);
+  outline-offset: -1px;
+}
+@media (hover: none) {
+  .git-action {
+    opacity: 1;
+  }
 }
 .glyph {
   width: 12px;

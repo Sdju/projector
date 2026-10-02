@@ -75,7 +75,7 @@ The settings endpoint is `GET /api/ide/keybindings` and same-origin `PUT /api/id
 
 ## Next migration slices
 
-1. Move the remaining explicit terminal, search, Git and project actions onto commands; keep process and filesystem services behind adapters.
+1. Move the remaining explicit terminal, search and project actions onto commands; keep process and filesystem services behind adapters.
 2. Add typed per-command argument/result contracts, contribution metadata, and richer context conditions; add key chords only when a real workflow needs them.
 3. Reuse the core registry from native/CLI hosts with their own focus and presentation adapters. A remote automation transport will need its own authorization and argument validation.
 
@@ -104,3 +104,25 @@ To open it directly from an SDK client:
 ```js
 await ide.executeCommand('ide.workbench.commandPalette.open', undefined, { scope: 'workbench' });
 ```
+
+## Git commands
+
+The `git:<projectId>` scope has `{ surface: 'git', projectId, path, staged, busy }`.
+Git rows, directory rows, group headers and their context menus use `ide.git.openDiff`, `ide.git.openFile`,
+`ide.git.stage`, `ide.git.unstage`, `ide.git.discard` and `ide.git.refresh`.
+File commands accept `{ path, staged }`; omitting them uses the context-menu target.
+`openFile` opens the current file separately from its comparison. Diff tabs show a
+file-diff icon; their tooltip and breadcrumb identify HEAD → index or index → worktree.
+Their context menu also offers `ide.editor.file.open`.
+
+For stage/unstage, `path` selects a file or directory prefix; `path: ""` selects the whole group. The +/− buttons on rows and headers invoke the same commands. The host sends the selected files in one batch, validated before any index writes.
+
+`stage` adds the selected files, `unstage` preserves their working contents
+(including before the first commit), and `discard` restores working contents from
+the index, preserving staged changes. Discard asks for confirmation; explicit SDK
+clients may pass `{ path, confirm: true }`. Untracked files move to `.projector-trash`.
+Conflicted files can be staged after resolving their markers; discard/unstage and
+diff stay unavailable until the conflict is resolved. Changes refresh the Git and
+file trees and remove obsolete comparisons. Writes use the same-origin
+`POST /api/projects/:id/workspace/git` adapter with `{ action, path }` or `{ action, paths }` and serialize
+index operations. Paths are restricted to individual changed files within the project.

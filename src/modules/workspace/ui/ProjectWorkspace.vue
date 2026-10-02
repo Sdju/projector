@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useSessionSnapshot, workspaceSessionSchema, type WorkspaceSession } from "../session.ts";
-import { workspaceRequest, saveWorkspaceMarkdown } from "../api.ts";
+import { workspaceRequest, saveWorkspaceMarkdown, mutateWorkspaceGit } from "../api.ts";
 import { isFileDrag, pathsFromDataTransfer } from "../../path-drop/index.ts";
 import { projectRelativePath, previewBrowserFile } from "../file-drop.ts";
 import { treeDragType } from "../tree-drag.ts";
@@ -9,6 +9,10 @@ import { onBeforeRouteLeave, onBeforeRouteUpdate } from "vue-router";
 import { relocatedPath } from "../../../../core/modules/workspace/index.ts";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import { useCommandScope, commandArgs } from "../../../common/utilities/commands.ts";
+import ContextMenu from "../../../common/ui/ContextMenu.vue";
+import IconPlus from "~icons/lucide/plus";
+import IconMinus from "~icons/lucide/minus";
+import IconDiff from "~icons/lucide/file-diff";
 import WorkspaceTabs from "../../../common/ui/WorkspaceTabs.vue";
 import FileTree from "./FileTree.vue";
 import GitChangesTree from "./GitChangesTree.vue";
@@ -174,9 +178,18 @@ registerEditor(
   () => toggleMarkdownSource(),
   () => !!active.value && isMarkdown(active.value),
 );
+registerEditor(
+  "ide.editor.file.open",
+  "Открыть файл",
+  (args) => openFile(commandFile(args)!.path),
+  (args) => !!commandFile(args) && commandFile(args)!.original !== undefined,
+);
 function tabActions(id: string): ContextMenuItem[] {
   if (tabs.value.find((tab) => tab.key === id)?.virtual) return [];
   return [
+    ...(tabs.value.find((tab) => tab.key === id)?.original !== undefined
+      ? [editorCommands.item("ide.editor.file.open", { id })]
+      : []),
     editorCommands.item("ide.editor.file.save", { id }, { separator: true }),
     editorCommands.item("ide.editor.file.reveal", { id }),
     editorCommands.item("ide.editor.file.copyRelativePath", { id }),
@@ -311,14 +324,12 @@ async function restoreSession(saved: WorkspaceSession | undefined, generation: n
 const fileTabs = computed(() =>
   tabs.value.map((tab) => ({
     id: tab.key,
-    label: tab.virtual
-      ? "Горячие клавиши"
-      : `${tab.path.split("/").at(-1)}${tab.original !== undefined ? (tab.staged ? " · index" : " · diff") : ""}`,
+    label: tab.virtual ? "Горячие клавиши" : tab.path.split("/").at(-1)!,
     title: tab.virtual
       ? "Настройки горячих клавиш"
       : tab.saveError
         ? `${tab.path} · ${tab.saveError}`
-        : tab.path,
+        : `${tab.path}${tab.original !== undefined ? (tab.staged ? " · HEAD → index" : " · index → рабочий файл") : ""}`,
     dirty: isDirty(tab),
     saving: !!tab.saving,
     error: !!tab.saveError,
@@ -335,6 +346,159 @@ const stagedChanges = computed(() =>
 const workingChanges = computed(() =>
   git.value.changes.filter((change) => change.worktree !== " "),
 );
+const gitBusy = ref(false);
+const gitMenu = ref<InstanceType<typeof ContextMenu>>();
+const gitTarget = ref({ path: "", staged: false });
+const gitCommands = useCommandScope(`git:${props.projectId}`, () => ({
+  surface: "git",
+  projectId: props.projectId,
+  path: gitTarget.value.path,
+  staged: gitTarget.value.staged,
+  busy: gitBusy.value,
+}));
+function gitArgs(value?: unknown) {
+  const args = commandArgs(value);
+  if (args.path !== undefined && typeof args.path !== "string")
+    throw new Error("path должен быть строкой");
+  if (args.staged !== undefined && typeof args.staged !== "boolean")
+    throw new Error("staged должен быть boolean");
+  return {
+    path: (args.path as string | undefined) ?? gitTarget.value.path,
+    staged: (args.staged as boolean | undefined) ?? gitTarget.value.staged,
+    confirm: args.confirm === true,
+  };
+}
+function gitChange(value?: unknown) {
+  return git.value.changes.find((change) => change.path === gitArgs(value).path);
+}
+function gitSelection(value: unknown, staged: boolean) {
+  const { path } = gitArgs(value);
+  return (staged ? stagedChanges.value : workingChanges.value).filter(
+    (change) => !path || change.path === path || change.path.startsWith(`${path}/`),
+  );
+}
+const hasConflict = (change: GitOverview["changes"][number]) =>
+  change.index === "U" ||
+  change.worktree === "U" ||
+  ["AA", "DD"].includes(change.index + change.worktree);
+for (const [action, title] of [
+  ["openDiff", "Открыть изменения"],
+  ["openFile", "Открыть файл"],
+  ["stage", "Отметить Staged"],
+  ["unstage", "Убрать из Staged"],
+  ["discard", "Откатить рабочие изменения…"],
+] as const) {
+  gitCommands.scope.registerCommand({
+    id: `ide.git.${action}`,
+    title,
+    enabled: (value) => {
+      if (gitBusy.value) return false;
+      if (action === "stage" || action === "unstage") {
+        const selection = gitSelection(value, action === "unstage");
+        return (
+          !!selection.length &&
+          (action === "stage" || selection.every((change) => !hasConflict(change)))
+        );
+      }
+      const change = gitChange(value);
+      if (!change) return false;
+      if (action === "openFile")
+        return change.worktree !== "D" && !(change.index === "D" && change.worktree === " ");
+      if (action === "openDiff")
+        return (
+          !hasConflict(change) &&
+          (gitArgs(value).staged ? ![" ", "?"].includes(change.index) : change.worktree !== " ")
+        );
+      return change.worktree !== " " && !hasConflict(change);
+    },
+    run: async (value) => {
+      const { path, staged, confirm } = gitArgs(value);
+      if (action === "openFile" || action === "openDiff")
+        return openFile(path, undefined, undefined, action === "openDiff" ? staged : undefined);
+      if (
+        action === "discard" &&
+        !confirm &&
+        !window.confirm(
+          gitChange(value)?.index === "?"
+            ? `Убрать новый файл ${path}? Он будет перемещён в .projector-trash.`
+            : `Откатить рабочие изменения ${path} до подготовленной версии? Несохранённый черновик тоже будет удалён.`,
+        )
+      )
+        return;
+      const paths =
+        action === "discard"
+          ? [path]
+          : gitSelection(value, action === "unstage").map((change) => change.path);
+      gitBusy.value = true;
+      try {
+        if (action !== "discard") {
+          for (const entry of paths)
+            if (!(await prepareEntryChange(entry))) throw new Error("Не удалось сохранить файл");
+        }
+        if (action === "discard") {
+          const affected = tabs.value.filter((tab) => tab.path === path);
+          for (const tab of affected) {
+            if (pendingSaves.has(tab) && !(await pendingSaves.get(tab)))
+              throw new Error("Не удалось завершить сохранение файла");
+          }
+        }
+        ++fileGeneration;
+        loading.value = false;
+        ++gitGeneration;
+        gitLoading.value = false;
+        git.value = await mutateWorkspaceGit(
+          props.projectId,
+          action,
+          action === "discard" ? path : paths,
+        );
+        gitError.value = "";
+        revision.value++;
+        // Drop obsolete comparisons; reload a visible file after discard.
+        const current = active.value;
+        tabs.value = tabs.value.filter(
+          (tab) =>
+            !paths.includes(tab.path) || (tab.original === undefined && action !== "discard"),
+        );
+        if (current?.path === path && action === "discard") {
+          const exists = await workspaceRequest<FileContent>(props.projectId, "file", {
+            path,
+          }).then(
+            () => true,
+            () => false,
+          );
+          if (exists) await openFile(path);
+        }
+        if (!tabs.value.some((tab) => tab.key === activeKey.value))
+          activeKey.value = tabs.value.at(-1)?.key ?? "";
+        if (query.value.trim()) void search();
+      } finally {
+        gitBusy.value = false;
+      }
+    },
+  });
+}
+gitCommands.scope.registerCommand({
+  id: "ide.git.refresh",
+  title: "Обновить Git",
+  run: loadGit,
+  enabled: () => !gitBusy.value,
+});
+const gitMenuItems = computed<ContextMenuItem[]>(() => {
+  const args = gitTarget.value;
+  const file = !!gitChange(args);
+  return [
+    ...(file
+      ? [gitCommands.item("ide.git.openDiff", args), gitCommands.item("ide.git.openFile", args)]
+      : []),
+    gitCommands.item(args.staged ? "ide.git.unstage" : "ide.git.stage", args, { separator: true }),
+    ...(!args.staged && file ? [gitCommands.item("ide.git.discard", args, { danger: true })] : []),
+  ];
+});
+function gitContext(event: MouseEvent | KeyboardEvent, path: string, staged: boolean) {
+  gitTarget.value = { path, staged };
+  gitCommands.scope.activate();
+  void gitMenu.value?.open(event);
+}
 let fileGeneration = 0;
 let gitGeneration = 0;
 let searchGeneration = 0;
@@ -734,7 +898,7 @@ onBeforeUnmount(() => {
             v-if="section !== 'project'"
             title="Обновить обзор"
             aria-label="Обновить обзор"
-            @click="refresh"
+            @click="section === 'git' ? gitCommands.run('ide.git.refresh') : refresh()"
           >
             <IconRefresh aria-hidden="true" />
           </button>
@@ -796,7 +960,13 @@ onBeforeUnmount(() => {
           ><span class="snippet">{{ hit.text }}</span>
         </button>
       </div>
-      <div v-show="section === 'git'" class="side-content">
+      <div
+        v-show="section === 'git'"
+        class="side-content"
+        @focusin="gitCommands.scope.activate()"
+        @keydown="gitCommands.keydown($event)"
+      >
+        <p v-if="git.available" class="notice">{{ git.branch }}</p>
         <p v-if="gitLoading" class="notice" role="status">загрузка Git…</p>
         <p v-if="gitError" class="notice error" role="alert">{{ gitError }}</p>
         <p v-else-if="!gitLoading && !git.available" class="notice">
@@ -805,23 +975,64 @@ onBeforeUnmount(() => {
         <p v-else-if="!gitLoading && !git.changes.length" class="notice">Нет изменений.</p>
         <template
           v-for="group in [
-            { label: 'Подготовленные', rows: stagedChanges, staged: true },
-            { label: 'Рабочие файлы', rows: workingChanges, staged: false },
+            { label: 'Staged', rows: stagedChanges, staged: true },
+            { label: 'Changed', rows: workingChanges, staged: false },
           ]"
           :key="group.label"
         >
-          <h3 v-if="group.rows.length">
-            {{ group.label }} <span>{{ group.rows.length }}</span>
-          </h3>
+          <div v-if="git.available" class="git-group">
+            <h3>
+              {{ group.label }} <span v-if="group.rows.length">{{ group.rows.length }}</span>
+            </h3>
+            <button
+              v-if="group.rows.length"
+              class="git-action"
+              :disabled="
+                !gitCommands.scope.describe(group.staged ? 'ide.git.unstage' : 'ide.git.stage', {
+                  path: '',
+                })?.enabled
+              "
+              :title="group.staged ? 'Убрать всё из Staged' : 'Отметить всё Staged'"
+              :aria-label="group.staged ? 'Убрать всё из Staged' : 'Отметить всё Staged'"
+              :data-command="group.staged ? 'ide.git.unstage' : 'ide.git.stage'"
+              @click="
+                gitCommands.run(group.staged ? 'ide.git.unstage' : 'ide.git.stage', {
+                  path: '',
+                  staged: group.staged,
+                })
+              "
+            >
+              <IconMinus v-if="group.staged" aria-hidden="true" /><IconPlus
+                v-else
+                aria-hidden="true"
+              />
+            </button>
+          </div>
           <GitChangesTree
             v-if="group.rows.length"
             :key="`${projectId}:${group.staged}`"
             :changes="group.rows"
             :staged="group.staged"
+            :disabled="gitBusy"
+            :can-toggle="
+              (path) =>
+                !!gitCommands.scope.describe(group.staged ? 'ide.git.unstage' : 'ide.git.stage', {
+                  path,
+                })?.enabled
+            "
             :selected="active?.staged === group.staged ? active.path : ''"
-            @open="openFile($event, undefined, undefined, group.staged)"
+            @change="
+              gitCommands.run(group.staged ? 'ide.git.unstage' : 'ide.git.stage', {
+                path: $event,
+                staged: group.staged,
+              })
+            "
+            @target="gitTarget = { path: $event, staged: group.staged }"
+            @open="gitCommands.run('ide.git.openDiff', { path: $event, staged: group.staged })"
+            @context="(event, path) => gitContext(event, path, group.staged)"
           />
         </template>
+        <ContextMenu ref="gitMenu" :items="gitMenuItems" label="Действия Git" />
       </div>
       <div v-if="section === 'project'" class="side-content project-settings">
         <slot name="project" />
@@ -867,7 +1078,15 @@ onBeforeUnmount(() => {
         }"
         close-saved
         :actions="tabActions"
-      />
+      >
+        <template #icon="{ tab }">
+          <IconDiff
+            v-if="tabs.find((file) => file.key === tab.id)?.original !== undefined"
+            class="diff-tab-icon"
+            aria-label="Изменения"
+          />
+        </template>
+      </WorkspaceTabs>
       <div v-if="active" class="breadcrumb">
         <span>{{ active.path }}</span>
         <span v-if="active.virtual">настройки IDE</span>
@@ -941,6 +1160,43 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.git-group {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px 2px 12px;
+}
+.git-group h3 {
+  flex: 1;
+  padding: 0;
+}
+.git-action {
+  display: grid;
+  place-items: center;
+  padding: 3px;
+  border-radius: 3px;
+  color: var(--muted);
+}
+.git-action svg {
+  width: 14px;
+  height: 14px;
+}
+.git-action:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--bg-2);
+}
+.git-action:disabled {
+  opacity: 0.35;
+}
+.git-action:focus-visible {
+  outline: 1px solid var(--focus);
+}
+
+.diff-tab-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--run);
+}
 .file-drop-hint {
   position: absolute;
   inset: 4px;

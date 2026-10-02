@@ -56,3 +56,18 @@ export async function mutateWorkspaceEntry(
   if (!response.ok) throw new Error(data.error || "Не удалось выполнить действие");
   return data as { source?: string; destination?: string };
 }
+
+export async function mutateWorkspaceGit(
+  projectId: string,
+  action: string,
+  path: string | string[],
+) {
+  const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}/workspace/git`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, ...(Array.isArray(path) ? { paths: path } : { path }) }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Не удалось выполнить действие Git");
+  return data as import("../../../core/modules/workspace/index.ts").GitOverview;
+}
