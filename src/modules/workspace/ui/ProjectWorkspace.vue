@@ -22,6 +22,9 @@ import { KeybindingsEditor } from "../../ide/index.ts";
 import IconKeyboard from "~icons/lucide/keyboard";
 import IconSettings from "~icons/lucide/settings";
 import IconRefresh from "~icons/lucide/rotate-cw";
+import IconFiles from "~icons/lucide/files";
+import IconSearch from "~icons/lucide/search";
+import IconGit from "~icons/devicon/git";
 import { TerminalPane } from "../../terminal/index.ts";
 import type {
   FileContent,
@@ -879,12 +882,33 @@ onBeforeUnmount(() => {
   <div ref="workspaceElement" class="workspace" :style="sizes">
     <aside class="sidebar" aria-label="Обзор проекта">
       <nav class="side-tabs" aria-label="Разделы проекта">
-        <button :class="{ selected: section === 'files' }" @click="section = 'files'">Файлы</button>
-        <button :class="{ selected: section === 'search' }" @click="section = 'search'">
-          Поиск
+        <button
+          :class="{ selected: section === 'files' }"
+          :aria-pressed="section === 'files'"
+          title="Файлы"
+          aria-label="Файлы"
+          @click="section = 'files'"
+        >
+          <IconFiles aria-hidden="true" />
         </button>
-        <button :class="{ selected: section === 'git' }" @click="section = 'git'">
-          Git <span v-if="git.changes.length">{{ git.changes.length }}</span>
+        <button
+          :class="{ selected: section === 'search' }"
+          :aria-pressed="section === 'search'"
+          title="Поиск"
+          aria-label="Поиск"
+          @click="section = 'search'"
+        >
+          <IconSearch aria-hidden="true" />
+        </button>
+        <button
+          :class="{ selected: section === 'git' }"
+          :aria-pressed="section === 'git'"
+          title="Git"
+          :aria-label="git.changes.length ? `Git: ${git.changes.length} изменений` : 'Git'"
+          @click="section = 'git'"
+        >
+          <IconGit class="git-logo" aria-hidden="true" />
+          <span v-if="git.changes.length" aria-hidden="true">{{ git.changes.length }}</span>
         </button>
         <div class="side-actions">
           <button
@@ -1274,6 +1298,11 @@ onBeforeUnmount(() => {
   padding: 0 12px;
 }
 .side-tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 24px;
   white-space: nowrap;
   font-size: 12px;
   color: var(--muted);
@@ -1293,9 +1322,12 @@ onBeforeUnmount(() => {
   display: grid;
   place-items: center;
 }
-.side-actions svg {
+.side-tabs svg {
   width: 14px;
   height: 14px;
+}
+.git-logo :deep(path) {
+  fill: currentColor;
 }
 .project-settings {
   padding: 8px 12px 16px;

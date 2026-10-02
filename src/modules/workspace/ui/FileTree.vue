@@ -724,19 +724,6 @@ defineExpose({ reveal });
     @contextmenu.self="showContext($event)"
     @dragleave="dragLeave"
   >
-    <li
-      v-if="depth === 0"
-      class="root-label"
-      @click="selection.replace()"
-      :class="{ 'drop-target': target === '' }"
-      title="Корень проекта"
-      tabindex="0"
-      @contextmenu.stop="showContext($event)"
-      @focus="activateEntry()"
-      @keydown.stop="entryKey($event)"
-    >
-      Корень проекта
-    </li>
     <li v-if="depth === 0 && busy" class="notice" role="status">выполняется…</li>
     <li v-if="depth === 0 && moveError" class="notice error" role="alert">{{ moveError }}</li>
     <li v-if="depth === 0 && message" class="notice" role="status">{{ message }}</li>
@@ -813,11 +800,6 @@ defineExpose({ reveal });
 .tree-root {
   min-height: 100%;
 }
-.root-label {
-  padding: 8px 12px;
-  color: var(--faint);
-  font-size: 11px;
-}
 .root-space {
   min-height: 64px;
 }
@@ -827,8 +809,7 @@ defineExpose({ reveal });
 button.dragging {
   opacity: 0.45;
 }
-button.drop-target,
-.root-label.drop-target {
+button.drop-target {
   background: var(--bg-2);
   color: var(--text);
   outline: 1px solid var(--accent, #b8ab77);
