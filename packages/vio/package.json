@@ -27,7 +27,7 @@
   },
   "scripts": {
     "build": "node-gtk generate-types Gtk-4.0 --no-docs && tsdown",
-    "test": "node tests/renderer.test.mjs && node tests/compiler.test.mjs",
+    "test": "vp run build && node tests/renderer.test.mjs && node tests/compiler.test.mjs",
     "demo": "node --import vio/register examples/counter/app/entry.ts",
     "gtk:types": "node-gtk generate-types Gtk-4.0 --no-docs",
     "test:gtk": "node --import vio/register tests/gtk.test.mjs"
