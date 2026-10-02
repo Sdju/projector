@@ -17,7 +17,8 @@ export function listApplications(): LaunchItem[] {
         id: `app:${id}`,
         name: app.getDisplayName(),
         description: app.getDescription() || "приложение",
-        keywords: [app.getExecutable() || "", ...(desktop?.getKeywords() || [])].join(" "),
+        // Older GioUnix typelibs misclassify getKeywords as a static method.
+        keywords: [app.getExecutable() || "", ...(desktop?.getLocaleString("Keywords") || "").split(";")].join(" "),
         kind: "application",
         icon: `/api/launcher/icon?id=${encodeURIComponent(id)}`,
       };
