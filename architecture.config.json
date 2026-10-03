@@ -37,12 +37,7 @@
     "@core": "core/modules"
   },
   "largeFiles": {
-    "files": {
-      "src/modules/workspace/ui/ProjectWorkspace.vue": {
-        "ceiling": 633,
-        "plan": "Вынесены панели и lib: git-overview, sidebar-resize, open-files, workbench-layout, editor-commands, workspace-session. Осталось: блок дока из шаблона и стили — в компонент."
-      }
-    },
+    "files": {},
     "thresholds": {
       "default": 400,
       ".vue": 500

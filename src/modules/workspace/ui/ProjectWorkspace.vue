@@ -3,9 +3,6 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { workspaceRequest } from "../api.ts";
 import { relocatedPath } from "../../../../core/modules/workspace/index.ts";
 import { useCommandScope } from "../../../common/utilities/commands.ts";
-import UiButton from "../../../common/ui/UiButton.vue";
-import UiEmpty from "../../../common/ui/UiEmpty.vue";
-import IconDiff from "~icons/lucide/file-diff";
 import FileTree from "./FileTree.vue";
 import SearchPanel from "./SearchPanel.vue";
 import WorkbenchToolbar from "./WorkbenchToolbar.vue";
@@ -17,16 +14,11 @@ import { useOpenFiles } from "../lib/open-files.ts";
 import { useWorkbenchLayout } from "../lib/workbench-layout.ts";
 import { registerEditorCommands } from "../lib/editor-commands.ts";
 import { useWorkspaceSession } from "../lib/workspace-session.ts";
-import FilePanel from "./FilePanel.vue";
-import PanelHost from "./PanelHost.vue";
-import { AgentChat } from "../../agent/index.ts";
-import { DockView, replacePanel, type DockTarget } from "../../dock/index.ts";
+import WorkbenchDock from "./WorkbenchDock.vue";
+import { replacePanel, type DockTarget } from "../../dock/index.ts";
 import { type OpenFile } from "../open-file.ts";
 import { createPanelHosts } from "../panel-hosts.ts";
-import IconRestart from "~icons/lucide/rotate-ccw";
-import IconFailed from "~icons/lucide/circle-slash";
-import IconFinishFlag from "../../../common/ui/IconFinishFlag.vue";
-import { TerminalCloseDialog, TerminalView } from "../../terminal/index.ts";
+import { TerminalCloseDialog } from "../../terminal/index.ts";
 import type { FileContent } from "../../../../core/modules/workspace/index.ts";
 const props = defineProps<{
   projectId: string;
@@ -88,15 +80,9 @@ const {
   layout,
   restoringSession,
   terminals,
-  terminalPanels,
   fileOf,
   activeKey,
   revealPanel,
-  describePanel,
-  selectPanel,
-  closePanel,
-  closeManyPanels,
-  renamePanel,
   hiddenGroups,
   groupLabel,
   showGroup,
@@ -117,8 +103,6 @@ const {
   loading,
   openFile,
   openBrowserFile,
-  acceptsFileDrop,
-  dropFiles,
   closeTab,
   selectTab,
   saveFile,
@@ -334,100 +318,19 @@ onBeforeUnmount(() => {
       @keydown.capture="editorKeydown"
     >
       <p v-if="loading" class="loading" role="status">читаю файл…</p>
-      <DockView
-        v-model:layout="layout"
-        :describe="describePanel"
+      <WorkbenchDock
         :project-id="projectId"
-        command-namespace="ide.workbench.tabs"
+        :workbench="workbench"
+        :files="files"
         :tab-actions="tabActions"
-        :accepts-drop="acceptsFileDrop"
-        @select="selectPanel"
-        @close="closePanel"
-        @close-many="closeManyPanels"
-        @rename="renamePanel"
-        @drop="dropFiles"
+        :panel-hosts="panelHosts"
+        :keep-alive="keepAlive"
+        :gutter-revision="gutterRevision"
+        :tabs="tabs"
+        :virtual-keys="{ agent: virtualTabs.agent.key, project: virtualTabs.project.key }"
       >
-        <template #panel="{ id, focused }">
-          <PanelHost v-if="keepAlive.has(id)" :id="id" :registry="panelHosts" />
-          <FilePanel
-            v-else-if="fileOf(id)"
-            :file="fileOf(id)!"
-            :project-id="projectId"
-            :revision="gutterRevision"
-            @change="fileOf(id)!.draft = $event"
-            @save="saveFile(fileOf(id))"
-            @mode="fileOf(id)!.markdownMode = $event"
-            @open="openFile($event)"
-          />
-          <TerminalView
-            v-else-if="terminalPanels.get(id)"
-            :project-id="projectId"
-            :session="terminalPanels.get(id)!"
-            :focused="focused"
-            @open="
-              (path, line, column, external) =>
-                openFile(path, line, column, undefined, false, external)
-            "
-            @status="terminals.update"
-            @sessions="terminals.replace"
-            @ended="terminals.refresh"
-          />
-        </template>
-        <template #icon="{ tab }">
-          <IconDiff
-            v-if="fileOf(tab.id)?.original !== undefined && fileOf(tab.id)"
-            class="diff-tab-icon"
-            aria-label="Изменения"
-          />
-          <template v-else-if="terminalPanels.get(tab.id)">
-            <IconFailed
-              v-if="terminals.failed(terminalPanels.get(tab.id)!)"
-              class="session-state failed"
-              aria-hidden="true"
-            />
-            <IconFinishFlag
-              v-else-if="terminalPanels.get(tab.id)!.status === 'exited'"
-              class="session-state"
-              aria-hidden="true"
-            />
-          </template>
-        </template>
-        <template #actions="{ activeId }">
-          <template v-if="terminalPanels.get(activeId)">
-            <UiButton
-              v-if="terminalPanels.get(activeId)!.status === 'running'"
-              icon
-              size="sm"
-              :disabled="terminals.busy.value || terminalPanels.get(activeId)!.stopRequested"
-              title="Завершить сессию"
-              aria-label="Завершить сессию"
-              @click="terminals.stop(terminalPanels.get(activeId)!.id)"
-            >
-              <IconFinishFlag aria-hidden="true" />
-            </UiButton>
-            <UiButton
-              v-else
-              icon
-              size="sm"
-              :disabled="terminals.busy.value"
-              title="Перезапустить сессию"
-              aria-label="Перезапустить сессию"
-              @click="terminals.restart(terminalPanels.get(activeId)!.id)"
-            >
-              <IconRestart aria-hidden="true" />
-            </UiButton>
-          </template>
-        </template>
-        <template #empty="{ group }">
-          <UiEmpty v-if="group.role === 'editor'">
-            Откройте файл из дерева или перетащите его сюда
-          </UiEmpty>
-          <UiEmpty v-else-if="group.role === 'terminal'">
-            Нет терминалов. Создайте сессию кнопками на панели выше
-          </UiEmpty>
-          <UiEmpty v-else>Перетащите сюда вкладку</UiEmpty>
-        </template>
-      </DockView>
+        <template #project><slot name="project" /></template>
+      </WorkbenchDock>
     </section>
     <TerminalCloseDialog
       :session="terminals.pendingClose.value"
@@ -435,41 +338,10 @@ onBeforeUnmount(() => {
       @cancel="terminals.cancelClose"
       @confirm="terminals.confirmClose"
     />
-    <div class="keep-alive" hidden>
-      <Teleport
-        v-if="tabs.some((tab) => tab.virtual === 'agent')"
-        :to="panelHosts.hosts[virtualTabs.agent.key] ?? null"
-        :disabled="!panelHosts.hosts[virtualTabs.agent.key]"
-      >
-        <AgentChat :key="projectId" :project-id="projectId" />
-      </Teleport>
-      <Teleport
-        v-if="tabs.some((tab) => tab.virtual === 'project')"
-        :to="panelHosts.hosts[virtualTabs.project.key] ?? null"
-        :disabled="!panelHosts.hosts[virtualTabs.project.key]"
-      >
-        <div class="project-settings"><slot name="project" /></div>
-      </Teleport>
-    </div>
   </div>
 </template>
 
 <style scoped>
-.diff-tab-icon {
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
-  color: var(--run);
-}
-.session-state {
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
-  color: var(--muted);
-}
-.session-state.failed {
-  color: var(--err);
-}
 
 .workspace {
   display: grid;
@@ -529,12 +401,6 @@ onBeforeUnmount(() => {
 }
 .sidebar {
   background: var(--bg-sunken);
-}
-.project-settings {
-  container-type: inline-size;
-  height: 100%;
-  overflow: auto;
-  padding: var(--sp-4);
 }
 .side-content {
   flex: 1;

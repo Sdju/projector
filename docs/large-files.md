@@ -4,4 +4,3 @@
 
 | Файл | Строк | Потолок | План разбиения |
 | --- | ---: | ---: | --- |
-| `src/modules/workspace/ui/ProjectWorkspace.vue` | 633 | 633 | Вынесены панели и lib: git-overview, sidebar-resize, open-files, workbench-layout, editor-commands, workspace-session. Осталось: блок дока из шаблона и стили — в компонент. |
