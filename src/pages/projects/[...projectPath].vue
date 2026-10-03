@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
   ProjectSettings,
+  useProjectCommands,
   useProjects,
   projectPathFromParams,
   projectRoute,
@@ -22,6 +23,10 @@ const projectId = ref("");
 const opening = ref(false);
 const openError = ref("");
 const project = computed(() => projects.value.find((item) => item.id === projectId.value));
+useProjectCommands(
+  () => project.value,
+  () => settingsDirty.value,
+);
 
 watch(
   () => projectPathFromParams(route.params.projectPath),

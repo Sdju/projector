@@ -127,6 +127,15 @@ file trees and remove obsolete comparisons. Writes use the same-origin
 `POST /api/projects/:id/workspace/git` adapter with `{ action, path }` or `{ action, paths }` and serialize
 index operations. Paths are restricted to individual changed files within the project.
 
+## Project settings commands
+
+The page registers scope `project:settings` with `{ surface: 'project', projectId, name, icon, url, mode, defaultCommandId, dirty }`.
+Commands: `ide.project.settings.get`, `ide.project.settings.update` (`name`, `icon`, `url`, `mode`, `defaultCommandId`),
+`ide.project.command.add|update|remove|setDefault` for run commands (tasks; by `id` or `name`) and
+`ide.project.command.import` for missing `package.json` scripts. Writes use the same validation and
+`catalog.save` as the settings form, and are unavailable while the open settings tab has unsaved edits.
+The chat agent uses them instead of editing Projector data files.
+
 ## Projector chat agent
 
 `ide.workbench.agent.open` opens a single virtual **Агент** tab beside files.

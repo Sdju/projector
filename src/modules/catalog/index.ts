@@ -14,3 +14,4 @@ export { shortPath } from "./format.ts";
 export { projectRoute, projectPathFromParams } from "./project-route.ts";
 
 export { default as ProjectSettings } from "./ui/ProjectSettings.vue";
+export { useProjectCommands } from "./model/project-commands.ts";
