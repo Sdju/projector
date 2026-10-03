@@ -7,6 +7,7 @@ defineProps<{
   id: string;
   heading: string;
   editing: boolean;
+  remote?: boolean;
   entries: DirectoryEntry[];
   selected: number;
   loading: boolean;
@@ -19,12 +20,12 @@ defineEmits<{ pick: [path: string] }>();
 <template>
   <div class="dropdown">
     <div class="dropdown-heading">{{ heading }}</div>
-    <p v-if="loading" class="notice" role="status">Читаю папки…</p>
+    <p v-if="loading" class="notice" role="status">{{ remote ? "Читаю репозитории…" : "Читаю папки…" }}</p>
     <p v-else-if="error" class="notice error" role="alert">{{ error }}</p>
     <p v-else-if="!entries.length" class="notice">
-      {{ editing ? "Подходящих папок нет" : "Нет вложенных папок" }}
+      {{ remote ? "Подходящих репозиториев нет" : editing ? "Подходящих папок нет" : "Нет вложенных папок" }}
     </p>
-    <div :id="id" role="listbox" aria-label="Доступные папки" class="options">
+    <div :id="id" role="listbox" :aria-label="remote ? 'Доступные репозитории' : 'Доступные папки'" class="options">
       <button
         v-for="(entry, index) in entries"
         :id="`${id}-${index}`"
@@ -41,7 +42,7 @@ defineEmits<{ pick: [path: string] }>();
         ><IconChevronRight aria-hidden="true" />
       </button>
     </div>
-    <p v-if="truncated" class="notice">Первые 1000 папок — уточните путь</p>
+    <p v-if="truncated" class="notice">{{ remote ? "Первые 1000 репозиториев — уточните путь" : "Первые 1000 папок — уточните путь" }}</p>
   </div>
 </template>
 <style scoped>

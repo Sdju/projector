@@ -1,5 +1,5 @@
 import { onBeforeUnmount, ref } from "vue";
-import { fetchDirectories } from "../../project/index.ts";
+import { fetchPathSuggestions } from "../../project/index.ts";
 import type { DirectoryEntry } from "../../../../core/modules/directories/index.ts";
 
 /** Directory suggestions with cancellation: a newer request invalidates any pending one. */
@@ -28,7 +28,7 @@ export function useDirectoryListing() {
     error.value = "";
     truncated.value = false;
     try {
-      const data = await fetchDirectories(path, complete, request.signal);
+      const data = await fetchPathSuggestions(path, complete, request.signal);
       if (current !== generation) return;
       entries.value = data.entries;
       truncated.value = data.truncated;

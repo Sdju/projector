@@ -74,3 +74,11 @@ export async function fetchDirectories(
 export function inspectCommands(path: string): Promise<{ commands: ProjectCommand[] }> {
   return request("/api/inspect/commands", { method: "POST", body: JSON.stringify({ path }) });
 }
+
+export function fetchPathSuggestions(path: string, complete: boolean, signal?: AbortSignal) {
+  if (parseProjectRef(path).kind === "local") return fetchDirectories(path, complete, signal);
+  return request<import("../../../../core/modules/directories/index.ts").DirectoryListing>(
+    `/api/integrations/github/browse/directories?${new URLSearchParams({ path, complete: String(complete) })}`,
+    { signal },
+  );
+}

@@ -7,6 +7,7 @@ import {
   parseProjectRef,
   projectRefSegments,
 } from "../../project/index.ts";
+import { useCommandScope, commandArgs } from "../../../common/utilities/commands.ts";
 import PathDropdown from "./PathDropdown.vue";
 import { useDirectoryListing } from "../model/directory-listing.ts";
 const props = defineProps<{ path: string; navigate: (path: string) => Promise<void> }>();
@@ -24,9 +25,26 @@ const { entries, selected, loading, error, truncated, invalidate, load, schedule
 let disposed = false;
 const remoteInput = computed(() => parseProjectRef(value.value).kind !== "local");
 const remoteProject = computed(() => parseProjectRef(props.path).kind !== "local");
-const open = computed(
-  () => (editing.value && (!remoteInput.value || !!error.value)) || menuPath.value !== null,
-);
+const open = computed(() => editing.value || menuPath.value !== null);
+const commands = useCommandScope(`path-bar:${listId}`, () => ({
+  surface: "path-bar", path: props.path,
+}));
+commands.scope.registerCommand({
+  id: "ide.project.path.suggestions", title: "Выбрать соседний проект",
+  description: "Показывает папки локального пути или репозитории владельца GitHub. Повторный вызов закрывает список.",
+  arguments: { path: "Путь сегмента, например gh:/owner" },
+  enabled: () => !busy.value,
+  run: (args) => {
+    const { path } = commandArgs(args);
+    if (typeof path !== "string") throw new Error("Укажите путь сегмента");
+    return toggle(path);
+  },
+});
+const githubOwnerPath = computed(() => {
+  const project = parseProjectRef(props.path);
+  return project.kind === "github" ? `gh:/${project.repository.split("/")[0]}` : "";
+});
+const listingRemote = computed(() => parseProjectRef(menuPath.value ?? value.value).kind === "github");
 const segments = computed(() => projectRefSegments(parseProjectRef(props.path)));
 const candidate = computed(() => entries.value[selected.value < 0 ? 0 : selected.value]);
 const completion = computed(() => {
@@ -35,7 +53,9 @@ const completion = computed(() => {
   const slash = value.value.lastIndexOf("/");
   const prefix = value.value.slice(slash + 1);
   if (value.value === "~") return "";
-  return name.startsWith(prefix) ? name.slice(prefix.length) + "/" : "";
+  const matches = remoteInput.value
+    ? name.toLowerCase().startsWith(prefix.toLowerCase()) : name.startsWith(prefix);
+  return matches ? name.slice(prefix.length) + (remoteInput.value ? "" : "/") : "";
 });
 async function edit(path = props.path) {
   if (busy.value) return;
@@ -56,7 +76,7 @@ function close() {
   menuPath.value = null;
   error.value = "";
 }
-function toggle(path: string) {
+async function toggle(path: string) {
   if (busy.value) return;
   if (menuPath.value === path) {
     close();
@@ -64,7 +84,10 @@ function toggle(path: string) {
   }
   editing.value = false;
   menuPath.value = path;
-  void load(path, false);
+  const project = parseProjectRef(path);
+  const listingPath = project.kind === "github"
+    ? `gh:/${project.repository.split("/")[0] || githubOwnerPath.value.slice(4)}` : path;
+  await load(listingPath, false);
 }
 function syncCaret() {
   scroll.value = input.value?.scrollLeft ?? 0;
@@ -188,12 +211,12 @@ onBeforeUnmount(() => {
         </button>
         <button
           class="segment-arrow"
-          :aria-label="`Папки в ${segment.path}`"
+          :aria-label="remoteProject ? `Репозитории ${githubOwnerPath.slice(4)} (${segment.name})` : `Папки в ${segment.path}`"
           :aria-expanded="menuPath === segment.path"
           aria-haspopup="listbox"
           :aria-controls="listId"
-          :disabled="busy || remoteProject"
-          @click="toggle(segment.path)"
+          :disabled="busy"
+          @click="commands.run('ide.project.path.suggestions', { path: segment.path })"
         >
           <IconChevronRight aria-hidden="true" />
         </button>
@@ -227,16 +250,15 @@ onBeforeUnmount(() => {
         @select="syncCaret"
       />
     </div>
-    <span v-if="editing" class="key-hint" aria-hidden="true">{{
-      remoteInput ? "Enter" : "Tab · Enter"
-    }}</span>
+    <span v-if="editing" class="key-hint" aria-hidden="true">Tab · Enter</span>
     <PathDropdown
       v-if="open"
       :id="listId"
       :heading="
-        editing ? (remoteInput ? 'Открыть репозиторий' : 'Перейти в папку') : (menuPath ?? '')
+        editing ? (remoteInput ? 'Открыть репозиторий' : 'Перейти в папку') : (remoteProject ? `Репозитории ${githubOwnerPath.slice(4)}` : (menuPath ?? ''))
       "
       :editing="editing"
+      :remote="listingRemote"
       :entries="entries"
       :selected="selected"
       :loading="loading"

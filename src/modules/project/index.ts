@@ -9,6 +9,7 @@ export type {
 export { missingCommands, projectDraft, settingsError } from "./model/project-settings.ts";
 export {
   fetchDirectories,
+  fetchPathSuggestions,
   inspectCommands,
   inspectPath,
   pickFolder,
