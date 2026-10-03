@@ -160,6 +160,25 @@ file trees and remove obsolete comparisons. Writes use the same-origin
 `POST /api/projects/:id/workspace/git` adapter with `{ action, path }` or `{ action, paths }` and serialize
 index operations. Paths are restricted to individual changed files within the project.
 
+### Git history
+
+The collapsible **History** block of the Git panel lists commits (`git log --topo-order`) with a lane graph,
+branch/tag badges, an `↑N ↓M` mark against the upstream and a hollow node for unpushed commits. The scope context also
+carries `commit`, `commitPath` and `historyOpen`. Commands:
+
+- `ide.git.history.toggle`, `ide.git.history.refresh`, `ide.git.history.more`;
+- `ide.git.history.filter` `{ query?, all? }` — message search, `@name` searches authors, `all` includes every branch;
+- `ide.git.commit.toggle` `{ hash }` expands the changes made by that commit only;
+- `ide.git.commit.openDiff` `{ hash, path }` opens a read-only diff `parent → commit` (tab title shows both hashes);
+- `ide.git.commit.openFile` `{ path }` opens the current file; `ide.git.commit.open` `{ hash }` opens the **Коммит** overview
+  tab (message, metadata, parents, every file with +/− lines); `ide.git.commit.copyHash` `{ hash }`.
+
+`hash` may be abbreviated; without it the commit under the cursor is used. Reads use
+`GET /api/projects/:id/workspace/log?skip&limit&q&all`, `commit?hash` and `commit-diff?hash&path`.
+Commit contents are immutable, so the client caches them by hash; the list is re-read on every Git refresh with
+the loaded extent. Merge commits are shown against their first parent, and files are limited to the project folder.
+Commit diff tabs are history: staging, discarding or moving files never closes them.
+
 ## Project settings commands
 
 The page registers scope `project:settings` with `{ surface: 'project', projectId, name, icon, url, mode, defaultCommandId, dirty }`.

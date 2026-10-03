@@ -146,7 +146,7 @@ async function copy() {
             </span>
             <span v-if="file.binary" class="muted">бинарный</span>
             <template v-else>
-              <span class="bar" aria-hidden="true">
+              <span v-if="file.additions + file.deletions" class="bar" aria-hidden="true">
                 <i :style="{ width: `${file.share * 100}%` }" />
               </span>
               <span class="add">+{{ file.additions }}</span>
