@@ -39,8 +39,8 @@
   "largeFiles": {
     "files": {
       "src/modules/workspace/ui/ProjectWorkspace.vue": {
-        "ceiling": 1215,
-        "plan": "Уже вынесены SearchPanel, GitPanel, SidebarTabs, WorkbenchToolbar, lib/git-overview и lib/sidebar-resize. Осталось: состояние вкладок и открытие файлов — в composable, раскладка дока и терминалы — в composable, регистрация команд редактора — отдельно."
+        "ceiling": 950,
+        "plan": "Вынесены SearchPanel, GitPanel, SidebarTabs, WorkbenchToolbar, lib/git-overview, lib/sidebar-resize и lib/open-files. Осталось: раскладка дока и терминалы — в composable, команды редактора — в отдельный файл, сессия — в composable, блок дока из шаблона — в компонент."
       }
     },
     "thresholds": {

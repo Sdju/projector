@@ -1,11 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useSessionSnapshot, workspaceSessionSchema, type WorkspaceSession } from "../session.ts";
-import { workspaceRequest, saveWorkspaceFile } from "../api.ts";
-import { isFileDrag, pathsFromDataTransfer } from "../../path-drop/index.ts";
-import { projectRelativePath, previewBrowserFile } from "../file-drop.ts";
-import { treeDragType } from "../tree-drag.ts";
-import { onBeforeRouteLeave, onBeforeRouteUpdate } from "vue-router";
+import { workspaceRequest } from "../api.ts";
 import { relocatedPath } from "../../../../core/modules/workspace/index.ts";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import { useCommandScope, commandArgs } from "../../../common/utilities/commands.ts";
@@ -19,42 +15,18 @@ import SidebarTabs, { type SidebarSection } from "./SidebarTabs.vue";
 import GitPanel from "./GitPanel.vue";
 import { useGitOverview } from "../lib/git-overview.ts";
 import { useSidebarResize } from "../lib/sidebar-resize.ts";
+import { useOpenFiles } from "../lib/open-files.ts";
 import FilePanel from "./FilePanel.vue";
 import PanelHost from "./PanelHost.vue";
 import { AgentChat } from "../../agent/index.ts";
-import {
-  DockView,
-  activatePanel,
-  addPanel,
-  createDockLayout,
-  dockGroups,
-  findDockGroup,
-  groupOfPanel,
-  movePanel,
-  parseDockLayout,
-  reconcileDock,
-  replacePanel,
-  serializeDockLayout,
-  setGroupHidden,
-  type DockGroup,
-  type DockLayout,
-  type DockTabInfo,
-  type DockTarget,
-} from "../../dock/index.ts";
+import { DockView, activatePanel, addPanel, createDockLayout, dockGroups, findDockGroup, groupOfPanel, movePanel, parseDockLayout, reconcileDock, replacePanel, serializeDockLayout, setGroupHidden, type DockGroup, type DockLayout, type DockTabInfo, type DockTarget } from "../../dock/index.ts";
 import { isEditable, isMarkdown, type OpenFile } from "../open-file.ts";
 import { createPanelHosts } from "../panel-hosts.ts";
 import IconRestart from "~icons/lucide/rotate-ccw";
 import IconFailed from "~icons/lucide/circle-slash";
 import IconFinishFlag from "../../../common/ui/IconFinishFlag.vue";
-import {
-  TerminalCloseDialog,
-  TerminalView,
-  useTerminalSessions,
-} from "../../terminal/index.ts";
-import type {
-  FileComparison,
-  FileContent,
-} from "../../../../core/modules/workspace/index.ts";
+import { TerminalCloseDialog, TerminalView, useTerminalSessions } from "../../terminal/index.ts";
+import type { FileContent } from "../../../../core/modules/workspace/index.ts";
 import type { TerminalProgram } from "../../../../core/modules/terminal/index.ts";
 const props = defineProps<{
   projectId: string;
@@ -66,18 +38,6 @@ const workspaceElement = ref<HTMLElement>();
 const sidebarHidden = ref(false);
 const { treeWidth, sizes, resizeTree, resizeTreeKey } = useSidebarResize(workspaceElement);
 const fileTree = ref<InstanceType<typeof FileTree>>();
-async function prepareEntryChange(path: string) {
-  const affected = tabs.value.filter(
-    (tab) => !tab.virtual && (tab.path === path || tab.path.startsWith(path + "/")),
-  );
-  return (await Promise.all(affected.map((tab) => saveFile(tab)))).every(Boolean);
-}
-async function closeManyTabs(ids: string[]) {
-  for (const id of ids) {
-    await closeTab(id);
-    if (tabs.value.some((tab) => tab.key === id)) break;
-  }
-}
 const editorCommands = useCommandScope(`editor:${props.projectId}`, () => ({
   surface: "editor",
   projectId: props.projectId,
@@ -189,8 +149,7 @@ function editorFocus(event: FocusEvent) {
     editorCommands.scope.activate();
 }
 function entryDeleted(path: string) {
-  ++fileGeneration;
-  loading.value = false;
+  files.invalidate();
   tabs.value = tabs.value.filter(
     (tab) => tab.virtual || (tab.path !== path && !tab.path.startsWith(path + "/")),
   );
@@ -204,12 +163,38 @@ const gitPanel = ref<InstanceType<typeof GitPanel>>();
 const section = ref<SidebarSection>("files");
 const searchPanel = ref<InstanceType<typeof SearchPanel>>();
 const revision = ref(0);
-const fileError = ref("");
-const loading = ref(false);
 const isDirty = (file: OpenFile) =>
   file.virtual === "project"
     ? !!props.projectSettingsDirty
     : !file.virtual && file.draft !== undefined && file.draft !== file.content;
+const tabs = ref<OpenFile[]>([]);
+/** Куда поместить следующую открытую вкладку: заполняется при перетаскивании файла на блок. */
+const pending: { target?: DockTarget } = {};
+const files = useOpenFiles({
+  projectId: () => props.projectId,
+  tabs,
+  active: () => active.value,
+  activeKey: () => activeKey.value,
+  reveal: (id) => revealPanel(id),
+  isDirty,
+  saved: () => void loadGit(),
+  beforeCloseProjectSettings: () => props.beforeCloseProjectSettings?.(),
+  pending,
+});
+const {
+  fileError,
+  loading,
+  openFile,
+  openBrowserFile,
+  acceptsFileDrop,
+  dropFiles,
+  closeTab,
+  closeManyTabs,
+  selectTab,
+  saveFile,
+  prepareEntryChange,
+  toggleMarkdownSource,
+} = files;
 const virtualTabs = {
   keybindings: {
     key: "settings:keybindings",
@@ -225,7 +210,6 @@ function openProjectSettings() {
     tabs.value.push({ key, path, virtual: "project", content: "" });
   selectTab(key);
 }
-const tabs = ref<OpenFile[]>([]);
 const layout = ref<DockLayout>(createDockLayout());
 const restoringSession = ref(false);
 const panelHosts = createPanelHosts();
@@ -233,7 +217,6 @@ const keepAlive = new Set([virtualTabs.agent.key, virtualTabs.project.key]);
 const fileOf = (id: string) => tabs.value.find((tab) => tab.key === id);
 const terminalPanel = (id: string) => `terminal:${id}`;
 /** Куда поместить следующую открытую вкладку: заполняется при перетаскивании файла на блок. */
-let pendingTarget: DockTarget | undefined;
 const lastGroup: Partial<Record<"editor" | "terminal", string>> = {};
 const terminals = useTerminalSessions(() => props.projectId, {
   started: (id) => revealPanel(terminalPanel(id)),
@@ -246,9 +229,9 @@ const terminalPanels = computed(
 );
 const roleOf = (id: string) => (terminalPanels.value.has(id) ? "terminal" : "editor");
 function place(id: string, current: DockLayout): DockTarget | undefined {
-  if (pendingTarget) {
-    const target = pendingTarget;
-    pendingTarget = undefined;
+  if (pending.target) {
+    const target = pending.target;
+    pending.target = undefined;
     return target;
   }
   const role = roleOf(id);
@@ -303,10 +286,10 @@ const activeKey = computed({
   },
 });
 function revealPanel(id: string) {
-  const target = pendingTarget;
+  const target = pending.target;
   const current = groupOfPanel(layout.value, id);
   if (current && target && (target.zone !== "center" || target.groupId !== current.id)) {
-    pendingTarget = undefined;
+    pending.target = undefined;
     layout.value = movePanel(layout.value, id, target);
   } else
     layout.value = current
@@ -482,7 +465,7 @@ async function restoreSession(saved: WorkspaceSession | undefined, generation: n
       if (
         generation !== sessionGeneration ||
         completed === undefined ||
-        completed !== fileGeneration
+        completed !== files.generation()
       )
         return;
       const file = tabs.value.find((file) => file.key === tab.key);
@@ -508,14 +491,7 @@ async function prepareGitChange(action: string, paths: string[]) {
       if (!(await prepareEntryChange(entry))) throw new Error("Не удалось сохранить файл");
     return;
   }
-  for (const tab of tabs.value.filter((tab) => tab.path === paths[0])) {
-    if (pendingSaves.has(tab) && !(await pendingSaves.get(tab)))
-      throw new Error("Не удалось завершить сохранение файла");
-  }
-}
-function invalidateOpening() {
-  ++fileGeneration;
-  loading.value = false;
+  if (!(await files.settle(paths[0]!))) throw new Error("Не удалось завершить сохранение файла");
 }
 async function gitChangeApplied(action: string, paths: string[]) {
   const path = paths[0]!;
@@ -534,250 +510,15 @@ async function gitChangeApplied(action: string, paths: string[]) {
   }
   searchPanel.value?.refresh();
 }
-let fileGeneration = 0;
-async function openFile(
-  path: string,
-  line?: number,
-  column?: number,
-  staged?: boolean,
-  reload = false,
-  external = false,
-) {
-  const key = `${external ? "external:" : ""}${path}:${staged === undefined ? "file" : staged ? "index" : "working"}`;
-  const existing = tabs.value.find((tab) => tab.key === key);
-  if (existing && (!reload || isDirty(existing) || existing.saving)) {
-    selectTab(key);
-    existing.line = line;
-    existing.column = column;
-    if (line && isMarkdown(existing)) existing.markdownMode = "source";
-    return fileGeneration;
-  }
-  const generation = ++fileGeneration;
-  loading.value = true;
-  fileError.value = "";
-  try {
-    const data =
-      staged === undefined
-        ? await workspaceRequest<FileContent & { image?: boolean }>(
-            props.projectId,
-            external ? "external" : "file",
-            { path },
-          )
-        : await workspaceRequest<FileComparison>(props.projectId, "diff", {
-            path,
-            staged: String(staged),
-          });
-    if (generation !== fileGeneration) return;
-    const file: OpenFile = {
-      external,
-      image:
-        "image" in data && data.image
-          ? `/api/projects/${encodeURIComponent(props.projectId)}/workspace/${external ? "external-asset" : "asset"}?${new URLSearchParams({ path })}`
-          : undefined,
-      path,
-      content: "modified" in data ? data.modified : data.content,
-      archive: "archive" in data ? data.archive : undefined,
-      original: "original" in data ? data.original : undefined,
-      staged,
-      line,
-      column,
-      key,
-      markdownMode: line ? "source" : (existing?.markdownMode ?? "document"),
-    };
-    const index = tabs.value.findIndex((tab) => tab.key === key);
-    if (index === -1) tabs.value.push(file);
-    else tabs.value[index] = file;
-    selectTab(key);
-    return fileGeneration;
-  } catch (err) {
-    if (generation === fileGeneration) {
-      fileError.value = err instanceof Error ? err.message : "Не удалось открыть файл";
-      return generation;
-    }
-  } finally {
-    if (generation === fileGeneration) loading.value = false;
-  }
-}
-let dropGeneration = 0;
-function releasePreview(file: OpenFile) {
-  if (file.image?.startsWith("blob:")) URL.revokeObjectURL(file.image);
-}
-async function openBrowserFile(source: File, reload = false) {
-  const key = `browser:${source.name}:${source.size}:${source.lastModified}`;
-  if (!reload && tabs.value.some((tab) => tab.key === key)) {
-    selectTab(key);
-    return;
-  }
-  const generation = ++fileGeneration;
-  loading.value = true;
-  fileError.value = "";
-  try {
-    const data = await previewBrowserFile(source);
-    if (generation !== fileGeneration) {
-      if (data.image) URL.revokeObjectURL(data.image);
-      return;
-    }
-    const file: OpenFile = { ...data, key, external: true, localFile: source };
-    const previous = tabs.value.findIndex((tab) => tab.key === key);
-    if (previous === -1) tabs.value.push(file);
-    else {
-      releasePreview(tabs.value[previous]!);
-      tabs.value[previous] = file;
-    }
-    selectTab(key);
-  } catch (err) {
-    if (generation === fileGeneration)
-      fileError.value = err instanceof Error ? err.message : "Не удалось открыть файл";
-  } finally {
-    if (generation === fileGeneration) loading.value = false;
-  }
-}
-const acceptsFileDrop = (data: DataTransfer | null) =>
-  isFileDrag(data) || !!data?.types.includes(treeDragType);
-async function dropFiles(event: DragEvent, target: DockTarget) {
-  event.preventDefault();
-  const data = event.dataTransfer;
-  if (!data || (!isFileDrag(data) && !data.types.includes(treeDragType))) return;
-  const generation = ++dropGeneration;
-  const projectId = props.projectId;
-  const paths = pathsFromDataTransfer(data);
-  const files = [...data.files];
-  const directories = [...data.items].some((item) => item.webkitGetAsEntry?.()?.isDirectory);
-  const tree = data.getData(treeDragType);
-  const current = () => generation === dropGeneration && projectId === props.projectId;
-  fileError.value = "";
-  pendingTarget = target;
-  try {
-    if (tree) {
-      const entry = JSON.parse(tree) as { projectId: string; path: string };
-      if (entry.projectId === projectId) {
-        await openFile(entry.path);
-        return;
-      }
-      const response = await fetch(`/api/projects/${encodeURIComponent(entry.projectId)}`);
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Не удалось прочитать проект");
-      paths.push(`${result.project.path.replace(/\/+$/, "")}/${entry.path}`);
-    }
-    if (paths.length) {
-      const { root } = await workspaceRequest<{ root: string }>(projectId, "root");
-      for (const path of paths) {
-        if (!current()) return;
-        const relative = projectRelativePath(root, path);
-        await openFile(
-          relative ?? path,
-          undefined,
-          undefined,
-          undefined,
-          false,
-          relative === undefined,
-        );
-      }
-    } else {
-      if (directories) throw new Error("Бросьте файл, чтобы открыть его в редакторе");
-      for (const file of files) {
-        if (!current()) return;
-        await openBrowserFile(file);
-      }
-      if (!files.length) throw new Error("Не удалось прочитать перетащенный файл");
-    }
-  } catch (err) {
-    if (current()) fileError.value = err instanceof Error ? err.message : "Не удалось открыть файл";
-  } finally {
-    pendingTarget = undefined;
-  }
-}
-
-async function closeTab(key: string) {
-  const tab = tabs.value.find((file) => file.key === key);
-  if (!tab) return;
-  if (tab.virtual === "project" && props.beforeCloseProjectSettings?.() === false) return;
-  if (!(await saveFile(tab))) {
-    revealPanel(tab.key);
-    if (!window.confirm(`Не удалось сохранить ${tab.path}. Закрыть без сохранения изменений?`))
-      return;
-  }
-  const index = tabs.value.indexOf(tab);
-  if (index === -1) return;
-  releasePreview(tab);
-  tabs.value.splice(index, 1);
-}
-function selectTab(key: string) {
-  if (key !== activeKey.value) void saveFile();
-  ++fileGeneration;
-  loading.value = false;
-  fileError.value = "";
-  revealPanel(key);
-}
-const pendingSaves = new Map<OpenFile, Promise<boolean>>();
-function saveFile(file = active.value): Promise<boolean> {
-  if (!file || !isEditable(file)) return Promise.resolve(true);
-  const pending = pendingSaves.get(file);
-  if (pending) return pending;
-  if (!isDirty(file)) return Promise.resolve(true);
-  file.saving = true;
-  file.saveError = "";
-  const projectId = props.projectId;
-  const operation = (async () => {
-    try {
-      // If a second blur/save arrives during a write, include the latest draft.
-      while (isDirty(file)) {
-        const content = file.draft!;
-        await saveWorkspaceFile(projectId, file.path, content, file.content);
-        file.content = content;
-      }
-      void loadGit();
-      return true;
-    } catch (error) {
-      file.saveError = error instanceof Error ? error.message : "Не удалось сохранить файл";
-      return false;
-    } finally {
-      file.saving = false;
-      pendingSaves.delete(file);
-    }
-  })();
-  pendingSaves.set(file, operation);
-  return operation;
-}
-async function canLeave() {
-  const results = await Promise.all(tabs.value.map((file) => saveFile(file)));
-  if (results.every(Boolean)) return true;
-  return window.confirm("Не удалось сохранить изменения файлов. Уйти без сохранения?");
-}
-onBeforeRouteLeave(canLeave);
-onBeforeRouteUpdate((to, from) => to.path === from.path || canLeave());
-function windowBlur() {
-  for (const file of tabs.value) void saveFile(file);
-}
-function toggleMarkdownSource() {
-  const file = active.value;
-  if (file && isMarkdown(file))
-    file.markdownMode = file.markdownMode === "source" ? "document" : "source";
-}
-function beforeUnload(event: BeforeUnloadEvent) {
-  if (!tabs.value.some((file) => isDirty(file) || file.saving)) return;
-  event.preventDefault();
-  event.returnValue = "";
-}
-onMounted(() => {
-  window.addEventListener("beforeunload", beforeUnload);
-  window.addEventListener("blur", windowBlur);
-});
 watch(
   () => props.projectId,
   () => {
     const saved = session.read();
     const generation = ++sessionGeneration;
     restoringSession.value = true;
-    ++fileGeneration;
+    files.reset();
     overview.reset();
-    ++dropGeneration;
-    pendingTarget = undefined;
-    tabs.value.forEach(releasePreview);
-    tabs.value = [];
     layout.value = parseDockLayout(saved?.layout) ?? createDockLayout();
-    fileError.value = "";
-    loading.value = false;
     section.value = saved?.section === "project" ? "files" : (saved?.section ?? "files");
     treeWidth.value = saved?.treeWidth;
     sidebarHidden.value = !!saved?.sidebarHidden;
@@ -806,8 +547,7 @@ async function refresh() {
     );
 }
 function entryMoved(source: string, destination: string) {
-  ++fileGeneration;
-  loading.value = false;
+  files.invalidate();
   for (const tab of [...tabs.value]) {
     if (tab.virtual) continue;
     const path = relocatedPath(tab.path, source, destination);
@@ -827,11 +567,6 @@ function entryMoved(source: string, destination: string) {
 }
 onBeforeUnmount(() => {
   ++sessionGeneration;
-  ++dropGeneration;
-  tabs.value.forEach(releasePreview);
-  window.removeEventListener("beforeunload", beforeUnload);
-  window.removeEventListener("blur", windowBlur);
-  ++fileGeneration;
   overview.cancel();
 });
 </script>
@@ -894,7 +629,7 @@ onBeforeUnmount(() => {
         :overview="overview"
         :selected="active ? { path: active.path, staged: active.staged } : undefined"
         :prepare="prepareGitChange"
-        :invalidate="invalidateOpening"
+        :invalidate="files.invalidate"
         :applied="gitChangeApplied"
         @open="(path, staged) => openFile(path, undefined, undefined, staged)"
       />

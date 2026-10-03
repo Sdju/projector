@@ -4,4 +4,4 @@
 
 | Файл | Строк | Потолок | План разбиения |
 | --- | ---: | ---: | --- |
-| `src/modules/workspace/ui/ProjectWorkspace.vue` | 1215 | 1215 | Уже вынесены SearchPanel, GitPanel, SidebarTabs, WorkbenchToolbar, lib/git-overview и lib/sidebar-resize. Осталось: состояние вкладок и открытие файлов — в composable, раскладка дока и терминалы — в composable, регистрация команд редактора — отдельно. |
+| `src/modules/workspace/ui/ProjectWorkspace.vue` | 950 | 950 | Вынесены SearchPanel, GitPanel, SidebarTabs, WorkbenchToolbar, lib/git-overview, lib/sidebar-resize и lib/open-files. Осталось: раскладка дока и терминалы — в composable, команды редактора — в отдельный файл, сессия — в composable, блок дока из шаблона — в компонент. |
