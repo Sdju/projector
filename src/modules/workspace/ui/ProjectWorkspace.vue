@@ -19,6 +19,8 @@ import { replacePanel, type DockTarget } from "../../dock/index.ts";
 import { type OpenFile } from "../open-file.ts";
 import { createPanelHosts } from "../panel-hosts.ts";
 import { TerminalCloseDialog } from "../../terminal/index.ts";
+import { useDocker } from "../../docker/index.ts";
+import { virtualTabs } from "../lib/virtual-tabs.ts";
 const props = defineProps<{
   projectId: string;
   projectSettingsDirty?: boolean;
@@ -140,16 +142,15 @@ const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
   },
   saveProjectSettings: () => props.saveProjectSettings?.(),
 });
-const virtualTabs = {
-  keybindings: {
-    key: "settings:keybindings",
-    path: "Горячие клавиши",
-    title: "Настройки горячих клавиш",
+const docker = useDocker(props.projectId, {
+  sidebar: () => { section.value = "docker"; showSidebar(); },
+  open: () => {
+    const { key, path } = virtualTabs.docker;
+    if (!tabs.value.some((tab) => tab.key === key)) tabs.value.push({ key, path, virtual: "docker", content: "" });
+    selectTab(key);
   },
-  agent: { key: "agent:chat", path: "Агент", title: "Чат с агентом Projector" },
-  project: { key: "settings:project", path: "Настройки проекта", title: "Настройки проекта" },
-  network: { key: "network:info", path: "Локальная сеть", title: "Доступ по локальной сети" },
-};
+  terminal: async (session) => { await terminals.refresh(); revealPanel(`terminal:${session.id}`); },
+});
 function openProjectSettings() {
   const { key, path } = virtualTabs.project;
   if (!tabs.value.some((tab) => tab.key === key))
@@ -308,7 +309,7 @@ onBeforeUnmount(() => {
       :branches="branches"
       :files="files"
       :git-sync="gitSync"
-      @command="editorCommands.run($event)"
+      @command="($event.startsWith('ide.docker.') ? docker.commands : editorCommands).run($event)"
       @navigate="mobileSidebarOpen = false"
       @refresh="refresh"
       @settings="openProjectSettings"

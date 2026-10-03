@@ -12,6 +12,7 @@ import type { useOpenFiles } from "../lib/open-files.ts";
 import type { OpenFile } from "../open-file.ts";
 import SearchPanel from "./SearchPanel.vue";
 import SidebarTabs, { type SidebarSection } from "./SidebarTabs.vue";
+import { DockerSidebar } from "../../docker/index.ts";
 
 /** Боковая панель проекта: дерево файлов, поиск и Git с переключателем разделов. */
 const props = defineProps<{
@@ -59,7 +60,7 @@ defineExpose({
       :git-count="overview.git.value.changes.length"
       :settings-active="active?.virtual === 'project'"
       @command="emit('command', $event)"
-      @refresh="section === 'git' ? gitPanel?.refresh() : emit('refresh')"
+      @refresh="section === 'git' ? gitPanel?.refresh() : section === 'docker' ? emit('command', 'ide.docker.refresh') : emit('refresh')"
       @settings="emit('settings')"
     />
     <div v-show="section === 'files'" class="side-content">
@@ -97,6 +98,7 @@ defineExpose({
       @open-commit="openCommit"
       @open-commit-diff="(hash, path, pinned) => openCommitFile(hash, path, !pinned)"
     />
+    <DockerSidebar v-show="section === 'docker'" />
   </aside>
 </template>
 

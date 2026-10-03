@@ -76,6 +76,7 @@ async function openTerminalLink(link: TerminalLink) {
     openExternalLink(link.path);
     return;
   }
+  if (props.session.docker) { error.value = "Пути Docker-терминала не сопоставлены с файлами хоста"; return; }
   const current = ++linkGeneration;
   error.value = "";
   try {
@@ -98,6 +99,7 @@ function send(message: TerminalClientMessage): void {
 function dragFiles(event: DragEvent): void {
   if (!isTerminalFileDrag(event.dataTransfer)) return;
   event.preventDefault();
+  if (props.session.docker) { if (event.dataTransfer) event.dataTransfer.dropEffect = "none"; return; }
   draggingFiles.value = true;
   if (event.dataTransfer) event.dataTransfer.dropEffect = running() ? "copy" : "none";
 }
@@ -105,6 +107,7 @@ function dragFiles(event: DragEvent): void {
 async function dropFiles(event: DragEvent): Promise<void> {
   event.preventDefault();
   draggingFiles.value = false;
+  if (props.session.docker) { error.value = "Файловые пути хоста недоступны в Docker-терминале"; return; }
   if (!isTerminalFileDrag(event.dataTransfer)) return;
   const currentGeneration = generation;
   if (!running()) {

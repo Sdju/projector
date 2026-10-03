@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { KeybindingsEditor } from "../../ide/index.ts";
 import { LanInfoPanel } from "../../network/index.ts";
+import { DockerPanel } from "../../docker/index.ts";
 import { isEditable, isMarkdown, type OpenFile } from "../open-file.ts";
 import {
   ArchiveViewer,
@@ -38,6 +39,7 @@ const emit = defineEmits<{
     <div class="panel-body">
       <KeybindingsEditor v-if="file.virtual === 'keybindings'" />
       <LanInfoPanel v-else-if="file.virtual === 'network'" />
+      <DockerPanel v-else-if="file.virtual === 'docker'" />
       <CommitOverview
         v-else-if="file.virtual === 'commit' && file.commit"
         :project-id="projectId"

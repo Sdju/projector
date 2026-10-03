@@ -7,8 +7,9 @@ import IconBot from "~icons/lucide/bot";
 import IconKeyboard from "~icons/lucide/keyboard";
 import IconRefresh from "~icons/lucide/rotate-cw";
 import IconSettings from "~icons/lucide/settings";
+import IconDocker from "~icons/lucide/container";
 
-export type SidebarSection = "files" | "search" | "git";
+export type SidebarSection = "files" | "search" | "git" | "docker";
 defineProps<{ section: SidebarSection; gitCount: number; settingsActive: boolean }>();
 const emit = defineEmits<{
   "update:section": [section: SidebarSection];
@@ -48,6 +49,7 @@ const emit = defineEmits<{
       <IconGit class="git-logo" aria-hidden="true" />
       <span v-if="gitCount" aria-hidden="true">{{ gitCount }}</span>
     </button>
+    <button :class="{ selected: section === 'docker' }" :aria-pressed="section === 'docker'" title="Docker" aria-label="Docker" @click="emit('command', 'ide.docker.sidebar.open')"><IconDocker aria-hidden="true" /></button>
     <div class="side-actions">
       <UiButton
         icon

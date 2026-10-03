@@ -3,6 +3,7 @@ import { onMounted, onBeforeUnmount, ref } from "vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import { fetchIntegrations, integrationRequest } from "./client.ts";
 import type { Integration, DeviceLogin } from "./client.ts";
+import { DockerSettings } from "../docker/index.ts";
 const github = ref<Integration | null>(null);
 const file = ref("");
 const enabled = ref(false);
@@ -115,6 +116,7 @@ function disconnect() {
       Настройки и авторизация хранятся в файле <code>{{ file || "integrations.json" }}</code
       >.
     </p>
+    <DockerSettings />
     <article v-if="github" class="plugin">
       <header>
         <h3>GitHub</h3>

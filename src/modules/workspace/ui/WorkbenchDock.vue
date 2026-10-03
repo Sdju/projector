@@ -115,7 +115,7 @@ const { fileOf, terminals, terminalPanels } = props.workbench;
           <IconFinishFlag aria-hidden="true" />
         </UiButton>
         <UiButton
-          v-else
+          v-else-if="!terminalPanels.get(activeId)!.docker"
           icon
           size="sm"
           :disabled="terminals.busy.value"
