@@ -17,10 +17,10 @@ import { MAX_SESSIONS, state, size, broadcast, flow, type Session } from "./sess
 const { Terminal } = headless;
 const { SerializeAddon } = serialization;
 
-export function listTerminalSessions(projectId: string): TerminalSession[] {
+export function listTerminalSessions(projectId?: string): TerminalSession[] {
   const processes = readTerminalProcesses();
   return [...state.sessions.values()]
-    .filter((session) => session.info.projectId === projectId)
+    .filter((session) => projectId === undefined || session.info.projectId === projectId)
     .map((session) => ({
       ...session.info,
       activity: terminalActivity(session.info, processes),
@@ -55,6 +55,7 @@ export async function resolveTerminalFile(project: Project, id: string, path: st
   const session = state.sessions.get(id);
   if (!session || session.info.projectId !== project.id)
     throw new HttpError(404, "Терминал не найден");
+  if (session.info.docker) throw new HttpError(409, "Пути Docker-терминала не сопоставлены с файлами хоста");
   const cwd =
     session.info.status === "running"
       ? await os.processes.workingDirectory(session.info.pid, project.path)
@@ -119,6 +120,7 @@ export async function uploadTerminalFile(
   const session = state.sessions.get(id);
   if (!session || session.info.projectId !== projectId)
     throw new HttpError(404, "Терминал не найден");
+  if (session.info.docker) throw new HttpError(409, "Загрузка файлов в Docker-терминал не поддерживается");
   const available = () =>
     !session.disposed && session.info.status === "running" && !session.info.stopRequested;
   if (!available()) throw new HttpError(409, "Терминал больше не принимает файлы");
@@ -150,6 +152,7 @@ export function createTerminalSession(
   input: Record<string, unknown>,
   observer?: { output: (data: string) => void; exit: (code: number) => void },
   replacingId?: string,
+  launch?: { file: string; args: string[]; title: string; docker: NonNullable<TerminalSession["docker"]> },
 ): TerminalSession {
   const previous = replacingId ? state.sessions.get(replacingId) : undefined;
   if (replacingId && (!previous || previous.info.projectId !== project.id))
@@ -177,6 +180,10 @@ export function createTerminalSession(
   delete env.CI;
   delete env.FORCE_COLOR;
   delete env.NO_COLOR;
+  if (launch?.docker) {
+    for (const key of Object.keys(env))
+      if (/^DOCKER_(HOST|CONTEXT|TLS_VERIFY|CERT_PATH|API_VERSION)$/.test(key)) delete env[key];
+  }
   env.TERM = "xterm-256color";
   env.COLORTERM = "truecolor";
   const shell = os.shell();
@@ -191,7 +198,7 @@ export function createTerminalSession(
   const mouseEncoding = trackMouseEncoding(screen);
   let child: IPty;
   try {
-    child = spawn(shell, args, { name: "xterm-256color", ...dimensions, cwd: project.path, env });
+    child = spawn(launch?.file ?? shell, launch?.args ?? args, { name: "xterm-256color", ...dimensions, cwd: project.path, env });
   } catch (error) {
     screen.dispose();
     throw error;
@@ -201,10 +208,11 @@ export function createTerminalSession(
       id: randomUUID(),
       projectId: project.id,
       program,
+      docker: launch?.docker,
       commandId: command?.id,
       customTitle: previous?.info.customTitle,
       title:
-        command?.name ??
+        launch?.title ?? command?.name ??
         { shell: "Shell", codex: "Codex", claude: "Claude Code", opencode: "OpenCode" }[program],
       pid: child.pid,
       ...dimensions,

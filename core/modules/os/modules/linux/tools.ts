@@ -2,6 +2,18 @@ import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 
 const execute = promisify(execFile);
+/** Argument-vector Docker transport; never invoke a shell or inherit a host override. */
+export function runDocker(args: string[], options: { cwd?: string; timeout?: number } = {}) {
+  const env = { ...process.env };
+  for (const key of Object.keys(env))
+    if (/^DOCKER_(HOST|CONTEXT|TLS_VERIFY|CERT_PATH|API_VERSION)$/.test(key)) delete env[key];
+  return execute("docker", args, {
+    cwd: options.cwd,
+    timeout: options.timeout ?? 15000,
+    maxBuffer: 4 * 1024 * 1024,
+    env,
+  });
+}
 export function runBash(command: string, options: { cwd: string; signal?: AbortSignal }) {
   return new Promise<{
     stdout: string;

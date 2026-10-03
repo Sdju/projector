@@ -64,6 +64,7 @@ export async function handleProjectTerminals({
         session: listTerminalSessions(id).find((item) => item.id === sessionId),
       });
     } else if (body.action === "restart") {
+      if (previous.docker) throw new HttpError(409, "Повторите Docker-действие из панели Docker");
       if (previous.status !== "exited") throw new HttpError(409, "Сначала завершите сессию");
       let session;
       if (previous.commandId) {

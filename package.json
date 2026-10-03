@@ -16,7 +16,8 @@
     "test:file-icons": "node --test tests/file-icons.test.mjs",
     "architecture": "node scripts/check-architecture.mjs",
     "test:architecture": "node --test tests/architecture.test.mjs",
-    "check": "vp run test && vp run build"
+    "test:docker": "node --test tests/docker.test.mjs",
+    "check": "vp run test && vp run test:docker && vp run build"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.54",

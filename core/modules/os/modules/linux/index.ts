@@ -6,7 +6,7 @@ export {
   descendants,
   workingDirectory,
 } from "./processes.ts";
-export { moveNoReplace, runPython, searchFiles, runBash } from "./tools.ts";
+export { moveNoReplace, runPython, searchFiles, runBash, runDocker } from "./tools.ts";
 export { dataHome, shell, desktopPaths, pickFolder } from "./directories.ts";
 export {
   focusAppWindow,

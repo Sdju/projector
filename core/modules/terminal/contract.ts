@@ -7,6 +7,8 @@ export interface TerminalActivity {
 }
 
 export interface TerminalSession {
+  /** Docker client session; closing the client does not stop the container. */
+  docker?: { context: string; kind: string; containerId?: string; composeProject?: string };
   id: string;
   projectId: string;
   program: TerminalProgram;

@@ -1,8 +1,9 @@
 import { integrationsPath } from "./store.ts";
 import { githubStatus } from "./github.ts";
+import { dockerIntegrationStatus } from "./docker.ts";
 
 // Each integration owns its settings, credentials and public status adapter.
-export const integrationRegistry = [{ id: "github", status: githubStatus }];
+export const integrationRegistry = [{ id: "github", status: githubStatus }, { id: "docker", status: dockerIntegrationStatus }];
 export async function listIntegrations() {
   return {
     file: integrationsPath(),

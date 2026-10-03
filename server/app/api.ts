@@ -29,7 +29,9 @@ import { handleProjectTerminals } from "../routes/api/projects/[id]/terminals.ts
 import { handleProjectActions } from "../routes/api/projects/[id]/index.ts";
 import { handleIdeKeybindings } from "../routes/api/ide/keybindings.ts";
 import { handleEditorSettings } from "../routes/api/ide/editor.ts";
+import { handleDocker } from "../routes/api/docker.ts";
 const routes = [
+  handleDocker,
   handleEditorSettings,
   handleIdeKeybindings,
   handleIntegrationsActions,
