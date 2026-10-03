@@ -16,3 +16,5 @@ export type {
   GitCommitDetail,
   CommitComparison,
 } from "./contract.ts";
+export { layoutGraph } from "./git-graph.ts";
+export type { GraphRow } from "./git-graph.ts";
