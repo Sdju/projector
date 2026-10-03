@@ -144,6 +144,10 @@ The `git:<projectId>` scope has `{ surface: 'git', projectId, path, staged, busy
 Git rows, directory rows, group headers and their context menus use `ide.git.openDiff`, `ide.git.openFile`,
 `ide.git.stage`, `ide.git.unstage`, `ide.git.discard` and `ide.git.refresh`.
 `ide.git.group.toggle` `{ staged }` collapses or expands the Staged / Changed blocks.
+Staged, Changed and History share the panel height as resizable blocks: each block scrolls on its own, and the border
+under it can be dragged (arrow keys move it, `Shift` moves further, double click or `Enter` resets). Squeezing a block
+to the minimum collapses it like `ide.git.group.toggle` / `ide.git.history.toggle`; `ide.git.block.reset` drops the
+fitted sizes. Sizes and collapsed state live only in the open panel.
 File commands accept `{ path, staged }`; omitting them uses the context-menu target.
 `openFile` opens the current file separately from its comparison. Diff tabs show a
 file-diff icon; their tooltip and breadcrumb identify HEAD → index or index → worktree.
