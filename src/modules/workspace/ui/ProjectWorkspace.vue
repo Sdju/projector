@@ -16,18 +16,18 @@ import GitPanel from "./GitPanel.vue";
 import { useGitOverview } from "../lib/git-overview.ts";
 import { useSidebarResize } from "../lib/sidebar-resize.ts";
 import { useOpenFiles } from "../lib/open-files.ts";
+import { useWorkbenchLayout } from "../lib/workbench-layout.ts";
 import FilePanel from "./FilePanel.vue";
 import PanelHost from "./PanelHost.vue";
 import { AgentChat } from "../../agent/index.ts";
-import { DockView, activatePanel, addPanel, createDockLayout, dockGroups, findDockGroup, groupOfPanel, movePanel, parseDockLayout, reconcileDock, replacePanel, serializeDockLayout, setGroupHidden, type DockGroup, type DockLayout, type DockTabInfo, type DockTarget } from "../../dock/index.ts";
+import { DockView, createDockLayout, parseDockLayout, replacePanel, serializeDockLayout, type DockTarget } from "../../dock/index.ts";
 import { isEditable, isMarkdown, type OpenFile } from "../open-file.ts";
 import { createPanelHosts } from "../panel-hosts.ts";
 import IconRestart from "~icons/lucide/rotate-ccw";
 import IconFailed from "~icons/lucide/circle-slash";
 import IconFinishFlag from "../../../common/ui/IconFinishFlag.vue";
-import { TerminalCloseDialog, TerminalView, useTerminalSessions } from "../../terminal/index.ts";
+import { TerminalCloseDialog, TerminalView } from "../../terminal/index.ts";
 import type { FileContent } from "../../../../core/modules/workspace/index.ts";
-import type { TerminalProgram } from "../../../../core/modules/terminal/index.ts";
 const props = defineProps<{
   projectId: string;
   projectSettingsDirty?: boolean;
@@ -170,6 +170,37 @@ const isDirty = (file: OpenFile) =>
 const tabs = ref<OpenFile[]>([]);
 /** Куда поместить следующую открытую вкладку: заполняется при перетаскивании файла на блок. */
 const pending: { target?: DockTarget } = {};
+const workbench = useWorkbenchLayout({
+  projectId: () => props.projectId,
+  tabs,
+  pending,
+  isDirty,
+  virtualTitle: (kind) => virtualTabs[kind].title,
+  selectTab: (key) => files.selectTab(key),
+  closeTab: (key) => files.closeTab(key),
+  closeManyTabs: (ids) => files.closeManyTabs(ids),
+  showSidebar: () => {
+    sidebarHidden.value = false;
+  },
+  register: registerEditor,
+});
+const {
+  layout,
+  restoringSession,
+  terminals,
+  terminalPanels,
+  fileOf,
+  activeKey,
+  revealPanel,
+  describePanel,
+  selectPanel,
+  closePanel,
+  closeManyPanels,
+  renamePanel,
+  hiddenGroups,
+  groupLabel,
+  showGroup,
+} = workbench;
 const files = useOpenFiles({
   projectId: () => props.projectId,
   tabs,
@@ -189,7 +220,6 @@ const {
   acceptsFileDrop,
   dropFiles,
   closeTab,
-  closeManyTabs,
   selectTab,
   saveFile,
   prepareEntryChange,
@@ -210,191 +240,8 @@ function openProjectSettings() {
     tabs.value.push({ key, path, virtual: "project", content: "" });
   selectTab(key);
 }
-const layout = ref<DockLayout>(createDockLayout());
-const restoringSession = ref(false);
 const panelHosts = createPanelHosts();
 const keepAlive = new Set([virtualTabs.agent.key, virtualTabs.project.key]);
-const fileOf = (id: string) => tabs.value.find((tab) => tab.key === id);
-const terminalPanel = (id: string) => `terminal:${id}`;
-/** Куда поместить следующую открытую вкладку: заполняется при перетаскивании файла на блок. */
-const lastGroup: Partial<Record<"editor" | "terminal", string>> = {};
-const terminals = useTerminalSessions(() => props.projectId, {
-  started: (id) => revealPanel(terminalPanel(id)),
-  restarted: (previous, id) => {
-    layout.value = replacePanel(layout.value, terminalPanel(previous), terminalPanel(id));
-  },
-});
-const terminalPanels = computed(
-  () => new Map(terminals.sessions.value.map((item) => [terminalPanel(item.id), item])),
-);
-const roleOf = (id: string) => (terminalPanels.value.has(id) ? "terminal" : "editor");
-function place(id: string, current: DockLayout): DockTarget | undefined {
-  if (pending.target) {
-    const target = pending.target;
-    pending.target = undefined;
-    return target;
-  }
-  const role = roleOf(id);
-  const holds = (group: DockGroup) => group.panels.some((panel) => roleOf(panel) === role);
-  const groups = dockGroups(current);
-  const group =
-    groups.find((item) => item.id === current.focused && holds(item)) ??
-    groups.find((item) => item.id === lastGroup[role]) ??
-    groups.find(holds) ??
-    groups.find((item) => item.role === role);
-  return group
-    ? { groupId: group.id, zone: "center" }
-    : { zone: role === "terminal" ? "right" : "left" };
-}
-function reconcileLayout() {
-  const keys = new Set(tabs.value.map((tab) => tab.key));
-  layout.value = reconcileDock(layout.value, {
-    ids: [...keys, ...terminalPanels.value.keys()],
-    exists: (id) =>
-      keys.has(id) || terminalPanels.value.has(id)
-        ? true
-        : id.startsWith("terminal:")
-          ? terminals.loaded.value
-            ? false
-            : undefined
-          : restoringSession.value
-            ? undefined
-            : false,
-    place,
-  });
-}
-// Вкладки и сессии — источник истины: раскладка подстраивается под них сразу, без кадра рассинхрона.
-watch(
-  () => [
-    tabs.value.map((tab) => tab.key).join("\n"),
-    terminals.sessions.value.map((item) => item.id).join("\n"),
-    restoringSession.value,
-    terminals.loaded.value,
-  ],
-  reconcileLayout,
-  { flush: "sync", immediate: true },
-);
-const focusedGroup = computed(() => findDockGroup(layout.value, layout.value.focused));
-/** Файл активной вкладки в блоке с фокусом; пусто, если там терминал или блок пуст. */
-const activeKey = computed({
-  get: () => {
-    const id = focusedGroup.value?.active ?? "";
-    return fileOf(id) ? id : "";
-  },
-  set: (key: string) => {
-    if (key) revealPanel(key);
-  },
-});
-function revealPanel(id: string) {
-  const target = pending.target;
-  const current = groupOfPanel(layout.value, id);
-  if (current && target && (target.zone !== "center" || target.groupId !== current.id)) {
-    pending.target = undefined;
-    layout.value = movePanel(layout.value, id, target);
-  } else
-    layout.value = current
-      ? activatePanel(layout.value, id)
-      : addPanel(layout.value, id, place(id, layout.value));
-  const group = groupOfPanel(layout.value, id);
-  if (group) lastGroup[roleOf(id)] = group.id;
-}
-async function createTerminal(program: TerminalProgram) {
-  const created = await terminals.create(program);
-  if (created) revealPanel(terminalPanel(created.id));
-}
-function describePanel(id: string): DockTabInfo {
-  const file = fileOf(id);
-  if (file)
-    return {
-      id,
-      label: file.virtual ? file.path : file.path.split("/").at(-1)!,
-      title: file.virtual
-        ? virtualTabs[file.virtual].title
-        : file.saveError
-          ? `${file.path} · ${file.saveError}`
-          : `${file.path}${file.original !== undefined ? (file.staged ? " · HEAD → index" : " · index → рабочий файл") : ""}`,
-      dirty: isDirty(file),
-      saving: !!file.saving,
-      error: !!file.saveError,
-    };
-  const item = terminalPanels.value.get(id);
-  if (item)
-    return {
-      id,
-      label: terminals.nameOf(item),
-      title: `${terminals.labelOf(item)}${item.status === "running" ? (item.activity?.state === "idle" ? " · ожидает ввода" : " · есть работающие процессы") : ""} · Двойной щелчок: переименовать`,
-      renameable: true,
-    };
-  // Сессии ещё загружаются: не показываем технический id.
-  return { id, label: id.startsWith("terminal:") ? "Терминал…" : id };
-}
-function selectPanel(id: string) {
-  if (fileOf(id)) selectTab(id);
-  else revealPanel(id);
-}
-function closePanel(id: string) {
-  const item = terminalPanels.value.get(id);
-  return item ? terminals.close(item.id) : closeTab(id);
-}
-async function closeManyPanels(ids: string[]) {
-  const files = ids.filter((id) => fileOf(id));
-  await closeManyTabs(files);
-  if (files.some((id) => fileOf(id))) return;
-  await terminals.closeMany(
-    ids.flatMap((id) => {
-      const item = terminalPanels.value.get(id);
-      return item ? [item.id] : [];
-    }),
-  );
-}
-function renamePanel(id: string, label: string) {
-  const item = terminalPanels.value.get(id);
-  if (item) void terminals.rename(item.id, label);
-}
-const hiddenGroups = computed(() => dockGroups(layout.value).filter((group) => group.hidden));
-const roleLabels: Record<string, string> = { editor: "Редактор", terminal: "Терминалы" };
-function groupLabel(group: DockGroup) {
-  if (!group.panels.length) return roleLabels[group.role ?? ""] ?? "Блок";
-  const label = describePanel(group.active).label;
-  return group.panels.length > 1 ? `${label} +${group.panels.length - 1}` : label;
-}
-const showGroup = (id: string) => {
-  layout.value = setGroupHidden(layout.value, id, false);
-};
-function resetLayout() {
-  const current = activeKey.value;
-  layout.value = createDockLayout();
-  sidebarHidden.value = false;
-  reconcileLayout();
-  if (current) revealPanel(current);
-}
-function panelArg(value?: unknown) {
-  const args = commandArgs(value);
-  if (args.id !== undefined && typeof args.id !== "string")
-    throw new Error("id должен быть строкой");
-  return (args.id as string | undefined) ?? focusedGroup.value?.active ?? "";
-}
-for (const [action, title, zone] of [
-  ["splitRight", "Разделить вправо", "right"],
-  ["splitDown", "Разделить вниз", "bottom"],
-] as const)
-  registerEditor(
-    `ide.workbench.panel.${action}`,
-    title,
-    (value) => {
-      const id = panelArg(value);
-      layout.value = movePanel(layout.value, id, { groupId: groupOfPanel(layout.value, id)!.id, zone });
-    },
-    (value) => (groupOfPanel(layout.value, panelArg(value))?.panels.length ?? 0) > 1,
-  );
-registerEditor(
-  "ide.workbench.panel.hideGroup",
-  "Скрыть блок",
-  (value) => {
-    layout.value = setGroupHidden(layout.value, groupOfPanel(layout.value, panelArg(value))!.id, true);
-  },
-  (value) => !!groupOfPanel(layout.value, panelArg(value)),
-);
 registerEditor(
   "ide.workbench.sidebar.toggle",
   "Показать или скрыть боковую панель",
@@ -402,18 +249,6 @@ registerEditor(
     sidebarHidden.value = !sidebarHidden.value;
   },
   () => true,
-);
-registerEditor("ide.workbench.layout.reset", "Сбросить раскладку блоков", resetLayout, () => true);
-registerEditor(
-  "ide.workbench.terminal.new",
-  "Новый терминал",
-  async (value) => {
-    const { program = "shell" } = commandArgs(value);
-    if (!["shell", "codex", "claude", "opencode"].includes(program as string))
-      throw new Error("program: shell, codex, claude или opencode");
-    await createTerminal(program as TerminalProgram);
-  },
-  () => !terminals.busy.value,
 );
 const session = useSessionSnapshot(
   () => `projector:workspace:v1:${props.projectId}`,
