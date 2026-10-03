@@ -181,4 +181,14 @@ a {
 .error {
   color: var(--err);
 }
+@media (max-width: 700px) {
+  form,
+  .repo {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .panel {
+    padding: var(--sp-3);
+  }
+}
 </style>

@@ -136,4 +136,9 @@ defineProps<{
   color: var(--muted);
   border-color: var(--line);
 }
+@media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {
+  .btn.chip {
+    min-height: var(--control-h-sm);
+  }
+}
 </style>

@@ -209,3 +209,18 @@ select:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Touch controls share the same scale across pages and workspace panels. */
+@media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {
+  :root {
+    --fs-input: 16px;
+    --control-h: 44px;
+    --control-h-sm: 40px;
+  }
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"]),
+  textarea:not(.xterm-helper-textarea),
+  select {
+    min-height: var(--control-h);
+    font-size: var(--fs-input);
+  }
+}

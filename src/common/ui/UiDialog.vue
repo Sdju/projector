@@ -60,4 +60,16 @@ defineExpose({
 .ui-dialog::backdrop {
   background: var(--overlay);
 }
+@media (max-width: 700px) {
+  .ui-dialog {
+    width: calc(100vw - var(--sp-2) * 2);
+    max-height: calc(100dvh - var(--sp-2) * 2);
+    padding: var(--sp-4);
+  }
+  .ui-dialog.top {
+    top: max(var(--sp-2), env(safe-area-inset-top));
+    padding: var(--sp-2);
+    max-height: calc(100dvh - var(--sp-4));
+  }
+}
 </style>

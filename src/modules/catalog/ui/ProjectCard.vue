@@ -105,4 +105,29 @@ h2 {
   flex-wrap: wrap;
   gap: var(--sp-2);
 }
+@media (max-width: 700px) {
+  .card {
+    padding-block: var(--sp-4);
+    gap: var(--sp-3);
+  }
+  .top {
+    display: grid;
+    grid-template-columns: 8px 20px minmax(0, 1fr) auto;
+  }
+  h2 {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .path {
+    grid-column: 3 / -1;
+    grid-row: 2;
+  }
+  .meta {
+    grid-column: 4;
+    grid-row: 1;
+  }
+  .run {
+    overflow-wrap: anywhere;
+  }
+}
 </style>

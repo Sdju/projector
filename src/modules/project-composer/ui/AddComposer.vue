@@ -257,4 +257,23 @@ strong.name {
   padding-top: var(--sp-2);
   border-top: 1px solid var(--line);
 }
+@media (max-width: 700px) {
+  .bar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .bar > input {
+    min-width: 0;
+  }
+  .bar > button:last-child {
+    grid-column: 1 / -1;
+  }
+  .row {
+    flex-wrap: wrap;
+  }
+  .path {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+}
 </style>
