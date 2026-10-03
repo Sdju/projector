@@ -73,6 +73,22 @@ export function provideIdeCommands() {
     run: () => pageReload.switchMode("prod"),
   });
   workbench.registerCommand({
+    id: "ide.workbench.server.network.lan",
+    title: "Открыть Projector для локальной сети",
+    description:
+      "Переключает сервер на все сетевые интерфейсы, чтобы управлять Projector с телефона или другой машины. Пароль доступа задаётся в настройках. Перезапускает сервер и завершает терминалы.",
+    enabled: () => pageReload.canSwitchNetwork("lan"),
+    run: () => pageReload.switchNetwork("lan"),
+  });
+  workbench.registerCommand({
+    id: "ide.workbench.server.network.local",
+    title: "Ограничить Projector только локально",
+    description:
+      "Возвращает сервер на localhost и закрывает доступ из локальной сети. Перезапускает сервер и завершает терминалы.",
+    enabled: () => pageReload.canSwitchNetwork("local"),
+    run: () => pageReload.switchNetwork("local"),
+  });
+  workbench.registerCommand({
     id: "ide.workbench.commandPalette.open",
     title: "Открыть командный центр",
     enabled: () => !!palette.value || !document.querySelector("dialog[open]"),

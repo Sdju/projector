@@ -39,3 +39,13 @@ export function providersPath(): string {
 export function serverModePath(): string {
   return join(dataDir(), "server-mode");
 }
+
+/** Режим доступа к серверу: `local` или `lan`. */
+export function networkModePath(): string {
+  return join(dataDir(), "network-mode");
+}
+
+/** Хеш пароля доступа по локальной сети (scrypt `salt:hash`). */
+export function lanPasswordPath(): string {
+  return join(dataDir(), "lan-password");
+}

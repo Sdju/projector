@@ -10,6 +10,7 @@ import { handleAppHide } from "../routes/api/app/hide.ts";
 import { handleAppRestart } from "../routes/api/app/restart.ts";
 import { handleAppMode } from "../routes/api/app/mode.ts";
 import { handleAppQuit } from "../routes/api/app/quit.ts";
+import { handleAppNetwork } from "../routes/api/app/network.ts";
 import { handleLauncherSettings } from "../routes/api/launcher/settings.ts";
 import { handleLauncherSearch } from "../routes/api/launcher/search.ts";
 import { handleLauncherLaunch } from "../routes/api/launcher/launch.ts";
@@ -39,6 +40,7 @@ const routes = [
   handleAppRestart,
   handleAppQuit,
   handleAppMode,
+  handleAppNetwork,
   handleLauncherSettings,
   handleLauncherSearch,
   handleLauncherLaunch,

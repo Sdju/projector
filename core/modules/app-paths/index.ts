@@ -7,4 +7,7 @@ export { providersPath } from "./paths.ts";
 export { APP_CLASS } from "./paths.ts";
 export { chromeProfileDir } from "./paths.ts";
 export { serverModePath } from "./paths.ts";
+export { networkModePath } from "./paths.ts";
+export { lanPasswordPath } from "./paths.ts";
 export { readServerMode, writeServerMode } from "./server-mode.ts";
+export { readNetworkMode, writeNetworkMode } from "./network-mode.ts";

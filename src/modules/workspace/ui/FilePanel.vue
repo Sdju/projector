@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { KeybindingsEditor } from "../../ide/index.ts";
+import { LanInfoPanel } from "../../network/index.ts";
 import { isEditable, isMarkdown, type OpenFile } from "../open-file.ts";
 import {
   ArchiveViewer,
@@ -28,6 +29,7 @@ const emit = defineEmits<{
     <div class="breadcrumb">
       <span>{{ file.path }}</span>
       <span v-if="file.virtual === 'keybindings'">настройки IDE</span>
+      <span v-if="file.virtual === 'network'">доступ по сети</span>
       <span v-if="file.external">только просмотр</span>
     </div>
     <p v-if="file.saveError && !isMarkdown(file)" class="file-error" role="alert">
@@ -35,6 +37,7 @@ const emit = defineEmits<{
     </p>
     <div class="panel-body">
       <KeybindingsEditor v-if="file.virtual === 'keybindings'" />
+      <LanInfoPanel v-else-if="file.virtual === 'network'" />
       <CommitOverview
         v-else-if="file.virtual === 'commit' && file.commit"
         :project-id="projectId"

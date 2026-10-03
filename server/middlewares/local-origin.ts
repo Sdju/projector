@@ -1,19 +1,10 @@
 import type { RouteContext } from "../modules/transport/index.ts";
 import { json } from "../modules/transport/index.ts";
-import { terminalRequestAllowed } from "../modules/terminal/index.ts";
+import { accessAllowed } from "../modules/access/index.ts";
 
-export function localOrigin({ req, res, url, path }: RouteContext): boolean {
-  const origin = req.headers.origin;
-  if (origin && origin !== url.origin) {
-    json(res, 403, { error: "Запрос разрешён только со страницы Projector" });
-    return false;
-  }
-  if (
-    (/^\/api\/projects\/[^/]+\/terminals(?:\/|$)/.test(path) ||
-      /^\/api\/agent(?:\/|$)/.test(path)) &&
-    !terminalRequestAllowed(req, false)
-  ) {
-    json(res, 403, { error: "Операция доступна только через локальный Projector" });
+export function localOrigin({ req, res }: RouteContext): boolean {
+  if (!accessAllowed(req, false)) {
+    json(res, 403, { error: "Доступ разрешён только с локальной машины или с паролем Projector" });
     return false;
   }
   return true;

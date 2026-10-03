@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { dataDir } from "../../../../core/modules/app-paths/index.ts";
 import { isServerMode } from "../../../../core/modules/server-mode/index.ts";
 import { HttpError } from "../../../modules/http/index.ts";
-import { terminalRequestAllowed } from "../../../modules/terminal/index.ts";
+import { isLocalRequest } from "../../../modules/access/index.ts";
 import { json, readBody } from "../../../modules/transport/index.ts";
 import type { RouteContext } from "../../../modules/transport/index.ts";
 
@@ -17,8 +17,8 @@ const host = globalThis as typeof globalThis & { projectorModeSwitch?: boolean }
  */
 export async function handleAppMode({ req, res, method, path }: RouteContext): Promise<boolean> {
   if (path !== "/api/app/mode" || method !== "POST") return false;
-  if (!terminalRequestAllowed(req, false))
-    throw new HttpError(403, "Переключение доступно только со страницы Projector");
+  if (!isLocalRequest(req))
+    throw new HttpError(403, "Переключение доступно только с локальной машины");
   const { mode } = (await readBody(req)) as { mode?: unknown };
   if (!isServerMode(mode)) throw new HttpError(400, "Режим: dev или prod");
   if (host.projectorModeSwitch) throw new HttpError(409, "Переключение режима уже выполняется");

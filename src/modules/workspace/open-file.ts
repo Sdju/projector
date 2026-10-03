@@ -1,7 +1,7 @@
 import type { FileContent } from "../../../core/modules/workspace/index.ts";
 
 export interface OpenFile extends FileContent {
-  virtual?: "keybindings" | "agent" | "project" | "commit";
+  virtual?: "keybindings" | "agent" | "project" | "commit" | "network";
   /** Полный хеш: вкладка обзора коммита или diff файла в этом коммите. */
   commit?: string;
   /** Короткий хеш родителя в diff коммита; пусто у корневого коммита. */

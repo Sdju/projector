@@ -1,7 +1,7 @@
 import { findProject } from "../../../../modules/projects/index.ts";
 import { HttpError } from "../../../../modules/http/index.ts";
 import { json, readBody } from "../../../../modules/transport/index.ts";
-import { terminalRequestAllowed } from "../../../../modules/terminal/index.ts";
+import { accessAllowed } from "../../../../modules/access/index.ts";
 import {
   listProjectDirectory,
   previewExternalFile,
@@ -41,7 +41,7 @@ export async function handleProjectWorkspace({
   }
 
   if (sessionId === "file" && method === "PUT") {
-    if (!terminalRequestAllowed(req, true))
+    if (!accessAllowed(req, true))
       throw new HttpError(403, "Сохранение доступно только со страницы Projector");
     const body = await readBody(req);
     if (
@@ -56,7 +56,7 @@ export async function handleProjectWorkspace({
   }
 
   if (sessionId === "move" && method === "POST") {
-    if (!terminalRequestAllowed(req, true))
+    if (!accessAllowed(req, true))
       throw new HttpError(403, "Перенос доступен только со страницы Projector");
     const body = await readBody(req);
     if (typeof body.path !== "string" || typeof body.directory !== "string")
@@ -67,7 +67,7 @@ export async function handleProjectWorkspace({
   }
 
   if (sessionId === "entry" && method === "POST") {
-    if (!terminalRequestAllowed(req, true))
+    if (!accessAllowed(req, true))
       throw new HttpError(403, "Операции доступны только со страницы Projector");
     const body = await readBody(req);
     for (const key of ["action", "path", "directory", "name"])
@@ -89,7 +89,7 @@ export async function handleProjectWorkspace({
   }
 
   if (sessionId === "branch" && method === "POST") {
-    if (!terminalRequestAllowed(req, true))
+    if (!accessAllowed(req, true))
       throw new HttpError(403, "Операции доступны только со страницы Projector");
     const body = await readBody(req);
     for (const key of ["name", "newName", "from"])
@@ -112,7 +112,7 @@ export async function handleProjectWorkspace({
   }
 
   if (sessionId === "git" && method === "POST") {
-    if (!terminalRequestAllowed(req, true))
+    if (!accessAllowed(req, true))
       throw new HttpError(403, "Операции доступны только со страницы Projector");
     const body = await readBody(req);
     const paths = body.paths ?? body.path;
@@ -130,7 +130,7 @@ export async function handleProjectWorkspace({
   }
 
   if (method === "GET") {
-    if (!terminalRequestAllowed(req, false))
+    if (!accessAllowed(req, false))
       throw new HttpError(403, "Обзор доступен только со страницы Projector");
     res.setHeader("Cache-Control", "no-store");
     const filePath = url.searchParams.get("path") ?? "";

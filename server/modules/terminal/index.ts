@@ -4,7 +4,6 @@ export { stopTerminalSession } from "./terminal.ts";
 export { closeTerminalSession } from "./terminal.ts";
 export { createTerminalSession } from "./terminal.ts";
 export { listTerminalSessions } from "./terminal.ts";
-export { terminalRequestAllowed } from "./access.ts";
 export { attachTerminalServer } from "./socket.ts";
 
 export { trackMouseEncoding } from "./terminal-mouse.ts";

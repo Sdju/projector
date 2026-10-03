@@ -4,6 +4,7 @@ import { Terminal, type IDisposable } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { openExternalLink } from "../../../common/utilities/open-external-link.ts";
+import { lanPassword } from "../../../common/utilities/lan-auth.ts";
 import { deferTerminalText } from "../lib/keyboard.ts";
 import { bindTerminalInput } from "../lib/input.ts";
 import { bindTerminalLinks, type TerminalLink } from "../lib/links.ts";
@@ -182,6 +183,8 @@ function connect(): void {
   const url = new URL("/api/terminal/socket", location.href);
   url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
   url.searchParams.set("session", sessionId);
+  const token = lanPassword();
+  if (token) url.searchParams.set("token", token);
   const client = new WebSocket(url);
   socket = client;
   client.onmessage = (event) => {

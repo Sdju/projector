@@ -4,7 +4,7 @@ import type { HttpServer } from "vite";
 import { WebSocket, WebSocketServer } from "ws";
 import { loadProjects } from "../projects/index.ts";
 import { MAX_BUFFER, state, size, send, broadcast, flow, type Session } from "./session-state.ts";
-import { terminalRequestAllowed } from "./access.ts";
+import { accessAllowed } from "../access/index.ts";
 
 export function attachTerminalServer(server: Server | HttpServer): void {
   if (state.servers.has(server)) return;
@@ -34,7 +34,7 @@ export function attachTerminalServer(server: Server | HttpServer): void {
   server.on("upgrade", (req: IncomingMessage, socket: Duplex, head: Buffer) => {
     const url = new URL(req.url ?? "/", "http://localhost");
     if (url.pathname !== "/api/terminal/socket") return; // Leave Vite HMR alone.
-    if (!terminalRequestAllowed(req)) {
+    if (!accessAllowed(req, true, url.searchParams.get("token") ?? undefined)) {
       socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
       return;
     }

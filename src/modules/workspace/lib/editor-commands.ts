@@ -113,6 +113,17 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
     },
     () => true,
   );
+  register(
+    "ide.workbench.server.network.open",
+    "Показать доступ по локальной сети",
+    () => {
+      const key = "network:info";
+      if (!tabs.value.some((tab) => tab.key === key))
+        tabs.value.push({ key, virtual: "network", path: "Локальная сеть", content: "" });
+      selectTab(key);
+    },
+    () => true,
+  );
   function editorKeydown(event: KeyboardEvent) {
     if (
       active()?.virtual === "project" &&
@@ -126,13 +137,17 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
     }
     if (
       !(event.target as Element).closest(
-        ".keybindings-editor, .project-settings-form, .terminal-view",
+        ".keybindings-editor, .project-settings-form, .terminal-view, .network-panel",
       )
     )
       editorCommands.keydown(event);
   }
   function editorFocus(event: FocusEvent) {
-    if (!(event.target as Element)?.closest(".workspace-tabs, .keybindings-editor, .terminal-view"))
+    if (
+      !(event.target as Element)?.closest(
+        ".workspace-tabs, .keybindings-editor, .terminal-view, .network-panel",
+      )
+    )
       editorCommands.scope.activate();
   }
   return { tabActions, editorKeydown, editorFocus };

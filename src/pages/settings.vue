@@ -3,6 +3,7 @@ import UiHint from "../common/ui/UiHint.vue";
 import { ProviderPanel } from "../modules/provider/index.ts";
 import { IntegrationSettings } from "../modules/integrations/index.ts";
 import { InterfaceSettings } from "../modules/launcher/index.ts";
+import { NetworkSettings } from "../modules/network/index.ts";
 import { EditorSettings } from "../modules/workspace/index.ts";
 </script>
 
@@ -11,6 +12,7 @@ import { EditorSettings } from "../modules/workspace/index.ts";
     <router-link class="back" to="/">← поиск</router-link>
     <h1>Настройки</h1>
     <InterfaceSettings />
+    <NetworkSettings />
     <EditorSettings />
     <IntegrationSettings />
     <section class="model">

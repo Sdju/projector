@@ -135,6 +135,7 @@ const virtualTabs = {
   },
   agent: { key: "agent:chat", path: "Агент", title: "Чат с агентом Projector" },
   project: { key: "settings:project", path: "Настройки проекта", title: "Настройки проекта" },
+  network: { key: "network:info", path: "Локальная сеть", title: "Доступ по локальной сети" },
 };
 function openProjectSettings() {
   const { key, path } = virtualTabs.project;

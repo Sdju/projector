@@ -10,9 +10,9 @@ import {
   closeTerminalSession,
   createTerminalSession,
   listTerminalSessions,
-  terminalRequestAllowed,
   resolveTerminalFile,
 } from "../../../../modules/terminal/index.ts";
+import { accessAllowed } from "../../../../modules/access/index.ts";
 import type { RouteContext } from "../../../../modules/transport/index.ts";
 
 export async function handleProjectTerminals({
@@ -32,7 +32,7 @@ export async function handleProjectTerminals({
   }
 
   if (sessionId && method === "PUT") {
-    if (!terminalRequestAllowed(req, true))
+    if (!accessAllowed(req, true))
       throw new HttpError(403, "Загрузка доступна только со страницы Projector");
     json(res, 201, {
       path: await uploadTerminalFile(id, sessionId, req, url.searchParams.get("name") ?? ""),
@@ -85,7 +85,7 @@ export async function handleProjectTerminals({
   }
   if (sessionId && method === "GET") {
     if (url.searchParams.has("link")) {
-      if (!terminalRequestAllowed(req, false))
+      if (!accessAllowed(req, false))
         throw new HttpError(403, "Открытие доступно только со страницы Projector");
       res.setHeader("Cache-Control", "no-store");
       json(

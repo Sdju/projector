@@ -3,7 +3,8 @@ import vue from "@vitejs/plugin-vue";
 import Icons from "unplugin-icons/vite";
 import { defineConfig, type Plugin } from "vite-plus";
 import { checkArchitecture } from "./scripts/check-architecture.mjs";
-import { APP_PORT } from "./core/modules/app-paths/index.ts";
+import { APP_PORT, readNetworkMode } from "./core/modules/app-paths/index.ts";
+import { networkHost } from "./core/modules/network-mode/index.ts";
 import { projectorPlugin } from "./server/app/plugin.ts";
 
 function architecturePlugin(): Plugin {
@@ -26,12 +27,12 @@ export default defineConfig({
     },
   },
   server: {
-    host: "localhost",
+    host: networkHost(readNetworkMode()),
     port: APP_PORT,
     strictPort: true,
   },
   preview: {
-    host: "localhost",
+    host: networkHost(readNetworkMode()),
     port: APP_PORT,
     strictPort: true,
   },

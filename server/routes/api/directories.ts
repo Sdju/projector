@@ -2,7 +2,7 @@ import { listDirectories } from "../../modules/directories/index.ts";
 
 import { HttpError } from "../../modules/http/index.ts";
 
-import { terminalRequestAllowed } from "../../modules/terminal/index.ts";
+import { accessAllowed } from "../../modules/access/index.ts";
 
 import { json } from "../../modules/transport/index.ts";
 
@@ -16,7 +16,7 @@ export async function handleDirectories({
   path,
 }: RouteContext): Promise<boolean> {
   if (path === "/api/directories" && method === "GET") {
-    if (!terminalRequestAllowed(req, false))
+    if (!accessAllowed(req, false))
       throw new HttpError(403, "Папки доступны только со страницы Projector");
     res.setHeader("Cache-Control", "no-store");
     json(

@@ -18,6 +18,8 @@ const mode = modeFlag?.slice(2);
 const toggle = args.includes("toggle") || args.includes("--toggle");
 const tray = args.includes("--tray");
 const quit = args.includes("quit") || args.includes("--quit");
+const lan = args.includes("--lan");
+const local = args.includes("--local");
 const modeCommand = args[0] === "mode";
 
 function sleep(ms) {
@@ -117,10 +119,14 @@ async function waitUntilReady(timeoutMs = 30000) {
 
 function childEnv() {
   const vpBin = os.toolchainBin();
-  return {
+  const env = {
     ...process.env,
     PATH: `${vpBin}:${process.env.PATH ?? "/usr/bin"}`,
   };
+  // Одноразовый режим доступа: не сохраняется на диск и не влияет на следующие запуски.
+  if (lan) env.PROJECTOR_NETWORK = "lan";
+  else if (local) env.PROJECTOR_NETWORK = "local";
+  return env;
 }
 
 function run(vp, commandArgs) {

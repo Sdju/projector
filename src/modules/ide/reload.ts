@@ -16,16 +16,22 @@ export function createPageReload(reportError: (error: unknown) => void, changed:
     const data = await response.json();
     if (!response.ok || !data.ok || data.app !== "projector" || !Number.isInteger(data.pid))
       throw new Error("Сервер Projector недоступен");
-    return { pid: data.pid as number, mode: data.mode === "prod" ? "prod" : "dev" } as const;
+    return {
+      pid: data.pid as number,
+      mode: data.mode === "prod" ? "prod" : "dev",
+      network: data.network?.mode === "lan" ? "lan" : "local",
+    } as const;
   }
 
   /** Режим работающего сервера; null, пока он не известен. */
   let serverMode: "dev" | "prod" | null = null;
+  let networkMode: "local" | "lan" | null = null;
   async function refreshMode() {
     try {
-      const { mode } = await health();
-      if (mode !== serverMode) {
+      const { mode, network } = await health();
+      if (mode !== serverMode || network !== networkMode) {
         serverMode = mode;
+        networkMode = network;
         if (!disposed) changed();
       }
     } catch {
@@ -66,6 +72,7 @@ export function createPageReload(reportError: (error: unknown) => void, changed:
     isBusy: () => busy,
     /** Команда переключения недоступна, если сервер уже в этом режиме. */
     canSwitchMode: (target: "dev" | "prod") => !busy && serverMode !== target,
+    canSwitchNetwork: (target: "local" | "lan") => !busy && networkMode !== target,
     refreshMode,
     reloadPages() {
       channel.postMessage({ type: "reload" });
@@ -113,6 +120,33 @@ export function createPageReload(reportError: (error: unknown) => void, changed:
         const data = await response.json();
         if (!response.ok || !data.ok)
           throw new Error(data.error || "Не удалось переключить режим сервера");
+        channel.postMessage({ type: "restart", pid });
+        await reloadAfterRestart(pid);
+      } finally {
+        if (!disposed) setBusy(false);
+      }
+    },
+    /** Переключает доступ по сети; пароль задаётся в настройках. */
+    async switchNetwork(target: "local" | "lan") {
+      if (busy) return;
+      const { pid, network } = await health();
+      if (network === target) throw new Error(`Сервер уже работает в режиме ${target}`);
+      if (
+        !window.confirm(
+          `Переключить доступ Projector в режим ${target === "lan" ? "локальной сети" : "только localhost"}? Сервер будет перезапущен, терминалы и дочерние процессы завершены.`,
+        )
+      )
+        return;
+      setBusy(true);
+      try {
+        const response = await fetch("/api/app/network", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode: target }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok)
+          throw new Error(data.error || "Не удалось переключить доступ по сети");
         channel.postMessage({ type: "restart", pid });
         await reloadAfterRestart(pid);
       } finally {
