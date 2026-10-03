@@ -9,6 +9,7 @@ import SidebarTabs, { type SidebarSection } from "./SidebarTabs.vue";
 import GitPanel from "./GitPanel.vue";
 import { useGitOverview } from "../lib/git-overview.ts";
 import { useGitHistory } from "../lib/git-history.ts";
+import { useGitBranches } from "../lib/git-branches.ts";
 import { useGitChangeSync } from "../lib/git-change-sync.ts";
 import { useSidebarResize } from "../lib/sidebar-resize.ts";
 import { useOpenFiles } from "../lib/open-files.ts";
@@ -51,6 +52,7 @@ function entryDeleted(path: string) {
 }
 const overview = useGitOverview(() => props.projectId);
 const history = useGitHistory(() => props.projectId);
+const branches = useGitBranches(() => props.projectId);
 const { git, gutterRevision, load: loadGit } = overview;
 const gitPanel = ref<InstanceType<typeof GitPanel>>();
 const section = ref<SidebarSection>("files");
@@ -172,6 +174,7 @@ useWorkspaceSession({
   resetGit: () => {
     overview.reset();
     history.reset();
+    branches.reset();
   },
   reloadGit: () => void loadGit(),
 });
@@ -284,6 +287,7 @@ onBeforeUnmount(() => {
         :project-id="projectId"
         :overview="overview"
         :history="history"
+        :branches="branches"
         :selected="active ? { path: active.path, staged: active.staged } : undefined"
         :prepare="prepareGitChange"
         :invalidate="files.invalidate"

@@ -6,7 +6,9 @@ import UiButton from "../../../common/ui/UiButton.vue";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import type { GitOverviewState } from "../lib/git-overview.ts";
+import type { GitBranchesState } from "../lib/git-branches.ts";
 import type { GitHistoryState } from "../lib/git-history.ts";
+import GitBranchBar from "./GitBranchBar.vue";
 import GitChangesTree from "./GitChangesTree.vue";
 import GitHistory from "./GitHistory.vue";
 import IconPlus from "~icons/lucide/plus";
@@ -17,6 +19,7 @@ const props = defineProps<{
   projectId: string;
   overview: GitOverviewState;
   history: GitHistoryState;
+  branches: GitBranchesState;
   /** Файл активной вкладки: подсвечивается в списке изменений. */
   selected?: { path: string; staged?: boolean };
   /** Сохраняет открытые файлы и ждёт записи перед изменением Git; бросает ошибку при неудаче. */
@@ -44,6 +47,8 @@ const collapsedGroups = ref(new Set<string>());
 const gitMenu = ref<InstanceType<typeof ContextMenu>>();
 const gitTarget = ref({ path: "", staged: false });
 const historyOpen = ref(false);
+const branchOpen = ref(false);
+const branchTarget = ref("");
 const commitTarget = ref({ hash: "", path: "" });
 const gitCommands = useCommandScope(`git:${props.projectId}`, () => ({
   surface: "git",
@@ -54,6 +59,8 @@ const gitCommands = useCommandScope(`git:${props.projectId}`, () => ({
   commit: commitTarget.value.hash,
   commitPath: commitTarget.value.path,
   historyOpen: historyOpen.value,
+  branch: branchTarget.value,
+  branchesOpen: branchOpen.value,
 }));
 function gitArgs(value?: unknown) {
   const args = commandArgs(value);
@@ -187,7 +194,17 @@ defineExpose({
     @focusin="gitCommands.scope.activate()"
     @keydown="gitCommands.keydown($event)"
   >
-    <p v-if="git.available" class="notice">{{ git.branch }}</p>
+    <GitBranchBar
+      v-if="git.available"
+      v-model:open="branchOpen"
+      v-model:target="branchTarget"
+      :branches="branches"
+      :commands="gitCommands"
+      :revision="overview.gutterRevision.value"
+      :prepare="prepare"
+      :applied="applied"
+      :reload="load"
+    />
     <p v-if="gitLoading" class="notice" role="status">загрузка Git…</p>
     <p v-if="gitError" class="notice error" role="alert">{{ gitError }}</p>
     <p v-else-if="!gitLoading && !git.available" class="notice">

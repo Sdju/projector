@@ -101,3 +101,18 @@ export async function mutateWorkspaceGit(
   if (!response.ok) throw new Error(data.error || "Не удалось выполнить действие Git");
   return data as import("../../../core/modules/workspace/index.ts").GitOverview;
 }
+
+export async function mutateWorkspaceBranch(
+  projectId: string,
+  action: string,
+  input: { name?: string; newName?: string; from?: string; checkout?: boolean; force?: boolean },
+) {
+  const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}/workspace/branch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, ...input }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Не удалось выполнить действие с веткой");
+  return data as import("../../../core/modules/workspace/index.ts").GitBranches;
+}
