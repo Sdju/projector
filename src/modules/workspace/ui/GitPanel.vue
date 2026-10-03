@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useGitBlocks } from "../lib/git-blocks.ts";
 import type { GitOverview } from "../../../../core/modules/workspace/index.ts";
 import ContextMenu from "../../../common/ui/ContextMenu.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
@@ -9,13 +8,13 @@ import { commandArgs, useCommandScope } from "../../../common/utilities/commands
 import type { GitOverviewState } from "../lib/git-overview.ts";
 import type { GitBranchesState } from "../lib/git-branches.ts";
 import type { GitHistoryState } from "../lib/git-history.ts";
-import GitBlock from "./GitBlock.vue";
 import GitBranchBar from "./GitBranchBar.vue";
+import GitSplitter from "./GitSplitter.vue";
 import GitChangesTree from "./GitChangesTree.vue";
 import GitHistory from "./GitHistory.vue";
 import IconPlus from "~icons/lucide/plus";
 import IconMinus from "~icons/lucide/minus";
-import IconRefresh from "~icons/lucide/refresh-cw";
+import IconChevronRight from "~icons/lucide/chevron-right";
 
 const props = defineProps<{
   projectId: string;
@@ -44,15 +43,22 @@ const workingChanges = computed(() =>
   git.value.changes.filter((change) => change.worktree !== " "),
 );
 const gitBusy = ref(false);
-/** Блоки панели делят высоту; история по умолчанию свёрнута. */
-const blocks = useGitBlocks(["staged", "changed", "history"], ["history"]);
-const stack = ref<HTMLElement>();
-const historyOpen = computed({
-  get: () => !blocks.collapsed.value.has("history"),
-  set: (open: boolean) => blocks.setCollapsed("history", !open),
-});
+/** Свёрнутые блоки изменений: ключ группы — `staged` или `changed`. */
+const collapsedGroups = ref(new Set<string>());
 const gitMenu = ref<InstanceType<typeof ContextMenu>>();
 const gitTarget = ref({ path: "", staged: false });
+const historyOpen = ref(false);
+/** Высота истории, подогнанная перетаскиванием; без неё история занимает место по содержимому. */
+const historyHeight = ref<number>();
+const stack = ref<HTMLElement>();
+const historyZone = ref<HTMLElement>();
+const historyStyle = computed(() =>
+  !historyOpen.value
+    ? { flex: "0 0 auto" }
+    : historyHeight.value
+      ? { flex: `0 0 ${historyHeight.value}px` }
+      : { flex: "0 1 auto" },
+);
 const branchOpen = ref(false);
 const branchTarget = ref("");
 const commitTarget = ref({ hash: "", path: "" });
@@ -161,14 +167,24 @@ gitCommands.scope.registerCommand({
   run: (value) => {
     const args = commandArgs(value);
     if (typeof args.staged !== "boolean") throw new Error("staged должен быть boolean");
-    blocks.toggle(args.staged ? "staged" : "changed");
+    const key = args.staged ? "staged" : "changed";
+    if (collapsedGroups.value.has(key)) collapsedGroups.value.delete(key);
+    else collapsedGroups.value.add(key);
   },
 });
 gitCommands.scope.registerCommand({
-  id: "ide.git.block.reset",
-  title: "Вернуть размеры блоков Git",
-  description: "Сбрасывает высоты блоков Staged, Changed и History, подогнанные перетаскиванием.",
-  run: () => blocks.reset(),
+  id: "ide.git.history.resize",
+  title: "Изменить высоту истории Git",
+  description:
+    "Задаёт высоту блока History в пикселях; без height возвращает размер по содержимому.",
+  arguments: { height: "Высота в пикселях; не меньше 120" },
+  run: (value) => {
+    const { height } = commandArgs(value);
+    if (height !== undefined && (typeof height !== "number" || !(height >= 120)))
+      throw new Error("height должен быть числом не меньше 120");
+    historyHeight.value = height as number | undefined;
+    if (height !== undefined) historyOpen.value = true;
+  },
 });
 gitCommands.scope.registerCommand({
   id: "ide.git.refresh",
@@ -222,103 +238,90 @@ defineExpose({
     </p>
     <p v-else-if="!gitLoading && !git.changes.length" class="notice">Нет изменений.</p>
     <div v-if="git.available" ref="stack" class="git-stack">
-      <GitBlock
-        v-for="group in [
-          { id: 'staged', label: 'Staged', rows: stagedChanges, staged: true },
-          { id: 'changed', label: 'Changed', rows: workingChanges, staged: false },
-        ]"
-        :key="group.id"
-        :id="group.id"
-        :blocks="blocks"
-        :stack="stack"
-        :label="group.label"
-        command="ide.git.group.toggle"
-        @toggle="gitCommands.run('ide.git.group.toggle', { staged: group.staged })"
-      >
-        <template #title>
-          {{ group.label }} <span v-if="group.rows.length" class="count">{{ group.rows.length }}</span>
-        </template>
-        <template #actions>
-          <UiButton
+      <div class="changes-zone">
+        <template
+          v-for="group in [
+            { label: 'Staged', rows: stagedChanges, staged: true },
+            { label: 'Changed', rows: workingChanges, staged: false },
+          ]"
+          :key="group.label"
+        >
+          <div v-if="git.available" class="git-group">
+            <button
+              class="group-toggle"
+              :aria-expanded="!collapsedGroups.has(group.staged ? 'staged' : 'changed')"
+              data-command="ide.git.group.toggle"
+              @click="gitCommands.run('ide.git.group.toggle', { staged: group.staged })"
+            >
+              <IconChevronRight
+                class="chevron"
+                :class="{ open: !collapsedGroups.has(group.staged ? 'staged' : 'changed') }"
+                aria-hidden="true"
+              />
+              <h3>
+                {{ group.label }} <span v-if="group.rows.length">{{ group.rows.length }}</span>
+              </h3>
+            </button>
+            <UiButton
+              v-if="group.rows.length"
+              icon
+              size="sm"
+              :disabled="
+                !gitCommands.scope.describe(group.staged ? 'ide.git.unstage' : 'ide.git.stage', {
+                  path: '',
+                })?.enabled
+              "
+              :title="group.staged ? 'Убрать всё из Staged' : 'Отметить всё Staged'"
+              :aria-label="group.staged ? 'Убрать всё из Staged' : 'Отметить всё Staged'"
+              :data-command="group.staged ? 'ide.git.unstage' : 'ide.git.stage'"
+              @click="
+                gitCommands.run(group.staged ? 'ide.git.unstage' : 'ide.git.stage', {
+                  path: '',
+                  staged: group.staged,
+                })
+              "
+            >
+              <IconMinus v-if="group.staged" aria-hidden="true" /><IconPlus
+                v-else
+                aria-hidden="true"
+              />
+            </UiButton>
+          </div>
+          <GitChangesTree
             v-if="group.rows.length"
-            icon
-            size="sm"
-            :disabled="
-              !gitCommands.scope.describe(group.staged ? 'ide.git.unstage' : 'ide.git.stage', {
-                path: '',
-              })?.enabled
+            v-show="!collapsedGroups.has(group.staged ? 'staged' : 'changed')"
+            :key="`${projectId}:${group.staged}`"
+            :changes="group.rows"
+            :staged="group.staged"
+            :disabled="gitBusy"
+            :can-toggle="
+              (path) =>
+                !!gitCommands.scope.describe(group.staged ? 'ide.git.unstage' : 'ide.git.stage', {
+                  path,
+                })?.enabled
             "
-            :title="group.staged ? 'Убрать всё из Staged' : 'Отметить всё Staged'"
-            :aria-label="group.staged ? 'Убрать всё из Staged' : 'Отметить всё Staged'"
-            :data-command="group.staged ? 'ide.git.unstage' : 'ide.git.stage'"
-            @click="
+            :selected="selected?.staged === group.staged ? selected.path : ''"
+            @change="
               gitCommands.run(group.staged ? 'ide.git.unstage' : 'ide.git.stage', {
-                path: '',
+                path: $event,
                 staged: group.staged,
               })
             "
-          >
-            <IconMinus v-if="group.staged" aria-hidden="true" /><IconPlus
-              v-else
-              aria-hidden="true"
-            />
-          </UiButton>
+            @target="gitTarget = { path: $event, staged: group.staged }"
+            @open="gitCommands.run('ide.git.openDiff', { path: $event, staged: group.staged })"
+            @context="(event, path) => gitContext(event, path, group.staged)"
+          />
         </template>
-        <GitChangesTree
-          v-if="group.rows.length"
-          :key="`${projectId}:${group.staged}`"
-          :changes="group.rows"
-          :staged="group.staged"
-          :disabled="gitBusy"
-          :can-toggle="
-            (path) =>
-              !!gitCommands.scope.describe(group.staged ? 'ide.git.unstage' : 'ide.git.stage', {
-                path,
-              })?.enabled
-          "
-          :selected="selected?.staged === group.staged ? selected.path : ''"
-          @change="
-            gitCommands.run(group.staged ? 'ide.git.unstage' : 'ide.git.stage', {
-              path: $event,
-              staged: group.staged,
-            })
-          "
-          @target="gitTarget = { path: $event, staged: group.staged }"
-          @open="gitCommands.run('ide.git.openDiff', { path: $event, staged: group.staged })"
-          @context="(event, path) => gitContext(event, path, group.staged)"
-        />
-      </GitBlock>
-      <GitBlock
-        id="history"
-        :blocks="blocks"
+      </div>
+      <GitSplitter
+        v-if="historyOpen"
+        :target="historyZone"
         :stack="stack"
-        label="History"
-        command="ide.git.history.toggle"
-        @toggle="gitCommands.run('ide.git.history.toggle')"
-      >
-        <template #title>
-          History
-          <span v-if="history.log.value.ahead" class="sync" title="Не отправлено в upstream">
-            ↑{{ history.log.value.ahead }}
-          </span>
-          <span v-if="history.log.value.behind" class="sync" title="Есть в upstream, нет локально">
-            ↓{{ history.log.value.behind }}
-          </span>
-        </template>
-        <template #actions>
-          <UiButton
-            v-if="historyOpen"
-            icon
-            size="sm"
-            :disabled="history.loading.value"
-            title="Обновить историю"
-            aria-label="Обновить историю"
-            data-command="ide.git.history.refresh"
-            @click="gitCommands.run('ide.git.history.refresh')"
-          >
-            <IconRefresh aria-hidden="true" />
-          </UiButton>
-        </template>
+        @resize="historyHeight = $event"
+        @collapse="historyOpen = false"
+        @reset="gitCommands.run('ide.git.history.resize')"
+      />
+      <div ref="historyZone" class="history-zone" :style="historyStyle">
         <GitHistory
           v-model:open="historyOpen"
           v-model:target="commitTarget"
@@ -329,14 +332,14 @@ defineExpose({
           @open-diff="(hash, path) => emit('openCommitDiff', hash, path)"
           @open-file="emit('open', $event)"
         />
-      </GitBlock>
+      </div>
     </div>
     <ContextMenu ref="gitMenu" :items="gitMenuItems" label="Действия Git" />
   </div>
 </template>
 
 <style scoped>
-/* Блоки делят высоту панели и прокручиваются каждый сам; панель целиком не прокручивается. */
+/* Две зоны делят высоту панели: изменения и история прокручиваются каждая сама. */
 .side-content.git-panel {
   display: flex;
   flex-direction: column;
@@ -348,12 +351,39 @@ defineExpose({
   display: flex;
   flex-direction: column;
 }
-.count {
+.changes-zone {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
+}
+.history-zone {
+  min-height: 0;
+  max-height: calc(100% - 96px);
+  overflow: auto;
+}
+.git-group {
+  display: flex;
+  align-items: center;
+  padding: 6px var(--sp-3) 2px var(--sp-3);
+}
+.git-group h3 {
+  padding: 0;
+}
+.group-toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  text-align: left;
+  padding: 2px 0;
+}
+.chevron {
+  width: 12px;
+  height: 12px;
   color: var(--faint);
 }
-.sync {
-  font: var(--fs-2xs) var(--mono);
-  color: var(--warn);
+.chevron.open {
+  transform: rotate(90deg);
 }
 .notice {
   padding: 0 var(--sp-3);
@@ -362,5 +392,18 @@ defineExpose({
 }
 .error {
   color: var(--err);
+}
+h3 {
+  padding: 10px 12px 4px;
+  margin: 0;
+  font-size: var(--fs-2xs);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--muted);
+}
+h3 span {
+  margin-left: 6px;
+  color: var(--faint);
 }
 </style>

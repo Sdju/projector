@@ -8,6 +8,8 @@ import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import { commandArgs, type useCommandScope } from "../../../common/utilities/commands.ts";
 import type { GitHistoryState } from "../lib/git-history.ts";
 import GitCommitRow from "./GitCommitRow.vue";
+import IconChevronRight from "~icons/lucide/chevron-right";
+import IconRefresh from "~icons/lucide/refresh-cw";
 
 const props = defineProps<{
   history: GitHistoryState;
@@ -172,6 +174,33 @@ watch(commits, (list) => {
 
 <template>
   <section class="history" aria-label="История Git">
+    <div class="head">
+      <button
+        class="toggle"
+        :aria-expanded="open"
+        data-command="ide.git.history.toggle"
+        @click="open = !open"
+      >
+        <IconChevronRight class="chevron" :class="{ open }" aria-hidden="true" />
+        <h3>History</h3>
+        <span v-if="log.ahead" class="sync" title="Не отправлено в upstream">↑{{ log.ahead }}</span>
+        <span v-if="log.behind" class="sync" title="Есть в upstream, нет локально">
+          ↓{{ log.behind }}
+        </span>
+      </button>
+      <UiButton
+        v-if="open"
+        icon
+        size="sm"
+        :disabled="loading"
+        title="Обновить историю"
+        aria-label="Обновить историю"
+        data-command="ide.git.history.refresh"
+        @click="commands.run('ide.git.history.refresh')"
+      >
+        <IconRefresh aria-hidden="true" />
+      </UiButton>
+    </div>
     <template v-if="open">
       <div class="filter">
         <input
@@ -236,8 +265,44 @@ watch(commits, (list) => {
 </template>
 
 <style scoped>
-.history {
-  padding-bottom: var(--sp-2);
+.head {
+  /* Заголовок остаётся на виду при прокрутке списка. */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-sunken);
+  display: flex;
+  align-items: center;
+  padding-right: var(--sp-3);
+}
+.toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px var(--sp-3) 4px 8px;
+  text-align: left;
+}
+h3 {
+  margin: 0;
+  font-size: var(--fs-2xs);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--muted);
+}
+.chevron {
+  width: 12px;
+  height: 12px;
+  color: var(--faint);
+}
+.chevron.open {
+  transform: rotate(90deg);
+}
+.sync {
+  margin-left: 6px;
+  font: var(--fs-2xs) var(--mono);
+  color: var(--warn);
 }
 .filter {
   display: flex;
