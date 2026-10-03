@@ -6,3 +6,5 @@ export { instancePath } from "./paths.ts";
 export { providersPath } from "./paths.ts";
 export { APP_CLASS } from "./paths.ts";
 export { chromeProfileDir } from "./paths.ts";
+export { serverModePath } from "./paths.ts";
+export { readServerMode, writeServerMode } from "./server-mode.ts";

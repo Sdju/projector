@@ -1,7 +1,9 @@
 import { execFileSync, spawn } from "node:child_process";
-import { accessSync, constants, mkdirSync, openSync } from "node:fs";
+import { accessSync, constants, existsSync, mkdirSync, openSync } from "node:fs";
 import { open, readFile, unlink } from "node:fs/promises";
 import { os } from "../../core/modules/os/index.ts";
+import { SERVER_MODES, isServerMode, serverCommand } from "../../core/modules/server-mode/index.ts";
+import { readServerMode, writeServerMode } from "../../core/modules/app-paths/index.ts";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -16,6 +18,7 @@ const mode = modeFlag?.slice(2);
 const toggle = args.includes("toggle") || args.includes("--toggle");
 const tray = args.includes("--tray");
 const quit = args.includes("quit") || args.includes("--quit");
+const modeCommand = args[0] === "mode";
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -53,21 +56,25 @@ function findVp() {
   return "vp";
 }
 
-async function health() {
+async function serverInfo() {
   try {
     const response = await fetch(`${APP_URL}/api/health`, { signal: AbortSignal.timeout(500) });
     const data = await response.json();
-    return Boolean(response.ok && data.ok && data.app === "projector");
+    return response.ok && data.ok && data.app === "projector" ? data : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
-async function openApp() {
-  const response = await fetch(`${APP_URL}/api/app/${quit ? "quit" : "open"}`, {
+async function health() {
+  return Boolean(await serverInfo());
+}
+
+async function openApp(options = { mode, toggle, tray }, action = quit ? "quit" : "open") {
+  const response = await fetch(`${APP_URL}/api/app/${action}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode, toggle, tray }),
+    body: JSON.stringify(options),
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -116,8 +123,30 @@ function childEnv() {
   };
 }
 
+function run(vp, commandArgs) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(vp, commandArgs, { cwd: ROOT, stdio: "inherit", env: childEnv() });
+    child.once("error", reject);
+    child.once("exit", (code) =>
+      code === 0
+        ? resolve()
+        : reject(new Error(`vp ${commandArgs.join(" ")} завершился (${code})`)),
+    );
+  });
+}
+
+function buildFrontend(vp) {
+  console.log("Сборка фронтенда (vp build)…");
+  return run(vp, ["build"]);
+}
+
+async function ensureBuilt(vp, serverMode) {
+  if (serverMode === "prod" && !existsSync(join(ROOT, "dist", "index.html")))
+    await buildFrontend(vp);
+}
+
 function startForeground(vp) {
-  const child = spawn(vp, ["dev"], {
+  const child = spawn(vp, serverCommand(readServerMode()), {
     cwd: ROOT,
     stdio: "inherit",
     env: childEnv(),
@@ -130,7 +159,7 @@ function startForeground(vp) {
 function startDaemon(vp) {
   mkdirSync(DATA_DIR, { recursive: true });
   const logFd = openSync(join(DATA_DIR, "server.log"), "a");
-  const child = spawn(vp, ["dev"], {
+  const child = spawn(vp, serverCommand(readServerMode()), {
     cwd: ROOT,
     detached: true,
     stdio: ["ignore", logFd, logFd],
@@ -139,9 +168,43 @@ function startDaemon(vp) {
   child.unref();
 }
 
+/** Меняет режим на диске и, если сервер работает в другом режиме, перезапускает его. */
+async function switchMode(target) {
+  const info = await serverInfo();
+  if (!target) {
+    console.log(`режим: ${readServerMode()}`);
+    console.log(info ? `сервер: ${info.mode ?? "dev"} (pid ${info.pid})` : "сервер не запущен");
+    return;
+  }
+  if (!isServerMode(target)) throw new Error(`Режим: ${SERVER_MODES.join(" | ")}`);
+  const vp = findVp();
+  // Сборку делаем до остановки сервера: при ошибке старый процесс и терминалы остаются.
+  if (target === "prod") await buildFrontend(vp);
+  writeServerMode(target);
+  if (!info) {
+    console.log(`режим ${target} сохранён; сервер не запущен`);
+    return;
+  }
+  if ((info.mode ?? "dev") === target) {
+    console.log(`уже работает в режиме ${target}`);
+    return;
+  }
+  console.log(`перезапуск в режиме ${target}: терминалы и их процессы будут завершены`);
+  await openApp({}, "quit");
+  await os.processes.waitForExit(info.pid, 15000);
+  startDaemon(vp);
+  await waitUntilReady();
+  await openApp({ tray: true });
+  console.log(`сервер работает в режиме ${target}`);
+}
+
 async function main() {
   const release = await acquireLock();
   try {
+    if (modeCommand) {
+      await switchMode(args[1]);
+      return;
+    }
     if (await health()) {
       if (serverOnly) {
         console.log(`уже запущен: ${APP_URL}`);
@@ -153,6 +216,7 @@ async function main() {
 
     const vp = findVp();
     if (quit) return;
+    await ensureBuilt(vp, readServerMode());
     if (serverOnly) {
       await release();
       startForeground(vp);

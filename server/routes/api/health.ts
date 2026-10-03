@@ -6,7 +6,8 @@ import type { RouteContext } from "../../modules/transport/index.ts";
 
 export async function handleHealth({ res, method, path }: RouteContext): Promise<boolean> {
   if (path === "/api/health" && method === "GET") {
-    json(res, 200, { ok: true, app: "projector", pid: process.pid, url: appUrl() });
+    const { projectorRuntimeMode: mode } = globalThis as { projectorRuntimeMode?: string };
+    json(res, 200, { ok: true, app: "projector", pid: process.pid, url: appUrl(), mode });
     return true;
   }
   return false;

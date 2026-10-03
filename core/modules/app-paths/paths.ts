@@ -34,3 +34,8 @@ export function launchLockPath(): string {
 export function providersPath(): string {
   return join(dataDir(), "providers.json");
 }
+
+/** Режим следующего запуска сервера: `dev` или `prod`. */
+export function serverModePath(): string {
+  return join(dataDir(), "server-mode");
+}

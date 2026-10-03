@@ -11,7 +11,12 @@
 ./bin/projector --window  # Chromium app-окно
 ./bin/projector --browser # браузер по умолчанию
 ./bin/projector quit     # завершить сервер и его процессы
+./bin/projector mode      # показать выбранный и текущий режим сервера
+./bin/projector mode prod # сборка и перезапуск через vp preview
+./bin/projector mode dev  # vp dev с HMR
 ```
+
+**Режим сервера.** `dev` (по умолчанию) — Vite с HMR, `prod` — собранный `dist` через `vp preview`. Выбор хранится в `$XDG_DATA_HOME/projector/server-mode` и действует при каждом запуске. `projector mode prod` сначала выполняет `vp build` (при ошибке сборки сервер не трогается), затем полностью перезапускает сервер: **терминалы и их процессы завершаются**. Текущий режим сообщает `mode` в `/api/health`. В `prod` изменения кода не применяются без повторного `projector mode prod`.
 
 После `vp run desktop` доступна команда `projector` в `~/.local/bin` и пункт меню приложений. Установка ссылается на checkout; после переноса каталога повторите её. Автозапуск настраивается средствами рабочего окружения командой `projector --tray`.
 
