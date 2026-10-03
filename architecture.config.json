@@ -49,10 +49,6 @@
       "src/modules/agent/ui/AgentChat.vue": {
         "ceiling": 835,
         "plan": "Вынести ввод, историю и прокрутку в composables, список сообщений — в компонент."
-      },
-      "src/modules/dock/ui/DockTabs.vue": {
-        "ceiling": 559,
-        "plan": "Перенесён из common в dock. Вынести перетаскивание, переименование и переполнение вкладок в composables."
       }
     },
     "thresholds": {
