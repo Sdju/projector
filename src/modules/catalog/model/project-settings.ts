@@ -14,9 +14,12 @@ export function projectDraft(project: Project): ProjectDraft {
 
 /** Import only missing commands; preserve custom names, IDs, order and launch defaults. */
 export function missingCommands(current: ProjectCommand[], discovered: ProjectCommand[]) {
-  return discovered.filter((candidate) => !current.some(
-    (command) => command.name.trim() === candidate.name || command.cmd.trim() === candidate.cmd,
-  ));
+  return discovered.filter(
+    (candidate) =>
+      !current.some(
+        (command) => command.name.trim() === candidate.name || command.cmd.trim() === candidate.cmd,
+      ),
+  );
 }
 
 export function settingsError(draft: ProjectDraft): string {
