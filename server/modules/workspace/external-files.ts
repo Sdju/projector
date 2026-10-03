@@ -1,7 +1,7 @@
 import { realpath } from "node:fs/promises";
 import { isAbsolute, dirname, basename } from "node:path";
 import { HttpError } from "../http/index.ts";
-import { previewProjectFile, readProjectImage } from "./workspace.ts";
+import { previewProjectFile, readProjectImage } from "./files.ts";
 
 async function externalLocation(path: string) {
   if (!isAbsolute(path) || path.includes("\0"))

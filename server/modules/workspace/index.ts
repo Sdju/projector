@@ -1,13 +1,12 @@
-export { listProjectDirectory } from "./workspace.ts";
-export { readProjectFile } from "./workspace.ts";
-export { saveProjectFile } from "./workspace.ts";
-export { readProjectImage } from "./workspace.ts";
-export { previewProjectFile } from "./workspace.ts";
-export { searchProject } from "./workspace.ts";
-export { projectGit } from "./workspace.ts";
-export { projectComparison } from "./workspace.ts";
-export { projectGutter } from "./workspace.ts";
-export { moveProjectEntry } from "./workspace.ts";
-export { mutateProjectEntry } from "./workspace.ts";
+export {
+  listProjectDirectory,
+  readProjectFile,
+  saveProjectFile,
+  readProjectImage,
+  previewProjectFile,
+  moveProjectEntry,
+  mutateProjectEntry,
+} from "./files.ts";
+export { searchProject } from "./search.ts";
+export { projectGit, projectComparison, projectGutter, mutateProjectGit } from "./git.ts";
 export { previewExternalFile, readExternalImage } from "./external-files.ts";
-export { mutateProjectGit } from "./workspace.ts";
