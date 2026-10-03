@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useId, watch } from "vue";
 import { useCommandScope, commandArgs } from "../utilities/commands.ts";
+import { tabDrag } from "../utilities/tab-drag.ts";
 import ContextMenu from "./ContextMenu.vue";
 import type { ContextMenuItem } from "./context-menu.ts";
 import IconClose from "~icons/lucide/x";
@@ -12,6 +13,8 @@ interface Tab {
   dirty?: boolean;
   saving?: boolean;
   error?: boolean;
+  /** Вкладку можно переименовать независимо от общего флага `renameable`. */
+  renameable?: boolean;
 }
 const props = defineProps<{
   tabs: Tab[];
@@ -19,6 +22,10 @@ const props = defineProps<{
   label: string;
   renameable?: boolean;
   disabled?: boolean;
+  /** Идентификатор полосы: по нему вкладки отличают перестановку от переноса из другой полосы. */
+  group?: string;
+  /** Полоса не в фокусе: выбранная вкладка подсвечивается слабее. */
+  dim?: boolean;
   actions?: (id: string) => ContextMenuItem[];
   closeSaved?: boolean;
   commandNamespace: string;
@@ -29,6 +36,8 @@ const props = defineProps<{
     closeMany: (ids: string[]) => unknown;
     reorder: (ids: string[]) => unknown;
     rename?: (id: string, label: string) => unknown;
+    /** Вкладка из другой полосы брошена сюда; `index` — позиция среди текущих вкладок. */
+    move?: (id: string, index: number) => unknown;
   };
 }>();
 const menu = ref<InstanceType<typeof ContextMenu>>();
@@ -127,7 +136,7 @@ register(
       throw new Error("Укажите label вкладки");
     return props.commandHandlers.rename?.(tab.id, args.label.trim());
   },
-  (args) => !!props.renameable && hasTab(args),
+  (args) => hasTab(args) && !!(props.renameable || findTab(args)?.renameable),
 );
 register("reorder", "Переставить вкладки", (value) => {
   const { ids } = commandArgs(value);
@@ -184,7 +193,7 @@ const menuItems = computed<ContextMenuItem[]>(() => {
     "closeAll",
   ].map((action) => item(action));
   if (props.closeSaved) items.push(item("closeSaved"));
-  if (props.renameable) items.push(item("rename", { separator: true }));
+  if (props.renameable || tab.renameable) items.push(item("rename", { separator: true }));
   items.push(...(props.actions?.(tab.id) ?? []));
   return items.map((item) => ({ ...item, disabled: props.disabled || item.disabled }));
 });
@@ -198,11 +207,12 @@ const strip = ref<HTMLElement>();
 const editing = ref("");
 const draft = ref("");
 const dragging = ref("");
+const groupId = computed(() => props.group ?? "");
 const target = ref("");
 const after = ref(false);
 
 async function startRename(tab: Tab) {
-  if (!props.renameable || props.disabled) return;
+  if (!(props.renameable || tab.renameable) || props.disabled) return;
   editing.value = tab.id;
   draft.value = tab.label;
   await nextTick();
@@ -228,12 +238,18 @@ function dragStart(event: DragEvent, id: string) {
     return;
   }
   dragging.value = id;
+  tabDrag.value = { id, group: groupId.value };
   event.dataTransfer.effectAllowed = "move";
   event.dataTransfer.setData("application/x-projector-tab", id);
   event.dataTransfer.setData("text/plain", props.tabs.find((tab) => tab.id === id)?.label ?? id);
 }
+function accepts() {
+  const drag = tabDrag.value;
+  if (!drag || props.disabled) return false;
+  return drag.group === groupId.value || !!props.commandHandlers.move;
+}
 function dragOver(event: DragEvent, id?: string) {
-  if (!dragging.value || props.disabled) return;
+  if (!accepts()) return;
   event.preventDefault();
   if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
   const element = event.currentTarget as HTMLElement;
@@ -246,23 +262,30 @@ function dragOver(event: DragEvent, id?: string) {
   else if (event.clientX > viewport.right - 32) container.scrollLeft += 24;
 }
 function endDrag() {
+  if (dragging.value && tabDrag.value?.id === dragging.value) tabDrag.value = undefined;
   dragging.value = "";
   target.value = "";
 }
 function drop(event: DragEvent, id?: string) {
-  if (!dragging.value) return;
+  const drag = tabDrag.value;
+  if (!drag || !accepts()) return;
   event.preventDefault();
   const destination = id ?? props.tabs.at(-1)?.id;
-  if (destination && destination !== dragging.value && !props.disabled) {
-    const ids = props.tabs.map((tab) => tab.id).filter((key) => key !== dragging.value);
-    ids.splice(
-      ids.indexOf(destination) + (id === undefined || after.value ? 1 : 0),
-      0,
-      dragging.value,
-    );
-    commands.run(commandId("reorder"), { ids });
+  const place = id === undefined || after.value ? 1 : 0;
+  if (drag.group === groupId.value) {
+    if (destination && destination !== drag.id) {
+      const ids = props.tabs.map((tab) => tab.id).filter((key) => key !== drag.id);
+      ids.splice(ids.indexOf(destination) + place, 0, drag.id);
+      commands.run(commandId("reorder"), { ids });
+    }
+  } else {
+    const index = destination ? props.tabs.findIndex((tab) => tab.id === destination) + place : 0;
+    void props.commandHandlers.move!(drag.id, index);
   }
-  endDrag();
+  target.value = "";
+  dragging.value = "";
+  // The source element may be gone after a move, so its dragend never arrives.
+  tabDrag.value = undefined;
 }
 function navigate(event: KeyboardEvent, id: string) {
   contextId.value = id;
@@ -286,7 +309,7 @@ watch(
   () => {
     if (!props.tabs.some((tab) => tab.id === contextId.value)) menu.value?.close(false);
     if (!props.tabs.some((tab) => tab.id === editing.value)) editing.value = "";
-    if (!props.tabs.some((tab) => tab.id === dragging.value)) endDrag();
+    if (dragging.value && !props.tabs.some((tab) => tab.id === dragging.value)) endDrag();
   },
 );
 </script>
@@ -295,6 +318,7 @@ watch(
   <div
     ref="strip"
     class="workspace-tabs"
+    :class="{ dim }"
     role="tablist"
     :aria-label="label"
     @dragover.self.stop="dragOver($event)"
@@ -345,7 +369,7 @@ watch(
         :title="tab.title ?? tab.label"
         @focus="activateTab(tab.id)"
         @click="commands.run(commandId('select'), { id: tab.id })"
-        @dblclick="renameable && commands.run(commandId('rename'), { id: tab.id })"
+        @dblclick="(renameable || tab.renameable) && commands.run(commandId('rename'), { id: tab.id })"
         @keydown="navigate($event, tab.id)"
       >
         <slot name="icon" :tab="tab" /><span>{{ tab.label }}</span>
@@ -407,6 +431,9 @@ watch(
 .workspace-tab.selected {
   border-top-color: var(--focus);
   background: var(--bg);
+}
+.dim .workspace-tab.selected {
+  border-top-color: var(--line-strong);
 }
 .tab-label {
   display: flex;
