@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, ref, watch } from "vue";
 import { useEventListener } from "@vueuse/core";
-import WorkspaceTabs from "../../../common/ui/WorkspaceTabs.vue";
+import DockTabs from "./DockTabs.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { tabDrag } from "../../../common/utilities/tab-drag.ts";
 import IconSplit from "~icons/lucide/columns-2";
@@ -84,7 +84,10 @@ function externalDrop(event: DragEvent) {
 }
 // dragleave не приходит при броске на полосу вкладок и при отмене drag: подсветка не должна залипать.
 const clearZone = () => (zone.value = "");
-watch(() => tabDrag.value, (drag) => !drag && clearZone());
+watch(
+  () => tabDrag.value,
+  (drag) => !drag && clearZone(),
+);
 useEventListener(window, "dragend", clearZone);
 useEventListener(window, "drop", clearZone, true);
 function leave(event: DragEvent) {
@@ -95,8 +98,7 @@ const handlers = {
   select: (id: string) => dock.select(id),
   close: (id: string) => dock.close(id),
   closeMany: (ids: string[]) => dock.closeMany(ids),
-  reorder: (ids: string[]) =>
-    dock.update(reorderPanels(dock.layout(), props.group.id, ids)),
+  reorder: (ids: string[]) => dock.update(reorderPanels(dock.layout(), props.group.id, ids)),
   rename: (id: string, label: string) => dock.rename(id, label),
   move: (id: string, index: number) =>
     dock.update(movePanel(dock.layout(), id, { groupId: props.group.id, zone: "center", index })),
@@ -115,7 +117,7 @@ const focus = () => {
     @focusin="focus"
   >
     <header class="dock-header" @dragenter.capture="clearZone" @dragover.capture="clearZone">
-      <WorkspaceTabs
+      <DockTabs
         v-if="group.panels.length"
         :tabs="tabs"
         :active-id="group.active"
@@ -131,7 +133,7 @@ const focus = () => {
         <template #icon="{ tab }">
           <component :is="dock.slots.icon" v-if="dock.slots.icon" v-bind="{ tab }" />
         </template>
-      </WorkspaceTabs>
+      </DockTabs>
       <div v-else class="dock-fill" />
       <div class="dock-actions">
         <component
