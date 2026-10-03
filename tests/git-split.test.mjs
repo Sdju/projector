@@ -5,7 +5,7 @@ import {
   HISTORY_COLLAPSE,
   HISTORY_MIN,
   resizeHistory,
-} from "../src/modules/workspace/lib/git-split.ts";
+} from "../src/modules/workspace/modules/git/lib/git-split.ts";
 
 test("dragging up grows the history and dragging down shrinks it", () => {
   assert.deepEqual(resizeHistory(200, 600, -50), { height: 250 });

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useDebounceFn } from "@vueuse/core";
-import { layoutGraph } from "../../../../core/modules/workspace/index.ts";
-import ContextMenu from "../../../common/ui/ContextMenu.vue";
-import UiButton from "../../../common/ui/UiButton.vue";
-import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
-import { commandArgs, type useCommandScope } from "../../../common/utilities/commands.ts";
+import { layoutGraph } from "../../../../../../core/modules/workspace/index.ts";
+import ContextMenu from "../../../../../common/ui/ContextMenu.vue";
+import UiButton from "../../../../../common/ui/UiButton.vue";
+import type { ContextMenuItem } from "../../../../../common/ui/context-menu.ts";
+import { commandArgs, type useCommandScope } from "../../../../../common/utilities/commands.ts";
 import type { GitHistoryState } from "../lib/git-history.ts";
 import GitCommitRow from "./GitCommitRow.vue";
 import IconChevronRight from "~icons/lucide/chevron-right";

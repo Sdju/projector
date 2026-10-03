@@ -1,6 +1,6 @@
 import { ref } from "vue";
-import type { GitOverview } from "../../../../core/modules/workspace/index.ts";
-import { mutateWorkspaceGit, workspaceRequest } from "../api.ts";
+import type { GitOverview } from "../../../../../../core/modules/workspace/index.ts";
+import { mutateWorkspaceGit, workspaceRequest } from "../../../../workspace-api/index.ts";
 
 const emptyOverview = (): GitOverview => ({ available: false, branch: "", changes: [] });
 

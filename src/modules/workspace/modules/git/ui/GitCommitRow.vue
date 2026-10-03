@@ -4,9 +4,9 @@ import type {
   GitCommit,
   GitOverview,
   GraphRow,
-} from "../../../../core/modules/workspace/index.ts";
-import UiButton from "../../../common/ui/UiButton.vue";
-import { absoluteTime, relativeTime, shortHash } from "../lib/commit-format.ts";
+} from "../../../../../../core/modules/workspace/index.ts";
+import UiButton from "../../../../../common/ui/UiButton.vue";
+import { absoluteTime, relativeTime, shortHash } from "../../../../../common/utilities/commit-format.ts";
 import type { CommitDetailState } from "../lib/git-history.ts";
 import GitChangesTree from "./GitChangesTree.vue";
 import GitGraphCell from "./GitGraphCell.vue";

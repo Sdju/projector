@@ -2,7 +2,7 @@ import { onBeforeUnmount, onMounted, ref, type Ref } from "vue";
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from "vue-router";
 import { isFileDrag, pathsFromDataTransfer } from "../../path-drop/index.ts";
 import type { DockTarget } from "../../dock/index.ts";
-import { workspaceRequest, saveWorkspaceFile } from "../api.ts";
+import { workspaceRequest, saveWorkspaceFile } from "../../workspace-api/index.ts";
 import { projectRelativePath, previewBrowserFile } from "../file-drop.ts";
 import { isEditable, isMarkdown, type OpenFile, type OpenFileOptions } from "../open-file.ts";
 import { dropPreviewExcept as dropPreviewTabs, opensAsPreview } from "./preview-tabs.ts";

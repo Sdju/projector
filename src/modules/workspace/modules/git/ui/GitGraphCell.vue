@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { GraphRow } from "../../../../core/modules/workspace/index.ts";
+import type { GraphRow } from "../../../../../../core/modules/workspace/index.ts";
 
 const props = defineProps<{
   row: GraphRow;

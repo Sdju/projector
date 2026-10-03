@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import type { GitBranch } from "../../../../core/modules/workspace/index.ts";
-import ContextMenu from "../../../common/ui/ContextMenu.vue";
-import EntryDialog from "../../../common/ui/EntryDialog.vue";
-import UiButton from "../../../common/ui/UiButton.vue";
-import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
-import { commandArgs, type useCommandScope } from "../../../common/utilities/commands.ts";
-import { relativeTime } from "../lib/commit-format.ts";
+import type { GitBranch } from "../../../../../../core/modules/workspace/index.ts";
+import ContextMenu from "../../../../../common/ui/ContextMenu.vue";
+import EntryDialog from "../../../../../common/ui/EntryDialog.vue";
+import UiButton from "../../../../../common/ui/UiButton.vue";
+import type { ContextMenuItem } from "../../../../../common/ui/context-menu.ts";
+import { commandArgs, type useCommandScope } from "../../../../../common/utilities/commands.ts";
+import { relativeTime } from "../../../../../common/utilities/commit-format.ts";
 import type { GitBranchesState } from "../lib/git-branches.ts";
 import IconBranch from "~icons/lucide/git-branch";
 import IconCheck from "~icons/lucide/check";

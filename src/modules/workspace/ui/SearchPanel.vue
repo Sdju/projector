@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import type { SearchHit } from "../../../../core/modules/workspace/index.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
-import { searchWorkspace } from "../api.ts";
+import { searchWorkspace } from "../../workspace-api/index.ts";
 import IconCaseSensitive from "~icons/lucide/case-sensitive";
 import IconWholeWord from "~icons/lucide/whole-word";
 import IconRegex from "~icons/lucide/regex";

@@ -1,6 +1,6 @@
 import { ref } from "vue";
-import type { GitBranches } from "../../../../core/modules/workspace/index.ts";
-import { mutateWorkspaceBranch, workspaceRequest } from "../api.ts";
+import type { GitBranches } from "../../../../../../core/modules/workspace/index.ts";
+import { mutateWorkspaceBranch, workspaceRequest } from "../../../../workspace-api/index.ts";
 
 const empty = (): GitBranches => ({ available: false, current: "", detached: false, branches: [] });
 

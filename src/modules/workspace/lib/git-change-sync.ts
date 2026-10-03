@@ -1,5 +1,5 @@
 import type { Ref } from "vue";
-import { workspaceRequest } from "../api.ts";
+import { workspaceRequest } from "../../workspace-api/index.ts";
 import type { OpenFile } from "../open-file.ts";
 import type { FileContent } from "../../../../core/modules/workspace/index.ts";
 import type { useOpenFiles } from "./open-files.ts";

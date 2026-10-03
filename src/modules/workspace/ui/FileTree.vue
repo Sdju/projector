@@ -18,7 +18,7 @@ import EntryDialog from "../../../common/ui/EntryDialog.vue";
 import IconChevronRight from "~icons/lucide/chevron-right";
 import { FileIcon } from "../../file-icons/index.ts";
 import { useFileIconTheme } from "../../file-icons/index.ts";
-import { workspaceRequest } from "../api.ts";
+import { workspaceRequest } from "../../workspace-api/index.ts";
 import { createTreeDrag, treeDragKey } from "../tree-drag.ts";
 import { createTreeSelection, treeSelectionKey } from "../tree-selection.ts";
 import {

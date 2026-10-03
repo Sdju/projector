@@ -1,4 +1,4 @@
-import { moveWorkspaceEntry } from "../api.ts";
+import { moveWorkspaceEntry } from "../../workspace-api/index.ts";
 import { treeDragType } from "../tree-drag.ts";
 import { topLevelTreePaths } from "../tree-selection.ts";
 import {

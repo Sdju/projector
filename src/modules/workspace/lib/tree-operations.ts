@@ -3,7 +3,7 @@ import { useCommandScope, commandArgs } from "../../../common/utilities/commands
 import type ContextMenu from "../../../common/ui/ContextMenu.vue";
 import type EntryDialog from "../../../common/ui/EntryDialog.vue";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
-import { workspaceRequest, moveWorkspaceEntry, mutateWorkspaceEntry } from "../api.ts";
+import { workspaceRequest, moveWorkspaceEntry, mutateWorkspaceEntry } from "../../workspace-api/index.ts";
 import type { createTreeDrag } from "../tree-drag.ts";
 import { topLevelTreePaths, type createTreeSelection } from "../tree-selection.ts";
 import { parentPath, relocatedPath } from "../../../../core/modules/workspace/index.ts";

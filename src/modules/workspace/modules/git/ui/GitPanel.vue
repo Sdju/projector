@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import type { GitOverview } from "../../../../core/modules/workspace/index.ts";
-import ContextMenu from "../../../common/ui/ContextMenu.vue";
-import UiButton from "../../../common/ui/UiButton.vue";
-import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
-import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
+import type { GitOverview } from "../../../../../../core/modules/workspace/index.ts";
+import ContextMenu from "../../../../../common/ui/ContextMenu.vue";
+import UiButton from "../../../../../common/ui/UiButton.vue";
+import type { ContextMenuItem } from "../../../../../common/ui/context-menu.ts";
+import { commandArgs, useCommandScope } from "../../../../../common/utilities/commands.ts";
 import type { GitOverviewState } from "../lib/git-overview.ts";
 import type { GitBranchesState } from "../lib/git-branches.ts";
 import type { GitHistoryState } from "../lib/git-history.ts";

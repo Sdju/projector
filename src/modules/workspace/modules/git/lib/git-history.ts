@@ -3,8 +3,8 @@ import type {
   GitCommit,
   GitCommitDetail,
   GitLog,
-} from "../../../../core/modules/workspace/index.ts";
-import { workspaceRequest } from "../api.ts";
+} from "../../../../../../core/modules/workspace/index.ts";
+import { workspaceRequest } from "../../../../workspace-api/index.ts";
 
 const PAGE = 50;
 const emptyLog = (): GitLog => ({
