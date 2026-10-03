@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useProjects, projectRoute, projectIconUrl, type Project } from "../../modules/project/index.ts";
-import { PathBar } from "../../modules/catalog/index.ts";
+import { PathBar, MobileProjectPicker } from "../../modules/catalog/index.ts";
 
 defineProps<{ currentProject?: Project }>();
 const { projects } = useProjects();
@@ -24,7 +24,8 @@ async function navigatePath(path: string) {
     @dragover.prevent
     @drop.prevent
   >
-    <header class="top">
+    <header class="top" :class="{ 'has-project': currentProject }">
+      <MobileProjectPicker v-if="currentProject" :key="currentProject.id" class="mobile-picker" :project="currentProject" />
       <router-link
         class="brand"
         :class="{ 'project-brand': currentProject }"
@@ -67,6 +68,8 @@ async function navigatePath(path: string) {
 </template>
 
 <style scoped>
+.mobile-picker { display: none; }
+
 .shell {
   --page-width: 760px;
   --brand-track: 0.16em;
@@ -167,15 +170,46 @@ async function navigatePath(path: string) {
   max-width: 2400px;
   padding-bottom: var(--sp-4);
 }
-@media (max-width: 600px) {
+@media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {
+  .shell,
+  .shell.workspace {
+    width: auto;
+    margin-inline: max(var(--sp-2), env(safe-area-inset-left)) max(var(--sp-2), env(safe-area-inset-right));
+    padding-top: max(var(--sp-2), env(safe-area-inset-top));
+    padding-bottom: max(var(--sp-3), env(safe-area-inset-bottom));
+  }
   .top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: var(--sp-2);
+    margin-bottom: var(--sp-2);
+  }
+  .brand,
+  .brand.project-brand {
+    max-width: none;
+    min-width: 0;
+    min-height: 44px;
+    --brand-track: 0.06em;
   }
   .nav {
-    gap: var(--sp-2);
+    grid-column: 2;
+    grid-row: 1;
+    gap: var(--sp-3);
   }
-  .brand {
-    --brand-track: 0.06em;
+  .nav a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  .top.has-project { display: flex; margin-bottom: 0; }
+  .has-project .brand, .has-project .header-path, .has-project .nav { display: none; }
+  .mobile-picker { display: block; }
+  .shell.workspace { margin-inline: 0; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); height: 100dvh; display: flex; flex-direction: column; }
+  .workspace main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .workspace main :deep(.project-page) { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .header-path {
+    grid-column: 1 / -1;
+    height: 44px;
   }
 }
 </style>

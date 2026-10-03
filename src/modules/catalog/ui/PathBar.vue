@@ -4,7 +4,6 @@ import IconChevronRight from "~icons/lucide/chevron-right";
 import IconFolder from "~icons/lucide/folder";
 import { fetchDirectories } from "../../project/index.ts";
 import type { DirectoryEntry } from "../../../../core/modules/directories/index.ts";
-
 const props = defineProps<{ path: string; navigate: (path: string) => Promise<void> }>();
 const root = ref<HTMLElement>();
 const input = ref<HTMLInputElement>();
@@ -210,7 +209,6 @@ onBeforeUnmount(() => {
   invalidate();
 });
 </script>
-
 <template>
   <div ref="root" class="path-bar" :aria-busy="busy" @keydown="keydown" @focusout="focusout">
     <IconFolder class="path-icon" aria-hidden="true" />
@@ -294,7 +292,6 @@ onBeforeUnmount(() => {
     </div>
   </div>
 </template>
-
 <style scoped>
 .path-bar {
   position: relative;
@@ -481,7 +478,17 @@ button {
 .error {
   color: var(--err);
 }
-@media (max-width: 600px) {
+@media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {
+  .path-bar { height: 44px; }
+  .input-wrap { height: 40px; }
+  .input-wrap input, .completion { min-height: 0; line-height: 40px; font-size: var(--fs-input); }
+  .segment-label,
+  .segment-arrow {
+    min-height: var(--control-h-sm);
+  }
+  .segment-arrow {
+    width: 32px;
+  }
   .key-hint {
     display: none;
   }
