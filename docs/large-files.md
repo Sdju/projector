@@ -8,4 +8,3 @@
 | `src/modules/workspace/ui/FileTree.vue` | 878 | 878 | Выделить drag/selection и контекстное меню в composables, строку дерева — в компонент. |
 | `src/modules/agent/ui/AgentChat.vue` | 835 | 835 | Вынести ввод, историю и прокрутку в composables, список сообщений — в компонент. |
 | `src/modules/dock/ui/DockTabs.vue` | 559 | 559 | Перенесён из common в dock. Вынести перетаскивание, переименование и переполнение вкладок в composables. |
-| `src/modules/dock/model/layout.ts` | 442 | 442 | Разделить дерево, операции перемещения и сериализацию. |

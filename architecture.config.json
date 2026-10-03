@@ -53,10 +53,6 @@
       "src/modules/dock/ui/DockTabs.vue": {
         "ceiling": 559,
         "plan": "Перенесён из common в dock. Вынести перетаскивание, переименование и переполнение вкладок в composables."
-      },
-      "src/modules/dock/model/layout.ts": {
-        "ceiling": 442,
-        "plan": "Разделить дерево, операции перемещения и сериализацию."
       }
     },
     "thresholds": {
