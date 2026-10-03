@@ -78,7 +78,7 @@ node --import vio/register native/app/entry.ts native http://localhost:4177 quit
 
 ## Редактор кода и dev-сервер
 
-Редактор — CodeMirror 6 (`ui/CodeViewer.vue`, `lib/codemirror.ts`). Языки подгружаются лениво из `@codemirror/language-data`, workers и ручной `optimizeDeps` не нужны. Темы — `lib/codemirror.ts` (`themeExtension`) и список в `core/modules/editor-themes`: чтобы добавить тему, допишите её в список и в `themeExtension`.
+Редактор — CodeMirror 6 (`modules/viewers/ui/CodeViewer.vue`, `modules/viewers/lib/codemirror.ts`). Языки подгружаются лениво из `@codemirror/language-data`, workers и ручной `optimizeDeps` не нужны. Темы — `modules/viewers/lib/codemirror.ts` (`themeExtension`) и список в `core/modules/editor-themes`: чтобы добавить тему, допишите её в список и в `themeExtension`.
 
 `504 Outdated Optimize Dep` означает, что браузер и оптимизатор Vite используют разные состояния предсборки. Проверяйте запросы к `node_modules/.vite/deps` и наличие `_metadata.json`; повторная загрузка страницы сама по себе не восстановит отсутствующие файлы кеша. Изменение Vite-конфигурации обновляет dev-сервер в том же Node-процессе: WebSocket переподключается, а существующие PTY сохраняются. Полный `projector restart` завершит процессы и для этой диагностики не нужен.
 
