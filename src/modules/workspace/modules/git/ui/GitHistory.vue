@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { copyWithNotice } from "../../../../../common/utilities/notice.ts";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useDebounceFn } from "@vueuse/core";
 import { layoutGraph } from "../../../../../../core/modules/workspace/index.ts";
@@ -60,7 +61,7 @@ async function setExpanded(hash: string, value: boolean) {
   } else expanded.value.delete(hash);
 }
 async function copy(hash: string) {
-  await navigator.clipboard.writeText(hash);
+  await copyWithNotice(null, hash, "Хеш скопирован");
 }
 
 const register = useCommandRegistrar(props.commands.scope);

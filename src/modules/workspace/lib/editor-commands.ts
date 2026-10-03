@@ -1,6 +1,7 @@
 import type { Ref } from "vue";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import { commandArgs, type useCommandScope } from "../../../common/utilities/commands.ts";
+import { copyWithNotice } from "../../../common/utilities/notice.ts";
 import { isEditable, isMarkdown, type OpenFile } from "../open-file.ts";
 
 export interface EditorCommandContext {
@@ -54,7 +55,9 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
   register(
     "ide.editor.file.copyRelativePath",
     "Копировать относительный путь",
-    (args) => navigator.clipboard.writeText(commandFile(args)!.path),
+    async (args) => {
+      await copyWithNotice(null, commandFile(args)!.path, "Путь скопирован");
+    },
     (args) => !!commandFile(args),
   );
   register(

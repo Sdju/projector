@@ -5,6 +5,7 @@ import { isLauncherWindow } from "../modules/launcher/index.ts";
 import { useProjects, projectPathFromParams, projectIconUrl } from "../modules/project/index.ts";
 import { useRunner } from "../modules/runner/index.ts";
 import { CommandPalette, provideIdeCommands } from "../modules/ide/index.ts";
+import UiNoticeHost from "../common/ui/UiNoticeHost.vue";
 import AppShell from "./layouts/AppShell.vue";
 
 const { error: commandError } = provideIdeCommands();
@@ -71,6 +72,7 @@ onUnmounted(() => {
 
 <template>
   <CommandPalette />
+  <UiNoticeHost />
   <div v-if="commandError" class="command-error" role="alert">
     {{ commandError }}<button aria-label="Закрыть сообщение" @click="commandError = ''">×</button>
   </div>

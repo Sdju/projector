@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import type { GitCommitDetail } from "../../../../../../core/modules/workspace/index.ts";
+import { copyWithNotice } from "../../../../../common/utilities/notice.ts";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import {
   absoluteTime,
@@ -12,12 +13,9 @@ import IconCopy from "~icons/lucide/copy";
 /** Заголовок обзора коммита: описание, ссылки, хеш, автор, даты и родители. */
 const props = defineProps<{ detail: GitCommitDetail }>();
 const emit = defineEmits<{ openCommit: [hash: string] }>();
-const copied = ref(false);
 const sameCommitter = computed(() => props.detail.committer === props.detail.author);
-async function copy() {
-  await navigator.clipboard.writeText(props.detail.hash);
-  copied.value = true;
-  setTimeout(() => (copied.value = false), 1500);
+async function copy(event: MouseEvent) {
+  await copyWithNotice(event.currentTarget as Element, props.detail.hash, "Хеш скопирован");
 }
 </script>
 
@@ -37,7 +35,7 @@ async function copy() {
         <UiButton
           icon
           size="sm"
-          :title="copied ? 'Скопировано' : 'Копировать хеш'"
+          title="Копировать хеш"
           aria-label="Копировать хеш"
           data-command="ide.git.commit.copyHash"
           @click="copy"
