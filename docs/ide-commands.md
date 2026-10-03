@@ -105,6 +105,18 @@ To open it directly from an SDK client:
 await ide.executeCommand('ide.workbench.commandPalette.open', undefined, { scope: 'workbench' });
 ```
 
+## Reload commands
+
+The global `workbench` scope registers `ide.workbench.pages.reload` (**Перезагрузить открытые страницы Projector**) and
+`ide.workbench.server.restart` (**Перезапустить сервер и открытые страницы**). Both appear in the command center and
+keyboard settings; no shortcut is assigned by default. They take no arguments.
+
+Reload updates all Projector pages on the same origin using BroadcastChannel, without browser storage.
+Restart asks for confirmation because it terminates all terminals and child processes, calls the existing
+`POST /api/app/restart` endpoint, then waits for `/api/health` to report a different PID before reloading pages.
+Each page retains its URL and normal unsaved-edit unload protection. Failed requests and a 60-second
+startup timeout are shown by the IDE host; duplicate actions are disabled while waiting. Save edits before restarting.
+
 ## Git commands
 
 The `git:<projectId>` scope has `{ surface: 'git', projectId, path, staged, busy }`.
