@@ -11,6 +11,9 @@ import {
   projectGit,
   projectComparison,
   projectGutter,
+  projectLog,
+  projectCommit,
+  projectCommitComparison,
   mutateProjectGit,
   moveProjectEntry,
   mutateProjectEntry,
@@ -136,6 +139,25 @@ export async function handleProjectWorkspace({
         }),
       );
     else if (sessionId === "git") json(res, 200, await projectGit(project.path));
+    else if (sessionId === "log")
+      json(
+        res,
+        200,
+        await projectLog(project.path, {
+          skip: Number(url.searchParams.get("skip")) || 0,
+          limit: Number(url.searchParams.get("limit")) || undefined,
+          query: url.searchParams.get("q") ?? "",
+          all: url.searchParams.get("all") === "true",
+        }),
+      );
+    else if (sessionId === "commit")
+      json(res, 200, await projectCommit(project.path, url.searchParams.get("hash") ?? ""));
+    else if (sessionId === "commit-diff")
+      json(
+        res,
+        200,
+        await projectCommitComparison(project.path, url.searchParams.get("hash") ?? "", filePath),
+      );
     else if (sessionId === "gutter") json(res, 200, await projectGutter(project.path, filePath));
     else if (sessionId === "diff")
       json(

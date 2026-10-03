@@ -10,3 +10,4 @@ export {
 export { searchProject } from "./search.ts";
 export { projectGit, projectComparison, projectGutter, mutateProjectGit } from "./git.ts";
 export { previewExternalFile, readExternalImage } from "./external-files.ts";
+export { projectLog, projectCommit, projectCommitComparison } from "./git-history.ts";

@@ -8,3 +8,11 @@ export type { ArchiveContent, ArchiveEntry } from "./contract.ts";
 export { parentPath, moveDestination, relocatedPath } from "./paths.ts";
 export { gitTreeDecorations } from "./git-decorations.ts";
 export type { GitDecoration } from "./git-decorations.ts";
+export type {
+  GitRef,
+  GitCommit,
+  GitLog,
+  GitCommitFile,
+  GitCommitDetail,
+  CommitComparison,
+} from "./contract.ts";

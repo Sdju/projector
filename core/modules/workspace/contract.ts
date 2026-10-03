@@ -62,3 +62,58 @@ export interface GitGutter {
   available: boolean;
   original: string;
 }
+
+export interface GitRef {
+  name: string;
+  kind: "head" | "branch" | "remote" | "tag";
+}
+export interface GitCommit {
+  hash: string;
+  parents: string[];
+  subject: string;
+  author: string;
+  email: string;
+  /** ISO 8601 author date. */
+  date: string;
+  refs: GitRef[];
+  /** The commit is reachable from HEAD but not from its upstream. */
+  unpushed: boolean;
+}
+/** One page of history; `next` is the `skip` of the following page. */
+export interface GitLog {
+  available: boolean;
+  head: string;
+  upstream: string;
+  ahead: number;
+  behind: number;
+  /** `user.email` of the repository, to dim the author of one's own commits. */
+  me: string;
+  commits: GitCommit[];
+  next: number | null;
+}
+export interface GitCommitFile {
+  path: string;
+  originalPath?: string;
+  /** A, M, D, R, C or T. */
+  status: string;
+  additions: number;
+  deletions: number;
+  binary: boolean;
+}
+export interface GitCommitDetail extends Omit<GitCommit, "unpushed"> {
+  body: string;
+  committer: string;
+  committerDate: string;
+  additions: number;
+  deletions: number;
+  /** Changes of this commit against its first parent, limited to the project folder. */
+  files: GitCommitFile[];
+}
+export interface CommitComparison {
+  path: string;
+  original: string;
+  modified: string;
+  hash: string;
+  /** Short hash of the first parent; empty for a root commit. */
+  parent: string;
+}

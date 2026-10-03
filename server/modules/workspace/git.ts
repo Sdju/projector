@@ -8,7 +8,7 @@ import type {
   GitOverview,
 } from "../../../core/modules/workspace/index.ts";
 
-async function git(root: string, args: string[]) {
+export async function git(root: string, args: string[]) {
   return (
     await exec("git", ["--literal-pathspecs", "-C", root, ...args], {
       maxBuffer: 4 * MAX_BYTES,
@@ -146,7 +146,7 @@ export async function mutateProjectGit(
     if (pendingGitWrites.get(repository) === operation) pendingGitWrites.delete(repository);
   }
 }
-async function gitText(root: string, ref: string, path: string) {
+export async function gitText(root: string, ref: string, path: string) {
   validatePath(path);
   const prefix = (await git(root, ["rev-parse", "--show-prefix"])).trim();
   const value = await git(root, ["show", `${ref}:${prefix}${path}`]);
