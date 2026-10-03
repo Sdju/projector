@@ -35,5 +35,33 @@
     "@modules": "src/modules",
     "@common": "src/common",
     "@core": "core/modules"
+  },
+  "largeFiles": {
+    "files": {
+      "src/modules/workspace/ui/ProjectWorkspace.vue": {
+        "ceiling": 1215,
+        "plan": "Уже вынесены SearchPanel, GitPanel, SidebarTabs, WorkbenchToolbar, lib/git-overview и lib/sidebar-resize. Осталось: состояние вкладок и открытие файлов — в composable, раскладка дока и терминалы — в composable, регистрация команд редактора — отдельно."
+      },
+      "src/modules/workspace/ui/FileTree.vue": {
+        "ceiling": 878,
+        "plan": "Выделить drag/selection и контекстное меню в composables, строку дерева — в компонент."
+      },
+      "src/modules/agent/ui/AgentChat.vue": {
+        "ceiling": 835,
+        "plan": "Вынести ввод, историю и прокрутку в composables, список сообщений — в компонент."
+      },
+      "src/modules/dock/ui/DockTabs.vue": {
+        "ceiling": 559,
+        "plan": "Перенесён из common в dock. Вынести перетаскивание, переименование и переполнение вкладок в composables."
+      },
+      "src/modules/dock/model/layout.ts": {
+        "ceiling": 442,
+        "plan": "Разделить дерево, операции перемещения и сериализацию."
+      }
+    },
+    "thresholds": {
+      "default": 400,
+      ".vue": 500
+    }
   }
 }

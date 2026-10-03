@@ -4,6 +4,7 @@ import {
   boundaryError,
   importsOf,
   checkArchitecture,
+  largeFileErrors,
   moduleCycles,
 } from "../scripts/check-architecture.mjs";
 
@@ -102,4 +103,30 @@ test("literal native file-URL imports are checked, arbitrary URLs cannot bypass 
     ["./catalog.ts"],
   );
   assert.equal(result.filter((r) => r.error).length, 2);
+});
+test("large-file registry is a ratchet with per-extension limits", () => {
+  const registry = {
+    thresholds: { default: 400, ".vue": 500 },
+    files: {
+      "a/Big.ts": { ceiling: 600, plan: "split" },
+      "a/Gone.ts": { ceiling: 450, plan: "x" },
+    },
+  };
+  assert.deepEqual(
+    largeFileErrors(
+      { "a/Big.ts": 600, "b/Ok.vue": 500, "b/Ok.ts": 400, "a/Gone.ts": 450 },
+      registry,
+    ),
+    [],
+  );
+  const errors = largeFileErrors(
+    { "a/Big.ts": 650, "b/New.vue": 501, "b/New.ts": 401, "a/Gone.ts": 380 },
+    registry,
+  );
+  assert.equal(errors.length, 4);
+  assert.match(errors.join("\n"), /Big\.ts: grew/);
+  assert.match(errors.join("\n"), /New\.vue: 501/);
+  assert.match(errors.join("\n"), /New\.ts: 401/);
+  assert.match(errors.join("\n"), /Gone\.ts: now 380/);
+  assert.match(largeFileErrors({ "a/Big.ts": 500 }, registry).join(), /lower its ceiling/);
 });

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
@@ -187,8 +187,68 @@ export function moduleCycles(graph) {
   return cycles;
 }
 
+const lineCount = (file) => readFileSync(file, "utf8").split("\n").length - 1;
+const isSource = (file) => /\.(?:[cm]?js|tsx?|vue|py)$/.test(file);
+
+const sizeLimit = (file, registry) =>
+  registry.thresholds[extname(file)] ?? registry.thresholds.default;
+
+// Large-file registry: a file over the threshold must be listed with a ceiling and a split plan.
+// The ceiling only goes down, so a registered file cannot keep growing unnoticed.
+export function largeFileErrors(sizes, registry = config.largeFiles) {
+  if (!registry) return [];
+  const errors = [];
+  const listed = registry.files ?? {};
+  for (const [file, lines] of Object.entries(sizes)) {
+    const entry = listed[file];
+    const limit = sizeLimit(file, registry);
+    if (lines > limit && !entry)
+      errors.push(
+        `${file}: ${lines} lines exceed ${limit}; add it to largeFiles with a split plan or split it`,
+      );
+    else if (entry && lines > entry.ceiling)
+      errors.push(
+        `${file}: grew to ${lines} lines, registry ceiling is ${entry.ceiling}; split it instead of growing`,
+      );
+  }
+  for (const [file, entry] of Object.entries(listed)) {
+    if (!(file in sizes))
+      errors.push(`${file}: listed in largeFiles but does not exist; remove the entry`);
+    else if (sizes[file] <= sizeLimit(file, registry))
+      errors.push(
+        `${file}: now ${sizes[file]} lines, within ${sizeLimit(file, registry)}; remove it from largeFiles`,
+      );
+    else if (sizes[file] < entry.ceiling)
+      errors.push(
+        `${file}: shrank to ${sizes[file]} lines; lower its ceiling from ${entry.ceiling}`,
+      );
+  }
+  return errors;
+}
+
+export function largeFilesMarkdown(sizes, registry = config.largeFiles) {
+  const rows = Object.entries(registry.files)
+    .sort(([, a], [, b]) => b.ceiling - a.ceiling)
+    .map(([file, e]) => `| \`${file}\` | ${sizes[file] ?? "—"} | ${e.ceiling} | ${e.plan} |`);
+  return [
+    "# Реестр больших файлов",
+    "",
+    "Файл живёт здесь, пока в нём больше " +
+      registry.thresholds.default +
+      " строк (для `.vue` — " +
+      registry.thresholds[".vue"] +
+      "). Реестр хранится в `largeFiles` файла `architecture.config.json`; эту таблицу создаёт `vp run architecture -- --registry`. `scripts/check-architecture.mjs` требует запись для каждого файла выше порога, запрещает рост выше потолка и просит снизить потолок или удалить запись после сокращения файла.",
+    "",
+    "| Файл | Строк | Потолок | План разбиения |",
+    "| --- | ---: | ---: | --- |",
+    ...rows,
+    "",
+  ].join("\n");
+}
+
 export function checkArchitecture() {
   const errors = [];
+  const sizes = {};
   const graph = new Map();
   const files = roots.flatMap(([root]) => filesIn(join(projectRoot, root)));
   for (const file of files) {
@@ -209,6 +269,7 @@ export function checkArchitecture() {
       report("Modules must have a concrete responsibility");
     if (own.module && !existsSync(join(own.module, "index.ts")) && !extname(own.module))
       report("Module must have a public index.ts");
+    if (isSource(file)) sizes[relative(projectRoot, file)] = lineCount(file);
     if (!/\.(?:[cm]?js|tsx?|vue)$/.test(file)) continue;
     const code = readFileSync(file, "utf8");
     if (
@@ -254,14 +315,18 @@ export function checkArchitecture() {
     }
   }
   errors.push(...moduleCycles(graph));
+  errors.push(...largeFileErrors(sizes));
   return {
     errors,
+    sizes,
     files: files.length,
     modules: new Set(files.map((p) => classify(p).module).filter(Boolean)).size,
   };
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const result = checkArchitecture();
+  if (process.argv.includes("--registry"))
+    writeFileSync(join(projectRoot, "docs/large-files.md"), largeFilesMarkdown(result.sizes));
   if (result.errors.length) {
     console.error(result.errors.join("\n"));
     process.exitCode = 1;
