@@ -84,3 +84,29 @@ export function commandArgs(value: unknown): Record<string, unknown> {
     throw new Error("Аргументы команды должны быть объектом");
   return value as Record<string, unknown>;
 }
+
+/** Регистрирует команды в чужом (родительском) scope и снимает их при размонтировании компонента. */
+export function useCommandRegistrar(scope: CommandScope) {
+  const disposers: (() => void)[] = [];
+  onBeforeUnmount(() => disposers.forEach((dispose) => dispose()));
+  return (
+    id: string,
+    title: string,
+    description: string,
+    run: (args?: unknown) => unknown,
+    args?: Record<string, string>,
+    enabled?: (args?: unknown) => boolean,
+  ) => {
+    disposers.push(
+      scope.registerCommand({ id, title, description, arguments: args, run, enabled }),
+    );
+  };
+}
+
+/** Необязательный строковый аргумент команды; другой тип — ошибка. */
+export function optionalStringArg(args: Record<string, unknown>, key: string) {
+  const value = args[key];
+  if (value !== undefined && typeof value !== "string")
+    throw new Error(`${key} должен быть строкой`);
+  return value as string | undefined;
+}

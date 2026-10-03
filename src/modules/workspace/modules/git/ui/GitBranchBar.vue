@@ -5,8 +5,9 @@ import ContextMenu from "../../../../../common/ui/ContextMenu.vue";
 import EntryDialog from "../../../../../common/ui/EntryDialog.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import type { ContextMenuItem } from "../../../../../common/ui/context-menu.ts";
-import { commandArgs, type useCommandScope } from "../../../../../common/utilities/commands.ts";
+import { type useCommandScope } from "../../../../../common/utilities/commands.ts";
 import { relativeTime } from "../../../../../common/utilities/commit-format.ts";
+import { registerBranchCommands } from "../lib/branch-commands.ts";
 import type { GitBranchesState } from "../lib/git-branches.ts";
 import IconBranch from "~icons/lucide/git-branch";
 import IconCheck from "~icons/lucide/check";
@@ -29,17 +30,12 @@ const open = defineModel<boolean>("open", { default: false });
 const target = defineModel<string>("target", { default: "" });
 const { state, error, loading } = props.branches;
 const filter = ref("");
-const busy = ref(false);
 const menu = ref<InstanceType<typeof ContextMenu>>();
 const dialog = ref<InstanceType<typeof EntryDialog>>();
 let submit: ((name: string) => Promise<void>) | undefined;
 const now = ref(Date.now());
 const clock = setInterval(() => (now.value = Date.now()), 60_000);
-const disposers: (() => void)[] = [];
-onBeforeUnmount(() => {
-  clearInterval(clock);
-  disposers.forEach((dispose) => dispose());
-});
+onBeforeUnmount(() => clearInterval(clock));
 
 const current = computed(() => state.value.branches.find((branch) => branch.current));
 const label = computed(() =>
@@ -53,30 +49,12 @@ const visible = computed(() => {
     { label: "Удалённые", rows: rows.filter((branch) => branch.kind === "remote") },
   ].filter((group) => group.rows.length);
 });
-const find = (name: unknown): GitBranch => {
-  const branch = state.value.branches.find((item) => item.name === name);
-  if (!branch) throw new Error(`Ветка не найдена: ${String(name)}`);
-  return branch;
-};
-const nameArg = (value?: unknown) => find(commandArgs(value).name ?? target.value);
-
-/** Операция над ветками; смена HEAD меняет файлы, поэтому вкладки сохраняются до неё и обновляются после. */
-async function apply(
-  action: string,
-  input: Parameters<GitBranchesState["mutate"]>[1],
-  movesHead: boolean,
+function ask(
+  title: string,
+  value: string,
+  description: string,
+  run: (name: string) => Promise<void>,
 ) {
-  busy.value = true;
-  try {
-    if (movesHead) await props.prepare("checkout", []);
-    await props.branches.mutate(action, input);
-    if (movesHead) await props.applied("checkout", []);
-    await props.reload();
-  } finally {
-    busy.value = false;
-  }
-}
-function ask(title: string, value: string, description: string, run: (name: string) => Promise<void>) {
   submit = run;
   void dialog.value?.open({ title, value, description });
 }
@@ -88,108 +66,19 @@ async function onSubmit(name: string) {
     dialog.value?.fail(err instanceof Error ? err.message : "Не удалось выполнить действие");
   }
 }
-function optionalString(args: Record<string, unknown>, key: string) {
-  const value = args[key];
-  if (value !== undefined && typeof value !== "string") throw new Error(`${key} должен быть строкой`);
-  return value as string | undefined;
-}
-
-const { scope } = props.commands;
-const register = (
-  id: string,
-  title: string,
-  description: string,
-  run: (args?: unknown) => unknown,
-  args?: Record<string, string>,
-  enabled?: (args?: unknown) => boolean,
-) => disposers.push(scope.registerCommand({ id, title, description, arguments: args, run, enabled }));
-const idle = () => !busy.value;
-const branchHelp = { name: "Имя ветки (для удалённой — вместе с remote, например origin/main)" };
-register("ide.git.branch.toggle", "Показать список веток", "Открывает или закрывает выбор ветки.", () => {
-  open.value = !open.value;
+const busy = ref(false);
+registerBranchCommands({
+  branches: props.branches,
+  commands: props.commands,
+  prepare: props.prepare,
+  applied: props.applied,
+  reload: props.reload,
+  open,
+  target,
+  busy,
+  label: () => label.value,
+  ask,
 });
-register(
-  "ide.git.branch.refresh",
-  "Обновить список веток",
-  "Перечитывает локальные и удалённые ветки.",
-  () => props.branches.load(),
-);
-register(
-  "ide.git.branch.list",
-  "Список веток",
-  "Возвращает ветки с upstream, ahead/behind и последним коммитом.",
-  async () => {
-    await props.branches.load();
-    return state.value;
-  },
-);
-register(
-  "ide.git.branch.checkout",
-  "Переключить ветку",
-  "Переключает рабочую папку на ветку; для удалённой создаёт локальную с отслеживанием.",
-  async (value) => {
-    const branch = nameArg(value);
-    if (!branch.current) await apply("checkout", { name: branch.name }, true);
-    open.value = false;
-  },
-  branchHelp,
-  (value) => idle() && (!commandArgs(value).name || !!state.value.branches.length),
-);
-register(
-  "ide.git.branch.create",
-  "Создать ветку…",
-  "Создаёт ветку от HEAD или от указанной ветки/коммита и переключается на неё. Без name спрашивает имя.",
-  async (value) => {
-    const args = commandArgs(value);
-    const from = optionalString(args, "from") ?? (args.fromTarget === true ? target.value : undefined);
-    const run = (name: string) =>
-      apply("create", { name, from, checkout: args.checkout === false ? false : undefined }, args.checkout !== false);
-    const name = optionalString(args, "name");
-    if (name) return run(name);
-    ask("Новая ветка", "", from ? `Начало: ${from}` : `Начало: ${label.value}`, run);
-  },
-  {
-    name: "Имя новой ветки",
-    from: "Ветка или хеш коммита, от которого начать; по умолчанию HEAD",
-    checkout: "false — не переключаться на новую ветку",
-  },
-  idle,
-);
-register(
-  "ide.git.branch.rename",
-  "Переименовать ветку…",
-  "Переименовывает локальную ветку. Без newName спрашивает имя.",
-  async (value) => {
-    const args = commandArgs(value);
-    const branch = nameArg(value);
-    const run = (newName: string) => apply("rename", { name: branch.name, newName }, false);
-    const newName = optionalString(args, "newName");
-    if (newName) return run(newName);
-    ask("Переименовать ветку", branch.name, branch.name, run);
-  },
-  { ...branchHelp, newName: "Новое имя" },
-  (value) => idle() && (!commandArgs(value).name ? target.value !== "" : true),
-);
-register(
-  "ide.git.branch.delete",
-  "Удалить ветку…",
-  "Удаляет локальную ветку. Неслитую ветку удаляет только с force: true.",
-  async (value) => {
-    const args = commandArgs(value);
-    const branch = nameArg(value);
-    let force = args.force === true;
-    if (args.confirm !== true) {
-      const message = branch.merged
-        ? `Удалить ветку ${branch.name}?`
-        : `Ветка ${branch.name} не слита в текущую. Удалить вместе с её коммитами?`;
-      if (!window.confirm(message)) return;
-      force = !branch.merged;
-    }
-    await apply("delete", { name: branch.name, force }, false);
-  },
-  { ...branchHelp, force: "true — удалить неслитую ветку", confirm: "true — без вопроса" },
-  idle,
-);
 
 const menuItems = computed<ContextMenuItem[]>(() => {
   const branch = state.value.branches.find((item) => item.name === target.value);
@@ -210,7 +99,7 @@ const menuItems = computed<ContextMenuItem[]>(() => {
 });
 function context(event: MouseEvent | KeyboardEvent, name: string) {
   target.value = name;
-  scope.activate();
+  props.commands.scope.activate();
   void menu.value?.open(event);
 }
 const syncText = (branch: GitBranch) =>

@@ -5,7 +5,11 @@ import { layoutGraph } from "../../../../../../core/modules/workspace/index.ts";
 import ContextMenu from "../../../../../common/ui/ContextMenu.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import type { ContextMenuItem } from "../../../../../common/ui/context-menu.ts";
-import { commandArgs, type useCommandScope } from "../../../../../common/utilities/commands.ts";
+import {
+  commandArgs,
+  useCommandRegistrar,
+  type useCommandScope,
+} from "../../../../../common/utilities/commands.ts";
 import type { GitHistoryState } from "../lib/git-history.ts";
 import GitCommitRow from "./GitCommitRow.vue";
 import IconChevronRight from "~icons/lucide/chevron-right";
@@ -36,7 +40,9 @@ onBeforeUnmount(() => clearInterval(clock));
 
 const MAX_COLUMNS = 6;
 const rows = computed(() => layoutGraph(commits.value));
-const columns = computed(() => Math.min(MAX_COLUMNS, Math.max(1, ...rows.value.map((r) => r.width))));
+const columns = computed(() =>
+  Math.min(MAX_COLUMNS, Math.max(1, ...rows.value.map((r) => r.width))),
+);
 const resolve = (value: unknown) => {
   if (typeof value !== "string" || !value) throw new Error("Укажите хеш коммита");
   return commits.value.find((commit) => commit.hash.startsWith(value))?.hash ?? value;
@@ -57,25 +63,26 @@ async function copy(hash: string) {
   await navigator.clipboard.writeText(hash);
 }
 
-const { scope } = props.commands;
-const disposers: (() => void)[] = [];
-onBeforeUnmount(() => disposers.forEach((dispose) => dispose()));
-const register = (
-  id: string,
-  title: string,
-  description: string,
-  run: (args?: unknown) => unknown,
-  args?: Record<string, string>,
-) => disposers.push(scope.registerCommand({ id, title, description, arguments: args, run }));
+const register = useCommandRegistrar(props.commands.scope);
 const hashHelp = { hash: "Хеш коммита (можно сокращённый); без него — коммит под курсором" };
 const pathHelp = { path: "Путь файла относительно папки проекта" };
-register("ide.git.history.toggle", "Показать или скрыть историю Git", "Сворачивает блок History.", () => {
-  open.value = !open.value;
-});
-register("ide.git.history.refresh", "Обновить историю Git", "Перечитывает загруженную историю.", () => {
-  open.value = true;
-  return props.history.load();
-});
+register(
+  "ide.git.history.toggle",
+  "Показать или скрыть историю Git",
+  "Сворачивает блок History.",
+  () => {
+    open.value = !open.value;
+  },
+);
+register(
+  "ide.git.history.refresh",
+  "Обновить историю Git",
+  "Перечитывает загруженную историю.",
+  () => {
+    open.value = true;
+    return props.history.load();
+  },
+);
 register(
   "ide.git.history.filter",
   "Фильтр истории Git",
@@ -148,7 +155,7 @@ const menuItems = computed<ContextMenuItem[]>(() => {
 });
 function context(event: MouseEvent | KeyboardEvent, hash: string, path: string) {
   target.value = { hash, path };
-  scope.activate();
+  props.commands.scope.activate();
   void menu.value?.open(event);
 }
 
@@ -243,7 +250,8 @@ watch(commits, (list) => {
           @open="commands.run('ide.git.commit.open', { hash: commit.hash })"
           @copy="commands.run('ide.git.commit.copyHash', { hash: commit.hash })"
           @open-diff="
-            (path, pinned) => commands.run('ide.git.commit.openDiff', { hash: commit.hash, path, pinned })
+            (path, pinned) =>
+              commands.run('ide.git.commit.openDiff', { hash: commit.hash, path, pinned })
           "
           @target="target = { hash: commit.hash, path: $event }"
           @context="(event, path) => context(event, commit.hash, path)"

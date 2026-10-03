@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import type { GitOverview } from "../../../../../../core/modules/workspace/index.ts";
 import ContextMenu from "../../../../../common/ui/ContextMenu.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import type { ContextMenuItem } from "../../../../../common/ui/context-menu.ts";
@@ -8,6 +7,7 @@ import { commandArgs, useCommandScope } from "../../../../../common/utilities/co
 import type { GitOverviewState } from "../lib/git-overview.ts";
 import type { GitBranchesState } from "../lib/git-branches.ts";
 import type { GitHistoryState } from "../lib/git-history.ts";
+import { registerChangeCommands } from "../lib/change-commands.ts";
 import GitBranchBar from "./GitBranchBar.vue";
 import GitSplitter from "./GitSplitter.vue";
 import GitChangesTree from "./GitChangesTree.vue";
@@ -36,12 +36,6 @@ const emit = defineEmits<{
   openCommitDiff: [hash: string, path: string, pinned?: boolean];
 }>();
 const { git, error: gitError, loading: gitLoading, load } = props.overview;
-const stagedChanges = computed(() =>
-  git.value.changes.filter((change) => change.index !== " " && change.index !== "?"),
-);
-const workingChanges = computed(() =>
-  git.value.changes.filter((change) => change.worktree !== " "),
-);
 const gitBusy = ref(false);
 /** Свёрнутые блоки изменений: ключ группы — `staged` или `changed`. */
 const collapsedGroups = ref(new Set<string>());
@@ -74,92 +68,16 @@ const gitCommands = useCommandScope(`git:${props.projectId}`, () => ({
   branch: branchTarget.value,
   branchesOpen: branchOpen.value,
 }));
-function gitArgs(value?: unknown) {
-  const args = commandArgs(value);
-  if (args.path !== undefined && typeof args.path !== "string")
-    throw new Error("path должен быть строкой");
-  if (args.staged !== undefined && typeof args.staged !== "boolean")
-    throw new Error("staged должен быть boolean");
-  return {
-    path: (args.path as string | undefined) ?? gitTarget.value.path,
-    staged: (args.staged as boolean | undefined) ?? gitTarget.value.staged,
-    confirm: args.confirm === true,
-    pinned: args.pinned === true,
-  };
-}
-function gitChange(value?: unknown) {
-  return git.value.changes.find((change) => change.path === gitArgs(value).path);
-}
-function gitSelection(value: unknown, staged: boolean) {
-  const { path } = gitArgs(value);
-  return (staged ? stagedChanges.value : workingChanges.value).filter(
-    (change) => !path || change.path === path || change.path.startsWith(`${path}/`),
-  );
-}
-const hasConflict = (change: GitOverview["changes"][number]) =>
-  change.index === "U" ||
-  change.worktree === "U" ||
-  ["AA", "DD"].includes(change.index + change.worktree);
-for (const [action, title] of [
-  ["openDiff", "Открыть изменения"],
-  ["openFile", "Открыть файл"],
-  ["stage", "Отметить Staged"],
-  ["unstage", "Убрать из Staged"],
-  ["discard", "Откатить рабочие изменения…"],
-] as const) {
-  gitCommands.scope.registerCommand({
-    id: `ide.git.${action}`,
-    title,
-    enabled: (value) => {
-      if (gitBusy.value) return false;
-      if (action === "stage" || action === "unstage") {
-        const selection = gitSelection(value, action === "unstage");
-        return (
-          !!selection.length &&
-          (action === "stage" || selection.every((change) => !hasConflict(change)))
-        );
-      }
-      const change = gitChange(value);
-      if (!change) return false;
-      if (action === "openFile")
-        return change.worktree !== "D" && !(change.index === "D" && change.worktree === " ");
-      if (action === "openDiff")
-        return (
-          !hasConflict(change) &&
-          (gitArgs(value).staged ? ![" ", "?"].includes(change.index) : change.worktree !== " ")
-        );
-      return change.worktree !== " " && !hasConflict(change);
-    },
-    run: async (value) => {
-      const { path, staged, confirm, pinned } = gitArgs(value);
-      if (action === "openFile" || action === "openDiff")
-        return emit("open", path, action === "openDiff" ? staged : undefined, pinned);
-      if (
-        action === "discard" &&
-        !confirm &&
-        !window.confirm(
-          gitChange(value)?.index === "?"
-            ? `Убрать новый файл ${path}? Он будет перемещён в .projector-trash.`
-            : `Откатить рабочие изменения ${path} до подготовленной версии? Несохранённый черновик тоже будет удалён.`,
-        )
-      )
-        return;
-      const paths =
-        action === "discard"
-          ? [path]
-          : gitSelection(value, action === "unstage").map((change) => change.path);
-      gitBusy.value = true;
-      try {
-        await props.prepare(action, paths);
-        props.invalidate();
-        await props.overview.mutate(action, action === "discard" ? path : paths);
-        await props.applied(action, paths);
-      } finally {
-        gitBusy.value = false;
-      }
-    },
-  });
-}
+const { gitChange, stagedChanges, workingChanges } = registerChangeCommands({
+  commands: gitCommands,
+  overview: props.overview,
+  target: gitTarget,
+  busy: gitBusy,
+  prepare: props.prepare,
+  invalidate: props.invalidate,
+  applied: props.applied,
+  open: (path, staged, pinned) => emit("open", path, staged, pinned),
+});
 gitCommands.scope.registerCommand({
   id: "ide.git.group.toggle",
   title: "Свернуть или развернуть блок изменений",
@@ -309,7 +227,10 @@ defineExpose({
               })
             "
             @target="gitTarget = { path: $event, staged: group.staged }"
-            @open="(path, pinned) => gitCommands.run('ide.git.openDiff', { path, staged: group.staged, pinned })"
+            @open="
+              (path, pinned) =>
+                gitCommands.run('ide.git.openDiff', { path, staged: group.staged, pinned })
+            "
             @context="(event, path) => gitContext(event, path, group.staged)"
           />
         </template>
