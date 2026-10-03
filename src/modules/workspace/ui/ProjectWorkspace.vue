@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useSessionSnapshot, workspaceSessionSchema, type WorkspaceSession } from "../session.ts";
-import { workspaceRequest, searchWorkspace, saveWorkspaceFile, mutateWorkspaceGit } from "../api.ts";
+import { workspaceRequest, saveWorkspaceFile } from "../api.ts";
 import { isFileDrag, pathsFromDataTransfer } from "../../path-drop/index.ts";
 import { projectRelativePath, previewBrowserFile } from "../file-drop.ts";
 import { treeDragType } from "../tree-drag.ts";
@@ -9,14 +9,16 @@ import { onBeforeRouteLeave, onBeforeRouteUpdate } from "vue-router";
 import { relocatedPath } from "../../../../core/modules/workspace/index.ts";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import { useCommandScope, commandArgs } from "../../../common/utilities/commands.ts";
-import ContextMenu from "../../../common/ui/ContextMenu.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiEmpty from "../../../common/ui/UiEmpty.vue";
-import IconPlus from "~icons/lucide/plus";
-import IconMinus from "~icons/lucide/minus";
 import IconDiff from "~icons/lucide/file-diff";
 import FileTree from "./FileTree.vue";
-import GitChangesTree from "./GitChangesTree.vue";
+import SearchPanel from "./SearchPanel.vue";
+import WorkbenchToolbar from "./WorkbenchToolbar.vue";
+import SidebarTabs, { type SidebarSection } from "./SidebarTabs.vue";
+import GitPanel from "./GitPanel.vue";
+import { useGitOverview } from "../lib/git-overview.ts";
+import { useSidebarResize } from "../lib/sidebar-resize.ts";
 import FilePanel from "./FilePanel.vue";
 import PanelHost from "./PanelHost.vue";
 import { AgentChat } from "../../agent/index.ts";
@@ -41,26 +43,6 @@ import {
 } from "../../dock/index.ts";
 import { isEditable, isMarkdown, type OpenFile } from "../open-file.ts";
 import { createPanelHosts } from "../panel-hosts.ts";
-import IconBot from "~icons/lucide/bot";
-import IconKeyboard from "~icons/lucide/keyboard";
-import IconSettings from "~icons/lucide/settings";
-import IconRefresh from "~icons/lucide/rotate-cw";
-import IconFiles from "~icons/lucide/files";
-import IconSearch from "~icons/lucide/search";
-import IconCaseSensitive from "~icons/lucide/case-sensitive";
-import IconWholeWord from "~icons/lucide/whole-word";
-import IconRegex from "~icons/lucide/regex";
-import IconChevronRight from "~icons/lucide/chevron-right";
-import IconChevronDown from "~icons/lucide/chevron-down";
-import IconFile from "~icons/lucide/file";
-import IconGit from "~icons/devicon/git";
-import IconSidebar from "~icons/lucide/panel-left";
-import IconLayout from "~icons/lucide/layout-template";
-import IconEye from "~icons/lucide/eye";
-import IconTerminal from "~icons/lucide/terminal";
-import IconCodex from "~icons/simple-icons/openai";
-import IconClaude from "~icons/simple-icons/claude";
-import IconOpenCode from "~icons/simple-icons/opencode";
 import IconRestart from "~icons/lucide/rotate-ccw";
 import IconFailed from "~icons/lucide/circle-slash";
 import IconFinishFlag from "../../../common/ui/IconFinishFlag.vue";
@@ -70,8 +52,6 @@ import {
   useTerminalSessions,
 } from "../../terminal/index.ts";
 import type {
-  SearchHit,
-  GitOverview,
   FileComparison,
   FileContent,
 } from "../../../../core/modules/workspace/index.ts";
@@ -83,60 +63,8 @@ const props = defineProps<{
   saveProjectSettings?: () => void | Promise<void>;
 }>();
 const workspaceElement = ref<HTMLElement>();
-const treeWidth = ref<number>();
 const sidebarHidden = ref(false);
-const sizes = computed(() => ({
-  "--tree-width": treeWidth.value ? `${treeWidth.value}px` : undefined,
-}));
-const minTree = 160;
-const minDock = 300;
-const clampTree = (width: number, total: number) =>
-  Math.max(minTree, Math.min(width, total - minDock));
-let sizeObserver: ResizeObserver | undefined;
-onMounted(() => {
-  sizeObserver = new ResizeObserver(() => {
-    const element = workspaceElement.value;
-    if (!element || window.innerWidth <= 1050 || treeWidth.value === undefined) return;
-    treeWidth.value = clampTree(treeWidth.value, element.clientWidth);
-  });
-  if (workspaceElement.value) sizeObserver.observe(workspaceElement.value);
-});
-let stopResize: (() => void) | undefined;
-function resizeTree(event: PointerEvent) {
-  const element = workspaceElement.value;
-  if (!element || window.innerWidth <= 1050) return;
-  stopResize?.();
-  (event.currentTarget as HTMLElement).focus();
-  event.preventDefault();
-  const rect = element.getBoundingClientRect();
-  const move = (moveEvent: PointerEvent) => {
-    treeWidth.value = clampTree(moveEvent.clientX - rect.left, rect.width);
-  };
-  const finish = () => {
-    window.removeEventListener("pointermove", move);
-    window.removeEventListener("pointerup", finish);
-    window.removeEventListener("pointercancel", finish);
-    document.body.style.cursor = "";
-    document.body.style.userSelect = "";
-    stopResize = undefined;
-  };
-  stopResize = finish;
-  document.body.style.cursor = "col-resize";
-  document.body.style.userSelect = "none";
-  window.addEventListener("pointermove", move);
-  window.addEventListener("pointerup", finish);
-  window.addEventListener("pointercancel", finish);
-}
-function resizeTreeKey(event: KeyboardEvent) {
-  if (!["ArrowLeft", "ArrowRight"].includes(event.key) || !workspaceElement.value) return;
-  event.preventDefault();
-  const element = workspaceElement.value;
-  const amount = event.key === "ArrowRight" ? 20 : -20;
-  treeWidth.value = clampTree(
-    (treeWidth.value ?? element.querySelector(".sidebar")!.clientWidth) + amount,
-    element.clientWidth,
-  );
-}
+const { treeWidth, sizes, resizeTree, resizeTreeKey } = useSidebarResize(workspaceElement);
 const fileTree = ref<InstanceType<typeof FileTree>>();
 async function prepareEntryChange(path: string) {
   const affected = tabs.value.filter(
@@ -268,24 +196,14 @@ function entryDeleted(path: string) {
   );
   revision.value++;
   void loadGit();
-  if (query.value.trim()) void search();
+  searchPanel.value?.refresh();
 }
-const section = ref<"files" | "search" | "git">("files");
+const overview = useGitOverview(() => props.projectId);
+const { git, gutterRevision, load: loadGit } = overview;
+const gitPanel = ref<InstanceType<typeof GitPanel>>();
+const section = ref<SidebarSection>("files");
+const searchPanel = ref<InstanceType<typeof SearchPanel>>();
 const revision = ref(0);
-const query = ref("");
-const searchCase = ref(false);
-const searchWord = ref(false);
-const searchRegex = ref(false);
-const hits = ref<SearchHit[]>([]);
-const searchError = ref("");
-const searching = ref(false);
-const searched = ref(false);
-const truncated = ref(false);
-const collapsedGroups = ref<Set<string>>(new Set());
-const git = ref<GitOverview>({ available: false, branch: "", changes: [] });
-const gutterRevision = ref(0);
-const gitError = ref("");
-const gitLoading = ref(false);
 const fileError = ref("");
 const loading = ref(false);
 const isDirty = (file: OpenFile) =>
@@ -460,12 +378,6 @@ function groupLabel(group: DockGroup) {
 const showGroup = (id: string) => {
   layout.value = setGroupHidden(layout.value, id, false);
 };
-const terminalPrograms = [
-  { program: "shell", title: "Новый shell", icon: IconTerminal },
-  { program: "codex", title: "Новый Codex", icon: IconCodex },
-  { program: "claude", title: "Новый Claude Code", icon: IconClaude },
-  { program: "opencode", title: "Новый OpenCode", icon: IconOpenCode },
-];
 function resetLayout() {
   const current = activeKey.value;
   layout.value = createDockLayout();
@@ -590,168 +502,39 @@ async function restoreSession(saved: WorkspaceSession | undefined, generation: n
 }
 
 const active = computed(() => tabs.value.find((file) => file.key === activeKey.value));
-const stagedChanges = computed(() =>
-  git.value.changes.filter((change) => change.index !== " " && change.index !== "?"),
-);
-const workingChanges = computed(() =>
-  git.value.changes.filter((change) => change.worktree !== " "),
-);
-const gitBusy = ref(false);
-const gitMenu = ref<InstanceType<typeof ContextMenu>>();
-const gitTarget = ref({ path: "", staged: false });
-const gitCommands = useCommandScope(`git:${props.projectId}`, () => ({
-  surface: "git",
-  projectId: props.projectId,
-  path: gitTarget.value.path,
-  staged: gitTarget.value.staged,
-  busy: gitBusy.value,
-}));
-function gitArgs(value?: unknown) {
-  const args = commandArgs(value);
-  if (args.path !== undefined && typeof args.path !== "string")
-    throw new Error("path должен быть строкой");
-  if (args.staged !== undefined && typeof args.staged !== "boolean")
-    throw new Error("staged должен быть boolean");
-  return {
-    path: (args.path as string | undefined) ?? gitTarget.value.path,
-    staged: (args.staged as boolean | undefined) ?? gitTarget.value.staged,
-    confirm: args.confirm === true,
-  };
+async function prepareGitChange(action: string, paths: string[]) {
+  if (action !== "discard") {
+    for (const entry of paths)
+      if (!(await prepareEntryChange(entry))) throw new Error("Не удалось сохранить файл");
+    return;
+  }
+  for (const tab of tabs.value.filter((tab) => tab.path === paths[0])) {
+    if (pendingSaves.has(tab) && !(await pendingSaves.get(tab)))
+      throw new Error("Не удалось завершить сохранение файла");
+  }
 }
-function gitChange(value?: unknown) {
-  return git.value.changes.find((change) => change.path === gitArgs(value).path);
+function invalidateOpening() {
+  ++fileGeneration;
+  loading.value = false;
 }
-function gitSelection(value: unknown, staged: boolean) {
-  const { path } = gitArgs(value);
-  return (staged ? stagedChanges.value : workingChanges.value).filter(
-    (change) => !path || change.path === path || change.path.startsWith(`${path}/`),
+async function gitChangeApplied(action: string, paths: string[]) {
+  const path = paths[0]!;
+  revision.value++;
+  // Drop obsolete comparisons; reload a visible file after discard.
+  const current = active.value;
+  tabs.value = tabs.value.filter(
+    (tab) => !paths.includes(tab.path) || (tab.original === undefined && action !== "discard"),
   );
-}
-const hasConflict = (change: GitOverview["changes"][number]) =>
-  change.index === "U" ||
-  change.worktree === "U" ||
-  ["AA", "DD"].includes(change.index + change.worktree);
-for (const [action, title] of [
-  ["openDiff", "Открыть изменения"],
-  ["openFile", "Открыть файл"],
-  ["stage", "Отметить Staged"],
-  ["unstage", "Убрать из Staged"],
-  ["discard", "Откатить рабочие изменения…"],
-] as const) {
-  gitCommands.scope.registerCommand({
-    id: `ide.git.${action}`,
-    title,
-    enabled: (value) => {
-      if (gitBusy.value) return false;
-      if (action === "stage" || action === "unstage") {
-        const selection = gitSelection(value, action === "unstage");
-        return (
-          !!selection.length &&
-          (action === "stage" || selection.every((change) => !hasConflict(change)))
-        );
-      }
-      const change = gitChange(value);
-      if (!change) return false;
-      if (action === "openFile")
-        return change.worktree !== "D" && !(change.index === "D" && change.worktree === " ");
-      if (action === "openDiff")
-        return (
-          !hasConflict(change) &&
-          (gitArgs(value).staged ? ![" ", "?"].includes(change.index) : change.worktree !== " ")
-        );
-      return change.worktree !== " " && !hasConflict(change);
-    },
-    run: async (value) => {
-      const { path, staged, confirm } = gitArgs(value);
-      if (action === "openFile" || action === "openDiff")
-        return openFile(path, undefined, undefined, action === "openDiff" ? staged : undefined);
-      if (
-        action === "discard" &&
-        !confirm &&
-        !window.confirm(
-          gitChange(value)?.index === "?"
-            ? `Убрать новый файл ${path}? Он будет перемещён в .projector-trash.`
-            : `Откатить рабочие изменения ${path} до подготовленной версии? Несохранённый черновик тоже будет удалён.`,
-        )
-      )
-        return;
-      const paths =
-        action === "discard"
-          ? [path]
-          : gitSelection(value, action === "unstage").map((change) => change.path);
-      gitBusy.value = true;
-      try {
-        if (action !== "discard") {
-          for (const entry of paths)
-            if (!(await prepareEntryChange(entry))) throw new Error("Не удалось сохранить файл");
-        }
-        if (action === "discard") {
-          const affected = tabs.value.filter((tab) => tab.path === path);
-          for (const tab of affected) {
-            if (pendingSaves.has(tab) && !(await pendingSaves.get(tab)))
-              throw new Error("Не удалось завершить сохранение файла");
-          }
-        }
-        ++fileGeneration;
-        loading.value = false;
-        ++gitGeneration;
-        gitLoading.value = false;
-        git.value = await mutateWorkspaceGit(
-          props.projectId,
-          action,
-          action === "discard" ? path : paths,
-        );
-        gitError.value = "";
-        revision.value++;
-        // Drop obsolete comparisons; reload a visible file after discard.
-        const current = active.value;
-        tabs.value = tabs.value.filter(
-          (tab) =>
-            !paths.includes(tab.path) || (tab.original === undefined && action !== "discard"),
-        );
-        if (current?.path === path && action === "discard") {
-          const exists = await workspaceRequest<FileContent>(props.projectId, "file", {
-            path,
-          }).then(
-            () => true,
-            () => false,
-          );
-          if (exists) await openFile(path);
-        }
-        if (query.value.trim()) void search();
-      } finally {
-        gitBusy.value = false;
-      }
-    },
-  });
-}
-gitCommands.scope.registerCommand({
-  id: "ide.git.refresh",
-  title: "Обновить Git",
-  run: loadGit,
-  enabled: () => !gitBusy.value,
-});
-const gitMenuItems = computed<ContextMenuItem[]>(() => {
-  const args = gitTarget.value;
-  const file = !!gitChange(args);
-  return [
-    ...(file
-      ? [gitCommands.item("ide.git.openDiff", args), gitCommands.item("ide.git.openFile", args)]
-      : []),
-    gitCommands.item(args.staged ? "ide.git.unstage" : "ide.git.stage", args, { separator: true }),
-    ...(!args.staged && file ? [gitCommands.item("ide.git.discard", args, { danger: true })] : []),
-  ];
-});
-function gitContext(event: MouseEvent | KeyboardEvent, path: string, staged: boolean) {
-  gitTarget.value = { path, staged };
-  gitCommands.scope.activate();
-  void gitMenu.value?.open(event);
+  if (current?.path === path && action === "discard") {
+    const exists = await workspaceRequest<FileContent>(props.projectId, "file", { path }).then(
+      () => true,
+      () => false,
+    );
+    if (exists) await openFile(path);
+  }
+  searchPanel.value?.refresh();
 }
 let fileGeneration = 0;
-let gitGeneration = 0;
-let searchGeneration = 0;
-let searchTimer: ReturnType<typeof setTimeout> | undefined;
-let searchAbort: AbortController | undefined;
 async function openFile(
   path: string,
   line?: number,
@@ -980,111 +763,6 @@ onMounted(() => {
   window.addEventListener("beforeunload", beforeUnload);
   window.addEventListener("blur", windowBlur);
 });
-async function loadGit() {
-  const generation = ++gitGeneration;
-  gutterRevision.value++;
-  gitLoading.value = true;
-  gitError.value = "";
-  try {
-    const data = await workspaceRequest<GitOverview>(props.projectId, "git");
-    if (generation === gitGeneration) git.value = data;
-  } catch (err) {
-    if (generation === gitGeneration)
-      gitError.value = err instanceof Error ? err.message : "Ошибка Git";
-  } finally {
-    if (generation === gitGeneration) gitLoading.value = false;
-  }
-}
-async function search() {
-  const generation = ++searchGeneration;
-  searchAbort?.abort();
-  searched.value = false;
-  hits.value = [];
-  searchError.value = "";
-  truncated.value = false;
-  if (!query.value.trim()) {
-    searching.value = false;
-    return;
-  }
-  searching.value = true;
-  searchAbort = new AbortController();
-  try {
-    const data = await searchWorkspace(
-      props.projectId,
-      query.value,
-      {
-        caseSensitive: searchCase.value,
-        wholeWord: searchWord.value,
-        regex: searchRegex.value,
-      },
-      searchAbort.signal,
-    );
-    if (generation !== searchGeneration) return;
-    hits.value = data.hits;
-    truncated.value = data.truncated;
-    searched.value = true;
-  } catch (err) {
-    if (generation === searchGeneration && !searchAbort.signal.aborted)
-      searchError.value = err instanceof Error ? err.message : "Ошибка поиска";
-  } finally {
-    if (generation === searchGeneration) searching.value = false;
-  }
-}
-watch(query, () => {
-  clearTimeout(searchTimer);
-  ++searchGeneration;
-  searchAbort?.abort();
-  hits.value = [];
-  collapsedGroups.value = new Set();
-  searched.value = false;
-  searching.value = !!query.value.trim();
-  searchTimer = setTimeout(() => void search(), 300);
-});
-watch([searchCase, searchWord, searchRegex], () => {
-  clearTimeout(searchTimer);
-  if (query.value.trim()) void search();
-});
-interface SearchGroup {
-  path: string;
-  name: string;
-  directory: string;
-  hits: SearchHit[];
-}
-const searchGroups = computed<SearchGroup[]>(() => {
-  const groups = new Map<string, SearchHit[]>();
-  for (const hit of hits.value) {
-    const list = groups.get(hit.path) ?? [];
-    list.push(hit);
-    groups.set(hit.path, list);
-  }
-  return [...groups.entries()].map(([path, list]) => {
-    const parts = path.split("/");
-    return { path, name: parts.at(-1) ?? path, directory: parts.slice(0, -1).join("/"), hits: list };
-  });
-});
-function toggleGroup(path: string) {
-  const next = new Set(collapsedGroups.value);
-  if (next.has(path)) next.delete(path);
-  else next.add(path);
-  collapsedGroups.value = next;
-}
-interface SnippetSegment {
-  text: string;
-  match: boolean;
-}
-function snippetSegments(hit: SearchHit): SnippetSegment[] {
-  const segments: SnippetSegment[] = [];
-  let cursor = 0;
-  for (const match of hit.matches ?? []) {
-    const start = Math.max(match.start, cursor);
-    if (start >= hit.text.length) break;
-    if (start > cursor) segments.push({ text: hit.text.slice(cursor, start), match: false });
-    segments.push({ text: hit.text.slice(start, match.end), match: true });
-    cursor = Math.max(cursor, match.end);
-  }
-  if (cursor < hit.text.length) segments.push({ text: hit.text.slice(cursor), match: false });
-  return segments;
-}
 watch(
   () => props.projectId,
   () => {
@@ -1092,11 +770,7 @@ watch(
     const generation = ++sessionGeneration;
     restoringSession.value = true;
     ++fileGeneration;
-    ++gitGeneration;
-    git.value = { available: false, branch: "", changes: [] };
-    ++searchGeneration;
-    searchAbort?.abort();
-    clearTimeout(searchTimer);
+    overview.reset();
     ++dropGeneration;
     pendingTarget = undefined;
     tabs.value.forEach(releasePreview);
@@ -1104,9 +778,6 @@ watch(
     layout.value = parseDockLayout(saved?.layout) ?? createDockLayout();
     fileError.value = "";
     loading.value = false;
-    query.value = "";
-    hits.value = [];
-    collapsedGroups.value = new Set();
     section.value = saved?.section === "project" ? "files" : (saved?.section ?? "files");
     treeWidth.value = saved?.treeWidth;
     sidebarHidden.value = !!saved?.sidebarHidden;
@@ -1121,7 +792,7 @@ watch(section, (value) => {
 async function refresh() {
   revision.value++;
   await loadGit();
-  if (section.value === "search") await search();
+  if (section.value === "search") await searchPanel.value?.search();
   if (active.value?.virtual) return;
   if (active.value?.localFile) void openBrowserFile(active.value.localFile, true);
   else if (active.value)
@@ -1152,7 +823,7 @@ function entryMoved(source: string, destination: string) {
   }
   revision.value++;
   void loadGit();
-  if (query.value.trim()) void search();
+  searchPanel.value?.refresh();
 }
 onBeforeUnmount(() => {
   ++sessionGeneration;
@@ -1160,13 +831,8 @@ onBeforeUnmount(() => {
   tabs.value.forEach(releasePreview);
   window.removeEventListener("beforeunload", beforeUnload);
   window.removeEventListener("blur", windowBlur);
-  stopResize?.();
-  sizeObserver?.disconnect();
   ++fileGeneration;
-  ++gitGeneration;
-  ++searchGeneration;
-  clearTimeout(searchTimer);
-  searchAbort?.abort();
+  overview.cancel();
 });
 </script>
 
@@ -1177,135 +843,27 @@ onBeforeUnmount(() => {
     :class="{ 'sidebar-hidden': sidebarHidden }"
     :style="sizes"
   >
-    <div class="toolbar" role="toolbar" aria-label="Блоки и терминалы">
-      <UiButton
-        icon
-        size="sm"
-        :active="!sidebarHidden"
-        :aria-pressed="!sidebarHidden"
-        title="Боковая панель"
-        aria-label="Боковая панель"
-        data-command="ide.workbench.sidebar.toggle"
-        @click="editorCommands.run('ide.workbench.sidebar.toggle')"
-      >
-        <IconSidebar aria-hidden="true" />
-      </UiButton>
-      <div class="toolbar-group" role="group" aria-label="Новая терминальная сессия">
-        <UiButton
-          v-for="entry in terminalPrograms"
-          :key="entry.program"
-          icon
-          size="sm"
-          :disabled="terminals.busy.value"
-          :title="entry.title"
-          :aria-label="entry.title"
-          @click="editorCommands.run('ide.workbench.terminal.new', { program: entry.program })"
-        >
-          <component :is="entry.icon" aria-hidden="true" />
-        </UiButton>
-      </div>
-      <slot name="terminal-actions" />
-      <slot name="terminal-status" />
-      <p v-if="terminals.error.value" class="toolbar-error" role="alert">
-        {{ terminals.error.value }}
-      </p>
-      <div class="toolbar-spacer" />
-      <UiButton
-        v-for="group in hiddenGroups"
-        :key="group.id"
-        variant="chip"
-        size="sm"
-        :title="`Показать блок: ${groupLabel(group)}`"
-        :aria-label="`Показать блок: ${groupLabel(group)}`"
-        @click="showGroup(group.id)"
-      >
-        <IconEye aria-hidden="true" />{{ groupLabel(group) }}
-      </UiButton>
-      <UiButton
-        icon
-        size="sm"
-        title="Сбросить раскладку блоков"
-        aria-label="Сбросить раскладку блоков"
-        data-command="ide.workbench.layout.reset"
-        @click="editorCommands.run('ide.workbench.layout.reset')"
-      >
-        <IconLayout aria-hidden="true" />
-      </UiButton>
-    </div>
+    <WorkbenchToolbar
+      :sidebar-hidden="sidebarHidden"
+      :terminals-busy="terminals.busy.value"
+      :terminals-error="terminals.error.value"
+      :hidden-groups="hiddenGroups.map((group) => ({ id: group.id, label: groupLabel(group) }))"
+      @command="(id, args) => editorCommands.run(id, args)"
+      @show-group="showGroup"
+    >
+      <template #terminal-actions><slot name="terminal-actions" /></template>
+      <template #terminal-status><slot name="terminal-status" /></template>
+    </WorkbenchToolbar>
     <p v-if="fileError" class="file-error" role="alert">{{ fileError }}</p>
     <aside v-show="!sidebarHidden" class="sidebar" aria-label="Обзор проекта">
-      <nav class="side-tabs" aria-label="Разделы проекта">
-        <button
-          :class="{ selected: section === 'files' }"
-          :aria-pressed="section === 'files'"
-          title="Файлы"
-          aria-label="Файлы"
-          @click="section = 'files'"
-        >
-          <IconFiles aria-hidden="true" />
-        </button>
-        <button
-          :class="{ selected: section === 'search' }"
-          :aria-pressed="section === 'search'"
-          title="Поиск"
-          aria-label="Поиск"
-          @click="section = 'search'"
-        >
-          <IconSearch aria-hidden="true" />
-        </button>
-        <button
-          :class="{ selected: section === 'git' }"
-          :aria-pressed="section === 'git'"
-          title="Git"
-          :aria-label="git.changes.length ? `Git: ${git.changes.length} изменений` : 'Git'"
-          @click="section = 'git'"
-        >
-          <IconGit class="git-logo" aria-hidden="true" />
-          <span v-if="git.changes.length" aria-hidden="true">{{ git.changes.length }}</span>
-        </button>
-        <div class="side-actions">
-          <UiButton
-            icon
-            size="sm"
-            title="Чат с агентом"
-            aria-label="Чат с агентом"
-            data-command="ide.workbench.agent.open"
-            @click="editorCommands.run('ide.workbench.agent.open')"
-          >
-            <IconBot aria-hidden="true" />
-          </UiButton>
-          <UiButton
-            icon
-            size="sm"
-            title="Горячие клавиши"
-            aria-label="Горячие клавиши"
-            data-command="ide.workbench.keybindings.open"
-            @click="editorCommands.run('ide.workbench.keybindings.open')"
-          >
-            <IconKeyboard aria-hidden="true" />
-          </UiButton>
-          <UiButton
-            icon
-            size="sm"
-            title="Обновить обзор"
-            aria-label="Обновить обзор"
-            @click="section === 'git' ? gitCommands.run('ide.git.refresh') : refresh()"
-          >
-            <IconRefresh aria-hidden="true" />
-          </UiButton>
-          <UiButton
-            icon
-            size="sm"
-            :active="active?.virtual === 'project'"
-            :aria-pressed="active?.virtual === 'project'"
-            title="Настройки проекта"
-            aria-label="Настройки проекта"
-            @click="openProjectSettings"
-          >
-            <IconSettings aria-hidden="true" />
-          </UiButton>
-        </div>
-      </nav>
+      <SidebarTabs
+        v-model:section="section"
+        :git-count="git.changes.length"
+        :settings-active="active?.virtual === 'project'"
+        @command="editorCommands.run($event)"
+        @refresh="section === 'git' ? gitPanel?.refresh() : refresh()"
+        @settings="openProjectSettings"
+      />
       <div v-show="section === 'files'" class="side-content">
         <FileTree
           ref="fileTree"
@@ -1323,171 +881,23 @@ onBeforeUnmount(() => {
           @moved="entryMoved"
         />
       </div>
-      <div v-show="section === 'search'" class="side-content search-panel">
-        <form class="search-form" @submit.prevent="search">
-          <div class="search-box">
-            <input
-              v-model="query"
-              type="search"
-              placeholder="Найти в проекте…"
-              aria-label="Поиск по содержимому"
-              maxlength="200"
-            />
-            <div class="search-options" role="group" aria-label="Параметры поиска">
-              <UiButton
-                icon
-                size="sm"
-                :active="searchCase"
-                :aria-pressed="searchCase"
-                title="Учитывать регистр"
-                aria-label="Учитывать регистр"
-                @click="searchCase = !searchCase"
-              >
-                <IconCaseSensitive aria-hidden="true" />
-              </UiButton>
-              <UiButton
-                icon
-                size="sm"
-                :active="searchWord"
-                :aria-pressed="searchWord"
-                title="Только слово целиком"
-                aria-label="Только слово целиком"
-                @click="searchWord = !searchWord"
-              >
-                <IconWholeWord aria-hidden="true" />
-              </UiButton>
-              <UiButton
-                icon
-                size="sm"
-                :active="searchRegex"
-                :aria-pressed="searchRegex"
-                title="Использовать регулярное выражение"
-                aria-label="Использовать регулярное выражение"
-                @click="searchRegex = !searchRegex"
-              >
-                <IconRegex aria-hidden="true" />
-              </UiButton>
-            </div>
-          </div>
-        </form>
-        <p v-if="searching" class="notice" role="status">поиск…</p>
-        <p v-if="searchError" class="notice error" role="alert">{{ searchError }}</p>
-        <p v-if="searched" class="notice">
-          {{
-            hits.length
-              ? `${hits.length} совпадений в ${searchGroups.length} файлах${truncated ? " · показаны первые 200" : ""}`
-              : "Совпадений нет"
-          }}
-        </p>
-        <div v-for="group in searchGroups" :key="group.path" class="result-group">
-          <button
-            class="result-group-header"
-            type="button"
-            :aria-expanded="!collapsedGroups.has(group.path)"
-            :title="group.path"
-            @click="toggleGroup(group.path)"
-          >
-            <IconChevronDown v-if="!collapsedGroups.has(group.path)" aria-hidden="true" />
-            <IconChevronRight v-else aria-hidden="true" />
-            <IconFile class="result-file-icon" aria-hidden="true" />
-            <span class="result-file">{{ group.name }}</span>
-            <span v-if="group.directory" class="result-dir">{{ group.directory }}</span>
-            <span class="result-count">{{ group.hits.length }}</span>
-          </button>
-          <template v-if="!collapsedGroups.has(group.path)">
-            <button
-              v-for="hit in group.hits"
-              :key="`${hit.path}:${hit.line}:${hit.column}`"
-              class="result"
-              :title="`${hit.path}:${hit.line}`"
-              @click="openFile(hit.path, hit.line, hit.column)"
-            >
-              <span class="result-line">{{ hit.line }}</span>
-              <span class="snippet"
-                ><template v-for="(segment, index) in snippetSegments(hit)" :key="index"
-                  ><mark v-if="segment.match">{{ segment.text }}</mark
-                  ><template v-else>{{ segment.text }}</template></template
-                ></span
-              >
-            </button>
-          </template>
-        </div>
-      </div>
-      <div
+      <SearchPanel
+        v-show="section === 'search'"
+        ref="searchPanel"
+        :project-id="projectId"
+        @open="openFile"
+      />
+      <GitPanel
         v-show="section === 'git'"
-        class="side-content"
-        @focusin="gitCommands.scope.activate()"
-        @keydown="gitCommands.keydown($event)"
-      >
-        <p v-if="git.available" class="notice">{{ git.branch }}</p>
-        <p v-if="gitLoading" class="notice" role="status">загрузка Git…</p>
-        <p v-if="gitError" class="notice error" role="alert">{{ gitError }}</p>
-        <p v-else-if="!gitLoading && !git.available" class="notice">
-          В этой папке нет Git-репозитория.
-        </p>
-        <p v-else-if="!gitLoading && !git.changes.length" class="notice">Нет изменений.</p>
-        <template
-          v-for="group in [
-            { label: 'Staged', rows: stagedChanges, staged: true },
-            { label: 'Changed', rows: workingChanges, staged: false },
-          ]"
-          :key="group.label"
-        >
-          <div v-if="git.available" class="git-group">
-            <h3>
-              {{ group.label }} <span v-if="group.rows.length">{{ group.rows.length }}</span>
-            </h3>
-            <UiButton
-              v-if="group.rows.length"
-              icon
-              size="sm"
-              :disabled="
-                !gitCommands.scope.describe(group.staged ? 'ide.git.unstage' : 'ide.git.stage', {
-                  path: '',
-                })?.enabled
-              "
-              :title="group.staged ? 'Убрать всё из Staged' : 'Отметить всё Staged'"
-              :aria-label="group.staged ? 'Убрать всё из Staged' : 'Отметить всё Staged'"
-              :data-command="group.staged ? 'ide.git.unstage' : 'ide.git.stage'"
-              @click="
-                gitCommands.run(group.staged ? 'ide.git.unstage' : 'ide.git.stage', {
-                  path: '',
-                  staged: group.staged,
-                })
-              "
-            >
-              <IconMinus v-if="group.staged" aria-hidden="true" /><IconPlus
-                v-else
-                aria-hidden="true"
-              />
-            </UiButton>
-          </div>
-          <GitChangesTree
-            v-if="group.rows.length"
-            :key="`${projectId}:${group.staged}`"
-            :changes="group.rows"
-            :staged="group.staged"
-            :disabled="gitBusy"
-            :can-toggle="
-              (path) =>
-                !!gitCommands.scope.describe(group.staged ? 'ide.git.unstage' : 'ide.git.stage', {
-                  path,
-                })?.enabled
-            "
-            :selected="active?.staged === group.staged ? active.path : ''"
-            @change="
-              gitCommands.run(group.staged ? 'ide.git.unstage' : 'ide.git.stage', {
-                path: $event,
-                staged: group.staged,
-              })
-            "
-            @target="gitTarget = { path: $event, staged: group.staged }"
-            @open="gitCommands.run('ide.git.openDiff', { path: $event, staged: group.staged })"
-            @context="(event, path) => gitContext(event, path, group.staged)"
-          />
-        </template>
-        <ContextMenu ref="gitMenu" :items="gitMenuItems" label="Действия Git" />
-      </div>
+        ref="gitPanel"
+        :project-id="projectId"
+        :overview="overview"
+        :selected="active ? { path: active.path, staged: active.staged } : undefined"
+        :prepare="prepareGitChange"
+        :invalidate="invalidateOpening"
+        :applied="gitChangeApplied"
+        @open="(path, staged) => openFile(path, undefined, undefined, staged)"
+      />
     </aside>
     <div
       v-show="!sidebarHidden"
@@ -1627,16 +1037,6 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.git-group {
-  display: flex;
-  align-items: center;
-  padding: 6px var(--sp-3) 2px var(--sp-3);
-}
-.git-group h3 {
-  flex: 1;
-  padding: 0;
-}
-
 .diff-tab-icon {
   width: 14px;
   height: 14px;
@@ -1665,36 +1065,6 @@ onBeforeUnmount(() => {
 }
 .workspace.sidebar-hidden {
   grid-template-columns: 0 0 minmax(0, 1fr);
-}
-.toolbar {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-  min-height: 40px;
-  padding: 0 var(--sp-3);
-  border-bottom: 1px solid var(--line);
-  background: var(--bg-sunken);
-}
-.toolbar-group {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding-left: var(--sp-2);
-  border-left: 1px solid var(--line);
-}
-.toolbar-spacer {
-  flex: 1;
-}
-.toolbar-error {
-  margin: 0;
-  color: var(--err);
-  font-size: var(--fs-xs);
-}
-.toolbar :deep(svg) {
-  width: 14px;
-  height: 14px;
 }
 .sidebar,
 .dock-pane {
@@ -1742,83 +1112,17 @@ onBeforeUnmount(() => {
 .sidebar {
   background: var(--bg-sunken);
 }
-.side-tabs {
-  display: flex;
-  height: 40px;
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--line);
-  align-items: stretch;
-  gap: var(--sp-3);
-  padding: 0 var(--sp-3);
-}
-.side-tabs > button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--sp-1);
-  min-width: 24px;
-  white-space: nowrap;
-  font-size: var(--fs-xs);
-  color: var(--muted);
-  border-bottom: 2px solid transparent;
-  transition: color var(--t-fast);
-}
-.side-tabs > button:hover {
-  color: var(--text);
-}
-.side-tabs > button.selected {
-  color: var(--text);
-  border-color: var(--focus);
-}
-.side-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  margin-left: auto;
-  padding-left: var(--sp-3);
-  border-left: 1px solid var(--line);
-  flex-shrink: 0;
-}
-.side-tabs > button svg {
-  width: 14px;
-  height: 14px;
-}
-.git-logo :deep(path) {
-  fill: currentColor;
-}
 .project-settings {
   container-type: inline-size;
   height: 100%;
   overflow: auto;
   padding: var(--sp-4);
 }
-.side-tabs span {
-  color: var(--run);
-  font: var(--fs-2xs) var(--mono);
-}
 .side-content {
   flex: 1;
   min-height: 0;
   overflow: auto;
 }
-.search-panel form {
-  margin: 2px 10px var(--sp-2);
-}
-.search-box {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-.search-box input {
-  flex: 1;
-  min-width: 0;
-  font-size: var(--fs-xs);
-}
-.search-options {
-  display: flex;
-  gap: 2px;
-}
-
 .notice {
   padding: 0 var(--sp-3);
   color: var(--muted);
@@ -1826,89 +1130,6 @@ onBeforeUnmount(() => {
 }
 .error {
   color: var(--err);
-}
-.result-group {
-  border-bottom: 1px solid var(--line);
-}
-.result-group-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  padding: 6px 12px;
-  text-align: left;
-  color: var(--muted);
-}
-.result-group-header:hover {
-  background: var(--hover);
-}
-.result-group-header > svg:first-child {
-  width: 13px;
-  height: 13px;
-  flex-shrink: 0;
-}
-.result-file-icon {
-  width: 13px;
-  height: 13px;
-  flex-shrink: 0;
-}
-.result-file {
-  font-size: var(--fs-xs);
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.result-dir {
-  flex: 1;
-  min-width: 0;
-  font-size: var(--fs-2xs);
-  color: var(--faint);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.result-count {
-  flex-shrink: 0;
-  min-width: 18px;
-  padding: 1px 5px;
-  text-align: center;
-  font: var(--fs-2xs) var(--mono);
-  color: var(--text);
-  background: var(--bg-4);
-  border-radius: var(--r-lg);
-}
-.result {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 5px var(--sp-3);
-  width: 100%;
-  text-align: left;
-  border-bottom: 1px solid var(--line);
-}
-.result:hover {
-  background: var(--hover);
-}
-.result-line {
-  flex-shrink: 0;
-  min-width: 2ch;
-  text-align: right;
-  font: var(--fs-2xs) var(--mono);
-  color: var(--faint);
-}
-.snippet {
-  flex: 1;
-  min-width: 0;
-  font: var(--fs-2xs) var(--mono);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.snippet mark {
-  color: inherit;
-  background: var(--search);
-  border-radius: var(--r-sm);
 }
 h3 {
   padding: 10px 12px 4px;
@@ -1989,13 +1210,6 @@ h3 span {
   }
   .dock-pane {
     grid-row: 4;
-  }
-  .side-tabs {
-    gap: 8px;
-    padding: 0 8px;
-  }
-  .side-tabs > button {
-    font-size: var(--fs-2xs);
   }
 }
 </style>
