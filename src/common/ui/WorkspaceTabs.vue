@@ -384,7 +384,7 @@ watch(
   height: 40px;
   flex-shrink: 0;
   overflow-x: auto;
-  background: #141412;
+  background: var(--bg-sunken);
   border-bottom: 1px solid var(--line);
   scrollbar-width: thin;
 }
@@ -416,7 +416,7 @@ watch(
   height: 100%;
   flex: 1;
   text-align: left;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--muted);
 }
 .tab-label span {
@@ -433,7 +433,7 @@ watch(
   place-items: center;
   flex-shrink: 0;
   padding: 4px;
-  border-radius: 3px;
+  border-radius: var(--r-sm);
   color: var(--faint);
   opacity: 0;
 }
@@ -486,13 +486,12 @@ watch(
   opacity: 1;
 }
 .tab-close:hover:not(:disabled) {
-  background: #ffffff12;
+  background: var(--active);
   color: var(--text);
 }
 .tab-label:focus-visible,
 .tab-close:focus-visible {
-  outline: 1px solid var(--focus);
-  outline-offset: -1px;
+  outline-offset: -2px;
 }
 .dragging {
   opacity: 0.45;
@@ -520,8 +519,8 @@ watch(
   height: 26px;
   padding: 2px 5px;
   border: 1px solid var(--focus);
-  border-radius: 2px;
-  font-size: 12px;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-xs);
   background: var(--bg);
   color: var(--text);
 }

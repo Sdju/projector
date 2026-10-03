@@ -19,8 +19,8 @@ defineProps<{
 
 span {
   color: var(--muted);
-  font-size: 11px;
-  letter-spacing: 0.08em;
+  font-size: var(--fs-2xs);
+  letter-spacing: var(--track-label);
   text-transform: uppercase;
 }
 </style>

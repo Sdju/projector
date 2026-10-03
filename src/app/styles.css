@@ -1,17 +1,86 @@
+/*
+ * Дизайн-система Projector.
+ * Все значения для интерфейса берутся из токенов ниже: цвета, шрифты, радиусы,
+ * отступы, тени, анимации. Hex, px-размеры шрифтов и радиусы в компонентах не
+ * пишутся. Общие элементы живут в src/common/ui (Ui*).
+ */
 :root {
   color-scheme: dark;
+
+  /* Поверхности: от самой глубокой к самой высокой */
   --bg: #10100f;
   --bg-2: #171716;
+  --bg-3: #20201c;
+  --bg-4: #2a2a26;
+  --bg-sunken: #0c0c0b;
+
+  /* Границы */
   --line: #2c2c28;
+  --line-strong: #46463f;
+
+  /* Текст: контраст на --bg не ниже 4.5:1 */
   --text: #ecece6;
-  --muted: #8c8c84;
-  --faint: #5c5c56;
-  --run: #8fbf8a;
-  --err: #c9897a;
+  --text-2: #c9c9bf;
+  --muted: #9a9a92;
+  --faint: #80807a;
+
+  /* Состояния */
   --focus: #d8d2c4;
+  --accent: #b8ab77;
+  --run: #8fbf8a;
+  --err: #d19585;
+  --warn: #c4b386;
+  --info: #7fb0d6;
   --search: #5c4a1e;
+
+  /* Интерактивные подложки поверх любой поверхности */
+  --hover: #ffffff0d;
+  --active: #ffffff18;
+  --selection: #3a3934;
+  --overlay: #00000099;
+
+  /* Тени */
+  --shadow-popover: 0 12px 32px #0008;
+  --shadow-modal: 0 18px 60px #0009;
+
+  /* Типографика */
   --sans: "Noto Sans", "DejaVu Sans", "Liberation Sans", system-ui, sans-serif;
   --mono: "Noto Sans Mono", "DejaVu Sans Mono", ui-monospace, monospace;
+  --fs-2xs: 11px; /* метки, подсказки, счётчики */
+  --fs-xs: 12px; /* вторичный текст, вкладки, кнопки */
+  --fs-sm: 13px; /* поля ввода, списки */
+  --fs-md: 15px; /* основной текст, заголовки диалогов */
+  --fs-lg: 20px; /* заголовки секций */
+  --fs-xl: 28px; /* заголовок страницы */
+  --lh: 1.45;
+  --track-label: 0.08em;
+
+  /* Радиусы */
+  --r-sm: 3px;
+  --r-md: 6px;
+  --r-lg: 10px;
+  --r-full: 999px;
+
+  /* Отступы */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+
+  /* Размеры контролов */
+  --control-h: 32px;
+  --control-h-sm: 28px;
+
+  /* Анимации */
+  --t-fast: 0.12s ease;
+  --t-base: 0.18s ease;
+
+  /* Слои */
+  --z-sticky: 10;
+  --z-expanded: 30;
+  --z-popover: 100;
 }
 
 * {
@@ -29,9 +98,8 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--sans);
-  font-size: 15px;
-  line-height: 1.45;
-  letter-spacing: 0.01em;
+  font-size: var(--fs-md);
+  line-height: var(--lh);
 }
 
 button,
@@ -54,15 +122,26 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: default;
+}
+
 input,
 textarea,
 select {
   width: 100%;
   background: transparent;
   border: 1px solid var(--line);
-  border-radius: 3px;
-  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  padding: var(--sp-2) 10px;
   outline: none;
+  transition: border-color var(--t-fast);
+}
+
+input:hover:not(:disabled, :focus),
+textarea:hover:not(:disabled, :focus),
+select:hover:not(:disabled, :focus) {
+  border-color: var(--line-strong);
 }
 
 input:focus,
@@ -71,11 +150,62 @@ select:focus {
   border-color: var(--focus);
 }
 
+input::placeholder,
+textarea::placeholder {
+  color: var(--faint);
+}
+
+input[type="checkbox"],
+input[type="radio"],
+input[type="range"],
+input[type="color"] {
+  width: auto;
+  padding: 0;
+  accent-color: var(--focus);
+}
+
 textarea {
   resize: vertical;
   min-height: 72px;
 }
 
+select {
+  appearance: none;
+  padding-right: 28px;
+  background:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%) right 14px center / 5px 5px no-repeat,
+    linear-gradient(-45deg, transparent 50%, var(--muted) 50%) right 9px center / 5px 5px no-repeat;
+}
+
+select option {
+  background: var(--bg-2);
+}
+
+/* Единый видимый фокус для клавиатуры. Компоненты не переопределяют outline. */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline-offset: 0;
+}
+
 ::selection {
-  background: #3a3934;
+  background: var(--selection);
+}
+
+* {
+  scrollbar-color: var(--bg-4) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -150,50 +150,49 @@ defineExpose({ open, openForElement, close });
     flip-block,
     flip-inline,
     flip-block flip-inline;
-  margin: 4px;
+  margin: var(--sp-1);
   inset: auto;
   min-width: 220px;
   max-width: calc(100vw - 16px);
   max-height: calc(100dvh - 16px);
   overflow-y: auto;
-  padding: 5px;
-  border: 1px solid var(--line, #363630);
-  border-radius: 7px;
-  background: var(--bg-2, #20201c);
-  color: var(--text, #e8e8dc);
-  box-shadow: 0 12px 40px #0008;
-  font: 12px var(--sans, sans-serif);
+  padding: var(--sp-1);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--bg-3);
+  color: var(--text);
+  box-shadow: var(--shadow-popover);
+  font: var(--fs-xs) var(--sans);
 }
 .context-menu button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: var(--sp-5);
   width: 100%;
   padding: 7px 10px;
   text-align: left;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   color: inherit;
 }
 .context-menu button:hover:not(:disabled),
 .context-menu button:focus-visible {
-  background: var(--bg-3, #36362d);
+  background: var(--active);
   outline: none;
 }
 .context-menu button:disabled {
-  opacity: 0.35;
-  cursor: default;
+  opacity: 0.45;
 }
 .context-menu button.danger {
-  color: var(--err, #ef8c7d);
+  color: var(--err);
 }
 kbd {
   color: var(--muted);
-  font: 10px var(--mono, monospace);
+  font: var(--fs-2xs) var(--mono);
 }
 .menu-separator {
   height: 1px;
-  margin: 4px 6px;
+  margin: var(--sp-1) 6px;
   background: var(--line);
 }
 </style>

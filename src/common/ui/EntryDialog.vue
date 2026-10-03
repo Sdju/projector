@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { nextTick, ref, useId } from "vue";
+import UiButton from "./UiButton.vue";
+import UiDialog from "./UiDialog.vue";
+import UiDialogActions from "./UiDialogActions.vue";
 const emit = defineEmits<{ submit: [value: string]; cancel: [] }>();
 const titleId = useId();
-const dialog = ref<HTMLDialogElement>();
+const dialog = ref<InstanceType<typeof UiDialog>>();
 const input = ref<HTMLInputElement>();
 const title = ref("");
 const value = ref("");
@@ -24,7 +27,7 @@ async function open(options: {
   confirm.value = !!options.confirm;
   error.value = "";
   busy.value = false;
-  dialog.value?.showModal();
+  dialog.value?.open();
   await nextTick();
   input.value?.focus();
   input.value?.select();
@@ -46,12 +49,7 @@ defineExpose({ open, close, fail });
 </script>
 <template>
   <Teleport to="body">
-    <dialog
-      ref="dialog"
-      class="entry-dialog"
-      :aria-labelledby="titleId"
-      @cancel="busy ? $event.preventDefault() : emit('cancel')"
-    >
+    <UiDialog ref="dialog" :labelledby="titleId" @cancel="busy ? $event.preventDefault() : emit('cancel')">
       <form @submit.prevent="submit">
         <h2 :id="titleId">{{ title }}</h2>
         <p v-if="description">{{ description }}</p>
@@ -65,9 +63,8 @@ defineExpose({ open, close, fail });
           maxlength="255"
         />
         <p v-if="error" class="error" role="alert">{{ error }}</p>
-        <div class="actions">
-          <button
-            type="button"
+        <UiDialogActions>
+          <UiButton
             :disabled="busy"
             @click="
               close();
@@ -75,53 +72,31 @@ defineExpose({ open, close, fail });
             "
           >
             Отмена
-          </button>
-          <button
+          </UiButton>
+          <UiButton
             type="submit"
+            :variant="confirm ? 'danger' : 'solid'"
             :disabled="busy || (!confirm && !value.trim())"
-            :class="{ danger: confirm }"
           >
             {{ busy ? "Выполняется…" : confirm ? "Удалить" : "Сохранить" }}
-          </button>
-        </div>
+          </UiButton>
+        </UiDialogActions>
       </form>
-    </dialog>
+    </UiDialog>
   </Teleport>
 </template>
 <style scoped>
-.entry-dialog {
-  width: min(420px, calc(100vw - 32px));
-  padding: 22px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--bg-2);
-  color: var(--text);
-}
-.entry-dialog::backdrop {
-  background: #0007;
-}
 h2 {
-  margin: 0 0 14px;
-  font-size: 15px;
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-md);
   font-weight: 500;
 }
 p {
-  font-size: 12px;
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-xs);
   overflow-wrap: anywhere;
   color: var(--muted);
 }
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
-}
-.actions button {
-  padding: 7px 12px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-}
-.danger,
 .error {
   color: var(--err);
 }
