@@ -11,7 +11,7 @@ import type { FileEntry } from "../../../../core/modules/workspace/index.ts";
 import { ref } from "vue";
 
 export interface TreeEmit {
-  (event: "open", path: string): void;
+  (event: "open", path: string, pinned?: boolean): void;
   (event: "moved", source: string, destination: string): void;
   (event: "changed"): void;
   (event: "deleted", path: string): void;
@@ -171,7 +171,7 @@ export function useTreeOperations({
       } else if (op.action !== "delete") {
         if (op.directory) expanded.value.add(op.directory);
         emit("changed");
-        if (op.action === "create-file") emit("open", result.destination!);
+        if (op.action === "create-file") emit("open", result.destination!, true);
       }
       message.value = "Готово";
       return result;
@@ -265,7 +265,7 @@ export function useTreeOperations({
   register(
     "file.open",
     "Открыть",
-    (args) => emit("open", resolveEntry(args)!.path),
+    (args) => emit("open", resolveEntry(args)!.path, commandArgs(args).pinned === true),
     (args) => !!resolveEntry(args) && !resolveEntry(args)!.directory,
   );
   register("file.create", "Новый файл…", (args) => requestAction("create-file", "", args));

@@ -23,7 +23,7 @@ const props = withDefaults(
   { path: "", depth: 0 },
 );
 const emit = defineEmits<{
-  open: [path: string];
+  open: [path: string, pinned?: boolean];
   target: [path: string];
   change: [path: string];
   context: [event: MouseEvent | KeyboardEvent, path: string];
@@ -110,7 +110,7 @@ function toggle(path: string) {
           :aria-expanded="entry.directory ? !collapsed.has(entry.path) : undefined"
           :aria-current="!entry.directory && selected === entry.path ? 'true' : undefined"
           @focus="emit('target', entry.path)"
-          @click="entry.directory ? toggle(entry.path) : emit('open', entry.path)"
+          @click="entry.directory ? toggle(entry.path) : emit('open', entry.path, $event.detail >= 2)"
         >
           <span class="glyph" aria-hidden="true">
             <IconChevronRight
@@ -148,7 +148,7 @@ function toggle(path: string) {
         :readonly="readonly"
         :selected="selected"
         @change="emit('change', $event)"
-        @open="emit('open', $event)"
+        @open="(path, pinned) => emit('open', path, pinned)"
         @target="emit('target', $event)"
         @context="(event, path) => emit('context', event, path)"
       />

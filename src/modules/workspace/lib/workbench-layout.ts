@@ -150,6 +150,7 @@ export function useWorkbenchLayout(ctx: WorkbenchLayoutContext) {
         dirty: ctx.isDirty(file),
         saving: !!file.saving,
         error: !!file.saveError,
+        preview: !!file.preview && !ctx.isDirty(file),
       };
     const item = terminalPanels.value.get(id);
     if (item)

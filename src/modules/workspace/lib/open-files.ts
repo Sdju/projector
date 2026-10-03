@@ -4,7 +4,8 @@ import { isFileDrag, pathsFromDataTransfer } from "../../path-drop/index.ts";
 import type { DockTarget } from "../../dock/index.ts";
 import { workspaceRequest, saveWorkspaceFile } from "../api.ts";
 import { projectRelativePath, previewBrowserFile } from "../file-drop.ts";
-import { isEditable, isMarkdown, type OpenFile } from "../open-file.ts";
+import { isEditable, isMarkdown, type OpenFile, type OpenFileOptions } from "../open-file.ts";
+import { dropPreviewExcept as dropPreviewTabs, opensAsPreview } from "./preview-tabs.ts";
 import { treeDragType } from "../tree-drag.ts";
 import type {
   CommitComparison,
@@ -40,12 +41,13 @@ export function useOpenFiles(ctx: OpenFilesContext) {
     line?: number,
     column?: number,
     staged?: boolean,
-    reload = false,
-    external = false,
+    { reload = false, external = false, preview = true }: OpenFileOptions = {},
   ) {
     const key = `${external ? "external:" : ""}${path}:${staged === undefined ? "file" : staged ? "index" : "working"}`;
     const existing = tabs.value.find((tab) => tab.key === key);
+    const asPreview = opensAsPreview(preview, existing);
     if (existing && (!reload || ctx.isDirty(existing) || existing.saving)) {
+      existing.preview = asPreview;
       selectTab(key);
       existing.line = line;
       existing.column = column;
@@ -68,6 +70,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
               staged: String(staged),
             });
       if (generation !== fileGeneration) return;
+      if (asPreview) dropPreviewExcept(key);
       const file: OpenFile = {
         external,
         image:
@@ -83,6 +86,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
         column,
         key,
         markdownMode: line ? "source" : (existing?.markdownMode ?? "document"),
+        preview: asPreview,
       };
       const index = tabs.value.findIndex((tab) => tab.key === key);
       if (index === -1) tabs.value.push(file);
@@ -99,9 +103,11 @@ export function useOpenFiles(ctx: OpenFilesContext) {
     }
   }
   /** Diff файла внутри коммита: родитель → коммит, только для чтения. */
-  async function openCommitFile(hash: string, path: string) {
+  async function openCommitFile(hash: string, path: string, preview = true) {
     const key = `${path}:commit:${hash}`;
-    if (tabs.value.some((tab) => tab.key === key)) {
+    const existing = tabs.value.find((tab) => tab.key === key);
+    if (existing) {
+      if (!preview) existing.preview = false;
       selectTab(key);
       return fileGeneration;
     }
@@ -114,6 +120,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
         path,
       });
       if (generation !== fileGeneration) return;
+      if (preview) dropPreviewExcept(key);
       tabs.value.push({
         key,
         path,
@@ -121,6 +128,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
         original: data.original,
         commit: data.hash,
         parent: data.parent,
+        preview,
       });
       selectTab(key);
       return fileGeneration;
@@ -148,6 +156,13 @@ export function useOpenFiles(ctx: OpenFilesContext) {
   }
   function releasePreview(file: OpenFile) {
     if (file.image?.startsWith("blob:")) URL.revokeObjectURL(file.image);
+  }
+  const dropPreviewExcept = (key: string) =>
+    dropPreviewTabs(tabs.value, key, ctx.isDirty, releasePreview);
+  /** Двойной щелчок по вкладке предпросмотра: закрепляет её как обычную. */
+  function pinPreview(key: string) {
+    const file = tabs.value.find((tab) => tab.key === key);
+    if (file) file.preview = false;
   }
   async function openBrowserFile(source: File, reload = false) {
     const key = `browser:${source.name}:${source.size}:${source.lastModified}`;
@@ -198,7 +213,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
       if (tree) {
         const entry = JSON.parse(tree) as { projectId: string; path: string };
         if (entry.projectId === projectId) {
-          await openFile(entry.path);
+          await openFile(entry.path, undefined, undefined, undefined, { preview: false });
           return;
         }
         const response = await fetch(`/api/projects/${encodeURIComponent(entry.projectId)}`);
@@ -211,14 +226,10 @@ export function useOpenFiles(ctx: OpenFilesContext) {
         for (const path of paths) {
           if (!current()) return;
           const relative = projectRelativePath(root, path);
-          await openFile(
-            relative ?? path,
-            undefined,
-            undefined,
-            undefined,
-            false,
-            relative === undefined,
-          );
+          await openFile(relative ?? path, undefined, undefined, undefined, {
+            external: relative === undefined,
+            preview: false,
+          });
         }
       } else {
         if (directories) throw new Error("Бросьте файл, чтобы открыть его в редакторе");
@@ -372,5 +383,6 @@ export function useOpenFiles(ctx: OpenFilesContext) {
     saveFile,
     prepareEntryChange,
     toggleMarkdownSource,
+    pinPreview,
   };
 }

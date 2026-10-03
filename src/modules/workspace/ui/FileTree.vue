@@ -40,7 +40,7 @@ const props = withDefaults(
   { path: "", depth: 0 },
 );
 const emit = defineEmits<{
-  open: [path: string];
+  open: [path: string, pinned?: boolean];
   moved: [source: string, destination: string];
   changed: [];
   deleted: [path: string];
@@ -88,7 +88,8 @@ function clickEntry(event: MouseEvent, entry: FileEntry) {
   activateEntry(entry);
   keys!.selectEntry(event, entry);
   if (event.shiftKey || event.ctrlKey || event.metaKey) return;
-  treeCommands.run(entry.directory ? "ide.fileTree.directory.toggle" : "ide.fileTree.file.open");
+  if (entry.directory) treeCommands.run("ide.fileTree.directory.toggle");
+  else treeCommands.run("ide.fileTree.file.open", { pinned: event.detail >= 2 });
 }
 const injectClickEntry = props.depth
   ? inject<(event: MouseEvent, entry: FileEntry) => void>("workspace-entry-click")
@@ -300,7 +301,7 @@ defineExpose({ reveal });
         :before-change="beforeChange"
         @changed="emit('changed')"
         @deleted="emit('deleted', $event)"
-        @open="emit('open', $event)"
+        @open="(path, pinned) => emit('open', path, pinned)"
         @moved="(source, destination) => emit('moved', source, destination)"
       />
     </li>

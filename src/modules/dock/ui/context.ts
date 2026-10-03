@@ -10,6 +10,7 @@ export interface DockTabInfo {
   saving?: boolean;
   error?: boolean;
   renameable?: boolean;
+  preview?: boolean;
 }
 
 /** Всё, что вложенные узлы раскладки получают от `DockLayout`, не передавая это через props. */
@@ -26,6 +27,7 @@ export interface DockContext {
   close: (id: string) => void;
   closeMany: (ids: string[]) => void;
   rename: (id: string, label: string) => void;
+  pin: (id: string) => void;
   drop: (event: DragEvent, target: DockTarget) => void;
 }
 

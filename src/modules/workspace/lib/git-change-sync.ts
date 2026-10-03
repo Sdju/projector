@@ -38,7 +38,7 @@ export function useGitChangeSync(ctx: GitChangeSyncContext) {
     ctx.files.invalidate();
     const activeKey = ctx.active()?.key;
     for (const tab of openTabs()) {
-      await ctx.files.openFile(tab.path, tab.line, tab.column, tab.staged, true);
+      await ctx.files.openFile(tab.path, tab.line, tab.column, tab.staged, { reload: true });
       if (ctx.files.fileError.value) {
         ctx.files.fileError.value = "";
         ctx.tabs.value = ctx.tabs.value.filter((item) => item !== tab);
@@ -67,7 +67,7 @@ export function useGitChangeSync(ctx: GitChangeSyncContext) {
         () => true,
         () => false,
       );
-      if (exists) await ctx.files.openFile(path);
+      if (exists) await ctx.files.openFile(path, undefined, undefined, undefined, { preview: false });
     }
     ctx.refreshSearch();
   }

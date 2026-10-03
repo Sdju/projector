@@ -44,6 +44,7 @@ const { fileOf, terminals, terminalPanels } = props.workbench;
     @close="workbench.closePanel"
     @close-many="workbench.closeManyPanels"
     @rename="workbench.renamePanel"
+    @pin="files.pinPreview"
     @drop="files.dropFiles"
   >
     <template #panel="{ id, focused }">
@@ -68,7 +69,7 @@ const { fileOf, terminals, terminalPanels } = props.workbench;
         :focused="focused"
         @open="
           (path, line, column, external) =>
-            files.openFile(path, line, column, undefined, false, external)
+            files.openFile(path, line, column, undefined, { external })
         "
         @status="terminals.update"
         @sessions="terminals.replace"

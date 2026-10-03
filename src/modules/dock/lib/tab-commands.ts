@@ -10,6 +10,8 @@ export interface DockTab {
   error?: boolean;
   /** Вкладку можно переименовать независимо от общего флага `renameable`. */
   renameable?: boolean;
+  /** Вкладка предварительного просмотра: отображается курсивом и закрепляется двойным щелчком. */
+  preview?: boolean;
 }
 export interface TabCommandProps {
   tabs: DockTab[];
@@ -24,6 +26,7 @@ export interface TabCommandProps {
     closeMany: (ids: string[]) => unknown;
     reorder: (ids: string[]) => unknown;
     rename?: (id: string, label: string) => unknown;
+    pin?: (id: string) => unknown;
   };
 }
 interface TabCommandContext {
@@ -129,6 +132,12 @@ export function registerTabCommands({
       return props.commandHandlers.rename?.(tab.id, args.label.trim());
     },
     (args) => hasTab(args) && !!(props.renameable || findTab(args)?.renameable),
+  );
+  register(
+    "pin",
+    "Закрепить вкладку",
+    (args) => props.commandHandlers.pin?.(findTab(args)!.id),
+    (args) => hasTab(args) && !!findTab(args)?.preview,
   );
   register("reorder", "Переставить вкладки", (value) => {
     const { ids } = commandArgs(value);

@@ -202,8 +202,7 @@ async function refresh() {
       active.value.line,
       active.value.column,
       active.value.staged,
-      true,
-      !!active.value.external,
+      { reload: true, external: !!active.value.external },
     );
 }
 function entryMoved(source: string, destination: string) {
@@ -271,7 +270,7 @@ onBeforeUnmount(() => {
           :selected="active?.path ?? ''"
           :revision="revision"
           :git-changes="git.changes"
-          @open="openFile($event)"
+          @open="(path, pinned) => openFile(path, undefined, undefined, undefined, { preview: !pinned })"
           @moved="entryMoved"
         />
       </div>
@@ -292,9 +291,9 @@ onBeforeUnmount(() => {
         :prepare="prepareGitChange"
         :invalidate="files.invalidate"
         :applied="gitChangeApplied"
-        @open="(path, staged) => openFile(path, undefined, undefined, staged)"
+        @open="(path, staged, pinned) => openFile(path, undefined, undefined, staged, { preview: !pinned })"
         @open-commit="files.openCommit"
-        @open-commit-diff="files.openCommitFile"
+        @open-commit-diff="(hash, path, pinned) => files.openCommitFile(hash, path, !pinned)"
       />
     </aside>
     <div

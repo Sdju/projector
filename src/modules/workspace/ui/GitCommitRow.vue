@@ -28,7 +28,7 @@ const emit = defineEmits<{
   toggle: [];
   open: [];
   copy: [];
-  openDiff: [path: string];
+  openDiff: [path: string, pinned?: boolean];
   context: [event: MouseEvent | KeyboardEvent, path: string];
   target: [path: string];
 }>();
@@ -139,7 +139,7 @@ const refs = computed(() => props.commit.refs.filter((ref) => ref.name !== "HEAD
           readonly
           :label="`Изменения коммита ${shortHash(commit.hash)}`"
           selected=""
-          @open="emit('openDiff', $event)"
+          @open="(path, pinned) => emit('openDiff', path, pinned)"
           @target="emit('target', $event)"
           @context="(event, path) => emit('context', event, path)"
         />

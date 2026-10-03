@@ -100,6 +100,7 @@ const handlers = {
   closeMany: (ids: string[]) => dock.closeMany(ids),
   reorder: (ids: string[]) => dock.update(reorderPanels(dock.layout(), props.group.id, ids)),
   rename: (id: string, label: string) => dock.rename(id, label),
+  pin: (id: string) => dock.pin(id),
   move: (id: string, index: number) =>
     dock.update(movePanel(dock.layout(), id, { groupId: props.group.id, zone: "center", index })),
 };

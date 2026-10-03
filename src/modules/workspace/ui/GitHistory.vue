@@ -19,7 +19,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{
   openCommit: [hash: string];
-  openDiff: [hash: string, path: string];
+  openDiff: [hash: string, path: string, pinned?: boolean];
   openFile: [path: string];
 }>();
 const target = defineModel<{ hash: string; path: string }>("target", {
@@ -117,7 +117,7 @@ register(
   "ide.git.commit.openDiff",
   "Открыть изменения файла в коммите",
   "Открывает diff файла: родитель коммита → коммит.",
-  (value) => emit("openDiff", hashArg(value), pathArg(value)),
+  (value) => emit("openDiff", hashArg(value), pathArg(value), commandArgs(value).pinned === true),
   { ...hashHelp, ...pathHelp },
 );
 register(
@@ -243,7 +243,7 @@ watch(commits, (list) => {
           @open="commands.run('ide.git.commit.open', { hash: commit.hash })"
           @copy="commands.run('ide.git.commit.copyHash', { hash: commit.hash })"
           @open-diff="
-            commands.run('ide.git.commit.openDiff', { hash: commit.hash, path: $event })
+            (path, pinned) => commands.run('ide.git.commit.openDiff', { hash: commit.hash, path, pinned })
           "
           @target="target = { hash: commit.hash, path: $event }"
           @context="(event, path) => context(event, commit.hash, path)"

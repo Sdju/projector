@@ -26,6 +26,7 @@ const emit = defineEmits<{
   close: [id: string];
   closeMany: [ids: string[]];
   rename: [id: string, label: string];
+  pin: [id: string];
   drop: [event: DragEvent, target: DockTarget];
 }>();
 const slots: Slots = useSlots();
@@ -46,6 +47,7 @@ provide(dockKey, {
   close: (id) => emit("close", id),
   closeMany: (ids) => emit("closeMany", ids),
   rename: (id, label) => emit("rename", id, label),
+  pin: (id) => emit("pin", id),
   drop: (event, target) => emit("drop", event, target),
 });
 const visible = computed(() => isNodeVisible(props.layout.root));

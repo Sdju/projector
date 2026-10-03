@@ -28,6 +28,7 @@ const props = defineProps<{
     closeMany: (ids: string[]) => unknown;
     reorder: (ids: string[]) => unknown;
     rename?: (id: string, label: string) => unknown;
+    pin?: (id: string) => unknown;
     /** Вкладка из другой полосы брошена сюда; `index` — позиция среди текущих вкладок. */
     move?: (id: string, index: number) => unknown;
   };
@@ -171,6 +172,10 @@ function activateTab(id: string) {
   contextId.value = id;
   commands.scope.activate();
 }
+function dblclickTab(tab: Tab) {
+  if (tab.preview) commands.run(commandId("pin"), { id: tab.id });
+  else if (props.renameable || tab.renameable) commands.run(commandId("rename"), { id: tab.id });
+}
 watch(
   () => props.activeId,
   async () => {
@@ -210,6 +215,7 @@ watch(
         dirty: tab.dirty,
         saving: tab.saving,
         error: tab.error,
+        preview: tab.preview,
         dragging: tab.id === dragging,
         'drop-before': tab.id === target && !after && tab.id !== dragging,
         'drop-after': tab.id === target && after && tab.id !== dragging,
@@ -245,9 +251,7 @@ watch(
         :title="tab.title ?? tab.label"
         @focus="activateTab(tab.id)"
         @click="commands.run(commandId('select'), { id: tab.id })"
-        @dblclick="
-          (renameable || tab.renameable) && commands.run(commandId('rename'), { id: tab.id })
-        "
+        @dblclick="dblclickTab(tab)"
         @keydown="navigate($event, tab.id)"
       >
         <slot name="icon" :tab="tab" /><span>{{ tab.label }}</span>
@@ -331,6 +335,9 @@ watch(
 }
 .selected .tab-label {
   color: var(--text);
+}
+.workspace-tab.preview .tab-label {
+  font-style: italic;
 }
 .tab-close {
   position: relative;

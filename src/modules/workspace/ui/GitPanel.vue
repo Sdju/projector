@@ -31,9 +31,9 @@ const props = defineProps<{
   applied: (action: string, paths: string[]) => Promise<void>;
 }>();
 const emit = defineEmits<{
-  open: [path: string, staged?: boolean];
+  open: [path: string, staged?: boolean, pinned?: boolean];
   openCommit: [hash: string];
-  openCommitDiff: [hash: string, path: string];
+  openCommitDiff: [hash: string, path: string, pinned?: boolean];
 }>();
 const { git, error: gitError, loading: gitLoading, load } = props.overview;
 const stagedChanges = computed(() =>
@@ -84,6 +84,7 @@ function gitArgs(value?: unknown) {
     path: (args.path as string | undefined) ?? gitTarget.value.path,
     staged: (args.staged as boolean | undefined) ?? gitTarget.value.staged,
     confirm: args.confirm === true,
+    pinned: args.pinned === true,
   };
 }
 function gitChange(value?: unknown) {
@@ -130,9 +131,9 @@ for (const [action, title] of [
       return change.worktree !== " " && !hasConflict(change);
     },
     run: async (value) => {
-      const { path, staged, confirm } = gitArgs(value);
+      const { path, staged, confirm, pinned } = gitArgs(value);
       if (action === "openFile" || action === "openDiff")
-        return emit("open", path, action === "openDiff" ? staged : undefined);
+        return emit("open", path, action === "openDiff" ? staged : undefined, pinned);
       if (
         action === "discard" &&
         !confirm &&
@@ -308,7 +309,7 @@ defineExpose({
               })
             "
             @target="gitTarget = { path: $event, staged: group.staged }"
-            @open="gitCommands.run('ide.git.openDiff', { path: $event, staged: group.staged })"
+            @open="(path, pinned) => gitCommands.run('ide.git.openDiff', { path, staged: group.staged, pinned })"
             @context="(event, path) => gitContext(event, path, group.staged)"
           />
         </template>
@@ -329,7 +330,7 @@ defineExpose({
           :commands="gitCommands"
           :revision="overview.gutterRevision.value"
           @open-commit="emit('openCommit', $event)"
-          @open-diff="(hash, path) => emit('openCommitDiff', hash, path)"
+          @open-diff="(hash, path, pinned) => emit('openCommitDiff', hash, path, pinned)"
           @open-file="emit('open', $event)"
         />
       </div>

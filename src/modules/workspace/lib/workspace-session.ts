@@ -5,7 +5,7 @@ import {
   serializeDockLayout,
   type DockLayout,
 } from "../../dock/index.ts";
-import type { OpenFile } from "../open-file.ts";
+import type { OpenFile, OpenFileOptions } from "../open-file.ts";
 import { useSessionSnapshot, workspaceSessionSchema, type WorkspaceSession } from "../session.ts";
 import type { SidebarSection } from "../ui/SidebarTabs.vue";
 
@@ -25,11 +25,10 @@ export interface WorkspaceSessionContext {
     line?: number,
     column?: number,
     staged?: boolean,
-    reload?: boolean,
-    external?: boolean,
+    options?: OpenFileOptions,
   ) => Promise<number | undefined>;
   openCommit: (hash: string) => void;
-  openCommitFile: (hash: string, path: string) => Promise<number | undefined>;
+  openCommitFile: (hash: string, path: string, preview?: boolean) => Promise<number | undefined>;
   fileGeneration: () => number;
   openProjectSettings: () => void;
   resetFiles: () => void;
@@ -83,8 +82,11 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
           continue;
         }
         const completed = tab.commit
-          ? await ctx.openCommitFile(tab.commit, tab.path)
-          : await ctx.openFile(tab.path, undefined, undefined, tab.staged, false, tab.external);
+          ? await ctx.openCommitFile(tab.commit, tab.path, false)
+          : await ctx.openFile(tab.path, undefined, undefined, tab.staged, {
+              external: tab.external,
+              preview: false,
+            });
         // A project switch or a user opening another file takes precedence over restoration.
         if (
           generation !== sessionGeneration ||
