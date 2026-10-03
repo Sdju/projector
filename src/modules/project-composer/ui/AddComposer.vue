@@ -2,12 +2,11 @@
 import UiHint from "../../../common/ui/UiHint.vue";
 import { computed, nextTick, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { shortPath, projectRoute } from "../../catalog/index.ts";
+import { shortPath, projectRoute, previewIconUrl } from "../../project/index.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { AgentDock } from "../../agent/index.ts";
-import { previewIconUrl } from "../../catalog/index.ts";
 import { useAddSession } from "../model/session.ts";
-import type { LaunchMode, ProjectDraft } from "../../catalog/index.ts";
+import type { LaunchMode, ProjectDraft } from "../../project/index.ts";
 import { ProjectForm } from "../../catalog/index.ts";
 
 const {

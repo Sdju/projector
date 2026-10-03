@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, watchEffect } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { isLauncherWindow } from "../modules/launcher/index.ts";
-import { useProjects, projectPathFromParams, projectIconUrl } from "../modules/catalog/index.ts";
+import { useProjects, projectPathFromParams, projectIconUrl } from "../modules/project/index.ts";
 import { useRunner } from "../modules/runner/index.ts";
 import { CommandPalette, provideIdeCommands } from "../modules/ide/index.ts";
 import AppShell from "./layouts/AppShell.vue";

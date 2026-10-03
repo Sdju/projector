@@ -1,5 +1,5 @@
 import { computed, reactive } from "vue";
-import { useProjects, type ProcessSnapshot } from "../../catalog/index.ts";
+import { useProjects, type ProcessSnapshot } from "../../project/index.ts";
 import { openProject, startProject, stopProject } from "../api/client.ts";
 
 const state = reactive({

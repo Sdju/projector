@@ -1,8 +1,12 @@
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
-import { inspectCommands } from "../api/client.ts";
-import { missingCommands, projectDraft, settingsError } from "./project-settings.ts";
-import { useProjects } from "./store.ts";
-import type { LaunchMode, Project, ProjectCommand } from "./types.ts";
+import {
+  inspectCommands,
+  missingCommands,
+  projectDraft,
+  settingsError,
+  useProjects,
+} from "../../project/index.ts";
+import type { LaunchMode, Project, ProjectCommand } from "../../project/index.ts";
 
 const text = (value: unknown, name: string) => {
   if (typeof value !== "string") throw new Error(`${name} должен быть строкой`);
@@ -39,16 +43,16 @@ export function useProjectCommands(
     const id = args.id === undefined ? undefined : text(args.id, "id");
     const name = args.name === undefined ? undefined : text(args.name, "name");
     if (!id && !name) throw new Error("Укажите id или name команды");
-    const found = item.commands.find((command) =>
-      id ? command.id === id : command.name === name,
-    );
+    const found = item.commands.find((command) => (id ? command.id === id : command.name === name));
     if (!found) throw new Error("Команда запуска не найдена");
     return found;
   }
   async function apply(change: (draft: ReturnType<typeof projectDraft>) => void) {
     const item = current();
     if (settingsDirty())
-      throw new Error("В открытых настройках есть несохранённые изменения; сохраните или сбросьте их");
+      throw new Error(
+        "В открытых настройках есть несохранённые изменения; сохраните или сбросьте их",
+      );
     if (busy) throw new Error("Настройки уже сохраняются");
     const draft = projectDraft(item);
     change(draft);
@@ -196,10 +200,7 @@ export function useProjectCommands(
     {},
     async () => {
       const item = current();
-      const found = missingCommands(
-        item.commands,
-        (await inspectCommands(item.path)).commands,
-      );
+      const found = missingCommands(item.commands, (await inspectCommands(item.path)).commands);
       if (!found.length) return { added: [] };
       await apply((draft) => draft.commands.push(...found));
       return { added: found.map(({ name, cmd }) => ({ name, cmd })) };

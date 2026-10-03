@@ -1,13 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import {
-  ProjectSettings,
-  useProjectCommands,
-  useProjects,
-  projectPathFromParams,
-  projectRoute,
-} from "../../modules/catalog/index.ts";
+import { useProjects, projectPathFromParams, projectRoute } from "../../modules/project/index.ts";
+import { ProjectSettings, useProjectCommands } from "../../modules/catalog/index.ts";
 import { RunControls, useRunner } from "../../modules/runner/index.ts";
 import { ProjectWorkspace } from "../../modules/workspace/index.ts";
 

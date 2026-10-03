@@ -4,7 +4,7 @@ import UiButton from "../../../common/ui/UiButton.vue";
 import IconWindow from "~icons/lucide/panels-top-left";
 import IconOpen from "~icons/lucide/external-link";
 import IconStop from "~icons/lucide/square";
-import type { Project } from "../../catalog/index.ts";
+import type { Project } from "../../project/index.ts";
 import { useRunner } from "../model/session.ts";
 
 const props = defineProps<{

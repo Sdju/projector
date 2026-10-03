@@ -1,4 +1,4 @@
-import type { Project } from "../../catalog/index.ts";
+import type { Project } from "../../project/index.ts";
 
 export interface AgentToolChip {
   id: string;

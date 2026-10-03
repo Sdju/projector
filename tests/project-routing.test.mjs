@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { createServer } from "node:http";
 import { once } from "node:events";
 import { createRouter, createMemoryHistory } from "vue-router";
-import { projectRoute, projectPathFromParams } from "../src/modules/catalog/project-route.ts";
+import { projectRoute, projectPathFromParams } from "../src/modules/project/project-route.ts";
 
 test("project URLs round-trip nested paths, root and reserved characters", () => {
   const router = createRouter({
@@ -103,7 +103,7 @@ test("opening a path reuses saved settings and resolves arbitrary directories on
 });
 
 test("settings import preserves custom commands and does not duplicate scripts", async () => {
-  const { missingCommands, projectDraft, settingsError } = await import("../src/modules/catalog/model/project-settings.ts");
+  const { missingCommands, projectDraft, settingsError } = await import("../src/modules/project/model/project-settings.ts");
   const project = {
     name: "App", path: "/tmp/app", icon: "", url: "", mode: "server",
     defaultCommandId: "custom", commands: [{ id: "custom", name: "develop", cmd: "pnpm dev" }],

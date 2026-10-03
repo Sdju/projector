@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { projectIconUrl } from "../api/client.ts";
-import { shortPath, statusLabel } from "../format.ts";
-import type { Project } from "../model/types.ts";
+import { projectIconUrl, shortPath, statusLabel } from "../../project/index.ts";
+import type { Project } from "../../project/index.ts";
 
 const props = defineProps<{
   project: Project;

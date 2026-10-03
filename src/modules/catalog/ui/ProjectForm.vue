@@ -3,7 +3,7 @@ import UiHint from "../../../common/ui/UiHint.vue";
 import { reactive, ref, watch } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiField from "../../../common/ui/UiField.vue";
-import type { LaunchMode, ProjectDraft } from "../model/types.ts";
+import type { LaunchMode, ProjectDraft } from "../../project/index.ts";
 
 const props = defineProps<{
   modelValue: ProjectDraft;

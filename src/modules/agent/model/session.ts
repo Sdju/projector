@@ -1,5 +1,5 @@
 import { computed, reactive } from "vue";
-import { useProjects, type Project } from "../../catalog/index.ts";
+import { useProjects, type Project } from "../../project/index.ts";
 import { streamAgent } from "../api/client.ts";
 import type { AgentHistoryTurn, AgentTurn, AgentCommandRequest } from "./types.ts";
 

@@ -1,13 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import {
-  PathBar,
-  useProjects,
-  projectRoute,
-  projectIconUrl,
-  type Project,
-} from "../../modules/catalog/index.ts";
+import { useProjects, projectRoute, projectIconUrl, type Project } from "../../modules/project/index.ts";
+import { PathBar } from "../../modules/catalog/index.ts";
 
 defineProps<{ currentProject?: Project }>();
 const { projects } = useProjects();

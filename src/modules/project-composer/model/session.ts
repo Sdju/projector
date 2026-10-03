@@ -2,9 +2,8 @@ import { computed, reactive } from "vue";
 import { looksLikePath } from "../../../common/utilities/looks-like-path.ts";
 import { agentMessageForPaths } from "../../path-drop/index.ts";
 import { useAgent } from "../../agent/index.ts";
-import { inspectPath, pickFolder } from "../../catalog/index.ts";
-import { useProjects } from "../../catalog/index.ts";
-import type { Project, ProjectDraft } from "../../catalog/index.ts";
+import { inspectPath, pickFolder, useProjects } from "../../project/index.ts";
+import type { Project, ProjectDraft } from "../../project/index.ts";
 
 const state = reactive({
   query: "",

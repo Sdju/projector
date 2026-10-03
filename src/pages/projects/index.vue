@@ -7,7 +7,8 @@ import { AddComposer } from "../../modules/project-composer/index.ts";
 import { useRouter } from "vue-router";
 import { GithubImport } from "../../modules/integrations/index.ts";
 import UiButton from "../../common/ui/UiButton.vue";
-import { ProjectCard, useProjects, projectRoute } from "../../modules/catalog/index.ts";
+import { useProjects, projectRoute } from "../../modules/project/index.ts";
+import { ProjectCard } from "../../modules/catalog/index.ts";
 import { RunControls } from "../../modules/runner/index.ts";
 
 const { projects, loading, error } = useProjects();

@@ -1,4 +1,4 @@
-import type { LaunchMode, ProcessSnapshot } from "../../catalog/index.ts";
+import type { LaunchMode, ProcessSnapshot } from "../../project/index.ts";
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {

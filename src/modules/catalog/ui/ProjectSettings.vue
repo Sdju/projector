@@ -3,10 +3,14 @@ import UiHint from "../../../common/ui/UiHint.vue";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from "vue-router";
 import UiButton from "../../../common/ui/UiButton.vue";
-import { inspectCommands } from "../api/client.ts";
-import { useProjects } from "../model/store.ts";
-import { missingCommands, projectDraft, settingsError } from "../model/project-settings.ts";
-import type { Project, ProjectCommand } from "../model/types.ts";
+import {
+  inspectCommands,
+  useProjects,
+  missingCommands,
+  projectDraft,
+  settingsError,
+} from "../../project/index.ts";
+import type { Project, ProjectCommand } from "../../project/index.ts";
 import IconPlus from "~icons/lucide/plus";
 import IconTrash from "~icons/lucide/trash-2";
 

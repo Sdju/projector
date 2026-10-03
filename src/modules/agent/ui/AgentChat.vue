@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useIdeCommands } from "../../ide/index.ts";
-import { useProjects } from "../../catalog/index.ts";
+import { useProjects } from "../../project/index.ts";
 import { agentCommandHandler } from "../model/commands.ts";
 import { useAgent } from "../model/session.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
