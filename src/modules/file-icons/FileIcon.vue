@@ -49,7 +49,7 @@ defineProps<{ icon: ResolvedFileIcon }>();
   display: grid;
   place-items: center;
   background: var(--bg);
-  border-radius: 2px;
+  border-radius: var(--r-sm);
 }
 .badge-symbol {
   width: 11px;

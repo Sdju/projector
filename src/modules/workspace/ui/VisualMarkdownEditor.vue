@@ -250,8 +250,8 @@ onBeforeUnmount(() => {
 }
 .editor-loading {
   color: var(--muted);
-  padding: 16px 24px;
-  font-size: 12px;
+  padding: var(--sp-4) var(--sp-5);
+  font-size: var(--fs-xs);
 }
 .visual-markdown-root {
   min-height: 100%;
@@ -260,24 +260,24 @@ onBeforeUnmount(() => {
   --crepe-color-background: var(--bg);
   --crepe-color-on-background: var(--text);
   --crepe-color-surface: var(--bg-2);
-  --crepe-color-surface-low: #20201c;
+  --crepe-color-surface-low: var(--bg-3);
   --crepe-color-on-surface: var(--text);
   --crepe-color-on-surface-variant: var(--muted);
   /* Crepe also uses outline for icons, input carets and drag handles. */
-  --crepe-color-outline: #b8b8ae;
-  --crepe-color-primary: #a4c7e8;
-  --crepe-color-secondary: #30302b;
+  --crepe-color-outline: var(--muted);
+  --crepe-color-primary: var(--info);
+  --crepe-color-secondary: var(--bg-4);
   --crepe-color-on-secondary: var(--text);
-  --crepe-color-hover: #242420;
-  --crepe-color-selected: #3a3934;
-  --crepe-color-inline-area: #24241f;
+  --crepe-color-hover: var(--bg-3);
+  --crepe-color-selected: var(--selection);
+  --crepe-color-inline-area: var(--bg-3);
   --crepe-font-title: var(--sans);
   --crepe-font-default: var(--sans);
   --crepe-font-code: var(--mono);
-  --crepe-shadow-1: 0 4px 16px #0005;
-  --crepe-shadow-2: 0 8px 24px #0007;
+  --crepe-shadow-1: var(--shadow-popover);
+  --crepe-shadow-2: var(--shadow-popover);
   min-height: 100%;
-  font-size: 15px;
+  font-size: var(--fs-md);
 }
 .visual-markdown :deep(.ProseMirror) {
   max-width: 820px;
@@ -285,7 +285,7 @@ onBeforeUnmount(() => {
   min-height: 100%;
   padding: 28px clamp(32px, 4vw, 56px) 80px;
   line-height: 1.8;
-  outline: none;
+  outline: none; /* каретка — собственный virtual cursor Prosemirror */
 }
 .visual-markdown :deep(.ProseMirror-focused) {
   --prosemirror-virtual-cursor-color: var(--text);
@@ -302,23 +302,23 @@ onBeforeUnmount(() => {
   letter-spacing: -0.02em;
 }
 .visual-markdown :deep(.ProseMirror h1) {
-  font-size: 30px;
+  font-size: var(--fs-xl);
   line-height: 1.35;
 }
 .visual-markdown :deep(.ProseMirror h2) {
-  font-size: 23px;
+  font-size: var(--fs-lg);
   line-height: 1.4;
 }
 .visual-markdown :deep(.ProseMirror p) {
-  font-size: 15px;
+  font-size: var(--fs-md);
   line-height: 1.8;
 }
 .visual-markdown :deep(.ProseMirror a) {
-  color: #a4c7e8;
+  color: var(--info);
   text-underline-offset: 3px;
 }
 .visual-markdown :deep(.ProseMirror blockquote) {
-  border-left: 3px solid #66685a;
+  border-left: 3px solid var(--line-strong);
   background: var(--bg-2);
   padding: 4px 20px;
 }
@@ -337,9 +337,9 @@ onBeforeUnmount(() => {
   accent-color: var(--run);
 }
 .visual-markdown :deep(.cm-editor) {
-  background: #181a1c;
+  background: var(--bg-sunken);
 }
 .visual-markdown :deep(.milkdown-code-block .cm-content) {
-  font: 13px var(--mono);
+  font: var(--fs-sm) var(--mono);
 }
 </style>

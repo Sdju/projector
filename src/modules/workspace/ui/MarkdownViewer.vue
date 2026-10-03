@@ -66,9 +66,9 @@ function focusOut(event: FocusEvent) {
 }
 .save-error {
   color: var(--err);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   margin: 0;
-  padding: 10px 16px;
+  padding: 10px var(--sp-4);
   border-bottom: 1px solid var(--line);
 }
 .save-error button {

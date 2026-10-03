@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { fitImage, zoomImageAt, type ImageTransform } from "../lib/image-viewport.ts";
+import UiButton from "../../../common/ui/UiButton.vue";
 import IconRatio from "~icons/lucide/ratio";
 import IconMaximize from "~icons/lucide/maximize";
 const props = withDefaults(
@@ -191,20 +192,24 @@ defineExpose({ reset });
     </div>
     <div class="view-controls">
       <span>{{ Math.round(view.zoom * 100) }}%</span>
-      <button
-        @click="reset(false)"
+      <UiButton
+        icon
+        size="sm"
         aria-label="Сбросить масштаб"
         title="Масштаб 100% и центрирование изображения"
+        @click="reset(false)"
       >
         <IconRatio aria-hidden="true" />
-      </button>
-      <button
-        @click="reset(true)"
+      </UiButton>
+      <UiButton
+        icon
+        size="sm"
         aria-label="Вписать"
         title="Вписать изображение в область просмотра"
+        @click="reset(true)"
       >
         <IconMaximize aria-hidden="true" />
-      </button>
+      </UiButton>
       <label v-if="backgroundControls" class="background-control"
         >Фон
         <select v-model="localBackground" aria-label="Фон изображения">
@@ -249,8 +254,7 @@ defineExpose({ reset });
   cursor: grabbing;
 }
 .image-canvas:focus-visible {
-  outline: 1px solid var(--focus, #a0b7aa);
-  outline-offset: -1px;
+  outline-offset: -2px;
 }
 .image-canvas img {
   position: absolute;
@@ -265,28 +269,10 @@ defineExpose({ reset });
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
-  padding: 5px 12px;
-  font-size: 11px;
+  gap: var(--sp-2) var(--sp-3);
+  padding: var(--sp-1) var(--sp-3);
+  font-size: var(--fs-2xs);
   border-top: 1px solid var(--line);
-}
-.view-controls button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  cursor: pointer;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 2px 6px;
-}
-.view-controls button svg {
-  width: 15px;
-  height: 15px;
-}
-.view-controls button:hover {
-  background: #3a3934;
 }
 .background-control {
   display: flex;
@@ -294,46 +280,62 @@ defineExpose({ reset });
   gap: 6px;
 }
 .background-control select {
-  font: inherit;
-  color: var(--text, #d8d2c4);
-  background: var(--surface, #171716);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 2px 6px;
+  width: auto;
+  padding-block: 2px;
 }
 .view-controls input[type="color"] {
   width: 28px;
   height: 24px;
   padding: 2px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
   background: transparent;
   cursor: pointer;
 }
+/* Тестовые фоны предпросмотра — данные, а не тема интерфейса. */
+.image-canvas {
+  --preview-light: #f5f5f4;
+  --preview-dark: #18181b;
+  --preview-checker-a: #e4e4e7;
+  --preview-checker-b: #b4b4bb;
+  --preview-gradient-from: #fafafa;
+  --preview-gradient-to: #18181b;
+  --preview-color-1: #c4b5fd;
+  --preview-color-2: #7dd3fc;
+  --preview-color-3: #fda4af;
+}
 .light {
-  background: #f5f5f4;
+  background: var(--preview-light);
 }
 .dark {
-  background: #18181b;
+  background: var(--preview-dark);
 }
 .checker {
-  background-color: #e4e4e7;
-  background-image: conic-gradient(#b4b4bb 25%, transparent 0 50%, #b4b4bb 0 75%, transparent 0);
+  background-color: var(--preview-checker-a);
+  background-image: conic-gradient(
+    var(--preview-checker-b) 25%,
+    transparent 0 50%,
+    var(--preview-checker-b) 0 75%,
+    transparent 0
+  );
   background-size: 20px 20px;
 }
 .gradient {
-  background: linear-gradient(135deg, #fafafa, #18181b);
+  background: linear-gradient(135deg, var(--preview-gradient-from), var(--preview-gradient-to));
 }
 .color-gradient {
-  background: linear-gradient(135deg, #c4b5fd, #7dd3fc 50%, #fda4af);
+  background: linear-gradient(
+    135deg,
+    var(--preview-color-1),
+    var(--preview-color-2) 50%,
+    var(--preview-color-3)
+  );
 }
 .error {
-  margin: 16px;
-  padding: 12px;
-  border-radius: 6px;
+  margin: var(--sp-4);
+  padding: var(--sp-3);
+  border-radius: var(--r-md);
   color: var(--err);
-  background: #171716;
-  font-size: 13px;
+  background: var(--bg-2);
+  font-size: var(--fs-sm);
   cursor: default;
 }
 </style>

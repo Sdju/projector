@@ -89,29 +89,20 @@ function date(value?: string) {
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  padding: 16px;
-  gap: 14px;
+  padding: var(--sp-4);
+  gap: var(--sp-3);
   box-sizing: border-box;
 }
 .archive-summary {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 20px;
-  font-size: 12px;
-  color: var(--muted, #9299ad);
+  gap: var(--sp-2) var(--sp-5);
+  font-size: var(--fs-xs);
+  color: var(--muted);
 }
 .archive-summary strong {
-  color: var(--text, #e1e5ef);
-}
-input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 9px 12px;
-  border: 1px solid #ffffff20;
-  border-radius: 6px;
-  color: inherit;
-  background: #ffffff06;
+  color: var(--text);
 }
 .archive-list {
   min-height: 0;
@@ -121,44 +112,43 @@ input {
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   text-align: left;
 }
 th {
   position: sticky;
   top: 0;
-  background: var(--panel, #171b25);
+  background: var(--bg-2);
   font-weight: 500;
 }
 th,
 td {
   padding: 10px;
-  border-bottom: 1px solid #ffffff12;
+  border-bottom: 1px solid var(--line);
   vertical-align: top;
 }
 td:not(.entry-path) {
   white-space: nowrap;
-  color: var(--muted, #9299ad);
+  color: var(--muted);
 }
 .entry-path {
   min-width: 160px;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
-  font-family: monospace;
+  font-family: var(--mono);
 }
 .entry-path small {
   display: block;
-  color: var(--muted, #9299ad);
-  margin-top: 4px;
+  color: var(--muted);
+  margin-top: var(--sp-1);
 }
 .entry-size {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.notice,
-.empty {
-  font-size: 12px;
-  color: var(--muted, #9299ad);
+.notice {
+  font-size: var(--fs-xs);
+  color: var(--muted);
   margin: 0;
 }
 </style>

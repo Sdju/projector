@@ -147,10 +147,10 @@ onBeforeUnmount(() => {
   bottom: 0;
   left: 3px;
   width: 3px;
-  background: #8fbf8a;
+  background: var(--run);
 }
 .code-viewer :deep(.git-gutter-modified)::before {
-  background: #7fb0d6;
+  background: var(--info);
 }
 .code-viewer :deep(.git-gutter-added:hover)::before,
 .code-viewer :deep(.git-gutter-modified:hover)::before {
@@ -163,7 +163,7 @@ onBeforeUnmount(() => {
   bottom: 0;
   width: 0;
   height: 0;
-  border-left: 4px solid #c9897a;
+  border-left: 4px solid var(--err);
   border-top: 4px solid transparent;
   border-bottom: 4px solid transparent;
 }
@@ -178,9 +178,9 @@ onBeforeUnmount(() => {
   box-sizing: border-box;
   height: 100%;
   overflow: hidden;
-  border-top: 1px solid #2c2c28;
-  border-bottom: 1px solid #2c2c28;
-  background: #171716;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-2);
 }
 .code-viewer :deep(.dirty-diff-bar) {
   display: flex;
@@ -188,8 +188,8 @@ onBeforeUnmount(() => {
   gap: 2px;
   padding: 0 8px;
   box-sizing: border-box;
-  color: #8c8c84;
-  font: 12px "Noto Sans", sans-serif;
+  color: var(--muted);
+  font: var(--fs-xs) var(--sans);
 }
 .code-viewer :deep(.dirty-diff-title) {
   flex: 1;
@@ -198,7 +198,7 @@ onBeforeUnmount(() => {
   min-width: 20px;
   height: 18px;
   border: 0;
-  border-radius: 3px;
+  border-radius: var(--r-sm);
   background: transparent;
   color: inherit;
   font: inherit;
@@ -206,13 +206,13 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 .code-viewer :deep(.dirty-diff-button:hover) {
-  background: #2c2c28;
-  color: #d8d2c4;
+  background: var(--active);
+  color: var(--text);
 }
 .code-viewer :deep(.dirty-diff-body) {
   padding-left: 64px;
-  background: #c9897a14;
-  font: 13px "Noto Sans Mono", monospace;
+  background: color-mix(in srgb, var(--err) 8%, transparent);
+  font: var(--fs-sm) var(--mono);
   white-space: pre;
 }
 .code-viewer :deep(.dirty-diff-peek-added .dirty-diff-body) {

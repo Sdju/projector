@@ -10,6 +10,8 @@ import { relocatedPath } from "../../../../core/modules/workspace/index.ts";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import { useCommandScope, commandArgs } from "../../../common/utilities/commands.ts";
 import ContextMenu from "../../../common/ui/ContextMenu.vue";
+import UiButton from "../../../common/ui/UiButton.vue";
+import UiEmpty from "../../../common/ui/UiEmpty.vue";
 import IconPlus from "~icons/lucide/plus";
 import IconMinus from "~icons/lucide/minus";
 import IconDiff from "~icons/lucide/file-diff";
@@ -1027,38 +1029,46 @@ onBeforeUnmount(() => {
           <span v-if="git.changes.length" aria-hidden="true">{{ git.changes.length }}</span>
         </button>
         <div class="side-actions">
-          <button
+          <UiButton
+            icon
+            size="sm"
             title="Чат с агентом"
             aria-label="Чат с агентом"
             data-command="ide.workbench.agent.open"
             @click="editorCommands.run('ide.workbench.agent.open')"
           >
             <IconBot aria-hidden="true" />
-          </button>
-          <button
+          </UiButton>
+          <UiButton
+            icon
+            size="sm"
             title="Горячие клавиши"
             aria-label="Горячие клавиши"
             data-command="ide.workbench.keybindings.open"
             @click="editorCommands.run('ide.workbench.keybindings.open')"
           >
             <IconKeyboard aria-hidden="true" />
-          </button>
-          <button
+          </UiButton>
+          <UiButton
+            icon
+            size="sm"
             title="Обновить обзор"
             aria-label="Обновить обзор"
             @click="section === 'git' ? gitCommands.run('ide.git.refresh') : refresh()"
           >
             <IconRefresh aria-hidden="true" />
-          </button>
-          <button
-            :class="{ selected: active?.virtual === 'project' }"
+          </UiButton>
+          <UiButton
+            icon
+            size="sm"
+            :active="active?.virtual === 'project'"
             :aria-pressed="active?.virtual === 'project'"
             title="Настройки проекта"
             aria-label="Настройки проекта"
             @click="openProjectSettings"
           >
             <IconSettings aria-hidden="true" />
-          </button>
+          </UiButton>
         </div>
       </nav>
       <div v-show="section === 'files'" class="side-content">
@@ -1089,36 +1099,39 @@ onBeforeUnmount(() => {
               maxlength="200"
             />
             <div class="search-options" role="group" aria-label="Параметры поиска">
-              <button
-                type="button"
-                :class="{ on: searchCase }"
+              <UiButton
+                icon
+                size="sm"
+                :active="searchCase"
                 :aria-pressed="searchCase"
                 title="Учитывать регистр"
                 aria-label="Учитывать регистр"
                 @click="searchCase = !searchCase"
               >
                 <IconCaseSensitive aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                :class="{ on: searchWord }"
+              </UiButton>
+              <UiButton
+                icon
+                size="sm"
+                :active="searchWord"
                 :aria-pressed="searchWord"
                 title="Только слово целиком"
                 aria-label="Только слово целиком"
                 @click="searchWord = !searchWord"
               >
                 <IconWholeWord aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                :class="{ on: searchRegex }"
+              </UiButton>
+              <UiButton
+                icon
+                size="sm"
+                :active="searchRegex"
                 :aria-pressed="searchRegex"
                 title="Использовать регулярное выражение"
                 aria-label="Использовать регулярное выражение"
                 @click="searchRegex = !searchRegex"
               >
                 <IconRegex aria-hidden="true" />
-              </button>
+              </UiButton>
             </div>
           </div>
         </form>
@@ -1189,9 +1202,10 @@ onBeforeUnmount(() => {
             <h3>
               {{ group.label }} <span v-if="group.rows.length">{{ group.rows.length }}</span>
             </h3>
-            <button
+            <UiButton
               v-if="group.rows.length"
-              class="git-action"
+              icon
+              size="sm"
               :disabled="
                 !gitCommands.scope.describe(group.staged ? 'ide.git.unstage' : 'ide.git.stage', {
                   path: '',
@@ -1211,7 +1225,7 @@ onBeforeUnmount(() => {
                 v-else
                 aria-hidden="true"
               />
-            </button>
+            </UiButton>
           </div>
           <GitChangesTree
             v-if="group.rows.length"
@@ -1301,9 +1315,9 @@ onBeforeUnmount(() => {
       </p>
       <div class="editor-body" :aria-busy="loading">
         <p v-if="loading" class="loading" role="status">читаю файл…</p>
-        <p v-if="!active && !loading" class="loading">
+        <UiEmpty v-if="!active && !loading" class="editor-empty">
           Откройте файл из дерева или перетащите его сюда
-        </p>
+        </UiEmpty>
         <AgentChat
           v-if="tabs.some((tab) => tab.virtual === 'agent')"
           v-show="active?.virtual === 'agent'"
@@ -1395,32 +1409,11 @@ onBeforeUnmount(() => {
 .git-group {
   display: flex;
   align-items: center;
-  padding: 6px 10px 2px 12px;
+  padding: 6px var(--sp-3) 2px var(--sp-3);
 }
 .git-group h3 {
   flex: 1;
   padding: 0;
-}
-.git-action {
-  display: grid;
-  place-items: center;
-  padding: 3px;
-  border-radius: 3px;
-  color: var(--muted);
-}
-.git-action svg {
-  width: 14px;
-  height: 14px;
-}
-.git-action:hover:not(:disabled) {
-  color: var(--text);
-  background: var(--bg-2);
-}
-.git-action:disabled {
-  opacity: 0.35;
-}
-.git-action:focus-visible {
-  outline: 1px solid var(--focus);
 }
 
 .diff-tab-icon {
@@ -1432,10 +1425,11 @@ onBeforeUnmount(() => {
 .file-drop-hint {
   position: absolute;
   inset: 4px;
-  z-index: 20;
+  z-index: var(--z-sticky);
   display: grid;
   place-items: center;
   border: 1px dashed var(--focus);
+  border-radius: var(--r-md);
   background: color-mix(in srgb, var(--bg) 82%, transparent);
   color: var(--text);
   pointer-events: none;
@@ -1444,10 +1438,10 @@ onBeforeUnmount(() => {
 .workspace {
   display: grid;
   grid-template-columns:
-    var(--tree-width, clamp(200px, 19vw, 280px)) 4px minmax(260px, 1fr)
-    4px var(--agent-width, clamp(370px, 34vw, 680px));
+    var(--tree-width, clamp(200px, 19vw, 280px)) 1px minmax(260px, 1fr)
+    1px var(--agent-width, clamp(370px, 34vw, 680px));
   border: 1px solid var(--line);
-  border-radius: 5px;
+  border-radius: var(--r-md);
   height: calc(100dvh - 84px);
   min-height: 440px;
   overflow: hidden;
@@ -1461,22 +1455,33 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
 }
+/* Видимая линия 1px, зона захвата шире за счёт ::before */
 .resize-handle {
+  position: relative;
+  z-index: 1;
   cursor: col-resize;
   background: var(--line);
   touch-action: none;
+  transition: background var(--t-fast);
+}
+.resize-handle::before {
+  content: "";
+  position: absolute;
+  inset: 0 -4px;
 }
 .resize-handle:hover,
+.resize-handle:focus-visible,
+.resize-handle:active {
+  background: var(--line-strong);
+}
 .resize-handle:focus-visible {
-  background: var(--focus);
   outline: none;
+  background: var(--focus);
 }
 .sidebar {
-  background: #141412;
-  border-right: 1px solid var(--line);
+  background: var(--bg-sunken);
 }
 .agent-pane {
-  border-left: 1px solid var(--line);
   background: var(--bg-2);
 }
 .side-tabs {
@@ -1484,35 +1489,39 @@ onBeforeUnmount(() => {
   height: 40px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--line);
-  gap: 14px;
-  padding: 0 12px;
+  align-items: stretch;
+  gap: var(--sp-3);
+  padding: 0 var(--sp-3);
 }
-.side-tabs button {
+.side-tabs > button {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: var(--sp-1);
   min-width: 24px;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--muted);
   border-bottom: 2px solid transparent;
+  transition: color var(--t-fast);
 }
-.side-tabs button.selected {
+.side-tabs > button:hover {
+  color: var(--text);
+}
+.side-tabs > button.selected {
   color: var(--text);
   border-color: var(--focus);
 }
 .side-actions {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 2px;
   margin-left: auto;
+  padding-left: var(--sp-3);
+  border-left: 1px solid var(--line);
   flex-shrink: 0;
 }
-.side-actions button {
-  display: grid;
-  place-items: center;
-}
-.side-tabs svg {
+.side-tabs > button svg {
   width: 14px;
   height: 14px;
 }
@@ -1523,11 +1532,11 @@ onBeforeUnmount(() => {
   container-type: inline-size;
   height: 100%;
   overflow: auto;
-  padding: 16px;
+  padding: var(--sp-4);
 }
 .side-tabs span {
   color: var(--run);
-  font: 10px var(--mono);
+  font: var(--fs-2xs) var(--mono);
 }
 .side-content {
   flex: 1;
@@ -1535,7 +1544,7 @@ onBeforeUnmount(() => {
   overflow: auto;
 }
 .search-panel form {
-  margin: 2px 10px 8px;
+  margin: 2px 10px var(--sp-2);
 }
 .search-box {
   display: flex;
@@ -1545,43 +1554,23 @@ onBeforeUnmount(() => {
 .search-box input {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 .search-options {
   display: flex;
   gap: 2px;
 }
-.search-options button {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 3px;
-  color: var(--muted);
-}
-.search-options button:hover {
-  color: var(--text);
-  background: var(--bg-2);
-}
-.search-options button.on {
-  color: var(--text);
-  background: var(--bg-2);
-  box-shadow: inset 0 0 0 1px var(--focus);
-}
-.search-options svg {
-  width: 15px;
-  height: 15px;
-}
+
 .notice {
-  padding: 0 12px;
+  padding: 0 var(--sp-3);
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 .error {
   color: var(--err);
 }
 .result-group {
-  border-bottom: 1px solid #21211e;
+  border-bottom: 1px solid var(--line);
 }
 .result-group-header {
   display: flex;
@@ -1593,7 +1582,7 @@ onBeforeUnmount(() => {
   color: var(--muted);
 }
 .result-group-header:hover {
-  background: #242420;
+  background: var(--hover);
 }
 .result-group-header > svg:first-child {
   width: 13px;
@@ -1606,7 +1595,7 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 .result-file {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1615,7 +1604,7 @@ onBeforeUnmount(() => {
 .result-dir {
   flex: 1;
   min-width: 0;
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   color: var(--faint);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1626,34 +1615,34 @@ onBeforeUnmount(() => {
   min-width: 18px;
   padding: 1px 5px;
   text-align: center;
-  font: 10px var(--mono);
+  font: var(--fs-2xs) var(--mono);
   color: var(--text);
-  background: var(--bg-2);
-  border-radius: 8px;
+  background: var(--bg-4);
+  border-radius: var(--r-lg);
 }
 .result {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  padding: 5px 12px;
+  padding: 5px var(--sp-3);
   width: 100%;
   text-align: left;
-  border-bottom: 1px solid #1c1c19;
+  border-bottom: 1px solid var(--line);
 }
 .result:hover {
-  background: #242420;
+  background: var(--hover);
 }
 .result-line {
   flex-shrink: 0;
   min-width: 2ch;
   text-align: right;
-  font: 10px var(--mono);
+  font: var(--fs-2xs) var(--mono);
   color: var(--faint);
 }
 .snippet {
   flex: 1;
   min-width: 0;
-  font: 11px var(--mono);
+  font: var(--fs-2xs) var(--mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1661,12 +1650,13 @@ onBeforeUnmount(() => {
 .snippet mark {
   color: inherit;
   background: var(--search);
-  border-radius: 2px;
+  border-radius: var(--r-sm);
 }
 h3 {
   padding: 10px 12px 4px;
   margin: 0;
-  font-size: 10px;
+  font-size: var(--fs-2xs);
+  letter-spacing: var(--track-label);
   text-transform: uppercase;
   font-weight: 500;
   color: var(--muted);
@@ -1679,10 +1669,10 @@ h3 span {
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  padding: 8px 14px;
-  font: 10px var(--mono);
+  padding: var(--sp-2) var(--sp-3);
+  font: var(--fs-2xs) var(--mono);
   color: var(--muted);
-  border-bottom: 1px solid #20201c;
+  border-bottom: 1px solid var(--line);
 }
 .breadcrumb span:first-child {
   overflow: hidden;
@@ -1700,9 +1690,9 @@ h3 span {
 }
 .file-error {
   margin: 0;
-  padding: 12px;
+  padding: var(--sp-3);
   color: var(--err);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   border-bottom: 1px solid var(--line);
 }
 .loading {
@@ -1711,9 +1701,16 @@ h3 span {
   right: 14px;
   z-index: 2;
   background: var(--bg-2);
-  padding: 6px 12px;
+  padding: 6px var(--sp-3);
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
+}
+.editor-body .editor-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 0;
 }
 @media (max-width: 1050px) {
   .workspace {
@@ -1723,6 +1720,9 @@ h3 span {
   }
   .resize-handle {
     display: none;
+  }
+  .sidebar {
+    border-right: 1px solid var(--line);
   }
   .sidebar,
   .editor-pane {
@@ -1757,8 +1757,8 @@ h3 span {
     gap: 8px;
     padding: 0 8px;
   }
-  .side-tabs button {
-    font-size: 11px;
+  .side-tabs > button {
+    font-size: var(--fs-2xs);
   }
   .breadcrumb span:last-child {
     display: none;

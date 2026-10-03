@@ -156,7 +156,7 @@ function toggle(path: string) {
   list-style: none;
   padding: 0;
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 .git-row {
   display: flex;
@@ -165,10 +165,10 @@ function toggle(path: string) {
 }
 .git-row:hover,
 .git-row:focus-within {
-  background: var(--bg-2);
+  background: var(--hover);
 }
 .git-row.selected {
-  background: #282820;
+  background: var(--active);
 }
 .entry {
   flex: 1;
@@ -181,18 +181,18 @@ function toggle(path: string) {
   color: var(--muted);
 }
 .entry:hover {
-  background: var(--bg-2);
+  background: var(--hover);
   color: var(--text);
 }
 .entry.selected {
-  background: #282820;
+  background: var(--active);
   color: var(--text);
 }
 .git-action {
   display: grid;
   place-items: center;
   padding: 3px;
-  border-radius: 3px;
+  border-radius: var(--r-sm);
   color: var(--muted);
   opacity: 0;
   flex-shrink: 0;
@@ -206,7 +206,7 @@ function toggle(path: string) {
   opacity: 1;
 }
 .git-action:hover:not(:disabled) {
-  background: #ffffff12;
+  background: var(--active);
   color: var(--text);
 }
 .git-action:disabled {
@@ -214,8 +214,7 @@ function toggle(path: string) {
 }
 .entry:focus-visible,
 .git-action:focus-visible {
-  outline: 1px solid var(--focus);
-  outline-offset: -1px;
+  outline-offset: -2px;
 }
 @media (hover: none) {
   .git-action {
@@ -245,7 +244,7 @@ function toggle(path: string) {
 .count,
 .status {
   flex-shrink: 0;
-  font: 11px var(--mono);
+  font: var(--fs-2xs) var(--mono);
 }
 .count {
   color: var(--faint);

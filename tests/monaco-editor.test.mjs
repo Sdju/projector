@@ -59,6 +59,7 @@ test("lazy Monaco renders from a cold cache and after an in-process Vite restart
   </script>`;
   const gutterHtml = `<!doctype html><div id="editor" style="height:400px"></div><pre id="result">WAITING</pre>
   <script type="module">
+    import '/src/app/styles.css';
     import {createApp, defineAsyncComponent, h} from 'vue';
     const CodeViewer = defineAsyncComponent(() => import('/src/modules/workspace/ui/CodeViewer.vue'));
     const content = Array.from({length:10}, (_, i) => 'line' + (i + 1)).join(String.fromCharCode(10)) + String.fromCharCode(10);
@@ -81,7 +82,7 @@ test("lazy Monaco renders from a cold cache and after an in-process Vite restart
         const deleted = document.querySelector('.git-gutter-deleted');
         check(getComputedStyle(added, '::before').backgroundColor === 'rgb(143, 191, 138)', 'Gutter add color');
         check(getComputedStyle(modified, '::before').backgroundColor === 'rgb(127, 176, 214)', 'Gutter modify color');
-        check(getComputedStyle(deleted, '::after').borderLeftColor === 'rgb(201, 137, 122)', 'Gutter delete color');
+        check(getComputedStyle(deleted, '::after').borderLeftColor === 'rgb(209, 149, 133)', 'Gutter delete color');
 
         const model = editor.getModel();
         model.applyEdits([{range: new monaco.Range(9, 1, 9, 1), text: 'typed '}]);

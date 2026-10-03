@@ -794,7 +794,7 @@ defineExpose({ reveal });
   list-style: none;
   padding: 0;
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   user-select: none;
 }
 .tree-root {
@@ -804,15 +804,15 @@ defineExpose({ reveal });
   min-height: 64px;
 }
 .root-target {
-  box-shadow: inset 0 0 0 1px var(--accent, #b8ab77);
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 button.dragging {
   opacity: 0.45;
 }
 button.drop-target {
-  background: var(--bg-2);
+  background: var(--hover);
   color: var(--text);
-  outline: 1px solid var(--accent, #b8ab77);
+  outline: 1px solid var(--accent);
   outline-offset: -1px;
 }
 button {
@@ -825,7 +825,7 @@ button {
   color: var(--muted);
 }
 button.git-changed {
-  --git-tint: #d6b46f;
+  --git-tint: var(--warn);
   box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--git-tint) 11%, transparent);
 }
 button[data-git-status="added"] {
@@ -835,17 +835,17 @@ button[data-git-status="deleted"] {
   --git-tint: var(--err);
 }
 button[data-git-status="conflict"] {
-  --git-tint: #e58e80;
+  --git-tint: var(--err);
 }
 button.git-changed.selected {
   box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--git-tint) 18%, transparent);
 }
 button:hover {
-  background: var(--bg-2);
+  background: var(--hover);
   color: var(--text);
 }
 button.selected {
-  background: #282820;
+  background: var(--active);
   color: var(--text);
 }
 .glyph {
@@ -858,15 +858,10 @@ button.selected {
 .glyph svg {
   width: 12px;
   height: 12px;
-  transition: transform 120ms ease;
+  transition: transform var(--t-fast);
 }
 .glyph svg.expanded {
   transform: rotate(90deg);
-}
-@media (prefers-reduced-motion: reduce) {
-  .glyph svg {
-    transition: none;
-  }
 }
 .name {
   overflow: hidden;
@@ -874,7 +869,7 @@ button.selected {
   white-space: nowrap;
 }
 .notice {
-  padding: 8px 12px;
+  padding: var(--sp-2) var(--sp-3);
   color: var(--faint);
 }
 .error {

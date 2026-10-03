@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref, watch } from "vue";
+import UiButton from "../../../common/ui/UiButton.vue";
 import ImageViewport from "./ImageViewport.vue";
 import IconRotateCcw from "~icons/lucide/rotate-ccw";
 import { svgPreview } from "../lib/svg-preview.ts";
@@ -152,14 +153,16 @@ function resetParameters() {
         type="color"
         aria-label="Свой цвет фона SVG"
       />
-      <button
+      <UiButton
         class="reset"
+        icon
+        size="sm"
         aria-label="Сбросить параметры SVG"
         title="Вернуть исходные currentColor, размер и фон SVG"
         @click="resetParameters"
       >
         <IconRotateCcw aria-hidden="true" />
-      </button>
+      </UiButton>
     </div>
     <div ref="panes" class="panes" :class="{ dragging }" :style="rows">
       <div v-show="split > 0" id="svg-render-pane" class="render-pane">
@@ -236,62 +239,39 @@ function resetParameters() {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px 14px;
-  padding: 10px 12px;
+  gap: var(--sp-2) var(--sp-4);
+  padding: var(--sp-2) var(--sp-3);
   border-bottom: 1px solid var(--line);
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 .toolbar label {
   display: flex;
   align-items: center;
   gap: 6px;
 }
-.toolbar button,
-.toolbar select,
-.size-input {
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  background: var(--surface, #171716);
-  color: var(--text, #d8d2c4);
-  padding: 5px 7px;
-  font: inherit;
-}
-.toolbar button {
-  cursor: pointer;
+.toolbar select {
+  width: auto;
+  padding-block: var(--sp-1);
 }
 .size-control input[type="range"] {
   width: clamp(100px, 15vw, 180px);
-  accent-color: #a0b7aa;
 }
 .toolbar input[type="color"] {
   width: 28px;
   height: 26px;
   padding: 2px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
   background: transparent;
   cursor: pointer;
 }
 .color-control span {
-  font-family: monospace;
+  font-family: var(--mono);
 }
 .size-input {
-  width: 62px;
+  width: 72px;
+  padding-block: var(--sp-1);
 }
 .reset {
   margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-}
-.reset svg {
-  width: 16px;
-  height: 16px;
-}
-.reset:hover {
-  background: #3a3934;
 }
 .panes {
   flex: 1;
@@ -314,27 +294,26 @@ function resetParameters() {
   cursor: row-resize;
   touch-action: none;
   user-select: none;
-  background: #252521;
+  background: var(--bg-3);
   border-block: 1px solid var(--line);
-  color: var(--text, #d8d2c4);
-  font-size: 10px;
-  line-height: 10px;
+  color: var(--text);
+  font-size: var(--fs-2xs);
+  line-height: var(--fs-2xs);
 }
 .pane-resize::before {
   content: "";
   width: 36px;
   height: 2px;
-  border-radius: 2px;
-  background: #73736b;
+  border-radius: var(--r-sm);
+  background: var(--faint);
 }
 .pane-resize:has(span:not(:empty))::before {
   display: none;
 }
 .pane-resize:hover,
 .pane-resize:focus-visible {
-  background: #3a3934;
-  outline: 1px solid #a0b7aa;
-  outline-offset: -1px;
+  background: var(--bg-4);
+  outline-offset: -2px;
 }
 .panes.dragging,
 .panes.dragging * {
@@ -351,9 +330,9 @@ function resetParameters() {
 .render-info {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 14px;
-  padding: 6px 12px;
-  font-size: 11px;
+  gap: var(--sp-1) var(--sp-3);
+  padding: 6px var(--sp-3);
+  font-size: var(--fs-2xs);
   color: var(--muted);
   border-bottom: 1px solid var(--line);
 }

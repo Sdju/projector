@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, ref } from "vue";
+import UiButton from "../../../common/ui/UiButton.vue";
 import { editorThemes, type EditorTheme } from "../../../../core/modules/editor-themes/index.ts";
 import { editorTheme, applyEditorTheme, loadEditorTheme } from "../lib/monaco.ts";
 const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
@@ -73,47 +74,38 @@ async function save() {
       автоматически.
     </p>
     <p v-if="error || status" role="status" :class="{ error }">{{ error || status }}</p>
-    <button v-if="!ready && error" @click="load">Повторить загрузку</button>
+    <UiButton v-if="!ready && error" @click="load">Повторить загрузку</UiButton>
   </section>
 </template>
 
 <style scoped>
 .editor-settings {
-  margin-bottom: 40px;
+  margin-bottom: var(--sp-6);
 }
 h1 {
-  margin: 0 0 20px;
-  font-size: 24px;
+  margin: 0 0 var(--sp-4);
+  font-size: var(--fs-lg);
   font-weight: 500;
 }
 label {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: var(--sp-2);
 }
 select {
   max-width: 420px;
 }
-select option {
-  background: var(--bg-2);
-  color: var(--text);
-}
 .hint {
   color: var(--muted);
-  font-size: 13px;
-  margin: 12px 0;
+  font-size: var(--fs-sm);
+  margin: var(--sp-3) 0;
 }
 .preview {
   height: 300px;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--r-md);
   overflow: hidden;
 }
 .error {
   color: var(--err);
-}
-button {
-  padding: 8px 12px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
 }
 </style>
