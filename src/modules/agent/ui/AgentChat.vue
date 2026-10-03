@@ -63,15 +63,31 @@ function resizeInput() {
   input.value.style.height = "auto";
   input.value.style.height = `${Math.min(input.value.scrollHeight, 180)}px`;
 }
+// Content growth never changes scrollTop, so only a decrease is a user scrolling up.
+let lastTop = 0;
 function trackScroll() {
   const element = log.value;
-  if (element && element.clientHeight)
-    away.value = element.scrollHeight - element.scrollTop - element.clientHeight > 72;
+  if (!element || !element.clientHeight) return;
+  const top = element.scrollTop;
+  if (element.scrollHeight - top - element.clientHeight <= 72) away.value = false;
+  else if (top < lastTop) away.value = true;
+  lastTop = top;
+}
+let frame = 0;
+function pin() {
+  if (frame) return;
+  frame = requestAnimationFrame(() => {
+    frame = 0;
+    const element = log.value;
+    if (!element || away.value) return;
+    element.scrollTop = turns.value.length ? element.scrollHeight : 0;
+    lastTop = element.scrollTop;
+  });
 }
 async function toBottom() {
   away.value = false;
   await nextTick();
-  log.value?.scrollTo({ top: turns.value.length ? log.value.scrollHeight : 0 });
+  pin();
 }
 async function submit() {
   if (busy.value || !draft.value.trim()) return;
@@ -116,21 +132,33 @@ watch(
       ?.tools.map((tool) => `${tool.id}:${tool.status}:${tool.detail}`)
       .join("|"),
   ],
-  () => {
-    if (!away.value) void toBottom();
+  async () => {
+    pin();
+    await nextTick();
+    observeContent();
   },
 );
 onMounted(() => {
   resizeInput();
   observer = new ResizeObserver(() => {
-    if (!away.value) void toBottom();
+    pin();
     resizeInput();
   });
   if (log.value) observer.observe(log.value);
+  observeContent();
 });
+function observeContent() {
+  const content = log.value?.firstElementChild;
+  if (!observer || !content || content === observed) return;
+  if (observed) observer.unobserve(observed);
+  observer.observe(content);
+  observed = content;
+}
+let observed: Element | undefined;
 onBeforeUnmount(() => {
   stop();
   observer?.disconnect();
+  cancelAnimationFrame(frame);
   clearTimeout(copyTimer);
 });
 function keydown(event: KeyboardEvent) {
@@ -373,6 +401,7 @@ function keydown(event: KeyboardEvent) {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  overflow-anchor: none;
   scrollbar-width: thin;
   scrollbar-color: var(--line-strong) transparent;
   padding: 32px 28px 28px;
