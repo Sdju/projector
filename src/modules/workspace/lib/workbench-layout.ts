@@ -56,7 +56,7 @@ export function useWorkbenchLayout(ctx: WorkbenchLayoutContext) {
   const terminalPanels = computed(
     () => new Map(terminals.sessions.value.map((item) => [terminalPanel(item.id), item])),
   );
-  const roleOf = (id: string) => (terminalPanels.value.has(id) ? "terminal" : "editor");
+  const roleOf = (id: string) => (id.startsWith("terminal:") ? "terminal" : "editor");
   function place(id: string, current: DockLayout): DockTarget | undefined {
     if (ctx.pending.target) {
       const target = ctx.pending.target;
@@ -78,6 +78,7 @@ export function useWorkbenchLayout(ctx: WorkbenchLayoutContext) {
   function reconcileLayout() {
     const keys = new Set(tabs.value.map((tab) => tab.key));
     layout.value = reconcileDock(layout.value, {
+      role: roleOf,
       ids: [...keys, ...terminalPanels.value.keys()],
       exists: (id) =>
         keys.has(id) || terminalPanels.value.has(id)

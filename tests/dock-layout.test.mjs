@@ -135,6 +135,50 @@ test("closing the active tab activates a neighbour; closing everything keeps kee
   assertValid(layout);
 });
 
+test("either half of a split terminal group disappears when its last tab closes or moves", () => {
+  for (const original of [true, false]) {
+    for (const action of ["close", "move", "reconcile"]) {
+      let layout = addPanel(createDockLayout(), "terminal:1", { groupId: "g2" });
+      layout = addPanel(layout, "terminal:2", { groupId: "g2" });
+      layout = movePanel(layout, "terminal:2", { groupId: "g2", zone: "bottom" });
+      const panel = original ? "terminal:1" : "terminal:2";
+      const removed = groupOfPanel(layout, panel).id;
+      layout = action === "move"
+        ? movePanel(layout, panel, { groupId: groupOfPanel(layout, original ? "terminal:2" : "terminal:1").id })
+        : action === "reconcile"
+          ? reconcileDock(layout, { ids: [], exists: (id) => id !== panel })
+          : removePanel(layout, panel);
+      assert.equal(findDockGroup(layout, removed), undefined, `${action}: ${removed}`);
+      assert.equal(layout.root.direction, "row", "empty nested split collapses");
+      assert.equal(dockGroups(layout).filter((group) => group.role === "terminal").length, 1);
+      for (const id of dockPanels(layout)) layout = removePanel(layout, id);
+      assert.equal(dockGroups(layout).filter((group) => group.role === "terminal").length, 1, "last empty terminal placeholder survives");
+      assertValid(layout);
+    }
+  }
+});
+
+test("reconcile repairs a saved split whose terminal group has no role", () => {
+  let layout = addPanel(createDockLayout(), "terminal:1", { groupId: "g2" });
+  layout = addPanel(layout, "terminal:2", { groupId: "g2" });
+  layout = movePanel(layout, "terminal:2", { groupId: "g2", zone: "top" });
+  const survivor = groupOfPanel(layout, "terminal:2");
+  delete survivor.role;
+  delete survivor.keepEmpty;
+  findDockGroup(layout, "g2").panels = [];
+  findDockGroup(layout, "g2").active = "";
+  layout = parseDockLayout(serializeDockLayout(layout));
+  layout = reconcileDock(layout, {
+    ids: ["terminal:2"], exists: () => true,
+    role: (id) => id.startsWith("terminal:") ? "terminal" : "editor",
+  });
+  assert.equal(findDockGroup(layout, "g2"), undefined);
+  assert.equal(groupOfPanel(layout, "terminal:2").role, "terminal");
+  assert.equal(groupOfPanel(layout, "terminal:2").keepEmpty, true);
+  assert.equal(layout.root.direction, "row");
+  assertValid(layout);
+});
+
 test("edge drop onto the whole dock creates a root-level group", () => {
   let layout = addPanel(createDockLayout(), "a", { groupId: "g1" });
   layout = addPanel(layout, "t", { zone: "bottom" });

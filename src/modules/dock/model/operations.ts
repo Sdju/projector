@@ -5,6 +5,7 @@ import {
   isEdge,
   findDockGroup,
   groupOfPanel,
+  dockGroups,
   dockPanels,
   locate,
   idFactory,
@@ -67,7 +68,7 @@ export function movePanel(layout: DockLayout, panel: string, target: DockTarget)
   if (isEdge(target.zone)) {
     const ids = idFactory(next);
     detach(next, panel);
-    const group = newGroup(ids("g"), panel);
+    const group = newGroup(ids("g"), panel, from);
     const anchor = to ?? next.root;
     insertBeside(next, anchor, group, target.zone, ids, anchor === next.root ? rootEdgeShare : 0.5);
     return commit(layout, finish(next, group.id));
@@ -153,9 +154,14 @@ export function reconcileDock(
     ids: string[];
     exists: (panel: string) => boolean | undefined;
     place?: (panel: string, layout: DockLayout) => DockTarget | undefined;
+    /** Восстанавливает назначение групп из старых сохранённых раскладок. */
+    role?: (panel: string) => string;
   },
 ): DockLayout {
   const next = copy(layout);
+  for (const group of dockGroups(next))
+    if (!group.role && group.panels.length && options.role)
+      group.role = options.role(group.active || group.panels[0]!);
   for (const panel of dockPanels(next)) if (options.exists(panel) === false) detach(next, panel);
   for (const panel of options.ids)
     if (!groupOfPanel(next, panel))

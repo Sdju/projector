@@ -19,6 +19,7 @@ const row = computed(() => split.value?.direction === "row");
 const minimum = computed(() => (row.value ? 140 : 100));
 const sizeOf = (node: DockNodeData) =>
   split.value!.sizes[split.value!.children.indexOf(node)] ?? 1 / split.value!.children.length;
+const visibleShare = computed(() => visibleChildren.value.reduce((sum, child) => sum + sizeOf(child), 0));
 
 /** Сдвигает границу перед видимым ребёнком `index`, перераспределяя долю между соседями. */
 function moveSash(index: number, start: [number, number], delta: number) {
@@ -91,7 +92,7 @@ function sashKey(event: KeyboardEvent, index: number) {
         @pointercancel="sashUp"
         @keydown="sashKey($event, index)"
       />
-      <div class="dock-cell" :style="{ flex: `${sizeOf(child)} 1 0` }">
+      <div class="dock-cell" :style="{ flex: `${sizeOf(child) / visibleShare} 1 0` }">
         <DockTree :node="child" />
       </div>
     </template>

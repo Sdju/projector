@@ -112,6 +112,19 @@ export function normalizeNode(node: DockNode): DockNode | undefined {
 }
 
 export function finish(layout: DockLayout, preferredFocus?: string): DockLayout {
+  // Подсказка пустого блока нужна только пока нет другой группы того же назначения.
+  const retained = new Map<string, DockGroup>();
+  const candidates = dockGroups(layout);
+  for (const group of candidates) {
+    if (!group.role) continue;
+    const previous = retained.get(group.role);
+    if (!previous || (!previous.panels.length && group.panels.length)) retained.set(group.role, group);
+  }
+  for (const group of candidates)
+    if (group.role && !group.panels.length && retained.get(group.role) !== group) {
+      if (group.keepEmpty) retained.get(group.role)!.keepEmpty = true;
+      delete group.keepEmpty;
+    }
   layout.root = normalizeNode(layout.root) ?? emptyGroup("g1");
   const groups = dockGroups(layout);
   if (preferredFocus && groups.some((group) => group.id === preferredFocus))
@@ -170,8 +183,12 @@ export function insertBeside(
   else layout.root = split;
 }
 
-export function newGroup(id: string, panel: string): DockGroup {
-  return { type: "group", id, panels: [panel], active: panel };
+export function newGroup(id: string, panel: string, source?: DockGroup): DockGroup {
+  return {
+    type: "group", id, panels: [panel], active: panel,
+    ...(source?.role ? { role: source.role } : {}),
+    ...(source?.keepEmpty ? { keepEmpty: true } : {}),
+  };
 }
 
 export function placeInto(
@@ -187,7 +204,7 @@ export function placeInto(
     groups.find((group) => group.id === layout.focused) ??
     groups[0]!;
   if (isEdge(target.zone)) {
-    const group = newGroup(ids("g"), panel);
+    const group = newGroup(ids("g"), panel, target.groupId ? destination : undefined);
     const anchor =
       target.groupId && groups.some((item) => item.id === target.groupId)
         ? destination
