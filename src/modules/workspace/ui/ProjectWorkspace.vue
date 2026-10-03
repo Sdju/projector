@@ -265,6 +265,7 @@ const searching = ref(false);
 const searched = ref(false);
 const truncated = ref(false);
 const git = ref<GitOverview>({ available: false, branch: "", changes: [] });
+const gutterRevision = ref(0);
 const gitError = ref("");
 const gitLoading = ref(false);
 const fileError = ref("");
@@ -790,6 +791,7 @@ onMounted(() => {
 });
 async function loadGit() {
   const generation = ++gitGeneration;
+  gutterRevision.value++;
   gitLoading.value = true;
   gitError.value = "";
   try {
@@ -1234,6 +1236,8 @@ onBeforeUnmount(() => {
         <CodeViewer
           v-else-if="active && !active.virtual"
           :path="active.path"
+          :project-id="projectId"
+          :revision="gutterRevision"
           :content="active.draft ?? active.content"
           :editable="isEditable(active)"
           @change="active.draft = $event"

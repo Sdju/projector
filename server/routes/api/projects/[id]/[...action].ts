@@ -28,6 +28,7 @@ import {
   searchProject,
   projectGit,
   projectComparison,
+  projectGutter,
   mutateProjectGit,
   moveProjectEntry,
   mutateProjectEntry,
@@ -156,6 +157,8 @@ export async function handleProjectsProjectActions({
       else if (sessionId === "search")
         json(res, 200, await searchProject(project.path, url.searchParams.get("q") ?? ""));
       else if (sessionId === "git") json(res, 200, await projectGit(project.path));
+      else if (sessionId === "gutter")
+        json(res, 200, await projectGutter(project.path, filePath));
       else if (sessionId === "diff")
         json(
           res,

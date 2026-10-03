@@ -20,6 +20,7 @@ import {
   searchProject,
   projectGit,
   projectComparison,
+  projectGutter,
   mutateProjectGit,
   moveProjectEntry,
   mutateProjectEntry,
@@ -366,6 +367,47 @@ test("workspace tree, bounded reading, traversal and symlink containment, litera
     await assert.rejects(projectComparison(root, "../outside", false), { status: 403 });
   } finally {
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("Git gutter returns the index text of tracked files only", async () => {
+  const base = await mkdtemp(join(tmpdir(), "projector-gutter-"));
+  try {
+    const run = (...args) => execFileSync("git", ["-C", base, ...args], { encoding: "utf8" });
+    run("init", "-q");
+    run("config", "user.name", "Gutter Test");
+    run("config", "user.email", "gutter@example.test");
+    await mkdir(join(base, "sub"));
+    await writeFile(join(base, "committed.txt"), "one\ntwo\n");
+    await writeFile(join(base, "sub", "nested.txt"), "nested\n");
+    run("add", ".");
+    run("commit", "-qm", "initial");
+
+    await writeFile(join(base, "committed.txt"), "staged\n");
+    run("add", "committed.txt");
+    await writeFile(join(base, "committed.txt"), "working\n");
+    await writeFile(join(base, "untracked.txt"), "x\n");
+
+    assert.deepEqual(await projectGutter(base, "committed.txt"), {
+      available: true,
+      original: "staged\n",
+    });
+    assert.deepEqual(await projectGutter(join(base, "sub"), "nested.txt"), {
+      available: true,
+      original: "nested\n",
+    });
+    assert.deepEqual(await projectGutter(base, "untracked.txt"), { available: false, original: "" });
+    await assert.rejects(projectGutter(base, "../outside"), { status: 403 });
+
+    const plain = await mkdtemp(join(tmpdir(), "projector-gutter-plain-"));
+    try {
+      await writeFile(join(plain, "file.txt"), "content\n");
+      assert.deepEqual(await projectGutter(plain, "file.txt"), { available: false, original: "" });
+    } finally {
+      await rm(plain, { recursive: true, force: true });
+    }
+  } finally {
+    await rm(base, { recursive: true, force: true });
   }
 });
 

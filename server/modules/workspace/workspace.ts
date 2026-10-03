@@ -9,6 +9,7 @@ import { HttpError } from "../http/index.ts";
 import { moveDestination } from "../../../core/modules/workspace/index.ts";
 import type {
   FileComparison,
+  GitGutter,
   GitOverview,
   SearchHit,
   FileContent,
@@ -572,4 +573,19 @@ export async function projectComparison(
         ? await gitText(root, "", path)
         : (await readProjectFile(root, path)).content;
   return { path, original, modified, staged };
+}
+/**
+ * Index version of a tracked file for editor gutter decorations. Like VS Code,
+ * staged changes are not marked and untracked files have no gutter.
+ */
+export async function projectGutter(root: string, path: string): Promise<GitGutter> {
+  validatePath(path);
+  const unavailable: GitGutter = { available: false, original: "" };
+  try {
+    await git(root, ["rev-parse", "--show-toplevel"]);
+    await git(root, ["ls-files", "--error-unmatch", "--", path]);
+    return { available: true, original: await git(root, ["show", `:./${path}`]) };
+  } catch {
+    return unavailable;
+  }
 }

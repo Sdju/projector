@@ -1,4 +1,4 @@
-export type { FileComparison } from "./contract.ts";
+export type { FileComparison, GitGutter } from "./contract.ts";
 export type { GitOverview } from "./contract.ts";
 export type { SearchHit } from "./contract.ts";
 export type { FileEntry } from "./contract.ts";

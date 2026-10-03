@@ -6,6 +6,7 @@ export { previewProjectFile } from "./workspace.ts";
 export { searchProject } from "./workspace.ts";
 export { projectGit } from "./workspace.ts";
 export { projectComparison } from "./workspace.ts";
+export { projectGutter } from "./workspace.ts";
 export { moveProjectEntry } from "./workspace.ts";
 export { mutateProjectEntry } from "./workspace.ts";
 export { previewExternalFile, readExternalImage } from "./external-files.ts";

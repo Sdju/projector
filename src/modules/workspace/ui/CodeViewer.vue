@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { monaco, language, editorTheme, loadEditorTheme } from "../lib/monaco.ts";
+import { gutterRequest } from "../api.ts";
+import { attachDirtyDiff, type DirtyDiff } from "../lib/dirty-diff.ts";
 const props = defineProps<{
   path: string;
   content: string;
@@ -8,6 +10,8 @@ const props = defineProps<{
   line?: number;
   column?: number;
   editable?: boolean;
+  projectId?: string;
+  revision?: number;
 }>();
 const emit = defineEmits<{ change: [content: string]; save: [] }>();
 const container = ref<HTMLElement>();
@@ -15,9 +19,32 @@ let editor: monaco.editor.IStandaloneCodeEditor | monaco.editor.IStandaloneDiffE
 let models: monaco.editor.ITextModel[] = [];
 let views = new Map<string, monaco.editor.ICodeEditorViewState | null>();
 let activePath = "";
+let dirtyDiff: DirtyDiff | undefined;
+let gutterToken = 0;
+function clearGutter() {
+  dirtyDiff?.dispose();
+  dirtyDiff = undefined;
+}
+async function loadGutter() {
+  const token = ++gutterToken;
+  const target = editor && !("getOriginalEditor" in editor) ? editor : undefined;
+  if (!target || props.original !== undefined || !props.projectId || props.path.startsWith("/")) {
+    clearGutter();
+    return;
+  }
+  try {
+    const data = await gutterRequest(props.projectId, props.path);
+    if (token !== gutterToken || editor !== target) return;
+    dirtyDiff ??= attachDirtyDiff(target);
+    dirtyDiff.setOriginal(data.available ? data.original : null);
+  } catch {
+    if (token === gutterToken) clearGutter();
+  }
+}
 function render() {
   if (!container.value) return;
   if (editor && !("getOriginalEditor" in editor)) views.set(activePath, editor.saveViewState());
+  clearGutter();
   editor?.dispose();
   models.forEach((model) => model.dispose());
   models = [];
@@ -55,6 +82,7 @@ function render() {
       editor.onDidChangeModelContent(() => emit("change", modified.getValue()));
     }
   }
+  void loadGutter();
   reveal();
 }
 function focusOut(event: FocusEvent) {
@@ -80,8 +108,12 @@ watch(
     if (models[0] && models[0].getValue() !== content) models[0].setValue(content);
   },
 );
+watch(() => props.projectId, () => void loadGutter());
+watch(() => props.revision, () => void loadGutter());
 watch(() => [props.line, props.column], reveal);
 onBeforeUnmount(() => {
+  ++gutterToken;
+  clearGutter();
   editor?.dispose();
   models.forEach((model) => model.dispose());
   views.clear();
@@ -100,5 +132,90 @@ onBeforeUnmount(() => {
   height: 100%;
   min-height: 0;
   overflow: hidden;
+}
+.code-viewer :deep(.git-gutter-added),
+.code-viewer :deep(.git-gutter-modified),
+.code-viewer :deep(.git-gutter-deleted) {
+  position: relative;
+  cursor: pointer;
+}
+.code-viewer :deep(.git-gutter-added)::before,
+.code-viewer :deep(.git-gutter-modified)::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 3px;
+  background: #8fbf8a;
+}
+.code-viewer :deep(.git-gutter-modified)::before {
+  background: #7fb0d6;
+}
+.code-viewer :deep(.git-gutter-added:hover)::before,
+.code-viewer :deep(.git-gutter-modified:hover)::before {
+  width: 6px;
+}
+.code-viewer :deep(.git-gutter-deleted)::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  bottom: 0;
+  width: 0;
+  height: 0;
+  border-left: 4px solid #c9897a;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+}
+.code-viewer :deep(.git-gutter-deleted-top)::after {
+  top: 0;
+  bottom: auto;
+}
+.code-viewer :deep(.git-gutter-deleted:hover)::after {
+  border-left-width: 7px;
+}
+.code-viewer :deep(.dirty-diff-peek) {
+  box-sizing: border-box;
+  height: 100%;
+  overflow: hidden;
+  border-top: 1px solid #2c2c28;
+  border-bottom: 1px solid #2c2c28;
+  background: #171716;
+}
+.code-viewer :deep(.dirty-diff-bar) {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  color: #8c8c84;
+  font: 12px "Noto Sans", sans-serif;
+}
+.code-viewer :deep(.dirty-diff-title) {
+  flex: 1;
+}
+.code-viewer :deep(.dirty-diff-button) {
+  min-width: 20px;
+  height: 18px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+.code-viewer :deep(.dirty-diff-button:hover) {
+  background: #2c2c28;
+  color: #d8d2c4;
+}
+.code-viewer :deep(.dirty-diff-body) {
+  padding-left: 64px;
+  background: #c9897a14;
+  font: 13px "Noto Sans Mono", monospace;
+  white-space: pre;
+}
+.code-viewer :deep(.dirty-diff-peek-added .dirty-diff-body) {
+  display: none;
 }
 </style>

@@ -46,3 +46,8 @@ export interface FileComparison {
   modified: string;
   staged: boolean;
 }
+/** Index text of a tracked file; the editor diffs against it live, like VS Code. */
+export interface GitGutter {
+  available: boolean;
+  original: string;
+}

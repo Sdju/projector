@@ -13,6 +13,15 @@ export async function workspaceRequest<T>(
   return data as T;
 }
 
+export function gutterRequest(projectId: string, path: string, signal?: AbortSignal) {
+  return workspaceRequest<import("../../../core/modules/workspace/index.ts").GitGutter>(
+    projectId,
+    "gutter",
+    { path },
+    signal,
+  );
+}
+
 export async function saveWorkspaceFile(
   projectId: string,
   path: string,
