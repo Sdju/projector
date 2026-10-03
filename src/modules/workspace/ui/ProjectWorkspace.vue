@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import { useSessionSnapshot, workspaceSessionSchema, type WorkspaceSession } from "../session.ts";
 import { workspaceRequest } from "../api.ts";
 import { relocatedPath } from "../../../../core/modules/workspace/index.ts";
-import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
-import { useCommandScope, commandArgs } from "../../../common/utilities/commands.ts";
+import { useCommandScope } from "../../../common/utilities/commands.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiEmpty from "../../../common/ui/UiEmpty.vue";
 import IconDiff from "~icons/lucide/file-diff";
@@ -17,11 +15,13 @@ import { useGitOverview } from "../lib/git-overview.ts";
 import { useSidebarResize } from "../lib/sidebar-resize.ts";
 import { useOpenFiles } from "../lib/open-files.ts";
 import { useWorkbenchLayout } from "../lib/workbench-layout.ts";
+import { registerEditorCommands } from "../lib/editor-commands.ts";
+import { useWorkspaceSession } from "../lib/workspace-session.ts";
 import FilePanel from "./FilePanel.vue";
 import PanelHost from "./PanelHost.vue";
 import { AgentChat } from "../../agent/index.ts";
-import { DockView, createDockLayout, parseDockLayout, replacePanel, serializeDockLayout, type DockTarget } from "../../dock/index.ts";
-import { isEditable, isMarkdown, type OpenFile } from "../open-file.ts";
+import { DockView, replacePanel, type DockTarget } from "../../dock/index.ts";
+import { type OpenFile } from "../open-file.ts";
 import { createPanelHosts } from "../panel-hosts.ts";
 import IconRestart from "~icons/lucide/rotate-ccw";
 import IconFailed from "~icons/lucide/circle-slash";
@@ -42,112 +42,12 @@ const editorCommands = useCommandScope(`editor:${props.projectId}`, () => ({
   surface: "editor",
   projectId: props.projectId,
 }));
-function commandFile(value?: unknown) {
-  const args = commandArgs(value);
-  if (args.id !== undefined && typeof args.id !== "string")
-    throw new Error("id должен быть строкой");
-  return tabs.value.find((tab) => !tab.virtual && tab.key === (args.id ?? activeKey.value));
-}
 const registerEditor = (
   id: string,
   title: string,
   run: (args?: unknown) => unknown,
   enabled: (args?: unknown) => boolean,
 ) => editorCommands.scope.registerCommand({ id, title, run, enabled });
-registerEditor(
-  "ide.editor.file.save",
-  "Сохранить",
-  async (args) => {
-    const file = commandFile(args)!;
-    if (!(await saveFile(file))) throw new Error(file.saveError || "Не удалось сохранить файл");
-  },
-  (args) => !!commandFile(args) && isEditable(commandFile(args)!),
-);
-registerEditor(
-  "ide.editor.file.reveal",
-  "Показать в дереве файлов",
-  (args) => {
-    section.value = "files";
-    sidebarHidden.value = false;
-    fileTree.value?.reveal(commandFile(args)!.path);
-  },
-  (args) => !!commandFile(args) && !commandFile(args)!.external,
-);
-registerEditor(
-  "ide.editor.file.copyRelativePath",
-  "Копировать относительный путь",
-  (args) => navigator.clipboard.writeText(commandFile(args)!.path),
-  (args) => !!commandFile(args),
-);
-registerEditor(
-  "ide.editor.markdown.toggleSource",
-  "Переключить исходник Markdown",
-  () => toggleMarkdownSource(),
-  () => !!active.value && isMarkdown(active.value),
-);
-registerEditor(
-  "ide.editor.file.open",
-  "Открыть файл",
-  (args) => openFile(commandFile(args)!.path),
-  (args) => !!commandFile(args) && commandFile(args)!.original !== undefined,
-);
-function tabActions(id: string): ContextMenuItem[] {
-  const file = fileOf(id);
-  const common = [
-    editorCommands.item("ide.workbench.panel.splitRight", { id }, { separator: true }),
-    editorCommands.item("ide.workbench.panel.splitDown", { id }),
-    editorCommands.item("ide.workbench.panel.hideGroup", { id }),
-  ];
-  if (!file || file.virtual) return common;
-  return [
-    ...(file.original !== undefined ? [editorCommands.item("ide.editor.file.open", { id })] : []),
-    editorCommands.item("ide.editor.file.save", { id }, { separator: true }),
-    editorCommands.item("ide.editor.file.reveal", { id }),
-    editorCommands.item("ide.editor.file.copyRelativePath", { id }),
-    ...common,
-  ];
-}
-registerEditor(
-  "ide.workbench.keybindings.open",
-  "Открыть горячие клавиши",
-  () => {
-    const key = "settings:keybindings";
-    if (!tabs.value.some((tab) => tab.key === key))
-      tabs.value.push({ key, virtual: "keybindings", path: "Горячие клавиши", content: "" });
-    selectTab(key);
-  },
-  () => true,
-);
-registerEditor(
-  "ide.workbench.agent.open",
-  "Открыть чат с агентом",
-  () => {
-    const key = "agent:chat";
-    if (!tabs.value.some((tab) => tab.key === key))
-      tabs.value.push({ key, virtual: "agent", path: "Агент", content: "" });
-    selectTab(key);
-  },
-  () => true,
-);
-function editorKeydown(event: KeyboardEvent) {
-  if (active.value?.virtual === "project" && (event.ctrlKey || event.metaKey)
-    && event.key.toLowerCase() === "s") {
-    event.preventDefault();
-    event.stopPropagation();
-    void props.saveProjectSettings?.();
-    return;
-  }
-  if (
-    !(event.target as Element).closest(
-      ".keybindings-editor, .project-settings-form, .terminal-view",
-    )
-  )
-    editorCommands.keydown(event);
-}
-function editorFocus(event: FocusEvent) {
-  if (!(event.target as Element)?.closest(".workspace-tabs, .keybindings-editor, .terminal-view"))
-    editorCommands.scope.activate();
-}
 function entryDeleted(path: string) {
   files.invalidate();
   tabs.value = tabs.value.filter(
@@ -225,6 +125,24 @@ const {
   prepareEntryChange,
   toggleMarkdownSource,
 } = files;
+const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
+  editorCommands,
+  register: registerEditor,
+  tabs,
+  active: () => active.value,
+  activeKey: () => activeKey.value,
+  fileOf,
+  saveFile,
+  openFile,
+  selectTab,
+  toggleMarkdownSource,
+  revealInTree: (path) => {
+    section.value = "files";
+    sidebarHidden.value = false;
+    fileTree.value?.reveal(path);
+  },
+  saveProjectSettings: () => props.saveProjectSettings?.(),
+});
 const virtualTabs = {
   keybindings: {
     key: "settings:keybindings",
@@ -250,75 +168,23 @@ registerEditor(
   },
   () => true,
 );
-const session = useSessionSnapshot(
-  () => `projector:workspace:v1:${props.projectId}`,
-  (): WorkspaceSession => ({
-    tabs: tabs.value
-      .filter((tab) => !tab.localFile)
-      .map((tab) => ({
-        key: tab.key,
-        path: tab.path,
-        virtual: tab.virtual,
-        external: tab.external,
-        staged: tab.staged,
-        markdownMode: tab.markdownMode,
-      })),
-    activeKey: activeKey.value,
-    section: section.value,
-    treeWidth: treeWidth.value,
-    sidebarHidden: sidebarHidden.value,
-    layout: serializeDockLayout(layout.value),
-  }),
-  workspaceSessionSchema,
-  () => !restoringSession.value,
-);
-let sessionGeneration = 0;
-async function restoreSession(saved: WorkspaceSession | undefined, generation: number) {
-  try {
-    for (const tab of saved?.tabs ?? []) {
-      if (generation !== sessionGeneration) return;
-      if (tab.virtual) {
-        const { key, path } = virtualTabs[tab.virtual];
-        if (!tabs.value.some((file) => file.key === key))
-          tabs.value.push({
-            key,
-            virtual: tab.virtual,
-            path,
-            content: "",
-          });
-        continue;
-      }
-      const completed = await openFile(
-        tab.path,
-        undefined,
-        undefined,
-        tab.staged,
-        false,
-        tab.external,
-      );
-      // A project switch or a user opening another file takes precedence over restoration.
-      if (
-        generation !== sessionGeneration ||
-        completed === undefined ||
-        completed !== files.generation()
-      )
-        return;
-      const file = tabs.value.find((file) => file.key === tab.key);
-      if (file) file.markdownMode = tab.markdownMode;
-    }
-    // Sessions saved before layouts existed only know the active tab.
-    if (
-      generation === sessionGeneration &&
-      !parseDockLayout(saved?.layout) &&
-      tabs.value.some((tab) => tab.key === saved?.activeKey)
-    )
-      activeKey.value = saved!.activeKey;
-    if (generation === sessionGeneration && saved?.section === "project") openProjectSettings();
-  } finally {
-    if (generation === sessionGeneration) restoringSession.value = false;
-  }
-}
-
+useWorkspaceSession({
+  projectId: () => props.projectId,
+  tabs,
+  layout,
+  restoringSession,
+  activeKey,
+  section,
+  treeWidth,
+  sidebarHidden,
+  virtualTab: (kind) => virtualTabs[kind],
+  openFile,
+  fileGeneration: files.generation,
+  openProjectSettings,
+  resetFiles: files.reset,
+  resetGit: overview.reset,
+  reloadGit: () => void loadGit(),
+});
 const active = computed(() => tabs.value.find((file) => file.key === activeKey.value));
 async function prepareGitChange(action: string, paths: string[]) {
   if (action !== "discard") {
@@ -345,23 +211,6 @@ async function gitChangeApplied(action: string, paths: string[]) {
   }
   searchPanel.value?.refresh();
 }
-watch(
-  () => props.projectId,
-  () => {
-    const saved = session.read();
-    const generation = ++sessionGeneration;
-    restoringSession.value = true;
-    files.reset();
-    overview.reset();
-    layout.value = parseDockLayout(saved?.layout) ?? createDockLayout();
-    section.value = saved?.section === "project" ? "files" : (saved?.section ?? "files");
-    treeWidth.value = saved?.treeWidth;
-    sidebarHidden.value = !!saved?.sidebarHidden;
-    void loadGit();
-    void restoreSession(saved, generation);
-  },
-  { immediate: true },
-);
 watch(section, (value) => {
   if (value === "git") void loadGit();
 });
@@ -401,7 +250,6 @@ function entryMoved(source: string, destination: string) {
   searchPanel.value?.refresh();
 }
 onBeforeUnmount(() => {
-  ++sessionGeneration;
   overview.cancel();
 });
 </script>

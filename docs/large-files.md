@@ -4,4 +4,4 @@
 
 | Файл | Строк | Потолок | План разбиения |
 | --- | ---: | ---: | --- |
-| `src/modules/workspace/ui/ProjectWorkspace.vue` | 785 | 785 | Вынесены SearchPanel, GitPanel, SidebarTabs, WorkbenchToolbar и lib: git-overview, sidebar-resize, open-files, workbench-layout. Осталось: команды редактора — в отдельный файл, сессия — в composable, блок дока из шаблона — в компонент, стили — по компонентам. |
+| `src/modules/workspace/ui/ProjectWorkspace.vue` | 633 | 633 | Вынесены панели и lib: git-overview, sidebar-resize, open-files, workbench-layout, editor-commands, workspace-session. Осталось: блок дока из шаблона и стили — в компонент. |
