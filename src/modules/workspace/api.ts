@@ -13,6 +13,27 @@ export async function workspaceRequest<T>(
   return data as T;
 }
 
+export function searchWorkspace(
+  projectId: string,
+  query: string,
+  options: import("../../../core/modules/workspace/index.ts").SearchOptions,
+  signal?: AbortSignal,
+) {
+  return workspaceRequest<
+    { hits: import("../../../core/modules/workspace/index.ts").SearchHit[]; truncated: boolean }
+  >(
+    projectId,
+    "search",
+    {
+      q: query,
+      case: String(!!options.caseSensitive),
+      word: String(!!options.wholeWord),
+      regex: String(!!options.regex),
+    },
+    signal,
+  );
+}
+
 export function gutterRequest(projectId: string, path: string, signal?: AbortSignal) {
   return workspaceRequest<import("../../../core/modules/workspace/index.ts").GitGutter>(
     projectId,

@@ -22,11 +22,22 @@ export interface ArchiveContent {
   entries: ArchiveEntry[];
   truncated: boolean;
 }
+export interface SearchMatch {
+  /** Character offsets (UTF-16 code units) into the hit text. */
+  start: number;
+  end: number;
+}
+export interface SearchOptions {
+  caseSensitive?: boolean;
+  wholeWord?: boolean;
+  regex?: boolean;
+}
 export interface SearchHit {
   path: string;
   line: number;
   column: number;
   text: string;
+  matches: SearchMatch[];
 }
 export interface GitChange {
   path: string;

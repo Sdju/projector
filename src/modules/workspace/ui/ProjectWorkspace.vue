@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useSessionSnapshot, workspaceSessionSchema, type WorkspaceSession } from "../session.ts";
-import { workspaceRequest, saveWorkspaceFile, mutateWorkspaceGit } from "../api.ts";
+import { workspaceRequest, searchWorkspace, saveWorkspaceFile, mutateWorkspaceGit } from "../api.ts";
 import { isFileDrag, pathsFromDataTransfer } from "../../path-drop/index.ts";
 import { projectRelativePath, previewBrowserFile } from "../file-drop.ts";
 import { treeDragType } from "../tree-drag.ts";
@@ -26,6 +26,12 @@ import IconSettings from "~icons/lucide/settings";
 import IconRefresh from "~icons/lucide/rotate-cw";
 import IconFiles from "~icons/lucide/files";
 import IconSearch from "~icons/lucide/search";
+import IconCaseSensitive from "~icons/lucide/case-sensitive";
+import IconWholeWord from "~icons/lucide/whole-word";
+import IconRegex from "~icons/lucide/regex";
+import IconChevronRight from "~icons/lucide/chevron-right";
+import IconChevronDown from "~icons/lucide/chevron-down";
+import IconFile from "~icons/lucide/file";
 import IconGit from "~icons/devicon/git";
 import { TerminalPane } from "../../terminal/index.ts";
 import type {
@@ -259,11 +265,15 @@ function entryDeleted(path: string) {
 const section = ref<"files" | "search" | "git">("files");
 const revision = ref(0);
 const query = ref("");
+const searchCase = ref(false);
+const searchWord = ref(false);
+const searchRegex = ref(false);
 const hits = ref<SearchHit[]>([]);
 const searchError = ref("");
 const searching = ref(false);
 const searched = ref(false);
 const truncated = ref(false);
+const collapsedGroups = ref<Set<string>>(new Set());
 const git = ref<GitOverview>({ available: false, branch: "", changes: [] });
 const gutterRevision = ref(0);
 const gitError = ref("");
@@ -818,10 +828,14 @@ async function search() {
   searching.value = true;
   searchAbort = new AbortController();
   try {
-    const data = await workspaceRequest<{ hits: SearchHit[]; truncated: boolean }>(
+    const data = await searchWorkspace(
       props.projectId,
-      "search",
-      { q: query.value },
+      query.value,
+      {
+        caseSensitive: searchCase.value,
+        wholeWord: searchWord.value,
+        regex: searchRegex.value,
+      },
       searchAbort.signal,
     );
     if (generation !== searchGeneration) return;
@@ -840,10 +854,56 @@ watch(query, () => {
   ++searchGeneration;
   searchAbort?.abort();
   hits.value = [];
+  collapsedGroups.value = new Set();
   searched.value = false;
   searching.value = !!query.value.trim();
   searchTimer = setTimeout(() => void search(), 300);
 });
+watch([searchCase, searchWord, searchRegex], () => {
+  clearTimeout(searchTimer);
+  if (query.value.trim()) void search();
+});
+interface SearchGroup {
+  path: string;
+  name: string;
+  directory: string;
+  hits: SearchHit[];
+}
+const searchGroups = computed<SearchGroup[]>(() => {
+  const groups = new Map<string, SearchHit[]>();
+  for (const hit of hits.value) {
+    const list = groups.get(hit.path) ?? [];
+    list.push(hit);
+    groups.set(hit.path, list);
+  }
+  return [...groups.entries()].map(([path, list]) => {
+    const parts = path.split("/");
+    return { path, name: parts.at(-1) ?? path, directory: parts.slice(0, -1).join("/"), hits: list };
+  });
+});
+function toggleGroup(path: string) {
+  const next = new Set(collapsedGroups.value);
+  if (next.has(path)) next.delete(path);
+  else next.add(path);
+  collapsedGroups.value = next;
+}
+interface SnippetSegment {
+  text: string;
+  match: boolean;
+}
+function snippetSegments(hit: SearchHit): SnippetSegment[] {
+  const segments: SnippetSegment[] = [];
+  let cursor = 0;
+  for (const match of hit.matches ?? []) {
+    const start = Math.max(match.start, cursor);
+    if (start >= hit.text.length) break;
+    if (start > cursor) segments.push({ text: hit.text.slice(cursor, start), match: false });
+    segments.push({ text: hit.text.slice(start, match.end), match: true });
+    cursor = Math.max(cursor, match.end);
+  }
+  if (cursor < hit.text.length) segments.push({ text: hit.text.slice(cursor), match: false });
+  return segments;
+}
 watch(
   () => props.projectId,
   () => {
@@ -865,6 +925,7 @@ watch(
     loading.value = false;
     query.value = "";
     hits.value = [];
+    collapsedGroups.value = new Set();
     section.value = saved?.section === "project" ? "files" : (saved?.section ?? "files");
     treeWidth.value = saved?.treeWidth;
     agentWidth.value = saved?.agentWidth;
@@ -1018,34 +1079,91 @@ onBeforeUnmount(() => {
         />
       </div>
       <div v-show="section === 'search'" class="side-content search-panel">
-        <form @submit.prevent="search">
-          <input
-            v-model="query"
-            type="search"
-            placeholder="Найти в проекте…"
-            aria-label="Поиск по содержимому"
-            maxlength="200"
-          />
+        <form class="search-form" @submit.prevent="search">
+          <div class="search-box">
+            <input
+              v-model="query"
+              type="search"
+              placeholder="Найти в проекте…"
+              aria-label="Поиск по содержимому"
+              maxlength="200"
+            />
+            <div class="search-options" role="group" aria-label="Параметры поиска">
+              <button
+                type="button"
+                :class="{ on: searchCase }"
+                :aria-pressed="searchCase"
+                title="Учитывать регистр"
+                aria-label="Учитывать регистр"
+                @click="searchCase = !searchCase"
+              >
+                <IconCaseSensitive aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                :class="{ on: searchWord }"
+                :aria-pressed="searchWord"
+                title="Только слово целиком"
+                aria-label="Только слово целиком"
+                @click="searchWord = !searchWord"
+              >
+                <IconWholeWord aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                :class="{ on: searchRegex }"
+                :aria-pressed="searchRegex"
+                title="Использовать регулярное выражение"
+                aria-label="Использовать регулярное выражение"
+                @click="searchRegex = !searchRegex"
+              >
+                <IconRegex aria-hidden="true" />
+              </button>
+            </div>
+          </div>
         </form>
         <p v-if="searching" class="notice" role="status">поиск…</p>
         <p v-if="searchError" class="notice error" role="alert">{{ searchError }}</p>
         <p v-if="searched" class="notice">
           {{
             hits.length
-              ? `${hits.length} совпадений${truncated ? " · показаны первые 200" : ""}`
+              ? `${hits.length} совпадений в ${searchGroups.length} файлах${truncated ? " · показаны первые 200" : ""}`
               : "Совпадений нет"
           }}
         </p>
-        <button
-          v-for="(hit, index) in hits"
-          :key="index"
-          class="result"
-          :title="`${hit.path}:${hit.line}`"
-          @click="openFile(hit.path, hit.line, hit.column)"
-        >
-          <span class="result-path">{{ hit.path }}:{{ hit.line }}</span
-          ><span class="snippet">{{ hit.text }}</span>
-        </button>
+        <div v-for="group in searchGroups" :key="group.path" class="result-group">
+          <button
+            class="result-group-header"
+            type="button"
+            :aria-expanded="!collapsedGroups.has(group.path)"
+            :title="group.path"
+            @click="toggleGroup(group.path)"
+          >
+            <IconChevronDown v-if="!collapsedGroups.has(group.path)" aria-hidden="true" />
+            <IconChevronRight v-else aria-hidden="true" />
+            <IconFile class="result-file-icon" aria-hidden="true" />
+            <span class="result-file">{{ group.name }}</span>
+            <span v-if="group.directory" class="result-dir">{{ group.directory }}</span>
+            <span class="result-count">{{ group.hits.length }}</span>
+          </button>
+          <template v-if="!collapsedGroups.has(group.path)">
+            <button
+              v-for="hit in group.hits"
+              :key="`${hit.path}:${hit.line}:${hit.column}`"
+              class="result"
+              :title="`${hit.path}:${hit.line}`"
+              @click="openFile(hit.path, hit.line, hit.column)"
+            >
+              <span class="result-line">{{ hit.line }}</span>
+              <span class="snippet"
+                ><template v-for="(segment, index) in snippetSegments(hit)" :key="index"
+                  ><mark v-if="segment.match">{{ segment.text }}</mark
+                  ><template v-else>{{ segment.text }}</template></template
+                ></span
+              >
+            </button>
+          </template>
+        </div>
       </div>
       <div
         v-show="section === 'git'"
@@ -1419,8 +1537,40 @@ onBeforeUnmount(() => {
 .search-panel form {
   margin: 2px 10px 8px;
 }
-.search-panel input {
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.search-box input {
+  flex: 1;
+  min-width: 0;
   font-size: 12px;
+}
+.search-options {
+  display: flex;
+  gap: 2px;
+}
+.search-options button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 3px;
+  color: var(--muted);
+}
+.search-options button:hover {
+  color: var(--text);
+  background: var(--bg-2);
+}
+.search-options button.on {
+  color: var(--text);
+  background: var(--bg-2);
+  box-shadow: inset 0 0 0 1px var(--focus);
+}
+.search-options svg {
+  width: 15px;
+  height: 15px;
 }
 .notice {
   padding: 0 12px;
@@ -1430,29 +1580,88 @@ onBeforeUnmount(() => {
 .error {
   color: var(--err);
 }
+.result-group {
+  border-bottom: 1px solid #21211e;
+}
+.result-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 12px;
+  text-align: left;
+  color: var(--muted);
+}
+.result-group-header:hover {
+  background: #242420;
+}
+.result-group-header > svg:first-child {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+.result-file-icon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+.result-file {
+  font-size: 12px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.result-dir {
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
+  color: var(--faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.result-count {
+  flex-shrink: 0;
+  min-width: 18px;
+  padding: 1px 5px;
+  text-align: center;
+  font: 10px var(--mono);
+  color: var(--text);
+  background: var(--bg-2);
+  border-radius: 8px;
+}
 .result {
-  display: block;
-  padding: 8px 12px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 12px;
   width: 100%;
   text-align: left;
-  border-bottom: 1px solid #21211e;
+  border-bottom: 1px solid #1c1c19;
 }
 .result:hover {
   background: #242420;
 }
-.result-path {
-  display: block;
-  font-size: 11px;
-  color: var(--muted);
-  overflow-wrap: anywhere;
+.result-line {
+  flex-shrink: 0;
+  min-width: 2ch;
+  text-align: right;
+  font: 10px var(--mono);
+  color: var(--faint);
 }
 .snippet {
-  display: block;
+  flex: 1;
+  min-width: 0;
   font: 11px var(--mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-top: 4px;
+}
+.snippet mark {
+  color: inherit;
+  background: var(--search);
+  border-radius: 2px;
 }
 h3 {
   padding: 10px 12px 4px;

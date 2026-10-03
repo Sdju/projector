@@ -9,6 +9,7 @@
   --run: #8fbf8a;
   --err: #c9897a;
   --focus: #d8d2c4;
+  --search: #5c4a1e;
   --sans: "Noto Sans", "DejaVu Sans", "Liberation Sans", system-ui, sans-serif;
   --mono: "Noto Sans Mono", "DejaVu Sans Mono", ui-monospace, monospace;
 }

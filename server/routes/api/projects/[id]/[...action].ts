@@ -155,7 +155,15 @@ export async function handleProjectsProjectActions({
       else if (sessionId === "file")
         json(res, 200, await previewProjectFile(project.path, filePath));
       else if (sessionId === "search")
-        json(res, 200, await searchProject(project.path, url.searchParams.get("q") ?? ""));
+        json(
+          res,
+          200,
+          await searchProject(project.path, url.searchParams.get("q") ?? "", {
+            caseSensitive: url.searchParams.get("case") === "true",
+            wholeWord: url.searchParams.get("word") === "true",
+            regex: url.searchParams.get("regex") === "true",
+          }),
+        );
       else if (sessionId === "git") json(res, 200, await projectGit(project.path));
       else if (sessionId === "gutter")
         json(res, 200, await projectGutter(project.path, filePath));

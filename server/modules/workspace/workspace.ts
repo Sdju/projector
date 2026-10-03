@@ -12,6 +12,8 @@ import type {
   GitGutter,
   GitOverview,
   SearchHit,
+  SearchMatch,
+  SearchOptions,
   FileContent,
   ArchiveContent,
 } from "../../../core/modules/workspace/index.ts";
@@ -348,30 +350,30 @@ export async function mutateProjectEntry(
   }
   return { destination };
 }
-export async function searchProject(root: string, query: string) {
+export async function searchProject(root: string, query: string, options: SearchOptions = {}) {
   if (!query.trim()) return { hits: [], truncated: false };
   if (query.length > 200) throw new HttpError(400, "Запрос длиннее 200 символов");
   const base = await realpath(root);
   let output: string;
   try {
-    const result = await os.tools.searchFiles(
-      [
-        "--json",
-        "--hidden",
-        "--no-require-git",
-        "--fixed-strings",
-        "--ignore-case",
-        "--max-count",
-        "5",
-        "--max-filesize",
-        "1M",
-        ...[...excluded].flatMap((name) => ["--glob", `!${name}/**`]),
-        "--",
-        query,
-        ".",
-      ],
-      { cwd: base, maxBuffer: 4 * MAX_BYTES, timeout: 10000 },
-    );
+    const args = [
+      "--json",
+      "--hidden",
+      "--no-require-git",
+      "--max-count",
+      "5",
+      "--max-filesize",
+      "1M",
+    ];
+    if (!options.regex) args.push("--fixed-strings");
+    args.push(options.caseSensitive ? "--case-sensitive" : "--ignore-case");
+    if (options.wholeWord) args.push("--word-regexp");
+    args.push(...[...excluded].flatMap((name) => ["--glob", `!${name}/**`]), "--", query, ".");
+    const result = await os.tools.searchFiles(args, {
+      cwd: base,
+      maxBuffer: 4 * MAX_BYTES,
+      timeout: 10000,
+    });
     output = result.stdout;
   } catch (error) {
     const failure = error as { code?: number | string; stdout?: string };
@@ -385,13 +387,22 @@ export async function searchProject(root: string, query: string) {
     const event = JSON.parse(row);
     if (event.type !== "match" || !event.data.path.text || !event.data.lines.text) continue;
     const data = event.data;
+    const lineText = data.lines.text;
+    const text = lineText.trimEnd().slice(0, 500);
+    const charOffset = (byte: number) =>
+      Buffer.from(lineText).subarray(0, byte).toString("utf8").length;
+    const matches: SearchMatch[] = [];
+    for (const submatch of data.submatches ?? []) {
+      const start = charOffset(submatch.start);
+      if (start >= text.length) continue;
+      matches.push({ start, end: Math.min(charOffset(submatch.end), text.length) });
+    }
     hits.push({
       path: data.path.text.replace(/^\.\//, ""),
       line: data.line_number,
-      column:
-        Buffer.from(data.lines.text).subarray(0, data.submatches[0].start).toString("utf8").length +
-        1,
-      text: data.lines.text.trimEnd().slice(0, 500),
+      column: charOffset(data.submatches?.[0]?.start ?? 0) + 1,
+      text,
+      matches,
     });
     if (hits.length > 200) break;
   }
