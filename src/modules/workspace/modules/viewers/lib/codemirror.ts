@@ -19,7 +19,7 @@ import { languages } from "@codemirror/language-data";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { Chunk } from "@codemirror/merge";
 import { highlightTree, tags as t } from "@lezer/highlight";
-import type { EditorTheme } from "../../../../core/modules/editor-themes/index.ts";
+import type { EditorTheme } from "../../../../../../core/modules/editor-themes/index.ts";
 
 const palette = {
   bg: "#10100f",

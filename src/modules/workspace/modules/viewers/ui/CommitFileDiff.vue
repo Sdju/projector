@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref } from "vue";
-import type { CommitComparison } from "../../../../core/modules/workspace/index.ts";
-import { shortHash } from "../../../common/utilities/commit-format.ts";
+import type { CommitComparison } from "../../../../../../core/modules/workspace/index.ts";
+import { shortHash } from "../../../../../common/utilities/commit-format.ts";
 
 const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
 const props = defineProps<{

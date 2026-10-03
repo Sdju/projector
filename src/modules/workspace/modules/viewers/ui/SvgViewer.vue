@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref, watch } from "vue";
-import UiButton from "../../../common/ui/UiButton.vue";
+import UiButton from "../../../../../common/ui/UiButton.vue";
 import ImageViewport from "./ImageViewport.vue";
 import IconRotateCcw from "~icons/lucide/rotate-ccw";
 import { svgPreview } from "../lib/svg-preview.ts";

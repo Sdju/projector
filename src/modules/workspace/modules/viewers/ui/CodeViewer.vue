@@ -16,7 +16,7 @@ import { bracketMatching, foldGutter, indentOnInput } from "@codemirror/language
 import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
 import { MergeView, unifiedMergeView } from "@codemirror/merge";
 import { editorTheme, loadEditorTheme } from "../lib/editor-theme.ts";
-import { gutterRequest } from "../../workspace-api/index.ts";
+import { gutterRequest } from "../../../../workspace-api/index.ts";
 import {
   dirtyDiff,
   languageCompartment,

@@ -26,7 +26,7 @@ const page = (body) => `<!doctype html><div id="editor" style="height:400px"></d
     import '/src/app/styles.css';
     import {createApp, defineAsyncComponent, h, nextTick, ref} from 'vue';
     import {EditorView} from '@codemirror/view';
-    const CodeViewer = defineAsyncComponent(() => import('/src/modules/workspace/ui/CodeViewer.vue'));
+    const CodeViewer = defineAsyncComponent(() => import('/src/modules/workspace/modules/viewers/ui/CodeViewer.vue'));
     ${helpers}
     const view = () => EditorView.findFromDOM(document.querySelector('.cm-editor'));
     const text = () => view().state.doc.toString();

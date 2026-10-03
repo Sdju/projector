@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import type { CommitComparison, GitCommitDetail } from "../../../../core/modules/workspace/index.ts";
-import UiButton from "../../../common/ui/UiButton.vue";
-import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
-import { FileIcon, useFileIconTheme } from "../../file-icons/index.ts";
-import { workspaceRequest } from "../../workspace-api/index.ts";
+import type { CommitComparison, GitCommitDetail } from "../../../../../../core/modules/workspace/index.ts";
+import UiButton from "../../../../../common/ui/UiButton.vue";
+import { commandArgs, useCommandScope } from "../../../../../common/utilities/commands.ts";
+import { FileIcon, useFileIconTheme } from "../../../../file-icons/index.ts";
+import { workspaceRequest } from "../../../../workspace-api/index.ts";
 import CommitFileDiff from "./CommitFileDiff.vue";
-import { absoluteTime, relativeTime, shortHash } from "../../../common/utilities/commit-format.ts";
+import { absoluteTime, relativeTime, shortHash } from "../../../../../common/utilities/commit-format.ts";
 import IconCopy from "~icons/lucide/copy";
 import IconChevronRight from "~icons/lucide/chevron-right";
 import IconOpen from "~icons/lucide/external-link";

@@ -30,7 +30,7 @@ import {
 } from "../server/modules/workspace/index.ts";
 import { projectRelativePath, previewBrowserFile } from "../src/modules/workspace/file-drop.ts";
 import { moveDestination, parentPath, relocatedPath } from "../core/modules/workspace/index.ts";
-import { fitImage, zoomImageAt } from "../src/modules/workspace/lib/image-viewport.ts";
+import { fitImage, zoomImageAt } from "../src/modules/workspace/modules/viewers/lib/image-viewport.ts";
 test("image zoom keeps the cursor anchor fixed, including at zoom limits", () => {
   const initial = { zoom: 2, x: 40, y: -30 };
   const anchor = { x: 130, y: 75 };

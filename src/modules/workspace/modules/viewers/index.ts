@@ -1,0 +1,8 @@
+import { defineAsyncComponent } from "vue";
+export { default as ArchiveViewer } from "./ui/ArchiveViewer.vue";
+export { default as CommitOverview } from "./ui/CommitOverview.vue";
+export { default as ImageViewport } from "./ui/ImageViewport.vue";
+export const CodeViewer = defineAsyncComponent(() => import("./ui/CodeViewer.vue"));
+export const MarkdownViewer = defineAsyncComponent(() => import("./ui/MarkdownViewer.vue"));
+export const SvgViewer = defineAsyncComponent(() => import("./ui/SvgViewer.vue"));
+export const EditorSettings = defineAsyncComponent(() => import("./ui/EditorSettings.vue"));

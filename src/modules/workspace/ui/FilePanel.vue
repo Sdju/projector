@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { defineAsyncComponent } from "vue";
 import { KeybindingsEditor } from "../../ide/index.ts";
 import { isEditable, isMarkdown, type OpenFile } from "../open-file.ts";
-import CommitOverview from "./CommitOverview.vue";
-import ArchiveViewer from "./ArchiveViewer.vue";
-import ImageViewport from "./ImageViewport.vue";
-
-const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
-const MarkdownViewer = defineAsyncComponent(() => import("./MarkdownViewer.vue"));
-const SvgViewer = defineAsyncComponent(() => import("./SvgViewer.vue"));
+import {
+  ArchiveViewer,
+  CodeViewer,
+  CommitOverview,
+  ImageViewport,
+  MarkdownViewer,
+  SvgViewer,
+} from "../modules/viewers/index.ts";
 
 /** Содержимое одной вкладки файла: хлебные крошки, ошибка сохранения и подходящий просмотрщик. */
 defineProps<{ file: OpenFile; projectId: string; revision: number }>();

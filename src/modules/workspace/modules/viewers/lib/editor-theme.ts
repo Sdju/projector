@@ -3,7 +3,7 @@ import {
   defaultEditorTheme,
   isEditorTheme,
   type EditorTheme,
-} from "../../../../core/modules/editor-themes/index.ts";
+} from "../../../../../../core/modules/editor-themes/index.ts";
 
 export const editorTheme = shallowRef<EditorTheme>(defaultEditorTheme);
 export function applyEditorTheme(theme: EditorTheme) {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import type { ArchiveContent, ArchiveEntry } from "../../../../core/modules/workspace/index.ts";
+import type { ArchiveContent, ArchiveEntry } from "../../../../../../core/modules/workspace/index.ts";
 const props = defineProps<{ archive: ArchiveContent }>();
 const query = ref("");
 const entries = computed(() => {

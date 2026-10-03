@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { fitImage, zoomImageAt, type ImageTransform } from "../lib/image-viewport.ts";
-import UiButton from "../../../common/ui/UiButton.vue";
+import UiButton from "../../../../../common/ui/UiButton.vue";
 import IconRatio from "~icons/lucide/ratio";
 import IconMaximize from "~icons/lucide/maximize";
 const props = withDefaults(

@@ -60,7 +60,7 @@ test(
     const html = `<!doctype html><div id="editor"></div><button id="outside">Outside editor</button><pre id="result">WAITING</pre><script type="module">
     import { createApp, h, nextTick, ref } from 'vue';
     import '/src/app/styles.css';
-    import MarkdownViewer from '/src/modules/workspace/ui/MarkdownViewer.vue';
+    import MarkdownViewer from '/src/modules/workspace/modules/viewers/ui/MarkdownViewer.vue';
     import {createCommandService, defaultKeybindings} from '/core/modules/ide/index.ts';
     const initial = "# Title\\r\\n\\r\\nA **bold** paragraph.\\r\\n\\r\\n![Alt text](../image.png)\\r\\n\\r\\n| A | B |\\r\\n| - | - |\\r\\n| One | Two |\\r\\n\\r\\n~~~js\\r\\nconst value = 1;\\r\\n~~~\\r\\n\\r\\n\\u003cdetails>\\u003csummary>More\\u003c/summary>Raw HTML\\u003c/details>\\r\\n\\r\\n\\u003cscript>window.unsafeMarkdown = true\\u003c/script>\\r\\n";
     const content = ref(initial); let changes = 0; let failure = ''; let saves = 0; let saved = ''; const opened = [];
