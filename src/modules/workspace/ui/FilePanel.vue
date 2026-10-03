@@ -25,9 +25,6 @@ const emit = defineEmits<{
       <span>{{ file.path }}</span>
       <span v-if="file.virtual === 'keybindings'">настройки IDE</span>
       <span v-if="file.external">только просмотр</span>
-      <span v-if="file.original !== undefined">{{
-        file.staged ? "HEAD → index" : "index → рабочий файл"
-      }}</span>
     </div>
     <p v-if="file.saveError && !isMarkdown(file)" class="file-error" role="alert">
       {{ file.saveError }}
@@ -68,6 +65,8 @@ const emit = defineEmits<{
         :content="file.draft ?? file.content"
         :editable="isEditable(file)"
         :original="file.original"
+        :original-label="file.staged ? 'HEAD' : 'Индекс'"
+        :modified-label="file.staged ? 'Индекс' : 'Рабочий файл'"
         :line="file.line"
         :column="file.column"
         @change="emit('change', $event)"

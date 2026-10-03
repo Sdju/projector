@@ -2,7 +2,7 @@
 import { computed, defineAsyncComponent, onMounted, ref } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { editorThemes, type EditorTheme } from "../../../../core/modules/editor-themes/index.ts";
-import { editorTheme, applyEditorTheme, loadEditorTheme } from "../lib/monaco.ts";
+import { editorTheme, applyEditorTheme, loadEditorTheme } from "../lib/editor-theme.ts";
 const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
 const selected = ref<EditorTheme>(editorTheme.value);
 const ready = ref(false);
@@ -61,7 +61,7 @@ async function save() {
 <template>
   <section class="editor-settings" aria-labelledby="editor-settings-title">
     <h1 id="editor-settings-title">Редактор кода</h1>
-    <label for="editor-theme">Цветовая тема Monaco</label>
+    <label for="editor-theme">Цветовая тема редактора</label>
     <select id="editor-theme" v-model="selected" :disabled="!ready || busy" @change="save">
       <option v-for="theme in editorThemes" :key="theme.id" :value="theme.id">
         {{ theme.title }}

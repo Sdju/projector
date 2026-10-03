@@ -320,14 +320,14 @@ test("editor themes default, persist, reject unknown values and protect HTTP wri
       body: JSON.stringify({ theme }),
     });
   assert.deepEqual(await readEditorSettings(), { theme: "projector-soft" });
-  assert.equal((await put("vs", "https://foreign.test")).status, 403);
-  assert.equal((await put("vs")).status, 200);
-  assert.deepEqual(await readEditorSettings(), { theme: "vs" });
+  assert.equal((await put("one-dark", "https://foreign.test")).status, 403);
+  assert.equal((await put("one-dark")).status, 200);
+  assert.deepEqual(await readEditorSettings(), { theme: "one-dark" });
   assert.equal((await put("unknown")).status, 400);
-  assert.deepEqual(await readEditorSettings(), { theme: "vs" });
+  assert.deepEqual(await readEditorSettings(), { theme: "one-dark" });
   const response = await fetch(url);
   assert.equal(response.headers.get("cache-control"), "no-store");
-  assert.deepEqual(await response.json(), { theme: "vs" });
+  assert.deepEqual(await response.json(), { theme: "one-dark" });
   await writeEditorSettings("projector-soft");
   const file = join(directory, "projector", "editor.json");
   assert.deepEqual(JSON.parse(await readFile(file, "utf8")), { theme: "projector-soft" });

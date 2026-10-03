@@ -9,9 +9,7 @@ export const editorThemes = [
     title: "Projector · классическая",
     description: "Прежняя подсветка на тёмном фоне Projector.",
   },
-  { id: "vs-dark", title: "VS Dark", description: "Стандартная тёмная тема Monaco." },
-  { id: "vs", title: "VS Light", description: "Светлая тема Monaco." },
-  { id: "hc-black", title: "Высокий контраст", description: "Чёрный фон и контрастные цвета." },
+  { id: "one-dark", title: "One Dark", description: "Классическая тёмная тема One Dark." },
 ] as const;
 export type EditorTheme = (typeof editorThemes)[number]["id"];
 export const defaultEditorTheme: EditorTheme = "projector-soft";

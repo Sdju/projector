@@ -1,12 +1,36 @@
 <script setup lang="ts">
+import IconRows from "~icons/lucide/rows-2";
+import IconColumns from "~icons/lucide/columns-2";
 import { onMounted, onBeforeUnmount, ref, watch } from "vue";
-import { monaco, language, editorTheme, loadEditorTheme } from "../lib/monaco.ts";
+import {
+  EditorView,
+  lineNumbers,
+  highlightActiveLine,
+  highlightActiveLineGutter,
+  keymap,
+  drawSelection,
+} from "@codemirror/view";
+import { EditorState } from "@codemirror/state";
+import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
+import { bracketMatching, foldGutter, indentOnInput } from "@codemirror/language";
+import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
+import { MergeView, unifiedMergeView } from "@codemirror/merge";
+import { editorTheme, loadEditorTheme } from "../lib/editor-theme.ts";
 import { gutterRequest } from "../api.ts";
-import { attachDirtyDiff, type DirtyDiff } from "../lib/dirty-diff.ts";
+import {
+  dirtyDiff,
+  languageCompartment,
+  languageExtension,
+  setOriginal,
+  themeCompartment,
+  themeExtension,
+} from "../lib/codemirror.ts";
 const props = defineProps<{
   path: string;
   content: string;
   original?: string;
+  originalLabel?: string;
+  modifiedLabel?: string;
   line?: number;
   column?: number;
   editable?: boolean;
@@ -15,75 +39,124 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ change: [content: string]; save: [] }>();
 const container = ref<HTMLElement>();
-let editor: monaco.editor.IStandaloneCodeEditor | monaco.editor.IStandaloneDiffEditor | undefined;
-let models: monaco.editor.ITextModel[] = [];
-let views = new Map<string, monaco.editor.ICodeEditorViewState | null>();
-let activePath = "";
-let dirtyDiff: DirtyDiff | undefined;
+let view: EditorView | undefined;
+let merge: MergeView | undefined;
+const sideBySide = ref(false);
 let gutterToken = 0;
-function clearGutter() {
-  dirtyDiff?.dispose();
-  dirtyDiff = undefined;
-}
+const states = new Map<string, EditorState>();
+let activePath = "";
+
 async function loadGutter() {
   const token = ++gutterToken;
-  const target = editor && !("getOriginalEditor" in editor) ? editor : undefined;
+  const target = view;
   if (!target || props.original !== undefined || !props.projectId || props.path.startsWith("/")) {
-    clearGutter();
+    target?.dispatch({ effects: setOriginal.of(null) });
     return;
   }
   try {
     const data = await gutterRequest(props.projectId, props.path);
-    if (token !== gutterToken || editor !== target) return;
-    dirtyDiff ??= attachDirtyDiff(target);
-    dirtyDiff.setOriginal(data.available ? data.original : null);
+    if (token !== gutterToken || view !== target) return;
+    target.dispatch({ effects: setOriginal.of(data.available ? data.original : null) });
   } catch {
-    if (token === gutterToken) clearGutter();
+    if (token === gutterToken) target.dispatch({ effects: setOriginal.of(null) });
   }
+}
+/** Only "reject" is offered: accepting would redefine the Git-index side. */
+function revertButton(type: "reject" | "accept", action: (event: MouseEvent) => void) {
+  const element = document.createElement(type === "reject" ? "button" : "span");
+  if (type === "reject") {
+    element.className = "diff-revert";
+    element.textContent = "↶ Откатить";
+    element.title = "Вернуть версию из индекса";
+    element.onmousedown = action;
+  }
+  return element;
+}
+function extensions(mode: "inline" | "side" = "inline") {
+  return [
+    lineNumbers(),
+    foldGutter(),
+    drawSelection(),
+    indentOnInput(),
+    bracketMatching(),
+    highlightActiveLine(),
+    highlightActiveLineGutter(),
+    highlightSelectionMatches(),
+    history(),
+    keymap.of([...defaultKeymap, ...searchKeymap, ...historyKeymap, indentWithTab]),
+    EditorState.readOnly.of(!props.editable),
+    EditorView.editable.of(!!props.editable),
+    props.editable ? EditorView.lineWrapping : [],
+    themeCompartment.of(themeExtension(editorTheme.value)),
+    languageCompartment.of([]),
+    EditorState.phrases.of({
+      "Revert this chunk": "Откатить изменение",
+      "$ unchanged lines": "$ строк без изменений",
+    }),
+    props.original === undefined
+      ? dirtyDiff
+      : mode === "inline"
+        ? unifiedMergeView({
+            original: props.original,
+            gutter: true,
+            mergeControls: props.editable ? revertButton : false,
+          })
+        : [],
+    EditorView.updateListener.of((update) => {
+      if (update.docChanged && props.editable) emit("change", update.state.doc.toString());
+    }),
+  ];
 }
 function render() {
   if (!container.value) return;
-  if (editor && !("getOriginalEditor" in editor)) views.set(activePath, editor.saveViewState());
-  clearGutter();
-  editor?.dispose();
-  models.forEach((model) => model.dispose());
-  models = [];
+  if (view) states.set(activePath, view.state);
+  merge?.destroy();
+  merge = undefined;
+  view?.destroy();
   activePath = props.path;
-  const options: monaco.editor.IStandaloneEditorConstructionOptions = {
-    theme: editorTheme.value,
-    readOnly: !props.editable,
-    domReadOnly: !props.editable,
-    automaticLayout: true,
-    minimap: { enabled: false },
-    fontSize: 13,
-    fontFamily: '"Noto Sans Mono", monospace',
-    scrollBeyondLastLine: false,
-    padding: { top: 16 },
-    renderLineHighlight: "line",
-    wordWrap: props.editable ? "on" : "off",
-    stickyScroll: { enabled: false },
-  };
-  const modified = monaco.editor.createModel(props.content, language(props.path));
-  models.push(modified);
-  if (props.original !== undefined) {
-    const original = monaco.editor.createModel(props.original, language(props.path));
-    models.push(original);
-    editor = monaco.editor.createDiffEditor(container.value, {
-      ...options,
-      renderSideBySide: false,
-      originalEditable: false,
-      renderOverviewRuler: false,
+  const saved = props.original === undefined ? states.get(props.path) : undefined;
+  if (props.original !== undefined && sideBySide.value) {
+    merge = new MergeView({
+      parent: container.value,
+      a: {
+        doc: props.original,
+        extensions: [
+          ...extensions("side"),
+          EditorState.readOnly.of(true),
+          EditorView.editable.of(false),
+        ],
+      },
+      b: { doc: props.content, extensions: extensions("side") },
+      gutter: true,
+      revertControls: props.editable ? "a-to-b" : undefined,
+      highlightChanges: true,
+      collapseUnchanged: { margin: 3, minSize: 6 },
     });
-    editor.setModel({ original, modified });
+    view = merge.b;
   } else {
-    editor = monaco.editor.create(container.value, { ...options, model: modified });
-    editor.restoreViewState(views.get(props.path) ?? null);
-    if (props.editable) {
-      editor.onDidChangeModelContent(() => emit("change", modified.getValue()));
-    }
+    view = new EditorView({
+      parent: container.value,
+      state: saved ?? EditorState.create({ doc: props.content, extensions: extensions() }),
+    });
   }
+  const target = view;
+  void languageExtension(props.path).then((ext) => {
+    if (view !== target) return;
+    const effects = { effects: languageCompartment.reconfigure(ext) };
+    merge?.a.dispatch(effects);
+    target.dispatch(effects);
+  });
   void loadGutter();
   reveal();
+}
+function reveal() {
+  if (!view || !props.line) return;
+  const line = view.state.doc.line(Math.min(props.line, view.state.doc.lines));
+  const pos = Math.min(line.from + (props.column ?? 1) - 1, line.to);
+  view.dispatch({
+    selection: { anchor: pos },
+    effects: EditorView.scrollIntoView(pos, { y: "center" }),
+  });
 }
 function focusOut(event: FocusEvent) {
   if (!props.editable) return;
@@ -91,92 +164,175 @@ function focusOut(event: FocusEvent) {
   if (target instanceof Node && container.value?.contains(target)) return;
   emit("save");
 }
-function reveal() {
-  if (!editor || !props.line) return;
-  const target = "getModifiedEditor" in editor ? editor.getModifiedEditor() : editor;
-  target.revealLineInCenter(props.line);
-  target.setPosition({ lineNumber: props.line, column: props.column ?? 1 });
-}
 onMounted(() => {
   render();
   void loadEditorTheme().catch(() => undefined);
 });
-watch(() => [props.path, props.original, props.editable], render);
+watch(() => [props.path, props.original, props.editable, sideBySide.value], render);
+watch(editorTheme, (theme) => {
+  const effects = { effects: themeCompartment.reconfigure(themeExtension(theme)) };
+  merge?.a.dispatch(effects);
+  view?.dispatch(effects);
+});
 watch(
   () => props.content,
   (content) => {
-    if (models[0] && models[0].getValue() !== content) models[0].setValue(content);
+    if (view && view.state.doc.toString() !== content)
+      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: content } });
   },
 );
-watch(() => props.projectId, () => void loadGutter());
-watch(() => props.revision, () => void loadGutter());
+watch(
+  () => [props.projectId, props.revision],
+  () => void loadGutter(),
+);
 watch(() => [props.line, props.column], reveal);
 onBeforeUnmount(() => {
   ++gutterToken;
-  clearGutter();
-  editor?.dispose();
-  models.forEach((model) => model.dispose());
-  views.clear();
+  merge?.destroy();
+  view?.destroy();
+  states.clear();
 });
 </script>
 <template>
-  <div
-    ref="container"
-    class="code-viewer"
-    @focusout="focusOut"
-    :aria-label="editable ? 'Редактор файла' : 'Просмотр кода'"
-  />
+  <div class="code-viewer-root">
+    <div v-if="original !== undefined" class="diff-layout" role="group" aria-label="Вид сравнения">
+      <button
+        type="button"
+        title="В одну колонку"
+        :aria-pressed="!sideBySide"
+        :class="{ active: !sideBySide }"
+        @click="sideBySide = false"
+      >
+        <IconRows />
+      </button>
+      <button
+        type="button"
+        title="Две колонки"
+        :aria-pressed="sideBySide"
+        :class="{ active: sideBySide }"
+        @click="sideBySide = true"
+      >
+        <IconColumns />
+      </button>
+    </div>
+    <div v-if="original !== undefined" class="diff-header">
+      <span class="diff-side">{{ originalLabel ?? "Было" }}</span>
+      <span class="diff-arrow" v-if="!sideBySide">→</span>
+      <span class="diff-side">{{ modifiedLabel ?? "Стало" }}</span>
+    </div>
+    <div
+      ref="container"
+      class="code-viewer"
+      @focusout="focusOut"
+      :aria-label="editable ? 'Редактор файла' : 'Просмотр кода'"
+    />
+  </div>
 </template>
 <style scoped>
-.code-viewer {
+.code-viewer-root {
+  position: relative;
+  display: flex;
+  flex-direction: column;
   height: 100%;
+  min-height: 0;
+}
+.diff-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: 24px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font: var(--fs-xs) var(--sans);
+}
+.diff-side {
+  flex: 1;
+  min-width: 0;
+  padding: 0 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.diff-side + .diff-side {
+  border-left: 1px solid var(--line);
+}
+.diff-arrow {
+  flex: none;
+}
+.diff-layout {
+  position: absolute;
+  top: 2px;
+  right: 18px;
+  z-index: 5;
+  display: flex;
+  gap: 2px;
+}
+.diff-layout button {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.diff-layout button:hover,
+.diff-layout button.active {
+  background: var(--active);
+  color: var(--text);
+}
+.code-viewer :deep(.cm-mergeView),
+.code-viewer :deep(.cm-mergeViewEditors) {
+  height: 100%;
+}
+.code-viewer :deep(.cm-mergeViewEditor) {
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+.code-viewer :deep(.cm-mergeViewEditor + .cm-mergeViewEditor) {
+  border-left: 1px solid var(--line);
+}
+.code-viewer :deep(.cm-mergeView .cm-editor) {
+  height: 100%;
+}
+.code-viewer {
+  flex: 1;
+  height: auto;
   min-height: 0;
   overflow: hidden;
 }
-.code-viewer :deep(.git-gutter-added),
-.code-viewer :deep(.git-gutter-modified),
-.code-viewer :deep(.git-gutter-deleted) {
-  position: relative;
-  cursor: pointer;
+.code-viewer :deep(.cm-dirty-gutter) {
+  width: 10px;
 }
-.code-viewer :deep(.git-gutter-added)::before,
-.code-viewer :deep(.git-gutter-modified)::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 3px;
+.code-viewer :deep(.git-gutter-added),
+.code-viewer :deep(.git-gutter-modified) {
+  height: 100%;
+  margin-left: 3px;
   width: 3px;
+  cursor: pointer;
   background: var(--run);
 }
-.code-viewer :deep(.git-gutter-modified)::before {
+.code-viewer :deep(.git-gutter-modified) {
   background: var(--info);
 }
-.code-viewer :deep(.git-gutter-added:hover)::before,
-.code-viewer :deep(.git-gutter-modified:hover)::before {
-  width: 6px;
-}
-.code-viewer :deep(.git-gutter-deleted)::after {
-  content: "";
-  position: absolute;
-  left: 3px;
-  bottom: 0;
+.code-viewer :deep(.git-gutter-deleted) {
+  margin-left: 3px;
   width: 0;
   height: 0;
+  margin-top: 100%;
   border-left: 4px solid var(--err);
   border-top: 4px solid transparent;
   border-bottom: 4px solid transparent;
 }
-.code-viewer :deep(.git-gutter-deleted-top)::after {
-  top: 0;
-  bottom: auto;
-}
-.code-viewer :deep(.git-gutter-deleted:hover)::after {
-  border-left-width: 7px;
+.code-viewer :deep(.git-gutter-deleted-top) {
+  margin-top: 0;
 }
 .code-viewer :deep(.dirty-diff-peek) {
   box-sizing: border-box;
-  height: 100%;
   overflow: hidden;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
@@ -187,7 +343,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 2px;
   padding: 0 8px;
-  box-sizing: border-box;
+  height: 20px;
   color: var(--muted);
   font: var(--fs-xs) var(--sans);
 }
@@ -210,12 +366,33 @@ onBeforeUnmount(() => {
   color: var(--text);
 }
 .code-viewer :deep(.dirty-diff-body) {
-  padding-left: 64px;
+  padding: 0 0 0 64px;
   background: color-mix(in srgb, var(--err) 8%, transparent);
   font: var(--fs-sm) var(--mono);
   white-space: pre;
+  line-height: 20px;
 }
-.code-viewer :deep(.dirty-diff-peek-added .dirty-diff-body) {
-  display: none;
+.code-viewer :deep(.cm-changedLine) {
+  background: color-mix(in srgb, var(--run) 8%, transparent);
+}
+.code-viewer :deep(.cm-changedText) {
+  background: color-mix(in srgb, var(--run) 20%, transparent);
+}
+.code-viewer :deep(.diff-revert) {
+  margin: 0 4px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  color: var(--muted);
+  font: var(--fs-xs) var(--sans);
+  cursor: pointer;
+}
+.code-viewer :deep(.diff-revert:hover) {
+  background: var(--active);
+  color: var(--text);
+}
+.code-viewer :deep(.cm-deletedChunk) {
+  background: color-mix(in srgb, var(--err) 8%, transparent);
 }
 </style>
