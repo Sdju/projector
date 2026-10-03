@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer } from "vite-plus";
 import vue from "@vitejs/plugin-vue";
+import Icons from "unplugin-icons/vite";
 
 const chromium =
   process.env.CHROMIUM_BIN ??
@@ -48,7 +49,7 @@ test(
       configFile: false,
       root: fileURLToPath(new URL("..", import.meta.url)),
       cacheDir: join(directory, "vite-cache"),
-      plugins: [vue(), fixturePlugin],
+      plugins: [vue(), Icons({ compiler: "vue3" }), fixturePlugin],
       optimizeDeps: { entries: [] },
       logLevel: "error",
       server: { host: "127.0.0.1", port: 0 },
@@ -57,16 +58,25 @@ test(
       await server.close();
       await rm(directory, { recursive: true, force: true });
     });
-    const html = `<!doctype html><div id="editor"></div><button id="outside">Outside editor</button><pre id="result">WAITING</pre><script type="module">
+    const html = `<!doctype html><div id="editor" style="height: 500px"></div><button id="outside">Outside editor</button><pre id="result">WAITING</pre><script type="module">
     import { createApp, h, nextTick, ref } from 'vue';
     import '/src/app/styles.css';
     import MarkdownViewer from '/src/modules/workspace/modules/viewers/ui/MarkdownViewer.vue';
+    import { DockView } from '/src/modules/dock/index.ts';
+    import { commandHostKey } from '/src/common/utilities/commands.ts';
     import {createCommandService, defaultKeybindings} from '/core/modules/ide/index.ts';
     const initial = "# Title\\r\\n\\r\\nA **bold** paragraph.\\r\\n\\r\\n![Alt text](../image.png)\\r\\n\\r\\n| A | B |\\r\\n| - | - |\\r\\n| One | Two |\\r\\n\\r\\n~~~js\\r\\nconst value = 1;\\r\\n~~~\\r\\n\\r\\n\\u003cdetails>\\u003csummary>More\\u003c/summary>Raw HTML\\u003c/details>\\r\\n\\r\\n\\u003cscript>window.unsafeMarkdown = true\\u003c/script>\\r\\n";
     const content = ref(initial); let changes = 0; let failure = ''; let saves = 0; let saved = ''; const opened = [];
-    const app = createApp({ render: () => h(MarkdownViewer, { mode: 'document', path: 'docs/test.md', projectId: 'test', content: content.value, onSave: () => { saves++; saved = content.value; }, onChange: value => { changes++; content.value = value; }, onOpen: path => opened.push(path), onError: message => failure = message }) });
-    app.mount('#editor');
+    const layout = ref({root:{type:'group',id:'g1',panels:['file'],active:'file'},focused:'g1'});
+    const app = createApp({ render: () => {
+      const draft = content.value;
+      return h(DockView, {layout:layout.value,projectId:'test',commandNamespace:'ide.test.tabs',describe:id=>({id,label:'test.md',dirty:draft!==initial}),'onUpdate:layout':value=>layout.value=value}, {
+        panel: () => h(MarkdownViewer, { mode: 'document', path: 'docs/test.md', projectId: 'test', content: draft, onSave: () => { saves++; saved = content.value; }, onChange: value => { changes++; content.value = value; }, onOpen: path => opened.push(path), onError: message => failure = message })
+      });
+    } });
     const sdk = createCommandService(defaultKeybindings);
+    app.provide(commandHostKey, {revision:ref(0),createScope:(id,context)=>sdk.createScope(id,context),reportError:error=>{failure=String(error);}});
+    app.mount('#editor');
     const scope = sdk.createScope('editor', () => ({surface:'editor'}));
     scope.registerCommand({id:'ide.editor.file.save',title:'Save',run:() => {saves++; saved=content.value;}});
     document.getElementById('editor').addEventListener('keydown', event => {
@@ -82,6 +92,19 @@ test(
       check(!document.querySelector('.markdown-toolbar'), 'There must be no upper toolbar');
       check(editor.contentEditable === 'true', 'The formatted document must be editable');
       check(editor.querySelector('strong').textContent === 'bold', 'Bold must render visually');
+      content.value = ${JSON.stringify('| Область | Реализация | Ограничение |\n| --- | --- | --- |\n| GitHub | `server/modules/integrations/github.ts`: PAT и OAuth Device Flow | Проверка пользователя |\n| Workspace | `$XDG_DATA_HOME/projector/workspaces/<workspaceId>/repo` | Рабочие файлы на диске хоста |\n')};
+      await nextTick();
+      const host = document.getElementById('editor');
+      for (const width of [820, 360]) {
+        host.style.width = width + 'px';
+        const table = editor.querySelector('.milkdown-table-block table.children');
+        const bounds = table.getBoundingClientRect();
+        const documentBounds = editor.getBoundingClientRect();
+        check(bounds.right <= documentBounds.right + 1, 'The table must fit the document at width ' + width);
+        for (const cell of table.querySelectorAll('td,th'))
+          check(cell.scrollWidth <= cell.clientWidth + 1, 'Long inline code must fit its table cell at width ' + width);
+      }
+      host.style.removeProperty('width');
       // Reproduce the paint-order failure with an opaque, positioned quote.
       content.value = '> Quote text\\n\\n> > Nested quote\\n'; await nextTick();
       const quoteSelection = window.getSelection();
@@ -115,6 +138,8 @@ test(
       const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range); editor.focus();
       document.execCommand('insertText', false, ' edited');
       await Promise.resolve(); await nextTick();
+      check(editor.isConnected && document.querySelector('.milkdown .ProseMirror') === editor, 'Updating a draft through the desktop dock must keep the same editor');
+      check(document.activeElement === editor && editor.contains(window.getSelection().anchorNode), 'Typing must preserve editor focus and selection');
       check(content.value.startsWith('# Title edited'), 'The draft must update in the same transaction, before Ctrl+S or unmount');
       editor.dispatchEvent(new KeyboardEvent('keydown', {key:'s', code:'KeyS', ctrlKey:true, bubbles:true, cancelable:true}));
       check(saved === content.value && saves === 1, 'Ctrl+S must save the latest visual edit');
@@ -172,6 +197,23 @@ test(
       content.value = '# From source\\n\\nNew **text**.\\n'; await nextTick();
       check(editor.querySelector('h1').textContent === 'From source', 'Source changes must update the visual document');
       check(editor.querySelector('strong').textContent === 'text', 'Source formatting must render');
+      content.value = '# Long document\\n\\n' + 'Paragraph.\\n\\n'.repeat(80) + 'Last paragraph.\\n';
+      await nextTick();
+      const lastParagraph = editor.querySelector('p:last-of-type');
+      const endRange = document.createRange(); endRange.selectNodeContents(lastParagraph); endRange.collapse(false);
+      selection.removeAllRanges(); selection.addRange(endRange); editor.focus();
+      lastParagraph.scrollIntoView({block:'end'});
+      const scroller = document.querySelector('.visual-markdown');
+      const scrollTop = scroller.scrollTop;
+      check(scrollTop > 0, 'The long-document regression must start below the top');
+      for (const text of [' first', ' second']) {
+        document.execCommand('insertText', false, text);
+        await Promise.resolve(); await nextTick();
+        check(editor.isConnected && document.activeElement === editor, 'Repeated edits must preserve the mounted editor and focus');
+        check(lastParagraph.contains(selection.anchorNode) && selection.isCollapsed, 'Repeated edits must keep the caret in the edited paragraph');
+        check(Math.abs(scroller.scrollTop - scrollTop) < 2, 'Repeated edits must preserve the document scroll position');
+      }
+      check(content.value.includes('Last paragraph. first second'), 'Successive edits must append at the current caret');
       app.unmount();
       document.getElementById('result').textContent = 'PASS';
     } catch (error) { document.getElementById('result').textContent = 'FAIL: ' + error.stack; }

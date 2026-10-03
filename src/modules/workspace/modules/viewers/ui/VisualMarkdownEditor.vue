@@ -350,6 +350,14 @@ onBeforeUnmount(() => {
 .visual-markdown :deep(.ProseMirror img) {
   max-width: 100%;
 }
+.visual-markdown :deep(.milkdown-table-block table) {
+  /* Колонки учитывают содержимое вместо одинаковой фиксированной ширины. */
+  table-layout: auto;
+}
+.visual-markdown :deep(.milkdown-table-block th),
+.visual-markdown :deep(.milkdown-table-block td) {
+  overflow-wrap: anywhere;
+}
 .visual-markdown :deep(.markdown-html) {
   display: inline-block;
   max-width: 100%;

@@ -2,6 +2,7 @@
 import { computed, inject, ref, watch } from "vue";
 import { useEventListener } from "@vueuse/core";
 import DockTabs from "./DockTabs.vue";
+import DockSlot from "./DockSlot.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { tabDrag } from "../../../common/utilities/tab-drag.ts";
 import IconSplit from "~icons/lucide/columns-2";
@@ -132,15 +133,15 @@ const focus = () => {
         close-saved
       >
         <template #icon="{ tab }">
-          <component :is="dock.slots.icon" v-if="dock.slots.icon" v-bind="{ tab }" />
+          <DockSlot v-if="dock.slots.icon" :render="dock.slots.icon" :args="{ tab }" />
         </template>
       </DockTabs>
       <div v-else class="dock-fill" />
       <div class="dock-actions">
-        <component
-          :is="dock.slots.actions"
+        <DockSlot
           v-if="dock.slots.actions"
-          v-bind="{ group, activeId: group.active }"
+          :render="dock.slots.actions"
+          :args="{ group, activeId: group.active }"
         />
         <UiButton
           icon
@@ -194,15 +195,15 @@ const focus = () => {
     >
       <template v-for="panel in group.panels" :key="panel">
         <div v-if="panel === group.active" class="dock-panel" :data-panel="panel">
-          <component
-            :is="dock.slots.panel"
+          <DockSlot
             v-if="dock.slots.panel"
-            v-bind="{ id: panel, group: group.id, focused }"
+            :render="dock.slots.panel"
+            :args="{ id: panel, group: group.id, focused }"
           />
         </div>
       </template>
       <div v-if="!group.panels.length" class="dock-empty">
-        <component :is="dock.slots.empty" v-if="dock.slots.empty" v-bind="{ group }" />
+        <DockSlot v-if="dock.slots.empty" :render="dock.slots.empty" :args="{ group }" />
       </div>
       <div v-if="zone" class="dock-drop" :class="zone" aria-hidden="true" />
     </div>
