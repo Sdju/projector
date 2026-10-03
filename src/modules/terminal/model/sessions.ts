@@ -141,8 +141,7 @@ export function useTerminalSessions(projectId: () => string, hooks: TerminalSess
         numbers.set(data.session.id, numbers.get(previous.id) ?? nextNumber++);
       }
     } catch (err) {
-      if (current(id))
-        error.value = err instanceof Error ? err.message : "Не удалось изменить сессию";
+      if (current(id)) error.value = err instanceof Error ? err.message : "Не удалось изменить сессию";
     } finally {
       busy.value = false;
     }

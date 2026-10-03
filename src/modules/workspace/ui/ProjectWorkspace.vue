@@ -38,20 +38,14 @@ const capabilities = profileCapabilities(profile);
 const workspaceElement = ref<HTMLElement>();
 const sidebarHidden = ref(false);
 // Mobile navigation is transient; keep the saved desktop layout independent.
-const mobile = useMediaQuery(
-  "(max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse)",
-);
+const mobile = useMediaQuery("(max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse)");
 const mobileSurface = ref<"editor" | "files" | "terminal">("editor");
 const mobileActionsOpen = ref(false);
 const mobileSidebarOpen = computed({
   get: () => mobileSurface.value === "files",
-  set: (open: boolean) => {
-    mobileSurface.value = open ? "files" : "editor";
-  },
+  set: (open: boolean) => { mobileSurface.value = open ? "files" : "editor"; },
 });
-const sidebarInvisible = computed(() =>
-  mobile.value ? !mobileSidebarOpen.value : sidebarHidden.value,
-);
+const sidebarInvisible = computed(() => mobile.value ? !mobileSidebarOpen.value : sidebarHidden.value);
 function showSidebar() {
   if (mobile.value) mobileSidebarOpen.value = true;
   else sidebarHidden.value = false;
@@ -168,20 +162,13 @@ const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
 });
 const docker = useDocker(props.projectId, {
   enabled: capabilities.docker,
-  sidebar: () => {
-    section.value = "docker";
-    showSidebar();
-  },
+  sidebar: () => { section.value = "docker"; showSidebar(); },
   open: () => {
     const { key, path } = virtualTabs.docker;
-    if (!tabs.value.some((tab) => tab.key === key))
-      tabs.value.push({ key, path, virtual: "docker", content: "" });
+    if (!tabs.value.some((tab) => tab.key === key)) tabs.value.push({ key, path, virtual: "docker", content: "" });
     selectTab(key);
   },
-  terminal: async (session) => {
-    await terminals.refresh();
-    revealPanel(`terminal:${session.id}`);
-  },
+  terminal: async (session) => { await terminals.refresh(); revealPanel(`terminal:${session.id}`); },
 });
 function openProjectSettings() {
   const { key, path } = virtualTabs.project;
@@ -203,8 +190,7 @@ registerEditor(
 editorCommands.scope.registerCommand({
   id: "ide.workbench.mobile.surface.show",
   title: "Открыть мобильную поверхность",
-  description:
-    "Переключает мобильный интерфейс между редактором, файлами слева и терминалами справа, сохраняя сессии.",
+  description: "Переключает мобильный интерфейс между редактором, файлами слева и терминалами справа, сохраняя сессии.",
   arguments: { surface: "editor, files или terminal" },
   enabled: () => mobile.value,
   run: (value) => {
@@ -219,13 +205,10 @@ editorCommands.scope.registerCommand({
   },
 });
 editorCommands.scope.registerCommand({
-  id: "ide.workbench.mobile.actions.toggle",
-  title: "Показать действия проекта",
+  id: "ide.workbench.mobile.actions.toggle", title: "Показать действия проекта",
   description: "Раскрывает команды запуска проекта и создания терминалов в мобильном интерфейсе.",
   enabled: () => mobile.value,
-  run: () => {
-    mobileActionsOpen.value = !mobileActionsOpen.value;
-  },
+  run: () => { mobileActionsOpen.value = !mobileActionsOpen.value; },
 });
 useWorkspaceSession({
   persist: capabilities.persist,
@@ -252,20 +235,12 @@ useWorkspaceSession({
   },
   reloadGit: () => void loadGit(),
 });
-watch(activeKey, (key) => {
-  if (key) mobileSurface.value = "editor";
+watch(activeKey, (key) => { if (key) mobileSurface.value = "editor"; });
+watch(() => workbench.focusedGroup.value?.active, (id) => {
+  if (mobile.value && !restoringSession.value && id?.startsWith("terminal:"))
+    mobileSurface.value = "terminal";
 });
-watch(
-  () => workbench.focusedGroup.value?.active,
-  (id) => {
-    if (mobile.value && !restoringSession.value && id?.startsWith("terminal:"))
-      mobileSurface.value = "terminal";
-  },
-);
-watch(mobile, () => {
-  mobileSurface.value = "editor";
-  mobileActionsOpen.value = false;
-});
+watch(mobile, () => { mobileSurface.value = "editor"; mobileActionsOpen.value = false; });
 const active = computed(() => tabs.value.find((file) => file.key === activeKey.value));
 const gitSync = useGitChangeSync({
   projectId: () => props.projectId,
@@ -297,10 +272,13 @@ async function refresh() {
   if (active.value?.virtual || active.value?.commit) return;
   if (active.value?.localFile) void openBrowserFile(active.value.localFile, true);
   else if (active.value)
-    void openFile(active.value.path, active.value.line, active.value.column, active.value.staged, {
-      reload: true,
-      external: !!active.value.external,
-    });
+    void openFile(
+      active.value.path,
+      active.value.line,
+      active.value.column,
+      active.value.staged,
+      { reload: true, external: !!active.value.external },
+    );
 }
 function entryMoved(source: string, destination: string) {
   files.invalidate();
@@ -335,72 +313,49 @@ onBeforeUnmount(() => {
     :style="sizes"
   >
     <nav v-if="mobile" class="mobile-surfaces" aria-label="Поверхности проекта">
-      <UiButton
-        v-for="entry in [
-          { id: 'files', title: 'Файлы' },
-          { id: 'editor', title: 'Редактор' },
-          ...(capabilities.terminals ? [{ id: 'terminal', title: 'Терминалы' }] : []),
-        ]"
-        :key="entry.id"
-        :active="mobileSurface === entry.id"
-        :aria-pressed="mobileSurface === entry.id"
-        @click="editorCommands.run('ide.workbench.mobile.surface.show', { surface: entry.id })"
-        >{{ entry.title }}</UiButton
-      >
-      <UiButton
-        :active="mobileActionsOpen"
-        :aria-expanded="mobileActionsOpen"
-        aria-label="Действия проекта"
-        @click="editorCommands.run('ide.workbench.mobile.actions.toggle')"
-        >···</UiButton
-      >
+      <UiButton v-for="entry in [{ id: 'files', title: 'Файлы' }, { id: 'editor', title: 'Редактор' }, ...(capabilities.terminals ? [{ id: 'terminal', title: 'Терминалы' }] : [])]"
+        :key="entry.id" :active="mobileSurface === entry.id" :aria-pressed="mobileSurface === entry.id"
+        @click="editorCommands.run('ide.workbench.mobile.surface.show', { surface: entry.id })">{{ entry.title }}</UiButton>
+      <UiButton :active="mobileActionsOpen" :aria-expanded="mobileActionsOpen" aria-label="Действия проекта"
+        @click="editorCommands.run('ide.workbench.mobile.actions.toggle')">···</UiButton>
     </nav>
-    <div
-      v-if="!mobile || mobileActionsOpen"
-      class="toolbar-host"
-      :class="{ 'mobile-actions': mobile }"
+    <div v-if="!mobile || mobileActionsOpen" class="toolbar-host" :class="{ 'mobile-actions': mobile }">
+    <WorkbenchToolbar
+      :capabilities="capabilities"
+      :sidebar-hidden="sidebarInvisible"
+      :terminals-busy="terminals.busy.value"
+      :terminals-error="terminals.error.value"
+      :hidden-groups="hiddenGroups.map((group) => ({ id: group.id, label: groupLabel(group) }))"
+      @command="(id, args) => { if (mobile) mobileActionsOpen = false; editorCommands.run(id, args); }"
+      @show-group="showGroup"
     >
-      <WorkbenchToolbar
-        :capabilities="capabilities"
-        :sidebar-hidden="sidebarInvisible"
-        :terminals-busy="terminals.busy.value"
-        :terminals-error="terminals.error.value"
-        :hidden-groups="hiddenGroups.map((group) => ({ id: group.id, label: groupLabel(group) }))"
-        @command="
-          (id, args) => {
-            if (mobile) mobileActionsOpen = false;
-            editorCommands.run(id, args);
-          }
-        "
-        @show-group="showGroup"
-      >
-        <template #terminal-actions><slot name="terminal-actions" /></template>
-        <template #terminal-status><slot name="terminal-status" /></template>
-      </WorkbenchToolbar>
+      <template #terminal-actions><slot name="terminal-actions" /></template>
+      <template #terminal-status><slot name="terminal-status" /></template>
+    </WorkbenchToolbar>
     </div>
     <p v-if="fileError" class="file-error" role="alert">{{ fileError }}</p>
     <Transition name="mobile-left">
-      <WorkspaceSidebar
-        ref="sidebar"
-        v-model:section="section"
-        :project-id="projectId"
-        :capabilities="capabilities"
-        :hidden="sidebarInvisible"
-        :active="active"
-        :revision="revision"
-        :overview="overview"
-        :history="history"
-        :branches="branches"
-        :files="files"
-        :git-sync="gitSync"
-        @command="($event.startsWith('ide.docker.') ? docker.commands : editorCommands).run($event)"
-        @navigate="mobileSidebarOpen = false"
-        @refresh="refresh"
-        @settings="openProjectSettings"
-        @changed="treeChanged"
-        @deleted="entryDeleted"
-        @moved="entryMoved"
-      />
+    <WorkspaceSidebar
+      ref="sidebar"
+      v-model:section="section"
+      :project-id="projectId"
+      :capabilities="capabilities"
+      :hidden="sidebarInvisible"
+      :active="active"
+      :revision="revision"
+      :overview="overview"
+      :history="history"
+      :branches="branches"
+      :files="files"
+      :git-sync="gitSync"
+      @command="($event.startsWith('ide.docker.') ? docker.commands : editorCommands).run($event)"
+      @navigate="mobileSidebarOpen = false"
+      @refresh="refresh"
+      @settings="openProjectSettings"
+      @changed="treeChanged"
+      @deleted="entryDeleted"
+      @moved="entryMoved"
+    />
     </Transition>
     <div
       v-show="!sidebarInvisible"
@@ -441,15 +396,9 @@ onBeforeUnmount(() => {
         :virtual-keys="{ agent: virtualTabs.agent.key, project: virtualTabs.project.key }"
       >
         <template #mobile-terminal-actions>
-          <UiButton
-            v-for="program in ['shell', 'codex', 'claude', 'opencode']"
-            :key="program"
-            size="sm"
-            :disabled="terminals.busy.value"
-            :aria-label="`Новый ${program}`"
-            @click="editorCommands.run('ide.workbench.terminal.new', { program })"
-            >+ {{ program }}</UiButton
-          >
+          <UiButton v-for="program in ['shell', 'codex', 'claude', 'opencode']" :key="program" size="sm"
+            :disabled="terminals.busy.value" :aria-label="`Новый ${program}`"
+            @click="editorCommands.run('ide.workbench.terminal.new', { program })">+ {{ program }}</UiButton>
         </template>
         <template #project><slot name="project" /></template>
       </WorkbenchDock>

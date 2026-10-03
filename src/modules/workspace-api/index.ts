@@ -68,10 +68,9 @@ export function searchWorkspace(
   options: import("../../../core/modules/workspace/index.ts").SearchOptions,
   signal?: AbortSignal,
 ) {
-  return workspaceRequest<{
-    hits: import("../../../core/modules/workspace/index.ts").SearchHit[];
-    truncated: boolean;
-  }>(
+  return workspaceRequest<
+    { hits: import("../../../core/modules/workspace/index.ts").SearchHit[]; truncated: boolean }
+  >(
     projectId,
     "search",
     {

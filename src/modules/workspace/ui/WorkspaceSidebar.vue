@@ -63,13 +63,7 @@ defineExpose({
       :git-count="overview.git.value.changes.length"
       :settings-active="active?.virtual === 'project'"
       @command="emit('command', $event)"
-      @refresh="
-        section === 'git'
-          ? gitPanel?.refresh()
-          : section === 'docker'
-            ? emit('command', 'ide.docker.refresh')
-            : emit('refresh')
-      "
+      @refresh="section === 'git' ? gitPanel?.refresh() : section === 'docker' ? emit('command', 'ide.docker.refresh') : emit('refresh')"
       @settings="emit('settings')"
     />
     <div v-show="section === 'files'" class="side-content">
@@ -82,9 +76,7 @@ defineExpose({
         :git-changes="overview.git.value.changes"
         @changed="emit('changed')"
         @deleted="emit('deleted', $event)"
-        @open="
-          (path, pinned) => openFile(path, undefined, undefined, undefined, { preview: !pinned })
-        "
+        @open="(path, pinned) => openFile(path, undefined, undefined, undefined, { preview: !pinned })"
         @moved="(source, destination) => emit('moved', source, destination)"
       />
     </div>
@@ -107,9 +99,7 @@ defineExpose({
       :prepare="gitSync.prepare"
       :invalidate="files.invalidate"
       :applied="gitSync.applied"
-      @open="
-        (path, staged, pinned) => openFile(path, undefined, undefined, staged, { preview: !pinned })
-      "
+      @open="(path, staged, pinned) => openFile(path, undefined, undefined, staged, { preview: !pinned })"
       @open-commit="openCommit"
       @open-commit-diff="(hash, path, pinned) => openCommitFile(hash, path, !pinned)"
     />
