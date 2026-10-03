@@ -11,6 +11,7 @@ import GitChangesTree from "./GitChangesTree.vue";
 import GitHistory from "./GitHistory.vue";
 import IconPlus from "~icons/lucide/plus";
 import IconMinus from "~icons/lucide/minus";
+import IconChevronRight from "~icons/lucide/chevron-right";
 
 const props = defineProps<{
   projectId: string;
@@ -38,6 +39,8 @@ const workingChanges = computed(() =>
   git.value.changes.filter((change) => change.worktree !== " "),
 );
 const gitBusy = ref(false);
+/** Свёрнутые блоки изменений: ключ группы — `staged` или `changed`. */
+const collapsedGroups = ref(new Set<string>());
 const gitMenu = ref<InstanceType<typeof ContextMenu>>();
 const gitTarget = ref({ path: "", staged: false });
 const historyOpen = ref(false);
@@ -138,6 +141,19 @@ for (const [action, title] of [
   });
 }
 gitCommands.scope.registerCommand({
+  id: "ide.git.group.toggle",
+  title: "Свернуть или развернуть блок изменений",
+  description: "Сворачивает блок Staged или Changed в панели Git.",
+  arguments: { staged: "true — блок Staged, false — блок Changed" },
+  run: (value) => {
+    const args = commandArgs(value);
+    if (typeof args.staged !== "boolean") throw new Error("staged должен быть boolean");
+    const key = args.staged ? "staged" : "changed";
+    if (collapsedGroups.value.has(key)) collapsedGroups.value.delete(key);
+    else collapsedGroups.value.add(key);
+  },
+});
+gitCommands.scope.registerCommand({
   id: "ide.git.refresh",
   title: "Обновить Git",
   run: load,
@@ -186,9 +202,21 @@ defineExpose({
       :key="group.label"
     >
       <div v-if="git.available" class="git-group">
-        <h3>
-          {{ group.label }} <span v-if="group.rows.length">{{ group.rows.length }}</span>
-        </h3>
+        <button
+          class="group-toggle"
+          :aria-expanded="!collapsedGroups.has(group.staged ? 'staged' : 'changed')"
+          data-command="ide.git.group.toggle"
+          @click="gitCommands.run('ide.git.group.toggle', { staged: group.staged })"
+        >
+          <IconChevronRight
+            class="chevron"
+            :class="{ open: !collapsedGroups.has(group.staged ? 'staged' : 'changed') }"
+            aria-hidden="true"
+          />
+          <h3>
+            {{ group.label }} <span v-if="group.rows.length">{{ group.rows.length }}</span>
+          </h3>
+        </button>
         <UiButton
           v-if="group.rows.length"
           icon
@@ -213,6 +241,7 @@ defineExpose({
       </div>
       <GitChangesTree
         v-if="group.rows.length"
+        v-show="!collapsedGroups.has(group.staged ? 'staged' : 'changed')"
         :key="`${projectId}:${group.staged}`"
         :changes="group.rows"
         :staged="group.staged"
@@ -257,8 +286,23 @@ defineExpose({
   padding: 6px var(--sp-3) 2px var(--sp-3);
 }
 .git-group h3 {
-  flex: 1;
   padding: 0;
+}
+.group-toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  text-align: left;
+  padding: 2px 0;
+}
+.chevron {
+  width: 12px;
+  height: 12px;
+  color: var(--faint);
+}
+.chevron.open {
+  transform: rotate(90deg);
 }
 .notice {
   padding: 0 var(--sp-3);
