@@ -16,7 +16,12 @@ export interface OpenFile extends FileContent {
   saveError?: string;
 }
 
+/** Diff against the Git index shows the real file on the right, so it can be edited in place. */
 export const isEditable = (file: OpenFile) =>
-  !file.virtual && !file.external && !file.image && !file.archive && file.original === undefined;
+  !file.virtual &&
+  !file.external &&
+  !file.image &&
+  !file.archive &&
+  (file.original === undefined || file.staged === false);
 export const isMarkdown = (file: OpenFile) =>
-  isEditable(file) && /\.(?:md|markdown)$/i.test(file.path);
+  isEditable(file) && file.original === undefined && /\.(?:md|markdown)$/i.test(file.path);
