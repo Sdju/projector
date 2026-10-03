@@ -19,6 +19,17 @@ export function commandHelp(id: string): {
             : { id: "string (необязательно): идентификатор вкладки" },
     };
   }
+  if (id === "ide.workbench.terminal.new")
+    return {
+      description: "Создаёт терминальную сессию в проекте и показывает её вкладку.",
+      arguments: { program: "string (необязательно): shell, codex, claude или opencode; по умолчанию shell" },
+    };
+  if (id.startsWith("ide.workbench.panel."))
+    return {
+      description:
+        "Действие над блоком вкладки: разделить вправо или вниз, скрыть блок. Без id используется активная вкладка блока с фокусом. Разделить можно блок минимум с двумя вкладками.",
+      arguments: { id: "string (необязательно): идентификатор вкладки" },
+    };
   if (id.startsWith("ide.fileTree.")) {
     const args: Record<string, string> = {
       path: "string (необязательно): путь относительно корня проекта; без него текущая запись дерева",

@@ -16,6 +16,9 @@ export const workspaceSessionSchema = z.object({
   section: z.enum(["files", "search", "git", "project"]),
   treeWidth: z.number().finite().positive().optional(),
   agentWidth: z.number().finite().positive().optional(),
+  sidebarHidden: z.boolean().optional(),
+  /** Раскладка блоков; читается через `parseDockLayout`, который сам отбрасывает повреждённые данные. */
+  layout: z.unknown().optional(),
 });
 export type WorkspaceSession = z.infer<typeof workspaceSessionSchema>;
 export const treeSessionSchema = z.array(z.string());

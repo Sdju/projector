@@ -1,3 +1,5 @@
 import { defineAsyncComponent } from "vue";
 
-export const TerminalPane = defineAsyncComponent(() => import("./ui/TerminalPane.vue"));
+export const TerminalView = defineAsyncComponent(() => import("./ui/TerminalView.vue"));
+export { default as TerminalCloseDialog } from "./ui/TerminalCloseDialog.vue";
+export { useTerminalSessions } from "./model/sessions.ts";

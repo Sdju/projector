@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useSessionSnapshot, workspaceSessionSchema, type WorkspaceSession } from "../session.ts";
 import { workspaceRequest, searchWorkspace, saveWorkspaceFile, mutateWorkspaceGit } from "../api.ts";
 import { isFileDrag, pathsFromDataTransfer } from "../../path-drop/index.ts";
@@ -15,13 +15,32 @@ import UiEmpty from "../../../common/ui/UiEmpty.vue";
 import IconPlus from "~icons/lucide/plus";
 import IconMinus from "~icons/lucide/minus";
 import IconDiff from "~icons/lucide/file-diff";
-import WorkspaceTabs from "../../../common/ui/WorkspaceTabs.vue";
 import FileTree from "./FileTree.vue";
 import GitChangesTree from "./GitChangesTree.vue";
-import ArchiveViewer from "./ArchiveViewer.vue";
-import ImageViewport from "./ImageViewport.vue";
-import { KeybindingsEditor } from "../../ide/index.ts";
+import FilePanel from "./FilePanel.vue";
+import PanelHost from "./PanelHost.vue";
 import { AgentChat } from "../../agent/index.ts";
+import {
+  DockView,
+  activatePanel,
+  addPanel,
+  createDockLayout,
+  dockGroups,
+  findDockGroup,
+  groupOfPanel,
+  movePanel,
+  parseDockLayout,
+  reconcileDock,
+  replacePanel,
+  serializeDockLayout,
+  setGroupHidden,
+  type DockGroup,
+  type DockLayout,
+  type DockTabInfo,
+  type DockTarget,
+} from "../../dock/index.ts";
+import { isEditable, isMarkdown, type OpenFile } from "../open-file.ts";
+import { createPanelHosts } from "../panel-hosts.ts";
 import IconBot from "~icons/lucide/bot";
 import IconKeyboard from "~icons/lucide/keyboard";
 import IconSettings from "~icons/lucide/settings";
@@ -35,16 +54,28 @@ import IconChevronRight from "~icons/lucide/chevron-right";
 import IconChevronDown from "~icons/lucide/chevron-down";
 import IconFile from "~icons/lucide/file";
 import IconGit from "~icons/devicon/git";
-import { TerminalPane } from "../../terminal/index.ts";
+import IconSidebar from "~icons/lucide/panel-left";
+import IconLayout from "~icons/lucide/layout-template";
+import IconEye from "~icons/lucide/eye";
+import IconTerminal from "~icons/lucide/terminal";
+import IconCodex from "~icons/simple-icons/openai";
+import IconClaude from "~icons/simple-icons/claude";
+import IconOpenCode from "~icons/simple-icons/opencode";
+import IconRestart from "~icons/lucide/rotate-ccw";
+import IconFailed from "~icons/lucide/circle-slash";
+import IconFinishFlag from "../../../common/ui/IconFinishFlag.vue";
+import {
+  TerminalCloseDialog,
+  TerminalView,
+  useTerminalSessions,
+} from "../../terminal/index.ts";
 import type {
-  FileContent,
   SearchHit,
   GitOverview,
   FileComparison,
+  FileContent,
 } from "../../../../core/modules/workspace/index.ts";
-const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
-const MarkdownViewer = defineAsyncComponent(() => import("./MarkdownViewer.vue"));
-const SvgViewer = defineAsyncComponent(() => import("./SvgViewer.vue"));
+import type { TerminalProgram } from "../../../../core/modules/terminal/index.ts";
 const props = defineProps<{
   projectId: string;
   projectSettingsDirty?: boolean;
@@ -53,29 +84,25 @@ const props = defineProps<{
 }>();
 const workspaceElement = ref<HTMLElement>();
 const treeWidth = ref<number>();
-const agentWidth = ref<number>();
+const sidebarHidden = ref(false);
 const sizes = computed(() => ({
   "--tree-width": treeWidth.value ? `${treeWidth.value}px` : undefined,
-  "--agent-width": agentWidth.value ? `${agentWidth.value}px` : undefined,
 }));
+const minTree = 160;
+const minDock = 300;
+const clampTree = (width: number, total: number) =>
+  Math.max(minTree, Math.min(width, total - minDock));
 let sizeObserver: ResizeObserver | undefined;
 onMounted(() => {
   sizeObserver = new ResizeObserver(() => {
     const element = workspaceElement.value;
-    if (!element || window.innerWidth <= 1050) return;
-    const width = element.clientWidth;
-    if (treeWidth.value !== undefined)
-      treeWidth.value = Math.max(160, Math.min(treeWidth.value, width - 300 - 268));
-    if (agentWidth.value !== undefined)
-      agentWidth.value = Math.max(
-        300,
-        Math.min(agentWidth.value, width - element.querySelector(".sidebar")!.clientWidth - 268),
-      );
+    if (!element || window.innerWidth <= 1050 || treeWidth.value === undefined) return;
+    treeWidth.value = clampTree(treeWidth.value, element.clientWidth);
   });
   if (workspaceElement.value) sizeObserver.observe(workspaceElement.value);
 });
 let stopResize: (() => void) | undefined;
-function resizePane(event: PointerEvent, pane: "tree" | "agent") {
+function resizeTree(event: PointerEvent) {
   const element = workspaceElement.value;
   if (!element || window.innerWidth <= 1050) return;
   stopResize?.();
@@ -83,24 +110,7 @@ function resizePane(event: PointerEvent, pane: "tree" | "agent") {
   event.preventDefault();
   const rect = element.getBoundingClientRect();
   const move = (moveEvent: PointerEvent) => {
-    if (pane === "tree")
-      treeWidth.value = Math.max(
-        160,
-        Math.min(
-          moveEvent.clientX - rect.left,
-          rect.width -
-            (agentWidth.value ?? element.querySelector(".agent-pane")!.clientWidth) -
-            268,
-        ),
-      );
-    else
-      agentWidth.value = Math.max(
-        300,
-        Math.min(
-          rect.right - moveEvent.clientX,
-          rect.width - (treeWidth.value ?? element.querySelector(".sidebar")!.clientWidth) - 268,
-        ),
-      );
+    treeWidth.value = clampTree(moveEvent.clientX - rect.left, rect.width);
   };
   const finish = () => {
     window.removeEventListener("pointermove", move);
@@ -117,27 +127,15 @@ function resizePane(event: PointerEvent, pane: "tree" | "agent") {
   window.addEventListener("pointerup", finish);
   window.addEventListener("pointercancel", finish);
 }
-function resizeKey(event: KeyboardEvent, pane: "tree" | "agent") {
+function resizeTreeKey(event: KeyboardEvent) {
   if (!["ArrowLeft", "ArrowRight"].includes(event.key) || !workspaceElement.value) return;
   event.preventDefault();
   const element = workspaceElement.value;
   const amount = event.key === "ArrowRight" ? 20 : -20;
-  if (pane === "tree")
-    treeWidth.value = Math.max(
-      160,
-      Math.min(
-        (treeWidth.value ?? element.querySelector(".sidebar")!.clientWidth) + amount,
-        element.clientWidth - element.querySelector(".agent-pane")!.clientWidth - 268,
-      ),
-    );
-  else
-    agentWidth.value = Math.max(
-      300,
-      Math.min(
-        (agentWidth.value ?? element.querySelector(".agent-pane")!.clientWidth) - amount,
-        element.clientWidth - element.querySelector(".sidebar")!.clientWidth - 268,
-      ),
-    );
+  treeWidth.value = clampTree(
+    (treeWidth.value ?? element.querySelector(".sidebar")!.clientWidth) + amount,
+    element.clientWidth,
+  );
 }
 const fileTree = ref<InstanceType<typeof FileTree>>();
 async function prepareEntryChange(path: string) {
@@ -182,6 +180,7 @@ registerEditor(
   "Показать в дереве файлов",
   (args) => {
     section.value = "files";
+    sidebarHidden.value = false;
     fileTree.value?.reveal(commandFile(args)!.path);
   },
   (args) => !!commandFile(args) && !commandFile(args)!.external,
@@ -205,14 +204,19 @@ registerEditor(
   (args) => !!commandFile(args) && commandFile(args)!.original !== undefined,
 );
 function tabActions(id: string): ContextMenuItem[] {
-  if (tabs.value.find((tab) => tab.key === id)?.virtual) return [];
+  const file = fileOf(id);
+  const common = [
+    editorCommands.item("ide.workbench.panel.splitRight", { id }, { separator: true }),
+    editorCommands.item("ide.workbench.panel.splitDown", { id }),
+    editorCommands.item("ide.workbench.panel.hideGroup", { id }),
+  ];
+  if (!file || file.virtual) return common;
   return [
-    ...(tabs.value.find((tab) => tab.key === id)?.original !== undefined
-      ? [editorCommands.item("ide.editor.file.open", { id })]
-      : []),
+    ...(file.original !== undefined ? [editorCommands.item("ide.editor.file.open", { id })] : []),
     editorCommands.item("ide.editor.file.save", { id }, { separator: true }),
     editorCommands.item("ide.editor.file.reveal", { id }),
     editorCommands.item("ide.editor.file.copyRelativePath", { id }),
+    ...common,
   ];
 }
 registerEditor(
@@ -245,11 +249,15 @@ function editorKeydown(event: KeyboardEvent) {
     void props.saveProjectSettings?.();
     return;
   }
-  if (!(event.target as Element).closest(".keybindings-editor, .project-settings-form"))
+  if (
+    !(event.target as Element).closest(
+      ".keybindings-editor, .project-settings-form, .terminal-view",
+    )
+  )
     editorCommands.keydown(event);
 }
 function editorFocus(event: FocusEvent) {
-  if (!(event.target as Element)?.closest(".workspace-tabs, .keybindings-editor"))
+  if (!(event.target as Element)?.closest(".workspace-tabs, .keybindings-editor, .terminal-view"))
     editorCommands.scope.activate();
 }
 function entryDeleted(path: string) {
@@ -258,8 +266,6 @@ function entryDeleted(path: string) {
   tabs.value = tabs.value.filter(
     (tab) => tab.virtual || (tab.path !== path && !tab.path.startsWith(path + "/")),
   );
-  if (!tabs.value.some((tab) => tab.key === activeKey.value))
-    activeKey.value = tabs.value.at(-1)?.key ?? "";
   revision.value++;
   void loadGit();
   if (query.value.trim()) void search();
@@ -282,24 +288,6 @@ const gitError = ref("");
 const gitLoading = ref(false);
 const fileError = ref("");
 const loading = ref(false);
-interface OpenFile extends FileContent {
-  virtual?: "keybindings" | "agent" | "project";
-  external?: boolean;
-  image?: string;
-  localFile?: File;
-  original?: string;
-  staged?: boolean;
-  line?: number;
-  column?: number;
-  key: string;
-  draft?: string;
-  markdownMode?: "document" | "source";
-  saving?: boolean;
-  saveError?: string;
-}
-const isEditable = (file: OpenFile) =>
-  !file.virtual && !file.external && !file.image && !file.archive && file.original === undefined;
-const isMarkdown = (file: OpenFile) => isEditable(file) && /\.(?:md|markdown)$/i.test(file.path);
 const isDirty = (file: OpenFile) =>
   file.virtual === "project"
     ? !!props.projectSettingsDirty
@@ -320,11 +308,221 @@ function openProjectSettings() {
   selectTab(key);
 }
 const tabs = ref<OpenFile[]>([]);
-const activeKey = ref("");
+const layout = ref<DockLayout>(createDockLayout());
 const restoringSession = ref(false);
+const panelHosts = createPanelHosts();
+const keepAlive = new Set([virtualTabs.agent.key, virtualTabs.project.key]);
+const fileOf = (id: string) => tabs.value.find((tab) => tab.key === id);
+const terminalPanel = (id: string) => `terminal:${id}`;
+/** Куда поместить следующую открытую вкладку: заполняется при перетаскивании файла на блок. */
+let pendingTarget: DockTarget | undefined;
+const lastGroup: Partial<Record<"editor" | "terminal", string>> = {};
+const terminals = useTerminalSessions(() => props.projectId, {
+  started: (id) => revealPanel(terminalPanel(id)),
+  restarted: (previous, id) => {
+    layout.value = replacePanel(layout.value, terminalPanel(previous), terminalPanel(id));
+  },
+});
+const terminalPanels = computed(
+  () => new Map(terminals.sessions.value.map((item) => [terminalPanel(item.id), item])),
+);
+const roleOf = (id: string) => (terminalPanels.value.has(id) ? "terminal" : "editor");
+function place(id: string, current: DockLayout): DockTarget | undefined {
+  if (pendingTarget) {
+    const target = pendingTarget;
+    pendingTarget = undefined;
+    return target;
+  }
+  const role = roleOf(id);
+  const holds = (group: DockGroup) => group.panels.some((panel) => roleOf(panel) === role);
+  const groups = dockGroups(current);
+  const group =
+    groups.find((item) => item.id === current.focused && holds(item)) ??
+    groups.find((item) => item.id === lastGroup[role]) ??
+    groups.find(holds) ??
+    groups.find((item) => item.role === role);
+  return group
+    ? { groupId: group.id, zone: "center" }
+    : { zone: role === "terminal" ? "right" : "left" };
+}
+function reconcileLayout() {
+  const keys = new Set(tabs.value.map((tab) => tab.key));
+  layout.value = reconcileDock(layout.value, {
+    ids: [...keys, ...terminalPanels.value.keys()],
+    exists: (id) =>
+      keys.has(id) || terminalPanels.value.has(id)
+        ? true
+        : id.startsWith("terminal:")
+          ? terminals.loaded.value
+            ? false
+            : undefined
+          : restoringSession.value
+            ? undefined
+            : false,
+    place,
+  });
+}
+// Вкладки и сессии — источник истины: раскладка подстраивается под них сразу, без кадра рассинхрона.
+watch(
+  () => [
+    tabs.value.map((tab) => tab.key).join("\n"),
+    terminals.sessions.value.map((item) => item.id).join("\n"),
+    restoringSession.value,
+    terminals.loaded.value,
+  ],
+  reconcileLayout,
+  { flush: "sync", immediate: true },
+);
+const focusedGroup = computed(() => findDockGroup(layout.value, layout.value.focused));
+/** Файл активной вкладки в блоке с фокусом; пусто, если там терминал или блок пуст. */
+const activeKey = computed({
+  get: () => {
+    const id = focusedGroup.value?.active ?? "";
+    return fileOf(id) ? id : "";
+  },
+  set: (key: string) => {
+    if (key) revealPanel(key);
+  },
+});
+function revealPanel(id: string) {
+  const target = pendingTarget;
+  const current = groupOfPanel(layout.value, id);
+  if (current && target && (target.zone !== "center" || target.groupId !== current.id)) {
+    pendingTarget = undefined;
+    layout.value = movePanel(layout.value, id, target);
+  } else
+    layout.value = current
+      ? activatePanel(layout.value, id)
+      : addPanel(layout.value, id, place(id, layout.value));
+  const group = groupOfPanel(layout.value, id);
+  if (group) lastGroup[roleOf(id)] = group.id;
+}
+async function createTerminal(program: TerminalProgram) {
+  const created = await terminals.create(program);
+  if (created) revealPanel(terminalPanel(created.id));
+}
+function describePanel(id: string): DockTabInfo {
+  const file = fileOf(id);
+  if (file)
+    return {
+      id,
+      label: file.virtual ? file.path : file.path.split("/").at(-1)!,
+      title: file.virtual
+        ? virtualTabs[file.virtual].title
+        : file.saveError
+          ? `${file.path} · ${file.saveError}`
+          : `${file.path}${file.original !== undefined ? (file.staged ? " · HEAD → index" : " · index → рабочий файл") : ""}`,
+      dirty: isDirty(file),
+      saving: !!file.saving,
+      error: !!file.saveError,
+    };
+  const item = terminalPanels.value.get(id);
+  if (item)
+    return {
+      id,
+      label: terminals.nameOf(item),
+      title: `${terminals.labelOf(item)}${item.status === "running" ? (item.activity?.state === "idle" ? " · ожидает ввода" : " · есть работающие процессы") : ""} · Двойной щелчок: переименовать`,
+      renameable: true,
+    };
+  // Сессии ещё загружаются: не показываем технический id.
+  return { id, label: id.startsWith("terminal:") ? "Терминал…" : id };
+}
+function selectPanel(id: string) {
+  if (fileOf(id)) selectTab(id);
+  else revealPanel(id);
+}
+function closePanel(id: string) {
+  const item = terminalPanels.value.get(id);
+  return item ? terminals.close(item.id) : closeTab(id);
+}
+async function closeManyPanels(ids: string[]) {
+  const files = ids.filter((id) => fileOf(id));
+  await closeManyTabs(files);
+  if (files.some((id) => fileOf(id))) return;
+  await terminals.closeMany(
+    ids.flatMap((id) => {
+      const item = terminalPanels.value.get(id);
+      return item ? [item.id] : [];
+    }),
+  );
+}
+function renamePanel(id: string, label: string) {
+  const item = terminalPanels.value.get(id);
+  if (item) void terminals.rename(item.id, label);
+}
+const hiddenGroups = computed(() => dockGroups(layout.value).filter((group) => group.hidden));
+const roleLabels: Record<string, string> = { editor: "Редактор", terminal: "Терминалы" };
+function groupLabel(group: DockGroup) {
+  if (!group.panels.length) return roleLabels[group.role ?? ""] ?? "Блок";
+  const label = describePanel(group.active).label;
+  return group.panels.length > 1 ? `${label} +${group.panels.length - 1}` : label;
+}
+const showGroup = (id: string) => {
+  layout.value = setGroupHidden(layout.value, id, false);
+};
+const terminalPrograms = [
+  { program: "shell", title: "Новый shell", icon: IconTerminal },
+  { program: "codex", title: "Новый Codex", icon: IconCodex },
+  { program: "claude", title: "Новый Claude Code", icon: IconClaude },
+  { program: "opencode", title: "Новый OpenCode", icon: IconOpenCode },
+];
+function resetLayout() {
+  const current = activeKey.value;
+  layout.value = createDockLayout();
+  sidebarHidden.value = false;
+  reconcileLayout();
+  if (current) revealPanel(current);
+}
+function panelArg(value?: unknown) {
+  const args = commandArgs(value);
+  if (args.id !== undefined && typeof args.id !== "string")
+    throw new Error("id должен быть строкой");
+  return (args.id as string | undefined) ?? focusedGroup.value?.active ?? "";
+}
+for (const [action, title, zone] of [
+  ["splitRight", "Разделить вправо", "right"],
+  ["splitDown", "Разделить вниз", "bottom"],
+] as const)
+  registerEditor(
+    `ide.workbench.panel.${action}`,
+    title,
+    (value) => {
+      const id = panelArg(value);
+      layout.value = movePanel(layout.value, id, { groupId: groupOfPanel(layout.value, id)!.id, zone });
+    },
+    (value) => (groupOfPanel(layout.value, panelArg(value))?.panels.length ?? 0) > 1,
+  );
+registerEditor(
+  "ide.workbench.panel.hideGroup",
+  "Скрыть блок",
+  (value) => {
+    layout.value = setGroupHidden(layout.value, groupOfPanel(layout.value, panelArg(value))!.id, true);
+  },
+  (value) => !!groupOfPanel(layout.value, panelArg(value)),
+);
+registerEditor(
+  "ide.workbench.sidebar.toggle",
+  "Показать или скрыть боковую панель",
+  () => {
+    sidebarHidden.value = !sidebarHidden.value;
+  },
+  () => true,
+);
+registerEditor("ide.workbench.layout.reset", "Сбросить раскладку блоков", resetLayout, () => true);
+registerEditor(
+  "ide.workbench.terminal.new",
+  "Новый терминал",
+  async (value) => {
+    const { program = "shell" } = commandArgs(value);
+    if (!["shell", "codex", "claude", "opencode"].includes(program as string))
+      throw new Error("program: shell, codex, claude или opencode");
+    await createTerminal(program as TerminalProgram);
+  },
+  () => !terminals.busy.value,
+);
 const session = useSessionSnapshot(
   () => `projector:workspace:v1:${props.projectId}`,
-  () => ({
+  (): WorkspaceSession => ({
     tabs: tabs.value
       .filter((tab) => !tab.localFile)
       .map((tab) => ({
@@ -338,7 +536,8 @@ const session = useSessionSnapshot(
     activeKey: activeKey.value,
     section: section.value,
     treeWidth: treeWidth.value,
-    agentWidth: agentWidth.value,
+    sidebarHidden: sidebarHidden.value,
+    layout: serializeDockLayout(layout.value),
   }),
   workspaceSessionSchema,
   () => !restoringSession.value,
@@ -377,7 +576,12 @@ async function restoreSession(saved: WorkspaceSession | undefined, generation: n
       const file = tabs.value.find((file) => file.key === tab.key);
       if (file) file.markdownMode = tab.markdownMode;
     }
-    if (generation === sessionGeneration && tabs.value.some((tab) => tab.key === saved?.activeKey))
+    // Sessions saved before layouts existed only know the active tab.
+    if (
+      generation === sessionGeneration &&
+      !parseDockLayout(saved?.layout) &&
+      tabs.value.some((tab) => tab.key === saved?.activeKey)
+    )
       activeKey.value = saved!.activeKey;
     if (generation === sessionGeneration && saved?.section === "project") openProjectSettings();
   } finally {
@@ -385,24 +589,6 @@ async function restoreSession(saved: WorkspaceSession | undefined, generation: n
   }
 }
 
-const fileTabs = computed(() =>
-  tabs.value.map((tab) => ({
-    id: tab.key,
-    label: tab.virtual ? tab.path : tab.path.split("/").at(-1)!,
-    title: tab.virtual
-      ? virtualTabs[tab.virtual].title
-      : tab.saveError
-        ? `${tab.path} · ${tab.saveError}`
-        : `${tab.path}${tab.original !== undefined ? (tab.staged ? " · HEAD → index" : " · index → рабочий файл") : ""}`,
-    dirty: isDirty(tab),
-    saving: !!tab.saving,
-    error: !!tab.saveError,
-  })),
-);
-function reorderTabs(ids: string[]) {
-  const files = new Map(tabs.value.map((tab) => [tab.key, tab]));
-  tabs.value = ids.map((id) => files.get(id)!);
-}
 const active = computed(() => tabs.value.find((file) => file.key === activeKey.value));
 const stagedChanges = computed(() =>
   git.value.changes.filter((change) => change.index !== " " && change.index !== "?"),
@@ -532,8 +718,6 @@ for (const [action, title] of [
           );
           if (exists) await openFile(path);
         }
-        if (!tabs.value.some((tab) => tab.key === activeKey.value))
-          activeKey.value = tabs.value.at(-1)?.key ?? "";
         if (query.value.trim()) void search();
       } finally {
         gitBusy.value = false;
@@ -631,14 +815,7 @@ async function openFile(
     if (generation === fileGeneration) loading.value = false;
   }
 }
-const draggingFiles = ref(false);
 let dropGeneration = 0;
-function fileDrag(event: DragEvent) {
-  if (!isFileDrag(event.dataTransfer) && !event.dataTransfer?.types.includes(treeDragType)) return;
-  event.preventDefault();
-  draggingFiles.value = true;
-  if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
-}
 function releasePreview(file: OpenFile) {
   if (file.image?.startsWith("blob:")) URL.revokeObjectURL(file.image);
 }
@@ -672,8 +849,9 @@ async function openBrowserFile(source: File, reload = false) {
     if (generation === fileGeneration) loading.value = false;
   }
 }
-async function dropFiles(event: DragEvent) {
-  draggingFiles.value = false;
+const acceptsFileDrop = (data: DataTransfer | null) =>
+  isFileDrag(data) || !!data?.types.includes(treeDragType);
+async function dropFiles(event: DragEvent, target: DockTarget) {
   event.preventDefault();
   const data = event.dataTransfer;
   if (!data || (!isFileDrag(data) && !data.types.includes(treeDragType))) return;
@@ -685,6 +863,7 @@ async function dropFiles(event: DragEvent) {
   const tree = data.getData(treeDragType);
   const current = () => generation === dropGeneration && projectId === props.projectId;
   fileError.value = "";
+  pendingTarget = target;
   try {
     if (tree) {
       const entry = JSON.parse(tree) as { projectId: string; path: string };
@@ -721,6 +900,8 @@ async function dropFiles(event: DragEvent) {
     }
   } catch (err) {
     if (current()) fileError.value = err instanceof Error ? err.message : "Не удалось открыть файл";
+  } finally {
+    pendingTarget = undefined;
   }
 }
 
@@ -729,7 +910,7 @@ async function closeTab(key: string) {
   if (!tab) return;
   if (tab.virtual === "project" && props.beforeCloseProjectSettings?.() === false) return;
   if (!(await saveFile(tab))) {
-    activeKey.value = tab.key;
+    revealPanel(tab.key);
     if (!window.confirm(`Не удалось сохранить ${tab.path}. Закрыть без сохранения изменений?`))
       return;
   }
@@ -737,15 +918,13 @@ async function closeTab(key: string) {
   if (index === -1) return;
   releasePreview(tab);
   tabs.value.splice(index, 1);
-  if (key === activeKey.value)
-    activeKey.value = tabs.value[Math.min(index, tabs.value.length - 1)]?.key ?? "";
 }
 function selectTab(key: string) {
   if (key !== activeKey.value) void saveFile();
   ++fileGeneration;
   loading.value = false;
   fileError.value = "";
-  activeKey.value = key;
+  revealPanel(key);
 }
 const pendingSaves = new Map<OpenFile, Promise<boolean>>();
 function saveFile(file = active.value): Promise<boolean> {
@@ -919,10 +1098,10 @@ watch(
     searchAbort?.abort();
     clearTimeout(searchTimer);
     ++dropGeneration;
-    draggingFiles.value = false;
+    pendingTarget = undefined;
     tabs.value.forEach(releasePreview);
     tabs.value = [];
-    activeKey.value = "";
+    layout.value = parseDockLayout(saved?.layout) ?? createDockLayout();
     fileError.value = "";
     loading.value = false;
     query.value = "";
@@ -930,7 +1109,7 @@ watch(
     collapsedGroups.value = new Set();
     section.value = saved?.section === "project" ? "files" : (saved?.section ?? "files");
     treeWidth.value = saved?.treeWidth;
-    agentWidth.value = saved?.agentWidth;
+    sidebarHidden.value = !!saved?.sidebarHidden;
     void loadGit();
     void restoreSession(saved, generation);
   },
@@ -966,10 +1145,10 @@ function entryMoved(source: string, destination: string) {
       closeTab(tab.key);
       continue;
     }
-    const wasActive = tab.key === activeKey.value;
+    const key = `${path}:file`;
+    layout.value = replacePanel(layout.value, tab.key, key);
     tab.path = path;
-    tab.key = `${path}:file`;
-    if (wasActive) activeKey.value = tab.key;
+    tab.key = key;
   }
   revision.value++;
   void loadGit();
@@ -995,10 +1174,66 @@ onBeforeUnmount(() => {
   <div
     ref="workspaceElement"
     class="workspace"
-    :class="{ 'chat-active': active?.virtual === 'agent', 'project-settings-active': active?.virtual === 'project' }"
+    :class="{ 'sidebar-hidden': sidebarHidden }"
     :style="sizes"
   >
-    <aside class="sidebar" aria-label="Обзор проекта">
+    <div class="toolbar" role="toolbar" aria-label="Блоки и терминалы">
+      <UiButton
+        icon
+        size="sm"
+        :active="!sidebarHidden"
+        :aria-pressed="!sidebarHidden"
+        title="Боковая панель"
+        aria-label="Боковая панель"
+        data-command="ide.workbench.sidebar.toggle"
+        @click="editorCommands.run('ide.workbench.sidebar.toggle')"
+      >
+        <IconSidebar aria-hidden="true" />
+      </UiButton>
+      <div class="toolbar-group" role="group" aria-label="Новая терминальная сессия">
+        <UiButton
+          v-for="entry in terminalPrograms"
+          :key="entry.program"
+          icon
+          size="sm"
+          :disabled="terminals.busy.value"
+          :title="entry.title"
+          :aria-label="entry.title"
+          @click="editorCommands.run('ide.workbench.terminal.new', { program: entry.program })"
+        >
+          <component :is="entry.icon" aria-hidden="true" />
+        </UiButton>
+      </div>
+      <slot name="terminal-actions" />
+      <slot name="terminal-status" />
+      <p v-if="terminals.error.value" class="toolbar-error" role="alert">
+        {{ terminals.error.value }}
+      </p>
+      <div class="toolbar-spacer" />
+      <UiButton
+        v-for="group in hiddenGroups"
+        :key="group.id"
+        variant="chip"
+        size="sm"
+        :title="`Показать блок: ${groupLabel(group)}`"
+        :aria-label="`Показать блок: ${groupLabel(group)}`"
+        @click="showGroup(group.id)"
+      >
+        <IconEye aria-hidden="true" />{{ groupLabel(group) }}
+      </UiButton>
+      <UiButton
+        icon
+        size="sm"
+        title="Сбросить раскладку блоков"
+        aria-label="Сбросить раскладку блоков"
+        data-command="ide.workbench.layout.reset"
+        @click="editorCommands.run('ide.workbench.layout.reset')"
+      >
+        <IconLayout aria-hidden="true" />
+      </UiButton>
+    </div>
+    <p v-if="fileError" class="file-error" role="alert">{{ fileError }}</p>
+    <aside v-show="!sidebarHidden" class="sidebar" aria-label="Обзор проекта">
       <nav class="side-tabs" aria-label="Разделы проекта">
         <button
           :class="{ selected: section === 'files' }"
@@ -1255,153 +1490,139 @@ onBeforeUnmount(() => {
       </div>
     </aside>
     <div
+      v-show="!sidebarHidden"
       class="resize-handle tree-resize"
       role="separator"
       aria-orientation="vertical"
       aria-label="Ширина дерева файлов"
       tabindex="0"
-      @pointerdown="resizePane($event, 'tree')"
-      @keydown="resizeKey($event, 'tree')"
+      @pointerdown="resizeTree"
+      @keydown="resizeTreeKey"
     />
     <section
-      class="editor-pane"
-      aria-label="Файлы и изменения"
-      @dragenter.stop="fileDrag"
-      @dragover.stop="fileDrag"
-      @dragleave.stop="
-        !($event.currentTarget as HTMLElement).contains($event.relatedTarget as Node) &&
-        (draggingFiles = false)
-      "
-      @drop.stop="dropFiles"
+      class="dock-pane"
+      aria-label="Блоки редактора и терминалов"
       @focusin="editorFocus"
       @keydown.capture="editorKeydown"
     >
-      <div v-if="draggingFiles" class="file-drop-hint">Бросьте файл — откроем его</div>
-      <WorkspaceTabs
-        v-if="tabs.length"
-        :tabs="fileTabs"
-        :active-id="activeKey"
-        label="Открытые файлы"
-        command-namespace="ide.editor.tabs"
+      <p v-if="loading" class="loading" role="status">читаю файл…</p>
+      <DockView
+        v-model:layout="layout"
+        :describe="describePanel"
         :project-id="projectId"
-        :command-handlers="{
-          select: selectTab,
-          close: closeTab,
-          closeMany: closeManyTabs,
-          reorder: reorderTabs,
-        }"
-        close-saved
-        :actions="tabActions"
+        command-namespace="ide.workbench.tabs"
+        :tab-actions="tabActions"
+        :accepts-drop="acceptsFileDrop"
+        @select="selectPanel"
+        @close="closePanel"
+        @close-many="closeManyPanels"
+        @rename="renamePanel"
+        @drop="dropFiles"
       >
+        <template #panel="{ id, focused }">
+          <PanelHost v-if="keepAlive.has(id)" :id="id" :registry="panelHosts" />
+          <FilePanel
+            v-else-if="fileOf(id)"
+            :file="fileOf(id)!"
+            :project-id="projectId"
+            :revision="gutterRevision"
+            @change="fileOf(id)!.draft = $event"
+            @save="saveFile(fileOf(id))"
+            @mode="fileOf(id)!.markdownMode = $event"
+            @open="openFile($event)"
+          />
+          <TerminalView
+            v-else-if="terminalPanels.get(id)"
+            :project-id="projectId"
+            :session="terminalPanels.get(id)!"
+            :focused="focused"
+            @open="
+              (path, line, column, external) =>
+                openFile(path, line, column, undefined, false, external)
+            "
+            @status="terminals.update"
+            @sessions="terminals.replace"
+            @ended="terminals.refresh"
+          />
+        </template>
         <template #icon="{ tab }">
           <IconDiff
-            v-if="tabs.find((file) => file.key === tab.id)?.original !== undefined"
+            v-if="fileOf(tab.id)?.original !== undefined && fileOf(tab.id)"
             class="diff-tab-icon"
             aria-label="Изменения"
           />
+          <template v-else-if="terminalPanels.get(tab.id)">
+            <IconFailed
+              v-if="terminals.failed(terminalPanels.get(tab.id)!)"
+              class="session-state failed"
+              aria-hidden="true"
+            />
+            <IconFinishFlag
+              v-else-if="terminalPanels.get(tab.id)!.status === 'exited'"
+              class="session-state"
+              aria-hidden="true"
+            />
+          </template>
         </template>
-      </WorkspaceTabs>
-      <div v-if="active && active.virtual !== 'agent'" class="breadcrumb">
-        <span>{{ active.path }}</span>
-        <span v-if="active.virtual === 'keybindings'">настройки IDE</span>
-        <span v-if="active.external">только просмотр</span>
-        <span v-if="active.original !== undefined">{{
-          active.staged ? "HEAD → index" : "index → рабочий файл"
-        }}</span>
-      </div>
-      <p v-if="fileError" class="file-error" role="alert">{{ fileError }}</p>
-      <p v-if="active?.saveError && !isMarkdown(active)" class="file-error" role="alert">
-        {{ active.saveError }}
-      </p>
-      <div class="editor-body" :aria-busy="loading">
-        <p v-if="loading" class="loading" role="status">читаю файл…</p>
-        <UiEmpty v-if="!active && !loading" class="editor-empty">
-          Откройте файл из дерева или перетащите его сюда
-        </UiEmpty>
-        <AgentChat
-          v-if="tabs.some((tab) => tab.virtual === 'agent')"
-          v-show="active?.virtual === 'agent'"
-          :key="projectId"
-          :project-id="projectId"
-        />
-        <div
-          v-if="tabs.some((tab) => tab.virtual === 'project')"
-          v-show="active?.virtual === 'project'"
-          class="project-settings"
-        >
-          <slot name="project" />
-        </div>
-        <KeybindingsEditor v-if="active?.virtual === 'keybindings'" />
-        <ImageViewport
-          v-else-if="active?.image"
-          :key="active.key"
-          :src="active.image"
-          :alt="active.path"
-        />
-        <ArchiveViewer v-else-if="active?.archive" :key="active.key" :archive="active.archive" />
-        <SvgViewer
-          v-else-if="active && /\.svg$/i.test(active.path) && active.original === undefined"
-          :key="active.key"
-          :path="active.path"
-          :content="active.draft ?? active.content"
-          :editable="isEditable(active)"
-          :line="active.line"
-          :column="active.column"
-          @change="active.draft = $event"
-          @save="saveFile"
-        />
-        <MarkdownViewer
-          v-else-if="active && isMarkdown(active)"
-          :key="active.key"
-          :project-id="projectId"
-          :path="active.path"
-          :content="active.draft ?? active.content"
-          :mode="active.markdownMode ?? 'document'"
-          :error="active.saveError"
-          :line="active.line"
-          :column="active.column"
-          @change="active.draft = $event"
-          @mode="active.markdownMode = $event"
-          @save="saveFile"
-          @open="openFile($event)"
-        />
-        <CodeViewer
-          v-else-if="active && !active.virtual"
-          :path="active.path"
-          :project-id="projectId"
-          :revision="gutterRevision"
-          :content="active.draft ?? active.content"
-          :editable="isEditable(active)"
-          @change="active.draft = $event"
-          @save="saveFile"
-          :original="active.original"
-          :line="active.line"
-          :column="active.column"
-        />
-      </div>
+        <template #actions="{ activeId }">
+          <template v-if="terminalPanels.get(activeId)">
+            <UiButton
+              v-if="terminalPanels.get(activeId)!.status === 'running'"
+              icon
+              size="sm"
+              :disabled="terminals.busy.value || terminalPanels.get(activeId)!.stopRequested"
+              title="Завершить сессию"
+              aria-label="Завершить сессию"
+              @click="terminals.stop(terminalPanels.get(activeId)!.id)"
+            >
+              <IconFinishFlag aria-hidden="true" />
+            </UiButton>
+            <UiButton
+              v-else
+              icon
+              size="sm"
+              :disabled="terminals.busy.value"
+              title="Перезапустить сессию"
+              aria-label="Перезапустить сессию"
+              @click="terminals.restart(terminalPanels.get(activeId)!.id)"
+            >
+              <IconRestart aria-hidden="true" />
+            </UiButton>
+          </template>
+        </template>
+        <template #empty="{ group }">
+          <UiEmpty v-if="group.role === 'editor'">
+            Откройте файл из дерева или перетащите его сюда
+          </UiEmpty>
+          <UiEmpty v-else-if="group.role === 'terminal'">
+            Нет терминалов. Создайте сессию кнопками на панели выше
+          </UiEmpty>
+          <UiEmpty v-else>Перетащите сюда вкладку</UiEmpty>
+        </template>
+      </DockView>
     </section>
-    <div
-      class="resize-handle agent-resize"
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Ширина терминала"
-      tabindex="0"
-      @pointerdown="resizePane($event, 'agent')"
-      @keydown="resizeKey($event, 'agent')"
+    <TerminalCloseDialog
+      :session="terminals.pendingClose.value"
+      :busy="terminals.busy.value"
+      @cancel="terminals.cancelClose"
+      @confirm="terminals.confirmClose"
     />
-    <aside class="agent-pane" aria-label="Агент и терминал">
-      <TerminalPane
-        :key="projectId"
-        :project-id="projectId"
-        embedded
-        @open="
-          (path, line, column, external) => openFile(path, line, column, undefined, false, external)
-        "
+    <div class="keep-alive" hidden>
+      <Teleport
+        v-if="tabs.some((tab) => tab.virtual === 'agent')"
+        :to="panelHosts.hosts[virtualTabs.agent.key] ?? null"
+        :disabled="!panelHosts.hosts[virtualTabs.agent.key]"
       >
-        <template #actions><slot name="terminal-actions" /></template>
-        <template #status><slot name="terminal-status" /></template>
-      </TerminalPane>
-    </aside>
+        <AgentChat :key="projectId" :project-id="projectId" />
+      </Teleport>
+      <Teleport
+        v-if="tabs.some((tab) => tab.virtual === 'project')"
+        :to="panelHosts.hosts[virtualTabs.project.key] ?? null"
+        :disabled="!panelHosts.hosts[virtualTabs.project.key]"
+      >
+        <div class="project-settings"><slot name="project" /></div>
+      </Teleport>
+    </div>
   </div>
 </template>
 
@@ -1422,38 +1643,78 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
   color: var(--run);
 }
-.file-drop-hint {
-  position: absolute;
-  inset: 4px;
-  z-index: var(--z-sticky);
-  display: grid;
-  place-items: center;
-  border: 1px dashed var(--focus);
-  border-radius: var(--r-md);
-  background: color-mix(in srgb, var(--bg) 82%, transparent);
-  color: var(--text);
-  pointer-events: none;
+.session-state {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--muted);
+}
+.session-state.failed {
+  color: var(--err);
 }
 
 .workspace {
   display: grid;
-  grid-template-columns:
-    var(--tree-width, clamp(200px, 19vw, 280px)) 1px minmax(260px, 1fr)
-    1px var(--agent-width, clamp(370px, 34vw, 680px));
+  grid-template-columns: var(--tree-width, clamp(200px, 19vw, 280px)) 1px minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   height: calc(100dvh - 84px);
   min-height: 440px;
   overflow: hidden;
 }
+.workspace.sidebar-hidden {
+  grid-template-columns: 0 0 minmax(0, 1fr);
+}
+.toolbar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  min-height: 40px;
+  padding: 0 var(--sp-3);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-sunken);
+}
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: var(--sp-2);
+  border-left: 1px solid var(--line);
+}
+.toolbar-spacer {
+  flex: 1;
+}
+.toolbar-error {
+  margin: 0;
+  color: var(--err);
+  font-size: var(--fs-xs);
+}
+.toolbar :deep(svg) {
+  width: 14px;
+  height: 14px;
+}
 .sidebar,
-.agent-pane,
-.editor-pane {
+.dock-pane {
   position: relative;
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+.sidebar {
+  grid-column: 1;
+  grid-row: 3;
+}
+.tree-resize {
+  grid-column: 2;
+  grid-row: 3;
+}
+.dock-pane {
+  grid-column: 3;
+  grid-row: 3;
 }
 /* Видимая линия 1px, зона захвата шире за счёт ::before */
 .resize-handle {
@@ -1480,9 +1741,6 @@ onBeforeUnmount(() => {
 }
 .sidebar {
   background: var(--bg-sunken);
-}
-.agent-pane {
-  background: var(--bg-2);
 }
 .side-tabs {
   display: flex;
@@ -1665,32 +1923,10 @@ h3 span {
   margin-left: 6px;
   color: var(--faint);
 }
-.breadcrumb {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  padding: var(--sp-2) var(--sp-3);
-  font: var(--fs-2xs) var(--mono);
-  color: var(--muted);
-  border-bottom: 1px solid var(--line);
-}
-.breadcrumb span:first-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.breadcrumb span:last-child {
-  flex-shrink: 0;
-  color: var(--faint);
-}
-.editor-body {
-  flex: 1;
-  min-height: 0;
-  position: relative;
-}
 .file-error {
+  grid-column: 1 / -1;
   margin: 0;
-  padding: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
   color: var(--err);
   font-size: var(--fs-xs);
   border-bottom: 1px solid var(--line);
@@ -1699,59 +1935,60 @@ h3 span {
   position: absolute;
   top: 4px;
   right: 14px;
-  z-index: 2;
+  z-index: var(--z-sticky);
   background: var(--bg-2);
   padding: 6px var(--sp-3);
   color: var(--muted);
   font-size: var(--fs-xs);
 }
-.editor-body .editor-empty {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  padding: 0;
-}
 @media (max-width: 1050px) {
   .workspace {
     grid-template-columns: 190px minmax(250px, 1fr);
+    grid-template-rows: auto auto auto auto;
     height: auto;
     min-height: 0;
+  }
+  .workspace.sidebar-hidden {
+    grid-template-columns: 0 minmax(250px, 1fr);
   }
   .resize-handle {
     display: none;
   }
   .sidebar {
+    grid-row: 3;
     border-right: 1px solid var(--line);
-  }
-  .sidebar,
-  .editor-pane {
     height: 65dvh;
     min-height: 400px;
   }
-  .agent-pane {
-    grid-column: 1 / -1;
-    height: 450px;
-    border-left: 0;
-    border-top: 1px solid var(--line);
+  .dock-pane {
+    grid-column: 2;
+    grid-row: 3;
+    height: 65dvh;
+    min-height: 400px;
+  }
+}
+@media (max-width: 700px) {
+  .dock-pane {
+    height: auto;
+    min-height: 0;
   }
 }
 @media (max-width: 600px) {
-  .workspace {
-    grid-template-columns: 145px minmax(0, 1fr);
-  }
-  .workspace.chat-active,
-  .workspace.project-settings-active {
+  .workspace,
+  .workspace.sidebar-hidden {
     grid-template-columns: minmax(0, 1fr);
   }
-  .workspace.chat-active .sidebar,
-  .workspace.project-settings-active .sidebar {
-    display: none;
+  .sidebar,
+  .dock-pane {
+    grid-column: 1;
   }
-  .workspace.chat-active .editor-pane,
-  .workspace.project-settings-active .editor-pane {
-    height: calc(100dvh - 85px);
-    min-height: 440px;
+  .sidebar {
+    grid-row: 3;
+    height: 260px;
+    min-height: 0;
+  }
+  .dock-pane {
+    grid-row: 4;
   }
   .side-tabs {
     gap: 8px;
@@ -1759,9 +1996,6 @@ h3 span {
   }
   .side-tabs > button {
     font-size: var(--fs-2xs);
-  }
-  .breadcrumb span:last-child {
-    display: none;
   }
 }
 </style>

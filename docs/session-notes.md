@@ -15,7 +15,8 @@
 | `core/modules/launcher` | Общие контракты, HTTP-клиент и модель поведения DOM/GTK-палитры |
 | `packages/vio` | Независимый Vue renderer для GTK4, SFC loader, стили и demo |
 | `server/modules/processes`, `server/modules/terminal` | Процессы проектов, PTY, WebSocket и восстановление экрана |
-| `src/modules/terminal` | xterm, клавиатура, IME и передача ввода |
+| `src/modules/terminal` | Список сессий (`useTerminalSessions`), `TerminalView` — один xterm и сокет на видимую вкладку, клавиатура, IME |
+| `src/modules/dock` | Раскладка блоков: чистая модель дерева (`model/layout.ts`), разделители, группы вкладок, drag-and-drop |
 | `server/modules/workspace`, `src/modules/workspace` | Файлы, поиск, Git, архивы и редакторы |
 
 Обычный запуск поднимает `vp dev`. Сборка проверяет типы и собирает фронтенд и `vio`, но не упаковывает desktop-продукт. Projector имеет собственный Git-корень; перед коммитом проверяйте текущий diff, поскольку другие сессии могут работать в том же checkout.

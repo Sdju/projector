@@ -40,9 +40,9 @@ await ide.executeCommand(
 );
 
 const tabs = ide.getScopes().find(({ context }) =>
-  context.namespace === 'ide.editor.tabs'
+  context.namespace === 'ide.workbench.tabs'
 );
-await ide.executeCommand('ide.editor.tabs.closeOthers', { id: tabId }, { scope: tabs.id });
+await ide.executeCommand('ide.workbench.tabs.closeOthers', { id: tabId }, { scope: tabs.id });
 ```
 
 `getCommands()` returns IDs, scopes, titles, current availability and effective shortcut labels. IDs can be registered by further adapters with `createScope(...).registerCommand(...)`. The registry rejects duplicate IDs within a scope and rejects execution of missing or unavailable commands.

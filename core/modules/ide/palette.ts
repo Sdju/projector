@@ -20,13 +20,11 @@ export function paletteCommands(
         ? "Файлы"
         : context?.surface === "editor"
           ? "Редактор"
-          : context?.namespace === "ide.editor.tabs"
-            ? "Вкладки файлов"
-            : context?.namespace === "ide.terminal.tabs"
-              ? "Вкладки терминала"
-              : context?.surface === "keybindings"
-                ? "Горячие клавиши"
-                : "IDE";
+          : context?.namespace === "ide.workbench.tabs"
+            ? "Вкладки"
+            : context?.surface === "keybindings"
+              ? "Горячие клавиши"
+              : "IDE";
     const previous = selected.get(command.id);
     if (
       !previous ||
