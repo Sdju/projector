@@ -4,6 +4,17 @@ Projector is moving toward an IDE that executes commands through a shared SDK. M
 
 The model follows the [VS Code command API](https://code.visualstudio.com/api/extension-guides/command): the command is independent of the way it is invoked. Projector's implementation and IDs are its own.
 
+## Why every feature needs commands
+
+The built-in agent works through this registry: it lists `getCommands()` and runs `executeCommand(...)` (`src/modules/agent/model/commands.ts`). A capability that exists only as a button or a private handler is invisible to it, and the agent quality depends directly on command coverage. When extending Projector:
+
+- register each user-visible action as a command and make the UI (button, menu, shortcut) invoke that ID instead of duplicating the logic;
+- give commands a clear `title` and a `description` that states arguments, effects and side effects (terminal loss, confirmations); the agent reads them to choose a command;
+- support explicit arguments for anything a dialog would ask for, so the command can run without the UI;
+- express unavailability through `enabled`, not by failing after the call (see `ide.workbench.server.mode.*`);
+- keep the agent-facing hint list (`server/modules/agent/agent-tools.ts`) in step when adding a command family;
+- use `palette: false` only for commands that cannot work without UI-supplied arguments.
+
 ## Layers
 
 - `core/modules/ide/index.ts`: platform-independent registry, execution, discovery, context matching, keybinding validation and resolution. No Vue, DOM or filesystem dependencies.
