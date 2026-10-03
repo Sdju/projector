@@ -7,26 +7,21 @@ import {
   parseProjectRef,
   projectRefSegments,
 } from "../../project/index.ts";
-import type { DirectoryEntry } from "../../../../core/modules/directories/index.ts";
+import PathDropdown from "./PathDropdown.vue";
+import { useDirectoryListing } from "../model/directory-listing.ts";
 const props = defineProps<{ path: string; navigate: (path: string) => Promise<void> }>();
 const root = ref<HTMLElement>();
 const input = ref<HTMLInputElement>();
 const editing = ref(false);
 const value = ref("");
 const menuPath = ref<string | null>(null);
-const entries = ref<DirectoryEntry[]>([]);
-const selected = ref(-1);
-const loading = ref(false);
 const busy = ref(false);
-const error = ref("");
-const truncated = ref(false);
 const scroll = ref(0);
 const caretAtEnd = ref(true);
 const listId = useId();
-let request: AbortController | undefined;
-let generation = 0;
+const { entries, selected, loading, error, truncated, invalidate, load, schedule } =
+  useDirectoryListing();
 let disposed = false;
-let timer: ReturnType<typeof setTimeout> | undefined;
 const remoteInput = computed(() => parseProjectRef(value.value).kind !== "local");
 const remoteProject = computed(() => parseProjectRef(props.path).kind !== "local");
 const open = computed(
@@ -42,33 +37,6 @@ const completion = computed(() => {
   if (value.value === "~") return "";
   return name.startsWith(prefix) ? name.slice(prefix.length) + "/" : "";
 });
-function invalidate() {
-  clearTimeout(timer);
-  ++generation;
-  request?.abort();
-  loading.value = false;
-}
-async function load(path: string, complete: boolean) {
-  invalidate();
-  const current = generation;
-  request = new AbortController();
-  loading.value = true;
-  entries.value = [];
-  selected.value = -1;
-  error.value = "";
-  truncated.value = false;
-  try {
-    const data = await fetchDirectories(path, complete, request.signal);
-    if (current !== generation) return;
-    entries.value = data.entries;
-    truncated.value = data.truncated;
-  } catch (err) {
-    if (current === generation)
-      error.value = err instanceof Error ? err.message : "Не удалось прочитать папку";
-  } finally {
-    if (current === generation) loading.value = false;
-  }
-}
 async function edit(path = props.path) {
   if (busy.value) return;
   menuPath.value = null;
@@ -105,13 +73,8 @@ function syncCaret() {
     input.value?.selectionEnd === value.value.length;
 }
 function changed() {
-  invalidate();
-  entries.value = [];
-  selected.value = -1;
-  error.value = "";
-  loading.value = true;
   syncCaret();
-  timer = setTimeout(() => void load(value.value, true), 100);
+  schedule(value.value);
 }
 async function accept() {
   if (!completion.value) return;
@@ -208,7 +171,6 @@ watch(
 );
 onBeforeUnmount(() => {
   disposed = true;
-  invalidate();
 });
 </script>
 <template>
@@ -268,34 +230,171 @@ onBeforeUnmount(() => {
     <span v-if="editing" class="key-hint" aria-hidden="true">{{
       remoteInput ? "Enter" : "Tab · Enter"
     }}</span>
-    <div v-if="open" class="dropdown">
-      <div class="dropdown-heading">
-        {{ editing ? (remoteInput ? "Открыть репозиторий" : "Перейти в папку") : menuPath }}
-      </div>
-      <p v-if="loading" class="notice" role="status">Читаю папки…</p>
-      <p v-else-if="error" class="notice error" role="alert">{{ error }}</p>
-      <p v-else-if="!entries.length" class="notice">
-        {{ editing ? "Подходящих папок нет" : "Нет вложенных папок" }}
-      </p>
-      <div :id="listId" role="listbox" aria-label="Доступные папки" class="options">
-        <button
-          v-for="(entry, index) in entries"
-          :id="`${listId}-${index}`"
-          :key="entry.path"
-          role="option"
-          :aria-selected="selected === index"
-          :class="{ highlighted: selected === index }"
-          :disabled="busy"
-          :title="entry.path"
-          @pointerdown.prevent
-          @click="navigate(entry.path)"
-        >
-          <IconFolder aria-hidden="true" /><span>{{ entry.name }}</span
-          ><IconChevronRight aria-hidden="true" />
-        </button>
-      </div>
-      <p v-if="truncated" class="notice">Первые 1000 папок — уточните путь</p>
-    </div>
+    <PathDropdown
+      v-if="open"
+      :id="listId"
+      :heading="
+        editing ? (remoteInput ? 'Открыть репозиторий' : 'Перейти в папку') : (menuPath ?? '')
+      "
+      :editing="editing"
+      :entries="entries"
+      :selected="selected"
+      :loading="loading"
+      :error="error"
+      :truncated="truncated"
+      :busy="busy"
+      @pick="navigate"
+    />
   </div>
 </template>
-<style scoped src="./PathBar.css" />
+<style scoped>
+.path-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  padding: 0 var(--sp-3);
+  color: var(--muted);
+  font: var(--fs-xs) var(--mono);
+}
+.path-bar:focus-within {
+  border-color: var(--focus);
+}
+.path-icon {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  color: var(--faint);
+}
+.segments {
+  display: flex;
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+.segment {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: 100%;
+}
+button {
+  font: inherit;
+  color: inherit;
+}
+.segment-label {
+  padding: var(--sp-1) var(--sp-2);
+  white-space: nowrap;
+  border-radius: var(--r-sm);
+}
+.segment:last-of-type .segment-label {
+  color: var(--text);
+}
+.segment-arrow {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 26px;
+  border-radius: var(--r-sm);
+  color: var(--faint);
+}
+.segment-arrow svg {
+  width: 12px;
+  height: 12px;
+}
+.segment-arrow[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+.segment-label:hover,
+.segment-arrow:hover,
+.segment-arrow[aria-expanded="true"] {
+  background: var(--active);
+  color: var(--text);
+}
+.edit-space {
+  align-self: stretch;
+  flex: 1;
+  min-width: 24px;
+}
+.input-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  overflow: hidden;
+}
+.input-wrap input,
+.completion {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  font: inherit;
+  line-height: 26px;
+  letter-spacing: normal;
+  white-space: pre;
+}
+.input-wrap input {
+  box-sizing: border-box;
+  z-index: 1;
+  color: var(--text);
+  background: transparent;
+  outline: none;
+  box-shadow: none;
+}
+.completion {
+  pointer-events: none;
+  color: var(--faint);
+  overflow: hidden;
+}
+.completion > span {
+  display: inline-block;
+}
+.typed {
+  visibility: hidden;
+}
+.key-hint {
+  flex-shrink: 0;
+  font-size: var(--fs-2xs);
+  color: var(--faint);
+}
+@media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {
+  .path-bar {
+    height: 44px;
+  }
+  .input-wrap {
+    height: 40px;
+  }
+  .input-wrap input,
+  .completion {
+    min-height: 0;
+    line-height: 40px;
+    font-size: var(--fs-input);
+  }
+  .segment-label,
+  .segment-arrow {
+    min-height: var(--control-h-sm);
+  }
+  .segment-arrow {
+    width: 32px;
+  }
+  .key-hint {
+    display: none;
+  }
+  .path-bar {
+    padding: 0 var(--sp-2);
+    gap: var(--sp-1);
+  }
+}
+</style>

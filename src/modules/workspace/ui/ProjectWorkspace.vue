@@ -1,14 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import { useMediaQuery } from "@vueuse/core";
 import {
   workspaceProfile,
   profileCapabilities,
-  refreshWorkspace,
   type WorkspaceCapability,
 } from "../../workspace-api/index.ts";
-import { relocatedPath } from "../../../../core/modules/workspace/index.ts";
-import { useCommandScope, commandArgs } from "../../../common/utilities/commands.ts";
+import { useCommandScope } from "../../../common/utilities/commands.ts";
 import WorkbenchToolbar from "./WorkbenchToolbar.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import WorkspaceSidebar from "./WorkspaceSidebar.vue";
@@ -21,12 +18,14 @@ import { useWorkbenchLayout } from "../lib/workbench-layout.ts";
 import { registerEditorCommands } from "../lib/editor-commands.ts";
 import { useWorkspaceSession } from "../lib/workspace-session.ts";
 import WorkbenchDock from "./WorkbenchDock.vue";
-import { replacePanel, type DockTarget } from "../../dock/index.ts";
+import type { DockTarget } from "../../dock/index.ts";
 import { type OpenFile } from "../open-file.ts";
 import { createPanelHosts } from "../panel-hosts.ts";
 import { TerminalCloseDialog } from "../../terminal/index.ts";
 import { useDocker } from "../../docker/index.ts";
 import { virtualTabs } from "../lib/virtual-tabs.ts";
+import { useWorkspaceRefresh } from "../lib/workspace-refresh.ts";
+import { useMobileSurfaces, registerMobileCommands } from "../lib/mobile-surfaces.ts";
 const props = defineProps<{
   projectId: string;
   projectSettingsDirty?: boolean;
@@ -37,19 +36,8 @@ const profile = workspaceProfile(props.projectId);
 const capabilities = profileCapabilities(profile);
 const workspaceElement = ref<HTMLElement>();
 const sidebarHidden = ref(false);
-// Mobile navigation is transient; keep the saved desktop layout independent.
-const mobile = useMediaQuery("(max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse)");
-const mobileSurface = ref<"editor" | "files" | "terminal">("editor");
-const mobileActionsOpen = ref(false);
-const mobileSidebarOpen = computed({
-  get: () => mobileSurface.value === "files",
-  set: (open: boolean) => { mobileSurface.value = open ? "files" : "editor"; },
-});
-const sidebarInvisible = computed(() => mobile.value ? !mobileSidebarOpen.value : sidebarHidden.value);
-function showSidebar() {
-  if (mobile.value) mobileSidebarOpen.value = true;
-  else sidebarHidden.value = false;
-}
+const { mobile, mobileSurface, mobileActionsOpen, mobileSidebarOpen, sidebarInvisible, showSidebar } =
+  useMobileSurfaces(sidebarHidden);
 const { treeWidth, sizes, resizeTree, resizeTreeKey } = useSidebarResize(workspaceElement);
 const sidebar = ref<InstanceType<typeof WorkspaceSidebar>>();
 const editorCommands = useCommandScope(`editor:${props.projectId}`, () => ({
@@ -136,8 +124,6 @@ const {
   fileError,
   loading,
   openFile,
-  openBrowserFile,
-  closeTab,
   selectTab,
   saveFile,
   toggleMarkdownSource,
@@ -187,29 +173,6 @@ registerEditor(
   },
   () => true,
 );
-editorCommands.scope.registerCommand({
-  id: "ide.workbench.mobile.surface.show",
-  title: "Открыть мобильную поверхность",
-  description: "Переключает мобильный интерфейс между редактором, файлами слева и терминалами справа, сохраняя сессии.",
-  arguments: { surface: "editor, files или terminal" },
-  enabled: () => mobile.value,
-  run: (value) => {
-    const { surface } = commandArgs(value);
-    if (
-      (surface === "terminal" && !capabilities.terminals) ||
-      (surface !== "editor" && surface !== "files" && surface !== "terminal")
-    )
-      throw new Error("surface: editor, files или terminal");
-    mobileSurface.value = surface;
-    mobileActionsOpen.value = false;
-  },
-});
-editorCommands.scope.registerCommand({
-  id: "ide.workbench.mobile.actions.toggle", title: "Показать действия проекта",
-  description: "Раскрывает команды запуска проекта и создания терминалов в мобильном интерфейсе.",
-  enabled: () => mobile.value,
-  run: () => { mobileActionsOpen.value = !mobileActionsOpen.value; },
-});
 useWorkspaceSession({
   persist: capabilities.persist,
   initialLayout: workbench.initialLayout,
@@ -235,12 +198,16 @@ useWorkspaceSession({
   },
   reloadGit: () => void loadGit(),
 });
-watch(activeKey, (key) => { if (key) mobileSurface.value = "editor"; });
-watch(() => workbench.focusedGroup.value?.active, (id) => {
-  if (mobile.value && !restoringSession.value && id?.startsWith("terminal:"))
-    mobileSurface.value = "terminal";
+registerMobileCommands({
+  editorCommands,
+  capabilities,
+  surface: mobileSurface,
+  actionsOpen: mobileActionsOpen,
+  mobile,
+  activeKey,
+  focusedPanel: () => workbench.focusedGroup.value?.active,
+  restoringSession,
 });
-watch(mobile, () => { mobileSurface.value = "editor"; mobileActionsOpen.value = false; });
 const active = computed(() => tabs.value.find((file) => file.key === activeKey.value));
 const gitSync = useGitChangeSync({
   projectId: () => props.projectId,
@@ -253,52 +220,19 @@ const gitSync = useGitChangeSync({
 watch(section, (value) => {
   if (value === "git") void loadGit();
 });
-async function refresh() {
-  await refreshWorkspace(props.projectId);
-  revision.value++;
-  await loadGit();
-  if (section.value === "search") await sidebar.value?.search();
-  if (!capabilities.write) {
-    const selected = activeKey.value;
-    for (const tab of [...tabs.value])
-      if (!tab.virtual && !tab.commit && !tab.localFile)
-        await openFile(tab.path, tab.line, tab.column, undefined, {
-          reload: true,
-          preview: !!tab.preview,
-        });
-    if (tabs.value.some((tab) => tab.key === selected)) selectTab(selected);
-    return;
-  }
-  if (active.value?.virtual || active.value?.commit) return;
-  if (active.value?.localFile) void openBrowserFile(active.value.localFile, true);
-  else if (active.value)
-    void openFile(
-      active.value.path,
-      active.value.line,
-      active.value.column,
-      active.value.staged,
-      { reload: true, external: !!active.value.external },
-    );
-}
-function entryMoved(source: string, destination: string) {
-  files.invalidate();
-  for (const tab of [...tabs.value]) {
-    if (tab.virtual || tab.commit) continue;
-    const path = relocatedPath(tab.path, source, destination);
-    if (path === tab.path) continue;
-    if (tab.staged !== undefined) {
-      closeTab(tab.key);
-      continue;
-    }
-    const key = `${path}:file`;
-    layout.value = replacePanel(layout.value, tab.key, key);
-    tab.path = path;
-    tab.key = key;
-  }
-  revision.value++;
-  void loadGit();
-  sidebar.value?.refreshSearch();
-}
+const { refresh, entryMoved } = useWorkspaceRefresh({
+  projectId: () => props.projectId,
+  capabilities,
+  tabs,
+  layout,
+  files,
+  active: () => active.value,
+  activeKey: () => activeKey.value,
+  revision,
+  section,
+  searchPanel: () => sidebar.value,
+  loadGit,
+});
 defineExpose({ openFile, refresh });
 onBeforeUnmount(() => {
   overview.cancel();
@@ -412,4 +346,153 @@ onBeforeUnmount(() => {
   </div>
 </template>
 
-<style scoped src="./ProjectWorkspace.css" />
+<style scoped>
+.workspace {
+  display: grid;
+  grid-template-columns: var(--tree-width, clamp(200px, 19vw, 280px)) 1px minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  height: calc(100dvh - 84px);
+  min-height: 440px;
+  overflow: hidden;
+}
+.workspace.sidebar-hidden {
+  grid-template-columns: 0 0 minmax(0, 1fr);
+}
+.tree-resize {
+  grid-column: 2;
+  grid-row: 3;
+}
+.dock-pane {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  grid-column: 3;
+  grid-row: 3;
+}
+/* Видимая линия 1px, зона захвата шире за счёт ::before */
+.resize-handle {
+  position: relative;
+  z-index: 1;
+  cursor: col-resize;
+  background: var(--line);
+  touch-action: none;
+  transition: background var(--t-fast);
+}
+.resize-handle::before {
+  content: "";
+  position: absolute;
+  inset: 0 -4px;
+}
+.resize-handle:hover,
+.resize-handle:focus-visible,
+.resize-handle:active {
+  background: var(--line-strong);
+}
+.resize-handle:focus-visible {
+  outline: none;
+  background: var(--focus);
+}
+.file-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--err);
+  font-size: var(--fs-xs);
+  border-bottom: 1px solid var(--line);
+}
+.loading {
+  position: absolute;
+  top: 4px;
+  right: 14px;
+  z-index: var(--z-sticky);
+  background: var(--bg-2);
+  padding: 6px var(--sp-3);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+@media (max-width: 1050px) and (min-width: 701px) {
+  .dock-pane {
+    overflow: auto;
+  }
+  .workspace {
+    grid-template-columns: 220px 1px minmax(0, 1fr);
+  }
+  .workspace.sidebar-hidden {
+    grid-template-columns: 0 0 minmax(0, 1fr);
+  }
+}
+@media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {
+  .workspace,
+  .workspace.sidebar-hidden {
+    position: relative;
+    grid-template-columns: minmax(0, 1fr);
+    flex: 1;
+    height: 100%;
+    min-height: 0;
+    border-radius: 0;
+    border-inline: 0;
+  }
+  .tree-resize {
+    display: none;
+  }
+  .dock-pane {
+    grid-column: 1;
+    grid-row: 3;
+    overflow: hidden;
+  }
+  .mobile-left-enter-active,
+  .mobile-left-leave-active {
+    transition: transform var(--t-base);
+  }
+  .mobile-left-enter-from,
+  .mobile-left-leave-to {
+    transform: translateX(-100%);
+  }
+  .sidebar-backdrop {
+    grid-column: 1;
+    grid-row: 3;
+    z-index: 2;
+    justify-self: end;
+    width: calc(100% - min(340px, 90%));
+    background: var(--overlay);
+  }
+}
+.toolbar-host {
+  grid-column: 1 / -1;
+}
+.mobile-surfaces {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: 40px;
+  padding-inline: var(--sp-2);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-sunken);
+}
+.mobile-surfaces .btn {
+  min-height: 36px;
+  border-color: transparent;
+  flex: 1;
+}
+.mobile-surfaces .btn:last-child {
+  flex: none;
+  width: 40px;
+}
+.mobile-actions {
+  position: absolute;
+  top: 40px;
+  inset-inline: 0;
+  z-index: var(--z-popover);
+  background: var(--bg-2);
+  box-shadow: var(--shadow-popover);
+}
+.mobile-actions :deep(.toolbar) {
+  flex-wrap: wrap;
+  padding: var(--sp-2);
+}
+</style>
