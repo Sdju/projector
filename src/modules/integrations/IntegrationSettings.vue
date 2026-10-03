@@ -110,14 +110,14 @@ function disconnect() {
 
 <template>
   <section class="integrations">
-    <h1>интеграции</h1>
+    <h2>Интеграции</h2>
     <p class="muted">
       Настройки и авторизация хранятся в файле <code>{{ file || "integrations.json" }}</code
       >.
     </p>
     <article v-if="github" class="plugin">
       <header>
-        <h2>GitHub</h2>
+        <h3>GitHub</h3>
         <span class="status">{{
           github.connected ? `подключён · ${github.account}` : "не подключён"
         }}</span>
@@ -204,29 +204,28 @@ function disconnect() {
 
 <style scoped>
 .integrations {
-  margin: 32px 0;
-}
-h1 {
-  margin: 0 0 8px;
-  font-size: 28px;
-  font-weight: 500;
-  letter-spacing: -0.03em;
+  margin: var(--sp-6) 0;
 }
 h2 {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-lg);
+  font-weight: 500;
+}
+h3 {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--fs-md);
   font-weight: 500;
 }
 .plugin {
   border: 1px solid var(--line);
-  padding: 20px;
-  border-radius: 4px;
+  padding: var(--sp-4);
+  border-radius: var(--r-sm);
 }
 header,
 .actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--sp-3);
   flex-wrap: wrap;
 }
 header {
@@ -235,25 +234,25 @@ header {
 .status,
 .muted {
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 code {
   overflow-wrap: anywhere;
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 form {
   display: grid;
-  gap: 12px;
+  gap: var(--sp-3);
 }
 label {
   display: grid;
-  gap: 6px;
-  font-size: 13px;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
 }
 .toggle {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-2);
 }
 .toggle input {
   width: auto;
@@ -264,27 +263,27 @@ label {
 .actions,
 details,
 .device {
-  margin-top: 18px;
+  margin-top: var(--sp-4);
 }
 summary {
   cursor: pointer;
   color: var(--muted);
-  font-size: 13px;
-  margin-bottom: 12px;
+  font-size: var(--fs-sm);
+  margin-bottom: var(--sp-3);
 }
 a {
   text-decoration: underline;
 }
 .link {
   display: inline-block;
-  margin-top: 18px;
-  font-size: 13px;
+  margin-top: var(--sp-4);
+  font-size: var(--fs-sm);
 }
 .error {
   color: var(--err);
 }
 .device {
-  padding: 12px;
+  padding: var(--sp-3);
   background: var(--bg-2);
 }
 .device strong {

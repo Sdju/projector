@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiHint from "../../../common/ui/UiHint.vue";
 import { computed, nextTick, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { shortPath, projectRoute } from "../../catalog/index.ts";
@@ -89,9 +90,9 @@ function onKeydown(event: KeyboardEvent): void {
         искать приложения внутри
       </button>
     </p>
-    <p v-else-if="!preview" class="hint">
+    <UiHint v-else-if="!preview">
       Путь или «папка» добавят сразу. Фраза — через агента. Можно бросить каталог сюда.
-    </p>
+    </UiHint>
 
     <article v-if="preview" class="preview">
       <div class="row">
@@ -149,32 +150,27 @@ function onKeydown(event: KeyboardEvent): void {
 <style scoped>
 .composer {
   display: grid;
-  gap: 8px;
-  margin-bottom: 18px;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
 }
 
 .bar {
   display: flex;
-  gap: 8px;
+  gap: var(--sp-2);
 }
 
-.hint,
 .err,
 .notice,
 .status {
   margin: 0;
-  font-size: 12px;
-}
-
-.hint {
-  color: var(--faint);
+  font-size: var(--fs-xs);
 }
 
 .err {
   color: var(--err);
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--sp-2);
   align-items: baseline;
 }
 
@@ -185,15 +181,15 @@ function onKeydown(event: KeyboardEvent): void {
 
 .link {
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .preview {
   display: grid;
-  gap: 10px;
-  padding: 12px 0;
+  gap: var(--sp-3);
+  padding: var(--sp-3) 0;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
@@ -201,14 +197,14 @@ function onKeydown(event: KeyboardEvent): void {
 .row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-3);
   min-width: 0;
 }
 
 .icon {
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: var(--r-md);
   object-fit: cover;
   background: var(--bg-2);
   flex: 0 0 auto;
@@ -216,12 +212,12 @@ function onKeydown(event: KeyboardEvent): void {
 
 .name {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--fs-md);
   font-weight: 500;
   flex: 0 1 auto;
   min-width: 120px;
   width: auto;
-  padding: 4px 8px;
+  padding: var(--sp-1) var(--sp-2);
 }
 
 strong.name {
@@ -233,7 +229,7 @@ strong.name {
   margin-left: auto;
   color: var(--muted);
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -244,14 +240,14 @@ strong.name {
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--sp-2);
   align-items: center;
 }
 
 .cmd {
-  color: var(--faint);
+  color: var(--muted);
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 
 .actions {
@@ -259,7 +255,7 @@ strong.name {
 }
 
 .advanced {
-  padding-top: 8px;
+  padding-top: var(--sp-2);
   border-top: 1px solid var(--line);
 }
 </style>

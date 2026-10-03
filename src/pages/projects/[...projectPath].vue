@@ -87,8 +87,8 @@ watch(
 <style scoped>
 .msg {
   margin: 0;
-  padding: 10px 12px;
+  padding: var(--sp-3) var(--sp-3);
   color: var(--err);
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 </style>

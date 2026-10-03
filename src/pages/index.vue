@@ -157,10 +157,10 @@ onUnmounted(() => {
   margin: min(18vh, 160px) auto 40px;
 }
 .launcher.in-window {
-  margin-top: 18px;
+  margin-top: var(--sp-4);
 }
 .in-window {
-  margin-bottom: 18px;
+  margin-bottom: var(--sp-4);
 }
 .in-window .palette {
   max-height: calc(100dvh - 70px);
@@ -181,28 +181,28 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   color: var(--muted);
-  font-size: 13px;
-  margin: 0 4px 12px;
+  font-size: var(--fs-sm);
+  margin: 0 var(--sp-1) var(--sp-3);
 }
 .palette {
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 12px;
-  box-shadow: 0 16px 60px #0003;
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-popover);
   overflow: hidden;
 }
 .search-line {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 18px 20px;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-4);
   border-bottom: 1px solid var(--line);
   color: var(--muted);
 }
 .search-line input {
   padding: 0;
   border: 0;
-  font-size: 20px;
+  font-size: var(--fs-lg);
   color: var(--text);
   letter-spacing: normal;
   min-width: 0;
@@ -211,10 +211,10 @@ onUnmounted(() => {
   color: var(--muted);
 }
 .activity {
-  font-size: 24px;
+  font-size: var(--fs-lg);
 }
 .results {
-  padding: 8px;
+  padding: var(--sp-2);
   max-height: 440px;
   overflow-y: auto;
 }
@@ -224,14 +224,14 @@ onUnmounted(() => {
 .result {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--sp-3);
   width: 100%;
-  padding: 11px 12px;
+  padding: var(--sp-3) var(--sp-3);
   text-align: left;
-  border-radius: 6px;
+  border-radius: var(--r-md);
 }
 .result.selected {
-  background: #ffffff0c;
+  background: var(--hover);
 }
 .result:disabled {
   cursor: wait;
@@ -244,16 +244,16 @@ onUnmounted(() => {
 .result-copy {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--sp-1);
   min-width: 0;
   flex: 1;
 }
 .name {
-  font-size: 15px;
+  font-size: var(--fs-md);
 }
 .description {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -264,9 +264,9 @@ onUnmounted(() => {
 .empty,
 .message {
   margin: 0;
-  padding: 18px 20px;
+  padding: var(--sp-4) var(--sp-4);
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 .error {
   color: var(--err);
@@ -275,25 +275,25 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: 12px 20px;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
   border-top: 1px solid var(--line);
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--fs-2xs);
 }
 .separator {
   color: var(--faint);
-  margin: 0 4px;
+  margin: 0 var(--sp-1);
 }
 a:hover {
   color: var(--text);
 }
 @media (max-width: 500px) {
   .search-line input {
-    font-size: 16px;
+    font-size: var(--fs-md);
   }
   .search-line {
-    padding: 16px;
+    padding: var(--sp-4);
   }
 }
 </style>

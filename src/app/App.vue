@@ -83,18 +83,18 @@ onUnmounted(() => {
 <style scoped>
 .command-error {
   position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 1000;
+  right: var(--sp-4);
+  bottom: var(--sp-4);
+  z-index: var(--z-popover);
   max-width: min(480px, calc(100vw - 32px));
-  padding: 12px 16px;
+  padding: var(--sp-3) var(--sp-4);
   background: var(--bg-2);
   border: 1px solid var(--err);
   color: var(--err);
-  border-radius: 6px;
-  font-size: 12px;
+  border-radius: var(--r-md);
+  font-size: var(--fs-xs);
 }
 .command-error button {
-  margin-left: 16px;
+  margin-left: var(--sp-4);
 }
 </style>

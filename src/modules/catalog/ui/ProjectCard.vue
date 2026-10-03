@@ -34,22 +34,22 @@ const busy = computed(() => status.value === "running" || status.value === "star
 <style scoped>
 .card {
   display: grid;
-  gap: 6px;
-  padding: 10px 0 12px;
+  gap: var(--sp-2);
+  padding: var(--sp-3) 0;
   border-bottom: 1px solid var(--line);
 }
 
 .top {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-2);
   min-width: 0;
 }
 
 .icon {
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--r-sm);
   object-fit: cover;
   background: var(--bg-2);
   flex: 0 0 auto;
@@ -57,22 +57,21 @@ const busy = computed(() => status.value === "running" || status.value === "star
 
 h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--fs-md);
   font-weight: 500;
-  letter-spacing: -0.02em;
   flex: 0 0 auto;
 }
 
 .meta {
   margin-left: auto;
-  color: var(--faint);
-  font-size: 12px;
+  color: var(--muted);
+  font-size: var(--fs-xs);
 }
 
 .dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-full);
   background: var(--faint);
   flex: 0 0 auto;
 }
@@ -80,6 +79,7 @@ h2 {
 .dot.running,
 .dot.starting {
   background: var(--run);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--run) 22%, transparent);
 }
 
 .dot.error {
@@ -91,7 +91,7 @@ h2 {
   margin: 0;
   color: var(--muted);
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: var(--fs-2xs);
 }
 
 .path {
@@ -104,6 +104,6 @@ h2 {
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--sp-2);
 }
 </style>

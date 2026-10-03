@@ -55,7 +55,14 @@ async function navigatePath(path: string) {
       <nav class="nav">
         <router-link to="/projects">проекты</router-link>
         <router-link to="/settings">настройки</router-link>
-        <span class="count">{{ running }}</span>
+        <span
+          class="count"
+          :class="{ active: running }"
+          :title="`Запущено проектов: ${running}`"
+          :aria-label="`Запущено проектов: ${running}`"
+          role="status"
+          ><span class="count-dot" aria-hidden="true" />{{ running }}</span
+        >
       </nav>
     </header>
     <main>
@@ -66,9 +73,11 @@ async function navigatePath(path: string) {
 
 <style scoped>
 .shell {
-  width: min(760px, calc(100% - 32px));
+  --page-width: 760px;
+  --brand-track: 0.16em;
+  width: min(var(--page-width), calc(100% - var(--sp-4) * 2));
   margin: 0 auto;
-  padding: 18px 0 56px;
+  padding: var(--sp-4) 0 56px;
   min-height: 100%;
   position: relative;
 }
@@ -77,8 +86,8 @@ async function navigatePath(path: string) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
-  gap: 18px;
+  margin-bottom: var(--sp-3);
+  gap: var(--sp-4);
 }
 
 .header-path {
@@ -88,10 +97,10 @@ async function navigatePath(path: string) {
 .brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-2);
   flex-shrink: 0;
-  font-size: 12px;
-  letter-spacing: 0.16em;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--brand-track);
   text-transform: lowercase;
   color: var(--muted);
 }
@@ -100,8 +109,8 @@ async function navigatePath(path: string) {
   flex-shrink: 1;
   min-width: 0;
   max-width: min(30vw, 320px);
-  font-size: 14px;
-  letter-spacing: normal;
+  font-size: var(--fs-sm);
+  letter-spacing: 0;
   text-transform: none;
   color: var(--text);
 }
@@ -115,40 +124,63 @@ async function navigatePath(path: string) {
 .brand img {
   flex-shrink: 0;
   object-fit: contain;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
 }
 
 .nav {
   flex-shrink: 0;
   display: flex;
-  gap: 12px;
-  align-items: baseline;
+  gap: var(--sp-3);
+  align-items: center;
 }
 
 .nav a,
 .count {
-  color: var(--faint);
-  font-size: 12px;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+.nav a:hover {
+  color: var(--text);
 }
 
 .nav a.router-link-active {
-  color: var(--muted);
+  color: var(--text);
+}
+
+.count {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.count-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--faint);
+}
+
+.count.active .count-dot {
+  background: var(--run);
 }
 
 .shell.workspace {
-  width: calc(100% - 32px);
+  width: calc(100% - var(--sp-4) * 2);
   max-width: 2400px;
-  padding-bottom: 16px;
+  padding-bottom: var(--sp-4);
 }
 @media (max-width: 600px) {
   .top {
-    gap: 8px;
+    gap: var(--sp-2);
   }
   .nav {
-    gap: 7px;
+    gap: var(--sp-2);
   }
   .brand {
-    letter-spacing: 0.06em;
+    --brand-track: 0.06em;
   }
 }
 </style>

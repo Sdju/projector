@@ -7,6 +7,12 @@ import {
   type Keybinding,
 } from "../../../../core/modules/ide/index.ts";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
+import UiButton from "../../../common/ui/UiButton.vue";
+import UiDialog from "../../../common/ui/UiDialog.vue";
+import UiDialogActions from "../../../common/ui/UiDialogActions.vue";
+import UiEmpty from "../../../common/ui/UiEmpty.vue";
+import UiHint from "../../../common/ui/UiHint.vue";
+import UiKbd from "../../../common/ui/UiKbd.vue";
 import IconEdit from "~icons/lucide/pencil";
 import IconReset from "~icons/lucide/rotate-ccw";
 import IconRemove from "~icons/lucide/x";
@@ -17,7 +23,7 @@ const busy = ref(false);
 const error = ref("");
 const status = ref("");
 const path = ref("");
-const dialog = ref<HTMLDialogElement>();
+const dialog = ref<InstanceType<typeof UiDialog>>();
 const recorder = ref<HTMLButtonElement>();
 const shortcut = ref("");
 interface Row {
@@ -116,7 +122,7 @@ async function startEdit(row: Row) {
   editing.value = row;
   shortcut.value = "";
   await nextTick();
-  dialog.value?.showModal();
+  dialog.value?.open();
   recorder.value?.focus();
 }
 function record(event: KeyboardEvent) {
@@ -222,49 +228,55 @@ onMounted(async () => {
                 :aria-label="`Изменить сочетание: ${row.command}`"
                 @click="run('edit', row)"
               >
-                <kbd v-if="row.rule && !row.rule.disabled">{{ displayKey(row.rule.key) }}</kbd
+                <UiKbd v-if="row.rule && !row.rule.disabled">{{ displayKey(row.rule.key) }}</UiKbd
                 ><span v-else class="muted">Не назначено</span>
               </button>
             </td>
             <td class="when">{{ condition(row.rule) }}</td>
             <td>{{ row.custom ? "Пользователь" : "По умолчанию" }}</td>
             <td class="actions">
-              <button
+              <UiButton
+                icon
+                size="sm"
                 :disabled="busy"
                 :aria-label="`Изменить: ${row.command}`"
                 title="Изменить сочетание"
                 @click="run('edit', row)"
               >
                 <IconEdit />
-              </button>
-              <button
+              </UiButton>
+              <UiButton
                 v-if="row.rule && !row.rule.disabled"
+                icon
+                size="sm"
                 :disabled="busy"
                 :aria-label="`Удалить: ${row.command}`"
                 title="Удалить привязку"
                 @click="run('remove', row)"
               >
                 <IconRemove />
-              </button>
-              <button
+              </UiButton>
+              <UiButton
                 v-if="row.custom"
+                icon
+                size="sm"
                 :disabled="busy"
                 :aria-label="`Сбросить: ${row.command}`"
                 title="Восстановить стандартные привязки команды"
                 @click="run('reset', row)"
               >
                 <IconReset />
-              </button>
+              </UiButton>
             </td>
           </tr>
         </tbody>
       </table>
-      <p v-if="!rows.length" class="empty">Команды не найдены</p>
+      <UiEmpty v-if="!rows.length">Команды не найдены</UiEmpty>
     </div>
     <footer :title="path">Изменения применяются сразу{{ path ? ` · ${path}` : "" }}</footer>
-    <dialog
+    <UiDialog
       ref="dialog"
-      aria-labelledby="keybinding-dialog-title"
+      labelledby="keybinding-dialog-title"
       @cancel="busy && $event.preventDefault()"
       @keydown.stop
     >
@@ -280,17 +292,17 @@ onMounted(async () => {
           :disabled="busy"
           @keydown="record"
         >
-          <kbd v-if="shortcut">{{ displayKey(shortcut) }}</kbd
+          <UiKbd v-if="shortcut">{{ displayKey(shortcut) }}</UiKbd
           ><span v-else>Нажмите сочетание клавиш</span>
         </button>
-        <p class="hint">Tab — перейти к кнопкам · Esc — отменить</p>
+        <UiHint>Tab — перейти к кнопкам · Esc — отменить</UiHint>
         <p v-if="error" class="error" role="alert">{{ error }}</p>
-        <div class="dialog-actions">
-          <button type="button" :disabled="busy" @click="dialog?.close()">Отмена</button
-          ><button type="submit" :disabled="busy || !shortcut">Сохранить</button>
-        </div>
+        <UiDialogActions>
+          <UiButton :disabled="busy" @click="dialog?.close()">Отмена</UiButton>
+          <UiButton variant="solid" type="submit" :disabled="busy || !shortcut">Сохранить</UiButton>
+        </UiDialogActions>
       </form>
-    </dialog>
+    </UiDialog>
   </section>
 </template>
 
@@ -300,43 +312,43 @@ onMounted(async () => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   background: var(--bg);
 }
 header {
-  padding: 20px 22px 0;
+  padding: var(--sp-4) var(--sp-5) 0;
 }
 h2 {
-  margin: 0 0 6px;
-  font-size: 20px;
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-lg);
   font-weight: 500;
 }
 header p {
-  margin: 0 0 18px;
+  margin: 0 0 var(--sp-4);
   color: var(--muted);
 }
 header > input {
   width: 100%;
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 .filters {
   display: flex;
   justify-content: space-between;
-  gap: 10px;
-  padding: 12px 0 0;
+  gap: var(--sp-3);
+  padding: var(--sp-3) 0 0;
   color: var(--muted);
 }
 .filters label {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--sp-2);
 }
 .filters input {
   width: auto;
 }
 .message {
   margin: 0;
-  padding: 5px 22px;
+  padding: var(--sp-1) var(--sp-5);
   min-height: 24px;
   color: var(--muted);
 }
@@ -356,7 +368,7 @@ table {
 th {
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: var(--z-sticky);
   background: var(--bg-2);
   color: var(--muted);
   font-weight: 500;
@@ -364,17 +376,17 @@ th {
 }
 th,
 td {
-  padding: 10px 12px;
+  padding: var(--sp-3) var(--sp-3);
 }
 th:first-child,
 td:first-child {
-  padding-left: 22px;
+  padding-left: var(--sp-5);
 }
 td {
   border-bottom: 1px solid color-mix(in srgb, var(--line) 50%, transparent);
 }
 tr:hover td {
-  background: var(--bg-2);
+  background: var(--hover);
 }
 td:first-child {
   min-width: 180px;
@@ -382,13 +394,13 @@ td:first-child {
 small {
   display: block;
   color: var(--muted);
-  font: 10px var(--mono);
-  margin-top: 5px;
+  font: var(--fs-2xs) var(--mono);
+  margin-top: var(--sp-1);
   overflow-wrap: anywhere;
 }
 .when {
   color: var(--muted);
-  font: 10px var(--mono);
+  font: var(--fs-2xs) var(--mono);
   min-width: 130px;
 }
 .binding {
@@ -396,48 +408,24 @@ small {
   white-space: nowrap;
   min-height: 26px;
 }
-kbd {
-  display: inline-block;
-  border: 1px solid var(--line);
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  background: var(--bg-2);
-  padding: 3px 7px;
-  font: 11px var(--mono);
-}
 .muted {
   color: var(--muted);
 }
 .actions {
   white-space: nowrap;
 }
-.actions button {
-  padding: 5px;
-  color: var(--muted);
-}
-.actions button:hover {
-  color: var(--text);
-}
 svg {
   width: 13px;
   height: 13px;
 }
-button:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
 footer {
-  padding: 9px 22px;
+  padding: var(--sp-2) var(--sp-5);
   border-top: 1px solid var(--line);
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.empty {
-  padding: 22px;
-  color: var(--muted);
 }
 .sr-only {
   position: absolute;
@@ -446,57 +434,30 @@ footer {
   overflow: hidden;
   clip-path: inset(50%);
 }
-dialog {
-  width: min(420px, calc(100vw - 32px));
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  padding: 22px;
-  background: var(--bg-2);
-  color: var(--text);
-  box-shadow: 0 14px 60px #0008;
-}
-dialog::backdrop {
-  background: #0007;
-}
 h3 {
-  font-size: 16px;
-  margin: 0 0 14px;
+  font-size: var(--fs-md);
+  margin: 0 0 var(--sp-4);
 }
 .recorder {
   display: block;
+  transition: background var(--t-fast);
   width: 100%;
-  padding: 18px;
-  margin-top: 20px;
+  padding: var(--sp-4);
+  margin-top: var(--sp-4);
   border: 1px solid var(--focus);
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   text-align: center;
 }
-.hint {
-  font-size: 11px;
-  color: var(--muted);
-}
-.dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 20px;
-}
-.dialog-actions button {
-  padding: 7px 12px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-}
-.dialog-actions button[type="submit"] {
-  background: var(--focus);
-  color: var(--bg);
+.recorder:hover:not(:disabled) {
+  background: var(--hover);
 }
 @media (max-width: 700px) {
   header {
-    padding: 12px 12px 0;
+    padding: var(--sp-3) var(--sp-3) 0;
   }
   th:first-child,
   td:first-child {
-    padding-left: 12px;
+    padding-left: var(--sp-3);
   }
   .filters {
     flex-wrap: wrap;

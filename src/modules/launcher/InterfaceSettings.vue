@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
+import UiButton from "../../common/ui/UiButton.vue";
+import UiHint from "../../common/ui/UiHint.vue";
 const mode = ref("native");
 const saved = ref("native");
 const shortcut = ref("Ctrl+Alt+Space");
@@ -80,7 +82,7 @@ async function open() {
 
 <template>
   <section class="interface-settings">
-    <h1>Как открывать Projector</h1>
+    <h2>Как открывать Projector</h2>
     <fieldset :disabled="!ready || busy">
       <legend class="sr-only">Режим интерфейса</legend>
       <label v-for="option in modes" :key="option.id" class="mode">
@@ -98,7 +100,7 @@ async function open() {
       <option value="Alt+Space">Alt + Space</option>
       <option value="">Выключена</option>
     </select>
-    <p class="hint" role="status">
+    <UiHint class="hint" role="status">
       <template v-if="!shortcut">Горячая клавиша выключена.</template>
       <template v-else-if="hotkey?.active"
         >Работает: {{ hotkey.shortcut }}. Projector остаётся в трее после закрытия поиска.</template
@@ -110,31 +112,32 @@ async function open() {
         >В этом окружении назначьте системный хоткей на команду
         <code>projector toggle</code>.</template
       >
-    </p>
+    </UiHint>
     <div class="actions">
-      <button
+      <UiButton
+        variant="solid"
         :disabled="!ready || busy || (saved === mode && savedShortcut === shortcut)"
         @click="save"
       >
         Сохранить
-      </button>
-      <button :disabled="!ready || busy" @click="open">Открыть выбранный режим</button>
+      </UiButton>
+      <UiButton :disabled="!ready || busy" @click="open">Открыть выбранный режим</UiButton>
     </div>
-    <p class="hint">
+    <UiHint class="hint">
       В KDE сочетание регистрируется автоматически; занятые клавиши не перехватываются. Клик по
       иконке в трее открывает поиск, меню даёт доступ к проектам, настройкам и выходу.
-    </p>
+    </UiHint>
     <p v-if="error || status" role="status" :class="{ error }">{{ error || status }}</p>
   </section>
 </template>
 
 <style scoped>
 .interface-settings {
-  margin-bottom: 40px;
+  margin-bottom: var(--sp-6);
 }
-h1 {
-  margin: 0 0 20px;
-  font-size: 24px;
+h2 {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-lg);
   font-weight: 500;
 }
 fieldset {
@@ -144,15 +147,13 @@ fieldset {
 }
 .mode {
   display: flex;
-  gap: 12px;
+  gap: var(--sp-3);
   align-items: flex-start;
-  padding: 14px 0;
+  padding: var(--sp-3) 0;
   cursor: pointer;
 }
 .mode input {
-  width: auto;
-  margin-top: 5px;
-  accent-color: var(--focus);
+  margin-top: var(--sp-1);
 }
 strong {
   display: block;
@@ -161,31 +162,24 @@ strong {
 small {
   display: block;
   color: var(--muted);
-  margin-top: 4px;
+  font-size: var(--fs-xs);
+  margin-top: var(--sp-1);
 }
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 18px;
-}
-.actions button {
-  padding: 8px 12px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-}
-button:disabled {
-  opacity: 0.4;
-  cursor: default;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
 }
 .hint {
-  color: var(--muted);
-  font-size: 13px;
-  margin-top: 20px;
+  margin-top: var(--sp-4);
+  font-size: var(--fs-xs);
 }
 .shortcut-label {
   display: block;
-  margin: 20px 0 8px;
+  margin: var(--sp-4) 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
 }
 select {
   max-width: 320px;

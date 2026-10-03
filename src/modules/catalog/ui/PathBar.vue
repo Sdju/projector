@@ -300,15 +300,15 @@ onBeforeUnmount(() => {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-2);
   min-width: 0;
   height: 36px;
   border: 1px solid var(--line);
-  border-radius: 5px;
+  border-radius: var(--r-md);
   background: var(--bg-2);
-  padding: 0 10px;
+  padding: 0 var(--sp-3);
   color: var(--muted);
-  font: 12px var(--mono);
+  font: var(--fs-xs) var(--mono);
 }
 .path-bar:focus-within {
   border-color: var(--focus);
@@ -339,9 +339,9 @@ button {
   color: inherit;
 }
 .segment-label {
-  padding: 5px 6px;
+  padding: var(--sp-1) var(--sp-2);
   white-space: nowrap;
-  border-radius: 3px;
+  border-radius: var(--r-sm);
 }
 .segment:last-of-type .segment-label {
   color: var(--text);
@@ -351,7 +351,7 @@ button {
   place-items: center;
   width: 22px;
   height: 26px;
-  border-radius: 3px;
+  border-radius: var(--r-sm);
   color: var(--faint);
 }
 .segment-arrow svg {
@@ -364,7 +364,7 @@ button {
 .segment-label:hover,
 .segment-arrow:hover,
 .segment-arrow[aria-expanded="true"] {
-  background: var(--line);
+  background: var(--active);
   color: var(--text);
 }
 .edit-space {
@@ -414,7 +414,7 @@ button {
 }
 .key-hint {
   flex-shrink: 0;
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   color: var(--faint);
 }
 .dropdown {
@@ -426,13 +426,13 @@ button {
   min-width: min(280px, 100%);
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 6px;
-  box-shadow: 0 12px 32px #0008;
-  padding: 5px;
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-popover);
+  padding: var(--sp-1);
 }
 .dropdown-heading {
-  padding: 7px 9px;
-  font-size: 10px;
+  padding: var(--sp-2) var(--sp-2);
+  font-size: var(--fs-2xs);
   color: var(--faint);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -446,11 +446,11 @@ button {
 .options button {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: var(--sp-2);
   width: 100%;
-  padding: 8px 9px;
+  padding: var(--sp-2) var(--sp-2);
   text-align: left;
-  border-radius: 3px;
+  border-radius: var(--r-sm);
 }
 .options button svg {
   width: 14px;
@@ -470,12 +470,12 @@ button {
 .options button:hover,
 .options button.highlighted,
 .options button:focus-visible {
-  background: var(--line);
+  background: var(--active);
   color: var(--text);
 }
 .notice {
   margin: 0;
-  padding: 10px 9px;
+  padding: var(--sp-3) var(--sp-2);
   color: var(--faint);
 }
 .error {
@@ -486,8 +486,8 @@ button {
     display: none;
   }
   .path-bar {
-    padding: 0 6px;
-    gap: 4px;
+    padding: 0 var(--sp-2);
+    gap: var(--sp-1);
   }
 }
 </style>

@@ -129,24 +129,24 @@ async function importRepo(name: string) {
 
 <style scoped>
 .github-import {
-  margin: 0 0 24px;
+  margin: 0 0 var(--sp-5);
 }
 .panel {
   border: 1px solid var(--line);
-  padding: 16px;
-  margin-top: 12px;
-  border-radius: 4px;
+  padding: var(--sp-4);
+  margin-top: var(--sp-3);
+  border-radius: var(--r-sm);
 }
 .muted,
 .description,
 .private {
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   overflow-wrap: anywhere;
 }
 form {
   display: flex;
-  gap: 8px;
+  gap: var(--sp-2);
 }
 form input {
   min-width: 0;
@@ -155,25 +155,25 @@ form button {
   flex-shrink: 0;
 }
 .filter {
-  margin: 16px 0 8px;
+  margin: var(--sp-4) 0 var(--sp-2);
 }
 .repo {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--sp-3);
   border-bottom: 1px solid var(--line);
-  padding: 12px 0;
+  padding: var(--sp-3) 0;
 }
 .repo > div {
   min-width: 0;
   overflow-wrap: anywhere;
 }
 .description {
-  margin: 4px 0 0;
+  margin: var(--sp-1) 0 0;
 }
 .private {
-  margin-left: 8px;
+  margin-left: var(--sp-2);
 }
 a {
   text-decoration: underline;

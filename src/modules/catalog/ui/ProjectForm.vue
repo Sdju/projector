@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiHint from "../../../common/ui/UiHint.vue";
 import { reactive, ref, watch } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiField from "../../../common/ui/UiField.vue";
@@ -74,7 +75,7 @@ function onInspect(): void {
         <input v-model="draft.path" placeholder="/home/…/проект" spellcheck="false" />
         <UiButton @click="onInspect">прочитать</UiButton>
       </div>
-      <p v-if="inspectError" class="hint err">{{ inspectError }}</p>
+      <UiHint v-if="inspectError" class="err">{{ inspectError }}</UiHint>
     </UiField>
 
     <UiField label="имя">
@@ -131,47 +132,42 @@ function onInspect(): void {
 <style scoped>
 .form {
   display: grid;
-  gap: 18px;
+  gap: var(--sp-4);
 }
 
 .row {
   display: flex;
-  gap: 8px;
-}
-
-.hint {
-  margin: 6px 0 0;
-  color: var(--muted);
-  font-size: 13px;
+  gap: var(--sp-2);
 }
 
 .err {
   color: var(--err);
+  font-size: var(--fs-xs);
 }
 
 .commands {
   display: grid;
-  gap: 8px;
+  gap: var(--sp-2);
 }
 
 .command {
   display: grid;
   grid-template-columns: 90px 1fr auto auto;
-  gap: 8px;
+  gap: var(--sp-2);
   align-items: center;
 }
 
 .name {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 
 .def {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--sp-1);
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   white-space: nowrap;
 }
 
@@ -184,12 +180,12 @@ function onInspect(): void {
   justify-content: flex-end;
 }
 .compact {
-  gap: 14px;
+  gap: var(--sp-4);
 }
 .compact input {
   min-width: 0;
-  padding: 6px 8px;
-  font-size: 12px;
+  padding: var(--sp-2) var(--sp-2);
+  font-size: var(--fs-xs);
 }
 .compact .row {
   flex-wrap: wrap;
@@ -200,13 +196,13 @@ function onInspect(): void {
 .compact .row > button,
 .compact .commands > button,
 .compact .actions > button {
-  font-size: 12px;
-  padding: 5px 8px;
+  font-size: var(--fs-xs);
+  padding: var(--sp-1) var(--sp-2);
 }
 .compact .command {
   grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 6px;
-  padding-bottom: 10px;
+  gap: var(--sp-2);
+  padding-bottom: var(--sp-3);
   border-bottom: 1px solid var(--line);
 }
 .compact .command-text {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiEmpty from "../../common/ui/UiEmpty.vue";
 import { ref } from "vue";
 import { isFileDrag, pathsFromDataTransfer } from "../../modules/path-drop/index.ts";
 import { useAddSession } from "../../modules/project-composer/index.ts";
@@ -51,9 +52,9 @@ async function dropProjects(event: DragEvent) {
 
     <p v-if="error" class="msg">{{ error }}</p>
 
-    <div v-if="!projects.length && !loading" class="empty">
+    <UiEmpty v-if="!projects.length && !loading">
       Выберите папку, вставьте путь или бросьте каталог проекта.
-    </div>
+    </UiEmpty>
 
     <ProjectCard v-for="project in projects" :key="project.id" :project="project">
       <RunControls :project="project" compact />
@@ -70,7 +71,7 @@ async function dropProjects(event: DragEvent) {
 .drop-hint {
   position: absolute;
   inset: 0;
-  z-index: 20;
+  z-index: var(--z-sticky);
   display: grid;
   place-items: center;
   pointer-events: none;
@@ -79,10 +80,9 @@ async function dropProjects(event: DragEvent) {
   color: var(--text);
 }
 
-.empty,
 .msg {
   color: var(--muted);
-  margin: 0 0 16px;
+  margin: 0 0 var(--sp-4);
 }
 
 .msg {

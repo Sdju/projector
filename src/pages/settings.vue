@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiHint from "../common/ui/UiHint.vue";
 import { ProviderPanel } from "../modules/provider/index.ts";
 import { IntegrationSettings } from "../modules/integrations/index.ts";
 import { InterfaceSettings } from "../modules/launcher/index.ts";
@@ -8,34 +9,46 @@ import { EditorSettings } from "../modules/workspace/index.ts";
 <template>
   <section>
     <router-link class="back" to="/">← поиск</router-link>
+    <h1>Настройки</h1>
     <InterfaceSettings />
     <EditorSettings />
     <IntegrationSettings />
-    <h1>модель</h1>
-    <p class="lead">
-      Агент добавления проектов ходит в Qwen через OpenAI-compatible API, как в ai-companion.
-    </p>
-    <ProviderPanel />
+    <section class="model">
+      <h2>Модель</h2>
+      <UiHint class="lead">
+        Агент добавления проектов ходит в Qwen через OpenAI-compatible API, как в ai-companion.
+      </UiHint>
+      <ProviderPanel />
+    </section>
   </section>
 </template>
 
 <style scoped>
 .back {
   display: inline-block;
-  margin-bottom: 18px;
+  margin-bottom: var(--sp-4);
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--fs-sm);
+}
+
+.back:hover {
+  color: var(--text);
 }
 
 h1 {
-  margin: 0 0 8px;
-  font-size: 28px;
+  margin: 0 0 var(--sp-5);
+  font-size: var(--fs-xl);
   font-weight: 500;
-  letter-spacing: -0.03em;
+}
+
+h2 {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-lg);
+  font-weight: 500;
 }
 
 .lead {
-  margin: 0 0 24px;
-  color: var(--muted);
+  margin-bottom: var(--sp-4);
+  font-size: var(--fs-sm);
 }
 </style>

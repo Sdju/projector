@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiHint from "../../../common/ui/UiHint.vue";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from "vue-router";
 import UiButton from "../../../common/ui/UiButton.vue";
@@ -24,14 +25,21 @@ const candidates = computed(() => missingCommands(draft.value.commands, discover
 const selected = ref<string[]>([]);
 const validation = computed(() => settingsError(draft.value));
 
-watch(dirty, (value) => {
-  if (value) notice.value = "";
-  emit("dirty", value);
-}, { immediate: true });
-watch(() => props.project, (project) => {
-  if (!dirty.value && !busy.value && JSON.stringify(projectDraft(project)) !== baseline.value)
-    reset(project);
-});
+watch(
+  dirty,
+  (value) => {
+    if (value) notice.value = "";
+    emit("dirty", value);
+  },
+  { immediate: true },
+);
+watch(
+  () => props.project,
+  (project) => {
+    if (!dirty.value && !busy.value && JSON.stringify(projectDraft(project)) !== baseline.value)
+      reset(project);
+  },
+);
 
 function reset(project = props.project) {
   draft.value = projectDraft(project);
@@ -42,7 +50,9 @@ function reset(project = props.project) {
   selected.value = [];
 }
 function canLeave() {
-  return !busy.value && (!dirty.value || window.confirm("Закрыть настройки без сохранения изменений?"));
+  return (
+    !busy.value && (!dirty.value || window.confirm("Закрыть настройки без сохранения изменений?"))
+  );
 }
 defineExpose({ canLeave, save });
 onBeforeRouteLeave(canLeave);
@@ -77,7 +87,9 @@ async function discover() {
   }
 }
 function importCommands() {
-  draft.value.commands.push(...candidates.value.filter((command) => selected.value.includes(command.id)));
+  draft.value.commands.push(
+    ...candidates.value.filter((command) => selected.value.includes(command.id)),
+  );
   discovered.value = null;
   selected.value = [];
 }
@@ -93,7 +105,9 @@ async function save() {
       url: draft.value.url.trim(),
       icon: draft.value.icon.trim(),
       commands: draft.value.commands.map((command) => ({
-        ...command, name: command.name.trim(), cmd: command.cmd.trim(),
+        ...command,
+        name: command.name.trim(),
+        cmd: command.cmd.trim(),
       })),
     });
     reset(saved);
@@ -105,9 +119,13 @@ async function save() {
   }
 }
 async function remove() {
-  if (busy.value || !window.confirm(
-    `Убрать «${props.project.name}» из Projector? Терминалы и запущенные процессы проекта будут завершены. Файлы останутся на диске.`,
-  )) return;
+  if (
+    busy.value ||
+    !window.confirm(
+      `Убрать «${props.project.name}» из Projector? Терминалы и запущенные процессы проекта будут завершены. Файлы останутся на диске.`,
+    )
+  )
+    return;
   busy.value = true;
   error.value = "";
   try {
@@ -130,114 +148,321 @@ function saveKey(event: KeyboardEvent) {
 </script>
 
 <template>
-  <form class="project-settings-form" aria-label="Настройки проекта" @submit.prevent="save" @keydown.capture="saveKey">
+  <form
+    class="project-settings-form"
+    aria-label="Настройки проекта"
+    @submit.prevent="save"
+    @keydown.capture="saveKey"
+  >
     <fieldset :disabled="busy">
       <section class="settings-section">
         <h2>Проект</h2>
-        <label class="field">Название<input v-model="draft.name" required autocomplete="off" /></label>
-        <div class="field">Папка проекта<code class="project-root">{{ project.path }}</code></div>
+        <label class="field"
+          >Название<input v-model="draft.name" required autocomplete="off"
+        /></label>
+        <div class="field">
+          Папка проекта<code class="project-root">{{ project.path }}</code>
+        </div>
         <details class="appearance">
           <summary>Иконка</summary>
-          <label class="field">Путь к иконке<input v-model="draft.icon" placeholder="Автоматически" spellcheck="false" /></label>
-          <p class="hint">Файл внутри проекта, например public/icon.svg. Пустое поле — автоматический выбор.</p>
+          <label class="field"
+            >Путь к иконке<input
+              v-model="draft.icon"
+              placeholder="Автоматически"
+              spellcheck="false"
+          /></label>
+          <UiHint
+            >Файл внутри проекта, например public/icon.svg. Пустое поле — автоматический
+            выбор.</UiHint
+          >
         </details>
       </section>
 
       <section class="settings-section">
         <div class="section-heading">
           <h2>Команды</h2>
-          <UiButton :disabled="discovering" @click="discover">{{ discovering ? 'читаю…' : 'из package.json' }}</UiButton>
+          <UiButton :disabled="discovering" @click="discover">{{
+            discovering ? "читаю…" : "из package.json"
+          }}</UiButton>
         </div>
-        <p class="hint">Запускаются в терминале из папки проекта.</p>
+        <UiHint>Запускаются в терминале из папки проекта.</UiHint>
         <div v-if="discovered !== null" class="script-picker">
           <template v-if="candidates.length">
             <label v-for="command in candidates" :key="command.id" class="script-option">
               <input v-model="selected" type="checkbox" :value="command.id" />
-              <span>{{ command.name }}</span><code>{{ command.cmd }}</code>
+              <span>{{ command.name }}</span
+              ><code>{{ command.cmd }}</code>
             </label>
             <div class="picker-actions">
-              <UiButton :disabled="!selected.length" @click="importCommands">Добавить выбранные</UiButton>
+              <UiButton :disabled="!selected.length" @click="importCommands"
+                >Добавить выбранные</UiButton
+              >
               <UiButton @click="discovered = null">Отмена</UiButton>
             </div>
           </template>
           <template v-else>
-            <p class="hint">{{ discovered.length ? 'Все найденные команды уже добавлены.' : 'В этой папке нет скриптов package.json. Добавьте свою команду.' }}</p>
+            <UiHint>{{
+              discovered.length
+                ? "Все найденные команды уже добавлены."
+                : "В этой папке нет скриптов package.json. Добавьте свою команду."
+            }}</UiHint>
             <UiButton @click="discovered = null">Закрыть</UiButton>
           </template>
         </div>
         <div class="commands">
           <div v-for="(command, index) in draft.commands" :key="command.id" class="command">
-            <label class="field">Название<input v-model="command.name" :aria-label="`Название команды ${index + 1}`" required placeholder="dev" /></label>
-            <label class="field command-input">Команда запуска<input v-model="command.cmd" :aria-label="`Команда запуска ${index + 1}`" class="command-text" required placeholder="pnpm dev" spellcheck="false" /></label>
-            <UiButton variant="ghost" :disabled="draft.commands.length === 1" :aria-label="`Удалить команду ${command.name || index + 1}`" :title="draft.commands.length === 1 ? 'Нужна хотя бы одна команда' : 'Удалить команду'" @click="removeCommand(command.id)"><IconTrash aria-hidden="true" /></UiButton>
+            <label class="field"
+              >Название<input
+                v-model="command.name"
+                :aria-label="`Название команды ${index + 1}`"
+                required
+                placeholder="dev"
+            /></label>
+            <label class="field command-input"
+              >Команда запуска<input
+                v-model="command.cmd"
+                :aria-label="`Команда запуска ${index + 1}`"
+                class="command-text"
+                required
+                placeholder="pnpm dev"
+                spellcheck="false"
+            /></label>
+            <UiButton
+              variant="ghost"
+              :disabled="draft.commands.length === 1"
+              :aria-label="`Удалить команду ${command.name || index + 1}`"
+              :title="
+                draft.commands.length === 1 ? 'Нужна хотя бы одна команда' : 'Удалить команду'
+              "
+              @click="removeCommand(command.id)"
+              ><IconTrash aria-hidden="true"
+            /></UiButton>
           </div>
         </div>
-        <UiButton class="add-command" @click="addCommand"><IconPlus aria-hidden="true" />Добавить команду</UiButton>
+        <UiButton class="add-command" @click="addCommand"
+          ><IconPlus aria-hidden="true" />Добавить команду</UiButton
+        >
       </section>
 
       <section class="settings-section">
         <h2>Запуск</h2>
-        <label class="field">Команда по умолчанию
+        <label class="field"
+          >Команда по умолчанию
           <select v-model="draft.defaultCommandId">
-            <option v-for="(command, index) in draft.commands" :key="command.id" :value="command.id">{{ command.name || `Команда ${index + 1}` }}</option>
+            <option
+              v-for="(command, index) in draft.commands"
+              :key="command.id"
+              :value="command.id"
+            >
+              {{ command.name || `Команда ${index + 1}` }}
+            </option>
           </select>
         </label>
-        <p class="hint">Используется при запуске проекта из палитры и списка проектов.</p>
-        <label class="field">Адрес приложения<input v-model="draft.url" type="url" placeholder="Необязательно, например http://localhost:5173" spellcheck="false" /></label>
-        <label class="checkbox"><input :checked="draft.mode === 'window'" type="checkbox" @change="draft.mode = ($event.target as HTMLInputElement).checked ? 'window' : 'server'" />Открывать приложение в отдельном окне после запуска</label>
-        <p class="hint">Без автоматического открытия команда работает в терминале. Изменения применятся при следующем запуске.</p>
+        <UiHint>Используется при запуске проекта из палитры и списка проектов.</UiHint>
+        <label class="field"
+          >Адрес приложения<input
+            v-model="draft.url"
+            type="url"
+            placeholder="Необязательно, например http://localhost:5173"
+            spellcheck="false"
+        /></label>
+        <label class="checkbox"
+          ><input
+            :checked="draft.mode === 'window'"
+            type="checkbox"
+            @change="draft.mode = ($event.target as HTMLInputElement).checked ? 'window' : 'server'"
+          />Открывать приложение в отдельном окне после запуска</label
+        >
+        <UiHint
+          >Без автоматического открытия команда работает в терминале. Изменения применятся при
+          следующем запуске.</UiHint
+        >
       </section>
     </fieldset>
 
     <div class="save-bar">
-      <span class="save-status" role="status">{{ notice || (dirty ? 'Есть несохранённые изменения' : 'Нет изменений') }}</span>
+      <span class="save-status" role="status">{{
+        notice || (dirty ? "Есть несохранённые изменения" : "Нет изменений")
+      }}</span>
       <UiButton :disabled="busy || !dirty" @click="reset()">Сбросить</UiButton>
-      <UiButton variant="solid" type="submit" :disabled="busy || !dirty">{{ busy ? 'сохраняю…' : 'Сохранить' }}</UiButton>
+      <UiButton variant="solid" type="submit" :disabled="busy || !dirty">{{
+        busy ? "сохраняю…" : "Сохранить"
+      }}</UiButton>
     </div>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-else-if="dirty && validation" class="error" role="status">{{ validation }}</p>
 
     <section class="remove-section">
-      <div><h2>Убрать из Projector</h2><p class="hint">Файлы останутся на диске. Терминалы и процессы проекта будут завершены.</p></div>
+      <div>
+        <h2>Убрать из Projector</h2>
+        <UiHint>Файлы останутся на диске. Терминалы и процессы проекта будут завершены.</UiHint>
+      </div>
       <UiButton variant="danger" :disabled="busy" @click="remove">Убрать проект</UiButton>
     </section>
   </form>
 </template>
 
 <style scoped>
-.project-settings-form { max-width: 760px; margin: 0 auto; font-size: 12px; }
-fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
-.settings-section { display: grid; gap: 12px; padding: 20px 0; border-bottom: 1px solid var(--line); }
-.settings-section:first-child { padding-top: 4px; }
-h2 { margin: 0; font-size: 14px; font-weight: 500; }
-.field { display: grid; gap: 6px; min-width: 0; color: var(--muted); }
-.field input, .field select { color: var(--text); font-size: 12px; }
-.project-root { color: var(--muted); overflow-wrap: anywhere; font-size: 11px; user-select: all; }
-.hint { margin: 0; color: var(--faint); font-size: 11px; }
-.appearance summary { color: var(--muted); cursor: pointer; }
-.appearance .field { margin: 12px 0 6px; }
-.section-heading, .picker-actions, .save-bar, .remove-section { display: flex; align-items: center; gap: 10px; }
-.section-heading { justify-content: space-between; flex-wrap: wrap; }
-.commands { display: grid; gap: 14px; }
-.command { display: grid; grid-template-columns: minmax(90px, 1fr) minmax(140px, 3fr) 34px; gap: 8px; }
-.command button { align-self: end; padding: 8px; }
-.command-text { font-family: var(--mono); }
-.add-command { justify-self: start; }
-svg { width: 14px; height: 14px; }
-.checkbox { display: flex; align-items: start; gap: 8px; color: var(--muted); }
-.checkbox input, .script-option input { width: auto; margin: 2px 0 0; flex-shrink: 0; accent-color: var(--focus); }
-.script-picker { border: 1px solid var(--line); border-radius: 3px; padding: 12px; display: grid; gap: 10px; }
-.script-option { display: flex; gap: 8px; align-items: baseline; }
-.script-option code { margin-left: auto; color: var(--muted); overflow-wrap: anywhere; min-width: 0; }
-.save-bar { position: sticky; bottom: -16px; padding: 12px 0; background: var(--bg); border-bottom: 1px solid var(--line); flex-wrap: wrap; z-index: 1; }
-.save-status { color: var(--muted); margin-right: auto; font-size: 11px; }
-.error { color: var(--err); margin: 10px 0; }
-.remove-section { justify-content: space-between; padding: 24px 0 8px; flex-wrap: wrap; }
-.remove-section .hint { margin-top: 6px; }
-@container (max-width: 500px) {
-  .command { grid-template-columns: minmax(0, 1fr) 34px; }
-  .command-input { grid-column: 1 / -1; grid-row: 2; }
-  .command button { grid-column: 2; grid-row: 1; }
+.project-settings-form {
+  max-width: 760px;
+  margin: 0 auto;
+  font-size: var(--fs-xs);
 }
-@container (max-width: 450px) { .script-option { flex-wrap: wrap; } .script-option code { flex-basis: 100%; margin-left: 22px; } }
+fieldset {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.settings-section {
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-4) 0;
+  border-bottom: 1px solid var(--line);
+}
+.settings-section:first-child {
+  padding-top: var(--sp-1);
+}
+h2 {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+.field {
+  display: grid;
+  gap: var(--sp-2);
+  min-width: 0;
+  color: var(--muted);
+}
+.field input,
+.field select {
+  color: var(--text);
+  font-size: var(--fs-xs);
+}
+.project-root {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  font-size: var(--fs-2xs);
+  user-select: all;
+}
+.appearance summary {
+  color: var(--muted);
+  cursor: pointer;
+}
+.appearance .field {
+  margin: var(--sp-3) 0 var(--sp-2);
+}
+.section-heading,
+.picker-actions,
+.save-bar,
+.remove-section {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.section-heading {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.commands {
+  display: grid;
+  gap: var(--sp-4);
+}
+.command {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) minmax(140px, 3fr) 34px;
+  gap: var(--sp-2);
+}
+.command button {
+  align-self: end;
+  padding: var(--sp-2);
+}
+.command-text {
+  font-family: var(--mono);
+}
+.add-command {
+  justify-self: start;
+}
+svg {
+  width: 14px;
+  height: 14px;
+}
+.checkbox {
+  display: flex;
+  align-items: start;
+  gap: var(--sp-2);
+  color: var(--muted);
+}
+.checkbox input,
+.script-option input {
+  width: auto;
+  margin: var(--sp-1) 0 0;
+  flex-shrink: 0;
+}
+.script-picker {
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: var(--sp-3);
+  display: grid;
+  gap: var(--sp-3);
+}
+.script-option {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: baseline;
+}
+.script-option code {
+  margin-left: auto;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.save-bar {
+  position: sticky;
+  bottom: calc(var(--sp-4) * -1);
+  padding: var(--sp-3) 0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+  z-index: var(--z-sticky);
+}
+.save-status {
+  color: var(--muted);
+  margin-right: auto;
+  font-size: var(--fs-2xs);
+}
+.error {
+  color: var(--err);
+  margin: var(--sp-3) 0;
+}
+.remove-section {
+  justify-content: space-between;
+  padding: var(--sp-5) 0 var(--sp-2);
+  flex-wrap: wrap;
+}
+.remove-section :deep(.hint) {
+  margin-top: var(--sp-2);
+}
+@container (max-width: 500px) {
+  .command {
+    grid-template-columns: minmax(0, 1fr) 34px;
+  }
+  .command-input {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .command button {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
+@container (max-width: 450px) {
+  .script-option {
+    flex-wrap: wrap;
+  }
+  .script-option code {
+    flex-basis: 100%;
+    margin-left: var(--sp-5);
+  }
+}
 </style>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiHint from "../../../common/ui/UiHint.vue";
 import { computed, onMounted, ref } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiField from "../../../common/ui/UiField.vue";
@@ -90,9 +91,9 @@ function keyDraft(): string {
           @input="setKeyDraft(selected.id, ($event.target as HTMLInputElement).value)"
         />
       </UiField>
-      <p class="hint">
+      <UiHint>
         Ключ шифруется на диске (AES). Можно задать DASHSCOPE_API_KEY / OPENAI_URL в окружении.
-      </p>
+      </UiHint>
       <div class="row">
         <UiButton
           variant="chip"
@@ -113,34 +114,34 @@ function keyDraft(): string {
 <style scoped>
 .panel {
   display: grid;
-  gap: 16px;
+  gap: var(--sp-4);
 }
 
 .kicker {
   margin: 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 
 .row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--sp-2);
   align-items: center;
   justify-content: space-between;
 }
 
 .list {
   display: grid;
-  gap: 6px;
+  gap: var(--sp-2);
 }
 
 .item {
   display: flex;
-  gap: 8px;
+  gap: var(--sp-2);
   align-items: center;
   width: 100%;
-  padding: 8px 0;
+  padding: var(--sp-2) 0;
   border-bottom: 1px solid var(--line);
   text-align: left;
 }
@@ -152,7 +153,7 @@ function keyDraft(): string {
 .dot {
   width: 7px;
   height: 7px;
-  border-radius: 50%;
+  border-radius: var(--r-full);
   background: var(--faint);
 }
 
@@ -162,24 +163,19 @@ function keyDraft(): string {
 
 .meta {
   margin-left: auto;
-  color: var(--faint);
+  color: var(--muted);
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 
 .form {
   display: grid;
-  gap: 14px;
+  gap: var(--sp-4);
 }
 
-.hint,
 .err {
   margin: 0;
-  font-size: 13px;
-}
-
-.hint {
-  color: var(--muted);
+  font-size: var(--fs-xs);
 }
 
 .err {
