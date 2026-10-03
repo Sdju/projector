@@ -8,6 +8,7 @@ import {
   type PaletteCommand,
 } from "../../../core/modules/ide/index.ts";
 import { commandHostKey } from "../../common/utilities/commands.ts";
+import { createPageReload } from "./reload.ts";
 interface PaletteSession {
   commands: PaletteCommand[];
   trigger: HTMLElement | null;
@@ -38,6 +39,23 @@ export function provideIdeCommands() {
     error.value = value instanceof Error ? value.message : "Не удалось выполнить команду";
   };
   const workbench = sdk.createScope("workbench", () => ({ surface: "workbench" }));
+  const pageReload = createPageReload(reportError, () => revision.value++);
+  workbench.registerCommand({
+    id: "ide.workbench.pages.reload",
+    title: "Перезагрузить открытые страницы Projector",
+    description:
+      "Обновляет все открытые страницы Projector на текущем адресе. Несохранённые изменения используют обычное подтверждение страницы.",
+    enabled: () => !pageReload.isBusy(),
+    run: () => pageReload.reloadPages(),
+  });
+  workbench.registerCommand({
+    id: "ide.workbench.server.restart",
+    title: "Перезапустить сервер и открытые страницы",
+    description:
+      "Запрашивает подтверждение, завершает терминалы и дочерние процессы, перезапускает сервер Projector и обновляет все открытые страницы после запуска нового процесса.",
+    enabled: () => !pageReload.isBusy(),
+    run: () => pageReload.restartServer(),
+  });
   workbench.registerCommand({
     id: "ide.workbench.commandPalette.open",
     title: "Открыть командный центр",
@@ -101,6 +119,7 @@ export function provideIdeCommands() {
     error.value = value instanceof Error ? value.message : String(value);
   });
   onBeforeUnmount(() => {
+    pageReload.dispose();
     unsubscribe();
     window.removeEventListener("keydown", globalKeydown, true);
     workbench.dispose();

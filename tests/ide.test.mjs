@@ -3,12 +3,121 @@ import { test } from "node:test";
 import { mkdtemp, readFile, writeFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createPageReload } from "../src/modules/ide/reload.ts";
 import {
   createCommandService,
   defaultKeybindings,
   parseKeybindings,
   matchesKey,
 } from "../core/modules/ide/index.ts";
+
+function reloadHost(t, replies, confirm = true) {
+  const messages = [];
+  const requests = [];
+  const errors = [];
+  let reloads = 0;
+  let channel;
+  const originals = {
+    window: globalThis.window,
+    BroadcastChannel: globalThis.BroadcastChannel,
+    fetch: globalThis.fetch,
+  };
+  globalThis.window = { confirm: () => confirm, location: { reload: () => reloads++ } };
+  globalThis.BroadcastChannel = class {
+    closed = false;
+    constructor() {
+      channel = this;
+    }
+    postMessage(message) {
+      messages.push(message);
+    }
+    close() {
+      this.closed = true;
+    }
+  };
+  globalThis.fetch = async (url, options) => {
+    requests.push({ url, options });
+    const reply = replies.shift();
+    if (reply instanceof Error) throw reply;
+    assert.ok(reply, `Unexpected request: ${url}`);
+    return { ok: reply.status !== false, json: async () => reply };
+  };
+  const host = createPageReload(
+    (error) => errors.push(error),
+    () => {},
+  );
+  t.after(() => {
+    host.dispose();
+    Object.assign(globalThis, originals);
+  });
+  return { host, messages, requests, errors, channel, reloads: () => reloads };
+}
+
+test("page reload reaches the initiating page and peers and closes its channel", (t) => {
+  const ctx = reloadHost(t, []);
+  ctx.host.reloadPages();
+  assert.deepEqual(ctx.messages, [{ type: "reload" }]);
+  assert.equal(ctx.reloads(), 1);
+  ctx.channel.onmessage({ data: { type: "unrelated" } });
+  assert.equal(ctx.reloads(), 1);
+  ctx.channel.onmessage({ data: { type: "reload" } });
+  assert.equal(ctx.reloads(), 2);
+  ctx.host.dispose();
+  assert.equal(ctx.channel.closed, true);
+});
+
+test("server restart waits for a different PID, tolerates downtime and prevents duplicates", async (t) => {
+  const health = (pid) => ({ ok: true, app: "projector", pid });
+  const ctx = reloadHost(t, [
+    health(10),
+    { ok: true },
+    health(10),
+    new Error("offline"),
+    health(11),
+  ]);
+  const restart = ctx.host.restartServer();
+  assert.equal(ctx.host.isBusy(), true);
+  await ctx.host.restartServer();
+  assert.equal(ctx.reloads(), 0);
+  await restart;
+  assert.deepEqual(ctx.messages, [{ type: "restart", pid: 10 }]);
+  assert.equal(ctx.requests.filter(({ url }) => url === "/api/app/restart").length, 1);
+  assert.equal(ctx.reloads(), 1);
+  assert.equal(ctx.host.isBusy(), false);
+});
+
+test("cancelled restart does not contact the server or reload pages", async (t) => {
+  const ctx = reloadHost(t, [], false);
+  await ctx.host.restartServer();
+  assert.deepEqual(ctx.requests, []);
+  assert.deepEqual(ctx.messages, []);
+  assert.equal(ctx.reloads(), 0);
+});
+
+test("rejected restart preserves pages and permits retry", async (t) => {
+  const ctx = reloadHost(t, [
+    { ok: true, app: "projector", pid: 10 },
+    { status: false, error: "denied" },
+  ]);
+  await assert.rejects(ctx.host.restartServer(), /denied/);
+  assert.deepEqual(ctx.messages, []);
+  assert.equal(ctx.reloads(), 0);
+  assert.equal(ctx.host.isBusy(), false);
+});
+
+test("peer reloads only after successor health and ignores events after disposal", async (t) => {
+  const ctx = reloadHost(t, [{ ok: true, app: "projector", pid: 11 }]);
+  ctx.channel.onmessage({ data: { type: "restart", pid: 10 } });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(ctx.reloads(), 1);
+  assert.deepEqual(
+    ctx.requests.map(({ url }) => url),
+    ["/api/health"],
+  );
+  ctx.host.dispose();
+  ctx.channel.onmessage({ data: { type: "reload" } });
+  assert.equal(ctx.reloads(), 1);
+});
 
 test("SDK executes scoped async commands with arguments, checks availability, and disposes registrations", async () => {
   const sdk = createCommandService(defaultKeybindings);
