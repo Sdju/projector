@@ -7,3 +7,10 @@ export type {
   InspectResult,
   ProjectDraft,
 } from "./contract.ts";
+export type { ProjectRef } from "./ref.ts";
+export {
+  parseProjectRef,
+  formatProjectRef,
+  projectRefSegments,
+  normalizeGithubRepository,
+} from "./ref.ts";

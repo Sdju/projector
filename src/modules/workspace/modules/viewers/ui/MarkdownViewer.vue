@@ -2,15 +2,19 @@
 import { defineAsyncComponent, ref } from "vue";
 import VisualMarkdownEditor from "./VisualMarkdownEditor.vue";
 const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
-defineProps<{
-  projectId: string;
-  path: string;
-  content: string;
-  mode: "document" | "source";
-  error?: string;
-  line?: number;
-  column?: number;
-}>();
+withDefaults(
+  defineProps<{
+    projectId: string;
+    path: string;
+    content: string;
+    mode: "document" | "source";
+    error?: string;
+    editable?: boolean;
+    line?: number;
+    column?: number;
+  }>(),
+  { editable: true },
+);
 const emit = defineEmits<{
   change: [content: string];
   mode: [mode: "document" | "source"];
@@ -37,6 +41,7 @@ function focusOut(event: FocusEvent) {
       <VisualMarkdownEditor
         v-show="mode === 'document'"
         :path="path"
+        :editable="editable !== false"
         :project-id="projectId"
         :content="content"
         @change="emit('change', $event)"
@@ -49,7 +54,7 @@ function focusOut(event: FocusEvent) {
         :content="content"
         :line="line"
         :column="column"
-        editable
+        :editable="editable !== false"
         @change="emit('change', $event)"
         @save="emit('save')"
       />

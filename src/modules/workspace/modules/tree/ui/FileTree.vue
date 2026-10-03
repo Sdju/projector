@@ -19,7 +19,7 @@ import EntryDialog from "../../../../../common/ui/EntryDialog.vue";
 import IconChevronRight from "~icons/lucide/chevron-right";
 import { FileIcon } from "../../../../file-icons/index.ts";
 import { useFileIconTheme } from "../../../../file-icons/index.ts";
-import { workspaceRequest } from "../../../../workspace-api/index.ts";
+import { workspaceRequest, workspaceCapabilities } from "../../../../workspace-api/index.ts";
 import { createTreeDrag, treeDragKey } from "../lib/tree-drag.ts";
 import { createTreeSelection, treeSelectionKey } from "../lib/tree-selection.ts";
 import {
@@ -123,11 +123,13 @@ if (props.depth === 0) {
 }
 const { source, target, busy, expanded, error: moveError, message } = drag;
 if (props.depth === 0) {
-  const session = useSessionSnapshot(
-    () => `projector:tree:v1:${props.projectId}`,
-    () => [...expanded.value],
-    treeSessionSchema,
-  );
+  const session = workspaceCapabilities(props.projectId).persist
+    ? useSessionSnapshot(
+        () => `projector:tree:v1:${props.projectId}`,
+        () => [...expanded.value],
+        treeSessionSchema,
+      )
+    : { read: () => undefined };
   expanded.value = new Set(session.read() ?? []);
   watch(
     () => props.projectId,
@@ -265,7 +267,8 @@ defineExpose({ reveal });
           dragging: selection.dragged.value.includes(entry.path) && !!source,
           'drop-target': entry.directory && target === entry.path,
         }"
-        :draggable="!busy"
+        :disabled="busy || entry.disabled"
+        :draggable="!busy && !entry.disabled"
         :data-path="entry.path"
         :data-git-status="decoration"
         :style="{ paddingLeft: `${12 + depth * 14}px` }"

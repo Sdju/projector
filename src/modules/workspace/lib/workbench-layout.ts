@@ -1,3 +1,8 @@
+import type {
+  WorkspaceCapabilities,
+  WorkspaceCapability,
+  WorkspaceProfile,
+} from "../../workspace-api/index.ts";
 import { computed, ref, watch, type Ref } from "vue";
 import { commandArgs } from "../../../common/utilities/commands.ts";
 import {
@@ -22,6 +27,9 @@ import type { OpenFile } from "../open-file.ts";
 
 export interface WorkbenchLayoutContext {
   projectId: () => string;
+  capabilities: Readonly<WorkspaceCapabilities>;
+  /** Dock preset of the profile. */
+  layout: WorkspaceProfile["layout"];
   tabs: Ref<OpenFile[]>;
   /** Куда поместить следующую открытую вкладку: заполняется при перетаскивании файла на блок. */
   pending: { target?: DockTarget };
@@ -36,18 +44,31 @@ export interface WorkbenchLayoutContext {
     title: string,
     run: (args?: unknown) => unknown,
     enabled: (args?: unknown) => boolean,
+    requires?: WorkspaceCapability,
   ) => unknown;
+}
+
+/** Starting dock of a profile: a single editor group needs no terminal zone. */
+export function initialDockLayout(kind: WorkspaceProfile["layout"]): DockLayout {
+  if (kind === "full") return createDockLayout();
+  return {
+    root: { type: "group", id: "g1", panels: [], active: "", role: "editor", keepEmpty: true },
+    focused: "g1",
+  };
 }
 
 /** Раскладка блоков дока: файлы и терминалы как панели, их выбор, закрытие и команды раскладки. */
 export function useWorkbenchLayout(ctx: WorkbenchLayoutContext) {
   const { tabs } = ctx;
-  const layout = ref<DockLayout>(createDockLayout());
+  const { capabilities } = ctx;
+  const initialLayout = (): DockLayout => initialDockLayout(ctx.layout);
+  const layout = ref<DockLayout>(initialLayout());
   const restoringSession = ref(false);
   const fileOf = (id: string) => tabs.value.find((tab) => tab.key === id);
   const terminalPanel = (id: string) => `terminal:${id}`;
   const lastGroup: Partial<Record<"editor" | "terminal", string>> = {};
   const terminals = useTerminalSessions(() => ctx.projectId(), {
+    enabled: capabilities.terminals,
     started: (id) => revealPanel(terminalPanel(id)),
     restarted: (previous, id) => {
       layout.value = replacePanel(layout.value, terminalPanel(previous), terminalPanel(id));
@@ -199,7 +220,7 @@ export function useWorkbenchLayout(ctx: WorkbenchLayoutContext) {
   };
   function resetLayout() {
     const current = activeKey.value;
-    layout.value = createDockLayout();
+    layout.value = initialLayout();
     ctx.showSidebar();
     reconcileLayout();
     if (current) revealPanel(current);
@@ -249,6 +270,7 @@ export function useWorkbenchLayout(ctx: WorkbenchLayoutContext) {
       await createTerminal(program as TerminalProgram);
     },
     () => !terminals.busy.value,
+    "terminals",
   );
   return {
     layout,
@@ -259,6 +281,7 @@ export function useWorkbenchLayout(ctx: WorkbenchLayoutContext) {
     focusedGroup,
     activeKey,
     revealPanel,
+    initialLayout,
     reconcileLayout,
     describePanel,
     selectPanel,

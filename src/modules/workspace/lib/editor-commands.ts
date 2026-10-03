@@ -2,6 +2,7 @@ import type { Ref } from "vue";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import { commandArgs, type useCommandScope } from "../../../common/utilities/commands.ts";
 import { copyWithNotice } from "../../../common/utilities/notice.ts";
+import type { WorkspaceCapability } from "../../workspace-api/index.ts";
 import { isEditable, isMarkdown, type OpenFile } from "../open-file.ts";
 
 export interface EditorCommandContext {
@@ -11,6 +12,7 @@ export interface EditorCommandContext {
     title: string,
     run: (args?: unknown) => unknown,
     enabled: (args?: unknown) => boolean,
+    requires?: WorkspaceCapability,
   ) => unknown;
   tabs: Ref<OpenFile[]>;
   active: () => OpenFile | undefined;
@@ -43,6 +45,7 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
       if (!(await saveFile(file))) throw new Error(file.saveError || "Не удалось сохранить файл");
     },
     (args) => !!commandFile(args) && isEditable(commandFile(args)!),
+    "write",
   );
   register(
     "ide.editor.file.reveal",
@@ -112,6 +115,7 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
       selectTab(key);
     },
     () => true,
+    "agent",
   );
   register(
     "ide.workbench.server.network.open",

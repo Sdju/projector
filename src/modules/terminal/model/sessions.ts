@@ -3,6 +3,7 @@ import type { TerminalProgram, TerminalSession } from "../../../../core/modules/
 import { TerminalRequestError, terminalRequest } from "../lib/api.ts";
 
 export interface TerminalSessionHooks {
+  enabled?: boolean;
   /** Процесс проекта открыл терминал: его нужно показать. */
   started?: (sessionId: string) => void;
   /** Перезапуск создаёт новую сессию на месте прежней. */
@@ -54,6 +55,10 @@ export function useTerminalSessions(projectId: () => string, hooks: TerminalSess
   const current = (id: string) => !destroyed && id === projectId();
 
   async function refresh(): Promise<void> {
+    if (hooks.enabled === false) {
+      loaded.value = true;
+      return;
+    }
     const generation = ++listGeneration;
     const id = projectId();
     try {
@@ -66,6 +71,7 @@ export function useTerminalSessions(projectId: () => string, hooks: TerminalSess
   }
 
   async function create(program: TerminalProgram): Promise<TerminalSession | undefined> {
+    if (hooks.enabled === false) throw new Error("Терминалы недоступны для этого проекта");
     busy.value = true;
     error.value = "";
     const id = projectId();
@@ -135,7 +141,8 @@ export function useTerminalSessions(projectId: () => string, hooks: TerminalSess
         numbers.set(data.session.id, numbers.get(previous.id) ?? nextNumber++);
       }
     } catch (err) {
-      if (current(id)) error.value = err instanceof Error ? err.message : "Не удалось изменить сессию";
+      if (current(id))
+        error.value = err instanceof Error ? err.message : "Не удалось изменить сессию";
     } finally {
       busy.value = false;
     }
@@ -224,6 +231,10 @@ export function useTerminalSessions(projectId: () => string, hooks: TerminalSess
   }
   watch(projectId, reset);
   onMounted(() => {
+    if (hooks.enabled === false) {
+      loaded.value = true;
+      return;
+    }
     window.addEventListener("projector:terminal-started", started);
     void refresh();
     timer = setInterval(() => {

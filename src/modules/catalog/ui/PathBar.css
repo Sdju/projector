@@ -1,0 +1,213 @@
+.path-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  padding: 0 var(--sp-3);
+  color: var(--muted);
+  font: var(--fs-xs) var(--mono);
+}
+.path-bar:focus-within {
+  border-color: var(--focus);
+}
+.path-icon {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  color: var(--faint);
+}
+.segments {
+  display: flex;
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+.segment {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: 100%;
+}
+button {
+  font: inherit;
+  color: inherit;
+}
+.segment-label {
+  padding: var(--sp-1) var(--sp-2);
+  white-space: nowrap;
+  border-radius: var(--r-sm);
+}
+.segment:last-of-type .segment-label {
+  color: var(--text);
+}
+.segment-arrow {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 26px;
+  border-radius: var(--r-sm);
+  color: var(--faint);
+}
+.segment-arrow svg {
+  width: 12px;
+  height: 12px;
+}
+.segment-arrow[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+.segment-label:hover,
+.segment-arrow:hover,
+.segment-arrow[aria-expanded="true"] {
+  background: var(--active);
+  color: var(--text);
+}
+.edit-space {
+  align-self: stretch;
+  flex: 1;
+  min-width: 24px;
+}
+.input-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  overflow: hidden;
+}
+.input-wrap input,
+.completion {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  font: inherit;
+  line-height: 26px;
+  letter-spacing: normal;
+  white-space: pre;
+}
+.input-wrap input {
+  box-sizing: border-box;
+  z-index: 1;
+  color: var(--text);
+  background: transparent;
+  outline: none;
+  box-shadow: none;
+}
+.completion {
+  pointer-events: none;
+  color: var(--faint);
+  overflow: hidden;
+}
+.completion > span {
+  display: inline-block;
+}
+.typed {
+  visibility: hidden;
+}
+.key-hint {
+  flex-shrink: 0;
+  font-size: var(--fs-2xs);
+  color: var(--faint);
+}
+.dropdown {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: -1px;
+  z-index: 30;
+  width: min(640px, 100%);
+  min-width: min(280px, 100%);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-popover);
+  padding: var(--sp-1);
+}
+.dropdown-heading {
+  padding: var(--sp-2) var(--sp-2);
+  font-size: var(--fs-2xs);
+  color: var(--faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line);
+}
+.options {
+  max-height: min(320px, 45dvh);
+  overflow-y: auto;
+}
+.options button {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: var(--sp-2) var(--sp-2);
+  text-align: left;
+  border-radius: var(--r-sm);
+}
+.options button svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--faint);
+}
+.options button svg:last-child {
+  margin-left: auto;
+  width: 12px;
+}
+.options button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.options button:hover,
+.options button.highlighted,
+.options button:focus-visible {
+  background: var(--active);
+  color: var(--text);
+}
+.notice {
+  margin: 0;
+  padding: var(--sp-3) var(--sp-2);
+  color: var(--faint);
+}
+.error {
+  color: var(--err);
+}
+@media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {
+  .path-bar {
+    height: 44px;
+  }
+  .input-wrap {
+    height: 40px;
+  }
+  .input-wrap input,
+  .completion {
+    min-height: 0;
+    line-height: 40px;
+    font-size: var(--fs-input);
+  }
+  .segment-label,
+  .segment-arrow {
+    min-height: var(--control-h-sm);
+  }
+  .segment-arrow {
+    width: 32px;
+  }
+  .key-hint {
+    display: none;
+  }
+  .path-bar {
+    padding: 0 var(--sp-2);
+    gap: var(--sp-1);
+  }
+}

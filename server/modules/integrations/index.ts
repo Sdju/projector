@@ -3,7 +3,10 @@ import { githubStatus } from "./github.ts";
 import { dockerIntegrationStatus } from "./docker.ts";
 
 // Each integration owns its settings, credentials and public status adapter.
-export const integrationRegistry = [{ id: "github", status: githubStatus }, { id: "docker", status: dockerIntegrationStatus }];
+export const integrationRegistry = [
+  { id: "github", status: githubStatus },
+  { id: "docker", status: dockerIntegrationStatus },
+];
 export async function listIntegrations() {
   return {
     file: integrationsPath(),
@@ -23,3 +26,10 @@ export type { IntegrationConfig } from "./store.ts";
 export { readIntegrations } from "./store.ts";
 export { integrationConfig } from "./store.ts";
 export { updateIntegration } from "./store.ts";
+
+export {
+  browseGithubRepository,
+  browseGithubTree,
+  browseGithubFile,
+  browseGithubAsset,
+} from "./github-browser.ts";

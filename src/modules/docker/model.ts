@@ -12,6 +12,7 @@ import { dockerRequest } from "./client.ts";
 export function useDocker(
   projectId: string,
   hooks: {
+    enabled?: boolean;
     open: () => void;
     sidebar: () => void;
     terminal: (session: TerminalSession) => Promise<void>;
@@ -97,7 +98,7 @@ export function useDocker(
       title,
       description,
       arguments: args,
-      enabled: (value) => enabled(commandArgs(value)),
+      enabled: (value) => hooks.enabled !== false && enabled(commandArgs(value)),
       run: (value) => run(commandArgs(value)),
     });
   };
@@ -347,7 +348,9 @@ export function useDocker(
       }
     if (!disposed) timer = setTimeout(tick, snapshot.value?.enabled ? 5000 : 15000);
   }
-  onMounted(tick);
+  onMounted(() => {
+    if (hooks.enabled !== false) void tick();
+  });
   onBeforeUnmount(() => {
     disposed = true;
     ++generation;

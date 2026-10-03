@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { WorkspaceCapabilities } from "../../workspace-api/index.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
 import IconFiles from "~icons/lucide/files";
 import IconSearch from "~icons/lucide/search";
@@ -10,7 +11,12 @@ import IconSettings from "~icons/lucide/settings";
 import IconDocker from "~icons/lucide/container";
 
 export type SidebarSection = "files" | "search" | "git" | "docker";
-defineProps<{ section: SidebarSection; gitCount: number; settingsActive: boolean }>();
+defineProps<{
+  section: SidebarSection;
+  gitCount: number;
+  settingsActive: boolean;
+  capabilities: Readonly<WorkspaceCapabilities>;
+}>();
 const emit = defineEmits<{
   "update:section": [section: SidebarSection];
   command: [id: string];
@@ -31,6 +37,7 @@ const emit = defineEmits<{
       <IconFiles aria-hidden="true" />
     </button>
     <button
+      v-if="capabilities.search"
       :class="{ selected: section === 'search' }"
       :aria-pressed="section === 'search'"
       title="Поиск"
@@ -40,6 +47,7 @@ const emit = defineEmits<{
       <IconSearch aria-hidden="true" />
     </button>
     <button
+      v-if="capabilities.git"
       :class="{ selected: section === 'git' }"
       :aria-pressed="section === 'git'"
       title="Git"
@@ -49,11 +57,21 @@ const emit = defineEmits<{
       <IconGit class="git-logo" aria-hidden="true" />
       <span v-if="gitCount" aria-hidden="true">{{ gitCount }}</span>
     </button>
-    <button :class="{ selected: section === 'docker' }" :aria-pressed="section === 'docker'" title="Docker" aria-label="Docker" @click="emit('command', 'ide.docker.sidebar.open')"><IconDocker aria-hidden="true" /></button>
+    <button
+      v-if="capabilities.docker"
+      :class="{ selected: section === 'docker' }"
+      :aria-pressed="section === 'docker'"
+      title="Docker"
+      aria-label="Docker"
+      @click="emit('command', 'ide.docker.sidebar.open')"
+    >
+      <IconDocker aria-hidden="true" />
+    </button>
     <div class="side-actions">
       <UiButton
         icon
         size="sm"
+        v-if="capabilities.agent"
         title="Чат с агентом"
         aria-label="Чат с агентом"
         data-command="ide.workbench.agent.open"
@@ -83,6 +101,7 @@ const emit = defineEmits<{
       <UiButton
         icon
         size="sm"
+        v-if="capabilities.settings"
         :active="settingsActive"
         :aria-pressed="settingsActive"
         title="Настройки проекта"

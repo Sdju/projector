@@ -66,12 +66,12 @@ test(
     import { commandHostKey } from '/src/common/utilities/commands.ts';
     import {createCommandService, defaultKeybindings} from '/core/modules/ide/index.ts';
     const initial = "# Title\\r\\n\\r\\nA **bold** paragraph.\\r\\n\\r\\n![Alt text](../image.png)\\r\\n\\r\\n| A | B |\\r\\n| - | - |\\r\\n| One | Two |\\r\\n\\r\\n~~~js\\r\\nconst value = 1;\\r\\n~~~\\r\\n\\r\\n\\u003cdetails>\\u003csummary>More\\u003c/summary>Raw HTML\\u003c/details>\\r\\n\\r\\n\\u003cscript>window.unsafeMarkdown = true\\u003c/script>\\r\\n";
-    const content = ref(initial); let changes = 0; let failure = ''; let saves = 0; let saved = ''; const opened = [];
+    const editable = ref(true); const content = ref(initial); let changes = 0; let failure = ''; let saves = 0; let saved = ''; const opened = [];
     const layout = ref({root:{type:'group',id:'g1',panels:['file'],active:'file'},focused:'g1'});
     const app = createApp({ render: () => {
       const draft = content.value;
       return h(DockView, {layout:layout.value,projectId:'test',commandNamespace:'ide.test.tabs',describe:id=>({id,label:'test.md',dirty:draft!==initial}),'onUpdate:layout':value=>layout.value=value}, {
-        panel: () => h(MarkdownViewer, { mode: 'document', path: 'docs/test.md', projectId: 'test', content: draft, onSave: () => { saves++; saved = content.value; }, onChange: value => { changes++; content.value = value; }, onOpen: path => opened.push(path), onError: message => failure = message })
+        panel: () => h(MarkdownViewer, { mode: 'document', editable: editable.value, path: 'docs/test.md', projectId: 'test', content: draft, onSave: () => { saves++; saved = content.value; }, onChange: value => { changes++; content.value = value; }, onOpen: path => opened.push(path), onError: message => failure = message })
       });
     } });
     const sdk = createCommandService(defaultKeybindings);
@@ -92,7 +92,7 @@ test(
       check(!document.querySelector('.markdown-toolbar'), 'There must be no upper toolbar');
       check(editor.contentEditable === 'true', 'The formatted document must be editable');
       check(editor.querySelector('strong').textContent === 'bold', 'Bold must render visually');
-      content.value = ${JSON.stringify('| Область | Реализация | Ограничение |\n| --- | --- | --- |\n| GitHub | `server/modules/integrations/github.ts`: PAT и OAuth Device Flow | Проверка пользователя |\n| Workspace | `$XDG_DATA_HOME/projector/workspaces/<workspaceId>/repo` | Рабочие файлы на диске хоста |\n')};
+      content.value = ${JSON.stringify("| Область | Реализация | Ограничение |\n| --- | --- | --- |\n| GitHub | `server/modules/integrations/github.ts`: PAT и OAuth Device Flow | Проверка пользователя |\n| Workspace | `$XDG_DATA_HOME/projector/workspaces/<workspaceId>/repo` | Рабочие файлы на диске хоста |\n")};
       await nextTick();
       const host = document.getElementById('editor');
       for (const width of [820, 360]) {
@@ -214,6 +214,14 @@ test(
         check(Math.abs(scroller.scrollTop - scrollTop) < 2, 'Repeated edits must preserve the document scroll position');
       }
       check(content.value.includes('Last paragraph. first second'), 'Successive edits must append at the current caret');
+      editable.value = false;
+      await nextTick(); await new Promise(resolve => setTimeout(resolve, 50));
+      check(editor.contentEditable === 'false', 'Readonly mode must disable the same visual editor');
+      check(!editor.querySelector('[contenteditable=true]'), 'Nested code blocks must also be readonly');
+      const readonlyContent = content.value; const readonlyChanges = changes;
+      editor.focus(); document.execCommand('insertText', false, ' forbidden');
+      await nextTick();
+      check(content.value === readonlyContent && changes === readonlyChanges, 'Readonly mode must never publish a draft');
       app.unmount();
       document.getElementById('result').textContent = 'PASS';
     } catch (error) { document.getElementById('result').textContent = 'FAIL: ' + error.stack; }
@@ -236,6 +244,10 @@ test(
       ],
       { timeout: 50000, maxBuffer: 2 * 1024 * 1024 },
     );
-    assert.equal(stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1], "PASS", `Markdown browser regression failed:\n${stdout.slice(-4000)}\n${stderr.slice(-2000)}`);
+    assert.equal(
+      stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1],
+      "PASS",
+      `Markdown browser regression failed:\n${stdout.slice(-4000)}\n${stderr.slice(-2000)}`,
+    );
   },
 );

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { WorkspaceCapabilities } from "../../workspace-api/index.ts";
 import { ref } from "vue";
 import { FileTree } from "../modules/tree/index.ts";
 import {
@@ -17,6 +18,7 @@ import { DockerSidebar } from "../../docker/index.ts";
 /** Боковая панель проекта: дерево файлов, поиск и Git с переключателем разделов. */
 const props = defineProps<{
   projectId: string;
+  capabilities: Readonly<WorkspaceCapabilities>;
   hidden: boolean;
   active?: OpenFile;
   revision: number;
@@ -57,10 +59,17 @@ defineExpose({
   <aside v-show="!hidden" class="sidebar" aria-label="Обзор проекта">
     <SidebarTabs
       v-model:section="section"
+      :capabilities="capabilities"
       :git-count="overview.git.value.changes.length"
       :settings-active="active?.virtual === 'project'"
       @command="emit('command', $event)"
-      @refresh="section === 'git' ? gitPanel?.refresh() : section === 'docker' ? emit('command', 'ide.docker.refresh') : emit('refresh')"
+      @refresh="
+        section === 'git'
+          ? gitPanel?.refresh()
+          : section === 'docker'
+            ? emit('command', 'ide.docker.refresh')
+            : emit('refresh')
+      "
       @settings="emit('settings')"
     />
     <div v-show="section === 'files'" class="side-content">
@@ -73,17 +82,21 @@ defineExpose({
         :git-changes="overview.git.value.changes"
         @changed="emit('changed')"
         @deleted="emit('deleted', $event)"
-        @open="(path, pinned) => openFile(path, undefined, undefined, undefined, { preview: !pinned })"
+        @open="
+          (path, pinned) => openFile(path, undefined, undefined, undefined, { preview: !pinned })
+        "
         @moved="(source, destination) => emit('moved', source, destination)"
       />
     </div>
     <SearchPanel
+      v-if="capabilities.search"
       v-show="section === 'search'"
       ref="searchPanel"
       :project-id="projectId"
       @open="openFile"
     />
     <GitPanel
+      v-if="capabilities.git"
       v-show="section === 'git'"
       ref="gitPanel"
       :project-id="projectId"
@@ -94,11 +107,13 @@ defineExpose({
       :prepare="gitSync.prepare"
       :invalidate="files.invalidate"
       :applied="gitSync.applied"
-      @open="(path, staged, pinned) => openFile(path, undefined, undefined, staged, { preview: !pinned })"
+      @open="
+        (path, staged, pinned) => openFile(path, undefined, undefined, staged, { preview: !pinned })
+      "
       @open-commit="openCommit"
       @open-commit-diff="(hash, path, pinned) => openCommitFile(hash, path, !pinned)"
     />
-    <DockerSidebar v-show="section === 'docker'" />
+    <DockerSidebar v-if="capabilities.docker" v-show="section === 'docker'" />
   </aside>
 </template>
 

@@ -3,7 +3,13 @@ import { useCommandScope, commandArgs } from "../../../../../common/utilities/co
 import type ContextMenu from "../../../../../common/ui/ContextMenu.vue";
 import type EntryDialog from "../../../../../common/ui/EntryDialog.vue";
 import type { ContextMenuItem } from "../../../../../common/ui/context-menu.ts";
-import { workspaceRequest, moveWorkspaceEntry, mutateWorkspaceEntry } from "../../../../workspace-api/index.ts";
+import {
+  workspaceRequest,
+  moveWorkspaceEntry,
+  mutateWorkspaceEntry,
+  workspaceCapabilities,
+  type WorkspaceCapability,
+} from "../../../../workspace-api/index.ts";
 import type { createTreeDrag } from "./tree-drag.ts";
 import { topLevelTreePaths, type createTreeSelection } from "./tree-selection.ts";
 import { parentPath, relocatedPath } from "../../../../../../core/modules/workspace/index.ts";
@@ -245,18 +251,31 @@ export function useTreeOperations({
       throw error;
     }
   }
+  const capabilities = workspaceCapabilities(props.projectId);
+  const requirements = new Map<string, WorkspaceCapability>();
+  /** `requires` is the profile capability a command needs; commands never inspect the project. */
   const register = (
     id: string,
     title: string,
     run: (args?: unknown) => unknown,
     enabled: (args?: unknown) => boolean = () => true,
-  ) =>
-    treeCommands.scope.registerCommand({
+    requires?: WorkspaceCapability,
+  ) => {
+    if (requires) requirements.set(`ide.fileTree.${id}`, requires);
+    return treeCommands.scope.registerCommand({
       id: `ide.fileTree.${id}`,
       title,
       run,
-      enabled: (args) => !drag.busy.value && enabled(args),
+      enabled: (args) =>
+        (!requires || capabilities[requires]) && !drag.busy.value && enabled(args),
     });
+  };
+  const registerWrite = (
+    id: string,
+    title: string,
+    run: (args?: unknown) => unknown,
+    enabled?: (args?: unknown) => boolean,
+  ) => register(id, title, run, enabled, "write");
   const hasEntry = (args?: unknown) => !!resolveEntry(args) && actionPaths(args).length > 0;
   const singleEntry = (args?: unknown) =>
     hasEntry(args) &&
@@ -268,18 +287,18 @@ export function useTreeOperations({
     (args) => emit("open", resolveEntry(args)!.path, commandArgs(args).pinned === true),
     (args) => !!resolveEntry(args) && !resolveEntry(args)!.directory,
   );
-  register("file.create", "Новый файл…", (args) => requestAction("create-file", "", args));
-  register("directory.create", "Новая папка…", (args) =>
+  registerWrite("file.create", "Новый файл…", (args) => requestAction("create-file", "", args));
+  registerWrite("directory.create", "Новая папка…", (args) =>
     requestAction("create-directory", "", args),
   );
   for (const kind of ["file", "directory"])
-    register(
+    registerWrite(
       `${kind}.rename`,
       "Переименовать…",
       (args) => requestAction("rename", resolveEntry(args)!.name, args),
       singleEntry,
     );
-  register(
+  registerWrite(
     "entry.cut",
     "Вырезать",
     (args) => {
@@ -287,7 +306,7 @@ export function useTreeOperations({
     },
     hasEntry,
   );
-  register(
+  registerWrite(
     "entry.copy",
     "Копировать",
     (args) => {
@@ -295,14 +314,14 @@ export function useTreeOperations({
     },
     hasEntry,
   );
-  register(
+  registerWrite(
     "entry.duplicate",
     "Дублировать…",
     (args) =>
       requestAction("copy", resolveEntry(args)!.name.replace(/(\.[^.]*)?$/, " copy$1"), args),
     singleEntry,
   );
-  register("entry.paste", "Вставить", paste, () => !!clipboard.value);
+  registerWrite("entry.paste", "Вставить", paste, () => !!clipboard.value);
   register("entry.copyRelativePath", "Копировать относительный путь", (args) =>
     copyPath(true, args),
   );
@@ -315,7 +334,7 @@ export function useTreeOperations({
   );
   register("collapseAll", "Свернуть все папки", () => expanded.value.clear());
   register("refresh", "Обновить", () => emit("changed"));
-  register("entry.delete", "Удалить…", (args) => requestAction("delete", "", args), hasEntry);
+  registerWrite("entry.delete", "Удалить…", (args) => requestAction("delete", "", args), hasEntry);
   register("contextMenu", "Открыть меню", () => {
     const target = tree.value?.querySelector<HTMLElement>(
       contextEntry.value
@@ -355,7 +374,10 @@ export function useTreeOperations({
     if (!entry) items.push(item("collapseAll"));
     items.push(item("refresh"));
     if (entry) items.push(item("entry.delete", { danger: true, separator: true }));
-    return items;
+    return items.filter((item) => {
+      const requires = requirements.get(item.id);
+      return !requires || capabilities[requires];
+    });
   });
   return { contextEntry, clipboard, treeCommands, menuItems, runOperation };
 }

@@ -16,7 +16,7 @@ import { bracketMatching, foldGutter, indentOnInput } from "@codemirror/language
 import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
 import { MergeView, unifiedMergeView } from "@codemirror/merge";
 import { editorTheme, loadEditorTheme } from "../lib/editor-theme.ts";
-import { gutterRequest } from "../../../../workspace-api/index.ts";
+import { gutterRequest, workspaceCapabilities } from "../../../../workspace-api/index.ts";
 import {
   dirtyDiff,
   languageCompartment,
@@ -49,7 +49,9 @@ let activePath = "";
 async function loadGutter() {
   const token = ++gutterToken;
   const target = view;
-  if (!target || props.original !== undefined || !props.projectId || props.path.startsWith("/")) {
+  if (!target || props.original !== undefined || !props.projectId ||
+    props.path.startsWith("/") ||
+    !workspaceCapabilities(props.projectId).git) {
     target?.dispatch({ effects: setOriginal.of(null) });
     return;
   }

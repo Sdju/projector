@@ -1,10 +1,17 @@
 <script setup lang="ts">
+import { useCommandScope, commandArgs } from "../../common/utilities/commands.ts";
 import { computed } from "vue";
+import { githubProjectRoute } from "../../../core/modules/github/index.ts";
 import { useRoute, useRouter } from "vue-router";
-import { useProjects, projectRoute, projectIconUrl, type Project } from "../../modules/project/index.ts";
+import {
+  useProjects,
+  projectRoute,
+  projectIconUrl,
+  type ProjectLocation,
+} from "../../modules/project/index.ts";
 import { PathBar, MobileProjectPicker } from "../../modules/catalog/index.ts";
 
-defineProps<{ currentProject?: Project }>();
+defineProps<{ currentProject?: ProjectLocation }>();
 const { projects } = useProjects();
 const route = useRoute();
 const router = useRouter();
@@ -12,20 +19,48 @@ const running = computed(
   () => projects.value.filter((item) => item.runtime?.status === "running").length,
 );
 
-async function navigatePath(path: string) {
-  await router.push(projectRoute(path));
-}
+const commands = useCommandScope("project:path", () => ({ surface: "project-path" }));
+commands.scope.registerCommand({
+  id: "ide.project.path.open",
+  title: "Открыть проект по пути",
+  description: "Открывает локальную папку либо gh:/owner/repository в readonly без клонирования.",
+  arguments: { path: "string: абсолютный путь или gh:/owner/repository" },
+  run: async (value) => {
+    const { path } = commandArgs(value);
+    if (typeof path !== "string") throw new Error("Укажите path");
+    await router.push(projectRoute(path));
+  },
+});
+commands.scope.registerCommand({
+  id: "ide.github.repository.open",
+  title: "Открыть репозиторий GitHub",
+  description:
+    "Открывает репозиторий GitHub в readonly без клонирования; публичный репозиторий не требует входа.",
+  arguments: { repository: "string: owner/repository или ссылка GitHub" },
+  run: async (value) => {
+    const { repository } = commandArgs(value);
+    if (typeof repository !== "string") throw new Error("Укажите repository");
+    await router.push(githubProjectRoute(repository));
+  },
+});
+const navigatePath = (path: string) =>
+  commands.scope.executeCommand<void>("ide.project.path.open", { path });
 </script>
 
 <template>
   <div
     class="shell"
-    :class="{ workspace: route.name === 'project' }"
+    :class="{ workspace: route.name === 'project' || route.name === 'github-project' }"
     @dragover.prevent
     @drop.prevent
   >
     <header class="top" :class="{ 'has-project': currentProject }">
-      <MobileProjectPicker v-if="currentProject" :key="currentProject.id" class="mobile-picker" :project="currentProject" />
+      <MobileProjectPicker
+        v-if="currentProject"
+        :key="currentProject.id"
+        class="mobile-picker"
+        :project="currentProject"
+      />
       <router-link
         class="brand"
         :class="{ 'project-brand': currentProject }"
@@ -68,7 +103,9 @@ async function navigatePath(path: string) {
 </template>
 
 <style scoped>
-.mobile-picker { display: none; }
+.mobile-picker {
+  display: none;
+}
 
 .shell {
   --page-width: 760px;
@@ -174,7 +211,8 @@ async function navigatePath(path: string) {
   .shell,
   .shell.workspace {
     width: auto;
-    margin-inline: max(var(--sp-2), env(safe-area-inset-left)) max(var(--sp-2), env(safe-area-inset-right));
+    margin-inline: max(var(--sp-2), env(safe-area-inset-left))
+      max(var(--sp-2), env(safe-area-inset-right));
     padding-top: max(var(--sp-2), env(safe-area-inset-top));
     padding-bottom: max(var(--sp-3), env(safe-area-inset-bottom));
   }
@@ -201,12 +239,37 @@ async function navigatePath(path: string) {
     align-items: center;
     min-height: 44px;
   }
-  .top.has-project { display: flex; margin-bottom: 0; }
-  .has-project .brand, .has-project .header-path, .has-project .nav { display: none; }
-  .mobile-picker { display: block; }
-  .shell.workspace { margin-inline: 0; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); height: 100dvh; display: flex; flex-direction: column; }
-  .workspace main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  .workspace main :deep(.project-page) { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .top.has-project {
+    display: flex;
+    margin-bottom: 0;
+  }
+  .has-project .brand,
+  .has-project .header-path,
+  .has-project .nav {
+    display: none;
+  }
+  .mobile-picker {
+    display: block;
+  }
+  .shell.workspace {
+    margin-inline: 0;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+  .workspace main {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .workspace main :deep(.project-page) {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
   .header-path {
     grid-column: 1 / -1;
     height: 44px;

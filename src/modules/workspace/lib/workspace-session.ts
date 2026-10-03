@@ -1,6 +1,5 @@
 import { onBeforeUnmount, watch, type Ref } from "vue";
 import {
-  createDockLayout,
   parseDockLayout,
   serializeDockLayout,
   type DockLayout,
@@ -12,6 +11,9 @@ import type { SidebarSection } from "../ui/SidebarTabs.vue";
 
 export interface WorkspaceSessionContext {
   projectId: () => string;
+  /** Whether tabs and layout survive a reload (profile feature). */
+  persist: boolean;
+  initialLayout: () => DockLayout;
   tabs: Ref<OpenFile[]>;
   layout: Ref<DockLayout>;
   restoringSession: Ref<boolean>;
@@ -60,7 +62,7 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
       layout: serializeDockLayout(ctx.layout.value),
     }),
     workspaceSessionSchema,
-    () => !ctx.restoringSession.value,
+    () => ctx.persist && !ctx.restoringSession.value,
   );
   let sessionGeneration = 0;
   async function restoreSession(saved: WorkspaceSession | undefined, generation: number) {
@@ -115,12 +117,12 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
   watch(
     () => ctx.projectId(),
     () => {
-      const saved = session.read();
+      const saved = ctx.persist ? session.read() : undefined;
       const generation = ++sessionGeneration;
       ctx.restoringSession.value = true;
       ctx.resetFiles();
       ctx.resetGit();
-      ctx.layout.value = parseDockLayout(saved?.layout) ?? createDockLayout();
+      ctx.layout.value = parseDockLayout(saved?.layout) ?? ctx.initialLayout();
       ctx.section.value = saved?.section === "project" ? "files" : (saved?.section ?? "files");
       ctx.treeWidth.value = saved?.treeWidth;
       ctx.sidebarHidden.value = !!saved?.sidebarHidden;

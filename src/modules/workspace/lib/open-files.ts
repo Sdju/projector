@@ -2,7 +2,12 @@ import { onBeforeUnmount, onMounted, ref, type Ref } from "vue";
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from "vue-router";
 import { isFileDrag, pathsFromDataTransfer } from "../../path-drop/index.ts";
 import type { DockTarget } from "../../dock/index.ts";
-import { workspaceRequest, saveWorkspaceFile } from "../../workspace-api/index.ts";
+import {
+  workspaceRequest,
+  saveWorkspaceFile,
+  workspaceAssetUrl,
+  workspaceCapabilities,
+} from "../../workspace-api/index.ts";
 import { projectRelativePath, previewBrowserFile } from "../file-drop.ts";
 import { isEditable, isMarkdown, type OpenFile, type OpenFileOptions } from "../open-file.ts";
 import { dropPreviewExcept as dropPreviewTabs, opensAsPreview } from "./preview-tabs.ts";
@@ -43,6 +48,8 @@ export function useOpenFiles(ctx: OpenFilesContext) {
     staged?: boolean,
     { reload = false, external = false, preview = true }: OpenFileOptions = {},
   ) {
+    if (external && !workspaceCapabilities(ctx.projectId()).externalFiles)
+      throw new Error("Внешние файлы недоступны для этого источника");
     const key = `${external ? "external:" : ""}${path}:${staged === undefined ? "file" : staged ? "index" : "working"}`;
     const existing = tabs.value.find((tab) => tab.key === key);
     const asPreview = opensAsPreview(preview, existing);
@@ -72,10 +79,12 @@ export function useOpenFiles(ctx: OpenFilesContext) {
       if (generation !== fileGeneration) return;
       if (asPreview) dropPreviewExcept(key);
       const file: OpenFile = {
+        ...data,
+        readonly: !workspaceCapabilities(ctx.projectId()).write,
         external,
         image:
           "image" in data && data.image
-            ? `/api/projects/${encodeURIComponent(ctx.projectId())}/workspace/${external ? "external-asset" : "asset"}?${new URLSearchParams({ path })}`
+            ? workspaceAssetUrl(ctx.projectId(), path, external)
             : undefined,
         path,
         content: "modified" in data ? data.modified : data.content,
@@ -195,7 +204,8 @@ export function useOpenFiles(ctx: OpenFilesContext) {
     }
   }
   const acceptsFileDrop = (data: DataTransfer | null) =>
-    isFileDrag(data) || !!data?.types.includes(treeDragType);
+    (workspaceCapabilities(ctx.projectId()).externalFiles && isFileDrag(data)) ||
+    !!data?.types.includes(treeDragType);
   async function dropFiles(event: DragEvent, target: DockTarget) {
     event.preventDefault();
     const data = event.dataTransfer;

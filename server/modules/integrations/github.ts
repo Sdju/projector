@@ -38,10 +38,10 @@ export function repositoryName(value: unknown): string {
     throw new HttpError(400, "Укажите owner/repository или ссылку github.com");
   return name;
 }
-async function github<T>(path: string, token: string): Promise<T> {
+export async function github<T>(path: string, token: string = ""): Promise<T> {
   const response = await fetch(`https://api.github.com${path}`, {
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       Accept: "application/vnd.github+json",
       "X-GitHub-Api-Version": "2022-11-28",
       "User-Agent": "Projector",
@@ -51,7 +51,7 @@ async function github<T>(path: string, token: string): Promise<T> {
   });
   if (!response.ok)
     throw new HttpError(
-      response.status === 401 ? 401 : response.status === 404 ? 404 : 400,
+      [401, 403, 404, 409, 429].includes(response.status) ? response.status : 400,
       response.status === 401
         ? "Авторизация GitHub истекла. Войдите снова"
         : response.status === 404

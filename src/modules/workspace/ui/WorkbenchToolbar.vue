@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { WorkspaceCapabilities } from "../../workspace-api/index.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
 import IconSidebar from "~icons/lucide/panel-left";
 import IconLayout from "~icons/lucide/layout-template";
@@ -9,11 +10,12 @@ import IconClaude from "~icons/simple-icons/claude";
 import IconOpenCode from "~icons/simple-icons/opencode";
 
 defineProps<{
-  sidebarHidden: boolean;
-  terminalsBusy: boolean;
-  terminalsError?: string;
-  /** Скрытые блоки дока: кнопка возвращает блок на место. */
-  hiddenGroups: { id: string; label: string }[];
+    capabilities: Readonly<WorkspaceCapabilities>;
+    sidebarHidden: boolean;
+    terminalsBusy: boolean;
+    terminalsError?: string;
+    /** Скрытые блоки дока: кнопка возвращает блок на место. */
+    hiddenGroups: { id: string; label: string }[];
 }>();
 const emit = defineEmits<{
   command: [id: string, args?: unknown];
@@ -41,7 +43,12 @@ const terminalPrograms = [
     >
       <IconSidebar aria-hidden="true" />
     </UiButton>
-    <div class="toolbar-group" role="group" aria-label="Новая терминальная сессия">
+    <div
+      v-if="capabilities.terminals"
+      class="toolbar-group"
+      role="group"
+      aria-label="Новая терминальная сессия"
+    >
       <UiButton
         v-for="entry in terminalPrograms"
         :key="entry.program"

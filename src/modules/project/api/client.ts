@@ -1,4 +1,5 @@
-import type { Project, ProjectDraft, ProjectCommand } from "../model/types.ts";
+import { parseProjectRef } from "../../../../core/modules/project/index.ts";
+import type { Project, ProjectDraft, ProjectCommand, ProjectLocation } from "../model/types.ts";
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -49,7 +50,8 @@ export function previewIconUrl(path: string): string {
   return `/api/preview-icon?path=${encodeURIComponent(path)}`;
 }
 
-export function projectIconUrl(project: Project): string {
+export function projectIconUrl(project: ProjectLocation): string {
+  if (project.iconUrl) return project.iconUrl;
   const revision = new URLSearchParams({
     path: project.path,
     name: project.name,
@@ -63,6 +65,7 @@ export async function fetchDirectories(
   complete = false,
   signal?: AbortSignal,
 ): Promise<import("../../../../core/modules/directories/index.ts").DirectoryListing> {
+  if (parseProjectRef(path).kind !== "local") return { path, entries: [], truncated: false };
   return request(`/api/directories?${new URLSearchParams({ path, complete: String(complete) })}`, {
     signal,
   });

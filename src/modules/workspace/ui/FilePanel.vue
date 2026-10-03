@@ -31,7 +31,7 @@ const emit = defineEmits<{
       <span>{{ file.path }}</span>
       <span v-if="file.virtual === 'keybindings'">настройки IDE</span>
       <span v-if="file.virtual === 'network'">доступ по сети</span>
-      <span v-if="file.external">только просмотр</span>
+      <span v-if="file.external || file.readonly">только просмотр</span>
     </div>
     <p v-if="file.saveError && !isMarkdown(file)" class="file-error" role="alert">
       {{ file.saveError }}
@@ -48,6 +48,9 @@ const emit = defineEmits<{
         @open-diff="(hash, path) => emit('openCommitDiff', hash, path)"
         @subject="emit('subject', $event)"
       />
+      <p v-else-if="file.binary && !file.image" class="file-error">
+        Бинарный файл · {{ file.size }} байт
+      </p>
       <ImageViewport v-else-if="file.image" :src="file.image" :alt="file.path" />
       <ArchiveViewer v-else-if="file.archive" :archive="file.archive" />
       <SvgViewer
@@ -61,8 +64,10 @@ const emit = defineEmits<{
         @save="emit('save')"
       />
       <MarkdownViewer
+        :key="file.readonly ? revision : undefined"
         v-else-if="isMarkdown(file)"
         :project-id="projectId"
+        :editable="isEditable(file)"
         :path="file.path"
         :content="file.draft ?? file.content"
         :mode="file.markdownMode ?? 'document'"

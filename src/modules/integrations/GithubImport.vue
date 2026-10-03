@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { useCommandScope } from "../../common/utilities/commands.ts";
 import { computed, onMounted, ref } from "vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import { useProjects } from "../project/index.ts";
 import type { Project } from "../project/index.ts";
 import { fetchIntegrations, integrationRequest } from "./client.ts";
 import type { Integration, Repository } from "./client.ts";
+const commands = useCommandScope("github:catalog", () => ({ surface: "github-catalog" }));
 const github = ref<Integration | null>(null);
 const opened = ref(false);
 const repos = ref<Repository[]>([]);
@@ -78,8 +80,17 @@ async function importRepo(name: string) {
 
 <template>
   <section class="github-import">
-    <UiButton :active="opened" @click="toggle">импорт из GitHub</UiButton>
+    <UiButton :active="opened" @click="toggle">GitHub</UiButton>
     <div v-if="opened" class="panel">
+      <form @submit.prevent="commands.run('ide.github.repository.open', { repository })">
+        <input
+          v-model="repository"
+          aria-label="Открыть репозиторий GitHub"
+          placeholder="owner/repository"
+          required
+        />
+        <UiButton type="submit" :disabled="!repository.trim()">открыть</UiButton>
+      </form>
       <template v-if="github?.enabled && github.connected">
         <p class="muted">{{ github.account }} · папка {{ github.settings.directory }}</p>
         <form @submit.prevent="importRepo(repository)">
@@ -106,6 +117,10 @@ async function importRepo(name: string) {
             ><span v-if="repo.private" class="private">приватный</span>
             <p v-if="repo.description" class="description">{{ repo.description }}</p>
           </div>
+          <UiButton
+            @click="commands.run('ide.github.repository.open', { repository: repo.fullName })"
+            >открыть</UiButton
+          >
           <UiButton :disabled="!!importing" @click="importRepo(repo.fullName)">импорт</UiButton>
         </div>
         <p v-if="loading" class="muted" role="status">Загружаем репозитории…</p>

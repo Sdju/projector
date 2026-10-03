@@ -1,4 +1,4 @@
-import { moveWorkspaceEntry } from "../../../../workspace-api/index.ts";
+import { moveWorkspaceEntry, workspaceCapabilities } from "../../../../workspace-api/index.ts";
 import { treeDragType } from "./tree-drag.ts";
 import { topLevelTreePaths } from "./tree-selection.ts";
 import {
@@ -20,7 +20,9 @@ export function useTreeDragDrop({ props, emit, selection, drag }: TreeContext) {
     if (!selection.paths.value.has(entry.path)) selection.replace(entry.path);
     selection.dragged.value = topLevelTreePaths(selection.paths.value);
     source.value = entry.path;
-    event.dataTransfer.effectAllowed = "copyMove";
+    event.dataTransfer.effectAllowed = workspaceCapabilities(props.projectId).write
+      ? "copyMove"
+      : "copy";
     event.dataTransfer.setData(
       treeDragType,
       JSON.stringify({
@@ -34,6 +36,7 @@ export function useTreeDragDrop({ props, emit, selection, drag }: TreeContext) {
     return entry ? (entry.directory ? entry.path : parentPath(entry.path)) : props.path;
   }
   function dragOver(event: DragEvent, entry?: FileEntry) {
+    if (!workspaceCapabilities(props.projectId).write) return;
     if (!source.value || busy.value || !event.dataTransfer?.types.includes(treeDragType)) return;
     event.preventDefault();
     const directory = destinationFor(entry);
@@ -46,6 +49,10 @@ export function useTreeDragDrop({ props, emit, selection, drag }: TreeContext) {
       drag.hover();
   }
   async function drop(event: DragEvent, entry?: FileEntry) {
+    if (!workspaceCapabilities(props.projectId).write) {
+      drag.clear();
+      return;
+    }
     if (!source.value || busy.value || !event.dataTransfer?.types.includes(treeDragType)) return;
     event.preventDefault();
     const directory = destinationFor(entry);

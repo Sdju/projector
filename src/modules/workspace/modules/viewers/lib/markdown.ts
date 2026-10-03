@@ -1,3 +1,4 @@
+import { workspaceAssetUrl } from "../../../../workspace-api/index.ts";
 import MarkdownIt from "markdown-it";
 import taskLists from "markdown-it-task-lists";
 import hljs from "highlight.js/lib/common";
@@ -61,11 +62,7 @@ export function renderMarkdown(content: string, path: string, projectId: string)
   }
   for (const image of document.querySelectorAll("img")) {
     const target = markdownPath(image.getAttribute("src") ?? "", path);
-    if (target)
-      image.setAttribute(
-        "src",
-        `/api/projects/${encodeURIComponent(projectId)}/workspace/asset?${new URLSearchParams({ path: target })}`,
-      );
+    if (target) image.setAttribute("src", workspaceAssetUrl(projectId, target));
     image.setAttribute("loading", "lazy");
   }
   return document.innerHTML;

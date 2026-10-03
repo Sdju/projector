@@ -3,11 +3,15 @@ export interface FileEntry {
   path: string;
   directory: boolean;
   executable?: boolean;
+  disabled?: boolean;
 }
 export interface FileContent {
   path: string;
   content: string;
   archive?: ArchiveContent;
+  readonly?: boolean;
+  binary?: boolean;
+  size?: number;
 }
 export interface ArchiveEntry {
   path: string;

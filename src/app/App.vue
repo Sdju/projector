@@ -2,7 +2,14 @@
 import { computed, onMounted, onUnmounted, watchEffect } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { isLauncherWindow } from "../modules/launcher/index.ts";
-import { useProjects, projectPathFromParams, projectIconUrl } from "../modules/project/index.ts";
+import {
+  useProjects,
+  projectPathFromParams,
+  projectIconUrl,
+  formatProjectRef,
+  githubRepositoryFromParams,
+  type ProjectLocation,
+} from "../modules/project/index.ts";
 import { useRunner } from "../modules/runner/index.ts";
 import { CommandPalette, provideIdeCommands } from "../modules/ide/index.ts";
 import UiNoticeHost from "../common/ui/UiNoticeHost.vue";
@@ -13,13 +20,21 @@ const { load, projects } = useProjects();
 const { connect } = useRunner();
 const route = useRoute();
 const router = useRouter();
-const currentProject = computed(() =>
-  route.name === "project"
-    ? projects.value.find(
-        (project) => project.path === projectPathFromParams(route.params.projectPath),
-      )
-    : undefined,
-);
+const currentProject = computed<ProjectLocation | undefined>(() => {
+  if (route.name === "project")
+    return projects.value.find(
+      (project) => project.path === projectPathFromParams(route.params.projectPath),
+    );
+  if (route.name !== "github-project") return;
+  const repository = githubRepositoryFromParams(route.params.githubPath);
+  const path = formatProjectRef({ kind: "github", repository });
+  return {
+    id: path,
+    path,
+    name: repository.split("/").at(-1) || "GitHub",
+    iconUrl: "/github.svg",
+  };
+});
 watchEffect(() => {
   const project = currentProject.value;
   const page =
@@ -27,9 +42,14 @@ watchEffect(() => {
       ? "поиск"
       : route.name === "home"
         ? "проекты"
-        : route.name === "settings"
-          ? "настройки"
-          : "проект";
+        : route.name === "github-project"
+          ? formatProjectRef({
+              kind: "github",
+              repository: githubRepositoryFromParams(route.params.githubPath),
+            })
+          : route.name === "settings"
+            ? "настройки"
+            : "проект";
   document.title = project ? `${project.name} — Projector` : `Projector — ${page}`;
   const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
   if (favicon) {

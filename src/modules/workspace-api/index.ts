@@ -1,16 +1,65 @@
+import {
+  createWorkspaceProfiles,
+  profileCapabilities,
+  readProviderFor,
+  type WorkspaceProfile,
+  type WorkspaceProfileResolver,
+} from "./profile.ts";
+import { createLocalWorkspaceProfile } from "./local.ts";
+export {
+  createWorkspaceProfiles,
+  profileCapabilities,
+  type WorkspaceCapability,
+  type WorkspaceCapabilities,
+  type WorkspaceProfile,
+  type WorkspaceProfileResolver,
+  type WorkspaceProfiles,
+  type FilesProvider,
+  type GitProvider,
+  type ReadProvider,
+} from "./profile.ts";
+export { createLocalWorkspaceProfile } from "./local.ts";
+
+/** Replaceable composition root: tests and new environments swap resolvers, not call sites. */
+const resolvers: WorkspaceProfileResolver[] = [];
+let profiles = createWorkspaceProfiles(resolvers, createLocalWorkspaceProfile);
+export function useWorkspaceProfiles(next: typeof profiles) {
+  profiles = next;
+}
+/** Adds an adapter that claims some project ids (GitHub, containers, ...). */
+export function addWorkspaceProfileResolver(resolver: WorkspaceProfileResolver) {
+  resolvers.push(resolver);
+}
+export const workspaceProfile = (projectId: string): WorkspaceProfile => profiles.resolve(projectId);
+export const registerWorkspaceProfile = (projectId: string, profile: WorkspaceProfile) =>
+  profiles.register(projectId, profile);
+export const workspaceCapabilities = (projectId: string) =>
+  profileCapabilities(workspaceProfile(projectId));
+export const workspaceAssetUrl = (projectId: string, path: string, external = false) =>
+  workspaceProfile(projectId).providers.files.assetUrl(path, external);
+export const refreshWorkspace = (projectId: string) =>
+  workspaceProfile(projectId).providers.files.refresh?.();
+
+const READONLY = "Проект открыт только для чтения";
+function fileWriter(projectId: string) {
+  const write = workspaceProfile(projectId).providers.files.write;
+  if (!write) throw new Error(READONLY);
+  return write;
+}
+function gitWriter(projectId: string) {
+  const write = workspaceProfile(projectId).providers.git?.write;
+  if (!write) throw new Error(READONLY);
+  return write;
+}
+
 export async function workspaceRequest<T>(
   projectId: string,
   action: string,
   params: Record<string, string> = {},
   signal?: AbortSignal,
 ): Promise<T> {
-  const response = await fetch(
-    `/api/projects/${encodeURIComponent(projectId)}/workspace/${action}?${new URLSearchParams(params)}`,
-    { signal },
-  );
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "Не удалось прочитать проект");
-  return data as T;
+  const provider = readProviderFor(workspaceProfile(projectId), action);
+  return (await provider.read(action, params, signal)) as T;
 }
 
 export function searchWorkspace(
@@ -19,9 +68,10 @@ export function searchWorkspace(
   options: import("../../../core/modules/workspace/index.ts").SearchOptions,
   signal?: AbortSignal,
 ) {
-  return workspaceRequest<
-    { hits: import("../../../core/modules/workspace/index.ts").SearchHit[]; truncated: boolean }
-  >(
+  return workspaceRequest<{
+    hits: import("../../../core/modules/workspace/index.ts").SearchHit[];
+    truncated: boolean;
+  }>(
     projectId,
     "search",
     {
@@ -49,25 +99,19 @@ export async function saveWorkspaceFile(
   content: string,
   original: string,
 ) {
-  const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}/workspace/file`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path, content, original }),
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "Не удалось сохранить файл");
-  return data as { path: string; content: string };
+  return (await fileWriter(projectId)(
+    "file",
+    { path, content, original },
+    "Не удалось сохранить файл",
+  )) as { path: string; content: string };
 }
 
 export async function moveWorkspaceEntry(projectId: string, path: string, directory: string) {
-  const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}/workspace/move`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path, directory }),
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "Не удалось перенести запись");
-  return data as { source: string; destination: string };
+  return (await fileWriter(projectId)(
+    "move",
+    { path, directory },
+    "Не удалось перенести запись",
+  )) as { source: string; destination: string };
 }
 
 export async function mutateWorkspaceEntry(
@@ -77,14 +121,11 @@ export async function mutateWorkspaceEntry(
   directory = "",
   name = "",
 ) {
-  const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}/workspace/entry`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action, path, directory, name }),
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "Не удалось выполнить действие");
-  return data as { source?: string; destination?: string };
+  return (await fileWriter(projectId)(
+    "entry",
+    { action, path, directory, name },
+    "Не удалось выполнить действие",
+  )) as { source?: string; destination?: string };
 }
 
 export async function mutateWorkspaceGit(
@@ -92,14 +133,11 @@ export async function mutateWorkspaceGit(
   action: string,
   path: string | string[],
 ) {
-  const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}/workspace/git`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action, ...(Array.isArray(path) ? { paths: path } : { path }) }),
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "Не удалось выполнить действие Git");
-  return data as import("../../../core/modules/workspace/index.ts").GitOverview;
+  return (await gitWriter(projectId)(
+    "git",
+    { action, ...(Array.isArray(path) ? { paths: path } : { path }) },
+    "Не удалось выполнить действие Git",
+  )) as import("../../../core/modules/workspace/index.ts").GitOverview;
 }
 
 export async function mutateWorkspaceBranch(
@@ -107,12 +145,9 @@ export async function mutateWorkspaceBranch(
   action: string,
   input: { name?: string; newName?: string; from?: string; checkout?: boolean; force?: boolean },
 ) {
-  const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}/workspace/branch`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action, ...input }),
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "Не удалось выполнить действие с веткой");
-  return data as import("../../../core/modules/workspace/index.ts").GitBranches;
+  return (await gitWriter(projectId)(
+    "branch",
+    { action, ...input },
+    "Не удалось выполнить действие с веткой",
+  )) as import("../../../core/modules/workspace/index.ts").GitBranches;
 }
