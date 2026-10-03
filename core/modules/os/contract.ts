@@ -1,3 +1,5 @@
+export type DesktopAction = "show" | "toggle" | "tray" | "quit";
+
 export interface ProcessInfo {
   pid: number;
   parent: number;

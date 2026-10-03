@@ -2,8 +2,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import * as linux from "./modules/linux/index.ts";
-import type { ResidentOptions } from "./contract.ts";
-import type { DesktopAction } from "../launcher/index.ts";
+import type { DesktopAction, ResidentOptions } from "./contract.ts";
 
 export class UnsupportedPlatformError extends Error {
   readonly code = "ERR_OS_UNSUPPORTED";

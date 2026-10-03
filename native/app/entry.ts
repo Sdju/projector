@@ -1,5 +1,5 @@
 import { os } from "../../core/modules/os/index.ts";
-import type { DesktopAction } from "../../core/modules/launcher/index.ts";
+import type { DesktopAction } from "../../core/modules/os/index.ts";
 
 async function main() {
   const [command, value, action] = process.argv.slice(2);

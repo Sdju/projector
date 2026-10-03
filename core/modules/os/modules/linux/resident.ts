@@ -1,8 +1,7 @@
-import type { ResidentOptions } from "../../contract.ts";
+import type { DesktopAction, ResidentOptions } from "../../contract.ts";
 import dbus from "dbus-next";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { DesktopAction } from "../../../launcher/index.ts";
 import { sessionBus, call } from "./bus.ts";
 import { Shortcut } from "./shortcut.ts";
 import { startTray } from "./tray.ts";

@@ -17,7 +17,6 @@ export interface ShortcutStatus {
   active: boolean;
   shortcut: string;
 }
-export type DesktopAction = "show" | "toggle" | "tray" | "quit";
 
 /** Same HTTP contract in the browser and the native Node process. */
 export function createLauncherClient(baseUrl = "") {

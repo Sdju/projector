@@ -1,4 +1,3 @@
-export type { DesktopAction } from "./launcher.ts";
 export { createLauncherClient } from "./launcher.ts";
 export type { LaunchItem } from "./launcher.ts";
 export type { ShortcutStatus } from "./launcher.ts";
