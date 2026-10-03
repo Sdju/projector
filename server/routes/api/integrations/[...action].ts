@@ -8,6 +8,7 @@ import {
   githubRepositories,
   importGithubProject,
   browseGithubRepository,
+  browseGithubDirectories,
   browseGithubTree,
   browseGithubFile,
   browseGithubAsset,
@@ -30,7 +31,9 @@ export async function handleIntegrationsActions({
     if (path.startsWith("/api/integrations/github/browse/") && method === "GET") {
       const repository = url.searchParams.get("repository") || "";
       const sha = url.searchParams.get("sha") || "";
-      if (path === "/api/integrations/github/browse/asset") {
+      if (path === "/api/integrations/github/browse/directories")
+        json(res, 200, await browseGithubDirectories(url.searchParams.get("path") || "", url.searchParams.get("complete") === "true"));
+      else if (path === "/api/integrations/github/browse/asset") {
         const asset = await browseGithubAsset(repository, sha, url.searchParams.get("path") || "");
         res.setHeader("Content-Type", asset.mime);
         res.setHeader("X-Content-Type-Options", "nosniff");

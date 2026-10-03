@@ -134,3 +134,55 @@ test("readonly GitHub browser reads snapshots, trees and blobs without cloning o
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("GitHub path suggestions paginate owners, filter prefixes and respect authentication", async () => {
+  const root = await mkdtemp(join(tmpdir(), "projector-gh-navigation-"));
+  process.env.XDG_DATA_HOME = root;
+  const { browseGithubDirectories, updateIntegration } = await import("../server/modules/integrations/index.ts");
+  const requests = [];
+  let token = "";
+  let total = 102;
+  const fetch = mock.method(globalThis, "fetch", async (address, init) => {
+    const url = new URL(address);
+    requests.push(url);
+    assert.equal(url.origin, "https://api.github.com");
+    assert.equal(init.headers.Authorization, token ? `Bearer ${token}` : undefined);
+    if (!url.pathname.endsWith("/repos"))
+      return Response.json({ type: url.pathname.endsWith("/team") ? "Organization" : "User" });
+    const page = Number(url.searchParams.get("page"));
+    return Response.json(Array.from({ length: Math.max(0, Math.min(100, total - (page - 1) * 100)) }, (_, i) => {
+      const name = `repo-${(page - 1) * 100 + i}`;
+      return { name, full_name: `${url.pathname.includes("team") ? "team" : "alice"}/${name}` };
+    }));
+  });
+  try {
+    const siblings = await browseGithubDirectories("gh:/alice/current", false);
+    assert.equal(siblings.entries.length, 102);
+    assert.equal(siblings.truncated, false);
+    assert.equal(requests.at(-1).pathname, "/users/alice/repos");
+    assert.equal(requests.at(-1).searchParams.get("page"), "2");
+    assert.equal((await browseGithubDirectories("gh:/alice/REPO-10", true)).entries.length, 3);
+    assert.equal((await browseGithubDirectories("gh:/alice/", true)).entries.length, 102);
+    assert.equal((await browseGithubDirectories("gh:/alice/absent", true)).entries.length, 0);
+    await browseGithubDirectories("gh:/team", false);
+    assert.equal(requests.at(-1).pathname, "/orgs/team/repos");
+    const count = requests.length;
+    for (const path of ["gh:/", "gh:/../evil", "gh:/alice/repo/extra", "gh:/alice/repo?x", "https://evil.test"])
+      await assert.rejects(browseGithubDirectories(path, false), { status: 400 });
+    assert.equal(requests.length, count);
+    await updateIntegration("github", (config) => ({ ...config, enabled: true, credentials: { token: "secret", login: "Alice" } }));
+    token = "secret";
+    await browseGithubDirectories("gh:/alice", false);
+    assert.equal(requests.at(-1).pathname, "/user/repos");
+    assert.equal(requests.at(-1).searchParams.get("type"), "owner");
+    await browseGithubDirectories("gh:/team", false);
+    assert.equal(requests.at(-1).pathname, "/orgs/team/repos");
+    await updateIntegration("github", (config) => ({ ...config, enabled: false }));
+    token = "";
+    total = 1000;
+    assert.equal((await browseGithubDirectories("gh:/alice", false)).truncated, true);
+  } finally {
+    fetch.mock.restore();
+    await rm(root, { recursive: true, force: true });
+  }
+});

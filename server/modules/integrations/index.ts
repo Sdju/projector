@@ -33,3 +33,5 @@ export {
   browseGithubFile,
   browseGithubAsset,
 } from "./github-browser.ts";
+
+export { browseGithubDirectories } from "./github-navigation.ts";
