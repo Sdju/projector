@@ -143,6 +143,7 @@ available as `projector mode [dev|prod]` (see [usage](usage.md)).
 The `git:<projectId>` scope has `{ surface: 'git', projectId, path, staged, busy }`.
 Git rows, directory rows, group headers and their context menus use `ide.git.openDiff`, `ide.git.openFile`,
 `ide.git.stage`, `ide.git.unstage`, `ide.git.discard` and `ide.git.refresh`.
+`ide.git.group.toggle` `{ staged }` collapses or expands the Staged / Changed blocks.
 File commands accept `{ path, staged }`; omitting them uses the context-menu target.
 `openFile` opens the current file separately from its comparison. Diff tabs show a
 file-diff icon; their tooltip and breadcrumb identify HEAD → index or index → worktree.
@@ -160,6 +161,23 @@ file trees and remove obsolete comparisons. Writes use the same-origin
 `POST /api/projects/:id/workspace/git` adapter with `{ action, path }` or `{ action, paths }` and serialize
 index operations. Paths are restricted to individual changed files within the project.
 
+### Git branches
+
+The branch row at the top of the Git panel shows the current branch (or `HEAD · hash` while detached) with `↑N ↓M`
+against its upstream; it opens a filterable list of local and remote branches. The scope context carries `branch`
+and `branchesOpen`. Commands:
+
+- `ide.git.branch.toggle`, `ide.git.branch.refresh`, `ide.git.branch.list` (returns branches with upstream, ahead/behind, last commit);
+- `ide.git.branch.checkout` `{ name }` — a remote branch (`origin/x`) becomes a local tracking branch, or reuses the existing local one;
+- `ide.git.branch.create` `{ name?, from?, checkout? }` — `from` is a branch or commit hash, default HEAD; without `name` it asks in a dialog;
+- `ide.git.branch.rename` `{ name, newName? }` and `ide.git.branch.delete` `{ name, force?, confirm? }` (local branches only;
+  the current branch cannot be deleted, an unmerged one needs `force`).
+
+Open files are saved before HEAD moves and re-read afterwards; tabs whose file does not exist on the new branch close.
+Git's own explanation (for example the files blocking a checkout) is shown as the error. Writes use
+`POST /api/projects/:id/workspace/branch` with `{ action, name, newName, from, checkout, force }` and share the index write queue;
+`GET .../workspace/branches` lists them.
+
 ### Git history
 
 The collapsible **History** block of the Git panel lists commits (`git log --topo-order`) with a lane graph,
@@ -170,6 +188,8 @@ carries `commit`, `commitPath` and `historyOpen`. Commands:
 - `ide.git.history.filter` `{ query?, all? }` — message search, `@name` searches authors, `all` includes every branch;
 - `ide.git.commit.toggle` `{ hash }` expands the changes made by that commit only;
 - `ide.git.commit.openDiff` `{ hash, path }` opens a read-only diff `parent → commit` (tab title shows both hashes);
+- `ide.git.commit.file.toggle` `{ path, open? }` and `ide.git.commit.files.toggleAll` `{ open? }` expand the code of files
+  right inside the overview tab (read lazily, short files get a short viewer);
 - `ide.git.commit.openFile` `{ path }` opens the current file; `ide.git.commit.open` `{ hash }` opens the **Коммит** overview
   tab (message, metadata, parents, every file with +/− lines); `ide.git.commit.copyHash` `{ hash }`.
 

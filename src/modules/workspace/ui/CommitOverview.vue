@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
-import type { GitCommitDetail } from "../../../../core/modules/workspace/index.ts";
+import { computed, defineAsyncComponent, ref, watch } from "vue";
+import type { CommitComparison, GitCommitDetail } from "../../../../core/modules/workspace/index.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
+import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import { FileIcon, useFileIconTheme } from "../../file-icons/index.ts";
 import { workspaceRequest } from "../api.ts";
 import { absoluteTime, relativeTime, shortHash } from "../lib/commit-format.ts";
 import IconCopy from "~icons/lucide/copy";
+import IconChevronRight from "~icons/lucide/chevron-right";
+import IconOpen from "~icons/lucide/external-link";
+
+const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
 
 /** Вкладка «Обзор коммита»: сообщение, метаданные и все файлы коммита с числом строк. */
 const props = defineProps<{ projectId: string; hash: string }>();
@@ -19,12 +24,80 @@ const error = ref("");
 const loading = ref(false);
 const copied = ref(false);
 const { resolver } = useFileIconTheme();
+/** Раскрытые файлы читаются при первом раскрытии; отдельные запросы не нужны, пока блок свёрнут. */
+const expanded = ref(new Set<string>());
+const diffs = ref<Record<string, { loading: boolean; error: string; data?: CommitComparison }>>({});
 let generation = 0;
+async function loadDiff(path: string) {
+  if (diffs.value[path]) return;
+  const current = generation;
+  diffs.value[path] = { loading: true, error: "" };
+  try {
+    const data = await workspaceRequest<CommitComparison>(props.projectId, "commit-diff", {
+      hash: props.hash,
+      path,
+    });
+    if (current === generation) diffs.value[path] = { loading: false, error: "", data };
+  } catch (err) {
+    if (current === generation)
+      diffs.value[path] = {
+        loading: false,
+        error: err instanceof Error ? err.message : "Ошибка Git",
+      };
+  }
+}
+/** Короткий файл не занимает лишнего места; длинный получает до 420px и растягивается за уголок. */
+function viewerHeight(data: CommitComparison) {
+  const lines = Math.max(data.original.split("\n").length, data.modified.split("\n").length);
+  return `${Math.min(420, Math.max(110, lines * 20 + 56))}px`;
+}
+async function toggleFile(path: string, value?: boolean) {
+  const open = value ?? !expanded.value.has(path);
+  if (!open) expanded.value.delete(path);
+  else {
+    expanded.value.add(path);
+    await loadDiff(path);
+  }
+}
+const commands = useCommandScope(`commit:${props.projectId}:${props.hash}`, () => ({
+  surface: "commit",
+  projectId: props.projectId,
+  hash: props.hash,
+}));
+const textFiles = computed(() => (detail.value?.files ?? []).filter((file) => !file.binary));
+commands.scope.registerCommand({
+  id: "ide.git.commit.file.toggle",
+  title: "Показать или скрыть код файла коммита",
+  description: "Раскрывает изменения файла прямо в обзоре коммита.",
+  arguments: { path: "Путь файла относительно папки проекта", open: "true/false — задать явно" },
+  run: async (value) => {
+    const args = commandArgs(value);
+    if (typeof args.path !== "string" || !textFiles.value.some((f) => f.path === args.path))
+      throw new Error("Укажите путь текстового файла этого коммита");
+    if (args.open !== undefined && typeof args.open !== "boolean")
+      throw new Error("open должен быть boolean");
+    await toggleFile(args.path, args.open as boolean | undefined);
+  },
+});
+commands.scope.registerCommand({
+  id: "ide.git.commit.files.toggleAll",
+  title: "Раскрыть или свернуть все файлы коммита",
+  description: "Раскрывает код всех текстовых файлов коммита или сворачивает их.",
+  arguments: { open: "true — раскрыть всё, false — свернуть; по умолчанию переключает" },
+  run: async (value) => {
+    const args = commandArgs(value);
+    const open = typeof args.open === "boolean" ? args.open : expanded.value.size === 0;
+    if (!open) return expanded.value.clear();
+    await Promise.all(textFiles.value.map((file) => toggleFile(file.path, true)));
+  },
+});
 async function load() {
   const current = ++generation;
   loading.value = true;
   error.value = "";
   detail.value = undefined;
+  expanded.value.clear();
+  diffs.value = {};
   try {
     const data = await workspaceRequest<GitCommitDetail>(props.projectId, "commit", {
       hash: props.hash,
@@ -124,6 +197,15 @@ async function copy() {
         Файлы <span>{{ files.length }}</span>
         <b class="add">+{{ detail.additions }}</b>
         <b class="del">−{{ detail.deletions }}</b>
+        <UiButton
+          v-if="textFiles.length"
+          size="sm"
+          class="all"
+          data-command="ide.git.commit.files.toggleAll"
+          @click="commands.run('ide.git.commit.files.toggleAll')"
+        >
+          {{ expanded.size ? "Свернуть всё" : "Развернуть всё" }}
+        </UiButton>
       </h3>
       <p v-if="detail.parents.length > 1" class="note">
         Слияние: показаны изменения относительно первого родителя.
@@ -131,28 +213,71 @@ async function copy() {
       <p v-if="!files.length" class="note">В этой папке коммит ничего не менял.</p>
       <ul v-else class="files">
         <li v-for="file in files" :key="file.path">
-          <button
-            :disabled="file.binary"
-            :title="file.binary ? 'Бинарный файл' : 'Открыть изменения'"
-            data-command="ide.git.commit.openDiff"
-            @click="emit('openDiff', detail.hash, file.path)"
-          >
-            <b class="status" :class="file.status">{{ file.status }}</b>
-            <FileIcon :icon="file.icon" />
-            <span class="name">{{ file.name }}</span>
-            <span class="dir">
-              <template v-if="file.originalPath">{{ file.originalPath }} → </template
-              >{{ file.directory }}
-            </span>
-            <span v-if="file.binary" class="muted">бинарный</span>
-            <template v-else>
-              <span v-if="file.additions + file.deletions" class="bar" aria-hidden="true">
-                <i :style="{ width: `${file.share * 100}%` }" />
+          <div class="file-row">
+            <button
+              class="file"
+              :disabled="file.binary"
+              :aria-expanded="file.binary ? undefined : expanded.has(file.path)"
+              :title="file.binary ? 'Бинарный файл' : 'Показать код'"
+              data-command="ide.git.commit.file.toggle"
+              @click="commands.run('ide.git.commit.file.toggle', { path: file.path })"
+            >
+              <span class="glyph" aria-hidden="true">
+                <IconChevronRight v-if="!file.binary" :class="{ open: expanded.has(file.path) }" />
               </span>
-              <span class="add">+{{ file.additions }}</span>
-              <span class="del">−{{ file.deletions }}</span>
-            </template>
-          </button>
+              <b class="status" :class="file.status">{{ file.status }}</b>
+              <FileIcon :icon="file.icon" />
+              <span class="name">{{ file.name }}</span>
+              <span class="dir">
+                <template v-if="file.originalPath">{{ file.originalPath }} → </template
+                >{{ file.directory }}
+              </span>
+              <span v-if="file.binary" class="muted">бинарный</span>
+              <template v-else>
+                <span v-if="file.additions + file.deletions" class="bar" aria-hidden="true">
+                  <i :style="{ width: `${file.share * 100}%` }" />
+                </span>
+                <span class="add">+{{ file.additions }}</span>
+                <span class="del">−{{ file.deletions }}</span>
+              </template>
+            </button>
+            <UiButton
+              v-if="!file.binary"
+              icon
+              size="sm"
+              title="Открыть изменения во вкладке"
+              :aria-label="`Открыть изменения во вкладке: ${file.path}`"
+              data-command="ide.git.commit.openDiff"
+              @click="emit('openDiff', detail.hash, file.path)"
+            >
+              <IconOpen aria-hidden="true" />
+            </UiButton>
+          </div>
+          <div v-if="expanded.has(file.path)" class="inline">
+            <p v-if="diffs[file.path]?.loading" class="note" role="status">загрузка…</p>
+            <p v-else-if="diffs[file.path]?.error" class="note error" role="alert">
+              {{ diffs[file.path]!.error }}
+            </p>
+            <p
+              v-else-if="diffs[file.path]?.data?.original === diffs[file.path]?.data?.modified"
+              class="note"
+            >
+              Содержимое не изменилось.
+            </p>
+            <div
+              v-else-if="diffs[file.path]?.data"
+              class="viewer"
+              :style="{ height: viewerHeight(diffs[file.path]!.data!) }"
+            >
+              <CodeViewer
+                :path="file.path"
+                :content="diffs[file.path]!.data!.modified"
+                :original="diffs[file.path]!.data!.original"
+                :original-label="diffs[file.path]!.data!.parent || '∅'"
+                :modified-label="shortHash(detail.hash)"
+              />
+            </div>
+          </div>
         </li>
       </ul>
     </article>
@@ -258,8 +383,17 @@ code {
 .files li + li {
   border-top: 1px solid var(--line);
 }
-.files button {
-  width: 100%;
+.file-row {
+  display: flex;
+  align-items: center;
+  padding-right: var(--sp-2);
+}
+.file-row:hover {
+  background: var(--hover);
+}
+.file {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -267,12 +401,39 @@ code {
   text-align: left;
   font-size: var(--fs-xs);
 }
-.files button:hover:not(:disabled) {
-  background: var(--hover);
-}
-.files button:disabled {
+.file:disabled {
   cursor: default;
   opacity: 0.7;
+}
+.glyph {
+  width: 12px;
+  flex-shrink: 0;
+  color: var(--faint);
+}
+.glyph svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
+.glyph svg.open {
+  transform: rotate(90deg);
+}
+.all {
+  margin-left: auto;
+}
+.inline {
+  border-top: 1px solid var(--line);
+}
+.inline .note {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+}
+/* The diff fills this box; the corner handle lets a long file take more room. */
+.viewer {
+  min-height: 100px;
+  max-height: 85vh;
+  resize: vertical;
+  overflow: hidden;
 }
 .status {
   width: 14px;
