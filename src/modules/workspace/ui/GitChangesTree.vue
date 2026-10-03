@@ -15,7 +15,10 @@ const props = withDefaults(
     path?: string;
     depth?: number;
     disabled?: boolean;
-    canToggle: (path: string) => boolean;
+    canToggle?: (path: string) => boolean;
+    /** Дерево коммита: без кнопок Staged. */
+    readonly?: boolean;
+    label?: string;
   }>(),
   { path: "", depth: 0 },
 );
@@ -84,7 +87,7 @@ function toggle(path: string) {
 <template>
   <ul
     class="git-tree"
-    :aria-label="path || (staged ? 'Подготовленные изменения' : 'Рабочие изменения')"
+    :aria-label="path || label || (staged ? 'Подготовленные изменения' : 'Рабочие изменения')"
   >
     <li v-for="entry in rows" :key="entry.path">
       <div
@@ -121,8 +124,9 @@ function toggle(path: string) {
           <b v-else class="status">{{ staged ? entry.change.index : entry.change.worktree }}</b>
         </button>
         <button
+          v-if="!readonly"
           class="git-action"
-          :disabled="disabled || !canToggle(entry.path)"
+          :disabled="disabled || !canToggle?.(entry.path)"
           :title="staged ? 'Убрать из Staged' : 'Отметить Staged'"
           :aria-label="`${staged ? 'Убрать из Staged' : 'Отметить Staged'}: ${entry.path}`"
           :data-command="staged ? 'ide.git.unstage' : 'ide.git.stage'"
@@ -141,6 +145,7 @@ function toggle(path: string) {
         :staged="staged"
         :disabled="disabled"
         :can-toggle="canToggle"
+        :readonly="readonly"
         :selected="selected"
         @change="emit('change', $event)"
         @open="emit('open', $event)"

@@ -19,7 +19,7 @@ export interface WorkspaceSessionContext {
   treeWidth: Ref<number | undefined>;
   sidebarHidden: Ref<boolean>;
   /** Заголовок и путь служебной вкладки («Агент», «Настройки проекта»). */
-  virtualTab: (kind: NonNullable<OpenFile["virtual"]>) => { key: string; path: string };
+  virtualTab: (kind: Exclude<NonNullable<OpenFile["virtual"]>, "commit">) => { key: string; path: string };
   openFile: (
     path: string,
     line?: number,
@@ -28,6 +28,8 @@ export interface WorkspaceSessionContext {
     reload?: boolean,
     external?: boolean,
   ) => Promise<number | undefined>;
+  openCommit: (hash: string) => void;
+  openCommitFile: (hash: string, path: string) => Promise<number | undefined>;
   fileGeneration: () => number;
   openProjectSettings: () => void;
   resetFiles: () => void;
@@ -46,6 +48,7 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
           key: tab.key,
           path: tab.path,
           virtual: tab.virtual,
+          commit: tab.commit,
           external: tab.external,
           staged: tab.staged,
           markdownMode: tab.markdownMode,
@@ -64,6 +67,10 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
     try {
       for (const tab of saved?.tabs ?? []) {
         if (generation !== sessionGeneration) return;
+        if (tab.virtual === "commit") {
+          if (tab.commit) ctx.openCommit(tab.commit);
+          continue;
+        }
         if (tab.virtual) {
           const { key, path } = ctx.virtualTab(tab.virtual);
           if (!ctx.tabs.value.some((file) => file.key === key))
@@ -75,14 +82,9 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
             });
           continue;
         }
-        const completed = await ctx.openFile(
-          tab.path,
-          undefined,
-          undefined,
-          tab.staged,
-          false,
-          tab.external,
-        );
+        const completed = tab.commit
+          ? await ctx.openCommitFile(tab.commit, tab.path)
+          : await ctx.openFile(tab.path, undefined, undefined, tab.staged, false, tab.external);
         // A project switch or a user opening another file takes precedence over restoration.
         if (
           generation !== sessionGeneration ||

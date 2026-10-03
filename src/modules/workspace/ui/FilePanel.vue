@@ -2,6 +2,7 @@
 import { defineAsyncComponent } from "vue";
 import { KeybindingsEditor } from "../../ide/index.ts";
 import { isEditable, isMarkdown, type OpenFile } from "../open-file.ts";
+import CommitOverview from "./CommitOverview.vue";
 import ArchiveViewer from "./ArchiveViewer.vue";
 import ImageViewport from "./ImageViewport.vue";
 
@@ -16,6 +17,9 @@ const emit = defineEmits<{
   save: [];
   mode: [mode: "document" | "source"];
   open: [path: string];
+  openCommit: [hash: string];
+  openCommitDiff: [hash: string, path: string];
+  subject: [text: string];
 }>();
 </script>
 
@@ -31,6 +35,14 @@ const emit = defineEmits<{
     </p>
     <div class="panel-body">
       <KeybindingsEditor v-if="file.virtual === 'keybindings'" />
+      <CommitOverview
+        v-else-if="file.virtual === 'commit' && file.commit"
+        :project-id="projectId"
+        :hash="file.commit"
+        @open-commit="emit('openCommit', $event)"
+        @open-diff="(hash, path) => emit('openCommitDiff', hash, path)"
+        @subject="emit('subject', $event)"
+      />
       <ImageViewport v-else-if="file.image" :src="file.image" :alt="file.path" />
       <ArchiveViewer v-else-if="file.archive" :archive="file.archive" />
       <SvgViewer
@@ -65,8 +77,10 @@ const emit = defineEmits<{
         :content="file.draft ?? file.content"
         :editable="isEditable(file)"
         :original="file.original"
-        :original-label="file.staged ? 'HEAD' : 'Индекс'"
-        :modified-label="file.staged ? 'Индекс' : 'Рабочий файл'"
+        :original-label="file.commit ? file.parent || '∅' : file.staged ? 'HEAD' : 'Индекс'"
+        :modified-label="
+          file.commit ? file.commit.slice(0, 7) : file.staged ? 'Индекс' : 'Рабочий файл'
+        "
         :line="file.line"
         :column="file.column"
         @change="emit('change', $event)"

@@ -6,7 +6,11 @@ import { workspaceRequest, saveWorkspaceFile } from "../api.ts";
 import { projectRelativePath, previewBrowserFile } from "../file-drop.ts";
 import { isEditable, isMarkdown, type OpenFile } from "../open-file.ts";
 import { treeDragType } from "../tree-drag.ts";
-import type { FileComparison, FileContent } from "../../../../core/modules/workspace/index.ts";
+import type {
+  CommitComparison,
+  FileComparison,
+  FileContent,
+} from "../../../../core/modules/workspace/index.ts";
 
 export interface OpenFilesContext {
   projectId: () => string;
@@ -93,6 +97,54 @@ export function useOpenFiles(ctx: OpenFilesContext) {
     } finally {
       if (generation === fileGeneration) loading.value = false;
     }
+  }
+  /** Diff файла внутри коммита: родитель → коммит, только для чтения. */
+  async function openCommitFile(hash: string, path: string) {
+    const key = `${path}:commit:${hash}`;
+    if (tabs.value.some((tab) => tab.key === key)) {
+      selectTab(key);
+      return fileGeneration;
+    }
+    const generation = ++fileGeneration;
+    loading.value = true;
+    fileError.value = "";
+    try {
+      const data = await workspaceRequest<CommitComparison>(ctx.projectId(), "commit-diff", {
+        hash,
+        path,
+      });
+      if (generation !== fileGeneration) return;
+      tabs.value.push({
+        key,
+        path,
+        content: data.modified,
+        original: data.original,
+        commit: data.hash,
+        parent: data.parent,
+      });
+      selectTab(key);
+      return fileGeneration;
+    } catch (err) {
+      if (generation === fileGeneration) {
+        fileError.value = err instanceof Error ? err.message : "Не удалось открыть изменения";
+        return generation;
+      }
+    } finally {
+      if (generation === fileGeneration) loading.value = false;
+    }
+  }
+  /** Вкладка с подробным обзором коммита; `subject` — подсказка до загрузки деталей. */
+  function openCommit(hash: string, subject = "") {
+    const key = `commit:${hash}`;
+    if (!tabs.value.some((tab) => tab.key === key))
+      tabs.value.push({
+        key,
+        virtual: "commit",
+        path: `Коммит ${hash.slice(0, 7)}`,
+        content: subject,
+        commit: hash,
+      });
+    selectTab(key);
   }
   function releasePreview(file: OpenFile) {
     if (file.image?.startsWith("blob:")) URL.revokeObjectURL(file.image);
@@ -309,6 +361,8 @@ export function useOpenFiles(ctx: OpenFilesContext) {
     settle,
     reset,
     openFile,
+    openCommit,
+    openCommitFile,
     openBrowserFile,
     acceptsFileDrop,
     dropFiles,

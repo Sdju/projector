@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import { workspaceRequest } from "../api.ts";
 import { relocatedPath } from "../../../../core/modules/workspace/index.ts";
 import { useCommandScope } from "../../../common/utilities/commands.ts";
 import FileTree from "./FileTree.vue";
@@ -9,6 +8,8 @@ import WorkbenchToolbar from "./WorkbenchToolbar.vue";
 import SidebarTabs, { type SidebarSection } from "./SidebarTabs.vue";
 import GitPanel from "./GitPanel.vue";
 import { useGitOverview } from "../lib/git-overview.ts";
+import { useGitHistory } from "../lib/git-history.ts";
+import { useGitChangeSync } from "../lib/git-change-sync.ts";
 import { useSidebarResize } from "../lib/sidebar-resize.ts";
 import { useOpenFiles } from "../lib/open-files.ts";
 import { useWorkbenchLayout } from "../lib/workbench-layout.ts";
@@ -19,7 +20,6 @@ import { replacePanel, type DockTarget } from "../../dock/index.ts";
 import { type OpenFile } from "../open-file.ts";
 import { createPanelHosts } from "../panel-hosts.ts";
 import { TerminalCloseDialog } from "../../terminal/index.ts";
-import type { FileContent } from "../../../../core/modules/workspace/index.ts";
 const props = defineProps<{
   projectId: string;
   projectSettingsDirty?: boolean;
@@ -43,13 +43,14 @@ const registerEditor = (
 function entryDeleted(path: string) {
   files.invalidate();
   tabs.value = tabs.value.filter(
-    (tab) => tab.virtual || (tab.path !== path && !tab.path.startsWith(path + "/")),
+    (tab) => tab.virtual || tab.commit || (tab.path !== path && !tab.path.startsWith(path + "/")),
   );
   revision.value++;
   void loadGit();
   searchPanel.value?.refresh();
 }
 const overview = useGitOverview(() => props.projectId);
+const history = useGitHistory(() => props.projectId);
 const { git, gutterRevision, load: loadGit } = overview;
 const gitPanel = ref<InstanceType<typeof GitPanel>>();
 const section = ref<SidebarSection>("files");
@@ -166,35 +167,23 @@ useWorkspaceSession({
   fileGeneration: files.generation,
   openProjectSettings,
   resetFiles: files.reset,
-  resetGit: overview.reset,
+  openCommit: (hash) => files.openCommit(hash),
+  openCommitFile: files.openCommitFile,
+  resetGit: () => {
+    overview.reset();
+    history.reset();
+  },
   reloadGit: () => void loadGit(),
 });
 const active = computed(() => tabs.value.find((file) => file.key === activeKey.value));
-async function prepareGitChange(action: string, paths: string[]) {
-  if (action !== "discard") {
-    for (const entry of paths)
-      if (!(await prepareEntryChange(entry))) throw new Error("Не удалось сохранить файл");
-    return;
-  }
-  if (!(await files.settle(paths[0]!))) throw new Error("Не удалось завершить сохранение файла");
-}
-async function gitChangeApplied(action: string, paths: string[]) {
-  const path = paths[0]!;
-  revision.value++;
-  // Drop obsolete comparisons; reload a visible file after discard.
-  const current = active.value;
-  tabs.value = tabs.value.filter(
-    (tab) => !paths.includes(tab.path) || (tab.original === undefined && action !== "discard"),
-  );
-  if (current?.path === path && action === "discard") {
-    const exists = await workspaceRequest<FileContent>(props.projectId, "file", { path }).then(
-      () => true,
-      () => false,
-    );
-    if (exists) await openFile(path);
-  }
-  searchPanel.value?.refresh();
-}
+const { prepare: prepareGitChange, applied: gitChangeApplied } = useGitChangeSync({
+  projectId: () => props.projectId,
+  tabs,
+  active: () => active.value,
+  files,
+  bumpRevision: () => revision.value++,
+  refreshSearch: () => searchPanel.value?.refresh(),
+});
 watch(section, (value) => {
   if (value === "git") void loadGit();
 });
@@ -202,7 +191,7 @@ async function refresh() {
   revision.value++;
   await loadGit();
   if (section.value === "search") await searchPanel.value?.search();
-  if (active.value?.virtual) return;
+  if (active.value?.virtual || active.value?.commit) return;
   if (active.value?.localFile) void openBrowserFile(active.value.localFile, true);
   else if (active.value)
     void openFile(
@@ -217,7 +206,7 @@ async function refresh() {
 function entryMoved(source: string, destination: string) {
   files.invalidate();
   for (const tab of [...tabs.value]) {
-    if (tab.virtual) continue;
+    if (tab.virtual || tab.commit) continue;
     const path = relocatedPath(tab.path, source, destination);
     if (path === tab.path) continue;
     if (tab.staged !== undefined) {
@@ -294,11 +283,14 @@ onBeforeUnmount(() => {
         ref="gitPanel"
         :project-id="projectId"
         :overview="overview"
+        :history="history"
         :selected="active ? { path: active.path, staged: active.staged } : undefined"
         :prepare="prepareGitChange"
         :invalidate="files.invalidate"
         :applied="gitChangeApplied"
         @open="(path, staged) => openFile(path, undefined, undefined, staged)"
+        @open-commit="files.openCommit"
+        @open-commit-diff="files.openCommitFile"
       />
     </aside>
     <div

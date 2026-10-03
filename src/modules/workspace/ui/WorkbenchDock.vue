@@ -57,6 +57,9 @@ const { fileOf, terminals, terminalPanels } = props.workbench;
         @save="files.saveFile(fileOf(id))"
         @mode="fileOf(id)!.markdownMode = $event"
         @open="files.openFile($event)"
+        @open-commit="files.openCommit($event)"
+        @open-commit-diff="files.openCommitFile"
+        @subject="fileOf(id)!.content = $event"
       />
       <TerminalView
         v-else-if="terminalPanels.get(id)"

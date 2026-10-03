@@ -26,7 +26,7 @@ export interface WorkbenchLayoutContext {
   /** Куда поместить следующую открытую вкладку: заполняется при перетаскивании файла на блок. */
   pending: { target?: DockTarget };
   isDirty: (file: OpenFile) => boolean;
-  virtualTitle: (kind: NonNullable<OpenFile["virtual"]>) => string;
+  virtualTitle: (kind: Exclude<NonNullable<OpenFile["virtual"]>, "commit">) => string;
   selectTab: (key: string) => void;
   closeTab: (key: string) => Promise<void>;
   closeManyTabs: (ids: string[]) => Promise<void>;
@@ -137,11 +137,16 @@ export function useWorkbenchLayout(ctx: WorkbenchLayoutContext) {
       return {
         id,
         label: file.virtual ? file.path : file.path.split("/").at(-1)!,
-        title: file.virtual
-          ? ctx.virtualTitle(file.virtual)
-          : file.saveError
-            ? `${file.path} · ${file.saveError}`
-            : `${file.path}${file.original !== undefined ? (file.staged ? " · HEAD → index" : " · index → рабочий файл") : ""}`,
+        title:
+          file.virtual === "commit"
+            ? `${file.content ? `${file.content} · ` : ""}${file.commit}`
+            : file.virtual
+              ? ctx.virtualTitle(file.virtual)
+              : file.saveError
+                ? `${file.path} · ${file.saveError}`
+                : file.commit
+                  ? `${file.path} · ${file.parent || "∅"} → ${file.commit.slice(0, 7)}`
+                  : `${file.path}${file.original !== undefined ? (file.staged ? " · HEAD → index" : " · index → рабочий файл") : ""}`,
         dirty: ctx.isDirty(file),
         saving: !!file.saving,
         error: !!file.saveError,

@@ -6,13 +6,16 @@ import UiButton from "../../../common/ui/UiButton.vue";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import type { GitOverviewState } from "../lib/git-overview.ts";
+import type { GitHistoryState } from "../lib/git-history.ts";
 import GitChangesTree from "./GitChangesTree.vue";
+import GitHistory from "./GitHistory.vue";
 import IconPlus from "~icons/lucide/plus";
 import IconMinus from "~icons/lucide/minus";
 
 const props = defineProps<{
   projectId: string;
   overview: GitOverviewState;
+  history: GitHistoryState;
   /** Файл активной вкладки: подсвечивается в списке изменений. */
   selected?: { path: string; staged?: boolean };
   /** Сохраняет открытые файлы и ждёт записи перед изменением Git; бросает ошибку при неудаче. */
@@ -22,7 +25,11 @@ const props = defineProps<{
   /** Приводит вкладки и дерево в соответствие с новым состоянием Git. */
   applied: (action: string, paths: string[]) => Promise<void>;
 }>();
-const emit = defineEmits<{ open: [path: string, staged?: boolean] }>();
+const emit = defineEmits<{
+  open: [path: string, staged?: boolean];
+  openCommit: [hash: string];
+  openCommitDiff: [hash: string, path: string];
+}>();
 const { git, error: gitError, loading: gitLoading, load } = props.overview;
 const stagedChanges = computed(() =>
   git.value.changes.filter((change) => change.index !== " " && change.index !== "?"),
@@ -33,12 +40,17 @@ const workingChanges = computed(() =>
 const gitBusy = ref(false);
 const gitMenu = ref<InstanceType<typeof ContextMenu>>();
 const gitTarget = ref({ path: "", staged: false });
+const historyOpen = ref(false);
+const commitTarget = ref({ hash: "", path: "" });
 const gitCommands = useCommandScope(`git:${props.projectId}`, () => ({
   surface: "git",
   projectId: props.projectId,
   path: gitTarget.value.path,
   staged: gitTarget.value.staged,
   busy: gitBusy.value,
+  commit: commitTarget.value.hash,
+  commitPath: commitTarget.value.path,
+  historyOpen: historyOpen.value,
 }));
 function gitArgs(value?: unknown) {
   const args = commandArgs(value);
@@ -223,6 +235,17 @@ defineExpose({
         @context="(event, path) => gitContext(event, path, group.staged)"
       />
     </template>
+    <GitHistory
+      v-if="git.available"
+      v-model:open="historyOpen"
+      v-model:target="commitTarget"
+      :history="history"
+      :commands="gitCommands"
+      :revision="overview.gutterRevision.value"
+      @open-commit="emit('openCommit', $event)"
+      @open-diff="(hash, path) => emit('openCommitDiff', hash, path)"
+      @open-file="emit('open', $event)"
+    />
     <ContextMenu ref="gitMenu" :items="gitMenuItems" label="Действия Git" />
   </div>
 </template>
