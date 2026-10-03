@@ -125,7 +125,7 @@ const rows = computed(() => props.tools.map((tool) => ({ ...tool, ...output(tool
   margin: 0 0 16px;
   max-width: 100%;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--fs-2xs);
 }
 .activity:last-child {
   margin-bottom: 0;
@@ -138,9 +138,8 @@ summary::-webkit-details-marker {
   display: none;
 }
 summary:focus-visible {
-  outline: 1px solid var(--focus);
   outline-offset: 3px;
-  border-radius: 5px;
+  border-radius: var(--r-md);
 }
 .activity-summary {
   display: flex;
@@ -158,17 +157,17 @@ svg {
   flex-shrink: 0;
 }
 .count {
-  font: 10px var(--mono);
-  color: #a5a597;
-  background: #24241f;
-  border-radius: 4px;
+  font: var(--fs-2xs) var(--mono);
+  color: var(--muted);
+  background: var(--bg-3);
+  border-radius: var(--r-sm);
   min-width: 18px;
   text-align: center;
   padding: 2px 4px;
 }
 .group-chevron {
   width: 12px;
-  transition: transform 0.15s;
+  transition: transform var(--t-fast);
 }
 .activity[open] > summary .group-chevron,
 .tool[open] > summary .row-chevron {
@@ -176,13 +175,13 @@ svg {
 }
 .activity-list {
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--r-lg);
   margin-top: 8px;
   overflow: hidden;
-  background: #151513;
+  background: var(--bg-sunken);
 }
 .tool + .tool {
-  border-top: 1px solid #272722;
+  border-top: 1px solid var(--line);
 }
 .tool > summary {
   display: flex;
@@ -192,10 +191,10 @@ svg {
   min-width: 0;
 }
 .tool > summary:hover {
-  background: #1e1e19;
+  background: var(--bg-2);
 }
 .tool-name {
-  color: #c5c5ba;
+  color: var(--text-2);
   flex-shrink: 0;
 }
 .tool-hint {
@@ -205,10 +204,10 @@ svg {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 10px;
+  font-size: var(--fs-2xs);
 }
 .tool-icon {
-  color: #999b8b;
+  color: var(--muted);
 }
 .row-chevron {
   width: 11px;
@@ -218,7 +217,7 @@ svg {
   width: 12px;
 }
 .done-icon {
-  color: #9aac8b;
+  color: var(--run);
 }
 .error-icon {
   color: var(--err);
@@ -227,12 +226,12 @@ svg {
   animation: spin 1s linear infinite;
 }
 pre {
-  font: 10px/1.7 var(--mono);
-  color: #b6b6a8;
+  font: var(--fs-2xs)/1.7 var(--mono);
+  color: var(--text-2);
   margin: 0;
   padding: 12px 14px;
-  background: #10100e;
-  border-top: 1px solid #25251f;
+  background: var(--bg-sunken);
+  border-top: 1px solid var(--line);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-height: 240px;

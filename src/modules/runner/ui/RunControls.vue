@@ -46,8 +46,9 @@ function runWindow(): void {
         {{ command.name }}
       </UiButton>
       <UiButton
-        :class="{ 'icon-button': toolbar }"
-        variant="chip"
+        :icon="toolbar"
+        :size="toolbar ? 'sm' : undefined"
+        :variant="toolbar ? 'ghost' : 'chip'"
         title="Открыть в окне"
         aria-label="Открыть проект в окне"
         @click="runWindow"
@@ -56,23 +57,26 @@ function runWindow(): void {
     </template>
     <template v-else>
       <UiButton
-        :class="{ 'icon-button': toolbar }"
-        variant="chip"
+        :icon="toolbar"
+        :size="toolbar ? 'sm' : undefined"
+        :variant="toolbar ? 'ghost' : 'chip'"
         title="Открыть в браузере"
         aria-label="Открыть проект в браузере"
         @click="runner.open(project.id, 'server')"
         ><IconOpen v-if="toolbar" aria-hidden="true" /><template v-else>открыть</template></UiButton
       >
       <UiButton
-        :class="{ 'icon-button': toolbar }"
-        variant="chip"
+        :icon="toolbar"
+        :size="toolbar ? 'sm' : undefined"
+        :variant="toolbar ? 'ghost' : 'chip'"
         title="Открыть в окне"
         aria-label="Открыть проект в окне"
         @click="runWindow"
         ><IconWindow v-if="toolbar" aria-hidden="true" /><template v-else>окно</template></UiButton
       >
       <UiButton
-        :class="{ 'icon-button': toolbar }"
+        :icon="toolbar"
+        :size="toolbar ? 'sm' : undefined"
         variant="danger"
         title="Остановить проект"
         aria-label="Остановить проект"
@@ -87,23 +91,10 @@ function runWindow(): void {
 .controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--sp-2);
 }
 .toolbar {
   align-items: center;
-  gap: 4px;
-}
-.toolbar .btn {
-  min-height: 28px;
-}
-.icon-button {
-  width: 28px;
-  height: 28px;
-  padding: 5px;
-  justify-content: center;
-}
-.icon-button svg {
-  width: 15px;
-  height: 15px;
+  gap: var(--sp-1);
 }
 </style>

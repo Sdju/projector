@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiButton from "../../../common/ui/UiButton.vue";
 import { useAgent } from "../model/session.ts";
 
 const { turns, busy, error, phase, clear } = useAgent();
@@ -8,7 +9,7 @@ const { turns, busy, error, phase, clear } = useAgent();
   <section v-if="turns.length || error || phase" class="log">
     <div class="head">
       <p class="phase" :class="{ err: error }">{{ error || phase || "агент" }}</p>
-      <button type="button" class="close" :disabled="busy" @click="clear">закрыть</button>
+      <UiButton variant="chip" :disabled="busy" @click="clear">закрыть</UiButton>
     </div>
     <article v-for="turn in turns" :key="turn.id" :class="turn.role">
       <p class="who">{{ turn.role === "user" ? "вы" : "агент" }}</p>
@@ -39,15 +40,10 @@ const { turns, busy, error, phase, clear } = useAgent();
 }
 
 .phase,
-.who,
-.close {
+.who {
   margin: 0;
   color: var(--muted);
-  font-size: 12px;
-}
-
-.close:hover:not(:disabled) {
-  color: var(--text);
+  font-size: var(--fs-xs);
 }
 
 .phase.err {
@@ -57,7 +53,7 @@ const { turns, busy, error, phase, clear } = useAgent();
 .text {
   margin: 2px 0 0;
   white-space: pre-wrap;
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 
 .tools {
@@ -69,10 +65,10 @@ const { turns, busy, error, phase, clear } = useAgent();
 
 .chip {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   color: var(--muted);
   border: 1px solid var(--line);
-  border-radius: 3px;
+  border-radius: var(--r-sm);
   padding: 2px 7px;
 }
 

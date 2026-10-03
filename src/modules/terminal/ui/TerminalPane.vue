@@ -4,6 +4,8 @@ import { Terminal, type IDisposable } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import UiButton from "../../../common/ui/UiButton.vue";
+import UiDialog from "../../../common/ui/UiDialog.vue";
+import UiDialogActions from "../../../common/ui/UiDialogActions.vue";
 import IconTerminal from "~icons/lucide/terminal";
 import IconCodex from "~icons/simple-icons/openai";
 import IconClaude from "~icons/simple-icons/claude";
@@ -26,6 +28,16 @@ import type {
   TerminalSession,
 } from "../../../../core/modules/terminal/index.ts";
 
+function terminalTheme() {
+  const styles = getComputedStyle(document.documentElement);
+  const token = (name: string) => styles.getPropertyValue(name).trim();
+  return {
+    background: token("--bg-2"),
+    foreground: token("--text-2"),
+    cursor: token("--text-2"),
+    selectionBackground: token("--line-strong"),
+  };
+}
 const props = defineProps<{ projectId: string; embedded?: boolean }>();
 const emit = defineEmits<{ open: [path: string, line: number | undefined, column: number | undefined, external: boolean] }>();
 const container = ref<HTMLElement>();
@@ -81,7 +93,7 @@ const error = ref("");
 const busy = ref(false);
 const draggingFiles = ref(false);
 const pendingClose = ref<TerminalSession | null>(null);
-const closeDialog = ref<HTMLDialogElement>();
+const closeDialog = ref<InstanceType<typeof UiDialog>>();
 const closeTitle = useId();
 const expanded = ref(false);
 const connection = ref<"offline" | "connecting" | "connected">("offline");
@@ -485,7 +497,7 @@ async function closeSession(id: string, confirmation?: string): Promise<void> {
 
 watch(pendingClose, async (session) => {
   await nextTick();
-  if (session && closeDialog.value && !closeDialog.value.open) closeDialog.value.showModal();
+  if (session && closeDialog.value && !closeDialog.value.element?.open) closeDialog.value.open();
 });
 
 watch(activeId, () => {
@@ -546,12 +558,7 @@ onMounted(() => {
         openExternalLink(url.href);
       },
     },
-    theme: {
-      background: "#171815",
-      foreground: "#d6d3ca",
-      cursor: "#d6d3ca",
-      selectionBackground: "#4a4a44",
-    },
+    theme: terminalTheme(),
   });
   fit = new FitAddon();
   terminal.loadAddon(fit);
@@ -624,8 +631,8 @@ onBeforeUnmount(() => {
         <slot name="actions" />
         <div class="session-actions" role="group" aria-label="Новая терминальная сессия">
           <UiButton
-            class="icon-button"
-            variant="chip"
+            icon
+            size="sm"
             :disabled="busy"
             title="Новый shell"
             aria-label="Новый shell"
@@ -633,8 +640,8 @@ onBeforeUnmount(() => {
             ><IconTerminal aria-hidden="true"
           /></UiButton>
           <UiButton
-            class="icon-button"
-            variant="chip"
+            icon
+            size="sm"
             :disabled="busy"
             title="Новый Codex"
             aria-label="Новый Codex"
@@ -642,8 +649,8 @@ onBeforeUnmount(() => {
             ><IconCodex aria-hidden="true"
           /></UiButton>
           <UiButton
-            class="icon-button"
-            variant="chip"
+            icon
+            size="sm"
             :disabled="busy"
             title="Новый Claude Code"
             aria-label="Новый Claude Code"
@@ -651,8 +658,8 @@ onBeforeUnmount(() => {
             ><IconClaude aria-hidden="true"
           /></UiButton>
           <UiButton
-            class="icon-button"
-            variant="chip"
+            icon
+            size="sm"
             :disabled="busy"
             title="Новый OpenCode"
             aria-label="Новый OpenCode"
@@ -663,8 +670,8 @@ onBeforeUnmount(() => {
         <div class="view-actions">
           <UiButton
             v-if="active?.status === 'running'"
-            class="icon-button"
-            variant="chip"
+            icon
+            size="sm"
             :disabled="busy || active.stopRequested"
             title="Завершить сессию"
             aria-label="Завершить сессию"
@@ -673,8 +680,8 @@ onBeforeUnmount(() => {
           /></UiButton>
           <UiButton
             v-else-if="active"
-            class="icon-button"
-            variant="chip"
+            icon
+            size="sm"
             :disabled="busy"
             title="Перезапустить сессию"
             aria-label="Перезапустить сессию"
@@ -683,8 +690,8 @@ onBeforeUnmount(() => {
           /></UiButton>
 
           <UiButton
-            class="icon-button"
-            variant="chip"
+            icon
+            size="sm"
             :title="expanded ? 'Свернуть терминал' : 'Развернуть терминал'"
             :aria-label="expanded ? 'Свернуть терминал' : 'Развернуть терминал'"
             @click="expanded = !expanded"
@@ -728,11 +735,12 @@ onBeforeUnmount(() => {
     <slot name="status" />
     <p v-if="statusText" class="status" role="status">{{ statusText }}</p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
-    <dialog
+    <UiDialog
       v-if="pendingClose"
       ref="closeDialog"
       class="close-dialog"
-      :aria-labelledby="closeTitle"
+      width="440px"
+      :labelledby="closeTitle"
       @cancel.prevent="cancelClose"
     >
       <h2 :id="closeTitle">Прервать процессы и закрыть вкладку?</h2>
@@ -750,13 +758,13 @@ onBeforeUnmount(() => {
           ><span class="process-pid">PID {{ process.pid }}</span>
         </li>
       </ul>
-      <div class="dialog-actions">
+      <UiDialogActions>
         <UiButton autofocus :disabled="busy" @click="cancelClose">Отмена</UiButton>
         <UiButton variant="danger" :disabled="busy" @click="confirmClose"
           >Прервать и закрыть</UiButton
         >
-      </div>
-    </dialog>
+      </UiDialogActions>
+    </UiDialog>
     <div
       class="screen-wrap"
       data-terminal-drop
@@ -775,8 +783,8 @@ onBeforeUnmount(() => {
 .terminal-pane {
   margin: 24px 0;
   border: 1px solid var(--line);
-  border-radius: 4px;
-  background: #171815;
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
   overflow: hidden;
 }
 header {
@@ -790,7 +798,7 @@ header {
 .status {
   margin: 0;
   padding: 4px 12px;
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   color: var(--faint);
 }
 .actions {
@@ -809,16 +817,6 @@ header {
 .view-actions {
   margin-left: auto;
 }
-.icon-button {
-  width: 28px;
-  height: 28px;
-  padding: 5px;
-  justify-content: center;
-}
-.icon-button svg {
-  width: 15px;
-  height: 15px;
-}
 .session-state {
   width: 14px;
   height: 14px;
@@ -828,26 +826,14 @@ header {
 .session-state.failed {
   color: var(--err);
 }
-.close-dialog {
-  width: min(440px, calc(100vw - 40px));
-  padding: 22px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--bg-2);
-  color: var(--text);
-  box-shadow: 0 20px 60px #0008;
-}
-.close-dialog::backdrop {
-  background: #0009;
-}
 .close-dialog h2 {
-  margin: 0 0 14px;
-  font-size: 16px;
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-md);
   font-weight: 500;
 }
 .close-dialog p {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   line-height: 1.6;
 }
 .close-dialog ul {
@@ -861,17 +847,10 @@ header {
   justify-content: space-between;
   gap: 20px;
   padding: 7px 0;
-  font: 12px var(--mono);
+  font: var(--fs-xs) var(--mono);
 }
 .process-pid {
   color: var(--faint);
-}
-.dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 22px;
-  font-size: 12px;
 }
 .screen-wrap {
   position: relative;
@@ -886,7 +865,7 @@ header {
   border: 1px dashed var(--focus);
   background: color-mix(in srgb, var(--bg) 82%, transparent);
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 .screen {
   height: 420px;
@@ -899,12 +878,12 @@ header {
   margin: 0;
   padding: 10px 12px;
   color: var(--err);
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 .expanded {
   position: fixed;
   inset: 12px;
-  z-index: 30;
+  z-index: var(--z-expanded);
   margin: 0;
   display: flex;
   flex-direction: column;

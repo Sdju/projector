@@ -12,7 +12,7 @@ const html = computed(() => renderChatMarkdown(props.text));
 <style scoped>
 .agent-message {
   color: var(--text);
-  font-size: 14px;
+  font-size: var(--fs-sm);
   line-height: 1.8;
   overflow-wrap: anywhere;
 }
@@ -29,17 +29,17 @@ const html = computed(() => renderChatMarkdown(props.text));
 .agent-message :deep(h2),
 .agent-message :deep(h3),
 .agent-message :deep(h4) {
-  font-size: 15px;
+  font-size: var(--fs-md);
   font-weight: 600;
   line-height: 1.5;
   margin: 24px 0 10px;
   letter-spacing: -0.02em;
 }
 .agent-message :deep(h1) {
-  font-size: 20px;
+  font-size: var(--fs-lg);
 }
 .agent-message :deep(h2) {
-  font-size: 17px;
+  font-size: var(--fs-md);
 }
 .agent-message :deep(ul),
 .agent-message :deep(ol) {
@@ -58,31 +58,31 @@ const html = computed(() => renderChatMarkdown(props.text));
 }
 .agent-message :deep(strong) {
   font-weight: 600;
-  color: #f1eee7;
+  color: var(--text);
 }
 .agent-message :deep(a) {
-  color: #c4cdb9;
+  color: var(--text-2);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 .agent-message :deep(a:hover) {
-  color: #e3ebd7;
+  color: var(--text);
 }
 .agent-message :deep(code) {
-  font: 11px/1.6 var(--mono);
-  background: #24241f;
-  color: #d8d1be;
-  border: 1px solid #30302a;
-  border-radius: 4px;
+  font: var(--fs-2xs)/1.6 var(--mono);
+  background: var(--bg-3);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
   padding: 2px 5px;
   box-decoration-break: clone;
 }
 .agent-message :deep(pre) {
   margin: 14px 0;
   padding: 15px 17px;
-  border-radius: 8px;
+  border-radius: var(--r-lg);
   border: 1px solid var(--line);
-  background: #141412;
+  background: var(--bg-sunken);
   overflow-x: auto;
   max-width: 100%;
 }
@@ -90,15 +90,15 @@ const html = computed(() => renderChatMarkdown(props.text));
   padding: 0;
   border: 0;
   background: none;
-  color: #cccac0;
-  font-size: 12px;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
   white-space: pre;
 }
 .agent-message :deep(blockquote) {
-  border-left: 2px solid #575b4b;
+  border-left: 2px solid var(--line-strong);
   margin: 14px 0;
   padding: 2px 0 2px 16px;
-  color: #b0b0a4;
+  color: var(--text-2);
 }
 .agent-message :deep(hr) {
   border: 0;
@@ -111,7 +111,7 @@ const html = computed(() => renderChatMarkdown(props.text));
   overflow-x: auto;
   border-collapse: collapse;
   margin: 14px 0;
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 .agent-message :deep(th),
 .agent-message :deep(td) {
@@ -120,26 +120,26 @@ const html = computed(() => renderChatMarkdown(props.text));
   text-align: left;
 }
 .agent-message :deep(th) {
-  background: #20201c;
+  background: var(--bg-2);
   font-weight: 500;
 }
 .agent-message :deep(.hljs-keyword),
 .agent-message :deep(.hljs-selector-tag) {
-  color: #c4b496;
+  color: var(--warn);
 }
 .agent-message :deep(.hljs-string),
 .agent-message :deep(.hljs-attr) {
-  color: #a8bf9f;
+  color: var(--run);
 }
 .agent-message :deep(.hljs-number),
 .agent-message :deep(.hljs-literal) {
-  color: #c0a2a2;
+  color: var(--err);
 }
 .agent-message :deep(.hljs-comment) {
-  color: #76796b;
+  color: var(--faint);
 }
 .agent-message :deep(.hljs-title),
 .agent-message :deep(.hljs-built_in) {
-  color: #b5c4cd;
+  color: var(--info);
 }
 </style>

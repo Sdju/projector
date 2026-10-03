@@ -4,6 +4,7 @@ import { useIdeCommands } from "../../ide/index.ts";
 import { useProjects } from "../../catalog/index.ts";
 import { agentCommandHandler } from "../model/commands.ts";
 import { useAgent } from "../model/session.ts";
+import UiButton from "../../../common/ui/UiButton.vue";
 import AgentMessage from "./AgentMessage.vue";
 import AgentActivity from "./AgentActivity.vue";
 import IconBot from "~icons/lucide/bot";
@@ -154,16 +155,16 @@ function keydown(event: KeyboardEvent) {
         <span class="agent-status" :class="{ busy }" role="status" :title="phase"
           ><i aria-hidden="true" />{{ busy ? "Работает" : "Готов" }}</span
         >
-        <button
-          class="icon-button"
-          type="button"
+        <UiButton
+          icon
+          size="sm"
           title="Новый чат"
           aria-label="Новый чат"
           :disabled="busy || !turns.length"
           @click="newChat"
         >
           <IconSquarePen aria-hidden="true" />
-        </button>
+        </UiButton>
       </div>
     </header>
     <div ref="log" class="chat-log" @scroll.passive="trackScroll">
@@ -204,10 +205,11 @@ function keydown(event: KeyboardEvent) {
             <div class="assistant-heading">
               <span class="avatar"><IconBot aria-hidden="true" /></span>
               <span class="sender">Projector</span>
-              <button
+              <UiButton
                 v-if="turn.text"
-                type="button"
-                class="icon-button copy-button"
+                icon
+                size="sm"
+                class="copy-button"
                 :class="{ copied: copied === turn.id }"
                 :aria-label="copied === turn.id ? 'Ответ скопирован' : 'Копировать ответ'"
                 :title="copied === turn.id ? 'Скопировано' : 'Копировать ответ'"
@@ -217,7 +219,7 @@ function keydown(event: KeyboardEvent) {
                   v-else
                   aria-hidden="true"
                 />
-              </button>
+              </UiButton>
             </div>
             <div class="assistant-body">
               <div
@@ -296,7 +298,7 @@ function keydown(event: KeyboardEvent) {
   height: 100%;
   min-height: 0;
   min-width: 0;
-  background: #121210;
+  background: var(--bg-sunken);
   container-type: inline-size;
   position: relative;
 }
@@ -305,7 +307,7 @@ function keydown(event: KeyboardEvent) {
   align-items: center;
   gap: 16px;
   padding: 12px 20px;
-  border-bottom: 1px solid #262620;
+  border-bottom: 1px solid var(--line);
   min-height: 53px;
 }
 .identity {
@@ -315,7 +317,7 @@ function keydown(event: KeyboardEvent) {
   flex-shrink: 0;
 }
 .header-mark {
-  color: #b8baa6;
+  color: var(--text-2);
   display: flex;
 }
 .header-mark svg {
@@ -323,7 +325,7 @@ function keydown(event: KeyboardEvent) {
   height: 17px;
 }
 .agent-name {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: -0.01em;
 }
@@ -333,7 +335,7 @@ function keydown(event: KeyboardEvent) {
   gap: 6px;
   min-width: 0;
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -351,7 +353,7 @@ function keydown(event: KeyboardEvent) {
   flex-shrink: 0;
 }
 .agent-status {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -361,46 +363,18 @@ function keydown(event: KeyboardEvent) {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #96a684;
+  background: var(--run);
 }
 .agent-status.busy i {
-  background: #c4b386;
+  background: var(--warn);
   animation: pulse 1.4s ease-in-out infinite;
-}
-.icon-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 5px;
-  color: var(--muted);
-  transition:
-    background 0.15s,
-    color 0.15s;
-}
-.icon-button svg {
-  width: 14px;
-  height: 14px;
-}
-.icon-button:hover:not(:disabled) {
-  background: #272720;
-  color: var(--text);
-}
-.icon-button:disabled {
-  opacity: 0.3;
-  cursor: default;
-}
-button:focus-visible {
-  outline: 1px solid var(--focus);
-  outline-offset: 3px;
 }
 .chat-log {
   flex: 1;
   min-height: 0;
   overflow: auto;
   scrollbar-width: thin;
-  scrollbar-color: #3d3d33 transparent;
+  scrollbar-color: var(--line-strong) transparent;
   padding: 32px 28px 28px;
 }
 .welcome {
@@ -420,11 +394,10 @@ button:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #3a3b30;
-  border-radius: 16px;
-  background: #202119;
-  color: #bbc0a6;
-  box-shadow: inset 0 1px 0 #ffffff07;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  background: var(--bg-2);
+  color: var(--text-2);
   margin-bottom: 23px;
 }
 .welcome-mark svg {
@@ -433,15 +406,15 @@ button:focus-visible {
   stroke-width: 1.3;
 }
 h1 {
-  font-size: 26px;
+  font-size: var(--fs-xl);
   font-weight: 500;
   line-height: 1.3;
   letter-spacing: -0.04em;
   margin: 0 0 12px;
 }
 .welcome > p {
-  color: #999b8e;
-  font-size: 12px;
+  color: var(--muted);
+  font-size: var(--fs-xs);
   line-height: 1.9;
   margin: 0;
 }
@@ -459,40 +432,40 @@ h1 {
   gap: 13px;
   text-align: left;
   padding: 13px 15px;
-  border: 1px solid #2e2f26;
-  border-radius: 9px;
-  background: #191a15;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--bg-2);
   transition:
-    border-color 0.15s,
-    background 0.15s;
+    border-color var(--t-fast),
+    background var(--t-fast);
 }
 .suggestions button:hover {
-  border-color: #555744;
-  background: #21221a;
+  border-color: var(--line-strong);
+  background: var(--bg-3);
 }
 .suggestion-icon {
   width: 17px;
   height: 17px;
-  color: #a4ab90;
+  color: var(--muted);
   flex-shrink: 0;
 }
 .suggestions strong {
   display: block;
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   font-weight: 500;
-  color: #d7d9ca;
+  color: var(--text);
 }
 .suggestions small {
   display: block;
-  font-size: 10px;
-  color: #858978;
+  font-size: var(--fs-2xs);
+  color: var(--muted);
   margin-top: 4px;
 }
 .suggestion-arrow {
   width: 13px;
   height: 13px;
   margin-left: auto;
-  color: #626750;
+  color: var(--faint);
   flex-shrink: 0;
 }
 .conversation {
@@ -514,7 +487,7 @@ h1 {
   padding-left: 38px;
 }
 .user-label {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   color: var(--muted);
   margin: 0 3px 7px;
 }
@@ -522,11 +495,11 @@ h1 {
   max-width: 90%;
   margin: 0;
   padding: 13px 17px;
-  border: 1px solid #33342b;
-  border-radius: 12px 12px 3px 12px;
-  background: #25261e;
-  color: #dedfd3;
-  font-size: 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg) 12px 3px 12px;
+  background: var(--bg-3);
+  color: var(--text);
+  font-size: var(--fs-sm);
   line-height: 1.8;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -544,10 +517,10 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  border: 1px solid #36382c;
-  background: #24261d;
-  color: #aeb99a;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  background: var(--bg-3);
+  color: var(--text-2);
   flex-shrink: 0;
 }
 .avatar svg {
@@ -556,9 +529,9 @@ h1 {
   stroke-width: 1.6;
 }
 .sender {
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   font-weight: 600;
-  color: #d5d8c7;
+  color: var(--text);
 }
 .copy-button {
   margin-left: auto;
@@ -580,8 +553,8 @@ h1 {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 12px;
-  color: #9b9e8d;
+  font-size: var(--fs-xs);
+  color: var(--muted);
   padding: 7px 0;
 }
 .thinking-dots {
@@ -591,7 +564,7 @@ h1 {
 .thinking-dots i {
   height: 4px;
   width: 4px;
-  background: #a5ab91;
+  background: var(--muted);
   border-radius: 50%;
   animation: pulse 1.2s ease-in-out infinite;
 }
@@ -610,22 +583,17 @@ h1 {
   position: relative;
 }
 .composer {
-  border: 1px solid #424438;
-  border-radius: 12px;
-  background: #1c1d17;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  background: var(--bg-2);
   padding: 3px 4px 5px;
-  box-shadow:
-    0 8px 28px #00000016,
-    inset 0 1px 0 #ffffff04;
+  box-shadow: var(--shadow-popover);
   transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
+    border-color var(--t-fast),
+    box-shadow var(--t-fast);
 }
 .composer:focus-within {
-  border-color: #7b8066;
-  box-shadow:
-    0 0 0 2px #9aa5810b,
-    0 8px 28px #00000016;
+  border-color: var(--focus);
 }
 .composer textarea {
   display: block;
@@ -638,12 +606,12 @@ h1 {
   border-radius: 0;
   outline: none;
   resize: none;
-  font: 13px/1.7 var(--sans);
-  color: #e2e4d6;
+  font: var(--fs-sm)/1.7 var(--sans);
+  color: var(--text);
   scrollbar-width: thin;
 }
 .composer textarea::placeholder {
-  color: #858b75;
+  color: var(--muted);
 }
 .composer-footer {
   display: flex;
@@ -658,8 +626,8 @@ h1 {
   gap: 5px;
   min-width: 0;
   max-width: 30%;
-  font: 9px var(--mono);
-  color: #a4ac92;
+  font: var(--fs-2xs) var(--mono);
+  color: var(--muted);
 }
 .composer-context svg {
   width: 11px;
@@ -673,13 +641,13 @@ h1 {
 }
 .input-hint {
   margin-left: auto;
-  font-size: 9px;
-  color: #797d6c;
+  font-size: var(--fs-2xs);
+  color: var(--faint);
   white-space: nowrap;
 }
 kbd {
   font-family: inherit;
-  color: #a0a58e;
+  color: var(--muted);
 }
 .send-button {
   display: flex;
@@ -688,12 +656,12 @@ kbd {
   width: 31px;
   height: 31px;
   flex-shrink: 0;
-  border-radius: 8px;
-  color: #1e2217;
-  background: #d5ddc2;
+  border-radius: var(--r-lg);
+  color: var(--faint);
+  background: var(--text);
   transition:
-    background 0.15s,
-    transform 0.15s;
+    background var(--t-fast),
+    transform var(--t-fast);
 }
 .send-button svg {
   width: 18px;
@@ -701,16 +669,16 @@ kbd {
   stroke-width: 2;
 }
 .send-button:hover:not(:disabled) {
-  background: #e7edda;
+  background: var(--text-2);
   transform: translateY(-1px);
 }
 .send-button:disabled {
-  background: #33372b;
-  color: #818b6c;
+  background: var(--bg-4);
+  color: var(--muted);
   cursor: default;
 }
 .stop-button {
-  background: #c7cdb6;
+  background: var(--text);
 }
 .stop-button svg {
   width: 11px;
@@ -726,13 +694,13 @@ kbd {
   align-items: center;
   gap: 7px;
   padding: 8px 12px;
-  border-radius: 18px;
-  border: 1px solid #444738;
-  background: #25271e;
-  color: #c7ceb6;
-  font-size: 10px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line-strong);
+  background: var(--bg-3);
+  color: var(--text-2);
+  font-size: var(--fs-2xs);
   white-space: nowrap;
-  box-shadow: 0 4px 12px #0004;
+  box-shadow: var(--shadow-popover);
 }
 .latest-button svg {
   width: 12px;
@@ -742,12 +710,12 @@ kbd {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  border: 1px solid #583b31;
-  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--err) 40%, var(--bg-2));
+  border-radius: var(--r-lg);
   padding: 10px 12px;
-  background: #2b211b;
-  color: #dfb5a4;
-  font-size: 11px;
+  background: color-mix(in srgb, var(--err) 12%, var(--bg-2));
+  color: var(--err);
+  font-size: var(--fs-2xs);
   line-height: 1.6;
   margin: 0 0 10px;
   overflow-wrap: anywhere;
@@ -805,7 +773,7 @@ kbd {
     max-width: 96%;
   }
   h1 {
-    font-size: 22px;
+    font-size: var(--fs-lg);
   }
 }
 @container (max-width: 300px) {
