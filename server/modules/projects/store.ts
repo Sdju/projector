@@ -38,3 +38,7 @@ export async function updateProjects(update: (projects: Project[]) => void): Pro
   projectWrites = operation.catch(() => {});
   await operation;
 }
+
+export async function findProject(id: string): Promise<Project | undefined> {
+  return (await loadProjects()).find((item) => item.id === id);
+}

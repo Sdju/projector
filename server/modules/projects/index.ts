@@ -1,7 +1,8 @@
 export { inspectProject, inspectProjectCommands } from "./inspect.ts";
 export { expandPath } from "./inspect.ts";
+export { findProjects, listDirectory } from "./discovery.ts";
 
-export { loadProjects } from "./store.ts";
+export { loadProjects, findProject } from "./store.ts";
 export { updateProjects } from "./store.ts";
 
 export type { LaunchMode } from "./types.ts";

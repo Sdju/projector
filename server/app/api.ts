@@ -22,7 +22,9 @@ import { handleInspect } from "../routes/api/inspect.ts";
 import { handlePickFolder } from "../routes/api/pick-folder.ts";
 import { handlePreviewIcon } from "../routes/api/preview-icon.ts";
 import { handleProjectsIndex } from "../routes/api/projects/index.ts";
-import { handleProjectsProjectActions } from "../routes/api/projects/[id]/[...action].ts";
+import { handleProjectWorkspace } from "../routes/api/projects/[id]/workspace.ts";
+import { handleProjectTerminals } from "../routes/api/projects/[id]/terminals.ts";
+import { handleProjectActions } from "../routes/api/projects/[id]/index.ts";
 import { handleIdeKeybindings } from "../routes/api/ide/keybindings.ts";
 import { handleEditorSettings } from "../routes/api/ide/editor.ts";
 const routes = [
@@ -48,7 +50,9 @@ const routes = [
   handlePickFolder,
   handlePreviewIcon,
   handleProjectsIndex,
-  handleProjectsProjectActions,
+  handleProjectWorkspace,
+  handleProjectTerminals,
+  handleProjectActions,
 ];
 export async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
   const url = new URL(req.url ?? "/", "http://" + (req.headers.host ?? "localhost"));
