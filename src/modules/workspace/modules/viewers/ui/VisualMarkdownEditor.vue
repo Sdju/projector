@@ -9,6 +9,7 @@ import type { Node } from "@milkdown/kit/prose/model";
 import { $prose, $remark, $view, replaceAll } from "@milkdown/kit/utils";
 import { languages } from "@codemirror/language-data";
 import { oneDark } from "@codemirror/theme-one-dark";
+import { copyWithNotice, notify } from "../../../../../common/utilities/notice.ts";
 import { markdownPath, renderMarkdown } from "../lib/markdown.ts";
 import "@milkdown/crepe/theme/common/style.css";
 import "@milkdown/crepe/theme/classic-dark.css";
@@ -193,7 +194,31 @@ function linkMouseDown(event: MouseEvent) {
   event.preventDefault();
   event.stopPropagation();
 }
+function codeBlockText(block: Element) {
+  let text: string | undefined;
+  crepe?.editor.action((ctx) => {
+    const view = ctx.get(editorViewCtx);
+    view.state.doc.descendants((node, pos) => {
+      if (text !== undefined) return false;
+      if (node.type.name === "code_block" && view.nodeDOM(pos) === block) text = node.textContent;
+    });
+  });
+  return text;
+}
+function copyCode(event: MouseEvent) {
+  if (!(event.target instanceof Element)) return false;
+  const button = event.target.closest<HTMLElement>(".milkdown-code-block .copy-button");
+  const block = button?.closest(".milkdown-code-block");
+  if (!button || !block) return false;
+  // Milkdown only logs clipboard failures to the console, so copy here to report them.
+  event.stopPropagation();
+  const text = codeBlockText(block);
+  if (text === undefined) notify(button, "Не удалось получить код блока", "error");
+  else void copyWithNotice(button, text, "Код скопирован", "Не удалось скопировать код");
+  return true;
+}
 function followLink(event: MouseEvent) {
+  if (copyCode(event)) return;
   if (!(event.target instanceof Element) || event.button !== 0) return;
   const link = event.target.closest("a");
   if (!link) return;
@@ -336,10 +361,104 @@ onBeforeUnmount(() => {
   width: auto;
   accent-color: var(--run);
 }
-.visual-markdown :deep(.cm-editor) {
+.visual-markdown :deep(.milkdown .milkdown-code-block) {
+  margin: var(--sp-3) 0;
+  padding: 0;
+  /* Без overflow: hidden — иначе список языка (.language-picker) режется границей блока. */
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
   background: var(--bg-sunken);
+  transition: border-color var(--t-fast);
+}
+.visual-markdown :deep(.milkdown .milkdown-code-block:hover) {
+  border-color: var(--line-strong);
+}
+.visual-markdown :deep(.milkdown .milkdown-code-block.selected) {
+  border-color: var(--info);
+  outline: none;
+}
+/* Шапка блока: язык слева, копирование справа; видна всегда, а не только по наведению. */
+.visual-markdown :deep(.milkdown-code-block .tools) {
+  min-height: 32px;
+  padding: 0 var(--sp-2) 0 var(--sp-1);
+  border-bottom: 1px solid var(--line);
+  border-radius: var(--r-md) var(--r-md) 0 0;
+  background: var(--bg-2);
+}
+.visual-markdown :deep(.milkdown-code-block .cm-editor) {
+  border-radius: 0 0 var(--r-md) var(--r-md);
+}
+.visual-markdown :deep(.milkdown-code-block .tools .language-button) {
+  margin: 0;
+  padding: 2px var(--sp-1) 2px var(--sp-2);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+  font: var(--fs-2xs) var(--mono);
+  font-weight: 500;
+  letter-spacing: var(--track-label);
+  text-transform: lowercase;
+  opacity: 1;
+}
+.visual-markdown :deep(.milkdown-code-block .tools .language-button:hover) {
+  background: var(--hover);
+  color: var(--text);
+}
+.visual-markdown :deep(.milkdown-code-block .tools .tools-button-group button) {
+  padding: 2px var(--sp-2);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+  font: var(--fs-2xs) var(--sans);
+  opacity: 0;
+  transition:
+    opacity var(--t-fast),
+    background var(--t-fast),
+    color var(--t-fast);
+}
+.visual-markdown :deep(.milkdown-code-block .tools .tools-button-group button svg) {
+  fill: currentColor;
+}
+.visual-markdown :deep(.milkdown-code-block .tools .tools-button-group button:hover),
+.visual-markdown :deep(.milkdown-code-block .tools .tools-button-group button:focus-visible) {
+  background: var(--hover);
+  color: var(--text);
+  opacity: 1;
+}
+.visual-markdown :deep(.milkdown-code-block:hover .tools-button-group > button),
+.visual-markdown :deep(.milkdown-code-block:focus-within .tools-button-group > button) {
+  opacity: 1;
+}
+.visual-markdown :deep(.milkdown-code-block .cm-editor),
+.visual-markdown :deep(.milkdown-code-block .cm-gutters) {
+  background: transparent;
+}
+.visual-markdown :deep(.milkdown-code-block .list-wrapper) {
+  z-index: var(--z-popover);
+}
+.visual-markdown :deep(.milkdown-code-block .cm-scroller) {
+  padding: var(--sp-2) 0;
+  line-height: 1.6;
 }
 .visual-markdown :deep(.milkdown-code-block .cm-content) {
   font: var(--fs-sm) var(--mono);
+}
+.visual-markdown :deep(.milkdown-code-block .cm-gutters) {
+  color: var(--faint);
+  font: var(--fs-2xs) var(--mono);
+}
+.visual-markdown :deep(.milkdown-code-block .cm-activeLine),
+.visual-markdown :deep(.milkdown-code-block .cm-activeLineGutter) {
+  background: var(--hover);
+}
+.visual-markdown :deep(.milkdown-code-block .cm-selectionBackground) {
+  background: var(--selection);
+}
+.visual-markdown :deep(.ProseMirror :not(pre) > code) {
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  font: 0.9em var(--mono);
 }
 </style>
