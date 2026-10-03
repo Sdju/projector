@@ -2,11 +2,10 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { relocatedPath } from "../../../../core/modules/workspace/index.ts";
 import { useCommandScope } from "../../../common/utilities/commands.ts";
-import { FileTree } from "../modules/tree/index.ts";
-import SearchPanel from "./SearchPanel.vue";
 import WorkbenchToolbar from "./WorkbenchToolbar.vue";
-import SidebarTabs, { type SidebarSection } from "./SidebarTabs.vue";
-import { GitPanel, useGitOverview, useGitHistory, useGitBranches } from "../modules/git/index.ts";
+import WorkspaceSidebar from "./WorkspaceSidebar.vue";
+import type { SidebarSection } from "./SidebarTabs.vue";
+import { useGitOverview, useGitHistory, useGitBranches } from "../modules/git/index.ts";
 import { useGitChangeSync } from "../lib/git-change-sync.ts";
 import { useSidebarResize } from "../lib/sidebar-resize.ts";
 import { useOpenFiles } from "../lib/open-files.ts";
@@ -27,7 +26,7 @@ const props = defineProps<{
 const workspaceElement = ref<HTMLElement>();
 const sidebarHidden = ref(false);
 const { treeWidth, sizes, resizeTree, resizeTreeKey } = useSidebarResize(workspaceElement);
-const fileTree = ref<InstanceType<typeof FileTree>>();
+const sidebar = ref<InstanceType<typeof WorkspaceSidebar>>();
 const editorCommands = useCommandScope(`editor:${props.projectId}`, () => ({
   surface: "editor",
   projectId: props.projectId,
@@ -38,6 +37,10 @@ const registerEditor = (
   run: (args?: unknown) => unknown,
   enabled: (args?: unknown) => boolean,
 ) => editorCommands.scope.registerCommand({ id, title, run, enabled });
+function treeChanged() {
+  revision.value++;
+  void loadGit();
+}
 function entryDeleted(path: string) {
   files.invalidate();
   tabs.value = tabs.value.filter(
@@ -45,15 +48,13 @@ function entryDeleted(path: string) {
   );
   revision.value++;
   void loadGit();
-  searchPanel.value?.refresh();
+  sidebar.value?.refreshSearch();
 }
 const overview = useGitOverview(() => props.projectId);
 const history = useGitHistory(() => props.projectId);
 const branches = useGitBranches(() => props.projectId);
-const { git, gutterRevision, load: loadGit } = overview;
-const gitPanel = ref<InstanceType<typeof GitPanel>>();
+const { gutterRevision, load: loadGit } = overview;
 const section = ref<SidebarSection>("files");
-const searchPanel = ref<InstanceType<typeof SearchPanel>>();
 const revision = ref(0);
 const isDirty = (file: OpenFile) =>
   file.virtual === "project"
@@ -106,7 +107,6 @@ const {
   closeTab,
   selectTab,
   saveFile,
-  prepareEntryChange,
   toggleMarkdownSource,
 } = files;
 const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
@@ -123,7 +123,7 @@ const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
   revealInTree: (path) => {
     section.value = "files";
     sidebarHidden.value = false;
-    fileTree.value?.reveal(path);
+    sidebar.value?.reveal(path);
   },
   saveProjectSettings: () => props.saveProjectSettings?.(),
 });
@@ -176,13 +176,13 @@ useWorkspaceSession({
   reloadGit: () => void loadGit(),
 });
 const active = computed(() => tabs.value.find((file) => file.key === activeKey.value));
-const { prepare: prepareGitChange, applied: gitChangeApplied } = useGitChangeSync({
+const gitSync = useGitChangeSync({
   projectId: () => props.projectId,
   tabs,
   active: () => active.value,
   files,
   bumpRevision: () => revision.value++,
-  refreshSearch: () => searchPanel.value?.refresh(),
+  refreshSearch: () => sidebar.value?.refreshSearch(),
 });
 watch(section, (value) => {
   if (value === "git") void loadGit();
@@ -190,7 +190,7 @@ watch(section, (value) => {
 async function refresh() {
   revision.value++;
   await loadGit();
-  if (section.value === "search") await searchPanel.value?.search();
+  if (section.value === "search") await sidebar.value?.search();
   if (active.value?.virtual || active.value?.commit) return;
   if (active.value?.localFile) void openBrowserFile(active.value.localFile, true);
   else if (active.value)
@@ -219,7 +219,7 @@ function entryMoved(source: string, destination: string) {
   }
   revision.value++;
   void loadGit();
-  searchPanel.value?.refresh();
+  sidebar.value?.refreshSearch();
 }
 onBeforeUnmount(() => {
   overview.cancel();
@@ -245,54 +245,25 @@ onBeforeUnmount(() => {
       <template #terminal-status><slot name="terminal-status" /></template>
     </WorkbenchToolbar>
     <p v-if="fileError" class="file-error" role="alert">{{ fileError }}</p>
-    <aside v-show="!sidebarHidden" class="sidebar" aria-label="Обзор проекта">
-      <SidebarTabs
-        v-model:section="section"
-        :git-count="git.changes.length"
-        :settings-active="active?.virtual === 'project'"
-        @command="editorCommands.run($event)"
-        @refresh="section === 'git' ? gitPanel?.refresh() : refresh()"
-        @settings="openProjectSettings"
-      />
-      <div v-show="section === 'files'" class="side-content">
-        <FileTree
-          ref="fileTree"
-          :before-change="prepareEntryChange"
-          @changed="
-            revision++;
-            loadGit();
-          "
-          @deleted="entryDeleted"
-          :project-id="projectId"
-          :selected="active?.path ?? ''"
-          :revision="revision"
-          :git-changes="git.changes"
-          @open="(path, pinned) => openFile(path, undefined, undefined, undefined, { preview: !pinned })"
-          @moved="entryMoved"
-        />
-      </div>
-      <SearchPanel
-        v-show="section === 'search'"
-        ref="searchPanel"
-        :project-id="projectId"
-        @open="openFile"
-      />
-      <GitPanel
-        v-show="section === 'git'"
-        ref="gitPanel"
-        :project-id="projectId"
-        :overview="overview"
-        :history="history"
-        :branches="branches"
-        :selected="active ? { path: active.path, staged: active.staged } : undefined"
-        :prepare="prepareGitChange"
-        :invalidate="files.invalidate"
-        :applied="gitChangeApplied"
-        @open="(path, staged, pinned) => openFile(path, undefined, undefined, staged, { preview: !pinned })"
-        @open-commit="files.openCommit"
-        @open-commit-diff="(hash, path, pinned) => files.openCommitFile(hash, path, !pinned)"
-      />
-    </aside>
+    <WorkspaceSidebar
+      ref="sidebar"
+      v-model:section="section"
+      :project-id="projectId"
+      :hidden="sidebarHidden"
+      :active="active"
+      :revision="revision"
+      :overview="overview"
+      :history="history"
+      :branches="branches"
+      :files="files"
+      :git-sync="gitSync"
+      @command="editorCommands.run($event)"
+      @refresh="refresh"
+      @settings="openProjectSettings"
+      @changed="treeChanged"
+      @deleted="entryDeleted"
+      @moved="entryMoved"
+    />
     <div
       v-show="!sidebarHidden"
       class="resize-handle tree-resize"
@@ -348,23 +319,16 @@ onBeforeUnmount(() => {
 .workspace.sidebar-hidden {
   grid-template-columns: 0 0 minmax(0, 1fr);
 }
-.sidebar,
+.tree-resize {
+  grid-column: 2;
+  grid-row: 3;
+}
 .dock-pane {
   position: relative;
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
-}
-.sidebar {
-  grid-column: 1;
-  grid-row: 3;
-}
-.tree-resize {
-  grid-column: 2;
-  grid-row: 3;
-}
-.dock-pane {
   grid-column: 3;
   grid-row: 3;
 }
@@ -390,35 +354,6 @@ onBeforeUnmount(() => {
 .resize-handle:focus-visible {
   outline: none;
   background: var(--focus);
-}
-.sidebar {
-  background: var(--bg-sunken);
-}
-.side-content {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-.notice {
-  padding: 0 var(--sp-3);
-  color: var(--muted);
-  font-size: var(--fs-xs);
-}
-.error {
-  color: var(--err);
-}
-h3 {
-  padding: 10px 12px 4px;
-  margin: 0;
-  font-size: var(--fs-2xs);
-  letter-spacing: var(--track-label);
-  text-transform: uppercase;
-  font-weight: 500;
-  color: var(--muted);
-}
-h3 span {
-  margin-left: 6px;
-  color: var(--faint);
 }
 .file-error {
   grid-column: 1 / -1;
@@ -451,12 +386,6 @@ h3 span {
   .resize-handle {
     display: none;
   }
-  .sidebar {
-    grid-row: 3;
-    border-right: 1px solid var(--line);
-    height: 65dvh;
-    min-height: 400px;
-  }
   .dock-pane {
     grid-column: 2;
     grid-row: 3;
@@ -475,16 +404,8 @@ h3 span {
   .workspace.sidebar-hidden {
     grid-template-columns: minmax(0, 1fr);
   }
-  .sidebar,
   .dock-pane {
     grid-column: 1;
-  }
-  .sidebar {
-    grid-row: 3;
-    height: 260px;
-    min-height: 0;
-  }
-  .dock-pane {
     grid-row: 4;
   }
 }
