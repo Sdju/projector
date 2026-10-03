@@ -16,6 +16,17 @@ function architecturePlugin(): Plugin {
 
 export default defineConfig({
   plugins: [architecturePlugin(), vue(), Icons({ compiler: "vue3" }), projectorPlugin()],
+  // Monaco is loaded lazily; prepare its deep imports before the first file is opened.
+  optimizeDeps: {
+    include: [
+      "monaco-editor/editor/editor.api.js",
+      "monaco-editor/editor/contrib/documentSymbols/browser/outlineModel.js",
+      "monaco-editor/editor/contrib/find/browser/findController.js",
+      "monaco-editor/editor/contrib/clipboard/browser/clipboard.js",
+      "monaco-editor/basic-languages/monaco.contribution.js",
+      "monaco-editor/languages/features/json/register.js",
+    ],
+  },
   resolve: {
     alias: {
       "@app": fileURLToPath(new URL("./src/app", import.meta.url)),
