@@ -5,4 +5,3 @@
 | Файл | Строк | Потолок | План разбиения |
 | --- | ---: | ---: | --- |
 | `src/modules/workspace/ui/ProjectWorkspace.vue` | 1215 | 1215 | Уже вынесены SearchPanel, GitPanel, SidebarTabs, WorkbenchToolbar, lib/git-overview и lib/sidebar-resize. Осталось: состояние вкладок и открытие файлов — в composable, раскладка дока и терминалы — в composable, регистрация команд редактора — отдельно. |
-| `src/modules/agent/ui/AgentChat.vue` | 835 | 835 | Вынести ввод, историю и прокрутку в composables, список сообщений — в компонент. |
