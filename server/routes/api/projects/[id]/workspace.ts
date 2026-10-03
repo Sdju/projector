@@ -12,6 +12,8 @@ import {
   projectComparison,
   projectGutter,
   projectLog,
+  projectBranches,
+  mutateProjectBranch,
   projectCommit,
   projectCommitComparison,
   mutateProjectGit,
@@ -86,6 +88,29 @@ export async function handleProjectWorkspace({
     return true;
   }
 
+  if (sessionId === "branch" && method === "POST") {
+    if (!terminalRequestAllowed(req, true))
+      throw new HttpError(403, "Операции доступны только со страницы Projector");
+    const body = await readBody(req);
+    for (const key of ["name", "newName", "from"])
+      if (body[key] !== undefined && typeof body[key] !== "string")
+        throw new HttpError(400, "Некорректные параметры ветки");
+    if (typeof body.action !== "string") throw new HttpError(400, "Укажите действие с веткой");
+    res.setHeader("Cache-Control", "no-store");
+    json(
+      res,
+      200,
+      await mutateProjectBranch(project.path, body.action, {
+        name: body.name as string | undefined,
+        newName: body.newName as string | undefined,
+        from: body.from as string | undefined,
+        checkout: body.checkout === false ? false : undefined,
+        force: body.force === true,
+      }),
+    );
+    return true;
+  }
+
   if (sessionId === "git" && method === "POST") {
     if (!terminalRequestAllowed(req, true))
       throw new HttpError(403, "Операции доступны только со страницы Projector");
@@ -139,6 +164,7 @@ export async function handleProjectWorkspace({
         }),
       );
     else if (sessionId === "git") json(res, 200, await projectGit(project.path));
+    else if (sessionId === "branches") json(res, 200, await projectBranches(project.path));
     else if (sessionId === "log")
       json(
         res,

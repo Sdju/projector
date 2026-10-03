@@ -117,3 +117,29 @@ export interface CommitComparison {
   /** Short hash of the first parent; empty for a root commit. */
   parent: string;
 }
+
+export interface GitBranch {
+  /** Short name: `main`, or `origin/main` for a remote-tracking branch. */
+  name: string;
+  kind: "local" | "remote";
+  current: boolean;
+  /** Short name of the upstream of a local branch; empty when there is none. */
+  upstream: string;
+  /** The configured upstream no longer exists. */
+  gone: boolean;
+  ahead: number;
+  behind: number;
+  /** Local branch fully merged into HEAD, so it can be deleted without force. */
+  merged: boolean;
+  hash: string;
+  subject: string;
+  /** ISO 8601 committer date of the tip. */
+  date: string;
+}
+export interface GitBranches {
+  available: boolean;
+  /** Current branch name, or the short hash while HEAD is detached. */
+  current: string;
+  detached: boolean;
+  branches: GitBranch[];
+}

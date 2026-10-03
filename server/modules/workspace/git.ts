@@ -58,7 +58,22 @@ export async function projectGit(root: string): Promise<GitOverview> {
   return { available: true, branch, changes };
 }
 // Serialize index writes even when multiple SDK clients act at once.
-const pendingGitWrites = new Map<string, Promise<GitOverview>>();
+const pendingGitWrites = new Map<string, Promise<unknown>>();
+/** Runs a write after the pending ones of the same repository finished. */
+export async function serializeGitWrite<T>(root: string, write: () => Promise<T>): Promise<T> {
+  const repository = (await git(root, ["rev-parse", "--absolute-git-dir"])).trim();
+  const previous = pendingGitWrites.get(repository);
+  const operation = (async () => {
+    await previous?.catch(() => {});
+    return write();
+  })();
+  pendingGitWrites.set(repository, operation);
+  try {
+    return await operation;
+  } finally {
+    if (pendingGitWrites.get(repository) === operation) pendingGitWrites.delete(repository);
+  }
+}
 export async function mutateProjectGit(
   root: string,
   action: string,
@@ -79,10 +94,7 @@ export async function mutateProjectGit(
       throw new HttpError(403, "Выберите файл проекта");
   }
   const base = await realpath(root);
-  const repository = (await git(base, ["rev-parse", "--absolute-git-dir"])).trim();
-  const previous = pendingGitWrites.get(repository);
-  const operation = (async () => {
-    await previous?.catch(() => {});
+  return serializeGitWrite(base, async () => {
     const overview = await projectGit(base);
     const selected = paths.map((path) => {
       const change = overview.changes.find((entry) => entry.path === path);
@@ -138,13 +150,7 @@ export async function mutateProjectGit(
     } else if (selected[0]!.index === "?") await mutateProjectEntry(base, "delete", paths[0]!);
     else await git(base, ["restore", "--worktree", "--", paths[0]!]);
     return projectGit(base);
-  })();
-  pendingGitWrites.set(repository, operation);
-  try {
-    return await operation;
-  } finally {
-    if (pendingGitWrites.get(repository) === operation) pendingGitWrites.delete(repository);
-  }
+  });
 }
 export async function gitText(root: string, ref: string, path: string) {
   validatePath(path);
