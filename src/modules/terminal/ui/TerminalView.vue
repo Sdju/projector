@@ -298,6 +298,8 @@ onMounted(() => {
       return false;
     }
     if (event.type === "keydown" && event.ctrlKey && event.shiftKey && event.code === "KeyV") {
+      // Returning false does not cancel the browser's own paste event: without this the text lands twice.
+      event.preventDefault();
       void navigator.clipboard
         .readText()
         .then((text) => {
@@ -377,6 +379,9 @@ onBeforeUnmount(() => {
   position: relative;
   flex: 1;
   min-height: 0;
+  /* The padding lives here: FitAddon reads the parent's height, and padding on it hid half of the last row.
+     No bottom padding: the fractional row left over by fitting already acts as one. */
+  padding: 12px 12px 0;
 }
 .drop-hint {
   position: absolute;
@@ -392,6 +397,5 @@ onBeforeUnmount(() => {
 }
 .screen {
   height: 100%;
-  padding: 12px;
 }
 </style>
