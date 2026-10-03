@@ -1,13 +1,13 @@
 import { computed, nextTick, useId, type Ref } from "vue";
-import { useCommandScope, commandArgs } from "../../../common/utilities/commands.ts";
-import type ContextMenu from "../../../common/ui/ContextMenu.vue";
-import type EntryDialog from "../../../common/ui/EntryDialog.vue";
-import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
-import { workspaceRequest, moveWorkspaceEntry, mutateWorkspaceEntry } from "../../workspace-api/index.ts";
-import type { createTreeDrag } from "../tree-drag.ts";
-import { topLevelTreePaths, type createTreeSelection } from "../tree-selection.ts";
-import { parentPath, relocatedPath } from "../../../../core/modules/workspace/index.ts";
-import type { FileEntry } from "../../../../core/modules/workspace/index.ts";
+import { useCommandScope, commandArgs } from "../../../../../common/utilities/commands.ts";
+import type ContextMenu from "../../../../../common/ui/ContextMenu.vue";
+import type EntryDialog from "../../../../../common/ui/EntryDialog.vue";
+import type { ContextMenuItem } from "../../../../../common/ui/context-menu.ts";
+import { workspaceRequest, moveWorkspaceEntry, mutateWorkspaceEntry } from "../../../../workspace-api/index.ts";
+import type { createTreeDrag } from "./tree-drag.ts";
+import { topLevelTreePaths, type createTreeSelection } from "./tree-selection.ts";
+import { parentPath, relocatedPath } from "../../../../../../core/modules/workspace/index.ts";
+import type { FileEntry } from "../../../../../../core/modules/workspace/index.ts";
 import { ref } from "vue";
 
 export interface TreeEmit {

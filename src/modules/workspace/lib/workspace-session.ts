@@ -6,7 +6,8 @@ import {
   type DockLayout,
 } from "../../dock/index.ts";
 import type { OpenFile, OpenFileOptions } from "../open-file.ts";
-import { useSessionSnapshot, workspaceSessionSchema, type WorkspaceSession } from "../session.ts";
+import { useSessionSnapshot } from "../../../common/utilities/session-snapshot.ts";
+import { workspaceSessionSchema, type WorkspaceSession } from "../session.ts";
 import type { SidebarSection } from "../ui/SidebarTabs.vue";
 
 export interface WorkspaceSessionContext {

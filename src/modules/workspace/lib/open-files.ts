@@ -6,7 +6,7 @@ import { workspaceRequest, saveWorkspaceFile } from "../../workspace-api/index.t
 import { projectRelativePath, previewBrowserFile } from "../file-drop.ts";
 import { isEditable, isMarkdown, type OpenFile, type OpenFileOptions } from "../open-file.ts";
 import { dropPreviewExcept as dropPreviewTabs, opensAsPreview } from "./preview-tabs.ts";
-import { treeDragType } from "../tree-drag.ts";
+import { treeDragType } from "../modules/tree/index.ts";
 import type {
   CommitComparison,
   FileComparison,

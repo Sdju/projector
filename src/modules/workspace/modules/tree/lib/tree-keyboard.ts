@@ -1,6 +1,6 @@
-import { selectTreeRange, type createTreeSelection } from "../tree-selection.ts";
-import { parentPath } from "../../../../core/modules/workspace/index.ts";
-import type { FileEntry } from "../../../../core/modules/workspace/index.ts";
+import { selectTreeRange, type createTreeSelection } from "./tree-selection.ts";
+import { parentPath } from "../../../../../../core/modules/workspace/index.ts";
+import type { FileEntry } from "../../../../../../core/modules/workspace/index.ts";
 import type { Ref } from "vue";
 import type { useTreeOperations } from "./tree-operations.ts";
 

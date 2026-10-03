@@ -2,11 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { effectScope, nextTick, ref } from "vue";
 import { setTimeout as delay } from "node:timers/promises";
-import {
-  useSessionSnapshot,
-  treeSessionSchema,
-  workspaceSessionSchema,
-} from "../src/modules/workspace/session.ts";
+import { useSessionSnapshot } from "../src/common/utilities/session-snapshot.ts";
+import { treeSessionSchema } from "../src/modules/workspace/modules/tree/lib/tree-session.ts";
+import { workspaceSessionSchema } from "../src/modules/workspace/session.ts";
 
 function fixture() {
   const values = new Map();

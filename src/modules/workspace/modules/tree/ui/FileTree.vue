@@ -9,24 +9,25 @@ import {
   watch,
   type ComputedRef,
 } from "vue";
-import { useSessionSnapshot, treeSessionSchema } from "../session.ts";
+import { useSessionSnapshot } from "../../../../../common/utilities/session-snapshot.ts";
+import { treeSessionSchema } from "../lib/tree-session.ts";
 import { useTreeOperations } from "../lib/tree-operations.ts";
 import { useTreeKeyboard } from "../lib/tree-keyboard.ts";
 import { useTreeDragDrop } from "../lib/tree-dnd.ts";
-import ContextMenu from "../../../common/ui/ContextMenu.vue";
-import EntryDialog from "../../../common/ui/EntryDialog.vue";
+import ContextMenu from "../../../../../common/ui/ContextMenu.vue";
+import EntryDialog from "../../../../../common/ui/EntryDialog.vue";
 import IconChevronRight from "~icons/lucide/chevron-right";
-import { FileIcon } from "../../file-icons/index.ts";
-import { useFileIconTheme } from "../../file-icons/index.ts";
-import { workspaceRequest } from "../../workspace-api/index.ts";
-import { createTreeDrag, treeDragKey } from "../tree-drag.ts";
-import { createTreeSelection, treeSelectionKey } from "../tree-selection.ts";
+import { FileIcon } from "../../../../file-icons/index.ts";
+import { useFileIconTheme } from "../../../../file-icons/index.ts";
+import { workspaceRequest } from "../../../../workspace-api/index.ts";
+import { createTreeDrag, treeDragKey } from "../lib/tree-drag.ts";
+import { createTreeSelection, treeSelectionKey } from "../lib/tree-selection.ts";
 import {
   gitTreeDecorations,
   type GitDecoration,
   type GitOverview,
-} from "../../../../core/modules/workspace/index.ts";
-import type { FileEntry } from "../../../../core/modules/workspace/index.ts";
+} from "../../../../../../core/modules/workspace/index.ts";
+import type { FileEntry } from "../../../../../../core/modules/workspace/index.ts";
 const props = withDefaults(
   defineProps<{
     projectId: string;

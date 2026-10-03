@@ -1,12 +1,12 @@
-import { moveWorkspaceEntry } from "../../workspace-api/index.ts";
-import { treeDragType } from "../tree-drag.ts";
-import { topLevelTreePaths } from "../tree-selection.ts";
+import { moveWorkspaceEntry } from "../../../../workspace-api/index.ts";
+import { treeDragType } from "./tree-drag.ts";
+import { topLevelTreePaths } from "./tree-selection.ts";
 import {
   moveDestination,
   parentPath,
   relocatedPath,
-} from "../../../../core/modules/workspace/index.ts";
-import type { FileEntry } from "../../../../core/modules/workspace/index.ts";
+} from "../../../../../../core/modules/workspace/index.ts";
+import type { FileEntry } from "../../../../../../core/modules/workspace/index.ts";
 import type { TreeContext } from "./tree-operations.ts";
 
 /** Перетаскивание записей дерева: выбор цели, подсветка и перенос. */

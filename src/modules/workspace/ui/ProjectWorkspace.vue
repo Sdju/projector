@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { relocatedPath } from "../../../../core/modules/workspace/index.ts";
 import { useCommandScope } from "../../../common/utilities/commands.ts";
-import FileTree from "./FileTree.vue";
+import { FileTree } from "../modules/tree/index.ts";
 import SearchPanel from "./SearchPanel.vue";
 import WorkbenchToolbar from "./WorkbenchToolbar.vue";
 import SidebarTabs, { type SidebarSection } from "./SidebarTabs.vue";
