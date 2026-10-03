@@ -57,10 +57,29 @@ export function provideIdeCommands() {
     run: () => pageReload.restartServer(),
   });
   workbench.registerCommand({
+    id: "ide.workbench.server.mode.dev",
+    title: "Переключить сервер в режим dev (HMR)",
+    description:
+      "Перезапускает Projector через vp dev с горячей заменой модулей. Запрашивает подтверждение, завершает терминалы и дочерние процессы, затем обновляет все открытые страницы.",
+    enabled: () => pageReload.canSwitchMode("dev"),
+    run: () => pageReload.switchMode("dev"),
+  });
+  workbench.registerCommand({
+    id: "ide.workbench.server.mode.prod",
+    title: "Переключить сервер в режим prod (сборка)",
+    description:
+      "Собирает фронтенд (vp build) и перезапускает Projector через vp preview. Изменения кода после этого не применяются без повторного переключения. Запрашивает подтверждение, завершает терминалы и дочерние процессы, затем обновляет все открытые страницы.",
+    enabled: () => pageReload.canSwitchMode("prod"),
+    run: () => pageReload.switchMode("prod"),
+  });
+  workbench.registerCommand({
     id: "ide.workbench.commandPalette.open",
     title: "Открыть командный центр",
     enabled: () => !!palette.value || !document.querySelector("dialog[open]"),
-    run: () => {
+    run: async () => {
+      if (palette.value) return;
+      // Актуальный режим сервера нужен до снимка списка команд.
+      await pageReload.refreshMode();
       if (palette.value) return;
       palette.value = {
         commands: paletteCommands(sdk.getCommands(), sdk.getScopes(), sdk.getActiveScope()),
@@ -82,7 +101,10 @@ export function provideIdeCommands() {
     // Calling this scope explicitly preserves the originating workspace scope.
     void workbench.executeCommand(binding.command, binding.args).catch(reportError);
   }
-  onMounted(() => window.addEventListener("keydown", globalKeydown, true));
+  onMounted(() => {
+    window.addEventListener("keydown", globalKeydown, true);
+    void pageReload.refreshMode();
+  });
   const unsubscribe = sdk.subscribe(() => revision.value++);
   provide(commandHostKey, {
     revision,

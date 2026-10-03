@@ -117,6 +117,16 @@ Restart asks for confirmation because it terminates all terminals and child proc
 Each page retains its URL and normal unsaved-edit unload protection. Failed requests and a 60-second
 startup timeout are shown by the IDE host; duplicate actions are disabled while waiting. Save edits before restarting.
 
+### Server mode
+
+`ide.workbench.server.mode.dev` (**Переключить сервер в режим dev (HMR)**) and `ide.workbench.server.mode.prod`
+(**Переключить сервер в режим prod (сборка)**) switch between `vp dev` and `vp preview` over `dist`. After confirmation the page
+calls `POST /api/app/mode` with `{ mode }`; the server starts `projector mode <mode>` as a detached CLI process
+(build for `prod`, then full restart — terminals and child processes end) and answers `202`. Pages wait for a new PID in
+`/api/health` and reload; `mode` in that response reports the running mode. A build failure leaves the old server
+running; the page reports the 60-second timeout, details are in `~/.local/share/projector/server.log`. The same switch is
+available as `projector mode [dev|prod]` (see [usage](usage.md)).
+
 ## Git commands
 
 The `git:<projectId>` scope has `{ surface: 'git', projectId, path, staged, busy }`.

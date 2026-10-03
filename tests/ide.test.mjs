@@ -443,3 +443,20 @@ test("editor themes default, persist, reject unknown values and protect HTTP wri
   await writeFile(file, '{"theme":"removed-theme"}');
   assert.deepEqual(await readEditorSettings(), { theme: "projector-soft" });
 });
+
+test("mode switch is unavailable for the mode the server already runs in", async (t) => {
+  const ctx = reloadHost(t, [
+    { ok: true, app: "projector", pid: 10, mode: "dev" },
+    { ok: true, app: "projector", pid: 10, mode: "dev" },
+  ]);
+  assert.equal(ctx.host.canSwitchMode("dev"), true, "unknown mode keeps both available");
+  await ctx.host.refreshMode();
+  assert.equal(ctx.host.canSwitchMode("dev"), false);
+  assert.equal(ctx.host.canSwitchMode("prod"), true);
+  await assert.rejects(ctx.host.switchMode("dev"), /уже работает в режиме dev/);
+  assert.deepEqual(
+    ctx.requests.map(({ url }) => url),
+    ["/api/health", "/api/health"],
+    "no switch request is sent",
+  );
+});
