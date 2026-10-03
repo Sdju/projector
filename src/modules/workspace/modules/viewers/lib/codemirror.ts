@@ -35,7 +35,8 @@ function projectorTheme(soft: boolean): Extension {
       "&": { backgroundColor: palette.bg, color: palette.fg, height: "100%" },
       ".cm-content": { caretColor: palette.fg, padding: "16px 0" },
       ".cm-cursor": { borderLeftColor: palette.fg },
-      ".cm-activeLine": { backgroundColor: palette.line },
+      // Полупрозрачный фон: иначе активная строка перекрывает слой выделения.
+      ".cm-activeLine": { backgroundColor: "#ffffff08" },
       ".cm-activeLineGutter": { backgroundColor: palette.line, color: palette.fg },
       ".cm-gutters": { backgroundColor: palette.bg, color: palette.gutter, border: "none" },
       "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection": {
