@@ -441,4 +441,15 @@ watch(
     opacity: 1;
   }
 }
+@media (max-width: 700px) {
+  .tab-close {
+    min-width: 36px;
+    min-height: 40px;
+    opacity: 1;
+  }
+  .workspace-tab {
+    gap: var(--sp-1);
+    padding-right: var(--sp-1);
+  }
+}
 </style>

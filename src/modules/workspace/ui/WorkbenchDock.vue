@@ -18,6 +18,8 @@ import IconFailed from "~icons/lucide/circle-slash";
 
 const props = defineProps<{
   projectId: string;
+  mobile?: boolean;
+  mobileSurface?: "editor" | "files" | "terminal";
   workbench: ReturnType<typeof useWorkbenchLayout>;
   files: ReturnType<typeof useOpenFiles>;
   tabActions: (id: string) => ContextMenuItem[];
@@ -35,6 +37,9 @@ const { fileOf, terminals, terminalPanels } = props.workbench;
 <template>
   <DockView
     v-model:layout="workbench.layout.value"
+    :mobile="mobile"
+    :mobile-surface="mobileSurface"
+    :terminal-panel="(id) => terminalPanels.has(id) || id.startsWith('terminal:')"
     :describe="workbench.describePanel"
     :project-id="projectId"
     command-namespace="ide.workbench.tabs"
@@ -47,6 +52,7 @@ const { fileOf, terminals, terminalPanels } = props.workbench;
     @pin="files.pinPreview"
     @drop="files.dropFiles"
   >
+    <template #mobileTerminalActions><slot name="mobile-terminal-actions" /></template>
     <template #panel="{ id, focused }">
       <PanelHost v-if="keepAlive.has(id)" :id="id" :registry="panelHosts" />
       <FilePanel

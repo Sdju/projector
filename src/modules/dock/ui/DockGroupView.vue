@@ -289,4 +289,18 @@ const focus = () => {
 .dock-drop.bottom {
   inset: 50% 0 0 0;
 }
+@media (max-width: 700px) {
+  .dock-header {
+    flex-wrap: wrap;
+  }
+  .dock-header :deep(.workspace-tabs) {
+    flex-basis: 100%;
+    height: 44px;
+  }
+  .dock-actions {
+    width: 100%;
+    height: 44px;
+    justify-content: flex-end;
+  }
+}
 </style>

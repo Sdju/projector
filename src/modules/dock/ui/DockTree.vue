@@ -163,7 +163,30 @@ function sashKey(event: KeyboardEvent, index: number) {
   }
   .dock-split > .dock-cell {
     flex: none !important;
-    min-height: 360px;
+    min-height: 0;
+    height: max(360px, calc(100dvh - 180px));
+  }
+  .dock-split.row,
+  .dock-split.column {
+    flex-direction: column;
+  }
+  .row > .dock-cell {
+    min-width: 0;
+  }
+  .dock-sash {
+    display: none;
+  }
+}
+@media (min-width: 701px) and (max-width: 1050px) {
+  .dock-split.row,
+  .dock-split.column {
+    flex-direction: column;
+  }
+  .dock-split > .dock-cell {
+    flex: none !important;
+    min-width: 0;
+    min-height: 0;
+    height: clamp(360px, 65dvh, 720px);
   }
   .dock-sash {
     display: none;

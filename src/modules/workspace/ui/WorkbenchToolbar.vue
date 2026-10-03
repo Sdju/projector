@@ -116,4 +116,23 @@ const terminalPrograms = [
   width: 14px;
   height: 14px;
 }
+@media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {
+  .toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: var(--sp-1);
+    padding: var(--sp-1) var(--sp-2);
+  }
+  .toolbar > *,
+  .toolbar :deep(.controls) {
+    flex-shrink: 0;
+  }
+  .toolbar :deep(.controls) {
+    flex-wrap: nowrap;
+  }
+  .toolbar-error {
+    max-width: 240px;
+    white-space: normal;
+  }
+}
 </style>

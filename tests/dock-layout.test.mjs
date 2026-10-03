@@ -247,3 +247,27 @@ test("layouts survive serialisation; hostile data does not throw", () => {
   const shallow = parseDockLayout({ root: deep });
   assert.ok(!shallow || !dockPanels(shallow).includes("x"), "excessive depth is dropped");
 });
+
+
+test("mobile surfaces separate mixed panels without changing desktop splits or hidden groups", async () => {
+  const { mobileDockSurfaces } = await import("../src/modules/dock/model/mobile-surfaces.ts");
+  let layout = createDockLayout();
+  layout = addPanel(layout, "a", { groupId: "g1", zone: "center" });
+  layout = addPanel(layout, "terminal:1", { groupId: "g1", zone: "center" });
+  layout = addPanel(layout, "b", { groupId: "g2", zone: "center" });
+  layout = addPanel(layout, "terminal:2", { groupId: "g2", zone: "center" });
+  layout = setGroupHidden(layout, "g2", true);
+  layout = toggleMaximized(layout, "g1");
+  const original = structuredClone(layout);
+  const isTerminal = (id) => id.startsWith("terminal:");
+  const last = { editor: "b", terminal: "terminal:2" };
+  let surfaces = mobileDockSurfaces(layout, isTerminal, last);
+  assert.deepEqual(surfaces[0], { side: "editor", ids: ["a", "b"], active: "b" });
+  assert.deepEqual(surfaces[1], { side: "terminal", ids: ["terminal:1", "terminal:2"], active: "terminal:1" });
+  surfaces = mobileDockSurfaces(layout, isTerminal, { editor: "removed", terminal: "removed" },
+    { editor: ["b", "removed", "a"], terminal: [] });
+  assert.equal(surfaces[0].active, "b");
+  assert.deepEqual(surfaces[0].ids, ["b", "a"]);
+  assert.deepEqual(layout, original);
+  assert.deepEqual(mobileDockSurfaces(createDockLayout(), isTerminal, last).map((item) => item.active), ["", ""]);
+});

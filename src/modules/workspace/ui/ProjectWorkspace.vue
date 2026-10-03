@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import { relocatedPath } from "../../../../core/modules/workspace/index.ts";
-import { useCommandScope } from "../../../common/utilities/commands.ts";
+import { useCommandScope, commandArgs } from "../../../common/utilities/commands.ts";
 import WorkbenchToolbar from "./WorkbenchToolbar.vue";
+import UiButton from "../../../common/ui/UiButton.vue";
 import WorkspaceSidebar from "./WorkspaceSidebar.vue";
 import type { SidebarSection } from "./SidebarTabs.vue";
 import { useGitOverview, useGitHistory, useGitBranches } from "../modules/git/index.ts";
@@ -25,6 +27,19 @@ const props = defineProps<{
 }>();
 const workspaceElement = ref<HTMLElement>();
 const sidebarHidden = ref(false);
+// Mobile navigation is transient; keep the saved desktop layout independent.
+const mobile = useMediaQuery("(max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse)");
+const mobileSurface = ref<"editor" | "files" | "terminal">("editor");
+const mobileActionsOpen = ref(false);
+const mobileSidebarOpen = computed({
+  get: () => mobileSurface.value === "files",
+  set: (open: boolean) => { mobileSurface.value = open ? "files" : "editor"; },
+});
+const sidebarInvisible = computed(() => mobile.value ? !mobileSidebarOpen.value : sidebarHidden.value);
+function showSidebar() {
+  if (mobile.value) mobileSidebarOpen.value = true;
+  else sidebarHidden.value = false;
+}
 const { treeWidth, sizes, resizeTree, resizeTreeKey } = useSidebarResize(workspaceElement);
 const sidebar = ref<InstanceType<typeof WorkspaceSidebar>>();
 const editorCommands = useCommandScope(`editor:${props.projectId}`, () => ({
@@ -72,9 +87,7 @@ const workbench = useWorkbenchLayout({
   selectTab: (key) => files.selectTab(key),
   closeTab: (key) => files.closeTab(key),
   closeManyTabs: (ids) => files.closeManyTabs(ids),
-  showSidebar: () => {
-    sidebarHidden.value = false;
-  },
+  showSidebar,
   register: registerEditor,
 });
 const {
@@ -122,7 +135,7 @@ const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
   toggleMarkdownSource,
   revealInTree: (path) => {
     section.value = "files";
-    sidebarHidden.value = false;
+    showSidebar();
     sidebar.value?.reveal(path);
   },
   saveProjectSettings: () => props.saveProjectSettings?.(),
@@ -149,10 +162,31 @@ registerEditor(
   "ide.workbench.sidebar.toggle",
   "Показать или скрыть боковую панель",
   () => {
-    sidebarHidden.value = !sidebarHidden.value;
+    if (mobile.value) mobileSidebarOpen.value = !mobileSidebarOpen.value;
+    else sidebarHidden.value = !sidebarHidden.value;
   },
   () => true,
 );
+editorCommands.scope.registerCommand({
+  id: "ide.workbench.mobile.surface.show",
+  title: "Открыть мобильную поверхность",
+  description: "Переключает мобильный интерфейс между редактором, файлами слева и терминалами справа, сохраняя сессии.",
+  arguments: { surface: "editor, files или terminal" },
+  enabled: () => mobile.value,
+  run: (value) => {
+    const { surface } = commandArgs(value);
+    if (surface !== "editor" && surface !== "files" && surface !== "terminal")
+      throw new Error("surface: editor, files или terminal");
+    mobileSurface.value = surface;
+    mobileActionsOpen.value = false;
+  },
+});
+editorCommands.scope.registerCommand({
+  id: "ide.workbench.mobile.actions.toggle", title: "Показать действия проекта",
+  description: "Раскрывает команды запуска проекта и создания терминалов в мобильном интерфейсе.",
+  enabled: () => mobile.value,
+  run: () => { mobileActionsOpen.value = !mobileActionsOpen.value; },
+});
 useWorkspaceSession({
   projectId: () => props.projectId,
   tabs,
@@ -176,6 +210,12 @@ useWorkspaceSession({
   },
   reloadGit: () => void loadGit(),
 });
+watch(activeKey, (key) => { if (key) mobileSurface.value = "editor"; });
+watch(() => workbench.focusedGroup.value?.active, (id) => {
+  if (mobile.value && !restoringSession.value && id?.startsWith("terminal:"))
+    mobileSurface.value = "terminal";
+});
+watch(mobile, () => { mobileSurface.value = "editor"; mobileActionsOpen.value = false; });
 const active = computed(() => tabs.value.find((file) => file.key === activeKey.value));
 const gitSync = useGitChangeSync({
   projectId: () => props.projectId,
@@ -231,26 +271,36 @@ onBeforeUnmount(() => {
   <div
     ref="workspaceElement"
     class="workspace"
-    :class="{ 'sidebar-hidden': sidebarHidden }"
+    :class="{ 'sidebar-hidden': sidebarInvisible }"
     :style="sizes"
   >
+    <nav v-if="mobile" class="mobile-surfaces" aria-label="Поверхности проекта">
+      <UiButton v-for="entry in [{ id: 'files', title: 'Файлы' }, { id: 'editor', title: 'Редактор' }, { id: 'terminal', title: 'Терминалы' }]"
+        :key="entry.id" :active="mobileSurface === entry.id" :aria-pressed="mobileSurface === entry.id"
+        @click="editorCommands.run('ide.workbench.mobile.surface.show', { surface: entry.id })">{{ entry.title }}</UiButton>
+      <UiButton :active="mobileActionsOpen" :aria-expanded="mobileActionsOpen" aria-label="Действия проекта"
+        @click="editorCommands.run('ide.workbench.mobile.actions.toggle')">···</UiButton>
+    </nav>
+    <div v-if="!mobile || mobileActionsOpen" class="toolbar-host" :class="{ 'mobile-actions': mobile }">
     <WorkbenchToolbar
-      :sidebar-hidden="sidebarHidden"
+      :sidebar-hidden="sidebarInvisible"
       :terminals-busy="terminals.busy.value"
       :terminals-error="terminals.error.value"
       :hidden-groups="hiddenGroups.map((group) => ({ id: group.id, label: groupLabel(group) }))"
-      @command="(id, args) => editorCommands.run(id, args)"
+      @command="(id, args) => { if (mobile) mobileActionsOpen = false; editorCommands.run(id, args); }"
       @show-group="showGroup"
     >
       <template #terminal-actions><slot name="terminal-actions" /></template>
       <template #terminal-status><slot name="terminal-status" /></template>
     </WorkbenchToolbar>
+    </div>
     <p v-if="fileError" class="file-error" role="alert">{{ fileError }}</p>
+    <Transition name="mobile-left">
     <WorkspaceSidebar
       ref="sidebar"
       v-model:section="section"
       :project-id="projectId"
-      :hidden="sidebarHidden"
+      :hidden="sidebarInvisible"
       :active="active"
       :revision="revision"
       :overview="overview"
@@ -259,14 +309,16 @@ onBeforeUnmount(() => {
       :files="files"
       :git-sync="gitSync"
       @command="editorCommands.run($event)"
+      @navigate="mobileSidebarOpen = false"
       @refresh="refresh"
       @settings="openProjectSettings"
       @changed="treeChanged"
       @deleted="entryDeleted"
       @moved="entryMoved"
     />
+    </Transition>
     <div
-      v-show="!sidebarHidden"
+      v-show="!sidebarInvisible"
       class="resize-handle tree-resize"
       role="separator"
       aria-orientation="vertical"
@@ -275,8 +327,16 @@ onBeforeUnmount(() => {
       @pointerdown="resizeTree"
       @keydown="resizeTreeKey"
     />
+    <button
+      v-if="mobile && mobileSidebarOpen"
+      class="sidebar-backdrop"
+      aria-label="Закрыть боковую панель"
+      data-command="ide.workbench.sidebar.toggle"
+      @click="editorCommands.run('ide.workbench.sidebar.toggle')"
+    />
     <section
       class="dock-pane"
+      :inert="mobile && mobileSidebarOpen"
       aria-label="Блоки редактора и терминалов"
       @focusin="editorFocus"
       @keydown.capture="editorKeydown"
@@ -285,6 +345,8 @@ onBeforeUnmount(() => {
       <WorkbenchDock
         :project-id="projectId"
         :workbench="workbench"
+        :mobile="mobile"
+        :mobile-surface="mobileSurface"
         :files="files"
         :tab-actions="tabActions"
         :panel-hosts="panelHosts"
@@ -293,6 +355,11 @@ onBeforeUnmount(() => {
         :tabs="tabs"
         :virtual-keys="{ agent: virtualTabs.agent.key, project: virtualTabs.project.key }"
       >
+        <template #mobile-terminal-actions>
+          <UiButton v-for="program in ['shell', 'codex', 'claude', 'opencode']" :key="program" size="sm"
+            :disabled="terminals.busy.value" :aria-label="`Новый ${program}`"
+            @click="editorCommands.run('ide.workbench.terminal.new', { program })">+ {{ program }}</UiButton>
+        </template>
         <template #project><slot name="project" /></template>
       </WorkbenchDock>
     </section>
@@ -374,40 +441,54 @@ onBeforeUnmount(() => {
   color: var(--muted);
   font-size: var(--fs-xs);
 }
-@media (max-width: 1050px) {
+@media (max-width: 1050px) and (min-width: 701px) {
+  .dock-pane {
+    overflow: auto;
+  }
   .workspace {
-    grid-template-columns: 190px minmax(250px, 1fr);
-    grid-template-rows: auto auto auto auto;
-    height: auto;
-    min-height: 0;
+    grid-template-columns: 220px 1px minmax(0, 1fr);
   }
   .workspace.sidebar-hidden {
-    grid-template-columns: 0 minmax(250px, 1fr);
+    grid-template-columns: 0 0 minmax(0, 1fr);
   }
-  .resize-handle {
+}
+@media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {
+  .workspace,
+  .workspace.sidebar-hidden {
+    position: relative;
+    grid-template-columns: minmax(0, 1fr);
+    flex: 1;
+    height: 100%;
+    min-height: 0;
+    border-radius: 0;
+    border-inline: 0;
+  }
+  .tree-resize {
     display: none;
   }
   .dock-pane {
-    grid-column: 2;
-    grid-row: 3;
-    height: 65dvh;
-    min-height: 400px;
-  }
-}
-@media (max-width: 700px) {
-  .dock-pane {
-    height: auto;
-    min-height: 0;
-  }
-}
-@media (max-width: 600px) {
-  .workspace,
-  .workspace.sidebar-hidden {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .dock-pane {
     grid-column: 1;
-    grid-row: 4;
+    grid-row: 3;
+    overflow: hidden;
+  }
+  .mobile-left-enter-active, .mobile-left-leave-active { transition: transform var(--t-base); }
+  .mobile-left-enter-from, .mobile-left-leave-to { transform: translateX(-100%); }
+  .sidebar-backdrop {
+    grid-column: 1;
+    grid-row: 3;
+    z-index: 2;
+    justify-self: end;
+    width: calc(100% - min(340px, 90%));
+    background: var(--overlay);
   }
 }
+.toolbar-host { grid-column: 1 / -1; }
+.mobile-surfaces {
+  grid-column: 1 / -1; display: flex; align-items: center; gap: var(--sp-1);
+  height: 40px; padding-inline: var(--sp-2); border-bottom: 1px solid var(--line); background: var(--bg-sunken);
+}
+.mobile-surfaces .btn { min-height: 36px; border-color: transparent; flex: 1; }
+.mobile-surfaces .btn:last-child { flex: none; width: 40px; }
+.mobile-actions { position: absolute; top: 40px; inset-inline: 0; z-index: var(--z-popover); background: var(--bg-2); box-shadow: var(--shadow-popover); }
+.mobile-actions :deep(.toolbar) { flex-wrap: wrap; padding: var(--sp-2); }
 </style>

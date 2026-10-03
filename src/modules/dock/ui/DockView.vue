@@ -6,6 +6,7 @@ import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import { isNodeVisible, type DockLayout, type DockTarget } from "../model/layout.ts";
 import { dockKey, type DockTabInfo } from "./context.ts";
 import DockTree from "./DockTree.vue";
+import MobileDock from "./MobileDock.vue";
 
 /**
  * Раскладка блоков: разделители, группы вкладок, перетаскивание и изменение размеров.
@@ -13,6 +14,9 @@ import DockTree from "./DockTree.vue";
  */
 const props = defineProps<{
   layout: DockLayout;
+  mobile?: boolean;
+  mobileSurface?: "editor" | "files" | "terminal";
+  terminalPanel?: (id: string) => boolean;
   describe: (id: string) => DockTabInfo;
   projectId: string;
   commandNamespace: string;
@@ -57,8 +61,9 @@ useEventListener(window, "drop", () => (tabDrag.value = undefined));
 </script>
 
 <template>
-  <div class="dock">
-    <DockTree v-if="visible" :node="layout.root" />
+  <div class="dock" :class="{ 'mobile': mobile }">
+    <MobileDock v-if="mobile && terminalPanel" :surface="mobileSurface ?? 'editor'" :terminal-panel="terminalPanel" />
+    <DockTree v-else-if="visible" :node="layout.root" />
     <p v-else class="dock-none">Все блоки скрыты. Включите нужный блок на панели выше.</p>
   </div>
 </template>
@@ -76,4 +81,11 @@ useEventListener(window, "drop", () => (tabDrag.value = undefined));
   color: var(--muted);
   font-size: var(--fs-sm);
 }
+@media (max-width: 1050px) {
+  .dock {
+    min-height: 100%;
+    height: auto;
+  }
+}
+.dock.mobile { height: 100%; min-height: 0; }
 </style>

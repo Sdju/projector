@@ -403,4 +403,10 @@ button.selected {
 .error {
   color: var(--err);
 }
+@media (max-width: 700px) {
+  button {
+    min-height: var(--control-h-sm);
+    font-size: var(--fs-sm);
+  }
+}
 </style>

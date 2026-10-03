@@ -461,4 +461,15 @@ onBeforeUnmount(() => {
   background: var(--bg-2);
   font: 0.9em var(--mono);
 }
+@media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {
+  .visual-markdown :deep(.ProseMirror) {
+    padding: var(--sp-4) var(--sp-4) var(--sp-6);
+  }
+  .visual-markdown :deep(.ProseMirror > :first-child) {
+    margin-top: 0;
+  }
+  .visual-markdown :deep(.ProseMirror blockquote) {
+    padding-inline: var(--sp-3);
+  }
+}
 </style>

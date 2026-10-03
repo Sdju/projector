@@ -29,6 +29,7 @@ const section = defineModel<SidebarSection>("section", { required: true });
 const emit = defineEmits<{
   command: [id: string];
   refresh: [];
+  navigate: [];
   settings: [];
   changed: [];
   deleted: [path: string];
@@ -37,7 +38,12 @@ const emit = defineEmits<{
 const fileTree = ref<InstanceType<typeof FileTree>>();
 const searchPanel = ref<InstanceType<typeof SearchPanel>>();
 const gitPanel = ref<InstanceType<typeof GitPanel>>();
-const { openFile, openCommit, openCommitFile, prepareEntryChange } = props.files;
+const { openCommit, openCommitFile, prepareEntryChange } = props.files;
+function openFile(...args: Parameters<typeof props.files.openFile>) {
+  const result = props.files.openFile(...args);
+  emit("navigate");
+  return result;
+}
 
 defineExpose({
   reveal: (path: string) => fileTree.value?.reveal(path),
@@ -110,20 +116,14 @@ defineExpose({
   min-height: 0;
   overflow: auto;
 }
-@media (max-width: 1050px) {
-  .sidebar {
-    grid-row: 3;
-    border-right: 1px solid var(--line);
-    height: 65dvh;
-    min-height: 400px;
-  }
-}
-@media (max-width: 600px) {
+@media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {
   .sidebar {
     grid-column: 1;
     grid-row: 3;
-    height: 260px;
-    min-height: 0;
+    z-index: 3;
+    width: min(340px, 90%);
+    border-right: 1px solid var(--line-strong);
+    box-shadow: var(--shadow-popover);
   }
 }
 </style>
