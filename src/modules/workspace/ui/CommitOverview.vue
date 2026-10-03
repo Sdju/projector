@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import type { CommitComparison, GitCommitDetail } from "../../../../core/modules/workspace/index.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import { FileIcon, useFileIconTheme } from "../../file-icons/index.ts";
 import { workspaceRequest } from "../api.ts";
+import CommitFileDiff from "./CommitFileDiff.vue";
 import { absoluteTime, relativeTime, shortHash } from "../lib/commit-format.ts";
 import IconCopy from "~icons/lucide/copy";
 import IconChevronRight from "~icons/lucide/chevron-right";
 import IconOpen from "~icons/lucide/external-link";
 
-const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
 
 /** Вкладка «Обзор коммита»: сообщение, метаданные и все файлы коммита с числом строк. */
 const props = defineProps<{ projectId: string; hash: string }>();
@@ -26,6 +26,8 @@ const copied = ref(false);
 const { resolver } = useFileIconTheme();
 /** Раскрытые файлы читаются при первом раскрытии; отдельные запросы не нужны, пока блок свёрнут. */
 const expanded = ref(new Set<string>());
+/** Высота кода по файлам: переживает сворачивание и повторное раскрытие. */
+const heights = ref<Record<string, number>>({});
 const diffs = ref<Record<string, { loading: boolean; error: string; data?: CommitComparison }>>({});
 let generation = 0;
 async function loadDiff(path: string) {
@@ -45,11 +47,6 @@ async function loadDiff(path: string) {
         error: err instanceof Error ? err.message : "Ошибка Git",
       };
   }
-}
-/** Короткий файл не занимает лишнего места; длинный получает до 420px и растягивается за уголок. */
-function viewerHeight(data: CommitComparison) {
-  const lines = Math.max(data.original.split("\n").length, data.modified.split("\n").length);
-  return `${Math.min(420, Math.max(110, lines * 20 + 56))}px`;
 }
 async function toggleFile(path: string, value?: boolean) {
   const open = value ?? !expanded.value.has(path);
@@ -97,6 +94,7 @@ async function load() {
   error.value = "";
   detail.value = undefined;
   expanded.value.clear();
+  heights.value = {};
   diffs.value = {};
   try {
     const data = await workspaceRequest<GitCommitDetail>(props.projectId, "commit", {
@@ -258,25 +256,14 @@ async function copy() {
             <p v-else-if="diffs[file.path]?.error" class="note error" role="alert">
               {{ diffs[file.path]!.error }}
             </p>
-            <p
-              v-else-if="diffs[file.path]?.data?.original === diffs[file.path]?.data?.modified"
-              class="note"
-            >
-              Содержимое не изменилось.
-            </p>
-            <div
+            <CommitFileDiff
               v-else-if="diffs[file.path]?.data"
-              class="viewer"
-              :style="{ height: viewerHeight(diffs[file.path]!.data!) }"
-            >
-              <CodeViewer
-                :path="file.path"
-                :content="diffs[file.path]!.data!.modified"
-                :original="diffs[file.path]!.data!.original"
-                :original-label="diffs[file.path]!.data!.parent || '∅'"
-                :modified-label="shortHash(detail.hash)"
-              />
-            </div>
+              :comparison="diffs[file.path]!.data!"
+              :path="file.path"
+              :height="heights[file.path]"
+              @resize="heights[file.path] = $event"
+              @collapse="commands.run('ide.git.commit.file.toggle', { path: file.path, open: false })"
+            />
           </div>
         </li>
       </ul>
@@ -286,8 +273,7 @@ async function copy() {
 
 <style scoped>
 .overview {
-  flex: 1;
-  min-height: 0;
+  height: 100%;
   overflow: auto;
   padding: var(--sp-4);
 }
@@ -427,13 +413,6 @@ code {
 .inline .note {
   margin: 0;
   padding: var(--sp-2) var(--sp-3);
-}
-/* The diff fills this box; the corner handle lets a long file take more room. */
-.viewer {
-  min-height: 100px;
-  max-height: 85vh;
-  resize: vertical;
-  overflow: hidden;
 }
 .status {
   width: 14px;

@@ -189,7 +189,9 @@ carries `commit`, `commitPath` and `historyOpen`. Commands:
 - `ide.git.commit.toggle` `{ hash }` expands the changes made by that commit only;
 - `ide.git.commit.openDiff` `{ hash, path }` opens a read-only diff `parent → commit` (tab title shows both hashes);
 - `ide.git.commit.file.toggle` `{ path, open? }` and `ide.git.commit.files.toggleAll` `{ open? }` expand the code of files
-  right inside the overview tab (read lazily, short files get a short viewer);
+  right inside the overview tab (read lazily, short files get a short viewer). The handle under each viewer resizes it
+  (drag, arrows, double click resets); squeezing it to the minimum collapses the file like `file.toggle { open: false }`,
+  and the next expansion restores the remembered height;
 - `ide.git.commit.openFile` `{ path }` opens the current file; `ide.git.commit.open` `{ hash }` opens the **Коммит** overview
   tab (message, metadata, parents, every file with +/− lines); `ide.git.commit.copyHash` `{ hash }`.
 
