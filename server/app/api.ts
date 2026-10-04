@@ -30,7 +30,9 @@ import { handleProjectActions } from "../routes/api/projects/[id]/index.ts";
 import { handleIdeKeybindings } from "../routes/api/ide/keybindings.ts";
 import { handleEditorSettings } from "../routes/api/ide/editor.ts";
 import { handleDocker } from "../routes/api/docker.ts";
+import { handleCodex } from "../routes/api/codex.ts";
 const routes = [
+  handleCodex,
   handleDocker,
   handleEditorSettings,
   handleIdeKeybindings,

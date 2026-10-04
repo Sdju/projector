@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { CodexUsageIndicator } from "../../codex/index.ts";
 import { useEditorStatus } from "../modules/viewers/index.ts";
 
 const status = useEditorStatus();
@@ -20,6 +21,7 @@ const selection = computed(() => {
       <span v-if="selection" class="status-item">{{ selection }}</span>
     </div>
     <div class="status-spacer" />
+    <CodexUsageIndicator />
     <span
       v-if="status.active && status.lineEnding"
       class="status-item"
