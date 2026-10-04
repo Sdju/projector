@@ -4,6 +4,7 @@ import { resolve, relative, isAbsolute } from "node:path";
 import { os } from "../../../core/modules/os/index.ts";
 import type { Project } from "../../../core/modules/project/index.ts";
 import { loadProjects } from "../projects/index.ts";
+import { serverId } from "./reconcile.ts";
 import { HttpError } from "../http/index.ts";
 
 export function environmentLaunch(
@@ -33,6 +34,8 @@ export function environmentLaunch(
     name,
     "--label",
     `io.projector.environment=${project.id}`,
+    "--label",
+    `io.projector.server=${serverId}`,
     "--init",
     "--read-only",
     "--cap-drop=ALL",

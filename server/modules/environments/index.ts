@@ -7,3 +7,4 @@ export {
   runEnvironmentCommand,
   environmentForPath,
 } from "./execution.ts";
+export { reconcileEnvironmentContainers, reconcileOnStartup } from "./reconcile.ts";
