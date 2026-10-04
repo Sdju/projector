@@ -14,6 +14,7 @@ import UiDialog from "../../../common/ui/UiDialog.vue";
 import UiDialogActions from "../../../common/ui/UiDialogActions.vue";
 import UiHint from "../../../common/ui/UiHint.vue";
 import UiKbd from "../../../common/ui/UiKbd.vue";
+defineProps<{ embedded?: boolean }>();
 const { api, revision } = useIdeCommands();
 const search = ref("");
 const customOnly = ref(false);
@@ -169,14 +170,15 @@ onMounted(async () => {
 <template>
   <section
     class="keybindings-editor"
+    :class="{ embedded }"
     aria-label="Настройки горячих клавиш"
     :aria-busy="busy"
     @focusin="commands.scope.activate()"
     @keydown="commands.keydown"
   >
     <header>
-      <h2>Горячие клавиши</h2>
-      <p>Сочетания клавиш для команд IDE</p>
+      <h2 v-if="!embedded">Горячие клавиши</h2>
+      <p v-if="!embedded">Сочетания клавиш для команд IDE</p>
       <input
         v-model="search"
         type="search"
@@ -239,6 +241,18 @@ onMounted(async () => {
   flex-direction: column;
   font-size: var(--fs-xs);
   background: var(--bg);
+}
+.keybindings-editor.embedded {
+  height: max(360px, calc(100dvh - 260px));
+}
+.embedded header {
+  padding: 0;
+}
+.embedded .message {
+  padding-inline: 0;
+}
+.embedded footer {
+  padding-inline: 0;
 }
 header {
   padding: var(--sp-4) var(--sp-5) 0;

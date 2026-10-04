@@ -155,7 +155,7 @@ onMounted(() => {
 }
 h2 {
   margin: 0 0 var(--sp-3);
-  font-size: var(--fs-lg);
+  font-size: var(--fs-sm);
   font-weight: 500;
 }
 fieldset {

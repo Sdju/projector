@@ -38,7 +38,7 @@ function keyDraft(): string {
 <template>
   <section class="panel">
     <div class="row">
-      <p class="kicker">Qwen / OpenAI-compatible</p>
+      <p class="kicker">OpenAI-compatible API</p>
       <UiButton variant="ghost" @click="addProvider">+ провайдер</UiButton>
     </div>
     <p v-if="error" class="err">{{ error }}</p>
@@ -58,30 +58,38 @@ function keyDraft(): string {
     </div>
 
     <div v-if="selected" class="form">
-      <UiField label="имя">
-        <input
-          :value="selected.name"
-          @input="patchProvider(selected.id, { name: ($event.target as HTMLInputElement).value })"
-        />
-      </UiField>
+      <div class="primary-fields">
+        <UiField label="имя">
+          <input
+            aria-label="Имя провайдера"
+            :value="selected.name"
+            @input="patchProvider(selected.id, { name: ($event.target as HTMLInputElement).value })"
+          />
+        </UiField>
+        <UiField label="модель">
+          <input
+            aria-label="Модель"
+            :value="selected.model"
+            spellcheck="false"
+            placeholder="qwen3.8-flash"
+            @input="
+              patchProvider(selected.id, { model: ($event.target as HTMLInputElement).value })
+            "
+          />
+        </UiField>
+      </div>
       <UiField label="url">
         <input
+          aria-label="URL API"
           :value="selected.url"
           spellcheck="false"
           placeholder="https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
           @input="patchProvider(selected.id, { url: ($event.target as HTMLInputElement).value })"
         />
       </UiField>
-      <UiField label="модель">
-        <input
-          :value="selected.model"
-          spellcheck="false"
-          placeholder="qwen3.8-flash"
-          @input="patchProvider(selected.id, { model: ($event.target as HTMLInputElement).value })"
-        />
-      </UiField>
       <UiField label="api key">
         <input
+          aria-label="API key"
           :value="keyDraft()"
           type="password"
           autocomplete="off"
@@ -168,6 +176,23 @@ function keyDraft(): string {
   font-size: var(--fs-xs);
 }
 
+.primary-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-3);
+}
+.item span:not(.dot) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.dot {
+  flex-shrink: 0;
+}
+@media (max-width: 700px) {
+  .primary-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .form {
   display: grid;
   gap: var(--sp-4);

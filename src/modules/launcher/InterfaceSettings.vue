@@ -123,10 +123,13 @@ async function open() {
       </UiButton>
       <UiButton :disabled="!ready || busy" @click="open">Открыть выбранный режим</UiButton>
     </div>
-    <UiHint class="hint">
-      В KDE сочетание регистрируется автоматически; занятые клавиши не перехватываются. Клик по
-      иконке в трее открывает поиск, меню даёт доступ к проектам, настройкам и выходу.
-    </UiHint>
+    <details>
+      <summary>Системный хоткей и трей</summary>
+      <UiHint class="hint">
+        В KDE сочетание регистрируется автоматически; занятые клавиши не перехватываются. Клик по
+        иконке в трее открывает поиск, меню даёт доступ к проектам, настройкам и выходу.
+      </UiHint>
+    </details>
     <p v-if="error || status" role="status" :class="{ error }">{{ error || status }}</p>
   </section>
 </template>
@@ -137,7 +140,7 @@ async function open() {
 }
 h2 {
   margin: 0 0 var(--sp-3);
-  font-size: var(--fs-lg);
+  font-size: var(--fs-sm);
   font-weight: 500;
 }
 fieldset {
@@ -183,6 +186,14 @@ small {
 }
 select {
   max-width: 320px;
+}
+details {
+  margin-top: var(--sp-4);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+summary {
+  cursor: pointer;
 }
 .error {
   color: var(--err);

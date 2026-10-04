@@ -6,6 +6,7 @@ import {
   type EditorTheme,
 } from "../../../../../../core/modules/editor-themes/index.ts";
 import { editorTheme, applyEditorTheme, loadEditorTheme } from "../lib/editor-theme.ts";
+defineProps<{ embedded?: boolean }>();
 const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
 const selected = ref<EditorTheme>(editorTheme.value);
 const ready = ref(false);
@@ -63,7 +64,7 @@ async function save() {
 
 <template>
   <section class="editor-settings" aria-labelledby="editor-settings-title">
-    <h1 id="editor-settings-title">Редактор кода</h1>
+    <h2 id="editor-settings-title" :class="{ 'sr-only': embedded }">Редактор кода</h2>
     <label for="editor-theme">Цветовая тема редактора</label>
     <select id="editor-theme" v-model="selected" :disabled="!ready || busy" @change="save">
       <option v-for="theme in editorThemes" :key="theme.id" :value="theme.id">
@@ -85,9 +86,9 @@ async function save() {
 .editor-settings {
   margin-bottom: var(--sp-6);
 }
-h1 {
+h2 {
   margin: 0 0 var(--sp-4);
-  font-size: var(--fs-lg);
+  font-size: var(--fs-sm);
   font-weight: 500;
 }
 label {
@@ -103,12 +104,19 @@ select {
   margin: var(--sp-3) 0;
 }
 .preview {
-  height: 300px;
+  height: 240px;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   overflow: hidden;
 }
 .error {
   color: var(--err);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 </style>
