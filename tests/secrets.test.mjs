@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdtemp, readFile, writeFile, mkdir, stat } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile, mkdir, stat, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { os } from "../core/modules/os/index.ts";
@@ -33,6 +33,7 @@ async function withData(run) {
     await run(join(root, "projector", "integrations.json"));
   } finally {
     useIntegrationVault(createVault(fakeBackend({ available: false })));
+    await rm(root, { recursive: true, force: true });
     if (previous === undefined) delete process.env.XDG_DATA_HOME;
     else process.env.XDG_DATA_HOME = previous;
   }

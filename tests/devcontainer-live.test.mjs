@@ -26,7 +26,9 @@ await test(
   async () => {
     const root = await mkdtemp(join(tmpdir(), "projector-devcontainer-live-"));
     process.env.XDG_DATA_HOME = join(root, "data");
-    const path = join(root, "repo");
+    // A unique folder name makes the derived image (vsc-<name>-…) safe to find and remove.
+    const name = `pdclive${process.pid}`;
+    const path = join(root, name);
     await mkdir(join(path, ".devcontainer"), { recursive: true });
     await writeFile(
       join(path, ".devcontainer", "devcontainer.json"),
@@ -58,7 +60,7 @@ await test(
         ["/bin/bash", "-c", "echo out; echo err >&2; id -un; pwd"],
         240_000,
       );
-      assert.equal(ok.stdout, "out\nnode\n/workspaces/repo\n");
+      assert.equal(ok.stdout, `out\nnode\n/workspaces/${name}\n`);
       assert.match(ok.stderr, /^err\n/);
       assert.equal(
         await exists(join(path, "host-ran.txt")),
@@ -75,9 +77,13 @@ await test(
       const { removed } = await stopDevcontainer(project);
       assert.equal(removed, 1);
       // The CLI builds a derived image per project; do not leave it behind.
-      const images = execFileSync("docker", ["images", "-q", "--filter", "reference=vsc-live-*"], {
-        encoding: "utf8",
-      })
+      const images = execFileSync(
+        "docker",
+        ["images", "-q", "--filter", `reference=vsc-${name}-*`],
+        {
+          encoding: "utf8",
+        },
+      )
         .split("\n")
         .filter(Boolean);
       if (images.length) execFileSync("docker", ["rmi", "--force", ...images], { stdio: "ignore" });

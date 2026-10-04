@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdtemp, mkdir, writeFile, symlink } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, symlink, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { classifyDevcontainer } from "../core/modules/devcontainer/index.ts";
@@ -33,8 +33,10 @@ await test("only elevated capabilities need a trust decision", () => {
   assert.deepEqual(ids(null), []);
 });
 
+const roots = [];
 async function fixture(config) {
   const root = await mkdtemp(join(tmpdir(), "projector-devcontainer-"));
+  roots.push(root);
   process.env.XDG_DATA_HOME = join(root, "data");
   const path = join(root, "repo");
   await mkdir(join(path, ".devcontainer"), { recursive: true });
@@ -109,6 +111,7 @@ await test("a config symlinked out of the project is ignored", async () => {
 
 await test("projects without a config have nothing to decide", async () => {
   const root = await mkdtemp(join(tmpdir(), "projector-devcontainer-"));
+  roots.push(root);
   const state = devcontainerState({ id: "n", name: "n", path: root });
   assert.equal(state.found, false);
   assert.equal(state.needsDecision, false);
@@ -130,3 +133,5 @@ await test("terminal links map container paths into the project and refuse escap
   assert.throws(() => map("../secret"), /за пределы/);
   assert.throws(() => map("/workspaces/application/x"), /вне проекта/);
 });
+
+await Promise.all(roots.map((root) => rm(root, { recursive: true, force: true })));

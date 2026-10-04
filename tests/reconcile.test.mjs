@@ -3,25 +3,27 @@ import { test } from "node:test";
 import { execFileSync } from "node:child_process";
 import { reconcileEnvironmentContainers } from "../server/modules/environments/index.ts";
 import { serverId } from "../server/modules/environments/reconcile.ts";
+import { os } from "../core/modules/os/index.ts";
 
-await test("only containers of another Projector process are removed", async () => {
+await test("only containers whose owner process is gone are removed", async () => {
   const calls = [];
+  const dead = "99999999-1";
+  const lines = [
+    `${"a".repeat(12)} ${serverId}`, // this process
+    `${"b".repeat(12)} ${dead}`, // dead owner
+    `${"c".repeat(12)} `, // no owner recorded
+    `${"d".repeat(12)} ${process.ppid}-1`, // live pid but a different start time: pid reuse
+    `${"e".repeat(12)} 123e4567-e89b-42d3-a456-426614174000`, // unknown format: left alone
+    "garbage",
+  ];
   const run = async (args) => {
     calls.push(args);
-    const filters = args.filter((_, i) => args[i - 1] === "--filter");
-    if (args.includes("rm")) return { stdout: "" };
-    // ours: carries the current server id; all: every Projector environment container.
-    return {
-      stdout: filters.some((f) => f.startsWith("label=io.projector.server="))
-        ? "aaaaaaaaaaaa\n"
-        : "aaaaaaaaaaaa\nbbbbbbbbbbbb\ncccccccccccc\n",
-    };
+    return { stdout: args.includes("rm") ? "" : lines.join("\n") };
   };
-  assert.equal(await reconcileEnvironmentContainers(["default", "default"], run), 2);
-  const removal = calls.find((args) => args.includes("rm"));
-  assert.deepEqual(removal.slice(-2), ["bbbbbbbbbbbb", "cccccccccccc"]);
-  assert.ok(!removal.includes("aaaaaaaaaaaa"), "live containers of this process stay");
-  assert.equal(calls.filter((args) => args.includes("rm")).length, 1, "one pass per context");
+  assert.equal(await reconcileEnvironmentContainers(["default", "default"], run), 3);
+  const removal = calls.filter((args) => args.includes("rm"));
+  assert.equal(removal.length, 1, "one pass per context");
+  assert.deepEqual(removal[0].slice(-3), ["b".repeat(12), "c".repeat(12), "d".repeat(12)]);
 });
 
 await test("an unreachable daemon is not an error", async () => {
@@ -51,15 +53,24 @@ await test(
       );
     const running = (name) => docker("ps", "-q", "--filter", `name=^${name}$`) !== "";
     const tag = `reconcile-test-${process.pid}`;
-    const names = { orphan: `${tag}-orphan`, mine: `${tag}-mine`, foreign: `${tag}-foreign` };
+    const names = {
+      orphan: `${tag}-orphan`,
+      mine: `${tag}-mine`,
+      otherLive: `${tag}-other-live`,
+      foreign: `${tag}-foreign`,
+    };
+    // Another Projector that is still running (the test runner's parent) must not be touched.
+    const liveOwner = `${process.ppid}-${os.processes.identity(process.ppid)}`;
     try {
-      start(names.orphan, "io.projector.environment=x", "io.projector.server=dead-process");
+      start(names.orphan, "io.projector.environment=x", "io.projector.server=99999999-1");
       start(names.mine, "io.projector.environment=x", `io.projector.server=${serverId}`);
+      start(names.otherLive, "io.projector.environment=x", `io.projector.server=${liveOwner}`);
       start(names.foreign, "unrelated=true");
       const removed = await reconcileEnvironmentContainers(["default"]);
       assert.ok(removed >= 1);
       assert.equal(running(names.orphan), false);
       assert.equal(running(names.mine), true);
+      assert.equal(running(names.otherLive), true, "a live Projector keeps its containers");
       assert.equal(running(names.foreign), true);
     } finally {
       for (const name of Object.values(names))

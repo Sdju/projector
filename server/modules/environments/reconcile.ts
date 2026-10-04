@@ -1,18 +1,22 @@
-import { randomUUID } from "node:crypto";
 import { os } from "../../../core/modules/os/index.ts";
 import { loadProjects } from "../projects/index.ts";
 
-const host = globalThis as typeof globalThis & {
-  projectorServerId?: string;
-  projectorReconciled?: boolean;
-};
-/** Identifies this server process; HMR reloads keep it so live containers are not mistaken for orphans. */
-export const serverId = (host.projectorServerId ??= randomUUID());
+const host = globalThis as typeof globalThis & { projectorReconciled?: boolean };
+/** Names this server process: pid plus start time, so a reused pid is not mistaken for it. */
+export const serverId = `${process.pid}-${os.processes.identity(process.pid) ?? "0"}`;
+
+/** True while the process named by an owner label is still running. */
+function ownerAlive(owner: string) {
+  const match = /^(\d+)-(\d+)$/.exec(owner);
+  if (!match) return undefined;
+  return os.processes.identity(Number(match[1])) === match[2];
+}
 
 /**
- * Removes Projector's isolated-environment containers left by a previous server
- * (SIGKILL, crash, power loss). Only containers carrying Projector's label and
- * another process's id are touched; everything else on the daemon is ignored.
+ * Removes Projector's isolated-environment containers whose server process is gone
+ * (SIGKILL, crash, power loss). A container is touched only if it carries Projector's
+ * label AND its owner is provably dead or missing; containers of a live Projector
+ * (another instance, a test server) and of unknown label formats are left alone.
  */
 export async function reconcileEnvironmentContainers(
   contexts: string[],
@@ -20,17 +24,23 @@ export async function reconcileEnvironmentContainers(
 ) {
   let removed = 0;
   for (const context of new Set(contexts)) {
-    const ids = async (...filters: string[]) =>
-      (
-        await run(["--context", context, "ps", "-aq", ...filters.flatMap((f) => ["--filter", f])])
-      ).stdout
-        .split("\n")
-        .filter((id) => /^[a-f0-9]{12,64}$/.test(id));
     try {
-      const ours = new Set(
-        await ids("label=io.projector.environment", `label=io.projector.server=${serverId}`),
-      );
-      const orphans = (await ids("label=io.projector.environment")).filter((id) => !ours.has(id));
+      const { stdout } = await run([
+        "--context",
+        context,
+        "ps",
+        "-a",
+        "--filter",
+        "label=io.projector.environment",
+        "--format",
+        '{{.ID}} {{.Label "io.projector.server"}}',
+      ]);
+      const orphans = stdout.split("\n").flatMap((line) => {
+        const [id, owner = ""] = line.trim().split(" ");
+        if (!/^[a-f0-9]{12,64}$/.test(id ?? "")) return [];
+        if (owner === "") return [id]; // created before owners were recorded
+        return ownerAlive(owner) === false ? [id] : [];
+      });
       if (orphans.length) await run(["--context", context, "rm", "--force", ...orphans]);
       removed += orphans.length;
     } catch {
