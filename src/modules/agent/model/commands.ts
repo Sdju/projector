@@ -12,7 +12,7 @@ export function agentCommandHandler(
         ({ context }) =>
           context.projectId === projectId ||
           (context.projectId === undefined &&
-            ["workbench", "keybindings"].includes(String(context.surface))),
+            ["workbench", "keybindings", "settings"].includes(String(context.surface))),
       );
     const allowed = new Set(scopes.map(({ id }) => id));
     if (request.operation === "list") {

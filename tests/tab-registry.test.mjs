@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createTabRegistry, defineTab, singletonTab } from "../src/modules/workspace-api/tabs.ts";
 import { ensureTab } from "../src/modules/workspace/lib/service-tabs.ts";
+import { baseTabTypes } from "../src/modules/workspace/lib/virtual-tabs.ts";
+import { workspaceSessionSchema } from "../src/modules/workspace/session.ts";
 
 const issue = defineTab({
   id: "issue",
@@ -9,6 +11,27 @@ const issue = defineTab({
   path: ({ number }) => `Issue #${number}`,
   title: ({ number }) => `Issue #${number}`,
   hint: ({ title }) => title ?? "",
+});
+
+test("application settings reuse one tab and restore through the workspace session", () => {
+  const registry = createTabRegistry(baseTabTypes);
+  const tabs = { value: [] };
+  const key = ensureTab(tabs, registry, "settings");
+  assert.equal(key, "settings:app");
+  assert.equal(ensureTab(tabs, registry, "settings"), key);
+  assert.equal(tabs.value.length, 1);
+  assert.equal(tabs.value[0].preview, false);
+  assert.equal(registry.get("settings").command.id, "ide.workbench.settings.open");
+  assert.match(registry.get("settings").command.description, /существующую вкладку/);
+  const saved = workspaceSessionSchema.parse({
+    tabs: tabs.value,
+    activeKey: key,
+    section: "files",
+  });
+  const restored = { value: [] };
+  for (const tab of saved.tabs) ensureTab(restored, registry, tab.virtual, tab.params);
+  assert.equal(restored.value[0].key, saved.activeKey);
+  assert.equal(restored.value[0].virtual, "settings");
 });
 
 test("later groups replace base kinds and unknown kinds are not opened", () => {

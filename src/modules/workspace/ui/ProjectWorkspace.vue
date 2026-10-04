@@ -157,6 +157,7 @@ const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
   saveFile,
   openFile,
   openTab,
+  onOpenTab: () => (mobileSidebarOpen.value = false),
   toggleMarkdownSource,
   revealInTree: (path) => {
     section.value = "files";

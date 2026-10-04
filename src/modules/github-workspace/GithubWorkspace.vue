@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import type { GithubRepository } from "../../../core/modules/github/index.ts";
 import { ProjectWorkspace, type TabViews } from "../workspace/index.ts";
+import { settingsTabViews } from "../app-settings/index.ts";
 import { registerWorkspaceProfile, workspaceRequest } from "../workspace-api/index.ts";
 import { useCommandScope } from "../../common/utilities/commands.ts";
 import UiButton from "../../common/ui/UiButton.vue";
@@ -54,6 +55,7 @@ commands.scope.registerCommand({
   run: () => workspace.value?.openTab("github-integration"),
 });
 const tabViews: TabViews = {
+  ...settingsTabViews,
   "github-integration": {
     component: GithubConnection,
     ownKeys: true,

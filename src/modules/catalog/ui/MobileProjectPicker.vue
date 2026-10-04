@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
+import { useIdeCommands } from "../../ide/index.ts";
 import { useCommandScope, commandArgs } from "../../../common/utilities/commands.ts";
 import {
   useProjects,
@@ -15,6 +16,7 @@ import IconClose from "~icons/lucide/x";
 
 const props = defineProps<{ project: ProjectLocation }>();
 const router = useRouter();
+const { api } = useIdeCommands();
 const { projects } = useProjects();
 const open = ref(false);
 const choices = computed(() => [
@@ -41,6 +43,13 @@ commands.scope.registerCommand({
   },
   run: async (value) => {
     const { path, page } = commandArgs(value);
+    if (page === "settings" && path === undefined) {
+      await api.executeCommand("ide.workbench.settings.open", undefined, {
+        scope: `editor:${props.project.id}`,
+      });
+      open.value = false;
+      return;
+    }
     const pages: Record<string, string> = {
       search: "/",
       projects: "/projects",

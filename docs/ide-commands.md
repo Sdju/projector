@@ -248,3 +248,9 @@ It returns stdout, stderr and exitCode, limits execution to 30 seconds and combi
 output to 256 KiB, and stops the process group on cancellation. Environment variables
 whose names contain KEY, TOKEN, SECRET, PASSWORD or CREDENTIAL are excluded. Bash
 runs with the user's filesystem permissions; it is not an isolated sandbox.
+
+## Общие настройки
+
+`ide.workbench.settings.open` (**Открыть настройки Projector**) в scope `editor:<projectId>` открывает вкладку **Настройки** рядом с файлами. Повторный вызов фокусирует вкладку `settings:app`. Кнопки настроек в шапке, мобильном выборе проекта и сайдбаре вызывают ту же команду; она доступна через командный центр. Вкладка сохраняет черновики при переключении файлов и переносе между блоками; закрытие завершает её состояние. Вне проекта настройки доступны по `/settings`.
+
+Внутри вкладки scope `settings` предоставляет `ide.settings.sections.list`, `ide.settings.section.open` (`{ id }`) и `ide.settings.search` (`{ query? }`). Эти команды доступны встроенному агенту; формы используют прежние серверные API хранения настроек.

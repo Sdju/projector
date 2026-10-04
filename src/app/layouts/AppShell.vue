@@ -10,8 +10,18 @@ import {
   type ProjectLocation,
 } from "../../modules/project/index.ts";
 import { PathBar, MobileProjectPicker } from "../../modules/catalog/index.ts";
+import { useIdeCommands } from "../../modules/ide/index.ts";
 
-defineProps<{ currentProject?: ProjectLocation }>();
+const props = defineProps<{ currentProject?: ProjectLocation }>();
+const { api, reportError } = useIdeCommands();
+function openSettings() {
+  if (props.currentProject)
+    void api
+      .executeCommand("ide.workbench.settings.open", undefined, {
+        scope: `editor:${props.currentProject.id}`,
+      })
+      .catch(reportError);
+}
 const { projects } = useProjects();
 const route = useRoute();
 const router = useRouter();
@@ -88,7 +98,14 @@ const navigatePath = (path: string) =>
       />
       <nav class="nav">
         <router-link to="/projects">проекты</router-link>
-        <router-link to="/settings">настройки</router-link>
+        <button
+          v-if="currentProject"
+          data-command="ide.workbench.settings.open"
+          @click="openSettings"
+        >
+          настройки
+        </button>
+        <router-link v-else to="/settings">настройки</router-link>
         <span
           class="count"
           :class="{ active: running }"
@@ -173,12 +190,14 @@ const navigatePath = (path: string) =>
 }
 
 .nav a,
+.nav button,
 .count {
   color: var(--muted);
   font-size: var(--fs-xs);
 }
 
-.nav a:hover {
+.nav a:hover,
+.nav button:hover {
   color: var(--text);
 }
 
@@ -241,7 +260,8 @@ const navigatePath = (path: string) =>
     grid-row: 1;
     gap: var(--sp-3);
   }
-  .nav a {
+  .nav a,
+  .nav button {
     display: flex;
     align-items: center;
     min-height: 44px;

@@ -90,6 +90,43 @@ test("agent discovers live commands, requires description, checks args and exclu
   );
 });
 
+test("agent can navigate global settings but cannot access another project's settings scope", async () => {
+  const sdk = createCommandService();
+  const sectionCommand = {
+    id: "ide.settings.section.open",
+    title: "Настройки",
+    run: (args) => args.id,
+  };
+  sdk.createScope("settings", () => ({ surface: "settings" })).registerCommand(sectionCommand);
+  sdk
+    .createScope("other-settings", () => ({ surface: "settings", projectId: "b" }))
+    .registerCommand(sectionCommand);
+  const commands = agentCommandHandler(sdk, "a");
+  const listed = await commands({ operation: "list", query: "ide.settings" });
+  assert.deepEqual(
+    listed.commands.map((command) => command.scope),
+    ["settings"],
+  );
+  assert.equal(
+    await commands({
+      operation: "execute",
+      scope: "settings",
+      command: sectionCommand.id,
+      args: { id: "editor" },
+    }),
+    "editor",
+  );
+  await assert.rejects(
+    commands({
+      operation: "execute",
+      scope: "other-settings",
+      command: sectionCommand.id,
+      args: { id: "editor" },
+    }),
+    /Область недоступна/,
+  );
+});
+
 test("Bash uses cwd, returns failure status, bounds output and aborts subprocesses", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "projector-agent-shell-"));
   try {

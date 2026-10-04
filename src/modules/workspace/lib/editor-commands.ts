@@ -13,6 +13,7 @@ export interface EditorCommandContext {
     run: (args?: unknown) => unknown,
     enabled: (args?: unknown) => boolean,
     requires?: WorkspaceCapability,
+    meta?: { description?: string; arguments?: Record<string, string> },
   ) => unknown;
   tabs: Ref<OpenFile[]>;
   active: () => OpenFile | undefined;
@@ -21,6 +22,7 @@ export interface EditorCommandContext {
   saveFile: (file?: OpenFile) => Promise<boolean>;
   openFile: (path: string) => unknown;
   openTab: (id: string) => void;
+  onOpenTab?: () => void;
   toggleMarkdownSource: () => void;
   /** Показывает файл в дереве: открывает сайдбар и раздел «Файлы». */
   revealInTree: (path: string) => void;
@@ -100,9 +102,13 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
       register(
         command.id,
         command.title,
-        () => openTab(id),
+        () => {
+          openTab(id);
+          ctx.onOpenTab?.();
+        },
         () => true,
         command.requires as WorkspaceCapability | undefined,
+        { description: command.description },
       );
   function editorKeydown(event: KeyboardEvent) {
     const save = ctx.tabTypes.behaviorOf(active()?.virtual)?.save;

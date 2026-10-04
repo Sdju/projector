@@ -7,7 +7,7 @@ import UiButton from "../../common/ui/UiButton.vue";
 import { commandArgs, useCommandScope } from "../../common/utilities/commands.ts";
 import type { SettingsSection } from "./sections.ts";
 
-const props = defineProps<{ sections: SettingsSection[]; selected: string }>();
+const props = defineProps<{ sections: SettingsSection[]; selected: string; embedded?: boolean }>();
 const emit = defineEmits<{ select: [id: string] }>();
 const query = ref("");
 const search = ref<HTMLInputElement>();
@@ -99,6 +99,7 @@ function filter(event: Event) {
 <template>
   <section
     class="settings-workbench"
+    :class="{ embedded }"
     aria-label="Настройки Projector"
     @pointerdown="commands.scope.activate()"
   >
@@ -172,10 +173,34 @@ function filter(event: Event) {
 
 <style scoped>
 .settings-workbench {
+  container-type: inline-size;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   overflow: hidden;
   font-size: var(--fs-sm);
+}
+.settings-workbench.embedded {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+}
+.embedded .toolbar {
+  flex-shrink: 0;
+}
+.embedded .layout {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+.embedded .sidebar,
+.embedded .content {
+  min-height: 0;
+  overflow-y: auto;
 }
 .toolbar {
   display: flex;
@@ -375,6 +400,73 @@ svg {
   .section-body :deep(input:not([type="checkbox"], [type="radio"])),
   .section-body :deep(select) {
     font-size: var(--fs-input);
+  }
+  .embedded .layout {
+    display: flex;
+    flex-direction: column;
+  }
+  .embedded .sidebar {
+    flex-shrink: 0;
+    overflow-y: hidden;
+  }
+  .embedded .content {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+  }
+}
+@container (max-width: 650px) {
+  .toolbar {
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+  .search {
+    width: 100%;
+  }
+  .layout {
+    display: block;
+    min-height: 0;
+  }
+  .sidebar {
+    display: flex;
+    gap: var(--sp-2);
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .group {
+    display: flex;
+    gap: var(--sp-1);
+    flex-shrink: 0;
+  }
+  .group + .group {
+    margin-top: 0;
+  }
+  .group h2 {
+    display: none;
+  }
+  .group button {
+    width: auto;
+    white-space: nowrap;
+  }
+  .content {
+    padding: var(--sp-4);
+  }
+  .section-heading {
+    margin-bottom: var(--sp-4);
+  }
+  .embedded .layout {
+    display: flex;
+    flex-direction: column;
+  }
+  .embedded .sidebar {
+    flex-shrink: 0;
+    overflow-y: hidden;
+  }
+  .embedded .content {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
   }
 }
 </style>

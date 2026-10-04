@@ -4,6 +4,7 @@ import type { WorkspaceCapabilities } from "../../workspace-api/index.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
 import IconBot from "~icons/lucide/bot";
 import IconRefresh from "~icons/lucide/rotate-cw";
+import IconSettings from "~icons/lucide/settings-2";
 
 export interface SidebarItem {
   id: string;
@@ -39,6 +40,16 @@ const emit = defineEmits<{
       <span v-if="item.badge" aria-hidden="true">{{ item.badge }}</span>
     </button>
     <div class="side-actions">
+      <UiButton
+        icon
+        size="sm"
+        title="Настройки Projector"
+        aria-label="Настройки Projector"
+        data-command="ide.workbench.settings.open"
+        @click="emit('command', 'ide.workbench.settings.open')"
+      >
+        <IconSettings aria-hidden="true" />
+      </UiButton>
       <UiButton
         icon
         size="sm"

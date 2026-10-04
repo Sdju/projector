@@ -6,6 +6,7 @@ import { ProjectSettings, useProjectCommands } from "../../modules/catalog/index
 import { RunControls, useRunner } from "../../modules/runner/index.ts";
 import { DevcontainerTrust } from "../../modules/devcontainer/index.ts";
 import { ProjectWorkspace, type TabViews } from "../../modules/workspace/index.ts";
+import { settingsTabViews } from "../../modules/app-settings/index.ts";
 
 const route = useRoute();
 const router = useRouter();
@@ -17,6 +18,7 @@ const settingsDirty = ref(false);
 
 // The settings form keeps unsaved edits, so its tab stays mounted while it moves between docks.
 const tabViews: TabViews = {
+  ...settingsTabViews,
   project: {
     keepAlive: true,
     scroll: true,
