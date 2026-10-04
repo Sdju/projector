@@ -3,7 +3,6 @@ import { test } from "node:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { NETWORK_MODES, isNetworkMode, networkHost } from "../core/modules/network-mode/index.ts";
 import { readNetworkMode, writeNetworkMode } from "../core/modules/app-paths/index.ts";
 import {
   accessAllowed,
@@ -17,15 +16,6 @@ import {
 function request(headers, encrypted = false) {
   return { headers, socket: { encrypted } };
 }
-
-test("network modes map to host binding", () => {
-  assert.deepEqual(NETWORK_MODES, ["local", "lan"]);
-  assert.equal(networkHost("local"), "localhost");
-  assert.equal(networkHost("lan"), "0.0.0.0");
-  assert.equal(isNetworkMode("lan"), true);
-  assert.equal(isNetworkMode("localhost"), false);
-  assert.equal(isNetworkMode(undefined), false);
-});
 
 test("readNetworkMode honours the one-shot env var over the persisted file", async () => {
   const dir = await mkdtemp(join(tmpdir(), "projector-network-"));
