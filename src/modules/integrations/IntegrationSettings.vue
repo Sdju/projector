@@ -139,8 +139,8 @@ function disconnect() {
         Токены и ключи — в системном хранилище секретов (Secret Service), в файле их нет.
       </template>
       <template v-else-if="secretStorage.reason === 'disabled'">
-        Хранилище секретов отключено (<code>PROJECTOR_SECRET_STORE=file</code>): токены лежат в
-        этом файле.
+        Хранилище секретов отключено (<code>PROJECTOR_SECRET_STORE=file</code>): токены лежат в этом
+        файле.
       </template>
       <template v-else>
         Системное хранилище секретов недоступно: токены лежат в этом файле с правами 0600.

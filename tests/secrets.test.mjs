@@ -66,7 +66,10 @@ await test("file fallback keeps working without a keyring or when disabled", () 
     ]) {
       useIntegrationVault(createVault(backend, () => mode));
       await updateIntegration("github", (config) => ({ ...config, credentials: { token: "t" } }));
-      assert.equal(JSON.parse(await readFile(file, "utf8")).integrations.github.credentials.token, "t");
+      assert.equal(
+        JSON.parse(await readFile(file, "utf8")).integrations.github.credentials.token,
+        "t",
+      );
       assert.equal(backend.items.size, 0);
     }
   }));

@@ -79,6 +79,6 @@ export async function stopDevcontainer(project: Project): Promise<{ removed: num
   ]);
   const ids = stdout.split("\n").filter((id) => /^[a-f0-9]{12,64}$/.test(id));
   if (ids.length) await os.tools.runDocker(["rm", "--force", ...ids], { timeout: 60_000 });
-  for (const key of [...ready.keys()]) if (key.startsWith(`${root}\0`)) ready.delete(key);
+  for (const key of ready.keys()) if (key.startsWith(`${root}\0`)) ready.delete(key);
   return { removed: ids.length };
 }

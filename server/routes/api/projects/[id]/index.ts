@@ -7,7 +7,11 @@ import {
 import { projectAppUrl } from "../../../../../core/modules/app-paths/index.ts";
 import { HttpError } from "../../../../modules/http/index.ts";
 import { isLocalRequest } from "../../../../modules/access/index.ts";
-import { devcontainerState, decideDevcontainer, stopDevcontainer } from "../../../../modules/devcontainer/index.ts";
+import {
+  devcontainerState,
+  decideDevcontainer,
+  stopDevcontainer,
+} from "../../../../modules/devcontainer/index.ts";
 import { openBrowser, openWindow } from "../../../../modules/window/index.ts";
 import { closeProjectTerminals } from "../../../../modules/terminal/index.ts";
 import { json, readBody, asString } from "../../../../modules/transport/index.ts";

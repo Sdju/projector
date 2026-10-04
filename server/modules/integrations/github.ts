@@ -88,7 +88,10 @@ export async function githubStatus() {
 export async function revealGithubToken() {
   const token = await revealIntegrationCredential("github", "token");
   if (!token)
-    throw new HttpError(409, "Просмотр доступен только для токена из системного хранилища секретов");
+    throw new HttpError(
+      409,
+      "Просмотр доступен только для токена из системного хранилища секретов",
+    );
   return { token };
 }
 export async function configureGithub(body: Record<string, unknown>) {

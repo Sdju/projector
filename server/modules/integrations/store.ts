@@ -98,7 +98,11 @@ export async function updateIntegration(
     const file = await readFileRaw();
     const stored = file.integrations[id] ?? empty();
     const credentials = await openCredentials(id, stored);
-    const { credentialsError: _error, credentials: next, ...rest } = update({
+    const {
+      credentialsError: _error,
+      credentials: next,
+      ...rest
+    } = update({
       enabled: stored.enabled,
       settings: stored.settings,
       credentials,
@@ -124,7 +128,8 @@ export async function migrateIntegrationSecrets(): Promise<string[]> {
       if (stored.vault || !Object.keys(stored.credentials ?? {}).length) continue;
       const payload = JSON.stringify(stored.credentials);
       await vault.set(account(id), `Projector: ${id}`, payload);
-      if ((await vault.get(account(id))) !== payload) throw new Error(`Не удалось проверить секреты ${id}`);
+      if ((await vault.get(account(id))) !== payload)
+        throw new Error(`Не удалось проверить секреты ${id}`);
       file.integrations[id] = { ...stored, credentials: {}, vault: "keyring" };
       moved.push(id);
     }

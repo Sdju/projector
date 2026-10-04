@@ -45,7 +45,11 @@ async function withService<T>(
   const bus = dbus.sessionBus();
   bus.on("error", () => {});
   try {
-    const object = await withTimeout(bus.getProxyObject(SERVICE, ROOT), CALL_TIMEOUT, "подключение");
+    const object = await withTimeout(
+      bus.getProxyObject(SERVICE, ROOT),
+      CALL_TIMEOUT,
+      "подключение",
+    );
     const service = object.getInterface("org.freedesktop.Secret.Service");
     // `plain` keeps the secret off disk; the transport is the user's private session bus.
     const opened: [unknown, string] = await withTimeout(

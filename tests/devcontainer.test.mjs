@@ -112,7 +112,10 @@ await test("projects without a config have nothing to decide", async () => {
   const state = devcontainerState({ id: "n", name: "n", path: root });
   assert.equal(state.found, false);
   assert.equal(state.needsDecision, false);
-  await assert.rejects(decideDevcontainer({ id: "n", name: "n", path: root }, "trusted", "x"), /нет devcontainer/);
+  await assert.rejects(
+    decideDevcontainer({ id: "n", name: "n", path: root }, "trusted", "x"),
+    /нет devcontainer/,
+  );
 });
 
 const { containerToHost } = await import("../server/modules/terminal/link-files.ts");

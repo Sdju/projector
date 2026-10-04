@@ -42,7 +42,9 @@ export function bindRuntime(httpServer: HttpServer | null, mode: ServerMode): vo
     const port = address && typeof address === "object" ? address.port : APP_PORT;
     void writeInstance(port);
     bindHooks();
-    void reconcileOnStartup().catch((error) => console.error("Очистка контейнеров:", error.message));
+    void reconcileOnStartup().catch((error) =>
+      console.error("Очистка контейнеров:", error.message),
+    );
     if (process.env.PROJECTOR_WINDOW === "1") {
       void openLauncher(listenAddress(address)).catch(console.error);
     }

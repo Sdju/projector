@@ -100,7 +100,12 @@ export async function resolveTerminalFile(project: Project, id: string, path: st
   if (session.info.docker)
     throw new HttpError(409, "Пути Docker-терминала не сопоставлены с файлами хоста");
   const workspace = session.info.devcontainer?.workspace;
-  if (workspace) return resolveTerminalPath(containerToHost(path, workspace, project.path), project.path, project.path);
+  if (workspace)
+    return resolveTerminalPath(
+      containerToHost(path, workspace, project.path),
+      project.path,
+      project.path,
+    );
   const cwd =
     session.info.status === "running"
       ? await os.processes.workingDirectory(session.info.pid, project.path)

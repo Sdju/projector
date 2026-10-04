@@ -27,7 +27,7 @@
     "architecture": "node scripts/check-architecture.mjs",
     "test:architecture": "node --test tests/architecture.test.mjs",
     "test:docker": "node --test tests/docker.test.mjs",
-    "test:live": "PROJECTOR_TEST_DOCKER=1 PROJECTOR_TEST_DEVCONTAINER=1 node --test tests/environment-live.test.mjs tests/reconcile.test.mjs tests/devcontainer-live.test.mjs",
+    "test:live": "PROJECTOR_TEST_DOCKER=1 PROJECTOR_TEST_DEVCONTAINER=1 node --test tests/environment-live.test.mjs tests/reconcile.test.mjs tests/devcontainer-live.test.mjs tests/sigkill-live.test.mjs",
     "check": "vp run test && vp run test:docker && vp run build"
   },
   "dependencies": {
