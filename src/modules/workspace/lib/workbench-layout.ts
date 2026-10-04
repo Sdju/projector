@@ -24,6 +24,7 @@ import {
 import { useTerminalSessions } from "../../terminal/index.ts";
 import type { TerminalProgram } from "../../../../core/modules/terminal/index.ts";
 import type { OpenFile } from "../open-file.ts";
+import { registerTabReader } from "./tab-reader.ts";
 
 export interface WorkbenchLayoutContext {
   projectId: () => string;
@@ -45,6 +46,7 @@ export interface WorkbenchLayoutContext {
     run: (args?: unknown) => unknown,
     enabled: (args?: unknown) => boolean,
     requires?: WorkspaceCapability,
+    meta?: { description?: string; arguments?: Record<string, string> },
   ) => unknown;
 }
 
@@ -272,6 +274,17 @@ export function useWorkbenchLayout(ctx: WorkbenchLayoutContext) {
     () => !terminals.busy.value,
     "terminals",
   );
+  registerTabReader({
+    layout: () => layout.value,
+    groups: dockGroups,
+    fileOf,
+    terminalOf: (id) => terminalPanels.value.get(id),
+    label: (id) => describePanel(id).label,
+    isDirty: ctx.isDirty,
+    readTerminal: terminals.readText,
+    register: (id, title, run, enabled, description, args) =>
+      ctx.register(id, title, run, enabled, undefined, { description, arguments: args }),
+  });
   return {
     layout,
     restoringSession,

@@ -1,5 +1,6 @@
 export { closeProjectTerminals } from "./terminal.ts";
 export { terminalSessionSnapshot } from "./terminal.ts";
+export { terminalSessionText } from "./terminal.ts";
 export { stopTerminalSession } from "./terminal.ts";
 export { closeTerminalSession } from "./terminal.ts";
 export { createTerminalSession } from "./terminal.ts";

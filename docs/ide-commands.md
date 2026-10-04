@@ -116,6 +116,15 @@ To open it directly from an SDK client:
 await ide.executeCommand('ide.workbench.commandPalette.open', undefined, { scope: 'workbench' });
 ```
 
+## Reading tabs
+
+The agent sees workspace content as text through two read-only commands in the editor scope (`src/modules/workspace/lib/tab-reader.ts`):
+
+- `ide.workbench.tabs.list` returns every open panel: `id`, `label`, `kind` (`file`, `diff`, `image`, `archive`, `binary`, `terminal`, virtual kinds), `path`, dock `group`, `active`/`focused`/`hidden`, `dirty` and the terminal `status`/`exitCode`.
+- `ide.workbench.tab.read` with `{ id?, maxChars?, lines? }` returns the tab's text. Files include the unsaved draft; diffs return both versions; archives return the entry list; images, binaries and UI-only tabs return a `note` instead of text. Terminals are read on the server from the session's headless xterm (screen plus scrollback, no ANSI), so hidden tabs work too; `lines` selects the tail (default 200, max 2000). Output is truncated to `maxChars` (default 20000, max 100000) and reports `truncated`.
+
+The terminal read is the `{ action: "read", lines }` POST on the terminal control WebSocket. It never writes to the PTY.
+
 ## Reload commands
 
 The global `workbench` scope registers `ide.workbench.pages.reload` (**Перезагрузить открытые страницы Projector**) and

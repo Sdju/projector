@@ -118,6 +118,14 @@ export function useTerminalSessions(projectId: () => string, hooks: TerminalSess
     }
   }
 
+  /** Текст экрана и прокрутки сессии; пригоден и для невидимых вкладок. */
+  const readText = (sessionId: string, lines?: number) =>
+    terminalRequest<{ text: string; totalLines: number; truncated: boolean }>(
+      projectId(),
+      `/${encodeURIComponent(sessionId)}`,
+      { method: "POST", body: JSON.stringify({ action: "read", lines }) },
+    );
+
   async function action(sessionId: string, kind: "stop" | "restart"): Promise<void> {
     const previous = sessions.value.find((item) => item.id === sessionId);
     if (!previous || busy.value) return;
@@ -290,6 +298,7 @@ export function useTerminalSessions(projectId: () => string, hooks: TerminalSess
     refresh,
     create,
     rename,
+    readText,
     stop: (id: string) => action(id, "stop"),
     restart: (id: string) => action(id, "restart"),
     close,

@@ -65,6 +65,33 @@ export function terminalSessionSnapshot(
   };
 }
 
+/** Текст экрана и прокрутки сессии: последние `lines` непустых строк (без ANSI-разметки). */
+export function terminalSessionText(
+  projectId: string,
+  id: string,
+  lines = 200,
+): { text: string; totalLines: number; truncated: boolean } {
+  const session = state.sessions.get(id);
+  if (!session || session.info.projectId !== projectId) throw new Error("Терминал не найден");
+  const buffer = session.screen.buffer.active;
+  const rows: string[] = [];
+  for (let index = 0; index < buffer.length; index++) {
+    const line = buffer.getLine(index);
+    if (!line) continue;
+    const text = line.translateToString(true);
+    // A wrapped row continues the previous logical line.
+    if (line.isWrapped && rows.length) rows[rows.length - 1] += text;
+    else rows.push(text);
+  }
+  while (rows.length && !rows[rows.length - 1].trim()) rows.pop();
+  const limit = Math.max(1, Math.min(2000, Math.floor(lines) || 200));
+  return {
+    text: rows.slice(-limit).join("\n"),
+    totalLines: rows.length,
+    truncated: rows.length > limit,
+  };
+}
+
 export async function resolveTerminalFile(project: Project, id: string, path: string) {
   const session = state.sessions.get(id);
   if (!session || session.info.projectId !== project.id)

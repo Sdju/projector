@@ -50,11 +50,11 @@ const registerEditor = (
   title: string,
   run: (args?: unknown) => unknown,
   enabled: (args?: unknown) => boolean,
-  requires?: WorkspaceCapability,
+  requires?: WorkspaceCapability, meta?: { description?: string; arguments?: Record<string, string> },
 ) =>
   editorCommands.scope.registerCommand({
     id,
-    title,
+    title, ...meta,
     run,
     enabled: (args) => (!requires || capabilities[requires]) && enabled(args),
   });

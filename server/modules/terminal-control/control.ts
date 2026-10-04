@@ -7,6 +7,7 @@ import {
   renameTerminalSession,
   stopTerminalSession,
   terminalSessionSnapshot,
+  terminalSessionText,
   closeTerminalSession,
   resolveTerminalFile,
 } from "../terminal/index.ts";
@@ -30,7 +31,10 @@ export async function terminalControl(
   if (sessionId && method === "POST") {
     const previous = listTerminalSessions(id).find((item) => item.id === sessionId);
     if (!previous) throw new HttpError(404, "Терминал не найден");
-    if (body.action === "rename") {
+    if (body.action === "read") {
+      const lines = typeof body.lines === "number" ? body.lines : undefined;
+      return { session: previous, ...terminalSessionText(id, sessionId, lines) };
+    } else if (body.action === "rename") {
       if (typeof body.title !== "string" || !body.title.trim() || body.title.trim().length > 80)
         throw new HttpError(400, "Название должно содержать от 1 до 80 символов");
       return { session: renameTerminalSession(id, sessionId, body.title.trim()) };

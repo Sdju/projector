@@ -315,3 +315,35 @@ test("mobile surfaces separate mixed panels without changing desktop splits or h
   assert.deepEqual(layout, original);
   assert.deepEqual(mobileDockSurfaces(createDockLayout(), isTerminal, last).map((item) => item.active), ["", ""]);
 });
+
+test("tab reader lists panels and reads files, diffs, terminals and rejects unknown tabs", async () => {
+  const { registerTabReader } = await import("../src/modules/workspace/lib/tab-reader.ts");
+  const commands = new Map();
+  const files = new Map([
+    ["a.ts", { key: "a.ts", path: "a.ts", content: "old", draft: "new" }],
+    ["img", { key: "img", path: "p.png", content: "", image: "x" }],
+    ["agent:chat", { key: "agent:chat", path: "Агент", content: "", virtual: "agent" }],
+  ]);
+  const layout = { focused: "g1", root: {} };
+  const group = { id: "g1", panels: ["a.ts", "img", "agent:chat", "terminal:t1"], active: "a.ts" };
+  const reads = [];
+  registerTabReader({
+    layout: () => layout,
+    groups: () => [group],
+    fileOf: (id) => files.get(id),
+    terminalOf: (id) => (id === "terminal:t1" ? { id: "t1", status: "running" } : undefined),
+    label: (id) => id,
+    isDirty: (file) => file.draft !== undefined && file.draft !== file.content,
+    readTerminal: async (id, lines) => (reads.push([id, lines]), { text: "0123456789", totalLines: 1, truncated: false }),
+    register: (id, _title, run) => commands.set(id, run),
+  });
+  const list = commands.get("ide.workbench.tabs.list")();
+  assert.deepEqual(list.tabs.map((tab) => [tab.kind, tab.dirty]), [["file", true], ["image", false], ["agent", false], ["terminal", undefined]]);
+  const read = commands.get("ide.workbench.tab.read");
+  assert.equal((await read()).text, "new");
+  assert.equal((await read({ id: "img" })).text, undefined);
+  assert.ok((await read({ id: "agent:chat" })).note);
+  const tail = await read({ id: "terminal:t1", maxChars: 4, lines: 5 });
+  assert.deepEqual([tail.text, tail.truncated, reads[0]], ["6789", true, ["t1", 5]]);
+  await assert.rejects(read({ id: "missing" }), /не найдена/);
+});
