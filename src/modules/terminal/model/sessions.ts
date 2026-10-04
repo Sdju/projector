@@ -1,6 +1,6 @@
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { TerminalProgram, TerminalSession } from "../../../../core/modules/terminal/index.ts";
-import { TerminalRequestError, terminalRequest } from "../lib/api.ts";
+import { TerminalRequestError, terminalRequest, subscribeTerminalSessions } from "../lib/api.ts";
 
 export interface TerminalSessionHooks {
   enabled?: boolean;
@@ -24,8 +24,9 @@ export function useTerminalSessions(projectId: () => string, hooks: TerminalSess
   let nextNumber = 1;
   let listGeneration = 0;
   let destroyed = false;
-  let timer: ReturnType<typeof setInterval> | undefined;
+  let unsubscribe: (() => void) | undefined;
   let closeQueue: string[] = [];
+  let pendingSessions: TerminalSession[] | undefined;
 
   function nameOf(session: TerminalSession): string {
     if (!numbers.has(session.id)) numbers.set(session.id, nextNumber++);
@@ -41,6 +42,11 @@ export function useTerminalSessions(projectId: () => string, hooks: TerminalSess
   }
 
   function replace(incoming: TerminalSession[]) {
+    // A restart must swap its dock panel before a pushed list removes the old session.
+    if (busy.value) {
+      pendingSessions = incoming;
+      return;
+    }
     for (const session of incoming) nameOf(session);
     const order = new Map(sessions.value.map((session, index) => [session.id, index]));
     sessions.value = [...incoming].sort(
@@ -82,7 +88,8 @@ export function useTerminalSessions(projectId: () => string, hooks: TerminalSess
       });
       if (!current(id)) return;
       nameOf(data.session);
-      sessions.value.push(data.session);
+      if (!sessions.value.some((session) => session.id === data.session.id))
+        sessions.value.push(data.session);
       return data.session;
     } catch (err) {
       error.value = err instanceof Error ? err.message : "Не удалось открыть терминал";
@@ -141,7 +148,8 @@ export function useTerminalSessions(projectId: () => string, hooks: TerminalSess
         numbers.set(data.session.id, numbers.get(previous.id) ?? nextNumber++);
       }
     } catch (err) {
-      if (current(id)) error.value = err instanceof Error ? err.message : "Не удалось изменить сессию";
+      if (current(id))
+        error.value = err instanceof Error ? err.message : "Не удалось изменить сессию";
     } finally {
       busy.value = false;
     }
@@ -218,7 +226,19 @@ export function useTerminalSessions(projectId: () => string, hooks: TerminalSess
       hooks.started?.(detail.sessionId);
   }
 
+  watch(
+    busy,
+    (value) => {
+      if (value || !pendingSessions) return;
+      const incoming = pendingSessions;
+      pendingSessions = undefined;
+      replace(incoming);
+    },
+    { flush: "sync" },
+  );
+
   function reset() {
+    pendingSessions = undefined;
     closeQueue = [];
     pendingClose.value = null;
     sessions.value = [];
@@ -226,7 +246,20 @@ export function useTerminalSessions(projectId: () => string, hooks: TerminalSess
     error.value = "";
     numbers.clear();
     nextNumber = 1;
-    void refresh();
+    subscribe();
+  }
+  function subscribe() {
+    unsubscribe?.();
+    if (hooks.enabled === false) {
+      loaded.value = true;
+      return;
+    }
+    const id = projectId();
+    unsubscribe = subscribeTerminalSessions(id, (incoming) => {
+      if (!current(id)) return;
+      ++listGeneration;
+      replace(incoming);
+    });
   }
   watch(projectId, reset);
   onMounted(() => {
@@ -235,14 +268,11 @@ export function useTerminalSessions(projectId: () => string, hooks: TerminalSess
       return;
     }
     window.addEventListener("projector:terminal-started", started);
-    void refresh();
-    timer = setInterval(() => {
-      if (!document.hidden && !busy.value) void refresh();
-    }, 3000);
+    subscribe();
   });
   onBeforeUnmount(() => {
     destroyed = true;
-    clearInterval(timer);
+    unsubscribe?.();
     window.removeEventListener("projector:terminal-started", started);
   });
 

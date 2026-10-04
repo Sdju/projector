@@ -1,4 +1,9 @@
-import { environmentPorts, stopEnvironmentContainerSync, environmentLaunch, stopEnvironmentContainer } from "../environments/index.ts";
+import {
+  environmentPorts,
+  stopEnvironmentContainerSync,
+  environmentLaunch,
+  stopEnvironmentContainer,
+} from "../environments/index.ts";
 import { readTerminalProcesses, terminalActivity } from "./terminal-activity.ts";
 import { randomUUID } from "node:crypto";
 import { resolveTerminalPath } from "./link-files.ts";
@@ -13,7 +18,15 @@ import serialization from "@xterm/addon-serialize";
 import type { TerminalProgram, TerminalSession } from "../../../core/modules/terminal/index.ts";
 import type { Project } from "../projects/index.ts";
 import { trackMouseEncoding } from "./terminal-mouse.ts";
-import { MAX_SESSIONS, state, size, broadcast, flow, type Session } from "./session-state.ts";
+import {
+  MAX_SESSIONS,
+  state,
+  size,
+  broadcast,
+  flow,
+  terminalSessionsChanged,
+  type Session,
+} from "./session-state.ts";
 
 const { Terminal } = headless;
 const { SerializeAddon } = serialization;
@@ -56,7 +69,8 @@ export async function resolveTerminalFile(project: Project, id: string, path: st
   const session = state.sessions.get(id);
   if (!session || session.info.projectId !== project.id)
     throw new HttpError(404, "Терминал не найден");
-  if (session.info.docker) throw new HttpError(409, "Пути Docker-терминала не сопоставлены с файлами хоста");
+  if (session.info.docker)
+    throw new HttpError(409, "Пути Docker-терминала не сопоставлены с файлами хоста");
   const cwd =
     session.info.status === "running"
       ? await os.processes.workingDirectory(session.info.pid, project.path)
@@ -126,7 +140,8 @@ export async function uploadTerminalFile(
   const session = state.sessions.get(id);
   if (!session || session.info.projectId !== projectId)
     throw new HttpError(404, "Терминал не найден");
-  if (session.info.docker) throw new HttpError(409, "Загрузка файлов в Docker-терминал не поддерживается");
+  if (session.info.docker)
+    throw new HttpError(409, "Загрузка файлов в Docker-терминал не поддерживается");
   const available = () =>
     !session.disposed && session.info.status === "running" && !session.info.stopRequested;
   if (!available()) throw new HttpError(409, "Терминал больше не принимает файлы");
@@ -140,10 +155,12 @@ export function closeTerminalSession(projectId: string, id: string): void {
   if (!session || session.info.projectId !== projectId) throw new Error("Терминал не найден");
   terminate(session);
   session.disposed = true;
+  session.controlExitSubscription?.dispose();
   for (const client of session.clients) client.close(1000, "Session closed");
   session.clients.clear();
   session.screen.dispose();
   state.sessions.delete(id);
+  terminalSessionsChanged(projectId);
   for (const directory of session.droppedDirectories ?? [])
     rmSync(directory, { recursive: true, force: true });
 }
@@ -158,7 +175,12 @@ export function createTerminalSession(
   input: Record<string, unknown>,
   observer?: { output: (data: string) => void; exit: (code: number) => void },
   replacingId?: string,
-  launch?: { file: string; args: string[]; title: string; docker: NonNullable<TerminalSession["docker"]> },
+  launch?: {
+    file: string;
+    args: string[];
+    title: string;
+    docker: NonNullable<TerminalSession["docker"]>;
+  },
 ): TerminalSession {
   const previous = replacingId ? state.sessions.get(replacingId) : undefined;
   if (replacingId && (!previous || previous.info.projectId !== project.id))
@@ -199,7 +221,11 @@ export function createTerminalSession(
       ? ["-i"]
       : ["-i", "-c", `exec ${program}`];
   if (project.environment) {
-    if (launch) throw new HttpError(403, "В изолированном проекте запрещены произвольные Docker/Compose-действия");
+    if (launch)
+      throw new HttpError(
+        403,
+        "В изолированном проекте запрещены произвольные Docker/Compose-действия",
+      );
     launch = environmentLaunch(project, ["/bin/bash", "--noprofile", "--norc", ...args]);
     for (const key of Object.keys(env))
       if (/^DOCKER_(HOST|CONTEXT|TLS_VERIFY|CERT_PATH|API_VERSION)$/.test(key)) delete env[key];
@@ -210,7 +236,12 @@ export function createTerminalSession(
   const mouseEncoding = trackMouseEncoding(screen);
   let child: IPty;
   try {
-    child = spawn(launch?.file ?? shell, launch?.args ?? args, { name: "xterm-256color", ...dimensions, cwd: project.path, env });
+    child = spawn(launch?.file ?? shell, launch?.args ?? args, {
+      name: "xterm-256color",
+      ...dimensions,
+      cwd: project.path,
+      env,
+    });
   } catch (error) {
     screen.dispose();
     throw error;
@@ -224,7 +255,8 @@ export function createTerminalSession(
       commandId: command?.id,
       customTitle: previous?.info.customTitle,
       title:
-        launch?.title ?? command?.name ??
+        launch?.title ??
+        command?.name ??
         { shell: "Shell", codex: "Codex", claude: "Claude Code", opencode: "OpenCode" }[program],
       pid: child.pid,
       ...dimensions,
@@ -246,7 +278,11 @@ export function createTerminalSession(
   if (project.environment?.ports.length && launch?.docker) {
     const docker = launch.docker;
     void (async () => {
-      for (let attempt = 0; attempt < 40 && !session.disposed && session.info.status === "running"; attempt++) {
+      for (
+        let attempt = 0;
+        attempt < 40 && !session.disposed && session.info.status === "running";
+        attempt++
+      ) {
         try {
           const ports = await environmentPorts(docker.context, docker.containerId!);
           if (ports.length) {
@@ -254,7 +290,9 @@ export function createTerminalSession(
             broadcast(session, { type: "status", session: { ...session.info } });
             return;
           }
-        } catch { /* Docker client is still starting. */ }
+        } catch {
+          /* Docker client is still starting. */
+        }
         await new Promise((done) => setTimeout(done, 250));
       }
     })();
@@ -303,5 +341,6 @@ export function createTerminalSession(
     state.sessions.clear();
     for (const [id, item] of ordered) state.sessions.set(id, item);
   }
+  terminalSessionsChanged(project.id);
   return { ...session.info };
 }

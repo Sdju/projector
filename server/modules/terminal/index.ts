@@ -12,3 +12,5 @@ export { renameTerminalSession } from "./terminal.ts";
 
 export { uploadTerminalFile } from "./terminal.ts";
 export { resolveTerminalFile } from "./terminal.ts";
+
+export { onTerminalSessionsChanged } from "./session-state.ts";

@@ -36,3 +36,19 @@ export type TerminalServerMessage =
   | { type: "output"; data: string }
   | { type: "status"; session: TerminalSession }
   | { type: "error"; message: string };
+
+/** Project-scoped session management, separate from the PTY output stream. */
+export interface TerminalControlRequest {
+  id: number;
+  method: "GET" | "POST" | "DELETE";
+  sessionId?: string;
+  body?: Record<string, unknown>;
+  link?: string;
+}
+export type TerminalControlMessage =
+  | { type: "sessions"; sessions: TerminalSession[] }
+  | {
+      type: "response";
+      id: number;
+      data: { error?: string; session?: TerminalSession; [key: string]: unknown };
+    };

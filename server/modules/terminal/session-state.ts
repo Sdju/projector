@@ -28,6 +28,7 @@ export interface Session {
   paused: boolean;
   disposed: boolean;
   droppedDirectories?: Set<string>;
+  controlExitSubscription?: { dispose(): void };
 }
 
 const host = globalThis as typeof globalThis & {
@@ -35,18 +36,37 @@ const host = globalThis as typeof globalThis & {
     sessions: Map<string, Session>;
     servers: WeakSet<Server | HttpServer>;
     hooksBound: boolean;
+    listeners: Set<(projectId: string) => void>;
   };
 };
 export const state = (host.projectorTerminals ??= {
   sessions: new Map(),
   servers: new WeakSet(),
   hooksBound: false,
+  listeners: new Set(),
 });
+state.listeners ??= new Set();
+
+export function terminalSessionsChanged(projectId: string): void {
+  for (const listener of state.listeners) listener(projectId);
+}
+
+export function onTerminalSessionsChanged(listener: (projectId: string) => void): () => void {
+  state.listeners.add(listener);
+  return () => {
+    state.listeners.delete(listener);
+  };
+}
+
 for (const session of state.sessions.values()) {
   session.pending ??= new Map();
   session.queued ??= 0;
   session.paused ??= false;
   session.mouseEncoding ??= trackMouseEncoding(session.screen);
+  // Retained PTYs can still hold a pre-control-channel onExit closure after HMR.
+  session.controlExitSubscription ??= session.pty.onExit(() => {
+    queueMicrotask(() => terminalSessionsChanged(session.info.projectId));
+  });
 }
 
 export function size(cols: unknown, rows: unknown): { cols: number; rows: number } {
@@ -81,6 +101,7 @@ export function broadcast(session: Session, message: TerminalServerMessage): voi
     }
   }
   flow(session);
+  if (message.type === "status") terminalSessionsChanged(session.info.projectId);
 }
 
 export function flow(session: Session): void {

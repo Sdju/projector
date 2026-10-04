@@ -48,7 +48,9 @@ const root = await mkdtemp(join(tmpdir(), "projector-terminal-"));
 process.env.XDG_DATA_HOME = root;
 // Keep PTY probes independent of the runner's interactive shell startup files.
 process.env.SHELL = join(root, "test-shell");
-await writeFile(process.env.SHELL, '#!/bin/sh\nexec /bin/bash --noprofile --norc "$@"\n', { mode: 0o700 });
+await writeFile(process.env.SHELL, '#!/bin/sh\nexec /bin/bash --noprofile --norc "$@"\n', {
+  mode: 0o700,
+});
 await mkdir(join(root, "projector"));
 const project = {
   id: "terminal-probe",
@@ -77,7 +79,9 @@ const server = createServer((req, res) => {
     if (!handled) res.writeHead(404).end();
   });
 });
+const { attachTerminalControlServer } = await import("../server/modules/terminal-control/index.ts");
 attachTerminalServer(server);
+attachTerminalControlServer(server);
 server.listen(0, "127.0.0.1");
 await once(server, "listening");
 const base = `http://127.0.0.1:${server.address().port}`;
@@ -140,47 +144,212 @@ await test("real PTY: input, Unicode, resize, interrupt, reconnect, alternate sc
     await new Promise((resolve) => server.close(resolve));
     await rm(root, { recursive: true, force: true });
   });
-  await t.test("OpenCode uses project cwd and an interactive PTY, reconnects and restarts", async () => {
-    const bin = join(root, "bin");
-    await mkdir(bin);
-    await writeFile(join(bin, "opencode"),
-      '#!/bin/sh\ntest -t 0 && test -t 1 || exit 1\nprintf "OPENCODE_READY:%s\\n" "$PWD"\nread value\nprintf "OPENCODE_INPUT:%s\\n" "$value"\n',
-      { mode: 0o700 });
-    const previousPath = process.env.PATH;
-    process.env.PATH = `${bin}:${previousPath}`;
+  await t.test(
+    "WS project control: push, cross-client mutations, process protection and reconnect",
+    async () => {
+      async function control(projectId = project.id) {
+        const client = new WebSocket(
+          `${base.replace("http:", "ws:")}/api/terminal/control?project=${projectId}`,
+          { origin: base },
+        );
+        sockets.add(client);
+        const messages = [];
+        client.on("message", (raw) => messages.push(JSON.parse(raw.toString())));
+        await once(client, "open");
+        await until(() => messages.some((item) => item.type === "sessions"), "control snapshot");
+        let id = 0;
+        return {
+          client,
+          messages,
+          latest: () => messages.filter((item) => item.type === "sessions").at(-1).sessions,
+          async rpc(method, sessionId, body) {
+            const requestId = ++id;
+            client.send(JSON.stringify({ id: requestId, method, sessionId, body }));
+            await until(() => messages.some((item) => item.id === requestId), "control response");
+            return messages.find((item) => item.id === requestId).data;
+          },
+        };
+      }
+      const first = await control();
+      const second = await control();
+      const { session } = await first.rpc("POST", undefined, { program: "shell" });
+      await until(
+        () => second.latest().some((item) => item.id === session.id),
+        "creation pushed to second client",
+      );
+      await second.rpc("POST", session.id, { action: "rename", title: "WS test" });
+      await until(
+        () => first.latest().some((item) => item.customTitle === "WS test"),
+        "rename pushed to first client",
+      );
+      const screen = await connect(session.id);
+      screen.send({ type: "input", data: "sleep 60\r" });
+      await until(
+        async () => (await first.rpc("GET", session.id)).session.activity.state === "busy",
+        "foreground process",
+      );
+      const rejected = await first.rpc("DELETE", session.id);
+      assert.equal(rejected.error, "Подтвердите прерывание процессов");
+      assert.equal(rejected.session.id, session.id);
+      await first.rpc("POST", session.id, { action: "stop" });
+      await until(
+        () => second.latest().some((item) => item.id === session.id && item.status === "exited"),
+        "exit pushed",
+      );
+      const restarted = await first.rpc("POST", session.id, { action: "restart" });
+      assert.notEqual(restarted.session.id, session.id);
+      await until(
+        () =>
+          second.latest().some((item) => item.id === restarted.session.id) &&
+          !second.latest().some((item) => item.id === session.id),
+        "replacement pushed",
+      );
+      const current = await first.rpc("GET", restarted.session.id);
+      assert.equal(
+        (
+          await first.rpc("DELETE", restarted.session.id, {
+            confirmation: current.session.activity.confirmation,
+          })
+        ).ok,
+        true,
+      );
+      await until(
+        () => !second.latest().some((item) => item.id === restarted.session.id),
+        "deletion pushed",
+      );
+      second.client.close();
+      await once(second.client, "close");
+      const restored = await control();
+      assert.deepEqual(
+        restored.latest().map((item) => item.id),
+        listTerminalSessions(project.id).map((item) => item.id),
+      );
+      // HTTP compatibility changes also publish to every WS subscriber.
+      const created = await request("", "POST", { program: "shell" });
+      const external = (await created.json()).session;
+      await until(
+        () => restored.latest().some((item) => item.id === external.id),
+        "HTTP creation pushed",
+      );
+      await request(`/${external.id}`, "DELETE");
+      await until(
+        () => !restored.latest().some((item) => item.id === external.id),
+        "HTTP deletion pushed",
+      );
+      for (const subscriber of [first, restored]) subscriber.client.close();
+    },
+  );
+  await t.test("session model preserves restart placement and reconnects its WS subscription", async () => {
+    const { createRenderer } = await import("vue");
+    const { useTerminalSessions } = await import("../src/modules/terminal/model/sessions.ts");
+    const keys = ["WebSocket", "location", "window", "sessionStorage"];
+    const globals = keys.map((key) => [key, globalThis[key]]);
+    const connections = [];
+    globalThis.WebSocket = class extends WebSocket {
+      constructor(url) { super(url, { origin: base }); connections.push(this); sockets.add(this); }
+    };
+    globalThis.location = new URL(base);
+    globalThis.window = new EventTarget();
+    globalThis.sessionStorage = { getItem: () => null };
+    const renderer = createRenderer({
+      createComment: () => ({}), createText: () => ({}), createElement: () => ({}),
+      insert() {}, remove() {}, setText() {}, setElementText() {}, patchProp() {},
+      parentNode: () => null, nextSibling: () => null,
+    });
+    let model;
+    let replacedBeforeList;
+    const app = renderer.createApp({ setup() {
+      model = useTerminalSessions(() => project.id, { restarted(previousId) {
+        replacedBeforeList = model.sessions.value.some((item) => item.id === previousId);
+      } });
+      return () => null;
+    } });
+    app.mount({});
     try {
-      const created = await request("", "POST", { program: "opencode" });
-      assert.equal(created.status, 201, await created.clone().text());
-      const { session } = await created.json();
-      assert.equal(session.program, "opencode");
-      assert.equal(session.title, "OpenCode");
-      const first = await connect(session.id);
-      await until(() => first.output().includes(`OPENCODE_READY:${root}`), "OpenCode PTY and cwd");
-      first.client.close();
-      await once(first.client, "close");
-      const reconnected = await connect(session.id);
-      assert.ok(reconnected.output().includes(`OPENCODE_READY:${root}`));
-      reconnected.send({ type: "input", data: "привет OpenCode\r" });
-      await until(() => reconnected.output().includes("OPENCODE_INPUT:привет OpenCode"), "OpenCode input");
-      await until(() => listTerminalSessions(project.id).find(item => item.id === session.id)?.exitCode === 0, "OpenCode exit");
-      const restarted = await request(`/${session.id}`, "POST", { action: "restart" });
-      assert.equal(restarted.status, 201, await restarted.clone().text());
-      const fresh = (await restarted.json()).session;
-      assert.equal(fresh.program, "opencode");
-      assert.equal(fresh.title, "OpenCode");
-      const output = await connect(fresh.id);
-      await until(() => output.output().includes(`OPENCODE_READY:${root}`), "OpenCode restart");
-      assert.equal((await request(`/${fresh.id}`, "DELETE")).status, 200);
+      await until(() => model.loaded.value, "model WS snapshot");
+      const created = await model.create("shell");
+      assert.ok(created);
+      assert.equal(model.sessions.value.filter((item) => item.id === created.id).length, 1);
+      await model.stop(created.id);
+      await until(() => model.sessions.value.find((item) => item.id === created.id)?.status === "exited", "model exit");
+      await model.restart(created.id);
+      assert.equal(model.error.value, "");
+      assert.equal(replacedBeforeList, true, "restart hook runs before pushed list removes previous panel");
+      const fresh = model.sessions.value.find((item) => item.id !== created.id);
+      assert.ok(fresh);
+      connections.at(-1).terminate();
+      await until(() => connections.length === 2 && connections.at(-1).readyState === WebSocket.OPEN, "automatic reconnect");
+      const external = (await (await request("", "POST", { program: "shell" })).json()).session;
+      await until(() => model.sessions.value.some((item) => item.id === external.id), "push after reconnect");
+      await request(`/${fresh.id}`, "DELETE");
+      await request(`/${external.id}`, "DELETE");
+      await until(() => model.sessions.value.length === 0, "model deletion push");
     } finally {
-      process.env.PATH = previousPath;
+      app.unmount();
+      for (const [key, value] of globals) {
+        if (value === undefined) delete globalThis[key]; else globalThis[key] = value;
+      }
     }
   });
+  await t.test(
+    "OpenCode uses project cwd and an interactive PTY, reconnects and restarts",
+    async () => {
+      const bin = join(root, "bin");
+      await mkdir(bin);
+      await writeFile(
+        join(bin, "opencode"),
+        '#!/bin/sh\ntest -t 0 && test -t 1 || exit 1\nprintf "OPENCODE_READY:%s\\n" "$PWD"\nread value\nprintf "OPENCODE_INPUT:%s\\n" "$value"\n',
+        { mode: 0o700 },
+      );
+      const previousPath = process.env.PATH;
+      process.env.PATH = `${bin}:${previousPath}`;
+      try {
+        const created = await request("", "POST", { program: "opencode" });
+        assert.equal(created.status, 201, await created.clone().text());
+        const { session } = await created.json();
+        assert.equal(session.program, "opencode");
+        assert.equal(session.title, "OpenCode");
+        const first = await connect(session.id);
+        await until(
+          () => first.output().includes(`OPENCODE_READY:${root}`),
+          "OpenCode PTY and cwd",
+        );
+        first.client.close();
+        await once(first.client, "close");
+        const reconnected = await connect(session.id);
+        assert.ok(reconnected.output().includes(`OPENCODE_READY:${root}`));
+        reconnected.send({ type: "input", data: "привет OpenCode\r" });
+        await until(
+          () => reconnected.output().includes("OPENCODE_INPUT:привет OpenCode"),
+          "OpenCode input",
+        );
+        await until(
+          () =>
+            listTerminalSessions(project.id).find((item) => item.id === session.id)?.exitCode === 0,
+          "OpenCode exit",
+        );
+        const restarted = await request(`/${session.id}`, "POST", { action: "restart" });
+        assert.equal(restarted.status, 201, await restarted.clone().text());
+        const fresh = (await restarted.json()).session;
+        assert.equal(fresh.program, "opencode");
+        assert.equal(fresh.title, "OpenCode");
+        const output = await connect(fresh.id);
+        await until(() => output.output().includes(`OPENCODE_READY:${root}`), "OpenCode restart");
+        assert.equal((await request(`/${fresh.id}`, "DELETE")).status, 200);
+      } finally {
+        process.env.PATH = previousPath;
+      }
+    },
+  );
   const droppedSession = (await (await request("", "POST", { program: "shell" })).json()).session;
   const uploadUrl = `${base}/api/projects/${project.id}/terminals/${droppedSession.id}`;
   const content = Buffer.from([0, 255, 10, 13, 65]);
-  const upload = (name, extra = {}) => fetch(`${uploadUrl}?name=${encodeURIComponent(name)}`, {
-    method: "PUT", headers: { Origin: base, "Content-Type": "application/octet-stream", ...extra }, body: content,
-  });
+  const upload = (name, extra = {}) =>
+    fetch(`${uploadUrl}?name=${encodeURIComponent(name)}`, {
+      method: "PUT",
+      headers: { Origin: base, "Content-Type": "application/octet-stream", ...extra },
+      body: content,
+    });
   assert.equal((await upload("../escape")).status, 400);
   assert.equal((await upload("file", { Origin: "https://evil.example" })).status, 403);
   const uploaded = await upload("файл с ' пробелами.bin");
@@ -241,12 +410,25 @@ print('RAW_HEX=' + data.hex(), flush=True)
   await writeFile(join(root, "root.md"), "# Root\n");
   first.send({ type: "input", data: "cd nested; printf 'LINK_CWD_%s\\n' READY\r" });
   await until(() => first.output().includes("LINK_CWD_READY"), "shell changed cwd for links");
-  const linkRequest = path => request(`/${session.id}?${new URLSearchParams({link:path})}`);
-  assert.deepEqual(await (await linkRequest("local.ts")).json(), {path:"nested/local.ts",external:false});
-  assert.deepEqual(await (await linkRequest("root.md")).json(), {path:"root.md",external:false});
+  const linkRequest = (path) => request(`/${session.id}?${new URLSearchParams({ link: path })}`);
+  assert.deepEqual(await (await linkRequest("local.ts")).json(), {
+    path: "nested/local.ts",
+    external: false,
+  });
+  assert.deepEqual(await (await linkRequest("root.md")).json(), {
+    path: "root.md",
+    external: false,
+  });
   assert.equal((await linkRequest("missing.ts")).status, 404);
-  assert.equal((await request(`/${session.id}?link=local.ts`, "GET", undefined, {Origin:"https://evil.example"})).status, 403);
-  assert.equal((await request('/missing-session?link=local.ts')).status, 404);
+  assert.equal(
+    (
+      await request(`/${session.id}?link=local.ts`, "GET", undefined, {
+        Origin: "https://evil.example",
+      })
+    ).status,
+    403,
+  );
+  assert.equal((await request("/missing-session?link=local.ts")).status, 404);
   first.send({ type: "input", data: "cd ..; printf 'LINK_BACK_%s\\n' READY\r" });
   await until(() => first.output().includes("LINK_BACK_READY"), "restore shell cwd after links");
   first.send({ type: "resize", cols: 112, rows: 35 });
@@ -535,6 +717,7 @@ await test("terminal refuses foreign origins, DNS rebinding hosts, missing WebSo
     void handleApi(req, res);
   });
   attachTerminalServer(probe);
+  attachTerminalControlServer(probe);
   probe.listen(0, "127.0.0.1");
   await once(probe, "listening");
   const url = `http://127.0.0.1:${probe.address().port}`;
@@ -556,25 +739,26 @@ await test("terminal refuses foreign origins, DNS rebinding hosts, missing WebSo
       req.end();
     });
     assert.equal(rebind, 403);
-    for (const origin of [undefined, "https://evil.example", url]) {
-      const client = new WebSocket(
-        `${url.replace("http:", "ws:")}/api/terminal/socket?session=missing`,
-        origin ? { origin } : {},
-      );
-      const response = await new Promise((resolve, reject) => {
-        client.on("unexpected-response", (_req, res) => {
-          resolve(res.statusCode);
-          res.resume();
-          client.terminate();
+    for (const endpoint of ["socket?session=missing", "control?project=missing"])
+      for (const origin of [undefined, "https://evil.example", url]) {
+        const client = new WebSocket(
+          `${url.replace("http:", "ws:")}/api/terminal/${endpoint}`,
+          origin ? { origin } : {},
+        );
+        const response = await new Promise((resolve, reject) => {
+          client.on("unexpected-response", (_req, res) => {
+            resolve(res.statusCode);
+            res.resume();
+            client.terminate();
+          });
+          client.on("error", () => {});
+          client.on("open", () => {
+            client.terminate();
+            reject(new Error("Unexpected successful handshake"));
+          });
         });
-        client.on("error", () => {});
-        client.on("open", () => {
-          client.terminate();
-          reject(new Error("Unexpected successful handshake"));
-        });
-      });
-      assert.equal(response, origin === url ? 404 : 403);
-    }
+        assert.equal(response, origin === url ? 404 : 403);
+      }
   } finally {
     await new Promise((resolve) => probe.close(resolve));
   }
