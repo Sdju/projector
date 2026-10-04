@@ -92,7 +92,7 @@ test(
       check(!document.querySelector('.markdown-toolbar'), 'There must be no upper toolbar');
       check(editor.contentEditable === 'true', 'The formatted document must be editable');
       check(editor.querySelector('strong').textContent === 'bold', 'Bold must render visually');
-      content.value = ${JSON.stringify('| Область | Реализация | Ограничение |\n| --- | --- | --- |\n| GitHub | `server/modules/integrations/github.ts`: PAT и OAuth Device Flow | Проверка пользователя |\n| Workspace | `$XDG_DATA_HOME/projector/workspaces/<workspaceId>/repo` | Рабочие файлы на диске хоста |\n')};
+      content.value = ${JSON.stringify("| Область | Реализация | Ограничение |\n| --- | --- | --- |\n| GitHub | `server/modules/integrations/github.ts`: PAT и OAuth Device Flow | Проверка пользователя |\n| Workspace | `$XDG_DATA_HOME/projector/workspaces/<workspaceId>/repo` | Рабочие файлы на диске хоста |\n")};
       await nextTick();
       const host = document.getElementById('editor');
       for (const width of [820, 360]) {
@@ -244,6 +244,10 @@ test(
       ],
       { timeout: 50000, maxBuffer: 2 * 1024 * 1024 },
     );
-    assert.equal(stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1], "PASS", `Markdown browser regression failed:\n${stdout.slice(-4000)}\n${stderr.slice(-2000)}`);
+    assert.equal(
+      stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1],
+      "PASS",
+      `Markdown browser regression failed:\n${stdout.slice(-4000)}\n${stderr.slice(-2000)}`,
+    );
   },
 );

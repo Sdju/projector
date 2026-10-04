@@ -15,46 +15,86 @@ import { resolveTerminalPath } from "../server/modules/terminal/link-files.ts";
 import { mkdir, writeFile, symlink } from "node:fs/promises";
 
 test("terminal links parse paths, diagnostic locations, quoted names and URLs", () => {
-  const text = 'src/main.ts:12:3 ./README.md ../file.js(9,2) "/tmp/with spaces.txt":4 `docs/русский.md` https://example.com/a?b=1 /tmp/test.ts, file:///tmp/a%20b.md';
+  const text =
+    'src/main.ts:12:3 ./README.md ../file.js(9,2) "/tmp/with spaces.txt":4 `docs/русский.md` https://example.com/a?b=1 /tmp/test.ts, file:///tmp/a%20b.md';
   const links = terminalLinks(text);
-  assert.deepEqual(links.map(({path,line,column,web}) => ({path,line,column,web})), [
-    {path:'src/main.ts',line:12,column:3,web:undefined},
-    {path:'./README.md',line:undefined,column:undefined,web:undefined},
-    {path:'../file.js',line:9,column:2,web:undefined},
-    {path:'/tmp/with spaces.txt',line:4,column:undefined,web:undefined},
-    {path:'docs/русский.md',line:undefined,column:undefined,web:undefined},
-    {path:'https://example.com/a?b=1',line:undefined,column:undefined,web:true},
-    {path:'/tmp/test.ts',line:undefined,column:undefined,web:undefined},
-    {path:'/tmp/a b.md',line:undefined,column:undefined,web:undefined},
-  ]);
-  assert.equal(text.slice(links[0].start, links[0].end), 'src/main.ts:12:3');
-  assert.deepEqual(terminalLinks('Dockerfile .env .gitignore main.ts(12, 3)').map(link => [link.path, link.line, link.column]), [
-    ['Dockerfile',undefined,undefined], ['.env',undefined,undefined], ['.gitignore',undefined,undefined], ['main.ts',12,3],
-  ]);
-  assert.deepEqual(terminalLinks('hello 1.2.3 12:30 javascript:alert(1) data:text/plain / //host/path'), []);
+  assert.deepEqual(
+    links.map(({ path, line, column, web }) => ({ path, line, column, web })),
+    [
+      { path: "src/main.ts", line: 12, column: 3, web: undefined },
+      { path: "./README.md", line: undefined, column: undefined, web: undefined },
+      { path: "../file.js", line: 9, column: 2, web: undefined },
+      { path: "/tmp/with spaces.txt", line: 4, column: undefined, web: undefined },
+      { path: "docs/русский.md", line: undefined, column: undefined, web: undefined },
+      { path: "https://example.com/a?b=1", line: undefined, column: undefined, web: true },
+      { path: "/tmp/test.ts", line: undefined, column: undefined, web: undefined },
+      { path: "/tmp/a b.md", line: undefined, column: undefined, web: undefined },
+    ],
+  );
+  assert.equal(text.slice(links[0].start, links[0].end), "src/main.ts:12:3");
+  assert.deepEqual(
+    terminalLinks("Dockerfile .env .gitignore main.ts(12, 3)").map((link) => [
+      link.path,
+      link.line,
+      link.column,
+    ]),
+    [
+      ["Dockerfile", undefined, undefined],
+      [".env", undefined, undefined],
+      [".gitignore", undefined, undefined],
+      ["main.ts", 12, 3],
+    ],
+  );
+  assert.deepEqual(
+    terminalLinks("hello 1.2.3 12:30 javascript:alert(1) data:text/plain / //host/path"),
+    [],
+  );
 });
 
-test("terminal file resolution uses cwd, project fallback and canonical external paths", async t => {
-  const root = await mkdtemp(join(tmpdir(), 'projector-link-path-'));
-  t.after(() => rm(root, {recursive:true,force:true}));
-  const project = join(root,'project'); const cwd = join(project,'nested');
-  await mkdir(cwd,{recursive:true});
-  await writeFile(join(cwd,'local.ts'),'local');
-  await writeFile(join(project,'README.md'),'readme');
-  const outside = join(root,'outside.txt'); await writeFile(outside,'external');
-  await symlink(outside,join(project,'linked.txt'));
-  assert.deepEqual(await resolveTerminalPath('local.ts',project,cwd), {path:'nested/local.ts',external:false});
-  assert.deepEqual(await resolveTerminalPath('README.md',project,cwd), {path:'README.md',external:false});
-  assert.deepEqual(await resolveTerminalPath('../README.md',project,cwd), {path:'README.md',external:false});
-  assert.deepEqual(await resolveTerminalPath(outside,project,cwd), {path:outside,external:true});
-  assert.deepEqual(await resolveTerminalPath('linked.txt',project,cwd), {path:outside,external:true});
-  await assert.rejects(resolveTerminalPath('missing.ts',project,cwd), /не найден/);
-  await assert.rejects(resolveTerminalPath(cwd,project,cwd), /не найден/);
-  await assert.rejects(resolveTerminalPath('bad\0.ts',project,cwd), /Некорректный/);
+test("terminal file resolution uses cwd, project fallback and canonical external paths", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "projector-link-path-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const project = join(root, "project");
+  const cwd = join(project, "nested");
+  await mkdir(cwd, { recursive: true });
+  await writeFile(join(cwd, "local.ts"), "local");
+  await writeFile(join(project, "README.md"), "readme");
+  const outside = join(root, "outside.txt");
+  await writeFile(outside, "external");
+  await symlink(outside, join(project, "linked.txt"));
+  assert.deepEqual(await resolveTerminalPath("local.ts", project, cwd), {
+    path: "nested/local.ts",
+    external: false,
+  });
+  assert.deepEqual(await resolveTerminalPath("README.md", project, cwd), {
+    path: "README.md",
+    external: false,
+  });
+  assert.deepEqual(await resolveTerminalPath("../README.md", project, cwd), {
+    path: "README.md",
+    external: false,
+  });
+  assert.deepEqual(await resolveTerminalPath(outside, project, cwd), {
+    path: outside,
+    external: true,
+  });
+  assert.deepEqual(await resolveTerminalPath("linked.txt", project, cwd), {
+    path: outside,
+    external: true,
+  });
+  await assert.rejects(resolveTerminalPath("missing.ts", project, cwd), /не найден/);
+  await assert.rejects(resolveTerminalPath(cwd, project, cwd), /не найден/);
+  await assert.rejects(resolveTerminalPath("bad\0.ts", project, cwd), /Некорректный/);
 });
 
 test("dropped paths survive shell quoting without command execution or Enter", async () => {
-  const paths = ["/tmp/файл с пробелами", "/tmp/a'b", "/tmp/$(echo INJECTED);`echo BAD`", "/tmp/a\\b", "/tmp/line\nnext\r\x1b"];
+  const paths = [
+    "/tmp/файл с пробелами",
+    "/tmp/a'b",
+    "/tmp/$(echo INJECTED);`echo BAD`",
+    "/tmp/a\\b",
+    "/tmp/line\nnext\r\x1b",
+  ];
   const text = terminalTextForPaths(paths);
   assert.ok(!/[\r\n\x1b]/.test(text));
   const { stdout } = await promisify(execFile)("bash", ["-c", `printf '%s\\0' ${text}`]);
@@ -79,7 +119,10 @@ test(
     const xterm = await readFile(
       new URL("../node_modules/@xterm/xterm/lib/xterm.js", import.meta.url),
     );
-    const css = await readFile(new URL("../node_modules/@xterm/xterm/css/xterm.css", import.meta.url), "utf8");
+    const css = await readFile(
+      new URL("../node_modules/@xterm/xterm/css/xterm.css", import.meta.url),
+      "utf8",
+    );
     const forwarding = ts.transpileModule(
       await readFile(new URL("../src/modules/terminal/lib/input.ts", import.meta.url), "utf8"),
       { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
@@ -92,10 +135,12 @@ test(
       await readFile(new URL("../src/modules/path-drop/drop-paths.ts", import.meta.url), "utf8"),
       { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
     ).outputText;
-    const drop = ts.transpileModule(
-      await readFile(new URL("../src/modules/terminal/lib/drop.ts", import.meta.url), "utf8"),
-      { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
-    ).outputText.replace("../../path-drop/index.ts", "/drop-paths.js");
+    const drop = ts
+      .transpileModule(
+        await readFile(new URL("../src/modules/terminal/lib/drop.ts", import.meta.url), "utf8"),
+        { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
+      )
+      .outputText.replace("../../path-drop/index.ts", "/drop-paths.js");
     const html = `<!doctype html><style>${css}</style><div id="terminal"></div><pre id="result">WAITING</pre>
     <script src="/xterm.js"></script><script type="module">
     import { deferTerminalText } from '/keyboard.js';
@@ -262,7 +307,21 @@ test(
         "Content-Type",
         req.url === "/" ? "text/html; charset=utf-8" : "text/javascript; charset=utf-8",
       );
-      res.end(req.url === "/xterm.js" ? xterm : req.url === "/keyboard.js" ? keyboard : req.url === "/forwarding.js" ? forwarding : req.url === "/links.js" ? links : req.url === "/drop-paths.js" ? dropPaths : req.url === "/drop.js" ? drop : html);
+      res.end(
+        req.url === "/xterm.js"
+          ? xterm
+          : req.url === "/keyboard.js"
+            ? keyboard
+            : req.url === "/forwarding.js"
+              ? forwarding
+              : req.url === "/links.js"
+                ? links
+                : req.url === "/drop-paths.js"
+                  ? dropPaths
+                  : req.url === "/drop.js"
+                    ? drop
+                    : html,
+      );
     });
     t.after(async () => {
       await new Promise((resolve) => server.close(resolve));
@@ -286,6 +345,10 @@ test(
       ],
       { timeout: 20000, maxBuffer: 1024 * 1024 },
     );
-    assert.equal(stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1], "PASS", `Browser input regression failed:\n${stdout.slice(-4000)}\n${stderr.slice(-2000)}`);
+    assert.equal(
+      stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1],
+      "PASS",
+      `Browser input regression failed:\n${stdout.slice(-4000)}\n${stderr.slice(-2000)}`,
+    );
   },
 );

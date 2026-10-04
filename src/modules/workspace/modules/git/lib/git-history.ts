@@ -97,7 +97,8 @@ export function useGitHistory(projectId: () => string) {
     details.value[hash] = { loading: true, error: "" };
     try {
       const data = await workspaceRequest<GitCommitDetail>(project, "commit", { hash });
-      if (project === projectId()) details.value[hash] = { loading: false, error: "", detail: data };
+      if (project === projectId())
+        details.value[hash] = { loading: false, error: "", detail: data };
     } catch (err) {
       if (project === projectId())
         details.value[hash] = {
@@ -119,6 +120,20 @@ export function useGitHistory(projectId: () => string) {
     loadingMore.value = false;
     error.value = "";
   }
-  return { log, commits, query, all, loading, loadingMore, error, details, load, more, filter, detail, reset };
+  return {
+    log,
+    commits,
+    query,
+    all,
+    loading,
+    loadingMore,
+    error,
+    details,
+    load,
+    more,
+    filter,
+    detail,
+    reset,
+  };
 }
 export type GitHistoryState = ReturnType<typeof useGitHistory>;

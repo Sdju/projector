@@ -6,7 +6,11 @@ import type {
   GraphRow,
 } from "../../../../../../core/modules/workspace/index.ts";
 import UiButton from "../../../../../common/ui/UiButton.vue";
-import { absoluteTime, relativeTime, shortHash } from "../../../../../common/utilities/commit-format.ts";
+import {
+  absoluteTime,
+  relativeTime,
+  shortHash,
+} from "../../../../../common/utilities/commit-format.ts";
 import type { CommitDetailState } from "../lib/git-history.ts";
 import GitChangesTree from "./GitChangesTree.vue";
 import GitGraphCell from "./GitGraphCell.vue";
@@ -52,7 +56,9 @@ const changes = computed<GitOverview["changes"]>(
 );
 const merge = computed(() => props.commit.parents.length > 1);
 const ownCommit = computed(() => !!props.me && props.commit.email === props.me);
-const refs = computed(() => props.commit.refs.filter((ref) => ref.name !== "HEAD" || props.commit.refs.length === 1));
+const refs = computed(() =>
+  props.commit.refs.filter((ref) => ref.name !== "HEAD" || props.commit.refs.length === 1),
+);
 </script>
 
 <template>
@@ -78,13 +84,9 @@ const refs = computed(() => props.commit.refs.filter((ref) => ref.name !== "HEAD
         <span class="text">
           <span class="line">
             <span class="subject">{{ commit.subject || "(без описания)" }}</span>
-            <span
-              v-for="ref in refs"
-              :key="ref.kind + ref.name"
-              class="ref"
-              :class="ref.kind"
-              >{{ ref.name }}</span
-            >
+            <span v-for="ref in refs" :key="ref.kind + ref.name" class="ref" :class="ref.kind">{{
+              ref.name
+            }}</span>
           </span>
           <span class="meta">
             <span v-if="!ownCommit" class="author">{{ commit.author }}</span>

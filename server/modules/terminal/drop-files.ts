@@ -12,7 +12,13 @@ export async function saveDroppedFile(
   available: () => boolean,
   retain: (directory: string) => void,
 ): Promise<string> {
-  if (!name || name === "." || name === ".." || /[\/\\\x00-\x1f\x7f]/.test(name) || name.length > 255)
+  if (
+    !name ||
+    name === "." ||
+    name === ".." ||
+    /[/\\\x00-\x1f\x7f]/.test(name) ||
+    name.length > 255
+  )
     throw new HttpError(400, "Некорректное имя файла");
   if (Number(req.headers["content-length"]) > MAX_DROP_BYTES)
     throw new HttpError(413, "Размер файла превышает 50 МБ");

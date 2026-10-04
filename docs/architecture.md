@@ -2,15 +2,15 @@
 
 Projector использует FEOD для всех приложений и собственной библиотеки renderer. Основа — `vendor/rules-example/feod.front.spec.ru.yml` и `feod.back.spec.ru.yml` из соседнего репозитория FEOD. Для тонкого клиентского слоя `common` применяются правила `docs/structure/common.md`: только универсальные однофайловые сущности, без бизнес-зависимостей и общих `index.ts`.
 
-| Корень | Слои и назначение |
-| --- | --- |
-| `src` | `app` — Vue bootstrap, router, layouts, assets; `pages` — URL; `modules` — функциональность; `common` — универсальные UI/утилиты; `globals` — ambient declarations |
-| `server` | `app` — Vite plugin и композиция HTTP; `routes` — обработчики по URL; `middlewares` — ограничения локального доступа; `modules` — серверная логика |
-| `native` | `app` — Node CLI; `modules/desktop` — Vue/GTK-палитра и её контроллер; системные операции — через `core/modules/os` |
-| `core` | Независимые именованные модули: launcher model/client, project/terminal/workspace/directory contracts, file-icon resolver, Node app-paths и OS-адаптер |
-| `cli` | `app` — запуск, перезапуск, desktop installation, импорт ключа |
-| `packages/vio/examples/counter` | `app` — bootstrap GTK demo; `modules/counter` — компонент примера |
-| `packages/vio/src` | `app` — публичная композиция библиотеки; `modules` — renderer, GTK driver/components, SFC compiler, loader |
+| Корень                          | Слои и назначение                                                                                                                                                  |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src`                           | `app` — Vue bootstrap, router, layouts, assets; `pages` — URL; `modules` — функциональность; `common` — универсальные UI/утилиты; `globals` — ambient declarations |
+| `server`                        | `app` — Vite plugin и композиция HTTP; `routes` — обработчики по URL; `middlewares` — ограничения локального доступа; `modules` — серверная логика                 |
+| `native`                        | `app` — Node CLI; `modules/desktop` — Vue/GTK-палитра и её контроллер; системные операции — через `core/modules/os`                                                |
+| `core`                          | Независимые именованные модули: launcher model/client, project/terminal/workspace/directory contracts, file-icon resolver, Node app-paths и OS-адаптер             |
+| `cli`                           | `app` — запуск, перезапуск, desktop installation, импорт ключа                                                                                                     |
+| `packages/vio/examples/counter` | `app` — bootstrap GTK demo; `modules/counter` — компонент примера                                                                                                  |
+| `packages/vio/src`              | `app` — публичная композиция библиотеки; `modules` — renderer, GTK driver/components, SFC compiler, loader                                                         |
 
 Слой `app` собирает приложение. Модули не импортируют `app`, страницы, маршруты или middleware. Страницы независимы друг от друга; маршруты и middleware также независимы. HTTP dispatcher находится в `server/app/api.ts` и связывает их. Имена страниц соответствуют маршрутам: `/` → `pages/index.vue`, `/projects` → `pages/projects/index.vue`, `/projects/:id` → `pages/projects/[id].vue`, `/settings` → `pages/settings.vue`.
 

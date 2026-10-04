@@ -3,7 +3,10 @@ import { promisify } from "node:util";
 
 const execute = promisify(execFile);
 /** Argument-vector Docker transport; never invoke a shell or inherit a host override. */
-export function runDocker(args: string[], options: { cwd?: string; timeout?: number; signal?: AbortSignal } = {}) {
+export function runDocker(
+  args: string[],
+  options: { cwd?: string; timeout?: number; signal?: AbortSignal } = {},
+) {
   const env = { ...process.env };
   for (const key of Object.keys(env))
     if (/^DOCKER_(HOST|CONTEXT|TLS_VERIFY|CERT_PATH|API_VERSION)$/.test(key)) delete env[key];

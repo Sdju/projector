@@ -67,9 +67,12 @@ export async function inspectProjectCommands(dir: string): Promise<ProjectComman
   const pkg = JSON.parse(raw) as { scripts?: Record<string, unknown> };
   const scripts = pkg.scripts ?? {};
   const prefix = commandPrefix(await detectPm(path));
-  const names = [...PREFERRED.filter((name) => name in scripts),
-    ...Object.keys(scripts).filter((name) => !PREFERRED.includes(name))];
-  return names.filter((name) => typeof scripts[name] === "string" && scripts[name].trim())
+  const names = [
+    ...PREFERRED.filter((name) => name in scripts),
+    ...Object.keys(scripts).filter((name) => !PREFERRED.includes(name)),
+  ];
+  return names
+    .filter((name) => typeof scripts[name] === "string" && scripts[name].trim())
     .map((name) => toCommand(name, prefix));
 }
 

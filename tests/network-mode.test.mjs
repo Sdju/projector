@@ -3,15 +3,8 @@ import { test } from "node:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  NETWORK_MODES,
-  isNetworkMode,
-  networkHost,
-} from "../core/modules/network-mode/index.ts";
-import {
-  readNetworkMode,
-  writeNetworkMode,
-} from "../core/modules/app-paths/index.ts";
+import { NETWORK_MODES, isNetworkMode, networkHost } from "../core/modules/network-mode/index.ts";
+import { readNetworkMode, writeNetworkMode } from "../core/modules/app-paths/index.ts";
 import {
   accessAllowed,
   isLocalRequest,
@@ -77,14 +70,8 @@ test("origin must match the request host when required", async () => {
   try {
     process.env.PROJECTOR_NETWORK = "lan";
     const host = "192.168.1.10:4177";
-    assert.equal(
-      accessAllowed(request({ host, origin: "http://192.168.1.10:4177" }), true),
-      true,
-    );
-    assert.equal(
-      accessAllowed(request({ host, origin: "http://evil.example" }), true),
-      false,
-    );
+    assert.equal(accessAllowed(request({ host, origin: "http://192.168.1.10:4177" }), true), true);
+    assert.equal(accessAllowed(request({ host, origin: "http://evil.example" }), true), false);
     assert.equal(accessAllowed(request({ host }), true), false, "no origin with requireOrigin");
   } finally {
     if (previous === undefined) delete process.env.PROJECTOR_NETWORK;
@@ -107,15 +94,13 @@ test("lan password gates non-loopback clients via bearer token", async () => {
 
     const host = "192.168.1.10:4177";
     assert.equal(accessAllowed(request({ host }), false), false, "no token");
+    assert.equal(accessAllowed(request({ host, authorization: "Bearer secret" }), false), true);
+    assert.equal(accessAllowed(request({ host, authorization: "Bearer wrong" }), false), false);
     assert.equal(
-      accessAllowed(request({ host, authorization: "Bearer secret" }), false),
+      accessAllowed(request({ host: "localhost:4177" }), false),
       true,
+      "loopback exempt",
     );
-    assert.equal(
-      accessAllowed(request({ host, authorization: "Bearer wrong" }), false),
-      false,
-    );
-    assert.equal(accessAllowed(request({ host: "localhost:4177" }), false), true, "loopback exempt");
 
     clearLanPassword();
     assert.equal(hasLanPassword(), false);

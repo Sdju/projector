@@ -2,6 +2,16 @@
   "name": "projector",
   "version": "0.2.0",
   "private": true,
+  "description": "Local Linux application and project launcher with a GTK palette, web workspace and terminals",
+  "homepage": "https://github.com/Sdju/projector#readme",
+  "bugs": {
+    "url": "https://github.com/Sdju/projector/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sdju/projector.git"
+  },
   "type": "module",
   "scripts": {
     "dev": "vp dev",
@@ -74,17 +84,7 @@
       "onFail": "download"
     }
   },
-  "description": "Local Linux application and project launcher with a GTK palette, web workspace and terminals",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Sdju/projector.git"
-  },
-  "homepage": "https://github.com/Sdju/projector#readme",
-  "bugs": {
-    "url": "https://github.com/Sdju/projector/issues"
-  },
   "engines": {
     "node": ">=24.0.0 <25"
-  },
-  "license": "MIT"
+  }
 }

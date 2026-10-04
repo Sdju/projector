@@ -17,20 +17,49 @@ export GIT_ASKPASS=/tmp/askpass GIT_TERMINAL_PROMPT=0
 exec git -c credential.helper= -c core.hooksPath=/dev/null -c http.followRedirects=false clone -- "$1" /workspace/checkout`;
 
 /** HTTPS clone is the only container receiving the scoped GitHub credential. */
-export async function cloneGithubContainer(repository: string, staging: string, token: string, environment: DockerEnvironment) {
-  if (token.includes("\n") || token.includes("\r")) throw new HttpError(400, "Некорректный GitHub token");
+export async function cloneGithubContainer(
+  repository: string,
+  staging: string,
+  token: string,
+  environment: DockerEnvironment,
+) {
+  if (token.includes("\n") || token.includes("\r"))
+    throw new HttpError(400, "Некорректный GitHub token");
   const credentials = join(staging, ".clone-credentials");
   await writeFile(credentials, `PROJECTOR_GITHUB_TOKEN=${token}\n`, { mode: 0o600 });
   const project: Project = {
-    id: "github-clone", name: repository, path: await realpath(staging), url: "", icon: "",
-    mode: "server", commands: [], defaultCommandId: "", createdAt: new Date().toISOString(),
+    id: "github-clone",
+    name: repository,
+    path: await realpath(staging),
+    url: "",
+    icon: "",
+    mode: "server",
+    commands: [],
+    defaultCommandId: "",
+    createdAt: new Date().toISOString(),
     environment: { ...environment, network: "bridge", ports: [] },
   };
   try {
-    await runEnvironmentCommand(project, ["/bin/bash", "--noprofile", "--norc", "-c", CLONE,
-      "projector-clone", `https://github.com/${repository}.git`], 300_000, undefined, credentials);
+    await runEnvironmentCommand(
+      project,
+      [
+        "/bin/bash",
+        "--noprofile",
+        "--norc",
+        "-c",
+        CLONE,
+        "projector-clone",
+        `https://github.com/${repository}.git`,
+      ],
+      300_000,
+      undefined,
+      credentials,
+    );
   } catch {
-    throw new HttpError(400, "Не удалось клонировать репозиторий внутри Docker. Проверьте сеть и права GitHub");
+    throw new HttpError(
+      400,
+      "Не удалось клонировать репозиторий внутри Docker. Проверьте сеть и права GitHub",
+    );
   } finally {
     await rm(credentials, { force: true });
   }

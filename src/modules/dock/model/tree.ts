@@ -118,7 +118,8 @@ export function finish(layout: DockLayout, preferredFocus?: string): DockLayout 
   for (const group of candidates) {
     if (!group.role) continue;
     const previous = retained.get(group.role);
-    if (!previous || (!previous.panels.length && group.panels.length)) retained.set(group.role, group);
+    if (!previous || (!previous.panels.length && group.panels.length))
+      retained.set(group.role, group);
   }
   for (const group of candidates)
     if (group.role && !group.panels.length && retained.get(group.role) !== group) {
@@ -185,7 +186,10 @@ export function insertBeside(
 
 export function newGroup(id: string, panel: string, source?: DockGroup): DockGroup {
   return {
-    type: "group", id, panels: [panel], active: panel,
+    type: "group",
+    id,
+    panels: [panel],
+    active: panel,
     ...(source?.role ? { role: source.role } : {}),
     ...(source?.keepEmpty ? { keepEmpty: true } : {}),
   };

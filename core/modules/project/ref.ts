@@ -1,7 +1,5 @@
 /** Where a project lives. The only place that knows how a reference is spelled as text. */
-export type ProjectRef =
-  | { kind: "local"; path: string }
-  | { kind: "github"; repository: string };
+export type ProjectRef = { kind: "local"; path: string } | { kind: "github"; repository: string };
 
 const GITHUB_PREFIX = "gh:/";
 const REPOSITORY = /^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9_.-]+$/;

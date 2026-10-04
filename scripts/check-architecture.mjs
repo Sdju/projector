@@ -261,7 +261,7 @@ export function checkArchitecture() {
           : ["app", "modules", "globals"];
     const report = (message) => errors.push(`${relative(projectRoot, file)}: ${message}`);
     if (!allowed.includes(own.layer)) report(`Unknown FEOD layer: ${own.layer}`);
-    if (own.layer === "common" && /^index\./.test(file.split(sep).at(-1)))
+    if (own.layer === "common" && file.split(sep).at(-1).startsWith("index."))
       report("Common must not have barrel indexes");
     if (own.layer === "globals" && !file.endsWith(".d.ts"))
       report("Globals may only contain ambient declarations");
@@ -289,7 +289,7 @@ export function checkArchitecture() {
           (own.root === "core" &&
             !file.includes("/app-paths/") &&
             !file.includes("/modules/os/"))) &&
-        (/^node:/.test(specifier) ||
+        (specifier.startsWith("node:") ||
           ["node-gtk", "dbus-next", "node-pty", "ws"].includes(specifier))
       )
         report(`Platform dependency in browser/domain code: ${specifier}`);

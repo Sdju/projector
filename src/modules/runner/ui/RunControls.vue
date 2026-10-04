@@ -33,7 +33,12 @@ function runWindow(): void {
 
 <template>
   <div class="controls" :class="{ toolbar }" role="group" aria-label="Запуск проекта">
-    <span v-if="project.environment" class="environment" :title="`${project.environment.image} · сеть: ${project.environment.network}`" aria-label="Проект запускается в Docker">
+    <span
+      v-if="project.environment"
+      class="environment"
+      :title="`${project.environment.image} · сеть: ${project.environment.network}`"
+      aria-label="Проект запускается в Docker"
+    >
       <IconContainer aria-hidden="true" /> Docker
     </span>
     <template v-if="!busy">

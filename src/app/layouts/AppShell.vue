@@ -55,7 +55,12 @@ const navigatePath = (path: string) =>
     @drop.prevent
   >
     <header class="top" :class="{ 'has-project': currentProject }">
-      <MobileProjectPicker v-if="currentProject" :key="currentProject.id" class="mobile-picker" :project="currentProject" />
+      <MobileProjectPicker
+        v-if="currentProject"
+        :key="currentProject.id"
+        class="mobile-picker"
+        :project="currentProject"
+      />
       <router-link
         class="brand"
         :class="{ 'project-brand': currentProject }"
@@ -98,7 +103,9 @@ const navigatePath = (path: string) =>
 </template>
 
 <style scoped>
-.mobile-picker { display: none; }
+.mobile-picker {
+  display: none;
+}
 
 .shell {
   --page-width: 760px;
@@ -204,7 +211,8 @@ const navigatePath = (path: string) =>
   .shell,
   .shell.workspace {
     width: auto;
-    margin-inline: max(var(--sp-2), env(safe-area-inset-left)) max(var(--sp-2), env(safe-area-inset-right));
+    margin-inline: max(var(--sp-2), env(safe-area-inset-left))
+      max(var(--sp-2), env(safe-area-inset-right));
     padding-top: max(var(--sp-2), env(safe-area-inset-top));
     padding-bottom: max(var(--sp-3), env(safe-area-inset-bottom));
   }
@@ -231,12 +239,37 @@ const navigatePath = (path: string) =>
     align-items: center;
     min-height: 44px;
   }
-  .top.has-project { display: flex; margin-bottom: 0; }
-  .has-project .brand, .has-project .header-path, .has-project .nav { display: none; }
-  .mobile-picker { display: block; }
-  .shell.workspace { margin-inline: 0; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); height: 100dvh; display: flex; flex-direction: column; }
-  .workspace main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  .workspace main :deep(.project-page) { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .top.has-project {
+    display: flex;
+    margin-bottom: 0;
+  }
+  .has-project .brand,
+  .has-project .header-path,
+  .has-project .nav {
+    display: none;
+  }
+  .mobile-picker {
+    display: block;
+  }
+  .shell.workspace {
+    margin-inline: 0;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+  .workspace main {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .workspace main :deep(.project-page) {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
   .header-path {
     grid-column: 1 / -1;
     height: 44px;

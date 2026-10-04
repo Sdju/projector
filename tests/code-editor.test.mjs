@@ -8,8 +8,14 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { createServer, loadConfigFromFile } from "vite-plus";
 
-const chromium = [process.env.CHROMIUM_BIN, "/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome"]
-  .filter(Boolean).find(existsSync);
+const chromium = [
+  process.env.CHROMIUM_BIN,
+  "/usr/bin/chromium",
+  "/usr/bin/chromium-browser",
+  "/usr/bin/google-chrome",
+]
+  .filter(Boolean)
+  .find(existsSync);
 
 const helpers = `const wait = async (condition, label) => {
       const until = Date.now() + 6000;
@@ -21,7 +27,9 @@ const helpers = `const wait = async (condition, label) => {
     const check = (condition, message) => {if(!condition) throw new Error(message);};
     const nl = String.fromCharCode(10);`;
 
-const page = (body) => `<!doctype html><div id="editor" style="height:400px"></div><pre id="result">WAITING</pre>
+const page = (
+  body,
+) => `<!doctype html><div id="editor" style="height:400px"></div><pre id="result">WAITING</pre>
   <script type="module">
     import '/src/app/styles.css';
     import {createApp, defineAsyncComponent, h, nextTick, ref} from 'vue';
@@ -108,67 +116,114 @@ const gutterPage = page(`
       } catch(error) {document.getElementById('result').textContent = 'FAIL: ' + error.stack;}
     })();`);
 
-test("CodeMirror editor renders files, diffs and Git markers, also after an in-process Vite restart", {
-  skip: chromium ? false : "Set CHROMIUM_BIN to run the editor browser regression",
-  timeout: 90000,
-}, async (t) => {
-  const directory = await mkdtemp(join(tmpdir(), "projector-editor-browser-"));
-  const loaded = await loadConfigFromFile({ command: "serve", mode: "development" });
-  const pages = { "/__file_test": filePage, "/__diff_edit_test": diffEditPage, "/__gutter_test": gutterPage };
-  const fixture = {
-    name: "editor-test-fixture",
-    configureServer(server) {
-      server.middlewares.use((req, res, next) => {
-        const html = pages[req.url];
-        if (html) {
-          res.setHeader("Content-Type", "text/html");
-          void server.transformIndexHtml(req.url, html).then((body) => res.end(body));
-          return;
-        }
-        if (req.url === "/__tick") {
-          setTimeout(() => res.end("ok"), 20);
-          return;
-        }
-        if (req.url.startsWith("/api/ide/")) {
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ theme: "projector" }));
-          return;
-        }
-        if (req.url.startsWith("/api/projects/") && req.url.includes("/workspace/gutter")) {
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ available: true, original: ["line1", "line4", "old5", "line6", "line7", "gone", "line8", "line9", "line10", ""].join("\n") }));
-          return;
-        }
-        next();
-      });
-    },
-  };
-  const server = await createServer({
-    ...loaded.config,
-    configFile: false,
-    // Never attach Projector's API/PTY server or write its instance file in this fixture.
-    plugins: [...loaded.config.plugins.filter((plugin) => plugin.name !== "projector-api"), fixture],
-    cacheDir: join(directory, "vite-cache"),
-    optimizeDeps: { ...loaded.config.optimizeDeps, entries: [] },
-    server: { host: "127.0.0.1", port: 0, strictPort: false },
-    logLevel: "error",
-  });
-  t.after(async () => { await server.close(); await rm(directory, { recursive: true, force: true }); });
-  await server.listen();
-  const base = `http://127.0.0.1:${server.httpServer.address().port}`;
-  const dump = async (path, profile) => {
-    const { stdout, stderr } = await promisify(execFile)(chromium, [
-      "--headless", "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage",
-      "--no-first-run", "--no-default-browser-check",
-      `--user-data-dir=${join(directory, profile)}`, "--virtual-time-budget=15000", "--dump-dom",
-      `${base}${path}`,
-    ], { timeout: 25000, maxBuffer: 2 * 1024 * 1024 });
-    return stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1] ?? stdout.slice(-2000) + stderr.slice(-1000);
-  };
-  for (const phase of ["cold", "restarted"]) {
-    if (phase === "restarted") await server.restart();
-    for (const path of Object.keys(pages)) {
-      assert.equal(await dump(path, `${path.slice(3)}-${phase}`), "PASS", `${phase} ${path} failed`);
+test(
+  "CodeMirror editor renders files, diffs and Git markers, also after an in-process Vite restart",
+  {
+    skip: chromium ? false : "Set CHROMIUM_BIN to run the editor browser regression",
+    timeout: 90000,
+  },
+  async (t) => {
+    const directory = await mkdtemp(join(tmpdir(), "projector-editor-browser-"));
+    const loaded = await loadConfigFromFile({ command: "serve", mode: "development" });
+    const pages = {
+      "/__file_test": filePage,
+      "/__diff_edit_test": diffEditPage,
+      "/__gutter_test": gutterPage,
+    };
+    const fixture = {
+      name: "editor-test-fixture",
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          const html = pages[req.url];
+          if (html) {
+            res.setHeader("Content-Type", "text/html");
+            void server.transformIndexHtml(req.url, html).then((body) => res.end(body));
+            return;
+          }
+          if (req.url === "/__tick") {
+            setTimeout(() => res.end("ok"), 20);
+            return;
+          }
+          if (req.url.startsWith("/api/ide/")) {
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ theme: "projector" }));
+            return;
+          }
+          if (req.url.startsWith("/api/projects/") && req.url.includes("/workspace/gutter")) {
+            res.setHeader("Content-Type", "application/json");
+            res.end(
+              JSON.stringify({
+                available: true,
+                original: [
+                  "line1",
+                  "line4",
+                  "old5",
+                  "line6",
+                  "line7",
+                  "gone",
+                  "line8",
+                  "line9",
+                  "line10",
+                  "",
+                ].join("\n"),
+              }),
+            );
+            return;
+          }
+          next();
+        });
+      },
+    };
+    const server = await createServer({
+      ...loaded.config,
+      configFile: false,
+      // Never attach Projector's API/PTY server or write its instance file in this fixture.
+      plugins: [
+        ...loaded.config.plugins.filter((plugin) => plugin.name !== "projector-api"),
+        fixture,
+      ],
+      cacheDir: join(directory, "vite-cache"),
+      optimizeDeps: { ...loaded.config.optimizeDeps, entries: [] },
+      server: { host: "127.0.0.1", port: 0, strictPort: false },
+      logLevel: "error",
+    });
+    t.after(async () => {
+      await server.close();
+      await rm(directory, { recursive: true, force: true });
+    });
+    await server.listen();
+    const base = `http://127.0.0.1:${server.httpServer.address().port}`;
+    const dump = async (path, profile) => {
+      const { stdout, stderr } = await promisify(execFile)(
+        chromium,
+        [
+          "--headless",
+          "--no-sandbox",
+          "--disable-gpu",
+          "--disable-dev-shm-usage",
+          "--no-first-run",
+          "--no-default-browser-check",
+          `--user-data-dir=${join(directory, profile)}`,
+          "--virtual-time-budget=15000",
+          "--dump-dom",
+          `${base}${path}`,
+        ],
+        { timeout: 25000, maxBuffer: 2 * 1024 * 1024 },
+      );
+      return (
+        stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1] ??
+        stdout.slice(-2000) + stderr.slice(-1000)
+      );
+    };
+    for (const phase of ["cold", "restarted"]) {
+      if (phase === "restarted") await server.restart();
+      for (const path of Object.keys(pages)) {
+        assert.equal(
+          await dump(path, `${path.slice(3)}-${phase}`),
+          "PASS",
+          `${phase} ${path} failed`,
+        );
+      }
     }
-  }
-});
+  },
+);

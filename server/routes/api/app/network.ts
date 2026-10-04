@@ -1,4 +1,8 @@
-import { appUrl, readNetworkMode, writeNetworkMode } from "../../../../core/modules/app-paths/index.ts";
+import {
+  appUrl,
+  readNetworkMode,
+  writeNetworkMode,
+} from "../../../../core/modules/app-paths/index.ts";
 import { isNetworkMode } from "../../../../core/modules/network-mode/index.ts";
 import { HttpError } from "../../../modules/http/index.ts";
 import { restartProjector } from "../../../modules/restart/index.ts";

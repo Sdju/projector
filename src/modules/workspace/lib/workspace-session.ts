@@ -1,9 +1,5 @@
 import { onBeforeUnmount, watch, type Ref } from "vue";
-import {
-  parseDockLayout,
-  serializeDockLayout,
-  type DockLayout,
-} from "../../dock/index.ts";
+import { parseDockLayout, serializeDockLayout, type DockLayout } from "../../dock/index.ts";
 import type { OpenFile, OpenFileOptions } from "../open-file.ts";
 import { useSessionSnapshot } from "../../../common/utilities/session-snapshot.ts";
 import { workspaceSessionSchema, type WorkspaceSession } from "../session.ts";
@@ -22,7 +18,10 @@ export interface WorkspaceSessionContext {
   treeWidth: Ref<number | undefined>;
   sidebarHidden: Ref<boolean>;
   /** Заголовок и путь служебной вкладки («Агент», «Настройки проекта»). */
-  virtualTab: (kind: Exclude<NonNullable<OpenFile["virtual"]>, "commit">) => { key: string; path: string };
+  virtualTab: (kind: Exclude<NonNullable<OpenFile["virtual"]>, "commit">) => {
+    key: string;
+    path: string;
+  };
   openFile: (
     path: string,
     line?: number,

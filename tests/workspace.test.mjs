@@ -30,7 +30,10 @@ import {
 } from "../server/modules/workspace/index.ts";
 import { projectRelativePath, previewBrowserFile } from "../src/modules/workspace/file-drop.ts";
 import { moveDestination, parentPath, relocatedPath } from "../core/modules/workspace/index.ts";
-import { fitImage, zoomImageAt } from "../src/modules/workspace/modules/viewers/lib/image-viewport.ts";
+import {
+  fitImage,
+  zoomImageAt,
+} from "../src/modules/workspace/modules/viewers/lib/image-viewport.ts";
 test("image zoom keeps the cursor anchor fixed, including at zoom limits", () => {
   const initial = { zoom: 2, x: 40, y: -30 };
   const anchor = { x: 130, y: 75 };
@@ -45,7 +48,12 @@ test("image zoom keeps the cursor anchor fixed, including at zoom limits", () =>
   assert.equal(fitImage(20, 10, 1048, 548), 32);
 });
 test("incremental image zoom stops at 100% in both directions and can continue afterward", () => {
-  for (const [start, requested] of [[0.99, 1.01], [1.01, 0.99], [0.5, 2], [2, 0.5]]) {
+  for (const [start, requested] of [
+    [0.99, 1.01],
+    [1.01, 0.99],
+    [0.5, 2],
+    [2, 0.5],
+  ]) {
     const original = { zoom: start, x: 20, y: -40 };
     const stopped = zoomImageAt(original, requested, 120, 60);
     assert.equal(stopped.zoom, 1);
@@ -60,14 +68,23 @@ test("file drops preserve external contents and distinguish project paths", asyn
   assert.equal(projectRelativePath("/tmp/project/", "/tmp/project/src/file.ts"), "src/file.ts");
   assert.equal(projectRelativePath("/tmp/project", "/tmp/project-other/file.ts"), undefined);
   const file = new File(["# External\n"], "external.md");
-  assert.deepEqual(await previewBrowserFile(file), { path: "external.md", content: "# External\n" });
+  assert.deepEqual(await previewBrowserFile(file), {
+    path: "external.md",
+    content: "# External\n",
+  });
   await assert.rejects(previewBrowserFile(new File(["a\0b"], "binary.bin")), /Бинарный файл/);
-  await assert.rejects(previewBrowserFile(new File([new Uint8Array(1024 * 1024 + 1)], "large.txt")), /больше 1 МБ/);
+  await assert.rejects(
+    previewBrowserFile(new File([new Uint8Array(1024 * 1024 + 1)], "large.txt")),
+    /больше 1 МБ/,
+  );
   const svg = "<svg xmlns='http://www.w3.org/2000/svg'/>";
   assert.deepEqual(await previewBrowserFile(new File([svg], "external.SVG")), {
-    path: "external.SVG", content: svg,
+    path: "external.SVG",
+    content: svg,
   });
-  const image = await previewBrowserFile(new File([new Uint8Array([137, 80, 78, 71])], "external.png"));
+  const image = await previewBrowserFile(
+    new File([new Uint8Array([137, 80, 78, 71])], "external.png"),
+  );
   assert.ok(image.image.startsWith("blob:"));
   URL.revokeObjectURL(image.image);
 });
@@ -176,7 +193,9 @@ test("Text file saves preserve text and mode, reject stale drafts and contain wr
     assert.equal(image.type, "image/png");
     assert.deepEqual(image.content, Buffer.from([137, 80, 78, 71]));
     assert.deepEqual(await previewProjectFile(base, "picture.png"), {
-      path: "picture.png", content: "", image: true,
+      path: "picture.png",
+      content: "",
+      image: true,
     });
     await assert.rejects(readProjectImage(base, "readme.md"), { status: 415 });
     await assert.rejects(readProjectImage(base, "../picture.png"), { status: 403 });
@@ -396,7 +415,10 @@ test("Git gutter returns the index text of tracked files only", async () => {
       available: true,
       original: "nested\n",
     });
-    assert.deepEqual(await projectGutter(base, "untracked.txt"), { available: false, original: "" });
+    assert.deepEqual(await projectGutter(base, "untracked.txt"), {
+      available: false,
+      original: "",
+    });
     await assert.rejects(projectGutter(base, "../outside"), { status: 403 });
 
     const plain = await mkdtemp(join(tmpdir(), "projector-gutter-plain-"));
@@ -418,7 +440,10 @@ test("workspace HTTP routes resolve catalog projects and reject foreign origins 
   const externalDirectory = await mkdtemp(join(tmpdir(), "projector-external-preview-"));
   const externalPath = join(externalDirectory, "outside.txt");
   await writeFile(externalPath, "External file contents\n");
-  await writeFile(join(externalDirectory, "outside.svg"), "<svg xmlns='http://www.w3.org/2000/svg'/>");
+  await writeFile(
+    join(externalDirectory, "outside.svg"),
+    "<svg xmlns='http://www.w3.org/2000/svg'/>",
+  );
   process.env.XDG_DATA_HOME = directory;
   await mkdir(join(directory, "projector"));
   await writeFile(join(directory, "sample.ts"), "const sample = true;\n");
@@ -446,12 +471,27 @@ test("workspace HTTP routes resolve catalog projects and reject foreign origins 
   try {
     const external = await fetch(`${route}/external?path=${encodeURIComponent(externalPath)}`);
     assert.equal(external.status, 200);
-    assert.deepEqual(await external.json(), { path: externalPath, content: "External file contents\n" });
+    assert.deepEqual(await external.json(), {
+      path: externalPath,
+      content: "External file contents\n",
+    });
     assert.equal((await fetch(`${route}/external?path=relative.txt`)).status, 400);
-    assert.equal((await fetch(`${route}/external?path=${encodeURIComponent(externalPath)}`, {headers:{Origin:"https://foreign.test"}})).status, 403);
+    assert.equal(
+      (
+        await fetch(`${route}/external?path=${encodeURIComponent(externalPath)}`, {
+          headers: { Origin: "https://foreign.test" },
+        })
+      ).status,
+      403,
+    );
     const imagePath = join(externalDirectory, "outside.svg");
-    const imagePreview = await (await fetch(`${route}/external?path=${encodeURIComponent(imagePath)}`)).json();
-    assert.deepEqual(imagePreview, { path: imagePath, content: "<svg xmlns='http://www.w3.org/2000/svg'/>" });
+    const imagePreview = await (
+      await fetch(`${route}/external?path=${encodeURIComponent(imagePath)}`)
+    ).json();
+    assert.deepEqual(imagePreview, {
+      path: imagePath,
+      content: "<svg xmlns='http://www.w3.org/2000/svg'/>",
+    });
     const image = await fetch(`${route}/external-asset?path=${encodeURIComponent(imagePath)}`);
     assert.equal(image.headers.get("content-type"), "image/svg+xml");
     assert.equal(image.headers.get("x-content-type-options"), "nosniff");
@@ -621,11 +661,23 @@ test("path bar lists real directories and symlinks, completes prefixes and rejec
 
 test("Git tree backgrounds aggregate nested changes, renames, deletions and conflicts without prefix collisions", async () => {
   const { gitTreeDecorations } = await import("../core/modules/workspace/index.ts");
-  const change = (path, index = " ", worktree = "M", originalPath) => ({ path, index, worktree, originalPath });
-  const changes = [change("src/deep/edit.ts"), change("src/new.ts", "?", "?"), change("src-other/clean.ts", " ", " "),
-    change("new/folder/file.txt", "A", "M"), change("deleted/old.txt", "D", " "),
-    change("destination/moved.ts", "R", " ", "source/moved.ts"), change("conflicts/a.txt", "U", "U"),
-    change("conflicts/b.txt", "?", "?"), change("ignored/file", "!", "!")];
+  const change = (path, index = " ", worktree = "M", originalPath) => ({
+    path,
+    index,
+    worktree,
+    originalPath,
+  });
+  const changes = [
+    change("src/deep/edit.ts"),
+    change("src/new.ts", "?", "?"),
+    change("src-other/clean.ts", " ", " "),
+    change("new/folder/file.txt", "A", "M"),
+    change("deleted/old.txt", "D", " "),
+    change("destination/moved.ts", "R", " ", "source/moved.ts"),
+    change("conflicts/a.txt", "U", "U"),
+    change("conflicts/b.txt", "?", "?"),
+    change("ignored/file", "!", "!"),
+  ];
   const before = structuredClone(changes);
   const decorations = gitTreeDecorations(changes);
   assert.equal(decorations.get("src"), "modified");
@@ -645,15 +697,17 @@ test("Git tree backgrounds aggregate nested changes, renames, deletions and conf
   assert.deepEqual(changes, before);
 });
 
-
 test("Git actions preserve staged content, handle deleted/literal paths and trash untracked files", async () => {
   const base = await mkdtemp(join(tmpdir(), "projector-git-actions-"));
   const run = (...args) => execFileSync("git", ["-C", base, ...args], { encoding: "utf8" });
   try {
-    run("init", "-q"); run("config", "user.name", "Test"); run("config", "user.email", "test@example.test");
+    run("init", "-q");
+    run("config", "user.name", "Test");
+    run("config", "user.email", "test@example.test");
     await writeFile(join(base, "file.txt"), "head");
     await writeFile(join(base, "other.txt"), "head");
-    run("add", "."); run("commit", "-qm", "initial");
+    run("add", ".");
+    run("commit", "-qm", "initial");
     await writeFile(join(base, "file.txt"), "index");
     await mutateProjectGit(base, "stage", "file.txt");
     await writeFile(join(base, "file.txt"), "working");
@@ -680,7 +734,11 @@ test("Git actions preserve staged content, handle deleted/literal paths and tras
     assert.equal((await projectGit(base)).changes.find((c) => c.path === "literal.txt").index, "?");
     await mutateProjectGit(base, "unstage", "[literal].txt");
     await mutateProjectGit(base, "discard", "[literal].txt");
-    assert.ok((await readdir(join(base, ".projector-trash"))).some((name) => name.endsWith("-[literal].txt")));
+    assert.ok(
+      (await readdir(join(base, ".projector-trash"))).some((name) =>
+        name.endsWith("-[literal].txt"),
+      ),
+    );
     run("mv", "other.txt", "renamed.txt");
     await mutateProjectGit(base, "unstage", "renamed.txt");
     assert.equal(run("diff", "--cached"), "");
@@ -690,7 +748,9 @@ test("Git actions preserve staged content, handle deleted/literal paths and tras
     await assert.rejects(mutateProjectGit(base, "reset", "literal.txt"), { status: 400 });
     await symlink("/tmp", join(base, "escape"));
     await assert.rejects(mutateProjectGit(base, "stage", "escape"), { status: 403 });
-  } finally { await rm(base, { recursive: true, force: true }); }
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
 });
 
 test("Git unstage works before the first commit, and index writes serialize", async () => {
@@ -698,26 +758,34 @@ test("Git unstage works before the first commit, and index writes serialize", as
   const run = (...args) => execFileSync("git", ["-C", base, ...args], { encoding: "utf8" });
   try {
     run("init", "-q");
-    await writeFile(join(base, "a.txt"), "a"); await writeFile(join(base, "b.txt"), "b");
-    await Promise.all([mutateProjectGit(base, "stage", "a.txt"), mutateProjectGit(base, "stage", "b.txt")]);
+    await writeFile(join(base, "a.txt"), "a");
+    await writeFile(join(base, "b.txt"), "b");
+    await Promise.all([
+      mutateProjectGit(base, "stage", "a.txt"),
+      mutateProjectGit(base, "stage", "b.txt"),
+    ]);
     assert.equal(run("ls-files").trim(), "a.txt\nb.txt");
     await writeFile(join(base, "a.txt"), "modified");
     await mutateProjectGit(base, "unstage", "a.txt");
     assert.equal(run("ls-files").trim(), "b.txt");
     assert.equal(await readFile(join(base, "a.txt"), "utf8"), "modified");
-  } finally { await rm(base, { recursive: true, force: true }); }
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
 });
-
 
 test("Git mutations stay within nested projects and reject conflict discard", async () => {
   const base = await mkdtemp(join(tmpdir(), "projector-git-nested-"));
   const run = (...args) => execFileSync("git", ["-C", base, ...args], { encoding: "utf8" });
   try {
-    run("init", "-q"); run("config", "user.name", "Test"); run("config", "user.email", "test@example.test");
+    run("init", "-q");
+    run("config", "user.name", "Test");
+    run("config", "user.email", "test@example.test");
     await mkdir(join(base, "nested"));
     await writeFile(join(base, "outside.txt"), "outside");
     await writeFile(join(base, "nested/inside.txt"), "inside");
-    run("add", "."); run("commit", "-qm", "initial");
+    run("add", ".");
+    run("commit", "-qm", "initial");
     await writeFile(join(base, "outside.txt"), "changed outside");
     await writeFile(join(base, "nested/inside.txt"), "changed inside");
     await Promise.all([
@@ -740,34 +808,51 @@ test("Git mutations stay within nested projects and reject conflict discard", as
     await assert.rejects(mutateProjectGit(base, "unstage", "nested/inside.txt"), { status: 409 });
     await mutateProjectGit(base, "stage", "nested/inside.txt");
     assert.equal(run("ls-files", "--unmerged"), "");
-  } finally { await rm(base, { recursive: true, force: true }); }
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
 });
 
 test("Git batch actions validate the whole selection and preserve working contents", async () => {
   const base = await mkdtemp(join(tmpdir(), "projector-git-batch-"));
   const run = (...args) => execFileSync("git", ["-C", base, ...args], { encoding: "utf8" });
   try {
-    run("init", "-q"); run("config", "user.name", "Test"); run("config", "user.email", "test@example.test");
+    run("init", "-q");
+    run("config", "user.name", "Test");
+    run("config", "user.email", "test@example.test");
     await mkdir(join(base, "folder"));
     for (const path of ["folder/a.txt", "folder/b.txt", "outside.txt"])
       await writeFile(join(base, path), "head");
-    run("add", "."); run("commit", "-qm", "initial");
+    run("add", ".");
+    run("commit", "-qm", "initial");
     await writeFile(join(base, "folder/a.txt"), "changed a");
     await rm(join(base, "folder/b.txt"));
     await writeFile(join(base, "folder/new.txt"), "new");
     await writeFile(join(base, "outside.txt"), "outside");
-    await assert.rejects(mutateProjectGit(base, "stage", ["folder/a.txt", "missing.txt"]), { status: 404 });
+    await assert.rejects(mutateProjectGit(base, "stage", ["folder/a.txt", "missing.txt"]), {
+      status: 404,
+    });
     assert.equal(run("diff", "--cached"), "");
-    await assert.rejects(mutateProjectGit(base, "stage", ["folder/a.txt", "../outside"]), { status: 403 });
+    await assert.rejects(mutateProjectGit(base, "stage", ["folder/a.txt", "../outside"]), {
+      status: 403,
+    });
     await assert.rejects(mutateProjectGit(base, "stage", []), { status: 400 });
     await mutateProjectGit(base, "stage", ["folder/a.txt", "folder/b.txt", "folder/new.txt"]);
-    assert.equal(run("diff", "--cached", "--name-only").trim(), "folder/a.txt\nfolder/b.txt\nfolder/new.txt");
+    assert.equal(
+      run("diff", "--cached", "--name-only").trim(),
+      "folder/a.txt\nfolder/b.txt\nfolder/new.txt",
+    );
     await writeFile(join(base, "folder/a.txt"), "partially staged");
     await mutateProjectGit(base, "unstage", ["folder/a.txt", "folder/b.txt", "folder/new.txt"]);
     assert.equal(run("diff", "--cached"), "");
     assert.equal(await readFile(join(base, "folder/a.txt"), "utf8"), "partially staged");
     assert.equal(await readFile(join(base, "folder/new.txt"), "utf8"), "new");
     assert.equal(await readFile(join(base, "outside.txt"), "utf8"), "outside");
-    assert.equal((await projectGit(base)).changes.find(c => c.path === "folder/b.txt").worktree, "D");
-  } finally { await rm(base, { recursive: true, force: true }); }
+    assert.equal(
+      (await projectGit(base)).changes.find((c) => c.path === "folder/b.txt").worktree,
+      "D",
+    );
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
 });

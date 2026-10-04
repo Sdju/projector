@@ -17,5 +17,7 @@ defineExpose({ text, count, entry, button });
   </VWindow>
 </template>
 <style scoped>
-.heading { font-size: 22px; }
+.heading {
+  font-size: 22px;
+}
 </style>

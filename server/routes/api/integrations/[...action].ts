@@ -36,7 +36,14 @@ export async function handleIntegrationsActions({
       const repository = url.searchParams.get("repository") || "";
       const sha = url.searchParams.get("sha") || "";
       if (path === "/api/integrations/github/browse/directories")
-        json(res, 200, await browseGithubDirectories(url.searchParams.get("path") || "", url.searchParams.get("complete") === "true"));
+        json(
+          res,
+          200,
+          await browseGithubDirectories(
+            url.searchParams.get("path") || "",
+            url.searchParams.get("complete") === "true",
+          ),
+        );
       else if (path === "/api/integrations/github/browse/asset") {
         const asset = await browseGithubAsset(repository, sha, url.searchParams.get("path") || "");
         res.setHeader("Content-Type", asset.mime);

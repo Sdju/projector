@@ -15,7 +15,7 @@ export function listApplications(): LaunchItem[] {
       const desktop = GioUnix.DesktopAppInfo.new(id);
       // GLib 2.80 moved this class from Gio; older typelibs incorrectly expose
       // its instance methods as static in generated GioUnix declarations.
-      const keywordApp = desktop as (typeof desktop & { getKeywords(): string[] | null });
+      const keywordApp = desktop as typeof desktop & { getKeywords(): string[] | null };
       return {
         id: `app:${id}`,
         name: app.getDisplayName(),

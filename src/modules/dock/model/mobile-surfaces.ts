@@ -14,10 +14,16 @@ export function mobileDockSurfaces(
   const focused = groups.find((group) => group.id === layout.focused)?.active;
   return (["editor", "terminal"] as const).map((side) => {
     const available = panels.filter((id) => isTerminal(id) === (side === "terminal"));
-    const ids = [...order[side].filter((id) => available.includes(id)),
-      ...available.filter((id) => !order[side].includes(id))];
-    const active = focused && ids.includes(focused) ? focused
-      : ids.includes(last[side]) ? last[side] : ids[0] ?? "";
+    const ids = [
+      ...order[side].filter((id) => available.includes(id)),
+      ...available.filter((id) => !order[side].includes(id)),
+    ];
+    const active =
+      focused && ids.includes(focused)
+        ? focused
+        : ids.includes(last[side])
+          ? last[side]
+          : (ids[0] ?? "");
     return { side, ids, active };
   });
 }

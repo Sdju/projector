@@ -82,18 +82,32 @@ export function createAgentTools(context: AgentToolContext) {
       execute: async ({ command, cwd }) => {
         const project = context.cwd ? await environmentForPath(context.cwd) : undefined;
         const target = expandPath(cwd || context.cwd || os.homeDirectory());
-        const environment = project ?? await environmentForPath(target);
+        const environment = project ?? (await environmentForPath(target));
         if (environment) {
-          if (target !== environment.path) throw new Error("Bash окружения выполняется только в корне изолированного проекта");
+          if (target !== environment.path)
+            throw new Error("Bash окружения выполняется только в корне изолированного проекта");
           if (context.signal?.aborted) throw new Error("Запрос остановлен");
           try {
-            const result = await runEnvironmentCommand(environment, ["/bin/bash", "--noprofile", "--norc", "-c", command], 30_000, context.signal);
-            return { stdout: result.stdout.slice(0, 256 * 1024), stderr: result.stderr.slice(0, 256 * 1024), exitCode: 0 };
+            const result = await runEnvironmentCommand(
+              environment,
+              ["/bin/bash", "--noprofile", "--norc", "-c", command],
+              30_000,
+              context.signal,
+            );
+            return {
+              stdout: result.stdout.slice(0, 256 * 1024),
+              stderr: result.stderr.slice(0, 256 * 1024),
+              exitCode: 0,
+            };
           } catch (error) {
             if (context.signal?.aborted) throw new Error("Запрос остановлен");
             const failure = error as { code?: number; stdout?: string; stderr?: string };
             if (typeof failure.code !== "number") throw error;
-            return { stdout: (failure.stdout || "").slice(0, 256 * 1024), stderr: (failure.stderr || "").slice(0, 256 * 1024), exitCode: failure.code };
+            return {
+              stdout: (failure.stdout || "").slice(0, 256 * 1024),
+              stderr: (failure.stderr || "").slice(0, 256 * 1024),
+              exitCode: failure.code,
+            };
           }
         }
         return os.tools.runBash(command, { cwd: target, signal: context.signal });

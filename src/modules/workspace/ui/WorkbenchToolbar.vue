@@ -10,12 +10,12 @@ import IconClaude from "~icons/simple-icons/claude";
 import IconOpenCode from "~icons/simple-icons/opencode";
 
 defineProps<{
-    capabilities: Readonly<WorkspaceCapabilities>;
-    sidebarHidden: boolean;
-    terminalsBusy: boolean;
-    terminalsError?: string;
-    /** Скрытые блоки дока: кнопка возвращает блок на место. */
-    hiddenGroups: { id: string; label: string }[];
+  capabilities: Readonly<WorkspaceCapabilities>;
+  sidebarHidden: boolean;
+  terminalsBusy: boolean;
+  terminalsError?: string;
+  /** Скрытые блоки дока: кнопка возвращает блок на место. */
+  hiddenGroups: { id: string; label: string }[];
 }>();
 const emit = defineEmits<{
   command: [id: string, args?: unknown];

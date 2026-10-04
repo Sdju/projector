@@ -1,4 +1,7 @@
-import { registerWorkspaceProfile, createLocalWorkspaceProfile } from "../../workspace-api/index.ts";
+import {
+  registerWorkspaceProfile,
+  createLocalWorkspaceProfile,
+} from "../../workspace-api/index.ts";
 import { computed, reactive } from "vue";
 import {
   createProject,

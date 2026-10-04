@@ -294,7 +294,8 @@ test("GitHub history paginates filtered commits and reads exact before/after blo
 test("GitHub path suggestions paginate owners, filter prefixes and respect authentication", async () => {
   const root = await mkdtemp(join(tmpdir(), "projector-gh-navigation-"));
   process.env.XDG_DATA_HOME = root;
-  const { browseGithubDirectories, updateIntegration } = await import("../server/modules/integrations/index.ts");
+  const { browseGithubDirectories, updateIntegration } =
+    await import("../server/modules/integrations/index.ts");
   const requests = [];
   let token = "";
   let total = 102;
@@ -306,10 +307,12 @@ test("GitHub path suggestions paginate owners, filter prefixes and respect authe
     if (!url.pathname.endsWith("/repos"))
       return Response.json({ type: url.pathname.endsWith("/team") ? "Organization" : "User" });
     const page = Number(url.searchParams.get("page"));
-    return Response.json(Array.from({ length: Math.max(0, Math.min(100, total - (page - 1) * 100)) }, (_, i) => {
-      const name = `repo-${(page - 1) * 100 + i}`;
-      return { name, full_name: `${url.pathname.includes("team") ? "team" : "alice"}/${name}` };
-    }));
+    return Response.json(
+      Array.from({ length: Math.max(0, Math.min(100, total - (page - 1) * 100)) }, (_, i) => {
+        const name = `repo-${(page - 1) * 100 + i}`;
+        return { name, full_name: `${url.pathname.includes("team") ? "team" : "alice"}/${name}` };
+      }),
+    );
   });
   try {
     const siblings = await browseGithubDirectories("gh:/alice/current", false);
@@ -323,10 +326,20 @@ test("GitHub path suggestions paginate owners, filter prefixes and respect authe
     await browseGithubDirectories("gh:/team", false);
     assert.equal(requests.at(-1).pathname, "/orgs/team/repos");
     const count = requests.length;
-    for (const path of ["gh:/", "gh:/../evil", "gh:/alice/repo/extra", "gh:/alice/repo?x", "https://evil.test"])
+    for (const path of [
+      "gh:/",
+      "gh:/../evil",
+      "gh:/alice/repo/extra",
+      "gh:/alice/repo?x",
+      "https://evil.test",
+    ])
       await assert.rejects(browseGithubDirectories(path, false), { status: 400 });
     assert.equal(requests.length, count);
-    await updateIntegration("github", (config) => ({ ...config, enabled: true, credentials: { token: "secret", login: "Alice" } }));
+    await updateIntegration("github", (config) => ({
+      ...config,
+      enabled: true,
+      credentials: { token: "secret", login: "Alice" },
+    }));
     token = "secret";
     await browseGithubDirectories("gh:/alice", false);
     assert.equal(requests.at(-1).pathname, "/user/repos");

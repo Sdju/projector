@@ -75,7 +75,10 @@ test("create, switch, rename and delete local branches", async () => {
 
     // Branching from an explicit start point.
     const first = run("rev-parse", "HEAD").trim();
-    list = await mutateProjectBranch(base, "create", { name: "from-hash", from: first.slice(0, 8) });
+    list = await mutateProjectBranch(base, "create", {
+      name: "from-hash",
+      from: first.slice(0, 8),
+    });
     assert.equal(list.current, "from-hash");
   } finally {
     await rm(base, { recursive: true, force: true });
@@ -142,14 +145,20 @@ test("remote branches track upstream state and check out as local tracking branc
     assert.equal(main.ahead, 1);
     assert.equal(main.behind, 0);
     assert.deepEqual(names(list, "remote").sort(), ["origin/main", "origin/topic"]);
-    assert.equal(list.branches.some((branch) => branch.name.endsWith("/HEAD")), false);
+    assert.equal(
+      list.branches.some((branch) => branch.name.endsWith("/HEAD")),
+      false,
+    );
 
     list = await mutateProjectBranch(base, "checkout", { name: "origin/topic" });
     assert.equal(list.current, "topic");
     assert.equal(list.branches.find((branch) => branch.name === "topic").upstream, "origin/topic");
     // The local branch already exists now, so it is reused.
     await mutateProjectBranch(base, "checkout", { name: "main" });
-    assert.equal((await mutateProjectBranch(base, "checkout", { name: "origin/topic" })).current, "topic");
+    assert.equal(
+      (await mutateProjectBranch(base, "checkout", { name: "origin/topic" })).current,
+      "topic",
+    );
     await assert.rejects(mutateProjectBranch(base, "delete", { name: "origin/topic" }), {
       status: 409,
     });

@@ -2,11 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from "vue";
 import IconChevronRight from "~icons/lucide/chevron-right";
 import IconFolder from "~icons/lucide/folder";
-import {
-  fetchDirectories,
-  parseProjectRef,
-  projectRefSegments,
-} from "../../project/index.ts";
+import { fetchDirectories, parseProjectRef, projectRefSegments } from "../../project/index.ts";
 import { useCommandScope, commandArgs } from "../../../common/utilities/commands.ts";
 import { GithubClone } from "../../integrations/index.ts";
 import PathDropdown from "./PathDropdown.vue";
@@ -28,11 +24,14 @@ const remoteInput = computed(() => parseProjectRef(value.value).kind !== "local"
 const remoteProject = computed(() => parseProjectRef(props.path).kind !== "local");
 const open = computed(() => editing.value || menuPath.value !== null);
 const commands = useCommandScope(`path-bar:${listId}`, () => ({
-  surface: "path-bar", path: props.path,
+  surface: "path-bar",
+  path: props.path,
 }));
 commands.scope.registerCommand({
-  id: "ide.project.path.suggestions", title: "Выбрать соседний проект",
-  description: "Показывает папки локального пути или репозитории владельца GitHub. Повторный вызов закрывает список.",
+  id: "ide.project.path.suggestions",
+  title: "Выбрать соседний проект",
+  description:
+    "Показывает папки локального пути или репозитории владельца GitHub. Повторный вызов закрывает список.",
   arguments: { path: "Путь сегмента, например gh:/owner" },
   enabled: () => !busy.value,
   run: (args) => {
@@ -45,7 +44,9 @@ const githubOwnerPath = computed(() => {
   const project = parseProjectRef(props.path);
   return project.kind === "github" ? `gh:/${project.repository.split("/")[0]}` : "";
 });
-const listingRemote = computed(() => parseProjectRef(menuPath.value ?? value.value).kind === "github");
+const listingRemote = computed(
+  () => parseProjectRef(menuPath.value ?? value.value).kind === "github",
+);
 const segments = computed(() => projectRefSegments(parseProjectRef(props.path)));
 const candidate = computed(() => entries.value[selected.value < 0 ? 0 : selected.value]);
 const completion = computed(() => {
@@ -55,7 +56,8 @@ const completion = computed(() => {
   const prefix = value.value.slice(slash + 1);
   if (value.value === "~") return "";
   const matches = remoteInput.value
-    ? name.toLowerCase().startsWith(prefix.toLowerCase()) : name.startsWith(prefix);
+    ? name.toLowerCase().startsWith(prefix.toLowerCase())
+    : name.startsWith(prefix);
   return matches ? name.slice(prefix.length) + (remoteInput.value ? "" : "/") : "";
 });
 async function edit(path = props.path) {
@@ -86,8 +88,10 @@ async function toggle(path: string) {
   editing.value = false;
   menuPath.value = path;
   const project = parseProjectRef(path);
-  const listingPath = project.kind === "github"
-    ? `gh:/${project.repository.split("/")[0] || githubOwnerPath.value.slice(4)}` : path;
+  const listingPath =
+    project.kind === "github"
+      ? `gh:/${project.repository.split("/")[0] || githubOwnerPath.value.slice(4)}`
+      : path;
   await load(listingPath, false);
 }
 function syncCaret() {
@@ -218,7 +222,11 @@ onBeforeUnmount(() => {
         <button
           v-else
           class="segment-arrow"
-          :aria-label="remoteProject ? `Репозитории ${githubOwnerPath.slice(4)} (${segment.name})` : `Папки в ${segment.path}`"
+          :aria-label="
+            remoteProject
+              ? `Репозитории ${githubOwnerPath.slice(4)} (${segment.name})`
+              : `Папки в ${segment.path}`
+          "
           :aria-expanded="menuPath === segment.path"
           aria-haspopup="listbox"
           :aria-controls="listId"
@@ -262,7 +270,13 @@ onBeforeUnmount(() => {
       v-if="open"
       :id="listId"
       :heading="
-        editing ? (remoteInput ? 'Открыть репозиторий' : 'Перейти в папку') : (remoteProject ? `Репозитории ${githubOwnerPath.slice(4)}` : (menuPath ?? ''))
+        editing
+          ? remoteInput
+            ? 'Открыть репозиторий'
+            : 'Перейти в папку'
+          : remoteProject
+            ? `Репозитории ${githubOwnerPath.slice(4)}`
+            : (menuPath ?? '')
       "
       :editing="editing"
       :remote="listingRemote"

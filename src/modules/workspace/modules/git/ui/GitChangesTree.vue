@@ -110,7 +110,9 @@ function toggle(path: string) {
           :aria-expanded="entry.directory ? !collapsed.has(entry.path) : undefined"
           :aria-current="!entry.directory && selected === entry.path ? 'true' : undefined"
           @focus="emit('target', entry.path)"
-          @click="entry.directory ? toggle(entry.path) : emit('open', entry.path, $event.detail >= 2)"
+          @click="
+            entry.directory ? toggle(entry.path) : emit('open', entry.path, $event.detail >= 2)
+          "
         >
           <span class="glyph" aria-hidden="true">
             <IconChevronRight

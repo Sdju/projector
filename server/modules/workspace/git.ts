@@ -11,7 +11,22 @@ import type {
 
 export async function git(root: string, args: string[]) {
   const project = await environmentForPath(root);
-  if (project) return (await runEnvironmentCommand(project, ["/usr/bin/git", "--literal-pathspecs", "-c", "core.hooksPath=/dev/null", "-C", "/workspace", ...args], 10_000)).stdout;
+  if (project)
+    return (
+      await runEnvironmentCommand(
+        project,
+        [
+          "/usr/bin/git",
+          "--literal-pathspecs",
+          "-c",
+          "core.hooksPath=/dev/null",
+          "-C",
+          "/workspace",
+          ...args,
+        ],
+        10_000,
+      )
+    ).stdout;
   return (
     await exec("git", ["--literal-pathspecs", "-C", root, ...args], {
       maxBuffer: 4 * MAX_BYTES,

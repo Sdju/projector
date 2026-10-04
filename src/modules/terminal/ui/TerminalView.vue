@@ -44,9 +44,13 @@ const error = ref("");
 const draggingFiles = ref(false);
 const connection = ref<"offline" | "connecting" | "connected">("offline");
 const sessionId = props.session.id;
-const portCommands = useCommandScope(`environment-ports:${sessionId}`, () => ({ projectId: props.projectId, surface: "environment-ports" }));
+const portCommands = useCommandScope(`environment-ports:${sessionId}`, () => ({
+  projectId: props.projectId,
+  surface: "environment-ports",
+}));
 portCommands.scope.registerCommand({
-  id: "ide.environment.port.open", title: "Открыть порт окружения",
+  id: "ide.environment.port.open",
+  title: "Открыть порт окружения",
   description: "Открывает TCP-порт контейнера, опубликованный только на loopback хоста, как HTTP.",
   arguments: { port: "TCP-порт внутри контейнера" },
   enabled: () => props.session.status === "running",
@@ -90,7 +94,10 @@ async function openTerminalLink(link: TerminalLink) {
     openExternalLink(link.path);
     return;
   }
-  if (props.session.docker) { error.value = "Пути Docker-терминала не сопоставлены с файлами хоста"; return; }
+  if (props.session.docker) {
+    error.value = "Пути Docker-терминала не сопоставлены с файлами хоста";
+    return;
+  }
   const current = ++linkGeneration;
   error.value = "";
   try {
@@ -113,7 +120,10 @@ function send(message: TerminalClientMessage): void {
 function dragFiles(event: DragEvent): void {
   if (!isTerminalFileDrag(event.dataTransfer)) return;
   event.preventDefault();
-  if (props.session.docker) { if (event.dataTransfer) event.dataTransfer.dropEffect = "none"; return; }
+  if (props.session.docker) {
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "none";
+    return;
+  }
   draggingFiles.value = true;
   if (event.dataTransfer) event.dataTransfer.dropEffect = running() ? "copy" : "none";
 }
@@ -121,7 +131,10 @@ function dragFiles(event: DragEvent): void {
 async function dropFiles(event: DragEvent): Promise<void> {
   event.preventDefault();
   draggingFiles.value = false;
-  if (props.session.docker) { error.value = "Файловые пути хоста недоступны в Docker-терминале"; return; }
+  if (props.session.docker) {
+    error.value = "Файловые пути хоста недоступны в Docker-терминале";
+    return;
+  }
   if (!isTerminalFileDrag(event.dataTransfer)) return;
   const currentGeneration = generation;
   if (!running()) {
@@ -357,8 +370,14 @@ onBeforeUnmount(() => {
 <template>
   <section class="terminal-view" tabindex="-1">
     <div v-if="session.ports?.length && session.status === 'running'" class="environment-ports">
-      <button v-for="port in session.ports" :key="port.container" :title="port.url"
-        @click="portCommands.run('ide.environment.port.open', { port: port.container })">{{ port.container }} ↗</button>
+      <button
+        v-for="port in session.ports"
+        :key="port.container"
+        :title="port.url"
+        @click="portCommands.run('ide.environment.port.open', { port: port.container })"
+      >
+        {{ port.container }} ↗
+      </button>
     </div>
     <p v-if="statusText" class="status" role="status">{{ statusText }}</p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
@@ -380,7 +399,13 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.environment-ports { display: flex; gap: var(--sp-3); padding: var(--sp-2); font: var(--fs-xs) var(--mono); color: var(--muted); }
+.environment-ports {
+  display: flex;
+  gap: var(--sp-3);
+  padding: var(--sp-2);
+  font: var(--fs-xs) var(--mono);
+  color: var(--muted);
+}
 .terminal-view {
   display: flex;
   flex-direction: column;

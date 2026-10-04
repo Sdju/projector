@@ -61,8 +61,12 @@ useEventListener(window, "drop", () => (tabDrag.value = undefined));
 </script>
 
 <template>
-  <div class="dock" :class="{ 'mobile': mobile }">
-    <MobileDock v-if="mobile && terminalPanel" :surface="mobileSurface ?? 'editor'" :terminal-panel="terminalPanel" />
+  <div class="dock" :class="{ mobile: mobile }">
+    <MobileDock
+      v-if="mobile && terminalPanel"
+      :surface="mobileSurface ?? 'editor'"
+      :terminal-panel="terminalPanel"
+    />
     <DockTree v-else-if="visible" :node="layout.root" />
     <p v-else class="dock-none">Все блоки скрыты. Включите нужный блок на панели выше.</p>
   </div>
@@ -87,5 +91,8 @@ useEventListener(window, "drop", () => (tabDrag.value = undefined));
     height: auto;
   }
 }
-.dock.mobile { height: 100%; min-height: 0; }
+.dock.mobile {
+  height: 100%;
+  min-height: 0;
+}
 </style>

@@ -7,14 +7,18 @@ export function isTerminalFileDrag(data: DataTransfer | null): boolean {
 }
 
 export function terminalTextForPaths(paths: string[]): string {
-  return paths.map((path) => {
-    if (!/[\x00-\x1f\x7f]/.test(path)) return "'" + path.replace(/'/g, "'\\''") + "'";
-    // Avoid xterm converting newlines into Enter; Bash/Zsh decode these escapes.
-    return `$'${path.replace(/[\\'\x00-\x1f\x7f]/g, (char) => {
-      if (char === "\\" || char === "'") return `\\${char}`;
-      return `\\x${char.charCodeAt(0).toString(16).padStart(2, "0")}`;
-    })}'`;
-  }).join(" ") + " ";
+  return (
+    paths
+      .map((path) => {
+        if (!/[\x00-\x1f\x7f]/.test(path)) return "'" + path.replace(/'/g, "'\\''") + "'";
+        // Avoid xterm converting newlines into Enter; Bash/Zsh decode these escapes.
+        return `$'${path.replace(/[\\'\x00-\x1f\x7f]/g, (char) => {
+          if (char === "\\" || char === "'") return `\\${char}`;
+          return `\\x${char.charCodeAt(0).toString(16).padStart(2, "0")}`;
+        })}'`;
+      })
+      .join(" ") + " "
+  );
 }
 
 export async function droppedTerminalPaths(

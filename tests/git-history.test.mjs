@@ -59,7 +59,10 @@ test("log pages commits with refs, parents and unpushed marks", async () => {
     assert.equal(rest.next, null);
     assert.deepEqual(rest.commits[0].refs, [{ name: "v1", kind: "tag" }]);
     assert.deepEqual(rest.commits[0].parents, []);
-    assert.equal(page.commits.every((commit) => !commit.unpushed), true);
+    assert.equal(
+      page.commits.every((commit) => !commit.unpushed),
+      true,
+    );
 
     assert.deepEqual(
       (await projectLog(base, { query: "COMMIT 2" })).commits.map((commit) => commit.subject),
@@ -114,7 +117,11 @@ test("commit detail lists files against the first parent, limited to the folder"
     const initial = await projectCommit(base, first);
     assert.deepEqual(
       initial.files.map((file) => [file.path, file.status]),
-      [["root.txt", "A"], ["sub/gone.txt", "A"], ["sub/keep.txt", "A"]],
+      [
+        ["root.txt", "A"],
+        ["sub/gone.txt", "A"],
+        ["sub/keep.txt", "A"],
+      ],
     );
     assert.deepEqual(initial.parents, []);
 

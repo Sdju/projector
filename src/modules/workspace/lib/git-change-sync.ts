@@ -67,7 +67,8 @@ export function useGitChangeSync(ctx: GitChangeSyncContext) {
         () => true,
         () => false,
       );
-      if (exists) await ctx.files.openFile(path, undefined, undefined, undefined, { preview: false });
+      if (exists)
+        await ctx.files.openFile(path, undefined, undefined, undefined, { preview: false });
     }
     ctx.refreshSearch();
   }

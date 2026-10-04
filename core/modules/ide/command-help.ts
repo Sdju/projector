@@ -22,7 +22,9 @@ export function commandHelp(id: string): {
   if (id === "ide.workbench.terminal.new")
     return {
       description: "Создаёт терминальную сессию в проекте и показывает её вкладку.",
-      arguments: { program: "string (необязательно): shell, codex, claude или opencode; по умолчанию shell" },
+      arguments: {
+        program: "string (необязательно): shell, codex, claude или opencode; по умолчанию shell",
+      },
     };
   if (id.startsWith("ide.workbench.panel."))
     return {

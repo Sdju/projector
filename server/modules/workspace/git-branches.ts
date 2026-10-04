@@ -37,7 +37,13 @@ async function run(root: string, args: string[]) {
 
 export async function projectBranches(root: string): Promise<GitBranches> {
   const empty: GitBranches = { available: false, current: "", detached: false, branches: [] };
-  if (await git(root, ["rev-parse", "--show-toplevel"]).then(() => false, () => true)) return empty;
+  if (
+    await git(root, ["rev-parse", "--show-toplevel"]).then(
+      () => false,
+      () => true,
+    )
+  )
+    return empty;
   const [rows, merged, symbolic, short] = await Promise.all([
     optional(root, [
       "for-each-ref",
@@ -54,8 +60,16 @@ export async function projectBranches(root: string): Promise<GitBranches> {
   const branches: GitBranch[] = [];
   for (const row of rows.split("\n")) {
     if (!row) continue;
-    const [head = "", ref = "", name = "", upstream = "", track = "", hash = "", date = "", subject = ""] =
-      row.split(FIELD);
+    const [
+      head = "",
+      ref = "",
+      name = "",
+      upstream = "",
+      track = "",
+      hash = "",
+      date = "",
+      subject = "",
+    ] = row.split(FIELD);
     if (ref.endsWith("/HEAD")) continue;
     const local = ref.startsWith("refs/heads/");
     branches.push({

@@ -40,7 +40,12 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
         assetUrl: (path, external = false) =>
           `${base(projectId)}/${external ? "external-asset" : "asset"}?${new URLSearchParams({ path })}`,
         write: (endpoint: FileWrite, body, failure = "Не удалось выполнить действие") =>
-          send(`${base(projectId)}/${endpoint}`, endpoint === "file" ? "PUT" : "POST", body, failure),
+          send(
+            `${base(projectId)}/${endpoint}`,
+            endpoint === "file" ? "PUT" : "POST",
+            body,
+            failure,
+          ),
       },
       git: {
         read,

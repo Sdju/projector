@@ -112,7 +112,9 @@ onMounted(() => {
       </label>
     </fieldset>
     <template v-if="mode === 'lan'">
-      <label class="password-label" for="projector-lan-password">Пароль доступа (необязательно)</label>
+      <label class="password-label" for="projector-lan-password"
+        >Пароль доступа (необязательно)</label
+      >
       <input
         id="projector-lan-password"
         v-model="password"
@@ -123,10 +125,12 @@ onMounted(() => {
       />
       <UiHint class="hint">
         <template v-if="passwordRequired"
-          >Пароль уже задан. Введите новый, чтобы заменить его, или очистите защиту вручную.</template
+          >Пароль уже задан. Введите новый, чтобы заменить его, или очистите защиту
+          вручную.</template
         >
         <template v-else
-          >Без пароля любой в локальной сети сможет управлять Projector, включая терминалы.</template
+          >Без пароля любой в локальной сети сможет управлять Projector, включая
+          терминалы.</template
         >
       </UiHint>
       <UiHint v-if="lanUrl" class="hint">
@@ -134,7 +138,9 @@ onMounted(() => {
       </UiHint>
     </template>
     <div class="actions">
-      <UiButton variant="solid" :disabled="!ready || busy" @click="save">Сохранить и перезапустить</UiButton>
+      <UiButton variant="solid" :disabled="!ready || busy" @click="save"
+        >Сохранить и перезапустить</UiButton
+      >
       <UiButton v-if="passwordRequired" :disabled="!ready || busy" @click="clearPassword"
         >Убрать пароль</UiButton
       >

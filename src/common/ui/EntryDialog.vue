@@ -49,7 +49,11 @@ defineExpose({ open, close, fail });
 </script>
 <template>
   <Teleport to="body">
-    <UiDialog ref="dialog" :labelledby="titleId" @cancel="busy ? $event.preventDefault() : emit('cancel')">
+    <UiDialog
+      ref="dialog"
+      :labelledby="titleId"
+      @cancel="busy ? $event.preventDefault() : emit('cancel')"
+    >
       <form @submit.prevent="submit">
         <h2 :id="titleId">{{ title }}</h2>
         <p v-if="description">{{ description }}</p>

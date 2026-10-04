@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, ref } from "vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
-import { editorThemes, type EditorTheme } from "../../../../../../core/modules/editor-themes/index.ts";
+import {
+  editorThemes,
+  type EditorTheme,
+} from "../../../../../../core/modules/editor-themes/index.ts";
 import { editorTheme, applyEditorTheme, loadEditorTheme } from "../lib/editor-theme.ts";
 const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
 const selected = ref<EditorTheme>(editorTheme.value);

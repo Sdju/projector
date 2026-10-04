@@ -61,8 +61,10 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
     tools: {
       startCodexAppServer: () => backend("startCodexAppServer").startCodexAppServer(),
       runDockerSync: (args: string[]) => backend("runDockerSync").runDockerSync(args),
-      runDocker: (args: string[], options?: { cwd?: string; timeout?: number; signal?: AbortSignal }) =>
-        backend("runDocker").runDocker(args, options),
+      runDocker: (
+        args: string[],
+        options?: { cwd?: string; timeout?: number; signal?: AbortSignal },
+      ) => backend("runDocker").runDocker(args, options),
       runBash: (command: string, options: { cwd: string; signal?: AbortSignal }) =>
         backend("runBash").runBash(command, options),
       moveNoReplace: (source: string, target: string) =>

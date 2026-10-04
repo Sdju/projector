@@ -274,22 +274,44 @@ export async function cloneGithubRepository(
 }
 export async function importGithubProject(body: Record<string, unknown>) {
   const config = await authorized();
-  return saveGithubProject(body, config.settings.directory || DEFAULT_DIRECTORY, config.credentials.token);
+  return saveGithubProject(
+    body,
+    config.settings.directory || DEFAULT_DIRECTORY,
+    config.credentials.token,
+  );
 }
 export async function cloneGithubProject(body: Record<string, unknown>) {
   const config = await integrationConfig("github");
   const docker = await integrationConfig("docker");
-  const environment = parseDockerEnvironment(body.environment, docker.settings.context || "default");
+  const environment = parseDockerEnvironment(
+    body.environment,
+    docker.settings.context || "default",
+  );
   const directory = body.directory ?? (config.settings.directory || DEFAULT_DIRECTORY);
-  if (typeof directory !== "string" || !/^(\/|~(?:\/|$))/.test(directory.trim()) || directory.includes("\0"))
+  if (
+    typeof directory !== "string" ||
+    !/^(\/|~(?:\/|$))/.test(directory.trim()) ||
+    directory.includes("\0")
+  )
     throw new HttpError(400, "Укажите абсолютный путь к папке или ~/папка");
   if (environment) {
-    if (directory.includes(",")) throw new HttpError(400, "Docker-путь не должен содержать запятую");
+    if (directory.includes(","))
+      throw new HttpError(400, "Docker-путь не должен содержать запятую");
     await prepareDockerEnvironment(environment);
   }
-  return saveGithubProject(body, directory, config.enabled ? config.credentials.token || "" : "", environment);
+  return saveGithubProject(
+    body,
+    directory,
+    config.enabled ? config.credentials.token || "" : "",
+    environment,
+  );
 }
-async function saveGithubProject(body: Record<string, unknown>, base: string, token: string, environment?: import("../../../core/modules/environment/index.ts").DockerEnvironment) {
+async function saveGithubProject(
+  body: Record<string, unknown>,
+  base: string,
+  token: string,
+  environment?: import("../../../core/modules/environment/index.ts").DockerEnvironment,
+) {
   const repository = repositoryName(body.repository);
   await github(`/repos/${repository}`, token);
   const directory = expandPath(base);

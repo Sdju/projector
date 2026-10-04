@@ -17,7 +17,11 @@ export {
   projectIconUrl,
 } from "./api/client.ts";
 export { shortPath, statusLabel } from "./format.ts";
-export { projectRoute, projectPathFromParams, githubRepositoryFromParams } from "./project-route.ts";
+export {
+  projectRoute,
+  projectPathFromParams,
+  githubRepositoryFromParams,
+} from "./project-route.ts";
 export {
   parseProjectRef,
   formatProjectRef,

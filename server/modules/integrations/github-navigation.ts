@@ -5,7 +5,8 @@ import type { DirectoryListing } from "../../../core/modules/directories/index.t
 
 /** Repository siblings for breadcrumbs and typed gh:/owner/repository prefixes. */
 export async function browseGithubDirectories(
-  path: string, complete: boolean,
+  path: string,
+  complete: boolean,
 ): Promise<DirectoryListing> {
   const match = /^gh:\/([A-Za-z0-9][A-Za-z0-9-]*)(?:\/([A-Za-z0-9_.-]*))?$/.exec(path);
   if (!match) throw new HttpError(400, "Укажите gh:/owner/ для выбора репозитория");
@@ -13,10 +14,12 @@ export async function browseGithubDirectories(
   const config = await integrationConfig("github");
   const token = config.enabled ? config.credentials.token || "" : "";
   const account = await github<{ type: string }>(`/users/${owner}`, token);
-  const endpoint = account.type === "Organization"
-    ? `/orgs/${owner}/repos`
-    : token && config.credentials.login?.toLowerCase() === owner!.toLowerCase()
-      ? "/user/repos" : `/users/${owner}/repos`;
+  const endpoint =
+    account.type === "Organization"
+      ? `/orgs/${owner}/repos`
+      : token && config.credentials.login?.toLowerCase() === owner!.toLowerCase()
+        ? "/user/repos"
+        : `/users/${owner}/repos`;
   const entries: DirectoryListing["entries"] = [];
   let truncated = false;
   for (let page = 1; page <= 10; page++) {

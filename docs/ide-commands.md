@@ -29,13 +29,13 @@ Scopes prevent a file-tab command from accidentally closing a terminal tab or ac
 
 ```js
 const ide = window.projector.ide;
-const tree = ide.getScopes().find(({ context }) =>
-  context.surface === 'fileTree' && context.projectId === projectId
-);
+const tree = ide
+  .getScopes()
+  .find(({ context }) => context.surface === "fileTree" && context.projectId === projectId);
 
 const result = await ide.executeCommand(
-  'ide.fileTree.file.rename',
-  { path: 'docs/old.md', name: 'new.md' },
+  "ide.fileTree.file.rename",
+  { path: "docs/old.md", name: "new.md" },
   { scope: tree.id },
 );
 // { source: 'docs/old.md', destination: 'docs/new.md' }
@@ -45,15 +45,13 @@ Explicit `name` performs creation, duplication or renaming without a name dialog
 
 ```js
 await ide.executeCommand(
-  'ide.fileTree.file.create',
-  { directory: 'docs', name: 'new.md' },
+  "ide.fileTree.file.create",
+  { directory: "docs", name: "new.md" },
   { scope: tree.id },
 );
 
-const tabs = ide.getScopes().find(({ context }) =>
-  context.namespace === 'ide.workbench.tabs'
-);
-await ide.executeCommand('ide.workbench.tabs.closeOthers', { id: tabId }, { scope: tabs.id });
+const tabs = ide.getScopes().find(({ context }) => context.namespace === "ide.workbench.tabs");
+await ide.executeCommand("ide.workbench.tabs.closeOthers", { id: tabId }, { scope: tabs.id });
 ```
 
 `getCommands()` returns IDs, scopes, titles, current availability and effective shortcut labels. IDs can be registered by further adapters with `createScope(...).registerCommand(...)`. The registry rejects duplicate IDs within a scope and rejects execution of missing or unavailable commands.
@@ -63,14 +61,14 @@ await ide.executeCommand('ide.workbench.tabs.closeOthers', { id: tabId }, { scop
 ```js
 await ide.saveKeybindings([
   {
-    command: 'ide.fileTree.file.rename',
-    key: 'F6',
-    when: { surface: 'fileTree', entryKind: 'file' },
+    command: "ide.fileTree.file.rename",
+    key: "F6",
+    when: { surface: "fileTree", entryKind: "file" },
   },
   {
-    command: 'ide.editor.file.save',
-    key: 'Mod+Shift+S',
-    when: { surface: 'editor' },
+    command: "ide.editor.file.save",
+    key: "Mod+Shift+S",
+    when: { surface: "editor" },
     allowInput: true,
   },
 ]);
@@ -113,7 +111,7 @@ The palette searches command titles, IDs and areas, supports Arrow Up/Down, Ente
 To open it directly from an SDK client:
 
 ```js
-await ide.executeCommand('ide.workbench.commandPalette.open', undefined, { scope: 'workbench' });
+await ide.executeCommand("ide.workbench.commandPalette.open", undefined, { scope: "workbench" });
 ```
 
 ## Reading tabs

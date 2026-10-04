@@ -81,13 +81,16 @@ function consumeChunk(session: Session, chunk: string): void {
     if (session.project.environment) {
       const docker = session.terminal.docker;
       const port = Number(new URL(match[0]).port);
-      if (docker) void environmentPorts(docker.context, docker.containerId!).then((ports) => {
-        const address = ports.find((item) => item.container === port);
-        if (!address || session.status !== "running") return;
-        session.url = address.url;
-        emit("status", snapshot(session));
-        maybeOpenWindow(session);
-      }).catch(() => {});
+      if (docker)
+        void environmentPorts(docker.context, docker.containerId!)
+          .then((ports) => {
+            const address = ports.find((item) => item.container === port);
+            if (!address || session.status !== "running") return;
+            session.url = address.url;
+            emit("status", snapshot(session));
+            maybeOpenWindow(session);
+          })
+          .catch(() => {});
       continue;
     }
     const url = match[0]

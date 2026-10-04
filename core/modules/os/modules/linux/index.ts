@@ -6,7 +6,14 @@ export {
   descendants,
   workingDirectory,
 } from "./processes.ts";
-export { moveNoReplace, runPython, searchFiles, runBash, runDocker, runDockerSync } from "./tools.ts";
+export {
+  moveNoReplace,
+  runPython,
+  searchFiles,
+  runBash,
+  runDocker,
+  runDockerSync,
+} from "./tools.ts";
 export { dataHome, shell, desktopPaths, pickFolder } from "./directories.ts";
 export {
   focusAppWindow,

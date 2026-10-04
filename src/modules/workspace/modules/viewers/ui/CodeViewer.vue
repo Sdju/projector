@@ -73,9 +73,13 @@ function reportCursor(state: EditorState) {
 async function loadGutter() {
   const token = ++gutterToken;
   const target = view;
-  if (!target || props.original !== undefined || !props.projectId ||
+  if (
+    !target ||
+    props.original !== undefined ||
+    !props.projectId ||
     props.path.startsWith("/") ||
-    !workspaceCapabilities(props.projectId).git) {
+    !workspaceCapabilities(props.projectId).git
+  ) {
     target?.dispatch({ effects: setOriginal.of(null) });
     return;
   }

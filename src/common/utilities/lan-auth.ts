@@ -8,7 +8,8 @@ type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respo
  */
 const NATIVE_FETCH = Symbol.for("projector.native-fetch");
 const fetchHost = globalThis as unknown as Record<symbol, unknown>;
-const nativeFetch = (fetchHost[NATIVE_FETCH] as FetchLike | undefined) ??
+const nativeFetch =
+  (fetchHost[NATIVE_FETCH] as FetchLike | undefined) ??
   (fetchHost[NATIVE_FETCH] = globalThis.fetch.bind(globalThis) as FetchLike);
 
 /** Пароль доступа по сети хранится только в sessionStorage, не на диске. */
@@ -49,10 +50,7 @@ function requestPassword(): Promise<string | null> {
  * fetch с Bearer-токеном для запросов на свой origin. При 401 запрашивает пароль
  * и повторяет запрос один раз. Внешние запросы (провайдеры и т.п.) не меняются.
  */
-export async function authedFetch(
-  input: RequestInfo | URL,
-  init?: RequestInit,
-): Promise<Response> {
+export async function authedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
   if (!isSameOrigin(url)) return nativeFetch(input, init);
 

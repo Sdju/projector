@@ -9,10 +9,10 @@ Vue custom renderer для GTK4 на Node.js. Компоненты, реакти
 ```vue
 <!-- Counter.vue -->
 <script setup lang="ts">
-import { ref, VWindow, VBox, VEntry, VLabel, VButton } from 'vio'
-const name = ref('Vue + GTK')
-const count = ref(0)
-defineProps<{ quit: () => void }>()
+import { ref, VWindow, VBox, VEntry, VLabel, VButton } from "vio";
+const name = ref("Vue + GTK");
+const count = ref(0);
+defineProps<{ quit: () => void }>();
 </script>
 
 <template>
@@ -26,24 +26,30 @@ defineProps<{ quit: () => void }>()
 </template>
 
 <style scoped>
-label { font-size: 22px; }
+label {
+  font-size: 22px;
+}
 </style>
 ```
 
 ```ts
 // main.ts
-import Gtk from 'gi:Gtk-4.0'
-import GLib from 'gi:GLib-2.0'
-import { createApp } from 'vio'
-import Counter from './Counter.vue'
+import Gtk from "gi:Gtk-4.0";
+import GLib from "gi:GLib-2.0";
+import { createApp } from "vio";
+import Counter from "./Counter.vue";
 
-Gtk.init()
-const loop = GLib.MainLoop.new(null, false)
+Gtk.init();
+const loop = GLib.MainLoop.new(null, false);
 const app = createApp(Counter, {
-  quit: () => { app.unmount(); loop.quit(); return true },
-})
-app.mount()
-loop.run()
+  quit: () => {
+    app.unmount();
+    loop.quit();
+    return true;
+  },
+});
+app.mount();
+loop.run();
 ```
 
 ```bash
@@ -54,13 +60,13 @@ node --import vio/register main.ts
 
 ## Компоненты и свойства
 
-| Компонент | GTK |
-| --- | --- |
-| `VWindow`, `VBox`, `VGrid`, `VStack` | Window, Box, Grid, Stack |
-| `VEntry`, `VLabel`, `VButton`, `VImage` | Entry, Label, Button, Image |
-| `VListBox`, `VListBoxRow`, `VScrolledWindow` | ListBox, ListBoxRow, ScrolledWindow |
+| Компонент                                           | GTK                                     |
+| --------------------------------------------------- | --------------------------------------- |
+| `VWindow`, `VBox`, `VGrid`, `VStack`                | Window, Box, Grid, Stack                |
+| `VEntry`, `VLabel`, `VButton`, `VImage`             | Entry, Label, Button, Image             |
+| `VListBox`, `VListBoxRow`, `VScrolledWindow`        | ListBox, ListBoxRow, ScrolledWindow     |
 | `VSeparator`, `VSpinner`, `VSwitch`, `VCheckButton` | Separator, Spinner, Switch, CheckButton |
-| `VKeyController` | EventControllerKey |
+| `VKeyController`                                    | EventControllerKey                      |
 
 Атрибуты соответствуют GObject properties. Принимаются camelCase и kebab-case: `:margin-top="16"`, `:hexpand="true"`, `:sensitive="!busy"`. Числа и boolean передавайте через `:`. `id` устанавливает GTK widget name. `class` поддерживает строку, массив и объект Vue; удаление binding восстанавливает исходные свойства и классы GTK.
 
@@ -79,9 +85,9 @@ Enum props можно передавать строками: `orientation="verti
 Ref компонента открывает `.element` — host node и `.widget` — реальный GTK объект:
 
 ```ts
-import { ref, type WidgetHandle, type EntryWidget } from 'vio'
-const search = ref<WidgetHandle<EntryWidget>>()
-search.value?.widget?.grabFocus()
+import { ref, type WidgetHandle, type EntryWidget } from "vio";
+const search = ref<WidgetHandle<EntryWidget>>();
+search.value?.widget?.grabFocus();
 ```
 
 ```vue
@@ -95,11 +101,11 @@ search.value?.widget?.grabFocus()
 `<style>` принимает GTK CSS. `<style scoped>` преобразует Vue scope attributes в GTK CSS classes. CSS provider живёт в scope компонента и удаляется при unmount. `class` и `style` bindings работают; inline style использует отдельный provider. Значения CSS должны быть допустимы для GTK, например `min-height: 44px`. Ошибки CSS не скрываются.
 
 ```ts
-import Adw from 'gi:Adw-1'
-import { registerWidget, defineWidgetComponent } from 'vio'
+import Adw from "gi:Adw-1";
+import { registerWidget, defineWidgetComponent } from "vio";
 
-registerWidget('clamp', { create: () => new Adw.Clamp(), children: 'single' })
-export const VClamp = defineWidgetComponent('VClamp', 'clamp')
+registerWidget("clamp", { create: () => new Adw.Clamp(), children: "single" });
+export const VClamp = defineWidgetComponent("VClamp", "clamp");
 ```
 
 `createRoot(existingGtkBox)` позволяет встроить Vue subtree в существующий GTK контейнер. `createVioRenderer(driver)` из `vio/core` отделён от GI и используется в headless-тестах; `vio/core` не импортирует GTK.

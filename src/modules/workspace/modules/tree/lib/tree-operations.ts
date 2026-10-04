@@ -266,8 +266,7 @@ export function useTreeOperations({
       id: `ide.fileTree.${id}`,
       title,
       run,
-      enabled: (args) =>
-        (!requires || capabilities[requires]) && !drag.busy.value && enabled(args),
+      enabled: (args) => (!requires || capabilities[requires]) && !drag.busy.value && enabled(args),
     });
   };
   const registerWrite = (

@@ -21,4 +21,3 @@ export function lanUrls(): string[] {
 export function lanUrl(): string | null {
   return lanUrls()[0] ?? null;
 }
-

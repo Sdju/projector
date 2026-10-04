@@ -239,58 +239,90 @@ await test("real PTY: input, Unicode, resize, interrupt, reconnect, alternate sc
       for (const subscriber of [first, restored]) subscriber.client.close();
     },
   );
-  await t.test("session model preserves restart placement and reconnects its WS subscription", async () => {
-    const { createRenderer } = await import("vue");
-    const { useTerminalSessions } = await import("../src/modules/terminal/model/sessions.ts");
-    const keys = ["WebSocket", "location", "window", "sessionStorage"];
-    const globals = keys.map((key) => [key, globalThis[key]]);
-    const connections = [];
-    globalThis.WebSocket = class extends WebSocket {
-      constructor(url) { super(url, { origin: base }); connections.push(this); sockets.add(this); }
-    };
-    globalThis.location = new URL(base);
-    globalThis.window = new EventTarget();
-    globalThis.sessionStorage = { getItem: () => null };
-    const renderer = createRenderer({
-      createComment: () => ({}), createText: () => ({}), createElement: () => ({}),
-      insert() {}, remove() {}, setText() {}, setElementText() {}, patchProp() {},
-      parentNode: () => null, nextSibling: () => null,
-    });
-    let model;
-    let replacedBeforeList;
-    const app = renderer.createApp({ setup() {
-      model = useTerminalSessions(() => project.id, { restarted(previousId) {
-        replacedBeforeList = model.sessions.value.some((item) => item.id === previousId);
-      } });
-      return () => null;
-    } });
-    app.mount({});
-    try {
-      await until(() => model.loaded.value, "model WS snapshot");
-      const created = await model.create("shell");
-      assert.ok(created);
-      assert.equal(model.sessions.value.filter((item) => item.id === created.id).length, 1);
-      await model.stop(created.id);
-      await until(() => model.sessions.value.find((item) => item.id === created.id)?.status === "exited", "model exit");
-      await model.restart(created.id);
-      assert.equal(model.error.value, "");
-      assert.equal(replacedBeforeList, true, "restart hook runs before pushed list removes previous panel");
-      const fresh = model.sessions.value.find((item) => item.id !== created.id);
-      assert.ok(fresh);
-      connections.at(-1).terminate();
-      await until(() => connections.length === 2 && connections.at(-1).readyState === WebSocket.OPEN, "automatic reconnect");
-      const external = (await (await request("", "POST", { program: "shell" })).json()).session;
-      await until(() => model.sessions.value.some((item) => item.id === external.id), "push after reconnect");
-      await request(`/${fresh.id}`, "DELETE");
-      await request(`/${external.id}`, "DELETE");
-      await until(() => model.sessions.value.length === 0, "model deletion push");
-    } finally {
-      app.unmount();
-      for (const [key, value] of globals) {
-        if (value === undefined) delete globalThis[key]; else globalThis[key] = value;
+  await t.test(
+    "session model preserves restart placement and reconnects its WS subscription",
+    async () => {
+      const { createRenderer } = await import("vue");
+      const { useTerminalSessions } = await import("../src/modules/terminal/model/sessions.ts");
+      const keys = ["WebSocket", "location", "window", "sessionStorage"];
+      const globals = keys.map((key) => [key, globalThis[key]]);
+      const connections = [];
+      globalThis.WebSocket = class extends WebSocket {
+        constructor(url) {
+          super(url, { origin: base });
+          connections.push(this);
+          sockets.add(this);
+        }
+      };
+      globalThis.location = new URL(base);
+      globalThis.window = new EventTarget();
+      globalThis.sessionStorage = { getItem: () => null };
+      const renderer = createRenderer({
+        createComment: () => ({}),
+        createText: () => ({}),
+        createElement: () => ({}),
+        insert() {},
+        remove() {},
+        setText() {},
+        setElementText() {},
+        patchProp() {},
+        parentNode: () => null,
+        nextSibling: () => null,
+      });
+      let model;
+      let replacedBeforeList;
+      const app = renderer.createApp({
+        setup() {
+          model = useTerminalSessions(() => project.id, {
+            restarted(previousId) {
+              replacedBeforeList = model.sessions.value.some((item) => item.id === previousId);
+            },
+          });
+          return () => null;
+        },
+      });
+      app.mount({});
+      try {
+        await until(() => model.loaded.value, "model WS snapshot");
+        const created = await model.create("shell");
+        assert.ok(created);
+        assert.equal(model.sessions.value.filter((item) => item.id === created.id).length, 1);
+        await model.stop(created.id);
+        await until(
+          () => model.sessions.value.find((item) => item.id === created.id)?.status === "exited",
+          "model exit",
+        );
+        await model.restart(created.id);
+        assert.equal(model.error.value, "");
+        assert.equal(
+          replacedBeforeList,
+          true,
+          "restart hook runs before pushed list removes previous panel",
+        );
+        const fresh = model.sessions.value.find((item) => item.id !== created.id);
+        assert.ok(fresh);
+        connections.at(-1).terminate();
+        await until(
+          () => connections.length === 2 && connections.at(-1).readyState === WebSocket.OPEN,
+          "automatic reconnect",
+        );
+        const external = (await (await request("", "POST", { program: "shell" })).json()).session;
+        await until(
+          () => model.sessions.value.some((item) => item.id === external.id),
+          "push after reconnect",
+        );
+        await request(`/${fresh.id}`, "DELETE");
+        await request(`/${external.id}`, "DELETE");
+        await until(() => model.sessions.value.length === 0, "model deletion push");
+      } finally {
+        app.unmount();
+        for (const [key, value] of globals) {
+          if (value === undefined) delete globalThis[key];
+          else globalThis[key] = value;
+        }
       }
-    }
-  });
+    },
+  );
   await t.test(
     "OpenCode uses project cwd and an interactive PTY, reconnects and restarts",
     async () => {

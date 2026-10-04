@@ -139,7 +139,7 @@ async function commitFiles(root: string, base: string, hash: string) {
   for (let i = 0; i < parts.length; i++) {
     const [add = "", del = "", path = ""] = parts[i]!.split("\t");
     // A rename is `add\tdel\t` followed by the old and the new path.
-    const target = path || (i += 2, parts[i]!);
+    const target = path || ((i += 2), parts[i]!);
     const binary = add === "-";
     stats.set(target, { additions: binary ? 0 : +add, deletions: binary ? 0 : +del, binary });
   }
@@ -164,8 +164,18 @@ export async function projectCommit(root: string, hash: string): Promise<GitComm
     `--format=${["%H", "%P", "%an", "%ae", "%aI", "%D", "%s", "%cn", "%cI", "%b"].join("%x1f")}`,
     full,
   ]);
-  const [h = "", parents = "", author = "", email = "", date = "", refs = "", subject = "", cn = "", cd = "", ...body] =
-    meta.split(FIELD);
+  const [
+    h = "",
+    parents = "",
+    author = "",
+    email = "",
+    date = "",
+    refs = "",
+    subject = "",
+    cn = "",
+    cd = "",
+    ...body
+  ] = meta.split(FIELD);
   const parentList = parents ? parents.split(" ") : [];
   const files = await commitFiles(root, parentList[0] ?? EMPTY_TREE, full);
   return {

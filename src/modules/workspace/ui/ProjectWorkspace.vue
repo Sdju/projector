@@ -7,7 +7,8 @@ import {
 } from "../../workspace-api/index.ts";
 import { useCommandScope } from "../../../common/utilities/commands.ts";
 import WorkbenchToolbar from "./WorkbenchToolbar.vue";
-import UiButton from "../../../common/ui/UiButton.vue";
+import MobileSurfaces from "./MobileSurfaces.vue";
+import MobileTerminalActions from "./MobileTerminalActions.vue";
 import WorkspaceSidebar from "./WorkspaceSidebar.vue";
 import type { SidebarSection } from "./SidebarTabs.vue";
 import { useGitOverview, useGitHistory, useGitBranches } from "../modules/git/index.ts";
@@ -37,8 +38,14 @@ const profile = workspaceProfile(props.projectId);
 const capabilities = profileCapabilities(profile);
 const workspaceElement = ref<HTMLElement>();
 const sidebarHidden = ref(false);
-const { mobile, mobileSurface, mobileActionsOpen, mobileSidebarOpen, sidebarInvisible, showSidebar } =
-  useMobileSurfaces(sidebarHidden);
+const {
+  mobile,
+  mobileSurface,
+  mobileActionsOpen,
+  mobileSidebarOpen,
+  sidebarInvisible,
+  showSidebar,
+} = useMobileSurfaces(sidebarHidden);
 const { treeWidth, sizes, resizeTree, resizeTreeKey } = useSidebarResize(workspaceElement);
 const sidebar = ref<InstanceType<typeof WorkspaceSidebar>>();
 const editorCommands = useCommandScope(`editor:${props.projectId}`, () => ({
@@ -50,11 +57,13 @@ const registerEditor = (
   title: string,
   run: (args?: unknown) => unknown,
   enabled: (args?: unknown) => boolean,
-  requires?: WorkspaceCapability, meta?: { description?: string; arguments?: Record<string, string> },
+  requires?: WorkspaceCapability,
+  meta?: { description?: string; arguments?: Record<string, string> },
 ) =>
   editorCommands.scope.registerCommand({
     id,
-    title, ...meta,
+    title,
+    ...meta,
     run,
     enabled: (args) => (!requires || capabilities[requires]) && enabled(args),
   });
@@ -121,14 +130,7 @@ const files = useOpenFiles({
   beforeCloseProjectSettings: () => props.beforeCloseProjectSettings?.(),
   pending,
 });
-const {
-  fileError,
-  loading,
-  openFile,
-  selectTab,
-  saveFile,
-  toggleMarkdownSource,
-} = files;
+const { fileError, loading, openFile, selectTab, saveFile, toggleMarkdownSource } = files;
 const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
   editorCommands,
   register: registerEditor,
@@ -149,13 +151,20 @@ const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
 });
 const docker = useDocker(props.projectId, {
   enabled: capabilities.docker,
-  sidebar: () => { section.value = "docker"; showSidebar(); },
+  sidebar: () => {
+    section.value = "docker";
+    showSidebar();
+  },
   open: () => {
     const { key, path } = virtualTabs.docker;
-    if (!tabs.value.some((tab) => tab.key === key)) tabs.value.push({ key, path, virtual: "docker", content: "" });
+    if (!tabs.value.some((tab) => tab.key === key))
+      tabs.value.push({ key, path, virtual: "docker", content: "" });
     selectTab(key);
   },
-  terminal: async (session) => { await terminals.refresh(); revealPanel(`terminal:${session.id}`); },
+  terminal: async (session) => {
+    await terminals.refresh();
+    revealPanel(`terminal:${session.id}`);
+  },
 });
 function openProjectSettings() {
   const { key, path } = virtualTabs.project;
@@ -247,50 +256,59 @@ onBeforeUnmount(() => {
     :class="{ 'sidebar-hidden': sidebarInvisible }"
     :style="sizes"
   >
-    <nav v-if="mobile" class="mobile-surfaces" aria-label="Поверхности проекта">
-      <UiButton v-for="entry in [{ id: 'files', title: 'Файлы' }, { id: 'editor', title: 'Редактор' }, ...(capabilities.terminals ? [{ id: 'terminal', title: 'Терминалы' }] : [])]"
-        :key="entry.id" :active="mobileSurface === entry.id" :aria-pressed="mobileSurface === entry.id"
-        @click="editorCommands.run('ide.workbench.mobile.surface.show', { surface: entry.id })">{{ entry.title }}</UiButton>
-      <UiButton :active="mobileActionsOpen" :aria-expanded="mobileActionsOpen" aria-label="Действия проекта"
-        @click="editorCommands.run('ide.workbench.mobile.actions.toggle')">···</UiButton>
-    </nav>
-    <div v-if="!mobile || mobileActionsOpen" class="toolbar-host" :class="{ 'mobile-actions': mobile }">
-    <WorkbenchToolbar
-      :capabilities="capabilities"
-      :sidebar-hidden="sidebarInvisible"
-      :terminals-busy="terminals.busy.value"
-      :terminals-error="terminals.error.value"
-      :hidden-groups="hiddenGroups.map((group) => ({ id: group.id, label: groupLabel(group) }))"
-      @command="(id, args) => { if (mobile) mobileActionsOpen = false; editorCommands.run(id, args); }"
-      @show-group="showGroup"
+    <MobileSurfaces
+      v-if="mobile"
+      :terminals="capabilities.terminals"
+      :surface="mobileSurface"
+      :actions-open="mobileActionsOpen"
+      @command="(id, args) => editorCommands.run(id, args)"
+    />
+    <div
+      v-if="!mobile || mobileActionsOpen"
+      class="toolbar-host"
+      :class="{ 'mobile-actions': mobile }"
     >
-      <template #terminal-actions><slot name="terminal-actions" /></template>
-      <template #terminal-status><slot name="terminal-status" /></template>
-    </WorkbenchToolbar>
+      <WorkbenchToolbar
+        :capabilities="capabilities"
+        :sidebar-hidden="sidebarInvisible"
+        :terminals-busy="terminals.busy.value"
+        :terminals-error="terminals.error.value"
+        :hidden-groups="hiddenGroups.map((group) => ({ id: group.id, label: groupLabel(group) }))"
+        @command="
+          (id, args) => {
+            if (mobile) mobileActionsOpen = false;
+            editorCommands.run(id, args);
+          }
+        "
+        @show-group="showGroup"
+      >
+        <template #terminal-actions><slot name="terminal-actions" /></template>
+        <template #terminal-status><slot name="terminal-status" /></template>
+      </WorkbenchToolbar>
     </div>
     <p v-if="fileError" class="file-error" role="alert">{{ fileError }}</p>
     <Transition name="mobile-left">
-    <WorkspaceSidebar
-      ref="sidebar"
-      v-model:section="section"
-      :project-id="projectId"
-      :capabilities="capabilities"
-      :hidden="sidebarInvisible"
-      :active="active"
-      :revision="revision"
-      :overview="overview"
-      :history="history"
-      :branches="branches"
-      :files="files"
-      :git-sync="gitSync"
-      @command="($event.startsWith('ide.docker.') ? docker.commands : editorCommands).run($event)"
-      @navigate="mobileSidebarOpen = false"
-      @refresh="refresh"
-      @settings="openProjectSettings"
-      @changed="treeChanged"
-      @deleted="entryDeleted"
-      @moved="entryMoved"
-    />
+      <WorkspaceSidebar
+        ref="sidebar"
+        v-model:section="section"
+        :project-id="projectId"
+        :capabilities="capabilities"
+        :hidden="sidebarInvisible"
+        :active="active"
+        :revision="revision"
+        :overview="overview"
+        :history="history"
+        :branches="branches"
+        :files="files"
+        :git-sync="gitSync"
+        @command="($event.startsWith('ide.docker.') ? docker.commands : editorCommands).run($event)"
+        @navigate="mobileSidebarOpen = false"
+        @refresh="refresh"
+        @settings="openProjectSettings"
+        @changed="treeChanged"
+        @deleted="entryDeleted"
+        @moved="entryMoved"
+      />
     </Transition>
     <div
       v-show="!sidebarInvisible"
@@ -331,9 +349,10 @@ onBeforeUnmount(() => {
         :virtual-keys="{ agent: virtualTabs.agent.key, project: virtualTabs.project.key }"
       >
         <template #mobile-terminal-actions>
-          <UiButton v-for="program in ['shell', 'codex', 'claude', 'opencode']" :key="program" size="sm"
-            :disabled="terminals.busy.value" :aria-label="`Новый ${program}`"
-            @click="editorCommands.run('ide.workbench.terminal.new', { program })">+ {{ program }}</UiButton>
+          <MobileTerminalActions
+            :busy="terminals.busy.value"
+            @command="(id, args) => editorCommands.run(id, args)"
+          />
         </template>
         <template #project><slot name="project" /></template>
       </WorkbenchDock>
@@ -469,25 +488,6 @@ onBeforeUnmount(() => {
 .workspace-status {
   grid-column: 1 / -1;
   grid-row: 4;
-}
-.mobile-surfaces {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: var(--sp-1);
-  height: 40px;
-  padding-inline: var(--sp-2);
-  border-bottom: 1px solid var(--line);
-  background: var(--bg-sunken);
-}
-.mobile-surfaces .btn {
-  min-height: 36px;
-  border-color: transparent;
-  flex: 1;
-}
-.mobile-surfaces .btn:last-child {
-  flex: none;
-  width: 40px;
 }
 .mobile-actions {
   position: absolute;

@@ -19,7 +19,9 @@ const row = computed(() => split.value?.direction === "row");
 const minimum = computed(() => (row.value ? 140 : 100));
 const sizeOf = (node: DockNodeData) =>
   split.value!.sizes[split.value!.children.indexOf(node)] ?? 1 / split.value!.children.length;
-const visibleShare = computed(() => visibleChildren.value.reduce((sum, child) => sum + sizeOf(child), 0));
+const visibleShare = computed(() =>
+  visibleChildren.value.reduce((sum, child) => sum + sizeOf(child), 0),
+);
 
 /** Сдвигает границу перед видимым ребёнком `index`, перераспределяя долю между соседями. */
 function moveSash(index: number, start: [number, number], delta: number) {

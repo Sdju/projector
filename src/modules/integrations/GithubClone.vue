@@ -26,12 +26,14 @@ const error = ref("");
 const cloned = ref<Project>();
 const projects = useProjects();
 const commands = useCommandScope(`github-clone:${id}`, () => ({
-  surface: "github-clone", projectId: `gh:/${props.repository}`,
+  surface: "github-clone",
+  projectId: `gh:/${props.repository}`,
 }));
 commands.scope.registerCommand({
   id: "ide.github.repository.clone.dialog",
   title: "Клонировать репозиторий GitHub",
-  description: "Открывает выбор папки для клонирования текущего репозитория и перехода в локальный проект.",
+  description:
+    "Открывает выбор папки для клонирования текущего репозитория и перехода в локальный проект.",
   enabled: () => !busy.value,
   run: async () => {
     error.value = "";
@@ -41,7 +43,8 @@ commands.scope.registerCommand({
     dialog.value?.open();
     try {
       const data = await fetchIntegrations();
-      directory.value = data.integrations.find((item) => item.id === "github")?.settings.directory || "~/Projects";
+      directory.value =
+        data.integrations.find((item) => item.id === "github")?.settings.directory || "~/Projects";
     } catch (err) {
       error.value = err instanceof Error ? err.message : "Не удалось прочитать настройки";
       directory.value = "~/Projects";
@@ -55,8 +58,13 @@ commands.scope.registerCommand({
 commands.scope.registerCommand({
   id: "ide.github.repository.clone",
   title: "Клонировать и открыть локальный проект",
-  description: "Клонирует текущий репозиторий в directory/owner/repository, добавляет в каталог и открывает /projects. Существующие папки не перезаписывает.",
-  arguments: { directory: "Абсолютная папка назначения или ~/папка", environment: "local или { kind: docker, image, network: none|bridge, ports: number[] }; по умолчанию настройки диалога" },
+  description:
+    "Клонирует текущий репозиторий в directory/owner/repository, добавляет в каталог и открывает /projects. Существующие папки не перезаписывает.",
+  arguments: {
+    directory: "Абсолютная папка назначения или ~/папка",
+    environment:
+      "local или { kind: docker, image, network: none|bridge, ports: number[] }; по умолчанию настройки диалога",
+  },
   enabled: () => !busy.value && !loading.value,
   run: async (value) => {
     const args = commandArgs(value);
@@ -67,11 +75,23 @@ commands.scope.registerCommand({
     try {
       if (!cloned.value) {
         const data = await integrationRequest<{ project: Project }>("/github/clone", "POST", {
-          repository: props.repository, directory: base.trim(),
-          environment: args.environment ?? (mode.value === "docker" ? {
-            kind: "docker", image: image.value, network: network.value ? "bridge" : "none",
-            ports: network.value ? ports.value.split(",").filter((port) => port.trim()).map(Number) : [],
-          } : "local"),
+          repository: props.repository,
+          directory: base.trim(),
+          environment:
+            args.environment ??
+            (mode.value === "docker"
+              ? {
+                  kind: "docker",
+                  image: image.value,
+                  network: network.value ? "bridge" : "none",
+                  ports: network.value
+                    ? ports.value
+                        .split(",")
+                        .filter((port) => port.trim())
+                        .map(Number)
+                    : [],
+                }
+              : "local"),
         });
         cloned.value = data.project;
         projects.ingest(data.project);
@@ -86,13 +106,15 @@ commands.scope.registerCommand({
   },
 });
 commands.scope.registerCommand({
-  id: "ide.github.repository.clone.cancel", title: "Закрыть окно клонирования",
+  id: "ide.github.repository.clone.cancel",
+  title: "Закрыть окно клонирования",
   description: "Закрывает окно клонирования и возвращает фокус в строку пути.",
   enabled: () => !busy.value,
   run: () => dialog.value?.close(),
 });
 commands.scope.registerCommand({
-  id: "ide.github.repository.clone.directory", title: "Выбрать папку клонирования",
+  id: "ide.github.repository.clone.directory",
+  title: "Выбрать папку клонирования",
   description: "Открывает системный выбор папки для локальной копии репозитория.",
   enabled: () => !busy.value && !loading.value && !cloned.value,
   run: async () => {
@@ -111,26 +133,51 @@ function cancel(event: Event) {
 </script>
 
 <template>
-  <button ref="trigger" class="clone-trigger" title="Клонировать репозиторий"
-    aria-label="Клонировать репозиторий" aria-haspopup="dialog" :disabled="busy"
-    @click="commands.run('ide.github.repository.clone.dialog')">
+  <button
+    ref="trigger"
+    class="clone-trigger"
+    title="Клонировать репозиторий"
+    aria-label="Клонировать репозиторий"
+    aria-haspopup="dialog"
+    :disabled="busy"
+    @click="commands.run('ide.github.repository.clone.dialog')"
+  >
     <IconDownload aria-hidden="true" />
   </button>
   <Teleport to="body">
-    <UiDialog ref="dialog" :labelledby="id" width="520px" @keydown.stop
-      @cancel="cancel" @close="trigger?.focus()">
+    <UiDialog
+      ref="dialog"
+      :labelledby="id"
+      width="520px"
+      @keydown.stop
+      @cancel="cancel"
+      @close="trigger?.focus()"
+    >
       <form @submit.prevent="commands.run('ide.github.repository.clone')" :aria-busy="busy">
         <h2 :id="id">Клонировать репозиторий</h2>
         <p class="repository">{{ repository }}</p>
         <label :for="`${id}-directory`">Папка назначения</label>
         <div class="directory">
-          <input :id="`${id}-directory`" ref="input" v-model="directory" required
-            :disabled="busy || loading || !!cloned" autocomplete="off" spellcheck="false" />
-          <UiButton title="Выбрать папку" aria-label="Выбрать папку"
+          <input
+            :id="`${id}-directory`"
+            ref="input"
+            v-model="directory"
+            required
             :disabled="busy || loading || !!cloned"
-            @click="commands.run('ide.github.repository.clone.directory')"><IconFolder aria-hidden="true" /></UiButton>
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <UiButton
+            title="Выбрать папку"
+            aria-label="Выбрать папку"
+            :disabled="busy || loading || !!cloned"
+            @click="commands.run('ide.github.repository.clone.directory')"
+            ><IconFolder aria-hidden="true"
+          /></UiButton>
         </div>
-        <p v-if="directory" class="destination">{{ directory.replace(/\/$/, '') }}/{{ repository }}</p>
+        <p v-if="directory" class="destination">
+          {{ directory.replace(/\/$/, "") }}/{{ repository }}
+        </p>
         <label :for="`${id}-mode`">Окружение</label>
         <select :id="`${id}-mode`" v-model="mode" :disabled="busy || !!cloned">
           <option value="docker">Docker — изолированный запуск</option>
@@ -139,20 +186,41 @@ function cancel(event: Event) {
         <template v-if="mode === 'docker'">
           <label :for="`${id}-image`">Образ</label>
           <input :id="`${id}-image`" v-model="image" :disabled="busy || !!cloned" required />
-          <label class="network"><input v-model="network" type="checkbox" :disabled="busy || !!cloned" /> Разрешить сеть (интернет и локальная сеть)</label>
+          <label class="network"
+            ><input v-model="network" type="checkbox" :disabled="busy || !!cloned" /> Разрешить сеть
+            (интернет и локальная сеть)</label
+          >
           <template v-if="network">
             <label :for="`${id}-ports`">Порты приложения</label>
-            <input :id="`${id}-ports`" v-model="ports" placeholder="5173, 3000" :disabled="busy || !!cloned" />
+            <input
+              :id="`${id}-ports`"
+              v-model="ports"
+              placeholder="5173, 3000"
+              :disabled="busy || !!cloned"
+            />
           </template>
-          <p>Контейнеру доступна только папка проекта. Установка зависимостей — из терминала; без сети она недоступна.</p>
+          <p>
+            Контейнеру доступна только папка проекта. Установка зависимостей — из терминала; без
+            сети она недоступна.
+          </p>
         </template>
         <p v-if="loading" role="status">Читаю настройки…</p>
-        <p v-if="busy" role="status">{{ cloned ? 'Открываю проект…' : mode === 'docker' ? 'Готовлю образ и клонирую репозиторий…' : 'Клонирую репозиторий…' }}</p>
+        <p v-if="busy" role="status">
+          {{
+            cloned
+              ? "Открываю проект…"
+              : mode === "docker"
+                ? "Готовлю образ и клонирую репозиторий…"
+                : "Клонирую репозиторий…"
+          }}
+        </p>
         <p v-if="error" class="error" role="alert">{{ error }}</p>
         <UiDialogActions>
-          <UiButton :disabled="busy" @click="commands.run('ide.github.repository.clone.cancel')">Отмена</UiButton>
+          <UiButton :disabled="busy" @click="commands.run('ide.github.repository.clone.cancel')"
+            >Отмена</UiButton
+          >
           <UiButton type="submit" variant="solid" :disabled="busy || loading || !directory.trim()">
-            {{ cloned ? 'Открыть проект' : 'Клонировать' }}
+            {{ cloned ? "Открыть проект" : "Клонировать" }}
           </UiButton>
         </UiDialogActions>
       </form>
@@ -162,21 +230,74 @@ function cancel(event: Event) {
 
 <style scoped>
 .clone-trigger {
-  display: grid; place-items: center; width: 22px; height: 26px;
-  border-radius: var(--r-sm); color: var(--faint);
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 26px;
+  border-radius: var(--r-sm);
+  color: var(--faint);
 }
-.clone-trigger:hover { background: var(--active); color: var(--text); }
-.clone-trigger svg { width: 13px; height: 13px; }
-h2 { margin: 0 0 var(--sp-3); font-size: var(--fs-md); font-weight: 500; }
-p { margin: var(--sp-3) 0; font-size: var(--fs-xs); color: var(--muted); overflow-wrap: anywhere; }
-.repository, .destination { font-family: var(--mono); }
-select { width: 100%; margin-bottom: var(--sp-3); }
-.network { display: flex; align-items: center; gap: var(--sp-2); margin-top: var(--sp-3); }
-.network input { width: auto; }
-label { display: block; margin-bottom: var(--sp-2); font-size: var(--fs-xs); color: var(--muted); }
-.directory { display: flex; gap: var(--sp-2); }
-.directory input { flex: 1; min-width: 0; }
-.directory svg { width: 16px; height: 16px; }
-.error { color: var(--err); }
-@media (max-width: 700px) { .clone-trigger { width: 32px; min-height: var(--control-h-sm); } }
+.clone-trigger:hover {
+  background: var(--active);
+  color: var(--text);
+}
+.clone-trigger svg {
+  width: 13px;
+  height: 13px;
+}
+h2 {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-md);
+  font-weight: 500;
+}
+p {
+  margin: var(--sp-3) 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.repository,
+.destination {
+  font-family: var(--mono);
+}
+select {
+  width: 100%;
+  margin-bottom: var(--sp-3);
+}
+.network {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+.network input {
+  width: auto;
+}
+label {
+  display: block;
+  margin-bottom: var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.directory {
+  display: flex;
+  gap: var(--sp-2);
+}
+.directory input {
+  flex: 1;
+  min-width: 0;
+}
+.directory svg {
+  width: 16px;
+  height: 16px;
+}
+.error {
+  color: var(--err);
+}
+@media (max-width: 700px) {
+  .clone-trigger {
+    width: 32px;
+    min-height: var(--control-h-sm);
+  }
+}
 </style>

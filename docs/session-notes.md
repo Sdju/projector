@@ -4,20 +4,20 @@
 
 ## Карта кода
 
-| Место | Ответственность |
-| --- | --- |
-| `bin/projector`, `cli/app` | Запуск, блокировка повторного старта, desktop installation, полный restart |
-| `vite.config.ts`, `server/app` | Vite, композиция локального HTTP API и SSE |
-| `server/modules/launcher`, `server/modules/preferences` | Поиск, история, настройки интерфейса и хоткея |
-| `server/modules/window` | Вызов native, Chromium, активация и скрытие в X11 |
-| `native/app/entry.ts`, `native/modules/desktop` | Запуск desktop через OS-адаптер, Vue/GTK-палитра и контроллер |
-| `core/modules/os`, его закрытый `modules/linux` | Выбор ОС, каталоги, процессы, утилиты, X11, GIO, D-Bus, resident, трей и хоткей |
-| `core/modules/launcher` | Общие контракты, HTTP-клиент и модель поведения DOM/GTK-палитры |
-| `packages/vio` | Независимый Vue renderer для GTK4, SFC loader, стили и demo |
-| `server/modules/processes`, `server/modules/terminal`, `server/modules/terminal-control` | Процессы проектов, PTY, WebSocket экрана и управления сессиями |
-| `src/modules/terminal` | Список сессий (`useTerminalSessions`), `TerminalView` — один xterm и сокет на видимую вкладку, клавиатура, IME |
-| `src/modules/dock` | Раскладка блоков: чистая модель дерева (`model/layout.ts`), разделители, группы вкладок, drag-and-drop |
-| `server/modules/workspace`, `src/modules/workspace` | Файлы, поиск, Git, архивы и редакторы |
+| Место                                                                                    | Ответственность                                                                                                |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `bin/projector`, `cli/app`                                                               | Запуск, блокировка повторного старта, desktop installation, полный restart                                     |
+| `vite.config.ts`, `server/app`                                                           | Vite, композиция локального HTTP API и SSE                                                                     |
+| `server/modules/launcher`, `server/modules/preferences`                                  | Поиск, история, настройки интерфейса и хоткея                                                                  |
+| `server/modules/window`                                                                  | Вызов native, Chromium, активация и скрытие в X11                                                              |
+| `native/app/entry.ts`, `native/modules/desktop`                                          | Запуск desktop через OS-адаптер, Vue/GTK-палитра и контроллер                                                  |
+| `core/modules/os`, его закрытый `modules/linux`                                          | Выбор ОС, каталоги, процессы, утилиты, X11, GIO, D-Bus, resident, трей и хоткей                                |
+| `core/modules/launcher`                                                                  | Общие контракты, HTTP-клиент и модель поведения DOM/GTK-палитры                                                |
+| `packages/vio`                                                                           | Независимый Vue renderer для GTK4, SFC loader, стили и demo                                                    |
+| `server/modules/processes`, `server/modules/terminal`, `server/modules/terminal-control` | Процессы проектов, PTY, WebSocket экрана и управления сессиями                                                 |
+| `src/modules/terminal`                                                                   | Список сессий (`useTerminalSessions`), `TerminalView` — один xterm и сокет на видимую вкладку, клавиатура, IME |
+| `src/modules/dock`                                                                       | Раскладка блоков: чистая модель дерева (`model/layout.ts`), разделители, группы вкладок, drag-and-drop         |
+| `server/modules/workspace`, `src/modules/workspace`                                      | Файлы, поиск, Git, архивы и редакторы                                                                          |
 
 Обычный запуск поднимает `vp dev`; `projector mode prod` переключает на `vp preview` по `dist` (`core/modules/server-mode`, переключение — `cli/app/launch.mjs`). Сборка проверяет типы и собирает фронтенд и `vio`, но не упаковывает desktop-продукт. Projector имеет собственный Git-корень; перед коммитом проверяйте текущий diff, поскольку другие сессии могут работать в том же checkout.
 
@@ -63,14 +63,14 @@ node --import vio/register native/app/entry.ts native http://localhost:4177 quit
 
 Данные находятся в `$XDG_DATA_HOME/projector`, по умолчанию `~/.local/share/projector`:
 
-| Файл | Содержимое |
-| --- | --- |
-| `launcher.json` | Режим, хоткей, история запусков |
-| `projects.json` | Каталог проектов |
-| `providers.json`, `integrations.json` | Провайдеры, интеграции и секреты |
-| `keybindings.json` | Привязки команд IDE |
+| Файл                                         | Содержимое                       |
+| -------------------------------------------- | -------------------------------- |
+| `launcher.json`                              | Режим, хоткей, история запусков  |
+| `projects.json`                              | Каталог проектов                 |
+| `providers.json`, `integrations.json`        | Провайдеры, интеграции и секреты |
+| `keybindings.json`                           | Привязки команд IDE              |
 | `instance.json`, `launch.lock`, `server.log` | Запуск, блокировка и диагностика |
-| `chrome-profile-launcher`, `chrome-profile` | Отдельные профили app-окон |
+| `chrome-profile-launcher`, `chrome-profile`  | Отдельные профили app-окон       |
 
 Не меняйте текущий профиль браузера ради тестов. Для изоляции используйте временный XDG-каталог в `/tmp`.
 

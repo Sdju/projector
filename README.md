@@ -41,11 +41,11 @@ Projector пока устанавливается из исходников. П�
 
 Перед установкой понадобятся:
 
-* Node.js 24 и [Vite+](https://viteplus.dev/) с командой `vp` в `PATH`.
-* GTK4 и GObject Introspection, включая typelib GioUnix.
-* Python 3, `make` и компилятор C++ для сборки зависимостей.
-* `git`, `rg` (ripgrep) и GNU `mv` для работы с проектами.
-* `xdg-open` для открытия браузера; для режима отдельного веб-окна — Chromium, `xdotool` и `xprop`.
+- Node.js 24 и [Vite+](https://viteplus.dev/) с командой `vp` в `PATH`.
+- GTK4 и GObject Introspection, включая typelib GioUnix.
+- Python 3, `make` и компилятор C++ для сборки зависимостей.
+- `git`, `rg` (ripgrep) и GNU `mv` для работы с проектами.
+- `xdg-open` для открытия браузера; для режима отдельного веб-окна — Chromium, `xdotool` и `xprop`.
 
 Скачайте первый выпуск и установите зависимости:
 

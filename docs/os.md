@@ -3,14 +3,14 @@
 `core/modules/os/index.ts` — единственный публичный вход для системных операций CLI, сервера и native. Браузер и доменные модули `core` не могут его импортировать.
 
 ```ts
-import { os } from '../../../core/modules/os/index.ts'
+import { os } from "../../../core/modules/os/index.ts";
 
-os.platform                      // process.platform, определяется при загрузке
-os.supported                     // сейчас true только для Linux
-os.capabilities.processInspection
-const processes = os.processes.list()
-const cwd = await os.processes.workingDirectory(pid, projectPath)
-await os.tools.moveNoReplace(source, destination)
+os.platform; // process.platform, определяется при загрузке
+os.supported; // сейчас true только для Linux
+os.capabilities.processInspection;
+const processes = os.processes.list();
+const cwd = await os.processes.workingDirectory(pid, projectPath);
+await os.tools.moveNoReplace(source, destination);
 ```
 
 ## Структура
@@ -38,16 +38,16 @@ Linux-подмодуль приватен для фасада. При добав
 
 ## Ответственность API
 
-| API | Что адаптирует |
-| --- | --- |
-| `dataHome`, `desktopPaths`, `homeDirectory`, `shell` | Пользовательские каталоги и командную оболочку |
-| `processes` | Список процессов, потомков, identity для защиты от повторного использования PID, cwd, сигнал и ожидание завершения |
-| `tools` | Перенос без перезаписи, изолированный Python helper и поиск ripgrep |
-| `windows` | Открытие браузера/app-окна, поиск, активацию, скрытие и закрытие палитры |
-| `catalog` | Ленивую загрузку GIO-каталога и иконок внутри native-процесса с GI loader |
-| `shortcutStatus`, `shortcutAvailable`, `desktopPid` | Desktop-интеграцию без загрузки GTK |
-| `runDesktop` | Resident; приложение передаёт каталог настроек и фабрику контроллера палитры |
-| `installDesktop` | Установку из текущего checkout, с учётом XDG и пробелов в пути |
+| API                                                  | Что адаптирует                                                                                                     |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `dataHome`, `desktopPaths`, `homeDirectory`, `shell` | Пользовательские каталоги и командную оболочку                                                                     |
+| `processes`                                          | Список процессов, потомков, identity для защиты от повторного использования PID, cwd, сигнал и ожидание завершения |
+| `tools`                                              | Перенос без перезаписи, изолированный Python helper и поиск ripgrep                                                |
+| `windows`                                            | Открытие браузера/app-окна, поиск, активацию, скрытие и закрытие палитры                                           |
+| `catalog`                                            | Ленивую загрузку GIO-каталога и иконок внутри native-процесса с GI loader                                          |
+| `shortcutStatus`, `shortcutAvailable`, `desktopPid`  | Desktop-интеграцию без загрузки GTK                                                                                |
+| `runDesktop`                                         | Resident; приложение передаёт каталог настроек и фабрику контроллера палитры                                       |
+| `installDesktop`                                     | Установку из текущего checkout, с учётом XDG и пробелов в пути                                                     |
 
 `moveNoReplace` не перезаписывает существующую запись. GNU mv при совпадении может успешно завершиться, оставив источник на месте: вызывающий код проверяет результат переноса и сообщает о конфликте. Проверки допустимости путей и ошибки HTTP остаются в workspace, а не в OS-адаптере.
 

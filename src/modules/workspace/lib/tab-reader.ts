@@ -46,7 +46,9 @@ function fileText(file: OpenFile): { text?: string; note?: string } {
   if (file.image) return { note: "Изображение: текстового содержимого нет" };
   if (file.archive)
     return {
-      text: file.archive.entries.map((entry) => `${entry.type}\t${entry.size}\t${entry.path}`).join("\n"),
+      text: file.archive.entries
+        .map((entry) => `${entry.type}\t${entry.size}\t${entry.path}`)
+        .join("\n"),
       note: `Архив ${file.archive.format}${file.archive.truncated ? ", список усечён" : ""}`,
     };
   if (file.binary) return { note: "Двоичный файл: текстового содержимого нет" };
@@ -99,7 +101,9 @@ export function registerTabReader(ctx: TabReaderContext) {
       if (args.lines !== undefined && typeof args.lines !== "number")
         throw new Error("lines должен быть числом");
       const layout = ctx.layout();
-      const id = (args.id as string | undefined) ?? ctx.groups(layout).find((g) => g.id === layout.focused)?.active;
+      const id =
+        (args.id as string | undefined) ??
+        ctx.groups(layout).find((g) => g.id === layout.focused)?.active;
       const info = tabs().find((tab) => tab.id === id);
       if (!id || !info) throw new Error("Вкладка не найдена: посмотрите ide.workbench.tabs.list");
       const limit = Math.max(1, Math.min(MAX_CHARS, Math.floor(args.maxChars ?? DEFAULT_CHARS)));

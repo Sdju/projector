@@ -38,7 +38,10 @@ await test("GitHub integration persists authorization and imports authenticated 
       return Response.json({ error: oauthMode === "slow" ? "slow_down" : "authorization_pending" });
     }
     if (address.startsWith("https://api.github.com/")) {
-      assert.equal(init.headers.Authorization, expectedToken ? `Bearer ${expectedToken}` : undefined);
+      assert.equal(
+        init.headers.Authorization,
+        expectedToken ? `Bearer ${expectedToken}` : undefined,
+      );
       if (!tokenValid) return Response.json({}, { status: 401 });
       if (address.endsWith("/user")) return Response.json({ login: "octocat" });
       if (address.includes("/user/repos")) {
@@ -202,15 +205,25 @@ await test("GitHub integration persists authorization and imports authenticated 
   assert.equal(projects.projects.length, 4);
   const selectedDirectory = join(root, "selected clone directory");
   const cloned = await request("/github/clone", "POST", {
-    repository: "octocat/app", directory: selectedDirectory,
+    repository: "octocat/app",
+    directory: selectedDirectory,
   });
   assert.equal(cloned.status, 201, JSON.stringify(cloned.data));
   assert.equal(cloned.data.project.path, join(selectedDirectory, "octocat", "app"));
-  assert.equal((await request("/github/clone", "POST", {
-    repository: "octocat/app", directory: selectedDirectory,
-  })).status, 409);
+  assert.equal(
+    (
+      await request("/github/clone", "POST", {
+        repository: "octocat/app",
+        directory: selectedDirectory,
+      })
+    ).status,
+    409,
+  );
   for (const directory of ["", "relative/path", 42, "/tmp/invalid\0path"])
-    assert.equal((await request("/github/clone", "POST", { repository: "octocat/app", directory })).status, 400);
+    assert.equal(
+      (await request("/github/clone", "POST", { repository: "octocat/app", directory })).status,
+      400,
+    );
   await request("/github/auth", "DELETE");
   assert.equal(
     (await request("/github/import", "POST", { repository: "octocat/app" })).status,
@@ -249,13 +262,15 @@ await test("GitHub integration persists authorization and imports authenticated 
   assert.equal((await request("/github/device", "POST")).status, 400);
   expectedToken = "";
   const publicClone = await request("/github/clone", "POST", {
-    repository: "octocat/public", directory: selectedDirectory,
+    repository: "octocat/public",
+    directory: selectedDirectory,
   });
   assert.equal(publicClone.status, 201, JSON.stringify(publicClone.data));
   assert.equal(publicClone.data.project.path, join(selectedDirectory, "octocat", "public"));
   assert.ok(!JSON.stringify(publicClone.data).includes(secret));
   const failedClone = await request("/github/clone", "POST", {
-    repository: "octocat/failure", directory: selectedDirectory,
+    repository: "octocat/failure",
+    directory: selectedDirectory,
   });
   assert.equal(failedClone.status, 400);
   await assert.rejects(access(join(selectedDirectory, "octocat", "failure")));
@@ -272,11 +287,18 @@ await test("GitHub integration persists authorization and imports authenticated 
       const credentials = args[args.indexOf("--env-file") + 1];
       assert.equal((await stat(credentials)).mode & 0o777, 0o600);
     }
-    if (args[0] === "context") return { stdout: JSON.stringify([{ Endpoints: { docker: { Host: "unix:///var/run/docker.sock" } } }]), stderr: "" };
+    if (args[0] === "context")
+      return {
+        stdout: JSON.stringify([
+          { Endpoints: { docker: { Host: "unix:///var/run/docker.sock" } } },
+        ]),
+        stderr: "",
+      };
     return { stdout: "", stderr: "" };
   });
   const dockerClone = await request("/github/clone", "POST", {
-    repository: "octocat/isolated", directory: selectedDirectory,
+    repository: "octocat/isolated",
+    directory: selectedDirectory,
     environment: { kind: "docker", network: "none" },
   });
   assert.equal(dockerClone.status, 201, JSON.stringify(dockerClone.data));
@@ -286,34 +308,61 @@ await test("GitHub integration persists authorization and imports authenticated 
   assert.ok(dockerCalls.some((args) => args.includes("info")));
   const launch = environmentLaunch(isolated, ["/bin/bash", "-c", "touch /workspace/probe"], false);
   assert.equal(launch.file, "docker");
-  for (const flag of ["--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges:true", "--pids-limit=256", "--memory=2g", "--cpus=2"])
+  for (const flag of [
+    "--read-only",
+    "--cap-drop=ALL",
+    "--security-opt=no-new-privileges:true",
+    "--pids-limit=256",
+    "--memory=2g",
+    "--cpus=2",
+  ])
     assert.ok(launch.args.includes(flag));
   assert.equal(launch.args[launch.args.indexOf("--network") + 1], "none");
   assert.equal(launch.args.filter((value) => value === "--mount").length, 1);
-  assert.equal(launch.args[launch.args.indexOf("--mount") + 1], `type=bind,source=${isolated.path},target=/workspace`);
+  assert.equal(
+    launch.args[launch.args.indexOf("--mount") + 1],
+    `type=bind,source=${isolated.path},target=/workspace`,
+  );
   assert.ok(!launch.args.some((value) => value.includes("docker.sock") || value.includes(secret)));
   assert.ok(!launch.args.includes("--privileged"));
   assert.equal((await environmentForPath(join(isolated.path, "src"))).id, isolated.id);
   assert.equal(await environmentForPath(join(isolated.path, "..", "isolated-other")), undefined);
   await runEnvironmentCommand(isolated, ["/usr/bin/git", "status"]);
-  assert.ok(dockerCalls.at(-1).includes("--force"), "Docker tool cleanup removes workload, not just CLI");
-  const forwarded = environmentLaunch({ ...isolated, environment: { ...isolated.environment, network: "bridge", ports: [5173] } }, ["/bin/bash"]);
+  assert.ok(
+    dockerCalls.at(-1).includes("--force"),
+    "Docker tool cleanup removes workload, not just CLI",
+  );
+  const forwarded = environmentLaunch(
+    { ...isolated, environment: { ...isolated.environment, network: "bridge", ports: [5173] } },
+    ["/bin/bash"],
+  );
   assert.ok(forwarded.args.includes("127.0.0.1::5173"));
   for (const config of [
-    { kind: "docker", privileged: true }, { kind: "docker", mounts: ["/:/host"] },
-    { kind: "docker", network: "host" }, { kind: "docker", image: "--privileged" },
+    { kind: "docker", privileged: true },
+    { kind: "docker", mounts: ["/:/host"] },
+    { kind: "docker", network: "host" },
+    { kind: "docker", image: "--privileged" },
     { kind: "docker", network: "none", ports: [5173] },
     { kind: "docker", network: "bridge", ports: [0] },
-  ]) assert.throws(() => parseDockerEnvironment(config), { status: 400 });
+  ])
+    assert.throws(() => parseDockerEnvironment(config), { status: 400 });
   const { normalizeProject } = await import("../server/modules/project-presentation/index.ts");
-  const normalized = normalizeProject({ ...isolated, path: "/tmp/changed", environment: null }, isolated);
+  const normalized = normalizeProject(
+    { ...isolated, path: "/tmp/changed", environment: null },
+    isolated,
+  );
   assert.equal(normalized.path, isolated.path);
   assert.deepEqual(normalized.environment, isolated.environment);
   const { createTerminalSession } = await import("../server/modules/terminal/index.ts");
-  assert.throws(() => createTerminalSession(isolated, { program: "shell" }, undefined, undefined, {
-    file: "/bin/bash", args: ["-c", "touch /host"], title: "Escape", docker: { context: "default", kind: "shell" },
-  }), { status: 403 });
+  assert.throws(
+    () =>
+      createTerminalSession(isolated, { program: "shell" }, undefined, undefined, {
+        file: "/bin/bash",
+        args: ["-c", "touch /host"],
+        title: "Escape",
+        docker: { context: "default", kind: "shell" },
+      }),
+    { status: 403 },
+  );
   docker.mock.restore();
-
-
 });

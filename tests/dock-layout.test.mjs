@@ -23,7 +23,10 @@ import {
 const sum = (values) => values.reduce((total, value) => total + value, 0);
 function assertValid(layout) {
   const groups = dockGroups(layout);
-  assert.ok(groups.some((group) => group.id === layout.focused), "focused group exists");
+  assert.ok(
+    groups.some((group) => group.id === layout.focused),
+    "focused group exists",
+  );
   const panels = dockPanels(layout);
   assert.equal(new Set(panels).size, panels.length, "panel appears once");
   const ids = new Set();
@@ -143,16 +146,23 @@ test("either half of a split terminal group disappears when its last tab closes 
       layout = movePanel(layout, "terminal:2", { groupId: "g2", zone: "bottom" });
       const panel = original ? "terminal:1" : "terminal:2";
       const removed = groupOfPanel(layout, panel).id;
-      layout = action === "move"
-        ? movePanel(layout, panel, { groupId: groupOfPanel(layout, original ? "terminal:2" : "terminal:1").id })
-        : action === "reconcile"
-          ? reconcileDock(layout, { ids: [], exists: (id) => id !== panel })
-          : removePanel(layout, panel);
+      layout =
+        action === "move"
+          ? movePanel(layout, panel, {
+              groupId: groupOfPanel(layout, original ? "terminal:2" : "terminal:1").id,
+            })
+          : action === "reconcile"
+            ? reconcileDock(layout, { ids: [], exists: (id) => id !== panel })
+            : removePanel(layout, panel);
       assert.equal(findDockGroup(layout, removed), undefined, `${action}: ${removed}`);
       assert.equal(layout.root.direction, "row", "empty nested split collapses");
       assert.equal(dockGroups(layout).filter((group) => group.role === "terminal").length, 1);
       for (const id of dockPanels(layout)) layout = removePanel(layout, id);
-      assert.equal(dockGroups(layout).filter((group) => group.role === "terminal").length, 1, "last empty terminal placeholder survives");
+      assert.equal(
+        dockGroups(layout).filter((group) => group.role === "terminal").length,
+        1,
+        "last empty terminal placeholder survives",
+      );
       assertValid(layout);
     }
   }
@@ -169,8 +179,9 @@ test("reconcile repairs a saved split whose terminal group has no role", () => {
   findDockGroup(layout, "g2").active = "";
   layout = parseDockLayout(serializeDockLayout(layout));
   layout = reconcileDock(layout, {
-    ids: ["terminal:2"], exists: () => true,
-    role: (id) => id.startsWith("terminal:") ? "terminal" : "editor",
+    ids: ["terminal:2"],
+    exists: () => true,
+    role: (id) => (id.startsWith("terminal:") ? "terminal" : "editor"),
   });
   assert.equal(findDockGroup(layout, "g2"), undefined);
   assert.equal(groupOfPanel(layout, "terminal:2").role, "terminal");
@@ -287,11 +298,15 @@ test("layouts survive serialisation; hostile data does not throw", () => {
 
   let deep = { type: "group", id: "leaf", panels: ["x"] };
   for (let i = 0; i < 20; i++)
-    deep = { type: "split", id: `n${i}`, direction: i % 2 ? "row" : "column", children: [deep, { type: "group", id: `l${i}`, panels: [] }] };
+    deep = {
+      type: "split",
+      id: `n${i}`,
+      direction: i % 2 ? "row" : "column",
+      children: [deep, { type: "group", id: `l${i}`, panels: [] }],
+    };
   const shallow = parseDockLayout({ root: deep });
   assert.ok(!shallow || !dockPanels(shallow).includes("x"), "excessive depth is dropped");
 });
-
 
 test("mobile surfaces separate mixed panels without changing desktop splits or hidden groups", async () => {
   const { mobileDockSurfaces } = await import("../src/modules/dock/model/mobile-surfaces.ts");
@@ -307,13 +322,24 @@ test("mobile surfaces separate mixed panels without changing desktop splits or h
   const last = { editor: "b", terminal: "terminal:2" };
   let surfaces = mobileDockSurfaces(layout, isTerminal, last);
   assert.deepEqual(surfaces[0], { side: "editor", ids: ["a", "b"], active: "b" });
-  assert.deepEqual(surfaces[1], { side: "terminal", ids: ["terminal:1", "terminal:2"], active: "terminal:1" });
-  surfaces = mobileDockSurfaces(layout, isTerminal, { editor: "removed", terminal: "removed" },
-    { editor: ["b", "removed", "a"], terminal: [] });
+  assert.deepEqual(surfaces[1], {
+    side: "terminal",
+    ids: ["terminal:1", "terminal:2"],
+    active: "terminal:1",
+  });
+  surfaces = mobileDockSurfaces(
+    layout,
+    isTerminal,
+    { editor: "removed", terminal: "removed" },
+    { editor: ["b", "removed", "a"], terminal: [] },
+  );
   assert.equal(surfaces[0].active, "b");
   assert.deepEqual(surfaces[0].ids, ["b", "a"]);
   assert.deepEqual(layout, original);
-  assert.deepEqual(mobileDockSurfaces(createDockLayout(), isTerminal, last).map((item) => item.active), ["", ""]);
+  assert.deepEqual(
+    mobileDockSurfaces(createDockLayout(), isTerminal, last).map((item) => item.active),
+    ["", ""],
+  );
 });
 
 test("tab reader lists panels and reads files, diffs, terminals and rejects unknown tabs", async () => {
@@ -334,11 +360,22 @@ test("tab reader lists panels and reads files, diffs, terminals and rejects unkn
     terminalOf: (id) => (id === "terminal:t1" ? { id: "t1", status: "running" } : undefined),
     label: (id) => id,
     isDirty: (file) => file.draft !== undefined && file.draft !== file.content,
-    readTerminal: async (id, lines) => (reads.push([id, lines]), { text: "0123456789", totalLines: 1, truncated: false }),
+    readTerminal: async (id, lines) => (
+      reads.push([id, lines]),
+      { text: "0123456789", totalLines: 1, truncated: false }
+    ),
     register: (id, _title, run) => commands.set(id, run),
   });
   const list = commands.get("ide.workbench.tabs.list")();
-  assert.deepEqual(list.tabs.map((tab) => [tab.kind, tab.dirty]), [["file", true], ["image", false], ["agent", false], ["terminal", undefined]]);
+  assert.deepEqual(
+    list.tabs.map((tab) => [tab.kind, tab.dirty]),
+    [
+      ["file", true],
+      ["image", false],
+      ["agent", false],
+      ["terminal", undefined],
+    ],
+  );
   const read = commands.get("ide.workbench.tab.read");
   assert.equal((await read()).text, "new");
   assert.equal((await read({ id: "img" })).text, undefined);
