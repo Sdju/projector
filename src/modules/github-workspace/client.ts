@@ -4,6 +4,13 @@ import type {
   GithubFile,
 } from "../../../core/modules/github/index.ts";
 import type { IssueDetail, IssueList } from "../../../core/modules/workspace/index.ts";
+export class GithubRequestError extends Error {
+  readonly status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
 export async function readGit<T>(
   action: string,
   params: Record<string, string>,
@@ -14,7 +21,8 @@ export async function readGit<T>(
     { signal },
   );
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "Не удалось прочитать GitHub");
+  if (!response.ok)
+    throw new GithubRequestError(data.error || "Не удалось прочитать GitHub", response.status);
   return data;
 }
 export const readRepository = (repository: string, ref = "", signal?: AbortSignal) =>

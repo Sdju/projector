@@ -4,6 +4,34 @@ import { defineTab, singletonTab, type WorkspaceProfile } from "../workspace-api
 import { formatProjectRef } from "../project/index.ts";
 import { readIssue, readIssues, readRepository, readTree, readFile, readGit } from "./client.ts";
 
+const connectionTab = singletonTab(
+  "github-integration", "github:integration", "GitHub", "Подключение к GitHub",
+);
+
+/** Authentication has its own empty workspace and never falls back to local files. */
+export function createGithubConnectionProfile(repository: string): WorkspaceProfile {
+  return {
+    id: "github-connection",
+    layout: "editor",
+    tabs: [connectionTab],
+    features: {
+      terminals: false, docker: false, agent: false, settings: false,
+      persist: false, externalFiles: false,
+    },
+    providers: {
+      files: {
+        assetUrl: () => "",
+        async read(action) {
+          if (action === "root")
+            return { root: formatProjectRef({ kind: "github", repository }) };
+          if (action === "tree") return { entries: [], truncated: false };
+          throw new Error("Подключите GitHub, чтобы открыть файлы");
+        },
+      },
+    },
+  };
+}
+
 /** GitHub adapts to the same provider contracts as a local workspace; it owns no UI. */
 export function createGithubWorkspaceProfile(
   repository: string,
@@ -138,6 +166,7 @@ export function createGithubWorkspaceProfile(
     layout: "editor",
     sidebar: [{ id: "issues", title: "Issues" }],
     tabs: [
+      connectionTab,
       singletonTab(
         "repository",
         "github:repository",

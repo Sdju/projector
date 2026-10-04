@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test, mock } from "node:test";
-import { createGithubWorkspaceProfile } from "../src/modules/github-workspace/source.ts";
+import { createGithubConnectionProfile, createGithubWorkspaceProfile } from "../src/modules/github-workspace/source.ts";
 import {
   registerWorkspaceProfile,
   workspaceCapabilities,
@@ -13,6 +13,21 @@ import {
   mutateWorkspaceBranch,
 } from "../src/modules/workspace-api/index.ts";
 import { isEditable, isMarkdown } from "../src/modules/workspace/open-file.ts";
+
+test("GitHub authentication opens an empty workspace without local or remote data access", async () => {
+  const projectId = "gh:/vuejs/core";
+  const disconnect = registerWorkspaceProfile(projectId, createGithubConnectionProfile("vuejs/core"));
+  try {
+    assert.deepEqual(await workspaceRequest(projectId, "root"), { root: projectId });
+    assert.deepEqual(await workspaceRequest(projectId, "tree"), { entries: [], truncated: false });
+    assert.ok(Object.values(workspaceCapabilities(projectId)).every((value) => !value));
+    await assert.rejects(workspaceRequest(projectId, "file", { path: "README.md" }), /Подключите GitHub/);
+    await assert.rejects(workspaceRequest(projectId, "issues"), /недоступно/);
+    await assert.rejects(saveWorkspaceFile(projectId, "README.md", "changed", ""), /только для чтения/);
+  } finally {
+    disconnect();
+  }
+});
 
 test("the shared workspace uses a readonly source for tree, files, assets and refresh", async () => {
   const initial = {
