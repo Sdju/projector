@@ -63,7 +63,14 @@ const routes = [
   handleProjectActions,
 ];
 export async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
-  const url = new URL(req.url ?? "/", "http://" + (req.headers.host ?? "localhost"));
+  let url: URL;
+  try {
+    // Routing does not depend on the untrusted Host header.
+    url = new URL(req.url ?? "/", "http://localhost");
+  } catch {
+    json(res, 400, { error: "Некорректный адрес запроса" });
+    return true;
+  }
   if (!url.pathname.startsWith("/api")) return false;
   const context = { req, res, url, path: url.pathname, method: req.method ?? "GET" };
   try {

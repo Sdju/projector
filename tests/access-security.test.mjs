@@ -222,3 +222,50 @@ test("Vite resources require LAN authentication; session cookies survive resourc
     401,
   );
 });
+
+test("malformed requests cannot crash HTTP or either WebSocket upgrade handler", async (t) => {
+  const dir = await isolatedLan(t);
+  const server = await listen(
+    t,
+    createServer((req, res) => {
+      if (!authorizeHttp(req, res)) return;
+      void handleApi(req, res);
+    }),
+  );
+  attachTerminalServer(server);
+  attachTerminalControlServer(server);
+  const response = await new Promise((resolve, reject) => {
+    const socket = connect(server.address().port, "127.0.0.1", () => {
+      socket.write(
+        "GET //[ HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n",
+      );
+    });
+    let raw = "";
+    socket.on("data", (chunk) => {
+      raw += chunk;
+    });
+    socket.on("end", () => resolve(raw));
+    socket.on("error", reject);
+  });
+  assert.match(response, /^HTTP\/1.1 400/);
+  assert.equal((await send(server, "127.0.0.1", "/api/app/network", { Host: "[" })).status, 403);
+  assert.equal(
+    (await send(server, "127.0.0.1", "/api/app/network")).status,
+    200,
+    "server remains alive",
+  );
+  const project = join(dir, "svg");
+  await mkdir(project);
+  await writeFile(
+    join(project, "favicon.svg"),
+    '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+  );
+  const icon = await send(
+    server,
+    "127.0.0.1",
+    `/api/preview-icon?path=${encodeURIComponent(project)}`,
+  );
+  assert.equal(icon.status, 200);
+  assert.equal(icon.headers["content-security-policy"], "default-src 'none'; sandbox");
+  assert.equal(icon.headers["x-content-type-options"], "nosniff");
+});

@@ -30,6 +30,8 @@ export function sendIconFile(res: ServerResponse, file: string): void {
   res.statusCode = 200;
   res.setHeader("Content-Type", iconContentType(file));
   res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
   createReadStream(file).pipe(res);
 }
 

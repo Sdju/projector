@@ -14,8 +14,8 @@ export function attachTerminalServer(server: Server | HttpServer): void {
     maxPayload: 64 * 1024,
     perMessageDeflate: false,
   });
-  protectLanSockets(server, sockets);
   const alive = new WeakSet<WebSocket>();
+  protectLanSockets(server, sockets);
   const heartbeat = setInterval(() => {
     for (const client of sockets.clients) {
       if (!alive.has(client)) {
@@ -33,7 +33,14 @@ export function attachTerminalServer(server: Server | HttpServer): void {
     sockets.close();
   });
   server.on("upgrade", (req: IncomingMessage, socket: Duplex, head: Buffer) => {
-    const url = new URL(req.url ?? "/", "http://localhost");
+    if (socket.writableEnded || socket.destroyed) return;
+    let url: URL;
+    try {
+      url = new URL(req.url ?? "/", "http://localhost");
+    } catch {
+      socket.end("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
+      return;
+    }
     if (url.pathname !== "/api/terminal/socket") return; // Leave Vite HMR alone.
     if (!accessAllowed(req, true, url.searchParams.get("token") ?? undefined)) {
       socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");

@@ -59,7 +59,14 @@ export function attachTerminalControlServer(server: Server | HttpServer): void {
     sockets.close();
   });
   server.on("upgrade", (req, socket, head) => {
-    const url = new URL(req.url ?? "/", "http://localhost");
+    if (socket.writableEnded || socket.destroyed) return;
+    let url: URL;
+    try {
+      url = new URL(req.url ?? "/", "http://localhost");
+    } catch {
+      socket.end("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
+      return;
+    }
     if (url.pathname !== "/api/terminal/control") return;
     if (!accessAllowed(req, true, url.searchParams.get("token") ?? undefined)) {
       socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
