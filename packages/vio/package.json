@@ -1,6 +1,6 @@
 {
   "name": "vio",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Vue custom renderer for native GTK4 applications on Node.js",
   "license": "MIT",
   "files": [

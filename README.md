@@ -47,10 +47,10 @@ Projector пока устанавливается из исходников. П�
 - `git`, `rg` (ripgrep) и GNU `mv` для работы с проектами.
 - `xdg-open` для открытия браузера; для режима отдельного веб-окна — Chromium, `xdotool` и `xprop`.
 
-Скачайте первый выпуск и установите зависимости:
+Скачайте выпуск и установите зависимости:
 
 ```bash
-git clone --branch v0.2.0 https://github.com/Sdju/projector.git
+git clone --branch v0.3.0 https://github.com/Sdju/projector.git
 cd projector
 vp install --frozen-lockfile
 vp run build
@@ -59,7 +59,7 @@ vp run build
 
 Исходники также доступны в [GitHub Releases](https://github.com/Sdju/projector/releases).
 Сборка проверяет код и создаёт веб-ресурсы; запуск пока использует `vp dev`
-из этой папки. Отдельного бинарного установщика в версии 0.2.0 нет.
+из этой папки. Отдельного бинарного установщика в версии 0.3.0 нет.
 
 Откроется окно поиска приложений и проектов. Чтобы использовать Projector в обычном браузере:
 
