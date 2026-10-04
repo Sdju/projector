@@ -205,6 +205,9 @@ importers:
       '@codemirror/view':
         specifier: ^6.43.13
         version: 6.43.13
+      '@devcontainers/cli':
+        specifier: ^0.89.0
+        version: 0.89.0
       '@lezer/highlight':
         specifier: ^1.2.5
         version: 1.2.5
@@ -244,6 +247,9 @@ importers:
       highlight.js:
         specifier: ^11.12.0
         version: 11.12.0
+      jsonc-parser:
+        specifier: ^3.3.1
+        version: 3.3.1
       markdown-it:
         specifier: ^15.0.2
         version: 15.0.2
@@ -521,6 +527,11 @@ packages:
 
   '@codemirror/view@6.43.13':
     resolution: {integrity: sha512-sihaFrUzAsYBQsL9J2t69y8nfMQGwcYmggAZsk+kjPbjYZMyuf2hU8tUNTZ+P+isb6XRr8JE22TZlJxBoVdH1A==}
+
+  '@devcontainers/cli@0.89.0':
+    resolution: {integrity: sha512-LzaoOGKQ/Zql6PsiZ4hVIYVZagzWkD65aG/1ou5/Kly5Y1PtjLg1yn7qu+LZCzVoAl6DZZ/pbz8qOO4RLNlqMg==}
+    engines: {node: '>=20.0.0'}
+    hasBin: true
 
   '@emnapi/core@1.10.0':
     resolution: {integrity: sha512-yq6OkJ4p82CAfPl0u9mQebQHKPJkY7WrIuk205cTYnYe+k2Z8YBh11FrbRG/H6ihirqcacOgl2BIO8oyMQLeXw==}
@@ -2146,6 +2157,9 @@ packages:
   json-stringify-safe@5.0.1:
     resolution: {integrity: sha512-ZClg6AaYvamvYEE82d3Iyd3vSSIjQ+odgjaTzRuO3s7toCdFKczob2i0zCh7JE8kWn17yvAWhUVxvqGwUalsRA==}
 
+  jsonc-parser@3.3.1:
+    resolution: {integrity: sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ==}
+
   jsprim@1.4.2:
     resolution: {integrity: sha512-P2bSOMAc/ciLz6DzgjVlGJP9+BrJWu5UDGK70C2iweC5QBIeFf0ZXRvGjEj2uYgrY2MkAAhsSWHDWlFtEroZWw==}
     engines: {node: '>=0.6.0'}
@@ -3730,6 +3744,8 @@ snapshots:
       crelt: 1.0.7
       style-mod: 4.1.4
       w3c-keyname: 2.2.8
+
+  '@devcontainers/cli@0.89.0': {}
 
   '@emnapi/core@1.10.0':
     dependencies:
@@ -5359,6 +5375,8 @@ snapshots:
 
   json-stringify-safe@5.0.1:
     optional: true
+
+  jsonc-parser@3.3.1: {}
 
   jsprim@1.4.2:
     dependencies:

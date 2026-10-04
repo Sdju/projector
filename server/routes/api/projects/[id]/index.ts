@@ -6,6 +6,8 @@ import {
 } from "../../../../modules/projects/index.ts";
 import { projectAppUrl } from "../../../../../core/modules/app-paths/index.ts";
 import { HttpError } from "../../../../modules/http/index.ts";
+import { isLocalRequest } from "../../../../modules/access/index.ts";
+import { devcontainerState, decideDevcontainer } from "../../../../modules/devcontainer/index.ts";
 import { openBrowser, openWindow } from "../../../../modules/window/index.ts";
 import { closeProjectTerminals } from "../../../../modules/terminal/index.ts";
 import { json, readBody, asString } from "../../../../modules/transport/index.ts";
@@ -86,6 +88,23 @@ export async function handleProjectActions({
       if (parseMode(body.mode) === "window") openWindow(projectAppUrl(id));
       else openBrowser(target);
       json(res, 200, { ok: true, url: target });
+      return true;
+    }
+
+    if (action === "devcontainer" && method === "GET") {
+      res.setHeader("Cache-Control", "no-store");
+      json(res, 200, devcontainerState(project));
+      return true;
+    }
+
+    if (action === "devcontainer" && method === "POST") {
+      // Trust is granted at the keyboard of this machine: never over LAN, never by the agent.
+      if (!isLocalRequest(req))
+        throw new HttpError(403, "Доверие к репозиторию задаётся только на локальной машине");
+      const body = await readBody(req);
+      if (body.decision !== "trusted" && body.decision !== "declined" && body.decision !== "forget")
+        throw new HttpError(400, "decision: trusted, declined или forget");
+      json(res, 200, await decideDevcontainer(project, body.decision, body.hash));
       return true;
     }
 

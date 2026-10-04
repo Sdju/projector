@@ -11,6 +11,7 @@ import { rmSync } from "node:fs";
 import { os } from "../../../core/modules/os/index.ts";
 import { saveDroppedFile } from "./drop-files.ts";
 import { HttpError } from "../http/index.ts";
+import { devcontainerLaunch } from "../devcontainer/index.ts";
 import type { IncomingMessage } from "node:http";
 import { spawn, type IPty } from "node-pty";
 import headless from "@xterm/headless";
@@ -206,7 +207,7 @@ export function createTerminalSession(
     file: string;
     args: string[];
     title: string;
-    docker: NonNullable<TerminalSession["docker"]>;
+    docker?: NonNullable<TerminalSession["docker"]>;
   },
 ): TerminalSession {
   const previous = replacingId ? state.sessions.get(replacingId) : undefined;
@@ -247,7 +248,10 @@ export function createTerminalSession(
     : program === "shell"
       ? ["-i"]
       : ["-i", "-c", `exec ${program}`];
-  if (project.environment) {
+  // A config the user trusted in its current form replaces the restricted environment.
+  const trusted = launch ? undefined : devcontainerLaunch(project, ["/bin/bash", ...args]);
+  if (trusted) launch = trusted;
+  else if (project.environment) {
     if (launch)
       throw new HttpError(
         403,
