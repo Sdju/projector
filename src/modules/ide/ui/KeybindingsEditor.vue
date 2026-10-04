@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, useId } from "vue";
+import KeybindingsTable from "./KeybindingsTable.vue";
+import type { KeybindingRow as Row } from "./keybinding-row.ts";
 import { useIdeCommands } from "../ide.ts";
 import {
   editKeybinding,
@@ -10,12 +12,8 @@ import { commandArgs, useCommandScope } from "../../../common/utilities/commands
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiDialog from "../../../common/ui/UiDialog.vue";
 import UiDialogActions from "../../../common/ui/UiDialogActions.vue";
-import UiEmpty from "../../../common/ui/UiEmpty.vue";
 import UiHint from "../../../common/ui/UiHint.vue";
 import UiKbd from "../../../common/ui/UiKbd.vue";
-import IconEdit from "~icons/lucide/pencil";
-import IconReset from "~icons/lucide/rotate-ccw";
-import IconRemove from "~icons/lucide/x";
 const { api, revision } = useIdeCommands();
 const search = ref("");
 const customOnly = ref(false);
@@ -26,13 +24,6 @@ const path = ref("");
 const dialog = ref<InstanceType<typeof UiDialog>>();
 const recorder = ref<HTMLButtonElement>();
 const shortcut = ref("");
-interface Row {
-  command: string;
-  title: string;
-  index: number;
-  rule?: Keybinding;
-  custom: boolean;
-}
 const editing = ref<Row>();
 const rows = computed(() => {
   revision.value;
@@ -199,80 +190,14 @@ onMounted(async () => {
     </header>
     <p v-if="error" class="message error" role="alert">{{ error }}</p>
     <p class="message" role="status">{{ busy ? "Сохранение и загрузка…" : status }}</p>
-    <div class="table-scroll">
-      <table>
-        <thead>
-          <tr>
-            <th>Команда</th>
-            <th>Сочетание</th>
-            <th>Когда</th>
-            <th>Источник</th>
-            <th><span class="sr-only">Действия</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="row in rows"
-            :key="`${row.command}:${row.index}`"
-            :data-command="row.command"
-            @dblclick="!busy && run('edit', row)"
-          >
-            <td>
-              <span>{{ row.title }}</span
-              ><small>{{ row.command }}</small>
-            </td>
-            <td>
-              <button
-                class="binding"
-                :disabled="busy"
-                :aria-label="`Изменить сочетание: ${row.command}`"
-                @click="run('edit', row)"
-              >
-                <UiKbd v-if="row.rule && !row.rule.disabled">{{ displayKey(row.rule.key) }}</UiKbd
-                ><span v-else class="muted">Не назначено</span>
-              </button>
-            </td>
-            <td class="when">{{ condition(row.rule) }}</td>
-            <td>{{ row.custom ? "Пользователь" : "По умолчанию" }}</td>
-            <td class="actions">
-              <UiButton
-                icon
-                size="sm"
-                :disabled="busy"
-                :aria-label="`Изменить: ${row.command}`"
-                title="Изменить сочетание"
-                @click="run('edit', row)"
-              >
-                <IconEdit />
-              </UiButton>
-              <UiButton
-                v-if="row.rule && !row.rule.disabled"
-                icon
-                size="sm"
-                :disabled="busy"
-                :aria-label="`Удалить: ${row.command}`"
-                title="Удалить привязку"
-                @click="run('remove', row)"
-              >
-                <IconRemove />
-              </UiButton>
-              <UiButton
-                v-if="row.custom"
-                icon
-                size="sm"
-                :disabled="busy"
-                :aria-label="`Сбросить: ${row.command}`"
-                title="Восстановить стандартные привязки команды"
-                @click="run('reset', row)"
-              >
-                <IconReset />
-              </UiButton>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <UiEmpty v-if="!rows.length">Команды не найдены</UiEmpty>
-    </div>
+    <KeybindingsTable
+      :rows="rows"
+      :busy="busy"
+      :reset-key="`${search}:${customOnly}`"
+      :display-key="displayKey"
+      :condition="condition"
+      @action="run"
+    />
     <footer :title="path">Изменения применяются сразу{{ path ? ` · ${path}` : "" }}</footer>
     <UiDialog
       ref="dialog"
@@ -355,69 +280,6 @@ header > input {
 .error {
   color: var(--err);
 }
-.table-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: left;
-}
-th {
-  position: sticky;
-  top: 0;
-  z-index: var(--z-sticky);
-  background: var(--bg-2);
-  color: var(--muted);
-  font-weight: 500;
-  border-bottom: 1px solid var(--line);
-}
-th,
-td {
-  padding: var(--sp-3) var(--sp-3);
-}
-th:first-child,
-td:first-child {
-  padding-left: var(--sp-5);
-}
-td {
-  border-bottom: 1px solid color-mix(in srgb, var(--line) 50%, transparent);
-}
-tr:hover td {
-  background: var(--hover);
-}
-td:first-child {
-  min-width: 180px;
-}
-small {
-  display: block;
-  color: var(--muted);
-  font: var(--fs-2xs) var(--mono);
-  margin-top: var(--sp-1);
-  overflow-wrap: anywhere;
-}
-.when {
-  color: var(--muted);
-  font: var(--fs-2xs) var(--mono);
-  min-width: 130px;
-}
-.binding {
-  text-align: left;
-  white-space: nowrap;
-  min-height: 26px;
-}
-.muted {
-  color: var(--muted);
-}
-.actions {
-  white-space: nowrap;
-}
-svg {
-  width: 13px;
-  height: 13px;
-}
 footer {
   padding: var(--sp-2) var(--sp-5);
   border-top: 1px solid var(--line);
@@ -426,13 +288,6 @@ footer {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
 }
 h3 {
   font-size: var(--fs-md);
@@ -454,10 +309,6 @@ h3 {
 @media (max-width: 700px) {
   header {
     padding: var(--sp-3) var(--sp-3) 0;
-  }
-  th:first-child,
-  td:first-child {
-    padding-left: var(--sp-3);
   }
   .filters {
     flex-wrap: wrap;
