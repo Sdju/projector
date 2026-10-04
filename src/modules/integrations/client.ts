@@ -30,5 +30,8 @@ export async function integrationRequest<T>(path = "", method = "GET", body?: un
   if (!response.ok) throw new Error(data.error || "Ошибка интеграции");
   return data;
 }
+export type SecretStorage =
+  | { backend: "keyring" }
+  | { backend: "file"; reason: "disabled" | "unavailable" };
 export const fetchIntegrations = () =>
-  integrationRequest<{ file: string; integrations: Integration[] }>();
+  integrationRequest<{ file: string; secretStorage: SecretStorage; integrations: Integration[] }>();

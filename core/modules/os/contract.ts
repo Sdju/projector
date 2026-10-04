@@ -24,3 +24,9 @@ export interface ResidentOptions {
   dataDirectory: string;
   createPalette(baseUrl: string): Promise<DesktopPalette>;
 }
+
+/** Identifies one entry in the OS secret store. */
+export interface SecretKey {
+  service: string;
+  account: string;
+}

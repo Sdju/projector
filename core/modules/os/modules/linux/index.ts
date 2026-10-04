@@ -85,3 +85,14 @@ export async function shortcutAvailable(shortcut: string) {
 export { installDesktop } from "./install-desktop.ts";
 
 export { startCodexAppServer } from "./codex.ts";
+
+const secrets = () =>
+  import(new URL("./secrets.ts", import.meta.url).href) as Promise<typeof import("./secrets.ts")>;
+export const secretsAvailable = async () => (await secrets()).secretsAvailable();
+export const getSecret = async (...args: Parameters<typeof import("./secrets.ts").getSecret>) =>
+  (await secrets()).getSecret(...args);
+export const setSecret = async (...args: Parameters<typeof import("./secrets.ts").setSecret>) =>
+  (await secrets()).setSecret(...args);
+export const deleteSecret = async (
+  ...args: Parameters<typeof import("./secrets.ts").deleteSecret>
+) => (await secrets()).deleteSecret(...args);

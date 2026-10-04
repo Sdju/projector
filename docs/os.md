@@ -30,6 +30,7 @@ core/modules/os/
     catalog.ts              GIO-каталог и запуск .desktop
     bus.ts                  session D-Bus
     shortcut.ts              KDE KGlobalAccel
+    secrets.ts              Secret Service (KWallet, GNOME Keyring) по D-Bus
     tray.ts                 StatusNotifierItem / DBusMenu
     resident.ts             desktop lifecycle и D-Bus command endpoint
 ```
@@ -45,6 +46,7 @@ Linux-подмодуль приватен для фасада. При добав
 | `tools`                                              | Перенос без перезаписи, изолированный Python helper и поиск ripgrep                                                |
 | `windows`                                            | Открытие браузера/app-окна, поиск, активацию, скрытие и закрытие палитры                                           |
 | `catalog`                                            | Ленивую загрузку GIO-каталога и иконок внутри native-процесса с GI loader                                          |
+| `secrets` | Системное хранилище секретов: `available`, `get`, `set`, `delete` (ключ — `service` и `account`); `available` не бросает ошибок, разблокировка может показать диалог ОС |
 | `shortcutStatus`, `shortcutAvailable`, `desktopPid`  | Desktop-интеграцию без загрузки GTK                                                                                |
 | `runDesktop`                                         | Resident; приложение передаёт каталог настроек и фабрику контроллера палитры                                       |
 | `installDesktop`                                     | Установку из текущего checkout, с учётом XDG и пробелов в пути                                                     |

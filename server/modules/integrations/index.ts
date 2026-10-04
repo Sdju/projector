@@ -1,4 +1,5 @@
-import { integrationsPath } from "./store.ts";
+import { integrationsPath, migrateIntegrationSecrets } from "./store.ts";
+import { vault } from "../secrets/index.ts";
 import { githubStatus } from "./github.ts";
 import { dockerIntegrationStatus } from "./docker.ts";
 
@@ -8,8 +9,13 @@ export const integrationRegistry = [
   { id: "docker", status: dockerIntegrationStatus },
 ];
 export async function listIntegrations() {
+  // Plaintext credentials left by older versions move into the keyring on first view.
+  await migrateIntegrationSecrets().catch((error) =>
+    console.error("Перенос секретов в системное хранилище:", error.message),
+  );
   return {
     file: integrationsPath(),
+    secretStorage: await vault.storage(),
     integrations: await Promise.all(integrationRegistry.map((plugin) => plugin.status())),
   };
 }

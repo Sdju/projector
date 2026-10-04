@@ -2,10 +2,11 @@
 import { onMounted, onBeforeUnmount, ref } from "vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import { fetchIntegrations, integrationRequest } from "./client.ts";
-import type { Integration, DeviceLogin } from "./client.ts";
+import type { Integration, DeviceLogin, SecretStorage } from "./client.ts";
 import { DockerSettings } from "../docker/index.ts";
 const github = ref<Integration | null>(null);
 const file = ref("");
+const secretStorage = ref<SecretStorage>({ backend: "file", reason: "unavailable" });
 const enabled = ref(false);
 const clientId = ref("");
 const directory = ref("");
@@ -42,6 +43,7 @@ onMounted(() =>
   action(async () => {
     const data = await fetchIntegrations();
     file.value = data.file;
+    secretStorage.value = data.secretStorage;
     const integration = data.integrations.find((item) => item.id === "github");
     if (integration) apply(integration);
   }),
@@ -115,6 +117,16 @@ function disconnect() {
     <p class="muted">
       Настройки и авторизация хранятся в файле <code>{{ file || "integrations.json" }}</code
       >.
+      <template v-if="secretStorage.backend === 'keyring'">
+        Токены и ключи — в системном хранилище секретов (Secret Service), в файле их нет.
+      </template>
+      <template v-else-if="secretStorage.reason === 'disabled'">
+        Хранилище секретов отключено (<code>PROJECTOR_SECRET_STORE=file</code>): токены лежат в
+        этом файле.
+      </template>
+      <template v-else>
+        Системное хранилище секретов недоступно: токены лежат в этом файле с правами 0600.
+      </template>
     </p>
     <DockerSettings />
     <article v-if="github" class="plugin">

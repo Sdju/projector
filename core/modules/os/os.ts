@@ -2,7 +2,7 @@ import { homedir, userInfo } from "node:os";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import * as linux from "./modules/linux/index.ts";
-import type { DesktopAction, ResidentOptions } from "./contract.ts";
+import type { DesktopAction, ResidentOptions, SecretKey } from "./contract.ts";
 
 export class UnsupportedPlatformError extends Error {
   readonly code = "ERR_OS_UNSUPPORTED";
@@ -88,6 +88,14 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
         backend("openPalette").openWebPalette(url, toggle, appClass, profile),
       closePalette: (appClass: string) => backend("closePalette").closePalette(appClass),
       activate: (id: number | bigint) => backend("activateWindow").activateWindow(id),
+    },
+    /** OS secret store (Linux: Secret Service over D-Bus). `available` never throws. */
+    secrets: {
+      available: () => (supported ? linux.secretsAvailable() : Promise.resolve(false)),
+      get: (key: SecretKey) => backend("secrets.get").getSecret(key),
+      set: (key: SecretKey, label: string, value: string) =>
+        backend("secrets.set").setSecret(key, label, value),
+      delete: (key: SecretKey) => backend("secrets.delete").deleteSecret(key),
     },
     pickFolder: () => backend("pickFolder").pickFolder(),
     catalog: () => backend("catalog").catalog(),
