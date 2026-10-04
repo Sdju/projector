@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref } from "vue";
+import IconEye from "~icons/lucide/eye";
+import IconEyeOff from "~icons/lucide/eye-off";
 import UiButton from "../../common/ui/UiButton.vue";
 import { fetchIntegrations, integrationRequest } from "./client.ts";
 import type { Integration, DeviceLogin, SecretStorage } from "./client.ts";
@@ -17,12 +19,27 @@ const busy = ref(false);
 const device = ref<DeviceLogin | null>(null);
 let timer: ReturnType<typeof setTimeout> | undefined;
 let disposed = false;
+const revealed = ref("");
+let hideTimer: ReturnType<typeof setTimeout> | undefined;
+function hideToken() {
+  clearTimeout(hideTimer);
+  revealed.value = "";
+}
+function toggleToken() {
+  if (revealed.value) return hideToken();
+  return action(async () => {
+    const data = await integrationRequest<{ token: string }>("/github/token", "POST");
+    revealed.value = data.token;
+    hideTimer = setTimeout(hideToken, 30_000);
+  });
+}
 function cancelDevice() {
   clearTimeout(timer);
   device.value = null;
 }
 function apply(value: Integration) {
   github.value = value;
+  if (!value.connected) hideToken();
   enabled.value = value.enabled;
   clientId.value = value.settings.clientId;
   directory.value = value.settings.directory;
@@ -49,6 +66,7 @@ onMounted(() =>
   }),
 );
 onBeforeUnmount(() => {
+  hideToken();
   disposed = true;
   cancelDevice();
 });
@@ -171,6 +189,24 @@ function disconnect() {
         </p>
         <UiButton type="submit" :disabled="busy">сохранить настройки</UiButton>
       </form>
+      <div v-if="github.connected && secretStorage.backend === 'keyring'" class="secret">
+        <span class="muted">Токен</span>
+        <input
+          class="secret-value"
+          readonly
+          :type="revealed ? 'text' : 'password'"
+          :value="revealed || '••••••••••••••••'"
+          aria-label="Токен GitHub"
+        />
+        <UiButton
+          :disabled="busy"
+          :aria-label="revealed ? 'Скрыть токен' : 'Показать токен'"
+          :title="revealed ? 'Скрыть токен' : 'Показать токен (скроется через 30 секунд)'"
+          @click="toggleToken"
+        >
+          <component :is="revealed ? IconEyeOff : IconEye" />
+        </UiButton>
+      </div>
       <div class="actions">
         <UiButton :disabled="busy || !enabled || !clientId.trim() || !!device" @click="login"
           >войти через GitHub</UiButton
@@ -252,6 +288,18 @@ header {
 }
 code {
   overflow-wrap: anywhere;
+  font-size: var(--fs-xs);
+}
+.secret {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin: var(--sp-3) 0;
+}
+.secret-value {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono, monospace);
   font-size: var(--fs-xs);
 }
 form {

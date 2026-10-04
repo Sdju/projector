@@ -137,3 +137,13 @@ export async function migrateIntegrationSecrets(): Promise<string[]> {
   );
   return operation;
 }
+
+/**
+ * Returns one credential for display, only while it is protected by the keyring.
+ * Plaintext file credentials are never offered for viewing.
+ */
+export async function revealIntegrationCredential(id: string, name: string) {
+  const stored = (await readFileRaw()).integrations[id];
+  if (stored?.vault !== "keyring") return undefined;
+  return (await openCredentials(id, stored))[name];
+}

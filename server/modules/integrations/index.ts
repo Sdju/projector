@@ -33,6 +33,7 @@ export type { IntegrationConfig } from "./store.ts";
 export { readIntegrations } from "./store.ts";
 export { integrationConfig } from "./store.ts";
 export { updateIntegration } from "./store.ts";
+export { revealGithubToken } from "./github.ts";
 
 export {
   browseGithubRepository,

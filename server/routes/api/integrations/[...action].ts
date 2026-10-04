@@ -1,6 +1,7 @@
 import { listIntegrations } from "../../../modules/integrations/index.ts";
 import {
   configureGithub,
+  revealGithubToken,
   connectGithub,
   disconnectGithub,
   beginGithubLogin,
@@ -20,6 +21,8 @@ import {
   browseGithubIssue,
 } from "../../../modules/integrations/index.ts";
 
+import { isLocalRequest } from "../../../modules/access/index.ts";
+import { HttpError } from "../../../modules/http/index.ts";
 import { json, readBody } from "../../../modules/transport/index.ts";
 
 import { withRuntime } from "../../../modules/project-presentation/index.ts";
@@ -88,6 +91,13 @@ export async function handleIntegrationsActions({
     }
     if (path === "/api/integrations/github/auth" && method === "POST") {
       json(res, 200, await connectGithub(await readBody(req)));
+      return true;
+    }
+    if (path === "/api/integrations/github/token" && method === "POST") {
+      // Secrets are shown only on this machine, never over LAN and never to the agent.
+      if (!isLocalRequest(req))
+        throw new HttpError(403, "Токен можно показать только на локальной машине");
+      json(res, 200, await revealGithubToken());
       return true;
     }
     if (path === "/api/integrations/github/auth" && method === "DELETE") {

@@ -8,7 +8,7 @@ import { randomUUID } from "node:crypto";
 import { parseDockerEnvironment, prepareDockerEnvironment } from "../environments/index.ts";
 import { cloneGithubContainer } from "./github-container.ts";
 import { realpath } from "node:fs/promises";
-import { integrationConfig, updateIntegration } from "./store.ts";
+import { integrationConfig, updateIntegration, revealIntegrationCredential } from "./store.ts";
 import { HttpError } from "../http/index.ts";
 import { expandPath, inspectProject } from "../projects/index.ts";
 import { loadProjects, updateProjects } from "../projects/index.ts";
@@ -95,6 +95,12 @@ export async function githubStatus() {
     connected: !!config.credentials.token,
     account: config.credentials.login || null,
   };
+}
+export async function revealGithubToken() {
+  const token = await revealIntegrationCredential("github", "token");
+  if (!token)
+    throw new HttpError(409, "Просмотр доступен только для токена из системного хранилища секретов");
+  return { token };
 }
 export async function configureGithub(body: Record<string, unknown>) {
   if (typeof body.enabled !== "boolean") throw new HttpError(400, "Укажите состояние интеграции");

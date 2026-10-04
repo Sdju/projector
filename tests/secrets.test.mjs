@@ -8,6 +8,7 @@ import { createVault } from "../server/modules/secrets/index.ts";
 import {
   integrationConfig,
   migrateIntegrationSecrets,
+  revealIntegrationCredential,
   updateIntegration,
   useIntegrationVault,
 } from "../server/modules/integrations/store.ts";
@@ -107,6 +108,18 @@ await test("a failing keyring blocks writes instead of erasing the stored secret
     assert.equal(read.credentialsError, "locked");
     assert.deepEqual(read.credentials, {});
     assert.equal(JSON.parse(backend.items.get("integration:github")).token, "keep");
+  }));
+
+await test("credentials can be revealed only while protected by the keyring", () =>
+  withData(async () => {
+    useIntegrationVault(createVault(fakeBackend({ available: false }), () => undefined));
+    await updateIntegration("github", (config) => ({ ...config, credentials: { token: "plain" } }));
+    assert.equal(await revealIntegrationCredential("github", "token"), undefined);
+
+    useIntegrationVault(createVault(fakeBackend(), () => undefined));
+    await updateIntegration("github", (config) => ({ ...config, credentials: { token: "safe" } }));
+    assert.equal(await revealIntegrationCredential("github", "token"), "safe");
+    assert.equal(await revealIntegrationCredential("github", "missing"), undefined);
   }));
 
 // Touches the real user keyring (and may show an unlock dialog), so it is opt-in.
