@@ -26,7 +26,7 @@ import { type OpenFile } from "../open-file.ts";
 import { createPanelHosts } from "../panel-hosts.ts";
 import { TerminalCloseDialog } from "../../terminal/index.ts";
 import { useDocker } from "../../docker/index.ts";
-import { keptAliveTabs, useWorkspaceTabTypes, type TabViews } from "../lib/tab-views.ts";
+import { useWorkspaceTabTypes, type TabViews } from "../lib/tab-views.ts";
 import { useWorkspaceRefresh } from "../lib/workspace-refresh.ts";
 import { useMobileSurfaces, registerMobileCommands } from "../lib/mobile-surfaces.ts";
 const props = defineProps<{
@@ -171,7 +171,6 @@ const docker = useDocker(props.projectId, {
   },
 });
 const panelHosts = createPanelHosts();
-const { keepAlive, virtualKeys } = keptAliveTabs(tabTypes);
 registerEditor(
   "ide.workbench.sidebar.toggle",
   "Показать или скрыть боковую панель",
@@ -339,10 +338,8 @@ onBeforeUnmount(() => overview.cancel());
         :files="files"
         :tab-actions="tabActions"
         :panel-hosts="panelHosts"
-        :keep-alive="keepAlive"
         :gutter-revision="gutterRevision"
         :tabs="tabs"
-        :virtual-keys="virtualKeys"
       >
         <template #mobile-terminal-actions>
           <MobileTerminalActions
@@ -350,7 +347,6 @@ onBeforeUnmount(() => overview.cancel());
             @command="(id, args) => editorCommands.run(id, args)"
           />
         </template>
-        <template #project><slot name="project" /></template>
       </WorkbenchDock>
     </section>
     <TerminalCloseDialog

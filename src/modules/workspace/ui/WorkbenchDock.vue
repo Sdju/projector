@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiEmpty from "../../../common/ui/UiEmpty.vue";
 import IconFinishFlag from "../../../common/ui/IconFinishFlag.vue";
@@ -9,7 +10,7 @@ import type { useOpenFiles } from "../lib/open-files.ts";
 import type { useWorkbenchLayout } from "../lib/workbench-layout.ts";
 import type { createPanelHosts } from "../panel-hosts.ts";
 import type { OpenFile } from "../open-file.ts";
-import { AgentChat } from "../../agent/index.ts";
+import { useWorkspaceTabs } from "../lib/tab-views.ts";
 import FilePanel from "./FilePanel.vue";
 import PanelHost from "./PanelHost.vue";
 import IconDiff from "~icons/lucide/file-diff";
@@ -24,18 +25,16 @@ const props = defineProps<{
   files: ReturnType<typeof useOpenFiles>;
   tabActions: (id: string) => ContextMenuItem[];
   panelHosts: ReturnType<typeof createPanelHosts>;
-  /** Панели с состоянием, которые живут вне дока и телепортируются в хост вкладки. */
-  keepAlive: Set<string>;
   gutterRevision: number;
   tabs: OpenFile[];
-  /** Ключи служебных вкладок, чьё содержимое живёт вне дока. */
-  virtualKeys: Record<string, string | undefined>;
 }>();
 const { fileOf, terminals, terminalPanels } = props.workbench;
-const hostOf = (kind: string) => {
-  const key = props.virtualKeys[kind];
-  return (key && props.panelHosts.hosts[key]) || null;
-};
+const workspaceTabs = useWorkspaceTabs();
+const viewOf = (tab: OpenFile) => (tab.virtual ? workspaceTabs.views[tab.virtual] : undefined);
+/** Вкладки с состоянием: их содержимое живёт вне дока и телепортируется в хост вкладки. */
+const kept = computed(() => props.tabs.filter((tab) => viewOf(tab)?.keepAlive));
+const isKept = (id: string) => kept.value.some((tab) => tab.key === id);
+const hostOf = (key: string) => props.panelHosts.hosts[key] ?? null;
 </script>
 
 <template>
@@ -58,7 +57,7 @@ const hostOf = (kind: string) => {
   >
     <template #mobileTerminalActions><slot name="mobile-terminal-actions" /></template>
     <template #panel="{ id, focused }">
-      <PanelHost v-if="keepAlive.has(id)" :id="id" :registry="panelHosts" />
+      <PanelHost v-if="isKept(id)" :id="id" :registry="panelHosts" />
       <FilePanel
         v-else-if="fileOf(id)"
         :file="fileOf(id)!"
@@ -145,19 +144,10 @@ const hostOf = (kind: string) => {
     </template>
   </DockView>
   <div class="keep-alive" hidden>
-    <Teleport
-      v-if="tabs.some((tab) => tab.virtual === 'agent')"
-      :to="hostOf('agent')"
-      :disabled="!hostOf('agent')"
-    >
-      <AgentChat :key="projectId" :project-id="projectId" />
-    </Teleport>
-    <Teleport
-      v-if="tabs.some((tab) => tab.virtual === 'project')"
-      :to="hostOf('project')"
-      :disabled="!hostOf('project')"
-    >
-      <div class="project-settings"><slot name="project" /></div>
+    <Teleport v-for="tab in kept" :key="tab.key" :to="hostOf(tab.key)" :disabled="!hostOf(tab.key)">
+      <div :class="viewOf(tab)?.scroll ? 'kept-scroll' : 'kept-panel'">
+        <component :is="viewOf(tab)!.component" v-bind="viewOf(tab)!.props?.(tab, projectId)" />
+      </div>
     </Teleport>
   </div>
 </template>
@@ -178,7 +168,14 @@ const hostOf = (kind: string) => {
 .session-state.failed {
   color: var(--err);
 }
-.project-settings {
+.kept-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.kept-scroll {
   container-type: inline-size;
   height: 100%;
   overflow: auto;

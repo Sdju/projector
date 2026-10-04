@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, h, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useProjects, projectPathFromParams, projectRoute } from "../../modules/project/index.ts";
 import { ProjectSettings, useProjectCommands } from "../../modules/catalog/index.ts";
 import { RunControls, useRunner } from "../../modules/runner/index.ts";
-import { ProjectWorkspace } from "../../modules/workspace/index.ts";
+import { ProjectWorkspace, type TabViews } from "../../modules/workspace/index.ts";
 
 const route = useRoute();
 const router = useRouter();
@@ -13,6 +13,22 @@ const { error } = useRunner();
 
 const settings = ref<InstanceType<typeof ProjectSettings>>();
 const settingsDirty = ref(false);
+
+// The settings form keeps unsaved edits, so its tab stays mounted while it moves between docks.
+const tabViews: TabViews = {
+  project: {
+    keepAlive: true,
+    scroll: true,
+    component: () =>
+      project.value &&
+      h(ProjectSettings, {
+        ref: settings,
+        project: project.value,
+        onDirty: (value: boolean) => (settingsDirty.value = value),
+        afterRemove: () => router.push("/projects"),
+      }),
+  },
+};
 
 const projectId = ref("");
 const opening = ref(false);
@@ -59,15 +75,8 @@ watch(
       :project-settings-dirty="settingsDirty"
       :before-close-project-settings="() => settings?.canLeave() ?? true"
       :save-project-settings="() => settings?.save()"
+      :tab-views="tabViews"
     >
-      <template #project>
-        <ProjectSettings
-          ref="settings"
-          :project="project"
-          @dirty="settingsDirty = $event"
-          :after-remove="() => router.push('/projects')"
-        />
-      </template>
       <template #terminal-actions>
         <RunControls :project="project" toolbar />
       </template>

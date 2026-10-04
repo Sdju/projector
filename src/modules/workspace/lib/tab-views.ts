@@ -10,6 +10,7 @@ import type { OpenFile } from "../open-file.ts";
 import { KeybindingsEditor } from "../../ide/index.ts";
 import { LanInfoPanel } from "../../network/index.ts";
 import { DockerPanel } from "../../docker/index.ts";
+import { AgentChat } from "../../agent/index.ts";
 import { IssueView } from "../modules/viewers/index.ts";
 
 /** How a tab kind is drawn; the owner of the kind supplies it, the workspace only mounts it. */
@@ -17,6 +18,10 @@ export interface TabView {
   component: Component;
   /** Props from the tab and its project; the view emits `open` with a file path. */
   props?: (tab: OpenFile, projectId: string) => Record<string, unknown>;
+  /** The view holds state (a chat, an unsaved form): it stays mounted and moves between docks. */
+  keepAlive?: boolean;
+  /** The panel pads and scrolls its content. */
+  scroll?: boolean;
 }
 export type TabViews = Record<string, TabView>;
 
@@ -24,20 +29,12 @@ export const baseTabViews: TabViews = {
   keybindings: { component: KeybindingsEditor },
   network: { component: LanInfoPanel },
   docker: { component: DockerPanel },
+  agent: { component: AgentChat, keepAlive: true, props: (_, projectId) => ({ projectId }) },
   issue: {
     component: IssueView,
     props: (tab, projectId) => ({ projectId, number: tab.params?.number }),
   },
 };
-
-/** Panels with their own state live outside the dock; only kinds the profile has are kept. */
-export function keptAliveTabs(types: TabRegistry) {
-  const kinds = ["agent", "project"].filter((id) => types.has(id));
-  return {
-    keepAlive: new Set(kinds.map((id) => types.keyOf(id))),
-    virtualKeys: Object.fromEntries(kinds.map((id) => [id, types.keyOf(id)])),
-  };
-}
 
 interface WorkspaceTabs {
   types: TabRegistry;
