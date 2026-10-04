@@ -69,4 +69,6 @@ Shell выполняет `docker exec -it` с `sh` или `bash`. Resize, вво
 
 В scope `docker:<projectId>` зарегистрированы `ide.docker.open`, `.sidebar.open`, `.status`, `.refresh`, `.context.select`, `.container.select`, `.binding.save`, `.logs.read`, `.port.open` и команды действий: `.start`, `.stop`, `.restart`, `.remove`, `.logs`, `.shell`, `.up`, `.composeStop`, `.composeRestart`, `.down`, `.build`, `.pull`. Передавайте полный `containerId`; Compose-команды принимают необязательный `service`. Удаление через SDK требует `confirm: true` либо интерактивного подтверждения. Scope `docker:settings` предоставляет `.settings.status` и `.settings.save` на странице настроек.
 
+Живые проверки изоляции, портов, очистки и Dev Container с настоящим демоном: `vp run test:live` (в `vp run check` не входит).
+
 Проверка транспорта, сохранения, границ файлов, contexts, ошибок daemon, подтверждений, параллельных операций и реального PTY с fixture CLI: `vp run test:docker`. Эта проверка не требует настоящего daemon. Она включена в `vp run check`.
