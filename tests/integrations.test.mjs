@@ -8,6 +8,9 @@ import { once } from "node:events";
 import childProcess from "node:child_process";
 import { syncBuiltinESMExports } from "node:module";
 
+// Never touch the real OS keyring from tests.
+process.env.PROJECTOR_SECRET_STORE = "file";
+
 await test("GitHub integration persists authorization and imports authenticated repositories", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "projector-integrations-"));
   process.env.XDG_DATA_HOME = join(root, "data");

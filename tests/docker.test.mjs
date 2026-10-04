@@ -6,6 +6,9 @@ import { tmpdir } from "node:os";
 import { createServer } from "node:http";
 import { once } from "node:events";
 
+// Never touch the real OS keyring from tests.
+process.env.PROJECTOR_SECRET_STORE = "file";
+
 await test("Docker integration: persisted binding, explicit context, guarded actions and real PTY transport", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "projector-docker-test-"));
   const original = { ...process.env };
