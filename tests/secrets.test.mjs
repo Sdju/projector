@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test, mock } from "node:test";
 import { mkdtemp, readFile, writeFile, mkdir, stat, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -25,6 +25,30 @@ function fakeBackend({ available = true } = {}) {
     delete: async (key) => void items.delete(key.account),
   };
 }
+
+await test("the default vault never reaches production secrets under the test runner", async (t) => {
+  assert.ok(process.env.NODE_TEST_CONTEXT);
+  const previous = process.env.PROJECTOR_SECRET_STORE;
+  process.env.PROJECTOR_SECRET_STORE = "keyring";
+  let calls = 0;
+  const guards = ["available", "get", "set", "delete"].map((method) =>
+    mock.method(os.secrets, method, async () => {
+      calls++;
+      throw new Error("Production keyring reached");
+    }),
+  );
+  t.after(() => {
+    guards.forEach((guard) => guard.mock.restore());
+    if (previous === undefined) delete process.env.PROJECTOR_SECRET_STORE;
+    else process.env.PROJECTOR_SECRET_STORE = previous;
+  });
+  const vault = createVault();
+  assert.equal((await vault.storage()).backend, "file");
+  await assert.rejects(vault.get("integration:github"), /Tests cannot access/);
+  await assert.rejects(vault.set("integration:github", "test", "replacement"), /Tests cannot access/);
+  await assert.rejects(vault.delete("integration:github"), /Tests cannot access/);
+  assert.equal(calls, 0);
+});
 async function withData(run) {
   const root = await mkdtemp(join(tmpdir(), "projector-secrets-"));
   const previous = process.env.XDG_DATA_HOME;

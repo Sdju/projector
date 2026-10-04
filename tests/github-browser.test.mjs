@@ -9,6 +9,9 @@ import { parseProjectRef, projectRefSegments } from "../core/modules/project/ind
 
 const projectPathSegments = (path) => projectRefSegments(parseProjectRef(path));
 
+// XDG_DATA_HOME isolates JSON files, but the OS keyring is shared with the app.
+process.env.PROJECTOR_SECRET_STORE = "file";
+
 test("GitHub paths use gh:/ in the segmented path and a dedicated browser route", () => {
   assert.equal(projectRoute("gh:/octocat/Hello-World"), "/gh/projects/octocat/Hello-World");
   assert.equal(

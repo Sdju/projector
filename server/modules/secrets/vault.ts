@@ -26,9 +26,15 @@ export function createVault(
   let probe: { at: number; ok: boolean } | undefined;
   const cache = new Map<string, { at: number; value: string | undefined }>();
   const key = (name: string): SecretKey => ({ service: SERVICE, account: name });
+  // Temporary XDG directories do not isolate Secret Service: its keys are global.
+  // Tests must inject a backend instead of accessing production credentials.
+  const isolatedTest = () => backend === os.secrets && !!process.env.NODE_TEST_CONTEXT;
+  function allowAccess() {
+    if (isolatedTest()) throw new Error("Tests cannot access the Projector system keyring");
+  }
 
   async function storage(): Promise<SecretStorage> {
-    if (mode() === "file") return { backend: "file", reason: "disabled" };
+    if (isolatedTest() || mode() === "file") return { backend: "file", reason: "disabled" };
     const now = Date.now();
     if (!probe || (!probe.ok && now - probe.at > RETRY_AFTER))
       probe = { at: now, ok: await backend.available() };
@@ -37,6 +43,7 @@ export function createVault(
   return {
     storage,
     async get(name: string): Promise<string | undefined> {
+      allowAccess();
       const hit = cache.get(name);
       if (hit && Date.now() - hit.at < READ_TTL) return hit.value;
       const value = await backend.get(key(name));
@@ -44,10 +51,12 @@ export function createVault(
       return value;
     },
     async set(name: string, label: string, value: string): Promise<void> {
+      allowAccess();
       await backend.set(key(name), label, value);
       cache.set(name, { at: Date.now(), value });
     },
     async delete(name: string): Promise<void> {
+      allowAccess();
       await backend.delete(key(name));
       cache.delete(name);
     },
