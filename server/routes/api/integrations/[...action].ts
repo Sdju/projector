@@ -7,6 +7,7 @@ import {
   pollGithubLogin,
   githubRepositories,
   importGithubProject,
+  cloneGithubProject,
   browseGithubRepository,
   browseGithubDirectories,
   browseGithubTree,
@@ -73,6 +74,11 @@ export async function handleIntegrationsActions({
     }
     if (path === "/api/integrations/github/repositories" && method === "GET") {
       json(res, 200, await githubRepositories(Number(url.searchParams.get("page") ?? 1)));
+      return true;
+    }
+    if (path === "/api/integrations/github/clone" && method === "POST") {
+      const result = await cloneGithubProject(await readBody(req));
+      json(res, 201, { project: withRuntime(result.project) });
       return true;
     }
     if (path === "/api/integrations/github/import" && method === "POST") {

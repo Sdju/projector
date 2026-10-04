@@ -20,6 +20,7 @@ export { disconnectGithub } from "./github.ts";
 export { beginGithubLogin } from "./github.ts";
 export { pollGithubLogin } from "./github.ts";
 export { githubRepositories } from "./github.ts";
+export { cloneGithubProject } from "./github.ts";
 export { importGithubProject } from "./github.ts";
 
 export type { IntegrationConfig } from "./store.ts";

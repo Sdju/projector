@@ -271,9 +271,19 @@ export async function cloneGithubRepository(
 }
 export async function importGithubProject(body: Record<string, unknown>) {
   const config = await authorized();
+  return saveGithubProject(body, config.settings.directory || DEFAULT_DIRECTORY, config.credentials.token);
+}
+export async function cloneGithubProject(body: Record<string, unknown>) {
+  const config = await integrationConfig("github");
+  const directory = body.directory ?? (config.settings.directory || DEFAULT_DIRECTORY);
+  if (typeof directory !== "string" || !/^(\/|~(?:\/|$))/.test(directory.trim()) || directory.includes("\0"))
+    throw new HttpError(400, "Укажите абсолютный путь к папке или ~/папка");
+  return saveGithubProject(body, directory, config.enabled ? config.credentials.token || "" : "");
+}
+async function saveGithubProject(body: Record<string, unknown>, base: string, token: string) {
   const repository = repositoryName(body.repository);
-  await github(`/repos/${repository}`, config.credentials.token);
-  const directory = expandPath(config.settings.directory || DEFAULT_DIRECTORY);
+  await github(`/repos/${repository}`, token);
+  const directory = expandPath(base);
   const destination = join(directory, ...repository.split("/"));
   if (imports.has(destination)) throw new HttpError(409, "Этот репозиторий уже импортируется");
   imports.add(destination);
@@ -295,7 +305,7 @@ export async function importGithubProject(body: Record<string, unknown>) {
     await mkdir(parent, { recursive: true });
     staging = await mkdtemp(join(parent, ".projector-import-"));
     const checkout = join(staging, "checkout");
-    await cloneGithubRepository(repository, checkout, config.credentials.token);
+    await cloneGithubRepository(repository, checkout, token);
     let draft;
     if (await lstat(join(checkout, "package.json")).catch(() => null)) {
       draft = await inspectProject(checkout);

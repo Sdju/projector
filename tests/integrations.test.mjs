@@ -13,6 +13,7 @@ await test("GitHub integration persists authorization and imports authenticated 
   process.env.XDG_DATA_HOME = join(root, "data");
   const directory = join(root, "projects with spaces");
   const secret = "test-token-never-return";
+  let expectedToken = secret;
   const nativeFetch = globalThis.fetch;
   let tokenValid = true;
   let tokenPolls = 0;
@@ -37,7 +38,7 @@ await test("GitHub integration persists authorization and imports authenticated 
       return Response.json({ error: oauthMode === "slow" ? "slow_down" : "authorization_pending" });
     }
     if (address.startsWith("https://api.github.com/")) {
-      assert.equal(init.headers.Authorization, `Bearer ${secret}`);
+      assert.equal(init.headers.Authorization, expectedToken ? `Bearer ${expectedToken}` : undefined);
       if (!tokenValid) return Response.json({}, { status: 401 });
       if (address.endsWith("/user")) return Response.json({ login: "octocat" });
       if (address.includes("/user/repos")) {
@@ -68,7 +69,7 @@ await test("GitHub integration persists authorization and imports authenticated 
     assert.ok(args.includes("core.hooksPath=/dev/null"));
     assert.ok(args.includes("http.followRedirects=false"));
     assert.ok(!JSON.stringify(args).includes(secret));
-    assert.equal(options.env.PROJECTOR_GITHUB_TOKEN, secret);
+    assert.equal(options.env.PROJECTOR_GITHUB_TOKEN, expectedToken);
     assert.equal(options.env.GIT_TERMINAL_PROMPT, "0");
     void (async () => {
       const helper = await readFile(options.env.GIT_ASKPASS, "utf8");
@@ -199,6 +200,17 @@ await test("GitHub integration persists authorization and imports authenticated 
     await readFile(join(root, "data", "projector", "projects.json"), "utf8"),
   );
   assert.equal(projects.projects.length, 4);
+  const selectedDirectory = join(root, "selected clone directory");
+  const cloned = await request("/github/clone", "POST", {
+    repository: "octocat/app", directory: selectedDirectory,
+  });
+  assert.equal(cloned.status, 201, JSON.stringify(cloned.data));
+  assert.equal(cloned.data.project.path, join(selectedDirectory, "octocat", "app"));
+  assert.equal((await request("/github/clone", "POST", {
+    repository: "octocat/app", directory: selectedDirectory,
+  })).status, 409);
+  for (const directory of ["", "relative/path", 42, "/tmp/invalid\0path"])
+    assert.equal((await request("/github/clone", "POST", { repository: "octocat/app", directory })).status, 400);
   await request("/github/auth", "DELETE");
   assert.equal(
     (await request("/github/import", "POST", { repository: "octocat/app" })).status,
@@ -235,4 +247,17 @@ await test("GitHub integration persists authorization and imports authenticated 
   assert.equal((await request("/github/device/poll", "POST", { id: expired.id })).status, 400);
   await request("/github", "PUT", { enabled: false, directory, clientId: "client" });
   assert.equal((await request("/github/device", "POST")).status, 400);
+  expectedToken = "";
+  const publicClone = await request("/github/clone", "POST", {
+    repository: "octocat/public", directory: selectedDirectory,
+  });
+  assert.equal(publicClone.status, 201, JSON.stringify(publicClone.data));
+  assert.equal(publicClone.data.project.path, join(selectedDirectory, "octocat", "public"));
+  assert.ok(!JSON.stringify(publicClone.data).includes(secret));
+  const failedClone = await request("/github/clone", "POST", {
+    repository: "octocat/failure", directory: selectedDirectory,
+  });
+  assert.equal(failedClone.status, 400);
+  await assert.rejects(access(join(selectedDirectory, "octocat", "failure")));
+
 });
