@@ -2,7 +2,6 @@ import type { Ref } from "vue";
 import { relocatedPath } from "../../../../core/modules/workspace/index.ts";
 import { replacePanel, type DockLayout } from "../../dock/index.ts";
 import { refreshWorkspace, type WorkspaceCapabilities } from "../../workspace-api/index.ts";
-import type { SidebarSection } from "../ui/SidebarTabs.vue";
 import type { OpenFile } from "../open-file.ts";
 import type { useOpenFiles } from "./open-files.ts";
 
@@ -15,7 +14,7 @@ export interface WorkspaceRefreshContext {
   active: () => OpenFile | undefined;
   activeKey: () => string | undefined;
   revision: Ref<number>;
-  section: Ref<SidebarSection>;
+  section: Ref<string>;
   searchPanel: () => { search(): Promise<void> | void; refreshSearch(): void } | undefined;
   loadGit: () => Promise<void>;
 }

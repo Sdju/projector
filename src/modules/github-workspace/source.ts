@@ -136,6 +136,7 @@ export function createGithubWorkspaceProfile(
   return {
     id: "github",
     layout: "editor",
+    sidebar: [{ id: "issues", title: "Issues" }],
     tabs: [
       singletonTab(
         "repository",

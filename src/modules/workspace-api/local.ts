@@ -27,6 +27,7 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
   return {
     id: "local",
     layout: "full",
+    sidebar: [{ id: "docker", title: "Docker", command: "ide.docker.sidebar.open" }],
     tabs: [
       singletonTab("agent", "agent:chat", "Агент", "Чат с агентом Projector", {
         command: {

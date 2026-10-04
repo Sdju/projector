@@ -19,6 +19,7 @@ export {
   type ReadProvider,
 } from "./profile.ts";
 export { createLocalWorkspaceProfile } from "./local.ts";
+export { createSidebarRegistry, type SidebarRegistry, type SidebarType } from "./sidebar.ts";
 export {
   createTabRegistry,
   defineTab,

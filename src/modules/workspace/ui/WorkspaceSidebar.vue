@@ -1,25 +1,18 @@
 <script setup lang="ts">
-import type { WorkspaceCapabilities } from "../../workspace-api/index.ts";
-import { ref } from "vue";
-import { FileTree } from "../modules/tree/index.ts";
-import {
-  GitPanel,
-  type GitBranchesState,
-  type GitHistoryState,
-  type GitOverviewState,
-} from "../modules/git/index.ts";
-import { IssuesPanel } from "../modules/issues/index.ts";
+import { computed, watch } from "vue";
+import type { SidebarRegistry, WorkspaceCapabilities } from "../../workspace-api/index.ts";
+import type { GitBranchesState, GitHistoryState, GitOverviewState } from "../modules/git/index.ts";
 import type { useGitChangeSync } from "../lib/git-change-sync.ts";
 import type { useOpenFiles } from "../lib/open-files.ts";
 import type { OpenFile } from "../open-file.ts";
-import SearchPanel from "./SearchPanel.vue";
-import SidebarTabs, { type SidebarSection } from "./SidebarTabs.vue";
-import { DockerSidebar } from "../../docker/index.ts";
+import { baseSidebarViews, type SidebarHost, type SidebarViews } from "../lib/sidebar-views.ts";
+import SidebarTabs from "./SidebarTabs.vue";
 
-/** Боковая панель проекта: дерево файлов, поиск и Git с переключателем разделов. */
+/** Боковая панель проекта: переключатель разделов и панель выбранного раздела. */
 const props = defineProps<{
   projectId: string;
   capabilities: Readonly<WorkspaceCapabilities>;
+  sections: SidebarRegistry;
   hidden: boolean;
   active?: OpenFile;
   revision: number;
@@ -28,8 +21,10 @@ const props = defineProps<{
   branches: GitBranchesState;
   files: ReturnType<typeof useOpenFiles>;
   gitSync: ReturnType<typeof useGitChangeSync>;
+  /** Panels of the sections the embedding page owns. */
+  views?: SidebarViews;
 }>();
-const section = defineModel<SidebarSection>("section", { required: true });
+const section = defineModel<string>("section", { required: true });
 const emit = defineEmits<{
   command: [id: string];
   refresh: [];
@@ -38,25 +33,73 @@ const emit = defineEmits<{
   deleted: [path: string];
   moved: [source: string, destination: string];
 }>();
-const fileTree = ref<InstanceType<typeof FileTree>>();
-const searchPanel = ref<InstanceType<typeof SearchPanel>>();
-const gitPanel = ref<InstanceType<typeof GitPanel>>();
-const issuesPanel = ref<InstanceType<typeof IssuesPanel>>();
-const { openCommit, openCommitFile, prepareEntryChange } = props.files;
-function openFile(...args: Parameters<typeof props.files.openFile>) {
-  const result = props.files.openFile(...args);
-  emit("navigate");
-  return result;
+const views = { ...baseSidebarViews, ...props.views };
+const panels = new Map<string, { refresh?: () => unknown; [name: string]: unknown }>();
+const host: SidebarHost = {
+  get projectId() {
+    return props.projectId;
+  },
+  get active() {
+    return props.active;
+  },
+  get revision() {
+    return props.revision;
+  },
+  get overview() {
+    return props.overview;
+  },
+  get history() {
+    return props.history;
+  },
+  get branches() {
+    return props.branches;
+  },
+  get files() {
+    return props.files;
+  },
+  get gitSync() {
+    return props.gitSync;
+  },
+  openFile(...args) {
+    const result = props.files.openFile(...args);
+    emit("navigate");
+    return result;
+  },
+  openTab(id, params) {
+    props.files.openTab(id, params);
+    emit("navigate");
+  },
+  command: (id) => emit("command", id),
+  refreshWorkspace: () => emit("refresh"),
+  changed: () => emit("changed"),
+  deleted: (path) => emit("deleted", path),
+  moved: (source, destination) => emit("moved", source, destination),
+};
+const items = computed(() =>
+  props.sections
+    .list()
+    .filter((type) => views[type.id])
+    .map((type) => ({
+      id: type.id,
+      title: type.title,
+      icon: views[type.id].icon,
+      command: type.command,
+      badge: views[type.id].badge?.(host) ?? 0,
+    })),
+);
+const setPanel = (id: string, panel: unknown) =>
+  panel ? panels.set(id, panel as never) : panels.delete(id);
+function refresh() {
+  const view = views[section.value];
+  if (view?.refresh) view.refresh(host, panels.get(section.value));
+  else emit("refresh");
 }
-function openIssue(issue: { number: number; title: string }) {
-  props.files.openTab("issue", issue);
-  emit("navigate");
-}
+watch(section, (id) => views[id]?.activate?.(host));
 
 defineExpose({
-  reveal: (path: string) => fileTree.value?.reveal(path),
-  refreshSearch: () => searchPanel.value?.refresh(),
-  search: () => searchPanel.value?.search(),
+  reveal: (path: string) => (panels.get("files")?.reveal as (path: string) => void)?.(path),
+  refreshSearch: () => panels.get("search")?.refresh?.(),
+  search: () => (panels.get("search")?.search as () => void | Promise<void>)?.(),
 });
 </script>
 
@@ -64,69 +107,19 @@ defineExpose({
   <aside v-show="!hidden" class="sidebar" aria-label="Обзор проекта">
     <SidebarTabs
       v-model:section="section"
+      :items="items"
       :capabilities="capabilities"
-      :git-count="overview.git.value.changes.length"
       @command="emit('command', $event)"
-      @refresh="
-        section === 'git'
-          ? gitPanel?.refresh()
-          : section === 'issues'
-            ? issuesPanel?.refresh()
-            : section === 'docker'
-              ? emit('command', 'ide.docker.refresh')
-              : emit('refresh')
-      "
+      @refresh="refresh"
     />
-    <div v-show="section === 'files'" class="side-content">
-      <FileTree
-        ref="fileTree"
-        :before-change="prepareEntryChange"
-        :project-id="projectId"
-        :selected="active?.path ?? ''"
-        :revision="revision"
-        :git-changes="overview.git.value.changes"
-        @changed="emit('changed')"
-        @deleted="emit('deleted', $event)"
-        @open="
-          (path, pinned) => openFile(path, undefined, undefined, undefined, { preview: !pinned })
-        "
-        @moved="(source, destination) => emit('moved', source, destination)"
-      />
-    </div>
-    <SearchPanel
-      v-if="capabilities.search"
-      v-show="section === 'search'"
-      ref="searchPanel"
-      :project-id="projectId"
-      @open="openFile"
+    <component
+      :is="views[item.id].component"
+      v-for="item in items"
+      :key="item.id"
+      v-show="section === item.id"
+      :ref="(panel: unknown) => setPanel(item.id, panel)"
+      v-bind="views[item.id].props(host, section === item.id)"
     />
-    <GitPanel
-      v-if="capabilities.git"
-      v-show="section === 'git'"
-      ref="gitPanel"
-      :project-id="projectId"
-      :overview="overview"
-      :history="history"
-      :branches="branches"
-      :selected="active ? { path: active.path, staged: active.staged } : undefined"
-      :prepare="gitSync.prepare"
-      :invalidate="files.invalidate"
-      :applied="gitSync.applied"
-      @open="
-        (path, staged, pinned) => openFile(path, undefined, undefined, staged, { preview: !pinned })
-      "
-      @open-commit="openCommit"
-      @open-commit-diff="(hash, path, pinned) => openCommitFile(hash, path, !pinned)"
-    />
-    <IssuesPanel
-      v-if="capabilities.issues"
-      v-show="section === 'issues'"
-      ref="issuesPanel"
-      :project-id="projectId"
-      :active="section === 'issues'"
-      @open="openIssue"
-    />
-    <DockerSidebar v-if="capabilities.docker" v-show="section === 'docker'" />
   </aside>
 </template>
 

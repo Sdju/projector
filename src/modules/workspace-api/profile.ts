@@ -1,3 +1,4 @@
+import type { SidebarType } from "./sidebar.ts";
 import type { TabType } from "./tabs.ts";
 
 export type WorkspaceCapability =
@@ -53,6 +54,8 @@ export interface WorkspaceProfile {
   features: Readonly<WorkspaceFeatures>;
   /** Service tab kinds this workspace adds to the base set. */
   tabs?: readonly TabType[];
+  /** Sidebar sections this workspace adds to the base set. */
+  sidebar?: readonly SidebarType[];
   /** `full` — editor and terminals; `editor` — a single editor group. */
   layout: "full" | "editor";
 }

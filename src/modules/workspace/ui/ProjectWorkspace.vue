@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref } from "vue";
 import {
   workspaceProfile,
   profileCapabilities,
@@ -10,7 +10,6 @@ import WorkbenchToolbar from "./WorkbenchToolbar.vue";
 import MobileSurfaces from "./MobileSurfaces.vue";
 import MobileTerminalActions from "./MobileTerminalActions.vue";
 import WorkspaceSidebar from "./WorkspaceSidebar.vue";
-import type { SidebarSection } from "./SidebarTabs.vue";
 import { useGitOverview, useGitHistory, useGitBranches } from "../modules/git/index.ts";
 import { useGitChangeSync } from "../lib/git-change-sync.ts";
 import { useSidebarResize } from "../lib/sidebar-resize.ts";
@@ -26,6 +25,7 @@ import { type OpenFile } from "../open-file.ts";
 import { createPanelHosts } from "../panel-hosts.ts";
 import { TerminalCloseDialog } from "../../terminal/index.ts";
 import { useDocker } from "../../docker/index.ts";
+import { sidebarSections } from "../lib/sidebar-views.ts";
 import { provideTabHost, useWorkspaceTabTypes, type TabViews } from "../lib/tab-views.ts";
 import { useWorkspaceRefresh } from "../lib/workspace-refresh.ts";
 import { useMobileSurfaces, registerMobileCommands } from "../lib/mobile-surfaces.ts";
@@ -94,7 +94,8 @@ const history = useGitHistory(() => props.projectId);
 const branches = useGitBranches(() => props.projectId);
 const { gutterRevision } = overview;
 const loadGit = () => (capabilities.git ? overview.load() : Promise.resolve());
-const section = ref<SidebarSection>("files");
+const section = ref("files");
+const sections = sidebarSections(profile, capabilities);
 const revision = ref(0);
 const isDirty = (file: OpenFile) =>
   file.virtual
@@ -195,6 +196,7 @@ useWorkspaceSession({
   restoringSession,
   activeKey,
   section,
+  sections,
   treeWidth,
   sidebarHidden,
   ensureTab: (id, params) => ensureTab(tabs, tabTypes, id, params),
@@ -227,9 +229,6 @@ const gitSync = useGitChangeSync({
   files,
   bumpRevision: () => revision.value++,
   refreshSearch: () => sidebar.value?.refreshSearch(),
-});
-watch(section, (value) => {
-  if (value === "git") void loadGit();
 });
 const { refresh, entryMoved } = useWorkspaceRefresh({
   projectId: () => props.projectId,
@@ -292,6 +291,7 @@ onBeforeUnmount(() => overview.cancel());
         v-model:section="section"
         :project-id="projectId"
         :capabilities="capabilities"
+        :sections="sections"
         :hidden="sidebarInvisible"
         :active="active"
         :revision="revision"

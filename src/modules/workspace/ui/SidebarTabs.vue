@@ -1,22 +1,24 @@
 <script setup lang="ts">
+import type { Component } from "vue";
 import type { WorkspaceCapabilities } from "../../workspace-api/index.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
-import IconFiles from "~icons/lucide/files";
-import IconSearch from "~icons/lucide/search";
-import IconGit from "~icons/devicon/git";
 import IconBot from "~icons/lucide/bot";
 import IconRefresh from "~icons/lucide/rotate-cw";
-import IconDocker from "~icons/lucide/container";
-import IconIssues from "~icons/lucide/circle-dot";
 
-export type SidebarSection = "files" | "search" | "git" | "issues" | "docker";
+export interface SidebarItem {
+  id: string;
+  title: string;
+  icon: Component;
+  badge: number;
+  command?: string;
+}
 defineProps<{
-  section: SidebarSection;
-  gitCount: number;
+  section: string;
+  items: SidebarItem[];
   capabilities: Readonly<WorkspaceCapabilities>;
 }>();
 const emit = defineEmits<{
-  "update:section": [section: SidebarSection];
+  "update:section": [section: string];
   command: [id: string];
   refresh: [];
 }>();
@@ -25,54 +27,16 @@ const emit = defineEmits<{
 <template>
   <nav class="side-tabs" aria-label="Разделы проекта">
     <button
-      :class="{ selected: section === 'files' }"
-      :aria-pressed="section === 'files'"
-      title="Файлы"
-      aria-label="Файлы"
-      @click="emit('update:section', 'files')"
+      v-for="item in items"
+      :key="item.id"
+      :class="{ selected: section === item.id }"
+      :aria-pressed="section === item.id"
+      :title="item.title"
+      :aria-label="item.badge ? `${item.title}: ${item.badge}` : item.title"
+      @click="item.command ? emit('command', item.command) : emit('update:section', item.id)"
     >
-      <IconFiles aria-hidden="true" />
-    </button>
-    <button
-      v-if="capabilities.search"
-      :class="{ selected: section === 'search' }"
-      :aria-pressed="section === 'search'"
-      title="Поиск"
-      aria-label="Поиск"
-      @click="emit('update:section', 'search')"
-    >
-      <IconSearch aria-hidden="true" />
-    </button>
-    <button
-      v-if="capabilities.git"
-      :class="{ selected: section === 'git' }"
-      :aria-pressed="section === 'git'"
-      title="Git"
-      :aria-label="gitCount ? `Git: ${gitCount} изменений` : 'Git'"
-      @click="emit('update:section', 'git')"
-    >
-      <IconGit class="git-logo" aria-hidden="true" />
-      <span v-if="gitCount" aria-hidden="true">{{ gitCount }}</span>
-    </button>
-    <button
-      v-if="capabilities.issues"
-      :class="{ selected: section === 'issues' }"
-      :aria-pressed="section === 'issues'"
-      title="Issues"
-      aria-label="Issues"
-      @click="emit('update:section', 'issues')"
-    >
-      <IconIssues aria-hidden="true" />
-    </button>
-    <button
-      v-if="capabilities.docker"
-      :class="{ selected: section === 'docker' }"
-      :aria-pressed="section === 'docker'"
-      title="Docker"
-      aria-label="Docker"
-      @click="emit('command', 'ide.docker.sidebar.open')"
-    >
-      <IconDocker aria-hidden="true" />
+      <component :is="item.icon" :class="{ 'git-logo': item.id === 'git' }" aria-hidden="true" />
+      <span v-if="item.badge" aria-hidden="true">{{ item.badge }}</span>
     </button>
     <div class="side-actions">
       <UiButton
