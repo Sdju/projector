@@ -8,6 +8,7 @@ import {
   projectRefSegments,
 } from "../../project/index.ts";
 import { useCommandScope, commandArgs } from "../../../common/utilities/commands.ts";
+import { GithubClone } from "../../integrations/index.ts";
 import PathDropdown from "./PathDropdown.vue";
 import { useDirectoryListing } from "../model/directory-listing.ts";
 const props = defineProps<{ path: string; navigate: (path: string) => Promise<void> }>();
@@ -209,7 +210,13 @@ onBeforeUnmount(() => {
         >
           {{ segment.name }}
         </button>
+        <GithubClone
+          v-if="remoteProject && segment.path === path"
+          :repository="path.slice(4)"
+          :navigate="props.navigate"
+        />
         <button
+          v-else
           class="segment-arrow"
           :aria-label="remoteProject ? `Репозитории ${githubOwnerPath.slice(4)} (${segment.name})` : `Папки в ${segment.path}`"
           :aria-expanded="menuPath === segment.path"
