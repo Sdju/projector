@@ -107,13 +107,21 @@ test("corrupt credentials fail closed, and replacing a password restores file pe
   assert.equal((await stat(lanPasswordPath())).mode & 0o777, 0o600);
 });
 
-test("fetch never attaches the LAN password to network-path or cross-origin URLs", async (t) => {
+test("fetch isolates LAN credentials and prompts only on an explicit LAN challenge", async (t) => {
   const previous = { fetch: globalThis.fetch, window: globalThis.window };
   const calls = [];
-  globalThis.window = { location: { origin: "http://localhost:4177" } };
+  const responses = [];
+  let prompts = 0;
+  globalThis.window = {
+    location: { origin: "http://localhost:4177" },
+    prompt: () => {
+      prompts++;
+      return "new-test-password";
+    },
+  };
   globalThis.fetch = async (url, init) => {
     calls.push({ url, authorization: new Headers(init?.headers).get("Authorization") });
-    return new Response("{}");
+    return responses.shift() ?? new Response("{}");
   };
   t.after(() => {
     globalThis.fetch = previous.fetch;
@@ -134,10 +142,35 @@ test("fetch never attaches the LAN password to network-path or cross-origin URLs
   await auth.authedFetch("/api/app/network");
   assert.equal(calls.at(-1).authorization, "Bearer test-only-password");
   auth.clearLanPassword();
+  for (const challenge of [null, 'Bearer realm="GitHub"']) {
+    responses.push(
+      new Response('{"error":"GitHub authorization expired"}', {
+        status: 401,
+        headers: challenge ? { "WWW-Authenticate": challenge } : {},
+      }),
+    );
+    const before = calls.length;
+    const response = await auth.authedFetch(
+      "/api/integrations/github/browse/repository?repository=vuejs/core",
+    );
+    assert.equal(response.status, 401);
+    assert.equal(prompts, 0, "upstream authentication is not a LAN password challenge");
+    assert.equal(calls.length, before + 1, "no password retry against GitHub");
+  }
+  responses.push(
+    new Response("{}", {
+      status: 401,
+      headers: { "WWW-Authenticate": 'Bearer realm="Projector LAN"' },
+    }),
+  );
+  assert.equal((await auth.authedFetch("/api/app/network")).status, 200);
+  assert.equal(prompts, 1);
+  assert.equal(calls.at(-1).authorization, "Bearer new-test-password");
+  auth.clearLanPassword();
 });
 
 test("Vite resources require LAN authentication; session cookies survive resource loads and expire on password replacement", async (t) => {
-  await isolatedLan(t);
+  const dir = await isolatedLan(t);
   const address = Object.values(networkInterfaces())
     .flat()
     .find((entry) => entry?.family === "IPv4" && !entry.internal)?.address;
@@ -145,6 +178,7 @@ test("Vite resources require LAN authentication; session cookies survive resourc
   const { createServer: createVite } = await import("vite-plus");
   const vite = await createVite({
     configFile: join(process.cwd(), "vite.config.ts"),
+    cacheDir: join(dir, "vite-cache"),
     server: { middlewareMode: true, hmr: false, ws: false },
     logLevel: "error",
     optimizeDeps: { noDiscovery: true, include: [] },
@@ -152,6 +186,9 @@ test("Vite resources require LAN authentication; session cookies survive resourc
   t.after(() => vite.close());
   const server = await listen(t, createServer(vite.middlewares));
   const headers = { Host: "localhost:4177" };
+  const unauthorized = await send(server, address, "/api/app/network", headers);
+  assert.equal(unauthorized.status, 401);
+  assert.equal(unauthorized.headers["www-authenticate"], 'Bearer realm="Projector LAN"');
   for (const path of [
     "/package.json",
     `/@fs${process.cwd()}/server/modules/access/access.ts?raw`,

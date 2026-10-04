@@ -40,6 +40,7 @@ export function authorizeHttp(
   ) {
     sendLogin(res);
   } else {
+    if (status === 401) res.setHeader("WWW-Authenticate", 'Bearer realm="Projector LAN"');
     res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
     res.end(
       JSON.stringify({

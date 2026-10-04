@@ -46,8 +46,8 @@ function requestPassword(): Promise<string | null> {
 }
 
 /**
- * fetch с Bearer-токеном для запросов на свой origin. При 401 запрашивает пароль
- * и повторяет запрос один раз. Внешние запросы (провайдеры и т.п.) не меняются.
+ * fetch с Bearer-токеном для запросов на свой origin. Только явный LAN challenge
+ * запрашивает пароль; 401 от GitHub/провайдеров возвращаются вызывающему коду.
  */
 export async function authedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -63,7 +63,10 @@ export async function authedFetch(input: RequestInfo | URL, init?: RequestInit):
   };
 
   let response = await nativeFetch(input, { ...init, headers: headers() });
-  if (response.status === 401) {
+  if (
+    response.status === 401 &&
+    response.headers.get("WWW-Authenticate") === 'Bearer realm="Projector LAN"'
+  ) {
     const password = await requestPassword();
     if (password) {
       setLanPassword(password);
