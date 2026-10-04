@@ -1,15 +1,24 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, useId } from "vue";
+import { useNow } from "@vueuse/core";
 import IconOpenCode from "~icons/simple-icons/opencode";
 import type { OpenCodeUsage } from "../../../../core/modules/opencode/index.ts";
 import { useCommandScope } from "../../../common/utilities/commands.ts";
+import { resetCountdown, resetTimestamp } from "../../../common/utilities/reset-time.ts";
 
 const usage = ref<OpenCodeUsage | null>(null);
+const now = useNow({ interval: 1000 });
 const failed = ref(false);
 type WindowName = keyof NonNullable<OpenCodeUsage["windows"]>;
 const windowOrder: WindowName[] = ["monthly", "rolling", "weekly"];
 const labels = { rolling: "5 часов", weekly: "Неделя", monthly: "Месяц" };
 const shortLabels = { rolling: "5ч", weekly: "нед", monthly: "мес" };
+const tickPositions = {
+  rolling: [20, 40, 60, 80],
+  weekly: Array.from({ length: 6 }, (_, day) => (day + 1) / 7 * 100),
+  // Monthly scale is approximately 30 days: one mark per seven days.
+  monthly: [7, 14, 21, 28].map((day) => day / 30 * 100),
+};
 const selectedWindow = ref<WindowName>("weekly");
 const commands = useCommandScope(`opencodeUsage:${useId()}`, () => ({
   surface: "statusBar", window: selectedWindow.value,
@@ -47,21 +56,27 @@ const remaining = computed(() => {
   if (failed.value || usage.value?.status !== "ready" || !usage.value.windows) return null;
   return Math.round(100 - usage.value.windows[selectedWindow.value].usedPercent);
 });
+const tooltipRows = computed(() => {
+  if (failed.value || usage.value?.status !== "ready" || !usage.value.windows) return [];
+  const windows = usage.value.windows;
+  return (Object.keys(shortLabels) as WindowName[]).map((name) => ({
+    name, label: shortLabels[name], remaining: Math.round(100 - windows[name].usedPercent),
+    countdown: resetCountdown(windows[name].resetsAt, now.value.getTime()),
+    limited: windows[name].limited,
+  }));
+});
 const tooltip = computed(() => {
-  const heading = `OpenCode Go · ${labels[selectedWindow.value]}\nНажмите, чтобы переключить лимит`;
+  const heading = `OpenCode Go · ${labels[selectedWindow.value]}`;
   if (failed.value) return `${heading}\nНе удалось обновить лимиты`;
   if (!usage.value) return `${heading}\nЗагрузка лимитов…`;
   const windows = usage.value.windows;
   if (remaining.value === null || !windows)
     return `${heading}\n${usage.value.message ?? "Лимиты недоступны"}`;
-  return [heading, ...Object.entries(labels).map(([name, label]) => {
+  return [`${heading} · остаток`, ...Object.entries(labels).map(([name, label]) => {
     const window = windows[name as keyof typeof windows];
-    const reset = window.resetsAt
-      ? new Date(window.resetsAt * 1000).toLocaleString(undefined, {
-        day: "numeric", month: "long", hour: "2-digit", minute: "2-digit", timeZoneName: "short",
-      }) : "неизвестно";
-    return `${label}: осталось ${Math.round(100 - window.usedPercent)}%${window.limited ? " · лимит исчерпан" : ""}\nСброс: ${reset}`;
-  })].join("\n");
+    const reset = resetCountdown(window.resetsAt, now.value.getTime());
+    return `${label}: ${Math.round(100 - window.usedPercent)}%${window.limited ? " · исчерпан" : ""} · ${reset} (${resetTimestamp(window.resetsAt)})`;
+  }), "Клик — сменить лимит"].join("\n");
 });
 function visibilityChanged() {
   if (!document.hidden) void refresh();
@@ -96,9 +111,34 @@ onBeforeUnmount(() => {
       :aria-label="`Остаток лимита OpenCode Go: ${labels[selectedWindow]}`"
     >
       <span v-if="remaining !== null" class="quota-fill" :style="{ width: `${remaining}%` }" />
-      <span class="quota-label">{{ shortLabels[selectedWindow] }} · {{ remaining === null ? "—" : `${remaining}%` }}</span>
+      <span class="quota-label">
+        <span>{{ shortLabels[selectedWindow] }} · {{ remaining === null ? "—" : `${remaining}%` }}</span>
+      </span>
     </span>
-    <span class="quota-tooltip" role="tooltip">{{ tooltip }}</span>
+    <span class="quota-tooltip" role="tooltip">
+      <template v-if="tooltipRows.length">
+        <span class="tooltip-heading">OpenCode Go · сброс через</span>
+        <span v-for="row in tooltipRows" :key="row.name" class="quota-row">
+          <span>{{ row.label }}</span>
+          <span class="quota-bar tooltip-bar" :class="{ exhausted: row.limited }">
+            <span class="quota-fill" :style="{ width: `${row.remaining}%` }" />
+            <span
+              v-for="position in tickPositions[row.name]"
+              :key="position"
+              class="quota-tick"
+              :style="{ left: `${position}%` }"
+              aria-hidden="true"
+            />
+            <span class="quota-label">
+              <span>{{ row.remaining }}%</span>
+              <span class="quota-time">{{ row.countdown }}</span>
+            </span>
+          </span>
+        </span>
+        <span class="tooltip-hint">Клик — сменить лимит</span>
+      </template>
+      <template v-else>{{ tooltip }}</template>
+    </span>
   </button>
 </template>
 
@@ -124,7 +164,7 @@ onBeforeUnmount(() => {
 }
 .quota-bar {
   position: relative;
-  width: 84px;
+  min-width: 84px;
   height: 16px;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -137,15 +177,40 @@ onBeforeUnmount(() => {
   background: color-mix(in srgb, currentColor 22%, transparent);
 }
 .quota-label {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 100%;
+  padding-inline: 6px;
+  white-space: nowrap;
   color: var(--text);
   font-size: 10px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
+.quota-time { opacity: 0.7; }
+.tooltip-heading { display: block; margin-bottom: 5px; }
+.quota-row {
+  display: grid;
+  grid-template-columns: 26px 160px;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.tooltip-bar { height: 18px; }
+.quota-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: color-mix(in srgb, currentColor 25%, transparent);
+  pointer-events: none;
+}
+.tooltip-bar .quota-label { justify-content: space-between; }
+.exhausted { border-color: var(--muted); }
+.tooltip-hint { display: block; margin-top: 5px; color: var(--muted); }
 .unavailable .quota-label { color: var(--muted); }
 .quota-tooltip {
   position: absolute;

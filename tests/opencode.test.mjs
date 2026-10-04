@@ -7,9 +7,25 @@ import { os } from "../core/modules/os/index.ts";
 import { readGoUsage } from "../server/modules/opencode/client.ts";
 import { goWindows, openCodeUsage } from "../server/modules/opencode/usage.ts";
 import { handleOpenCode } from "../server/routes/api/opencode.ts";
+import { resetCountdown } from "../src/common/utilities/reset-time.ts";
 
 const window = { status: "ok", percent: 42, resetsAt: "2026-10-10T12:00:00Z" };
 const payload = { usage: { rolling: window, weekly: window, monthly: window } };
+
+test("compact reset countdown handles missing, expired and minute/hour/day boundaries", () => {
+  const now = 1791150000000;
+  const reset = (seconds) => resetCountdown(now / 1000 + seconds, now);
+  for (const value of [null, undefined, NaN, Infinity]) assert.equal(resetCountdown(value, now), "—");
+  assert.equal(reset(-10), "сейчас");
+  assert.equal(reset(0), "сейчас");
+  assert.equal(reset(59), "<1м");
+  assert.equal(reset(60), "1м");
+  assert.equal(reset(3599), "59м");
+  assert.equal(reset(3600), "1ч");
+  assert.equal(reset(8100), "2ч 15м");
+  assert.equal(reset(86400), "1д");
+  assert.equal(reset(187200), "2д 4ч");
+});
 
 test("Go windows validate percentages and status, normalize resets and exhausted limits", () => {
   const parsed = goWindows(payload);

@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref } from "vue";
+import { useNow } from "@vueuse/core";
 import IconCodex from "~icons/simple-icons/openai";
 import type { CodexUsage } from "../../../../core/modules/codex/index.ts";
+import { resetCountdown, resetTimestamp } from "../../../common/utilities/reset-time.ts";
 
 const usage = ref<CodexUsage | null>(null);
+const now = useNow({ interval: 1000 });
 const failed = ref(false);
 let timer: ReturnType<typeof setTimeout> | undefined;
 let controller: AbortController | undefined;
@@ -29,21 +32,13 @@ const remaining = computed(() => {
   if (failed.value || usage.value?.status !== "ready" || !usage.value.weekly) return null;
   return Math.round(100 - usage.value.weekly.usedPercent);
 });
+const countdown = computed(() => resetCountdown(usage.value?.weekly?.resetsAt, now.value.getTime()));
 const tooltip = computed(() => {
   if (failed.value) return "Codex: не удалось обновить недельный лимит";
   if (!usage.value) return "Codex: загрузка недельного лимита…";
   if (remaining.value === null) return `Codex: ${usage.value.message ?? "лимит недоступен"}`;
   const reset = usage.value.weekly?.resetsAt;
-  const resetTime = reset
-    ? new Date(reset * 1000).toLocaleString(undefined, {
-        day: "numeric",
-        month: "long",
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZoneName: "short",
-      })
-    : "неизвестно";
-  return `Codex · осталось ${remaining.value}% недельного лимита\nСброс: ${resetTime}`;
+  return `Codex · неделя · осталось ${remaining.value}%\nСброс через ${countdown.value} · ${resetTimestamp(reset)}`;
 });
 function visibilityChanged() {
   if (!document.hidden) void refresh();
@@ -73,9 +68,33 @@ onBeforeUnmount(() => {
       aria-label="Остаток недельного лимита Codex"
     >
       <span v-if="remaining !== null" class="quota-fill" :style="{ width: `${remaining}%` }" />
-      <span class="quota-label">{{ remaining === null ? "—" : `${remaining}%` }}</span>
+      <span class="quota-label">
+        <span>{{ remaining === null ? "—" : `${remaining}%` }}</span>
+      </span>
     </span>
-    <span class="quota-tooltip" role="tooltip">{{ tooltip }}</span>
+    <span class="quota-tooltip" role="tooltip">
+      <template v-if="remaining !== null">
+        <span class="tooltip-heading">Codex · сброс через</span>
+        <span class="quota-row">
+          <span>нед</span>
+          <span class="quota-bar tooltip-bar">
+            <span class="quota-fill" :style="{ width: `${remaining}%` }" />
+            <span
+              v-for="day in 6"
+              :key="day"
+              class="quota-tick"
+              :style="{ left: `${day / 7 * 100}%` }"
+              aria-hidden="true"
+            />
+            <span class="quota-label">
+              <span>{{ remaining }}%</span>
+              <span class="quota-time">{{ countdown }}</span>
+            </span>
+          </span>
+        </span>
+      </template>
+      <template v-else>{{ tooltip }}</template>
+    </span>
   </span>
 </template>
 
@@ -94,7 +113,7 @@ onBeforeUnmount(() => {
 }
 .quota-bar {
   position: relative;
-  width: 64px;
+  min-width: 64px;
   height: 16px;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -107,15 +126,32 @@ onBeforeUnmount(() => {
   background: color-mix(in srgb, currentColor 22%, transparent);
 }
 .quota-label {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 100%;
+  padding-inline: 6px;
+  white-space: nowrap;
   color: var(--text);
   font-size: 10px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
+.quota-time { opacity: 0.7; }
+.tooltip-heading { display: block; margin-bottom: 5px; }
+.quota-row { display: grid; grid-template-columns: 26px 160px; align-items: center; gap: 6px; }
+.tooltip-bar { height: 18px; }
+.quota-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: color-mix(in srgb, currentColor 25%, transparent);
+  pointer-events: none;
+}
+.tooltip-bar .quota-label { justify-content: space-between; }
 .unavailable .quota-label {
   color: var(--muted);
 }
