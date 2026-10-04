@@ -14,7 +14,7 @@
 | `core/modules/os`, его закрытый `modules/linux` | Выбор ОС, каталоги, процессы, утилиты, X11, GIO, D-Bus, resident, трей и хоткей |
 | `core/modules/launcher` | Общие контракты, HTTP-клиент и модель поведения DOM/GTK-палитры |
 | `packages/vio` | Независимый Vue renderer для GTK4, SFC loader, стили и demo |
-| `server/modules/processes`, `server/modules/terminal` | Процессы проектов, PTY, WebSocket и восстановление экрана |
+| `server/modules/processes`, `server/modules/terminal`, `server/modules/terminal-control` | Процессы проектов, PTY, WebSocket экрана и управления сессиями |
 | `src/modules/terminal` | Список сессий (`useTerminalSessions`), `TerminalView` — один xterm и сокет на видимую вкладку, клавиатура, IME |
 | `src/modules/dock` | Раскладка блоков: чистая модель дерева (`model/layout.ts`), разделители, группы вкладок, drag-and-drop |
 | `server/modules/workspace`, `src/modules/workspace` | Файлы, поиск, Git, архивы и редакторы |
@@ -52,6 +52,8 @@ node --import vio/register native/app/entry.ts native http://localhost:4177 quit
 ## Процессы, HMR и терминальный ввод
 
 `globalThis.projectorProcesses` и `globalThis.projectorTerminals` сохраняют состояние при перезагрузке модулей. Не теряйте учёт живых процессов и не создавайте дубли подписок/обработчиков. Полный restart Node завершает терминалы; данные сессий находятся в памяти сервера.
+
+Список терминалов подписывается на `/api/terminal/control?project=<id>`: сервер отправляет полный список при подключении и после создания, удаления, переименования, изменения статуса или размеров сессии. Создание, stop/restart, переименование, проверка активности перед закрытием, закрытие и разрешение файловых ссылок идут запросами с `id` по этому же WS. После обрыва клиент переподключается с задержкой до 10 секунд и получает свежий список; операции с неизвестным результатом автоматически не повторяются. Экран, ввод и resize остаются на `/api/terminal/socket?session=<id>`. HTTP API сохранён для совместимости и загрузки файлов; периодического HTTP-опроса терминалов нет.
 
 Клавиатура имеет несколько слоёв: KDE/XKB и Fcitx5. Одного `LayoutList` недостаточно для диагностики языков. Проверяйте строчные и заглавные символы, композицию и реальные клавиши: вставка Unicode не подтверждает работу IME. Обработчик xterm должен дождаться переведённого текста, сохраняя Ctrl+C, Enter и стрелки.
 
