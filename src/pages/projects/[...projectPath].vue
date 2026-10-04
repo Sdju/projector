@@ -4,6 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useProjects, projectPathFromParams, projectRoute } from "../../modules/project/index.ts";
 import { ProjectSettings, useProjectCommands } from "../../modules/catalog/index.ts";
 import { RunControls, useRunner } from "../../modules/runner/index.ts";
+import { DevcontainerTrust } from "../../modules/devcontainer/index.ts";
 import { ProjectWorkspace, type TabViews } from "../../modules/workspace/index.ts";
 
 const route = useRoute();
@@ -70,6 +71,7 @@ watch(
 
 <template>
   <section v-if="project" class="project-page">
+    <DevcontainerTrust :key="`${project.id}:${project.path}`" :project-id="project.id" />
     <ProjectWorkspace
       :key="`${project.id}:${project.path}`"
       :project-id="project.id"
