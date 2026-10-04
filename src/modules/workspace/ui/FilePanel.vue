@@ -43,9 +43,9 @@ const emit = defineEmits<{
       <DockerPanel v-else-if="file.virtual === 'docker'" />
       <slot v-else-if="file.virtual === 'repository'" name="repository" />
       <IssueView
-        v-else-if="file.virtual === 'issue' && file.issue"
+        v-else-if="file.virtual === 'issue' && typeof file.params?.number === 'number'"
         :project-id="projectId"
-        :number="file.issue"
+        :number="file.params.number"
         @open="emit('open', $event)"
       />
       <CommitOverview

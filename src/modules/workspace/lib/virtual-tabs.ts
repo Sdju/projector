@@ -1,16 +1,12 @@
-export const virtualTabs = {
-  keybindings: {
-    key: "settings:keybindings",
-    path: "Горячие клавиши",
-    title: "Настройки горячих клавиш",
-  },
-  agent: { key: "agent:chat", path: "Агент", title: "Чат с агентом Projector" },
-  project: { key: "settings:project", path: "Настройки проекта", title: "Настройки проекта" },
-  network: { key: "network:info", path: "Локальная сеть", title: "Доступ по локальной сети" },
-  docker: { key: "docker:overview", path: "Docker", title: "Контейнеры и Compose" },
-  repository: {
-    key: "github:repository",
-    path: "О репозитории",
-    title: "Информация о репозитории GitHub",
-  },
-};
+import { singletonTab } from "../../workspace-api/index.ts";
+
+/** Kinds every workspace has; profiles add their own through `profile.tabs`. */
+export const baseTabTypes = [
+  singletonTab(
+    "keybindings",
+    "settings:keybindings",
+    "Горячие клавиши",
+    "Настройки горячих клавиш",
+  ),
+  singletonTab("network", "network:info", "Локальная сеть", "Доступ по локальной сети"),
+];

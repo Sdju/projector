@@ -1,19 +1,13 @@
 import type { FileContent } from "../../../core/modules/workspace/index.ts";
+import type { TabParams } from "../workspace-api/index.ts";
 
 export interface OpenFile extends FileContent {
-  virtual?:
-    | "keybindings"
-    | "agent"
-    | "project"
-    | "commit"
-    | "network"
-    | "docker"
-    | "repository"
-    | "issue";
+  /** Id зарегистрированного типа служебной вкладки (`TabType`) или `commit`. */
+  virtual?: string;
+  /** Параметры типа вкладки: по ним строится ключ и восстанавливается сессия. */
+  params?: TabParams;
   /** Полный хеш: вкладка обзора коммита или diff файла в этом коммите. */
   commit?: string;
-  /** Номер issue для вкладки обсуждения. */
-  issue?: number;
   /** Короткий хеш родителя в diff коммита; пусто у корневого коммита. */
   parent?: string;
   external?: boolean;

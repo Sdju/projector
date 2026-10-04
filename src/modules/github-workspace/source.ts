@@ -1,6 +1,6 @@
 import type { GithubRepository, GithubEntry } from "../../../core/modules/github/index.ts";
 import type { FileContent, FileEntry } from "../../../core/modules/workspace/index.ts";
-import type { WorkspaceProfile } from "../workspace-api/index.ts";
+import { defineTab, singletonTab, type WorkspaceProfile } from "../workspace-api/index.ts";
 import { formatProjectRef } from "../project/index.ts";
 import { readIssue, readIssues, readRepository, readTree, readFile, readGit } from "./client.ts";
 
@@ -136,6 +136,21 @@ export function createGithubWorkspaceProfile(
   return {
     id: "github",
     layout: "editor",
+    tabs: [
+      singletonTab(
+        "repository",
+        "github:repository",
+        "О репозитории",
+        "Информация о репозитории GitHub",
+      ),
+      defineTab<{ number: number; title?: string }>({
+        id: "issue",
+        key: ({ number }) => `issue:${number}`,
+        path: ({ number }) => `Issue #${number}`,
+        title: ({ number, title }) => `${title ? `${title} · ` : ""}Issue #${number}`,
+        hint: ({ title }) => title ?? "",
+      }),
+    ],
     features: {
       terminals: false,
       docker: false,

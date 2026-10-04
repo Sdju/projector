@@ -50,7 +50,7 @@ function openFile(...args: Parameters<typeof props.files.openFile>) {
   return result;
 }
 function openIssue(issue: { number: number; title: string }) {
-  props.files.openIssue(issue);
+  props.files.openTab("issue", issue);
   emit("navigate");
 }
 

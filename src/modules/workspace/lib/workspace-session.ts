@@ -1,5 +1,6 @@
 import { onBeforeUnmount, watch, type Ref } from "vue";
 import { parseDockLayout, serializeDockLayout, type DockLayout } from "../../dock/index.ts";
+import type { TabParams } from "../../workspace-api/index.ts";
 import type { OpenFile, OpenFileOptions } from "../open-file.ts";
 import { useSessionSnapshot } from "../../../common/utilities/session-snapshot.ts";
 import { workspaceSessionSchema, type WorkspaceSession } from "../session.ts";
@@ -17,11 +18,8 @@ export interface WorkspaceSessionContext {
   section: Ref<SidebarSection>;
   treeWidth: Ref<number | undefined>;
   sidebarHidden: Ref<boolean>;
-  /** Заголовок и путь служебной вкладки («Агент», «Настройки проекта»). */
-  virtualTab: (kind: Exclude<NonNullable<OpenFile["virtual"]>, "commit" | "issue">) => {
-    key: string;
-    path: string;
-  };
+  /** Добавляет вкладку зарегистрированного типа без выбора; `undefined` — тип неизвестен профилю. */
+  ensureTab: (id: string, params?: TabParams) => string | undefined;
   openFile: (
     path: string,
     line?: number,
@@ -49,6 +47,7 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
           key: tab.key,
           path: tab.path,
           virtual: tab.virtual,
+          params: tab.params,
           commit: tab.commit,
           external: tab.external,
           staged: tab.staged,
@@ -72,17 +71,9 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
           if (tab.commit) ctx.openCommit(tab.commit);
           continue;
         }
-        // Issue tabs are not persisted: they exist only in readonly GitHub sessions.
-        if (tab.virtual === "issue") continue;
         if (tab.virtual) {
-          const { key, path } = ctx.virtualTab(tab.virtual);
-          if (!ctx.tabs.value.some((file) => file.key === key))
-            ctx.tabs.value.push({
-              key,
-              virtual: tab.virtual,
-              path,
-              content: "",
-            });
+          // A kind the profile does not know (older session, other source) is dropped.
+          ctx.ensureTab(tab.virtual, tab.params);
           continue;
         }
         const completed = tab.commit

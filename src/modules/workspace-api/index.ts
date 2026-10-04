@@ -19,6 +19,14 @@ export {
   type ReadProvider,
 } from "./profile.ts";
 export { createLocalWorkspaceProfile } from "./local.ts";
+export {
+  createTabRegistry,
+  defineTab,
+  singletonTab,
+  type TabParams,
+  type TabRegistry,
+  type TabType,
+} from "./tabs.ts";
 
 /** Replaceable composition root: tests and new environments swap resolvers, not call sites. */
 const resolvers: WorkspaceProfileResolver[] = [];

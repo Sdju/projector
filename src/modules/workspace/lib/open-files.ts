@@ -6,11 +6,13 @@ import {
   saveWorkspaceFile,
   workspaceAssetUrl,
   workspaceCapabilities,
+  type TabParams,
+  type TabRegistry,
 } from "../../workspace-api/index.ts";
 import { projectRelativePath, previewBrowserFile } from "../file-drop.ts";
 import { isEditable, isMarkdown, type OpenFile, type OpenFileOptions } from "../open-file.ts";
 import { dropPreviewExcept as dropPreviewTabs, opensAsPreview } from "./preview-tabs.ts";
-import { openIssueTab } from "./service-tabs.ts";
+import { ensureTab } from "./service-tabs.ts";
 import { useDirtyGuard } from "./dirty-guard.ts";
 import { treeDragType } from "../modules/tree/index.ts";
 import type {
@@ -33,6 +35,7 @@ export interface OpenFilesContext {
   beforeCloseProjectSettings?: () => boolean | undefined;
   /** Куда поместить следующую открытую вкладку: заполняется при перетаскивании файла на блок. */
   pending: { target?: DockTarget };
+  tabTypes: TabRegistry;
 }
 
 /** Открытые файлы проекта: чтение, сохранение, закрытие и приём перетаскиваемых файлов. */
@@ -164,9 +167,11 @@ export function useOpenFiles(ctx: OpenFilesContext) {
       });
     selectTab(key);
   }
-  /** Вкладка обсуждения issue; `title` — подсказка до загрузки деталей. */
-  function openIssue(issue: { number: number; title?: string }) {
-    openIssueTab(tabs, selectTab, issue);
+  /** Открывает вкладку зарегистрированного типа или фокусирует уже открытую с тем же ключом. */
+  function openTab(id: string, params?: TabParams) {
+    const key = ensureTab(tabs, ctx.tabTypes, id, params);
+    if (!key) throw new Error(`Вкладка «${id}» недоступна в этом проекте`);
+    selectTab(key);
   }
   function releasePreview(file: OpenFile) {
     if (file.image?.startsWith("blob:")) URL.revokeObjectURL(file.image);
@@ -369,7 +374,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
     openFile,
     openCommit,
     openCommitFile,
-    openIssue,
+    openTab,
     openBrowserFile,
     acceptsFileDrop,
     dropFiles,

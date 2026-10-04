@@ -1,3 +1,5 @@
+import type { TabType } from "./tabs.ts";
+
 export type WorkspaceCapability =
   | "write"
   | "git"
@@ -49,6 +51,8 @@ export interface WorkspaceProfile {
     issues?: ReadProvider;
   };
   features: Readonly<WorkspaceFeatures>;
+  /** Service tab kinds this workspace adds to the base set. */
+  tabs?: readonly TabType[];
   /** `full` — editor and terminals; `editor` — a single editor group. */
   layout: "full" | "editor";
 }

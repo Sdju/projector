@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import {
   workspaceProfile,
+  createTabRegistry,
   profileCapabilities,
   type WorkspaceCapability,
 } from "../../workspace-api/index.ts";
@@ -15,7 +16,7 @@ import { useGitOverview, useGitHistory, useGitBranches } from "../modules/git/in
 import { useGitChangeSync } from "../lib/git-change-sync.ts";
 import { useSidebarResize } from "../lib/sidebar-resize.ts";
 import { useOpenFiles } from "../lib/open-files.ts";
-import { openServiceTab } from "../lib/service-tabs.ts";
+import { ensureTab } from "../lib/service-tabs.ts";
 import { useWorkbenchLayout } from "../lib/workbench-layout.ts";
 import { registerEditorCommands } from "../lib/editor-commands.ts";
 import { useWorkspaceSession } from "../lib/workspace-session.ts";
@@ -26,7 +27,7 @@ import { type OpenFile } from "../open-file.ts";
 import { createPanelHosts } from "../panel-hosts.ts";
 import { TerminalCloseDialog } from "../../terminal/index.ts";
 import { useDocker } from "../../docker/index.ts";
-import { virtualTabs } from "../lib/virtual-tabs.ts";
+import { baseTabTypes } from "../lib/virtual-tabs.ts";
 import { useWorkspaceRefresh } from "../lib/workspace-refresh.ts";
 import { useMobileSurfaces, registerMobileCommands } from "../lib/mobile-surfaces.ts";
 const props = defineProps<{
@@ -37,6 +38,7 @@ const props = defineProps<{
 }>();
 const profile = workspaceProfile(props.projectId);
 const capabilities = profileCapabilities(profile);
+const tabTypes = createTabRegistry(baseTabTypes, profile.tabs);
 const workspaceElement = ref<HTMLElement>();
 const sidebarHidden = ref(false);
 const {
@@ -102,7 +104,7 @@ const workbench = useWorkbenchLayout({
   tabs,
   pending,
   isDirty,
-  virtualTitle: (kind) => virtualTabs[kind].title,
+  tabTypes,
   selectTab: (key) => files.selectTab(key),
   closeTab: (key) => files.closeTab(key),
   closeManyTabs: (ids) => files.closeManyTabs(ids),
@@ -130,8 +132,9 @@ const files = useOpenFiles({
   saved: () => void loadGit(),
   beforeCloseProjectSettings: () => props.beforeCloseProjectSettings?.(),
   pending,
+  tabTypes,
 });
-const { fileError, loading, openFile, selectTab, saveFile, toggleMarkdownSource } = files;
+const { fileError, loading, openFile, openTab, saveFile, toggleMarkdownSource } = files;
 const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
   editorCommands,
   register: registerEditor,
@@ -141,7 +144,7 @@ const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
   fileOf,
   saveFile,
   openFile,
-  selectTab,
+  openTab,
   toggleMarkdownSource,
   revealInTree: (path) => {
     section.value = "files";
@@ -156,20 +159,16 @@ const docker = useDocker(props.projectId, {
     section.value = "docker";
     showSidebar();
   },
-  open: () => {
-    const { key, path } = virtualTabs.docker;
-    if (!tabs.value.some((tab) => tab.key === key))
-      tabs.value.push({ key, path, virtual: "docker", content: "" });
-    selectTab(key);
-  },
+  open: () => openTab("docker"),
   terminal: async (session) => {
     await terminals.refresh();
     revealPanel(`terminal:${session.id}`);
   },
 });
-const openTab = (kind: "project" | "repository") => openServiceTab(tabs, selectTab, kind);
 const panelHosts = createPanelHosts();
-const keepAlive = new Set([virtualTabs.agent.key, virtualTabs.project.key]);
+const keptKinds = ["agent", "project"].filter((id) => tabTypes.has(id));
+const keepAlive = new Set(keptKinds.map((id) => tabTypes.keyOf(id)));
+const virtualKeys = Object.fromEntries(keptKinds.map((id) => [id, tabTypes.keyOf(id)]));
 registerEditor(
   "ide.workbench.sidebar.toggle",
   "Показать или скрыть боковую панель",
@@ -190,7 +189,7 @@ useWorkspaceSession({
   section,
   treeWidth,
   sidebarHidden,
-  virtualTab: (kind) => virtualTabs[kind],
+  ensureTab: (id, params) => ensureTab(tabs, tabTypes, id, params),
   openFile,
   fileGeneration: files.generation,
   openProjectSettings: () => openTab("project"),
@@ -340,7 +339,7 @@ onBeforeUnmount(() => overview.cancel());
         :keep-alive="keepAlive"
         :gutter-revision="gutterRevision"
         :tabs="tabs"
-        :virtual-keys="{ agent: virtualTabs.agent.key, project: virtualTabs.project.key }"
+        :virtual-keys="virtualKeys"
       >
         <template #mobile-terminal-actions>
           <MobileTerminalActions

@@ -1,35 +1,24 @@
 import type { Ref } from "vue";
+import type { TabParams, TabRegistry } from "../../workspace-api/index.ts";
 import type { OpenFile } from "../open-file.ts";
-import { virtualTabs } from "./virtual-tabs.ts";
 
-type ServiceTab = keyof typeof virtualTabs;
-
-/** Opens a single service tab and focuses it, creating it on first use. */
-export function openServiceTab(
+/** Adds the tab of a registered kind unless it is already open; returns its key. */
+export function ensureTab(
   tabs: Ref<OpenFile[]>,
-  selectTab: (key: string) => void,
-  kind: ServiceTab,
+  registry: TabRegistry,
+  id: string,
+  params: TabParams = {},
 ) {
-  const { key, path } = virtualTabs[kind];
-  if (!tabs.value.some((tab) => tab.key === key))
-    tabs.value.push({ key, path, virtual: kind, content: "" });
-  selectTab(key);
-}
-
-/** Opens the discussion tab of a single issue; each issue gets its own tab. */
-export function openIssueTab(
-  tabs: Ref<OpenFile[]>,
-  selectTab: (key: string) => void,
-  issue: { number: number; title?: string },
-) {
-  const key = `issue:${issue.number}`;
+  const type = registry.get(id);
+  if (!type) return undefined;
+  const key = type.key(params);
   if (!tabs.value.some((tab) => tab.key === key))
     tabs.value.push({
       key,
-      virtual: "issue",
-      path: `Issue #${issue.number}`,
-      content: issue.title || "",
-      issue: issue.number,
+      path: type.path(params),
+      virtual: id,
+      content: type.hint?.(params) ?? "",
+      params,
     });
-  selectTab(key);
+  return key;
 }

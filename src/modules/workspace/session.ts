@@ -3,9 +3,8 @@ import { z } from "zod";
 const tabSchema = z.object({
   key: z.string(),
   path: z.string(),
-  virtual: z
-    .enum(["keybindings", "agent", "project", "commit", "network", "docker", "repository", "issue"])
-    .optional(),
+  virtual: z.string().optional(),
+  params: z.record(z.string(), z.unknown()).optional(),
   commit: z.string().optional(),
   external: z.boolean().optional(),
   staged: z.boolean().optional(),

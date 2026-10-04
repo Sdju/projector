@@ -20,7 +20,7 @@ export interface EditorCommandContext {
   fileOf: (id: string) => OpenFile | undefined;
   saveFile: (file?: OpenFile) => Promise<boolean>;
   openFile: (path: string) => unknown;
-  selectTab: (key: string) => void;
+  openTab: (id: string) => void;
   toggleMarkdownSource: () => void;
   /** Показывает файл в дереве: открывает сайдбар и раздел «Файлы». */
   revealInTree: (path: string) => void;
@@ -29,7 +29,7 @@ export interface EditorCommandContext {
 
 /** Команды редактора: сохранение, показ в дереве, копирование пути, служебные вкладки и клавиши. */
 export function registerEditorCommands(ctx: EditorCommandContext) {
-  const { editorCommands, register, tabs, active, activeKey, fileOf, saveFile, selectTab } = ctx;
+  const { editorCommands, register, tabs, active, activeKey, fileOf, saveFile, openTab } = ctx;
   const { openFile, toggleMarkdownSource } = ctx;
   function commandFile(value?: unknown) {
     const args = commandArgs(value);
@@ -98,10 +98,7 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
     "ide.workbench.keybindings.open",
     "Открыть горячие клавиши",
     () => {
-      const key = "settings:keybindings";
-      if (!tabs.value.some((tab) => tab.key === key))
-        tabs.value.push({ key, virtual: "keybindings", path: "Горячие клавиши", content: "" });
-      selectTab(key);
+      openTab("keybindings");
     },
     () => true,
   );
@@ -109,10 +106,7 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
     "ide.workbench.agent.open",
     "Открыть чат с агентом",
     () => {
-      const key = "agent:chat";
-      if (!tabs.value.some((tab) => tab.key === key))
-        tabs.value.push({ key, virtual: "agent", path: "Агент", content: "" });
-      selectTab(key);
+      openTab("agent");
     },
     () => true,
     "agent",
@@ -121,10 +115,7 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
     "ide.workbench.server.network.open",
     "Показать доступ по локальной сети",
     () => {
-      const key = "network:info";
-      if (!tabs.value.some((tab) => tab.key === key))
-        tabs.value.push({ key, virtual: "network", path: "Локальная сеть", content: "" });
-      selectTab(key);
+      openTab("network");
     },
     () => true,
   );

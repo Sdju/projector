@@ -1,6 +1,7 @@
 import type {
   WorkspaceCapabilities,
   WorkspaceCapability,
+  TabRegistry,
   WorkspaceProfile,
 } from "../../workspace-api/index.ts";
 import { computed, ref, watch, type Ref } from "vue";
@@ -35,7 +36,7 @@ export interface WorkbenchLayoutContext {
   /** Куда поместить следующую открытую вкладку: заполняется при перетаскивании файла на блок. */
   pending: { target?: DockTarget };
   isDirty: (file: OpenFile) => boolean;
-  virtualTitle: (kind: Exclude<NonNullable<OpenFile["virtual"]>, "commit" | "issue">) => string;
+  tabTypes: TabRegistry;
   selectTab: (key: string) => void;
   closeTab: (key: string) => Promise<void>;
   closeManyTabs: (ids: string[]) => Promise<void>;
@@ -164,15 +165,13 @@ export function useWorkbenchLayout(ctx: WorkbenchLayoutContext) {
         title:
           file.virtual === "commit"
             ? `${file.content ? `${file.content} · ` : ""}${file.commit}`
-            : file.virtual === "issue"
-              ? `${file.content ? `${file.content} · ` : ""}Issue #${file.issue}`
-              : file.virtual
-                ? ctx.virtualTitle(file.virtual)
-                : file.saveError
-                  ? `${file.path} · ${file.saveError}`
-                  : file.commit
-                    ? `${file.path} · ${file.parent || "∅"} → ${file.commit.slice(0, 7)}`
-                    : `${file.path}${file.original !== undefined ? (file.staged ? " · HEAD → index" : " · index → рабочий файл") : ""}`,
+            : file.virtual
+              ? (ctx.tabTypes.get(file.virtual)?.title(file.params ?? {}) ?? file.path)
+              : file.saveError
+                ? `${file.path} · ${file.saveError}`
+                : file.commit
+                  ? `${file.path} · ${file.parent || "∅"} → ${file.commit.slice(0, 7)}`
+                  : `${file.path}${file.original !== undefined ? (file.staged ? " · HEAD → index" : " · index → рабочий файл") : ""}`,
         dirty: ctx.isDirty(file),
         saving: !!file.saving,
         error: !!file.saveError,

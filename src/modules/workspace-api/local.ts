@@ -1,4 +1,5 @@
 import type { FileWrite, GitWrite, WorkspaceProfile } from "./profile.ts";
+import { singletonTab } from "./tabs.ts";
 
 const base = (projectId: string) => `/api/projects/${encodeURIComponent(projectId)}/workspace`;
 
@@ -26,6 +27,11 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
   return {
     id: "local",
     layout: "full",
+    tabs: [
+      singletonTab("agent", "agent:chat", "Агент", "Чат с агентом Projector"),
+      singletonTab("project", "settings:project", "Настройки проекта", "Настройки проекта"),
+      singletonTab("docker", "docker:overview", "Docker", "Контейнеры и Compose"),
+    ],
     features: {
       terminals: true,
       docker: true,

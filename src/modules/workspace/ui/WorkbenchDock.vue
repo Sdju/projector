@@ -29,9 +29,13 @@ const props = defineProps<{
   gutterRevision: number;
   tabs: OpenFile[];
   /** Ключи служебных вкладок, чьё содержимое живёт вне дока. */
-  virtualKeys: { agent: string; project: string };
+  virtualKeys: Record<string, string | undefined>;
 }>();
 const { fileOf, terminals, terminalPanels } = props.workbench;
+const hostOf = (kind: string) => {
+  const key = props.virtualKeys[kind];
+  return (key && props.panelHosts.hosts[key]) || null;
+};
 </script>
 
 <template>
@@ -145,15 +149,15 @@ const { fileOf, terminals, terminalPanels } = props.workbench;
   <div class="keep-alive" hidden>
     <Teleport
       v-if="tabs.some((tab) => tab.virtual === 'agent')"
-      :to="panelHosts.hosts[virtualKeys.agent] ?? null"
-      :disabled="!panelHosts.hosts[virtualKeys.agent]"
+      :to="hostOf('agent')"
+      :disabled="!hostOf('agent')"
     >
       <AgentChat :key="projectId" :project-id="projectId" />
     </Teleport>
     <Teleport
       v-if="tabs.some((tab) => tab.virtual === 'project')"
-      :to="panelHosts.hosts[virtualKeys.project] ?? null"
-      :disabled="!panelHosts.hosts[virtualKeys.project]"
+      :to="hostOf('project')"
+      :disabled="!hostOf('project')"
     >
       <div class="project-settings"><slot name="project" /></div>
     </Teleport>
