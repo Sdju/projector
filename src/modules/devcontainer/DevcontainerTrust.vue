@@ -39,8 +39,8 @@ watch(
     <h2 :id="titleId">Доверять этому репозиторию?</h2>
     <p>
       Проект содержит <code>{{ model.state.value.configPath }}</code
-      ><template v-if="model.state.value.name"> ({{ model.state.value.name }})</template>. Он
-      просит возможности, которых нет в изолированном режиме Projector.
+      ><template v-if="model.state.value.name"> ({{ model.state.value.name }})</template>. Он просит
+      возможности, которых нет в изолированном режиме Projector.
       <strong v-if="model.state.value.stale"
         >Конфигурация изменилась после вашего прошлого решения.</strong
       >
@@ -57,9 +57,9 @@ watch(
     </ul>
     <p class="muted">
       <strong>Не доверять</strong> — проект продолжит работать в нашей модели (ограниченный Docker
-      или хост). <strong>Доверять</strong> — терминалы откроются в Dev Container по этому
-      конфигу, со всеми перечисленными правами. Если файлы конфигурации изменятся, решение
-      сбросится. Уже открытые терминалы не переключаются.
+      или хост). <strong>Доверять</strong> — терминалы откроются в Dev Container по этому конфигу,
+      со всеми перечисленными правами. Если файлы конфигурации изменятся, решение сбросится. Уже
+      открытые терминалы не переключаются.
     </p>
     <p v-if="model.error.value" class="error" role="alert">{{ model.error.value }}</p>
     <UiDialogActions>

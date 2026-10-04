@@ -13,6 +13,7 @@ export {
   runBash,
   runDocker,
   runDockerSync,
+  runNodeScript,
 } from "./tools.ts";
 export { dataHome, shell, desktopPaths, pickFolder } from "./directories.ts";
 export {

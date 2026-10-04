@@ -1,4 +1,5 @@
 import { environmentForPath, runEnvironmentCommand } from "../environments/index.ts";
+import { devcontainerForPath, runDevcontainerCommand } from "../devcontainer/index.ts";
 import { os } from "../../../core/modules/os/index.ts";
 import type { CommandRequest } from "./command-bridge.ts";
 import { randomUUID } from "node:crypto";
@@ -77,23 +78,37 @@ export function createAgentTools(context: AgentToolContext) {
     }),
     bash: tool({
       description:
-        "Выполнить Bash в окружении проекта: Docker для изолированного проекта, иначе машина пользователя. Возвращает stdout, stderr, exitCode; лимит 30 секунд. cwd по умолчанию — открытый проект.",
+        "Выполнить Bash в окружении проекта: Dev Container для доверенного проекта, Docker для изолированного, иначе машина пользователя. Возвращает stdout, stderr, exitCode; лимит 30 секунд. cwd по умолчанию — открытый проект.",
       inputSchema: z.object({ command: z.string().min(1), cwd: z.string().optional() }),
       execute: async ({ command, cwd }) => {
-        const project = context.cwd ? await environmentForPath(context.cwd) : undefined;
         const target = expandPath(cwd || context.cwd || os.homeDirectory());
-        const environment = project ?? (await environmentForPath(target));
+        // A trusted Dev Container takes precedence over the restricted Docker environment.
+        const trusted =
+          (context.cwd ? await devcontainerForPath(context.cwd) : undefined) ??
+          (await devcontainerForPath(target));
+        const restricted = trusted
+          ? undefined
+          : ((context.cwd ? await environmentForPath(context.cwd) : undefined) ??
+            (await environmentForPath(target)));
+        const environment = trusted ?? restricted;
         if (environment) {
           if (target !== environment.path)
-            throw new Error("Bash окружения выполняется только в корне изолированного проекта");
+            throw new Error("Bash окружения выполняется только в корне проекта с окружением");
           if (context.signal?.aborted) throw new Error("Запрос остановлен");
           try {
-            const result = await runEnvironmentCommand(
-              environment,
-              ["/bin/bash", "--noprofile", "--norc", "-c", command],
-              30_000,
-              context.signal,
-            );
+            const result = trusted
+              ? await runDevcontainerCommand(
+                  trusted,
+                  ["/bin/bash", "-c", command],
+                  30_000,
+                  context.signal,
+                )
+              : await runEnvironmentCommand(
+                  environment,
+                  ["/bin/bash", "--noprofile", "--norc", "-c", command],
+                  30_000,
+                  context.signal,
+                );
             return {
               stdout: result.stdout.slice(0, 256 * 1024),
               stderr: result.stderr.slice(0, 256 * 1024),

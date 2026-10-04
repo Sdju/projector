@@ -42,7 +42,8 @@ export function classifyDevcontainer(config: unknown): DevcontainerFinding[] {
       id: "privileges",
       risk: "host",
       title: "Расширенные права контейнера",
-      detail: "Снимает ограничения изоляции: привилегированный режим, capabilities или security-опции.",
+      detail:
+        "Снимает ограничения изоляции: привилегированный режим, capabilities или security-опции.",
       keys: privileged,
     });
   if (nonEmpty(input.runArgs))
@@ -50,7 +51,8 @@ export function classifyDevcontainer(config: unknown): DevcontainerFinding[] {
       id: "run-args",
       risk: "host",
       title: "Произвольные аргументы docker run",
-      detail: "runArgs передаются Docker как есть и могут менять сеть, устройства и доступ к хосту.",
+      detail:
+        "runArgs передаются Docker как есть и могут менять сеть, устройства и доступ к хосту.",
       keys: ["runArgs"],
     });
   const mounts = ["mounts", "workspaceMount"].filter((key) => nonEmpty(input[key]));

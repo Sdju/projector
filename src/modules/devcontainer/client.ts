@@ -20,3 +20,12 @@ export const decideDevcontainer = (
   decision: DevcontainerDecision | "forget",
   hash?: string,
 ) => request(projectId, "POST", { decision, hash });
+
+export async function stopDevcontainer(projectId: string) {
+  const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}/devcontainer-stop`, {
+    method: "POST",
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Не удалось остановить Dev Container");
+  return data as { removed: number };
+}

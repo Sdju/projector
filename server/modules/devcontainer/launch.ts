@@ -20,7 +20,16 @@ export function devcontainerLaunch(project: Project, command: string[]) {
   const cli = createRequire(import.meta.url).resolve("@devcontainers/cli/devcontainer.js");
   return {
     file: "/bin/sh",
-    args: ["-c", SCRIPT, "projector-devcontainer", process.execPath, cli, realpathSync(project.path), config.file, ...command],
+    args: [
+      "-c",
+      SCRIPT,
+      "projector-devcontainer",
+      process.execPath,
+      cli,
+      realpathSync(project.path),
+      config.file,
+      ...command,
+    ],
     title: `Dev Container · ${project.name}`,
   };
 }

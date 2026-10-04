@@ -22,7 +22,14 @@ const current = (entry: { hash: string } | undefined, hash: string | undefined) 
 export function devcontainerState(project: Project): DevcontainerState {
   const { found, entry } = resolved(project);
   if (!found)
-    return { found: false, findings: [], decision: null, stale: false, needsDecision: false, active: false };
+    return {
+      found: false,
+      findings: [],
+      decision: null,
+      stale: false,
+      needsDecision: false,
+      active: false,
+    };
   const findings = classifyDevcontainer(found.config);
   const valid = current(entry, found.hash);
   const decision = valid ? entry!.decision : null;

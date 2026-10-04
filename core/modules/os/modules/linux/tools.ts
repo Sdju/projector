@@ -18,6 +18,27 @@ export function runDocker(
     env,
   });
 }
+/** Runs a Node script with this server's Node; no shell, no secrets from the host environment. */
+export function runNodeScript(
+  script: string,
+  args: string[],
+  options: { cwd?: string; timeout?: number; signal?: AbortSignal } = {},
+) {
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(
+      ([key]) =>
+        !/KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL/i.test(key) &&
+        !/^DOCKER_(HOST|CONTEXT|TLS_VERIFY|CERT_PATH|API_VERSION)$/.test(key),
+    ),
+  );
+  return execute(process.execPath, [script, ...args], {
+    cwd: options.cwd,
+    timeout: options.timeout ?? 30000,
+    signal: options.signal,
+    maxBuffer: 4 * 1024 * 1024,
+    env,
+  });
+}
 export function runDockerSync(args: string[]) {
   const env = { ...process.env };
   for (const key of Object.keys(env))

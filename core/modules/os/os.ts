@@ -65,6 +65,11 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
         args: string[],
         options?: { cwd?: string; timeout?: number; signal?: AbortSignal },
       ) => backend("runDocker").runDocker(args, options),
+      runNodeScript: (
+        script: string,
+        args: string[],
+        options?: { cwd?: string; timeout?: number; signal?: AbortSignal },
+      ) => backend("runNodeScript").runNodeScript(script, args, options),
       runBash: (command: string, options: { cwd: string; signal?: AbortSignal }) =>
         backend("runBash").runBash(command, options),
       moveNoReplace: (source: string, target: string) =>

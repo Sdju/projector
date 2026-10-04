@@ -4,7 +4,7 @@ import type {
   DevcontainerState,
 } from "../../../core/modules/devcontainer/index.ts";
 import { useCommandScope } from "../../common/utilities/commands.ts";
-import { decideDevcontainer, fetchDevcontainer } from "./client.ts";
+import { decideDevcontainer, fetchDevcontainer, stopDevcontainer } from "./client.ts";
 
 /**
  * Trust state of the project's devcontainer.json. Granting or revoking trust is
@@ -67,6 +67,19 @@ export function useDevcontainer(projectId: string) {
       open.value = true;
     },
   });
+  commands.scope.registerCommand({
+    id: "ide.devcontainer.stop",
+    title: "Остановить и удалить Dev Container",
+    description:
+      "Удаляет контейнер проекта: завершаются его терминалы и процессы внутри. Файлы проекта сохраняются, следующий терминал соберёт контейнер заново. confirm=true подтверждает удаление.",
+    arguments: { confirm: "true — явное подтверждение удаления" },
+    enabled: () => state.value?.active === true,
+    run: async (args) => {
+      const confirmed = (args as { confirm?: unknown } | undefined)?.confirm === true;
+      if (!confirmed && !window.confirm("Удалить Dev Container? Его терминалы завершатся.")) return;
+      return stopDevcontainer(projectId);
+    },
+  });
   onMounted(async () => {
     const next = await refresh().catch(() => undefined);
     if (next?.needsDecision) open.value = true;
@@ -74,5 +87,13 @@ export function useDevcontainer(projectId: string) {
   onBeforeUnmount(() => {
     disposed = true;
   });
-  return { state, error, busy, open, decide, refresh, visible: computed(() => open.value && !!state.value?.found) };
+  return {
+    state,
+    error,
+    busy,
+    open,
+    decide,
+    refresh,
+    visible: computed(() => open.value && !!state.value?.found),
+  };
 }
