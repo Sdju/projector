@@ -5,9 +5,12 @@ import type { GithubRepository } from "../../../core/modules/github/index.ts";
 import { ProjectWorkspace } from "../workspace/index.ts";
 import { registerWorkspaceProfile, workspaceRequest } from "../workspace-api/index.ts";
 import { useCommandScope } from "../../common/utilities/commands.ts";
+import UiButton from "../../common/ui/UiButton.vue";
 import { formatProjectRef } from "../project/index.ts";
+import IconGithub from "~icons/simple-icons/github";
 import { readRepository } from "./client.ts";
 import { createGithubWorkspaceProfile } from "./source.ts";
+import GithubRepositoryInfo from "./ui/GithubRepositoryInfo.vue";
 const props = defineProps<{ repository: string }>();
 const route = useRoute();
 const metadata = ref<GithubRepository>();
@@ -31,6 +34,13 @@ commands.scope.registerCommand({
   description: "Перечитывает GitHub и обновляет общий workspace без клонирования.",
   enabled: () => !!workspace.value,
   run: () => workspace.value?.refresh(),
+});
+commands.scope.registerCommand({
+  id: "ide.github.repository.info",
+  title: "Информация о репозитории GitHub",
+  description: "Открывает вкладку с описанием, статистикой и метаданными репозитория.",
+  enabled: () => !!workspace.value,
+  run: () => workspace.value?.openTab("repository"),
 });
 onMounted(async () => {
   try {
@@ -71,12 +81,27 @@ onBeforeUnmount(() => {
 </script>
 <template>
   <ProjectWorkspace v-if="metadata" :ref="ready" :project-id="projectId">
+    <template #terminal-actions>
+      <UiButton
+        icon
+        size="sm"
+        title="Информация о репозитории"
+        aria-label="Информация о репозитории"
+        data-command="ide.github.repository.info"
+        @click="commands.run('ide.github.repository.info')"
+      >
+        <IconGithub aria-hidden="true" />
+      </UiButton>
+    </template>
     <template #terminal-status
       ><span v-if="error" role="alert">{{ error }}</span
       ><span class="github-status" :title="metadata.commit"
         >{{ metadata.branch }} · {{ metadata.commit.slice(0, 7) }} · только чтение</span
       ></template
     >
+    <template #repository>
+      <GithubRepositoryInfo :repository="metadata" />
+    </template>
   </ProjectWorkspace>
   <p v-else class="msg" :role="error ? 'alert' : 'status'">
     {{ error || "открываю репозиторий…" }}

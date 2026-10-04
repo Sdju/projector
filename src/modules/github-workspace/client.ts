@@ -3,6 +3,7 @@ import type {
   GithubEntry,
   GithubFile,
 } from "../../../core/modules/github/index.ts";
+import type { IssueDetail, IssueList } from "../../../core/modules/workspace/index.ts";
 export async function readGit<T>(
   action: string,
   params: Record<string, string>,
@@ -22,3 +23,10 @@ export const readTree = (repository: string, sha: string, signal?: AbortSignal) 
   readGit<{ entries: GithubEntry[]; truncated: boolean }>("tree", { repository, sha }, signal);
 export const readFile = (repository: string, sha: string, path: string, signal?: AbortSignal) =>
   readGit<GithubFile>("file", { repository, sha, path }, signal);
+export const readIssues = (
+  repository: string,
+  params: Record<string, string>,
+  signal?: AbortSignal,
+) => readGit<IssueList>("issues", { repository, ...params }, signal);
+export const readIssue = (repository: string, number: number, signal?: AbortSignal) =>
+  readGit<IssueDetail>("issue", { repository, number: String(number) }, signal);

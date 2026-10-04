@@ -38,3 +38,5 @@ export {
 export { browseGithubLog, browseGithubCommit, browseGithubComparison } from "./github-history.ts";
 
 export { browseGithubDirectories } from "./github-navigation.ts";
+
+export { browseGithubIssue, browseGithubIssues } from "./github-issues.ts";

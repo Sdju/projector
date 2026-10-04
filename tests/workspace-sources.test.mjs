@@ -64,6 +64,12 @@ test("the shared workspace uses a readonly source for tree, files, assets and re
       async readFile(repository, sha) {
         return { content: sha, binary: false, image: null, size: 40 };
       },
+      async readIssues(repository, params) {
+        return { action: "issues", repository, params };
+      },
+      async readIssue(repository, number) {
+        return { action: "issue", repository, number };
+      },
     },
   );
   const unregister = registerWorkspaceProfile("remote-test", profile);
@@ -99,6 +105,18 @@ test("the shared workspace uses a readonly source for tree, files, assets and re
     assert.equal(calls.length, 4);
     assert.equal((await workspaceRequest("remote-test", "git")).branch, "main");
     assert.equal(workspaceCapabilities("remote-test").git, true);
+    assert.equal(workspaceCapabilities("remote-test").issues, true);
+    assert.deepEqual(await workspaceRequest("remote-test", "issues", { state: "open", page: "1" }), {
+      action: "issues",
+      repository: "octocat/repo",
+      params: { state: "open", page: "1" },
+    });
+    assert.deepEqual(await workspaceRequest("remote-test", "issue", { number: "7" }), {
+      action: "issue",
+      repository: "octocat/repo",
+      number: 7,
+    });
+    await assert.rejects(workspaceRequest("remote-test", "issue", { number: "nope" }));
     assert.equal(profile.providers.git.write, undefined);
     for (const action of ["search", "external", "diff"])
       await assert.rejects(workspaceRequest("remote-test", action));

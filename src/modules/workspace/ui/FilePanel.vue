@@ -8,6 +8,7 @@ import {
   CodeViewer,
   CommitOverview,
   ImageViewport,
+  IssueView,
   MarkdownViewer,
   SvgViewer,
 } from "../modules/viewers/index.ts";
@@ -40,6 +41,13 @@ const emit = defineEmits<{
       <KeybindingsEditor v-if="file.virtual === 'keybindings'" />
       <LanInfoPanel v-else-if="file.virtual === 'network'" />
       <DockerPanel v-else-if="file.virtual === 'docker'" />
+      <slot v-else-if="file.virtual === 'repository'" name="repository" />
+      <IssueView
+        v-else-if="file.virtual === 'issue' && file.issue"
+        :project-id="projectId"
+        :number="file.issue"
+        @open="emit('open', $event)"
+      />
       <CommitOverview
         v-else-if="file.virtual === 'commit' && file.commit"
         :project-id="projectId"

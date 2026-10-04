@@ -8,6 +8,7 @@ import {
   type GitHistoryState,
   type GitOverviewState,
 } from "../modules/git/index.ts";
+import { IssuesPanel } from "../modules/issues/index.ts";
 import type { useGitChangeSync } from "../lib/git-change-sync.ts";
 import type { useOpenFiles } from "../lib/open-files.ts";
 import type { OpenFile } from "../open-file.ts";
@@ -41,11 +42,16 @@ const emit = defineEmits<{
 const fileTree = ref<InstanceType<typeof FileTree>>();
 const searchPanel = ref<InstanceType<typeof SearchPanel>>();
 const gitPanel = ref<InstanceType<typeof GitPanel>>();
+const issuesPanel = ref<InstanceType<typeof IssuesPanel>>();
 const { openCommit, openCommitFile, prepareEntryChange } = props.files;
 function openFile(...args: Parameters<typeof props.files.openFile>) {
   const result = props.files.openFile(...args);
   emit("navigate");
   return result;
+}
+function openIssue(issue: { number: number; title: string }) {
+  props.files.openIssue(issue);
+  emit("navigate");
 }
 
 defineExpose({
@@ -66,9 +72,11 @@ defineExpose({
       @refresh="
         section === 'git'
           ? gitPanel?.refresh()
-          : section === 'docker'
-            ? emit('command', 'ide.docker.refresh')
-            : emit('refresh')
+          : section === 'issues'
+            ? issuesPanel?.refresh()
+            : section === 'docker'
+              ? emit('command', 'ide.docker.refresh')
+              : emit('refresh')
       "
       @settings="emit('settings')"
     />
@@ -112,6 +120,14 @@ defineExpose({
       "
       @open-commit="openCommit"
       @open-commit-diff="(hash, path, pinned) => openCommitFile(hash, path, !pinned)"
+    />
+    <IssuesPanel
+      v-if="capabilities.issues"
+      v-show="section === 'issues'"
+      ref="issuesPanel"
+      :project-id="projectId"
+      :active="section === 'issues'"
+      @open="openIssue"
     />
     <DockerSidebar v-if="capabilities.docker" v-show="section === 'docker'" />
   </aside>

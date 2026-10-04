@@ -147,3 +147,45 @@ export interface GitBranches {
   detached: boolean;
   branches: GitBranch[];
 }
+
+export interface IssueLabel {
+  name: string;
+  /** Hex color without the leading `#`. */
+  color: string;
+}
+export interface IssueUser {
+  login: string;
+  avatarUrl: string;
+}
+export interface Issue {
+  number: number;
+  title: string;
+  state: "open" | "closed";
+  author: IssueUser;
+  labels: IssueLabel[];
+  assignees: IssueUser[];
+  /** Number of comments reported by the host. */
+  comments: number;
+  body: string;
+  htmlUrl: string;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface IssueComment {
+  id: number;
+  author: IssueUser;
+  body: string;
+  htmlUrl: string;
+  createdAt: string;
+}
+export interface IssueList {
+  issues: Issue[];
+  /** Page number of the next page, or null when the list is complete. */
+  next: number | null;
+}
+export interface IssueDetail {
+  issue: Issue;
+  comments: IssueComment[];
+  /** The host returned more comments than the reader loads at once. */
+  commentsTruncated: boolean;
+}

@@ -15,6 +15,7 @@ import { useGitOverview, useGitHistory, useGitBranches } from "../modules/git/in
 import { useGitChangeSync } from "../lib/git-change-sync.ts";
 import { useSidebarResize } from "../lib/sidebar-resize.ts";
 import { useOpenFiles } from "../lib/open-files.ts";
+import { openServiceTab } from "../lib/service-tabs.ts";
 import { useWorkbenchLayout } from "../lib/workbench-layout.ts";
 import { registerEditorCommands } from "../lib/editor-commands.ts";
 import { useWorkspaceSession } from "../lib/workspace-session.ts";
@@ -166,12 +167,7 @@ const docker = useDocker(props.projectId, {
     revealPanel(`terminal:${session.id}`);
   },
 });
-function openProjectSettings() {
-  const { key, path } = virtualTabs.project;
-  if (!tabs.value.some((tab) => tab.key === key))
-    tabs.value.push({ key, path, virtual: "project", content: "" });
-  selectTab(key);
-}
+const openTab = (kind: "project" | "repository") => openServiceTab(tabs, selectTab, kind);
 const panelHosts = createPanelHosts();
 const keepAlive = new Set([virtualTabs.agent.key, virtualTabs.project.key]);
 registerEditor(
@@ -197,7 +193,7 @@ useWorkspaceSession({
   virtualTab: (kind) => virtualTabs[kind],
   openFile,
   fileGeneration: files.generation,
-  openProjectSettings,
+  openProjectSettings: () => openTab("project"),
   resetFiles: files.reset,
   openCommit: (hash) => files.openCommit(hash),
   openCommitFile: files.openCommitFile,
@@ -243,10 +239,8 @@ const { refresh, entryMoved } = useWorkspaceRefresh({
   searchPanel: () => sidebar.value,
   loadGit,
 });
-defineExpose({ openFile, refresh });
-onBeforeUnmount(() => {
-  overview.cancel();
-});
+defineExpose({ openFile, refresh, openTab });
+onBeforeUnmount(() => overview.cancel());
 </script>
 
 <template>
@@ -304,7 +298,7 @@ onBeforeUnmount(() => {
         @command="($event.startsWith('ide.docker.') ? docker.commands : editorCommands).run($event)"
         @navigate="mobileSidebarOpen = false"
         @refresh="refresh"
-        @settings="openProjectSettings"
+        @settings="openTab('project')"
         @changed="treeChanged"
         @deleted="entryDeleted"
         @moved="entryMoved"
@@ -355,6 +349,7 @@ onBeforeUnmount(() => {
           />
         </template>
         <template #project><slot name="project" /></template>
+        <template #repository><slot name="repository" /></template>
       </WorkbenchDock>
     </section>
     <TerminalCloseDialog

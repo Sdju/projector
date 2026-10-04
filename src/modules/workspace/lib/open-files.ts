@@ -1,5 +1,4 @@
-import { onBeforeUnmount, onMounted, ref, type Ref } from "vue";
-import { onBeforeRouteLeave, onBeforeRouteUpdate } from "vue-router";
+import { onBeforeUnmount, ref, type Ref } from "vue";
 import { isFileDrag, pathsFromDataTransfer } from "../../path-drop/index.ts";
 import type { DockTarget } from "../../dock/index.ts";
 import {
@@ -11,6 +10,8 @@ import {
 import { projectRelativePath, previewBrowserFile } from "../file-drop.ts";
 import { isEditable, isMarkdown, type OpenFile, type OpenFileOptions } from "../open-file.ts";
 import { dropPreviewExcept as dropPreviewTabs, opensAsPreview } from "./preview-tabs.ts";
+import { openIssueTab } from "./service-tabs.ts";
+import { useDirtyGuard } from "./dirty-guard.ts";
 import { treeDragType } from "../modules/tree/index.ts";
 import type {
   CommitComparison,
@@ -163,6 +164,10 @@ export function useOpenFiles(ctx: OpenFilesContext) {
       });
     selectTab(key);
   }
+  /** Вкладка обсуждения issue; `title` — подсказка до загрузки деталей. */
+  function openIssue(issue: { number: number; title?: string }) {
+    openIssueTab(tabs, selectTab, issue);
+  }
   function releasePreview(file: OpenFile) {
     if (file.image?.startsWith("blob:")) URL.revokeObjectURL(file.image);
   }
@@ -308,25 +313,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
     pendingSaves.set(file, operation);
     return operation;
   }
-  async function canLeave() {
-    const results = await Promise.all(tabs.value.map((file) => saveFile(file)));
-    if (results.every(Boolean)) return true;
-    return window.confirm("Не удалось сохранить изменения файлов. Уйти без сохранения?");
-  }
-  onBeforeRouteLeave(canLeave);
-  onBeforeRouteUpdate((to, from) => to.path === from.path || canLeave());
-  function windowBlur() {
-    for (const file of tabs.value) void saveFile(file);
-  }
-  function beforeUnload(event: BeforeUnloadEvent) {
-    if (!tabs.value.some((file) => ctx.isDirty(file) || file.saving)) return;
-    event.preventDefault();
-    event.returnValue = "";
-  }
-  onMounted(() => {
-    window.addEventListener("beforeunload", beforeUnload);
-    window.addEventListener("blur", windowBlur);
-  });
+  useDirtyGuard({ tabs, saveFile, isDirty: ctx.isDirty });
   async function prepareEntryChange(path: string) {
     const affected = tabs.value.filter(
       (tab) => !tab.virtual && (tab.path === path || tab.path.startsWith(path + "/")),
@@ -368,8 +355,6 @@ export function useOpenFiles(ctx: OpenFilesContext) {
     loading.value = false;
   }
   onBeforeUnmount(() => {
-    window.removeEventListener("beforeunload", beforeUnload);
-    window.removeEventListener("blur", windowBlur);
     ++dropGeneration;
     tabs.value.forEach(releasePreview);
     ++fileGeneration;
@@ -384,6 +369,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
     openFile,
     openCommit,
     openCommitFile,
+    openIssue,
     openBrowserFile,
     acceptsFileDrop,
     dropFiles,

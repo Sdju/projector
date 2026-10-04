@@ -7,6 +7,20 @@ export interface GithubRepository {
   tree: string;
   private: boolean;
   empty: boolean;
+  owner: string;
+  avatarUrl: string;
+  htmlUrl: string;
+  defaultBranch: string;
+  stars: number;
+  forks: number;
+  watchers: number;
+  openIssues: number;
+  language: string;
+  license: string;
+  homepage: string;
+  topics: string[];
+  createdAt: string;
+  updatedAt: string;
 }
 export interface GithubEntry {
   name: string;

@@ -3,7 +3,9 @@ import { z } from "zod";
 const tabSchema = z.object({
   key: z.string(),
   path: z.string(),
-  virtual: z.enum(["keybindings", "agent", "project", "commit", "network", "docker"]).optional(),
+  virtual: z
+    .enum(["keybindings", "agent", "project", "commit", "network", "docker", "repository", "issue"])
+    .optional(),
   commit: z.string().optional(),
   external: z.boolean().optional(),
   staged: z.boolean().optional(),
@@ -12,7 +14,7 @@ const tabSchema = z.object({
 export const workspaceSessionSchema = z.object({
   tabs: z.array(tabSchema),
   activeKey: z.string(),
-  section: z.enum(["files", "search", "git", "project", "docker"]),
+  section: z.enum(["files", "search", "git", "issues", "project", "docker"]),
   treeWidth: z.number().finite().positive().optional(),
   agentWidth: z.number().finite().positive().optional(),
   sidebarHidden: z.boolean().optional(),

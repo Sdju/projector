@@ -15,8 +15,15 @@ import "@milkdown/crepe/theme/common/style.css";
 import "@milkdown/crepe/theme/classic-dark.css";
 
 const props = withDefaults(
-  defineProps<{ content: string; path: string; projectId: string; editable?: boolean }>(),
-  { editable: true },
+  defineProps<{
+    content: string;
+    path: string;
+    projectId: string;
+    editable?: boolean;
+    /** Без полей документа: рендер встроенного блока (issue, комментарий). */
+    compact?: boolean;
+  }>(),
+  { editable: true, compact: false },
 );
 const emit = defineEmits<{
   change: [content: string];
@@ -156,7 +163,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="visual-markdown" @mousedown.capture="linkMouseDown" @click.capture="followLink">
+  <div
+    class="visual-markdown"
+    :class="{ compact }"
+    @mousedown.capture="linkMouseDown"
+    @click.capture="followLink"
+  >
     <p v-if="loading" class="editor-loading" role="status">Открываю документ…</p>
     <div ref="root" class="visual-markdown-root" />
   </div>
@@ -364,6 +376,35 @@ onBeforeUnmount(() => {
   border-radius: var(--r-sm);
   background: var(--bg-2);
   font: 0.9em var(--mono);
+}
+/* Встроенный readonly-блок: без полей документа, высота по содержимому. */
+.visual-markdown.compact {
+  height: auto;
+  overflow: visible;
+}
+.visual-markdown.compact .visual-markdown-root {
+  min-height: 0;
+}
+.visual-markdown.compact :deep(.milkdown) {
+  min-height: 0;
+  font-size: var(--fs-sm);
+}
+.visual-markdown.compact :deep(.ProseMirror) {
+  max-width: none;
+  margin: 0;
+  min-height: 0;
+  padding: 0;
+  line-height: 1.6;
+}
+.visual-markdown.compact :deep(.ProseMirror h1),
+.visual-markdown.compact :deep(.ProseMirror h2) {
+  padding-bottom: 0;
+  border-bottom: 0;
+  font-size: var(--fs-md);
+}
+.visual-markdown.compact :deep(.ProseMirror p) {
+  font-size: inherit;
+  line-height: 1.6;
 }
 @media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {
   .visual-markdown :deep(.ProseMirror) {

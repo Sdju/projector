@@ -8,4 +8,9 @@ export const virtualTabs = {
   project: { key: "settings:project", path: "Настройки проекта", title: "Настройки проекта" },
   network: { key: "network:info", path: "Локальная сеть", title: "Доступ по локальной сети" },
   docker: { key: "docker:overview", path: "Docker", title: "Контейнеры и Compose" },
+  repository: {
+    key: "github:repository",
+    path: "О репозитории",
+    title: "Информация о репозитории GitHub",
+  },
 };

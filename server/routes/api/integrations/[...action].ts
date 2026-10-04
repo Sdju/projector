@@ -16,6 +16,8 @@ import {
   browseGithubLog,
   browseGithubCommit,
   browseGithubComparison,
+  browseGithubIssues,
+  browseGithubIssue,
 } from "../../../modules/integrations/index.ts";
 
 import { json, readBody } from "../../../modules/transport/index.ts";
@@ -69,6 +71,10 @@ export async function handleIntegrationsActions({
             url.searchParams.get("path") || "",
           ),
         );
+      else if (path.endsWith("/issues"))
+        json(res, 200, await browseGithubIssues(repository, Object.fromEntries(url.searchParams)));
+      else if (path.endsWith("/issue"))
+        json(res, 200, await browseGithubIssue(repository, Number(url.searchParams.get("number"))));
       else return false;
       return true;
     }

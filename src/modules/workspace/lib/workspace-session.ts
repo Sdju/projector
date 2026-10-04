@@ -18,7 +18,7 @@ export interface WorkspaceSessionContext {
   treeWidth: Ref<number | undefined>;
   sidebarHidden: Ref<boolean>;
   /** Заголовок и путь служебной вкладки («Агент», «Настройки проекта»). */
-  virtualTab: (kind: Exclude<NonNullable<OpenFile["virtual"]>, "commit">) => {
+  virtualTab: (kind: Exclude<NonNullable<OpenFile["virtual"]>, "commit" | "issue">) => {
     key: string;
     path: string;
   };
@@ -72,6 +72,8 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
           if (tab.commit) ctx.openCommit(tab.commit);
           continue;
         }
+        // Issue tabs are not persisted: they exist only in readonly GitHub sessions.
+        if (tab.virtual === "issue") continue;
         if (tab.virtual) {
           const { key, path } = ctx.virtualTab(tab.virtual);
           if (!ctx.tabs.value.some((file) => file.key === key))

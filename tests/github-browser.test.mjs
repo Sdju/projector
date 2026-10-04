@@ -54,6 +54,18 @@ test("readonly GitHub browser reads snapshots, trees and blobs without cloning o
         default_branch: "main",
         private: false,
         size: 0,
+        owner: { login: "octocat", avatar_url: "https://avatars.example/octocat" },
+        html_url: "https://github.com/octocat/repo",
+        stargazers_count: 42,
+        forks_count: 7,
+        subscribers_count: 3,
+        open_issues_count: 5,
+        language: "TypeScript",
+        license: { spdx_id: "MIT", name: "MIT License" },
+        homepage: "https://example.test",
+        topics: ["demo", "test"],
+        created_at: "2020-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
       });
     if (url.pathname.includes("/commits/")) {
       if (mode === "empty") return Response.json({}, { status: 409 });
@@ -80,6 +92,20 @@ test("readonly GitHub browser reads snapshots, trees and blobs without cloning o
     assert.equal(repo.commit, sha);
     assert.equal(repo.tree, tree);
     assert.equal(repo.empty, false);
+    assert.equal(repo.owner, "octocat");
+    assert.equal(repo.avatarUrl, "https://avatars.example/octocat");
+    assert.equal(repo.htmlUrl, "https://github.com/octocat/repo");
+    assert.equal(repo.defaultBranch, "main");
+    assert.equal(repo.stars, 42);
+    assert.equal(repo.forks, 7);
+    assert.equal(repo.watchers, 3);
+    assert.equal(repo.openIssues, 5);
+    assert.equal(repo.language, "TypeScript");
+    assert.equal(repo.license, "MIT");
+    assert.equal(repo.homepage, "https://example.test");
+    assert.deepEqual(repo.topics, ["demo", "test"]);
+    assert.equal(repo.createdAt, "2020-01-01T00:00:00Z");
+    assert.equal(repo.updatedAt, "2026-01-01T00:00:00Z");
     await api.browseGithubRepository("octocat/repo", "feature/test");
     assert.ok(requests.at(-1).endsWith("/feature%2Ftest"));
     const directory = await api.browseGithubTree("octocat/repo", tree);
@@ -350,6 +376,85 @@ test("GitHub path suggestions paginate owners, filter prefixes and respect authe
     token = "";
     total = 1000;
     assert.equal((await browseGithubDirectories("gh:/alice", false)).truncated, true);
+  } finally {
+    fetch.mock.restore();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("GitHub issues list filters pull requests, paginates and reads discussion comments", async () => {
+  const root = await mkdtemp(join(tmpdir(), "projector-gh-issues-"));
+  process.env.XDG_DATA_HOME = root;
+  const { browseGithubIssues, browseGithubIssue } =
+    await import("../server/modules/integrations/index.ts");
+  const requests = [];
+  let mode = "normal";
+  const remoteIssue = (number, extra = {}) => ({
+    number,
+    title: `Issue ${number}`,
+    state: "open",
+    user: { login: "alice", avatar_url: "https://avatars.example/alice" },
+    labels: [{ name: "bug", color: "ff0000" }],
+    assignees: [{ login: "bob" }],
+    comments: 2,
+    body: "Body",
+    html_url: `https://github.com/octocat/repo/issues/${number}`,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-02T00:00:00Z",
+    ...extra,
+  });
+  const fetch = mock.method(globalThis, "fetch", async (address) => {
+    const url = new URL(address);
+    requests.push(url);
+    assert.equal(url.origin, "https://api.github.com");
+    if (mode === "error") return Response.json({}, { status: 403 });
+    if (url.pathname === "/repos/octocat/repo/issues") {
+      const page = Number(url.searchParams.get("page"));
+      if (page === 2) return Response.json([remoteIssue(31)]);
+      return Response.json([
+        remoteIssue(1),
+        remoteIssue(2, { pull_request: { url: "https://api.github.com/pulls/2" } }),
+        ...Array.from({ length: 28 }, (_, index) => remoteIssue(index + 3)),
+      ]);
+    }
+    if (url.pathname === "/repos/octocat/repo/issues/7") return Response.json(remoteIssue(7));
+    if (url.pathname === "/repos/octocat/repo/issues/7/comments")
+      return Response.json([
+        { id: 11, user: { login: "carol" }, body: "First", html_url: "u", created_at: "d" },
+        { id: 12, user: { login: "dave" }, body: "Second", html_url: "u", created_at: "d" },
+      ]);
+    throw new Error(`Unexpected URL: ${url}`);
+  });
+  try {
+    const first = await browseGithubIssues("octocat/repo", { state: "open" });
+    assert.equal(first.issues.length, 29);
+    assert.equal(first.issues[0].number, 1);
+    assert.equal(first.issues[0].author.login, "alice");
+    assert.deepEqual(first.issues[0].labels, [{ name: "bug", color: "ff0000" }]);
+    assert.equal(first.issues[0].state, "open");
+    assert.equal(first.next, 2);
+    assert.equal(requests.at(-1).searchParams.get("state"), "open");
+    assert.equal(requests.at(-1).searchParams.get("per_page"), "30");
+
+    const second = await browseGithubIssues("octocat/repo", { state: "open", page: "2" });
+    assert.equal(second.issues.length, 1);
+    assert.equal(second.issues[0].number, 31);
+    assert.equal(second.next, null);
+
+    await browseGithubIssues("octocat/repo", { state: "weird" });
+    assert.equal(requests.at(-1).searchParams.get("state"), "open");
+
+    const detail = await browseGithubIssue("octocat/repo", 7);
+    assert.equal(detail.issue.number, 7);
+    assert.equal(detail.issue.body, "Body");
+    assert.equal(detail.issue.assignees[0].login, "bob");
+    assert.equal(detail.comments.length, 2);
+    assert.equal(detail.comments[0].author.login, "carol");
+    assert.equal(detail.commentsTruncated, false);
+
+    await assert.rejects(browseGithubIssue("octocat/repo", 0), { status: 400 });
+    mode = "error";
+    await assert.rejects(browseGithubIssues("octocat/repo", { state: "open" }), { status: 403 });
   } finally {
     fetch.mock.restore();
     await rm(root, { recursive: true, force: true });

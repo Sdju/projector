@@ -24,17 +24,47 @@ export async function browseGithubRepository(
   const get = await githubReader(repository);
   const repo = await get<{
     full_name: string;
-    description: string;
+    description?: string | null;
     default_branch: string;
     private: boolean;
     size: number;
+    owner?: { login?: string; avatar_url?: string };
+    html_url?: string;
+    stargazers_count?: number;
+    forks_count?: number;
+    subscribers_count?: number;
+    open_issues_count?: number;
+    language?: string | null;
+    license?: { spdx_id?: string | null; name?: string } | null;
+    homepage?: string | null;
+    topics?: string[];
+    created_at?: string;
+    updated_at?: string;
   }>("");
   const branch = ref || repo.default_branch;
+  const license =
+    repo.license?.spdx_id && repo.license.spdx_id !== "NOASSERTION"
+      ? repo.license.spdx_id
+      : repo.license?.name || "";
   const result = {
     fullName: repo.full_name,
     description: repo.description || "",
     branch,
     private: repo.private,
+    owner: repo.owner?.login || repo.full_name.split("/")[0] || "",
+    avatarUrl: repo.owner?.avatar_url || "",
+    htmlUrl: repo.html_url || `https://github.com/${repo.full_name}`,
+    defaultBranch: repo.default_branch,
+    stars: repo.stargazers_count ?? 0,
+    forks: repo.forks_count ?? 0,
+    watchers: repo.subscribers_count ?? 0,
+    openIssues: repo.open_issues_count ?? 0,
+    language: repo.language || "",
+    license,
+    homepage: repo.homepage || "",
+    topics: Array.isArray(repo.topics) ? repo.topics : [],
+    createdAt: repo.created_at || "",
+    updatedAt: repo.updated_at || "",
   };
   try {
     const commit = await get<{ sha: string; commit: { tree: { sha: string } } }>(

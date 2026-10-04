@@ -67,7 +67,9 @@ const { fileOf, terminals, terminalPanels } = props.workbench;
         @open-commit="files.openCommit($event)"
         @open-commit-diff="files.openCommitFile"
         @subject="fileOf(id)!.content = $event"
-      />
+      >
+        <template #repository><slot name="repository" /></template>
+      </FilePanel>
       <TerminalView
         v-else-if="terminalPanels.get(id)"
         :project-id="projectId"

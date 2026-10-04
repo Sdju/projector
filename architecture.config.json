@@ -37,12 +37,7 @@
     "@core": "core/modules"
   },
   "largeFiles": {
-    "files": {
-      "src/modules/workspace/ui/ProjectWorkspace.vue": {
-        "ceiling": 504,
-        "plan": "Композиционный корень workspace. При росте вынести мобильные поверхности (nav + mobile-команды) в отдельный компонент, а шапку (WorkbenchToolbar) и подвал (StatusBar) — в подкомпоненты."
-      }
-    },
+    "files": {},
     "thresholds": {
       "default": 400,
       ".vue": 500

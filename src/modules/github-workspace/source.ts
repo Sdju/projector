@@ -2,7 +2,7 @@ import type { GithubRepository, GithubEntry } from "../../../core/modules/github
 import type { FileContent, FileEntry } from "../../../core/modules/workspace/index.ts";
 import type { WorkspaceProfile } from "../workspace-api/index.ts";
 import { formatProjectRef } from "../project/index.ts";
-import { readRepository, readTree, readFile, readGit } from "./client.ts";
+import { readIssue, readIssues, readRepository, readTree, readFile, readGit } from "./client.ts";
 
 /** GitHub adapts to the same provider contracts as a local workspace; it owns no UI. */
 export function createGithubWorkspaceProfile(
@@ -15,7 +15,9 @@ export function createGithubWorkspaceProfile(
     readTree: typeof readTree;
     readFile: typeof readFile;
     readGit?: typeof readGit;
-  } = { readRepository, readTree, readFile, readGit },
+    readIssues?: typeof readIssues;
+    readIssue?: typeof readIssue;
+  } = { readRepository, readTree, readFile, readGit, readIssues, readIssue },
 ): WorkspaceProfile {
   let metadata = initial;
   const directories = new Map<string, Promise<GithubEntry[]>>();
@@ -120,6 +122,17 @@ export function createGithubWorkspaceProfile(
       return content;
     },
   };
+  const issues: WorkspaceProfile["providers"]["issues"] = {
+    read(action, params, signal) {
+      if (action === "issues") return (api.readIssues ?? readIssues)(repository, params, signal);
+      if (action === "issue") {
+        const number = Number(params.number);
+        if (!Number.isInteger(number) || number <= 0) throw new Error("Укажите номер issue");
+        return (api.readIssue ?? readIssue)(repository, number, signal);
+      }
+      throw new Error("Действие недоступно для этого источника workspace");
+    },
+  };
   return {
     id: "github",
     layout: "editor",
@@ -131,6 +144,6 @@ export function createGithubWorkspaceProfile(
       persist: false,
       externalFiles: false,
     },
-    providers: { files, git },
+    providers: { files, git, issues },
   };
 }
