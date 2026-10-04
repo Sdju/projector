@@ -5,9 +5,7 @@ import IconFiles from "~icons/lucide/files";
 import IconSearch from "~icons/lucide/search";
 import IconGit from "~icons/devicon/git";
 import IconBot from "~icons/lucide/bot";
-import IconKeyboard from "~icons/lucide/keyboard";
 import IconRefresh from "~icons/lucide/rotate-cw";
-import IconSettings from "~icons/lucide/settings";
 import IconDocker from "~icons/lucide/container";
 
 export type SidebarSection = "files" | "search" | "git" | "docker";
@@ -82,33 +80,11 @@ const emit = defineEmits<{
       <UiButton
         icon
         size="sm"
-        title="Горячие клавиши"
-        aria-label="Горячие клавиши"
-        data-command="ide.workbench.keybindings.open"
-        @click="emit('command', 'ide.workbench.keybindings.open')"
-      >
-        <IconKeyboard aria-hidden="true" />
-      </UiButton>
-      <UiButton
-        icon
-        size="sm"
         title="Обновить обзор"
         aria-label="Обновить обзор"
         @click="emit('refresh')"
       >
         <IconRefresh aria-hidden="true" />
-      </UiButton>
-      <UiButton
-        icon
-        size="sm"
-        v-if="capabilities.settings"
-        :active="settingsActive"
-        :aria-pressed="settingsActive"
-        title="Настройки проекта"
-        aria-label="Настройки проекта"
-        @click="emit('settings')"
-      >
-        <IconSettings aria-hidden="true" />
       </UiButton>
     </div>
   </nav>
