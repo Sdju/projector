@@ -86,6 +86,7 @@ export async function shortcutAvailable(shortcut: string) {
 export { installDesktop } from "./install-desktop.ts";
 
 export { startCodexAppServer } from "./codex.ts";
+export { readOpenCodeGoKey } from "./opencode.ts";
 
 const secrets = () =>
   import(new URL("./secrets.ts", import.meta.url).href) as Promise<typeof import("./secrets.ts")>;
