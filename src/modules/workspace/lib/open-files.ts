@@ -154,18 +154,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
     }
   }
   /** Вкладка с подробным обзором коммита; `subject` — подсказка до загрузки деталей. */
-  function openCommit(hash: string, subject = "") {
-    const key = `commit:${hash}`;
-    if (!tabs.value.some((tab) => tab.key === key))
-      tabs.value.push({
-        key,
-        virtual: "commit",
-        path: `Коммит ${hash.slice(0, 7)}`,
-        content: subject,
-        commit: hash,
-      });
-    selectTab(key);
-  }
+  const openCommit = (hash: string, subject = "") => openTab("commit", { hash, subject });
   /** Открывает вкладку зарегистрированного типа или фокусирует уже открытую с тем же ключом. */
   function openTab(id: string, params?: TabParams) {
     const key = ensureTab(tabs, ctx.tabTypes, id, params);

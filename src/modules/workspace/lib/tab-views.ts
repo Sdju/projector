@@ -2,6 +2,7 @@ import { inject, onBeforeUnmount, provide, type Component, type InjectionKey } f
 import {
   createTabRegistry,
   type TabBehavior,
+  type TabParams,
   type TabRegistry,
   type WorkspaceProfile,
 } from "../../workspace-api/index.ts";
@@ -11,13 +12,15 @@ import { KeybindingsEditor } from "../../ide/index.ts";
 import { LanInfoPanel } from "../../network/index.ts";
 import { DockerPanel } from "../../docker/index.ts";
 import { AgentChat } from "../../agent/index.ts";
-import { IssueView } from "../modules/viewers/index.ts";
+import { CommitOverview, IssueView } from "../modules/viewers/index.ts";
 
 /** How a tab kind is drawn; the owner of the kind supplies it, the workspace only mounts it. */
 export interface TabView {
   component: Component;
-  /** Props from the tab and its project; the view emits `open` with a file path. */
-  props?: (tab: OpenFile, projectId: string) => Record<string, unknown>;
+  /** Props and event listeners (`onOpen`...) of the view, built from the tab and the host. */
+  props?: (tab: OpenFile, host: TabHost) => Record<string, unknown>;
+  /** The view handles keyboard itself: editor shortcuts do not fire inside it. */
+  ownKeys?: boolean;
   /** The view holds state (a chat, an unsaved form): it stays mounted and moves between docks. */
   keepAlive?: boolean;
   /** The panel pads and scrolls its content. */
@@ -25,14 +28,40 @@ export interface TabView {
 }
 export type TabViews = Record<string, TabView>;
 
+/** What a view may ask of the workspace that shows it. */
+export interface TabHost {
+  projectId: string;
+  openFile(path: string): void;
+  openTab(id: string, params?: TabParams): void;
+  openCommitDiff(hash: string, path: string): void;
+}
+
 export const baseTabViews: TabViews = {
-  keybindings: { component: KeybindingsEditor },
-  network: { component: LanInfoPanel },
+  keybindings: { component: KeybindingsEditor, ownKeys: true },
+  network: { component: LanInfoPanel, ownKeys: true },
   docker: { component: DockerPanel },
-  agent: { component: AgentChat, keepAlive: true, props: (_, projectId) => ({ projectId }) },
+  agent: {
+    component: AgentChat,
+    keepAlive: true,
+    props: (_, host) => ({ projectId: host.projectId }),
+  },
   issue: {
     component: IssueView,
-    props: (tab, projectId) => ({ projectId, number: tab.params?.number }),
+    props: (tab, host) => ({
+      projectId: host.projectId,
+      number: tab.params?.number,
+      onOpen: host.openFile,
+    }),
+  },
+  commit: {
+    component: CommitOverview,
+    props: (tab, host) => ({
+      projectId: host.projectId,
+      hash: tab.params?.hash,
+      onOpenCommit: (hash: string) => host.openTab("commit", { hash }),
+      onOpenDiff: host.openCommitDiff,
+      onSubject: (text: string) => (tab.content = text),
+    }),
   },
 };
 
@@ -60,4 +89,12 @@ export function useWorkspaceTabs() {
   const tabs = inject(workspaceTabsKey);
   if (!tabs) throw new Error("Workspace tabs are not provided");
   return tabs;
+}
+
+const tabHostKey: InjectionKey<TabHost> = Symbol("tab-host");
+export const provideTabHost = (host: TabHost) => provide(tabHostKey, host);
+export function useTabHost() {
+  const host = inject(tabHostKey);
+  if (!host) throw new Error("Tab host is not provided");
+  return host;
 }

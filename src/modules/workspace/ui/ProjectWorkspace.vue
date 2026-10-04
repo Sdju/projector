@@ -26,7 +26,7 @@ import { type OpenFile } from "../open-file.ts";
 import { createPanelHosts } from "../panel-hosts.ts";
 import { TerminalCloseDialog } from "../../terminal/index.ts";
 import { useDocker } from "../../docker/index.ts";
-import { useWorkspaceTabTypes, type TabViews } from "../lib/tab-views.ts";
+import { provideTabHost, useWorkspaceTabTypes, type TabViews } from "../lib/tab-views.ts";
 import { useWorkspaceRefresh } from "../lib/workspace-refresh.ts";
 import { useMobileSurfaces, registerMobileCommands } from "../lib/mobile-surfaces.ts";
 const props = defineProps<{
@@ -140,6 +140,12 @@ const files = useOpenFiles({
   tabTypes,
 });
 const { fileError, loading, openFile, openTab, saveFile, toggleMarkdownSource } = files;
+provideTabHost({
+  projectId: props.projectId,
+  openFile: (path) => void openFile(path),
+  openTab,
+  openCommitDiff: (hash, path) => void files.openCommitFile(hash, path),
+});
 const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
   editorCommands,
   register: registerEditor,
@@ -194,9 +200,7 @@ useWorkspaceSession({
   ensureTab: (id, params) => ensureTab(tabs, tabTypes, id, params),
   openFile,
   fileGeneration: files.generation,
-  openProjectSettings: () => openTab("project"),
   resetFiles: files.reset,
-  openCommit: (hash) => files.openCommit(hash),
   openCommitFile: files.openCommitFile,
   resetGit: () => {
     overview.reset();
@@ -299,7 +303,6 @@ onBeforeUnmount(() => overview.cancel());
         @command="($event.startsWith('ide.docker.') ? docker.commands : editorCommands).run($event)"
         @navigate="mobileSidebarOpen = false"
         @refresh="refresh"
-        @settings="openTab('project')"
         @changed="treeChanged"
         @deleted="entryDeleted"
         @moved="entryMoved"

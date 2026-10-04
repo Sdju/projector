@@ -13,14 +13,12 @@ export type SidebarSection = "files" | "search" | "git" | "issues" | "docker";
 defineProps<{
   section: SidebarSection;
   gitCount: number;
-  settingsActive: boolean;
   capabilities: Readonly<WorkspaceCapabilities>;
 }>();
 const emit = defineEmits<{
   "update:section": [section: SidebarSection];
   command: [id: string];
   refresh: [];
-  settings: [];
 }>();
 </script>
 

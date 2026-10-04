@@ -10,7 +10,7 @@ import type { useOpenFiles } from "../lib/open-files.ts";
 import type { useWorkbenchLayout } from "../lib/workbench-layout.ts";
 import type { createPanelHosts } from "../panel-hosts.ts";
 import type { OpenFile } from "../open-file.ts";
-import { useWorkspaceTabs } from "../lib/tab-views.ts";
+import { useTabHost, useWorkspaceTabs } from "../lib/tab-views.ts";
 import FilePanel from "./FilePanel.vue";
 import PanelHost from "./PanelHost.vue";
 import IconDiff from "~icons/lucide/file-diff";
@@ -30,6 +30,7 @@ const props = defineProps<{
 }>();
 const { fileOf, terminals, terminalPanels } = props.workbench;
 const workspaceTabs = useWorkspaceTabs();
+const host = useTabHost();
 const viewOf = (tab: OpenFile) => (tab.virtual ? workspaceTabs.views[tab.virtual] : undefined);
 /** Вкладки с состоянием: их содержимое живёт вне дока и телепортируется в хост вкладки. */
 const kept = computed(() => props.tabs.filter((tab) => viewOf(tab)?.keepAlive));
@@ -67,9 +68,6 @@ const hostOf = (key: string) => props.panelHosts.hosts[key] ?? null;
         @save="files.saveFile(fileOf(id))"
         @mode="fileOf(id)!.markdownMode = $event"
         @open="files.openFile($event)"
-        @open-commit="files.openCommit($event)"
-        @open-commit-diff="files.openCommitFile"
-        @subject="fileOf(id)!.content = $event"
       />
       <TerminalView
         v-else-if="terminalPanels.get(id)"
@@ -145,8 +143,11 @@ const hostOf = (key: string) => props.panelHosts.hosts[key] ?? null;
   </DockView>
   <div class="keep-alive" hidden>
     <Teleport v-for="tab in kept" :key="tab.key" :to="hostOf(tab.key)" :disabled="!hostOf(tab.key)">
-      <div :class="viewOf(tab)?.scroll ? 'kept-scroll' : 'kept-panel'">
-        <component :is="viewOf(tab)!.component" v-bind="viewOf(tab)!.props?.(tab, projectId)" />
+      <div
+        :class="viewOf(tab)?.scroll ? 'kept-scroll' : 'kept-panel'"
+        :data-own-keys="viewOf(tab)?.ownKeys || undefined"
+      >
+        <component :is="viewOf(tab)!.component" v-bind="viewOf(tab)!.props?.(tab, host)" />
       </div>
     </Teleport>
   </div>

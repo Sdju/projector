@@ -28,7 +28,13 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
     id: "local",
     layout: "full",
     tabs: [
-      singletonTab("agent", "agent:chat", "Агент", "Чат с агентом Projector"),
+      singletonTab("agent", "agent:chat", "Агент", "Чат с агентом Projector", {
+        command: {
+          id: "ide.workbench.agent.open",
+          title: "Открыть чат с агентом",
+          requires: "agent",
+        },
+      }),
       singletonTab("project", "settings:project", "Настройки проекта", "Настройки проекта"),
       singletonTab("docker", "docker:overview", "Docker", "Контейнеры и Compose"),
     ],

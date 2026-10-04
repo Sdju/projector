@@ -344,19 +344,35 @@ test("mobile surfaces separate mixed panels without changing desktop splits or h
 
 test("tab reader lists panels and reads files, diffs, terminals and rejects unknown tabs", async () => {
   const { registerTabReader } = await import("../src/modules/workspace/lib/tab-reader.ts");
+  const { createTabRegistry, defineTab } = await import("../src/modules/workspace-api/tabs.ts");
+  const tabTypes = createTabRegistry([
+    defineTab({
+      id: "note",
+      key: () => "note",
+      path: () => "Note",
+      title: () => "Note",
+      read: () => ({ text: "from the kind", note: "own reader" }),
+    }),
+  ]);
   const commands = new Map();
   const files = new Map([
     ["a.ts", { key: "a.ts", path: "a.ts", content: "old", draft: "new" }],
     ["img", { key: "img", path: "p.png", content: "", image: "x" }],
     ["agent:chat", { key: "agent:chat", path: "Агент", content: "", virtual: "agent" }],
+    ["note", { key: "note", path: "Note", content: "", virtual: "note" }],
   ]);
   const layout = { focused: "g1", root: {} };
-  const group = { id: "g1", panels: ["a.ts", "img", "agent:chat", "terminal:t1"], active: "a.ts" };
+  const group = {
+    id: "g1",
+    panels: ["a.ts", "img", "agent:chat", "note", "terminal:t1"],
+    active: "a.ts",
+  };
   const reads = [];
   registerTabReader({
     layout: () => layout,
     groups: () => [group],
     fileOf: (id) => files.get(id),
+    tabTypes,
     terminalOf: (id) => (id === "terminal:t1" ? { id: "t1", status: "running" } : undefined),
     label: (id) => id,
     isDirty: (file) => file.draft !== undefined && file.draft !== file.content,
@@ -373,6 +389,7 @@ test("tab reader lists panels and reads files, diffs, terminals and rejects unkn
       ["file", true],
       ["image", false],
       ["agent", false],
+      ["note", false],
       ["terminal", undefined],
     ],
   );
@@ -380,6 +397,10 @@ test("tab reader lists panels and reads files, diffs, terminals and rejects unkn
   assert.equal((await read()).text, "new");
   assert.equal((await read({ id: "img" })).text, undefined);
   assert.ok((await read({ id: "agent:chat" })).note);
+  assert.deepEqual(
+    [(await read({ id: "note" })).text, (await read({ id: "note" })).note],
+    ["from the kind", "own reader"],
+  );
   const tail = await read({ id: "terminal:t1", maxChars: 4, lines: 5 });
   assert.deepEqual([tail.text, tail.truncated, reads[0]], ["6789", true, ["t1", 5]]);
   await assert.rejects(read({ id: "missing" }), /не найдена/);

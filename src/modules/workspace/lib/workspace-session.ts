@@ -27,10 +27,8 @@ export interface WorkspaceSessionContext {
     staged?: boolean,
     options?: OpenFileOptions,
   ) => Promise<number | undefined>;
-  openCommit: (hash: string) => void;
   openCommitFile: (hash: string, path: string, preview?: boolean) => Promise<number | undefined>;
   fileGeneration: () => number;
-  openProjectSettings: () => void;
   resetFiles: () => void;
   resetGit: () => void;
   reloadGit: () => void;
@@ -67,13 +65,10 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
     try {
       for (const tab of saved?.tabs ?? []) {
         if (generation !== sessionGeneration) return;
-        if (tab.virtual === "commit") {
-          if (tab.commit) ctx.openCommit(tab.commit);
-          continue;
-        }
         if (tab.virtual) {
           // A kind the profile does not know (older session, other source) is dropped.
-          ctx.ensureTab(tab.virtual, tab.params);
+          // Sessions before params kept a commit overview as `commit`.
+          ctx.ensureTab(tab.virtual, tab.params ?? (tab.commit ? { hash: tab.commit } : undefined));
           continue;
         }
         const completed = tab.commit
@@ -99,8 +94,6 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
         ctx.tabs.value.some((tab) => tab.key === saved?.activeKey)
       )
         ctx.activeKey.value = saved!.activeKey;
-      if (generation === sessionGeneration && saved?.section === "project")
-        ctx.openProjectSettings();
     } finally {
       if (generation === sessionGeneration) ctx.restoringSession.value = false;
     }

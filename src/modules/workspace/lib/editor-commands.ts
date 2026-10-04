@@ -94,31 +94,16 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
       ...common,
     ];
   }
-  register(
-    "ide.workbench.keybindings.open",
-    "Открыть горячие клавиши",
-    () => {
-      openTab("keybindings");
-    },
-    () => true,
-  );
-  register(
-    "ide.workbench.agent.open",
-    "Открыть чат с агентом",
-    () => {
-      openTab("agent");
-    },
-    () => true,
-    "agent",
-  );
-  register(
-    "ide.workbench.server.network.open",
-    "Показать доступ по локальной сети",
-    () => {
-      openTab("network");
-    },
-    () => true,
-  );
+  // A kind that wants a command declares it; the workspace does not know the kinds.
+  for (const { id, command } of ctx.tabTypes.list())
+    if (command)
+      register(
+        command.id,
+        command.title,
+        () => openTab(id),
+        () => true,
+        command.requires as WorkspaceCapability | undefined,
+      );
   function editorKeydown(event: KeyboardEvent) {
     const save = ctx.tabTypes.behaviorOf(active()?.virtual)?.save;
     if (save && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
@@ -127,11 +112,7 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
       void save();
       return;
     }
-    if (
-      !(event.target as Element).closest(
-        ".keybindings-editor, .project-settings-form, .terminal-view, .network-panel",
-      )
-    )
+    if (!(event.target as Element).closest("[data-own-keys], .terminal-view"))
       editorCommands.keydown(event);
   }
   function editorFocus(event: FocusEvent) {

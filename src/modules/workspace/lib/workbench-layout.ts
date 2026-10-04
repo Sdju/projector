@@ -162,16 +162,13 @@ export function useWorkbenchLayout(ctx: WorkbenchLayoutContext) {
       return {
         id,
         label: file.virtual ? file.path : file.path.split("/").at(-1)!,
-        title:
-          file.virtual === "commit"
-            ? `${file.content ? `${file.content} · ` : ""}${file.commit}`
-            : file.virtual
-              ? (ctx.tabTypes.get(file.virtual)?.title(file.params ?? {}) ?? file.path)
-              : file.saveError
-                ? `${file.path} · ${file.saveError}`
-                : file.commit
-                  ? `${file.path} · ${file.parent || "∅"} → ${file.commit.slice(0, 7)}`
-                  : `${file.path}${file.original !== undefined ? (file.staged ? " · HEAD → index" : " · index → рабочий файл") : ""}`,
+        title: file.virtual
+          ? (ctx.tabTypes.get(file.virtual)?.title(file.params ?? {}, file.content) ?? file.path)
+          : file.saveError
+            ? `${file.path} · ${file.saveError}`
+            : file.commit
+              ? `${file.path} · ${file.parent || "∅"} → ${file.commit.slice(0, 7)}`
+              : `${file.path}${file.original !== undefined ? (file.staged ? " · HEAD → index" : " · index → рабочий файл") : ""}`,
         dirty: ctx.isDirty(file),
         saving: !!file.saving,
         error: !!file.saveError,
@@ -279,6 +276,7 @@ export function useWorkbenchLayout(ctx: WorkbenchLayoutContext) {
     layout: () => layout.value,
     groups: dockGroups,
     fileOf,
+    tabTypes: ctx.tabTypes,
     terminalOf: (id) => terminalPanels.value.get(id),
     label: (id) => describePanel(id).label,
     isDirty: ctx.isDirty,

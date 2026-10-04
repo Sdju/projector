@@ -19,6 +19,7 @@ const tabViews: TabViews = {
   project: {
     keepAlive: true,
     scroll: true,
+    ownKeys: true,
     component: () =>
       project.value &&
       h(ProjectSettings, {

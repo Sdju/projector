@@ -10,12 +10,16 @@ export interface TabType<P extends TabParams = TabParams> {
   key(params: P): string;
   /** Label in the tab strip. */
   path(params: P): string;
-  /** Tooltip of the tab. */
-  title(params: P): string;
+  /** Tooltip of the tab; `content` is the hint the tab may update once it loads. */
+  title(params: P, content: string): string;
   /** Initial text shown before the tab loads its own data. */
   hint?(params: P): string;
   /** Short note on the right of the tab breadcrumb. */
   subtitle?: string;
+  /** What the built-in agent sees when it reads the tab; the default says it has no text. */
+  read?(params: P, content: string): { text?: string; note?: string };
+  /** An IDE command that opens the tab; the workspace registers it with the kind. */
+  command?: { id: string; title: string; requires?: string };
 }
 
 /**
@@ -39,12 +43,13 @@ export const singletonTab = (
   key: string,
   path: string,
   title: string,
-  subtitle?: string,
-) => defineTab({ id, key: () => key, path: () => path, title: () => title, subtitle });
+  extra: Pick<TabType, "subtitle" | "command"> = {},
+) => defineTab({ id, key: () => key, path: () => path, title: () => title, ...extra });
 
 export interface TabRegistry {
   has(id: string): boolean;
   get(id: string): TabType | undefined;
+  list(): TabType[];
   /** Key of a parameterless tab; for panels that live outside the dock. */
   keyOf(id: string): string;
   /** Attaches host behavior to a kind; returns a function that detaches it. */
@@ -60,6 +65,7 @@ export function createTabRegistry(...groups: ReadonlyArray<readonly TabType[] | 
   const registry: TabRegistry = {
     has: (id) => types.has(id),
     get: (id) => types.get(id),
+    list: () => [...types.values()],
     keyOf(id) {
       const type = types.get(id);
       if (!type) throw new Error(`Неизвестный тип вкладки: ${id}`);

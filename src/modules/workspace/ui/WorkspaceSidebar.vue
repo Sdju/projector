@@ -34,7 +34,6 @@ const emit = defineEmits<{
   command: [id: string];
   refresh: [];
   navigate: [];
-  settings: [];
   changed: [];
   deleted: [path: string];
   moved: [source: string, destination: string];
@@ -67,7 +66,6 @@ defineExpose({
       v-model:section="section"
       :capabilities="capabilities"
       :git-count="overview.git.value.changes.length"
-      :settings-active="active?.virtual === 'project'"
       @command="emit('command', $event)"
       @refresh="
         section === 'git'
@@ -78,7 +76,6 @@ defineExpose({
               ? emit('command', 'ide.docker.refresh')
               : emit('refresh')
       "
-      @settings="emit('settings')"
     />
     <div v-show="section === 'files'" class="side-content">
       <FileTree

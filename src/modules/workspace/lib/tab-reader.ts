@@ -1,6 +1,7 @@
 import { commandArgs } from "../../../common/utilities/commands.ts";
 import type { DockGroup, DockLayout } from "../../dock/index.ts";
 import type { TerminalSession } from "../../../../core/modules/terminal/index.ts";
+import type { TabRegistry } from "../../workspace-api/index.ts";
 import type { OpenFile } from "../open-file.ts";
 
 const DEFAULT_CHARS = 20_000;
@@ -10,6 +11,7 @@ export interface TabReaderContext {
   layout: () => DockLayout;
   groups: (layout: DockLayout) => DockGroup[];
   fileOf: (id: string) => OpenFile | undefined;
+  tabTypes: TabRegistry;
   terminalOf: (id: string) => TerminalSession | undefined;
   label: (id: string) => string;
   isDirty: (file: OpenFile) => boolean;
@@ -38,11 +40,13 @@ function kindOf(file: OpenFile | undefined, terminal: TerminalSession | undefine
 }
 
 /** Текстовое представление файловой вкладки; для нетекстовых вкладок — описание. */
-function fileText(file: OpenFile): { text?: string; note?: string } {
-  if (file.virtual === "commit")
-    return { text: file.content, note: `Обзор коммита ${file.commit ?? ""}` };
+function fileText(file: OpenFile, types: TabRegistry): { text?: string; note?: string } {
   if (file.virtual)
-    return { note: "Служебная вкладка с интерфейсом: у неё нет текстового содержимого" };
+    return (
+      types.get(file.virtual)?.read?.(file.params ?? {}, file.content) ?? {
+        note: "Служебная вкладка с интерфейсом: у неё нет текстового содержимого",
+      }
+    );
   if (file.image) return { note: "Изображение: текстового содержимого нет" };
   if (file.archive)
     return {
@@ -118,7 +122,7 @@ export function registerTabReader(ctx: TabReaderContext) {
         ({ text, totalLines } = read);
         linesTruncated = read.truncated;
         note = "Текст экрана терминала без цветов; показаны последние строки";
-      } else if (file) ({ text, note } = fileText(file));
+      } else if (file) ({ text, note } = fileText(file, ctx.tabTypes));
       let truncated = linesTruncated;
       if (text !== undefined && text.length > limit) {
         // Terminal tails matter most; file heads are the natural starting point.

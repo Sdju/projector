@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useWorkspaceTabs } from "../lib/tab-views.ts";
+import { useTabHost, useWorkspaceTabs } from "../lib/tab-views.ts";
 import { isEditable, isMarkdown, type OpenFile } from "../open-file.ts";
 import {
   ArchiveViewer,
   CodeViewer,
-  CommitOverview,
   ImageViewport,
   MarkdownViewer,
   SvgViewer,
@@ -18,11 +17,9 @@ const emit = defineEmits<{
   save: [];
   mode: [mode: "document" | "source"];
   open: [path: string];
-  openCommit: [hash: string];
-  openCommitDiff: [hash: string, path: string];
-  subject: [text: string];
 }>();
 const tabs = useWorkspaceTabs();
+const host = useTabHost();
 const view = computed(() => (props.file.virtual ? tabs.views[props.file.virtual] : undefined));
 const subtitle = computed(() =>
   props.file.virtual ? tabs.types.get(props.file.virtual)?.subtitle : undefined,
@@ -39,21 +36,8 @@ const subtitle = computed(() =>
     <p v-if="file.saveError && !isMarkdown(file)" class="file-error" role="alert">
       {{ file.saveError }}
     </p>
-    <div class="panel-body">
-      <component
-        :is="view.component"
-        v-if="view"
-        v-bind="view.props?.(file, projectId)"
-        @open="emit('open', $event)"
-      />
-      <CommitOverview
-        v-else-if="file.virtual === 'commit' && file.commit"
-        :project-id="projectId"
-        :hash="file.commit"
-        @open-commit="emit('openCommit', $event)"
-        @open-diff="(hash, path) => emit('openCommitDiff', hash, path)"
-        @subject="emit('subject', $event)"
-      />
+    <div class="panel-body" :data-own-keys="view?.ownKeys || undefined">
+      <component :is="view.component" v-if="view" v-bind="view.props?.(file, host)" />
       <p v-else-if="file.binary && !file.image" class="file-error">
         Бинарный файл · {{ file.size }} байт
       </p>
