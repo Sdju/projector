@@ -7,6 +7,13 @@ export const baseTabTypes = [
     "settings:keybindings",
     "Горячие клавиши",
     "Настройки горячих клавиш",
+    "настройки IDE",
   ),
-  singletonTab("network", "network:info", "Локальная сеть", "Доступ по локальной сети"),
+  singletonTab(
+    "network",
+    "network:info",
+    "Локальная сеть",
+    "Доступ по локальной сети",
+    "доступ по сети",
+  ),
 ];

@@ -2,7 +2,6 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import {
   workspaceProfile,
-  createTabRegistry,
   profileCapabilities,
   type WorkspaceCapability,
 } from "../../workspace-api/index.ts";
@@ -27,7 +26,7 @@ import { type OpenFile } from "../open-file.ts";
 import { createPanelHosts } from "../panel-hosts.ts";
 import { TerminalCloseDialog } from "../../terminal/index.ts";
 import { useDocker } from "../../docker/index.ts";
-import { baseTabTypes } from "../lib/virtual-tabs.ts";
+import { keptAliveTabs, useWorkspaceTabTypes, type TabViews } from "../lib/tab-views.ts";
 import { useWorkspaceRefresh } from "../lib/workspace-refresh.ts";
 import { useMobileSurfaces, registerMobileCommands } from "../lib/mobile-surfaces.ts";
 const props = defineProps<{
@@ -35,10 +34,17 @@ const props = defineProps<{
   projectSettingsDirty?: boolean;
   beforeCloseProjectSettings?: () => boolean;
   saveProjectSettings?: () => void | Promise<void>;
+  tabViews?: TabViews; // views of the kinds the embedding page owns
 }>();
 const profile = workspaceProfile(props.projectId);
 const capabilities = profileCapabilities(profile);
-const tabTypes = createTabRegistry(baseTabTypes, profile.tabs);
+const tabTypes = useWorkspaceTabTypes(profile, props.tabViews, {
+  project: {
+    dirty: () => !!props.projectSettingsDirty,
+    beforeClose: () => props.beforeCloseProjectSettings?.(),
+    save: () => props.saveProjectSettings?.(),
+  },
+});
 const workspaceElement = ref<HTMLElement>();
 const sidebarHidden = ref(false);
 const {
@@ -91,9 +97,9 @@ const loadGit = () => (capabilities.git ? overview.load() : Promise.resolve());
 const section = ref<SidebarSection>("files");
 const revision = ref(0);
 const isDirty = (file: OpenFile) =>
-  file.virtual === "project"
-    ? !!props.projectSettingsDirty
-    : !file.virtual && file.draft !== undefined && file.draft !== file.content;
+  file.virtual
+    ? !!tabTypes.behaviorOf(file.virtual)?.dirty?.()
+    : file.draft !== undefined && file.draft !== file.content;
 const tabs = ref<OpenFile[]>([]);
 /** Куда поместить следующую открытую вкладку: заполняется при перетаскивании файла на блок. */
 const pending: { target?: DockTarget } = {};
@@ -130,7 +136,6 @@ const files = useOpenFiles({
   reveal: (id) => revealPanel(id),
   isDirty,
   saved: () => void loadGit(),
-  beforeCloseProjectSettings: () => props.beforeCloseProjectSettings?.(),
   pending,
   tabTypes,
 });
@@ -151,7 +156,7 @@ const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
     showSidebar();
     sidebar.value?.reveal(path);
   },
-  saveProjectSettings: () => props.saveProjectSettings?.(),
+  tabTypes,
 });
 const docker = useDocker(props.projectId, {
   enabled: capabilities.docker,
@@ -166,9 +171,7 @@ const docker = useDocker(props.projectId, {
   },
 });
 const panelHosts = createPanelHosts();
-const keptKinds = ["agent", "project"].filter((id) => tabTypes.has(id));
-const keepAlive = new Set(keptKinds.map((id) => tabTypes.keyOf(id)));
-const virtualKeys = Object.fromEntries(keptKinds.map((id) => [id, tabTypes.keyOf(id)]));
+const { keepAlive, virtualKeys } = keptAliveTabs(tabTypes);
 registerEditor(
   "ide.workbench.sidebar.toggle",
   "Показать или скрыть боковую панель",
@@ -348,7 +351,6 @@ onBeforeUnmount(() => overview.cancel());
           />
         </template>
         <template #project><slot name="project" /></template>
-        <template #repository><slot name="repository" /></template>
       </WorkbenchDock>
     </section>
     <TerminalCloseDialog

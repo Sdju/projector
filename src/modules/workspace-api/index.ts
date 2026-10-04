@@ -23,6 +23,7 @@ export {
   createTabRegistry,
   defineTab,
   singletonTab,
+  type TabBehavior,
   type TabParams,
   type TabRegistry,
   type TabType,

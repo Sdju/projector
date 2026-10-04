@@ -32,7 +32,6 @@ export interface OpenFilesContext {
   isDirty: (file: OpenFile) => boolean;
   /** Файл записан на диск: Git и маркеры строк устарели. */
   saved: () => void;
-  beforeCloseProjectSettings?: () => boolean | undefined;
   /** Куда поместить следующую открытую вкладку: заполняется при перетаскивании файла на блок. */
   pending: { target?: DockTarget };
   tabTypes: TabRegistry;
@@ -270,7 +269,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
   async function closeTab(key: string) {
     const tab = tabs.value.find((file) => file.key === key);
     if (!tab) return;
-    if (tab.virtual === "project" && ctx.beforeCloseProjectSettings?.() === false) return;
+    if (ctx.tabTypes.behaviorOf(tab.virtual)?.beforeClose?.() === false) return;
     if (!(await saveFile(tab))) {
       ctx.reveal(tab.key);
       if (!window.confirm(`Не удалось сохранить ${tab.path}. Закрыть без сохранения изменений?`))

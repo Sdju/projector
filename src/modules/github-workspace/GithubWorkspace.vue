@@ -2,7 +2,7 @@
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import type { GithubRepository } from "../../../core/modules/github/index.ts";
-import { ProjectWorkspace } from "../workspace/index.ts";
+import { ProjectWorkspace, type TabViews } from "../workspace/index.ts";
 import { registerWorkspaceProfile, workspaceRequest } from "../workspace-api/index.ts";
 import { useCommandScope } from "../../common/utilities/commands.ts";
 import UiButton from "../../common/ui/UiButton.vue";
@@ -42,6 +42,12 @@ commands.scope.registerCommand({
   enabled: () => !!workspace.value,
   run: () => workspace.value?.openTab("repository"),
 });
+const tabViews: TabViews = {
+  repository: {
+    component: GithubRepositoryInfo,
+    props: () => ({ repository: metadata.value }),
+  },
+};
 onMounted(async () => {
   try {
     const ref = typeof route.query.ref === "string" ? route.query.ref : "";
@@ -80,7 +86,7 @@ onBeforeUnmount(() => {
 });
 </script>
 <template>
-  <ProjectWorkspace v-if="metadata" :ref="ready" :project-id="projectId">
+  <ProjectWorkspace v-if="metadata" :ref="ready" :project-id="projectId" :tab-views="tabViews">
     <template #terminal-actions>
       <UiButton
         icon
@@ -99,9 +105,6 @@ onBeforeUnmount(() => {
         >{{ metadata.branch }} · {{ metadata.commit.slice(0, 7) }} · только чтение</span
       ></template
     >
-    <template #repository>
-      <GithubRepositoryInfo :repository="metadata" />
-    </template>
   </ProjectWorkspace>
   <p v-else class="msg" :role="error ? 'alert' : 'status'">
     {{ error || "открываю репозиторий…" }}

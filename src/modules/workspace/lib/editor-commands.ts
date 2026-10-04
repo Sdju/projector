@@ -2,7 +2,7 @@ import type { Ref } from "vue";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import { commandArgs, type useCommandScope } from "../../../common/utilities/commands.ts";
 import { copyWithNotice } from "../../../common/utilities/notice.ts";
-import type { WorkspaceCapability } from "../../workspace-api/index.ts";
+import type { TabRegistry, WorkspaceCapability } from "../../workspace-api/index.ts";
 import { isEditable, isMarkdown, type OpenFile } from "../open-file.ts";
 
 export interface EditorCommandContext {
@@ -24,7 +24,7 @@ export interface EditorCommandContext {
   toggleMarkdownSource: () => void;
   /** Показывает файл в дереве: открывает сайдбар и раздел «Файлы». */
   revealInTree: (path: string) => void;
-  saveProjectSettings?: () => void | Promise<void>;
+  tabTypes: TabRegistry;
 }
 
 /** Команды редактора: сохранение, показ в дереве, копирование пути, служебные вкладки и клавиши. */
@@ -120,14 +120,11 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
     () => true,
   );
   function editorKeydown(event: KeyboardEvent) {
-    if (
-      active()?.virtual === "project" &&
-      (event.ctrlKey || event.metaKey) &&
-      event.key.toLowerCase() === "s"
-    ) {
+    const save = ctx.tabTypes.behaviorOf(active()?.virtual)?.save;
+    if (save && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
       event.preventDefault();
       event.stopPropagation();
-      void ctx.saveProjectSettings?.();
+      void save();
       return;
     }
     if (

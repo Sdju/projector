@@ -1,20 +1,18 @@
 <script setup lang="ts">
-import { KeybindingsEditor } from "../../ide/index.ts";
-import { LanInfoPanel } from "../../network/index.ts";
-import { DockerPanel } from "../../docker/index.ts";
+import { computed } from "vue";
+import { useWorkspaceTabs } from "../lib/tab-views.ts";
 import { isEditable, isMarkdown, type OpenFile } from "../open-file.ts";
 import {
   ArchiveViewer,
   CodeViewer,
   CommitOverview,
   ImageViewport,
-  IssueView,
   MarkdownViewer,
   SvgViewer,
 } from "../modules/viewers/index.ts";
 
 /** Содержимое одной вкладки файла: хлебные крошки, ошибка сохранения и подходящий просмотрщик. */
-defineProps<{ file: OpenFile; projectId: string; revision: number }>();
+const props = defineProps<{ file: OpenFile; projectId: string; revision: number }>();
 const emit = defineEmits<{
   change: [draft: string];
   save: [];
@@ -24,28 +22,28 @@ const emit = defineEmits<{
   openCommitDiff: [hash: string, path: string];
   subject: [text: string];
 }>();
+const tabs = useWorkspaceTabs();
+const view = computed(() => (props.file.virtual ? tabs.views[props.file.virtual] : undefined));
+const subtitle = computed(() =>
+  props.file.virtual ? tabs.types.get(props.file.virtual)?.subtitle : undefined,
+);
 </script>
 
 <template>
   <div class="file-panel">
     <div class="breadcrumb">
       <span>{{ file.path }}</span>
-      <span v-if="file.virtual === 'keybindings'">настройки IDE</span>
-      <span v-if="file.virtual === 'network'">доступ по сети</span>
+      <span v-if="subtitle">{{ subtitle }}</span>
       <span v-if="file.external || file.readonly">только просмотр</span>
     </div>
     <p v-if="file.saveError && !isMarkdown(file)" class="file-error" role="alert">
       {{ file.saveError }}
     </p>
     <div class="panel-body">
-      <KeybindingsEditor v-if="file.virtual === 'keybindings'" />
-      <LanInfoPanel v-else-if="file.virtual === 'network'" />
-      <DockerPanel v-else-if="file.virtual === 'docker'" />
-      <slot v-else-if="file.virtual === 'repository'" name="repository" />
-      <IssueView
-        v-else-if="file.virtual === 'issue' && typeof file.params?.number === 'number'"
-        :project-id="projectId"
-        :number="file.params.number"
+      <component
+        :is="view.component"
+        v-if="view"
+        v-bind="view.props?.(file, projectId)"
         @open="emit('open', $event)"
       />
       <CommitOverview
