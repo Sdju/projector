@@ -25,6 +25,13 @@ import {
   themeCompartment,
   themeExtension,
 } from "../lib/codemirror.ts";
+import {
+  acquireEditorStatus,
+  activateEditorStatus,
+  releaseEditorStatus,
+  updateEditorStatus,
+  type LineEnding,
+} from "../lib/editor-status.ts";
 const props = defineProps<{
   path: string;
   content: string;
@@ -45,6 +52,23 @@ const sideBySide = ref(false);
 let gutterToken = 0;
 const states = new Map<string, EditorState>();
 let activePath = "";
+const statusId = acquireEditorStatus();
+
+function detectLineEnding(content: string): LineEnding {
+  const index = content.indexOf("\n");
+  return index > 0 && content[index - 1] === "\r" ? "CRLF" : "LF";
+}
+function reportCursor(state: EditorState) {
+  const { main } = state.selection;
+  const line = state.doc.lineAt(main.head);
+  return {
+    line: line.number,
+    column: main.head - line.from + 1,
+    selectedChars: main.empty ? 0 : main.to - main.from,
+    selectedLines: main.empty ? 0 : state.doc.lineAt(main.to).number - line.number + 1,
+    lineEnding: detectLineEnding(props.content),
+  };
+}
 
 async function loadGutter() {
   const token = ++gutterToken;
@@ -106,6 +130,9 @@ function extensions(mode: "inline" | "side" = "inline") {
         : [],
     EditorView.updateListener.of((update) => {
       if (update.docChanged && props.editable) emit("change", update.state.doc.toString());
+      if (update.view !== view) return;
+      if (update.selectionSet) activateEditorStatus(statusId, reportCursor(update.state));
+      else if (update.docChanged) updateEditorStatus(statusId, reportCursor(update.state));
     }),
   ];
 }
@@ -142,6 +169,7 @@ function render() {
     });
   }
   const target = view;
+  activateEditorStatus(statusId, reportCursor(target.state));
   void languageExtension(props.path).then((ext) => {
     if (view !== target) return;
     const effects = { effects: languageCompartment.reconfigure(ext) };
@@ -193,6 +221,7 @@ onBeforeUnmount(() => {
   merge?.destroy();
   view?.destroy();
   states.clear();
+  releaseEditorStatus(statusId);
 });
 </script>
 <template>

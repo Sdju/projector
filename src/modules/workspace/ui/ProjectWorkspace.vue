@@ -18,6 +18,7 @@ import { useWorkbenchLayout } from "../lib/workbench-layout.ts";
 import { registerEditorCommands } from "../lib/editor-commands.ts";
 import { useWorkspaceSession } from "../lib/workspace-session.ts";
 import WorkbenchDock from "./WorkbenchDock.vue";
+import StatusBar from "./StatusBar.vue";
 import type { DockTarget } from "../../dock/index.ts";
 import { type OpenFile } from "../open-file.ts";
 import { createPanelHosts } from "../panel-hosts.ts";
@@ -343,6 +344,7 @@ onBeforeUnmount(() => {
       @cancel="terminals.cancelClose"
       @confirm="terminals.confirmClose"
     />
+    <StatusBar class="workspace-status" />
   </div>
 </template>
 
@@ -350,7 +352,7 @@ onBeforeUnmount(() => {
 .workspace {
   display: grid;
   grid-template-columns: var(--tree-width, clamp(200px, 19vw, 280px)) 1px minmax(0, 1fr);
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   height: calc(100dvh - 84px);
@@ -463,6 +465,10 @@ onBeforeUnmount(() => {
 }
 .toolbar-host {
   grid-column: 1 / -1;
+}
+.workspace-status {
+  grid-column: 1 / -1;
+  grid-row: 4;
 }
 .mobile-surfaces {
   grid-column: 1 / -1;

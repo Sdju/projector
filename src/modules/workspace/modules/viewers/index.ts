@@ -6,3 +6,4 @@ export const CodeViewer = defineAsyncComponent(() => import("./ui/CodeViewer.vue
 export const MarkdownViewer = defineAsyncComponent(() => import("./ui/MarkdownViewer.vue"));
 export const SvgViewer = defineAsyncComponent(() => import("./ui/SvgViewer.vue"));
 export const EditorSettings = defineAsyncComponent(() => import("./ui/EditorSettings.vue"));
+export { useEditorStatus, type EditorStatus, type LineEnding } from "./lib/editor-status.ts";
