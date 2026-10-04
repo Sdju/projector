@@ -138,7 +138,7 @@ startup timeout are shown by the IDE host; duplicate actions are disabled while 
 ### Server mode
 
 `ide.workbench.server.mode.dev` (**Переключить сервер в режим dev (HMR)**) and `ide.workbench.server.mode.prod`
-(**Переключить сервер в режим prod (сборка)**) switch between `vp dev` and `vp preview` over `dist`. After confirmation the page
+(**Переключить сервер в режим prod (сборка)**) switch between `vp dev` and the standalone Node server over `dist`. After confirmation the page
 calls `POST /api/app/mode` with `{ mode }`; the server starts `projector mode <mode>` as a detached CLI process
 (build for `prod`, then full restart — terminals and child processes end) and answers `202`. Pages wait for a new PID in
 `/api/health` and reload; `mode` in that response reports the running mode. A build failure leaves the old server

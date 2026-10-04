@@ -4,8 +4,12 @@ import { SERVER_MODES, isServerMode, serverCommand } from "../core/modules/serve
 
 test("server modes map to vp commands", () => {
   assert.deepEqual(SERVER_MODES, ["dev", "prod"]);
-  assert.deepEqual(serverCommand("dev"), ["dev"]);
-  assert.deepEqual(serverCommand("prod"), ["preview"]);
+  const paths = { vp: "vp", node: "node", root: "/app" };
+  assert.deepEqual(serverCommand("dev", paths), { command: "vp", args: ["dev"] });
+  assert.deepEqual(serverCommand("prod", paths), {
+    command: "node",
+    args: ["/app/server/app/standalone.ts"],
+  });
 });
 
 test("only known modes are accepted", () => {

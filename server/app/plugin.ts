@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { PreviewServer, ViteDevServer } from "vite";
+import type { HttpServer, PreviewServer, ViteDevServer } from "vite";
 import type { Plugin } from "vite";
 import { handleApi } from "./api.ts";
 import { clearInstance, writeInstance } from "../modules/instance/index.ts";
@@ -30,26 +30,29 @@ function bindHooks(): void {
   });
 }
 
-function attach(server: ViteDevServer | PreviewServer, mode: ServerMode): void {
+/** Общая часть dev, preview и standalone: режим, сокеты терминалов, запись instance, окно. */
+export function bindRuntime(httpServer: HttpServer | null, mode: ServerMode): void {
   runtime.projectorRuntimeMode = mode;
-  if (server.httpServer) {
-    attachTerminalServer(server.httpServer);
-    attachTerminalControlServer(server.httpServer);
-  }
-  server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
-    void handleApi(req, res).then((handled) => {
-      if (!handled) next();
-    });
-  });
-
-  server.httpServer?.once("listening", () => {
-    const address = server.httpServer?.address() ?? null;
+  if (!httpServer) return;
+  attachTerminalServer(httpServer);
+  attachTerminalControlServer(httpServer);
+  httpServer.once("listening", () => {
+    const address = httpServer.address();
     const port = address && typeof address === "object" ? address.port : APP_PORT;
     void writeInstance(port);
     bindHooks();
     if (process.env.PROJECTOR_WINDOW === "1") {
       void openLauncher(listenAddress(address)).catch(console.error);
     }
+  });
+}
+
+function attach(server: ViteDevServer | PreviewServer, mode: ServerMode): void {
+  bindRuntime(server.httpServer, mode);
+  server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
+    void handleApi(req, res).then((handled) => {
+      if (!handled) next();
+    });
   });
 }
 

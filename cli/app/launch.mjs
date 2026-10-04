@@ -151,8 +151,13 @@ async function ensureBuilt(vp, serverMode) {
     await buildFrontend(vp);
 }
 
+function serverPaths(vp) {
+  return { vp, node: process.execPath, root: ROOT };
+}
+
 function startForeground(vp) {
-  const child = spawn(vp, serverCommand(readServerMode()), {
+  const { command, args } = serverCommand(readServerMode(), serverPaths(vp));
+  const child = spawn(command, args, {
     cwd: ROOT,
     stdio: "inherit",
     env: childEnv(),
@@ -165,7 +170,8 @@ function startForeground(vp) {
 function startDaemon(vp) {
   mkdirSync(DATA_DIR, { recursive: true });
   const logFd = openSync(join(DATA_DIR, "server.log"), "a");
-  const child = spawn(vp, serverCommand(readServerMode()), {
+  const { command, args } = serverCommand(readServerMode(), serverPaths(vp));
+  const child = spawn(command, args, {
     cwd: ROOT,
     detached: true,
     stdio: ["ignore", logFd, logFd],
