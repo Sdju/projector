@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, useId } from "vue";
-import { useNow } from "@vueuse/core";
+import { useIntervalFn, useNow } from "@vueuse/core";
 import IconOpenCode from "~icons/simple-icons/opencode";
 import type { OpenCodeUsage } from "../../../../core/modules/opencode/index.ts";
 import { useCommandScope } from "../../../common/utilities/commands.ts";
 import { resetCountdown, resetTimestamp } from "../../../common/utilities/reset-time.ts";
 
 const usage = ref<OpenCodeUsage | null>(null);
-const now = useNow({ interval: 1000 });
+const now = useNow({ scheduler: (update) => useIntervalFn(update, 1000) });
 const failed = ref(false);
 type WindowName = keyof NonNullable<OpenCodeUsage["windows"]>;
 const windowOrder: WindowName[] = ["monthly", "rolling", "weekly"];

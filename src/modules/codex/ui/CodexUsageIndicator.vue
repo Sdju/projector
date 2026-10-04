@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref } from "vue";
-import { useNow } from "@vueuse/core";
+import { useIntervalFn, useNow } from "@vueuse/core";
 import IconCodex from "~icons/simple-icons/openai";
 import type { CodexUsage } from "../../../../core/modules/codex/index.ts";
 import { resetCountdown, resetTimestamp } from "../../../common/utilities/reset-time.ts";
 
 const usage = ref<CodexUsage | null>(null);
-const now = useNow({ interval: 1000 });
+const now = useNow({ scheduler: (update) => useIntervalFn(update, 1000) });
 const failed = ref(false);
 let timer: ReturnType<typeof setTimeout> | undefined;
 let controller: AbortController | undefined;
