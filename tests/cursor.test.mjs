@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { os } from "../core/modules/os/index.ts";
 import { readCursorUsage } from "../server/modules/cursor/client.ts";
 import { cursorWindows, cursorUsage } from "../server/modules/cursor/usage.ts";
+import { NETWORK_CONTEXT_URL } from "../server/modules/network/index.ts";
 import { handleCursor } from "../server/routes/api/cursor.ts";
 
 const payload = {
@@ -83,8 +84,17 @@ test("Cursor reads existing auth, bounds and sanitizes requests, shares cached A
     });
     await t.test("concurrent polls, repeated reads and HTTP route share one request", async () => {
       state.value = undefined;
+      calls = 0;
+      let cursorCalls = 0;
       globalThis.fetch = async (url, options) => {
         calls++;
+        if (url === NETWORK_CONTEXT_URL) {
+          assert.equal(options.method ?? "GET", "GET");
+          assert.equal(options.redirect, "error");
+          assert.ok(options.signal instanceof AbortSignal);
+          return Response.json({ success: true, is_eu: true, ip: "SECRET" });
+        }
+        cursorCalls++;
         assert.equal(
           url,
           "https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage",
@@ -107,16 +117,43 @@ test("Cursor reads existing auth, bounds and sanitizes requests, shares cached A
       assert.equal(res.statusCode, 200);
       assert.deepEqual(JSON.parse(body), a);
       assert.doesNotMatch(body, /SECRET|fixture|Authorization|refreshToken/);
-      assert.equal(calls, 1);
+      assert.equal(cursorCalls, 1);
+      assert.equal(calls, 2);
       assert.equal(await handleCursor({ res, method: "POST", path: "/api/cursor/usage" }), false);
       state.value.checkedAt -= 60001;
       await cursorUsage();
-      assert.equal(calls, 2);
+      assert.equal(cursorCalls, 2);
+      assert.equal(calls, 4);
+    });
+    await t.test("failed network probe blocks Cursor usage requests", async () => {
+      state.value = undefined;
+      let cursorCalls = 0;
+      for (const body of [
+        { success: false, is_eu: true, message: "SECRET" },
+        { success: true, is_eu: false, country_code: "US" },
+        { success: true, ip: "SECRET" },
+      ]) {
+        globalThis.fetch = async (url) => {
+          if (url === NETWORK_CONTEXT_URL) return Response.json(body);
+          cursorCalls++;
+          throw new Error("must not request Cursor after failed probe");
+        };
+        const result = await cursorUsage();
+        assert.equal(result.status, "unavailable");
+        assert.equal(result.windows, null);
+        assert.match(result.message, /сетевой контекст/);
+        assert.doesNotMatch(result.message, /SECRET|US/);
+        state.value = undefined;
+      }
+      assert.equal(cursorCalls, 0);
     });
     await t.test("auth errors and malformed responses do not expose upstream bodies", async () => {
       for (const status of [401, 403, 429, 500]) {
         state.value = undefined;
-        globalThis.fetch = async () => new Response("SECRET upstream details", { status });
+        globalThis.fetch = async (url) => {
+          if (url === NETWORK_CONTEXT_URL) return Response.json({ success: true, is_eu: true });
+          return new Response("SECRET upstream details", { status });
+        };
         const result = await cursorUsage();
         assert.equal(result.status, "unavailable");
         assert.equal(result.windows, null);
@@ -124,16 +161,27 @@ test("Cursor reads existing auth, bounds and sanitizes requests, shares cached A
         if (status === 401) assert.match(result.message, /истекла/);
         if (status === 403) assert.match(result.message, /Подписка/);
       }
-      globalThis.fetch = async () => new Response("SECRET invalid JSON");
+      globalThis.fetch = async (url) => {
+        if (url === NETWORK_CONTEXT_URL) return Response.json({ success: true, is_eu: true });
+        return new Response("SECRET invalid JSON");
+      };
       await assert.rejects(readCursorUsage(), /Некорректный ответ/);
       state.value = undefined;
-      globalThis.fetch = async () => Response.json({ planUsage: { totalPercentUsed: 1 } });
+      globalThis.fetch = async (url) => {
+        if (url === NETWORK_CONTEXT_URL) return Response.json({ success: true, is_eu: true });
+        return Response.json({ planUsage: { totalPercentUsed: 1 } });
+      };
       assert.equal((await cursorUsage()).status, "unavailable");
     });
     await t.test("hanging requests time out without returning credentials", async () => {
-      globalThis.fetch = (_url, options) => new Promise((_resolve, reject) => {
-        options.signal.addEventListener("abort", () => reject(new Error("SECRET request")), { once: true });
-      });
+      globalThis.fetch = (url, options) => {
+        if (url === NETWORK_CONTEXT_URL) return Response.json({ success: true, is_eu: true });
+        return new Promise((_resolve, reject) => {
+          options.signal.addEventListener("abort", () => reject(new Error("SECRET request")), {
+            once: true,
+          });
+        });
+      };
       const keepAlive = setInterval(() => {}, 100);
       try { await assert.rejects(readCursorUsage(20), /Не удалось получить лимиты/); }
       finally { clearInterval(keepAlive); }

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { weeklyWindow, codexUsage } from "../server/modules/codex/usage.ts";
 import { readCodexRateLimits } from "../server/modules/codex/cli.ts";
+import { NETWORK_CONTEXT_URL } from "../server/modules/network/index.ts";
 
 const weekly = { usedPercent: 40, windowDurationMins: 10080, resetsAt: 1791574411 };
 test("weekly quota follows duration and codex bucket, never another model's quota", () => {
@@ -40,6 +41,7 @@ test("weekly quota follows duration and codex bucket, never another model's quot
 test("Codex stdio handshake, bounded failures and shared usage cache", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "projector-codex-"));
   const originalPath = process.env.PATH;
+  const previousFetch = globalThis.fetch;
   const trace = join(directory, "trace.jsonl");
   const fixture = `#!/usr/bin/env node
 const fs = require('node:fs');
@@ -61,14 +63,20 @@ process.stdin.on('data', chunk => {
     const response=JSON.stringify({id:2,result:{rateLimits:{primary:${JSON.stringify(weekly)}}}})+'\\n';
     process.stdout.write('not-json\\n'+JSON.stringify({method:'notification',params:{}})+'\\n'+response.slice(0,15));
     setTimeout(()=>process.stdout.write(response.slice(15)),10);
-   }
   }
  }
+}
 });
 `;
   await writeFile(join(directory, "codex"), fixture, { mode: 0o755 });
   process.env.PATH = `${directory}:${originalPath}`;
   process.env.PROJECTOR_CODEX_TRACE = trace;
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, NETWORK_CONTEXT_URL);
+    assert.equal(options.redirect, "error");
+    assert.ok(options.signal instanceof AbortSignal);
+    return Response.json({ success: true, is_eu: true, ip: "SECRET" });
+  };
   try {
     await t.test("handshakes, ignores notifications and accepts split JSON responses", async () => {
       assert.deepEqual(weeklyWindow(await readCodexRateLimits()), weekly);
@@ -97,6 +105,31 @@ process.stdin.on('data', chunk => {
       assert.equal(usage.weekly, null);
       assert.doesNotMatch(usage.message, /SECRET/);
     });
+    await t.test("failed network probe blocks Codex CLI usage requests", async () => {
+      const state = globalThis.projectorCodexUsage;
+      state.value = undefined;
+      delete process.env.PROJECTOR_CODEX_MODE;
+      const before = (await readFile(trace, "utf8")).trim().split("\n").filter(Boolean).length;
+      for (const body of [
+        { success: false, is_eu: true, message: "SECRET" },
+        { success: true, is_eu: false, country_code: "US" },
+        { success: true, ip: "SECRET" },
+      ]) {
+        globalThis.fetch = async () => Response.json(body);
+        const usage = await codexUsage();
+        assert.equal(usage.status, "unavailable");
+        assert.equal(usage.weekly, null);
+        assert.match(usage.message, /сетевой контекст/);
+        assert.doesNotMatch(usage.message, /SECRET|US/);
+        state.value = undefined;
+      }
+      const after = (await readFile(trace, "utf8")).trim().split("\n").filter(Boolean).length;
+      assert.equal(after, before);
+      globalThis.fetch = async (url) => {
+        assert.equal(url, NETWORK_CONTEXT_URL);
+        return Response.json({ success: true, is_eu: true });
+      };
+    });
     await t.test("hung CLI times out and missing executable rejects", async () => {
       process.env.PROJECTOR_CODEX_MODE = "hang";
       await assert.rejects(readCodexRateLimits(100), /не ответил вовремя/);
@@ -104,6 +137,7 @@ process.stdin.on('data', chunk => {
       await assert.rejects(readCodexRateLimits(), /недоступен/);
     });
   } finally {
+    globalThis.fetch = previousFetch;
     process.env.PATH = originalPath;
     delete process.env.PROJECTOR_CODEX_MODE;
     delete process.env.PROJECTOR_CODEX_TRACE;

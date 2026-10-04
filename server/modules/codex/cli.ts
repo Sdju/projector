@@ -1,4 +1,5 @@
 import { os } from "../../../core/modules/os/index.ts";
+import { assertEuNetworkContext } from "../network/index.ts";
 
 /** One bounded JSON-RPC request over the authenticated local Codex CLI. */
 export function codexRequest(method: string, params: unknown, timeoutMs = 15000): Promise<unknown> {
@@ -60,6 +61,7 @@ export function codexRequest(method: string, params: unknown, timeoutMs = 15000)
   });
 }
 
-export function readCodexRateLimits(timeoutMs = 15000) {
+export async function readCodexRateLimits(timeoutMs = 15000) {
+  await assertEuNetworkContext(timeoutMs);
   return codexRequest("account/rateLimits/read", { excludeResetCreditDetails: true }, timeoutMs);
 }
