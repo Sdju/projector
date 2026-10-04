@@ -33,6 +33,9 @@ test("the shared workspace uses a readonly source for tree, files, assets and re
     "",
     (value) => metadata.push(value),
     {
+      async readGit(action, params) {
+        return { action, params };
+      },
       async readRepository() {
         revision++;
         return { ...initial, commit: "c".repeat(40), tree: "d".repeat(40) };
@@ -65,6 +68,10 @@ test("the shared workspace uses a readonly source for tree, files, assets and re
   );
   const unregister = registerWorkspaceProfile("remote-test", profile);
   try {
+    assert.deepEqual(await workspaceRequest("remote-test", "log", { limit: "50" }), {
+      action: "log",
+      params: { limit: "50", repository: "octocat/repo", sha: initial.commit },
+    });
     const root = await workspaceRequest("remote-test", "tree");
     assert.deepEqual(root.entries[0], {
       name: "src",
@@ -83,13 +90,17 @@ test("the shared workspace uses a readonly source for tree, files, assets and re
     assert.ok(workspaceAssetUrl("remote-test", "docs/image.png").includes(initial.tree));
     await profile.providers.files.refresh();
     assert.equal(metadata.length, 1);
+    assert.equal((await workspaceRequest("remote-test", "log")).params.sha, "c".repeat(40));
     assert.ok(workspaceAssetUrl("remote-test", "docs/image.png").includes("d".repeat(40)));
     assert.equal(
       (await workspaceRequest("remote-test", "file", { path: "src/main.ts" })).content,
       "2".repeat(40),
     );
     assert.equal(calls.length, 4);
-    for (const action of ["git", "search", "external", "diff"])
+    assert.equal((await workspaceRequest("remote-test", "git")).branch, "main");
+    assert.equal(workspaceCapabilities("remote-test").git, true);
+    assert.equal(profile.providers.git.write, undefined);
+    for (const action of ["search", "external", "diff"])
       await assert.rejects(workspaceRequest("remote-test", action));
     await assert.rejects(workspaceRequest("remote-test", "file", { path: "../secret" }));
     assert.equal(workspaceCapabilities("remote-test").terminals, false);
@@ -138,9 +149,8 @@ test("readonly guards reject all shared write helpers before any HTTP request", 
 });
 
 test("a profile is a set of replaceable providers and capabilities follow from them", async () => {
-  const { createWorkspaceProfiles, profileCapabilities, workspaceProfile } = await import(
-    "../src/modules/workspace-api/index.ts"
-  );
+  const { createWorkspaceProfiles, profileCapabilities, workspaceProfile } =
+    await import("../src/modules/workspace-api/index.ts");
   const calls = [];
   const memory = {
     id: "memory",

@@ -18,6 +18,7 @@ import IconRefresh from "~icons/lucide/refresh-cw";
 
 const props = defineProps<{
   history: GitHistoryState;
+  allBranches?: boolean;
   commands: ReturnType<typeof useCommandScope>;
   /** Растёт при каждом обновлении Git: открытая история перечитывается следом. */
   revision: number;
@@ -94,6 +95,8 @@ register(
       throw new Error("query должен быть строкой");
     if (args.all !== undefined && typeof args.all !== "boolean")
       throw new Error("all должен быть boolean");
+    if (args.all === true && props.allBranches === false)
+      throw new Error("Этот источник поддерживает историю текущей ветки");
     open.value = true;
     search.value = (args.query as string | undefined) ?? search.value;
     await props.history.filter({ query: search.value, all: args.all as boolean | undefined });
@@ -187,7 +190,7 @@ watch(commits, (list) => {
         class="toggle"
         :aria-expanded="open"
         data-command="ide.git.history.toggle"
-        @click="open = !open"
+        @click="commands.run('ide.git.history.toggle')"
       >
         <IconChevronRight class="chevron" :class="{ open }" aria-hidden="true" />
         <h3>History</h3>
@@ -219,6 +222,7 @@ watch(commits, (list) => {
           @keydown.stop
         />
         <UiButton
+          v-if="allBranches !== false"
           size="sm"
           :aria-pressed="all"
           title="Показать коммиты всех веток"
@@ -234,7 +238,13 @@ watch(commits, (list) => {
       <p v-if="error" class="note error" role="alert">{{ error }}</p>
       <p v-else-if="loading && !commits.length" class="note" role="status">загрузка истории…</p>
       <p v-else-if="log.available && !commits.length" class="note">
-        {{ query ? "Ничего не найдено." : "Коммитов пока нет." }}
+        {{
+          query
+            ? log.next === null
+              ? "Ничего не найдено."
+              : "В этой части истории совпадений нет."
+            : "Коммитов пока нет."
+        }}
       </p>
       <ul v-if="commits.length" class="commits">
         <GitCommitRow

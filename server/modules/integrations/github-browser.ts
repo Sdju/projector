@@ -7,7 +7,7 @@ import type {
   GithubFile,
 } from "../../../core/modules/github/index.ts";
 
-async function reader(repository: string) {
+export async function githubReader(repository: string) {
   const name = repositoryName(repository);
   const config = await integrationConfig("github");
   const token = config.enabled ? config.credentials.token || "" : "";
@@ -21,7 +21,7 @@ export async function browseGithubRepository(
   repository: string,
   ref = "",
 ): Promise<GithubRepository> {
-  const get = await reader(repository);
+  const get = await githubReader(repository);
   const repo = await get<{
     full_name: string;
     description: string;
@@ -56,7 +56,7 @@ export async function browseGithubTree(
   sha: string,
 ): Promise<{ entries: GithubEntry[]; truncated: boolean }> {
   objectId(sha);
-  const get = await reader(repository);
+  const get = await githubReader(repository);
   const data = await get<{
     tree: Array<{
       path: string;
@@ -90,7 +90,7 @@ export async function browseGithubFile(
   path: string,
 ): Promise<GithubFile> {
   objectId(sha);
-  const get = await reader(repository);
+  const get = await githubReader(repository);
   const blob = await get<{ content: string; encoding: string; size: number }>(`/git/blobs/${sha}`);
   if (blob.size > LIMIT) throw new HttpError(413, "Просмотр файлов больше 5 MiB пока недоступен");
   if (blob.encoding !== "base64")

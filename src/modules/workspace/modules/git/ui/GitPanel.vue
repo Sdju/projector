@@ -8,6 +8,7 @@ import type { GitOverviewState } from "../lib/git-overview.ts";
 import type { GitBranchesState } from "../lib/git-branches.ts";
 import type { GitHistoryState } from "../lib/git-history.ts";
 import { registerChangeCommands } from "../lib/change-commands.ts";
+import { workspaceProfile } from "../../../../workspace-api/index.ts";
 import GitBranchBar from "./GitBranchBar.vue";
 import GitSplitter from "./GitSplitter.vue";
 import GitChangesTree from "./GitChangesTree.vue";
@@ -41,17 +42,21 @@ const gitBusy = ref(false);
 const collapsedGroups = ref(new Set<string>());
 const gitMenu = ref<InstanceType<typeof ContextMenu>>();
 const gitTarget = ref({ path: "", staged: false });
-const historyOpen = ref(false);
+const gitProvider = workspaceProfile(props.projectId).providers.git;
+const writable = !!gitProvider?.write;
+const historyOpen = ref(!writable);
 /** Высота истории, подогнанная перетаскиванием; без неё история занимает место по содержимому. */
 const historyHeight = ref<number>();
 const stack = ref<HTMLElement>();
 const historyZone = ref<HTMLElement>();
 const historyStyle = computed(() =>
-  !historyOpen.value
-    ? { flex: "0 0 auto" }
-    : historyHeight.value
-      ? { flex: `0 0 ${historyHeight.value}px` }
-      : { flex: "0 1 auto" },
+  !writable
+    ? { flex: "1 1 0", maxHeight: "none" }
+    : !historyOpen.value
+      ? { flex: "0 0 auto" }
+      : historyHeight.value
+        ? { flex: `0 0 ${historyHeight.value}px` }
+        : { flex: "0 1 auto" },
 );
 const branchOpen = ref(false);
 const branchTarget = ref("");
@@ -80,6 +85,7 @@ const { gitChange, stagedChanges, workingChanges } = registerChangeCommands({
 });
 gitCommands.scope.registerCommand({
   id: "ide.git.group.toggle",
+  enabled: () => writable,
   title: "Свернуть или развернуть блок изменений",
   description: "Сворачивает блок Staged или Changed в панели Git.",
   arguments: { staged: "true — блок Staged, false — блок Changed" },
@@ -93,6 +99,7 @@ gitCommands.scope.registerCommand({
 });
 gitCommands.scope.registerCommand({
   id: "ide.git.history.resize",
+  enabled: () => writable,
   title: "Изменить высоту истории Git",
   description:
     "Задаёт высоту блока History в пикселях; без height возвращает размер по содержимому.",
@@ -140,7 +147,7 @@ defineExpose({
     @keydown="gitCommands.keydown($event)"
   >
     <GitBranchBar
-      v-if="git.available"
+      v-if="git.available && writable"
       v-model:open="branchOpen"
       v-model:target="branchTarget"
       :branches="branches"
@@ -155,9 +162,9 @@ defineExpose({
     <p v-else-if="!gitLoading && !git.available" class="notice">
       В этой папке нет Git-репозитория.
     </p>
-    <p v-else-if="!gitLoading && !git.changes.length" class="notice">Нет изменений.</p>
+    <p v-else-if="writable && !gitLoading && !git.changes.length" class="notice">Нет изменений.</p>
     <div v-if="git.available" ref="stack" class="git-stack">
-      <div class="changes-zone">
+      <div v-if="writable" class="changes-zone">
         <template
           v-for="group in [
             { label: 'Staged', rows: stagedChanges, staged: true },
@@ -236,7 +243,7 @@ defineExpose({
         </template>
       </div>
       <GitSplitter
-        v-if="historyOpen"
+        v-if="historyOpen && writable"
         :target="historyZone"
         :stack="stack"
         @resize="historyHeight = $event"
@@ -248,6 +255,7 @@ defineExpose({
           v-model:open="historyOpen"
           v-model:target="commitTarget"
           :history="history"
+          :all-branches="gitProvider?.allBranches !== false"
           :commands="gitCommands"
           :revision="overview.gutterRevision.value"
           @open-commit="emit('openCommit', $event)"

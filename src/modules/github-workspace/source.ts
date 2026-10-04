@@ -2,7 +2,7 @@ import type { GithubRepository, GithubEntry } from "../../../core/modules/github
 import type { FileContent, FileEntry } from "../../../core/modules/workspace/index.ts";
 import type { WorkspaceProfile } from "../workspace-api/index.ts";
 import { formatProjectRef } from "../project/index.ts";
-import { readRepository, readTree, readFile } from "./client.ts";
+import { readRepository, readTree, readFile, readGit } from "./client.ts";
 
 /** GitHub adapts to the same provider contracts as a local workspace; it owns no UI. */
 export function createGithubWorkspaceProfile(
@@ -10,7 +10,12 @@ export function createGithubWorkspaceProfile(
   initial: GithubRepository,
   ref: string,
   changed: (metadata: GithubRepository) => void,
-  api = { readRepository, readTree, readFile },
+  api: {
+    readRepository: typeof readRepository;
+    readTree: typeof readTree;
+    readFile: typeof readFile;
+    readGit?: typeof readGit;
+  } = { readRepository, readTree, readFile, readGit },
 ): WorkspaceProfile {
   let metadata = initial;
   const directories = new Map<string, Promise<GithubEntry[]>>();
@@ -48,6 +53,21 @@ export function createGithubWorkspaceProfile(
       throw error;
     }
   }
+  const git: WorkspaceProfile["providers"]["git"] = {
+    allBranches: false,
+    async read(action, params, signal) {
+      const snapshot = metadata;
+      if (action === "git") return { available: true, branch: snapshot.branch, changes: [] };
+      if (action === "gutter") return { available: false, original: "" };
+      if (!["log", "commit", "commit-diff"].includes(action))
+        throw new Error("Действие недоступно для этого источника workspace");
+      return (api.readGit ?? readGit)(
+        action,
+        { ...params, repository, sha: snapshot.commit },
+        signal,
+      );
+    },
+  };
   const files: WorkspaceProfile["providers"]["files"] = {
     async refresh() {
       const next = await api.readRepository(repository, ref);
@@ -61,7 +81,8 @@ export function createGithubWorkspaceProfile(
     async read(action, params, signal) {
       const snapshot = metadata;
       const path = params.path || "";
-      if (action === "root") return { root: formatProjectRef({ kind: "github", repository: snapshot.fullName }) };
+      if (action === "root")
+        return { root: formatProjectRef({ kind: "github", repository: snapshot.fullName }) };
       if (action === "tree") {
         const entries: FileEntry[] = (await directory(snapshot, path, signal)).map((entry) => ({
           name: entry.name,
@@ -110,6 +131,6 @@ export function createGithubWorkspaceProfile(
       persist: false,
       externalFiles: false,
     },
-    providers: { files },
+    providers: { files, git },
   };
 }

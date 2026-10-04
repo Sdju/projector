@@ -13,6 +13,9 @@ import {
   browseGithubTree,
   browseGithubFile,
   browseGithubAsset,
+  browseGithubLog,
+  browseGithubCommit,
+  browseGithubComparison,
 } from "../../../modules/integrations/index.ts";
 
 import { json, readBody } from "../../../modules/transport/index.ts";
@@ -45,6 +48,20 @@ export async function handleIntegrationsActions({
       else if (path.endsWith("/tree")) json(res, 200, await browseGithubTree(repository, sha));
       else if (path.endsWith("/file"))
         json(res, 200, await browseGithubFile(repository, sha, url.searchParams.get("path") || ""));
+      else if (path.endsWith("/log"))
+        json(res, 200, await browseGithubLog(repository, Object.fromEntries(url.searchParams)));
+      else if (path.endsWith("/commit"))
+        json(res, 200, await browseGithubCommit(repository, url.searchParams.get("hash") || ""));
+      else if (path.endsWith("/commit-diff"))
+        json(
+          res,
+          200,
+          await browseGithubComparison(
+            repository,
+            url.searchParams.get("hash") || "",
+            url.searchParams.get("path") || "",
+          ),
+        );
       else return false;
       return true;
     }

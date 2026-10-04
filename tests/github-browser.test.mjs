@@ -135,6 +135,162 @@ test("readonly GitHub browser reads snapshots, trees and blobs without cloning o
   }
 });
 
+test("GitHub history paginates filtered commits and reads exact before/after blobs", async () => {
+  const root = await mkdtemp(join(tmpdir(), "projector-gh-history-"));
+  process.env.XDG_DATA_HOME = root;
+  const { browseGithubLog, browseGithubCommit, browseGithubComparison } =
+    await import("../server/modules/integrations/index.ts");
+  const head = "a".repeat(40),
+    parent = "b".repeat(40);
+  const remote = (index) => ({
+    sha: index === 0 ? head : index.toString(16).padStart(40, "0"),
+    parents: [{ sha: parent }],
+    commit: {
+      message: `Commit ${index}\n\nDetails`,
+      author: { name: "Alice", email: "alice@test", date: "2026-10-04T00:00:00Z" },
+      committer: { name: "Bob", date: "2026-10-04T01:00:00Z" },
+    },
+  });
+  let mode = "rename";
+  let total = 105;
+  const requests = [];
+  const fetch = mock.method(globalThis, "fetch", async (address) => {
+    const url = new URL(address);
+    requests.push(url);
+    if (url.pathname.endsWith("/commits")) {
+      const start = (Number(url.searchParams.get("page")) - 1) * 100;
+      return Response.json(
+        Array.from({ length: Math.max(0, Math.min(100, total - start)) }, (_, i) =>
+          remote(start + i),
+        ),
+      );
+    }
+    if (url.pathname.startsWith("/repos/octocat/repo/commits/")) {
+      const page = Number(url.searchParams.get("page"));
+      const files =
+        mode === "pages"
+          ? Array.from({ length: page === 1 ? 100 : 1 }, (_, i) => ({
+              filename: `file-${page}-${i}`,
+              status: "added",
+              additions: 1,
+              deletions: 0,
+            }))
+          : [
+              {
+                filename: "new.txt",
+                previous_filename: mode === "rename" ? "old.txt" : undefined,
+                status: { rename: "renamed", add: "added", delete: "removed" }[mode] || "modified",
+                additions: 2,
+                deletions: 1,
+              },
+            ];
+      return Response.json({
+        ...remote(0),
+        parents: mode === "root" ? [] : [{ sha: parent }],
+        files,
+      });
+    }
+    if (url.pathname.includes("/git/commits/"))
+      return Response.json({
+        tree: { sha: url.pathname.endsWith(parent) ? "c".repeat(40) : "d".repeat(40) },
+      });
+    if (url.pathname.includes("/git/trees/")) {
+      const before = url.pathname.endsWith("c".repeat(40));
+      return Response.json({
+        tree: [
+          {
+            path: before && mode === "rename" ? "old.txt" : "new.txt",
+            type: "blob",
+            mode: "100644",
+            sha: (before ? "e" : "f").repeat(40),
+          },
+        ],
+        truncated: false,
+      });
+    }
+    if (url.pathname.includes("/git/blobs/")) {
+      const bytes =
+        mode === "binary"
+          ? Buffer.from([0, 255])
+          : Buffer.from(url.pathname.endsWith("e".repeat(40)) ? "before" : "after");
+      return Response.json({
+        encoding: "base64",
+        content: bytes.toString("base64"),
+        size: bytes.length,
+      });
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  });
+  try {
+    const first = await browseGithubLog("octocat/repo", { sha: head, limit: "50" });
+    assert.equal(first.commits.length, 50);
+    assert.equal(first.next, 50);
+    assert.equal(first.commits[0].refs[0].kind, "head");
+    const second = await browseGithubLog("octocat/repo", { sha: head, skip: "50", limit: "50" });
+    assert.equal(second.commits[0].subject, "Commit 50");
+    assert.equal(second.next, 100);
+    const last = await browseGithubLog("octocat/repo", { sha: head, skip: "100" });
+    assert.equal(last.commits.length, 5);
+    assert.equal(last.next, null);
+    assert.equal(
+      (await browseGithubLog("octocat/repo", { sha: head, q: "Commit 104" })).commits[0].subject,
+      "Commit 104",
+    );
+    assert.equal(
+      (await browseGithubLog("octocat/repo", { sha: head, q: "@alice" })).commits.length,
+      50,
+    );
+    assert.equal((await browseGithubLog("octocat/repo", { sha: "" })).commits.length, 0);
+    total = 605;
+    const scan = await browseGithubLog("octocat/repo", { sha: head, q: "Commit 599" });
+    assert.equal(scan.commits.length, 0);
+    assert.equal(scan.next, 500);
+    const continued = await browseGithubLog("octocat/repo", {
+      sha: head,
+      q: "Commit 599",
+      skip: String(scan.next),
+    });
+    assert.equal(continued.commits[0].subject, "Commit 599");
+    assert.equal(continued.next, null);
+    total = 105;
+    const detail = await browseGithubCommit("octocat/repo", head);
+    assert.equal(detail.body, "Details");
+    assert.equal(detail.files[0].status, "R");
+    assert.equal(detail.files[0].originalPath, "old.txt");
+    assert.equal(detail.committer, "Bob");
+    assert.deepEqual(await browseGithubComparison("octocat/repo", head, "new.txt"), {
+      path: "new.txt",
+      original: "before",
+      modified: "after",
+      hash: head,
+      parent: parent.slice(0, 7),
+    });
+    for (const next of ["add", "delete", "root"]) {
+      mode = next;
+      const comparison = await browseGithubComparison("octocat/repo", head, "new.txt");
+      assert.equal(comparison.original, next === "delete" ? "before" : "");
+      assert.equal(comparison.modified, next === "delete" ? "" : "after");
+    }
+    mode = "pages";
+    assert.equal((await browseGithubCommit("octocat/repo", head)).files.length, 101);
+    mode = "binary";
+    await assert.rejects(browseGithubComparison("octocat/repo", head, "new.txt"), { status: 415 });
+    await assert.rejects(browseGithubComparison("octocat/repo", head, "missing"), { status: 404 });
+    const count = requests.length;
+    await assert.rejects(browseGithubComparison("octocat/repo", head, "../secret"), {
+      status: 400,
+    });
+    await assert.rejects(browseGithubCommit("octocat/repo", "invalid"), { status: 400 });
+    await assert.rejects(browseGithubLog("octocat/repo", { sha: head, skip: "NaN" }), {
+      status: 400,
+    });
+    assert.equal(requests.length, count);
+  } finally {
+    fetch.mock.restore();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("GitHub path suggestions paginate owners, filter prefixes and respect authentication", async () => {
   const root = await mkdtemp(join(tmpdir(), "projector-gh-navigation-"));
   process.env.XDG_DATA_HOME = root;

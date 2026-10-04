@@ -24,6 +24,8 @@ export interface FilesProvider extends ReadProvider {
 }
 export type GitWrite = "git" | "branch";
 export interface GitProvider extends ReadProvider {
+  /** False when history can only follow the opened ref. */
+  allBranches?: boolean;
   write?(endpoint: GitWrite, body: unknown, failure?: string): Promise<unknown>;
 }
 

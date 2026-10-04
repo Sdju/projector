@@ -3,7 +3,7 @@ import type {
   GithubEntry,
   GithubFile,
 } from "../../../core/modules/github/index.ts";
-async function request<T>(
+export async function readGit<T>(
   action: string,
   params: Record<string, string>,
   signal?: AbortSignal,
@@ -17,8 +17,8 @@ async function request<T>(
   return data;
 }
 export const readRepository = (repository: string, ref = "", signal?: AbortSignal) =>
-  request<GithubRepository>("repository", { repository, ref }, signal);
+  readGit<GithubRepository>("repository", { repository, ref }, signal);
 export const readTree = (repository: string, sha: string, signal?: AbortSignal) =>
-  request<{ entries: GithubEntry[]; truncated: boolean }>("tree", { repository, sha }, signal);
+  readGit<{ entries: GithubEntry[]; truncated: boolean }>("tree", { repository, sha }, signal);
 export const readFile = (repository: string, sha: string, path: string, signal?: AbortSignal) =>
-  request<GithubFile>("file", { repository, sha, path }, signal);
+  readGit<GithubFile>("file", { repository, sha, path }, signal);

@@ -35,4 +35,6 @@ export {
   browseGithubAsset,
 } from "./github-browser.ts";
 
+export { browseGithubLog, browseGithubCommit, browseGithubComparison } from "./github-history.ts";
+
 export { browseGithubDirectories } from "./github-navigation.ts";
