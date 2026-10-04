@@ -42,6 +42,26 @@ test("restart refuses to launch a replacement while shutdown is stuck", async (t
 });
 
 test("restart endpoint rejects foreign origins and hosts before starting a worker", async (t) => {
+  const previousRestart = Object.getOwnPropertyDescriptor(globalThis, "projectorRestart");
+  let restartAttempts = 0;
+  // Even a broken access guard must not reach the user's real desktop or launcher.
+  Object.defineProperty(globalThis, "projectorRestart", {
+    configurable: true,
+    get() {
+      restartAttempts++;
+      throw new Error("Restart worker disabled in guard test");
+    },
+  });
+  t.after(() => {
+    if (previousRestart) Object.defineProperty(globalThis, "projectorRestart", previousRestart);
+    else delete globalThis.projectorRestart;
+  });
+  const previousNetwork = process.env.PROJECTOR_NETWORK;
+  process.env.PROJECTOR_NETWORK = "local";
+  t.after(() => {
+    if (previousNetwork === undefined) delete process.env.PROJECTOR_NETWORK;
+    else process.env.PROJECTOR_NETWORK = previousNetwork;
+  });
   const server = createServer((req, res) => {
     void handleApi(req, res);
   });
@@ -61,5 +81,5 @@ test("restart endpoint rejects foreign origins and hosts before starting a worke
     });
     assert.equal(status, 403);
   }
-  assert.equal(globalThis.projectorRestart, undefined);
+  assert.equal(restartAttempts, 0);
 });
