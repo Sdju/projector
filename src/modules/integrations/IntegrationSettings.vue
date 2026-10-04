@@ -5,7 +5,6 @@ import IconEyeOff from "~icons/lucide/eye-off";
 import UiButton from "../../common/ui/UiButton.vue";
 import { fetchIntegrations, integrationRequest } from "./client.ts";
 import type { Integration, DeviceLogin, SecretStorage } from "./client.ts";
-import { DockerSettings } from "../docker/index.ts";
 const github = ref<Integration | null>(null);
 const file = ref("");
 const secretStorage = ref<SecretStorage>({ backend: "file", reason: "unavailable" });
@@ -131,30 +130,13 @@ function disconnect() {
 
 <template>
   <section class="integrations">
-    <h2>Интеграции</h2>
-    <p class="muted">
-      Настройки и авторизация хранятся в файле <code>{{ file || "integrations.json" }}</code
-      >.
-      <template v-if="secretStorage.backend === 'keyring'">
-        Токены и ключи — в системном хранилище секретов (Secret Service), в файле их нет.
-      </template>
-      <template v-else-if="secretStorage.reason === 'disabled'">
-        Хранилище секретов отключено (<code>PROJECTOR_SECRET_STORE=file</code>): токены лежат в этом
-        файле.
-      </template>
-      <template v-else>
-        Системное хранилище секретов недоступно: токены лежат в этом файле с правами 0600.
-      </template>
-    </p>
-    <DockerSettings />
     <article v-if="github" class="plugin">
       <header>
-        <h3>GitHub</h3>
+        <h3>Подключение</h3>
         <span class="status">{{
           github.connected ? `подключён · ${github.account}` : "не подключён"
         }}</span>
       </header>
-      <p class="muted">Импорт публичных и приватных репозиториев, доступных вашему аккаунту.</p>
       <form
         @submit.prevent="
           action(async () => {
@@ -247,6 +229,23 @@ function disconnect() {
         >перейти к импорту проектов →</router-link
       >
     </article>
+    <details class="storage">
+      <summary>Хранение настроек и авторизации</summary>
+      <p class="muted">
+        Настройки и авторизация хранятся в файле <code>{{ file || "integrations.json" }}</code
+        >.
+        <template v-if="secretStorage.backend === 'keyring'">
+          Токены и ключи — в системном хранилище секретов (Secret Service), в файле их нет.
+        </template>
+        <template v-else-if="secretStorage.reason === 'disabled'">
+          Хранилище секретов отключено (<code>PROJECTOR_SECRET_STORE=file</code>): токены лежат в
+          этом файле.
+        </template>
+        <template v-else>
+          Системное хранилище секретов недоступно: токены лежат в этом файле с правами 0600.
+        </template>
+      </p>
+    </details>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="message" class="muted" role="status">{{ message }}</p>
   </section>
@@ -254,12 +253,7 @@ function disconnect() {
 
 <style scoped>
 .integrations {
-  margin: var(--sp-6) 0;
-}
-h2 {
-  margin: 0 0 var(--sp-2);
-  font-size: var(--fs-lg);
-  font-weight: 500;
+  margin: 0;
 }
 h3 {
   margin: 0;
@@ -267,9 +261,7 @@ h3 {
   font-weight: 500;
 }
 .plugin {
-  border: 1px solid var(--line);
-  padding: var(--sp-4);
-  border-radius: var(--r-sm);
+  padding: 0;
 }
 header,
 .actions {
@@ -284,7 +276,7 @@ header {
 .status,
 .muted {
   color: var(--muted);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
 }
 code {
   overflow-wrap: anywhere;
@@ -305,6 +297,11 @@ code {
 form {
   display: grid;
   gap: var(--sp-3);
+  justify-items: start;
+}
+form > label,
+form > p {
+  width: 100%;
 }
 label {
   display: grid;

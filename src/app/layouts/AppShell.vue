@@ -50,7 +50,10 @@ const navigatePath = (path: string) =>
 <template>
   <div
     class="shell"
-    :class="{ workspace: route.name === 'project' || route.name === 'github-project' }"
+    :class="{
+      workspace: route.name === 'project' || route.name === 'github-project',
+      settings: route.name === 'settings',
+    }"
     @dragover.prevent
     @drop.prevent
   >
@@ -205,6 +208,10 @@ const navigatePath = (path: string) =>
 .shell.workspace {
   width: calc(100% - var(--sp-4) * 2);
   max-width: 2400px;
+  padding-bottom: var(--sp-4);
+}
+.shell.settings {
+  --page-width: 1100px;
   padding-bottom: var(--sp-4);
 }
 @media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {

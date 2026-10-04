@@ -60,7 +60,7 @@ onMounted(
 <template>
   <section class="docker-settings" @pointerdown="commands.scope.activate()">
     <header>
-      <h3>Docker</h3>
+      <h3>Подключение</h3>
       <span>{{ snapshot?.connected ? `подключён · ${snapshot.version}` : "не подключён" }}</span>
     </header>
     <form @submit.prevent="commands.run('ide.docker.settings.save')">
@@ -99,10 +99,7 @@ onMounted(
 </template>
 <style scoped>
 .docker-settings {
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  padding: var(--sp-4);
-  margin-block: var(--sp-4);
+  margin: 0;
   font-size: var(--fs-sm);
 }
 header,
@@ -116,7 +113,7 @@ header {
   justify-content: space-between;
 }
 h3 {
-  font-size: var(--fs-base);
+  font-size: var(--fs-sm);
   font-weight: 500;
   margin: 0 0 var(--sp-3);
 }
@@ -143,6 +140,7 @@ select {
   padding: var(--sp-2);
   min-width: 0;
   max-width: 100%;
+  flex: 1;
 }
 .error {
   color: var(--err);
