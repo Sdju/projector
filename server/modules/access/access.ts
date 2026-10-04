@@ -1,15 +1,30 @@
 import type { IncomingMessage } from "node:http";
+import { BlockList, isIP } from "node:net";
 import { readNetworkMode } from "../../../core/modules/app-paths/index.ts";
 import { hasLanPassword, verifyLanPassword } from "./password.ts";
+import { validLanSession } from "./session.ts";
 
 const LOOPBACK = ["localhost", "127.0.0.1", "[::1]"];
+const loopbackAddresses = new BlockList();
+loopbackAddresses.addSubnet("127.0.0.0", 8, "ipv4");
+loopbackAddresses.addAddress("::1", "ipv6");
 
 function hostname(req: IncomingMessage): string {
   try {
-    return new URL(`http://${req.headers.host}`).hostname;
+    const host = req.headers.host;
+    if (!host) return "";
+    const url = new URL(`http://${host}`);
+    if (url.username || url.password || url.pathname !== "/" || url.search || url.hash) return "";
+    return url.hostname;
   } catch {
     return "";
   }
+}
+
+/** Numeric LAN addresses and localhost cannot be rebound by a third-party DNS owner. */
+export function isTrustedHost(req: IncomingMessage): boolean {
+  const host = hostname(req);
+  return host === "localhost" || !!isIP(host.replace(/^\[|\]$/g, ""));
 }
 
 function scheme(req: IncomingMessage): string {
@@ -25,7 +40,10 @@ export function lanPassword(req: IncomingMessage, queryToken?: string): string |
 
 /** Запрос пришёл с loopback-интерфейса этой машины. */
 export function isLocalRequest(req: IncomingMessage): boolean {
-  return LOOPBACK.includes(hostname(req));
+  const address = req.socket.remoteAddress;
+  if (!address) return false;
+  const family = isIP(address);
+  return !!family && loopbackAddresses.check(address, family === 6 ? "ipv6" : "ipv4");
 }
 
 /**
@@ -39,16 +57,24 @@ export function accessAllowed(
   queryToken?: string,
 ): boolean {
   const host = hostname(req);
-  const local = LOOPBACK.includes(host);
-  if (readNetworkMode() === "local" && !local) return false;
+  const local = isLocalRequest(req);
+  if (!isTrustedHost(req)) return false;
+  // Host is a separate DNS rebinding guard, never proof of the client's address.
+  if (readNetworkMode() === "local" && (!local || !LOOPBACK.includes(host))) return false;
 
   const origin = req.headers.origin;
   if (origin && origin !== `${scheme(req)}//${req.headers.host}`) return false;
   if (!origin && requireOrigin) return false;
 
-  if (!local && hasLanPassword()) {
-    const token = lanPassword(req, queryToken);
-    if (!token || !verifyLanPassword(token)) return false;
+  try {
+    if (!local && hasLanPassword()) {
+      if (validLanSession(req)) return true;
+      const token = lanPassword(req, queryToken);
+      if (!token || !verifyLanPassword(token)) return false;
+    }
+  } catch {
+    // A damaged/unreadable credential file must never turn protected LAN into open LAN.
+    return false;
   }
   return true;
 }

@@ -1,7 +1,7 @@
 import type { Server } from "node:http";
 import type { HttpServer } from "vite";
 import { WebSocket, WebSocketServer } from "ws";
-import { accessAllowed } from "../access/index.ts";
+import { accessAllowed, protectLanSockets } from "../access/index.ts";
 import { findProject } from "../projects/index.ts";
 import { listTerminalSessions, onTerminalSessionsChanged } from "../terminal/index.ts";
 import { terminalControl } from "./control.ts";
@@ -20,6 +20,7 @@ export function attachTerminalControlServer(server: Server | HttpServer): void {
     perMessageDeflate: false,
   });
   const projects = new Map<WebSocket, string>();
+  protectLanSockets(server, sockets);
   const alive = new WeakSet<WebSocket>();
   const send = (client: WebSocket, message: unknown) => {
     if (client.readyState !== WebSocket.OPEN) return;
@@ -72,6 +73,7 @@ export function attachTerminalControlServer(server: Server | HttpServer): void {
           return;
         }
         sockets.handleUpgrade(req, socket, head, (client) => {
+          sockets.emit("connection", client, req);
           projects.set(client, projectId);
           alive.add(client);
           client.on("pong", () => alive.add(client));

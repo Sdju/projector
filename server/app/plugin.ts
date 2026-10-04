@@ -10,6 +10,7 @@ import { attachTerminalServer } from "../modules/terminal/index.ts";
 import { reconcileOnStartup } from "../modules/environments/index.ts";
 
 import { attachTerminalControlServer } from "../modules/terminal-control/index.ts";
+import { authorizeHttp } from "../modules/access/index.ts";
 
 let hooksBound = false;
 
@@ -54,9 +55,15 @@ export function bindRuntime(httpServer: HttpServer | null, mode: ServerMode): vo
 function attach(server: ViteDevServer | PreviewServer, mode: ServerMode): void {
   bindRuntime(server.httpServer, mode);
   server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
-    void handleApi(req, res).then((handled) => {
-      if (!handled) next();
-    });
+    if (!authorizeHttp(req, res, true)) return;
+    void handleApi(req, res)
+      .then((handled) => {
+        if (!handled) next();
+      })
+      .catch(() => {
+        if (!res.headersSent) res.writeHead(400);
+        res.end();
+      });
   });
 }
 

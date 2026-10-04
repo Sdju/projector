@@ -6,6 +6,7 @@ import { bindRuntime } from "./plugin.ts";
 import { serveStatic } from "./static.ts";
 import { APP_PORT, readNetworkMode } from "../../core/modules/app-paths/index.ts";
 import { networkHost } from "../../core/modules/network-mode/index.ts";
+import { authorizeHttp } from "../modules/access/index.ts";
 
 /** Prod-сервер без Vite: собранный `dist` и API Projector на чистом Node. */
 const root = fileURLToPath(new URL("../../dist", import.meta.url));
@@ -15,6 +16,7 @@ if (!existsSync(root + "/index.html")) {
 }
 
 const server = createServer((req, res) => {
+  if (!authorizeHttp(req, res, true)) return;
   void handleApi(req, res)
     .then((handled) => (handled ? undefined : serveStatic(root, req, res)))
     .catch((error) => {
@@ -31,8 +33,6 @@ server.on("error", (error) => {
 });
 const host = networkHost(readNetworkMode());
 const port = Number(process.env.PROJECTOR_PORT) || APP_PORT;
-server.listen(port, host, () =>
-  console.log(`Projector (prod): http://localhost:${port}`),
-);
+server.listen(port, host, () => console.log(`Projector (prod): http://localhost:${port}`));
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => process.exit(0));

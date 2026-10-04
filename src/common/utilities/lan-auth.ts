@@ -1,4 +1,4 @@
-const TOKEN_KEY = "projector:lan-password";
+let currentPassword: string | null = null;
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -12,21 +12,20 @@ const nativeFetch =
   (fetchHost[NATIVE_FETCH] as FetchLike | undefined) ??
   (fetchHost[NATIVE_FETCH] = globalThis.fetch.bind(globalThis) as FetchLike);
 
-/** Пароль доступа по сети хранится только в sessionStorage, не на диске. */
+/** Password is held in memory; HTTP resources use the server's HttpOnly session cookie. */
 export function lanPassword(): string | null {
-  return sessionStorage.getItem(TOKEN_KEY);
+  return currentPassword;
 }
 
 export function setLanPassword(value: string): void {
-  sessionStorage.setItem(TOKEN_KEY, value);
+  currentPassword = value;
 }
 
 export function clearLanPassword(): void {
-  sessionStorage.removeItem(TOKEN_KEY);
+  currentPassword = null;
 }
 
 function isSameOrigin(url: string): boolean {
-  if (url.startsWith("/")) return true;
   try {
     return new URL(url, window.location.origin).origin === window.location.origin;
   } catch {
@@ -55,7 +54,9 @@ export async function authedFetch(input: RequestInfo | URL, init?: RequestInit):
   if (!isSameOrigin(url)) return nativeFetch(input, init);
 
   const headers = () => {
-    const result = new Headers(init?.headers);
+    const result = new Headers(
+      init?.headers ?? (input instanceof Request ? input.headers : undefined),
+    );
     const token = lanPassword();
     if (token) result.set("Authorization", `Bearer ${token}`);
     return result;

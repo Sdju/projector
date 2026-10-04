@@ -4,7 +4,7 @@ import type { HttpServer } from "vite";
 import { WebSocket, WebSocketServer } from "ws";
 import { loadProjects } from "../projects/index.ts";
 import { MAX_BUFFER, state, size, send, broadcast, flow, type Session } from "./session-state.ts";
-import { accessAllowed } from "../access/index.ts";
+import { accessAllowed, protectLanSockets } from "../access/index.ts";
 
 export function attachTerminalServer(server: Server | HttpServer): void {
   if (state.servers.has(server)) return;
@@ -14,6 +14,7 @@ export function attachTerminalServer(server: Server | HttpServer): void {
     maxPayload: 64 * 1024,
     perMessageDeflate: false,
   });
+  protectLanSockets(server, sockets);
   const alive = new WeakSet<WebSocket>();
   const heartbeat = setInterval(() => {
     for (const client of sockets.clients) {
