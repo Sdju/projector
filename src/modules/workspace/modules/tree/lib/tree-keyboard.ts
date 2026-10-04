@@ -59,24 +59,33 @@ export function useTreeKeyboard({
       selection.replace();
       return;
     }
+    const pagination =
+      event.target instanceof Element && !!event.target.closest("button[data-tree-more]");
     if (
-      entry &&
+      (entry || pagination) &&
       ["ArrowUp", "ArrowDown", "Home", "End", "ArrowLeft", "ArrowRight", " "].includes(event.key)
     ) {
       event.preventDefault();
       if (event.key === " ") {
-        selectEntry(event, entry);
+        if (entry) selectEntry(event, entry);
+        else (event.target as HTMLButtonElement).click();
         return;
       }
-      const rows = visibleRows();
-      const index = rows.findIndex((row) => row.dataset.path === entry.path);
+      const rows = [
+        ...(tree.value?.querySelectorAll<HTMLButtonElement>(
+          "button[data-path],button[data-tree-more]",
+        ) ?? []),
+      ];
+      const index = rows.findIndex((row) =>
+        entry ? row.dataset.path === entry.path : row === event.target,
+      );
       let next = index;
       if (event.key === "ArrowDown") next = Math.min(rows.length - 1, index + 1);
       if (event.key === "ArrowUp") next = Math.max(0, index - 1);
       if (event.key === "Home") next = 0;
       if (event.key === "End") next = rows.length - 1;
       if (event.key === "ArrowRight") {
-        if (!entry.directory) return;
+        if (!entry?.directory) return;
         if (!expanded.value.has(entry.path)) {
           toggle(entry.path);
           return;
@@ -84,15 +93,18 @@ export function useTreeKeyboard({
         if (rows[index + 1]?.dataset.path?.startsWith(entry.path + "/")) next = index + 1;
       }
       if (event.key === "ArrowLeft") {
-        if (entry.directory && expanded.value.has(entry.path)) {
+        if (entry?.directory && expanded.value.has(entry.path)) {
           toggle(entry.path);
           return;
         }
-        next = rows.findIndex((row) => row.dataset.path === parentPath(entry.path));
+        const parent = entry
+          ? parentPath(entry.path)
+          : (event.target as HTMLElement).dataset.treeMore;
+        next = rows.findIndex((row) => row.dataset.path === parent);
       }
       const row = rows[next];
       if (row) {
-        if (!mod || event.shiftKey)
+        if (row.dataset.path !== undefined && (!mod || event.shiftKey))
           selectEntry(event, {
             path: row.dataset.path!,
             name: "",

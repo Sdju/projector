@@ -151,7 +151,11 @@ export async function handleProjectWorkspace({
     if (sessionId === "external") json(res, 200, await previewExternalFile(filePath));
     else if (sessionId === "root") json(res, 200, { root: project.path });
     else if (sessionId === "tree")
-      json(res, 200, await listProjectDirectory(project.path, filePath));
+      json(
+        res,
+        200,
+        await listProjectDirectory(project.path, filePath, Object.fromEntries(url.searchParams)),
+      );
     else if (sessionId === "file") json(res, 200, await previewProjectFile(project.path, filePath));
     else if (sessionId === "search")
       json(

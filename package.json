@@ -18,7 +18,7 @@
     "build": "vp run architecture && vp run gtk:types && vp run vio:build && vue-tsc --noEmit && vp build",
     "preview": "node server/app/standalone.ts",
     "gtk:types": "node-gtk generate-types Gtk-4.0 GdkX11-4.0 GioUnix-2.0 --no-docs",
-    "test": "vp run architecture && vp run test:architecture && vp run vio:test && node --test tests/codex.test.mjs tests/agent.test.mjs tests/os.test.mjs tests/ide.test.mjs tests/launcher.test.mjs tests/integrations.test.mjs tests/secrets.test.mjs tests/clone-jobs.test.mjs tests/reconcile.test.mjs tests/devcontainer.test.mjs tests/devcontainer-live.test.mjs tests/github-browser.test.mjs tests/workspace-sources.test.mjs tests/terminal.test.mjs tests/terminal-input.test.mjs tests/workspace.test.mjs tests/git-history.test.mjs tests/git-graph.test.mjs tests/git-branches.test.mjs tests/git-split.test.mjs tests/workspace-session.test.mjs tests/preview-tabs.test.mjs tests/dock-layout.test.mjs tests/project-routing.test.mjs tests/tree-selection.test.mjs tests/markdown-editor.test.mjs tests/code-editor.test.mjs tests/virtual-list.test.mjs tests/archives.test.mjs tests/file-icons.test.mjs tests/restart.test.mjs tests/tab-registry.test.mjs tests/network-mode.test.mjs tests/access-security.test.mjs && node tests/launcher-model.test.mjs",
+    "test": "vp run architecture && vp run test:architecture && vp run vio:test && node --test tests/codex.test.mjs tests/agent.test.mjs tests/os.test.mjs tests/ide.test.mjs tests/launcher.test.mjs tests/integrations.test.mjs tests/secrets.test.mjs tests/clone-jobs.test.mjs tests/reconcile.test.mjs tests/devcontainer.test.mjs tests/devcontainer-live.test.mjs tests/github-browser.test.mjs tests/workspace-sources.test.mjs tests/terminal.test.mjs tests/terminal-input.test.mjs tests/workspace.test.mjs tests/git-history.test.mjs tests/git-graph.test.mjs tests/git-branches.test.mjs tests/git-split.test.mjs tests/workspace-session.test.mjs tests/preview-tabs.test.mjs tests/dock-layout.test.mjs tests/project-routing.test.mjs tests/tree-selection.test.mjs tests/tree-page.test.mjs tests/tree-pagination.test.mjs tests/markdown-editor.test.mjs tests/code-editor.test.mjs tests/virtual-list.test.mjs tests/archives.test.mjs tests/file-icons.test.mjs tests/restart.test.mjs tests/tab-registry.test.mjs tests/network-mode.test.mjs tests/access-security.test.mjs && node tests/launcher-model.test.mjs",
     "vio:build": "vp run --filter vio build",
     "vio:test": "vp run --filter vio test",
     "vio:demo": "vp run --filter vio demo",
@@ -29,7 +29,8 @@
     "test:docker": "node --test tests/docker.test.mjs",
     "test:live": "PROJECTOR_TEST_DOCKER=1 PROJECTOR_TEST_DEVCONTAINER=1 node --test --test-concurrency=1 tests/environment-live.test.mjs tests/reconcile.test.mjs tests/devcontainer-live.test.mjs tests/sigkill-live.test.mjs",
     "check": "vp run test && vp run test:docker && vp run build",
-    "test:virtual-list": "node --test tests/virtual-list.test.mjs"
+    "test:virtual-list": "node --test tests/virtual-list.test.mjs",
+    "test:tree": "node --test tests/tree-page.test.mjs tests/tree-pagination.test.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.54",

@@ -1,5 +1,6 @@
 import type { GithubRepository, GithubEntry } from "../../../core/modules/github/index.ts";
 import type { FileContent, FileEntry } from "../../../core/modules/workspace/index.ts";
+import { treePageRange } from "../../../core/modules/workspace/index.ts";
 import { defineTab, singletonTab, type WorkspaceProfile } from "../workspace-api/index.ts";
 import { formatProjectRef } from "../project/index.ts";
 import { readIssue, readIssues, readRepository, readTree, readFile, readGit } from "./client.ts";
@@ -121,7 +122,13 @@ export function createGithubWorkspaceProfile(
           executable: entry.mode === "100755",
           disabled: entry.type === "commit",
         }));
-        return { entries, truncated: false };
+        const page = treePageRange(entries, path, params);
+        return {
+          entries: entries.slice(page.offset, page.end),
+          truncated: page.nextOffset !== null,
+          total: page.total,
+          nextOffset: page.nextOffset,
+        };
       }
       if (action !== "file") throw new Error("Действие недоступно для этого источника workspace");
       if (

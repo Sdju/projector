@@ -10,6 +10,8 @@ import {
   type ComputedRef,
 } from "vue";
 import { useSessionSnapshot } from "../../../../../common/utilities/session-snapshot.ts";
+import { createTreePaging, treePagingKey, useTreeListing } from "../lib/tree-listing.ts";
+import { TREE_PAGE_SIZE } from "../../../../../../core/modules/workspace/index.ts";
 import { treeSessionSchema } from "../lib/tree-session.ts";
 import { useTreeOperations } from "../lib/tree-operations.ts";
 import { useTreeKeyboard } from "../lib/tree-keyboard.ts";
@@ -19,7 +21,7 @@ import EntryDialog from "../../../../../common/ui/EntryDialog.vue";
 import IconChevronRight from "~icons/lucide/chevron-right";
 import { FileIcon } from "../../../../file-icons/index.ts";
 import { useFileIconTheme } from "../../../../file-icons/index.ts";
-import { workspaceRequest, workspaceCapabilities } from "../../../../workspace-api/index.ts";
+import { workspaceCapabilities } from "../../../../workspace-api/index.ts";
 import { createTreeDrag, treeDragKey } from "../lib/tree-drag.ts";
 import { createTreeSelection, treeSelectionKey } from "../lib/tree-selection.ts";
 import {
@@ -46,7 +48,8 @@ const emit = defineEmits<{
   changed: [];
   deleted: [path: string];
 }>();
-const entries = ref<FileEntry[]>([]);
+const paging = props.depth === 0 ? createTreePaging() : inject(treePagingKey)!;
+if (props.depth === 0) provide(treePagingKey, paging);
 const gitDecorations =
   props.depth === 0
     ? computed(() => gitTreeDecorations(props.gitChanges ?? []))
@@ -140,6 +143,7 @@ if (props.depth === 0) {
       selection.replace();
       selection.dragged.value = [];
       drag.clear();
+      paging.revealPath.value = "";
       expanded.value = new Set(session.read() ?? []);
       moveError.value = "";
       message.value = "";
@@ -154,6 +158,9 @@ if (props.depth === 0) {
   );
   onBeforeUnmount(() => drag.clear());
 }
+const { entries, total, nextOffset, loading, error } = useTreeListing(props, paging, (path) =>
+  selection.relocate(path),
+);
 const { resolver, error: themeError } = useFileIconTheme();
 const rows = computed(() =>
   entries.value.map((entry) => ({
@@ -162,36 +169,6 @@ const rows = computed(() =>
     icon: resolver.value.resolve(entry, expanded.value.has(entry.path)),
   })),
 );
-const error = ref("");
-const loading = ref(false);
-const truncated = ref(false);
-let generation = 0;
-watch(
-  () => [props.projectId, props.path, props.revision],
-  async () => {
-    const current = ++generation;
-    loading.value = true;
-    error.value = "";
-    try {
-      const data = await workspaceRequest<{ entries: FileEntry[]; truncated: boolean }>(
-        props.projectId,
-        "tree",
-        { path: props.path },
-      );
-      if (current !== generation) return;
-      const remaining = new Set(data.entries.map((entry) => entry.path));
-      for (const entry of entries.value)
-        if (!remaining.has(entry.path)) selection.relocate(entry.path);
-      entries.value = data.entries;
-      truncated.value = data.truncated;
-    } catch (err) {
-      if (current === generation) error.value = err instanceof Error ? err.message : "Ошибка";
-    } finally {
-      if (current === generation) loading.value = false;
-    }
-  },
-  { immediate: true },
-);
 function toggle(path: string) {
   if (expanded.value.has(path)) expanded.value.delete(path);
   else expanded.value.add(path);
@@ -199,6 +176,7 @@ function toggle(path: string) {
 let revealObserver: MutationObserver | undefined;
 let revealTimer: ReturnType<typeof setTimeout> | undefined;
 function reveal(path: string) {
+  paging.revealPath.value = path;
   selection.replace(path);
   const parts = path.split("/");
   for (let i = 1; i < parts.length; i++) expanded.value.add(parts.slice(0, i).join("/"));
@@ -223,12 +201,14 @@ function reveal(path: string) {
   });
 }
 const tree = ref<HTMLElement>();
-const context = { props, emit, selection, drag, tree, menu, dialog, toggle };
+const context = { props, emit, selection, drag, tree, menu, dialog, toggle, paging };
 // Операции, клавиатура и общая очередь команд есть только у корня; вложенные ветки получают их через inject.
 const { contextEntry, clipboard, treeCommands, menuItems, runOperation } = (
   props.depth === 0 ? useTreeOperations(context) : {}
 ) as ReturnType<typeof useTreeOperations>;
 if (props.depth === 0) provide("workspace-tree-commands", treeCommands);
+const commandsForTree =
+  props.depth === 0 ? treeCommands : inject<typeof treeCommands>("workspace-tree-commands")!;
 const keys =
   props.depth === 0
     ? useTreeKeyboard({ tree, selection, expanded, busy, contextEntry, treeCommands, toggle })
@@ -309,7 +289,25 @@ defineExpose({ reveal });
         @moved="(source, destination) => emit('moved', source, destination)"
       />
     </li>
-    <li v-if="truncated" class="notice">показаны первые 1000 записей</li>
+    <li v-if="nextOffset !== null" role="none">
+      <button
+        class="load-more"
+        :style="{ paddingLeft: `${12 + depth * 14}px` }"
+        :disabled="busy || loading"
+        :data-tree-more="path"
+        role="treeitem"
+        :aria-level="depth + 1"
+        :aria-label="`Показать ещё ${Math.min(TREE_PAGE_SIZE, total - entries.length)} в ${path || 'корне проекта'}`"
+        @focus="activateEntry()"
+        @keydown.stop="entryKey($event)"
+        @click="commandsForTree.run('ide.fileTree.directory.loadMore', { path })"
+      >
+        {{
+          loading ? "загрузка…" : `Показать ещё ${Math.min(TREE_PAGE_SIZE, total - entries.length)}`
+        }}
+        <span class="remaining">{{ total - entries.length }} осталось</span>
+      </button>
+    </li>
     <li
       v-if="depth === 0"
       class="root-space"
@@ -402,6 +400,13 @@ button.selected {
 .notice {
   padding: var(--sp-2) var(--sp-3);
   color: var(--faint);
+}
+.load-more {
+  color: var(--text);
+}
+.remaining {
+  color: var(--faint);
+  font-size: var(--fs-2xs);
 }
 .error {
   color: var(--err);

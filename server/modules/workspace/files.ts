@@ -4,7 +4,7 @@ import { resolve, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { HttpError } from "../http/index.ts";
-import { moveDestination } from "../../../core/modules/workspace/index.ts";
+import { moveDestination, treePageRange } from "../../../core/modules/workspace/index.ts";
 import { MAX_BYTES, decode, excluded, location, validatePath } from "./paths.ts";
 
 const archiveHelper = fileURLToPath(new URL("./archive.py", import.meta.url));
@@ -139,16 +139,26 @@ export async function readProjectImage(root: string, path: string) {
     await file.close();
   }
 }
-export async function listProjectDirectory(root: string, path = "") {
+export async function listProjectDirectory(
+  root: string,
+  path = "",
+  params: Record<string, string> = {},
+) {
   const full = await location(root, path);
   const entries = (await readdir(full, { withFileTypes: true }))
     .filter((entry) => !excluded.has(entry.name) && (entry.isDirectory() || entry.isFile()))
     .sort(
       (a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name),
     );
+  let page;
+  try {
+    page = treePageRange(entries, path, params);
+  } catch (error) {
+    throw new HttpError(400, error instanceof Error ? error.message : "Неверная страница");
+  }
   return {
     entries: await Promise.all(
-      entries.slice(0, 1000).map(async (entry) => ({
+      entries.slice(page.offset, page.end).map(async (entry) => ({
         name: entry.name,
         path: path ? `${path}/${entry.name}` : entry.name,
         directory: entry.isDirectory(),
@@ -160,7 +170,9 @@ export async function listProjectDirectory(root: string, path = "") {
           )),
       })),
     ),
-    truncated: entries.length > 1000,
+    truncated: page.nextOffset !== null,
+    total: page.total,
+    nextOffset: page.nextOffset,
   };
 }
 export async function moveProjectEntry(

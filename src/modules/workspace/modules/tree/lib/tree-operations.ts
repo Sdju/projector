@@ -15,6 +15,7 @@ import { topLevelTreePaths, type createTreeSelection } from "./tree-selection.ts
 import { parentPath, relocatedPath } from "../../../../../../core/modules/workspace/index.ts";
 import type { FileEntry } from "../../../../../../core/modules/workspace/index.ts";
 import { ref } from "vue";
+import { registerTreePagingCommand, type createTreePaging } from "./tree-listing.ts";
 
 export interface TreeEmit {
   (event: "open", path: string, pinned?: boolean): void;
@@ -31,6 +32,7 @@ export interface TreeContext {
   menu: Ref<InstanceType<typeof ContextMenu> | undefined>;
   dialog: Ref<InstanceType<typeof EntryDialog> | undefined>;
   toggle: (path: string) => void;
+  paging: ReturnType<typeof createTreePaging>;
 }
 
 /** Операции корневого дерева: создание, переименование, буфер обмена, удаление и их команды. */
@@ -43,6 +45,7 @@ export function useTreeOperations({
   menu,
   dialog,
   toggle,
+  paging,
 }: TreeContext) {
   const { busy, expanded, error: moveError, message } = drag;
   const contextEntry = ref<FileEntry>();
@@ -332,6 +335,9 @@ export function useTreeOperations({
     (args) => !!resolveEntry(args)?.directory,
   );
   register("collapseAll", "Свернуть все папки", () => expanded.value.clear());
+  registerTreePagingCommand(treeCommands.scope, paging, tree, drag.busy, () =>
+    contextEntry.value?.directory ? contextEntry.value.path : props.path,
+  );
   register("refresh", "Обновить", () => emit("changed"));
   registerWrite("entry.delete", "Удалить…", (args) => requestAction("delete", "", args), hasEntry);
   register("contextMenu", "Открыть меню", () => {

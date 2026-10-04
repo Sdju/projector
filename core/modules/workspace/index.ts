@@ -3,6 +3,7 @@ export type { GitOverview } from "./contract.ts";
 export type { SearchHit } from "./contract.ts";
 export type { SearchMatch, SearchOptions } from "./contract.ts";
 export type { FileEntry } from "./contract.ts";
+export { TREE_PAGE_SIZE, treePageRange, type TreePage } from "./tree-page.ts";
 export type { FileContent } from "./contract.ts";
 export type { ArchiveContent, ArchiveEntry } from "./contract.ts";
 export { parentPath, moveDestination, relocatedPath } from "./paths.ts";
