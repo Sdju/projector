@@ -32,7 +32,7 @@ export type TabViews = Record<string, TabView>;
 export interface TabHost {
   projectId: string;
   openFile(path: string): void;
-  openTab(id: string, params?: TabParams): void;
+  openTab(id: string, params?: TabParams, options?: { preview?: boolean }): void;
   openCommitDiff(hash: string, path: string): void;
 }
 

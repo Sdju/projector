@@ -51,7 +51,7 @@ export interface SidebarHost {
     staged?: boolean,
     options?: OpenFileOptions,
   ): unknown;
-  openTab(id: string, params?: Record<string, unknown>): void;
+  openTab(id: string, params?: Record<string, unknown>, options?: { preview?: boolean }): void;
   command(id: string): void;
   refreshWorkspace(): void;
   changed(): void;
@@ -124,7 +124,8 @@ export const baseSidebarViews: SidebarViews = {
     props: (host, selected) => ({
       projectId: host.projectId,
       active: selected,
-      onOpen: (issue: { number: number; title: string }) => host.openTab("issue", issue),
+      onOpen: (issue: { number: number; title: string }, pinned?: boolean) =>
+        host.openTab("issue", issue, { preview: !pinned }),
     }),
     refresh: (_, panel) => panel?.refresh?.(),
   },

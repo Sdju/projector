@@ -36,3 +36,23 @@ test("ensureTab keys a tab by its params and reuses an open one", () => {
     ],
   );
 });
+
+test("a preview kind opens as a preview unless pinned and a pinned tab stays pinned", () => {
+  const registry = createTabRegistry([{ ...issue, preview: true }]);
+  const tabs = { value: [] };
+  ensureTab(tabs, registry, "issue", { number: 1 }, true);
+  assert.equal(tabs.value[0].preview, true);
+  ensureTab(tabs, registry, "issue", { number: 1 }, false);
+  assert.equal(tabs.value[0].preview, false);
+  ensureTab(tabs, registry, "issue", { number: 1 }, true);
+  assert.equal(tabs.value[0].preview, false);
+  ensureTab(tabs, registry, "issue", { number: 2 });
+  assert.equal(tabs.value[1].preview, false);
+});
+
+test("a kind that is not a preview kind never opens as a preview", () => {
+  const registry = createTabRegistry([issue]);
+  const tabs = { value: [] };
+  ensureTab(tabs, registry, "issue", { number: 3 }, true);
+  assert.equal(tabs.value[0].preview, false);
+});

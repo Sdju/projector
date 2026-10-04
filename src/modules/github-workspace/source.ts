@@ -150,6 +150,7 @@ export function createGithubWorkspaceProfile(
         path: ({ number }) => `Issue #${number}`,
         title: ({ number, title }) => `${title ? `${title} · ` : ""}Issue #${number}`,
         hint: ({ title }) => title ?? "",
+        preview: true,
       }),
     ],
     features: {

@@ -14,6 +14,8 @@ export interface TabType<P extends TabParams = TabParams> {
   title(params: P, content: string): string;
   /** Initial text shown before the tab loads its own data. */
   hint?(params: P): string;
+  /** Opens as a preview tab (the next preview replaces it) unless the caller pins it. */
+  preview?: boolean;
   /** Short note on the right of the tab breadcrumb. */
   subtitle?: string;
   /** What the built-in agent sees when it reads the tab; the default says it has no text. */

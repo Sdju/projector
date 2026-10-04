@@ -155,10 +155,11 @@ export function useOpenFiles(ctx: OpenFilesContext) {
   }
   /** Вкладка с подробным обзором коммита; `subject` — подсказка до загрузки деталей. */
   const openCommit = (hash: string, subject = "") => openTab("commit", { hash, subject });
-  /** Открывает вкладку зарегистрированного типа или фокусирует уже открытую с тем же ключом. */
-  function openTab(id: string, params?: TabParams) {
-    const key = ensureTab(tabs, ctx.tabTypes, id, params);
+  /** Открывает вкладку зарегистрированного типа (временную, если тип так задан и не `preview: false`) или фокусирует открытую. */
+  function openTab(id: string, params?: TabParams, { preview = true } = {}) {
+    const key = ensureTab(tabs, ctx.tabTypes, id, params, preview);
     if (!key) throw new Error(`Вкладка «${id}» недоступна в этом проекте`);
+    if (tabs.value.find((tab) => tab.key === key)?.preview) dropPreviewExcept(key);
     selectTab(key);
   }
   function releasePreview(file: OpenFile) {

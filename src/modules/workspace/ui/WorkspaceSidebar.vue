@@ -65,8 +65,8 @@ const host: SidebarHost = {
     emit("navigate");
     return result;
   },
-  openTab(id, params) {
-    props.files.openTab(id, params);
+  openTab(id, params, options) {
+    props.files.openTab(id, params, options);
     emit("navigate");
   },
   command: (id) => emit("command", id),

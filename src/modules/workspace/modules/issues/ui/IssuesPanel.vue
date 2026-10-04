@@ -13,7 +13,9 @@ import { useIssues, type IssueState } from "../lib/issues.ts";
 
 /** Сайдбар-блок issues: состояние, список и подгрузка следующих страниц. */
 const props = defineProps<{ projectId: string; active: boolean }>();
-const emit = defineEmits<{ open: [issue: { number: number; title: string }] }>();
+const emit = defineEmits<{
+  open: [issue: { number: number; title: string }, pinned?: boolean];
+}>();
 const { state, issues, next, loading, loadingMore, error, load, more, filter, reset } = useIssues(
   () => props.projectId,
 );
@@ -65,11 +67,15 @@ register(
   "Открыть issue",
   "Открывает вкладку обсуждения выбранного issue.",
   (value) => {
-    const { number, title } = commandArgs(value);
+    const { number, title, pinned } = commandArgs(value);
     if (typeof number !== "number") throw new Error("Укажите номер issue");
-    emit("open", { number, title: typeof title === "string" ? title : "" });
+    emit("open", { number, title: typeof title === "string" ? title : "" }, pinned === true);
   },
-  { number: "number: номер issue", title: "string (необязательно): заголовок вкладки" },
+  {
+    number: "number: номер issue",
+    title: "string (необязательно): заголовок вкладки",
+    pinned: "boolean (необязательно): true — постоянная вкладка вместо временной",
+  },
 );
 let loaded = false;
 watch(
@@ -131,6 +137,13 @@ defineExpose({ refresh: () => load() });
             type="button"
             class="issue-row"
             @click="commands.run('ide.issues.open', { number: issue.number, title: issue.title })"
+            @dblclick="
+              commands.run('ide.issues.open', {
+                number: issue.number,
+                title: issue.title,
+                pinned: true,
+              })
+            "
           >
             <span class="issue-title">{{ issue.title }}</span>
             <span class="issue-meta">
