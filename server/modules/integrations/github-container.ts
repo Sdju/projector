@@ -22,6 +22,7 @@ export async function cloneGithubContainer(
   staging: string,
   token: string,
   environment: DockerEnvironment,
+  signal?: AbortSignal,
 ) {
   if (token.includes("\n") || token.includes("\r"))
     throw new HttpError(400, "Некорректный GitHub token");
@@ -52,10 +53,11 @@ export async function cloneGithubContainer(
         `https://github.com/${repository}.git`,
       ],
       300_000,
-      undefined,
+      signal,
       credentials,
     );
-  } catch {
+  } catch (error) {
+    if (signal?.aborted) throw error;
     throw new HttpError(
       400,
       "Не удалось клонировать репозиторий внутри Docker. Проверьте сеть и права GitHub",

@@ -40,7 +40,10 @@ export function parseDockerEnvironment(
     throw new HttpError(400, "Публикация портов требует сети bridge");
   return { kind: "docker", context, image, network, ports };
 }
-export async function prepareDockerEnvironment(environment: DockerEnvironment) {
+export async function prepareDockerEnvironment(
+  environment: DockerEnvironment,
+  options: { signal?: AbortSignal; onPull?: () => void } = {},
+) {
   const result = await os.tools.runDocker(["context", "inspect", environment.context]);
   const context = JSON.parse(result.stdout)[0];
   if (!context?.Endpoints?.docker?.Host?.startsWith("unix://"))
@@ -54,8 +57,15 @@ export async function prepareDockerEnvironment(environment: DockerEnvironment) {
   ]);
   const prefix = ["--context", environment.context];
   try {
-    await os.tools.runDocker([...prefix, "image", "inspect", environment.image]);
-  } catch {
-    await os.tools.runDocker([...prefix, "pull", environment.image], { timeout: 300_000 });
+    await os.tools.runDocker([...prefix, "image", "inspect", environment.image], {
+      signal: options.signal,
+    });
+  } catch (error) {
+    if (options.signal?.aborted) throw error;
+    options.onPull?.();
+    await os.tools.runDocker([...prefix, "pull", environment.image], {
+      timeout: 300_000,
+      signal: options.signal,
+    });
   }
 }

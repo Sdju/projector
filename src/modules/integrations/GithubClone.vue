@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { DEFAULT_ENVIRONMENT_IMAGE } from "../../../core/modules/environment/index.ts";
-import { nextTick, ref, useId } from "vue";
+import { nextTick, onBeforeUnmount, ref, useId } from "vue";
 import IconDownload from "~icons/lucide/download";
 import IconFolder from "~icons/lucide/folder-open";
 import { commandArgs, useCommandScope } from "../../common/utilities/commands.ts";
@@ -24,6 +24,43 @@ const loading = ref(false);
 const busy = ref(false);
 const error = ref("");
 const cloned = ref<Project>();
+const step = ref("");
+let jobId = "";
+interface CloneJob {
+  id: string;
+  phase:
+    | "queued"
+    | "preparing"
+    | "pulling"
+    | "cloning"
+    | "finishing"
+    | "done"
+    | "error"
+    | "cancelled";
+  message: string;
+  project?: Project;
+}
+/** Clones in the background and follows its phases until it finishes or is cancelled. */
+async function cloneInBackground(body: unknown) {
+  const started = await integrationRequest<{ job: CloneJob }>("/github/clone-jobs", "POST", body);
+  jobId = started.job.id;
+  try {
+    for (;;) {
+      const { job } = await integrationRequest<{ job: CloneJob }>(`/github/clone-jobs/${jobId}`);
+      step.value = job.message;
+      if (job.phase === "done" && job.project) return job.project;
+      if (job.phase === "cancelled") throw new Error("Клонирование отменено");
+      if (job.phase === "error") throw new Error(job.message);
+      await new Promise((resolve) => setTimeout(resolve, 700));
+    }
+  } finally {
+    jobId = "";
+    step.value = "";
+  }
+}
+onBeforeUnmount(() => {
+  if (jobId) void integrationRequest(`/github/clone-jobs/${jobId}`, "DELETE").catch(() => {});
+});
 const projects = useProjects();
 const commands = useCommandScope(`github-clone:${id}`, () => ({
   surface: "github-clone",
@@ -74,7 +111,7 @@ commands.scope.registerCommand({
     error.value = "";
     try {
       if (!cloned.value) {
-        const data = await integrationRequest<{ project: Project }>("/github/clone", "POST", {
+        const project = await cloneInBackground({
           repository: props.repository,
           directory: base.trim(),
           environment:
@@ -93,8 +130,8 @@ commands.scope.registerCommand({
                 }
               : "local"),
         });
-        cloned.value = data.project;
-        projects.ingest(data.project);
+        cloned.value = project;
+        projects.ingest(project);
       }
       await props.navigate(cloned.value.path);
       dialog.value?.close();
@@ -103,6 +140,16 @@ commands.scope.registerCommand({
     } finally {
       busy.value = false;
     }
+  },
+});
+commands.scope.registerCommand({
+  id: "ide.github.repository.clone.abort",
+  title: "Прервать клонирование",
+  description:
+    "Отменяет идущее клонирование: останавливает загрузку образа и git clone, удаляет временную папку. Проект не добавляется.",
+  enabled: () => busy.value && !!jobId,
+  run: async () => {
+    await integrationRequest(`/github/clone-jobs/${jobId}`, "DELETE");
   },
 });
 commands.scope.registerCommand({
@@ -206,17 +253,16 @@ function cancel(event: Event) {
         </template>
         <p v-if="loading" role="status">Читаю настройки…</p>
         <p v-if="busy" role="status">
-          {{
-            cloned
-              ? "Открываю проект…"
-              : mode === "docker"
-                ? "Готовлю образ и клонирую репозиторий…"
-                : "Клонирую репозиторий…"
-          }}
+          {{ cloned ? "Открываю проект…" : step || "Запускаю…" }}
         </p>
         <p v-if="error" class="error" role="alert">{{ error }}</p>
         <UiDialogActions>
-          <UiButton :disabled="busy" @click="commands.run('ide.github.repository.clone.cancel')"
+          <UiButton
+            v-if="busy && !cloned"
+            @click="commands.run('ide.github.repository.clone.abort')"
+            >Прервать</UiButton
+          >
+          <UiButton v-else @click="commands.run('ide.github.repository.clone.cancel')"
             >Отмена</UiButton
           >
           <UiButton type="submit" variant="solid" :disabled="busy || loading || !directory.trim()">

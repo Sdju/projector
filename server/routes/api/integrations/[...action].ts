@@ -9,6 +9,9 @@ import {
   githubRepositories,
   importGithubProject,
   cloneGithubProject,
+  startCloneJob,
+  cloneJob,
+  cancelCloneJob,
   browseGithubRepository,
   browseGithubDirectories,
   browseGithubTree,
@@ -114,6 +117,20 @@ export async function handleIntegrationsActions({
     }
     if (path === "/api/integrations/github/repositories" && method === "GET") {
       json(res, 200, await githubRepositories(Number(url.searchParams.get("page") ?? 1)));
+      return true;
+    }
+    if (path === "/api/integrations/github/clone-jobs" && method === "POST") {
+      json(res, 202, { job: startCloneJob(await readBody(req)) });
+      return true;
+    }
+    const jobMatch = path.match(/^\/api\/integrations\/github\/clone-jobs\/([0-9a-f-]{36})$/);
+    if (jobMatch && method === "GET") {
+      const job = cloneJob(jobMatch[1]);
+      json(res, 200, { job: job.project ? { ...job, project: withRuntime(job.project) } : job });
+      return true;
+    }
+    if (jobMatch && method === "DELETE") {
+      json(res, 200, { job: cancelCloneJob(jobMatch[1]) });
       return true;
     }
     if (path === "/api/integrations/github/clone" && method === "POST") {

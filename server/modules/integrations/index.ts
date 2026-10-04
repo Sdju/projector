@@ -26,8 +26,9 @@ export { disconnectGithub } from "./github.ts";
 export { beginGithubLogin } from "./github.ts";
 export { pollGithubLogin } from "./github.ts";
 export { githubRepositories } from "./github.ts";
-export { cloneGithubProject } from "./github.ts";
-export { importGithubProject } from "./github.ts";
+export { cloneGithubProject } from "./github-clone.ts";
+export { importGithubProject } from "./github-clone.ts";
+export { startCloneJob, cloneJob, cancelCloneJob } from "./clone-jobs.ts";
 
 export type { IntegrationConfig } from "./store.ts";
 export { readIntegrations } from "./store.ts";
