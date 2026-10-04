@@ -61,7 +61,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <span class="codex-usage" :title="tooltip" :aria-label="tooltip" tabindex="0">
+  <span class="codex-usage" :aria-label="tooltip" tabindex="0">
     <IconCodex class="codex-icon" aria-hidden="true" />
     <span
       class="quota-bar"
