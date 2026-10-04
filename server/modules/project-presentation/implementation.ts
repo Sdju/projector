@@ -68,7 +68,8 @@ export function normalizeProject(input: Record<string, unknown>, current?: Proje
   return {
     id: current?.id ?? randomUUID(),
     name: asString(input.name) || "без имени",
-    path: asString(input.path),
+    path: current?.environment ? current.path : asString(input.path),
+    environment: current?.environment,
     url: asString(input.url),
     icon: asString(input.icon),
     mode: parseMode(input.mode),

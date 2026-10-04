@@ -18,6 +18,7 @@ export interface Project {
   defaultCommandId: string;
   commands: ProjectCommand[];
   createdAt: string;
+  environment?: import("../environment/index.ts").DockerEnvironment;
   runtime?: ProcessSnapshot;
 }
 

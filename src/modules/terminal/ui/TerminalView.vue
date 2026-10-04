@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { Terminal, type IDisposable } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
@@ -43,6 +44,19 @@ const error = ref("");
 const draggingFiles = ref(false);
 const connection = ref<"offline" | "connecting" | "connected">("offline");
 const sessionId = props.session.id;
+const portCommands = useCommandScope(`environment-ports:${sessionId}`, () => ({ projectId: props.projectId, surface: "environment-ports" }));
+portCommands.scope.registerCommand({
+  id: "ide.environment.port.open", title: "Открыть порт окружения",
+  description: "Открывает TCP-порт контейнера, опубликованный только на loopback хоста, как HTTP.",
+  arguments: { port: "TCP-порт внутри контейнера" },
+  enabled: () => props.session.status === "running",
+  run: (value) => {
+    const { port } = commandArgs(value);
+    const address = props.session.ports?.find((item) => item.container === port);
+    if (!address) throw new Error("Порт не опубликован");
+    openExternalLink(address.url);
+  },
+});
 const statusText = computed(() => {
   if (props.session.status === "exited") {
     const failed = !props.session.stopRequested && props.session.exitCode !== 0;
@@ -342,6 +356,10 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="terminal-view" tabindex="-1">
+    <div v-if="session.ports?.length && session.status === 'running'" class="environment-ports">
+      <button v-for="port in session.ports" :key="port.container" :title="port.url"
+        @click="portCommands.run('ide.environment.port.open', { port: port.container })">{{ port.container }} ↗</button>
+    </div>
     <p v-if="statusText" class="status" role="status">{{ statusText }}</p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <div
@@ -362,6 +380,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.environment-ports { display: flex; gap: var(--sp-3); padding: var(--sp-2); font: var(--fs-xs) var(--mono); color: var(--muted); }
 .terminal-view {
   display: flex;
   flex-direction: column;

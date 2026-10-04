@@ -1,3 +1,4 @@
+import { environmentPorts } from "../environments/index.ts";
 import { createTerminalSession, stopTerminalSession } from "../terminal/index.ts";
 import type { TerminalSession } from "../../../core/modules/terminal/index.ts";
 import { projectAppUrl } from "../../../core/modules/app-paths/index.ts";
@@ -77,6 +78,18 @@ function consumeChunk(session: Session, chunk: string): void {
   for (const line of lines) {
     const match = line.match(URL_RE);
     if (!match) continue;
+    if (session.project.environment) {
+      const docker = session.terminal.docker;
+      const port = Number(new URL(match[0]).port);
+      if (docker) void environmentPorts(docker.context, docker.containerId!).then((ports) => {
+        const address = ports.find((item) => item.container === port);
+        if (!address || session.status !== "running") return;
+        session.url = address.url;
+        emit("status", snapshot(session));
+        maybeOpenWindow(session);
+      }).catch(() => {});
+      continue;
+    }
     const url = match[0]
       .replace("0.0.0.0", "localhost")
       .replace("127.0.0.1", "localhost")
@@ -144,7 +157,7 @@ export function startProject(
     commandName: command.name,
     terminal,
     status: "running",
-    url: project.url || null,
+    url: project.environment ? null : project.url || null,
     startedAt: terminal.startedAt,
     exitCode: null,
     pendingWindow: (mode ?? project.mode) === "window",
@@ -154,7 +167,7 @@ export function startProject(
   emit("status", snapshot(session));
   emit("terminal-started", { projectId: project.id, sessionId: terminal.id });
 
-  if (session.pendingWindow && project.url) {
+  if (session.pendingWindow && project.url && !project.environment) {
     setTimeout(() => {
       if (sessions.get(project.id) !== session || session.status !== "running") return;
       if (!session.url) session.url = project.url;

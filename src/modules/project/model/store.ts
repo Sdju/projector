@@ -1,3 +1,4 @@
+import { registerWorkspaceProfile, createLocalWorkspaceProfile } from "../../workspace-api/index.ts";
 import { computed, reactive } from "vue";
 import {
   createProject,
@@ -16,6 +17,13 @@ const state = reactive({
   error: "",
 });
 
+function registerEnvironment(project: Project) {
+  if (!project.environment) return;
+  const profile = createLocalWorkspaceProfile(project.id);
+  profile.id = "docker";
+  profile.features = { ...profile.features, docker: false, externalFiles: false };
+  registerWorkspaceProfile(project.id, profile);
+}
 export function useProjects() {
   const projects = computed(() => state.projects);
   const loading = computed(() => state.loading);
@@ -27,6 +35,7 @@ export function useProjects() {
     state.error = "";
     try {
       const data = await fetchProjects();
+      data.projects.forEach(registerEnvironment);
       // A path may be resolved while the initial catalog request is in flight.
       state.projects = [
         ...data.projects,
@@ -73,6 +82,7 @@ export function useProjects() {
   }
 
   function ingest(project: Project): void {
+    registerEnvironment(project);
     const index = state.projects.findIndex((item) => item.id === project.id);
     if (index === -1) state.projects.unshift(project);
     else state.projects[index] = project;

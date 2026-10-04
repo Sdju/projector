@@ -259,5 +259,61 @@ await test("GitHub integration persists authorization and imports authenticated 
   });
   assert.equal(failedClone.status, 400);
   await assert.rejects(access(join(selectedDirectory, "octocat", "failure")));
+  const { os } = await import("../core/modules/os/index.ts");
+  const { parseDockerEnvironment, environmentLaunch, environmentForPath, runEnvironmentCommand } =
+    await import("../server/modules/environments/index.ts");
+  const dockerCalls = [];
+  const docker = mock.method(os.tools, "runDocker", async (args) => {
+    dockerCalls.push(args);
+    if (args.includes("run") && args.at(-1).startsWith("https://github.com/")) {
+      const source = args[args.indexOf("--mount") + 1].match(/source=(.*),target=/)[1];
+      await mkdir(join(source, "checkout"));
+      await writeFile(join(source, "checkout", "README"), "Docker clone fixture");
+      const credentials = args[args.indexOf("--env-file") + 1];
+      assert.equal((await stat(credentials)).mode & 0o777, 0o600);
+    }
+    if (args[0] === "context") return { stdout: JSON.stringify([{ Endpoints: { docker: { Host: "unix:///var/run/docker.sock" } } }]), stderr: "" };
+    return { stdout: "", stderr: "" };
+  });
+  const dockerClone = await request("/github/clone", "POST", {
+    repository: "octocat/isolated", directory: selectedDirectory,
+    environment: { kind: "docker", network: "none" },
+  });
+  assert.equal(dockerClone.status, 201, JSON.stringify(dockerClone.data));
+  const isolated = dockerClone.data.project;
+  assert.equal(isolated.environment.kind, "docker");
+  assert.equal(isolated.environment.network, "none");
+  assert.ok(dockerCalls.some((args) => args.includes("info")));
+  const launch = environmentLaunch(isolated, ["/bin/bash", "-c", "touch /workspace/probe"], false);
+  assert.equal(launch.file, "docker");
+  for (const flag of ["--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges:true", "--pids-limit=256", "--memory=2g", "--cpus=2"])
+    assert.ok(launch.args.includes(flag));
+  assert.equal(launch.args[launch.args.indexOf("--network") + 1], "none");
+  assert.equal(launch.args.filter((value) => value === "--mount").length, 1);
+  assert.equal(launch.args[launch.args.indexOf("--mount") + 1], `type=bind,source=${isolated.path},target=/workspace`);
+  assert.ok(!launch.args.some((value) => value.includes("docker.sock") || value.includes(secret)));
+  assert.ok(!launch.args.includes("--privileged"));
+  assert.equal((await environmentForPath(join(isolated.path, "src"))).id, isolated.id);
+  assert.equal(await environmentForPath(join(isolated.path, "..", "isolated-other")), undefined);
+  await runEnvironmentCommand(isolated, ["/usr/bin/git", "status"]);
+  assert.ok(dockerCalls.at(-1).includes("--force"), "Docker tool cleanup removes workload, not just CLI");
+  const forwarded = environmentLaunch({ ...isolated, environment: { ...isolated.environment, network: "bridge", ports: [5173] } }, ["/bin/bash"]);
+  assert.ok(forwarded.args.includes("127.0.0.1::5173"));
+  for (const config of [
+    { kind: "docker", privileged: true }, { kind: "docker", mounts: ["/:/host"] },
+    { kind: "docker", network: "host" }, { kind: "docker", image: "--privileged" },
+    { kind: "docker", network: "none", ports: [5173] },
+    { kind: "docker", network: "bridge", ports: [0] },
+  ]) assert.throws(() => parseDockerEnvironment(config), { status: 400 });
+  const { normalizeProject } = await import("../server/modules/project-presentation/index.ts");
+  const normalized = normalizeProject({ ...isolated, path: "/tmp/changed", environment: null }, isolated);
+  assert.equal(normalized.path, isolated.path);
+  assert.deepEqual(normalized.environment, isolated.environment);
+  const { createTerminalSession } = await import("../server/modules/terminal/index.ts");
+  assert.throws(() => createTerminalSession(isolated, { program: "shell" }, undefined, undefined, {
+    file: "/bin/bash", args: ["-c", "touch /host"], title: "Escape", docker: { context: "default", kind: "shell" },
+  }), { status: 403 });
+  docker.mock.restore();
+
 
 });

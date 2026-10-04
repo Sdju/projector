@@ -1,3 +1,4 @@
+import { environmentPorts, stopEnvironmentContainerSync, environmentLaunch, stopEnvironmentContainer } from "../environments/index.ts";
 import { readTerminalProcesses, terminalActivity } from "./terminal-activity.ts";
 import { randomUUID } from "node:crypto";
 import { resolveTerminalPath } from "./link-files.ts";
@@ -67,6 +68,11 @@ const descendants = (pid: number) => os.processes.descendants(pid);
 
 function terminate(session: Session, immediate = false): void {
   if (session.info.status !== "running") return;
+  if (session.info.docker?.kind === "environment") {
+    const { context, containerId } = session.info.docker;
+    if (immediate) stopEnvironmentContainerSync(context, containerId!);
+    else void stopEnvironmentContainer(context, containerId!, true);
+  }
   const family = descendants(session.pty.pid);
   for (const entry of family.reverse()) {
     try {
@@ -192,6 +198,12 @@ export function createTerminalSession(
     : program === "shell"
       ? ["-i"]
       : ["-i", "-c", `exec ${program}`];
+  if (project.environment) {
+    if (launch) throw new HttpError(403, "В изолированном проекте запрещены произвольные Docker/Compose-действия");
+    launch = environmentLaunch(project, ["/bin/bash", "--noprofile", "--norc", ...args]);
+    for (const key of Object.keys(env))
+      if (/^DOCKER_(HOST|CONTEXT|TLS_VERIFY|CERT_PATH|API_VERSION)$/.test(key)) delete env[key];
+  }
   const screen = new Terminal({ ...dimensions, scrollback: 5000, allowProposedApi: true });
   const serialize = new SerializeAddon();
   screen.loadAddon(serialize);
@@ -231,6 +243,22 @@ export function createTerminalSession(
     disposed: false,
   };
   state.sessions.set(session.info.id, session);
+  if (project.environment?.ports.length && launch?.docker) {
+    const docker = launch.docker;
+    void (async () => {
+      for (let attempt = 0; attempt < 40 && !session.disposed && session.info.status === "running"; attempt++) {
+        try {
+          const ports = await environmentPorts(docker.context, docker.containerId!);
+          if (ports.length) {
+            session.info.ports = ports;
+            broadcast(session, { type: "status", session: { ...session.info } });
+            return;
+          }
+        } catch { /* Docker client is still starting. */ }
+        await new Promise((done) => setTimeout(done, 250));
+      }
+    })();
+  }
   // Parse before publishing, so reconnect snapshots and subsequent output form
   // one ordered stream, including alternate screen and cursor state.
   child.onData((data) => {

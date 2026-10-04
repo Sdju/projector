@@ -7,7 +7,7 @@ function storePath(): string {
   return join(dataDir(), "projects.json");
 }
 
-export async function loadProjects(): Promise<Project[]> {
+export async function loadProjects(strict = false): Promise<Project[]> {
   try {
     const raw = await readFile(storePath(), "utf8");
     const parsed = JSON.parse(raw) as { projects?: Project[] };
@@ -15,7 +15,8 @@ export async function loadProjects(): Promise<Project[]> {
       ...item,
       icon: item.icon ?? "",
     }));
-  } catch {
+  } catch (error) {
+    if (strict && (error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     return [];
   }
 }

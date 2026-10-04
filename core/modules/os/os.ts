@@ -1,4 +1,4 @@
-import { homedir } from "node:os";
+import { homedir, userInfo } from "node:os";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import * as linux from "./modules/linux/index.ts";
@@ -28,6 +28,11 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
       fileOperations: supported,
     }),
     homeDirectory: homedir,
+    userIdentity: () => {
+      backend("userIdentity");
+      const { uid, gid } = userInfo();
+      return { uid, gid };
+    },
     dataHome: () => backend("dataHome").dataHome(),
     shell: () => backend("shell").shell(),
     installDesktop: (root: string) => backend("installDesktop").installDesktop(root),
@@ -54,7 +59,8 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
       },
     },
     tools: {
-      runDocker: (args: string[], options?: { cwd?: string; timeout?: number }) =>
+      runDockerSync: (args: string[]) => backend("runDockerSync").runDockerSync(args),
+      runDocker: (args: string[], options?: { cwd?: string; timeout?: number; signal?: AbortSignal }) =>
         backend("runDocker").runDocker(args, options),
       runBash: (command: string, options: { cwd: string; signal?: AbortSignal }) =>
         backend("runBash").runBash(command, options),

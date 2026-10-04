@@ -5,6 +5,9 @@ import { tmpdir } from "node:os";
 import { os } from "../../../core/modules/os/index.ts";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
+import { parseDockerEnvironment, prepareDockerEnvironment } from "../environments/index.ts";
+import { cloneGithubContainer } from "./github-container.ts";
+import { realpath } from "node:fs/promises";
 import { integrationConfig, updateIntegration } from "./store.ts";
 import { HttpError } from "../http/index.ts";
 import { expandPath, inspectProject } from "../projects/index.ts";
@@ -275,12 +278,18 @@ export async function importGithubProject(body: Record<string, unknown>) {
 }
 export async function cloneGithubProject(body: Record<string, unknown>) {
   const config = await integrationConfig("github");
+  const docker = await integrationConfig("docker");
+  const environment = parseDockerEnvironment(body.environment, docker.settings.context || "default");
   const directory = body.directory ?? (config.settings.directory || DEFAULT_DIRECTORY);
   if (typeof directory !== "string" || !/^(\/|~(?:\/|$))/.test(directory.trim()) || directory.includes("\0"))
     throw new HttpError(400, "Укажите абсолютный путь к папке или ~/папка");
-  return saveGithubProject(body, directory, config.enabled ? config.credentials.token || "" : "");
+  if (environment) {
+    if (directory.includes(",")) throw new HttpError(400, "Docker-путь не должен содержать запятую");
+    await prepareDockerEnvironment(environment);
+  }
+  return saveGithubProject(body, directory, config.enabled ? config.credentials.token || "" : "", environment);
 }
-async function saveGithubProject(body: Record<string, unknown>, base: string, token: string) {
+async function saveGithubProject(body: Record<string, unknown>, base: string, token: string, environment?: import("../../../core/modules/environment/index.ts").DockerEnvironment) {
   const repository = repositoryName(body.repository);
   await github(`/repos/${repository}`, token);
   const directory = expandPath(base);
@@ -305,7 +314,8 @@ async function saveGithubProject(body: Record<string, unknown>, base: string, to
     await mkdir(parent, { recursive: true });
     staging = await mkdtemp(join(parent, ".projector-import-"));
     const checkout = join(staging, "checkout");
-    await cloneGithubRepository(repository, checkout, token);
+    if (environment) await cloneGithubContainer(repository, staging, token, environment);
+    else await cloneGithubRepository(repository, checkout, token);
     let draft;
     if (await lstat(join(checkout, "package.json")).catch(() => null)) {
       draft = await inspectProject(checkout);
@@ -337,7 +347,8 @@ async function saveGithubProject(body: Record<string, unknown>, base: string, to
     }
     const project: Project = {
       ...draft,
-      path: destination,
+      path: await realpath(destination),
+      environment,
       id: randomUUID(),
       createdAt: new Date().toISOString(),
     };

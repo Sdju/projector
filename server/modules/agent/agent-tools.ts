@@ -1,3 +1,4 @@
+import { environmentForPath, runEnvironmentCommand } from "../environments/index.ts";
 import { os } from "../../../core/modules/os/index.ts";
 import type { CommandRequest } from "./command-bridge.ts";
 import { randomUUID } from "node:crypto";
@@ -76,13 +77,27 @@ export function createAgentTools(context: AgentToolContext) {
     }),
     bash: tool({
       description:
-        "Выполнить Bash на машине пользователя. Возвращает stdout, stderr, exitCode; лимит 30 секунд. cwd по умолчанию — открытый проект.",
+        "Выполнить Bash в окружении проекта: Docker для изолированного проекта, иначе машина пользователя. Возвращает stdout, stderr, exitCode; лимит 30 секунд. cwd по умолчанию — открытый проект.",
       inputSchema: z.object({ command: z.string().min(1), cwd: z.string().optional() }),
-      execute: ({ command, cwd }) =>
-        os.tools.runBash(command, {
-          cwd: expandPath(cwd || context.cwd || os.homeDirectory()),
-          signal: context.signal,
-        }),
+      execute: async ({ command, cwd }) => {
+        const project = context.cwd ? await environmentForPath(context.cwd) : undefined;
+        const target = expandPath(cwd || context.cwd || os.homeDirectory());
+        const environment = project ?? await environmentForPath(target);
+        if (environment) {
+          if (target !== environment.path) throw new Error("Bash окружения выполняется только в корне изолированного проекта");
+          if (context.signal?.aborted) throw new Error("Запрос остановлен");
+          try {
+            const result = await runEnvironmentCommand(environment, ["/bin/bash", "--noprofile", "--norc", "-c", command], 30_000, context.signal);
+            return { stdout: result.stdout.slice(0, 256 * 1024), stderr: result.stderr.slice(0, 256 * 1024), exitCode: 0 };
+          } catch (error) {
+            if (context.signal?.aborted) throw new Error("Запрос остановлен");
+            const failure = error as { code?: number; stdout?: string; stderr?: string };
+            if (typeof failure.code !== "number") throw error;
+            return { stdout: (failure.stdout || "").slice(0, 256 * 1024), stderr: (failure.stderr || "").slice(0, 256 * 1024), exitCode: failure.code };
+          }
+        }
+        return os.tools.runBash(command, { cwd: target, signal: context.signal });
+      },
     }),
     list_projects: tool({
       description: "Список уже добавленных в projector проектов.",
