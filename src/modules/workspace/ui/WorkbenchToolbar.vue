@@ -8,6 +8,7 @@ import IconTerminal from "~icons/lucide/terminal";
 import IconCodex from "~icons/simple-icons/openai";
 import IconClaude from "~icons/simple-icons/claude";
 import IconOpenCode from "~icons/simple-icons/opencode";
+import IconCursor from "~icons/simple-icons/cursor";
 
 defineProps<{
   capabilities: Readonly<WorkspaceCapabilities>;
@@ -26,6 +27,7 @@ const terminalPrograms = [
   { program: "codex", title: "Новый Codex", icon: IconCodex },
   { program: "claude", title: "Новый Claude Code", icon: IconClaude },
   { program: "opencode", title: "Новый OpenCode", icon: IconOpenCode },
+  { program: "cursor", title: "Новый Cursor", icon: IconCursor },
 ];
 </script>
 

@@ -87,6 +87,7 @@ export { installDesktop } from "./install-desktop.ts";
 
 export { startCodexAppServer } from "./codex.ts";
 export { readOpenCodeGoKey } from "./opencode.ts";
+export { readCursorAccessToken } from "./cursor.ts";
 
 const secrets = () =>
   import(new URL("./secrets.ts", import.meta.url).href) as Promise<typeof import("./secrets.ts")>;

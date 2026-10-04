@@ -225,7 +225,7 @@ export function createTerminalSession(
   if (!previous && state.sessions.size >= MAX_SESSIONS)
     throw new Error("Лимит терминалов: закройте ненужные сессии");
   const program = (input.program ?? "shell") as TerminalProgram;
-  if (!["shell", "codex", "claude", "opencode"].includes(program))
+  if (!["shell", "codex", "claude", "opencode", "cursor"].includes(program))
     throw new Error("Неизвестная программа");
   const command =
     input.commandId === undefined
@@ -251,11 +251,13 @@ export function createTerminalSession(
   env.TERM = "xterm-256color";
   env.COLORTERM = "truecolor";
   const shell = os.shell();
+  // Cursor Agent CLI installs as `agent` / `cursor-agent`, not `cursor`.
+  const executable = program === "cursor" ? "agent" : program;
   const args = command
     ? ["-c", command.cmd]
     : program === "shell"
       ? ["-i"]
-      : ["-i", "-c", `exec ${program}`];
+      : ["-i", "-c", `exec ${executable}`];
   // A config the user trusted in its current form replaces the restricted environment.
   const trusted = launch ? undefined : devcontainerLaunch(project, ["/bin/bash", ...args]);
   if (trusted) launch = trusted;
@@ -297,7 +299,13 @@ export function createTerminalSession(
       title:
         launch?.title ??
         command?.name ??
-        { shell: "Shell", codex: "Codex", claude: "Claude Code", opencode: "OpenCode" }[program],
+        {
+          shell: "Shell",
+          codex: "Codex",
+          claude: "Claude Code",
+          opencode: "OpenCode",
+          cursor: "Cursor",
+        }[program],
       pid: child.pid,
       ...dimensions,
       status: "running",

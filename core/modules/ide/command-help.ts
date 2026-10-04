@@ -23,7 +23,8 @@ export function commandHelp(id: string): {
     return {
       description: "Создаёт терминальную сессию в проекте и показывает её вкладку.",
       arguments: {
-        program: "string (необязательно): shell, codex, claude или opencode; по умолчанию shell",
+        program:
+          "string (необязательно): shell, codex, claude, opencode или cursor; по умолчанию shell",
       },
     };
   if (id.startsWith("ide.workbench.panel."))

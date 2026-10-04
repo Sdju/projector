@@ -1,4 +1,4 @@
-export type TerminalProgram = "shell" | "codex" | "claude" | "opencode";
+export type TerminalProgram = "shell" | "codex" | "claude" | "opencode" | "cursor";
 
 export interface TerminalActivity {
   state: "idle" | "busy" | "unknown";

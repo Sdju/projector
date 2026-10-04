@@ -373,6 +373,35 @@ await test("real PTY: input, Unicode, resize, interrupt, reconnect, alternate sc
       }
     },
   );
+  await t.test(
+    "Cursor launches agent CLI in project cwd with an interactive PTY",
+    async () => {
+      const bin = join(root, "bin");
+      await mkdir(bin, { recursive: true });
+      await writeFile(
+        join(bin, "agent"),
+        '#!/bin/sh\ntest -t 0 && test -t 1 || exit 1\nprintf "CURSOR_READY:%s\\n" "$PWD"\n',
+        { mode: 0o700 },
+      );
+      const previousPath = process.env.PATH;
+      process.env.PATH = `${bin}:${previousPath}`;
+      try {
+        const created = await request("", "POST", { program: "cursor" });
+        assert.equal(created.status, 201, await created.clone().text());
+        const { session } = await created.json();
+        assert.equal(session.program, "cursor");
+        assert.equal(session.title, "Cursor");
+        const first = await connect(session.id);
+        await until(
+          () => first.output().includes(`CURSOR_READY:${root}`),
+          "Cursor agent PTY and cwd",
+        );
+        assert.equal((await request(`/${session.id}`, "DELETE")).status, 200);
+      } finally {
+        process.env.PATH = previousPath;
+      }
+    },
+  );
   const droppedSession = (await (await request("", "POST", { program: "shell" })).json()).session;
   const uploadUrl = `${base}/api/projects/${project.id}/terminals/${droppedSession.id}`;
   const content = Buffer.from([0, 255, 10, 13, 65]);

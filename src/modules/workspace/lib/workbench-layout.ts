@@ -265,8 +265,8 @@ export function useWorkbenchLayout(ctx: WorkbenchLayoutContext) {
     "Новый терминал",
     async (value) => {
       const { program = "shell" } = commandArgs(value);
-      if (!["shell", "codex", "claude", "opencode"].includes(program as string))
-        throw new Error("program: shell, codex, claude или opencode");
+      if (!["shell", "codex", "claude", "opencode", "cursor"].includes(program as string))
+        throw new Error("program: shell, codex, claude, opencode или cursor");
       await createTerminal(program as TerminalProgram);
     },
     () => !terminals.busy.value,

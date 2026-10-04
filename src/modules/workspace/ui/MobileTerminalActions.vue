@@ -8,7 +8,7 @@ defineEmits<{ command: [id: string, args?: unknown] }>();
 
 <template>
   <UiButton
-    v-for="program in ['shell', 'codex', 'claude', 'opencode']"
+    v-for="program in ['shell', 'codex', 'claude', 'opencode', 'cursor']"
     :key="program"
     size="sm"
     :disabled="busy"

@@ -32,7 +32,9 @@ import { handleEditorSettings } from "../routes/api/ide/editor.ts";
 import { handleDocker } from "../routes/api/docker.ts";
 import { handleCodex } from "../routes/api/codex.ts";
 import { handleOpenCode } from "../routes/api/opencode.ts";
+import { handleCursor } from "../routes/api/cursor.ts";
 const routes = [
+  handleCursor,
   handleOpenCode,
   handleCodex,
   handleDocker,

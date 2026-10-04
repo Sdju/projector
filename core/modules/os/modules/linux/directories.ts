@@ -7,6 +7,9 @@ const execute = promisify(execFile);
 export function dataHome() {
   return process.env.XDG_DATA_HOME || join(homedir(), ".local/share");
 }
+export function configHome() {
+  return process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
+}
 export function shell() {
   return process.env.SHELL || "/bin/bash";
 }
