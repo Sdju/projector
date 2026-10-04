@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
 import { realpathSync } from "node:fs";
+import { basename } from "node:path";
 import type { Project } from "../../../core/modules/project/index.ts";
 import { trustedDevcontainer } from "./state.ts";
 
@@ -14,6 +15,15 @@ const SCRIPT = [
  * Runs `command` inside the project's dev container, building it first when needed.
  * Only for configs the user trusted in their current form; undefined otherwise.
  */
+/** Where the CLI mounts the project: `workspaceFolder`, else `/workspaces/<folder name>`. */
+export function containerWorkspace(config: Record<string, unknown>, root: string) {
+  const name = basename(root);
+  const custom = config.workspaceFolder;
+  if (typeof custom === "string" && custom.startsWith("/"))
+    return custom.replaceAll("${localWorkspaceFolderBasename}", name).replace(/\/+$/, "");
+  return `/workspaces/${name}`;
+}
+
 export function devcontainerLaunch(project: Project, command: string[]) {
   const config = trustedDevcontainer(project);
   if (!config) return undefined;
@@ -31,5 +41,6 @@ export function devcontainerLaunch(project: Project, command: string[]) {
       ...command,
     ],
     title: `Dev Container · ${project.name}`,
+    workspace: containerWorkspace(config.config, realpathSync(project.path)),
   };
 }

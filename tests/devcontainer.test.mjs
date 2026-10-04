@@ -114,3 +114,16 @@ await test("projects without a config have nothing to decide", async () => {
   assert.equal(state.needsDecision, false);
   await assert.rejects(decideDevcontainer({ id: "n", name: "n", path: root }, "trusted", "x"), /нет devcontainer/);
 });
+
+const { containerToHost } = await import("../server/modules/terminal/link-files.ts");
+await test("terminal links map container paths into the project and refuse escapes", () => {
+  const map = (path) => containerToHost(path, "/workspaces/app", "/home/me/app");
+  assert.equal(map("/workspaces/app/src/a.ts"), "/home/me/app/src/a.ts");
+  assert.equal(map("src/a.ts"), "/home/me/app/src/a.ts");
+  assert.equal(map("/workspaces/app"), "/home/me/app");
+  assert.throws(() => map("/etc/passwd"), /вне проекта/);
+  assert.throws(() => map("~/x"), /вне проекта/);
+  assert.throws(() => map("/workspaces/app/../../etc/passwd"), /за пределы/);
+  assert.throws(() => map("../secret"), /за пределы/);
+  assert.throws(() => map("/workspaces/application/x"), /вне проекта/);
+});

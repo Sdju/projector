@@ -9,6 +9,8 @@ export interface TerminalActivity {
 export interface TerminalSession {
   /** Docker client session; closing the client does not stop the container. */
   docker?: { context: string; kind: string; containerId?: string; composeProject?: string };
+  /** Session runs in the trusted Dev Container; `workspace` is where the project is mounted. */
+  devcontainer?: { workspace: string };
   ports?: Array<{ container: number; url: string }>;
   id: string;
   projectId: string;

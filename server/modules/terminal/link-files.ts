@@ -1,6 +1,6 @@
 import { realpath, stat } from "node:fs/promises";
 import { os } from "../../../core/modules/os/index.ts";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
 import { HttpError } from "../http/index.ts";
 
 export async function resolveTerminalPath(path: string, projectRoot: string, cwd: string) {
@@ -24,4 +24,18 @@ export async function resolveTerminalPath(path: string, projectRoot: string, cwd
     }
   }
   throw new HttpError(404, "Файл из терминала не найден");
+}
+
+/**
+ * Maps a path printed inside a Dev Container to the project on the host.
+ * Anything that does not stay inside the mounted workspace cannot be opened.
+ */
+export function containerToHost(path: string, workspace: string, root: string) {
+  const inside = path === workspace || path.startsWith(`${workspace}/`);
+  if (!inside && (path.startsWith("/") || path.startsWith("~")))
+    throw new HttpError(404, "Путь находится вне проекта внутри контейнера");
+  const local = normalize(inside ? path.slice(workspace.length + 1) || "." : path);
+  if (local === ".." || local.startsWith(`..${sep}`))
+    throw new HttpError(404, "Путь выходит за пределы проекта");
+  return join(root, local);
 }

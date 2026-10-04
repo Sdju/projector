@@ -6,7 +6,7 @@ import {
 } from "../environments/index.ts";
 import { readTerminalProcesses, terminalActivity } from "./terminal-activity.ts";
 import { randomUUID } from "node:crypto";
-import { resolveTerminalPath } from "./link-files.ts";
+import { containerToHost, resolveTerminalPath } from "./link-files.ts";
 import { rmSync } from "node:fs";
 import { os } from "../../../core/modules/os/index.ts";
 import { saveDroppedFile } from "./drop-files.ts";
@@ -99,6 +99,8 @@ export async function resolveTerminalFile(project: Project, id: string, path: st
     throw new HttpError(404, "Терминал не найден");
   if (session.info.docker)
     throw new HttpError(409, "Пути Docker-терминала не сопоставлены с файлами хоста");
+  const workspace = session.info.devcontainer?.workspace;
+  if (workspace) return resolveTerminalPath(containerToHost(path, workspace, project.path), project.path, project.path);
   const cwd =
     session.info.status === "running"
       ? await os.processes.workingDirectory(session.info.pid, project.path)
@@ -168,7 +170,7 @@ export async function uploadTerminalFile(
   const session = state.sessions.get(id);
   if (!session || session.info.projectId !== projectId)
     throw new HttpError(404, "Терминал не найден");
-  if (session.info.docker)
+  if (session.info.docker || session.info.devcontainer)
     throw new HttpError(409, "Загрузка файлов в Docker-терминал не поддерживается");
   const available = () =>
     !session.disposed && session.info.status === "running" && !session.info.stopRequested;
@@ -208,6 +210,7 @@ export function createTerminalSession(
     args: string[];
     title: string;
     docker?: NonNullable<TerminalSession["docker"]>;
+    workspace?: string;
   },
 ): TerminalSession {
   const previous = replacingId ? state.sessions.get(replacingId) : undefined;
@@ -283,6 +286,7 @@ export function createTerminalSession(
       projectId: project.id,
       program,
       docker: launch?.docker,
+      devcontainer: launch?.workspace ? { workspace: launch.workspace } : undefined,
       commandId: command?.id,
       customTitle: previous?.info.customTitle,
       title:

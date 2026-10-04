@@ -120,7 +120,7 @@ function send(message: TerminalClientMessage): void {
 function dragFiles(event: DragEvent): void {
   if (!isTerminalFileDrag(event.dataTransfer)) return;
   event.preventDefault();
-  if (props.session.docker) {
+  if (props.session.docker || props.session.devcontainer) {
     if (event.dataTransfer) event.dataTransfer.dropEffect = "none";
     return;
   }
@@ -131,7 +131,7 @@ function dragFiles(event: DragEvent): void {
 async function dropFiles(event: DragEvent): Promise<void> {
   event.preventDefault();
   draggingFiles.value = false;
-  if (props.session.docker) {
+  if (props.session.docker || props.session.devcontainer) {
     error.value = "Файловые пути хоста недоступны в Docker-терминале";
     return;
   }
