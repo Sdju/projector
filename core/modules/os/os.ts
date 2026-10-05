@@ -66,6 +66,7 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
     },
     tools: {
       commandExists: (bin: string) => backend("commandExists").commandExists(bin),
+      readClaudeAccessToken: () => backend("readClaudeAccessToken").readClaudeAccessToken(),
       readOpenCodeGoKey: () => backend("readOpenCodeGoKey").readOpenCodeGoKey(),
       readCursorAccessToken: () => backend("readCursorAccessToken").readCursorAccessToken(),
       startCodexAppServer: () => backend("startCodexAppServer").startCodexAppServer(),

@@ -100,3 +100,5 @@ export const setSecret = async (...args: Parameters<typeof import("./secrets.ts"
 export const deleteSecret = async (
   ...args: Parameters<typeof import("./secrets.ts").deleteSecret>
 ) => (await secrets()).deleteSecret(...args);
+
+export { readClaudeAccessToken } from "./claude.ts";

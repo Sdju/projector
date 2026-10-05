@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { ClaudeUsageIndicator } from "../../claude/index.ts";
 import { CodexUsageIndicator } from "../../codex/index.ts";
 import { CursorUsageIndicator } from "../../cursor/index.ts";
 import { OpenCodeUsageIndicator } from "../../opencode/index.ts";
@@ -25,6 +26,7 @@ const selection = computed(() => {
     <div class="status-spacer" />
     <CodexUsageIndicator />
     <OpenCodeUsageIndicator />
+    <ClaudeUsageIndicator />
     <CursorUsageIndicator />
     <span
       v-if="status.active && status.lineEnding"
@@ -62,5 +64,15 @@ const selection = computed(() => {
 }
 .status-spacer {
   flex: 1;
+}
+@media (max-width: 600px) {
+  .status-bar {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-inline: 6px;
+  }
+  .status-spacer, .status-group:empty { display: none; }
+  .status-group:not(:empty) { flex-basis: 100%; }
+  .status-bar :deep(.quota-bar:not(.tooltip-bar)) { min-width: 64px; }
 }
 </style>
