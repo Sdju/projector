@@ -51,8 +51,3 @@ export function pathsFromDataTransfer(data: DataTransfer | null): string[] {
   }
   return found;
 }
-
-export function agentMessageForPaths(paths: string[]): string {
-  if (paths.length === 1) return `добавь проект ${paths[0]}`;
-  return `добавь эти проекты:\n${paths.map((path) => `- ${path}`).join("\n")}`;
-}

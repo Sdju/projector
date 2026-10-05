@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useCommandScope, commandArgs } from "../../common/utilities/commands.ts";
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { githubProjectRoute } from "../../../core/modules/github/index.ts";
 import { useRoute, useRouter } from "vue-router";
 import {
@@ -11,6 +11,7 @@ import {
 } from "../../modules/project/index.ts";
 import { PathBar, MobileProjectPicker } from "../../modules/catalog/index.ts";
 import { useIdeCommands } from "../../modules/ide/index.ts";
+import { isFileDrag, pathsFromDataTransfer } from "../../modules/path-drop/index.ts";
 
 const props = defineProps<{ currentProject?: ProjectLocation }>();
 const { api, reportError } = useIdeCommands();
@@ -22,7 +23,7 @@ function openSettings() {
       })
       .catch(reportError);
 }
-const { projects } = useProjects();
+const { projects, openPath } = useProjects();
 const route = useRoute();
 const router = useRouter();
 const running = computed(
@@ -53,6 +54,51 @@ commands.scope.registerCommand({
     await router.push(githubProjectRoute(repository));
   },
 });
+commands.scope.registerCommand({
+  id: "ide.project.paths.open",
+  title: "Открыть папки как проекты",
+  description:
+    "Создаёт проекты для локальных папок, которых нет в каталоге, и открывает первую из них.",
+  arguments: { paths: "string[]: абсолютные пути папок" },
+  run: async (value) => {
+    const { paths } = commandArgs(value);
+    if (!Array.isArray(paths) || !paths.length || paths.some((path) => typeof path !== "string"))
+      throw new Error("Укажите paths");
+    const opened = [];
+    for (const path of paths as string[]) opened.push((await openPath(path)).project);
+    await router.push(projectRoute(opened[0].path));
+  },
+});
+// Inside a workspace the terminal and file tree own dropped files; elsewhere a folder becomes a project.
+const dropsProjects = computed(() => route.name === "launcher" || route.name === "home");
+const dragging = ref(false);
+const dropError = ref("");
+let dragDepth = 0;
+function dragEnter(event: DragEvent) {
+  if (!dropsProjects.value || !isFileDrag(event.dataTransfer)) return;
+  dragDepth++;
+  dragging.value = true;
+}
+function dragLeave() {
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (!dragDepth) dragging.value = false;
+}
+async function drop(event: DragEvent) {
+  dragging.value = false;
+  dragDepth = 0;
+  if (!dropsProjects.value || !isFileDrag(event.dataTransfer)) return;
+  const paths = pathsFromDataTransfer(event.dataTransfer);
+  dropError.value = "";
+  if (!paths.length) {
+    dropError.value = "Не удалось прочитать путь. Перетащите папку из файлового менеджера.";
+    return;
+  }
+  try {
+    await commands.scope.executeCommand<void>("ide.project.paths.open", { paths });
+  } catch (err) {
+    dropError.value = err instanceof Error ? err.message : "Не удалось открыть папку";
+  }
+}
 const navigatePath = (path: string) =>
   commands.scope.executeCommand<void>("ide.project.path.open", { path });
 </script>
@@ -64,9 +110,12 @@ const navigatePath = (path: string) =>
       workspace: route.name === 'project' || route.name === 'github-project',
       settings: route.name === 'settings',
     }"
+    @dragenter="dragEnter"
     @dragover.prevent
-    @drop.prevent
+    @dragleave="dragLeave"
+    @drop.prevent="drop"
   >
+    <div v-if="dragging" class="drop-hint">Бросьте папку — откроем проект</div>
     <header class="top" :class="{ 'has-project': currentProject }">
       <MobileProjectPicker
         v-if="currentProject"
@@ -116,6 +165,7 @@ const navigatePath = (path: string) =>
         >
       </nav>
     </header>
+    <p v-if="dropError" class="drop-error" role="alert">{{ dropError }}</p>
     <main>
       <slot />
     </main>
@@ -123,6 +173,22 @@ const navigatePath = (path: string) =>
 </template>
 
 <style scoped>
+.drop-hint {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-sticky);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  border: 1px dashed var(--focus);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  color: var(--text);
+}
+.drop-error {
+  margin: 0 0 var(--sp-3);
+  color: var(--err);
+  font-size: var(--fs-xs);
+}
 .mobile-picker {
   display: none;
 }
