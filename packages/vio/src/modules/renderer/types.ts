@@ -27,6 +27,8 @@ export interface WindowWidget extends Widget {
 export interface EntryWidget extends Widget {
   getText(): string;
   setText(text: string): void;
+  /** Позиция курсора в символах (`Gtk.Editable`). */
+  getPosition(): number;
 }
 export interface RowWidget extends Widget {
   getIndex(): number;

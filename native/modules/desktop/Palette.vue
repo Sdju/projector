@@ -25,8 +25,15 @@ import {
   type ListBoxWidget,
   type RowWidget,
 } from "vio";
-import { createLauncherClient, type LaunchItem } from "../../../core/modules/launcher/index.ts";
-import { createLauncherModel } from "../../../core/modules/launcher/index.ts";
+import {
+  createLauncherClient,
+  createLauncherModel,
+  launchScopeTitles,
+  launchSectionTitles,
+  parseLaunchQuery,
+  type LaunchAction,
+  type LaunchItem,
+} from "../../../core/modules/launcher/index.ts";
 
 const props = defineProps<{ baseUrl: string; applicationIcon: (id: string) => object | null }>();
 GLib.setPrgname("projector-launcher");
@@ -38,15 +45,26 @@ const unsubscribe = model.subscribe((value) => {
   state.value = value;
 });
 const query = computed({ get: () => state.value.query, set: (value) => model.setQuery(value) });
-const status = computed(
-  () =>
-    state.value.error ||
-    (state.value.busy
-      ? "Запускаю…"
-      : state.value.loading
-        ? "Поиск…"
-        : state.value.warning || (state.value.items.length ? "" : "Ничего не найдено")),
-);
+const status = computed(() => {
+  const value = state.value;
+  if (value.error) return value.error;
+  if (value.busy) return "Запускаю…";
+  if (value.focus) return value.detailLoading ? "Загрузка…" : "";
+  if (value.loading) return "Поиск…";
+  return value.warning || (value.items.length ? "" : "Ничего не найдено");
+});
+const focus = computed(() => state.value.focus);
+const detailActions = computed(() => state.value.detail?.actions ?? []);
+const failure = computed(() => state.value.detail?.failure);
+const detailIndex = ref(0);
+const scope = computed(() => parseLaunchQuery(state.value.query).scope);
+const scopeTitle = computed(() => (scope.value === "all" ? "" : launchScopeTitles[scope.value]));
+const failureText = computed(() => {
+  const value = failure.value;
+  if (!value) return "";
+  const code = value.exitCode === null ? "" : ` (код ${value.exitCode})`;
+  return `«${value.command}» завершилась с ошибкой${code}\n\n${value.output || "Вывод терминала пуст."}`;
+});
 const windowRef = ref<WidgetHandle<WindowWidget>>();
 const entryRef = ref<WidgetHandle<EntryWidget>>();
 const listRef = ref<WidgetHandle<ListBoxWidget>>();
@@ -66,6 +84,14 @@ function appIcon(item: LaunchItem) {
     }
   }
   return icons.get(item.id);
+}
+function itemTitle(item: LaunchItem) {
+  return item.status ? `${item.status.state === "error" ? "✖" : "●"} ${item.name}` : item.name;
+}
+function sectionTitle(item: LaunchItem, index: number) {
+  return item.section && item.section !== state.value.items[index - 1]?.section
+    ? launchSectionTitles[item.section]
+    : "";
 }
 function rowHint(item: LaunchItem) {
   const [first, second] = item.actions ?? [];
@@ -116,10 +142,33 @@ async function focusWindow() {
 }
 async function launch(index = state.value.selected, secondary = false) {
   const item = state.value.items[index];
-  const action = secondary ? item?.actions?.[1]?.id : item?.actions?.[0]?.id;
+  const action = item?.actions?.[secondary ? 1 : 0];
   if (!action) return;
   if (await model.launch(item, action)) hide();
   else entryRef.value?.widget?.grabFocus();
+}
+async function launchDetail() {
+  const item = state.value.focus;
+  const action: LaunchAction | undefined = detailActions.value[detailIndex.value];
+  if (!item || !action) return;
+  if (await model.launch(item, action)) {
+    model.leave();
+    hide();
+  } else entryRef.value?.widget?.grabFocus();
+}
+async function enter() {
+  if (!state.value.items.length) return;
+  detailIndex.value = 0;
+  await model.enter();
+}
+function entryHasFocus() {
+  const entry = entryRef.value?.widget;
+  const current = windowRef.value?.widget?.getFocus();
+  return !!entry && (current === entry || !!current?.isAncestor(entry));
+}
+function caretAtEnd() {
+  const entry = entryRef.value?.widget;
+  return !!entry && entry.getPosition() >= entry.getText().length;
 }
 async function invokeSelected(toggle = false) {
   if (opening) return;
@@ -157,7 +206,34 @@ async function restartProjector() {
   }
 }
 function keyPressed(keyval: number, _keycode?: number, modifiers = 0) {
+  const ctrl = (modifiers & Gdk.ModifierType.CONTROL_MASK) !== 0;
+  if (focus.value) {
+    if (keyval === Gdk.KEY_Escape || keyval === Gdk.KEY_Left || keyval === Gdk.KEY_Tab) {
+      model.leave();
+      return true;
+    }
+    if (keyval === Gdk.KEY_Down || keyval === Gdk.KEY_Up) {
+      const count = detailActions.value.length;
+      if (count)
+        detailIndex.value =
+          (detailIndex.value + (keyval === Gdk.KEY_Down ? 1 : -1) + count) % count;
+      return true;
+    }
+    if (keyval === Gdk.KEY_Return || keyval === Gdk.KEY_KP_Enter) {
+      void launchDetail();
+      return true;
+    }
+    return false;
+  }
   if (keyval === Gdk.KEY_Escape) return hide();
+  if (
+    keyval === Gdk.KEY_Tab ||
+    (keyval === Gdk.KEY_Right && entryHasFocus() && caretAtEnd()) ||
+    (ctrl && (keyval === Gdk.KEY_k || keyval === Gdk.KEY_K))
+  ) {
+    void enter();
+    return true;
+  }
   if (keyval === Gdk.KEY_Down || keyval === Gdk.KEY_Up) {
     model.move(keyval === Gdk.KEY_Down ? 1 : -1);
     void nextTick(() => {
@@ -167,18 +243,18 @@ function keyPressed(keyval: number, _keycode?: number, modifiers = 0) {
     return true;
   }
   if (keyval === Gdk.KEY_Return || keyval === Gdk.KEY_KP_Enter) {
-    const focus = windowRef.value?.widget?.getFocus();
-    const entry = entryRef.value?.widget;
+    const current = windowRef.value?.widget?.getFocus();
     const list = listRef.value?.widget;
-    if (
-      (entry && (focus === entry || focus?.isAncestor(entry))) ||
-      (list && (focus === list || focus?.isAncestor(list)))
-    ) {
-      void launch(undefined, (modifiers & Gdk.ModifierType.CONTROL_MASK) !== 0);
+    if (entryHasFocus() || (list && (current === list || current?.isAncestor(list)))) {
+      void launch(undefined, ctrl);
       return true;
     }
   }
   return false;
+}
+function detailActivated(row: RowWidget) {
+  detailIndex.value = row.getIndex();
+  void launchDetail();
 }
 function rowActivated(row: RowWidget) {
   void launch(row.getIndex());
@@ -212,15 +288,43 @@ defineExpose({ show, hide, toggle, invokeSelected, openPage, quitProjector, rest
       :margin-start="16"
       :margin-end="16"
     >
-      <VEntry
-        ref="entryRef"
-        v-model="query"
-        id="projector-search"
-        placeholder-text="Поиск приложений и проектов…"
-        :sensitive="!state.busy"
-        @activate="launch()"
-      />
-      <VScrolledWindow :vexpand="true">
+      <VBox :spacing="8">
+        <VLabel v-if="scopeTitle" class="scope-chip" :valign="3">{{ scopeTitle }}</VLabel>
+        <VEntry
+          ref="entryRef"
+          v-model="query"
+          id="projector-search"
+          :hexpand="true"
+          placeholder-text="Поиск приложений и проектов… (/ проекты, gh/ GitHub)"
+          :sensitive="!state.busy"
+          @activate="focus ? launchDetail() : launch()"
+        />
+      </VBox>
+      <VScrolledWindow v-if="focus" :vexpand="true">
+        <VBox orientation="vertical" :spacing="8">
+          <VLabel :xalign="0" class="heading">← {{ focus.name }}</VLabel>
+          <VListBox
+            selection-mode="single"
+            :activate-on-single-click="true"
+            :selected="detailIndex"
+            :sensitive="!state.busy"
+            @row-activated="detailActivated"
+          >
+            <VListBoxRow v-for="action in detailActions" :key="`${action.id}:${action.arg ?? ''}`">
+              <VLabel :xalign="0">{{ action.title }}</VLabel>
+            </VListBoxRow>
+          </VListBox>
+          <VLabel
+            v-if="failureText"
+            :xalign="0"
+            :wrap="true"
+            :selectable="true"
+            class="monospace failure-text"
+            >{{ failureText }}</VLabel
+          >
+        </VBox>
+      </VScrolledWindow>
+      <VScrolledWindow v-else :vexpand="true">
         <VListBox
           ref="listRef"
           selection-mode="single"
@@ -229,25 +333,33 @@ defineExpose({ show, hide, toggle, invokeSelected, openPage, quitProjector, rest
           :sensitive="!state.busy && !state.loading"
           @row-activated="rowActivated"
         >
-          <VListBoxRow v-for="item in state.items" :key="item.id">
-            <VBox :spacing="12">
-              <VImage v-if="appIcon(item)" :gicon="appIcon(item)" :pixel-size="32" />
-              <VImage
-                v-else
-                :icon-name="
-                  item.kind === 'project'
-                    ? 'folder'
-                    : item.kind === 'github'
-                      ? 'folder-remote'
-                      : 'application-x-executable'
-                "
-                :pixel-size="32"
-              />
-              <VBox orientation="vertical" :spacing="2" :hexpand="true">
-                <VLabel :xalign="0">{{ item.name }}</VLabel>
-                <VLabel :xalign="0" ellipsize="end" :max-width-chars="56" class="dim-label">{{
-                  rowHint(item)
-                }}</VLabel>
+          <VListBoxRow v-for="(item, index) in state.items" :key="item.id">
+            <VBox orientation="vertical" :spacing="4">
+              <VLabel
+                v-if="sectionTitle(item, index)"
+                :xalign="0"
+                class="dim-label section-title"
+                >{{ sectionTitle(item, index) }}</VLabel
+              >
+              <VBox :spacing="12">
+                <VImage v-if="appIcon(item)" :gicon="appIcon(item)" :pixel-size="32" />
+                <VImage
+                  v-else
+                  :icon-name="
+                    item.kind === 'project'
+                      ? 'folder'
+                      : item.kind === 'github'
+                        ? 'folder-remote'
+                        : 'application-x-executable'
+                  "
+                  :pixel-size="32"
+                />
+                <VBox orientation="vertical" :spacing="2" :hexpand="true">
+                  <VLabel :xalign="0">{{ itemTitle(item) }}</VLabel>
+                  <VLabel :xalign="0" ellipsize="end" :max-width-chars="56" class="dim-label">{{
+                    rowHint(item)
+                  }}</VLabel>
+                </VBox>
               </VBox>
             </VBox>
           </VListBoxRow>
@@ -255,9 +367,11 @@ defineExpose({ show, hide, toggle, invokeSelected, openPage, quitProjector, rest
       </VScrolledWindow>
       <VLabel :xalign="0" :wrap="true" class="dim-label">{{ status }}</VLabel>
       <VBox :spacing="12">
-        <VLabel :xalign="0" :hexpand="true" class="dim-label"
-          >↑↓ выбрать Enter основное действие Ctrl+Enter второе Esc закрыть</VLabel
-        >
+        <VLabel :xalign="0" :hexpand="true" class="dim-label">{{
+          focus
+            ? "↑↓ выбрать Enter выполнить ← назад"
+            : "↑↓ выбрать Enter основное Ctrl+Enter второе → все действия Esc закрыть"
+        }}</VLabel>
         <VButton
           class="flat"
           @clicked="
@@ -282,5 +396,20 @@ list row {
 }
 list {
   background: transparent;
+}
+.scope-chip {
+  padding: 0 10px;
+  border-radius: 6px;
+  background-color: alpha(currentColor, 0.12);
+}
+.section-title {
+  font-size: 11px;
+  font-weight: bold;
+}
+.failure-text {
+  padding: 10px;
+  border-radius: 6px;
+  background-color: alpha(currentColor, 0.08);
+  font-size: 12px;
 }
 </style>
