@@ -29,6 +29,8 @@ export interface EntryWidget extends Widget {
   setText(text: string): void;
   /** Позиция курсора в символах (`Gtk.Editable`). */
   getPosition(): number;
+  /** `-1` — в конец текста; снимает выделение. */
+  setPosition(position: number): void;
 }
 export interface RowWidget extends Widget {
   getIndex(): number;

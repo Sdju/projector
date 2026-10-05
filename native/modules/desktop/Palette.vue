@@ -196,12 +196,23 @@ async function launch(index = state.value.selected, secondary = false) {
   const action = item?.actions?.[secondary ? 1 : 0];
   if (!action) return;
   if (await model.launch(item, action)) hide();
-  else entryRef.value?.widget?.grabFocus();
+  else focusEntryAtEnd();
+}
+/** `grabFocus` selects the whole text; put the caret back at the end so typing continues. */
+function focusEntryAtEnd() {
+  const entry = entryRef.value?.widget;
+  if (!entry) return;
+  entry.grabFocus();
+  entry.setPosition(-1);
 }
 async function pin(item: LaunchItem | undefined) {
   if (!item || item.kind === "github") return;
   // Pinning keeps the palette and the open card in place; only the lists change.
-  if (await model.launch(item, { id: "favorite", title: "" })) await model.refresh();
+  const ok = await model.launch(item, { id: "favorite", title: "" });
+  if (ok) await model.refresh();
+  // The entry is insensitive while the action runs and loses its caret.
+  await nextTick();
+  focusEntryAtEnd();
 }
 async function launchDetail() {
   const item = state.value.focus;
@@ -214,7 +225,7 @@ async function launchDetail() {
   if (await model.launch(item, action)) {
     model.leave();
     hide();
-  } else entryRef.value?.widget?.grabFocus();
+  } else focusEntryAtEnd();
 }
 async function enter() {
   if (!state.value.items.length) return;
