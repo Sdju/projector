@@ -10,6 +10,7 @@ import {
   fetchProjects,
   inspectPath,
   resolveProject,
+  restoreProjectDirectory,
   updateProject,
 } from "../api/client.ts";
 import type { ProcessSnapshot, Project, ProjectDraft } from "./types.ts";
@@ -91,8 +92,18 @@ export function useProjects() {
     else state.projects[index] = project;
   }
 
-  async function openPath(path: string): Promise<Project> {
+  /** `missing` — the project is saved but its folder no longer exists. */
+  async function openPath(path: string): Promise<{ project: Project; missing: boolean }> {
     const data = await resolveProject(path);
+    ingest(data.project);
+    return { project: data.project, missing: data.missing === true };
+  }
+
+  async function restoreDirectory(
+    id: string,
+    body: Parameters<typeof restoreProjectDirectory>[1],
+  ): Promise<Project> {
+    const data = await restoreProjectDirectory(id, body);
     ingest(data.project);
     return data.project;
   }
@@ -110,6 +121,7 @@ export function useProjects() {
     applyRuntime,
     ingest,
     openPath,
+    restoreDirectory,
   };
 }
 

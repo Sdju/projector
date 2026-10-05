@@ -222,6 +222,17 @@ Commands: `ide.project.settings.get`, `ide.project.settings.update` (`name`, `ic
 `catalog.save` as the settings form, and are unavailable while the open settings tab has unsaved edits.
 The chat agent uses them instead of editing Projector data files.
 
+## Missing project folder
+
+When a saved project's folder no longer exists, its page shows a recovery view instead of the workspace
+and registers scope `project:missing` with `{ surface: 'project-missing', projectId, path }`.
+Commands: `ide.project.directory.create` recreates the folder at the saved path and
+`ide.project.directory.relocate` (`path`, optional `create`) moves the project to another folder
+(`create: true` creates it first). The server side is `POST /api/projects/<id>/directory` with
+`{ mode: 'create' }` or `{ mode: 'relocate', path, create? }`; `POST /api/projects/resolve` reports
+`missing: true` for such a project. Relocating stops the project's processes and closes its terminals,
+and refuses a path already used by another project.
+
 ## Projector chat agent
 
 `ide.workbench.agent.open` opens a single virtual **Агент** tab beside files.

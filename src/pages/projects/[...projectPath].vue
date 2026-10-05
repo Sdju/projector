@@ -2,7 +2,12 @@
 import { computed, h, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useProjects, projectPathFromParams, projectRoute } from "../../modules/project/index.ts";
-import { ProjectSettings, useProjectCommands } from "../../modules/catalog/index.ts";
+import type { Project } from "../../modules/project/index.ts";
+import {
+  ProjectMissing,
+  ProjectSettings,
+  useProjectCommands,
+} from "../../modules/catalog/index.ts";
 import { RunControls, useRunner } from "../../modules/runner/index.ts";
 import { DevcontainerTrust } from "../../modules/devcontainer/index.ts";
 import { ProjectWorkspace, type TabViews } from "../../modules/workspace/index.ts";
@@ -35,6 +40,7 @@ const tabViews: TabViews = {
 };
 
 const projectId = ref("");
+const missing = ref(false);
 const opening = ref(false);
 const openError = ref("");
 const project = computed(() => projects.value.find((item) => item.id === projectId.value));
@@ -43,20 +49,28 @@ useProjectCommands(
   () => settingsDirty.value,
 );
 
+const reload = ref(0);
+function restored(item: Project) {
+  const canonical = projectRoute(item.path);
+  if (route.path === canonical) reload.value++;
+  else void router.replace(canonical);
+}
 watch(
-  () => projectPathFromParams(route.params.projectPath),
-  async (path, _, onCleanup) => {
+  () => [projectPathFromParams(route.params.projectPath), reload.value] as const,
+  async ([path], _, onCleanup) => {
     let active = true;
     onCleanup(() => {
       active = false;
     });
     projectId.value = "";
+    missing.value = false;
     openError.value = "";
     opening.value = true;
     try {
-      const item = await openPath(path);
+      const { project: item, missing: gone } = await openPath(path);
       if (active) {
         projectId.value = item.id;
+        missing.value = gone;
         const canonical = projectRoute(item.path);
         if (route.path !== canonical) await router.replace(canonical);
       }
@@ -72,7 +86,15 @@ watch(
 </script>
 
 <template>
-  <section v-if="project" class="project-page">
+  <section v-if="project && missing" class="project-page">
+    <ProjectMissing
+      :key="project.id"
+      :project="project"
+      @restored="restored"
+      @removed="router.push('/projects')"
+    />
+  </section>
+  <section v-else-if="project" class="project-page">
     <DevcontainerTrust :key="`${project.id}:${project.path}`" :project-id="project.id" />
     <ProjectWorkspace
       :key="`${project.id}:${project.path}`"

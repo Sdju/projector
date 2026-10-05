@@ -1,6 +1,9 @@
+import { mkdir, stat } from "node:fs/promises";
 import { getSnapshot, startProject, stopProject } from "../../../../modules/processes/index.ts";
 import {
+  loadProjects,
   findProject,
+  expandPath,
   updateProjects,
   resolveProjectIcon,
 } from "../../../../modules/projects/index.ts";
@@ -65,6 +68,45 @@ export async function handleProjectActions({
         if (currentIndex !== -1) current.splice(currentIndex, 1);
       });
       json(res, 200, { ok: true });
+      return true;
+    }
+
+    // Recovery of a project whose folder is gone: recreate it or point the project elsewhere.
+    if (action === "directory" && method === "POST") {
+      const body = await readBody(req);
+      const isDirectory = (dir: string) =>
+        stat(dir).then(
+          (info) => info.isDirectory(),
+          () => false,
+        );
+      const mode = asString(body.mode);
+      if (mode !== "create" && mode !== "relocate")
+        throw new HttpError(400, "mode: create или relocate");
+      const target = expandPath(mode === "create" ? project.path : asString(body.path));
+      if (mode === "relocate" && !asString(body.path).trim())
+        throw new HttpError(400, "Укажите новый путь");
+      if (mode === "relocate" && !(await isDirectory(target))) {
+        if (body.create !== true) throw new HttpError(400, "Папка не найдена");
+      }
+      if (!(await isDirectory(target))) {
+        const existing = await stat(target).catch(() => null);
+        if (existing) throw new HttpError(400, "Путь занят файлом");
+        await mkdir(target, { recursive: true });
+      }
+      if (mode === "relocate" && target !== expandPath(project.path)) {
+        const duplicate = (await loadProjects()).find(
+          (item) => item.id !== id && expandPath(item.path) === target,
+        );
+        if (duplicate) throw new HttpError(409, `Путь уже занят проектом «${duplicate.name}»`);
+        stopProject(id);
+        closeProjectTerminals(id);
+        await updateProjects((current) => {
+          const item = current.find((entry) => entry.id === id);
+          if (!item) throw new HttpError(404, "Проект не найден");
+          item.path = target;
+        });
+      }
+      json(res, 200, { project: withRuntime({ ...project, path: target }) });
       return true;
     }
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:http";
@@ -125,6 +125,93 @@ test("opening a path reuses saved settings and resolves arbitrary directories on
     assert.equal((await resolve(join(root, "missing"))).status, 400);
     assert.equal((await resolve("")).status, 400);
     assert.equal((await loadProjects()).length, 3);
+  } finally {
+    server.closeAllConnections();
+    await new Promise((done) => server.close(done));
+    if (previousDataHome === undefined) delete process.env.XDG_DATA_HOME;
+    else process.env.XDG_DATA_HOME = previousDataHome;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a project whose folder disappeared can recreate it or move to a new path", async () => {
+  const root = await mkdtemp(join(tmpdir(), "projector-missing-"));
+  const previousDataHome = process.env.XDG_DATA_HOME;
+  process.env.XDG_DATA_HOME = root;
+  const { handleApi } = await import("../server/app/api.ts");
+  const { loadProjects } = await import("../server/modules/projects/index.ts");
+  const server = createServer((req, res) => {
+    void handleApi(req, res).then((handled) => {
+      if (!handled) res.writeHead(404).end();
+    });
+  });
+  try {
+    const gone = join(root, "gone");
+    const other = join(root, "other");
+    await mkdir(join(root, "projector"));
+    await mkdir(other);
+    const entry = (id, path) => ({
+      id,
+      name: id,
+      path,
+      url: "",
+      commands: [{ id: "c", name: "dev", cmd: "true" }],
+      defaultCommandId: "c",
+      mode: "server",
+      createdAt: "",
+    });
+    await writeFile(
+      join(root, "projector", "projects.json"),
+      JSON.stringify({ projects: [entry("gone-id", gone), entry("other-id", other)] }),
+    );
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const post = (url, body) =>
+      fetch(`${base}${url}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    const resolved = await (await post("/api/projects/resolve", { path: gone })).json();
+    assert.equal(resolved.project.id, "gone-id");
+    assert.equal(resolved.missing, true);
+    assert.equal(
+      (await (await post("/api/projects/resolve", { path: other })).json()).missing,
+      false,
+    );
+
+    assert.equal((await post("/api/projects/gone-id/directory", { mode: "bogus" })).status, 400);
+    assert.equal((await post("/api/projects/gone-id/directory", { mode: "create" })).status, 200);
+    assert.equal((await stat(gone)).isDirectory(), true);
+    assert.equal(
+      (await (await post("/api/projects/resolve", { path: gone })).json()).missing,
+      false,
+    );
+
+    await rm(gone, { recursive: true });
+    const target = join(root, "moved", "deep");
+    assert.equal(
+      (await post("/api/projects/gone-id/directory", { mode: "relocate", path: target })).status,
+      400,
+    );
+    assert.equal(
+      (await post("/api/projects/gone-id/directory", { mode: "relocate", path: "" })).status,
+      400,
+    );
+    assert.equal(
+      (await post("/api/projects/gone-id/directory", { mode: "relocate", path: other })).status,
+      409,
+    );
+    const moved = await post("/api/projects/gone-id/directory", {
+      mode: "relocate",
+      path: target,
+      create: true,
+    });
+    assert.equal(moved.status, 200);
+    assert.equal((await moved.json()).project.path, target);
+    assert.equal((await stat(target)).isDirectory(), true);
+    assert.equal((await loadProjects()).find((item) => item.id === "gone-id").path, target);
   } finally {
     server.closeAllConnections();
     await new Promise((done) => server.close(done));

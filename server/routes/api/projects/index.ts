@@ -1,3 +1,4 @@
+import { stat } from "node:fs/promises";
 import {
   loadProjects,
   updateProjects,
@@ -25,7 +26,12 @@ export async function handleProjectsIndex({
     const directory = expandPath(body.path);
     const existing = (await loadProjects()).find((item) => expandPath(item.path) === directory);
     if (existing) {
-      json(res, 200, { project: withRuntime({ ...existing, path: directory }) });
+      // A saved project outlives its folder: report it so the UI can offer recovery.
+      const missing = !(await stat(directory).then(
+        (info) => info.isDirectory(),
+        () => false,
+      ));
+      json(res, 200, { project: withRuntime({ ...existing, path: directory }), missing });
       return true;
     }
     const draft = await inspectProject(directory, true);

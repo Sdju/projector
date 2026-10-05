@@ -15,8 +15,16 @@ export function fetchProjects(): Promise<{ projects: Project[] }> {
   return request("/api/projects");
 }
 
-export function resolveProject(path: string): Promise<{ project: Project }> {
+export function resolveProject(path: string): Promise<{ project: Project; missing?: boolean }> {
   return request("/api/projects/resolve", { method: "POST", body: JSON.stringify({ path }) });
+}
+
+/** Recreates the folder (`create`) or moves the project to `path` (`relocate`, optionally creating it). */
+export function restoreProjectDirectory(
+  id: string,
+  body: { mode: "create" } | { mode: "relocate"; path: string; create?: boolean },
+): Promise<{ project: Project }> {
+  return request(`/api/projects/${id}/directory`, { method: "POST", body: JSON.stringify(body) });
 }
 
 export function fetchProject(id: string): Promise<{ project: Project }> {
