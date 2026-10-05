@@ -1,4 +1,4 @@
-import type { Keybinding, KeyStroke } from "./commands.ts";
+import { shortcutKey, type Keybinding, type KeyStroke } from "./commands.ts";
 
 // Replacing one row must preserve the command's other bindings and all other commands.
 export function editKeybinding(
@@ -30,12 +30,13 @@ export function recordedKey(event: KeyStroke): string | undefined {
     ["Control", "Meta", "Alt", "Shift", "Dead", "Unidentified", "+"].includes(event.key)
   )
     return;
+  const key = shortcutKey(event);
   return [
     event.ctrlKey && "Ctrl",
     event.metaKey && "Meta",
     event.altKey && "Alt",
     event.shiftKey && "Shift",
-    event.key === " " ? "Space" : event.key.length === 1 ? event.key.toUpperCase() : event.key,
+    key === " " ? "Space" : key.length === 1 ? key.toUpperCase() : key,
   ]
     .filter(Boolean)
     .join("+");

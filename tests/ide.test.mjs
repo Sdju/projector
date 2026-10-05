@@ -186,6 +186,9 @@ test("declarative overrides replace defaults, support contexts and unbinding, an
   assert.equal(calls, 0, "Resolution and menu availability must not execute commands");
   assert.ok(matchesKey("Mod+S", { key: "s", ctrlKey: true }));
   assert.ok(matchesKey("Mod+S", { key: "s", metaKey: true }));
+  assert.ok(matchesKey("Mod+S", { key: "ы", code: "KeyS", ctrlKey: true }));
+  assert.ok(matchesKey("Mod+Shift+P", { key: "З", code: "KeyP", ctrlKey: true, shiftKey: true }));
+  assert.ok(!matchesKey("Mod+S", { key: "ы", code: "KeyA", ctrlKey: true }));
   assert.ok(!matchesKey("Mod+S", { key: "s", ctrlKey: true, altKey: true }));
   const editor = sdk.createScope("editor", () => ({ surface: "editor" }));
   editor.registerCommand({ id: "ide.editor.file.save", title: "Save", run: () => {} });
@@ -314,10 +317,16 @@ test("shortcut recorder ignores modifiers, composition and repeats, and recorded
   assert.equal(recordedKey({ key: "F6", repeat: true }), undefined);
   assert.equal(recordedKey({ key: "Dead" }), undefined);
   assert.equal(recordedKey({ key: "+", shiftKey: true }), undefined);
+  assert.equal(recordedKey({ key: "ы", code: "KeyS", ctrlKey: true }), "Ctrl+S");
+  assert.equal(
+    recordedKey({ key: "З", code: "KeyP", ctrlKey: true, shiftKey: true }),
+    "Ctrl+Shift+P",
+  );
   for (const event of [
     { key: "s", ctrlKey: true, shiftKey: true },
     { key: "F6" },
     { key: " ", altKey: true },
+    { key: "ы", code: "KeyS", ctrlKey: true },
   ]) {
     const key = recordedKey(event);
     assert.equal(matchesKey(parseKeybindings([{ command: "test", key }])[0].key, event), true);

@@ -11,6 +11,7 @@ import {
   settingsError,
 } from "../../project/index.ts";
 import type { Project, ProjectCommand } from "../../project/index.ts";
+import { shortcutKey } from "../../../../core/modules/ide/index.ts";
 import IconPlus from "~icons/lucide/plus";
 import IconTrash from "~icons/lucide/trash-2";
 
@@ -143,7 +144,7 @@ async function remove() {
   }
 }
 function saveKey(event: KeyboardEvent) {
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+  if ((event.ctrlKey || event.metaKey) && shortcutKey(event) === "s") {
     event.preventDefault();
     event.stopPropagation();
     void save();

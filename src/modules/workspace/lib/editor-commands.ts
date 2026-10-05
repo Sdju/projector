@@ -1,4 +1,5 @@
 import type { Ref } from "vue";
+import { shortcutKey } from "../../../../core/modules/ide/index.ts";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import { commandArgs, type useCommandScope } from "../../../common/utilities/commands.ts";
 import { copyWithNotice } from "../../../common/utilities/notice.ts";
@@ -112,7 +113,7 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
       );
   function editorKeydown(event: KeyboardEvent) {
     const save = ctx.tabTypes.behaviorOf(active()?.virtual)?.save;
-    if (save && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+    if (save && (event.ctrlKey || event.metaKey) && shortcutKey(event) === "s") {
       event.preventDefault();
       event.stopPropagation();
       void save();

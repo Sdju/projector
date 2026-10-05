@@ -12,12 +12,36 @@ export interface Keybinding {
 }
 export interface KeyStroke {
   key: string;
+  /** Физическая клавиша (`KeyboardEvent.code`); буква не зависит от раскладки. */
+  code?: string;
   ctrlKey?: boolean;
   metaKey?: boolean;
   altKey?: boolean;
   shiftKey?: boolean;
   isComposing?: boolean;
   repeat?: boolean;
+}
+const punctuationByCode: Record<string, string> = {
+  Space: " ",
+  Minus: "-",
+  Equal: "=",
+  BracketLeft: "[",
+  BracketRight: "]",
+  Backslash: "\\",
+  Semicolon: ";",
+  Quote: "'",
+  Backquote: "`",
+  Comma: ",",
+  Period: ".",
+  Slash: "/",
+  IntlBackslash: "\\",
+};
+/** Буква, цифра и знак — по позиции клавиши US QWERTY. Enter, F2 и стрелки остаются `event.key`. */
+export function shortcutKey(event: KeyStroke): string {
+  const code = event.code ?? "";
+  if (/^Key[A-Z]$/.test(code)) return code.slice(3).toLowerCase();
+  if (/^Digit[0-9]$/.test(code)) return code.slice(5);
+  return punctuationByCode[code] ?? event.key;
 }
 export interface CommandRegistration {
   description?: string;
@@ -44,9 +68,10 @@ export function matchesContext(when: CommandContext | undefined, context: Comman
 export function matchesKey(key: string, event: KeyStroke) {
   const parts = key.toLowerCase().split("+");
   const name = parts.pop();
+  const pressed = shortcutKey(event);
   const mod = parts.includes("mod");
   return (
-    (name === event.key.toLowerCase() || (name === "space" && event.key === " ")) &&
+    (name === pressed.toLowerCase() || (name === "space" && pressed === " ")) &&
     (mod ? !!(event.ctrlKey || event.metaKey) : !!event.ctrlKey === parts.includes("ctrl")) &&
     (mod ? !(event.ctrlKey && event.metaKey) : !!event.metaKey === parts.includes("meta")) &&
     !!event.altKey === parts.includes("alt") &&

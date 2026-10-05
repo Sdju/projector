@@ -78,7 +78,7 @@ await ide.saveKeybindings([
 
 An override replaces all default bindings of its command. Multiple overrides can bind that command in different contexts. Use `{ command, key, disabled: true }` to unbind it. The last applicable rule wins a key collision. `when` is an object of exact context-key matches, not a JavaScript expression or the VS Code expression language. `args` passes arguments to the handler.
 
-Keys support `Mod`, `Ctrl`, `Meta`, `Alt`, `Shift` and a `KeyboardEvent.key` name. `Mod` matches Ctrl or Meta. Extra modifiers prevent a match. Business shortcuts ignore composing/repeated events and text input by default; a rule must explicitly set `allowInput: true` for editing surfaces. Tab-rename and file-name inputs therefore keep normal text editing. Platform editor formatting and navigation remain with their editors.
+Keys support `Mod`, `Ctrl`, `Meta`, `Alt`, `Shift` and a key name. `Mod` matches Ctrl or Meta. Extra modifiers prevent a match. Letter, digit and punctuation chords follow the physical key (`KeyboardEvent.code`, the US QWERTY position), so Ctrl+S is the same key on any layout. Named keys such as Enter, F2 and the arrows use `KeyboardEvent.key`. Business shortcuts ignore composing/repeated events and text input by default; a rule must explicitly set `allowInput: true` for editing surfaces. Tab-rename and file-name inputs therefore keep normal text editing. Platform editor formatting and navigation remain with their editors.
 
 The settings endpoint is `GET /api/ide/keybindings` and same-origin `PUT /api/ide/keybindings` with `{ bindings: [...] }`. GET also returns the settings path. No localStorage is used.
 

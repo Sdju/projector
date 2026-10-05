@@ -1,4 +1,5 @@
 import { selectTreeRange, type createTreeSelection } from "./tree-selection.ts";
+import { shortcutKey } from "../../../../../../core/modules/ide/index.ts";
 import { parentPath } from "../../../../../../core/modules/workspace/index.ts";
 import type { FileEntry } from "../../../../../../core/modules/workspace/index.ts";
 import type { Ref } from "vue";
@@ -46,7 +47,7 @@ export function useTreeKeyboard({
       return;
     }
     const mod = event.ctrlKey || event.metaKey;
-    if (mod && event.key.toLowerCase() === "a") {
+    if (mod && shortcutKey(event) === "a") {
       event.preventDefault();
       const rows = visibleRows();
       selection.paths.value = new Set(rows.map((row) => row.dataset.path!));

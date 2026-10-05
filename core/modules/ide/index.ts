@@ -1,4 +1,10 @@
-export { createCommandService, parseKeybindings, matchesKey, matchesContext } from "./commands.ts";
+export {
+  createCommandService,
+  parseKeybindings,
+  matchesKey,
+  matchesContext,
+  shortcutKey,
+} from "./commands.ts";
 export type {
   CommandContext,
   CommandInfo,
