@@ -153,6 +153,26 @@ await test("query prefixes choose the search scope", async () => {
   assert.deepEqual(parseLaunchQuery("gh/own/repo"), { scope: "github", text: "own/repo" });
   assert.deepEqual(parseLaunchQuery("GH/"), { scope: "github", text: "" });
   assert.deepEqual(parseLaunchQuery("ghost"), { scope: "all", text: "ghost" });
+  // A github.com link is the same as gh/owner/repo.
+  const github = (text) => ({ scope: "github", text });
+  assert.deepEqual(parseLaunchQuery("https://github.com/Sdju/bapm"), github("Sdju/bapm"));
+  assert.deepEqual(parseLaunchQuery("  http://www.GitHub.com/Sdju/bapm.git"), github("Sdju/bapm"));
+  assert.deepEqual(
+    parseLaunchQuery("https://github.com/Sdju/bapm/tree/main?tab=x#top"),
+    github("Sdju/bapm"),
+  );
+  assert.deepEqual(parseLaunchQuery("https://github.com/Sdju/"), github("Sdju/"));
+  assert.deepEqual(parseLaunchQuery("https://github.com/Sdju"), github("Sdju/"));
+  assert.deepEqual(parseLaunchQuery("https://github.com/"), github(""));
+  assert.deepEqual(parseLaunchQuery("https://github.com"), github(""));
+  assert.deepEqual(parseLaunchQuery("https://github.community/x"), {
+    scope: "all",
+    text: "https://github.community/x",
+  });
+  assert.deepEqual(parseLaunchQuery("https://example.com/Sdju/bapm"), {
+    scope: "all",
+    text: "https://example.com/Sdju/bapm",
+  });
 });
 
 await test("process events refresh the list and the open card without moving the selection", async () => {
