@@ -59,6 +59,15 @@ const failure = computed(() => state.value.detail?.failure);
 const detailIndex = ref(0);
 const scope = computed(() => parseLaunchQuery(state.value.query).scope);
 const scopeTitle = computed(() => (scope.value === "all" ? "" : launchScopeTitles[scope.value]));
+const infoText = computed(() => {
+  const value = state.value.detail?.info;
+  if (!value) return "";
+  const marks = { idle: "○", starting: "●", running: "●", stopping: "◐", error: "✖" } as const;
+  const parts = [value.stateLabel, value.command, value.url].filter(Boolean);
+  return [value.path, `${marks[value.state]} ${parts.join(" · ")}`, value.docker]
+    .filter(Boolean)
+    .join("\n");
+});
 const failureText = computed(() => {
   const value = failure.value;
   if (!value) return "";
@@ -86,7 +95,8 @@ function appIcon(item: LaunchItem) {
   return icons.get(item.id);
 }
 function itemTitle(item: LaunchItem) {
-  return item.status ? `${item.status.state === "error" ? "✖" : "●"} ${item.name}` : item.name;
+  const marks = { running: "●", starting: "●", stopping: "◐", error: "✖" } as const;
+  return item.status ? `${marks[item.status.state]} ${item.name}` : item.name;
 }
 function sectionTitle(item: LaunchItem, index: number) {
   return item.section && item.section !== state.value.items[index - 1]?.section
@@ -101,6 +111,7 @@ function rowHint(item: LaunchItem) {
 }
 async function show() {
   clearTimeout(blurTimer);
+  model.live(true);
   model.setQuery("");
   await nextTick();
   const window = windowRef.value!.widget!;
@@ -112,6 +123,7 @@ async function show() {
 }
 function hide() {
   clearTimeout(blurTimer);
+  model.live(false);
   windowRef.value?.widget?.hide();
   return true;
 }
@@ -303,6 +315,9 @@ defineExpose({ show, hide, toggle, invokeSelected, openPage, quitProjector, rest
       <VScrolledWindow v-if="focus" :vexpand="true">
         <VBox orientation="vertical" :spacing="8">
           <VLabel :xalign="0" class="heading">← {{ focus.name }}</VLabel>
+          <VLabel v-if="infoText" :xalign="0" :wrap="true" class="dim-label info-text">{{
+            infoText
+          }}</VLabel>
           <VListBox
             selection-mode="single"
             :activate-on-single-click="true"
@@ -405,6 +420,9 @@ list {
 .section-title {
   font-size: 11px;
   font-weight: bold;
+}
+.info-text {
+  font-size: 12px;
 }
 .failure-text {
   padding: 10px;

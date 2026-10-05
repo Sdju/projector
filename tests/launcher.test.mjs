@@ -222,9 +222,22 @@ if (process.argv.includes("--prepare")) {
         ["open", undefined],
         ["run", "boom"],
         ["run", "other"],
+        ["window", "boom"],
       ],
     );
     assert.equal(idleDetail.failure, undefined);
+    assert.equal(idleDetail.info.state, "idle");
+    assert.equal(idleDetail.info.docker, undefined);
+    assert.ok(idleDetail.info.path.length > 0);
+    assert.equal(
+      (
+        await request("/api/launcher/launch", "POST", {
+          id: "project:fail-project",
+          action: "browser",
+        })
+      ).status,
+      400,
+    );
     assert.equal(
       (
         await request("/api/launcher/launch", "POST", {
@@ -242,6 +255,9 @@ if (process.argv.includes("--prepare")) {
     assert.equal(getSnapshot("fail-project").commandId, "boom");
     const failed = await (await request("/api/launcher/detail?id=project%3Afail-project")).json();
     assert.equal(failed.failure.exitCode, 3);
+    assert.equal(failed.info.state, "error");
+    assert.equal(failed.info.stateLabel, "ошибка запуска");
+    assert.equal(failed.info.command, "boom");
     assert.equal(failed.failure.command, "boom");
     assert.match(failed.failure.output, /boom-output/);
     assert.equal((await searchLauncher("Failing workspace")).items[0].status.state, "error");

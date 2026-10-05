@@ -3,6 +3,7 @@ export type {
   LaunchAction,
   LaunchActionId,
   LaunchDetail,
+  LaunchInfo,
   LaunchItem,
   LaunchResult,
   LaunchSection,

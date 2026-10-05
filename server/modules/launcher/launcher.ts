@@ -2,22 +2,20 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { os } from "../../../core/modules/os/index.ts";
 import { loadProjects } from "../projects/index.ts";
-import { getSnapshot, processOutput, startProject, stopProject } from "../processes/index.ts";
+import { getSnapshot, startProject, stopProject } from "../processes/index.ts";
 import { openBrowser, openWindow } from "../window/index.ts";
 import { desktopArgs } from "../window/index.ts";
 import type {
   LaunchActionId,
-  LaunchDetail,
   LaunchItem,
   LaunchResult,
   LaunchSection,
 } from "../../../core/modules/launcher/index.ts";
 import { parseLaunchQuery } from "../../../core/modules/launcher/index.ts";
+import { projectItem, workspaceRoute } from "./project-entries.ts";
 import { searchGithubRepositories } from "../integrations/index.ts";
-import { appUrl } from "../../../core/modules/app-paths/index.ts";
+import { appUrl, projectAppUrl } from "../../../core/modules/app-paths/index.ts";
 import { githubProjectRoute } from "../../../core/modules/github/index.ts";
-import { parseProjectRef, pathToUrlSegments } from "../../../core/modules/project/index.ts";
-import type { Project } from "../../../core/modules/project/index.ts";
 export {
   shortcuts,
   type LaunchItem,
@@ -107,47 +105,6 @@ export function matchScore(item: LaunchItem, query: string): number {
     }
   }
   return score;
-}
-
-/** Mirrors the client `projectRoute`: the workspace URL of a project path. */
-export function workspaceRoute(path: string): string {
-  const ref = parseProjectRef(path);
-  if (ref.kind === "github") return githubProjectRoute(ref.repository);
-  const segments = pathToUrlSegments(path).map((segment) =>
-    encodeURIComponent(segment).replaceAll("%3A", ":"),
-  );
-  return `/projects/${segments.length ? segments.join("/") : "%2F"}`;
-}
-
-function projectItem(project: Project): LaunchItem {
-  const command = project.commands.find((c) => c.id === project.defaultCommandId);
-  const state = getSnapshot(project.id).status;
-  const running = state === "running" || state === "starting";
-  return {
-    id: `project:${project.id}`,
-    name: project.name,
-    kind: "project",
-    description: `проект · ${running ? "работает" : state === "error" ? "ошибка запуска" : (command?.name ?? "без команды")}`,
-    status: running
-      ? { state, label: state === "starting" ? "запускается" : "работает" }
-      : state === "error"
-        ? { state, label: "ошибка запуска" }
-        : undefined,
-    keywords: project.path,
-    icon: `/api/projects/${encodeURIComponent(project.id)}/icon`,
-    actions: [
-      { id: "open", title: "Открыть" },
-      ...(command || running
-        ? [
-            {
-              id: "run" as const,
-              title: running ? "Открыть запущенный" : `Запустить ${command!.name}`,
-            },
-          ]
-        : []),
-      ...(running ? [{ id: "stop" as const, title: "Остановить" }] : []),
-    ],
-  };
 }
 
 async function searchGithub(text: string): Promise<{ items: LaunchItem[]; warning?: string }> {
@@ -251,43 +208,6 @@ function browse(
 }
 
 /** All actions of one result and, for a failed project, the tail of its terminal. */
-export async function launchDetail(id: string): Promise<LaunchDetail> {
-  if (!id.startsWith("project:")) {
-    if (id.startsWith("gh:")) return { actions: [{ id: "open", title: "Открыть репозиторий" }] };
-    return { actions: [{ id: "launch", title: "Запустить" }] };
-  }
-  const project = (await loadProjects()).find((p) => `project:${p.id}` === id);
-  if (!project) throw new Error("Проект не найден");
-  const runtime = getSnapshot(project.id);
-  const running = runtime.status === "running" || runtime.status === "starting";
-  const commands = [
-    ...project.commands.filter((command) => command.id === project.defaultCommandId),
-    ...project.commands.filter((command) => command.id !== project.defaultCommandId),
-  ];
-  const detail: LaunchDetail = {
-    actions: [
-      { id: "open", title: "Открыть воркспейс" },
-      ...(running
-        ? [
-            { id: "run" as const, title: "Открыть запущенный" },
-            { id: "stop" as const, title: "Остановить" },
-          ]
-        : commands.map((command) => ({
-            id: "run" as const,
-            title: `Запустить ${command.name}`,
-            arg: command.id,
-          }))),
-    ],
-  };
-  if (runtime.status === "error")
-    detail.failure = {
-      command: runtime.commandName ?? "команда",
-      exitCode: runtime.exitCode,
-      output: processOutput(project.id) ?? "",
-    };
-  return detail;
-}
-
 /** Without an explicit action the item's primary action runs. */
 export async function launchItem(
   id: string,
@@ -315,6 +235,22 @@ export async function launchItem(
     if (action === "launch") throw new Error("Для проекта доступны открытие, запуск и остановка");
     if (action === "stop") {
       stopProject(project.id);
+      return result;
+    }
+    const current = getSnapshot(project.id);
+    const alive = current.status === "running" || current.status === "starting";
+    if (action === "browser" || action === "window") {
+      if (alive) {
+        const url = current.url || project.url;
+        if (!url) throw new Error("Проект запускается; адрес пока недоступен");
+        if (action === "window") openWindow(projectAppUrl(project.id));
+        else openBrowser(url);
+      } else if (action === "window") startProject(project, arg || undefined, "window");
+      else throw new Error("Проект не запущен");
+      await updatePreferences((value) => {
+        const usage = value.usage[id];
+        value.usage[id] = { count: (usage?.count ?? 0) + 1, last: Date.now() };
+      });
       return result;
     }
     if (action !== "run") {

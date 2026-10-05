@@ -1,4 +1,10 @@
-import type { LaunchAction, LaunchActionId, LaunchDetail, LaunchItem, LauncherClient } from "./launcher.ts";
+import type {
+  LaunchAction,
+  LaunchActionId,
+  LaunchDetail,
+  LaunchItem,
+  LauncherClient,
+} from "./launcher.ts";
 
 export interface LauncherState {
   query: string;
@@ -18,7 +24,10 @@ export interface LauncherState {
 }
 
 /** UI-independent search, selection and launch state shared by GTK and Vue. */
-export function createLauncherModel(client: Pick<LauncherClient, "search" | "launch" | "detail">) {
+export function createLauncherModel(
+  client: Pick<LauncherClient, "search" | "launch" | "detail"> &
+    Partial<Pick<LauncherClient, "subscribe">>,
+) {
   const state: LauncherState = {
     query: "",
     focus: null,
@@ -85,6 +94,32 @@ export function createLauncherModel(client: Pick<LauncherClient, "search" | "lau
     }
   }
 
+  let stopEvents: (() => void) | undefined;
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Quiet reload after a process event: keeps the selected row and the open card. */
+  async function refresh() {
+    if (disposed || state.busy || state.loading) return;
+    const selectedId = state.items[state.selected]?.id;
+    const focused = state.focus;
+    await search(true);
+    const index = state.items.findIndex((entry) => entry.id === selectedId);
+    if (index >= 0 && !disposed) {
+      state.selected = index;
+      emit();
+    }
+    if (focused && state.focus?.id === focused.id) {
+      try {
+        const detail = await client.detail(focused.id, AbortSignal.timeout(15000));
+        if (!disposed && state.focus?.id === focused.id) {
+          state.detail = detail;
+          emit();
+        }
+      } catch {
+        /* The card keeps its previous data until the next event. */
+      }
+    }
+  }
+
   return {
     get state() {
       return state;
@@ -97,6 +132,18 @@ export function createLauncherModel(client: Pick<LauncherClient, "search" | "lau
       };
     },
     search,
+    refresh,
+    /** Follows process events while enabled (the palette is visible). */
+    live(enabled: boolean) {
+      stopEvents?.();
+      stopEvents = undefined;
+      clearTimeout(refreshTimer);
+      if (!enabled || disposed || !client.subscribe) return;
+      stopEvents = client.subscribe(() => {
+        clearTimeout(refreshTimer);
+        refreshTimer = setTimeout(() => void refresh(), 150);
+      });
+    },
     setQuery(query: string) {
       leave();
       state.query = query;
@@ -185,6 +232,8 @@ export function createLauncherModel(client: Pick<LauncherClient, "search" | "lau
     dispose() {
       disposed = true;
       detailController?.abort();
+      stopEvents?.();
+      clearTimeout(refreshTimer);
       invalidate();
       listeners.clear();
     },

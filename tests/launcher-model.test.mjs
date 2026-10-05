@@ -154,3 +154,41 @@ await test("query prefixes choose the search scope", async () => {
   assert.deepEqual(parseLaunchQuery("GH/"), { scope: "github", text: "" });
   assert.deepEqual(parseLaunchQuery("ghost"), { scope: "all", text: "ghost" });
 });
+
+await test("process events refresh the list and the open card without moving the selection", async () => {
+  let notify = () => {};
+  let unsubscribed = false;
+  let version = 0;
+  const model = createLauncherModel({
+    search: async () => ({ items: [item("a"), item("b")] }),
+    detail: async () => ({
+      actions: [],
+      info: { path: "~/x", state: "idle", stateLabel: `v${version}` },
+    }),
+    launch: async () => ({ ok: true }),
+    subscribe: (onStatus) => {
+      notify = onStatus;
+      return () => {
+        unsubscribed = true;
+      };
+    },
+  });
+  try {
+    await model.search();
+    model.select(1);
+    await model.enter();
+    assert.equal(model.state.detail.info.stateLabel, "v0");
+    model.live(true);
+    version = 1;
+    notify();
+    notify();
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    assert.equal(model.state.items[model.state.selected].id, "b");
+    assert.equal(model.state.focus.id, "b");
+    assert.equal(model.state.detail.info.stateLabel, "v1");
+    model.live(false);
+    assert.equal(unsubscribed, true);
+  } finally {
+    model.dispose();
+  }
+});

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, shallowRef, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { isLauncherWindow } from "../modules/launcher/index.ts";
+import { isLauncherWindow, LaunchDetailPanel } from "../modules/launcher/index.ts";
 import {
   createLauncherClient,
   launchScopeTitles,
@@ -42,6 +42,7 @@ async function hide() {
 const focus = computed(() => state.value.focus);
 const detailActions = computed(() => state.value.detail?.actions ?? []);
 const failure = computed(() => state.value.detail?.failure);
+const info = computed(() => state.value.detail?.info);
 const detailIndex = ref(0);
 const scope = computed(() => parseLaunchQuery(state.value.query).scope);
 watch(focus, () => (detailIndex.value = 0));
@@ -121,6 +122,7 @@ function showSearch() {
 }
 onMounted(() => {
   focusSearch();
+  model.live(true);
   window.addEventListener("focus", focusSearch);
   window.addEventListener("projector:show", showSearch);
 });
@@ -210,40 +212,16 @@ onUnmounted(() => {
           </button>
         </template>
       </div>
-      <div
+      <LaunchDetailPanel
         v-if="focus"
-        class="actions-panel"
-        role="listbox"
-        :aria-label="`Действия: ${focus.name}`"
-      >
-        <div class="panel-title">
-          <span class="back" aria-hidden="true">←</span> {{ focus.name }}
-          <span v-if="state.detailLoading" class="activity" aria-hidden="true">⋯</span>
-        </div>
-        <button
-          v-for="(action, index) in detailActions"
-          :key="`${action.id}:${action.arg ?? ''}`"
-          role="option"
-          class="result"
-          :class="{ selected: index === detailIndex }"
-          :aria-selected="index === detailIndex"
-          tabindex="-1"
-          @mousemove="detailIndex = index"
-          @click="launch(focus, action)"
-        >
-          <span class="name">{{ action.title }}</span>
-          <span v-if="index === detailIndex" class="enter" aria-hidden="true">↵</span>
-        </button>
-        <div v-if="failure" class="failure" role="alert">
-          <div class="failure-title">
-            «{{ failure.command }}» завершилась с ошибкой<template v-if="failure.exitCode !== null">
-              (код {{ failure.exitCode }})</template
-            >
-          </div>
-          <pre v-if="failure.output">{{ failure.output }}</pre>
-          <div v-else class="failure-empty">Вывод терминала пуст.</div>
-        </div>
-      </div>
+        v-model:index="detailIndex"
+        :item="focus"
+        :actions="detailActions"
+        :info="info"
+        :failure="failure"
+        :loading="state.detailLoading"
+        @launch="(action) => launch(focus!, action)"
+      />
       <p v-if="!loading && !items.length && !error" class="empty">Ничего не найдено</p>
       <p v-if="error || warning || notice" class="message" :class="{ error }" role="status">
         {{ error || warning || notice }}
@@ -394,12 +372,11 @@ onUnmounted(() => {
 .status-dot.error {
   background: var(--err);
 }
-.actions-panel {
-  padding: var(--sp-2);
-  border-top: 1px solid var(--line);
+.status-dot.stopping {
+  background: var(--muted);
 }
-.actions-panel .result {
-  justify-content: space-between;
+.status-dot.idle {
+  background: var(--faint);
 }
 .scope-chip {
   flex-shrink: 0;
@@ -407,38 +384,6 @@ onUnmounted(() => {
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
   color: var(--text);
-  font-size: var(--fs-xs);
-}
-.back {
-  color: var(--muted);
-}
-.failure {
-  margin: var(--sp-2) var(--sp-2) var(--sp-1);
-  padding: var(--sp-3);
-  border: 1px solid color-mix(in srgb, var(--err) 45%, var(--line));
-  border-radius: var(--r-md);
-}
-.failure-title {
-  color: var(--err);
-  font-size: var(--fs-xs);
-}
-.failure pre {
-  max-height: 220px;
-  margin: var(--sp-2) 0 0;
-  overflow: auto;
-  font-family: var(--mono);
-  font-size: var(--fs-2xs);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.failure-empty {
-  margin-top: var(--sp-2);
-  color: var(--muted);
-  font-size: var(--fs-xs);
-}
-.panel-title {
-  padding: var(--sp-1) var(--sp-3);
-  color: var(--muted);
   font-size: var(--fs-xs);
 }
 .empty,
