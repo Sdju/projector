@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { createBoundaries } from "../scripts/architecture-boundaries.mjs";
 import {
   boundaryError,
   importsOf,
@@ -7,6 +8,78 @@ import {
   largeFileErrors,
   moduleCycles,
 } from "../scripts/check-architecture.mjs";
+
+const transit = createBoundaries({
+  src: { kind: "frontend", dependencies: ["core"], transitModules: ["tools"] },
+  server: { kind: "backend", dependencies: ["core"], transitModules: ["tools"] },
+  core: { kind: "library", dependencies: [], transitModules: ["tools"] },
+}, "/fixture");
+
+test("transit submodules are public through their own index, including across roots", () => {
+  for (const [from, to] of [
+    ["src/modules/workspace/ui.ts", "src/modules/tools/a/index.ts"],
+    ["src/app/entry.ts", "src/modules/tools/a/index.ts"],
+    ["src/modules/tools/b/ui.ts", "src/modules/tools/a/index.ts"],
+    ["server/routes/api/usage.ts", "server/modules/tools/a/index.ts"],
+    ["server/modules/tools/a/usage.ts", "core/modules/tools/a/index.ts"],
+    ["src/modules/tools/a/ui.ts", "core/modules/tools/a/index.ts"],
+    ["bootstrap.ts", "core/modules/tools/a/index.ts"],
+  ]) assert.equal(transit.boundaryError(from, to), undefined, `${from} -> ${to}`);
+  for (const [from, to] of [
+    ["src/modules/workspace/ui.ts", "src/modules/tools/a/private.ts"],
+    ["src/modules/tools/b/ui.ts", "src/modules/tools/a/private.ts"],
+    ["server/modules/tools/a/usage.ts", "core/modules/tools/a/private.ts"],
+    ["bootstrap.ts", "core/modules/tools/a/private.ts"],
+  ]) assert.match(transit.boundaryError(from, to), /public index/, `${from} -> ${to}`);
+});
+
+test("transit private core is available only inside its own container and root", () => {
+  const target = "src/modules/tools/_/polling.ts";
+  for (const from of ["src/modules/tools/a/ui.ts", "src/modules/tools/_/cache.ts"])
+    assert.equal(transit.boundaryError(from, target), undefined);
+  for (const [from, to] of [
+    ["src/modules/workspace/ui.ts", target],
+    ["src/app/entry.ts", target],
+    ["src/pages/index.vue", target],
+    ["bootstrap.ts", target],
+    ["src/modules/other/_/cache.ts", target],
+    ["src/modules/tools/a/ui.ts", "core/modules/tools/_/types.ts"],
+    ["server/modules/tools/a/usage.ts", "core/modules/tools/_/types.ts"],
+    ["src/modules/tools/index.ts", target],
+  ]) assert.match(transit.boundaryError(from, to), /private core/, `${from} -> ${to}`);
+});
+
+test("transit containers retain nested-module, layer and platform boundaries", () => {
+  assert.equal(transit.boundaryError(
+    "src/modules/tools/a/ui.ts", "src/modules/tools/a/modules/nested/index.ts",
+  ), undefined);
+  assert.equal(transit.boundaryError(
+    "src/modules/tools/a/modules/nested/model.ts", "src/modules/tools/a/private.ts",
+  ), undefined);
+  for (const [from, to] of [
+    ["src/modules/workspace/ui.ts", "src/modules/tools/index.ts"],
+    ["src/modules/tools/b/ui.ts", "src/modules/tools/a/modules/nested/index.ts"],
+    ["src/modules/tools/a/ui.ts", "src/modules/tools/a/modules/nested/private.ts"],
+    ["src/common/utilities/date.ts", "src/modules/tools/a/index.ts"],
+    ["src/modules/tools/a/ui.ts", "src/app/router.ts"],
+    ["src/modules/tools/a/ui.ts", "server/modules/tools/a/index.ts"],
+    ["src/modules/tools/a/ui.ts", "core/modules/os/index.ts"],
+    ["core/modules/tools/a/index.ts", "core/modules/os/index.ts"],
+  ]) assert.ok(transit.boundaryError(from, to), `${from} -> ${to}`);
+});
+
+test("transit adapters and private core have distinct owners so cycles remain visible", () => {
+  const a = transit.classify("src/modules/tools/a/index.ts").module;
+  const b = transit.classify("src/modules/tools/b/index.ts").module;
+  const shared = transit.classify("src/modules/tools/_/polling.ts").module;
+  assert.equal(new Set([a, b, shared]).size, 3);
+  assert.equal(transit.classify("src/modules/tools/index.ts").module, undefined);
+  assert.deepEqual(moduleCycles(new Map([[a, new Set([shared])], [b, new Set([shared])]])), []);
+  for (const graph of [
+    new Map([[a, new Set([b])], [b, new Set([a])]]),
+    new Map([[a, new Set([shared])], [shared, new Set([a])]]),
+  ]) assert.equal(moduleCycles(graph).length, 1);
+});
 
 test("all applications obey FEOD boundaries and have no module cycles", () => {
   assert.deepEqual(checkArchitecture().errors, []);

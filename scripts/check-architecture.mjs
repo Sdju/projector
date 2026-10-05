@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync, realpathSync, writeFileSync } fr
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
+import { createBoundaries } from "./architecture-boundaries.mjs";
 
 const projectRoot = fileURLToPath(new URL("..", import.meta.url));
 const config = JSON.parse(readFileSync(join(projectRoot, "architecture.config.json"), "utf8"));
@@ -9,70 +10,7 @@ const extensions = [".ts", ".tsx", ".js", ".mjs", ".vue", ".json", ".css"];
 const inside = (file, directory) => file === directory || file.startsWith(directory + sep);
 const roots = Object.entries(config.roots).sort(([a], [b]) => b.length - a.length);
 
-export function classify(file, base = projectRoot) {
-  const absolute = resolve(base, file);
-  for (const [root, options] of roots) {
-    const directory = resolve(base, root);
-    if (!inside(absolute, directory)) continue;
-    const parts = relative(directory, absolute).split(sep);
-    let module;
-    let parentModule;
-    for (let i = 0; i < parts.length - 1; i++) {
-      if (parts[i] === "modules" && parts[i + 1]) {
-        parentModule = module;
-        module = join(directory, ...parts.slice(0, i + 2));
-      }
-    }
-    return { root, options, layer: parts[0], module, parentModule, absolute };
-  }
-  return { absolute };
-}
-
-export function boundaryError(from, to, base = projectRoot) {
-  const source = classify(from, base);
-  const target = classify(to, base);
-  if (!target.root) return "Local dependency is outside the configured FEOD roots";
-  if (
-    (source.root === "src" ||
-      (source.root === "core" &&
-        !["app-paths", "os"].includes(
-          relative(resolve(base, "core/modules"), source.absolute).split(sep)[0],
-        ))) &&
-    target.root === "core" &&
-    ["app-paths", "os"].includes(
-      relative(resolve(base, "core/modules"), target.absolute).split(sep)[0],
-    )
-  )
-    return "Browser/domain code cannot consume Node OS infrastructure";
-  if (target.layer === "globals") return "Globals are ambient declarations and cannot be imported";
-  if (!source.root)
-    return target.layer === "app" || target.layer === "modules"
-      ? undefined
-      : "Bootstrap may only consume app or public modules";
-  if (source.layer === "globals") return "Globals cannot import application code";
-  if (
-    source.root !== target.root &&
-    !source.options.dependencies.some((p) => inside(target.absolute, resolve(base, p)))
-  )
-    return "Dependency between these applications is forbidden";
-  if (target.module && source.module !== target.module && target.module !== source.parentModule) {
-    if (target.parentModule && source.module !== target.parentModule)
-      return "A nested module is private to its parent";
-    const publicFile = extname(target.module) ? target.module : join(target.module, "index.ts");
-    if (target.absolute !== publicFile) return "Use the module public index.ts";
-  }
-  if (source.root !== target.root && target.layer !== "modules")
-    return "Applications may only consume public modules from another root";
-  if (source.layer === "common" && !["common"].includes(target.layer))
-    return "Common cannot depend on business modules or upper layers";
-  if (source.layer === "modules" && !["modules", "common"].includes(target.layer))
-    return "Modules cannot import routes, middleware, pages or app";
-  if (
-    ["pages", "routes", "middlewares"].includes(source.layer) &&
-    !["modules", "common"].includes(target.layer)
-  )
-    return "Pages, routes and middleware are isolated; compose them in app";
-}
+export const { classify, boundaryError } = createBoundaries(config.roots, projectRoot);
 
 export function importsOf(code, file) {
   const blocks = file.endsWith(".vue")
@@ -267,7 +205,10 @@ export function checkArchitecture() {
       report("Globals may only contain ambient declarations");
     if (own.module && ["common", "shared", "utils"].includes(own.module.split(sep).at(-1)))
       report("Modules must have a concrete responsibility");
-    if (own.module && !existsSync(join(own.module, "index.ts")) && !extname(own.module))
+    if (own.transit?.type === "container")
+      report("Transit containers may only contain public submodule directories and a private _ core");
+    const privateCore = own.transit?.type === "private" && own.module === join(own.transit.container, "_");
+    if (own.module && !privateCore && !existsSync(join(own.module, "index.ts")) && !extname(own.module))
       report("Module must have a public index.ts");
     if (isSource(file)) sizes[relative(projectRoot, file)] = lineCount(file);
     if (!/\.(?:[cm]?js|tsx?|vue)$/.test(file)) continue;
