@@ -1,6 +1,6 @@
 {
   "name": "projector",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "private": true,
   "description": "Local Linux application and project launcher with a GTK palette, web workspace and terminals",
   "homepage": "https://github.com/Sdju/projector#readme",
