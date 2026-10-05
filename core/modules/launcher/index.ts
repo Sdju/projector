@@ -1,5 +1,11 @@
-export { createLauncherClient } from "./launcher.ts";
-export type { LaunchAction, LaunchActionId, LaunchItem, LaunchResult } from "./launcher.ts";
+export { createLauncherClient, launchSectionTitles } from "./launcher.ts";
+export type {
+  LaunchAction,
+  LaunchActionId,
+  LaunchItem,
+  LaunchResult,
+  LaunchSection,
+} from "./launcher.ts";
 export type { ShortcutStatus } from "./launcher.ts";
 export { shortcuts } from "./launcher.ts";
 export type { InterfaceMode } from "./launcher.ts";

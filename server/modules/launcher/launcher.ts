@@ -9,6 +9,7 @@ import type {
   LaunchActionId,
   LaunchItem,
   LaunchResult,
+  LaunchSection,
 } from "../../../core/modules/launcher/index.ts";
 import { appUrl } from "../../../core/modules/app-paths/index.ts";
 import { githubProjectRoute } from "../../../core/modules/github/index.ts";
@@ -163,6 +164,7 @@ export async function searchLauncher(
     ...apps.map((app): LaunchItem => ({ ...app, actions: [{ id: "launch", title: "Запустить" }] })),
     ...projects.map(projectItem),
   ];
+  if (!query.trim()) return { items: browse(items, prefs.usage), warning };
   const ranked = items.map((item) => ({
     item,
     score: matchScore(item, query),
@@ -178,13 +180,45 @@ export async function searchLauncher(
   return {
     items: ranked
       .filter((row) => row.score >= 0)
-      .slice(0, 7)
+      .slice(0, 10)
       .map((row) => row.item),
     warning,
   };
 }
 
-/** Without an explicit action the item's primary action runs. */
+const RECENT_LIMIT = 5;
+const PROJECT_LIMIT = 30;
+const APP_LIMIT = 6;
+
+/** Empty query: running projects, recent items, the remaining projects, frequent applications. */
+function browse(
+  items: LaunchItem[],
+  usage: Record<string, { count: number; last: number } | undefined>,
+): LaunchItem[] {
+  const placed = new Set<string>();
+  const take = (section: LaunchSection, list: LaunchItem[], limit = Infinity) =>
+    list
+      .filter((item) => !placed.has(item.id))
+      .slice(0, limit)
+      .map((item) => {
+        placed.add(item.id);
+        return { ...item, section };
+      });
+  const byName = (a: LaunchItem, b: LaunchItem) => a.name.localeCompare(b.name);
+  const byRecent = (a: LaunchItem, b: LaunchItem) =>
+    (usage[b.id]?.last ?? 0) - (usage[a.id]?.last ?? 0) || byName(a, b);
+  const byFrequency = (a: LaunchItem, b: LaunchItem) =>
+    (usage[b.id]?.count ?? 0) - (usage[a.id]?.count ?? 0) || byRecent(a, b);
+  const projects = items.filter((item) => item.kind === "project");
+  const apps = items.filter((item) => item.kind === "application");
+  return [
+    ...take("running", projects.filter((item) => item.status).sort(byRecent)),
+    ...take("recent", items.filter((item) => usage[item.id]).sort(byRecent), RECENT_LIMIT),
+    ...take("projects", projects.sort(byName), PROJECT_LIMIT),
+    ...take("apps", apps.sort(byFrequency), APP_LIMIT),
+  ];
+}
+
 export async function launchItem(
   id: string,
   action?: LaunchActionId,

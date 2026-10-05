@@ -121,6 +121,14 @@ if (process.argv.includes("--prepare")) {
     const settings = JSON.parse(await readFile(join(data, "projector", "launcher.json"), "utf8"));
     assert.equal(settings.usage["app:projector probe.desktop"].count, 2);
     assert.equal((await searchLauncher("")).items[0].id, "app:projector probe.desktop");
+    const browsed = (await searchLauncher("")).items;
+    assert.equal(browsed[0].section, "recent");
+    assert.ok(browsed.every((item) => item.section));
+    assert.equal(new Set(browsed.map((item) => item.id)).size, browsed.length);
+    assert.ok(
+      browsed.some((item) => item.id === "project:probe-project" && item.section === "projects"),
+    );
+    assert.equal((await searchLauncher("Probe workspace")).items[0].section, undefined);
     const projectItem = (await searchLauncher("Probe workspace")).items[0];
     assert.deepEqual(
       projectItem.actions.map((action) => action.id),

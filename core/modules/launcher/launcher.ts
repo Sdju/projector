@@ -6,6 +6,14 @@ export interface LaunchAction {
   id: LaunchActionId;
   title: string;
 }
+/** Секции пустого запроса; при поиске по тексту список плоский. */
+export type LaunchSection = "running" | "recent" | "projects" | "apps";
+export const launchSectionTitles: Record<LaunchSection, string> = {
+  running: "Работает",
+  recent: "Недавние",
+  projects: "Проекты",
+  apps: "Приложения",
+};
 export interface LaunchItem {
   id: string;
   name: string;
@@ -13,6 +21,7 @@ export interface LaunchItem {
   keywords: string;
   kind: "application" | "project";
   icon?: string;
+  section?: LaunchSection;
   /** Живое состояние проекта; у приложений нет. */
   status?: { state: "running" | "starting"; label: string };
   /** Первое действие выполняется по Enter, второе — по Ctrl+Enter. */

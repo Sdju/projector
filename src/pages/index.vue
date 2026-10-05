@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, shallowRef, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { isLauncherWindow } from "../modules/launcher/index.ts";
-import { createLauncherClient } from "../../core/modules/launcher/index.ts";
+import { createLauncherClient, launchSectionTitles } from "../../core/modules/launcher/index.ts";
 import { createLauncherModel } from "../../core/modules/launcher/index.ts";
 
 const router = useRouter();
@@ -21,7 +21,6 @@ const error = computed(() => state.value.error);
 const warning = computed(() => state.value.warning);
 const notice = computed(() => state.value.notice);
 const input = ref<HTMLInputElement>();
-const list = ref<HTMLElement>();
 const webWindow = isLauncherWindow;
 const activeId = computed(() =>
   items.value.length ? `launch-option-${selected.value}` : undefined,
@@ -81,7 +80,11 @@ function key(event: KeyboardEvent) {
   } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
     event.preventDefault();
     model.move(event.key === "ArrowDown" ? 1 : -1);
-    void nextTick(() => list.value?.children[selected.value]?.scrollIntoView({ block: "nearest" }));
+    void nextTick(() =>
+      document
+        .getElementById(`launch-option-${selected.value}`)
+        ?.scrollIntoView({ block: "nearest" }),
+    );
   } else if (event.key === "Enter") {
     event.preventDefault();
     void launch(undefined, event.ctrlKey || event.metaKey ? 1 : 0);
@@ -142,44 +145,50 @@ onUnmounted(() => {
         <span v-if="loading || busy" class="activity" aria-hidden="true">⋯</span>
       </div>
       <div
-        ref="list"
         id="launch-results"
         class="results"
         role="listbox"
         aria-label="Результаты"
         :aria-busy="loading"
       >
-        <button
-          v-for="(item, index) in items"
-          :id="`launch-option-${index}`"
-          :key="item.id"
-          role="option"
-          :aria-selected="index === selected"
-          class="result"
-          :class="{ selected: index === selected }"
-          :disabled="busy || loading"
-          tabindex="-1"
-          @mousemove="selected = index"
-          @click="launch(item)"
-        >
-          <img v-if="item.icon" :src="item.icon" alt="" width="36" height="36" />
-          <span class="result-copy"
-            ><span class="name"
-              ><span
-                v-if="item.status"
-                class="status-dot"
-                :title="item.status.label"
-                aria-hidden="true"
-              />{{ item.name }}</span
-            ><span class="description">{{ item.description }}</span></span
+        <template v-for="(item, index) in items" :key="item.id">
+          <div
+            v-if="item.section && item.section !== items[index - 1]?.section"
+            class="section-title"
+            role="presentation"
           >
-          <span v-if="index === selected" class="enter" aria-hidden="true"
-            >↵ {{ item.actions?.[0]?.title
-            }}<template v-if="item.actions?.[1]">
-              · Ctrl+↵ {{ item.actions[1].title }}</template
-            ></span
+            {{ launchSectionTitles[item.section] }}
+          </div>
+          <button
+            :id="`launch-option-${index}`"
+            role="option"
+            :aria-selected="index === selected"
+            class="result"
+            :class="{ selected: index === selected }"
+            :disabled="busy || loading"
+            tabindex="-1"
+            @mousemove="selected = index"
+            @click="launch(item)"
           >
-        </button>
+            <img v-if="item.icon" :src="item.icon" alt="" width="36" height="36" />
+            <span class="result-copy"
+              ><span class="name"
+                ><span
+                  v-if="item.status"
+                  class="status-dot"
+                  :title="item.status.label"
+                  aria-hidden="true"
+                />{{ item.name }}</span
+              ><span class="description">{{ item.description }}</span></span
+            >
+            <span v-if="index === selected" class="enter" aria-hidden="true"
+              >↵ {{ item.actions?.[0]?.title
+              }}<template v-if="item.actions?.[1]">
+                · Ctrl+↵ {{ item.actions[1].title }}</template
+              ></span
+            >
+          </button>
+        </template>
       </div>
       <div
         v-if="panel"
@@ -332,6 +341,13 @@ onUnmounted(() => {
 .enter {
   color: var(--muted);
   white-space: nowrap;
+}
+.section-title {
+  padding: var(--sp-3) var(--sp-3) var(--sp-1);
+  color: var(--muted);
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 .status-dot {
   display: inline-block;
