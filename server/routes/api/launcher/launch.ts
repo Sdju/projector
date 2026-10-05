@@ -23,6 +23,7 @@ export async function handleLauncherLaunch({
         asString(body.id),
         (action || undefined) as LaunchActionId | undefined,
         body.inline === true,
+        asString(body.arg) || undefined,
       ),
     );
     return true;

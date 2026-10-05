@@ -39,6 +39,20 @@ await writeFile(
         commands: [{ id: "dev", name: "dev", cmd: "/usr/bin/true" }],
         createdAt: "2026-10-01",
       },
+      {
+        id: "fail-project",
+        name: "Failing workspace",
+        path: root,
+        url: "",
+        icon: "",
+        mode: "server",
+        defaultCommandId: "boom",
+        commands: [
+          { id: "boom", name: "boom", cmd: "echo boom-output; exit 3" },
+          { id: "other", name: "other", cmd: "/usr/bin/true" },
+        ],
+        createdAt: "2026-10-02",
+      },
     ],
   }),
 );
@@ -47,7 +61,8 @@ if (process.argv.includes("--prepare")) {
   console.log(JSON.stringify({ root, data }));
 } else {
   process.env.XDG_DATA_HOME = data;
-  const { searchLauncher, matchScore } = await import("../server/modules/launcher/index.ts");
+  const { searchLauncher, matchScore, launchDetail } =
+    await import("../server/modules/launcher/index.ts");
   const { handleApi } = await import("../server/app/api.ts");
   const { getSnapshot } = await import("../server/modules/processes/index.ts");
   const server = createServer((req, res) => {
@@ -186,6 +201,50 @@ if (process.argv.includes("--prepare")) {
     assert.equal(runtime.commandId, "dev");
     assert.equal(runtime.status, "idle");
     assert.equal(runtime.exitCode, 0);
+    // Prefixes: "/" keeps only projects, "gh/" switches to GitHub.
+    const scoped = await searchLauncher("/");
+    assert.ok(scoped.items.length >= 2 && scoped.items.every((item) => item.kind === "project"));
+    assert.deepEqual((await searchLauncher("/workspace")).items.map((item) => item.id).sort(), [
+      "project:fail-project",
+      "project:probe-project",
+    ]);
+    assert.ok(
+      (await searchLauncher("/Projector Probe")).items.every((item) => item.kind === "project"),
+    );
+    const noToken = await searchLauncher("gh/");
+    assert.deepEqual(noToken.items, []);
+    assert.match(noToken.warning, /GitHub/);
+    // Detail lists a run action per command; a failed run exposes its terminal output.
+    const idleDetail = await launchDetail("project:fail-project");
+    assert.deepEqual(
+      idleDetail.actions.map((action) => [action.id, action.arg]),
+      [
+        ["open", undefined],
+        ["run", "boom"],
+        ["run", "other"],
+      ],
+    );
+    assert.equal(idleDetail.failure, undefined);
+    assert.equal(
+      (
+        await request("/api/launcher/launch", "POST", {
+          id: "project:fail-project",
+          action: "run",
+          arg: "boom",
+        })
+      ).status,
+      200,
+    );
+    const failDeadline = Date.now() + 5000;
+    while (getSnapshot("fail-project").status !== "error" && Date.now() < failDeadline) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    assert.equal(getSnapshot("fail-project").commandId, "boom");
+    const failed = await (await request("/api/launcher/detail?id=project%3Afail-project")).json();
+    assert.equal(failed.failure.exitCode, 3);
+    assert.equal(failed.failure.command, "boom");
+    assert.match(failed.failure.output, /boom-output/);
+    assert.equal((await searchLauncher("Failing workspace")).items[0].status.state, "error");
     const reloaded = await import("../server/modules/processes/processes.ts?reload-check");
     assert.equal(reloaded.getSnapshot("probe-project").commandId, "dev");
     assert.equal(reloaded.getSnapshot("probe-project").exitCode, 0);

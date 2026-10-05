@@ -8,3 +8,4 @@ export { shortcuts } from "./launcher.ts";
 export { checkShortcut } from "./launcher.ts";
 export { shortcutStatus } from "./launcher.ts";
 export { matchScore } from "./launcher.ts";
+export { launchDetail } from "./launcher.ts";

@@ -2,7 +2,13 @@
 import { computed, nextTick, onMounted, onUnmounted, shallowRef, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { isLauncherWindow } from "../modules/launcher/index.ts";
-import { createLauncherClient, launchSectionTitles } from "../../core/modules/launcher/index.ts";
+import {
+  createLauncherClient,
+  launchScopeTitles,
+  launchSectionTitles,
+  parseLaunchQuery,
+} from "../../core/modules/launcher/index.ts";
+import type { LaunchAction } from "../../core/modules/launcher/index.ts";
 import { createLauncherModel } from "../../core/modules/launcher/index.ts";
 
 const router = useRouter();
@@ -33,21 +39,20 @@ async function hide() {
     input.value?.focus();
   }
 }
-const panel = ref(false);
-const panelIndex = ref(0);
-const current = computed(() => items.value[selected.value]);
-const panelActions = computed(() => current.value?.actions ?? []);
-watch([query, selected], () => (panel.value = false));
-function openPanel() {
-  if (panelActions.value.length < 2) return;
-  panelIndex.value = 0;
-  panel.value = true;
+const focus = computed(() => state.value.focus);
+const detailActions = computed(() => state.value.detail?.actions ?? []);
+const failure = computed(() => state.value.detail?.failure);
+const detailIndex = ref(0);
+const scope = computed(() => parseLaunchQuery(state.value.query).scope);
+watch(focus, () => (detailIndex.value = 0));
+async function enter() {
+  if (await model.enter()) await nextTick();
 }
-async function launch(item = items.value[selected.value], index = 0) {
-  panel.value = false;
-  const action = item?.actions?.[index]?.id;
-  if (!action) return;
-  const ok = await model.launch(item, action, !webWindow);
+async function launch(item = items.value[selected.value], action?: LaunchAction) {
+  const chosen = action ?? item?.actions?.[0];
+  if (!item || !chosen) return;
+  const ok = await model.launch(item, chosen, !webWindow);
+  if (ok) model.leave();
   if (ok && !webWindow && state.value.route) {
     await router.push(state.value.route);
     return;
@@ -63,20 +68,31 @@ async function launch(item = items.value[selected.value], index = 0) {
   input.value?.focus();
 }
 function key(event: KeyboardEvent) {
-  if (panel.value) {
-    event.preventDefault();
-    if (event.key === "ArrowDown" || event.key === "ArrowUp")
-      panelIndex.value =
-        (panelIndex.value + (event.key === "ArrowDown" ? 1 : -1) + panelActions.value.length) %
-        panelActions.value.length;
-    else if (event.key === "Enter") void launch(current.value, panelIndex.value);
-    else if (event.key === "Escape" || event.key === "ArrowLeft" || event.key === "Tab")
-      panel.value = false;
+  if (focus.value) {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const count = detailActions.value.length;
+      if (count)
+        detailIndex.value =
+          (detailIndex.value + (event.key === "ArrowDown" ? 1 : -1) + count) % count;
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      void launch(focus.value, detailActions.value[detailIndex.value]);
+    } else if (["Escape", "ArrowLeft", "Tab"].includes(event.key)) {
+      event.preventDefault();
+      model.leave();
+    }
     return;
   }
-  if (event.key === "Tab" || (event.key === "k" && (event.ctrlKey || event.metaKey))) {
+  const atEnd = input.value?.selectionStart === input.value?.value.length;
+  if (
+    event.key === "Tab" ||
+    (event.key === "ArrowRight" && atEnd && !event.shiftKey) ||
+    (event.key === "k" && (event.ctrlKey || event.metaKey))
+  ) {
+    if (!items.value.length) return;
     event.preventDefault();
-    openPanel();
+    void enter();
   } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
     event.preventDefault();
     model.move(event.key === "ArrowDown" ? 1 : -1);
@@ -87,7 +103,8 @@ function key(event: KeyboardEvent) {
     );
   } else if (event.key === "Enter") {
     event.preventDefault();
-    void launch(undefined, event.ctrlKey || event.metaKey ? 1 : 0);
+    const item = items.value[selected.value];
+    void launch(item, item?.actions?.[event.ctrlKey || event.metaKey ? 1 : 0]);
   } else if (event.key === "Escape") {
     event.preventDefault();
     void hide().catch((error) => model.reportError(error));
@@ -127,6 +144,7 @@ onUnmounted(() => {
           <circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="1.5" />
           <path d="m16 16 5 5" stroke="currentColor" stroke-width="1.5" />
         </svg>
+        <span v-if="scope !== 'all'" class="scope-chip">{{ launchScopeTitles[scope] }}</span>
         <input
           ref="input"
           v-model="query"
@@ -138,13 +156,14 @@ onUnmounted(() => {
           :aria-activedescendant="activeId"
           autocomplete="off"
           spellcheck="false"
-          placeholder="Поиск приложений и проектов…"
+          placeholder="Поиск приложений и проектов… (/ проекты, gh/ GitHub)"
           :disabled="busy"
           @keydown="key"
         />
         <span v-if="loading || busy" class="activity" aria-hidden="true">⋯</span>
       </div>
       <div
+        v-show="!focus"
         id="launch-results"
         class="results"
         role="listbox"
@@ -176,6 +195,7 @@ onUnmounted(() => {
                 ><span
                   v-if="item.status"
                   class="status-dot"
+                  :class="item.status.state"
                   :title="item.status.label"
                   aria-hidden="true"
                 />{{ item.name }}</span
@@ -191,38 +211,52 @@ onUnmounted(() => {
         </template>
       </div>
       <div
-        v-if="panel"
+        v-if="focus"
         class="actions-panel"
         role="listbox"
-        :aria-label="`Действия: ${current?.name}`"
+        :aria-label="`Действия: ${focus.name}`"
       >
-        <div class="panel-title">{{ current?.name }}</div>
+        <div class="panel-title">
+          <span class="back" aria-hidden="true">←</span> {{ focus.name }}
+          <span v-if="state.detailLoading" class="activity" aria-hidden="true">⋯</span>
+        </div>
         <button
-          v-for="(action, index) in panelActions"
-          :key="action.id"
+          v-for="(action, index) in detailActions"
+          :key="`${action.id}:${action.arg ?? ''}`"
           role="option"
           class="result"
-          :class="{ selected: index === panelIndex }"
-          :aria-selected="index === panelIndex"
+          :class="{ selected: index === detailIndex }"
+          :aria-selected="index === detailIndex"
           tabindex="-1"
-          @mousemove="panelIndex = index"
-          @click="launch(current, index)"
+          @mousemove="detailIndex = index"
+          @click="launch(focus, action)"
         >
           <span class="name">{{ action.title }}</span>
-          <span class="enter" aria-hidden="true">{{
-            index === 0 ? "↵" : index === 1 ? "Ctrl+↵" : ""
-          }}</span>
+          <span v-if="index === detailIndex" class="enter" aria-hidden="true">↵</span>
         </button>
+        <div v-if="failure" class="failure" role="alert">
+          <div class="failure-title">
+            «{{ failure.command }}» завершилась с ошибкой<template v-if="failure.exitCode !== null">
+              (код {{ failure.exitCode }})</template
+            >
+          </div>
+          <pre v-if="failure.output">{{ failure.output }}</pre>
+          <div v-else class="failure-empty">Вывод терминала пуст.</div>
+        </div>
       </div>
       <p v-if="!loading && !items.length && !error" class="empty">Ничего не найдено</p>
       <p v-if="error || warning || notice" class="message" :class="{ error }" role="status">
         {{ error || warning || notice }}
       </p>
       <footer class="palette-footer">
-        <span
+        <span v-if="focus"
           >↑↓ выбрать <span class="separator">·</span> Enter выполнить
-          <span class="separator">·</span> Ctrl+Enter второе <span class="separator">·</span> Tab
-          все действия <span class="separator">·</span> Esc
+          <span class="separator">·</span> ← назад</span
+        >
+        <span v-else
+          >↑↓ выбрать <span class="separator">·</span> Enter основное
+          <span class="separator">·</span> Ctrl+Enter второе <span class="separator">·</span> → все
+          действия <span class="separator">·</span> Esc
           {{ webWindow ? "закрыть" : "очистить" }}</span
         >
         <router-link to="/projects">Проекты →</router-link>
@@ -357,12 +391,50 @@ onUnmounted(() => {
   border-radius: var(--r-full);
   background: var(--run);
 }
+.status-dot.error {
+  background: var(--err);
+}
 .actions-panel {
   padding: var(--sp-2);
   border-top: 1px solid var(--line);
 }
 .actions-panel .result {
   justify-content: space-between;
+}
+.scope-chip {
+  flex-shrink: 0;
+  padding: 2px var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  font-size: var(--fs-xs);
+}
+.back {
+  color: var(--muted);
+}
+.failure {
+  margin: var(--sp-2) var(--sp-2) var(--sp-1);
+  padding: var(--sp-3);
+  border: 1px solid color-mix(in srgb, var(--err) 45%, var(--line));
+  border-radius: var(--r-md);
+}
+.failure-title {
+  color: var(--err);
+  font-size: var(--fs-xs);
+}
+.failure pre {
+  max-height: 220px;
+  margin: var(--sp-2) 0 0;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.failure-empty {
+  margin-top: var(--sp-2);
+  color: var(--muted);
+  font-size: var(--fs-xs);
 }
 .panel-title {
   padding: var(--sp-1) var(--sp-3);

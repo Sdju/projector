@@ -1,5 +1,9 @@
 import { environmentPorts } from "../environments/index.ts";
-import { createTerminalSession, stopTerminalSession } from "../terminal/index.ts";
+import {
+  createTerminalSession,
+  stopTerminalSession,
+  terminalSessionText,
+} from "../terminal/index.ts";
 import type { TerminalSession } from "../../../core/modules/terminal/index.ts";
 import { projectAppUrl } from "../../../core/modules/app-paths/index.ts";
 import type { LaunchMode, ProcessSnapshot, ProcessStatus, Project } from "../projects/index.ts";
@@ -114,6 +118,17 @@ function maybeOpenWindow(session: Session): void {
 
 export function listSnapshots(): ProcessSnapshot[] {
   return [...sessions.values()].map(snapshot);
+}
+
+/** Tail of the last run's terminal output, or null when the project has no session. */
+export function processOutput(projectId: string, lines = 40): string | null {
+  const session = sessions.get(projectId);
+  if (!session) return null;
+  try {
+    return terminalSessionText(projectId, session.terminal.id, lines).text;
+  } catch {
+    return null;
+  }
 }
 
 export function getSnapshot(projectId: string): ProcessSnapshot {

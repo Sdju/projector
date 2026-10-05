@@ -234,7 +234,13 @@ defineExpose({ show, hide, toggle, invokeSelected, openPage, quitProjector, rest
               <VImage v-if="appIcon(item)" :gicon="appIcon(item)" :pixel-size="32" />
               <VImage
                 v-else
-                :icon-name="item.kind === 'project' ? 'folder' : 'application-x-executable'"
+                :icon-name="
+                  item.kind === 'project'
+                    ? 'folder'
+                    : item.kind === 'github'
+                      ? 'folder-remote'
+                      : 'application-x-executable'
+                "
                 :pixel-size="32"
               />
               <VBox orientation="vertical" :spacing="2" :hexpand="true">

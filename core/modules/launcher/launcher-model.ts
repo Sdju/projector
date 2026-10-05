@@ -1,7 +1,11 @@
-import type { LaunchActionId, LaunchItem, LauncherClient } from "./launcher.ts";
+import type { LaunchAction, LaunchActionId, LaunchDetail, LaunchItem, LauncherClient } from "./launcher.ts";
 
 export interface LauncherState {
   query: string;
+  /** Элемент, в который вошли стрелкой вправо; его действия и сбой лежат в `detail`. */
+  focus: LaunchItem | null;
+  detail: LaunchDetail | null;
+  detailLoading: boolean;
   items: LaunchItem[];
   selected: number;
   loading: boolean;
@@ -14,9 +18,12 @@ export interface LauncherState {
 }
 
 /** UI-independent search, selection and launch state shared by GTK and Vue. */
-export function createLauncherModel(client: Pick<LauncherClient, "search" | "launch">) {
+export function createLauncherModel(client: Pick<LauncherClient, "search" | "launch" | "detail">) {
   const state: LauncherState = {
     query: "",
+    focus: null,
+    detail: null,
+    detailLoading: false,
     items: [],
     selected: 0,
     loading: true,
@@ -33,6 +40,13 @@ export function createLauncherModel(client: Pick<LauncherClient, "search" | "lau
   let disposed = false;
   const emit = () => {
     if (!disposed) for (const listener of listeners) listener({ ...state });
+  };
+  let detailController: AbortController | undefined;
+  const leave = () => {
+    detailController?.abort();
+    state.focus = null;
+    state.detail = null;
+    state.detailLoading = false;
   };
   const invalidate = () => {
     generation++;
@@ -84,6 +98,7 @@ export function createLauncherModel(client: Pick<LauncherClient, "search" | "lau
     },
     search,
     setQuery(query: string) {
+      leave();
       state.query = query;
       state.notice = "";
       invalidate();
@@ -101,11 +116,48 @@ export function createLauncherModel(client: Pick<LauncherClient, "search" | "lau
       this.select(state.selected + delta);
     },
     /** Действие по умолчанию — первое у элемента; `inline` оставляет переход клиенту. */
+    /** Вход в элемент: загружает все его действия и последний сбой запуска. */
+    async enter(item = state.items[state.selected]): Promise<boolean> {
+      if (!item || state.busy || disposed) return false;
+      leave();
+      state.focus = item;
+      state.detail = { actions: item.actions ?? [] };
+      state.detailLoading = true;
+      state.error = "";
+      detailController = new AbortController();
+      const current = detailController;
+      emit();
+      try {
+        const detail = await client.detail(
+          item.id,
+          AbortSignal.any([current.signal, AbortSignal.timeout(15000)]),
+        );
+        if (disposed || current.signal.aborted) return true;
+        state.detail = detail;
+      } catch (error) {
+        if (!disposed && !current.signal.aborted)
+          state.error = error instanceof Error ? error.message : "Не удалось загрузить действия";
+      } finally {
+        if (!disposed && !current.signal.aborted) {
+          state.detailLoading = false;
+          emit();
+        }
+      }
+      return true;
+    },
+    leave() {
+      leave();
+      emit();
+    },
     async launch(
       item = state.items[state.selected],
-      action?: LaunchActionId,
+      action?: LaunchAction | LaunchActionId,
       inline = false,
     ): Promise<boolean> {
+      const chosen: LaunchAction | undefined =
+        typeof action === "string"
+          ? (item?.actions?.find((entry) => entry.id === action) ?? { id: action, title: "" })
+          : (action ?? item?.actions?.[0]);
       if (!item || state.busy || state.loading || disposed) return false;
       state.busy = true;
       state.error = "";
@@ -113,10 +165,10 @@ export function createLauncherModel(client: Pick<LauncherClient, "search" | "lau
       state.route = "";
       emit();
       try {
-        const result = await client.launch(item.id, action ?? item.actions?.[0]?.id, inline);
+        const result = await client.launch(item.id, chosen?.id, inline, chosen?.arg);
         if (disposed) return false;
         state.route = result?.route ?? "";
-        state.notice = `${item.name} — ${(action ?? item.actions?.[0]?.id) === "open" ? "открыто" : "запущено"}`;
+        state.notice = `${item.name} — ${chosen?.id === "open" ? "открыто" : chosen?.id === "stop" ? "остановлено" : "запущено"}`;
         return true;
       } catch (error) {
         state.error = error instanceof Error ? error.message : "Не удалось запустить";
@@ -132,6 +184,7 @@ export function createLauncherModel(client: Pick<LauncherClient, "search" | "lau
     },
     dispose() {
       disposed = true;
+      detailController?.abort();
       invalidate();
       listeners.clear();
     },

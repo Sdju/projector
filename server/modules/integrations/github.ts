@@ -223,3 +223,43 @@ export async function githubRepositories(page: number) {
     hasMore: repos.length === 50,
   };
 }
+
+export interface GithubSearchHit {
+  fullName: string;
+  description: string;
+  private: boolean;
+}
+/**
+ * Launcher search over repositories. Empty text lists the account's most recently updated repositories;
+ * `owner/part` narrows to one owner. Public search works without a token.
+ */
+export async function searchGithubRepositories(text: string): Promise<GithubSearchHit[]> {
+  const config = await integrationConfig("github");
+  const token = config.enabled ? config.credentials.token || "" : "";
+  const query = text.trim();
+  if (!query) {
+    if (!token) throw new HttpError(401, "Войдите в GitHub в настройках интеграции");
+    return (await githubRepositories(1)).repositories.slice(0, 10).map((repo) => ({
+      fullName: repo.fullName,
+      description: repo.description ?? "",
+      private: repo.private,
+    }));
+  }
+  const slash = query.indexOf("/");
+  const owner = slash > 0 ? query.slice(0, slash) : "";
+  const rest = slash > 0 ? query.slice(slash + 1) : query;
+  if (owner && !/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(owner))
+    throw new HttpError(400, "Неверное имя владельца");
+  const terms = rest.replace(/[^\w.\- ]/g, " ").trim();
+  const q = owner
+    ? `${terms ? `${terms} in:name ` : ""}user:${owner}`
+    : `${terms} in:name,description`;
+  const found = await github<{
+    items: Array<{ full_name: string; description: string | null; private: boolean }>;
+  }>(`/search/repositories?q=${encodeURIComponent(q)}&per_page=10`, token);
+  return found.items.map((repo) => ({
+    fullName: repo.full_name,
+    description: repo.description ?? "",
+    private: repo.private,
+  }));
+}

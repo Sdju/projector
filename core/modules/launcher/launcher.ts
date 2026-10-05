@@ -5,6 +5,8 @@ export type LaunchActionId = "launch" | "open" | "run" | "stop";
 export interface LaunchAction {
   id: LaunchActionId;
   title: string;
+  /** Параметр действия: для `run` — id команды проекта. */
+  arg?: string;
 }
 /** Секции пустого запроса; при поиске по тексту список плоский. */
 export type LaunchSection = "running" | "recent" | "projects" | "apps";
@@ -19,13 +21,18 @@ export interface LaunchItem {
   name: string;
   description: string;
   keywords: string;
-  kind: "application" | "project";
+  kind: "application" | "project" | "github";
   icon?: string;
   section?: LaunchSection;
   /** Живое состояние проекта; у приложений нет. */
-  status?: { state: "running" | "starting"; label: string };
+  status?: { state: "running" | "starting" | "error"; label: string };
   /** Первое действие выполняется по Enter, второе — по Ctrl+Enter. */
   actions?: LaunchAction[];
+}
+/** Подробности выбранного элемента: все действия и последний сбой запуска. */
+export interface LaunchDetail {
+  actions: LaunchAction[];
+  failure?: { command: string; exitCode: number | null; output: string };
 }
 export interface LaunchResult {
   ok: boolean;
@@ -63,8 +70,10 @@ export function createLauncherClient(baseUrl = "") {
         signal,
       ),
     /** `inline` — клиент сам перейдёт по `route`, сервер не открывает окно. */
-    launch: (id: string, action?: LaunchActionId, inline = false) =>
-      request<LaunchResult>("/api/launcher/launch", { id, action, inline }),
+    launch: (id: string, action?: LaunchActionId, inline = false, arg?: string) =>
+      request<LaunchResult>("/api/launcher/launch", { id, action, inline, arg }),
+    detail: (id: string, signal?: AbortSignal) =>
+      request<LaunchDetail>(`/api/launcher/detail?id=${encodeURIComponent(id)}`, undefined, signal),
     hide: () => request<{ ok: boolean }>("/api/app/hide", {}),
     open: (toggle = false) => request<{ ok: boolean }>("/api/app/open", { toggle }),
     quit: () => request<{ ok: boolean }>("/api/app/quit", {}),

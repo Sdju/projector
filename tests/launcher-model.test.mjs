@@ -107,3 +107,50 @@ await test("native and browser clients send the same launch contract and preserv
   assert.equal(requests[1].url, "http://localhost:4177/api/launcher/launch");
   assert.equal(requests[0].options.body, requests[1].options.body);
 });
+
+await test("entering an item loads its detail, leaving or a new query closes it, launch passes the action argument", async () => {
+  const launches = [];
+  const model = createLauncherModel({
+    search: async () => ({
+      items: [{ ...item("p"), kind: "project", actions: [{ id: "open", title: "o" }] }],
+    }),
+    detail: async () => ({
+      actions: [
+        { id: "open", title: "Открыть" },
+        { id: "run", title: "Запустить dev", arg: "dev" },
+      ],
+      failure: { command: "dev", exitCode: 1, output: "boom" },
+    }),
+    launch: async (...args) => {
+      launches.push(args);
+      return { ok: true };
+    },
+  });
+  try {
+    await model.search();
+    assert.equal(await model.enter(), true);
+    assert.equal(model.state.focus.id, "p");
+    assert.equal(model.state.detail.actions.length, 2);
+    assert.equal(model.state.detail.failure.output, "boom");
+    assert.equal(await model.launch(model.state.focus, model.state.detail.actions[1], true), true);
+    assert.deepEqual(launches[0], ["p", "run", true, "dev"]);
+    model.leave();
+    assert.equal(model.state.focus, null);
+    await model.enter();
+    model.setQuery("x");
+    assert.equal(model.state.focus, null);
+    assert.equal(model.state.detail, null);
+  } finally {
+    model.dispose();
+  }
+});
+
+await test("query prefixes choose the search scope", async () => {
+  const { parseLaunchQuery } = await import("../core/modules/launcher/index.ts");
+  assert.deepEqual(parseLaunchQuery("chrome"), { scope: "all", text: "chrome" });
+  assert.deepEqual(parseLaunchQuery("/proj"), { scope: "projects", text: "proj" });
+  assert.deepEqual(parseLaunchQuery("/"), { scope: "projects", text: "" });
+  assert.deepEqual(parseLaunchQuery("gh/own/repo"), { scope: "github", text: "own/repo" });
+  assert.deepEqual(parseLaunchQuery("GH/"), { scope: "github", text: "" });
+  assert.deepEqual(parseLaunchQuery("ghost"), { scope: "all", text: "ghost" });
+});
