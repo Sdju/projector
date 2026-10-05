@@ -10,19 +10,9 @@ import {
   type ProjectLocation,
 } from "../../modules/project/index.ts";
 import { PathBar, MobileProjectPicker } from "../../modules/catalog/index.ts";
-import { useIdeCommands } from "../../modules/ide/index.ts";
 import { isFileDrag, pathsFromDataTransfer } from "../../modules/path-drop/index.ts";
 
-const props = defineProps<{ currentProject?: ProjectLocation }>();
-const { api, reportError } = useIdeCommands();
-function openSettings() {
-  if (props.currentProject)
-    void api
-      .executeCommand("ide.workbench.settings.open", undefined, {
-        scope: `editor:${props.currentProject.id}`,
-      })
-      .catch(reportError);
-}
+defineProps<{ currentProject?: ProjectLocation }>();
 const { projects, openPath } = useProjects();
 const route = useRoute();
 const router = useRouter();
@@ -146,14 +136,7 @@ const navigatePath = (path: string) =>
         :navigate="navigatePath"
       />
       <nav class="nav">
-        <button
-          v-if="currentProject"
-          data-command="ide.workbench.settings.open"
-          @click="openSettings"
-        >
-          настройки
-        </button>
-        <router-link v-else to="/settings">настройки</router-link>
+        <router-link v-if="!currentProject" to="/settings">настройки</router-link>
         <span
           class="count"
           :class="{ active: running }"
