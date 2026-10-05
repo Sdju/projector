@@ -26,6 +26,7 @@ export {
   parseProjectRef,
   formatProjectRef,
   projectRefSegments,
+  isAbsoluteLocalPath,
 } from "../../../core/modules/project/index.ts";
 export type { ProjectRef } from "../../../core/modules/project/index.ts";
 export type { ProjectLocation } from "./model/types.ts";

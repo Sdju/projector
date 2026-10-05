@@ -52,13 +52,14 @@ const candidate = computed(() => entries.value[selected.value < 0 ? 0 : selected
 const completion = computed(() => {
   if (!editing.value || !caretAtEnd.value || !candidate.value) return "";
   const name = candidate.value.name;
-  const slash = value.value.lastIndexOf("/");
+  const slash = Math.max(value.value.lastIndexOf("/"), value.value.lastIndexOf("\\"));
   const prefix = value.value.slice(slash + 1);
+  const separator = value.value.includes("\\") ? "\\" : "/";
   if (value.value === "~") return "";
   const matches = remoteInput.value
     ? name.toLowerCase().startsWith(prefix.toLowerCase())
     : name.startsWith(prefix);
-  return matches ? name.slice(prefix.length) + (remoteInput.value ? "" : "/") : "";
+  return matches ? name.slice(prefix.length) + (remoteInput.value ? "" : separator) : "";
 });
 async function edit(path = props.path) {
   if (busy.value) return;

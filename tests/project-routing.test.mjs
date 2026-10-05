@@ -7,6 +7,7 @@ import { createServer } from "node:http";
 import { once } from "node:events";
 import { createRouter, createMemoryHistory } from "vue-router";
 import { projectRoute, projectPathFromParams } from "../src/modules/project/project-route.ts";
+import { parseProjectRef, projectRefSegments } from "../core/modules/project/index.ts";
 
 test("project URLs round-trip nested paths, root and reserved characters", () => {
   const router = createRouter({
@@ -24,6 +25,37 @@ test("project URLs round-trip nested paths, root and reserved characters", () =>
     assert.equal(route.hash, "");
     assert.equal(projectPathFromParams(route.params.projectPath), path);
   }
+});
+
+test("Windows project URLs use one segment per directory and restore native separators", () => {
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: "/projects/:projectPath(.*)+", name: "project", component: {} }],
+  });
+  const path = "C:\\Users\\DChernov\\home\\pr\\my\\projector";
+  const route = router.resolve(projectRoute(path));
+  assert.equal(route.href.includes("%5C"), false);
+  assert.equal(route.href, "/projects/C:/Users/DChernov/home/pr/my/projector");
+  assert.equal(projectPathFromParams(route.params.projectPath), path);
+  assert.equal(projectPathFromParams("C:\\Users\\DChernov\\home\\pr\\my\\projector"), path);
+  assert.equal(projectRoute("C:\\"), "/projects/C:");
+  assert.equal(projectPathFromParams(["C:"]), "C:\\");
+  const unc = "\\\\server\\share\\dir";
+  assert.equal(projectPathFromParams(router.resolve(projectRoute(unc)).params.projectPath), unc);
+  assert.deepEqual(projectRefSegments(parseProjectRef(path)), [
+    { name: "C:", path: "C:\\" },
+    { name: "Users", path: "C:\\Users" },
+    { name: "DChernov", path: "C:\\Users\\DChernov" },
+    { name: "home", path: "C:\\Users\\DChernov\\home" },
+    { name: "pr", path: "C:\\Users\\DChernov\\home\\pr" },
+    { name: "my", path: "C:\\Users\\DChernov\\home\\pr\\my" },
+    { name: "projector", path: "C:\\Users\\DChernov\\home\\pr\\my\\projector" },
+  ]);
+  const reserved = "C:\\tmp\\проект # ? %\\child";
+  assert.equal(
+    projectPathFromParams(router.resolve(projectRoute(reserved)).params.projectPath),
+    reserved,
+  );
 });
 
 test("opening a path reuses saved settings and resolves arbitrary directories once", async () => {

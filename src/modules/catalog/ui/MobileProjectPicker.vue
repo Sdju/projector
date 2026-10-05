@@ -7,6 +7,7 @@ import {
   useProjects,
   projectRoute,
   parseProjectRef,
+  isAbsoluteLocalPath,
   projectIconUrl,
   type ProjectLocation,
 } from "../../project/index.ts";
@@ -56,7 +57,8 @@ commands.scope.registerCommand({
       settings: "/settings",
     };
     const target =
-      typeof path === "string" && (path.startsWith("/") || parseProjectRef(path).kind === "github")
+      typeof path === "string" &&
+        (isAbsoluteLocalPath(path) || parseProjectRef(path).kind === "github")
         ? projectRoute(path)
         : typeof page === "string"
           ? pages[page]

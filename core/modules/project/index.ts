@@ -13,4 +13,7 @@ export {
   formatProjectRef,
   projectRefSegments,
   normalizeGithubRepository,
+  isAbsoluteLocalPath,
+  pathToUrlSegments,
+  pathFromUrlSegments,
 } from "./ref.ts";
