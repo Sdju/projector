@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, shallowRef, ref } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, shallowRef, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { isLauncherWindow } from "../modules/launcher/index.ts";
 import { createLauncherClient } from "../../core/modules/launcher/index.ts";
@@ -34,8 +34,19 @@ async function hide() {
     input.value?.focus();
   }
 }
-async function launch(item = items.value[selected.value], secondary = false) {
-  const action = secondary ? item?.actions?.[1]?.id : item?.actions?.[0]?.id;
+const panel = ref(false);
+const panelIndex = ref(0);
+const current = computed(() => items.value[selected.value]);
+const panelActions = computed(() => current.value?.actions ?? []);
+watch([query, selected], () => (panel.value = false));
+function openPanel() {
+  if (panelActions.value.length < 2) return;
+  panelIndex.value = 0;
+  panel.value = true;
+}
+async function launch(item = items.value[selected.value], index = 0) {
+  panel.value = false;
+  const action = item?.actions?.[index]?.id;
   if (!action) return;
   const ok = await model.launch(item, action, !webWindow);
   if (ok && !webWindow && state.value.route) {
@@ -53,13 +64,27 @@ async function launch(item = items.value[selected.value], secondary = false) {
   input.value?.focus();
 }
 function key(event: KeyboardEvent) {
-  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+  if (panel.value) {
+    event.preventDefault();
+    if (event.key === "ArrowDown" || event.key === "ArrowUp")
+      panelIndex.value =
+        (panelIndex.value + (event.key === "ArrowDown" ? 1 : -1) + panelActions.value.length) %
+        panelActions.value.length;
+    else if (event.key === "Enter") void launch(current.value, panelIndex.value);
+    else if (event.key === "Escape" || event.key === "ArrowLeft" || event.key === "Tab")
+      panel.value = false;
+    return;
+  }
+  if (event.key === "Tab" || (event.key === "k" && (event.ctrlKey || event.metaKey))) {
+    event.preventDefault();
+    openPanel();
+  } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
     event.preventDefault();
     model.move(event.key === "ArrowDown" ? 1 : -1);
     void nextTick(() => list.value?.children[selected.value]?.scrollIntoView({ block: "nearest" }));
   } else if (event.key === "Enter") {
     event.preventDefault();
-    void launch(undefined, event.ctrlKey || event.metaKey);
+    void launch(undefined, event.ctrlKey || event.metaKey ? 1 : 0);
   } else if (event.key === "Escape") {
     event.preventDefault();
     void hide().catch((error) => model.reportError(error));
@@ -139,7 +164,13 @@ onUnmounted(() => {
         >
           <img v-if="item.icon" :src="item.icon" alt="" width="36" height="36" />
           <span class="result-copy"
-            ><span class="name">{{ item.name }}</span
+            ><span class="name"
+              ><span
+                v-if="item.status"
+                class="status-dot"
+                :title="item.status.label"
+                aria-hidden="true"
+              />{{ item.name }}</span
             ><span class="description">{{ item.description }}</span></span
           >
           <span v-if="index === selected" class="enter" aria-hidden="true"
@@ -150,6 +181,30 @@ onUnmounted(() => {
           >
         </button>
       </div>
+      <div
+        v-if="panel"
+        class="actions-panel"
+        role="listbox"
+        :aria-label="`Действия: ${current?.name}`"
+      >
+        <div class="panel-title">{{ current?.name }}</div>
+        <button
+          v-for="(action, index) in panelActions"
+          :key="action.id"
+          role="option"
+          class="result"
+          :class="{ selected: index === panelIndex }"
+          :aria-selected="index === panelIndex"
+          tabindex="-1"
+          @mousemove="panelIndex = index"
+          @click="launch(current, index)"
+        >
+          <span class="name">{{ action.title }}</span>
+          <span class="enter" aria-hidden="true">{{
+            index === 0 ? "↵" : index === 1 ? "Ctrl+↵" : ""
+          }}</span>
+        </button>
+      </div>
       <p v-if="!loading && !items.length && !error" class="empty">Ничего не найдено</p>
       <p v-if="error || warning || notice" class="message" :class="{ error }" role="status">
         {{ error || warning || notice }}
@@ -157,7 +212,9 @@ onUnmounted(() => {
       <footer class="palette-footer">
         <span
           >↑↓ выбрать <span class="separator">·</span> Enter выполнить
-          <span class="separator">·</span> Esc {{ webWindow ? "закрыть" : "очистить" }}</span
+          <span class="separator">·</span> Ctrl+Enter второе <span class="separator">·</span> Tab
+          все действия <span class="separator">·</span> Esc
+          {{ webWindow ? "закрыть" : "очистить" }}</span
         >
         <router-link to="/projects">Проекты →</router-link>
       </footer>
@@ -274,6 +331,27 @@ onUnmounted(() => {
 }
 .enter {
   color: var(--muted);
+  white-space: nowrap;
+}
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: var(--sp-2);
+  border-radius: var(--r-full);
+  background: var(--run);
+}
+.actions-panel {
+  padding: var(--sp-2);
+  border-top: 1px solid var(--line);
+}
+.actions-panel .result {
+  justify-content: space-between;
+}
+.panel-title {
+  padding: var(--sp-1) var(--sp-3);
+  color: var(--muted);
+  font-size: var(--fs-xs);
 }
 .empty,
 .message {

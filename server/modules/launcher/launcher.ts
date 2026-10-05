@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { os } from "../../../core/modules/os/index.ts";
 import { loadProjects } from "../projects/index.ts";
-import { getSnapshot, startProject } from "../processes/index.ts";
+import { getSnapshot, startProject, stopProject } from "../processes/index.ts";
 import { openBrowser, openWindow } from "../window/index.ts";
 import { desktopArgs } from "../window/index.ts";
 import type {
@@ -117,12 +117,16 @@ export function workspaceRoute(path: string): string {
 
 function projectItem(project: Project): LaunchItem {
   const command = project.commands.find((c) => c.id === project.defaultCommandId);
-  const running = ["running", "starting"].includes(getSnapshot(project.id).status);
+  const state = getSnapshot(project.id).status;
+  const running = state === "running" || state === "starting";
   return {
     id: `project:${project.id}`,
     name: project.name,
     kind: "project",
     description: `проект · ${running ? "работает" : (command?.name ?? "без команды")}`,
+    status: running
+      ? { state, label: state === "starting" ? "запускается" : "работает" }
+      : undefined,
     keywords: project.path,
     icon: `/api/projects/${encodeURIComponent(project.id)}/icon`,
     actions: [
@@ -135,6 +139,7 @@ function projectItem(project: Project): LaunchItem {
             },
           ]
         : []),
+      ...(running ? [{ id: "stop" as const, title: "Остановить" }] : []),
     ],
   };
 }
@@ -194,7 +199,11 @@ export async function launchItem(
   } else if (id.startsWith("project:")) {
     const project = (await loadProjects()).find((p) => `project:${p.id}` === id);
     if (!project) throw new Error("Проект не найден");
-    if (action === "launch") throw new Error("Для проекта доступны открытие и запуск");
+    if (action === "launch") throw new Error("Для проекта доступны открытие, запуск и остановка");
+    if (action === "stop") {
+      stopProject(project.id);
+      return result;
+    }
     if (action !== "run") {
       result.route = workspaceRoute(project.path);
       if (!inline) {

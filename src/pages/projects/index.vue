@@ -4,15 +4,12 @@ import { ref } from "vue";
 import { isFileDrag, pathsFromDataTransfer } from "../../modules/path-drop/index.ts";
 import { useAddSession } from "../../modules/project-composer/index.ts";
 import { AddComposer } from "../../modules/project-composer/index.ts";
-import { useRouter } from "vue-router";
 import { GithubImport } from "../../modules/integrations/index.ts";
-import UiButton from "../../common/ui/UiButton.vue";
-import { useProjects, projectRoute } from "../../modules/project/index.ts";
+import { useProjects } from "../../modules/project/index.ts";
 import { ProjectCard } from "../../modules/catalog/index.ts";
 import { RunControls } from "../../modules/runner/index.ts";
 
 const { projects, loading, error } = useProjects();
-const router = useRouter();
 const add = useAddSession();
 const dragging = ref(false);
 let dragDepth = 0;
@@ -59,7 +56,6 @@ async function dropProjects(event: DragEvent) {
 
     <ProjectCard v-for="project in projects" :key="project.id" :project="project">
       <RunControls :project="project" compact />
-      <UiButton variant="chip" @click="router.push(projectRoute(project.path))">ещё</UiButton>
     </ProjectCard>
   </section>
 </template>

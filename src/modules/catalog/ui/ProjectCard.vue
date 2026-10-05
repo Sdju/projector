@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { projectIconUrl, shortPath, statusLabel } from "../../project/index.ts";
+import { projectIconUrl, projectRoute, shortPath, statusLabel } from "../../project/index.ts";
 import type { Project } from "../../project/index.ts";
 
 const props = defineProps<{
@@ -16,7 +16,11 @@ const busy = computed(() => status.value === "running" || status.value === "star
     <div class="top">
       <span class="dot" :class="status" />
       <img class="icon" :src="projectIconUrl(project)" alt="" />
-      <h2>{{ project.name }}</h2>
+      <h2>
+        <router-link class="open" :to="projectRoute(project.path)" title="Открыть воркспейс">{{
+          project.name
+        }}</router-link>
+      </h2>
       <p class="path">{{ shortPath(project.path) }}</p>
       <span class="meta">{{ statusLabel(status) }}</span>
     </div>
@@ -59,6 +63,15 @@ h2 {
   font-size: var(--fs-md);
   font-weight: 500;
   flex: 0 0 auto;
+}
+
+.open {
+  color: inherit;
+  text-decoration: none;
+}
+.open:hover,
+.open:focus-visible {
+  text-decoration: underline;
 }
 
 .meta {

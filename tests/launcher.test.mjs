@@ -138,6 +138,16 @@ if (process.argv.includes("--prepare")) {
       })
     ).json();
     assert.match(opened.route, /^\/projects\//);
+    assert.equal(projectItem.status, undefined);
+    assert.equal(
+      (
+        await request("/api/launcher/launch", "POST", {
+          id: "project:probe-project",
+          action: "stop",
+        })
+      ).status,
+      200,
+    );
     assert.equal(getSnapshot("probe-project").status, "idle");
     assert.equal(
       (

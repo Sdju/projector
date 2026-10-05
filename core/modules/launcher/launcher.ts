@@ -1,7 +1,7 @@
 export type InterfaceMode = "native" | "window" | "browser";
 export const shortcuts = ["", "Ctrl+Alt+Space", "Super+Space", "Alt+Space"];
-/** `launch` — запуск приложения; `open` — воркспейс проекта; `run` — основная команда проекта. */
-export type LaunchActionId = "launch" | "open" | "run";
+/** `launch` — запуск приложения; `open` — воркспейс проекта; `run` — основная команда проекта; `stop` — остановка запущенного. */
+export type LaunchActionId = "launch" | "open" | "run" | "stop";
 export interface LaunchAction {
   id: LaunchActionId;
   title: string;
@@ -13,6 +13,8 @@ export interface LaunchItem {
   keywords: string;
   kind: "application" | "project";
   icon?: string;
+  /** Живое состояние проекта; у приложений нет. */
+  status?: { state: "running" | "starting"; label: string };
   /** Первое действие выполняется по Enter, второе — по Ctrl+Enter. */
   actions?: LaunchAction[];
 }
