@@ -28,3 +28,15 @@ export type {
   IssueList,
   IssueUser,
 } from "./contract.ts";
+export type { FilesExcludeMap } from "./files-exclude.ts";
+export {
+  ALWAYS_FILES_EXCLUDE,
+  DEFAULT_FILES_EXCLUDE,
+  activeExcludePatterns,
+  defaultFilesExclude,
+  isExcludedPath,
+  isValidExcludePattern,
+  matchGlob,
+  migratePattern,
+  normalizeFilesExclude,
+} from "./files-exclude.ts";

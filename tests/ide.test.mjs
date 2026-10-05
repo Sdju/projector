@@ -453,6 +453,68 @@ test("editor themes default, persist, reject unknown values and protect HTTP wri
   assert.deepEqual(await readEditorSettings(), { theme: "projector-soft" });
 });
 
+test("files exclude defaults, persist globs, reject invalid patterns and protect HTTP writes", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "projector-files-exclude-"));
+  const previous = process.env.XDG_DATA_HOME;
+  process.env.XDG_DATA_HOME = directory;
+  const { readFilesExclude, writeFilesExclude } = await import("../server/modules/workspace/index.ts");
+  const { defaultFilesExclude } = await import("../core/modules/workspace/index.ts");
+  const { createServer } = await import("node:http");
+  const { once } = await import("node:events");
+  const { handleApi } = await import("../server/app/api.ts");
+  const server = createServer((req, res) => void handleApi(req, res));
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(async () => {
+    await new Promise((resolve) => server.close(resolve));
+    if (previous === undefined) delete process.env.XDG_DATA_HOME;
+    else process.env.XDG_DATA_HOME = previous;
+    await rm(directory, { recursive: true, force: true });
+  });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const url = base + "/api/ide/files-exclude";
+  const put = (exclude, origin = base) =>
+    fetch(url, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Origin: origin },
+      body: JSON.stringify({ exclude }),
+    });
+  assert.deepEqual(await readFilesExclude(), defaultFilesExclude());
+  assert.equal(
+    (await put({ ...defaultFilesExclude(), "**/node_modules": false }, "https://foreign.test")).status,
+    403,
+  );
+  assert.equal((await put({ ...defaultFilesExclude(), "**/node_modules": false })).status, 200);
+  assert.equal((await readFilesExclude())["**/node_modules"], false);
+  assert.equal(
+    (await put({ ...defaultFilesExclude(), "../escape": true, ".projector-trash": true })).status,
+    200,
+  );
+  const saved = await readFilesExclude();
+  assert.equal(saved["../escape"], undefined);
+  assert.equal(saved[".projector-trash"], undefined);
+  assert.equal(saved["**/.projector-trash"], undefined);
+  assert.equal(saved["**/node_modules"], true);
+  const response = await fetch(url);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.deepEqual((await response.json()).exclude, defaultFilesExclude());
+  await writeFilesExclude({
+    ...defaultFilesExclude(),
+    "**/custom_build": true,
+    "**/dist": false,
+    "*.log": true,
+  });
+  const file = join(directory, "projector", "files-exclude.json");
+  assert.deepEqual(JSON.parse(await readFile(file, "utf8")), {
+    exclude: {
+      ...defaultFilesExclude(),
+      "**/custom_build": true,
+      "**/dist": false,
+      "*.log": true,
+    },
+  });
+});
+
 test("mode switch is unavailable for the mode the server already runs in", async (t) => {
   const ctx = reloadHost(t, [
     { ok: true, app: "projector", pid: 10, mode: "dev" },

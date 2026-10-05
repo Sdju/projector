@@ -3,23 +3,11 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
 import { realpath } from "node:fs/promises";
 import { promisify } from "node:util";
 import { HttpError } from "../http/index.ts";
+import { excludePatterns, pathIsExcluded } from "./files-exclude.ts";
 
 export const exec = promisify(execFile);
 export const MAX_BYTES = 1024 * 1024;
-export const excluded = new Set([
-  ".git",
-  ".projector-trash",
-  "node_modules",
-  "dist",
-  "build",
-  ".next",
-  ".nuxt",
-  ".output",
-  "coverage",
-  ".cache",
-  ".venv",
-  "vendor",
-]);
+export { excludePatterns, pathIsExcluded };
 export function within(root: string, path: string) {
   const rel = relative(root, path);
   return rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
@@ -38,4 +26,11 @@ export async function location(root: string, path: string) {
 export function decode(buffer: Buffer) {
   if (buffer.includes(0)) throw new HttpError(415, "Бинарный файл — просмотр текста недоступен");
   return buffer.toString("utf8");
+}
+export async function pathExcluded(path: string) {
+  if (!path || path.split("/").some((part) => !part || part === ".")) return true;
+  return pathIsExcluded(path);
+}
+export async function nameExcluded(name: string) {
+  return pathIsExcluded(name);
 }

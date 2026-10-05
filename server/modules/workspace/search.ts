@@ -1,7 +1,7 @@
 import { os } from "../../../core/modules/os/index.ts";
 import { realpath } from "node:fs/promises";
 import { HttpError } from "../http/index.ts";
-import { MAX_BYTES, excluded } from "./paths.ts";
+import { MAX_BYTES, excludePatterns } from "./paths.ts";
 import type {
   SearchHit,
   SearchMatch,
@@ -26,7 +26,11 @@ export async function searchProject(root: string, query: string, options: Search
     if (!options.regex) args.push("--fixed-strings");
     args.push(options.caseSensitive ? "--case-sensitive" : "--ignore-case");
     if (options.wholeWord) args.push("--word-regexp");
-    args.push(...[...excluded].flatMap((name) => ["--glob", `!${name}/**`]), "--", query, ".");
+    for (const pattern of await excludePatterns()) {
+      args.push("--glob", `!${pattern}`);
+      if (!pattern.endsWith("/**")) args.push("--glob", `!${pattern}/**`);
+    }
+    args.push("--", query, ".");
     const result = await os.tools.searchFiles(args, {
       cwd: base,
       maxBuffer: 4 * MAX_BYTES,

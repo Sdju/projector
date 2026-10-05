@@ -27,13 +27,25 @@ import {
   saveProjectFile,
   readProjectImage,
   previewProjectFile,
+  withFilesExclude,
 } from "../server/modules/workspace/index.ts";
 import { projectRelativePath, previewBrowserFile } from "../src/modules/workspace/file-drop.ts";
-import { moveDestination, parentPath, relocatedPath } from "../core/modules/workspace/index.ts";
+import {
+  defaultFilesExclude,
+  moveDestination,
+  parentPath,
+  relocatedPath,
+} from "../core/modules/workspace/index.ts";
 import {
   fitImage,
   zoomImageAt,
 } from "../src/modules/workspace/modules/viewers/lib/image-viewport.ts";
+
+/** Workspace excludes are global settings; isolate them from the developer machine. */
+function withDefaultExcludes(run) {
+  return withFilesExclude(defaultFilesExclude(), run);
+}
+
 test("image zoom keeps the cursor anchor fixed, including at zoom limits", () => {
   const initial = { zoom: 2, x: 40, y: -30 };
   const anchor = { x: 130, y: 75 };
@@ -267,6 +279,7 @@ test("tree move destinations and open-file paths respect directory boundaries", 
 });
 
 test("moves preserve contents, never overwrite, and reject self, traversal, excluded and symlink paths", async () => {
+  await withDefaultExcludes(async () => {
   const base = await mkdtemp(join(tmpdir(), "projector-move-"));
   try {
     for (const folder of ["src/nested", "docs", "other", ".git", "node_modules"])
@@ -325,8 +338,36 @@ test("moves preserve contents, never overwrite, and reject self, traversal, excl
   } finally {
     await rm(base, { recursive: true, force: true });
   }
+  });
 });
+
+test("files exclude setting controls tree visibility for node_modules", async () => {
+  const root = await mkdtemp(join(tmpdir(), "projector-exclude-project-"));
+  try {
+    await mkdir(join(root, "node_modules"));
+    await writeFile(join(root, "readme.md"), "hi");
+    await withFilesExclude(defaultFilesExclude(), async () => {
+      assert.ok(
+        !(await listProjectDirectory(root)).entries.some((entry) => entry.name === "node_modules"),
+      );
+      const next = { ...defaultFilesExclude() };
+      delete next["**/node_modules"];
+      await withFilesExclude(next, async () => {
+        assert.ok(
+          (await listProjectDirectory(root)).entries.some((entry) => entry.name === "node_modules"),
+        );
+      });
+      assert.ok(
+        !(await listProjectDirectory(root)).entries.some((entry) => entry.name === "node_modules"),
+      );
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("workspace tree, bounded reading, traversal and symlink containment, literal search", async () => {
+  await withDefaultExcludes(async () => {
   try {
     await mkdir(join(root, "src"));
     await mkdir(join(root, "node_modules"));
@@ -387,6 +428,7 @@ test("workspace tree, bounded reading, traversal and symlink containment, litera
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+  });
 });
 
 test("Git gutter returns the index text of tracked files only", async () => {

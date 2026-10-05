@@ -1,7 +1,9 @@
 import { environmentForPath, runEnvironmentCommand } from "../environments/index.ts";
 import { lstat, realpath } from "node:fs/promises";
 import { HttpError } from "../http/index.ts";
-import { MAX_BYTES, decode, excluded, exec, location, validatePath } from "./paths.ts";
+import { MAX_BYTES, decode, exec, location, pathExcluded, validatePath } from "./paths.ts";
+import { isExcludedPath } from "../../../core/modules/workspace/index.ts";
+import { excludePatterns } from "./files-exclude.ts";
 import { mutateProjectEntry, mutationLocation, readProjectFile } from "./files.ts";
 import type {
   FileComparison,
@@ -104,11 +106,7 @@ export async function mutateProjectGit(
     throw new HttpError(400, "Укажите файлы Git");
   for (const path of paths) {
     validatePath(path);
-    if (
-      !path ||
-      path.includes("\\") ||
-      path.split("/").some((part) => !part || part === "." || excluded.has(part))
-    )
+    if (!path || path.includes("\\") || (await pathExcluded(path)))
       throw new HttpError(403, "Выберите файл проекта");
   }
   const base = await realpath(root);
@@ -120,6 +118,7 @@ export async function mutateProjectGit(
       return change;
     });
     const indexPaths = new Set(paths);
+    const patterns = await excludePatterns();
     // Validate the entire selection before changing the shared index.
     for (const change of selected) {
       let ancestor = change.path;
@@ -147,7 +146,7 @@ export async function mutateProjectGit(
               "Переименование пересекает границу проекта. Откройте корень репозитория.",
             );
           validatePath(change.originalPath);
-          if (change.originalPath.split("/").some((part) => excluded.has(part)))
+          if (isExcludedPath(change.originalPath, patterns))
             throw new HttpError(403, "Недоступный путь Git");
           indexPaths.add(change.originalPath);
         }

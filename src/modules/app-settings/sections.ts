@@ -1,5 +1,5 @@
 import { InterfaceSettings } from "../launcher/index.ts";
-import { EditorSettings } from "../workspace/index.ts";
+import { EditorSettings, FilesExcludeSettings } from "../workspace/index.ts";
 import { KeybindingsEditor } from "../ide/index.ts";
 import { NetworkSettings } from "../network/index.ts";
 import { IntegrationSettings } from "../integrations/index.ts";
@@ -23,6 +23,16 @@ export const settingsSections: SettingsSection[] = [
     description: "Тема кода и сравнения изменений во всех проектах.",
     keywords: "цвет тема подсветка код diff",
     component: EditorSettings,
+    props: { embedded: true },
+  },
+  {
+    id: "files",
+    title: "Файлы",
+    group: "Среда",
+    description: "Исключения дерева проекта и поиска через glob-паттерны files.exclude.",
+    keywords:
+      "exclude files.exclude glob скрыть дерево node_modules dist .git vendor coverage поиск файлы",
+    component: FilesExcludeSettings,
     props: { embedded: true },
   },
   {

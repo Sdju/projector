@@ -12,3 +12,4 @@ export { projectGit, projectComparison, projectGutter, mutateProjectGit } from "
 export { projectBranches, mutateProjectBranch } from "./git-branches.ts";
 export { previewExternalFile, readExternalImage } from "./external-files.ts";
 export { projectLog, projectCommit, projectCommitComparison } from "./git-history.ts";
+export { readFilesExclude, writeFilesExclude, excludePatterns, pathIsExcluded, withFilesExclude } from "./files-exclude.ts";

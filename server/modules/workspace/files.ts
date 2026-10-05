@@ -6,7 +6,16 @@ import { fileURLToPath } from "node:url";
 import { HttpError } from "../http/index.ts";
 import { moveDestination, treePageRange } from "../../../core/modules/workspace/index.ts";
 import { ignoredPaths } from "./ignored.ts";
-import { MAX_BYTES, decode, excluded, location, validatePath } from "./paths.ts";
+import {
+  MAX_BYTES,
+  decode,
+  excludePatterns,
+  location,
+  nameExcluded,
+  pathExcluded,
+  validatePath,
+} from "./paths.ts";
+import { isExcludedPath } from "../../../core/modules/workspace/index.ts";
 
 const archiveHelper = fileURLToPath(new URL("./archive.py", import.meta.url));
 import type { FileContent, ArchiveContent } from "../../../core/modules/workspace/index.ts";
@@ -34,10 +43,7 @@ export async function saveProjectFile(
   original: string,
 ) {
   validatePath(path);
-  if (
-    path.includes("\\") ||
-    path.split("/").some((part) => !part || part === "." || excluded.has(part))
-  )
+  if (path.includes("\\") || (await pathExcluded(path)))
     throw new HttpError(403, "Выберите файл дерева проекта");
   if (Buffer.byteLength(content) > MAX_BYTES || Buffer.byteLength(original) > MAX_BYTES)
     throw new HttpError(413, "Файл больше 1 МБ");
@@ -146,8 +152,13 @@ export async function listProjectDirectory(
   params: Record<string, string> = {},
 ) {
   const full = await location(root, path);
+  const patterns = await excludePatterns();
   const entries = (await readdir(full, { withFileTypes: true }))
-    .filter((entry) => !excluded.has(entry.name) && (entry.isDirectory() || entry.isFile()))
+    .filter((entry) => {
+      if (!(entry.isDirectory() || entry.isFile())) return false;
+      const relative = path ? `${path}/${entry.name}` : entry.name;
+      return !isExcludedPath(relative, patterns);
+    })
     .sort(
       (a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name),
     );
@@ -191,11 +202,11 @@ export async function moveProjectEntry(
   // Mutations only accept canonical visible tree entries, never symlink aliases.
   for (const value of [path, directory]) {
     validatePath(value);
-    if (value && value.split("/").some((part) => !part || part === "." || excluded.has(part)))
+    if (value && (await pathExcluded(value)))
       throw new HttpError(403, "Перенос доступен только для файлов дерева проекта");
     if (value.includes("\\")) throw new HttpError(403, "Некорректный путь");
   }
-  if (name !== undefined) validateEntryName(name);
+  if (name !== undefined) await validateEntryName(name);
   const destination =
     name === undefined
       ? moveDestination(path, directory)
@@ -243,17 +254,13 @@ export async function moveProjectEntry(
   if (remains) throw new HttpError(409, "Не удалось перенести: запись назначения уже существует");
   return { source: path, destination };
 }
-export function validateEntryName(name: string) {
-  if (!name.trim() || name === "." || name === ".." || /[/\\\0]/.test(name) || excluded.has(name))
+export async function validateEntryName(name: string) {
+  if (!name.trim() || name === "." || name === ".." || /[/\\\0]/.test(name) || (await nameExcluded(name)))
     throw new HttpError(400, "Укажите имя без разделителей пути");
 }
 export async function mutationLocation(root: string, path: string, allowRoot = false) {
   validatePath(path);
-  if (
-    (!path && !allowRoot) ||
-    path.includes("\\") ||
-    (path && path.split("/").some((part) => !part || part === "." || excluded.has(part)))
-  )
+  if ((!path && !allowRoot) || path.includes("\\") || (path && (await pathExcluded(path))))
     throw new HttpError(403, "Выберите запись дерева проекта");
   const base = await realpath(root);
   const full = await location(base, path);
@@ -269,7 +276,7 @@ export async function mutateProjectEntry(
   name = "",
 ) {
   if (action === "rename") {
-    validateEntryName(name);
+    await validateEntryName(name);
     await mutationLocation(root, path);
     return moveProjectEntry(root, path, path.split("/").slice(0, -1).join("/"), name);
   }
@@ -285,7 +292,7 @@ export async function mutateProjectEntry(
   }
   if (!["create-file", "create-directory", "copy"].includes(action))
     throw new HttpError(400, "Неизвестное действие");
-  validateEntryName(name);
+  await validateEntryName(name);
   const parent = await mutationLocation(root, directory, true);
   if (!(await lstat(parent)).isDirectory()) throw new HttpError(400, "Выберите папку назначения");
   const destination = directory ? `${directory}/${name}` : name;

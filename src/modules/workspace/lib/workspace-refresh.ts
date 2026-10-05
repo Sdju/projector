@@ -1,7 +1,9 @@
 import type { Ref } from "vue";
+import { watch } from "vue";
 import { relocatedPath } from "../../../../core/modules/workspace/index.ts";
 import { replacePanel, type DockLayout } from "../../dock/index.ts";
 import { refreshWorkspace, type WorkspaceCapabilities } from "../../workspace-api/index.ts";
+import { filesExcludeRevision } from "../modules/tree/index.ts";
 import type { OpenFile } from "../open-file.ts";
 import type { useOpenFiles } from "./open-files.ts";
 
@@ -21,6 +23,9 @@ export interface WorkspaceRefreshContext {
 
 /** Re-reading the workspace after the source changed, and keeping open tabs valid after a move. */
 export function useWorkspaceRefresh(ctx: WorkspaceRefreshContext) {
+  watch(filesExcludeRevision, () => {
+    ctx.revision.value++;
+  });
   const { tabs, files } = ctx;
   const { openFile, openBrowserFile, closeTab, selectTab } = files;
   async function refresh() {
