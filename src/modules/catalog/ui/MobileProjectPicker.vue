@@ -40,7 +40,7 @@ commands.scope.registerCommand({
     "Открывает папку проекта либо поиск, список проектов или настройки из мобильной шапки.",
   arguments: {
     path: "Абсолютный путь к папке проекта или gh:/owner/repository",
-    page: "search, projects или settings",
+    page: "search или settings",
   },
   run: async (value) => {
     const { path, page } = commandArgs(value);
@@ -53,7 +53,6 @@ commands.scope.registerCommand({
     }
     const pages: Record<string, string> = {
       search: "/",
-      projects: "/projects",
       settings: "/settings",
     };
     const target =
@@ -118,9 +117,6 @@ const navigate = (path: string) =>
       <nav>
         <button @click="commands.run('ide.project.picker.navigate', { page: 'search' })">
           Поиск
-        </button>
-        <button @click="commands.run('ide.project.picker.navigate', { page: 'projects' })">
-          Все проекты
         </button>
         <button @click="commands.run('ide.project.picker.navigate', { page: 'settings' })">
           Настройки

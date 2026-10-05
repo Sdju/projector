@@ -13,11 +13,9 @@ test("project URLs round-trip nested paths, root and reserved characters", () =>
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      { path: "/projects", name: "home", component: {} },
       { path: "/projects/:projectPath(.*)+", name: "project", component: {} },
     ],
   });
-  assert.equal(router.resolve("/projects").name, "home");
   for (const path of ["/", "/tmp/nested/project", "/tmp/проект # ? %/child", "/tmp/%2F"]) {
     const route = router.resolve(projectRoute(path));
     assert.equal(route.name, "project");

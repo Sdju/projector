@@ -225,9 +225,6 @@ function disconnect() {
           <UiButton type="submit" :disabled="busy || !token.trim()">подключить GitHub</UiButton>
         </form>
       </details>
-      <router-link v-if="github.enabled && github.connected" to="/projects" class="link"
-        >перейти к импорту проектов →</router-link
-      >
     </article>
     <details class="storage">
       <summary>Хранение настроек и авторизации</summary>

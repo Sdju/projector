@@ -255,7 +255,6 @@ onUnmounted(() => {
           действия <span class="separator">·</span> Ctrl+D ★ <span class="separator">·</span> Esc
           {{ webWindow ? "закрыть" : "очистить" }}</span
         >
-        <router-link to="/projects">Проекты →</router-link>
       </footer>
     </section>
   </main>

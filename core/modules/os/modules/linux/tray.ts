@@ -95,7 +95,6 @@ class TrayMenu extends Interface {
   private items = new Map<number, Properties>([
     [0, { "children-display": new dbus.Variant("s", "submenu") }],
     [1, item("Открыть поиск")],
-    [2, item("Проекты")],
     [3, item("Настройки")],
     [4, { type: new dbus.Variant("s", "separator") }],
     [6, item("Перезапустить")],
@@ -186,7 +185,6 @@ export async function startTray(
   const menu = new TrayMenu(
     new Map([
       [1, activate],
-      [2, () => openPage("/projects")],
       [3, () => openPage("/settings")],
       [5, quit],
       [6, restart],

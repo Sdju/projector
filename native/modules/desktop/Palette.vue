@@ -450,10 +450,10 @@ defineExpose({ show, hide, toggle, invokeSelected, openPage, quitProjector, rest
         <VButton
           class="flat"
           @clicked="
-            openPage('/projects');
+            openPage('/settings');
             hide();
           "
-          >Проекты и настройки</VButton
+          >Настройки</VButton
         >
       </VBox>
     </VBox>

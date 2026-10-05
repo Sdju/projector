@@ -114,7 +114,7 @@ commands.scope.registerCommand({
 
     <div class="block footer">
       <UiButton variant="danger" :disabled="busy" @click="remove">Убрать из Projector</UiButton>
-      <router-link to="/projects">к списку проектов</router-link>
+      <router-link to="/">к поиску</router-link>
     </div>
   </section>
 </template>

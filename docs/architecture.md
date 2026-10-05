@@ -12,7 +12,7 @@ Projector использует FEOD для всех приложений и со
 | `packages/vio/examples/counter` | `app` — bootstrap GTK demo; `modules/counter` — компонент примера                                                                                                  |
 | `packages/vio/src`              | `app` — публичная композиция библиотеки; `modules` — renderer, GTK driver/components, SFC compiler, loader                                                         |
 
-Слой `app` собирает приложение. Модули не импортируют `app`, страницы, маршруты или middleware. Страницы независимы друг от друга; маршруты и middleware также независимы. HTTP dispatcher находится в `server/app/api.ts` и связывает их. Имена страниц соответствуют маршрутам: `/` → `pages/index.vue`, `/projects` → `pages/projects/index.vue`, `/projects/:id` → `pages/projects/[id].vue`, `/settings` → `pages/settings.vue`.
+Слой `app` собирает приложение. Модули не импортируют `app`, страницы, маршруты или middleware. Страницы независимы друг от друга; маршруты и middleware также независимы. HTTP dispatcher находится в `server/app/api.ts` и связывает их. Имена страниц соответствуют маршрутам: `/` → `pages/index.vue`, `/projects/:id` → `pages/projects/[id].vue`, `/settings` → `pages/settings.vue`.
 
 Внешние потребители модуля импортируют только его `index.ts`. Реализация остаётся приватной. Подмодуль может использовать реализацию родителя; родитель обращается к непосредственному подмодулю через его публичный API. Вложенные подмодули недоступны соседним модулям. Циклы зависимостей запрещены, включая зависимости типов.
 

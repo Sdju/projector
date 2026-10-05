@@ -40,16 +40,14 @@ watchEffect(() => {
   const page =
     route.name === "launcher"
       ? "поиск"
-      : route.name === "home"
-        ? "проекты"
-        : route.name === "github-project"
-          ? formatProjectRef({
-              kind: "github",
-              repository: githubRepositoryFromParams(route.params.githubPath),
-            })
-          : route.name === "settings"
-            ? "настройки"
-            : "проект";
+      : route.name === "github-project"
+        ? formatProjectRef({
+            kind: "github",
+            repository: githubRepositoryFromParams(route.params.githubPath),
+          })
+        : route.name === "settings"
+          ? "настройки"
+          : "проект";
   document.title = project ? `${project.name} — Projector` : `Projector — ${page}`;
   const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
   if (favicon) {

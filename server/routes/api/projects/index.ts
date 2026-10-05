@@ -37,13 +37,17 @@ export async function handleProjectsIndex({
     const draft = await inspectProject(directory, true);
     const candidate = normalizeProject({ ...draft });
     let project: Project = candidate;
+    let created = false;
     await updateProjects((projects) => {
       // Serialize duplicate opens so that terminals and settings share one ID.
       const current = projects.find((item) => expandPath(item.path) === directory);
       if (current) project = { ...current, path: directory };
-      else projects.unshift(candidate);
+      else {
+        projects.unshift(candidate);
+        created = true;
+      }
     });
-    json(res, 200, { project: withRuntime(project) });
+    json(res, 200, { project: withRuntime(project), created });
     return true;
   }
   if (path === "/api/projects" && method === "GET") {

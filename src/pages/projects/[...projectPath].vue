@@ -11,6 +11,7 @@ import {
 import { RunControls, useRunner } from "../../modules/runner/index.ts";
 import { DevcontainerTrust } from "../../modules/devcontainer/index.ts";
 import { ProjectWorkspace, type TabViews } from "../../modules/workspace/index.ts";
+import { projectInitPrompt, useAgent } from "../../modules/agent/index.ts";
 import { settingsTabViews } from "../../modules/app-settings/index.ts";
 
 const route = useRoute();
@@ -34,12 +35,25 @@ const tabViews: TabViews = {
         ref: settings,
         project: project.value,
         onDirty: (value: boolean) => (settingsDirty.value = value),
-        afterRemove: () => router.push("/projects"),
+        afterRemove: () => router.push("/"),
       }),
   },
 };
 
 const projectId = ref("");
+const workspace = ref<InstanceType<typeof ProjectWorkspace>>();
+// A project created by this visit gets an agent tab with a suggested initialization request.
+let initProjectId = "";
+function suggestInit(instance: unknown) {
+  workspace.value = instance as InstanceType<typeof ProjectWorkspace> | undefined;
+  if (!workspace.value || !initProjectId || initProjectId !== projectId.value) return;
+  const id = initProjectId;
+  initProjectId = "";
+  const agent = useAgent(id);
+  if (!agent.draft.value.trim() && !agent.turns.value.length)
+    agent.draft.value = projectInitPrompt;
+  workspace.value.openTab("agent");
+}
 const missing = ref(false);
 const opening = ref(false);
 const openError = ref("");
@@ -67,9 +81,10 @@ watch(
     openError.value = "";
     opening.value = true;
     try {
-      const { project: item, missing: gone } = await openPath(path);
+      const { project: item, missing: gone, created } = await openPath(path);
       if (active) {
         projectId.value = item.id;
+        initProjectId = created && !gone ? item.id : "";
         missing.value = gone;
         const canonical = projectRoute(item.path);
         if (route.path !== canonical) await router.replace(canonical);
@@ -91,12 +106,13 @@ watch(
       :key="project.id"
       :project="project"
       @restored="restored"
-      @removed="router.push('/projects')"
+      @removed="router.push('/')"
     />
   </section>
   <section v-else-if="project" class="project-page">
     <DevcontainerTrust :key="`${project.id}:${project.path}`" :project-id="project.id" />
     <ProjectWorkspace
+      :ref="suggestInit"
       :key="`${project.id}:${project.path}`"
       :project-id="project.id"
       :project-settings-dirty="settingsDirty"
@@ -116,7 +132,7 @@ watch(
     <p class="msg" :role="openError ? 'alert' : undefined">
       {{ opening ? "открываю проект…" : openError || "проект не найден" }}
     </p>
-    <router-link to="/projects">назад</router-link>
+    <router-link to="/">назад</router-link>
   </section>
 </template>
 

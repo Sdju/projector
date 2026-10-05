@@ -70,7 +70,7 @@ commands.scope.registerCommand({
   },
 });
 // Inside a workspace the terminal and file tree own dropped files; elsewhere a folder becomes a project.
-const dropsProjects = computed(() => route.name === "launcher" || route.name === "home");
+const dropsProjects = computed(() => route.name === "launcher");
 const dragging = ref(false);
 const dropError = ref("");
 let dragDepth = 0;
@@ -146,7 +146,6 @@ const navigatePath = (path: string) =>
         :navigate="navigatePath"
       />
       <nav class="nav">
-        <router-link to="/projects">проекты</router-link>
         <button
           v-if="currentProject"
           data-command="ide.workbench.settings.open"
