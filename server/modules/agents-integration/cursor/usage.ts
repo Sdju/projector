@@ -1,4 +1,5 @@
-import type { CursorUsage, CursorUsageWindow } from "../../../core/modules/cursor/index.ts";
+import { createUsageCache } from "../_/usage-cache.ts";
+import type { CursorUsage, CursorUsageWindow } from "../../../../core/modules/agents-integration/cursor/index.ts";
 import { readCursorUsage } from "./client.ts";
 
 const record = (value: unknown): Record<string, unknown> | null =>
@@ -42,26 +43,17 @@ const globalState = globalThis as typeof globalThis & {
 const state = (globalState.projectorCursorUsage ??= {});
 
 /** One poll for all windows, including during HMR; credentials stay on the server. */
-export function cursorUsage(): Promise<CursorUsage> {
-  if (state.pending) return state.pending;
-  if (state.value && Date.now() - state.value.checkedAt < 60000)
-    return Promise.resolve(state.value);
-  state.pending = (async (): Promise<CursorUsage> => {
-    try {
-      const windows = cursorWindows(await readCursorUsage());
-      return {
-        status: windows ? "ready" : "unavailable", windows, checkedAt: Date.now(),
-        message: windows ? null : "Лимиты Cursor недоступны",
-      };
-    } catch (error) {
-      return {
-        status: "unavailable", windows: null, checkedAt: Date.now(),
-        message: error instanceof Error ? error.message : "Cursor недоступен",
-      };
-    }
-  })().then((value) => {
-    state.value = value;
-    return value;
-  }).finally(() => { state.pending = undefined; });
-  return state.pending;
-}
+export const cursorUsage = createUsageCache(state, async (): Promise<CursorUsage> => {
+  try {
+    const windows = cursorWindows(await readCursorUsage());
+    return {
+      status: windows ? "ready" : "unavailable", windows, checkedAt: Date.now(),
+      message: windows ? null : "Лимиты Cursor недоступны",
+    };
+  } catch (error) {
+    return {
+      status: "unavailable", windows: null, checkedAt: Date.now(),
+      message: error instanceof Error ? error.message : "Cursor недоступен",
+    };
+  }
+});

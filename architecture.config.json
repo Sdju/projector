@@ -2,11 +2,13 @@
   "roots": {
     "src": {
       "kind": "frontend",
-      "dependencies": ["core"]
+      "dependencies": ["core"],
+      "transitModules": ["agents-integration"]
     },
     "server": {
       "kind": "backend",
-      "dependencies": ["core"]
+      "dependencies": ["core"],
+      "transitModules": ["agents-integration"]
     },
     "native": {
       "kind": "frontend",
@@ -14,7 +16,8 @@
     },
     "core": {
       "kind": "library",
-      "dependencies": []
+      "dependencies": [],
+      "transitModules": ["agents-integration"]
     },
     "cli": {
       "kind": "library",

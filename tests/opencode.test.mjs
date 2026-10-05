@@ -4,8 +4,8 @@ import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { os } from "../core/modules/os/index.ts";
-import { readGoUsage } from "../server/modules/opencode/client.ts";
-import { goWindows, openCodeUsage } from "../server/modules/opencode/usage.ts";
+import { readGoUsage } from "../server/modules/agents-integration/opencode/client.ts";
+import { goWindows, openCodeUsage } from "../server/modules/agents-integration/opencode/usage.ts";
 import { handleOpenCode } from "../server/routes/api/opencode.ts";
 import { resetCountdown } from "../src/common/utilities/reset-time.ts";
 

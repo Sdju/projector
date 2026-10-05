@@ -1,4 +1,5 @@
-import type { OpenCodeUsage, OpenCodeUsageWindow } from "../../../core/modules/opencode/index.ts";
+import { createUsageCache } from "../_/usage-cache.ts";
+import type { OpenCodeUsage, OpenCodeUsageWindow } from "../../../../core/modules/agents-integration/opencode/index.ts";
 import { readGoUsage } from "./client.ts";
 
 const record = (value: unknown): Record<string, unknown> | null =>
@@ -31,26 +32,17 @@ const globalState = globalThis as typeof globalThis & {
 const state = (globalState.projectorOpenCodeUsage ??= {});
 
 /** One poll for all windows, including during HMR; credentials stay on the server. */
-export function openCodeUsage(): Promise<OpenCodeUsage> {
-  if (state.pending) return state.pending;
-  if (state.value && Date.now() - state.value.checkedAt < 60000)
-    return Promise.resolve(state.value);
-  state.pending = (async (): Promise<OpenCodeUsage> => {
-    try {
-      const windows = goWindows(await readGoUsage());
-      return {
-        status: windows ? "ready" : "unavailable", windows, checkedAt: Date.now(),
-        message: windows ? null : "Лимиты OpenCode Go недоступны",
-      };
-    } catch (error) {
-      return {
-        status: "unavailable", windows: null, checkedAt: Date.now(),
-        message: error instanceof Error ? error.message : "OpenCode Go недоступен",
-      };
-    }
-  })().then((value) => {
-    state.value = value;
-    return value;
-  }).finally(() => { state.pending = undefined; });
-  return state.pending;
-}
+export const openCodeUsage = createUsageCache(state, async (): Promise<OpenCodeUsage> => {
+  try {
+    const windows = goWindows(await readGoUsage());
+    return {
+      status: windows ? "ready" : "unavailable", windows, checkedAt: Date.now(),
+      message: windows ? null : "Лимиты OpenCode Go недоступны",
+    };
+  } catch (error) {
+    return {
+      status: "unavailable", windows: null, checkedAt: Date.now(),
+      message: error instanceof Error ? error.message : "OpenCode Go недоступен",
+    };
+  }
+});

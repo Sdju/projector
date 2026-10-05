@@ -1,4 +1,4 @@
-import { os } from "../../../core/modules/os/index.ts";
+import { os } from "../../../../core/modules/os/index.ts";
 
 export class ClaudeUsageError extends Error {
   readonly retryAfterMs: number | null;

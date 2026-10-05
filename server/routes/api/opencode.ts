@@ -1,4 +1,4 @@
-import { openCodeUsage } from "../../modules/opencode/index.ts";
+import { openCodeUsage } from "../../modules/agents-integration/opencode/index.ts";
 import { json, type RouteContext } from "../../modules/transport/index.ts";
 
 export async function handleOpenCode({ res, method, path }: RouteContext) {

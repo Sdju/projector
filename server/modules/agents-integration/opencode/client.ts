@@ -1,4 +1,4 @@
-import { os } from "../../../core/modules/os/index.ts";
+import { os } from "../../../../core/modules/os/index.ts";
 
 /** Fixed official destination, bounded request, no upstream body in errors. */
 export async function readGoUsage(timeoutMs = 10000): Promise<unknown> {

@@ -3,8 +3,8 @@ import { test } from "node:test";
 import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { weeklyWindow, codexUsage } from "../server/modules/codex/usage.ts";
-import { readCodexRateLimits } from "../server/modules/codex/cli.ts";
+import { weeklyWindow, codexUsage } from "../server/modules/agents-integration/codex/usage.ts";
+import { readCodexRateLimits } from "../server/modules/agents-integration/codex/cli.ts";
 import { NETWORK_CONTEXT_URL } from "../server/modules/network/index.ts";
 
 const weekly = { usedPercent: 40, windowDurationMins: 10080, resetsAt: 1791574411 };

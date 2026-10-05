@@ -1,4 +1,5 @@
-import type { CodexUsage, CodexUsageWindow } from "../../../core/modules/codex/index.ts";
+import { createUsageCache } from "../_/usage-cache.ts";
+import type { CodexUsage, CodexUsageWindow } from "../../../../core/modules/agents-integration/codex/index.ts";
 import { readCodexRateLimits } from "./cli.ts";
 
 const record = (value: unknown): Record<string, unknown> | null =>
@@ -29,34 +30,21 @@ const globalState = globalThis as typeof globalThis & {
 const state = (globalState.projectorCodexUsage ??= {});
 
 /** Share polls across workspaces and HMR; expose only normalized usage, never account data. */
-export function codexUsage(): Promise<CodexUsage> {
-  if (state.pending) return state.pending;
-  if (state.value && Date.now() - state.value.checkedAt < 60000)
-    return Promise.resolve(state.value);
-  state.pending = (async (): Promise<CodexUsage> => {
-    try {
-      const weekly = weeklyWindow(await readCodexRateLimits());
-      return {
-        status: weekly ? "ready" : "unavailable",
-        weekly,
-        checkedAt: Date.now(),
-        message: weekly ? null : "Недельный лимит Codex недоступен",
-      };
-    } catch (error) {
-      return {
-        status: "unavailable",
-        weekly: null,
-        checkedAt: Date.now(),
-        message: error instanceof Error ? error.message : "Codex CLI недоступен",
-      };
-    }
-  })()
-    .then((value) => {
-      state.value = value;
-      return value;
-    })
-    .finally(() => {
-      state.pending = undefined;
-    });
-  return state.pending;
-}
+export const codexUsage = createUsageCache(state, async (): Promise<CodexUsage> => {
+  try {
+    const weekly = weeklyWindow(await readCodexRateLimits());
+    return {
+      status: weekly ? "ready" : "unavailable",
+      weekly,
+      checkedAt: Date.now(),
+      message: weekly ? null : "Недельный лимит Codex недоступен",
+    };
+  } catch (error) {
+    return {
+      status: "unavailable",
+      weekly: null,
+      checkedAt: Date.now(),
+      message: error instanceof Error ? error.message : "Codex CLI недоступен",
+    };
+  }
+});

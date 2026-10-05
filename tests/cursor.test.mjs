@@ -4,8 +4,8 @@ import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { os } from "../core/modules/os/index.ts";
-import { readCursorUsage } from "../server/modules/cursor/client.ts";
-import { cursorWindows, cursorUsage } from "../server/modules/cursor/usage.ts";
+import { readCursorUsage } from "../server/modules/agents-integration/cursor/client.ts";
+import { cursorWindows, cursorUsage } from "../server/modules/agents-integration/cursor/usage.ts";
 import { NETWORK_CONTEXT_URL } from "../server/modules/network/index.ts";
 import { handleCursor } from "../server/routes/api/cursor.ts";
 

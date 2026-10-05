@@ -1,4 +1,4 @@
-import { claudeUsage } from "../../modules/claude/index.ts";
+import { claudeUsage } from "../../modules/agents-integration/claude/index.ts";
 import { json, type RouteContext } from "../../modules/transport/index.ts";
 
 export async function handleClaude({ res, method, path }: RouteContext) {

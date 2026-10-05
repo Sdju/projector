@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref, useId } from "vue";
+import { computed, ref, useId } from "vue";
 import { useIntervalFn, useNow } from "@vueuse/core";
+import UsageMeter from "../../_/UsageMeter.vue";
+import { useUsagePolling } from "../../_/use-usage-polling.ts";
 import IconCursor from "~icons/simple-icons/cursor";
-import type { CursorUsage } from "../../../../core/modules/cursor/index.ts";
-import { useCommandScope } from "../../../common/utilities/commands.ts";
-import { resetCountdown, resetTimestamp } from "../../../common/utilities/reset-time.ts";
+import type { CursorUsage } from "../../../../../core/modules/agents-integration/cursor/index.ts";
+import { useCommandScope } from "../../../../common/utilities/commands.ts";
+import { resetCountdown, resetTimestamp } from "../../../../common/utilities/reset-time.ts";
 
-const usage = ref<CursorUsage | null>(null);
+const { usage, failed } = useUsagePolling<CursorUsage>("/api/cursor/usage");
 const now = useNow({ scheduler: (update) => useIntervalFn(update, 1000) });
-const failed = ref(false);
 type WindowName = keyof NonNullable<CursorUsage["windows"]>;
 const windowOrder: WindowName[] = ["total", "auto", "api"];
 const labels = { total: "Всего", auto: "Авто", api: "API" };
@@ -27,26 +28,6 @@ commands.scope.registerCommand({
     return { window: selectedWindow.value };
   },
 });
-let timer: ReturnType<typeof setTimeout> | undefined;
-let controller: AbortController | undefined;
-let disposed = false;
-
-async function refresh() {
-  if (disposed || controller || document.hidden) return;
-  clearTimeout(timer);
-  controller = new AbortController();
-  try {
-    const response = await fetch("/api/cursor/usage", { signal: controller.signal });
-    if (!response.ok) throw new Error("Cursor usage unavailable");
-    usage.value = await response.json();
-    failed.value = false;
-  } catch {
-    if (!disposed) failed.value = true;
-  } finally {
-    controller = undefined;
-    if (!disposed) timer = setTimeout(refresh, 60000);
-  }
-}
 const remaining = computed(() => {
   if (failed.value || usage.value?.status !== "ready" || !usage.value.windows) return null;
   return Math.round(100 - usage.value.windows[selectedWindow.value].usedPercent);
@@ -73,19 +54,6 @@ const tooltip = computed(() => {
     return `${label}: ${Math.round(100 - window.usedPercent)}%${window.limited ? " · исчерпан" : ""} · ${reset} (${resetTimestamp(window.resetsAt)})`;
   }), "Клик — сменить лимит"].join("\n");
 });
-function visibilityChanged() {
-  if (!document.hidden) void refresh();
-}
-onMounted(() => {
-  void refresh();
-  document.addEventListener("visibilitychange", visibilityChanged);
-});
-onBeforeUnmount(() => {
-  disposed = true;
-  clearTimeout(timer);
-  controller?.abort();
-  document.removeEventListener("visibilitychange", visibilityChanged);
-});
 </script>
 
 <template>
@@ -96,32 +64,21 @@ onBeforeUnmount(() => {
     @click="commands.run('ide.cursor.usage.window.cycle')"
   >
     <IconCursor class="cursor-icon" aria-hidden="true" />
-    <span
-      class="quota-bar"
-      :class="{ unavailable: remaining === null }"
-      :role="remaining === null ? undefined : 'meter'"
-      :aria-valuemin="remaining === null ? undefined : 0"
-      :aria-valuemax="remaining === null ? undefined : 100"
-      :aria-valuenow="remaining ?? undefined"
+    <UsageMeter
+      :remaining="remaining"
+      :prefix="shortLabels[selectedWindow]"
       :aria-label="`Остаток лимита Cursor: ${labels[selectedWindow]}`"
-    >
-      <span v-if="remaining !== null" class="quota-fill" :style="{ width: `${remaining}%` }" />
-      <span class="quota-label">
-        <span>{{ shortLabels[selectedWindow] }} · {{ remaining === null ? "—" : `${remaining}%` }}</span>
-      </span>
-    </span>
+    />
     <span class="quota-tooltip" role="tooltip">
       <template v-if="tooltipRows.length">
         <span class="tooltip-heading">Cursor · сброс через</span>
         <span v-for="row in tooltipRows" :key="row.name" class="quota-row">
           <span>{{ row.label }}</span>
-          <span class="quota-bar tooltip-bar" :class="{ exhausted: row.limited }">
-            <span class="quota-fill" :style="{ width: `${row.remaining}%` }" />
-            <span class="quota-label">
-              <span>{{ row.remaining }}%</span>
-              <span class="quota-time">{{ row.countdown }}</span>
-            </span>
-          </span>
+          <UsageMeter
+            :remaining="row.remaining"
+            :countdown="row.countdown"
+            :exhausted="row.limited"
+          />
         </span>
         <span class="tooltip-hint">Клик — сменить лимит</span>
       </template>
@@ -150,35 +107,6 @@ onBeforeUnmount(() => {
   width: 13px;
   height: 13px;
 }
-.quota-bar {
-  position: relative;
-  min-width: 84px;
-  height: 16px;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  background: var(--bg-sunken);
-}
-.quota-fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  background: color-mix(in srgb, currentColor 22%, transparent);
-}
-.quota-label {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 100%;
-  padding-inline: 6px;
-  white-space: nowrap;
-  color: var(--text);
-  font-size: 10px;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-.quota-time { opacity: 0.7; }
 .tooltip-heading { display: block; margin-bottom: 5px; }
 .quota-row {
   display: grid;
@@ -187,11 +115,7 @@ onBeforeUnmount(() => {
   gap: 6px;
   margin-bottom: 4px;
 }
-.tooltip-bar { height: 18px; }
-.tooltip-bar .quota-label { justify-content: space-between; }
-.exhausted { border-color: var(--muted); }
 .tooltip-hint { display: block; margin-top: 5px; color: var(--muted); }
-.unavailable .quota-label { color: var(--muted); }
 .quota-tooltip {
   position: absolute;
   z-index: 30;

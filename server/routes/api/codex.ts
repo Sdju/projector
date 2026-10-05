@@ -1,4 +1,4 @@
-import { codexUsage } from "../../modules/codex/index.ts";
+import { codexUsage } from "../../modules/agents-integration/codex/index.ts";
 import { json, type RouteContext } from "../../modules/transport/index.ts";
 
 export async function handleCodex({ res, method, path }: RouteContext) {

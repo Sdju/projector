@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { ClaudeUsageIndicator } from "../../claude/index.ts";
-import { CodexUsageIndicator } from "../../codex/index.ts";
-import { CursorUsageIndicator } from "../../cursor/index.ts";
-import { OpenCodeUsageIndicator } from "../../opencode/index.ts";
+import { AgentUsageIndicators } from "../../agents-integration/status-bar/index.ts";
 import { useEditorStatus } from "../modules/viewers/index.ts";
 
 const status = useEditorStatus();
@@ -24,10 +21,7 @@ const selection = computed(() => {
       <span v-if="selection" class="status-item">{{ selection }}</span>
     </div>
     <div class="status-spacer" />
-    <CodexUsageIndicator />
-    <OpenCodeUsageIndicator />
-    <ClaudeUsageIndicator />
-    <CursorUsageIndicator />
+    <AgentUsageIndicators />
     <span
       v-if="status.active && status.lineEnding"
       class="status-item"

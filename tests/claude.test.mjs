@@ -4,8 +4,8 @@ import { mkdtemp, writeFile, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createOs, os } from "../core/modules/os/index.ts";
-import { readClaudeUsage, retryAfterMs } from "../server/modules/claude/client.ts";
-import { claudeWindows, claudeUsage } from "../server/modules/claude/usage.ts";
+import { readClaudeUsage, retryAfterMs } from "../server/modules/agents-integration/claude/client.ts";
+import { claudeWindows, claudeUsage } from "../server/modules/agents-integration/claude/usage.ts";
 import { handleClaude } from "../server/routes/api/claude.ts";
 
 const window = { utilization: 29, resets_at: "2026-10-11T19:00:00.220419+00:00" };

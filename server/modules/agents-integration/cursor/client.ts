@@ -1,5 +1,5 @@
-import { os } from "../../../core/modules/os/index.ts";
-import { assertEuNetworkContext } from "../network/index.ts";
+import { os } from "../../../../core/modules/os/index.ts";
+import { assertEuNetworkContext } from "../../network/index.ts";
 
 const USAGE_URL =
   "https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage";
