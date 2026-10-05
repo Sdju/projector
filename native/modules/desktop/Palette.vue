@@ -134,7 +134,8 @@ function appIcon(item: LaunchItem) {
 }
 function itemTitle(item: LaunchItem) {
   const marks = { running: "●", starting: "●", stopping: "◐", error: "✖" } as const;
-  return item.status ? `${marks[item.status.state]} ${item.name}` : item.name;
+  const name = item.status ? `${marks[item.status.state]} ${item.name}` : item.name;
+  return item.favorite ? `★ ${name}` : name;
 }
 function sectionTitle(item: LaunchItem, index: number) {
   return item.section && item.section !== state.value.items[index - 1]?.section
@@ -197,10 +198,19 @@ async function launch(index = state.value.selected, secondary = false) {
   if (await model.launch(item, action)) hide();
   else entryRef.value?.widget?.grabFocus();
 }
+async function pin(item: LaunchItem | undefined) {
+  if (!item || item.kind === "github") return;
+  // Pinning keeps the palette and the open card in place; only the lists change.
+  if (await model.launch(item, { id: "favorite", title: "" })) await model.refresh();
+}
 async function launchDetail() {
   const item = state.value.focus;
   const action: LaunchAction | undefined = detailActions.value[detailIndex.value];
   if (!item || !action) return;
+  if (action.id === "favorite") {
+    await pin(item);
+    return;
+  }
   if (await model.launch(item, action)) {
     model.leave();
     hide();
@@ -257,6 +267,10 @@ async function restartProjector() {
 }
 function keyPressed(keyval: number, _keycode?: number, modifiers = 0) {
   const ctrl = (modifiers & Gdk.ModifierType.CONTROL_MASK) !== 0;
+  if (ctrl && (keyval === Gdk.KEY_d || keyval === Gdk.KEY_D)) {
+    void pin(focus.value ?? state.value.items[state.value.selected]);
+    return true;
+  }
   if (focus.value) {
     if (keyval === Gdk.KEY_Escape || keyval === Gdk.KEY_Left || keyval === Gdk.KEY_Tab) {
       model.leave();
@@ -420,7 +434,7 @@ defineExpose({ show, hide, toggle, invokeSelected, openPage, quitProjector, rest
         <VLabel :xalign="0" :hexpand="true" class="dim-label">{{
           focus
             ? "↑↓ выбрать Enter выполнить ← назад"
-            : "↑↓ выбрать Enter основное Ctrl+Enter второе → все действия Esc закрыть"
+            : "↑↓ выбрать Enter основное Ctrl+Enter второе → все действия Ctrl+D избранное Esc закрыть"
         }}</VLabel>
         <VButton
           class="flat"

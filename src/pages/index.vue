@@ -53,6 +53,13 @@ async function launch(item = items.value[selected.value], action?: LaunchAction)
   const chosen = action ?? item?.actions?.[0];
   if (!item || !chosen) return;
   const ok = await model.launch(item, chosen, !webWindow);
+  if (chosen.id === "favorite") {
+    // Pinning keeps the palette and the open card in place; only the lists change.
+    if (ok) await model.refresh();
+    await nextTick();
+    input.value?.focus();
+    return;
+  }
   if (ok) model.leave();
   if (ok && !webWindow && state.value.route) {
     await router.push(state.value.route);
@@ -68,7 +75,16 @@ async function launch(item = items.value[selected.value], action?: LaunchAction)
   await nextTick();
   input.value?.focus();
 }
+function toggleFavorite(item = focus.value ?? items.value[selected.value]) {
+  if (!item || item.kind === "github") return;
+  void launch(item, { id: "favorite", title: "" });
+}
 function key(event: KeyboardEvent) {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d") {
+    event.preventDefault();
+    toggleFavorite();
+    return;
+  }
   if (focus.value) {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
@@ -194,6 +210,8 @@ onUnmounted(() => {
             <img v-if="item.icon" :src="item.icon" alt="" width="36" height="36" />
             <span class="result-copy"
               ><span class="name"
+                ><span v-if="item.favorite" class="star" title="В избранном" aria-hidden="true"
+                  >★</span
                 ><span
                   v-if="item.status"
                   class="status-dot"
@@ -233,8 +251,8 @@ onUnmounted(() => {
         >
         <span v-else
           >↑↓ выбрать <span class="separator">·</span> Enter основное
-          <span class="separator">·</span> Ctrl+Enter второе <span class="separator">·</span> → все
-          действия <span class="separator">·</span> Esc
+          <span class="separator">·</span> Ctrl+Enter второе <span class="separator">·</span> →
+          действия <span class="separator">·</span> Ctrl+D ★ <span class="separator">·</span> Esc
           {{ webWindow ? "закрыть" : "очистить" }}</span
         >
         <router-link to="/projects">Проекты →</router-link>
@@ -360,6 +378,10 @@ onUnmounted(() => {
   font-size: var(--fs-2xs);
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+.star {
+  margin-right: var(--sp-2);
+  color: var(--warn, var(--run));
 }
 .status-dot {
   display: inline-block;

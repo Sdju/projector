@@ -215,7 +215,17 @@ export function createLauncherModel(
         const result = await client.launch(item.id, chosen?.id, inline, chosen?.arg);
         if (disposed) return false;
         state.route = result?.route ?? "";
-        state.notice = `${item.name} — ${chosen?.id === "open" ? "открыто" : chosen?.id === "stop" ? "остановлено" : "запущено"}`;
+        state.notice = `${item.name} — ${
+          chosen?.id === "favorite"
+            ? result?.favorite
+              ? "добавлено в избранное"
+              : "убрано из избранного"
+            : chosen?.id === "open"
+              ? "открыто"
+              : chosen?.id === "stop"
+                ? "остановлено"
+                : "запущено"
+        }`;
         return true;
       } catch (error) {
         state.error = error instanceof Error ? error.message : "Не удалось запустить";

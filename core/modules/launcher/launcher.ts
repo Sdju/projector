@@ -1,8 +1,9 @@
 export type InterfaceMode = "native" | "window" | "browser";
 export const shortcuts = ["", "Ctrl+Alt+Space", "Super+Space", "Alt+Space"];
 /** `launch` — запуск приложения; `open` — воркспейс проекта; `run` — основная команда проекта; `stop` — остановка запущенного; `browser`/`window` — открыть запущенный проект
- * в браузере или окне (для остановленного `window` запускает команду в окне). */
-export type LaunchActionId = "launch" | "open" | "run" | "stop" | "browser" | "window";
+ * в браузере или окне (для остановленного `window` запускает команду в окне);
+ * `favorite` — добавить в избранное или убрать из него. */
+export type LaunchActionId = "launch" | "open" | "run" | "stop" | "browser" | "window" | "favorite";
 export interface LaunchAction {
   id: LaunchActionId;
   title: string;
@@ -10,8 +11,9 @@ export interface LaunchAction {
   arg?: string;
 }
 /** Секции пустого запроса; при поиске по тексту список плоский. */
-export type LaunchSection = "running" | "recent" | "projects" | "apps";
+export type LaunchSection = "favorites" | "running" | "recent" | "projects" | "apps";
 export const launchSectionTitles: Record<LaunchSection, string> = {
+  favorites: "Избранное",
   running: "Работает",
   recent: "Недавние",
   projects: "Проекты",
@@ -25,6 +27,8 @@ export interface LaunchItem {
   kind: "application" | "project" | "github";
   icon?: string;
   section?: LaunchSection;
+  /** В избранном: такие результаты идут первыми и в поиске, и в обзоре. */
+  favorite?: boolean;
   /** Живое состояние проекта; у приложений нет. */
   status?: { state: "running" | "starting" | "stopping" | "error"; label: string };
   /** Первое действие выполняется по Enter, второе — по Ctrl+Enter. */
@@ -51,6 +55,8 @@ export interface LaunchResult {
   ok: boolean;
   /** Маршрут воркспейса для действия `open`. */
   route?: string;
+  /** Новое состояние избранного после действия `favorite`. */
+  favorite?: boolean;
 }
 export interface SearchResult {
   items: LaunchItem[];

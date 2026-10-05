@@ -1,6 +1,7 @@
 import { os } from "../../../core/modules/os/index.ts";
 import { loadProjects } from "../projects/index.ts";
 import { getSnapshot, processOutput } from "../processes/index.ts";
+import { preferences } from "../preferences/index.ts";
 import type {
   LaunchAction,
   LaunchDetail,
@@ -66,10 +67,15 @@ const tildePath = (path: string) => {
   return path === home ? "~" : path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path;
 };
 
+async function favoriteAction(id: string): Promise<LaunchAction> {
+  const favorite = (await preferences()).favorites.includes(id);
+  return { id: "favorite", title: favorite ? "Убрать из избранного" : "Добавить в избранное" };
+}
+
 export async function launchDetail(id: string): Promise<LaunchDetail> {
   if (!id.startsWith("project:")) {
     if (id.startsWith("gh:")) return { actions: [{ id: "open", title: "Открыть репозиторий" }] };
-    return { actions: [{ id: "launch", title: "Запустить" }] };
+    return { actions: [{ id: "launch", title: "Запустить" }, await favoriteAction(id)] };
   }
   const project = (await loadProjects()).find((p) => `project:${p.id}` === id);
   if (!project) throw new Error("Проект не найден");
@@ -101,6 +107,7 @@ export async function launchDetail(id: string): Promise<LaunchDetail> {
         arg: commands[0].id,
       });
   }
+  actions.push(await favoriteAction(id));
   const info: LaunchInfo = {
     path: tildePath(project.path),
     state: runtime.status,

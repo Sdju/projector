@@ -214,6 +214,50 @@ if (process.argv.includes("--prepare")) {
     const noToken = await searchLauncher("gh/");
     assert.deepEqual(noToken.items, []);
     assert.match(noToken.warning, /GitHub/);
+    // Favorites float to the top of text search and open the browse view; unknown ids are refused.
+    const toggle = (id) =>
+      request("/api/launcher/launch", "POST", { id, action: "favorite" }).then((res) =>
+        res.status === 200 ? res.json() : res.status,
+      );
+    assert.equal(await toggle("project:nope"), 400);
+    assert.equal(await toggle("gh:Sdju/projector"), 400);
+    assert.equal(await toggle("app:../../etc.desktop"), 400);
+    const before = (await searchLauncher("workspace")).items.map((item) => item.id);
+    assert.equal(before.includes("project:fail-project"), true);
+    assert.equal((await toggle("project:fail-project")).favorite, true);
+    const after = (await searchLauncher("workspace")).items;
+    assert.equal(after[0].id, "project:fail-project");
+    assert.equal(after[0].favorite, true);
+    assert.equal(after.find((item) => item.id === "project:probe-project").favorite, undefined);
+    assert.equal((await toggle("app:projector probe.desktop")).favorite, true);
+    const favoriteBrowse = (await searchLauncher("")).items;
+    assert.deepEqual(
+      favoriteBrowse
+        .filter((item) => item.section === "favorites")
+        .map((item) => item.id)
+        .sort(),
+      ["app:projector probe.desktop", "project:fail-project"],
+    );
+    assert.equal(favoriteBrowse[0].section, "favorites");
+    assert.equal(new Set(favoriteBrowse.map((item) => item.id)).size, favoriteBrowse.length);
+    assert.equal(
+      (await launchDetail("project:fail-project")).actions.at(-1).title,
+      "Убрать из избранного",
+    );
+    assert.equal(
+      (await launchDetail("app:projector probe.desktop")).actions.at(-1).title,
+      "Убрать из избранного",
+    );
+    assert.equal((await toggle("project:fail-project")).favorite, false);
+    assert.equal((await toggle("app:projector probe.desktop")).favorite, false);
+    assert.equal(
+      (await launchDetail("project:fail-project")).actions.at(-1).title,
+      "Добавить в избранное",
+    );
+    assert.equal(
+      (await searchLauncher("")).items.some((item) => item.section === "favorites"),
+      false,
+    );
     // Detail lists a run action per command; a failed run exposes its terminal output.
     const idleDetail = await launchDetail("project:fail-project");
     assert.deepEqual(
@@ -223,6 +267,7 @@ if (process.argv.includes("--prepare")) {
         ["run", "boom"],
         ["run", "other"],
         ["window", "boom"],
+        ["favorite", undefined],
       ],
     );
     assert.equal(idleDetail.failure, undefined);

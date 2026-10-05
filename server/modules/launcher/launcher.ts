@@ -23,7 +23,7 @@ export {
 } from "../../../core/modules/launcher/index.ts";
 
 const execute = promisify(execFile);
-import { preferences, updatePreferences } from "../preferences/index.ts";
+import { preferences, toggleFavorite, updatePreferences } from "../preferences/index.ts";
 export { preferences, interfaceMode, saveInterface } from "../preferences/index.ts";
 export async function shortcutStatus(): Promise<{
   supported: boolean;
@@ -148,7 +148,7 @@ export async function searchLauncher(
       ? apps.map((app): LaunchItem => ({ ...app, actions: [{ id: "launch", title: "Запустить" }] }))
       : []),
     ...projects.map(projectItem),
-  ];
+  ].map((item) => (prefs.favorites.includes(item.id) ? { ...item, favorite: true } : item));
   if (!text) return { items: browse(items, prefs.usage), warning };
   const ranked = items.map((item) => ({
     item,
@@ -157,6 +157,7 @@ export async function searchLauncher(
   }));
   ranked.sort(
     (a, b) =>
+      Number(!!b.item.favorite) - Number(!!a.item.favorite) ||
       b.score - a.score ||
       (b.usage?.count ?? 0) - (a.usage?.count ?? 0) ||
       (b.usage?.last ?? 0) - (a.usage?.last ?? 0) ||
@@ -197,6 +198,7 @@ function browse(
   const projects = items.filter((item) => item.kind === "project");
   const apps = items.filter((item) => item.kind === "application");
   return [
+    ...take("favorites", items.filter((item) => item.favorite).sort(byRecent)),
     ...take(
       "running",
       projects.filter((item) => item.status && item.status.state !== "error").sort(byRecent),
@@ -216,6 +218,14 @@ export async function launchItem(
   arg?: string,
 ): Promise<LaunchResult> {
   const result: LaunchResult = { ok: true };
+  if (action === "favorite") {
+    const known = id.startsWith("app:")
+      ? (await applications()).some((item) => item.id === id)
+      : id.startsWith("project:") && (await loadProjects()).some((p) => `project:${p.id}` === id);
+    if (!known) throw new Error("В избранное можно добавить приложение или проект");
+    result.favorite = await toggleFavorite(id);
+    return result;
+  }
   if (id.startsWith("gh:")) {
     if (action && action !== "open") throw new Error("Для репозитория доступно только открытие");
     result.route = githubProjectRoute(id.slice(3));

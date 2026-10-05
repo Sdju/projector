@@ -10,6 +10,8 @@ interface Preferences {
   mode: InterfaceMode;
   shortcut: string;
   usage: Record<string, Usage>;
+  /** Ids (`app:…`, `project:…`) pinned to the top of the palette. */
+  favorites: string[];
 }
 
 const preferencesPath = () => join(dataDir(), "launcher.json");
@@ -21,9 +23,12 @@ export async function preferences(): Promise<Preferences> {
       mode: interfaceMode(data.mode),
       shortcut: shortcuts.includes(data.shortcut) ? data.shortcut : "Ctrl+Alt+Space",
       usage: data.usage ?? {},
+      favorites: Array.isArray(data.favorites)
+        ? data.favorites.filter((id: unknown): id is string => typeof id === "string")
+        : [],
     };
   } catch {
-    return { mode: "native", shortcut: "Ctrl+Alt+Space", usage: {} };
+    return { mode: "native", shortcut: "Ctrl+Alt+Space", usage: {}, favorites: [] };
   }
 }
 export function interfaceMode(value: unknown): InterfaceMode {
@@ -46,4 +51,15 @@ export function saveInterface(mode: InterfaceMode, shortcut?: string): Promise<v
     value.mode = mode;
     if (shortcut !== undefined) value.shortcut = shortcut;
   });
+}
+/** Adds or removes a favorite and returns the new state. */
+export async function toggleFavorite(id: string): Promise<boolean> {
+  let favorite = false;
+  await updatePreferences((value) => {
+    favorite = !value.favorites.includes(id);
+    value.favorites = favorite
+      ? [...value.favorites, id]
+      : value.favorites.filter((entry) => entry !== id);
+  });
+  return favorite;
 }

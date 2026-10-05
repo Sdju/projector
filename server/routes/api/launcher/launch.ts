@@ -14,7 +14,10 @@ export async function handleLauncherLaunch({
   if (path === "/api/launcher/launch" && method === "POST") {
     const body = await readBody(req);
     const action = asString(body.action);
-    if (action && !["launch", "open", "run", "stop", "browser", "window"].includes(action))
+    if (
+      action &&
+      !["launch", "open", "run", "stop", "browser", "window", "favorite"].includes(action)
+    )
       throw new Error("Неизвестное действие");
     json(
       res,
