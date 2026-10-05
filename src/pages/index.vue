@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, shallowRef, ref } from "vue";
+import { useRouter } from "vue-router";
 import { isLauncherWindow } from "../modules/launcher/index.ts";
 import { createLauncherClient } from "../../core/modules/launcher/index.ts";
 import { createLauncherModel } from "../../core/modules/launcher/index.ts";
 
+const router = useRouter();
 const client = createLauncherClient();
 const model = createLauncherModel(client);
 const state = shallowRef({ ...model.state });
@@ -32,8 +34,15 @@ async function hide() {
     input.value?.focus();
   }
 }
-async function launch(item = items.value[selected.value]) {
-  if ((await model.launch(item)) && webWindow) {
+async function launch(item = items.value[selected.value], secondary = false) {
+  const action = secondary ? item?.actions?.[1]?.id : item?.actions?.[0]?.id;
+  if (!action) return;
+  const ok = await model.launch(item, action, !webWindow);
+  if (ok && !webWindow && state.value.route) {
+    await router.push(state.value.route);
+    return;
+  }
+  if (ok && webWindow) {
     try {
       await hide();
     } catch (error) {
@@ -50,7 +59,7 @@ function key(event: KeyboardEvent) {
     void nextTick(() => list.value?.children[selected.value]?.scrollIntoView({ block: "nearest" }));
   } else if (event.key === "Enter") {
     event.preventDefault();
-    void launch();
+    void launch(undefined, event.ctrlKey || event.metaKey);
   } else if (event.key === "Escape") {
     event.preventDefault();
     void hide().catch((error) => model.reportError(error));
@@ -133,7 +142,12 @@ onUnmounted(() => {
             ><span class="name">{{ item.name }}</span
             ><span class="description">{{ item.description }}</span></span
           >
-          <span v-if="index === selected" class="enter" aria-hidden="true">↵</span>
+          <span v-if="index === selected" class="enter" aria-hidden="true"
+            >↵ {{ item.actions?.[0]?.title
+            }}<template v-if="item.actions?.[1]">
+              · Ctrl+↵ {{ item.actions[1].title }}</template
+            ></span
+          >
         </button>
       </div>
       <p v-if="!loading && !items.length && !error" class="empty">Ничего не найдено</p>
@@ -142,7 +156,7 @@ onUnmounted(() => {
       </p>
       <footer class="palette-footer">
         <span
-          >↑↓ выбрать <span class="separator">·</span> Enter запустить
+          >↑↓ выбрать <span class="separator">·</span> Enter выполнить
           <span class="separator">·</span> Esc {{ webWindow ? "закрыть" : "очистить" }}</span
         >
         <router-link to="/projects">Проекты →</router-link>

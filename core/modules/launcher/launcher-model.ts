@@ -1,4 +1,4 @@
-import type { LaunchItem, LauncherClient } from "./launcher.ts";
+import type { LaunchActionId, LaunchItem, LauncherClient } from "./launcher.ts";
 
 export interface LauncherState {
   query: string;
@@ -9,6 +9,8 @@ export interface LauncherState {
   error: string;
   warning: string;
   notice: string;
+  /** Маршрут воркспейса последнего действия `open`; пусто для остальных. */
+  route: string;
 }
 
 /** UI-independent search, selection and launch state shared by GTK and Vue. */
@@ -22,6 +24,7 @@ export function createLauncherModel(client: Pick<LauncherClient, "search" | "lau
     error: "",
     warning: "",
     notice: "",
+    route: "",
   };
   const listeners = new Set<(state: LauncherState) => void>();
   let generation = 0;
@@ -97,16 +100,23 @@ export function createLauncherModel(client: Pick<LauncherClient, "search" | "lau
     move(delta: number) {
       this.select(state.selected + delta);
     },
-    async launch(item = state.items[state.selected]): Promise<boolean> {
+    /** Действие по умолчанию — первое у элемента; `inline` оставляет переход клиенту. */
+    async launch(
+      item = state.items[state.selected],
+      action?: LaunchActionId,
+      inline = false,
+    ): Promise<boolean> {
       if (!item || state.busy || state.loading || disposed) return false;
       state.busy = true;
       state.error = "";
       state.notice = "";
+      state.route = "";
       emit();
       try {
-        await client.launch(item.id);
+        const result = await client.launch(item.id, action ?? item.actions?.[0]?.id, inline);
         if (disposed) return false;
-        state.notice = `${item.name} — запущено`;
+        state.route = result?.route ?? "";
+        state.notice = `${item.name} — ${(action ?? item.actions?.[0]?.id) === "open" ? "открыто" : "запущено"}`;
         return true;
       } catch (error) {
         state.error = error instanceof Error ? error.message : "Не удалось запустить";

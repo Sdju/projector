@@ -5,7 +5,15 @@ import { loadProjects } from "../projects/index.ts";
 import { getSnapshot, startProject } from "../processes/index.ts";
 import { openBrowser, openWindow } from "../window/index.ts";
 import { desktopArgs } from "../window/index.ts";
-import { type LaunchItem } from "../../../core/modules/launcher/index.ts";
+import type {
+  LaunchActionId,
+  LaunchItem,
+  LaunchResult,
+} from "../../../core/modules/launcher/index.ts";
+import { appUrl } from "../../../core/modules/app-paths/index.ts";
+import { githubProjectRoute } from "../../../core/modules/github/index.ts";
+import { parseProjectRef, pathToUrlSegments } from "../../../core/modules/project/index.ts";
+import type { Project } from "../../../core/modules/project/index.ts";
 export {
   shortcuts,
   type LaunchItem,
@@ -97,6 +105,40 @@ export function matchScore(item: LaunchItem, query: string): number {
   return score;
 }
 
+/** Mirrors the client `projectRoute`: the workspace URL of a project path. */
+export function workspaceRoute(path: string): string {
+  const ref = parseProjectRef(path);
+  if (ref.kind === "github") return githubProjectRoute(ref.repository);
+  const segments = pathToUrlSegments(path).map((segment) =>
+    encodeURIComponent(segment).replaceAll("%3A", ":"),
+  );
+  return `/projects/${segments.length ? segments.join("/") : "%2F"}`;
+}
+
+function projectItem(project: Project): LaunchItem {
+  const command = project.commands.find((c) => c.id === project.defaultCommandId);
+  const running = ["running", "starting"].includes(getSnapshot(project.id).status);
+  return {
+    id: `project:${project.id}`,
+    name: project.name,
+    kind: "project",
+    description: `проект · ${running ? "работает" : (command?.name ?? "без команды")}`,
+    keywords: project.path,
+    icon: `/api/projects/${encodeURIComponent(project.id)}/icon`,
+    actions: [
+      { id: "open", title: "Открыть" },
+      ...(command || running
+        ? [
+            {
+              id: "run" as const,
+              title: running ? "Открыть запущенный" : `Запустить ${command!.name}`,
+            },
+          ]
+        : []),
+    ],
+  };
+}
+
 export async function searchLauncher(
   query: string,
 ): Promise<{ items: LaunchItem[]; warning?: string }> {
@@ -113,15 +155,8 @@ export async function searchLauncher(
     preferences(),
   ]);
   const items: LaunchItem[] = [
-    ...apps,
-    ...projects.map((project): LaunchItem => ({
-      id: `project:${project.id}`,
-      name: project.name,
-      kind: "project",
-      description: `проект · ${project.commands.find((c) => c.id === project.defaultCommandId)?.name ?? "запуск"}`,
-      keywords: project.path,
-      icon: `/api/projects/${encodeURIComponent(project.id)}/icon`,
-    })),
+    ...apps.map((app): LaunchItem => ({ ...app, actions: [{ id: "launch", title: "Запустить" }] })),
+    ...projects.map(projectItem),
   ];
   const ranked = items.map((item) => ({
     item,
@@ -144,26 +179,44 @@ export async function searchLauncher(
   };
 }
 
-export async function launchItem(id: string): Promise<void> {
+/** Without an explicit action the item's primary action runs. */
+export async function launchItem(
+  id: string,
+  action?: LaunchActionId,
+  inline = false,
+): Promise<LaunchResult> {
+  const result: LaunchResult = { ok: true };
   if (id.startsWith("app:")) {
+    if (action && action !== "launch") throw new Error("Для приложения доступен только запуск");
     const app = (await applications()).find((item) => item.id === id);
     if (!app) throw new Error("Приложение больше не доступно");
     await execute(process.execPath, [...desktopArgs(), "launch", id.slice(4)], { timeout: 10000 });
   } else if (id.startsWith("project:")) {
     const project = (await loadProjects()).find((p) => `project:${p.id}` === id);
     if (!project) throw new Error("Проект не найден");
-    const runtime = getSnapshot(project.id);
-    if (runtime.status === "running" || runtime.status === "starting") {
-      const url = runtime.url || project.url;
-      if (!url) throw new Error("Проект запускается; адрес пока недоступен");
-      if (project.mode === "window") openWindow(url);
-      else openBrowser(url);
-    } else startProject(project);
+    if (action === "launch") throw new Error("Для проекта доступны открытие и запуск");
+    if (action !== "run") {
+      result.route = workspaceRoute(project.path);
+      if (!inline) {
+        const url = appUrl() + result.route;
+        if ((await preferences()).mode === "window") openWindow(url);
+        else openBrowser(url);
+      }
+    } else {
+      const runtime = getSnapshot(project.id);
+      if (runtime.status === "running" || runtime.status === "starting") {
+        const url = runtime.url || project.url;
+        if (!url) throw new Error("Проект запускается; адрес пока недоступен");
+        if (project.mode === "window") openWindow(url);
+        else openBrowser(url);
+      } else startProject(project);
+    }
   } else throw new Error("Неизвестный результат поиска");
   await updatePreferences((value) => {
     const usage = value.usage[id];
     value.usage[id] = { count: (usage?.count ?? 0) + 1, last: Date.now() };
   });
+  return result;
 }
 
 export async function applicationIcon(id: string): Promise<string | null> {

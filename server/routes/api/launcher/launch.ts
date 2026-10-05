@@ -2,6 +2,7 @@ import { launchItem } from "../../../modules/launcher/index.ts";
 
 import { json, readBody, asString } from "../../../modules/transport/index.ts";
 
+import type { LaunchActionId } from "../../../../core/modules/launcher/index.ts";
 import type { RouteContext } from "../../../modules/transport/index.ts";
 
 export async function handleLauncherLaunch({
@@ -12,8 +13,18 @@ export async function handleLauncherLaunch({
 }: RouteContext): Promise<boolean> {
   if (path === "/api/launcher/launch" && method === "POST") {
     const body = await readBody(req);
-    await launchItem(asString(body.id));
-    json(res, 200, { ok: true });
+    const action = asString(body.action);
+    if (action && !["launch", "open", "run"].includes(action))
+      throw new Error("Неизвестное действие");
+    json(
+      res,
+      200,
+      await launchItem(
+        asString(body.id),
+        (action || undefined) as LaunchActionId | undefined,
+        body.inline === true,
+      ),
+    );
     return true;
   }
   return false;

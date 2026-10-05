@@ -67,6 +67,12 @@ function appIcon(item: LaunchItem) {
   }
   return icons.get(item.id);
 }
+function rowHint(item: LaunchItem) {
+  const [first, second] = item.actions ?? [];
+  return second
+    ? `${item.description} · Enter: ${first.title} · Ctrl+Enter: ${second.title}`
+    : item.description;
+}
 async function show() {
   clearTimeout(blurTimer);
   model.setQuery("");
@@ -108,8 +114,11 @@ async function focusWindow() {
     /* Wayland uses compositor activation. */
   }
 }
-async function launch(index = state.value.selected) {
-  if (await model.launch(state.value.items[index])) hide();
+async function launch(index = state.value.selected, secondary = false) {
+  const item = state.value.items[index];
+  const action = secondary ? item?.actions?.[1]?.id : item?.actions?.[0]?.id;
+  if (!action) return;
+  if (await model.launch(item, action)) hide();
   else entryRef.value?.widget?.grabFocus();
 }
 async function invokeSelected(toggle = false) {
@@ -147,7 +156,7 @@ async function restartProjector() {
     opening = false;
   }
 }
-function keyPressed(keyval: number) {
+function keyPressed(keyval: number, _keycode?: number, modifiers = 0) {
   if (keyval === Gdk.KEY_Escape) return hide();
   if (keyval === Gdk.KEY_Down || keyval === Gdk.KEY_Up) {
     model.move(keyval === Gdk.KEY_Down ? 1 : -1);
@@ -165,7 +174,7 @@ function keyPressed(keyval: number) {
       (entry && (focus === entry || focus?.isAncestor(entry))) ||
       (list && (focus === list || focus?.isAncestor(list)))
     ) {
-      void launch();
+      void launch(undefined, (modifiers & Gdk.ModifierType.CONTROL_MASK) !== 0);
       return true;
     }
   }
@@ -231,7 +240,7 @@ defineExpose({ show, hide, toggle, invokeSelected, openPage, quitProjector, rest
               <VBox orientation="vertical" :spacing="2" :hexpand="true">
                 <VLabel :xalign="0">{{ item.name }}</VLabel>
                 <VLabel :xalign="0" ellipsize="end" :max-width-chars="56" class="dim-label">{{
-                  item.description
+                  rowHint(item)
                 }}</VLabel>
               </VBox>
             </VBox>
@@ -241,7 +250,7 @@ defineExpose({ show, hide, toggle, invokeSelected, openPage, quitProjector, rest
       <VLabel :xalign="0" :wrap="true" class="dim-label">{{ status }}</VLabel>
       <VBox :spacing="12">
         <VLabel :xalign="0" :hexpand="true" class="dim-label"
-          >↑↓ выбрать Enter запустить Esc закрыть</VLabel
+          >↑↓ выбрать Enter основное действие Ctrl+Enter второе Esc закрыть</VLabel
         >
         <VButton
           class="flat"

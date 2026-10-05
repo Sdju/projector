@@ -1,5 +1,11 @@
 export type InterfaceMode = "native" | "window" | "browser";
 export const shortcuts = ["", "Ctrl+Alt+Space", "Super+Space", "Alt+Space"];
+/** `launch` — запуск приложения; `open` — воркспейс проекта; `run` — основная команда проекта. */
+export type LaunchActionId = "launch" | "open" | "run";
+export interface LaunchAction {
+  id: LaunchActionId;
+  title: string;
+}
 export interface LaunchItem {
   id: string;
   name: string;
@@ -7,6 +13,13 @@ export interface LaunchItem {
   keywords: string;
   kind: "application" | "project";
   icon?: string;
+  /** Первое действие выполняется по Enter, второе — по Ctrl+Enter. */
+  actions?: LaunchAction[];
+}
+export interface LaunchResult {
+  ok: boolean;
+  /** Маршрут воркспейса для действия `open`. */
+  route?: string;
 }
 export interface SearchResult {
   items: LaunchItem[];
@@ -38,7 +51,9 @@ export function createLauncherClient(baseUrl = "") {
         undefined,
         signal,
       ),
-    launch: (id: string) => request<{ ok: boolean }>("/api/launcher/launch", { id }),
+    /** `inline` — клиент сам перейдёт по `route`, сервер не открывает окно. */
+    launch: (id: string, action?: LaunchActionId, inline = false) =>
+      request<LaunchResult>("/api/launcher/launch", { id, action, inline }),
     hide: () => request<{ ok: boolean }>("/api/app/hide", {}),
     open: (toggle = false) => request<{ ok: boolean }>("/api/app/open", { toggle }),
     quit: () => request<{ ok: boolean }>("/api/app/quit", {}),

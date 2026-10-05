@@ -121,8 +121,40 @@ if (process.argv.includes("--prepare")) {
     const settings = JSON.parse(await readFile(join(data, "projector", "launcher.json"), "utf8"));
     assert.equal(settings.usage["app:projector probe.desktop"].count, 2);
     assert.equal((await searchLauncher("")).items[0].id, "app:projector probe.desktop");
+    const projectItem = (await searchLauncher("Probe workspace")).items[0];
+    assert.deepEqual(
+      projectItem.actions.map((action) => action.id),
+      ["open", "run"],
+    );
+    assert.deepEqual(
+      (await searchLauncher("Projector Probe")).items[0].actions.map((action) => action.id),
+      ["launch"],
+    );
+    const opened = await (
+      await request("/api/launcher/launch", "POST", {
+        id: "project:probe-project",
+        action: "open",
+        inline: true,
+      })
+    ).json();
+    assert.match(opened.route, /^\/projects\//);
+    assert.equal(getSnapshot("probe-project").status, "idle");
     assert.equal(
-      (await request("/api/launcher/launch", "POST", { id: "project:probe-project" })).status,
+      (
+        await request("/api/launcher/launch", "POST", {
+          id: "app:projector probe.desktop",
+          action: "open",
+        })
+      ).status,
+      400,
+    );
+    assert.equal(
+      (
+        await request("/api/launcher/launch", "POST", {
+          id: "project:probe-project",
+          action: "run",
+        })
+      ).status,
       200,
     );
     const deadline = Date.now() + 3000;
