@@ -4,6 +4,10 @@ import { setImmediate } from "node:timers/promises";
 import { createRenderer } from "vue";
 import { createUsageCache } from "../server/modules/agents-integration/_/usage-cache.ts";
 import { useUsagePolling } from "../src/modules/agents-integration/_/use-usage-polling.ts";
+import {
+  USAGE_PERIOD_SECONDS,
+  usagePaceTone,
+} from "../src/modules/agents-integration/_/usage-pace.ts";
 
 test("usage cache survives loader replacement during a pending HMR request", async (t) => {
   t.mock.timers.enable({ apis: ["Date"], now: 100000 });
@@ -134,4 +138,33 @@ test("HTTP polling errors retain last usage and recover on the next interval", a
   await setImmediate();
   assert.equal(model.failed.value, false);
   assert.equal(model.usage.value.sequence, 3);
+});
+
+test("usage pace tones compare spent percent to elapsed fraction of the cycle", () => {
+  const week = USAGE_PERIOD_SECONDS.week;
+  const month = USAGE_PERIOD_SECONDS.month;
+  const now = Date.parse("2026-10-05T12:00:00Z");
+  const left = (seconds) => Math.floor(now / 1000) + seconds;
+
+  // Mid-week: expected used ≈ 50%.
+  assert.equal(usagePaceTone(50, left(week / 2), week, now), "normal");
+  assert.equal(usagePaceTone(30, left(week / 2), week, now), "spare");
+  assert.equal(usagePaceTone(65, left(week / 2), week, now), "hot");
+  assert.equal(usagePaceTone(80, left(week / 2), week, now), "over");
+
+  // Three days left in a week (~57% elapsed → expected ≈ 57%).
+  assert.equal(usagePaceTone(35, left(3 * 86400), week, now), "spare");
+  assert.equal(usagePaceTone(60, left(3 * 86400), week, now), "normal");
+  assert.equal(usagePaceTone(75, left(3 * 86400), week, now), "hot");
+
+  // Monthly Cursor/OpenCode: fifteen days left of thirty.
+  assert.equal(usagePaceTone(20, left(15 * 86400), month, now), "spare");
+  assert.equal(usagePaceTone(50, left(15 * 86400), month, now), "normal");
+  assert.equal(usagePaceTone(68, left(15 * 86400), month, now), "hot");
+  assert.equal(usagePaceTone(80, left(15 * 86400), month, now), "over");
+
+  assert.equal(usagePaceTone(10, left(week), week, now, true), "over");
+  assert.equal(usagePaceTone(100, left(week / 2), week, now), "over");
+  assert.equal(usagePaceTone(40, null, week, now), null);
+  assert.equal(usagePaceTone(40, left(week / 2), 0, now), null);
 });

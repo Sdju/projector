@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { UsagePaceTone } from "./usage-pace.ts";
+
 // Adapters own window selection and commands; this component only renders the meter.
 defineProps<{
   remaining: number | null;
@@ -8,13 +10,17 @@ defineProps<{
   ticks?: readonly number[];
   exhausted?: boolean;
   compact?: boolean;
+  tone?: UsagePaceTone | null;
 }>();
 </script>
 
 <template>
   <span
     class="quota-bar"
-    :class="{ unavailable: remaining === null, exhausted, compact, 'tooltip-bar': countdown !== undefined }"
+    :class="[
+      tone ? `tone-${tone}` : undefined,
+      { unavailable: remaining === null, exhausted, compact, 'tooltip-bar': countdown !== undefined },
+    ]"
     :role="ariaLabel && remaining !== null ? 'meter' : undefined"
     :aria-valuemin="ariaLabel && remaining !== null ? 0 : undefined"
     :aria-valuemax="ariaLabel && remaining !== null ? 100 : undefined"
@@ -61,7 +67,7 @@ defineProps<{
   height: 100%;
   padding-inline: 6px;
   white-space: nowrap;
-  color: var(--text);
+  color: inherit;
   font-size: 10px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -79,4 +85,8 @@ defineProps<{
 .tooltip-bar .quota-label { justify-content: space-between; }
 .exhausted { border-color: var(--muted); }
 .unavailable .quota-label { color: var(--muted); }
+.tone-spare { color: var(--info); border-color: color-mix(in srgb, var(--info) 55%, var(--line)); }
+.tone-normal { color: var(--muted); }
+.tone-hot { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 55%, var(--line)); }
+.tone-over { color: var(--err); border-color: color-mix(in srgb, var(--err) 55%, var(--line)); }
 </style>

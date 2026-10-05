@@ -3,6 +3,7 @@ import { computed, ref, useId } from "vue";
 import { useIntervalFn, useNow } from "@vueuse/core";
 import UsageMeter from "../../_/UsageMeter.vue";
 import { useUsagePolling } from "../../_/use-usage-polling.ts";
+import { USAGE_PERIOD_SECONDS, usagePaceTone } from "../../_/usage-pace.ts";
 import IconCursor from "~icons/simple-icons/cursor";
 import type { CursorUsage } from "../../../../../core/modules/agents-integration/cursor/index.ts";
 import { useCommandScope } from "../../../../common/utilities/commands.ts";
@@ -14,6 +15,8 @@ type WindowName = keyof NonNullable<CursorUsage["windows"]>;
 const windowOrder: WindowName[] = ["total", "auto", "api"];
 const labels = { total: "Всего", auto: "Авто", api: "API" };
 const shortLabels = { total: "вс", auto: "авт", api: "API" };
+// Cursor billing cycle is monthly; day ticks match OpenCode monthly scale.
+const monthTicks = [7, 14, 21, 28].map((day) => day / 30 * 100);
 const selectedWindow = ref<WindowName>("total");
 const commands = useCommandScope(`cursorUsage:${useId()}`, () => ({
   surface: "statusBar", window: selectedWindow.value,
@@ -32,13 +35,24 @@ const remaining = computed(() => {
   if (failed.value || usage.value?.status !== "ready" || !usage.value.windows) return null;
   return Math.round(100 - usage.value.windows[selectedWindow.value].usedPercent);
 });
+const selectedTone = computed(() => {
+  const window = usage.value?.windows?.[selectedWindow.value];
+  if (failed.value || usage.value?.status !== "ready" || !window) return null;
+  return usagePaceTone(
+    window.usedPercent, window.resetsAt, USAGE_PERIOD_SECONDS.month, now.value.getTime(), window.limited,
+  );
+});
 const tooltipRows = computed(() => {
   if (failed.value || usage.value?.status !== "ready" || !usage.value.windows) return [];
   const windows = usage.value.windows;
+  const at = now.value.getTime();
   return (Object.keys(shortLabels) as WindowName[]).map((name) => ({
     name, label: shortLabels[name], remaining: Math.round(100 - windows[name].usedPercent),
-    countdown: resetCountdown(windows[name].resetsAt, now.value.getTime()),
+    countdown: resetCountdown(windows[name].resetsAt, at),
     limited: windows[name].limited,
+    tone: usagePaceTone(
+      windows[name].usedPercent, windows[name].resetsAt, USAGE_PERIOD_SECONDS.month, at, windows[name].limited,
+    ),
   }));
 });
 const tooltip = computed(() => {
@@ -60,6 +74,7 @@ const tooltip = computed(() => {
   <button
     type="button"
     class="cursor-usage"
+    :class="selectedTone ? `tone-${selectedTone}` : undefined"
     :aria-label="tooltip"
     @click="commands.run('ide.cursor.usage.window.cycle')"
   >
@@ -67,6 +82,7 @@ const tooltip = computed(() => {
     <UsageMeter
       :remaining="remaining"
       :prefix="shortLabels[selectedWindow]"
+      :tone="selectedTone"
       :aria-label="`Остаток лимита Cursor: ${labels[selectedWindow]}`"
     />
     <span class="quota-tooltip" role="tooltip">
@@ -78,6 +94,8 @@ const tooltip = computed(() => {
             :remaining="row.remaining"
             :countdown="row.countdown"
             :exhausted="row.limited"
+            :ticks="monthTicks"
+            :tone="row.tone"
           />
         </span>
         <span class="tooltip-hint">Клик — сменить лимит</span>
@@ -103,6 +121,10 @@ const tooltip = computed(() => {
   font: inherit;
   cursor: pointer;
 }
+.tone-spare { color: var(--info); }
+.tone-normal { color: var(--muted); }
+.tone-hot { color: var(--warn); }
+.tone-over { color: var(--err); }
 .cursor-icon {
   width: 13px;
   height: 13px;
