@@ -2,7 +2,8 @@ import { homedir, userInfo } from "node:os";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import * as linux from "./modules/linux/index.ts";
-import type { DesktopAction, ResidentOptions, SecretKey } from "./contract.ts";
+import * as windows from "./modules/windows/index.ts";
+import type { DesktopAction, ResidentOptions, SecretKey, ShellLaunch } from "./contract.ts";
 
 export class UnsupportedPlatformError extends Error {
   readonly code = "ERR_OS_UNSUPPORTED";
@@ -14,16 +15,18 @@ export class UnsupportedPlatformError extends Error {
 
 /** OS selection happens once; user environment/settings are read when needed. */
 export function createOs(platform: NodeJS.Platform = process.platform) {
-  const supported = platform === "linux";
+  const implementation = platform === "linux" ? linux : platform === "win32" ? windows : null;
+  const supported = implementation !== null;
+  const nativeDesktop = platform === "linux";
   const backend = (operation: string) => {
-    if (!supported) throw new UnsupportedPlatformError(platform, operation);
-    return linux;
+    if (!implementation) throw new UnsupportedPlatformError(platform, operation);
+    return implementation;
   };
   const adapter = {
     platform,
     supported,
     capabilities: Object.freeze({
-      nativeDesktop: supported,
+      nativeDesktop,
       processInspection: supported,
       fileOperations: supported,
     }),
@@ -31,17 +34,20 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
     userIdentity: () => {
       backend("userIdentity");
       const { uid, gid } = userInfo();
+      if (platform === "win32" && uid < 0) return { uid: 1000, gid: 1000 };
       return { uid, gid };
     },
     dataHome: () => backend("dataHome").dataHome(),
     shell: () => backend("shell").shell(),
+    shellLaunch: (spec: ShellLaunch) => backend("shellLaunch").shellLaunch(spec),
     installDesktop: (root: string) => backend("installDesktop").installDesktop(root),
     desktopPaths: () => backend("desktopPaths").desktopPaths(),
     requireSupported: (operation: string) => {
-      backend(operation);
+      if (!supported || (operation === "native desktop" && !nativeDesktop))
+        throw new UnsupportedPlatformError(platform, operation);
     },
     processes: {
-      list: () => (supported ? linux.listProcesses() : null),
+      list: () => (supported ? backend("processes.list").listProcesses() : null),
       signal: (pid: number, signal: NodeJS.Signals) =>
         backend("processes.signal").signalProcess(pid, signal),
       descendants: (pid: number) => backend("processes.descendants").descendants(pid),
@@ -59,6 +65,7 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
       },
     },
     tools: {
+      commandExists: (bin: string) => backend("commandExists").commandExists(bin),
       readOpenCodeGoKey: () => backend("readOpenCodeGoKey").readOpenCodeGoKey(),
       readCursorAccessToken: () => backend("readCursorAccessToken").readCursorAccessToken(),
       startCodexAppServer: () => backend("startCodexAppServer").startCodexAppServer(),
@@ -98,7 +105,7 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
     },
     /** OS secret store (Linux: Secret Service over D-Bus). `available` never throws. */
     secrets: {
-      available: () => (supported ? linux.secretsAvailable() : Promise.resolve(false)),
+      available: () => (supported ? backend("secrets.available").secretsAvailable() : Promise.resolve(false)),
       get: (key: SecretKey) => backend("secrets.get").getSecret(key),
       set: (key: SecretKey, label: string, value: string) =>
         backend("secrets.set").setSecret(key, label, value),
@@ -107,18 +114,19 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
     pickFolder: () => backend("pickFolder").pickFolder(),
     catalog: () => backend("catalog").catalog(),
     async runDesktop(url: string, action: DesktopAction, options: ResidentOptions) {
+      if (!nativeDesktop) throw new UnsupportedPlatformError(platform, "runDesktop");
       const { runResident } = await backend("runDesktop").resident();
       return runResident(url, action, options);
     },
     desktopPid: (service: string) =>
-      supported ? linux.desktopPid(service) : Promise.resolve(undefined),
+      supported ? backend("desktopPid").desktopPid(service) : Promise.resolve(undefined),
     shortcutStatus: () =>
       supported
-        ? linux.shortcutStatus()
+        ? backend("shortcutStatus").shortcutStatus()
         : Promise.resolve({ supported: false, active: false, shortcut: "" }),
     shortcutAvailable: (shortcut: string) =>
       supported
-        ? linux.shortcutAvailable(shortcut)
+        ? backend("shortcutAvailable").shortcutAvailable(shortcut)
         : Promise.resolve({ supported: false, available: false }),
     toolchainBin: () => join(homedir(), ".vite-plus/bin"),
   };

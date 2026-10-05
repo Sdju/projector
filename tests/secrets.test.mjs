@@ -153,7 +153,7 @@ await test("credentials can be revealed only while protected by the keyring", ()
 // Touches the real user keyring (and may show an unlock dialog), so it is opt-in.
 await test("OS secret store round-trips a value (PROJECTOR_TEST_KEYRING=1)", async (t) => {
   if (!process.env.PROJECTOR_TEST_KEYRING) return t.skip("нужен PROJECTOR_TEST_KEYRING=1");
-  if (!(await os.secrets.available())) return t.skip("Secret Service недоступен");
+  if (!(await os.secrets.available())) return t.skip("системное хранилище секретов недоступно");
   const key = { service: "projector-test", account: `roundtrip-${process.pid}` };
   try {
     await os.secrets.set(key, "Projector test", "значение");

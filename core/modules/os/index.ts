@@ -5,4 +5,5 @@ export type {
   DesktopPalette,
   ResidentOptions,
   SecretKey,
+  ShellLaunch,
 } from "./contract.ts";

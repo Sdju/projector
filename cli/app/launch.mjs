@@ -1,10 +1,10 @@
-import { execFileSync, spawn } from "node:child_process";
-import { accessSync, constants, existsSync, mkdirSync, openSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { existsSync, mkdirSync, openSync } from "node:fs";
 import { open, readFile, unlink } from "node:fs/promises";
 import { os } from "../../core/modules/os/index.ts";
 import { SERVER_MODES, isServerMode, serverCommand } from "../../core/modules/server-mode/index.ts";
 import { readServerMode, writeServerMode } from "../../core/modules/app-paths/index.ts";
-import { join } from "node:path";
+import { delimiter, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
@@ -35,25 +35,16 @@ function isPidAlive(pid) {
   }
 }
 
-function isExecutable(path) {
-  try {
-    accessSync(path, constants.X_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function findVp() {
-  const candidates = [process.env.VP, join(os.toolchainBin(), "vp"), "vp"].filter(Boolean);
+  const candidates = [
+    process.env.VP,
+    join(os.toolchainBin(), "vp"),
+    join(os.toolchainBin(), "vp.cmd"),
+    "vp",
+  ].filter(Boolean);
   for (const bin of candidates) {
-    if (bin.includes("/") && isExecutable(bin)) return bin;
-    try {
-      execFileSync("which", [bin], { stdio: "ignore" });
-      return bin;
-    } catch {
-      continue;
-    }
+    if (isAbsolute(bin) && existsSync(bin)) return bin;
+    if (!isAbsolute(bin) && os.tools.commandExists(bin)) return bin;
   }
   return "vp";
 }
@@ -121,7 +112,7 @@ function childEnv() {
   const vpBin = os.toolchainBin();
   const env = {
     ...process.env,
-    PATH: `${vpBin}:${process.env.PATH ?? "/usr/bin"}`,
+    PATH: [vpBin, process.env.PATH].filter(Boolean).join(delimiter),
   };
   // Одноразовый режим доступа: не сохраняется на диск и не влияет на следующие запуски.
   if (lan) env.PROJECTOR_NETWORK = "lan";

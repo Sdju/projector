@@ -131,7 +131,14 @@ test("Bash uses cwd, returns failure status, bounds output and aborts subprocess
   const cwd = await mkdtemp(join(tmpdir(), "projector-agent-shell-"));
   try {
     const result = await os.tools.runBash("pwd; printf failure >&2; exit 7", { cwd });
-    assert.equal(result.stdout.trim(), cwd);
+    const printed =
+      process.platform === "win32"
+        ? result.stdout
+            .trim()
+            .replace(/^\/([A-Za-z])\//, (_, drive) => `${drive.toUpperCase()}:\\`)
+            .replace(/\//g, "\\")
+        : result.stdout.trim();
+    assert.equal(printed.toLowerCase(), cwd.toLowerCase());
     assert.equal(result.stderr, "failure");
     assert.equal(result.exitCode, 7);
     const bounded = await os.tools.runBash("yes agent", { cwd });

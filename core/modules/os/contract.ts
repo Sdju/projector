@@ -30,3 +30,9 @@ export interface SecretKey {
   service: string;
   account: string;
 }
+
+/** How a host shell should be started. Containers keep their own `/bin/bash` argv. */
+export type ShellLaunch =
+  | { kind: "interactive" }
+  | { kind: "command"; command: string }
+  | { kind: "program"; executable: string };

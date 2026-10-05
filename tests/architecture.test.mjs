@@ -90,6 +90,7 @@ test("OS is Node-only and Linux implementation is private to its facade", () => 
   ]) {
     assert.equal(boundaryError(consumer, "core/modules/os/index.ts"), undefined);
     assert.match(boundaryError(consumer, "core/modules/os/modules/linux/index.ts"), /private/);
+    assert.match(boundaryError(consumer, "core/modules/os/modules/windows/index.ts"), /private/);
   }
 });
 

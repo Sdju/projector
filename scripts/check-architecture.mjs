@@ -277,6 +277,11 @@ export function checkArchitecture() {
       /["'`]\/proc(?:\/|["'`])|["'](?:xdotool|xprop|wmctrl|org\.kde\.[^"']*)["']/.test(code)
     )
       report("Linux-specific operations must live in the os Linux adapter");
+    if (
+      !inside(file, join(projectRoot, "core/modules/os/modules/windows")) &&
+      /powershell\.exe|taskkill|ntdll|advapi32|LOCALAPPDATA|WScript\.Shell|CredRead/.test(code)
+    )
+      report("Windows-specific operations must live in the os Windows adapter");
     for (const dependency of importsOf(readFileSync(file, "utf8"), file)) {
       if (dependency.error) {
         report(dependency.error);
@@ -284,11 +289,12 @@ export function checkArchitecture() {
       }
       const specifier = dependency.specifier;
       // Node-only infrastructure is confined to app-paths and os.
+      const portable = file.split(sep).join("/");
       if (
         (own.root === "src" ||
           (own.root === "core" &&
-            !file.includes("/app-paths/") &&
-            !file.includes("/modules/os/"))) &&
+            !portable.includes("/app-paths/") &&
+            !portable.includes("/modules/os/"))) &&
         (specifier.startsWith("node:") ||
           ["node-gtk", "dbus-next", "node-pty", "ws"].includes(specifier))
       )

@@ -67,6 +67,12 @@ vp run build
 ./bin/projector --browser
 ```
 
+На Windows системное GTK-окно недоступно. Веб-интерфейс запускается так:
+
+```bat
+bin\projector.cmd --browser
+```
+
 Веб-интерфейс доступен по адресу <http://localhost:4177> при работающем Projector.
 
 Чтобы добавить Projector в меню приложений и установить команду `projector`:

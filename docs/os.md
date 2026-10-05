@@ -6,7 +6,8 @@
 import { os } from "../../../core/modules/os/index.ts";
 
 os.platform; // process.platform, определяется при загрузке
-os.supported; // сейчас true только для Linux
+os.supported; // true для Linux и Windows
+os.capabilities.nativeDesktop; // GTK-палитра: только Linux
 os.capabilities.processInspection;
 const processes = os.processes.list();
 const cwd = await os.processes.workingDirectory(pid, projectPath);
@@ -20,22 +21,11 @@ core/modules/os/
   index.ts                  публичный API и типы
   os.ts                     выбор адаптера, capabilities и единый фасад
   contract.ts               процесс и интерфейс контроллера палитры
-  modules/linux/
-    index.ts                закрытый API Linux и ленивые загрузчики
-    directories.ts          XDG, shell и диалоги выбора папки
-    processes.ts            /proc, PID identity, потомки, cwd и сигналы
-    tools.ts                GNU mv, Python и ripgrep
-    windows.ts              браузер и управление X11-окнами
-    install-desktop.ts      desktop entry, иконки и команда запуска
-    catalog.ts              GIO-каталог и запуск .desktop
-    bus.ts                  session D-Bus
-    shortcut.ts              KDE KGlobalAccel
-    secrets.ts              Secret Service (KWallet, GNOME Keyring) по D-Bus
-    tray.ts                 StatusNotifierItem / DBusMenu
-    resident.ts             desktop lifecycle и D-Bus command endpoint
+  modules/linux/            /proc, X11, GIO, D-Bus, Secret Service, трей
+  modules/windows/          Win32-процессы, Credential Manager, меню Пуск, окно Chromium
 ```
 
-Linux-подмодуль приватен для фасада. При добавлении другой ОС реализация регистрируется в `createOs`; потребители сохраняют вызовы `os.*`. Фабрика экспортирована для проверки выбора платформы. Singleton `os` выбирает систему один раз, а пользовательские настройки окружения (например, XDG и SHELL) читаются при обращении.
+Подмодули `linux` и `windows` приватны для фасада. Новая ОС регистрируется в `createOs`; потребители сохраняют вызовы `os.*`. Фабрика экспортирована для проверки выбора платформы. Singleton `os` выбирает систему один раз, а пользовательские настройки окружения (XDG, LOCALAPPDATA, SHELL) читаются при обращении.
 
 ## Ответственность API
 
@@ -57,9 +47,9 @@ Linux-подмодуль приватен для фасада. При добав
 
 Импорт `os` не загружает GTK, GIO или D-Bus и не создаёт соединения. Native-компоненты загружаются по буквальным file URL: это сохраняет ленивость при сборке Vite-конфигурации; архитектурный checker проверяет такие зависимости.
 
-Для неподдерживаемых ОС `supported` и capabilities равны false. Список процессов возвращает `null`, сведения о хоткее показывают отсутствие поддержки. Операции с отсутствующей реализацией выбрасывают `UnsupportedPlatformError` с кодом `ERR_OS_UNSUPPORTED`, а не запускают Linux-команды.
+Для неподдерживаемых ОС (`darwin` и остальные) `supported` и capabilities равны false. Список процессов возвращает `null`, сведения о хоткее показывают отсутствие поддержки. Операции с отсутствующей реализацией выбрасывают `UnsupportedPlatformError` с кодом `ERR_OS_UNSUPPORTED`, а не запускают команды другой ОС.
 
-Capabilities означают наличие реализации, а не установленность GTK/утилит или доступность display. Linux по-прежнему требует системных зависимостей; автоматический хоткей зависит от KDE, управление app-окном — от X11. Bash bootstrap и renderer `vio` остаются платформенными. Этот слой изолирует зависимости, но сам по себе не реализует поддержку Windows/macOS.
+Capabilities означают наличие реализации, а не установленность утилит. Linux по-прежнему требует GTK, X11 и KDE для системного окна и хоткея. На Windows `nativeDesktop` равен false: GTK-палитра, трей и глобальный хоткей остаются на Linux. Работают каталоги (`LOCALAPPDATA`, с приоритетом `XDG_DATA_HOME`), процессы, перенос файлов, Git Bash или PowerShell, Credential Manager, меню Пуск и окно Chromium. Запуск на Windows — `bin/projector.cmd`.
 
 Порт сервера и модель хранения проектов — настройки приложения; они не относятся к OS-адаптеру. Импорт ключей ai-companion теперь принимает путь аргументом:
 
@@ -69,4 +59,4 @@ node cli/app/import-companion-key.mjs /path/to/providers.json
 
 ## Проверка
 
-`tests/os.test.mjs` проверяет выбор ОС, отсутствие Linux fallback, XDG, реальные процессы/cwd и перенос файлов с Unicode и конфликтом имён. Входит в `vp run test`. Архитектурные тесты запрещают прямой доступ к Linux-подмодулю и импорт Node OS-инфраструктуры в браузер.
+`tests/os.test.mjs` проверяет выбор ОС, отсутствие чужого fallback, каталоги, реальные процессы/cwd и перенос файлов с Unicode и конфликтом имён. Входит в `vp run test`. Архитектурные тесты запрещают прямой доступ к подмодулям Linux и Windows и импорт Node OS-инфраструктуры в браузер.

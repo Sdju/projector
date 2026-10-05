@@ -21,7 +21,9 @@ export function terminalActivity(
   const rows = (processes ?? []).filter((row) => family.has(row.pid) && row.state !== "Z");
   const root = rows.find((row) => row.pid === info.pid);
   const children = rows.filter((row) => row.pid !== info.pid);
-  const shell = root && ["bash", "sh", "zsh", "fish", "dash", "ksh"].includes(root.name);
+  const shell =
+    root &&
+    ["bash", "sh", "zsh", "fish", "dash", "ksh", "powershell", "pwsh", "cmd"].includes(root.name);
   const state = !root
     ? "unknown"
     : children.length || info.commandId || info.program !== "shell" || !shell || root.state === "R"

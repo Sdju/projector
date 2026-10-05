@@ -250,14 +250,14 @@ export function createTerminalSession(
   }
   env.TERM = "xterm-256color";
   env.COLORTERM = "truecolor";
-  const shell = os.shell();
   // Cursor Agent CLI installs as `agent` / `cursor-agent`, not `cursor`.
   const executable = program === "cursor" ? "agent" : program;
-  const args = command
-    ? ["-c", command.cmd]
+  const invocation = command
+    ? os.shellLaunch({ kind: "command", command: command.cmd })
     : program === "shell"
-      ? ["-i"]
-      : ["-i", "-c", `exec ${executable}`];
+      ? os.shellLaunch({ kind: "interactive" })
+      : os.shellLaunch({ kind: "program", executable });
+  const args = invocation.args;
   // A config the user trusted in its current form replaces the restricted environment.
   const trusted = launch ? undefined : devcontainerLaunch(project, ["/bin/bash", ...args]);
   if (trusted) launch = trusted;
@@ -277,7 +277,7 @@ export function createTerminalSession(
   const mouseEncoding = trackMouseEncoding(screen);
   let child: IPty;
   try {
-    child = spawn(launch?.file ?? shell, launch?.args ?? args, {
+    child = spawn(launch?.file ?? invocation.file, launch?.args ?? args, {
       name: "xterm-256color",
       ...dimensions,
       cwd: project.path,

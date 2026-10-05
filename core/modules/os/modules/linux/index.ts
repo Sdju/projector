@@ -14,8 +14,9 @@ export {
   runDocker,
   runDockerSync,
   runNodeScript,
+  commandExists,
 } from "./tools.ts";
-export { dataHome, shell, desktopPaths, pickFolder } from "./directories.ts";
+export { dataHome, shell, shellLaunch, desktopPaths, pickFolder } from "./directories.ts";
 export {
   focusAppWindow,
   openWindow,

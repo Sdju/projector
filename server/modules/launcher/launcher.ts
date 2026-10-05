@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { os } from "../../../core/modules/os/index.ts";
 import { loadProjects } from "../projects/index.ts";
 import { getSnapshot, startProject } from "../processes/index.ts";
 import { openBrowser, openWindow } from "../window/index.ts";
@@ -102,7 +103,10 @@ export async function searchLauncher(
   let warning: string | undefined;
   const [apps, projects, prefs] = await Promise.all([
     applications().catch(() => {
-      warning = "Системные приложения недоступны. Проверьте node-gtk и системные библиотеки GIO.";
+      warning =
+        os.platform === "win32"
+          ? "Системные приложения недоступны."
+          : "Системные приложения недоступны. Проверьте node-gtk и системные библиотеки GIO.";
       return [];
     }),
     loadProjects(),

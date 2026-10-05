@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import type { ShellLaunch } from "../../contract.ts";
 
 const execute = promisify(execFile);
 export function dataHome() {
@@ -12,6 +13,12 @@ export function configHome() {
 }
 export function shell() {
   return process.env.SHELL || "/bin/bash";
+}
+export function shellLaunch(spec: ShellLaunch) {
+  const file = shell();
+  if (spec.kind === "command") return { file, args: ["-c", spec.command] };
+  if (spec.kind === "program") return { file, args: ["-i", "-c", `exec ${spec.executable}`] };
+  return { file, args: ["-i"] };
 }
 export function desktopPaths() {
   return {
