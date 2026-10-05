@@ -154,7 +154,6 @@ onUnmounted(() => {
   <main class="launcher" :class="{ 'in-window': webWindow }">
     <div class="launcher-heading">
       <router-link to="/">projector</router-link>
-      <router-link to="/settings" aria-label="Настройки">Настройки</router-link>
     </div>
     <section class="palette" aria-label="Запуск приложений">
       <div class="search-line">
