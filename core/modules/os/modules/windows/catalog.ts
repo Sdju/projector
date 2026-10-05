@@ -21,6 +21,11 @@ function allowed(id: string) {
   });
 }
 
+/** GTK-палитра есть только на Linux; заглушка держит общий тип каталога. */
+export function desktopApp(_id: string): { getIcon(): never } {
+  throw new Error("GTK-палитра доступна только на Linux");
+}
+
 export function listApplications(): LaunchItem[] {
   const script = `
 $shell = New-Object -ComObject WScript.Shell
