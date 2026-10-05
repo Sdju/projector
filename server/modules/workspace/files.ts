@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { HttpError } from "../http/index.ts";
 import { moveDestination, treePageRange } from "../../../core/modules/workspace/index.ts";
+import { ignoredPaths } from "./ignored.ts";
 import { MAX_BYTES, decode, excluded, location, validatePath } from "./paths.ts";
 
 const archiveHelper = fileURLToPath(new URL("./archive.py", import.meta.url));
@@ -156,12 +157,18 @@ export async function listProjectDirectory(
   } catch (error) {
     throw new HttpError(400, error instanceof Error ? error.message : "Неверная страница");
   }
+  const visible = entries.slice(page.offset, page.end);
+  const ignored = await ignoredPaths(
+    full,
+    visible.map((entry) => entry.name),
+  );
   return {
     entries: await Promise.all(
-      entries.slice(page.offset, page.end).map(async (entry) => ({
+      visible.map(async (entry) => ({
         name: entry.name,
         path: path ? `${path}/${entry.name}` : entry.name,
         directory: entry.isDirectory(),
+        ...(ignored.has(entry.name) ? { ignored: true } : {}),
         executable:
           entry.isFile() &&
           (await lstat(resolve(full, entry.name)).then(

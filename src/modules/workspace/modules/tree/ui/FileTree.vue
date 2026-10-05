@@ -243,6 +243,7 @@ defineExpose({ reveal });
       <button
         :class="{
           'git-changed': !!decoration,
+          'git-ignored': entry.ignored,
           selected: selection.paths.value.has(entry.path),
           dragging: selection.dragged.value.includes(entry.path) && !!source,
           'drop-target': entry.directory && target === entry.path,
@@ -365,6 +366,9 @@ button[data-git-status="deleted"] {
 }
 button[data-git-status="conflict"] {
   --git-tint: var(--err);
+}
+button.git-ignored:not(.selected) {
+  opacity: 0.55;
 }
 button.git-changed.selected {
   box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--git-tint) 18%, transparent);

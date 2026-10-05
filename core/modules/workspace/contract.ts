@@ -3,6 +3,7 @@ export interface FileEntry {
   path: string;
   directory: boolean;
   executable?: boolean;
+  ignored?: boolean;
   disabled?: boolean;
 }
 export interface FileContent {
