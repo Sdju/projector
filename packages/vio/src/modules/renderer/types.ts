@@ -32,6 +32,17 @@ export interface EntryWidget extends Widget {
 }
 export interface RowWidget extends Widget {
   getIndex(): number;
+  /** Границы относительно `target`; `[false, …]`, если виджеты не связаны. */
+  computeBounds(target: Widget): [boolean, { getY(): number; getHeight(): number }];
+}
+export interface ScrolledWidget extends Widget {
+  /** Если окно само добавило `Viewport`, возвращается он, а не исходный виджет. */
+  getChild(): (Widget & { getChild?(): Widget | null }) | null;
+  getVadjustment(): {
+    getValue(): number;
+    getPageSize(): number;
+    setValue(value: number): void;
+  };
 }
 export interface ListBoxWidget extends Widget {
   getRowAtIndex(index: number): RowWidget | null;

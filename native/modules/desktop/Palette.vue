@@ -7,6 +7,7 @@ import {
   shallowRef,
   ref,
   nextTick,
+  watch,
   onUnmounted,
   markRaw,
   VWindow,
@@ -23,6 +24,7 @@ import {
   type WindowWidget,
   type EntryWidget,
   type ListBoxWidget,
+  type ScrolledWidget,
   type RowWidget,
 } from "vio";
 import {
@@ -77,6 +79,42 @@ const failureText = computed(() => {
 const windowRef = ref<WidgetHandle<WindowWidget>>();
 const entryRef = ref<WidgetHandle<EntryWidget>>();
 const listRef = ref<WidgetHandle<ListBoxWidget>>();
+const listScrollRef = ref<WidgetHandle<ScrolledWidget>>();
+const detailScrollRef = ref<WidgetHandle<ScrolledWidget>>();
+const detailListRef = ref<WidgetHandle<ListBoxWidget>>();
+/** A list box does not scroll its selection by itself; keep the row inside the viewport. */
+function scrollToRow(scroller?: ScrolledWidget | null, row?: RowWidget | null) {
+  // Bounds must be taken in content coordinates: the widget inside the auto-added viewport.
+  const viewport = scroller?.getChild();
+  const target = viewport?.getChild?.() ?? viewport;
+  if (!scroller || !target || !row) return;
+  const [ok, rect] = row.computeBounds(target);
+  if (!ok) return;
+  const adjustment = scroller.getVadjustment();
+  const top = rect.getY();
+  const bottom = top + rect.getHeight();
+  const value = adjustment.getValue();
+  const page = adjustment.getPageSize();
+  if (top < value) adjustment.setValue(top);
+  else if (bottom > value + page) adjustment.setValue(bottom - page);
+}
+watch(
+  () => [state.value.selected, state.value.items],
+  async () => {
+    await nextTick();
+    scrollToRow(
+      listScrollRef.value?.widget,
+      listRef.value?.widget?.getRowAtIndex(state.value.selected),
+    );
+  },
+);
+watch(detailIndex, async () => {
+  await nextTick();
+  scrollToRow(
+    detailScrollRef.value?.widget,
+    detailListRef.value?.widget?.getRowAtIndex(detailIndex.value),
+  );
+});
 const icons = new Map<string, object | null>();
 let wasActive = false;
 let blurTimer: ReturnType<typeof setTimeout> | undefined;
@@ -248,10 +286,6 @@ function keyPressed(keyval: number, _keycode?: number, modifiers = 0) {
   }
   if (keyval === Gdk.KEY_Down || keyval === Gdk.KEY_Up) {
     model.move(keyval === Gdk.KEY_Down ? 1 : -1);
-    void nextTick(() => {
-      listRef.value?.widget?.getRowAtIndex(state.value.selected)?.grabFocus();
-      entryRef.value?.widget?.grabFocus();
-    });
     return true;
   }
   if (keyval === Gdk.KEY_Return || keyval === Gdk.KEY_KP_Enter) {
@@ -312,13 +346,14 @@ defineExpose({ show, hide, toggle, invokeSelected, openPage, quitProjector, rest
           @activate="focus ? launchDetail() : launch()"
         />
       </VBox>
-      <VScrolledWindow v-if="focus" :vexpand="true">
+      <VScrolledWindow v-if="focus" ref="detailScrollRef" :vexpand="true">
         <VBox orientation="vertical" :spacing="8">
           <VLabel :xalign="0" class="heading">← {{ focus.name }}</VLabel>
           <VLabel v-if="infoText" :xalign="0" :wrap="true" class="dim-label info-text">{{
             infoText
           }}</VLabel>
           <VListBox
+            ref="detailListRef"
             selection-mode="single"
             :activate-on-single-click="true"
             :selected="detailIndex"
@@ -339,7 +374,7 @@ defineExpose({ show, hide, toggle, invokeSelected, openPage, quitProjector, rest
           >
         </VBox>
       </VScrolledWindow>
-      <VScrolledWindow v-else :vexpand="true">
+      <VScrolledWindow v-else ref="listScrollRef" :vexpand="true">
         <VListBox
           ref="listRef"
           selection-mode="single"

@@ -36,6 +36,7 @@ export type {
   EntryWidget,
   RowWidget,
   ListBoxWidget,
+  ScrolledWidget,
   ButtonWidget,
   LabelWidget,
   ToggleWidget,
