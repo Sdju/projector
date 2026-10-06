@@ -71,7 +71,7 @@ const emit = defineEmits<{ open: [path: string] }>();
           :key="label.name"
           :style="{ borderColor: label.color ? `#${label.color}` : undefined }"
         >
-          {{ label.name }}
+          <EmojiText :text="label.name" />
         </li>
       </ul>
       <VisualMarkdownEditor

@@ -17,7 +17,7 @@ const labelDot = (label: IssueLabel) => (label.color ? `#${label.color}` : "tran
       <span class="number">#{{ number }}</span>
       <span v-for="label in labels.slice(0, 3)" :key="label.name" class="label">
         <span class="dot" :style="{ background: labelDot(label) }" />
-        {{ label.name }}
+        <EmojiText :text="label.name" />
       </span>
       <span class="author">
         <UiAvatar :src="author.avatarUrl" :alt="author.login" :size="14" />
