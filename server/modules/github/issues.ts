@@ -10,15 +10,15 @@ import type {
 } from "../../../core/modules/workspace/index.ts";
 
 const PAGE = 30;
-const COMMENT_PAGE = 100;
-const COMMENT_PAGES = 5;
+export const COMMENT_PAGE = 100;
+export const COMMENT_PAGES = 5;
 const STATES = ["open", "closed", "all"] as const;
 
-interface RemoteUser {
+export interface RemoteUser {
   login?: string;
   avatar_url?: string;
 }
-interface RemoteLabel {
+export interface RemoteLabel {
   name?: string;
   color?: string;
 }
@@ -37,17 +37,17 @@ interface RemoteIssue {
   /** Present only for pull requests, which the issues endpoint also returns. */
   pull_request?: unknown;
 }
-interface RemoteComment {
+export interface RemoteComment {
   id: number;
   user?: RemoteUser;
   body?: string | null;
   html_url?: string;
   created_at?: string;
 }
-function user(raw?: RemoteUser): IssueUser {
+export function user(raw?: RemoteUser): IssueUser {
   return { login: raw?.login || "", avatarUrl: raw?.avatar_url || "" };
 }
-function labels(raw: RemoteIssue["labels"]): IssueLabel[] {
+export function labels(raw: RemoteIssue["labels"]): IssueLabel[] {
   return (raw ?? []).map((label) =>
     typeof label === "string"
       ? { name: label, color: "" }
@@ -69,7 +69,7 @@ function issue(raw: RemoteIssue): Issue {
     updatedAt: raw.updated_at || "",
   };
 }
-function comment(raw: RemoteComment): IssueComment {
+export function comment(raw: RemoteComment): IssueComment {
   return {
     id: raw.id,
     author: user(raw.user),

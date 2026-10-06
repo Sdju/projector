@@ -3,7 +3,12 @@ import type {
   GithubEntry,
   GithubFile,
 } from "../../../core/modules/github/index.ts";
-import type { IssueDetail, IssueList } from "../../../core/modules/workspace/index.ts";
+import type {
+  IssueDetail,
+  IssueList,
+  PullRequestDetail,
+  PullRequestList,
+} from "../../../core/modules/workspace/index.ts";
 export class GithubRequestError extends Error {
   readonly status: number;
   constructor(message: string, status: number) {
@@ -38,3 +43,10 @@ export const readIssues = (
 ) => readGit<IssueList>("issues", { repository, ...params }, signal);
 export const readIssue = (repository: string, number: number, signal?: AbortSignal) =>
   readGit<IssueDetail>("issue", { repository, number: String(number) }, signal);
+export const readPulls = (
+  repository: string,
+  params: Record<string, string>,
+  signal?: AbortSignal,
+) => readGit<PullRequestList>("pulls", { repository, ...params }, signal);
+export const readPull = (repository: string, number: number, signal?: AbortSignal) =>
+  readGit<PullRequestDetail>("pull", { repository, number: String(number) }, signal);

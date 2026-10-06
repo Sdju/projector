@@ -27,6 +27,12 @@ export type {
   IssueLabel,
   IssueList,
   IssueUser,
+  PullRequest,
+  PullRequestDetail,
+  PullRequestFile,
+  PullRequestList,
+  PullRequestReview,
+  PullRequestState,
 } from "./contract.ts";
 export type { FilesExcludeMap } from "./files-exclude.ts";
 export {

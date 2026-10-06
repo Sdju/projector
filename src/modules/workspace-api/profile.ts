@@ -6,6 +6,7 @@ export type WorkspaceCapability =
   | "git"
   | "search"
   | "issues"
+  | "pulls"
   | "terminals"
   | "docker"
   | "agent"
@@ -52,6 +53,7 @@ export interface WorkspaceProfile {
     git?: GitProvider;
     search?: ReadProvider;
     issues?: ReadProvider;
+    pulls?: ReadProvider;
   };
   features: Readonly<WorkspaceFeatures>;
   /** Service tab kinds this workspace adds to the base set. */
@@ -72,6 +74,7 @@ export function profileCapabilities(profile: WorkspaceProfile): Readonly<Workspa
       git: !!profile.providers.git,
       search: !!profile.providers.search,
       issues: !!profile.providers.issues,
+      pulls: !!profile.providers.pulls,
     });
     capabilityCache.set(profile, capabilities);
   }
@@ -79,7 +82,7 @@ export function profileCapabilities(profile: WorkspaceProfile): Readonly<Workspa
 }
 
 /** Which provider serves a read action; the table is the only place that knows the split. */
-const READ_DOMAIN: Record<string, "files" | "git" | "search" | "issues"> = {
+const READ_DOMAIN: Record<string, "files" | "git" | "search" | "issues" | "pulls"> = {
   tree: "files",
   file: "files",
   root: "files",
@@ -93,6 +96,8 @@ const READ_DOMAIN: Record<string, "files" | "git" | "search" | "issues"> = {
   search: "search",
   issues: "issues",
   issue: "issues",
+  pulls: "pulls",
+  pull: "pulls",
 };
 export function readProviderFor(profile: WorkspaceProfile, action: string): ReadProvider {
   const domain = READ_DOMAIN[action];

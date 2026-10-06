@@ -8,10 +8,22 @@ import {
   type WorkspaceProfile,
 } from "../workspace-api/index.ts";
 import { formatProjectRef } from "../project/index.ts";
-import { readIssue, readIssues, readRepository, readTree, readFile, readGit } from "./client.ts";
+import {
+  readIssue,
+  readIssues,
+  readPull,
+  readPulls,
+  readRepository,
+  readTree,
+  readFile,
+  readGit,
+} from "./client.ts";
 
 const connectionTab = singletonTab(
-  "github-integration", "github:integration", "GitHub", "Подключение к GitHub",
+  "github-integration",
+  "github:integration",
+  "GitHub",
+  "Подключение к GitHub",
 );
 
 /** Authentication has its own empty workspace and never falls back to local files. */
@@ -21,15 +33,18 @@ export function createGithubConnectionProfile(repository: string): WorkspaceProf
     layout: "editor",
     tabs: [connectionTab],
     features: {
-      terminals: false, docker: false, agent: false, settings: false,
-      persist: false, externalFiles: false,
+      terminals: false,
+      docker: false,
+      agent: false,
+      settings: false,
+      persist: false,
+      externalFiles: false,
     },
     providers: {
       files: {
         assetUrl: () => "",
         async read(action) {
-          if (action === "root")
-            return { root: formatProjectRef({ kind: "github", repository }) };
+          if (action === "root") return { root: formatProjectRef({ kind: "github", repository }) };
           if (action === "tree") return { entries: [], truncated: false };
           throw new Error("Подключите GitHub, чтобы открыть файлы");
         },
@@ -40,6 +55,44 @@ export function createGithubConnectionProfile(repository: string): WorkspaceProf
 
 const UNAVAILABLE = "Действие недоступно для этого источника workspace";
 
+const numberedTab = (id: string, label: string) =>
+  defineTab<{ number: number; title?: string }>({
+    id,
+    key: ({ number }) => `${id}:${number}`,
+    path: ({ number }) => `${label} #${number}`,
+    title: ({ number, title }) => `${title ? `${title} · ` : ""}${label} #${number}`,
+    hint: ({ title }) => title ?? "",
+    preview: true,
+  });
+const issueTab = numberedTab("issue", "Issue");
+const pullTab = numberedTab("pull", "PR");
+
+/** Read provider for a numbered resource (issues, pull requests): a list action and a single-item one. */
+function numberedProvider(
+  listAction: string,
+  itemAction: string,
+  noun: string,
+  repository: string,
+  list: (
+    repository: string,
+    params: Record<string, string>,
+    signal?: AbortSignal,
+  ) => Promise<unknown>,
+  item: (repository: string, number: number, signal?: AbortSignal) => Promise<unknown>,
+) {
+  return {
+    read(action: string, params: Record<string, string>, signal?: AbortSignal) {
+      if (action === listAction) return list(repository, params, signal);
+      if (action === itemAction) {
+        const number = Number(params.number);
+        if (!Number.isInteger(number) || number <= 0) throw new Error(`Укажите номер ${noun}`);
+        return item(repository, number, signal);
+      }
+      throw new Error(UNAVAILABLE);
+    },
+  };
+}
+
 /**
  * Local project whose `origin` points at GitHub: files, Git and search stay local (the tree and
  * editing are unchanged); GitHub adds issues and the repository info tab.
@@ -49,21 +102,16 @@ export function createGithubEnabledLocalProfile(
   repository: string,
 ): WorkspaceProfile {
   const local = createLocalWorkspaceProfile(projectId);
-  const issues: WorkspaceProfile["providers"]["issues"] = {
-    read(action, params, signal) {
-      if (action === "issues") return readIssues(repository, params, signal);
-      if (action === "issue") {
-        const number = Number(params.number);
-        if (!Number.isInteger(number) || number <= 0) throw new Error("Укажите номер issue");
-        return readIssue(repository, number, signal);
-      }
-      throw new Error(UNAVAILABLE);
-    },
-  };
+  const issues = numberedProvider("issues", "issue", "issue", repository, readIssues, readIssue);
+  const pulls = numberedProvider("pulls", "pull", "pull request", repository, readPulls, readPull);
   return {
     ...local,
     id: "local-github",
-    sidebar: [...(local.sidebar ?? []), { id: "issues", title: "Issues" }],
+    sidebar: [
+      ...(local.sidebar ?? []),
+      { id: "issues", title: "Issues" },
+      { id: "pulls", title: "Pull requests" },
+    ],
     tabs: [
       ...(local.tabs ?? []),
       singletonTab(
@@ -72,8 +120,10 @@ export function createGithubEnabledLocalProfile(
         "О репозитории",
         "Информация о репозитории GitHub",
       ),
+      issueTab,
+      pullTab,
     ],
-    providers: { ...local.providers, issues },
+    providers: { ...local.providers, issues, pulls },
   };
 }
 
@@ -90,7 +140,9 @@ export function createGithubWorkspaceProfile(
     readGit?: typeof readGit;
     readIssues?: typeof readIssues;
     readIssue?: typeof readIssue;
-  } = { readRepository, readTree, readFile, readGit, readIssues, readIssue },
+    readPulls?: typeof readPulls;
+    readPull?: typeof readPull;
+  } = { readRepository, readTree, readFile, readGit, readIssues, readIssue, readPulls, readPull },
 ): WorkspaceProfile {
   let metadata = initial;
   const directories = new Map<string, Promise<GithubEntry[]>>();
@@ -134,8 +186,7 @@ export function createGithubWorkspaceProfile(
       const snapshot = metadata;
       if (action === "git") return { available: true, branch: snapshot.branch, changes: [] };
       if (action === "gutter") return { available: false, original: "" };
-      if (!["log", "commit", "commit-diff"].includes(action))
-        throw new Error(UNAVAILABLE);
+      if (!["log", "commit", "commit-diff"].includes(action)) throw new Error(UNAVAILABLE);
       return (api.readGit ?? readGit)(
         action,
         { ...params, repository, sha: snapshot.commit },
@@ -201,21 +252,29 @@ export function createGithubWorkspaceProfile(
       return content;
     },
   };
-  const issues: WorkspaceProfile["providers"]["issues"] = {
-    read(action, params, signal) {
-      if (action === "issues") return (api.readIssues ?? readIssues)(repository, params, signal);
-      if (action === "issue") {
-        const number = Number(params.number);
-        if (!Number.isInteger(number) || number <= 0) throw new Error("Укажите номер issue");
-        return (api.readIssue ?? readIssue)(repository, number, signal);
-      }
-      throw new Error(UNAVAILABLE);
-    },
-  };
+  const issues = numberedProvider(
+    "issues",
+    "issue",
+    "issue",
+    repository,
+    api.readIssues ?? readIssues,
+    api.readIssue ?? readIssue,
+  );
+  const pulls = numberedProvider(
+    "pulls",
+    "pull",
+    "pull request",
+    repository,
+    api.readPulls ?? readPulls,
+    api.readPull ?? readPull,
+  );
   return {
     id: "github",
     layout: "editor",
-    sidebar: [{ id: "issues", title: "Issues" }],
+    sidebar: [
+      { id: "issues", title: "Issues" },
+      { id: "pulls", title: "Pull requests" },
+    ],
     tabs: [
       connectionTab,
       singletonTab(
@@ -224,14 +283,8 @@ export function createGithubWorkspaceProfile(
         "О репозитории",
         "Информация о репозитории GitHub",
       ),
-      defineTab<{ number: number; title?: string }>({
-        id: "issue",
-        key: ({ number }) => `issue:${number}`,
-        path: ({ number }) => `Issue #${number}`,
-        title: ({ number, title }) => `${title ? `${title} · ` : ""}Issue #${number}`,
-        hint: ({ title }) => title ?? "",
-        preview: true,
-      }),
+      issueTab,
+      pullTab,
     ],
     features: {
       terminals: false,
@@ -241,6 +294,6 @@ export function createGithubWorkspaceProfile(
       persist: false,
       externalFiles: false,
     },
-    providers: { files, git, issues },
+    providers: { files, git, issues, pulls },
   };
 }

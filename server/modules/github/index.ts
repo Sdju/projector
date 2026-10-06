@@ -20,3 +20,4 @@ export {
 export { browseGithubLog, browseGithubCommit, browseGithubComparison } from "./history.ts";
 export { browseGithubDirectories } from "./navigation.ts";
 export { browseGithubIssue, browseGithubIssues } from "./issues.ts";
+export { browseGithubPull, browseGithubPulls } from "./pulls.ts";

@@ -190,3 +190,56 @@ export interface IssueDetail {
   /** The host returned more comments than the reader loads at once. */
   commentsTruncated: boolean;
 }
+
+export type PullRequestState = "open" | "closed" | "merged";
+export interface PullRequest {
+  number: number;
+  title: string;
+  /** `merged` is a closed pull request that landed (`merged_at` set). */
+  state: PullRequestState;
+  draft: boolean;
+  author: IssueUser;
+  labels: IssueLabel[];
+  /** Source branch; `owner:branch` for a fork. */
+  head: string;
+  base: string;
+  body: string;
+  htmlUrl: string;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface PullRequestList {
+  pulls: PullRequest[];
+  /** Page number of the next page, or null when the list is complete. */
+  next: number | null;
+}
+export interface PullRequestFile {
+  path: string;
+  /** Previous path of a renamed file. */
+  previousPath: string;
+  status: "added" | "removed" | "modified" | "renamed" | "copied" | "changed" | "unchanged";
+  additions: number;
+  deletions: number;
+}
+export interface PullRequestReview {
+  id: number;
+  author: IssueUser;
+  state: "approved" | "changes_requested" | "commented" | "dismissed" | "pending";
+  body: string;
+  htmlUrl: string;
+  submittedAt: string;
+}
+export interface PullRequestDetail {
+  pull: PullRequest;
+  commits: number;
+  additions: number;
+  deletions: number;
+  changedFiles: number;
+  /** Conversation comments (not inline review comments). */
+  comments: IssueComment[];
+  reviews: PullRequestReview[];
+  files: PullRequestFile[];
+  /** The host returned more comments or files than the reader loads at once. */
+  commentsTruncated: boolean;
+  filesTruncated: boolean;
+}

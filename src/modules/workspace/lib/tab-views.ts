@@ -12,7 +12,7 @@ import { KeybindingsEditor } from "../../ide/index.ts";
 import { LanInfoPanel } from "../../network/index.ts";
 import { DockerPanel } from "../../docker/index.ts";
 import { AgentChat } from "../../agent/index.ts";
-import { CommitOverview, IssueView } from "../modules/viewers/index.ts";
+import { CommitOverview, IssueView, PullRequestView } from "../modules/viewers/index.ts";
 
 /** How a tab kind is drawn; the owner of the kind supplies it, the workspace only mounts it. */
 export interface TabView {
@@ -49,6 +49,14 @@ export const baseTabViews: TabViews = {
   },
   issue: {
     component: IssueView,
+    props: (tab, host) => ({
+      projectId: host.projectId,
+      number: tab.params?.number,
+      onOpen: host.openFile,
+    }),
+  },
+  pull: {
+    component: PullRequestView,
     props: (tab, host) => ({
       projectId: host.projectId,
       number: tab.params?.number,

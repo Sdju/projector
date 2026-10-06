@@ -464,3 +464,87 @@ test("GitHub issues list filters pull requests, paginates and reads discussion c
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("GitHub pull requests list derives state and detail gathers reviews, comments and files", async () => {
+  const root = await mkdtemp(join(tmpdir(), "projector-gh-pulls-"));
+  process.env.XDG_DATA_HOME = root;
+  const { browseGithubPulls, browseGithubPull } = await import("../server/modules/github/index.ts");
+  const requests = [];
+  const remotePull = (number, extra = {}) => ({
+    number,
+    title: `Pull ${number}`,
+    state: "open",
+    draft: false,
+    user: { login: "alice", avatar_url: "https://avatars.example/alice" },
+    labels: [{ name: "bug", color: "ff0000" }],
+    head: { ref: "feature", label: "fork:feature" },
+    base: { ref: "main" },
+    body: "Body",
+    html_url: `https://github.com/octocat/repo/pull/${number}`,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-02T00:00:00Z",
+    ...extra,
+  });
+  const fetch = mock.method(globalThis, "fetch", async (address) => {
+    const url = new URL(address);
+    requests.push(url);
+    assert.equal(url.origin, "https://api.github.com");
+    if (url.pathname === "/repos/octocat/repo/pulls")
+      return Response.json([
+        remotePull(1),
+        remotePull(2, { state: "closed", merged_at: "2026-01-03T00:00:00Z" }),
+        remotePull(3, { state: "closed" }),
+        remotePull(4, { draft: true }),
+      ]);
+    if (url.pathname === "/repos/octocat/repo/pulls/7")
+      return Response.json(
+        remotePull(7, { commits: 3, additions: 10, deletions: 4, changed_files: 2 }),
+      );
+    if (url.pathname === "/repos/octocat/repo/pulls/7/reviews")
+      return Response.json([
+        { id: 1, user: { login: "bob" }, state: "APPROVED", body: "", html_url: "u" },
+        { id: 2, user: { login: "bob" }, state: "COMMENTED", body: "", html_url: "u" },
+        { id: 3, user: { login: "bob" }, state: "COMMENTED", body: "Note", html_url: "u" },
+      ]);
+    if (url.pathname === "/repos/octocat/repo/issues/7/comments")
+      return Response.json([{ id: 11, user: { login: "carol" }, body: "Hi", html_url: "u" }]);
+    if (url.pathname === "/repos/octocat/repo/pulls/7/files")
+      return Response.json([
+        { filename: "a.ts", status: "modified", additions: 6, deletions: 1 },
+        { filename: "b.ts", previous_filename: "c.ts", status: "renamed", additions: 4, deletions: 3 },
+      ]);
+    throw new Error(`Unexpected URL: ${url}`);
+  });
+  try {
+    const list = await browseGithubPulls("octocat/repo", { state: "all", page: "2" });
+    assert.deepEqual(
+      list.pulls.map((item) => item.state),
+      ["open", "merged", "closed", "open"],
+    );
+    assert.equal(list.pulls[3].draft, true);
+    assert.equal(list.pulls[0].head, "fork:feature");
+    assert.equal(list.pulls[0].base, "main");
+    assert.equal(list.next, null);
+    assert.equal(requests.at(-1).searchParams.get("state"), "all");
+    assert.equal(requests.at(-1).searchParams.get("page"), "2");
+
+    const detail = await browseGithubPull("octocat/repo", 7);
+    assert.equal(detail.pull.number, 7);
+    assert.equal(detail.commits, 3);
+    assert.equal(detail.additions, 10);
+    assert.deepEqual(
+      detail.reviews.map((item) => [item.id, item.state]),
+      [
+        [1, "approved"],
+        [3, "commented"],
+      ],
+    );
+    assert.equal(detail.comments[0].author.login, "carol");
+    assert.equal(detail.files[1].previousPath, "c.ts");
+    assert.equal(detail.filesTruncated, false);
+    await assert.rejects(browseGithubPull("octocat/repo", 0), { status: 400 });
+  } finally {
+    fetch.mock.restore();
+    await rm(root, { recursive: true, force: true });
+  }
+});

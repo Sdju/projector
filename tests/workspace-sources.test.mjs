@@ -89,6 +89,12 @@ test("the shared workspace uses a readonly source for tree, files, assets and re
       async readIssue(repository, number) {
         return { action: "issue", repository, number };
       },
+      async readPulls(repository, params) {
+        return { action: "pulls", repository, params };
+      },
+      async readPull(repository, number) {
+        return { action: "pull", repository, number };
+      },
     },
   );
   const unregister = registerWorkspaceProfile("remote-test", profile);
@@ -136,6 +142,18 @@ test("the shared workspace uses a readonly source for tree, files, assets and re
       number: 7,
     });
     await assert.rejects(workspaceRequest("remote-test", "issue", { number: "nope" }));
+    assert.equal(workspaceCapabilities("remote-test").pulls, true);
+    assert.deepEqual(await workspaceRequest("remote-test", "pulls", { state: "all" }), {
+      action: "pulls",
+      repository: "octocat/repo",
+      params: { state: "all" },
+    });
+    assert.deepEqual(await workspaceRequest("remote-test", "pull", { number: "9" }), {
+      action: "pull",
+      repository: "octocat/repo",
+      number: 9,
+    });
+    await assert.rejects(workspaceRequest("remote-test", "pull", { number: "0" }));
     assert.equal(profile.providers.git.write, undefined);
     for (const action of ["search", "external", "diff"])
       await assert.rejects(workspaceRequest("remote-test", action));
@@ -156,7 +174,10 @@ test("a local project with a GitHub origin keeps local providers and adds issues
   const profile = createGithubEnabledLocalProfile("/tmp/app", "octocat/repo");
   assert.equal(profile.id, "local-github");
   assert.ok(profile.sidebar.some((section) => section.id === "issues"));
+  assert.ok(profile.sidebar.some((section) => section.id === "pulls"));
   assert.ok(profile.tabs.some((tab) => tab.id === "repository"));
+  assert.ok(profile.tabs.some((tab) => tab.id === "issue"));
+  assert.ok(profile.tabs.some((tab) => tab.id === "pull"));
   const calls = [];
   const fetch = mock.method(globalThis, "fetch", async (url) => {
     calls.push(String(url));

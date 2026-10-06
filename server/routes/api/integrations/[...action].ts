@@ -22,6 +22,8 @@ import {
   browseGithubComparison,
   browseGithubIssues,
   browseGithubIssue,
+  browseGithubPulls,
+  browseGithubPull,
 } from "../../../modules/github/index.ts";
 import {
   configureGitlab,
@@ -107,6 +109,10 @@ export async function handleIntegrationsActions({
         json(res, 200, await browseGithubIssues(repository, Object.fromEntries(url.searchParams)));
       else if (path.endsWith("/issue"))
         json(res, 200, await browseGithubIssue(repository, Number(url.searchParams.get("number"))));
+      else if (path.endsWith("/pulls"))
+        json(res, 200, await browseGithubPulls(repository, Object.fromEntries(url.searchParams)));
+      else if (path.endsWith("/pull"))
+        json(res, 200, await browseGithubPull(repository, Number(url.searchParams.get("number"))));
       else return false;
       return true;
     }
