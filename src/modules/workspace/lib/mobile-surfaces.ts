@@ -1,5 +1,5 @@
 import { computed, ref, watch, type Ref } from "vue";
-import { useMediaQuery } from "@vueuse/core";
+import { useCompactViewport } from "../../../common/utilities/compact-viewport.ts";
 import { commandArgs, type useCommandScope } from "../../../common/utilities/commands.ts";
 import type { WorkspaceCapabilities } from "../../workspace-api/index.ts";
 
@@ -7,9 +7,7 @@ export type MobileSurface = "editor" | "files" | "terminal";
 
 /** Mobile navigation is transient; it never touches the saved desktop layout. */
 export function useMobileSurfaces(sidebarHidden: Ref<boolean>) {
-  const mobile = useMediaQuery(
-    "(max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse)",
-  );
+  const mobile = useCompactViewport();
   const mobileSurface = ref<MobileSurface>("editor");
   const mobileSidebarOpen = computed({
     get: () => mobileSurface.value === "files",

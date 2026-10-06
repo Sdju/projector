@@ -69,7 +69,12 @@ const handlers = {
         :inert="surface.side === 'editor' && terminalOpen"
         :aria-label="surface.side === 'editor' ? 'Редактор' : 'Терминалы'"
       >
-        <header v-if="surface.tabs.length" class="tabs">
+        <header v-if="surface.tabs.length || surface.side === 'terminal'" class="tabs">
+          <DockSlot
+            v-if="dock.slots.leading"
+            :render="dock.slots.leading"
+            :args="{ group: { role: surface.side } }"
+          />
           <DockTabs
             :tabs="surface.tabs"
             :active-id="surface.active"
@@ -90,13 +95,6 @@ const handlers = {
             :args="{ activeId: surface.active }"
           />
         </header>
-        <div v-if="surface.side === 'terminal'" class="terminal-tools">
-          <DockSlot
-            v-if="dock.slots.mobileTerminalActions"
-            :render="dock.slots.mobileTerminalActions"
-            :args="{}"
-          />
-        </div>
         <div class="body">
           <div
             v-for="id in surface.ids.filter((id) => id === surface.active)"
@@ -156,15 +154,6 @@ const handlers = {
   flex: 1;
   min-width: 0;
   height: 36px;
-}
-.terminal-tools {
-  display: flex;
-  gap: var(--sp-1);
-  flex: none;
-  overflow-x: auto;
-  scrollbar-width: none;
-  padding: var(--sp-1) var(--sp-2);
-  border-bottom: 1px solid var(--line);
 }
 .body {
   position: relative;

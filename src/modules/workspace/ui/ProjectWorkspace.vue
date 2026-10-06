@@ -8,7 +8,6 @@ import {
 import { useCommandScope } from "../../../common/utilities/commands.ts";
 import WorkbenchToolbar from "./WorkbenchToolbar.vue";
 import MobileSurfaces from "./MobileSurfaces.vue";
-import MobileTerminalActions from "./MobileTerminalActions.vue";
 import WorkspaceSidebar from "./WorkspaceSidebar.vue";
 import { useGitOverview, useGitHistory, useGitBranches } from "../modules/git/index.ts";
 import { useGitChangeSync } from "../lib/git-change-sync.ts";
@@ -342,14 +341,7 @@ onBeforeUnmount(() => overview.cancel());
         :terminals-busy="terminals.busy.value"
         :agent="capabilities.agent"
         @command="(id, args) => editorCommands.run(id, args)"
-      >
-        <template #mobile-terminal-actions>
-          <MobileTerminalActions
-            :busy="terminals.busy.value"
-            @command="(id, args) => editorCommands.run(id, args)"
-          />
-        </template>
-      </WorkbenchDock>
+      />
     </section>
     <MobileSurfaces
       v-if="mobile"

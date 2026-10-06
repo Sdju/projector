@@ -89,7 +89,7 @@ const navigate = (path: string) =>
       aria-label="Закрыть выбор проекта"
       @click="commands.run('ide.project.picker.toggle')"
     />
-    <div v-if="open" class="sheet" @keydown.esc.stop="commands.run('ide.project.picker.toggle')">
+    <div v-if="open" class="sheet mobile-sheet" @keydown.esc.stop="commands.run('ide.project.picker.toggle')">
       <div class="sheet-heading">
         <span>Выбор проекта</span>
         <button
@@ -162,19 +162,13 @@ svg {
   position: fixed;
   inset: 0;
   z-index: var(--z-popover);
-  background: var(--overlay);
+  background: transparent;
 }
 .sheet {
-  position: absolute;
-  top: calc(100% + var(--island-gap));
-  inset-inline: 0;
   z-index: calc(var(--z-popover) + 1);
   background: var(--bg-2);
   border: 1px solid var(--line-strong);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-popover);
-  padding: var(--sp-2);
-}
+  padding: var(--sp-2);}
 .sheet-heading {
   display: flex;
   justify-content: space-between;

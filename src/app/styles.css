@@ -226,3 +226,32 @@ select:focus-visible {
     font-size: var(--fs-input);
   }
 }
+
+/* Попапы-острова на узком экране становятся нижней шторкой: на всю ширину между островами, со скримом */
+body .mobile-sheet.mobile-sheet {
+  position: fixed;
+  inset: auto var(--island-gap) max(var(--island-gap), env(safe-area-inset-bottom));
+  width: auto;
+  max-width: none;
+  max-height: min(72dvh, 560px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: calc(var(--r-lg) + 4px);
+  box-shadow:
+    0 0 0 100vmax var(--overlay),
+    var(--shadow-popover);
+  animation: sheet-up var(--t-base);
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+body .mobile-sheet .up {
+  transform: none;
+}
+/* Подсказки про клавиатуру на тач-экране не нужны */
+body .mobile-sheet .foot {
+  display: none;
+}

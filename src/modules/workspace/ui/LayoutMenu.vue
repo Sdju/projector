@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useCompactViewport } from "../../../common/utilities/compact-viewport.ts";
 import { computed, nextTick, ref } from "vue";
 import { onClickOutside, useEventListener } from "@vueuse/core";
 import UiButton from "../../../common/ui/UiButton.vue";
@@ -27,6 +28,7 @@ const titles: Record<LayoutPreset, { title: string; caption: string }> = {
   terminal: { title: "Терминалы", caption: "Только сессии" },
 };
 const roleTitles: Record<string, string> = { editor: "Редактор", terminal: "Терминалы" };
+const compact = useCompactViewport();
 const open = ref(false);
 const trigger = ref<HTMLElement>();
 const island = ref<HTMLElement>();
@@ -88,7 +90,8 @@ useEventListener(window, "blur", close);
       class="island"
       role="dialog"
       aria-label="Управление раскладкой"
-      :style="{ right: `${origin.right - 4}px`, top: `${origin.top - 4}px` }"
+      :class="{ 'mobile-sheet': compact }"
+      :style="compact ? undefined : { right: `${origin.right - 4}px`, top: `${origin.top - 4}px` }"
       @keydown="keydown"
     >
       <button class="island-head" aria-label="Закрыть" @click="toggle(false)">

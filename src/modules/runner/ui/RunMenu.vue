@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useCompactViewport } from "../../../common/utilities/compact-viewport.ts";
 import { computed, nextTick, ref, useId } from "vue";
 import { onClickOutside, useEventListener } from "@vueuse/core";
 import UiButton from "../../../common/ui/UiButton.vue";
@@ -22,6 +23,7 @@ import IconSettings from "~icons/lucide/settings-2";
 const props = defineProps<{ project: Project }>();
 const runner = useRunner();
 const { api } = useIdeCommands();
+const compact = useCompactViewport();
 const open = ref(false);
 const trigger = ref<HTMLElement>();
 const island = ref<HTMLElement>();
@@ -186,7 +188,8 @@ useEventListener(window, "blur", close);
       class="island"
       role="dialog"
       aria-label="Сценарии запуска"
-      :style="{ right: `${origin.right - 4}px`, top: `${origin.top - 4}px` }"
+      :class="{ 'mobile-sheet': compact }"
+      :style="compact ? undefined : { right: `${origin.right - 4}px`, top: `${origin.top - 4}px` }"
       @keydown="keydown"
     >
       <button class="island-head" aria-label="Закрыть" @click="toggle(false)">

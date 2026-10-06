@@ -60,7 +60,6 @@ const hostOf = (key: string) => props.panelHosts.hosts[key] ?? null;
     @pin="files.pinPreview"
     @drop="files.dropFiles"
   >
-    <template #mobileTerminalActions><slot name="mobile-terminal-actions" /></template>
     <template #panel="{ id, focused }">
       <PanelHost v-if="isKept(id)" :id="id" :registry="panelHosts" />
       <FilePanel

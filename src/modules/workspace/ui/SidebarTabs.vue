@@ -159,13 +159,36 @@ const emit = defineEmits<{
   border-left: 0;
   gap: var(--sp-1);
 }
-@media (max-width: 600px) {
-  .side-tabs {
-    gap: 8px;
-    padding: 0 8px;
-  }
-  .side-tabs > button {
-    font-size: var(--fs-2xs);
-  }
+/* Мобильная полоса разделов — тот же язык, что у вертикальной: иконки с плашкой выбранного раздела */
+.side-tabs:not(.vertical) {
+  height: 44px;
+  align-items: center;
+  gap: 2px;
+  padding: 0 var(--sp-2);
+}
+.side-tabs:not(.vertical) > button {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: var(--r-md);
+  position: relative;
+}
+.side-tabs:not(.vertical) > button.selected {
+  background: var(--active);
+}
+.side-tabs:not(.vertical) > button svg {
+  width: 17px;
+  height: 17px;
+}
+.side-tabs:not(.vertical) > button span {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 14px;
+  padding: 0 3px;
+  border-radius: var(--r-full);
+  background: var(--bg-3);
+  line-height: 14px;
+  text-align: center;
 }
 </style>

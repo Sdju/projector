@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useCompactViewport } from "../../../common/utilities/compact-viewport.ts";
 import { computed, nextTick, onBeforeUnmount, ref, useId } from "vue";
 import { onClickOutside, useEventListener } from "@vueuse/core";
 import UiButton from "../../../common/ui/UiButton.vue";
@@ -39,6 +40,7 @@ const programs = [
   },
   { program: "cursor", title: "Cursor", caption: "Запустит агента Cursor", icon: IconCursor },
 ];
+const compact = useCompactViewport();
 const open = ref(false);
 const trigger = ref<HTMLElement>();
 const island = ref<HTMLElement>();
@@ -115,7 +117,8 @@ onBeforeUnmount(() => (open.value = false));
       class="island"
       role="dialog"
       aria-label="Новая сессия"
-      :style="{ left: `${origin.left - 4}px`, top: `${origin.top - 4}px` }"
+      :class="{ 'mobile-sheet': compact }"
+      :style="compact ? undefined : { left: `${origin.left - 4}px`, top: `${origin.top - 4}px` }"
       @keydown="keydown"
     >
       <button class="island-head" aria-label="Закрыть" @click="toggle(false)">
