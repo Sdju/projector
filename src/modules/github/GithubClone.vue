@@ -8,7 +8,7 @@ import UiButton from "../../common/ui/UiButton.vue";
 import UiDialog from "../../common/ui/UiDialog.vue";
 import UiDialogActions from "../../common/ui/UiDialogActions.vue";
 import { pickFolder, useProjects, type Project } from "../project/index.ts";
-import { fetchIntegrations, integrationRequest } from "./client.ts";
+import { fetchIntegrations, integrationRequest } from "../integration-api/index.ts";
 
 const props = defineProps<{ repository: string; navigate: (path: string) => Promise<void> }>();
 const id = useId();

@@ -75,6 +75,8 @@ async function favoriteAction(id: string): Promise<LaunchAction> {
 export async function launchDetail(id: string): Promise<LaunchDetail> {
   if (!id.startsWith("project:")) {
     if (id.startsWith("gh:")) return { actions: [{ id: "open", title: "Открыть репозиторий" }] };
+    if (id.startsWith("gl:"))
+      return { actions: [{ id: "import", title: "Клонировать и открыть" }] };
     return { actions: [{ id: "launch", title: "Запустить" }, await favoriteAction(id)] };
   }
   const project = (await loadProjects()).find((p) => `project:${p.id}` === id);

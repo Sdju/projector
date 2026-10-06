@@ -35,7 +35,8 @@ test("GitHub paths use gh:/ in the segmented path and a dedicated browser route"
 test("readonly GitHub browser reads snapshots, trees and blobs without cloning or persisting projects", async () => {
   const root = await mkdtemp(join(tmpdir(), "projector-gh-browser-"));
   process.env.XDG_DATA_HOME = root;
-  const api = await import("../server/modules/integrations/index.ts");
+  const api = await import("../server/modules/github/index.ts");
+  const { updateIntegration } = await import("../server/modules/integration-store/index.ts");
   const sha = "a".repeat(40);
   const tree = "b".repeat(40);
   let mode = "normal";
@@ -147,7 +148,7 @@ test("readonly GitHub browser reads snapshots, trees and blobs without cloning o
     await assert.rejects(api.browseGithubAsset("octocat/repo", tree, "../image.png"), {
       status: 400,
     });
-    await api.updateIntegration("github", (config) => ({
+    await updateIntegration("github", (config) => ({
       ...config,
       enabled: true,
       credentials: { token: "test-secret", login: "octocat" },
@@ -155,7 +156,7 @@ test("readonly GitHub browser reads snapshots, trees and blobs without cloning o
     authorized = true;
     const privateRepo = await api.browseGithubRepository("octocat/repo");
     assert.ok(!JSON.stringify(privateRepo).includes("test-secret"));
-    await api.updateIntegration("github", (config) => ({ ...config, enabled: false }));
+    await updateIntegration("github", (config) => ({ ...config, enabled: false }));
     authorized = false;
     await api.browseGithubRepository("octocat/repo");
   } finally {
@@ -168,7 +169,7 @@ test("GitHub history paginates filtered commits and reads exact before/after blo
   const root = await mkdtemp(join(tmpdir(), "projector-gh-history-"));
   process.env.XDG_DATA_HOME = root;
   const { browseGithubLog, browseGithubCommit, browseGithubComparison } =
-    await import("../server/modules/integrations/index.ts");
+    await import("../server/modules/github/index.ts");
   const head = "a".repeat(40),
     parent = "b".repeat(40);
   const remote = (index) => ({
@@ -323,8 +324,8 @@ test("GitHub history paginates filtered commits and reads exact before/after blo
 test("GitHub path suggestions paginate owners, filter prefixes and respect authentication", async () => {
   const root = await mkdtemp(join(tmpdir(), "projector-gh-navigation-"));
   process.env.XDG_DATA_HOME = root;
-  const { browseGithubDirectories, updateIntegration } =
-    await import("../server/modules/integrations/index.ts");
+  const { browseGithubDirectories } = await import("../server/modules/github/index.ts");
+  const { updateIntegration } = await import("../server/modules/integration-store/index.ts");
   const requests = [];
   let token = "";
   let total = 102;
@@ -389,7 +390,7 @@ test("GitHub issues list filters pull requests, paginates and reads discussion c
   const root = await mkdtemp(join(tmpdir(), "projector-gh-issues-"));
   process.env.XDG_DATA_HOME = root;
   const { browseGithubIssues, browseGithubIssue } =
-    await import("../server/modules/integrations/index.ts");
+    await import("../server/modules/github/index.ts");
   const requests = [];
   let mode = "normal";
   const remoteIssue = (number, extra = {}) => ({

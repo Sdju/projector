@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { dataDir } from "../../../core/modules/app-paths/index.ts";
 import { vault as systemVault } from "../secrets/index.ts";
+import { HttpError } from "../http/index.ts";
 
 export interface IntegrationConfig {
   enabled: boolean;
@@ -151,4 +152,20 @@ export async function revealIntegrationCredential(id: string, name: string) {
   const stored = (await readFileRaw()).integrations[id];
   if (stored?.vault !== "keyring") return undefined;
   return (await openCredentials(id, stored))[name];
+}
+
+/** `{ token }` for the settings «eye»; refuses tokens that live in the plaintext file. */
+export async function revealIntegrationToken(id: string) {
+  const token = await revealIntegrationCredential(id, "token");
+  if (!token)
+    throw new HttpError(
+      409,
+      "Просмотр доступен только для токена из системного хранилища секретов",
+    );
+  return { token };
+}
+
+/** Trimmed string from untrusted input, or "". */
+export function fieldText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
 }

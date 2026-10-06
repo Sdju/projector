@@ -1,5 +1,5 @@
-import { github, repositoryName } from "./github.ts";
-import { integrationConfig } from "./store.ts";
+import { github, repositoryName } from "./api.ts";
+import { integrationConfig } from "../integration-store/index.ts";
 import { HttpError } from "../http/index.ts";
 import type {
   GithubRepository,

@@ -1,5 +1,5 @@
-import { github } from "./github.ts";
-import { integrationConfig } from "./store.ts";
+import { github } from "./api.ts";
+import { integrationConfig } from "../integration-store/index.ts";
 import { HttpError } from "../http/index.ts";
 import type { DirectoryListing } from "../../../core/modules/directories/index.ts";
 

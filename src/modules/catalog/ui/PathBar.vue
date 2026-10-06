@@ -4,7 +4,7 @@ import IconChevronRight from "~icons/lucide/chevron-right";
 import IconFolder from "~icons/lucide/folder";
 import { fetchDirectories, parseProjectRef, projectRefSegments } from "../../project/index.ts";
 import { useCommandScope, commandArgs } from "../../../common/utilities/commands.ts";
-import { GithubClone } from "../../integrations/index.ts";
+import { GithubClone } from "../../github/index.ts";
 import PathDropdown from "./PathDropdown.vue";
 import { useDirectoryListing } from "../model/directory-listing.ts";
 const props = defineProps<{ path: string; navigate: (path: string) => Promise<void> }>();

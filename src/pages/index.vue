@@ -76,7 +76,7 @@ async function launch(item = items.value[selected.value], action?: LaunchAction)
   input.value?.focus();
 }
 function toggleFavorite(item = focus.value ?? items.value[selected.value]) {
-  if (!item || item.kind === "github") return;
+  if (!item || item.kind === "github" || item.kind === "gitlab") return;
   void launch(item, { id: "favorite", title: "" });
 }
 function key(event: KeyboardEvent) {

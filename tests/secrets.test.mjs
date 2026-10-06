@@ -11,7 +11,7 @@ import {
   revealIntegrationCredential,
   updateIntegration,
   useIntegrationVault,
-} from "../server/modules/integrations/store.ts";
+} from "../server/modules/integration-store/index.ts";
 
 function fakeBackend({ available = true } = {}) {
   const items = new Map();

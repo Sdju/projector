@@ -8,7 +8,7 @@ import { registerWorkspaceProfile, workspaceRequest } from "../workspace-api/ind
 import { useCommandScope } from "../../common/utilities/commands.ts";
 import UiButton from "../../common/ui/UiButton.vue";
 import { formatProjectRef } from "../project/index.ts";
-import { GithubConnection } from "../integrations/index.ts";
+import { GithubConnection } from "../github/index.ts";
 import IconGithub from "~icons/simple-icons/github";
 import { GithubRequestError, readRepository } from "./client.ts";
 import { createGithubConnectionProfile, createGithubWorkspaceProfile } from "./source.ts";

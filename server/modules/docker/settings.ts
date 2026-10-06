@@ -2,7 +2,7 @@ import { realpath, stat } from "node:fs/promises";
 import { resolve, relative, isAbsolute } from "node:path";
 import { os } from "../../../core/modules/os/index.ts";
 import type { DockerBinding, DockerContext } from "../../../core/modules/docker/index.ts";
-import { integrationConfig, updateIntegration } from "../integrations/index.ts";
+import { integrationConfig, updateIntegration } from "../integration-store/index.ts";
 import { HttpError } from "../http/index.ts";
 
 export async function dockerContexts(): Promise<DockerContext[]> {
@@ -118,4 +118,16 @@ export async function bindDocker(projectId: string, path: string, input: Record<
     settings: { ...config.settings, [`project:${projectId}`]: JSON.stringify(binding) },
   }));
   return binding;
+}
+
+/** Entry for the settings overview; live daemon health is owned by the snapshot. */
+export async function dockerIntegrationStatus() {
+  const config = await integrationConfig("docker");
+  return {
+    id: "docker",
+    name: "Docker",
+    description: "Локальные контейнеры и Compose-окружения",
+    enabled: config.enabled,
+    settings: { context: config.settings.context || "default" },
+  };
 }

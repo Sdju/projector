@@ -1,8 +1,12 @@
 import { randomUUID } from "node:crypto";
 import type { Project } from "../../../core/modules/project/index.ts";
 import { HttpError } from "../http/index.ts";
-import { cloneGithubProject, type CloneHooks } from "./github-clone.ts";
 
+/** What a clone run may report and obey; hosts add phases of their own before `cloning`. */
+export interface CloneHooks {
+  signal?: AbortSignal;
+  phase?: (phase: "preparing" | "pulling" | "cloning" | "finishing") => void;
+}
 export type CloneJobPhase =
   | "queued"
   | "preparing"
@@ -49,10 +53,7 @@ function prune() {
 /** Starts a clone in the background; the caller polls `cloneJob` and may `cancelCloneJob`. */
 export function startCloneJob(
   body: Record<string, unknown>,
-  run: (
-    body: Record<string, unknown>,
-    hooks: CloneHooks,
-  ) => Promise<{ project: Project }> = cloneGithubProject,
+  run: (body: Record<string, unknown>, hooks: CloneHooks) => Promise<{ project: Project }>,
 ): CloneJob {
   const repository = typeof body.repository === "string" ? body.repository : "";
   const controller = new AbortController();

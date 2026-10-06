@@ -2,7 +2,8 @@ import { InterfaceSettings } from "../launcher/index.ts";
 import { EditorSettings, FilesExcludeSettings } from "../workspace/index.ts";
 import { KeybindingsEditor } from "../ide/index.ts";
 import { NetworkSettings } from "../network/index.ts";
-import { IntegrationSettings } from "../integrations/index.ts";
+import { GithubSettings } from "../github/index.ts";
+import { GitlabSettings } from "../gitlab/index.ts";
 import { DockerSettings } from "../docker/index.ts";
 import { ProviderPanel } from "../provider/index.ts";
 import { type SettingsSection } from "../settings/index.ts";
@@ -58,7 +59,15 @@ export const settingsSections: SettingsSection[] = [
     group: "Подключения",
     description: "Авторизация и папка для импорта репозиториев.",
     keywords: "интеграции OAuth Client ID token токен PAT импорт папка репозиторий",
-    component: IntegrationSettings,
+    component: GithubSettings,
+  },
+  {
+    id: "gitlab",
+    title: "GitLab",
+    group: "Подключения",
+    description: "Токен, адрес сервера и папка для импорта проектов GitLab.",
+    keywords: "интеграции gitlab self-hosted token токен PAT импорт папка проект клонирование",
+    component: GitlabSettings,
   },
   {
     id: "docker",

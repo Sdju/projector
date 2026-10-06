@@ -1,4 +1,6 @@
-import { listIntegrations } from "../../../modules/integrations/index.ts";
+import { listIntegrations } from "../../../modules/integration-store/index.ts";
+import { dockerIntegrationStatus } from "../../../modules/docker/index.ts";
+import { startCloneJob, cloneJob, cancelCloneJob } from "../../../modules/git-import/index.ts";
 import {
   configureGithub,
   revealGithubToken,
@@ -7,11 +9,9 @@ import {
   beginGithubLogin,
   pollGithubLogin,
   githubRepositories,
+  githubStatus,
   importGithubProject,
   cloneGithubProject,
-  startCloneJob,
-  cloneJob,
-  cancelCloneJob,
   browseGithubRepository,
   browseGithubDirectories,
   browseGithubTree,
@@ -22,7 +22,16 @@ import {
   browseGithubComparison,
   browseGithubIssues,
   browseGithubIssue,
-} from "../../../modules/integrations/index.ts";
+} from "../../../modules/github/index.ts";
+import {
+  configureGitlab,
+  connectGitlab,
+  disconnectGitlab,
+  revealGitlabToken,
+  gitlabRepositories,
+  gitlabStatus,
+  importGitlabProject,
+} from "../../../modules/gitlab/index.ts";
 
 import { isLocalRequest } from "../../../modules/access/index.ts";
 import { HttpError } from "../../../modules/http/index.ts";
@@ -30,6 +39,23 @@ import { json, readBody } from "../../../modules/transport/index.ts";
 
 import { withRuntime } from "../../../modules/project-presentation/index.ts";
 import type { RouteContext } from "../../../modules/transport/index.ts";
+
+const hosts = {
+  github: {
+    configure: configureGithub,
+    connect: connectGithub,
+    disconnect: disconnectGithub,
+    reveal: revealGithubToken,
+    repositories: githubRepositories,
+  },
+  gitlab: {
+    configure: configureGitlab,
+    connect: connectGitlab,
+    disconnect: disconnectGitlab,
+    reveal: revealGitlabToken,
+    repositories: gitlabRepositories,
+  },
+};
 
 export async function handleIntegrationsActions({
   req,
@@ -85,27 +111,37 @@ export async function handleIntegrationsActions({
       return true;
     }
     if (path === "/api/integrations" && method === "GET") {
-      json(res, 200, await listIntegrations());
+      json(res, 200, await listIntegrations([githubStatus, gitlabStatus, dockerIntegrationStatus]));
       return true;
     }
-    if (path === "/api/integrations/github" && method === "PUT") {
-      json(res, 200, await configureGithub(await readBody(req)));
-      return true;
-    }
-    if (path === "/api/integrations/github/auth" && method === "POST") {
-      json(res, 200, await connectGithub(await readBody(req)));
-      return true;
-    }
-    if (path === "/api/integrations/github/token" && method === "POST") {
-      // Secrets are shown only on this machine, never over LAN and never to the agent.
-      if (!isLocalRequest(req))
-        throw new HttpError(403, "Токен можно показать только на локальной машине");
-      json(res, 200, await revealGithubToken());
-      return true;
-    }
-    if (path === "/api/integrations/github/auth" && method === "DELETE") {
-      json(res, 200, await disconnectGithub());
-      return true;
+    // Settings, token and repository list behave identically for every code host.
+    const hostMatch = path.match(/^\/api\/integrations\/(github|gitlab)(\/auth|\/token|\/repositories)?$/);
+    if (hostMatch) {
+      const host = hosts[hostMatch[1] as keyof typeof hosts];
+      const action = hostMatch[2] ?? "";
+      if (action === "" && method === "PUT") {
+        json(res, 200, await host.configure(await readBody(req)));
+        return true;
+      }
+      if (action === "/auth" && method === "POST") {
+        json(res, 200, await host.connect(await readBody(req)));
+        return true;
+      }
+      if (action === "/auth" && method === "DELETE") {
+        json(res, 200, await host.disconnect());
+        return true;
+      }
+      if (action === "/token" && method === "POST") {
+        // Secrets are shown only on this machine, never over LAN and never to the agent.
+        if (!isLocalRequest(req))
+          throw new HttpError(403, "Токен можно показать только на локальной машине");
+        json(res, 200, await host.reveal());
+        return true;
+      }
+      if (action === "/repositories" && method === "GET") {
+        json(res, 200, await host.repositories(Number(url.searchParams.get("page") ?? 1)));
+        return true;
+      }
     }
     if (path === "/api/integrations/github/device" && method === "POST") {
       json(res, 200, await beginGithubLogin());
@@ -115,12 +151,13 @@ export async function handleIntegrationsActions({
       json(res, 200, await pollGithubLogin(await readBody(req)));
       return true;
     }
-    if (path === "/api/integrations/github/repositories" && method === "GET") {
-      json(res, 200, await githubRepositories(Number(url.searchParams.get("page") ?? 1)));
+    if (path === "/api/integrations/gitlab/import" && method === "POST") {
+      const result = await importGitlabProject(await readBody(req));
+      json(res, 201, { project: withRuntime(result.project) });
       return true;
     }
     if (path === "/api/integrations/github/clone-jobs" && method === "POST") {
-      json(res, 202, { job: startCloneJob(await readBody(req)) });
+      json(res, 202, { job: startCloneJob(await readBody(req), cloneGithubProject) });
       return true;
     }
     const jobMatch = path.match(/^\/api\/integrations\/github\/clone-jobs\/([0-9a-f-]{36})$/);

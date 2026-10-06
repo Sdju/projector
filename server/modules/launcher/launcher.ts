@@ -6,6 +6,7 @@ import { getSnapshot, startProject, stopProject } from "../processes/index.ts";
 import { openBrowser, openWindow } from "../window/index.ts";
 import { desktopArgs } from "../window/index.ts";
 import type {
+  LaunchAction,
   LaunchActionId,
   LaunchItem,
   LaunchResult,
@@ -13,7 +14,8 @@ import type {
 } from "../../../core/modules/launcher/index.ts";
 import { parseLaunchQuery } from "../../../core/modules/launcher/index.ts";
 import { projectItem, workspaceRoute } from "./project-entries.ts";
-import { searchGithubRepositories } from "../integrations/index.ts";
+import { searchGithubRepositories } from "../github/index.ts";
+import { searchGitlabProjects, importGitlabProject } from "../gitlab/index.ts";
 import { appUrl, projectAppUrl } from "../../../core/modules/app-paths/index.ts";
 import { githubProjectRoute } from "../../../core/modules/github/index.ts";
 export {
@@ -107,29 +109,52 @@ export function matchScore(item: LaunchItem, query: string): number {
   return score;
 }
 
-async function searchGithub(text: string): Promise<{ items: LaunchItem[]; warning?: string }> {
+interface HostedHit {
+  fullName: string;
+  description: string;
+  private: boolean;
+}
+/** Search results of a code host (`gh:` / `gl:`); every host differs only in id prefix and wording. */
+async function searchHosted(
+  host: { prefix: "gh" | "gl"; kind: "github" | "gitlab"; noun: string; action: LaunchAction },
+  find: () => Promise<HostedHit[]>,
+): Promise<{ items: LaunchItem[]; warning?: string }> {
   try {
-    const hits = await searchGithubRepositories(text);
+    const hits = await find();
     return {
       items: hits.map((repo): LaunchItem => ({
-        id: `gh:${repo.fullName}`,
+        id: `${host.prefix}:${repo.fullName}`,
         name: repo.fullName,
-        kind: "github",
-        description: `${repo.private ? "приватный · " : ""}${repo.description || "репозиторий GitHub"}`,
+        kind: host.kind,
+        description: `${repo.private ? "приватный · " : ""}${repo.description || host.noun}`,
         keywords: "",
-        actions: [{ id: "open", title: "Открыть репозиторий" }],
+        actions: [host.action],
       })),
-      warning: hits.length ? undefined : "Репозитории не найдены",
+      warning: hits.length ? undefined : "Ничего не найдено",
     };
   } catch (error) {
-    return { items: [], warning: error instanceof Error ? error.message : "GitHub недоступен" };
+    return { items: [], warning: error instanceof Error ? error.message : "Сервис недоступен" };
   }
 }
+const GITHUB = {
+  prefix: "gh",
+  kind: "github",
+  noun: "репозиторий GitHub",
+  action: { id: "open", title: "Открыть репозиторий" },
+} as const;
+const GITLAB = {
+  prefix: "gl",
+  kind: "gitlab",
+  noun: "проект GitLab",
+  action: { id: "import", title: "Клонировать и открыть" },
+} as const;
 
 export async function searchLauncher(
   query: string,
 ): Promise<{ items: LaunchItem[]; warning?: string }> {
-  if (parseLaunchQuery(query).scope === "github") return searchGithub(parseLaunchQuery(query).text);
+  const parsed = parseLaunchQuery(query);
+  if (parsed.scope === "github") return searchHosted(GITHUB, () => searchGithubRepositories(parsed.text));
+  if (parsed.scope === "gitlab") return searchHosted(GITLAB, () => searchGitlabProjects(parsed.text));
   let warning: string | undefined;
   const [apps, projects, prefs] = await Promise.all([
     applications().catch(() => {
@@ -209,6 +234,13 @@ function browse(
   ];
 }
 
+/** Shows a Projector route in the window or browser, per the user's interface mode. */
+async function openRoute(route: string) {
+  const url = appUrl() + route;
+  if ((await preferences()).mode === "window") openWindow(url);
+  else openBrowser(url);
+}
+
 /** All actions of one result and, for a failed project, the tail of its terminal. */
 /** Without an explicit action the item's primary action runs. */
 export async function launchItem(
@@ -226,14 +258,15 @@ export async function launchItem(
     result.favorite = await toggleFavorite(id);
     return result;
   }
-  if (id.startsWith("gh:")) {
+  if (id.startsWith("gl:")) {
+    if (action && action !== "import") throw new Error("Для проекта GitLab доступно только клонирование");
+    const { project } = await importGitlabProject({ repository: id.slice(3) });
+    result.route = workspaceRoute(project.path);
+    if (!inline) await openRoute(result.route);
+  } else if (id.startsWith("gh:")) {
     if (action && action !== "open") throw new Error("Для репозитория доступно только открытие");
     result.route = githubProjectRoute(id.slice(3));
-    if (!inline) {
-      const url = appUrl() + result.route;
-      if ((await preferences()).mode === "window") openWindow(url);
-      else openBrowser(url);
-    }
+    if (!inline) await openRoute(result.route);
   } else if (id.startsWith("app:")) {
     if (action && action !== "launch") throw new Error("Для приложения доступен только запуск");
     const app = (await applications()).find((item) => item.id === id);
@@ -265,11 +298,7 @@ export async function launchItem(
     }
     if (action !== "run") {
       result.route = workspaceRoute(project.path);
-      if (!inline) {
-        const url = appUrl() + result.route;
-        if ((await preferences()).mode === "window") openWindow(url);
-        else openBrowser(url);
-      }
+      if (!inline) await openRoute(result.route);
     } else {
       const runtime = getSnapshot(project.id);
       if (runtime.status === "running" || runtime.status === "starting") {

@@ -1,4 +1,4 @@
-import { githubReader } from "./github-browser.ts";
+import { githubReader } from "./browser.ts";
 import { HttpError } from "../http/index.ts";
 import type {
   Issue,

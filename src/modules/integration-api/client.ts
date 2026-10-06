@@ -3,7 +3,7 @@ export interface Integration {
   name: string;
   description: string;
   enabled: boolean;
-  settings: { clientId: string; directory: string };
+  settings: { clientId: string; directory: string; url?: string };
   connected: boolean;
   account: string | null;
 }

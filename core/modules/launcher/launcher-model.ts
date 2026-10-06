@@ -220,7 +220,9 @@ export function createLauncherModel(
             ? result?.favorite
               ? "добавлено в избранное"
               : "убрано из избранного"
-            : chosen?.id === "open"
+            : chosen?.id === "import"
+              ? "клонировано и добавлено"
+              : chosen?.id === "open"
               ? "открыто"
               : chosen?.id === "stop"
                 ? "остановлено"

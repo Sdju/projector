@@ -1,6 +1,11 @@
 import { os } from "../../../core/modules/os/index.ts";
 import { join } from "node:path";
-import { integrationConfig, updateIntegration, revealIntegrationCredential } from "./store.ts";
+import {
+  integrationConfig,
+  updateIntegration,
+  revealIntegrationToken,
+  fieldText as text,
+} from "../integration-store/index.ts";
 import { randomUUID } from "node:crypto";
 import { HttpError } from "../http/index.ts";
 import { expandPath } from "../projects/index.ts";
@@ -15,9 +20,6 @@ interface DeviceSession {
   nextPoll: number;
 }
 const sessions = new Map<string, DeviceSession>();
-function text(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
 export function repositoryName(value: unknown): string {
   const name = text(value)
     .replace(/^https:\/\/github\.com\//, "")
@@ -85,15 +87,7 @@ export async function githubStatus() {
     account: config.credentials.login || null,
   };
 }
-export async function revealGithubToken() {
-  const token = await revealIntegrationCredential("github", "token");
-  if (!token)
-    throw new HttpError(
-      409,
-      "Просмотр доступен только для токена из системного хранилища секретов",
-    );
-  return { token };
-}
+export const revealGithubToken = () => revealIntegrationToken("github");
 export async function configureGithub(body: Record<string, unknown>) {
   if (typeof body.enabled !== "boolean") throw new HttpError(400, "Укажите состояние интеграции");
   const directory = text(body.directory);

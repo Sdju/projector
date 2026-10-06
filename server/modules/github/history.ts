@@ -1,4 +1,4 @@
-import { githubReader, browseGithubFile, browseGithubTree } from "./github-browser.ts";
+import { githubReader, browseGithubFile, browseGithubTree } from "./browser.ts";
 import { HttpError } from "../http/index.ts";
 import type {
   GitCommit,

@@ -5,7 +5,7 @@ import {
   cancelCloneJob,
   cloneJob,
   startCloneJob,
-} from "../server/modules/integrations/clone-jobs.ts";
+} from "../server/modules/git-import/index.ts";
 
 const project = { id: "p", name: "app", path: "/tmp/app" };
 const settled = async (id) => {

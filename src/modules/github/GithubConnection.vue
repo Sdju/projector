@@ -2,7 +2,7 @@
 import { ref } from "vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import { useCommandScope } from "../../common/utilities/commands.ts";
-import { fetchIntegrations, integrationRequest } from "./client.ts";
+import { fetchIntegrations, integrationRequest } from "../integration-api/index.ts";
 const props = defineProps<{ repository: string }>();
 const emit = defineEmits<{ connected: [] }>();
 const token = ref("");

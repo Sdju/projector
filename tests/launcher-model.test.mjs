@@ -163,6 +163,17 @@ await test("query prefixes choose the search scope", async () => {
   );
   assert.deepEqual(parseLaunchQuery("https://github.com/Sdju/"), github("Sdju/"));
   assert.deepEqual(parseLaunchQuery("https://github.com/Sdju"), github("Sdju/"));
+  // Any host with "gitlab" in its name is gl/<path>; nested groups and /-/ pages are kept or cut.
+  const gitlab = (text) => ({ scope: "gitlab", text });
+  assert.deepEqual(parseLaunchQuery("gl/zede/fore"), gitlab("zede/fore"));
+  assert.deepEqual(parseLaunchQuery("https://gitlab.com/zede/forester.git"), gitlab("zede/forester"));
+  assert.deepEqual(
+    parseLaunchQuery("https://gitlab.example.com:8443/a/b/c/-/tree/main?x#y"),
+    gitlab("a/b/c"),
+  );
+  assert.deepEqual(parseLaunchQuery("https://git.gitlab-x.org/zede"), gitlab("zede/"));
+  assert.deepEqual(parseLaunchQuery("https://gitlab.com"), gitlab(""));
+  assert.deepEqual(parseLaunchQuery("https://example.com/gitlab/x"), { scope: "all", text: "https://example.com/gitlab/x" });
   assert.deepEqual(parseLaunchQuery("https://github.com/"), github(""));
   assert.deepEqual(parseLaunchQuery("https://github.com"), github(""));
   assert.deepEqual(parseLaunchQuery("https://github.community/x"), {

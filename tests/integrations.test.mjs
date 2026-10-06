@@ -154,7 +154,7 @@ await test("GitHub integration persists authorization and imports authenticated 
   );
   assert.equal((await stat(file)).mode & 0o777, 0o600);
   assert.equal((await request("")).headers.get("cache-control"), "no-store");
-  const reloaded = await import("../server/modules/integrations/store.ts?reload-check");
+  const reloaded = await import("../server/modules/integration-store/index.ts?reload-check");
   assert.equal((await reloaded.integrationConfig("github")).credentials.login, "octocat");
   assert.equal((await request("/github/repositories?page=0")).status, 400);
   const firstPage = (await request("/github/repositories")).data;
