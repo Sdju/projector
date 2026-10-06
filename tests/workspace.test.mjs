@@ -19,6 +19,7 @@ import {
   readProjectFile,
   searchProject,
   projectGit,
+  projectGithubRepository,
   projectComparison,
   projectGutter,
   mutateProjectGit,
@@ -36,6 +37,7 @@ import {
   parentPath,
   relocatedPath,
 } from "../core/modules/workspace/index.ts";
+import { githubRepositoryFromRemote } from "../core/modules/github/index.ts";
 import {
   fitImage,
   zoomImageAt,
@@ -894,6 +896,40 @@ test("Git batch actions validate the whole selection and preserve working conten
       (await projectGit(base)).changes.find((c) => c.path === "folder/b.txt").worktree,
       "D",
     );
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
+
+test("githubRepositoryFromRemote accepts GitHub remotes and rejects the rest", () => {
+  const cases = [
+    ["https://github.com/Sdju/projector.git", "Sdju/projector"],
+    ["https://github.com/Sdju/projector", "Sdju/projector"],
+    ["git@github.com:Sdju/projector.git", "Sdju/projector"],
+    ["ssh://git@github.com/Sdju/projector.git", "Sdju/projector"],
+    ["ssh://git@github.com:22/Sdju/projector", "Sdju/projector"],
+    ["git://github.com/Sdju/projector.git", "Sdju/projector"],
+    ["https://github.com/Sdju/projector/", "Sdju/projector"],
+    ["ssh://git@ssh.github.com:443/Sdju/projector.git", "Sdju/projector"],
+    ["https://gitlab.com/Sdju/projector.git", null],
+    ["git@gitlab.com:Sdju/projector.git", null],
+    ["git@github.com:owner/../escape", null],
+    ["", null],
+  ];
+  for (const [remote, expected] of cases)
+    assert.equal(githubRepositoryFromRemote(remote), expected, remote);
+});
+
+test("projectGithubRepository reads a local project's GitHub origin", async () => {
+  const base = await mkdtemp(join(tmpdir(), "projector-remote-"));
+  const run = (...args) => execFileSync("git", ["-C", base, ...args], { encoding: "utf8" });
+  try {
+    run("init", "-q");
+    assert.equal(await projectGithubRepository(base), null);
+    run("remote", "add", "origin", "git@github.com:Sdju/projector.git");
+    assert.equal(await projectGithubRepository(base), "Sdju/projector");
+    run("remote", "set-url", "origin", "https://gitlab.com/Sdju/projector.git");
+    assert.equal(await projectGithubRepository(base), null);
   } finally {
     await rm(base, { recursive: true, force: true });
   }

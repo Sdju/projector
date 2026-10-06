@@ -10,6 +10,7 @@ export { missingCommands, projectDraft, settingsError } from "./model/project-se
 export {
   fetchDirectories,
   fetchPathSuggestions,
+  fetchProjectGithub,
   inspectCommands,
   inspectPath,
   pickFolder,

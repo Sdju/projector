@@ -1,7 +1,12 @@
 import type { GithubRepository, GithubEntry } from "../../../core/modules/github/index.ts";
 import type { FileContent, FileEntry } from "../../../core/modules/workspace/index.ts";
 import { treePageRange } from "../../../core/modules/workspace/index.ts";
-import { defineTab, singletonTab, type WorkspaceProfile } from "../workspace-api/index.ts";
+import {
+  createLocalWorkspaceProfile,
+  defineTab,
+  singletonTab,
+  type WorkspaceProfile,
+} from "../workspace-api/index.ts";
 import { formatProjectRef } from "../project/index.ts";
 import { readIssue, readIssues, readRepository, readTree, readFile, readGit } from "./client.ts";
 
@@ -30,6 +35,45 @@ export function createGithubConnectionProfile(repository: string): WorkspaceProf
         },
       },
     },
+  };
+}
+
+const UNAVAILABLE = "Действие недоступно для этого источника workspace";
+
+/**
+ * Local project whose `origin` points at GitHub: files, Git and search stay local (the tree and
+ * editing are unchanged); GitHub adds issues and the repository info tab.
+ */
+export function createGithubEnabledLocalProfile(
+  projectId: string,
+  repository: string,
+): WorkspaceProfile {
+  const local = createLocalWorkspaceProfile(projectId);
+  const issues: WorkspaceProfile["providers"]["issues"] = {
+    read(action, params, signal) {
+      if (action === "issues") return readIssues(repository, params, signal);
+      if (action === "issue") {
+        const number = Number(params.number);
+        if (!Number.isInteger(number) || number <= 0) throw new Error("Укажите номер issue");
+        return readIssue(repository, number, signal);
+      }
+      throw new Error(UNAVAILABLE);
+    },
+  };
+  return {
+    ...local,
+    id: "local-github",
+    sidebar: [...(local.sidebar ?? []), { id: "issues", title: "Issues" }],
+    tabs: [
+      ...(local.tabs ?? []),
+      singletonTab(
+        "repository",
+        "github:repository",
+        "О репозитории",
+        "Информация о репозитории GitHub",
+      ),
+    ],
+    providers: { ...local.providers, issues },
   };
 }
 
@@ -91,7 +135,7 @@ export function createGithubWorkspaceProfile(
       if (action === "git") return { available: true, branch: snapshot.branch, changes: [] };
       if (action === "gutter") return { available: false, original: "" };
       if (!["log", "commit", "commit-diff"].includes(action))
-        throw new Error("Действие недоступно для этого источника workspace");
+        throw new Error(UNAVAILABLE);
       return (api.readGit ?? readGit)(
         action,
         { ...params, repository, sha: snapshot.commit },
@@ -130,7 +174,7 @@ export function createGithubWorkspaceProfile(
           nextOffset: page.nextOffset,
         };
       }
-      if (action !== "file") throw new Error("Действие недоступно для этого источника workspace");
+      if (action !== "file") throw new Error(UNAVAILABLE);
       if (
         !path ||
         path.includes("\\") ||
@@ -165,7 +209,7 @@ export function createGithubWorkspaceProfile(
         if (!Number.isInteger(number) || number <= 0) throw new Error("Укажите номер issue");
         return (api.readIssue ?? readIssue)(repository, number, signal);
       }
-      throw new Error("Действие недоступно для этого источника workspace");
+      throw new Error(UNAVAILABLE);
     },
   };
   return {

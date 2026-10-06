@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { test, mock } from "node:test";
-import { createGithubConnectionProfile, createGithubWorkspaceProfile } from "../src/modules/github-workspace/source.ts";
+import {
+  createGithubConnectionProfile,
+  createGithubEnabledLocalProfile,
+  createGithubWorkspaceProfile,
+} from "../src/modules/github-workspace/source.ts";
 import {
   registerWorkspaceProfile,
   workspaceCapabilities,
@@ -146,6 +150,32 @@ test("the shared workspace uses a readonly source for tree, files, assets and re
     unregister();
   }
   assert.equal(workspaceCapabilities("local-test").write, true);
+});
+
+test("a local project with a GitHub origin keeps local providers and adds issues", async () => {
+  const profile = createGithubEnabledLocalProfile("/tmp/app", "octocat/repo");
+  assert.equal(profile.id, "local-github");
+  assert.ok(profile.sidebar.some((section) => section.id === "issues"));
+  assert.ok(profile.tabs.some((tab) => tab.id === "repository"));
+  const calls = [];
+  const fetch = mock.method(globalThis, "fetch", async (url) => {
+    calls.push(String(url));
+    return Response.json({ issues: [], next: null });
+  });
+  const unregister = registerWorkspaceProfile("local-github-test", profile);
+  try {
+    const capabilities = workspaceCapabilities("local-github-test");
+    assert.equal(capabilities.write, true);
+    assert.equal(capabilities.git, true);
+    assert.equal(capabilities.search, true);
+    assert.equal(capabilities.issues, true);
+    assert.equal(capabilities.terminals, true);
+    await workspaceRequest("local-github-test", "issues", { state: "open", page: "1" });
+    assert.match(calls[0], /repository=octocat%2Frepo/);
+  } finally {
+    fetch.mock.restore();
+    unregister();
+  }
 });
 
 test("readonly guards reject all shared write helpers before any HTTP request", async () => {

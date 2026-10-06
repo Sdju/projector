@@ -8,7 +8,13 @@ export {
   mutateProjectEntry,
 } from "./files.ts";
 export { searchProject } from "./search.ts";
-export { projectGit, projectComparison, projectGutter, mutateProjectGit } from "./git.ts";
+export {
+  projectGit,
+  projectGithubRepository,
+  projectComparison,
+  projectGutter,
+  mutateProjectGit,
+} from "./git.ts";
 export { projectBranches, mutateProjectBranch } from "./git-branches.ts";
 export { previewExternalFile, readExternalImage } from "./external-files.ts";
 export { projectLog, projectCommit, projectCommitComparison } from "./git-history.ts";

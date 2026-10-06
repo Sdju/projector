@@ -12,7 +12,9 @@ import IconScale from "~icons/lucide/scale";
 import IconGlobe from "~icons/lucide/globe";
 import IconExternal from "~icons/lucide/external-link";
 
-const props = defineProps<{ repository: GithubRepository }>();
+const props = withDefaults(defineProps<{ repository: GithubRepository; snapshot?: boolean }>(), {
+  snapshot: true,
+});
 const number = (value: number) => value.toLocaleString("ru-RU");
 const stats = computed(() => [
   { key: "stars", label: "Звёзды", value: props.repository.stars, icon: IconStar },
@@ -87,7 +89,7 @@ const details = computed(() => [
         {{ repository.homepage }}
       </a>
     </p>
-    <p v-if="!repository.empty" class="ref-note">
+    <p v-if="snapshot && !repository.empty" class="ref-note">
       <IconBranch aria-hidden="true" />Дерево и история привязаны к снимку
       <code>{{ repository.tree.slice(0, 7) }}</code>
     </p>

@@ -9,3 +9,5 @@ addWorkspaceProfileResolver({
   },
 });
 export { default as GithubWorkspace } from "./GithubWorkspace.vue";
+export { default as GithubRepositoryInfoLoader } from "./ui/GithubRepositoryInfoLoader.vue";
+export { createGithubEnabledLocalProfile } from "./source.ts";

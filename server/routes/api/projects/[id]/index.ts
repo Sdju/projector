@@ -17,6 +17,7 @@ import {
 } from "../../../../modules/devcontainer/index.ts";
 import { openBrowser, openWindow } from "../../../../modules/window/index.ts";
 import { closeProjectTerminals } from "../../../../modules/terminal/index.ts";
+import { projectGithubRepository } from "../../../../modules/workspace/index.ts";
 import { json, readBody, asString } from "../../../../modules/transport/index.ts";
 import {
   parseMode,
@@ -134,6 +135,14 @@ export async function handleProjectActions({
       if (parseMode(body.mode) === "window") openWindow(projectAppUrl(id));
       else openBrowser(target);
       json(res, 200, { ok: true, url: target });
+      return true;
+    }
+
+    if (action === "github" && method === "GET") {
+      res.setHeader("Cache-Control", "no-store");
+      json(res, 200, {
+        repository: project.environment ? null : await projectGithubRepository(project.path),
+      });
       return true;
     }
 

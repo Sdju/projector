@@ -31,6 +31,11 @@ export function fetchProject(id: string): Promise<{ project: Project }> {
   return request(`/api/projects/${id}`);
 }
 
+/** `origin` of the local repository as `owner/repository`, or null when it is not GitHub. */
+export function fetchProjectGithub(id: string): Promise<{ repository: string | null }> {
+  return request(`/api/projects/${id}/github`);
+}
+
 export function createProject(draft: ProjectDraft): Promise<{ project: Project }> {
   return request("/api/projects", { method: "POST", body: JSON.stringify(draft) });
 }

@@ -1,6 +1,7 @@
 import { environmentForPath, runEnvironmentCommand } from "../environments/index.ts";
 import { lstat, realpath } from "node:fs/promises";
 import { HttpError } from "../http/index.ts";
+import { githubRepositoryFromRemote } from "../../../core/modules/github/index.ts";
 import { MAX_BYTES, decode, exec, location, pathExcluded, validatePath } from "./paths.ts";
 import { isExcludedPath } from "../../../core/modules/workspace/index.ts";
 import { excludePatterns } from "./files-exclude.ts";
@@ -36,6 +37,11 @@ export async function git(root: string, args: string[]) {
       env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
     })
   ).stdout;
+}
+/** `owner/repository` when the project's `origin` points at GitHub, otherwise null. */
+export async function projectGithubRepository(root: string): Promise<string | null> {
+  const remote = await git(root, ["remote", "get-url", "origin"]).catch(() => "");
+  return githubRepositoryFromRemote(remote);
 }
 export async function projectGit(root: string): Promise<GitOverview> {
   try {
