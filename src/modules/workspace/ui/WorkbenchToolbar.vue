@@ -5,6 +5,8 @@ import type { LayoutPreset } from "../lib/workbench-layout.ts";
 
 defineProps<{
   capabilities: Readonly<WorkspaceCapabilities>;
+  /** Узкий экран: раскладка блоков заменена поверхностями, остаются запуск и ссылки. */
+  mobile?: boolean;
   sidebarHidden: boolean;
   terminalsBusy: boolean;
   terminalsError?: string;
@@ -27,6 +29,7 @@ const emit = defineEmits<{
     <div class="toolbar-spacer" />
     <slot name="terminal-actions" />
     <LayoutMenu
+      v-if="!mobile"
       :groups="layoutGroups"
       :preset="preset"
       :presets-available="presetsAvailable"
@@ -64,21 +67,14 @@ const emit = defineEmits<{
 }
 @media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {
   .toolbar {
-    flex-wrap: nowrap;
-    overflow-x: auto;
+    flex: none;
     gap: var(--sp-1);
-    padding: var(--sp-1) var(--sp-2);
   }
-  .toolbar > *,
-  .toolbar :deep(.controls) {
-    flex-shrink: 0;
-  }
-  .toolbar :deep(.controls) {
-    flex-wrap: nowrap;
+  .toolbar-spacer {
+    display: none;
   }
   .toolbar-error {
-    max-width: 240px;
-    white-space: normal;
+    display: none;
   }
 }
 </style>

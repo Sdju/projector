@@ -127,22 +127,23 @@ const navigate = (path: string) =>
 </template>
 
 <style scoped>
+/* Лист привязан к шапке (.top), а не к самой кнопке: он занимает всю её ширину */
 .picker {
-  position: relative;
   min-width: 0;
-  width: 100%;
+  flex: 1;
 }
 .trigger {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  width: 100%;
-  height: 44px;
+  max-width: 100%;
+  height: 36px;
+  font-size: var(--fs-sm);
   padding-inline: var(--sp-2);
   text-align: left;
 }
 .trigger span {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -159,18 +160,18 @@ svg {
 }
 .backdrop {
   position: fixed;
-  inset: calc(44px + env(safe-area-inset-top)) 0 0;
+  inset: 0;
   z-index: var(--z-popover);
   background: var(--overlay);
 }
 .sheet {
   position: absolute;
-  top: 100%;
+  top: calc(100% + var(--island-gap));
   inset-inline: 0;
   z-index: calc(var(--z-popover) + 1);
   background: var(--bg-2);
   border: 1px solid var(--line-strong);
-  border-radius: var(--r-md);
+  border-radius: var(--r-lg);
   box-shadow: var(--shadow-popover);
   padding: var(--sp-2);
 }

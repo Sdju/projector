@@ -50,7 +50,6 @@ const sidebarHidden = ref(false);
 const {
   mobile,
   mobileSurface,
-  mobileActionsOpen,
   mobileSidebarOpen,
   sidebarInvisible,
   showSidebar,
@@ -224,7 +223,6 @@ registerMobileCommands({
   editorCommands,
   capabilities,
   surface: mobileSurface,
-  actionsOpen: mobileActionsOpen,
   mobile,
   activeKey,
   focusedPanel: () => workbench.focusedGroup.value?.active,
@@ -263,33 +261,18 @@ onBeforeUnmount(() => overview.cancel());
     :class="{ 'sidebar-hidden': sidebarInvisible }"
     :style="sizes"
   >
-    <MobileSurfaces
-      v-if="mobile"
-      :terminals="capabilities.terminals"
-      :surface="mobileSurface"
-      :actions-open="mobileActionsOpen"
-      @command="(id, args) => editorCommands.run(id, args)"
-    />
-    <div
-      v-if="!mobile || mobileActionsOpen"
-      class="toolbar-host"
-      :class="{ 'mobile-actions': mobile }"
-    >
-      <Teleport to="#header-tools" :disabled="mobile" defer>
+    <div class="toolbar-host">
+      <Teleport to="#header-tools" defer>
         <WorkbenchToolbar
           :capabilities="capabilities"
+          :mobile="mobile"
           :sidebar-hidden="sidebarInvisible"
           :terminals-busy="terminals.busy.value"
           :terminals-error="terminals.error.value"
           :layout-groups="layoutGroups"
           :preset="currentPreset"
           :presets-available="presetsAvailable"
-          @command="
-            (id, args) => {
-              if (mobile) mobileActionsOpen = false;
-              editorCommands.run(id, args);
-            }
-          "
+          @command="(id, args) => editorCommands.run(id, args)"
         >
           <template #terminal-actions><slot name="terminal-actions" /></template>
           <template #terminal-status><slot name="terminal-status" /></template>
@@ -368,13 +351,19 @@ onBeforeUnmount(() => overview.cancel());
         </template>
       </WorkbenchDock>
     </section>
+    <MobileSurfaces
+      v-if="mobile"
+      :terminals="capabilities.terminals"
+      :surface="mobileSurface"
+      @command="(id, args) => editorCommands.run(id, args)"
+    />
     <TerminalCloseDialog
       :session="terminals.pendingClose.value"
       :busy="terminals.busy.value"
       @cancel="terminals.cancelClose"
       @confirm="terminals.confirmClose"
     />
-    <StatusBar class="workspace-status" />
+    <StatusBar v-if="!mobile" class="workspace-status" />
   </div>
 </template>
 
@@ -473,21 +462,16 @@ onBeforeUnmount(() => overview.cancel());
     background: none;
     border-radius: 0;
   }
-  .file-error {
-    margin: 0;
-    border-radius: 0;
-    border-width: 0 0 1px;
-  }
   .tree-resize {
     display: none;
-  }
-  .workspace-status {
-    margin-top: 0;
   }
   .dock-pane {
     grid-column: 1;
     grid-row: 3;
     overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    background: var(--bg);
   }
   .mobile-left-enter-active,
   .mobile-left-leave-active {
@@ -498,37 +482,19 @@ onBeforeUnmount(() => overview.cancel());
     transform: translateX(-100%);
   }
   .sidebar-backdrop {
-    grid-column: 1;
-    grid-row: 3;
-    z-index: 2;
-    justify-self: end;
-    width: calc(100% - min(340px, 90%));
-    background: var(--overlay);
+    display: none;
   }
 }
 .toolbar-host {
   grid-column: 1 / -1;
 }
-/* Полоса действий вынесена в шапку (Teleport); на мобильном остаётся выпадающей панелью */
-.toolbar-host:not(.mobile-actions) {
+/* Полоса действий вынесена в шапку (Teleport), здесь остаётся только якорь */
+.toolbar-host {
   display: none;
 }
 .workspace-status {
   grid-column: 1 / -1;
   grid-row: 4;
   margin-top: var(--island-gap);
-}
-.mobile-actions {
-  margin-bottom: 0;
-  position: absolute;
-  top: 40px;
-  inset-inline: 0;
-  z-index: var(--z-popover);
-  background: var(--bg-2);
-  box-shadow: var(--shadow-popover);
-}
-.mobile-actions :deep(.toolbar) {
-  flex-wrap: wrap;
-  padding: var(--sp-2);
 }
 </style>

@@ -11,7 +11,6 @@ export function useMobileSurfaces(sidebarHidden: Ref<boolean>) {
     "(max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse)",
   );
   const mobileSurface = ref<MobileSurface>("editor");
-  const mobileActionsOpen = ref(false);
   const mobileSidebarOpen = computed({
     get: () => mobileSurface.value === "files",
     set: (open: boolean) => {
@@ -28,7 +27,6 @@ export function useMobileSurfaces(sidebarHidden: Ref<boolean>) {
   return {
     mobile,
     mobileSurface,
-    mobileActionsOpen,
     mobileSidebarOpen,
     sidebarInvisible,
     showSidebar,
@@ -40,13 +38,12 @@ export function registerMobileCommands(options: {
   editorCommands: ReturnType<typeof useCommandScope>;
   capabilities: Readonly<WorkspaceCapabilities>;
   surface: Ref<MobileSurface>;
-  actionsOpen: Ref<boolean>;
   mobile: Ref<boolean>;
   activeKey: Ref<string | undefined>;
   focusedPanel: () => string | undefined;
   restoringSession: Ref<boolean>;
 }) {
-  const { editorCommands, capabilities, surface, actionsOpen, mobile } = options;
+  const { editorCommands, capabilities, surface, mobile } = options;
   editorCommands.scope.registerCommand({
     id: "ide.workbench.mobile.surface.show",
     title: "Открыть мобильную поверхность",
@@ -62,16 +59,6 @@ export function registerMobileCommands(options: {
       )
         throw new Error("surface: editor, files или terminal");
       surface.value = target;
-      actionsOpen.value = false;
-    },
-  });
-  editorCommands.scope.registerCommand({
-    id: "ide.workbench.mobile.actions.toggle",
-    title: "Показать действия проекта",
-    description: "Раскрывает команды запуска проекта и создания терминалов в мобильном интерфейсе.",
-    enabled: () => mobile.value,
-    run: () => {
-      actionsOpen.value = !actionsOpen.value;
     },
   });
   watch(options.activeKey, (key) => {
@@ -83,6 +70,5 @@ export function registerMobileCommands(options: {
   });
   watch(mobile, () => {
     surface.value = "editor";
-    actionsOpen.value = false;
   });
 }

@@ -227,11 +227,7 @@ defineExpose({
     grid-column: 1;
     grid-row: 3;
     z-index: 3;
-    width: min(340px, 90%);
-    border-width: 0 1px 0 0;
-    border-color: var(--line-strong);
-    border-radius: 0;
-    box-shadow: var(--shadow-popover);
+    width: 100%;
   }
 }
 </style>

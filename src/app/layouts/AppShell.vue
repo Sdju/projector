@@ -324,29 +324,38 @@ const navigatePath = (path: string) =>
     align-items: center;
     min-height: 44px;
   }
+  /* Шапка проекта: выбор проекта слева, запуск и ссылки справа; лист выбора привязан к шапке */
   .top.has-project {
+    position: relative;
     display: flex;
     margin-bottom: 0;
   }
   .has-project .project-switcher,
-  .has-project .header-tools,
   .has-project .nav {
     display: none;
+  }
+  .has-project .header-tools {
+    flex: none;
+    --control-h: 34px;
+    --control-h-sm: 34px;
   }
   .mobile-picker {
     display: block;
   }
   .shell.workspace {
     margin-inline: 0;
-    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    padding: max(var(--island-gap), env(safe-area-inset-top))
+      max(var(--island-gap), env(safe-area-inset-right))
+      max(var(--island-gap), env(safe-area-inset-bottom))
+      max(var(--island-gap), env(safe-area-inset-left));
     height: 100dvh;
     display: flex;
     flex-direction: column;
-    background: none;
+    background: var(--canvas);
   }
   .workspace .top {
     padding-inline: 0;
-    margin-bottom: 0;
+    margin-bottom: var(--island-gap);
   }
   .workspace main {
     flex: 1;

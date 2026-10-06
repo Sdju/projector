@@ -143,27 +143,26 @@ const handlers = {
 }
 .terminal {
   z-index: 2;
-  border-left: 1px solid var(--line-strong);
-  box-shadow: var(--shadow-popover);
 }
 .tabs {
   display: flex;
   align-items: center;
   min-width: 0;
   flex: none;
-  height: 44px;
+  height: 36px;
   background: var(--bg-sunken);
 }
 .tabs :deep(.workspace-tabs) {
   flex: 1;
   min-width: 0;
-  height: 44px;
+  height: 36px;
 }
 .terminal-tools {
   display: flex;
   gap: var(--sp-1);
   flex: none;
-  overflow: auto;
+  overflow-x: auto;
+  scrollbar-width: none;
   padding: var(--sp-1) var(--sp-2);
   border-bottom: 1px solid var(--line);
 }
