@@ -48,6 +48,8 @@ export const workspaceCapabilities = (projectId: string) =>
   profileCapabilities(workspaceProfile(projectId));
 export const workspaceAssetUrl = (projectId: string, path: string, external = false) =>
   workspaceProfile(projectId).providers.files.assetUrl(path, external);
+export const workspaceSiteUrl = (projectId: string, path: string) =>
+  workspaceProfile(projectId).providers.files.siteUrl?.(path) ?? "";
 export const refreshWorkspace = (projectId: string) =>
   workspaceProfile(projectId).providers.files.refresh?.();
 

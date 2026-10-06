@@ -52,6 +52,8 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
         read,
         assetUrl: (path, external = false) =>
           `${base(projectId)}/${external ? "external-asset" : "asset"}?${new URLSearchParams({ path })}`,
+        siteUrl: (path) =>
+          `/api/projects/${encodeURIComponent(projectId)}/site/${path.split("/").map(encodeURIComponent).join("/")}`,
         write: (endpoint: FileWrite, body, failure = "Не удалось выполнить действие") =>
           send(
             `${base(projectId)}/${endpoint}`,

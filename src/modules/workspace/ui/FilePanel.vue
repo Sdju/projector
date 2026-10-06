@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { workspaceSiteUrl } from "../../workspace-api/index.ts";
 import { useTabHost, useWorkspaceTabs } from "../lib/tab-views.ts";
-import { isEditable, isMarkdown, type OpenFile } from "../open-file.ts";
+import { isEditable, isHtml, isMarkdown, type OpenFile } from "../open-file.ts";
 import {
   ArchiveViewer,
   CodeViewer,
+  HtmlViewer,
   ImageViewport,
   MarkdownViewer,
   SvgViewer,
@@ -20,6 +22,7 @@ const emit = defineEmits<{
 }>();
 const tabs = useWorkspaceTabs();
 const host = useTabHost();
+const siteUrl = computed(() => workspaceSiteUrl(props.projectId, props.file.path));
 const view = computed(() => (props.file.virtual ? tabs.views[props.file.virtual] : undefined));
 const subtitle = computed(() =>
   props.file.virtual ? tabs.types.get(props.file.virtual)?.subtitle : undefined,
@@ -52,6 +55,21 @@ const subtitle = computed(() =>
         :column="file.column"
         @change="emit('change', $event)"
         @save="emit('save')"
+      />
+      <HtmlViewer
+        v-else-if="isHtml(file) && siteUrl"
+        :path="file.path"
+        :content="file.draft ?? file.content"
+        :saved="file.content"
+        :site-url="siteUrl"
+        :mode="file.htmlMode ?? 'split'"
+        :reload="file.htmlReload"
+        :editable="isEditable(file)"
+        :line="file.line"
+        :column="file.column"
+        @change="emit('change', $event)"
+        @save="emit('save')"
+        @command="(id, args) => host.run(id, args)"
       />
       <MarkdownViewer
         :key="file.readonly ? revision : undefined"

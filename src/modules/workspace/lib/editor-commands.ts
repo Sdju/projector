@@ -4,9 +4,11 @@ import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import { commandArgs, type useCommandScope } from "../../../common/utilities/commands.ts";
 import { copyWithNotice } from "../../../common/utilities/notice.ts";
 import type { TabRegistry, WorkspaceCapability } from "../../workspace-api/index.ts";
-import { isEditable, isMarkdown, type OpenFile } from "../open-file.ts";
+import { workspaceSiteUrl } from "../../workspace-api/index.ts";
+import { isEditable, isHtml, isMarkdown, type HtmlMode, type OpenFile } from "../open-file.ts";
 
 export interface EditorCommandContext {
+  projectId: string;
   editorCommands: ReturnType<typeof useCommandScope>;
   register: (
     id: string,
@@ -75,6 +77,60 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
       return !!file && isMarkdown(file);
     },
   );
+  const htmlFile = (args?: unknown) => {
+    const file = commandFile(args);
+    return file && isHtml(file) && workspaceSiteUrl(ctx.projectId, file.path) ? file : undefined;
+  };
+  register(
+    "ide.editor.html.setMode",
+    "Режим просмотра HTML",
+    (args) => {
+      const mode = commandArgs(args).mode;
+      if (mode !== "page" && mode !== "split" && mode !== "source")
+        throw new Error("mode: page, split или source");
+      htmlFile(args)!.htmlMode = mode as HtmlMode;
+    },
+    (args) => !!htmlFile(args),
+    undefined,
+    {
+      description:
+        "Переключает вид открытого HTML-файла: page — только отрендеренная страница, split — страница и исходник, source — только исходник.",
+      arguments: {
+        mode: "page, split или source",
+        id: "Ключ вкладки; по умолчанию активная вкладка",
+      },
+    },
+  );
+  register(
+    "ide.editor.html.reload",
+    "Перезагрузить HTML-страницу",
+    (args) => {
+      const file = htmlFile(args)!;
+      file.htmlReload = (file.htmlReload ?? 0) + 1;
+    },
+    (args) => !!htmlFile(args),
+    undefined,
+    {
+      description:
+        "Заново загружает страницу открытого HTML-файла вместе со стилями, скриптами и картинками. Страница читает файлы с диска, поэтому несохранённые правки не видны.",
+      arguments: { id: "Ключ вкладки; по умолчанию активная вкладка" },
+    },
+  );
+  register(
+    "ide.editor.html.openInBrowser",
+    "Открыть HTML-страницу в браузере",
+    (args) => {
+      const file = htmlFile(args)!;
+      window.open(workspaceSiteUrl(ctx.projectId, file.path), "_blank", "noopener");
+    },
+    (args) => !!htmlFile(args),
+    undefined,
+    {
+      description:
+        "Открывает HTML-файл как страницу в новой вкладке браузера: относительные пути разрешаются от его каталога в проекте.",
+      arguments: { id: "Ключ вкладки; по умолчанию активная вкладка" },
+    },
+  );
   register(
     "ide.editor.file.open",
     "Открыть файл",
@@ -91,6 +147,9 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
     if (!file || file.virtual) return common;
     return [
       ...(file.original !== undefined ? [editorCommands.item("ide.editor.file.open", { id })] : []),
+      ...(isHtml(file)
+        ? [editorCommands.item("ide.editor.html.openInBrowser", { id }, { separator: true })]
+        : []),
       editorCommands.item("ide.editor.file.save", { id }, { separator: true }),
       editorCommands.item("ide.editor.file.reveal", { id }),
       editorCommands.item("ide.editor.file.copyRelativePath", { id }),

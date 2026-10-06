@@ -34,6 +34,8 @@ export interface TabHost {
   openFile(path: string): void;
   openTab(id: string, params?: TabParams, options?: { preview?: boolean }): void;
   openCommitDiff(hash: string, path: string): void;
+  /** Runs an editor command of this workspace (a button of a view is a command too). */
+  run(command: string, args?: unknown): void;
 }
 
 export const baseTabViews: TabViews = {

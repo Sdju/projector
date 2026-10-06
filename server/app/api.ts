@@ -25,6 +25,7 @@ import { handlePickFolder } from "../routes/api/pick-folder.ts";
 import { handlePreviewIcon } from "../routes/api/preview-icon.ts";
 import { handleProjectsIndex } from "../routes/api/projects/index.ts";
 import { handleProjectWorkspace } from "../routes/api/projects/[id]/workspace.ts";
+import { handleProjectSite } from "../routes/api/projects/[id]/site.ts";
 import { handleProjectTerminals } from "../routes/api/projects/[id]/terminals.ts";
 import { handleProjectActions } from "../routes/api/projects/[id]/index.ts";
 import { handleIdeKeybindings } from "../routes/api/ide/keybindings.ts";
@@ -66,6 +67,7 @@ const routes = [
   handlePickFolder,
   handlePreviewIcon,
   handleProjectsIndex,
+  handleProjectSite,
   handleProjectWorkspace,
   handleProjectTerminals,
   handleProjectActions,

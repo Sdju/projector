@@ -7,6 +7,7 @@ export {
   moveProjectEntry,
   mutateProjectEntry,
 } from "./files.ts";
+export { openProjectSiteFile } from "./site.ts";
 export { searchProject } from "./search.ts";
 export {
   projectGit,

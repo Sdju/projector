@@ -146,8 +146,10 @@ provideTabHost({
   openFile: (path) => void openFile(path),
   openTab,
   openCommitDiff: (hash, path) => void files.openCommitFile(hash, path),
+  run: (command, args) => editorCommands.run(command, args),
 });
 const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
+  projectId: props.projectId,
   editorCommands,
   register: registerEditor,
   tabs,

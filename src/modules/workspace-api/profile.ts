@@ -21,6 +21,8 @@ export interface ReadProvider {
 export type FileWrite = "file" | "move" | "entry";
 export interface FilesProvider extends ReadProvider {
   assetUrl(path: string, external?: boolean): string;
+  /** Address that serves the file as part of a site (relative links resolve); absent when it cannot. */
+  siteUrl?(path: string): string;
   /** Present only when the files can change. */
   write?(endpoint: FileWrite, body: unknown, failure?: string): Promise<unknown>;
   /** Re-reads a mutable snapshot (a remote ref moved). */

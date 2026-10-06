@@ -9,6 +9,7 @@ const tabSchema = z.object({
   external: z.boolean().optional(),
   staged: z.boolean().optional(),
   markdownMode: z.enum(["document", "source"]).optional(),
+  htmlMode: z.enum(["page", "split", "source"]).optional(),
 });
 export const workspaceSessionSchema = z.object({
   tabs: z.array(tabSchema),

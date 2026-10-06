@@ -265,3 +265,7 @@ runs with the user's filesystem permissions; it is not an isolated sandbox.
 `ide.workbench.settings.open` (**Открыть настройки Projector**) в scope `editor:<projectId>` открывает вкладку **Настройки** рядом с файлами. Повторный вызов фокусирует вкладку `settings:app`. Кнопки настроек в шапке, мобильном выборе проекта и сайдбаре вызывают ту же команду; она доступна через командный центр. Вкладка сохраняет черновики при переключении файлов и переносе между блоками; закрытие завершает её состояние. Вне проекта настройки доступны по `/settings`.
 
 Внутри вкладки scope `settings` предоставляет `ide.settings.sections.list`, `ide.settings.section.open` (`{ id }`) и `ide.settings.search` (`{ query? }`). Эти команды доступны встроенному агенту; формы используют прежние серверные API хранения настроек.
+
+## HTML-страницы
+
+`ide.editor.html.setMode` (`mode`: `page` / `split` / `source`), `ide.editor.html.reload` и `ide.editor.html.openInBrowser` работают с активным HTML-файлом или с вкладкой по `id`. Панель просмотра вызывает их через `TabHost.run`.

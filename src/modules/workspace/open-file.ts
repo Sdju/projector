@@ -1,6 +1,8 @@
 import type { FileContent } from "../../../core/modules/workspace/index.ts";
 import type { TabParams } from "../workspace-api/index.ts";
 
+export type HtmlMode = "page" | "split" | "source";
+
 export interface OpenFile extends FileContent {
   /** Id зарегистрированного типа служебной вкладки (`TabType`) или `commit`. */
   virtual?: string;
@@ -20,6 +22,10 @@ export interface OpenFile extends FileContent {
   key: string;
   draft?: string;
   markdownMode?: "document" | "source";
+  /** HTML: страница, исходник или оба; по умолчанию оба. */
+  htmlMode?: HtmlMode;
+  /** Счётчик ручных перезагрузок страницы в iframe. */
+  htmlReload?: number;
   saving?: boolean;
   saveError?: string;
   /** Вкладка предварительного просмотра: одна на блок, курсивом; закрепляется двойным щелчком. */
@@ -48,3 +54,10 @@ export const isMarkdown = (file: OpenFile) =>
   !file.image &&
   file.original === undefined &&
   /\.(?:md|markdown)$/i.test(file.path);
+export const isHtml = (file: OpenFile) =>
+  !file.virtual &&
+  !file.binary &&
+  !file.image &&
+  !file.external &&
+  file.original === undefined &&
+  /\.html?$/i.test(file.path);
