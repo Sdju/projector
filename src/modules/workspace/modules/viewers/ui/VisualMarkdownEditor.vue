@@ -8,7 +8,9 @@ import { Plugin } from "@milkdown/kit/prose/state";
 import type { Node } from "@milkdown/kit/prose/model";
 import { $prose, $view, replaceAll } from "@milkdown/kit/utils";
 import { workspaceAssetUrl } from "../../../../workspace-api/index.ts";
+import { loadGithubEmojis } from "../../../../../common/utilities/github-emoji.ts";
 import { markdownPath, renderMarkdown } from "../lib/markdown.ts";
+import { githubEmojiDecorations } from "../lib/markdown-emoji.ts";
 import { createCrepe, normalizeImageAttributes } from "../lib/crepe-options.ts";
 import { useMarkdownInteractions } from "../lib/markdown-links.ts";
 import "@milkdown/crepe/theme/common/style.css";
@@ -74,6 +76,8 @@ onMounted(async () => {
   });
   crepe = editor;
   editor.editor.use(normalizeImageAttributes);
+  // Only a readonly document (issue, comment) shows emoji images; an edited file stays as typed.
+  if (props.editable === false) editor.editor.use(githubEmojiDecorations(await loadGithubEmojis()));
   editor.editor
     .use(
       $prose(

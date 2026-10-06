@@ -23,6 +23,7 @@ import {
   browseGithubIssues,
   browseGithubIssue,
   browseGithubPulls,
+  githubEmojis,
   browseGithubDiscussions,
   browseGithubDiscussion,
   browseGithubPull,
@@ -70,6 +71,11 @@ export async function handleIntegrationsActions({
 }: RouteContext): Promise<boolean> {
   if (path.startsWith("/api/integrations")) {
     res.setHeader("Cache-Control", "no-store");
+    if (path === "/api/integrations/github/emojis" && method === "GET") {
+      res.setHeader("Cache-Control", "private, max-age=3600");
+      json(res, 200, await githubEmojis());
+      return true;
+    }
     if (path.startsWith("/api/integrations/github/browse/") && method === "GET") {
       const repository = url.searchParams.get("repository") || "";
       const sha = url.searchParams.get("sha") || "";

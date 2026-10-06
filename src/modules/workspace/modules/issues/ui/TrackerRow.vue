@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { IssueLabel, IssueUser } from "../../../../../../core/modules/workspace/index.ts";
+import EmojiText from "../../../../../common/ui/EmojiText.vue";
 import UiAvatar from "../../../../../common/ui/UiAvatar.vue";
 
 /** Строка списка (issue, pull request); клики и двойные клики обрабатывает родитель. */
@@ -9,7 +10,9 @@ const labelDot = (label: IssueLabel) => (label.color ? `#${label.color}` : "tran
 
 <template>
   <button type="button" class="tracker-row">
-    <span class="title"><slot name="icon" />{{ title }}</span>
+    <span class="title"
+      ><slot name="icon" /><span><EmojiText :text="title" /></span
+    ></span>
     <span class="meta">
       <span class="number">#{{ number }}</span>
       <span v-for="label in labels.slice(0, 3)" :key="label.name" class="label">

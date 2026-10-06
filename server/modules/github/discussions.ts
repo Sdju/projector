@@ -6,6 +6,8 @@ import type {
   DiscussionDetail,
   DiscussionList,
   IssueUser,
+  Reaction,
+  ReactionKind,
 } from "../../../core/modules/workspace/index.ts";
 
 const PAGE = 30;
@@ -14,11 +16,31 @@ const COMMENT_PAGES = 5;
 const STATES: Record<string, string[] | null> = { open: ["OPEN"], closed: ["CLOSED"], all: null };
 const CURSOR = /^[A-Za-z0-9+/=_-]{1,200}$/;
 
+const GROUPS: Record<string, ReactionKind> = {
+  THUMBS_UP: "+1",
+  THUMBS_DOWN: "-1",
+  LAUGH: "laugh",
+  HOORAY: "hooray",
+  CONFUSED: "confused",
+  HEART: "heart",
+  ROCKET: "rocket",
+  EYES: "eyes",
+};
+interface RemoteReactionGroups {
+  reactionGroups?: Array<{ content: string; reactors?: { totalCount?: number } }> | null;
+}
+function reactions(raw: RemoteReactionGroups): Reaction[] {
+  return (raw.reactionGroups ?? []).flatMap((group) => {
+    const content = GROUPS[group.content];
+    const count = group.reactors?.totalCount ?? 0;
+    return content && count ? [{ content, count }] : [];
+  });
+}
 interface RemoteUser {
   login?: string;
   avatarUrl?: string;
 }
-interface RemoteDiscussion {
+interface RemoteDiscussion extends RemoteReactionGroups {
   number: number;
   title: string;
   closed?: boolean;
@@ -33,7 +55,7 @@ interface RemoteDiscussion {
   createdAt?: string;
   updatedAt?: string;
 }
-interface RemoteComment {
+interface RemoteComment extends RemoteReactionGroups {
   databaseId?: number;
   author?: RemoteUser | null;
   body?: string;
@@ -51,6 +73,7 @@ interface PageInfo {
 const DISCUSSION_FIELDS = `
   number title closed isAnswered upvoteCount body url createdAt updatedAt
   author { login avatarUrl }
+  reactionGroups { content reactors { totalCount } }
   category { name emoji }
   labels(first: 10) { nodes { name color } }
   comments { totalCount }
@@ -58,6 +81,7 @@ const DISCUSSION_FIELDS = `
 const COMMENT_FIELDS = `
   databaseId body url createdAt upvoteCount
   author { login avatarUrl }
+  reactionGroups { content reactors { totalCount } }
 `;
 
 function user(raw?: RemoteUser | null): IssueUser {
@@ -78,6 +102,7 @@ function discussion(raw: RemoteDiscussion): Discussion {
     comments: raw.comments?.totalCount ?? 0,
     upvotes: raw.upvoteCount ?? 0,
     body: raw.body || "",
+    reactions: reactions(raw),
     htmlUrl: raw.url || "",
     createdAt: raw.createdAt || "",
     updatedAt: raw.updatedAt || "",
@@ -89,6 +114,7 @@ function comment(raw: RemoteComment): DiscussionComment {
     id: raw.databaseId ?? 0,
     author: user(raw.author),
     body: raw.body || "",
+    reactions: reactions(raw),
     htmlUrl: raw.url || "",
     createdAt: raw.createdAt || "",
     upvotes: raw.upvoteCount ?? 0,

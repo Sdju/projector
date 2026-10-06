@@ -21,4 +21,5 @@ export { browseGithubLog, browseGithubCommit, browseGithubComparison } from "./h
 export { browseGithubDirectories } from "./navigation.ts";
 export { browseGithubIssue, browseGithubIssues } from "./issues.ts";
 export { browseGithubDiscussion, browseGithubDiscussions } from "./discussions.ts";
+export { githubEmojis } from "./emojis.ts";
 export { browseGithubPull, browseGithubPulls } from "./pulls.ts";

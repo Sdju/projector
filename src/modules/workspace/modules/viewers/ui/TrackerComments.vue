@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import type { IssueUser } from "../../../../../../core/modules/workspace/index.ts";
+import type { IssueUser, Reaction } from "../../../../../../core/modules/workspace/index.ts";
 import { absoluteTime, relativeTime } from "../../../../../common/utilities/commit-format.ts";
 import UiAvatar from "../../../../../common/ui/UiAvatar.vue";
+import TrackerReactions from "./TrackerReactions.vue";
 import VisualMarkdownEditor from "./VisualMarkdownEditor.vue";
 
 /** Раздел вкладки: заголовок и карточки с Markdown (комментарии, ревью). */
@@ -9,6 +10,7 @@ export interface TrackerComment {
   id: number;
   author: IssueUser;
   body: string;
+  reactions?: Reaction[];
   /** ISO-время; пусто — не показывать. */
   at: string;
   /** Пометка после автора (состояние ревью) и её класс. */
@@ -48,6 +50,7 @@ const emit = defineEmits<{ open: [path: string] }>();
         compact
         @open="emit('open', $event)"
       />
+      <TrackerReactions :reactions="item.reactions ?? []" />
     </li>
   </ul>
 </template>

@@ -4,9 +4,11 @@ import {
   COMMENT_PAGES,
   comment,
   labels,
+  reactions,
   user,
   type RemoteComment,
   type RemoteLabel,
+  type RemoteReactions,
   type RemoteUser,
 } from "./issues.ts";
 import { HttpError } from "../http/index.ts";
@@ -78,7 +80,7 @@ interface RemoteReview {
   submitted_at?: string;
 }
 
-function pull(raw: RemotePull): PullRequest {
+function pull(raw: RemotePull, reactionCounts?: RemoteReactions): PullRequest {
   return {
     number: raw.number,
     title: raw.title || "",
@@ -89,6 +91,7 @@ function pull(raw: RemotePull): PullRequest {
     head: raw.head?.label || raw.head?.ref || "",
     base: raw.base?.ref || "",
     body: raw.body || "",
+    reactions: reactions(reactionCounts),
     htmlUrl: raw.html_url || "",
     createdAt: raw.created_at || "",
     updatedAt: raw.updated_at || "",
@@ -128,7 +131,7 @@ export async function browseGithubPulls(
   const raw = await get<RemotePull[]>(
     `/pulls?state=${state}&per_page=${PAGE}&page=${page}&sort=updated&direction=desc`,
   );
-  return { pulls: raw.map(pull), next: raw.length === PAGE ? page + 1 : null };
+  return { pulls: raw.map((item) => pull(item)), next: raw.length === PAGE ? page + 1 : null };
 }
 
 /** Pull request metadata, conversation, reviews and changed files, each read up to a bound. */
@@ -139,8 +142,10 @@ export async function browseGithubPull(
   if (!Number.isInteger(number) || number <= 0)
     throw new HttpError(400, "Укажите номер pull request");
   const get = await githubReader(repository);
-  const [raw, reviews] = await Promise.all([
+  const [raw, issue, reviews] = await Promise.all([
     get<RemotePull>(`/pulls/${number}`),
+    // Reactions of the description live on the issue side of a pull request.
+    get<{ reactions?: RemoteReactions }>(`/issues/${number}`),
     get<RemoteReview[]>(`/pulls/${number}/reviews?per_page=100`),
   ]);
   const comments: PullRequestDetail["comments"] = [];
@@ -163,7 +168,7 @@ export async function browseGithubPull(
   }
   const changedFiles = raw.changed_files ?? files.length;
   return {
-    pull: pull(raw),
+    pull: pull(raw, issue.reactions),
     commits: raw.commits ?? 0,
     additions: raw.additions ?? 0,
     deletions: raw.deletions ?? 0,

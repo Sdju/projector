@@ -402,6 +402,7 @@ test("GitHub issues list filters pull requests, paginates and reads discussion c
     assignees: [{ login: "bob" }],
     comments: 2,
     body: "Body",
+    reactions: { heart: 4, rocket: 0 },
     html_url: `https://github.com/octocat/repo/issues/${number}`,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-02T00:00:00Z",
@@ -424,7 +425,14 @@ test("GitHub issues list filters pull requests, paginates and reads discussion c
     if (url.pathname === "/repos/octocat/repo/issues/7") return Response.json(remoteIssue(7));
     if (url.pathname === "/repos/octocat/repo/issues/7/comments")
       return Response.json([
-        { id: 11, user: { login: "carol" }, body: "First", html_url: "u", created_at: "d" },
+        {
+          id: 11,
+          user: { login: "carol" },
+          body: "First",
+          reactions: { eyes: 1 },
+          html_url: "u",
+          created_at: "d",
+        },
         { id: 12, user: { login: "dave" }, body: "Second", html_url: "u", created_at: "d" },
       ]);
     throw new Error(`Unexpected URL: ${url}`);
@@ -436,6 +444,7 @@ test("GitHub issues list filters pull requests, paginates and reads discussion c
     assert.equal(first.issues[0].author.login, "alice");
     assert.deepEqual(first.issues[0].labels, [{ name: "bug", color: "ff0000" }]);
     assert.equal(first.issues[0].state, "open");
+    assert.deepEqual(first.issues[0].reactions, [{ content: "heart", count: 4 }]);
     assert.equal(first.next, 2);
     assert.equal(requests.at(-1).searchParams.get("state"), "open");
     assert.equal(requests.at(-1).searchParams.get("per_page"), "30");
@@ -454,6 +463,7 @@ test("GitHub issues list filters pull requests, paginates and reads discussion c
     assert.equal(detail.issue.assignees[0].login, "bob");
     assert.equal(detail.comments.length, 2);
     assert.equal(detail.comments[0].author.login, "carol");
+    assert.deepEqual(detail.comments[0].reactions, [{ content: "eyes", count: 1 }]);
     assert.equal(detail.commentsTruncated, false);
 
     await assert.rejects(browseGithubIssue("octocat/repo", 0), { status: 400 });
@@ -500,6 +510,8 @@ test("GitHub pull requests list derives state and detail gathers reviews, commen
       return Response.json(
         remotePull(7, { commits: 3, additions: 10, deletions: 4, changed_files: 2 }),
       );
+    if (url.pathname === "/repos/octocat/repo/issues/7")
+      return Response.json({ reactions: { "+1": 2, "-1": 0, hooray: 1, total_count: 3 } });
     if (url.pathname === "/repos/octocat/repo/pulls/7/reviews")
       return Response.json([
         { id: 1, user: { login: "bob" }, state: "APPROVED", body: "", html_url: "u" },
@@ -536,6 +548,10 @@ test("GitHub pull requests list derives state and detail gathers reviews, commen
 
     const detail = await browseGithubPull("octocat/repo", 7);
     assert.equal(detail.pull.number, 7);
+    assert.deepEqual(detail.pull.reactions, [
+      { content: "+1", count: 2 },
+      { content: "hooray", count: 1 },
+    ]);
     assert.equal(detail.commits, 3);
     assert.equal(detail.additions, 10);
     assert.deepEqual(
@@ -571,6 +587,10 @@ test("GitHub discussions need a token, page by cursor and nest replies under com
     body: "Body",
     url: `https://github.com/octocat/repo/discussions/${number}`,
     author: null,
+    reactionGroups: [
+      { content: "THUMBS_UP", reactors: { totalCount: 5 } },
+      { content: "HOORAY", reactors: { totalCount: 0 } },
+    ],
     category: { name: "Q&A", emoji: ":pray:" },
     labels: { nodes: [{ name: "bug", color: "ff0000" }, null] },
     comments: { totalCount: 2 },
@@ -638,6 +658,7 @@ test("GitHub discussions need a token, page by cursor and nest replies under com
     assert.equal(requests.at(-1).after, null);
     assert.equal(first.discussions[0].author.login, "ghost");
     assert.equal(first.discussions[0].answered, true);
+    assert.deepEqual(first.discussions[0].reactions, [{ content: "+1", count: 5 }]);
     assert.deepEqual(first.discussions[0].labels, [{ name: "bug", color: "ff0000" }]);
     assert.equal(first.next, "Y3Vyc29y");
     const second = await browseGithubDiscussions("octocat/repo", {

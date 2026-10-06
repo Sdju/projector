@@ -88,6 +88,7 @@ const stateLabel = computed(() => {
     :html-url="detail?.pull.htmlUrl ?? ''"
     :labels="detail?.pull.labels ?? []"
     :body="detail?.pull.body ?? ''"
+    :reactions="detail?.pull.reactions ?? []"
     @open="emit('open', $event)"
   >
     <template #meta>

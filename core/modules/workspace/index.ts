@@ -31,6 +31,8 @@ export type {
   IssueLabel,
   IssueList,
   IssueUser,
+  Reaction,
+  ReactionKind,
   PullRequest,
   PullRequestDetail,
   PullRequestFile,

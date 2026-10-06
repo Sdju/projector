@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import EmojiText from "../../../../../common/ui/EmojiText.vue";
 import { computed, ref, watch } from "vue";
 import type {
   DiscussionComment,
@@ -76,12 +77,14 @@ const STATE_LABEL = { open: "открыто", closed: "закрыто", answered
     :html-url="detail?.discussion.htmlUrl ?? ''"
     :labels="detail?.discussion.labels ?? []"
     :body="detail?.discussion.body ?? ''"
+    :reactions="detail?.discussion.reactions ?? []"
     @open="emit('open', $event)"
   >
     <template #meta>
-      <span v-if="detail?.discussion.category.name" class="category">{{
-        detail.discussion.category.name
-      }}</span>
+      <span v-if="detail?.discussion.category.name" class="category"
+        ><EmojiText :text="detail.discussion.category.emoji" />
+        {{ detail.discussion.category.name }}</span
+      >
       <span v-if="detail?.discussion.upvotes">▲ {{ detail.discussion.upvotes }}</span>
     </template>
     <TrackerComments

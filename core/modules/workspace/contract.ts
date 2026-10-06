@@ -149,6 +149,21 @@ export interface GitBranches {
   branches: GitBranch[];
 }
 
+/** Reaction names of the GitHub REST API (`laugh` is 😄, `hooray` is 🎉). */
+export type ReactionKind =
+  | "+1"
+  | "-1"
+  | "laugh"
+  | "hooray"
+  | "confused"
+  | "heart"
+  | "rocket"
+  | "eyes";
+/** Only reactions somebody left; the host's zero counters are dropped. */
+export interface Reaction {
+  content: ReactionKind;
+  count: number;
+}
 export interface IssueLabel {
   name: string;
   /** Hex color without the leading `#`. */
@@ -168,6 +183,7 @@ export interface Issue {
   /** Number of comments reported by the host. */
   comments: number;
   body: string;
+  reactions: Reaction[];
   htmlUrl: string;
   createdAt: string;
   updatedAt: string;
@@ -176,6 +192,7 @@ export interface IssueComment {
   id: number;
   author: IssueUser;
   body: string;
+  reactions: Reaction[];
   htmlUrl: string;
   createdAt: string;
 }
@@ -204,6 +221,7 @@ export interface PullRequest {
   head: string;
   base: string;
   body: string;
+  reactions: Reaction[];
   htmlUrl: string;
   createdAt: string;
   updatedAt: string;
@@ -257,6 +275,7 @@ export interface Discussion {
   comments: number;
   upvotes: number;
   body: string;
+  reactions: Reaction[];
   htmlUrl: string;
   createdAt: string;
   updatedAt: string;
@@ -270,6 +289,7 @@ export interface DiscussionComment {
   id: number;
   author: IssueUser;
   body: string;
+  reactions: Reaction[];
   htmlUrl: string;
   createdAt: string;
   upvotes: number;

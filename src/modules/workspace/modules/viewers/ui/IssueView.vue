@@ -52,6 +52,7 @@ const comments = computed(() =>
     :html-url="detail?.issue.htmlUrl ?? ''"
     :labels="detail?.issue.labels ?? []"
     :body="detail?.issue.body ?? ''"
+    :reactions="detail?.issue.reactions ?? []"
     @open="emit('open', $event)"
   >
     <template #meta>

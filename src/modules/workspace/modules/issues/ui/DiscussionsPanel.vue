@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import EmojiText from "../../../../../common/ui/EmojiText.vue";
 import type { Discussion } from "../../../../../../core/modules/workspace/index.ts";
 import { usePagedList } from "../lib/paged-list.ts";
 import { useTrackerPanel } from "../lib/tracker-panel.ts";
@@ -76,9 +77,9 @@ defineExpose({ refresh: () => list.load() });
           />
         </template>
         <template #meta>
-          <span v-if="discussion.category.name" class="category">{{
-            discussion.category.name
-          }}</span>
+          <span v-if="discussion.category.name" class="category"
+            ><EmojiText :text="discussion.category.emoji" /> {{ discussion.category.name }}</span
+          >
           <span
             v-if="discussion.comments"
             class="comments"

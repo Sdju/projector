@@ -7,6 +7,8 @@ import type {
   IssueLabel,
   IssueList,
   IssueUser,
+  Reaction,
+  ReactionKind,
 } from "../../../core/modules/workspace/index.ts";
 
 const PAGE = 30;
@@ -14,6 +16,23 @@ export const COMMENT_PAGE = 100;
 export const COMMENT_PAGES = 5;
 const STATES = ["open", "closed", "all"] as const;
 
+const REACTIONS: ReactionKind[] = [
+  "+1",
+  "-1",
+  "laugh",
+  "hooray",
+  "confused",
+  "heart",
+  "rocket",
+  "eyes",
+];
+export type RemoteReactions = Partial<Record<ReactionKind, number>>;
+/** Counters of the REST `reactions` summary that are not zero, in the order GitHub shows them. */
+export function reactions(raw?: RemoteReactions | null): Reaction[] {
+  return REACTIONS.flatMap((content) =>
+    raw?.[content] ? [{ content, count: raw[content]! }] : [],
+  );
+}
 export interface RemoteUser {
   login?: string;
   avatar_url?: string;
@@ -31,6 +50,7 @@ interface RemoteIssue {
   assignees?: RemoteUser[];
   comments?: number;
   body?: string | null;
+  reactions?: RemoteReactions;
   html_url?: string;
   created_at?: string;
   updated_at?: string;
@@ -41,6 +61,7 @@ export interface RemoteComment {
   id: number;
   user?: RemoteUser;
   body?: string | null;
+  reactions?: RemoteReactions;
   html_url?: string;
   created_at?: string;
 }
@@ -64,6 +85,7 @@ function issue(raw: RemoteIssue): Issue {
     assignees: (raw.assignees ?? []).map(user),
     comments: raw.comments ?? 0,
     body: raw.body || "",
+    reactions: reactions(raw.reactions),
     htmlUrl: raw.html_url || "",
     createdAt: raw.created_at || "",
     updatedAt: raw.updated_at || "",
@@ -74,6 +96,7 @@ export function comment(raw: RemoteComment): IssueComment {
     id: raw.id,
     author: user(raw.user),
     body: raw.body || "",
+    reactions: reactions(raw.reactions),
     htmlUrl: raw.html_url || "",
     createdAt: raw.created_at || "",
   };

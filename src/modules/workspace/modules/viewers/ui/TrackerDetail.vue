@@ -1,7 +1,13 @@
 <script setup lang="ts">
-import type { IssueLabel, IssueUser } from "../../../../../../core/modules/workspace/index.ts";
+import type {
+  IssueLabel,
+  IssueUser,
+  Reaction,
+} from "../../../../../../core/modules/workspace/index.ts";
 import { absoluteTime, relativeTime } from "../../../../../common/utilities/commit-format.ts";
 import UiAvatar from "../../../../../common/ui/UiAvatar.vue";
+import EmojiText from "../../../../../common/ui/EmojiText.vue";
+import TrackerReactions from "./TrackerReactions.vue";
 import VisualMarkdownEditor from "./VisualMarkdownEditor.vue";
 import IconExternal from "~icons/lucide/external-link";
 
@@ -25,6 +31,7 @@ defineProps<{
   htmlUrl: string;
   labels: IssueLabel[];
   body: string;
+  reactions: Reaction[];
 }>();
 const emit = defineEmits<{ open: [path: string] }>();
 </script>
@@ -37,7 +44,7 @@ const emit = defineEmits<{ open: [path: string] }>();
       <header class="head">
         <span class="state" :class="state">{{ stateLabel }}</span>
         <h2>
-          {{ title }} <span class="number">#{{ number }}</span>
+          <EmojiText :text="title" /> <span class="number">#{{ number }}</span>
         </h2>
       </header>
       <p class="meta">
@@ -78,6 +85,7 @@ const emit = defineEmits<{ open: [path: string] }>();
         @open="emit('open', $event)"
       />
       <p v-else class="note">Без описания</p>
+      <TrackerReactions :reactions="reactions" />
       <slot />
     </article>
   </div>
