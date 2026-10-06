@@ -1,206 +1,233 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
-import { createBoundaries } from "../scripts/architecture-boundaries.mjs";
-import {
-  boundaryError,
-  importsOf,
-  checkArchitecture,
-  largeFileErrors,
-  moduleCycles,
-} from "../scripts/check-architecture.mjs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { after, test } from "node:test";
+import feod from "../feod.config.mjs";
+import { checkFeod } from "../scripts/check-feod.mjs";
 
-const transit = createBoundaries({
-  src: { kind: "frontend", dependencies: ["core"], transitModules: ["tools"] },
-  server: { kind: "backend", dependencies: ["core"], transitModules: ["tools"] },
-  core: { kind: "library", dependencies: [], transitModules: ["tools"] },
-}, "/fixture");
+const temporary = [];
+after(() => temporary.forEach((directory) => rmSync(directory, { recursive: true, force: true })));
 
-test("transit submodules are public through their own index, including across roots", () => {
-  for (const [from, to] of [
-    ["src/modules/workspace/ui.ts", "src/modules/tools/a/index.ts"],
-    ["src/app/entry.ts", "src/modules/tools/a/index.ts"],
-    ["src/modules/tools/b/ui.ts", "src/modules/tools/a/index.ts"],
-    ["server/routes/api/usage.ts", "server/modules/tools/a/index.ts"],
-    ["server/modules/tools/a/usage.ts", "core/modules/tools/a/index.ts"],
-    ["src/modules/tools/a/ui.ts", "core/modules/tools/a/index.ts"],
-    ["bootstrap.ts", "core/modules/tools/a/index.ts"],
-  ]) assert.equal(transit.boundaryError(from, to), undefined, `${from} -> ${to}`);
-  for (const [from, to] of [
-    ["src/modules/workspace/ui.ts", "src/modules/tools/a/private.ts"],
-    ["src/modules/tools/b/ui.ts", "src/modules/tools/a/private.ts"],
-    ["server/modules/tools/a/usage.ts", "core/modules/tools/a/private.ts"],
-    ["bootstrap.ts", "core/modules/tools/a/private.ts"],
-  ]) assert.match(transit.boundaryError(from, to), /public index/, `${from} -> ${to}`);
+/** Build a fixture project, lint it with Projector's real FEOD policy, group rules by file. */
+function lint(files, config = feod) {
+  const rootDir = mkdtempSync(join(tmpdir(), "projector-arch-"));
+  temporary.push(rootDir);
+  for (const [file, contents] of Object.entries(files)) {
+    mkdirSync(dirname(join(rootDir, file)), { recursive: true });
+    writeFileSync(join(rootDir, file), contents);
+  }
+  const byFile = {};
+  const messages = [];
+  for (const item of checkFeod({ rootDir, config })) {
+    const file = item.file.replace(`${rootDir}/`, "");
+    (byFile[file] ??= new Set()).add(item.rule);
+    messages.push(item.message);
+  }
+  // Inventory-wide findings attach to whichever file is linted first; assert them by message.
+  Object.defineProperty(byFile, "messages", { value: messages });
+  return byFile;
+}
+const lines = (count) => "export {};\n" + "void 0;\n".repeat(count);
+const index = (name = "x") => `export const ${name} = 1;\n`;
+
+test("valid layers, public entries, transit adapters and shared cores pass", () => {
+  assert.deepEqual(
+    lint({
+      "src/app/entry.ts":
+        'import { a } from "../modules/a"; import { t } from "../modules/agents-integration/one"; export const v = [a, t];',
+      "src/pages/index.vue":
+        '<script setup lang="ts">import { a } from "../modules/a"; void a;</script>',
+      "src/modules/a/index.ts":
+        'export { a } from "./model"; export { c } from "../../common/util";',
+      "src/modules/a/model.ts": index("a"),
+      "src/common/util.ts": index("c"),
+      "src/modules/agents-integration/_/core.ts": index("core"),
+      "src/modules/agents-integration/one/index.ts":
+        'import { core } from "../_/core"; export const t = core;',
+      "src/modules/agents-integration/two/index.ts":
+        'import { core } from "../_/core"; export const u = core;',
+      "server/routes/api.ts": 'import { s } from "../modules/s"; export const r = s;',
+      "server/modules/s/index.ts": index("s"),
+      "core/modules/shared-contract/index.ts": index("k"),
+    }),
+    {},
+  );
 });
 
-test("transit private core is available only inside its own container and root", () => {
-  const target = "src/modules/tools/_/polling.ts";
-  for (const from of ["src/modules/tools/a/ui.ts", "src/modules/tools/_/cache.ts"])
-    assert.equal(transit.boundaryError(from, target), undefined);
-  for (const [from, to] of [
-    ["src/modules/workspace/ui.ts", target],
-    ["src/app/entry.ts", target],
-    ["src/pages/index.vue", target],
-    ["bootstrap.ts", target],
-    ["src/modules/other/_/cache.ts", target],
-    ["src/modules/tools/a/ui.ts", "core/modules/tools/_/types.ts"],
-    ["server/modules/tools/a/usage.ts", "core/modules/tools/_/types.ts"],
-    ["src/modules/tools/index.ts", target],
-  ]) assert.match(transit.boundaryError(from, to), /private core/, `${from} -> ${to}`);
+test("module internals, nested modules and transit private core stay private", () => {
+  const result = lint({
+    "src/modules/a/index.ts": index("a"),
+    "src/modules/a/model.ts": index("m"),
+    "src/modules/a/modules/b/index.ts": index("b"),
+    "src/modules/a/modules/b/modules/c/index.ts": index("c"),
+    "src/modules/agents-integration/_/core.ts": index("core"),
+    "src/modules/agents-integration/one/index.ts": index("one"),
+    "src/modules/agents-integration/one/private.ts": index("p"),
+    "src/modules/other/index.ts":
+      'import { m } from "../a/model"; import { b } from "../a/modules/b"; import { core } from "../agents-integration/_/core"; import { p } from "../agents-integration/one/private"; export const o = [m, b, core, p];',
+    "src/modules/a/deep.ts": 'import { c } from "./modules/b/modules/c"; export const d = c;',
+  });
+  assert.ok(
+    result["src/modules/other/index.ts"]?.has("layer-imports"),
+    "outsider reaches internals",
+  );
+  assert.ok(result["src/modules/a/deep.ts"], "grandchild is not a public API of its grandparent");
 });
 
-test("transit containers retain nested-module, layer and platform boundaries", () => {
-  assert.equal(transit.boundaryError(
-    "src/modules/tools/a/ui.ts", "src/modules/tools/a/modules/nested/index.ts",
-  ), undefined);
-  assert.equal(transit.boundaryError(
-    "src/modules/tools/a/modules/nested/model.ts", "src/modules/tools/a/private.ts",
-  ), undefined);
-  for (const [from, to] of [
-    ["src/modules/workspace/ui.ts", "src/modules/tools/index.ts"],
-    ["src/modules/tools/b/ui.ts", "src/modules/tools/a/modules/nested/index.ts"],
-    ["src/modules/tools/a/ui.ts", "src/modules/tools/a/modules/nested/private.ts"],
-    ["src/common/utilities/date.ts", "src/modules/tools/a/index.ts"],
-    ["src/modules/tools/a/ui.ts", "src/app/router.ts"],
-    ["src/modules/tools/a/ui.ts", "server/modules/tools/a/index.ts"],
-    ["src/modules/tools/a/ui.ts", "core/modules/os/index.ts"],
-    ["core/modules/tools/a/index.ts", "core/modules/os/index.ts"],
-  ]) assert.ok(transit.boundaryError(from, to), `${from} -> ${to}`);
-});
-
-test("transit adapters and private core have distinct owners so cycles remain visible", () => {
-  const a = transit.classify("src/modules/tools/a/index.ts").module;
-  const b = transit.classify("src/modules/tools/b/index.ts").module;
-  const shared = transit.classify("src/modules/tools/_/polling.ts").module;
-  assert.equal(new Set([a, b, shared]).size, 3);
-  assert.equal(transit.classify("src/modules/tools/index.ts").module, undefined);
-  assert.deepEqual(moduleCycles(new Map([[a, new Set([shared])], [b, new Set([shared])]])), []);
-  for (const graph of [
-    new Map([[a, new Set([b])], [b, new Set([a])]]),
-    new Map([[a, new Set([shared])], [shared, new Set([a])]]),
-  ]) assert.equal(moduleCycles(graph).length, 1);
-});
-
-test("all applications obey FEOD boundaries and have no module cycles", () => {
-  assert.deepEqual(checkArchitecture().errors, []);
-});
-test("cross-module access requires public API, including app consumers", () => {
-  assert.match(boundaryError("src/modules/a/model.ts", "src/modules/b/model.ts"), /public index/);
-  assert.match(boundaryError("server/app/plugin.ts", "server/modules/b/store.ts"), /public index/);
-  assert.equal(boundaryError("server/routes/api/test.ts", "server/modules/b/index.ts"), undefined);
-});
-test("upper layers, route/middleware siblings, globals and cross-app internals are isolated", () => {
-  for (const [from, to] of [
-    ["src/modules/a/index.ts", "src/app/router.ts"],
-    ["src/common/utilities/date.ts", "src/modules/a/index.ts"],
-    ["src/pages/index.vue", "src/pages/settings.vue"],
-    ["server/routes/api/test.ts", "server/middlewares/origin.ts"],
-    ["server/middlewares/origin.ts", "server/routes/api/test.ts"],
-    ["src/app/entry.ts", "server/modules/projects/index.ts"],
-    ["server/modules/a/index.ts", "native/modules/desktop/index.ts"],
-    ["core/modules/a/index.ts", "src/modules/catalog/index.ts"],
-    ["src/app/entry.ts", "src/globals/env.d.ts"],
+test("upper layers, siblings, globals and cross-application internals are isolated", () => {
+  const result = lint({
+    "src/app/router.ts": index("r"),
+    "src/globals/env.d.ts": "export {};\n",
+    "src/modules/m/index.ts": 'import { r } from "../../app/router"; export const m = r;',
+    "src/common/util.ts": 'import { m } from "../modules/m"; export const u = m;',
+    "src/pages/index.vue":
+      '<script setup lang="ts">import { s } from "./settings.vue"; void s;</script>',
+    "src/pages/settings.vue": '<script setup lang="ts">export const s = 1;</script>',
+    "src/app/entry.ts":
+      'import type {} from "../globals/env.d.ts"; import { p } from "../../server/modules/p"; export const e = p;',
+    "server/modules/p/index.ts": index("p"),
+    "server/routes/api.ts": 'import { o } from "../middlewares/origin"; export const a = o;',
+    "server/middlewares/origin.ts": index("o"),
+    "core/modules/c/index.ts": 'import { m } from "../../../src/modules/m"; export const c = m;',
+  });
+  for (const file of [
+    "src/modules/m/index.ts",
+    "src/common/util.ts",
+    "src/pages/index.vue",
+    "src/app/entry.ts",
+    "server/routes/api.ts",
+    "core/modules/c/index.ts",
   ])
-    assert.ok(boundaryError(from, to), `${from} -> ${to}`);
-});
-test("nested modules have public API and may access parent implementation", () => {
-  assert.equal(
-    boundaryError("src/modules/a/index.ts", "src/modules/a/modules/b/index.ts"),
-    undefined,
-  );
-  assert.ok(boundaryError("src/modules/other/index.ts", "src/modules/a/modules/b/index.ts"));
-  assert.ok(boundaryError("src/modules/a/index.ts", "src/modules/a/modules/b/modules/c/index.ts"));
-});
-test("a submodule may use parent implementation", () => {
-  assert.equal(
-    boundaryError("src/modules/a/modules/b/index.ts", "src/modules/a/model.ts"),
-    undefined,
-  );
-});
-test("static, dynamic, require, reexport, type imports and both SFC script blocks are analyzed", () => {
-  const code = `<script>export { x } from './private.ts'; const x = require('./other.ts');</script>
-<script setup lang="ts">import type { X } from './types.ts';
-const y = import('./dynamic.ts'); type Z = import('./type.ts').Z;
-const hidden = import(variable); const other = require(variable);</script>`;
-  const result = importsOf(code, "example.vue");
-  assert.deepEqual(
-    result.filter((x) => x.specifier).map((x) => x.specifier),
-    ["./private.ts", "./other.ts", "./types.ts", "./dynamic.ts", "./type.ts"],
-  );
-  assert.equal(result.filter((x) => x.error).length, 2);
+    assert.ok(result[file], `${file} must be rejected`);
 });
 
-test("module cycles are rejected while a shared dependency stays acyclic", () => {
-  assert.deepEqual(
-    moduleCycles(
-      new Map([
-        ["a", new Set(["b"])],
-        ["c", new Set(["b"])],
-      ]),
-    ),
-    [],
-  );
-  assert.equal(
-    moduleCycles(
-      new Map([
-        ["a", new Set(["b"])],
-        ["b", new Set(["c"])],
-        ["c", new Set(["a"])],
-      ]),
-    ).length,
-    1,
+test("browser code cannot use Node infrastructure; the OS facade hides its implementation", () => {
+  const result = lint({
+    "src/modules/w/index.ts":
+      'import fs from "node:fs"; import { os } from "@core/os"; export const w = [fs, os];',
+    "core/modules/launcher/index.ts": 'import pty from "node-pty"; export const l = pty;',
+    "core/modules/os/index.ts": 'export * from "./modules/linux";',
+    "core/modules/os/modules/linux/index.ts": index("linux"),
+    "server/modules/t/index.ts":
+      'import { linux } from "../../../core/modules/os/modules/linux"; export const t = linux;',
+    "cli/app/launch.mjs": 'import { os } from "../../core/modules/os"; export const run = os;',
+  });
+  assert.ok(result["src/modules/w/index.ts"]?.has("confine"));
+  assert.ok(result["core/modules/launcher/index.ts"]?.has("confine"));
+  assert.ok(result["server/modules/t/index.ts"], "Linux implementation is private to the facade");
+  assert.equal(result["cli/app/launch.mjs"], undefined, "applications may use the OS facade");
+});
+
+test("Linux and Windows operations stay inside their adapters", () => {
+  const result = lint({
+    "core/modules/os/modules/linux/index.ts": 'export const p = "/proc/1/stat";',
+    "core/modules/os/modules/windows/index.ts": 'export const k = "taskkill";',
+    "core/modules/os/index.ts": index("os"),
+    "server/modules/s/index.ts":
+      'export const a = "/proc/self"; export const b = "powershell.exe"; export const c = ["xdotool"];',
+  });
+  assert.equal(result["core/modules/os/modules/linux/index.ts"], undefined);
+  assert.equal(result["core/modules/os/modules/windows/index.ts"], undefined);
+  assert.ok(result["server/modules/s/index.ts"]?.has("confine"));
+});
+
+test("computed and unresolved imports are rejected; literal native file URLs are checked", () => {
+  const result = lint({
+    "src/modules/m/index.ts": index("m"),
+    "src/modules/computed/index.ts":
+      'const name = "x"; export const a = import(name); export const b = require(name);',
+    "src/modules/missing/index.ts": 'import { nope } from "./nope"; export const n = nope;',
+    "src/modules/url/index.ts":
+      'export const u = import(new URL("../m/index.ts", import.meta.url).href); export const bad = import(new URL("../m/internal.ts", import.meta.url).href);',
+    "src/modules/m/internal.ts": index("i"),
+  });
+  assert.ok(result["src/modules/computed/index.ts"]?.has("layer-imports"));
+  assert.ok(result["src/modules/missing/index.ts"]?.has("layer-imports"));
+  assert.ok(result["src/modules/url/index.ts"], "non-public literal URL target is rejected");
+});
+
+test("entries, names, globals and stray files follow the structure", () => {
+  const result = lint({
+    "src/modules/no-entry/impl.ts": index("i"),
+    "src/modules/shared/index.ts": index("s"),
+    "src/modules/agents-integration/_/core.ts": index("core"),
+    "src/modules/agents-integration/one/index.ts": index("one"),
+    "src/globals/ok.d.ts": "export {};\n",
+    "src/globals/bad.ts": index("bad"),
+    "src/orphan/note.ts": index("o"),
+  });
+  const text = result.messages.join("\n");
+  assert.match(text, /module 'src\/modules\/no-entry' is missing a public entry/);
+  assert.match(text, /module name 'shared' is forbidden/);
+  assert.ok(result["src/globals/bad.ts"]?.has("global-files"));
+  assert.ok(result["src/orphan/note.ts"]?.has("no-unknown-files"));
+  assert.ok(!result["src/globals/ok.d.ts"]?.has("global-files"));
+  assert.doesNotMatch(
+    text,
+    /agents-integration/,
+    "transit container and private core need no entry",
   );
 });
 
-test("OS is Node-only and Linux implementation is private to its facade", () => {
-  for (const consumer of ["src/modules/workspace/index.ts", "core/modules/launcher/index.ts"]) {
-    assert.match(boundaryError(consumer, "core/modules/os/index.ts"), /Node OS/);
-  }
-  for (const consumer of [
-    "server/modules/terminal/index.ts",
-    "native/modules/desktop/index.ts",
-    "cli/app/launch.mjs",
-  ]) {
-    assert.equal(boundaryError(consumer, "core/modules/os/index.ts"), undefined);
-    assert.match(boundaryError(consumer, "core/modules/os/modules/linux/index.ts"), /private/);
-    assert.match(boundaryError(consumer, "core/modules/os/modules/windows/index.ts"), /private/);
-  }
+test("module cycles are rejected, including type edges, while shared dependencies stay acyclic", () => {
+  const result = lint({
+    "src/modules/a/index.ts": 'import { b } from "../b"; export const a = b;',
+    "src/modules/b/index.ts":
+      'import type { a } from "../a"; export type B = typeof a; export const b = 1;',
+    "src/modules/agents-integration/_/core.ts": index("core"),
+    "src/modules/agents-integration/one/index.ts":
+      'import { core } from "../_/core"; export const one = core;',
+    "src/modules/agents-integration/two/index.ts":
+      'import { core } from "../_/core"; export const two = core;',
+    "src/modules/parent/index.ts": index("p"),
+    "src/modules/parent/modules/child/index.ts":
+      'import type { p } from "../.."; export type C = typeof p;',
+  });
+  assert.ok(
+    Object.values(result).some((rules) => rules.has("no-module-cycles")),
+    "a <-> b via a type edge",
+  );
+  assert.equal(Object.values(result).filter((rules) => rules.has("no-module-cycles")).length, 1);
 });
 
-test("literal native file-URL imports are checked, arbitrary URLs cannot bypass boundaries", () => {
-  const result = importsOf(
-    'const x = import(new URL("./catalog.ts", import.meta.url).href); const y = import(new URL(path, import.meta.url).href); const z = import(new URL("./catalog.ts", otherBase).href)',
-    "loader.ts",
-  );
-  assert.deepEqual(
-    result.filter((r) => r.specifier).map((r) => r.specifier),
-    ["./catalog.ts"],
-  );
-  assert.equal(result.filter((r) => r.error).length, 2);
-});
-test("large-file registry is a ratchet with per-extension limits", () => {
-  const registry = {
-    thresholds: { default: 400, ".vue": 500 },
-    files: {
-      "a/Big.ts": { ceiling: 600, plan: "split" },
-      "a/Gone.ts": { ceiling: 450, plan: "x" },
+test("the large-file registry is a ratchet with per-extension limits", () => {
+  const withRegistry = (files) => ({
+    ...feod,
+    rootDefault: {
+      ...feod.rootDefault,
+      extra: {
+        ...feod.rootDefault.extra,
+        largeFiles: { thresholds: { default: 400, ".vue": 500 }, files },
+      },
     },
+  });
+  const fixture = {
+    "src/modules/a/index.ts": index("a"),
+    "src/modules/a/ok.ts": lines(399),
+    "src/modules/a/ok.vue": `<script setup lang="ts">\n${"void 0;\n".repeat(480)}</script>\n`,
+    "src/modules/a/new.ts": lines(401),
+    "src/modules/a/big.ts": lines(600),
+    "src/modules/a/shrunk.ts": lines(430),
+    "src/modules/a/small.ts": lines(100),
   };
-  assert.deepEqual(
-    largeFileErrors(
-      { "a/Big.ts": 600, "b/Ok.vue": 500, "b/Ok.ts": 400, "a/Gone.ts": 450 },
-      registry,
-    ),
-    [],
+  const result = lint(
+    fixture,
+    withRegistry({
+      "src/modules/a/big.ts": { ceiling: 590, plan: "split" },
+      "src/modules/a/shrunk.ts": { ceiling: 450, plan: "split" },
+      "src/modules/a/small.ts": { ceiling: 450, plan: "split" },
+      "src/modules/a/gone.ts": { ceiling: 450, plan: "split" },
+    }),
   );
-  const errors = largeFileErrors(
-    { "a/Big.ts": 650, "b/New.vue": 501, "b/New.ts": 401, "a/Gone.ts": 380 },
-    registry,
-  );
-  assert.equal(errors.length, 4);
-  assert.match(errors.join("\n"), /Big\.ts: grew/);
-  assert.match(errors.join("\n"), /New\.vue: 501/);
-  assert.match(errors.join("\n"), /New\.ts: 401/);
-  assert.match(errors.join("\n"), /Gone\.ts: now 380/);
-  assert.match(largeFileErrors({ "a/Big.ts": 500 }, registry).join(), /lower its ceiling/);
+  assert.equal(result["src/modules/a/ok.ts"], undefined);
+  assert.equal(result["src/modules/a/ok.vue"], undefined);
+  for (const file of ["new.ts", "big.ts", "shrunk.ts", "small.ts"]) {
+    assert.ok(result[`src/modules/a/${file}`]?.has("large-files"), file);
+  }
+  assert.ok(Object.values(result).some((rules) => rules.has("large-files")));
+});
+
+test("the real Projector tree satisfies its FEOD policy", () => {
+  assert.deepEqual(checkFeod(), []);
 });

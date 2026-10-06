@@ -2,18 +2,27 @@ import { fileURLToPath, URL } from "node:url";
 import vue from "@vitejs/plugin-vue";
 import Icons from "unplugin-icons/vite";
 import { defineConfig, type Plugin } from "vite-plus";
-import { checkArchitecture } from "./scripts/check-architecture.mjs";
+import { createConfig as createFeodConfig } from "@o-feod/oxlint-structure-plugin/configs";
+import feod from "./feod.config.mjs";
+import { checkFeod } from "./scripts/check-feod.mjs";
 import { APP_PORT, readNetworkMode } from "./core/modules/app-paths/index.ts";
 import { networkHost } from "./core/modules/network-mode/index.ts";
 import { projectorPlugin } from "./server/app/plugin.ts";
 
 function architecturePlugin(): Plugin {
+  // Full check on build and dev start; per-change feedback comes from `vp lint` and the editor.
   function validate() {
-    const { errors } = checkArchitecture();
-    if (errors.length) throw new Error("FEOD architecture violations:\n" + errors.join("\n"));
+    const errors = checkFeod();
+    if (errors.length)
+      throw new Error(
+        "FEOD architecture violations:\n" +
+          errors.map((item) => `${item.file}: ${item.message}`).join("\n"),
+      );
   }
-  return { name: "projector-feod", buildStart: validate, handleHotUpdate: validate };
+  return { name: "projector-feod", buildStart: validate };
 }
+
+const feodLint = createFeodConfig(feod, { rootDir: fileURLToPath(new URL(".", import.meta.url)) });
 
 export default defineConfig({
   plugins: [architecturePlugin(), vue(), Icons({ compiler: "vue3" }), projectorPlugin()],
@@ -50,8 +59,14 @@ export default defineConfig({
   },
   fmt: {},
   lint: {
-    jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
-    rules: { "vite-plus/prefer-vite-plus-imports": "error" },
+    jsPlugins: [
+      { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
+      ...(feodLint.jsPlugins ?? []),
+    ],
+    rules: {
+      "vite-plus/prefer-vite-plus-imports": "error",
+      ...(feodLint.rules as Record<string, "error" | "warn" | "off" | [string, object]>),
+    },
     options: { typeAware: true, typeCheck: true },
   },
 });
