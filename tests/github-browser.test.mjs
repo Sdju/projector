@@ -511,7 +511,13 @@ test("GitHub pull requests list derives state and detail gathers reviews, commen
     if (url.pathname === "/repos/octocat/repo/pulls/7/files")
       return Response.json([
         { filename: "a.ts", status: "modified", additions: 6, deletions: 1 },
-        { filename: "b.ts", previous_filename: "c.ts", status: "renamed", additions: 4, deletions: 3 },
+        {
+          filename: "b.ts",
+          previous_filename: "c.ts",
+          status: "renamed",
+          additions: 4,
+          deletions: 3,
+        },
       ]);
     throw new Error(`Unexpected URL: ${url}`);
   });
@@ -543,6 +549,116 @@ test("GitHub pull requests list derives state and detail gathers reviews, commen
     assert.equal(detail.files[1].previousPath, "c.ts");
     assert.equal(detail.filesTruncated, false);
     await assert.rejects(browseGithubPull("octocat/repo", 0), { status: 400 });
+  } finally {
+    fetch.mock.restore();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("GitHub discussions need a token, page by cursor and nest replies under comments", async () => {
+  const root = await mkdtemp(join(tmpdir(), "projector-gh-discussions-"));
+  process.env.XDG_DATA_HOME = root;
+  const { browseGithubDiscussions, browseGithubDiscussion } =
+    await import("../server/modules/github/index.ts");
+  const { updateIntegration } = await import("../server/modules/integration-store/index.ts");
+  const requests = [];
+  const remote = (number, extra = {}) => ({
+    number,
+    title: `Discussion ${number}`,
+    closed: false,
+    isAnswered: true,
+    upvoteCount: 3,
+    body: "Body",
+    url: `https://github.com/octocat/repo/discussions/${number}`,
+    author: null,
+    category: { name: "Q&A", emoji: ":pray:" },
+    labels: { nodes: [{ name: "bug", color: "ff0000" }, null] },
+    comments: { totalCount: 2 },
+    ...extra,
+  });
+  const fetch = mock.method(globalThis, "fetch", async (address, init) => {
+    assert.equal(String(address), "https://api.github.com/graphql");
+    assert.equal(init.headers.Authorization, "Bearer secret");
+    const { query, variables } = JSON.parse(init.body);
+    requests.push(variables);
+    assert.equal(variables.owner, "octocat");
+    assert.equal(variables.name, "repo");
+    if (query.includes("discussion(number")) {
+      if (variables.number === 404)
+        return Response.json({ data: { repository: { discussion: null } } });
+      const first = !variables.after;
+      return Response.json({
+        data: {
+          repository: {
+            discussion: {
+              ...remote(7),
+              comments: {
+                pageInfo: { hasNextPage: first, endCursor: "next" },
+                nodes: [
+                  {
+                    databaseId: first ? 1 : 2,
+                    body: "Hi",
+                    isAnswer: first,
+                    author: { login: "carol" },
+                    replies: {
+                      totalCount: first ? 3 : 0,
+                      nodes: first
+                        ? [{ databaseId: 10, body: "Reply", author: { login: "dave" } }]
+                        : [],
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        },
+      });
+    }
+    return Response.json({
+      data: {
+        repository: {
+          hasDiscussionsEnabled: variables.owner === "octocat",
+          discussions: {
+            nodes: [remote(1)],
+            pageInfo: { hasNextPage: !variables.after, endCursor: "Y3Vyc29y" },
+          },
+        },
+      },
+    });
+  });
+  try {
+    await assert.rejects(browseGithubDiscussions("octocat/repo", {}), { status: 401 });
+    await updateIntegration("github", (config) => ({
+      ...config,
+      enabled: true,
+      credentials: { token: "secret", login: "octocat" },
+    }));
+    const first = await browseGithubDiscussions("octocat/repo", { state: "closed", page: "1" });
+    assert.deepEqual(requests.at(-1).states, ["CLOSED"]);
+    assert.equal(requests.at(-1).after, null);
+    assert.equal(first.discussions[0].author.login, "ghost");
+    assert.equal(first.discussions[0].answered, true);
+    assert.deepEqual(first.discussions[0].labels, [{ name: "bug", color: "ff0000" }]);
+    assert.equal(first.next, "Y3Vyc29y");
+    const second = await browseGithubDiscussions("octocat/repo", {
+      state: "all",
+      page: first.next,
+    });
+    assert.equal(requests.at(-1).after, "Y3Vyc29y");
+    assert.equal(requests.at(-1).states, null);
+    assert.equal(second.next, null);
+    // A cursor that is not base64-like never reaches GraphQL.
+    await browseGithubDiscussions("octocat/repo", { page: 'x"} injected' });
+    assert.equal(requests.at(-1).after, null);
+
+    const detail = await browseGithubDiscussion("octocat/repo", 7);
+    assert.equal(detail.comments.length, 2);
+    assert.equal(detail.comments[0].isAnswer, true);
+    assert.equal(detail.comments[0].replies[0].author.login, "dave");
+    assert.equal(detail.comments[0].repliesTruncated, true);
+    assert.equal(detail.comments[1].repliesTruncated, false);
+    await assert.rejects(browseGithubDiscussion("octocat/repo", 0), { status: 400 });
+    await assert.rejects(browseGithubDiscussion("octocat/repo", 404), { status: 404 });
   } finally {
     fetch.mock.restore();
     await rm(root, { recursive: true, force: true });

@@ -10,6 +10,8 @@ import {
 import { formatProjectRef } from "../project/index.ts";
 import {
   readIssue,
+  readDiscussion,
+  readDiscussions,
   readIssues,
   readPull,
   readPulls,
@@ -66,6 +68,7 @@ const numberedTab = (id: string, label: string) =>
   });
 const issueTab = numberedTab("issue", "Issue");
 const pullTab = numberedTab("pull", "PR");
+const discussionTab = numberedTab("discussion", "Discussion");
 
 /** Read provider for a numbered resource (issues, pull requests): a list action and a single-item one. */
 function numberedProvider(
@@ -104,6 +107,14 @@ export function createGithubEnabledLocalProfile(
   const local = createLocalWorkspaceProfile(projectId);
   const issues = numberedProvider("issues", "issue", "issue", repository, readIssues, readIssue);
   const pulls = numberedProvider("pulls", "pull", "pull request", repository, readPulls, readPull);
+  const discussions = numberedProvider(
+    "discussions",
+    "discussion",
+    "обсуждения",
+    repository,
+    readDiscussions,
+    readDiscussion,
+  );
   return {
     ...local,
     id: "local-github",
@@ -111,6 +122,7 @@ export function createGithubEnabledLocalProfile(
       ...(local.sidebar ?? []),
       { id: "issues", title: "Issues" },
       { id: "pulls", title: "Pull requests" },
+      { id: "discussions", title: "Discussions" },
     ],
     tabs: [
       ...(local.tabs ?? []),
@@ -122,8 +134,9 @@ export function createGithubEnabledLocalProfile(
       ),
       issueTab,
       pullTab,
+      discussionTab,
     ],
-    providers: { ...local.providers, issues, pulls },
+    providers: { ...local.providers, issues, pulls, discussions },
   };
 }
 
@@ -142,7 +155,20 @@ export function createGithubWorkspaceProfile(
     readIssue?: typeof readIssue;
     readPulls?: typeof readPulls;
     readPull?: typeof readPull;
-  } = { readRepository, readTree, readFile, readGit, readIssues, readIssue, readPulls, readPull },
+    readDiscussions?: typeof readDiscussions;
+    readDiscussion?: typeof readDiscussion;
+  } = {
+    readRepository,
+    readTree,
+    readFile,
+    readGit,
+    readIssues,
+    readIssue,
+    readPulls,
+    readPull,
+    readDiscussions,
+    readDiscussion,
+  },
 ): WorkspaceProfile {
   let metadata = initial;
   const directories = new Map<string, Promise<GithubEntry[]>>();
@@ -268,12 +294,21 @@ export function createGithubWorkspaceProfile(
     api.readPulls ?? readPulls,
     api.readPull ?? readPull,
   );
+  const discussions = numberedProvider(
+    "discussions",
+    "discussion",
+    "обсуждения",
+    repository,
+    api.readDiscussions ?? readDiscussions,
+    api.readDiscussion ?? readDiscussion,
+  );
   return {
     id: "github",
     layout: "editor",
     sidebar: [
       { id: "issues", title: "Issues" },
       { id: "pulls", title: "Pull requests" },
+      { id: "discussions", title: "Discussions" },
     ],
     tabs: [
       connectionTab,
@@ -285,6 +320,7 @@ export function createGithubWorkspaceProfile(
       ),
       issueTab,
       pullTab,
+      discussionTab,
     ],
     features: {
       terminals: false,
@@ -294,6 +330,6 @@ export function createGithubWorkspaceProfile(
       persist: false,
       externalFiles: false,
     },
-    providers: { files, git, issues, pulls },
+    providers: { files, git, issues, pulls, discussions },
   };
 }

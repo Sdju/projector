@@ -5,7 +5,7 @@ export type TrackerState = "open" | "closed" | "all";
 
 /**
  * Список сущностей проекта (issues, pull requests) с фильтром по состоянию: первая страница и
- * подгрузка следующих. `action` — действие провайдера, `key` — поле ответа со списком.
+ * подгрузка следующих (страница — номер или курсор). `action` — действие провайдера, `key` — поле ответа со списком.
  */
 export function usePagedList<T extends { number: number }>(
   projectId: () => string,
@@ -15,15 +15,15 @@ export function usePagedList<T extends { number: number }>(
 ) {
   const state = ref<TrackerState>("open");
   const items = ref<T[]>([]) as Ref<T[]>;
-  const next = ref<number | null>(null);
+  const next = ref<number | string | null>(null);
   const loading = ref(false);
   const loadingMore = ref(false);
   const error = ref("");
   let generation = 0;
-  const page = (number: number) =>
+  const page = (cursor: number | string) =>
     workspaceRequest<Record<string, unknown>>(projectId(), action, {
       state: state.value,
-      page: String(number),
+      page: String(cursor),
     });
   const message = (err: unknown) => (err instanceof Error ? err.message : failure);
   async function load() {
@@ -35,7 +35,7 @@ export function usePagedList<T extends { number: number }>(
       const data = await page(1);
       if (current !== generation) return;
       items.value = data[key] as T[];
-      next.value = data.next as number | null;
+      next.value = data.next as number | string | null;
     } catch (err) {
       if (current === generation) error.value = message(err);
     } finally {
@@ -54,7 +54,7 @@ export function usePagedList<T extends { number: number }>(
         ...items.value,
         ...(data[key] as T[]).filter((item) => !known.has(item.number)),
       ];
-      next.value = data.next as number | null;
+      next.value = data.next as number | string | null;
     } catch (err) {
       if (current === generation) error.value = message(err);
     } finally {

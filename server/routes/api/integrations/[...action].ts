@@ -23,6 +23,8 @@ import {
   browseGithubIssues,
   browseGithubIssue,
   browseGithubPulls,
+  browseGithubDiscussions,
+  browseGithubDiscussion,
   browseGithubPull,
 } from "../../../modules/github/index.ts";
 import {
@@ -113,6 +115,18 @@ export async function handleIntegrationsActions({
         json(res, 200, await browseGithubPulls(repository, Object.fromEntries(url.searchParams)));
       else if (path.endsWith("/pull"))
         json(res, 200, await browseGithubPull(repository, Number(url.searchParams.get("number"))));
+      else if (path.endsWith("/discussions"))
+        json(
+          res,
+          200,
+          await browseGithubDiscussions(repository, Object.fromEntries(url.searchParams)),
+        );
+      else if (path.endsWith("/discussion"))
+        json(
+          res,
+          200,
+          await browseGithubDiscussion(repository, Number(url.searchParams.get("number"))),
+        );
       else return false;
       return true;
     }

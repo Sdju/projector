@@ -20,14 +20,23 @@ import { isEditable, isMarkdown } from "../src/modules/workspace/open-file.ts";
 
 test("GitHub authentication opens an empty workspace without local or remote data access", async () => {
   const projectId = "gh:/vuejs/core";
-  const disconnect = registerWorkspaceProfile(projectId, createGithubConnectionProfile("vuejs/core"));
+  const disconnect = registerWorkspaceProfile(
+    projectId,
+    createGithubConnectionProfile("vuejs/core"),
+  );
   try {
     assert.deepEqual(await workspaceRequest(projectId, "root"), { root: projectId });
     assert.deepEqual(await workspaceRequest(projectId, "tree"), { entries: [], truncated: false });
     assert.ok(Object.values(workspaceCapabilities(projectId)).every((value) => !value));
-    await assert.rejects(workspaceRequest(projectId, "file", { path: "README.md" }), /Подключите GitHub/);
+    await assert.rejects(
+      workspaceRequest(projectId, "file", { path: "README.md" }),
+      /Подключите GitHub/,
+    );
     await assert.rejects(workspaceRequest(projectId, "issues"), /недоступно/);
-    await assert.rejects(saveWorkspaceFile(projectId, "README.md", "changed", ""), /только для чтения/);
+    await assert.rejects(
+      saveWorkspaceFile(projectId, "README.md", "changed", ""),
+      /только для чтения/,
+    );
   } finally {
     disconnect();
   }
@@ -95,6 +104,12 @@ test("the shared workspace uses a readonly source for tree, files, assets and re
       async readPull(repository, number) {
         return { action: "pull", repository, number };
       },
+      async readDiscussions(repository, params) {
+        return { action: "discussions", repository, params };
+      },
+      async readDiscussion(repository, number) {
+        return { action: "discussion", repository, number };
+      },
     },
   );
   const unregister = registerWorkspaceProfile("remote-test", profile);
@@ -131,11 +146,14 @@ test("the shared workspace uses a readonly source for tree, files, assets and re
     assert.equal((await workspaceRequest("remote-test", "git")).branch, "main");
     assert.equal(workspaceCapabilities("remote-test").git, true);
     assert.equal(workspaceCapabilities("remote-test").issues, true);
-    assert.deepEqual(await workspaceRequest("remote-test", "issues", { state: "open", page: "1" }), {
-      action: "issues",
-      repository: "octocat/repo",
-      params: { state: "open", page: "1" },
-    });
+    assert.deepEqual(
+      await workspaceRequest("remote-test", "issues", { state: "open", page: "1" }),
+      {
+        action: "issues",
+        repository: "octocat/repo",
+        params: { state: "open", page: "1" },
+      },
+    );
     assert.deepEqual(await workspaceRequest("remote-test", "issue", { number: "7" }), {
       action: "issue",
       repository: "octocat/repo",
@@ -154,6 +172,17 @@ test("the shared workspace uses a readonly source for tree, files, assets and re
       number: 9,
     });
     await assert.rejects(workspaceRequest("remote-test", "pull", { number: "0" }));
+    assert.equal(workspaceCapabilities("remote-test").discussions, true);
+    assert.deepEqual(await workspaceRequest("remote-test", "discussions", { page: "Y3Vyc29y" }), {
+      action: "discussions",
+      repository: "octocat/repo",
+      params: { page: "Y3Vyc29y" },
+    });
+    assert.deepEqual(await workspaceRequest("remote-test", "discussion", { number: "4" }), {
+      action: "discussion",
+      repository: "octocat/repo",
+      number: 4,
+    });
     assert.equal(profile.providers.git.write, undefined);
     for (const action of ["search", "external", "diff"])
       await assert.rejects(workspaceRequest("remote-test", action));
@@ -178,6 +207,8 @@ test("a local project with a GitHub origin keeps local providers and adds issues
   assert.ok(profile.tabs.some((tab) => tab.id === "repository"));
   assert.ok(profile.tabs.some((tab) => tab.id === "issue"));
   assert.ok(profile.tabs.some((tab) => tab.id === "pull"));
+  assert.ok(profile.sidebar.some((section) => section.id === "discussions"));
+  assert.ok(profile.tabs.some((tab) => tab.id === "discussion"));
   const calls = [];
   const fetch = mock.method(globalThis, "fetch", async (url) => {
     calls.push(String(url));

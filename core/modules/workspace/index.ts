@@ -21,6 +21,10 @@ export { layoutGraph } from "./git-graph.ts";
 export type { GraphRow } from "./git-graph.ts";
 export type { GitBranch, GitBranches } from "./contract.ts";
 export type {
+  Discussion,
+  DiscussionComment,
+  DiscussionDetail,
+  DiscussionList,
   Issue,
   IssueComment,
   IssueDetail,

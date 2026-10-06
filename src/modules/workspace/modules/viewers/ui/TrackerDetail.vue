@@ -110,7 +110,8 @@ const emit = defineEmits<{ open: [path: string] }>();
   background: color-mix(in srgb, var(--run) 22%, transparent);
   color: var(--run);
 }
-.state.merged {
+.state.merged,
+.state.answered {
   background: color-mix(in srgb, var(--accent) 22%, transparent);
   color: var(--accent);
 }

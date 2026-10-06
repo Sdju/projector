@@ -7,7 +7,7 @@ import {
 } from "../../workspace-api/index.ts";
 import type { GitBranchesState, GitHistoryState, GitOverviewState } from "../modules/git/index.ts";
 import { GitPanel } from "../modules/git/index.ts";
-import { IssuesPanel, PullsPanel } from "../modules/issues/index.ts";
+import { DiscussionsPanel, IssuesPanel, PullsPanel } from "../modules/issues/index.ts";
 import { DockerSidebar } from "../../docker/index.ts";
 import SearchPanel from "../ui/SearchPanel.vue";
 import FilesSection from "../ui/FilesSection.vue";
@@ -20,6 +20,7 @@ import IconGit from "~icons/devicon/git";
 import IconDocker from "~icons/lucide/container";
 import IconIssues from "~icons/lucide/circle-dot";
 import IconPulls from "~icons/lucide/git-pull-request";
+import IconDiscussions from "~icons/lucide/messages-square";
 
 /** Sections every workspace has; profiles add their own through `profile.sidebar`. */
 export const baseSidebarTypes: SidebarType[] = [
@@ -138,6 +139,17 @@ export const baseSidebarViews: SidebarViews = {
       active: selected,
       onOpen: (pull: { number: number; title: string }, pinned?: boolean) =>
         host.openTab("pull", pull, { preview: !pinned }),
+    }),
+    refresh: (_, panel) => panel?.refresh?.(),
+  },
+  discussions: {
+    icon: IconDiscussions,
+    component: DiscussionsPanel,
+    props: (host, selected) => ({
+      projectId: host.projectId,
+      active: selected,
+      onOpen: (discussion: { number: number; title: string }, pinned?: boolean) =>
+        host.openTab("discussion", discussion, { preview: !pinned }),
     }),
     refresh: (_, panel) => panel?.refresh?.(),
   },

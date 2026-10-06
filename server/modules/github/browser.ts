@@ -1,4 +1,4 @@
-import { github, repositoryName } from "./api.ts";
+import { github, githubGraphql, repositoryName } from "./api.ts";
 import { integrationConfig } from "../integration-store/index.ts";
 import { HttpError } from "../http/index.ts";
 import type {
@@ -12,6 +12,14 @@ export async function githubReader(repository: string) {
   const config = await integrationConfig("github");
   const token = config.enabled ? config.credentials.token || "" : "";
   return <T>(path: string) => github<T>(`/repos/${name}${path}`, token);
+}
+/** GraphQL counterpart of `githubReader`: variables carry `owner` and `name` of the repository. */
+export async function githubGraphqlReader(repository: string) {
+  const [owner, name] = repositoryName(repository).split("/");
+  const config = await integrationConfig("github");
+  const token = config.enabled ? config.credentials.token || "" : "";
+  return <T>(query: string, variables: Record<string, unknown> = {}) =>
+    githubGraphql<T>(query, { owner, name, ...variables }, token);
 }
 function objectId(sha: string) {
   if (!/^[a-f0-9]{40}$/.test(sha)) throw new HttpError(400, "Неверный Git object ID");

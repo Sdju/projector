@@ -243,3 +243,45 @@ export interface PullRequestDetail {
   commentsTruncated: boolean;
   filesTruncated: boolean;
 }
+
+export interface Discussion {
+  number: number;
+  title: string;
+  closed: boolean;
+  /** An answer was marked in a Q&A discussion. */
+  answered: boolean;
+  author: IssueUser;
+  category: { name: string; emoji: string };
+  labels: IssueLabel[];
+  /** Number of top-level comments reported by the host. */
+  comments: number;
+  upvotes: number;
+  body: string;
+  htmlUrl: string;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface DiscussionList {
+  discussions: Discussion[];
+  /** Cursor of the next page, or null when the list is complete. */
+  next: string | null;
+}
+export interface DiscussionComment {
+  id: number;
+  author: IssueUser;
+  body: string;
+  htmlUrl: string;
+  createdAt: string;
+  upvotes: number;
+  /** Marked as the answer of the discussion. */
+  isAnswer: boolean;
+  /** Replies are one level deep; the host does not nest further. */
+  replies: DiscussionComment[];
+  /** The comment has more replies than the reader loads. */
+  repliesTruncated: boolean;
+}
+export interface DiscussionDetail {
+  discussion: Discussion;
+  comments: DiscussionComment[];
+  commentsTruncated: boolean;
+}

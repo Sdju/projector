@@ -14,6 +14,8 @@ export interface TrackerComment {
   /** Пометка после автора (состояние ревью) и её класс. */
   badge?: string;
   badgeClass?: string;
+  /** Уровень вложенности ответа: 0 — комментарий верхнего уровня. */
+  depth?: number;
 }
 defineProps<{ projectId: string; title: string; empty?: string; items: TrackerComment[] }>();
 const emit = defineEmits<{ open: [path: string] }>();
@@ -23,7 +25,12 @@ const emit = defineEmits<{ open: [path: string] }>();
   <h3>{{ title }}</h3>
   <p v-if="!items.length" class="note">{{ empty }}</p>
   <ul v-else class="comment-list">
-    <li v-for="item in items" :key="item.id">
+    <li
+      v-for="item in items"
+      :key="item.id"
+      :class="{ reply: item.depth }"
+      :style="item.depth ? { marginLeft: `calc(var(--sp-4) * ${item.depth})` } : undefined"
+    >
       <p class="comment-meta">
         <span class="author">
           <UiAvatar :src="item.author.avatarUrl" :alt="item.author.login" :size="16" />
@@ -65,6 +72,9 @@ h3 {
   border: 1px solid var(--line);
   border-radius: var(--r-md);
 }
+.comment-list li.reply {
+  background: var(--active);
+}
 .comment-meta {
   display: flex;
   gap: var(--sp-2);
@@ -79,7 +89,8 @@ h3 {
   font-family: var(--mono);
   color: var(--text-2);
 }
-.approved {
+.approved,
+.answer {
   color: var(--run);
 }
 .changes_requested {

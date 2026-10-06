@@ -4,6 +4,8 @@ import type {
   GithubFile,
 } from "../../../core/modules/github/index.ts";
 import type {
+  DiscussionDetail,
+  DiscussionList,
   IssueDetail,
   IssueList,
   PullRequestDetail,
@@ -50,3 +52,10 @@ export const readPulls = (
 ) => readGit<PullRequestList>("pulls", { repository, ...params }, signal);
 export const readPull = (repository: string, number: number, signal?: AbortSignal) =>
   readGit<PullRequestDetail>("pull", { repository, number: String(number) }, signal);
+export const readDiscussions = (
+  repository: string,
+  params: Record<string, string>,
+  signal?: AbortSignal,
+) => readGit<DiscussionList>("discussions", { repository, ...params }, signal);
+export const readDiscussion = (repository: string, number: number, signal?: AbortSignal) =>
+  readGit<DiscussionDetail>("discussion", { repository, number: String(number) }, signal);

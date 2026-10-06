@@ -54,6 +54,50 @@ export async function github<T>(path: string, token: string = ""): Promise<T> {
     );
   return (await response.json()) as T;
 }
+/** GraphQL v4: Discussions exist only there, and it answers only to a signed-in token. */
+export async function githubGraphql<T>(
+  query: string,
+  variables: Record<string, unknown>,
+  token: string,
+): Promise<T> {
+  if (!token)
+    throw new HttpError(
+      401,
+      "Для Discussions войдите в GitHub: GraphQL API работает только с токеном",
+    );
+  const response = await fetch("https://api.github.com/graphql", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "User-Agent": "Projector",
+    },
+    body: JSON.stringify({ query, variables }),
+    signal: AbortSignal.timeout(30_000),
+    redirect: "error",
+  });
+  if (!response.ok)
+    throw new HttpError(
+      [401, 403, 429].includes(response.status) ? response.status : 400,
+      response.status === 401
+        ? "Авторизация GitHub истекла. Войдите снова"
+        : `GitHub вернул ${response.status}. Проверьте права доступа и лимит API`,
+    );
+  const body = (await response.json()) as {
+    data?: T;
+    errors?: Array<{ type?: string; message?: string }>;
+  };
+  if (body.errors?.length || !body.data) {
+    const notFound = body.errors?.some((error) => error.type === "NOT_FOUND");
+    throw new HttpError(
+      notFound ? 404 : 400,
+      notFound
+        ? "Репозиторий или обсуждение не найдены или нет доступа"
+        : "GitHub отклонил запрос Discussions",
+    );
+  }
+  return body.data;
+}
 async function oauth(path: string, body: Record<string, string>): Promise<Record<string, any>> {
   const response = await fetch(`https://github.com/login/${path}`, {
     method: "POST",
