@@ -36,7 +36,15 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
           requires: "agent",
         },
       }),
-      singletonTab("project", "settings:project", "Настройки проекта", "Настройки проекта"),
+      singletonTab("project", "settings:project", "Настройки проекта", "Настройки проекта", {
+        subtitle: "иконка, запуск и сценарии",
+        command: {
+          id: "ide.workbench.project.settings.open",
+          title: "Открыть настройки проекта",
+          description:
+            "Открывает вкладку настроек проекта: иконка, параметры запуска и сценарии (команды запуска). Повторный вызов фокусирует вкладку.",
+        },
+      }),
       singletonTab("docker", "docker:overview", "Docker", "Контейнеры и Compose"),
     ],
     features: {

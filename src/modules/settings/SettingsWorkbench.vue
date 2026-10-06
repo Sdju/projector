@@ -7,7 +7,18 @@ import UiButton from "../../common/ui/UiButton.vue";
 import { commandArgs, useCommandScope } from "../../common/utilities/commands.ts";
 import type { SettingsSection } from "./sections.ts";
 
-const props = defineProps<{ sections: SettingsSection[]; selected: string; embedded?: boolean }>();
+const props = withDefaults(
+  defineProps<{
+    sections: SettingsSection[];
+    selected: string;
+    embedded?: boolean;
+    /** Заголовок и подпись области; у настроек проекта свои. */
+    title?: string;
+    /** Идентификатор области команд: у одновременно открытых настроек он разный. */
+    scope?: string;
+  }>(),
+  { title: "Настройки", scope: "settings" },
+);
 const emit = defineEmits<{ select: [id: string] }>();
 const query = ref("");
 const search = ref<HTMLInputElement>();
@@ -44,7 +55,7 @@ watch(
   },
   { immediate: true },
 );
-const commands = useCommandScope("settings", () => ({
+const commands = useCommandScope(props.scope, () => ({
   surface: "settings",
   section: active.value?.id ?? "",
   query: query.value,
@@ -100,11 +111,11 @@ function filter(event: Event) {
   <section
     class="settings-workbench"
     :class="{ embedded }"
-    aria-label="Настройки Projector"
+    :aria-label="title"
     @pointerdown="commands.scope.activate()"
   >
     <header class="toolbar">
-      <h1><IconSettings aria-hidden="true" />Настройки</h1>
+      <h1><IconSettings aria-hidden="true" />{{ title }}</h1>
       <div class="search">
         <IconSearch aria-hidden="true" />
         <input
@@ -158,6 +169,7 @@ function filter(event: Event) {
             <component :is="section.component" v-bind="section.props" />
           </div>
         </template>
+        <div v-if="$slots.footer && active" class="footer"><slot name="footer" /></div>
         <div v-if="!active" class="empty">
           <IconSearch aria-hidden="true" />
           <p>Настройки не найдены</p>
@@ -201,6 +213,13 @@ function filter(event: Event) {
 .embedded .content {
   min-height: 0;
   overflow-y: auto;
+}
+.embedded .content {
+  display: flex;
+  flex-direction: column;
+}
+.embedded .section-body {
+  width: 100%;
 }
 .toolbar {
   display: flex;
@@ -324,6 +343,16 @@ svg {
 .section-body :deep(.hint),
 .section-body :deep(.muted) {
   font-size: var(--fs-xs);
+}
+/* Панель действий (например, «Сохранить») закреплена внизу прокручиваемого содержимого */
+.footer {
+  position: sticky;
+  bottom: calc(var(--sp-5) * -1);
+  margin: auto calc(var(--sp-5) * -1) calc(var(--sp-5) * -1);
+  padding: var(--sp-3) var(--sp-5);
+  border-top: 1px solid var(--line);
+  background: var(--bg-2);
+  z-index: var(--z-sticky);
 }
 .no-results {
   color: var(--muted);

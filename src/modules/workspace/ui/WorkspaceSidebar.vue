@@ -7,6 +7,7 @@ import type { useOpenFiles } from "../lib/open-files.ts";
 import type { OpenFile } from "../open-file.ts";
 import { baseSidebarViews, type SidebarHost, type SidebarViews } from "../lib/sidebar-views.ts";
 import SidebarTabs from "./SidebarTabs.vue";
+import IconRefresh from "~icons/lucide/rotate-cw";
 
 /** Боковая панель проекта: переключатель разделов и панель выбранного раздела. */
 const props = defineProps<{
@@ -23,6 +24,8 @@ const props = defineProps<{
   gitSync: ReturnType<typeof useGitChangeSync>;
   /** Panels of the sections the embedding page owns. */
   views?: SidebarViews;
+  /** Разделы — вертикальная полоса-остров слева; иначе вкладки сверху панели (мобильный вид). */
+  rail?: boolean;
 }>();
 const section = defineModel<string>("section", { required: true });
 const emit = defineEmits<{
@@ -95,8 +98,18 @@ function refresh() {
   else emit("refresh");
 }
 watch(section, (id) => views[id]?.activate?.(host));
+/** Как в WebStorm: клик по активному разделу сворачивает панель, клик при свёрнутой — раскрывает. */
+function select(id: string) {
+  if (!props.rail) {
+    section.value = id;
+    return;
+  }
+  if (props.hidden || section.value === id) emit("command", "ide.workbench.sidebar.toggle");
+  section.value = id;
+}
 
 defineExpose({
+  refreshSection: refresh,
   reveal: (path: string) => (panels.get("files")?.reveal as (path: string) => void)?.(path),
   refreshSearch: () => panels.get("search")?.refresh?.(),
   search: () => (panels.get("search")?.search as () => void | Promise<void>)?.(),
@@ -104,22 +117,35 @@ defineExpose({
 </script>
 
 <template>
-  <aside v-show="!hidden" class="sidebar" aria-label="Обзор проекта">
+  <aside v-show="rail || !hidden" class="sidebar" :class="{ 'with-rail': rail }" aria-label="Обзор проекта">
     <SidebarTabs
-      v-model:section="section"
+      :section="section"
       :items="items"
-      :capabilities="capabilities"
+      :vertical="rail"
+      :collapsed="rail && hidden"
+      @update:section="select"
       @command="emit('command', $event)"
-      @refresh="refresh"
     />
-    <component
-      :is="views[item.id].component"
-      v-for="item in items"
-      :key="item.id"
-      v-show="section === item.id"
-      :ref="(panel: unknown) => setPanel(item.id, panel)"
-      v-bind="views[item.id].props(host, section === item.id)"
-    />
+    <div v-show="!rail || !hidden" class="panel">
+      <button
+        v-if="rail"
+        class="panel-refresh"
+        title="Обновить раздел"
+        aria-label="Обновить раздел"
+        data-command="ide.workbench.sidebar.refresh"
+        @click="emit('command', 'ide.workbench.sidebar.refresh')"
+      >
+        <IconRefresh aria-hidden="true" />
+      </button>
+      <component
+        :is="views[item.id].component"
+        v-for="item in items"
+        :key="item.id"
+        v-show="section === item.id"
+        :ref="(panel: unknown) => setPanel(item.id, panel)"
+        v-bind="views[item.id].props(host, section === item.id)"
+      />
+    </div>
   </aside>
 </template>
 
@@ -136,6 +162,60 @@ defineExpose({
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   background: var(--bg);
+}
+/* Рядом с полосой разделов: полоса — отдельный остров, панель — второй */
+.sidebar.with-rail {
+  flex-direction: row;
+  gap: var(--island-gap);
+  overflow: visible;
+  border: 0;
+  background: none;
+}
+.panel {
+  display: contents;
+}
+.with-rail .panel {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--bg);
+}
+/* Как в VS Code: кнопка обновления скрыта и проступает в правом верхнем углу при наведении на остров */
+.panel-refresh {
+  position: absolute;
+  top: var(--sp-1);
+  right: var(--sp-3);
+  z-index: var(--z-sticky);
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-3);
+  color: var(--muted);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-fast);
+}
+.panel-refresh svg {
+  width: 13px;
+  height: 13px;
+}
+.with-rail .panel:hover .panel-refresh,
+.with-rail .panel:focus-within .panel-refresh {
+  opacity: 1;
+  pointer-events: auto;
+}
+.panel-refresh:hover {
+  color: var(--text);
+  background: var(--bg-4);
 }
 .side-content {
   flex: 1;

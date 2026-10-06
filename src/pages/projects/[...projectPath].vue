@@ -13,7 +13,7 @@ import {
   ProjectSettings,
   useProjectCommands,
 } from "../../modules/catalog/index.ts";
-import { RunControls, useRunner } from "../../modules/runner/index.ts";
+import { RunMenu, useRunner } from "../../modules/runner/index.ts";
 import { DevcontainerTrust } from "../../modules/devcontainer/index.ts";
 import { ProjectWorkspace, type TabViews } from "../../modules/workspace/index.ts";
 import { registerWorkspaceProfile } from "../../modules/workspace-api/index.ts";
@@ -47,7 +47,6 @@ const tabViews: TabViews = {
   },
   project: {
     keepAlive: true,
-    scroll: true,
     ownKeys: true,
     component: () =>
       project.value &&
@@ -170,7 +169,7 @@ watch(
       :tab-views="tabViews"
     >
       <template #terminal-actions>
-        <RunControls :project="project" toolbar />
+        <RunMenu :project="project" />
         <UiButton
           v-if="repository"
           icon

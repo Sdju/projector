@@ -9,10 +9,7 @@ import {
   launchSectionTitles,
   type LaunchItem,
 } from "../../../../core/modules/launcher/index.ts";
-import {
-  projectIconUrl,
-  type ProjectLocation,
-} from "../../project/index.ts";
+import { projectIconUrl, type ProjectLocation } from "../../project/index.ts";
 import PathBar from "./PathBar.vue";
 import IconChevron from "~icons/lucide/chevron-down";
 import IconSearch from "~icons/lucide/search";
@@ -21,7 +18,10 @@ import IconSearch from "~icons/lucide/search";
  * Переключатель проекта: кнопка с текущим проектом открывает остров с путём к папке
  * (родители и соседние папки), поиском проектов и списком недавних.
  */
-const props = defineProps<{ project: ProjectLocation; navigate: (path: string) => Promise<void> }>();
+const props = defineProps<{
+  project: ProjectLocation;
+  navigate: (path: string) => Promise<void>;
+}>();
 const router = useRouter();
 const root = ref<HTMLElement>();
 const input = ref<HTMLInputElement>();
@@ -45,11 +45,14 @@ commands.scope.registerCommand({
 });
 
 /** Поиск в переключателе — по проектам; ссылки и gh/, gl/ остаются как есть. */
-const toQuery = (value: string) => (/^(gh|gl)\//i.test(value) || /^https?:/i.test(value) ? value : `/${value}`);
+const toQuery = (value: string) =>
+  /^(gh|gl)\//i.test(value) || /^https?:/i.test(value) ? value : `/${value}`;
 watch(text, (value) => model?.setQuery(toQuery(value.trim())));
 
 const currentId = computed(() => `project:${props.project.id}`);
-const items = computed(() => (state.value?.items ?? []).filter((item) => item.id !== currentId.value));
+const items = computed(() =>
+  (state.value?.items ?? []).filter((item) => item.id !== currentId.value),
+);
 const selected = computed(() => state.value?.selected ?? 0);
 const rows = computed(() =>
   items.value.map((item, index) => ({

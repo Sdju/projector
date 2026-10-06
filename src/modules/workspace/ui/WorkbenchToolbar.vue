@@ -20,12 +20,12 @@ const emit = defineEmits<{
 
 <template>
   <div class="toolbar" role="toolbar" aria-label="Блоки и терминалы">
-    <slot name="terminal-actions" />
     <slot name="terminal-status" />
     <p v-if="terminalsError" class="toolbar-error" role="alert">
       {{ terminalsError }}
     </p>
     <div class="toolbar-spacer" />
+    <slot name="terminal-actions" />
     <LayoutMenu
       :groups="layoutGroups"
       :preset="preset"

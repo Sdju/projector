@@ -1,2 +1,2 @@
 export { useRunner } from "./model/session.ts";
-export { default as RunControls } from "./ui/RunControls.vue";
+export { default as RunMenu } from "./ui/RunMenu.vue";

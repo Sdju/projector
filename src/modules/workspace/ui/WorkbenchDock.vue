@@ -29,6 +29,7 @@ const props = defineProps<{
   gutterRevision: number;
   tabs: OpenFile[];
   terminalsBusy: boolean;
+  agent?: boolean;
 }>();
 const emit = defineEmits<{ command: [id: string, args?: unknown] }>();
 const { fileOf, terminals, terminalPanels } = props.workbench;
@@ -90,6 +91,7 @@ const hostOf = (key: string) => props.panelHosts.hosts[key] ?? null;
       <NewSessionMenu
         v-if="group.role === 'terminal'"
         :busy="terminalsBusy"
+        :agent="agent"
         @command="(id, args) => emit('command', id, args)"
       />
     </template>

@@ -4,6 +4,7 @@ import { onClickOutside, useEventListener } from "@vueuse/core";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { agentUsageSummary } from "../../agents-integration/status-bar/index.ts";
 import IconPlus from "~icons/lucide/plus";
+import IconBot from "~icons/lucide/bot";
 import IconTerminal from "~icons/lucide/terminal";
 import IconCodex from "~icons/simple-icons/openai";
 import IconClaude from "~icons/simple-icons/claude";
@@ -14,7 +15,7 @@ import IconCursor from "~icons/simple-icons/cursor";
  * «+» с островом создания сессии: при открытии рамка охватывает кнопку, как у переключателя
  * проекта. Остров рисуется поверх дока (Teleport), поэтому кнопка дублируется в его шапке.
  */
-const props = defineProps<{ busy: boolean }>();
+const props = defineProps<{ busy: boolean; agent?: boolean }>();
 const emit = defineEmits<{ command: [id: string, args?: unknown] }>();
 const programs = [
   {
@@ -67,6 +68,10 @@ function focusRow(index: number) {
   const list = buttons();
   active.value = (index + list.length) % list.length;
   list[active.value]?.focus();
+}
+function openChat() {
+  void toggle(false);
+  emit("command", "ide.workbench.agent.open");
 }
 function pick(program: string) {
   if (props.busy) return;
@@ -138,6 +143,22 @@ onBeforeUnmount(() => (open.value = false));
           >
         </button>
       </div>
+      <template v-if="agent">
+        <div class="group-title">Projector</div>
+        <button
+          class="row"
+          role="menuitem"
+          data-command="ide.workbench.agent.open"
+          :tabindex="-1"
+          @click="openChat"
+        >
+          <IconBot class="row-icon" aria-hidden="true" />
+          <span class="copy">
+            <span class="name">Чат с агентом</span>
+            <span class="caption">Встроенный агент Projector, история разговоров</span>
+          </span>
+        </button>
+      </template>
       <footer class="foot">↑↓ выбрать · Enter запустить сессию в папке проекта</footer>
     </section>
   </Teleport>
@@ -241,6 +262,15 @@ onBeforeUnmount(() => (open.value = false));
 .hint.tone-over {
   color: var(--err);
   border-color: color-mix(in srgb, var(--err) 55%, var(--line));
+}
+.group-title {
+  margin-top: var(--sp-1);
+  padding: var(--sp-2) var(--sp-2) 2px;
+  border-top: 1px solid var(--line);
+  color: var(--faint);
+  font-size: var(--fs-2xs);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
 }
 .foot {
   padding: var(--sp-1) var(--sp-2) 2px;

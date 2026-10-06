@@ -182,6 +182,12 @@ const docker = useDocker(props.projectId, {
 });
 const panelHosts = createPanelHosts();
 registerEditor(
+  "ide.workbench.sidebar.refresh",
+  "Обновить раздел боковой панели",
+  () => sidebar.value?.refreshSection(),
+  () => true,
+);
+registerEditor(
   "ide.workbench.sidebar.toggle",
   "Показать или скрыть боковую панель",
   () => {
@@ -299,6 +305,7 @@ onBeforeUnmount(() => overview.cancel());
         :capabilities="capabilities"
         :sections="sections"
         :hidden="sidebarInvisible"
+        :rail="!mobile"
         :active="active"
         :revision="revision"
         :overview="overview"
@@ -350,6 +357,7 @@ onBeforeUnmount(() => overview.cancel());
         :gutter-revision="gutterRevision"
         :tabs="tabs"
         :terminals-busy="terminals.busy.value"
+        :agent="capabilities.agent"
         @command="(id, args) => editorCommands.run(id, args)"
       >
         <template #mobile-terminal-actions>
@@ -372,18 +380,17 @@ onBeforeUnmount(() => overview.cancel());
 
 <style scoped>
 .workspace {
+  --rail-w: 40px;
   display: grid;
-  grid-template-columns: var(--tree-width, clamp(200px, 19vw, 280px)) var(--island-gap) minmax(
-      0,
-      1fr
-    );
+  grid-template-columns: var(--tree-width, clamp(240px, 21vw, 320px)) var(--island-gap) minmax(0, 1fr);
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   flex: 1;
   min-height: 0;
   overflow: hidden;
 }
+/* Панель свёрнута, полоса разделов остаётся */
 .workspace.sidebar-hidden {
-  grid-template-columns: 0 0 minmax(0, 1fr);
+  grid-template-columns: calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr);
   column-gap: 0;
 }
 .tree-resize {
@@ -448,10 +455,10 @@ onBeforeUnmount(() => overview.cancel());
     overflow: auto;
   }
   .workspace {
-    grid-template-columns: 220px 1px minmax(0, 1fr);
+    grid-template-columns: 260px var(--island-gap) minmax(0, 1fr);
   }
   .workspace.sidebar-hidden {
-    grid-template-columns: 0 0 minmax(0, 1fr);
+    grid-template-columns: calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr);
   }
 }
 @media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {
