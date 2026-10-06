@@ -66,7 +66,7 @@ Projector пока устанавливается из исходников. П�
 Скачайте выпуск и установите зависимости:
 
 ```bash
-git clone --branch v0.3.5 https://github.com/Sdju/projector.git
+git clone --branch v0.4.0 https://github.com/Sdju/projector.git
 cd projector
 vp install --frozen-lockfile
 vp run build
@@ -75,7 +75,7 @@ vp run build
 
 Исходники также доступны в [GitHub Releases](https://github.com/Sdju/projector/releases).
 Сборка проверяет код и создаёт веб-ресурсы; запуск пока использует `vp dev`
-из этой папки. Отдельного бинарного установщика в версии 0.3.5 нет.
+из этой папки. Отдельного бинарного установщика в версии 0.4.0 нет.
 
 Откроется окно поиска приложений и проектов. Чтобы использовать Projector в обычном браузере:
 

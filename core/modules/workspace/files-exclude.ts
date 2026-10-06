@@ -52,7 +52,7 @@ export function normalizeFilesExclude(input: unknown): FilesExcludeMap {
 }
 
 export function activeExcludePatterns(map: FilesExcludeMap): string[] {
-  const patterns = [...ALWAYS_FILES_EXCLUDE];
+  const patterns: string[] = [...ALWAYS_FILES_EXCLUDE];
   for (const [pattern, enabled] of Object.entries(map)) {
     if (enabled && isValidExcludePattern(pattern)) patterns.push(pattern);
   }
