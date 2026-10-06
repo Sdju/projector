@@ -2,6 +2,7 @@
 import { computed, ref, useId } from "vue";
 import { useIntervalFn, useNow } from "@vueuse/core";
 import UsageMeter from "../../_/UsageMeter.vue";
+import { publishAgentUsage } from "../../_/usage-summary.ts";
 import { useUsagePolling } from "../../_/use-usage-polling.ts";
 import { USAGE_PERIOD_SECONDS, usagePaceTone } from "../../_/usage-pace.ts";
 import IconCursor from "~icons/simple-icons/cursor";
@@ -42,6 +43,7 @@ const selectedTone = computed(() => {
     window.usedPercent, window.resetsAt, USAGE_PERIOD_SECONDS.month, now.value.getTime(), window.limited,
   );
 });
+publishAgentUsage("cursor", remaining, selectedTone);
 const tooltipRows = computed(() => {
   if (failed.value || usage.value?.status !== "ready" || !usage.value.windows) return [];
   const windows = usage.value.windows;

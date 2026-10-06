@@ -12,6 +12,7 @@ import type { createPanelHosts } from "../panel-hosts.ts";
 import type { OpenFile } from "../open-file.ts";
 import { useTabHost, useWorkspaceTabs } from "../lib/tab-views.ts";
 import FilePanel from "./FilePanel.vue";
+import NewSessionMenu from "./NewSessionMenu.vue";
 import PanelHost from "./PanelHost.vue";
 import IconDiff from "~icons/lucide/file-diff";
 import IconRestart from "~icons/lucide/rotate-ccw";
@@ -27,7 +28,9 @@ const props = defineProps<{
   panelHosts: ReturnType<typeof createPanelHosts>;
   gutterRevision: number;
   tabs: OpenFile[];
+  terminalsBusy: boolean;
 }>();
+const emit = defineEmits<{ command: [id: string, args?: unknown] }>();
 const { fileOf, terminals, terminalPanels } = props.workbench;
 const workspaceTabs = useWorkspaceTabs();
 const host = useTabHost();
@@ -81,6 +84,13 @@ const hostOf = (key: string) => props.panelHosts.hosts[key] ?? null;
         @status="terminals.update"
         @sessions="terminals.replace"
         @ended="terminals.refresh"
+      />
+    </template>
+    <template #leading="{ group }">
+      <NewSessionMenu
+        v-if="group.role === 'terminal'"
+        :busy="terminalsBusy"
+        @command="(id, args) => emit('command', id, args)"
       />
     </template>
     <template #icon="{ tab }">

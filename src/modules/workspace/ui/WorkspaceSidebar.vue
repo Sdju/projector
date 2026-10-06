@@ -132,7 +132,10 @@ defineExpose({
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: var(--bg-sunken);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--bg);
 }
 .side-content {
   flex: 1;
@@ -145,7 +148,9 @@ defineExpose({
     grid-row: 3;
     z-index: 3;
     width: min(340px, 90%);
-    border-right: 1px solid var(--line-strong);
+    border-width: 0 1px 0 0;
+    border-color: var(--line-strong);
+    border-radius: 0;
     box-shadow: var(--shadow-popover);
   }
 }

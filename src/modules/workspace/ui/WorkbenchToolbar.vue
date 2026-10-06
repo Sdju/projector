@@ -4,11 +4,6 @@ import UiButton from "../../../common/ui/UiButton.vue";
 import IconSidebar from "~icons/lucide/panel-left";
 import IconLayout from "~icons/lucide/layout-template";
 import IconEye from "~icons/lucide/eye";
-import IconTerminal from "~icons/lucide/terminal";
-import IconCodex from "~icons/simple-icons/openai";
-import IconClaude from "~icons/simple-icons/claude";
-import IconOpenCode from "~icons/simple-icons/opencode";
-import IconCursor from "~icons/simple-icons/cursor";
 
 defineProps<{
   capabilities: Readonly<WorkspaceCapabilities>;
@@ -22,13 +17,6 @@ const emit = defineEmits<{
   command: [id: string, args?: unknown];
   "show-group": [id: string];
 }>();
-const terminalPrograms = [
-  { program: "shell", title: "Новый shell", icon: IconTerminal },
-  { program: "codex", title: "Новый Codex", icon: IconCodex },
-  { program: "claude", title: "Новый Claude Code", icon: IconClaude },
-  { program: "opencode", title: "Новый OpenCode", icon: IconOpenCode },
-  { program: "cursor", title: "Новый Cursor", icon: IconCursor },
-];
 </script>
 
 <template>
@@ -45,25 +33,6 @@ const terminalPrograms = [
     >
       <IconSidebar aria-hidden="true" />
     </UiButton>
-    <div
-      v-if="capabilities.terminals"
-      class="toolbar-group"
-      role="group"
-      aria-label="Новая терминальная сессия"
-    >
-      <UiButton
-        v-for="entry in terminalPrograms"
-        :key="entry.program"
-        icon
-        size="sm"
-        :disabled="terminalsBusy"
-        :title="entry.title"
-        :aria-label="entry.title"
-        @click="emit('command', 'ide.workbench.terminal.new', { program: entry.program })"
-      >
-        <component :is="entry.icon" aria-hidden="true" />
-      </UiButton>
-    </div>
     <slot name="terminal-actions" />
     <slot name="terminal-status" />
     <p v-if="terminalsError" class="toolbar-error" role="alert">
@@ -105,13 +74,6 @@ const terminalPrograms = [
   padding: 0 var(--sp-3);
   border-bottom: 1px solid var(--line);
   background: var(--bg-sunken);
-}
-.toolbar-group {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding-left: var(--sp-2);
-  border-left: 1px solid var(--line);
 }
 .toolbar-spacer {
   flex: 1;

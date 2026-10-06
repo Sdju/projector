@@ -119,6 +119,7 @@ const focus = () => {
     @focusin="focus"
   >
     <header class="dock-header" @dragenter.capture="clearZone" @dragover.capture="clearZone">
+      <DockSlot v-if="dock.slots.leading" :render="dock.slots.leading" :args="{ group }" />
       <DockTabs
         v-if="group.panels.length"
         :tabs="tabs"
@@ -217,7 +218,13 @@ const focus = () => {
   flex: 1;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
   background: var(--bg);
+}
+.dock-group.focused {
+  border-color: var(--line-strong);
 }
 .dock-group.maximized {
   position: absolute;
@@ -291,6 +298,10 @@ const focus = () => {
   inset: 50% 0 0 0;
 }
 @media (max-width: 700px) {
+  .dock-group {
+    border-width: 0;
+    border-radius: 0;
+  }
   .dock-header {
     flex-wrap: wrap;
   }

@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { useIntervalFn, useNow } from "@vueuse/core";
 import UsageMeter from "../../_/UsageMeter.vue";
+import { publishAgentUsage } from "../../_/usage-summary.ts";
 import { useUsagePolling } from "../../_/use-usage-polling.ts";
 import { USAGE_PERIOD_SECONDS, usagePaceTone } from "../../_/usage-pace.ts";
 import IconCodex from "~icons/simple-icons/openai";
@@ -27,6 +28,7 @@ const tone = computed(() => {
     weekly.value.usedPercent, weekly.value.resetsAt, periodSeconds.value, now.value.getTime(),
   );
 });
+publishAgentUsage("codex", remaining, tone);
 const countdown = computed(() => resetCountdown(weekly.value?.resetsAt, now.value.getTime()));
 const tooltip = computed(() => {
   if (failed.value) return "Codex: не удалось обновить недельный лимит";

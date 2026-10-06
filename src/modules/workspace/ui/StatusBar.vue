@@ -37,9 +37,7 @@ const selection = computed(() => {
   align-items: center;
   gap: var(--sp-3);
   min-height: 24px;
-  padding-inline: var(--sp-3);
-  border-top: 1px solid var(--line);
-  background: var(--bg-sunken);
+  padding-inline: var(--sp-2);
   color: var(--muted);
   font-size: var(--fs-2xs);
   user-select: none;

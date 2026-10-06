@@ -346,6 +346,8 @@ onBeforeUnmount(() => overview.cancel());
         :panel-hosts="panelHosts"
         :gutter-revision="gutterRevision"
         :tabs="tabs"
+        :terminals-busy="terminals.busy.value"
+        @command="(id, args) => editorCommands.run(id, args)"
       >
         <template #mobile-terminal-actions>
           <MobileTerminalActions
@@ -368,16 +370,18 @@ onBeforeUnmount(() => overview.cancel());
 <style scoped>
 .workspace {
   display: grid;
-  grid-template-columns: var(--tree-width, clamp(200px, 19vw, 280px)) 1px minmax(0, 1fr);
+  grid-template-columns: var(--tree-width, clamp(200px, 19vw, 280px)) var(--island-gap) minmax(
+      0,
+      1fr
+    );
   grid-template-rows: auto auto minmax(0, 1fr) auto;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  height: calc(100dvh - 84px);
-  min-height: 440px;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 .workspace.sidebar-hidden {
   grid-template-columns: 0 0 minmax(0, 1fr);
+  column-gap: 0;
 }
 .tree-resize {
   grid-column: 2;
@@ -392,36 +396,39 @@ onBeforeUnmount(() => overview.cancel());
   grid-column: 3;
   grid-row: 3;
 }
-/* Видимая линия 1px, зона захвата шире за счёт ::before */
+/* Зазор между островами и есть зона захвата; при наведении проступает тонкая линия */
 .resize-handle {
   position: relative;
   z-index: 1;
   cursor: col-resize;
-  background: var(--line);
   touch-action: none;
-  transition: background var(--t-fast);
 }
 .resize-handle::before {
   content: "";
   position: absolute;
-  inset: 0 -4px;
+  inset: 0 calc(var(--island-gap) / 2 - 1px);
+  border-radius: var(--r-full);
+  transition: background var(--t-fast);
 }
-.resize-handle:hover,
-.resize-handle:focus-visible,
-.resize-handle:active {
+.resize-handle:hover::before,
+.resize-handle:active::before {
   background: var(--line-strong);
 }
 .resize-handle:focus-visible {
   outline: none;
+}
+.resize-handle:focus-visible::before {
   background: var(--focus);
 }
 .file-error {
   grid-column: 1 / -1;
-  margin: 0;
+  margin: 0 0 var(--island-gap);
   padding: var(--sp-2) var(--sp-3);
   color: var(--err);
   font-size: var(--fs-xs);
-  border-bottom: 1px solid var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--bg);
 }
 .loading {
   position: absolute;
@@ -452,11 +459,24 @@ onBeforeUnmount(() => overview.cancel());
     flex: 1;
     height: 100%;
     min-height: 0;
+    padding: 0;
+    background: none;
     border-radius: 0;
-    border-inline: 0;
+  }
+  .file-error {
+    margin: 0;
+    border-radius: 0;
+    border-width: 0 0 1px;
   }
   .tree-resize {
     display: none;
+  }
+  .toolbar-host :deep(.toolbar) {
+    border-width: 0 0 1px;
+    border-radius: 0;
+  }
+  .workspace-status {
+    margin-top: 0;
   }
   .dock-pane {
     grid-column: 1;
@@ -482,12 +502,20 @@ onBeforeUnmount(() => overview.cancel());
 }
 .toolbar-host {
   grid-column: 1 / -1;
+  margin-bottom: var(--island-gap);
+}
+.toolbar-host :deep(.toolbar) {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--bg);
 }
 .workspace-status {
   grid-column: 1 / -1;
   grid-row: 4;
+  margin-top: var(--island-gap);
 }
 .mobile-actions {
+  margin-bottom: 0;
   position: absolute;
   top: 40px;
   inset-inline: 0;
@@ -496,6 +524,8 @@ onBeforeUnmount(() => overview.cancel());
   box-shadow: var(--shadow-popover);
 }
 .mobile-actions :deep(.toolbar) {
+  border-width: 0;
+  border-radius: 0;
   flex-wrap: wrap;
   padding: var(--sp-2);
 }

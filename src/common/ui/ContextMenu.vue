@@ -129,7 +129,13 @@ defineExpose({ open, openForElement, close });
           :class="{ danger: item.danger }"
           @click="activate(item)"
         >
-          <span>{{ item.label }}</span
+          <span class="item-label"
+            ><component :is="item.icon" v-if="item.icon" aria-hidden="true" />{{
+              item.label
+            }}</span
+          ><span v-if="item.hint" class="hint" :class="item.hint.tone && `tone-${item.hint.tone}`">{{
+            item.hint.text
+          }}</span
           ><kbd v-if="item.shortcut">{{ item.shortcut }}</kbd>
         </button>
       </template>
@@ -185,6 +191,36 @@ defineExpose({ open, openForElement, close });
 }
 .context-menu button.danger {
   color: var(--err);
+}
+.item-label {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.item-label svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.hint {
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  color: var(--muted);
+  font: var(--fs-2xs) var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.hint.tone-spare {
+  color: var(--info);
+  border-color: color-mix(in srgb, var(--info) 55%, var(--line));
+}
+.hint.tone-hot {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 55%, var(--line));
+}
+.hint.tone-over {
+  color: var(--err);
+  border-color: color-mix(in srgb, var(--err) 55%, var(--line));
 }
 kbd {
   color: var(--muted);

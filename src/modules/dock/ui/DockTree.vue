@@ -125,39 +125,41 @@ function sashKey(event: KeyboardEvent, index: number) {
 .column > .dock-cell {
   min-height: 100px;
 }
-/* Видимая линия 1px, зона захвата шире за счёт ::before */
+/* Зазор между островами и есть зона захвата; при наведении проступает тонкая линия */
 .dock-sash {
   position: relative;
   z-index: 1;
   flex: none;
-  background: var(--line);
   touch-action: none;
-  transition: background var(--t-fast);
 }
 .dock-sash.row {
-  width: 1px;
+  width: var(--island-gap);
   cursor: col-resize;
 }
 .dock-sash.column {
-  height: 1px;
+  height: var(--island-gap);
   cursor: row-resize;
 }
 .dock-sash::before {
   content: "";
   position: absolute;
+  border-radius: var(--r-full);
+  transition: background var(--t-fast);
 }
 .dock-sash.row::before {
-  inset: 0 -4px;
+  inset: 0 calc(var(--island-gap) / 2 - 1px);
 }
 .dock-sash.column::before {
-  inset: -4px 0;
+  inset: calc(var(--island-gap) / 2 - 1px) 0;
 }
-.dock-sash:hover,
-.dock-sash:active {
+.dock-sash:hover::before,
+.dock-sash:active::before {
   background: var(--line-strong);
 }
 .dock-sash:focus-visible {
   outline: none;
+}
+.dock-sash:focus-visible::before {
   background: var(--focus);
 }
 @media (max-width: 700px) {
@@ -184,6 +186,7 @@ function sashKey(event: KeyboardEvent, index: number) {
   .dock-split.row,
   .dock-split.column {
     flex-direction: column;
+    gap: var(--island-gap);
   }
   .dock-split > .dock-cell {
     flex: none !important;

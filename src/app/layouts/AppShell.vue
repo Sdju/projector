@@ -272,10 +272,33 @@ const navigatePath = (path: string) =>
   background: var(--run);
 }
 
+/* Рабочая область: один внешний отступ — зазор между островами, фон общий */
 .shell.workspace {
-  width: calc(100% - var(--sp-4) * 2);
-  max-width: 2400px;
-  padding-bottom: var(--sp-4);
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: var(--island-gap);
+  height: 100dvh;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas);
+}
+.workspace .top {
+  margin-bottom: var(--island-gap);
+  padding-inline: var(--sp-2);
+}
+.workspace main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.workspace main :deep(.project-page) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .shell.settings {
   --page-width: 1100px;
@@ -332,6 +355,11 @@ const navigatePath = (path: string) =>
     height: 100dvh;
     display: flex;
     flex-direction: column;
+    background: none;
+  }
+  .workspace .top {
+    padding-inline: 0;
+    margin-bottom: 0;
   }
   .workspace main {
     flex: 1;
