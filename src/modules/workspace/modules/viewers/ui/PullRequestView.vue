@@ -1,15 +1,13 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import type {
   PullRequestDetail,
   PullRequestFile,
   PullRequestReview,
 } from "../../../../../../core/modules/workspace/index.ts";
 import { workspaceRequest } from "../../../../workspace-api/index.ts";
-import { absoluteTime, relativeTime } from "../../../../../common/utilities/commit-format.ts";
-import UiAvatar from "../../../../../common/ui/UiAvatar.vue";
-import VisualMarkdownEditor from "./VisualMarkdownEditor.vue";
-import IconExternal from "~icons/lucide/external-link";
+import TrackerComments from "./TrackerComments.vue";
+import TrackerDetail from "./TrackerDetail.vue";
 
 /** Вкладка pull request: метаданные, Markdown-описание, ревью, обсуждение и изменённые файлы. */
 const props = defineProps<{ projectId: string; number: number }>();
@@ -57,103 +55,60 @@ const FILE_MARK: Record<PullRequestFile["status"], string> = {
 };
 const filePath = (file: PullRequestFile) =>
   file.previousPath ? `${file.previousPath} → ${file.path}` : file.path;
+const reviews = computed(() =>
+  (detail.value?.reviews ?? []).map((item) => ({
+    ...item,
+    at: item.submittedAt,
+    badge: REVIEW_LABEL[item.state],
+    badgeClass: item.state,
+  })),
+);
+const comments = computed(() =>
+  (detail.value?.comments ?? []).map((item) => ({ ...item, at: item.createdAt })),
+);
+const stateLabel = computed(() => {
+  const pull = detail.value?.pull;
+  return pull?.draft && pull.state === "open" ? "черновик" : STATE_LABEL[pull?.state ?? "open"];
+});
 </script>
 
 <template>
-  <div class="pull-view">
-    <p v-if="loading" class="note" role="status">загрузка pull request…</p>
-    <p v-else-if="error" class="note error" role="alert">{{ error }}</p>
-    <article v-else-if="detail" class="pull-article">
-      <header class="pull-head">
-        <span class="state" :class="detail.pull.state">
-          {{
-            detail.pull.draft && detail.pull.state === "open"
-              ? "черновик"
-              : STATE_LABEL[detail.pull.state]
-          }}
-        </span>
-        <h2>
-          {{ detail.pull.title }} <span class="number">#{{ detail.pull.number }}</span>
-        </h2>
-      </header>
-      <p class="meta">
-        <span class="author">
-          <UiAvatar
-            :src="detail.pull.author.avatarUrl"
-            :alt="detail.pull.author.login"
-            :size="18"
-          />
-          {{ detail.pull.author.login }}
-        </span>
-        <span class="branches">{{ detail.pull.head }} → {{ detail.pull.base }}</span>
-        <span :title="absoluteTime(detail.pull.createdAt)"
-          >открыт {{ relativeTime(detail.pull.createdAt) }}</span
-        >
-        <a
-          v-if="detail.pull.htmlUrl"
-          class="external"
-          :href="detail.pull.htmlUrl"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <IconExternal aria-hidden="true" />на GitHub
-        </a>
-      </p>
-      <p class="meta">
+  <TrackerDetail
+    :project-id="projectId"
+    :loading="loading"
+    :error="error"
+    :ready="!!detail"
+    noun="pull request"
+    :state="detail?.pull.state ?? ''"
+    :state-label="stateLabel"
+    :title="detail?.pull.title ?? ''"
+    :number="detail?.pull.number ?? number"
+    :author="detail?.pull.author ?? { login: '', avatarUrl: '' }"
+    :created-at="detail?.pull.createdAt ?? ''"
+    :html-url="detail?.pull.htmlUrl ?? ''"
+    :labels="detail?.pull.labels ?? []"
+    :body="detail?.pull.body ?? ''"
+    @open="emit('open', $event)"
+  >
+    <template #meta>
+      <span class="branches">{{ detail?.pull.head }} → {{ detail?.pull.base }}</span>
+    </template>
+    <template #stats>
+      <p v-if="detail" class="stats">
         <span>{{ detail.commits }} коммитов</span>
         <span>{{ detail.changedFiles }} файлов</span>
         <span class="add">+{{ detail.additions }}</span>
         <span class="del">−{{ detail.deletions }}</span>
       </p>
-      <ul v-if="detail.pull.labels.length" class="labels">
-        <li
-          v-for="label in detail.pull.labels"
-          :key="label.name"
-          :style="{ borderColor: label.color ? `#${label.color}` : undefined }"
-        >
-          {{ label.name }}
-        </li>
-      </ul>
-
-      <VisualMarkdownEditor
-        v-if="detail.pull.body"
-        class="body"
-        :content="detail.pull.body"
-        path=""
-        :project-id="projectId"
-        :editable="false"
-        compact
-        @open="emit('open', $event)"
-      />
-      <p v-else class="note">Без описания</p>
-
-      <template v-if="detail.reviews.length">
-        <h3>Ревью</h3>
-        <ul class="comment-list">
-          <li v-for="item in detail.reviews" :key="item.id">
-            <p class="comment-meta">
-              <span class="author">
-                <UiAvatar :src="item.author.avatarUrl" :alt="item.author.login" :size="16" />
-                {{ item.author.login }}
-              </span>
-              <span class="review" :class="item.state">{{ REVIEW_LABEL[item.state] }}</span>
-              <span :title="absoluteTime(item.submittedAt)">{{
-                relativeTime(item.submittedAt)
-              }}</span>
-            </p>
-            <VisualMarkdownEditor
-              v-if="item.body"
-              :content="item.body"
-              path=""
-              :project-id="projectId"
-              :editable="false"
-              compact
-              @open="emit('open', $event)"
-            />
-          </li>
-        </ul>
-      </template>
-
+    </template>
+    <TrackerComments
+      v-if="reviews.length"
+      :project-id="projectId"
+      title="Ревью"
+      :items="reviews"
+      @open="emit('open', $event)"
+    />
+    <template v-if="detail">
       <h3>Изменённые файлы</h3>
       <p v-if="!detail.files.length" class="note">Файлов нет</p>
       <ul v-else class="file-list">
@@ -170,106 +125,31 @@ const filePath = (file: PullRequestFile) =>
         Показано {{ detail.files.length }} из {{ detail.changedFiles }} файлов. Остальные — на
         GitHub.
       </p>
-
-      <h3>Обсуждение</h3>
-      <p v-if="!detail.comments.length" class="note">Комментариев нет</p>
-      <ul v-else class="comment-list">
-        <li v-for="comment in detail.comments" :key="comment.id">
-          <p class="comment-meta">
-            <span class="author">
-              <UiAvatar :src="comment.author.avatarUrl" :alt="comment.author.login" :size="16" />
-              {{ comment.author.login }}
-            </span>
-            <span :title="absoluteTime(comment.createdAt)">{{
-              relativeTime(comment.createdAt)
-            }}</span>
-          </p>
-          <VisualMarkdownEditor
-            :content="comment.body"
-            path=""
-            :project-id="projectId"
-            :editable="false"
-            compact
-            @open="emit('open', $event)"
-          />
-        </li>
-      </ul>
-      <p v-if="detail.commentsTruncated" class="note">
-        Показаны первые 500 комментариев. Откройте pull request на GitHub, чтобы увидеть все.
-      </p>
-    </article>
-  </div>
+    </template>
+    <TrackerComments
+      :project-id="projectId"
+      title="Обсуждение"
+      empty="Комментариев нет"
+      :items="comments"
+      @open="emit('open', $event)"
+    />
+    <p v-if="detail?.commentsTruncated" class="note">
+      Показаны первые 500 комментариев. Откройте pull request на GitHub, чтобы увидеть все.
+    </p>
+  </TrackerDetail>
 </template>
 
 <style scoped>
-.pull-view {
-  height: 100%;
-  overflow: auto;
-  padding: var(--sp-4);
-}
-.pull-article {
-  max-width: 880px;
-  margin: 0 auto;
-}
-.pull-head {
-  display: flex;
-  align-items: baseline;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
-}
-.state {
-  padding: 1px var(--sp-2);
-  border-radius: var(--r-full);
-  background: var(--active);
-  color: var(--muted);
-  font-size: var(--fs-2xs);
-}
-.state.open {
-  background: color-mix(in srgb, var(--run) 22%, transparent);
-  color: var(--run);
-}
-.state.merged {
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
-  color: var(--accent);
-}
-h2 {
-  margin: 0;
-  font-size: var(--fs-lg);
-  font-weight: 600;
-}
-.number {
-  color: var(--muted);
-  font: var(--fs-xs) var(--mono);
-}
-.meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-  margin: var(--sp-2) 0 0;
-  color: var(--muted);
-  font-size: var(--fs-xs);
-}
-.author {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-family: var(--mono);
-  color: var(--text-2);
-}
 .branches {
   font-family: var(--mono);
   color: var(--text-2);
 }
-.external {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--text-2);
-}
-.external svg {
-  width: 13px;
-  height: 13px;
+.stats {
+  display: flex;
+  gap: var(--sp-2);
+  margin: var(--sp-2) 0 0;
+  color: var(--muted);
+  font-size: var(--fs-xs);
 }
 .add {
   color: var(--run);
@@ -279,58 +159,11 @@ h2 {
   color: var(--err);
   font-family: var(--mono);
 }
-.labels {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-  list-style: none;
-  margin: var(--sp-3) 0 0;
-  padding: 0;
-}
-.labels li {
-  padding: 1px var(--sp-2);
-  border: 1px solid var(--line);
-  border-radius: var(--r-full);
-  color: var(--text-2);
-  font-size: var(--fs-2xs);
-}
 h3 {
   margin: var(--sp-4) 0 var(--sp-2);
   font-size: var(--fs-sm);
   color: var(--text-2);
   font-weight: 500;
-}
-.body {
-  margin-top: var(--sp-3);
-  padding: var(--sp-3);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-}
-.comment-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-}
-.comment-list li {
-  padding: var(--sp-3);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-}
-.comment-meta {
-  display: flex;
-  gap: var(--sp-2);
-  margin: 0 0 var(--sp-2);
-  color: var(--muted);
-  font-size: var(--fs-2xs);
-}
-.review.approved {
-  color: var(--run);
-}
-.review.changes_requested {
-  color: var(--err);
 }
 .file-list {
   list-style: none;
@@ -374,8 +207,5 @@ h3 {
   margin: var(--sp-2) 0 0;
   color: var(--muted);
   font-size: var(--fs-xs);
-}
-.note.error {
-  color: var(--err);
 }
 </style>

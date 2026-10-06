@@ -7,8 +7,7 @@ import {
 } from "../../workspace-api/index.ts";
 import type { GitBranchesState, GitHistoryState, GitOverviewState } from "../modules/git/index.ts";
 import { GitPanel } from "../modules/git/index.ts";
-import { IssuesPanel } from "../modules/issues/index.ts";
-import { PullsPanel } from "../modules/pulls/index.ts";
+import { IssuesPanel, PullsPanel } from "../modules/issues/index.ts";
 import { DockerSidebar } from "../../docker/index.ts";
 import SearchPanel from "../ui/SearchPanel.vue";
 import FilesSection from "../ui/FilesSection.vue";
