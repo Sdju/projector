@@ -35,7 +35,7 @@ vp run vio:gtk-test  # реальные GTK-виджеты; нужен display
 ## Документация
 
 - [Разработка и диагностика](docs/session-notes.md): карта кода, HMR, native, ввод и данные.
-- [Реестр больших файлов](docs/large-files.md): потолки размеров и планы разбиения; проверка включена в `vp run architecture`.
+- [Реестр больших файлов](docs/large-files.md): потолки размеров и планы разбиения; проверка (`extra.largeFiles` в `feod.config.mjs`) включена в `vp run architecture`.
 - [Использование](docs/usage.md): режимы, хоткей, трей, файлы и терминалы.
 - [Интеграции](docs/integrations.md): GitHub, авторизация и импорт.
 - [SDK команд IDE](docs/ide-commands.md), [темы иконок](docs/file-icons.md), [renderer vio](packages/vio/README.md).
