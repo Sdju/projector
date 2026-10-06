@@ -62,7 +62,6 @@ const subtitle = computed(() =>
         :content="file.draft ?? file.content"
         :saved="file.content"
         :site-url="siteUrl"
-        :mode="file.htmlMode ?? 'split'"
         :reload="file.htmlReload"
         :editable="isEditable(file)"
         :line="file.line"

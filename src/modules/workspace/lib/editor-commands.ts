@@ -5,7 +5,7 @@ import { commandArgs, type useCommandScope } from "../../../common/utilities/com
 import { copyWithNotice } from "../../../common/utilities/notice.ts";
 import type { TabRegistry, WorkspaceCapability } from "../../workspace-api/index.ts";
 import { workspaceSiteUrl } from "../../workspace-api/index.ts";
-import { isEditable, isHtml, isMarkdown, type HtmlMode, type OpenFile } from "../open-file.ts";
+import { isEditable, isHtml, isMarkdown, type OpenFile } from "../open-file.ts";
 
 export interface EditorCommandContext {
   projectId: string;
@@ -81,26 +81,6 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
     const file = commandFile(args);
     return file && isHtml(file) && workspaceSiteUrl(ctx.projectId, file.path) ? file : undefined;
   };
-  register(
-    "ide.editor.html.setMode",
-    "Режим просмотра HTML",
-    (args) => {
-      const mode = commandArgs(args).mode;
-      if (mode !== "page" && mode !== "split" && mode !== "source")
-        throw new Error("mode: page, split или source");
-      htmlFile(args)!.htmlMode = mode as HtmlMode;
-    },
-    (args) => !!htmlFile(args),
-    undefined,
-    {
-      description:
-        "Переключает вид открытого HTML-файла: page — только отрендеренная страница, split — страница и исходник, source — только исходник.",
-      arguments: {
-        mode: "page, split или source",
-        id: "Ключ вкладки; по умолчанию активная вкладка",
-      },
-    },
-  );
   register(
     "ide.editor.html.reload",
     "Перезагрузить HTML-страницу",

@@ -268,4 +268,4 @@ runs with the user's filesystem permissions; it is not an isolated sandbox.
 
 ## HTML-страницы
 
-`ide.editor.html.setMode` (`mode`: `page` / `split` / `source`), `ide.editor.html.reload` и `ide.editor.html.openInBrowser` работают с активным HTML-файлом или с вкладкой по `id`. Панель просмотра вызывает их через `TabHost.run`.
+`ide.editor.html.reload` и `ide.editor.html.openInBrowser` работают с активным HTML-файлом или с вкладкой по `id`. Панель просмотра вызывает их через `TabHost.run`.

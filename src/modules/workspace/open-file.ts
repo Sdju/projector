@@ -1,8 +1,6 @@
 import type { FileContent } from "../../../core/modules/workspace/index.ts";
 import type { TabParams } from "../workspace-api/index.ts";
 
-export type HtmlMode = "page" | "split" | "source";
-
 export interface OpenFile extends FileContent {
   /** Id зарегистрированного типа служебной вкладки (`TabType`) или `commit`. */
   virtual?: string;
@@ -22,8 +20,6 @@ export interface OpenFile extends FileContent {
   key: string;
   draft?: string;
   markdownMode?: "document" | "source";
-  /** HTML: страница, исходник или оба; по умолчанию оба. */
-  htmlMode?: HtmlMode;
   /** Счётчик ручных перезагрузок страницы в iframe. */
   htmlReload?: number;
   saving?: boolean;

@@ -51,7 +51,6 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
           external: tab.external,
           staged: tab.staged,
           markdownMode: tab.markdownMode,
-          htmlMode: tab.htmlMode,
         })),
       activeKey: ctx.activeKey.value,
       section: ctx.section.value,
@@ -87,10 +86,7 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
         )
           return;
         const file = ctx.tabs.value.find((file) => file.key === tab.key);
-        if (file) {
-          file.markdownMode = tab.markdownMode;
-          file.htmlMode = tab.htmlMode;
-        }
+        if (file) file.markdownMode = tab.markdownMode;
       }
       // Sessions saved before layouts existed only know the active tab.
       if (
