@@ -6,10 +6,9 @@ import { useRoute, useRouter } from "vue-router";
 import {
   useProjects,
   projectRoute,
-  projectIconUrl,
   type ProjectLocation,
 } from "../../modules/project/index.ts";
-import { PathBar, MobileProjectPicker } from "../../modules/catalog/index.ts";
+import { ProjectSwitcher, MobileProjectPicker } from "../../modules/catalog/index.ts";
 import { isFileDrag, pathsFromDataTransfer } from "../../modules/path-drop/index.ts";
 
 defineProps<{ currentProject?: ProjectLocation }>();
@@ -113,28 +112,21 @@ const navigatePath = (path: string) =>
         class="mobile-picker"
         :project="currentProject"
       />
-      <router-link
-        class="brand"
-        :class="{ 'project-brand': currentProject }"
-        to="/"
-        :title="currentProject ? `${currentProject.name} — открыть поиск` : 'Открыть поиск'"
-      >
-        <img
-          v-if="currentProject"
-          :src="projectIconUrl(currentProject)"
-          alt=""
-          width="22"
-          height="22"
-        />
-        <span>{{ currentProject?.name ?? "projector" }}</span>
-      </router-link>
-      <PathBar
+      <ProjectSwitcher
         v-if="currentProject"
         :key="currentProject.id"
-        class="header-path"
-        :path="currentProject.path"
+        class="project-switcher"
+        :project="currentProject"
         :navigate="navigatePath"
       />
+      <router-link
+        v-else
+        class="brand"
+        to="/"
+        title="Открыть поиск"
+      >
+        <span>projector</span>
+      </router-link>
       <nav class="nav">
         <router-link v-if="!currentProject" to="/settings">настройки</router-link>
         <span
@@ -193,8 +185,8 @@ const navigatePath = (path: string) =>
   gap: var(--sp-4);
 }
 
-.header-path {
-  flex: 1;
+.nav {
+  margin-left: auto;
 }
 
 .brand {
@@ -206,16 +198,6 @@ const navigatePath = (path: string) =>
   letter-spacing: var(--brand-track);
   text-transform: lowercase;
   color: var(--muted);
-}
-
-.brand.project-brand {
-  flex-shrink: 1;
-  min-width: 0;
-  max-width: min(30vw, 320px);
-  font-size: var(--fs-sm);
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--text);
 }
 
 .brand span {
@@ -319,8 +301,7 @@ const navigatePath = (path: string) =>
     gap: var(--sp-2);
     margin-bottom: var(--sp-2);
   }
-  .brand,
-  .brand.project-brand {
+  .brand {
     max-width: none;
     min-width: 0;
     min-height: 44px;
@@ -341,8 +322,7 @@ const navigatePath = (path: string) =>
     display: flex;
     margin-bottom: 0;
   }
-  .has-project .brand,
-  .has-project .header-path,
+  .has-project .project-switcher,
   .has-project .nav {
     display: none;
   }
@@ -372,10 +352,6 @@ const navigatePath = (path: string) =>
     min-height: 0;
     display: flex;
     flex-direction: column;
-  }
-  .header-path {
-    grid-column: 1 / -1;
-    height: 44px;
   }
 }
 </style>
