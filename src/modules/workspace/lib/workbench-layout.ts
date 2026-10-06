@@ -51,6 +51,10 @@ export interface WorkbenchLayoutContext {
   ) => unknown;
 }
 
+/** Готовые раскладки: рядом, терминал снизу, только редактор, только терминалы. */
+export type LayoutPreset = "side" | "stacked" | "editor" | "terminal";
+export const layoutPresets: readonly LayoutPreset[] = ["side", "stacked", "editor", "terminal"];
+
 /** Starting dock of a profile: a single editor group needs no terminal zone. */
 export function initialDockLayout(kind: WorkspaceProfile["layout"]): DockLayout {
   if (kind === "full") return createDockLayout();
@@ -208,16 +212,50 @@ export function useWorkbenchLayout(ctx: WorkbenchLayoutContext) {
     const item = terminalPanels.value.get(id);
     if (item) void terminals.rename(item.id, label);
   }
-  const hiddenGroups = computed(() => dockGroups(layout.value).filter((group) => group.hidden));
   const roleLabels: Record<string, string> = { editor: "Редактор", terminal: "Терминалы" };
   function groupLabel(group: DockGroup) {
     if (!group.panels.length) return roleLabels[group.role ?? ""] ?? "Блок";
     const label = describePanel(group.active).label;
     return group.panels.length > 1 ? `${label} +${group.panels.length - 1}` : label;
   }
-  const showGroup = (id: string) => {
-    layout.value = setGroupHidden(layout.value, id, false);
-  };
+  /** Блоки дока для острова раскладки: подпись и видимость. */
+  const layoutGroups = computed(() =>
+    dockGroups(layout.value).map((group) => ({
+      id: group.id,
+      role: group.role,
+      label: groupLabel(group),
+      hidden: !!group.hidden,
+    })),
+  );
+  /** Готовые раскладки доступны, только если в доке есть редактор и терминалы. */
+  const presetsAvailable = computed(() => initialLayout().root.type === "split");
+  const currentPreset = computed<LayoutPreset | undefined>(() => {
+    const root = layout.value.root;
+    if (root.type !== "split" || root.children.length !== 2) return undefined;
+    const [editor, terminal] = root.children;
+    if (editor?.type !== "group" || terminal?.type !== "group") return undefined;
+    if (editor.role !== "editor" || terminal.role !== "terminal") return undefined;
+    if (terminal.hidden && !editor.hidden) return "editor";
+    if (editor.hidden && !terminal.hidden) return "terminal";
+    if (editor.hidden || terminal.hidden) return undefined;
+    return root.direction === "row" ? "side" : "stacked";
+  });
+  function applyPreset(preset: LayoutPreset) {
+    const base = initialLayout();
+    if (base.root.type !== "split") return;
+    const [editor, terminal] = base.root.children as DockGroup[];
+    base.root.direction = preset === "stacked" ? "column" : "row";
+    if (preset === "editor") terminal!.hidden = true;
+    if (preset === "terminal") editor!.hidden = true;
+    const current = activeKey.value;
+    layout.value = base;
+    reconcileLayout();
+    if (current) revealPanel(current);
+  }
+  function toggleGroup(id: string) {
+    const group = findDockGroup(layout.value, id);
+    if (group) layout.value = setGroupHidden(layout.value, id, !group.hidden);
+  }
   function resetLayout() {
     const current = activeKey.value;
     layout.value = initialLayout();
@@ -258,6 +296,42 @@ export function useWorkbenchLayout(ctx: WorkbenchLayoutContext) {
       );
     },
     (value) => !!groupOfPanel(layout.value, panelArg(value)),
+  );
+  ctx.register(
+    "ide.workbench.layout.preset",
+    "Выбрать раскладку блоков",
+    (value) => {
+      const { preset } = commandArgs(value);
+      if (!layoutPresets.includes(preset as LayoutPreset))
+        throw new Error(`preset: ${layoutPresets.join(", ")}`);
+      applyPreset(preset as LayoutPreset);
+    },
+    () => presetsAvailable.value,
+    undefined,
+    {
+      description:
+        "Перестраивает док: side — редактор и терминалы рядом, stacked — терминалы снизу, editor — только редактор, terminal — только терминалы. Вкладки сохраняются.",
+      arguments: { preset: "string: side | stacked | editor | terminal" },
+    },
+  );
+  ctx.register(
+    "ide.workbench.layout.group.toggle",
+    "Показать или скрыть блок",
+    (value) => {
+      const { group } = commandArgs(value);
+      const target = dockGroups(layout.value).find(
+        (item) => item.id === group || item.role === group,
+      );
+      if (!target) throw new Error("group: id блока либо editor или terminal");
+      toggleGroup(target.id);
+    },
+    () => true,
+    undefined,
+    {
+      description:
+        "Показывает скрытый блок дока или скрывает видимый; вкладки блока не закрываются.",
+      arguments: { group: "string: id блока либо роль editor или terminal" },
+    },
   );
   ctx.register("ide.workbench.layout.reset", "Сбросить раскладку блоков", resetLayout, () => true);
   ctx.register(
@@ -300,8 +374,8 @@ export function useWorkbenchLayout(ctx: WorkbenchLayoutContext) {
     closePanel,
     closeManyPanels,
     renamePanel,
-    hiddenGroups,
-    groupLabel,
-    showGroup,
+    layoutGroups,
+    currentPreset,
+    presetsAvailable,
   };
 }

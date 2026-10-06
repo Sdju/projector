@@ -119,6 +119,7 @@ const navigatePath = (path: string) =>
         :project="currentProject"
         :navigate="navigatePath"
       />
+      <div v-if="currentProject" id="header-tools" class="header-tools" />
       <router-link
         v-else
         class="brand"
@@ -185,6 +186,11 @@ const navigatePath = (path: string) =>
   gap: var(--sp-4);
 }
 
+.header-tools {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
 .nav {
   margin-left: auto;
 }
@@ -323,6 +329,7 @@ const navigatePath = (path: string) =>
     margin-bottom: 0;
   }
   .has-project .project-switcher,
+  .has-project .header-tools,
   .has-project .nav {
     display: none;
   }

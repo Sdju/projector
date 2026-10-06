@@ -1,84 +1,59 @@
 <script setup lang="ts">
 import type { WorkspaceCapabilities } from "../../workspace-api/index.ts";
-import UiButton from "../../../common/ui/UiButton.vue";
-import IconSidebar from "~icons/lucide/panel-left";
-import IconLayout from "~icons/lucide/layout-template";
-import IconEye from "~icons/lucide/eye";
+import LayoutMenu from "./LayoutMenu.vue";
+import type { LayoutPreset } from "../lib/workbench-layout.ts";
 
 defineProps<{
   capabilities: Readonly<WorkspaceCapabilities>;
   sidebarHidden: boolean;
   terminalsBusy: boolean;
   terminalsError?: string;
-  /** Скрытые блоки дока: кнопка возвращает блок на место. */
-  hiddenGroups: { id: string; label: string }[];
+  /** Блоки дока и выбранная готовая раскладка для острова раскладки. */
+  layoutGroups: { id: string; role?: string; label: string; hidden: boolean }[];
+  preset?: LayoutPreset;
+  presetsAvailable: boolean;
 }>();
 const emit = defineEmits<{
   command: [id: string, args?: unknown];
-  "show-group": [id: string];
 }>();
 </script>
 
 <template>
   <div class="toolbar" role="toolbar" aria-label="Блоки и терминалы">
-    <UiButton
-      icon
-      size="sm"
-      :active="!sidebarHidden"
-      :aria-pressed="!sidebarHidden"
-      title="Боковая панель"
-      aria-label="Боковая панель"
-      data-command="ide.workbench.sidebar.toggle"
-      @click="emit('command', 'ide.workbench.sidebar.toggle')"
-    >
-      <IconSidebar aria-hidden="true" />
-    </UiButton>
     <slot name="terminal-actions" />
     <slot name="terminal-status" />
     <p v-if="terminalsError" class="toolbar-error" role="alert">
       {{ terminalsError }}
     </p>
     <div class="toolbar-spacer" />
-    <UiButton
-      v-for="group in hiddenGroups"
-      :key="group.id"
-      variant="chip"
-      size="sm"
-      :title="`Показать блок: ${group.label}`"
-      :aria-label="`Показать блок: ${group.label}`"
-      @click="emit('show-group', group.id)"
-    >
-      <IconEye aria-hidden="true" />{{ group.label }}
-    </UiButton>
-    <UiButton
-      icon
-      size="sm"
-      title="Сбросить раскладку блоков"
-      aria-label="Сбросить раскладку блоков"
-      data-command="ide.workbench.layout.reset"
-      @click="emit('command', 'ide.workbench.layout.reset')"
-    >
-      <IconLayout aria-hidden="true" />
-    </UiButton>
+    <LayoutMenu
+      :groups="layoutGroups"
+      :preset="preset"
+      :presets-available="presetsAvailable"
+      :sidebar-hidden="sidebarHidden"
+      @command="(id, args) => emit('command', id, args)"
+    />
   </div>
 </template>
 
 <style scoped>
+/* На десктопе полоса телепортируется в шапку и живёт на общем фоне, без собственной подложки */
 .toolbar {
-  grid-column: 1 / -1;
   display: flex;
+  flex: 1;
   align-items: center;
-  flex-wrap: wrap;
   gap: var(--sp-2);
-  min-height: 40px;
-  padding: 0 var(--sp-3);
-  border-bottom: 1px solid var(--line);
-  background: var(--bg-sunken);
+  min-width: 0;
+  min-height: var(--control-h);
 }
 .toolbar-spacer {
   flex: 1;
 }
 .toolbar-error {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   margin: 0;
   color: var(--err);
   font-size: var(--fs-xs);

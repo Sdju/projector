@@ -125,9 +125,9 @@ const {
   fileOf,
   activeKey,
   revealPanel,
-  hiddenGroups,
-  groupLabel,
-  showGroup,
+  layoutGroups,
+  currentPreset,
+  presetsAvailable,
 } = workbench;
 const files = useOpenFiles({
   projectId: () => props.projectId,
@@ -269,23 +269,26 @@ onBeforeUnmount(() => overview.cancel());
       class="toolbar-host"
       :class="{ 'mobile-actions': mobile }"
     >
-      <WorkbenchToolbar
-        :capabilities="capabilities"
-        :sidebar-hidden="sidebarInvisible"
-        :terminals-busy="terminals.busy.value"
-        :terminals-error="terminals.error.value"
-        :hidden-groups="hiddenGroups.map((group) => ({ id: group.id, label: groupLabel(group) }))"
-        @command="
-          (id, args) => {
-            if (mobile) mobileActionsOpen = false;
-            editorCommands.run(id, args);
-          }
-        "
-        @show-group="showGroup"
-      >
-        <template #terminal-actions><slot name="terminal-actions" /></template>
-        <template #terminal-status><slot name="terminal-status" /></template>
-      </WorkbenchToolbar>
+      <Teleport to="#header-tools" :disabled="mobile" defer>
+        <WorkbenchToolbar
+          :capabilities="capabilities"
+          :sidebar-hidden="sidebarInvisible"
+          :terminals-busy="terminals.busy.value"
+          :terminals-error="terminals.error.value"
+          :layout-groups="layoutGroups"
+          :preset="currentPreset"
+          :presets-available="presetsAvailable"
+          @command="
+            (id, args) => {
+              if (mobile) mobileActionsOpen = false;
+              editorCommands.run(id, args);
+            }
+          "
+        >
+          <template #terminal-actions><slot name="terminal-actions" /></template>
+          <template #terminal-status><slot name="terminal-status" /></template>
+        </WorkbenchToolbar>
+      </Teleport>
     </div>
     <p v-if="fileError" class="file-error" role="alert">{{ fileError }}</p>
     <Transition name="mobile-left">
@@ -471,10 +474,6 @@ onBeforeUnmount(() => overview.cancel());
   .tree-resize {
     display: none;
   }
-  .toolbar-host :deep(.toolbar) {
-    border-width: 0 0 1px;
-    border-radius: 0;
-  }
   .workspace-status {
     margin-top: 0;
   }
@@ -502,12 +501,10 @@ onBeforeUnmount(() => overview.cancel());
 }
 .toolbar-host {
   grid-column: 1 / -1;
-  margin-bottom: var(--island-gap);
 }
-.toolbar-host :deep(.toolbar) {
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  background: var(--bg);
+/* Полоса действий вынесена в шапку (Teleport); на мобильном остаётся выпадающей панелью */
+.toolbar-host:not(.mobile-actions) {
+  display: none;
 }
 .workspace-status {
   grid-column: 1 / -1;
@@ -524,8 +521,6 @@ onBeforeUnmount(() => overview.cancel());
   box-shadow: var(--shadow-popover);
 }
 .mobile-actions :deep(.toolbar) {
-  border-width: 0;
-  border-radius: 0;
   flex-wrap: wrap;
   padding: var(--sp-2);
 }

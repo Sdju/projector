@@ -5,15 +5,12 @@ import DockTabs from "./DockTabs.vue";
 import DockSlot from "./DockSlot.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { tabDrag } from "../../../common/utilities/tab-drag.ts";
-import IconSplit from "~icons/lucide/columns-2";
 import IconMaximize from "~icons/lucide/maximize-2";
 import IconMinimize from "~icons/lucide/minimize-2";
-import IconHide from "~icons/lucide/eye-off";
 import {
   focusGroup,
   movePanel,
   reorderPanels,
-  setGroupHidden,
   toggleMaximized,
   type DockGroup,
   type DockTarget,
@@ -28,7 +25,6 @@ const zone = ref<DockZone | "">("");
 const focused = computed(() => dock.layout().focused === props.group.id);
 const maximized = computed(() => dock.layout().maximized === props.group.id);
 const tabs = computed(() => props.group.panels.map((id) => dock.describe(id)));
-const canSplit = computed(() => props.group.panels.length > 1);
 
 function zoneAt(event: DragEvent): DockZone {
   const bounds = body.value!.getBoundingClientRect();
@@ -147,20 +143,6 @@ const focus = () => {
         <UiButton
           icon
           size="sm"
-          :disabled="!canSplit"
-          title="Разделить вправо"
-          aria-label="Разделить вправо"
-          @click="
-            dock.update(
-              movePanel(dock.layout(), group.active, { groupId: group.id, zone: 'right' }),
-            )
-          "
-        >
-          <IconSplit aria-hidden="true" />
-        </UiButton>
-        <UiButton
-          icon
-          size="sm"
           :active="maximized"
           :title="maximized ? 'Вернуть размер блока' : 'Развернуть блок'"
           :aria-label="maximized ? 'Вернуть размер блока' : 'Развернуть блок'"
@@ -171,15 +153,6 @@ const focus = () => {
             v-else
             aria-hidden="true"
           />
-        </UiButton>
-        <UiButton
-          icon
-          size="sm"
-          title="Скрыть блок"
-          aria-label="Скрыть блок"
-          @click="dock.update(setGroupHidden(dock.layout(), group.id, true))"
-        >
-          <IconHide aria-hidden="true" />
         </UiButton>
       </div>
     </header>
