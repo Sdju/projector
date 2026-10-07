@@ -267,6 +267,11 @@ const navigatePath = (path: string) =>
   margin-bottom: var(--island-gap);
   padding-inline: var(--sp-2);
 }
+/* Логотип проекта встаёт по центру колонки иконок слева */
+.workspace .top :deep(.project-switcher .trigger) {
+  margin-inline-start: calc(-1 * var(--sp-2));
+  padding-inline-start: 5px;
+}
 .workspace main {
   flex: 1;
   min-height: 0;
