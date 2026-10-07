@@ -34,17 +34,15 @@ export function useDocker(
   let refreshing = false;
   let generation = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const containers = computed(() => {
+  const projectContainers = computed(() => {
     const data = snapshot.value;
-    if (!data) return [];
-    return data.containers.filter(
-      (item) =>
-        all.value ||
-        (data.binding &&
-          data.binding.context === data.context &&
-          item.project === data.binding.name),
-    );
+    const binding = data?.binding;
+    if (!data || !binding || binding.context !== data.context) return [];
+    return data.containers.filter((item) => item.project === binding.name);
   });
+  const containers = computed(() =>
+    all.value ? (snapshot.value?.containers ?? []) : projectContainers.value,
+  );
   const current = computed(() => containers.value.find((item) => item.id === selected.value));
   async function refresh() {
     if (refreshing) return snapshot.value;
@@ -356,7 +354,17 @@ export function useDocker(
     ++generation;
     clearTimeout(timer);
   });
-  const state = { snapshot, error, busy, all, selected, containers, current, commands };
+  const state = {
+    snapshot,
+    error,
+    busy,
+    all,
+    selected,
+    projectContainers,
+    containers,
+    current,
+    commands,
+  };
   provide(dockerKey, state);
   return state;
 }

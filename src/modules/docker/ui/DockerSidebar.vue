@@ -2,16 +2,7 @@
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiEmpty from "../../../common/ui/UiEmpty.vue";
 import { useDockerState } from "../model.ts";
-import { computed } from "vue";
-const { snapshot, error, commands } = useDockerState();
-const containers = computed(
-  () =>
-    snapshot.value?.containers.filter(
-      (item) =>
-        snapshot.value?.binding?.context === snapshot.value?.context &&
-        item.project === snapshot.value?.binding?.name,
-    ) ?? [],
-);
+const { snapshot, error, commands, projectContainers: containers } = useDockerState();
 </script>
 <template>
   <div class="docker-sidebar" @pointerdown="commands.scope.activate()">
