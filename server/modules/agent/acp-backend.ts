@@ -36,9 +36,10 @@ export function createAcpBackend(id: AgentBackendId): AgentBackend {
  * start; the `npx` fallback therefore runs outside the project. The session still gets the project
  * through `session/new`, so the agent's own config and files are unaffected.
  */
-function resolveLaunch(program: AcpProgram, cwd: string) {
-  const env = agentEnv();
-  if (program.binary && os.tools.commandExists(program.binary))
+async function resolveLaunch(program: AcpProgram, cwd: string) {
+  // Resolve programs the way a terminal session does, not through the server's own PATH.
+  const env = await os.tools.agentEnv(agentEnv());
+  if (program.binary && os.tools.commandExists(program.binary, env))
     return { command: program.binary, args: [] as string[], cwd, env };
   if (program.command === "npx")
     return { command: program.command, args: program.args, cwd: os.dataHome(), env };
@@ -52,7 +53,7 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
     throw new Error(`${program.label} работает внутри проекта: откройте чат в проекте`);
   await assertHostProject(options.cwd, program.label);
 
-  const child = os.tools.spawnAgentProcess(resolveLaunch(program, options.cwd));
+  const child = os.tools.spawnAgentProcess(await resolveLaunch(program, options.cwd));
   const mapper = createAcpEventMapper(options.emit, program.label);
   let sessionId = "";
   // `session/load` replays the whole conversation; those updates are history, not this answer.

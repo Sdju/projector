@@ -7,10 +7,14 @@ import { runPowerShell } from "./ps.ts";
 
 const execute = promisify(execFile);
 
-export function commandExists(bin: string): boolean {
+export function commandExists(bin: string, env?: Record<string, string | undefined>): boolean {
   if (existsSync(bin)) return true;
   try {
-    execFileSync("where.exe", [bin], { stdio: "ignore", windowsHide: true });
+    execFileSync("where.exe", [bin], {
+      stdio: "ignore",
+      windowsHide: true,
+      env: (env ?? process.env) as NodeJS.ProcessEnv,
+    });
     return true;
   } catch {
     return false;

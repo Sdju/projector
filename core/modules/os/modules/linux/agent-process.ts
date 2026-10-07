@@ -1,4 +1,5 @@
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import { shell } from "./directories.ts";
 import type { AgentProcess, AgentProcessSpec } from "../../contract.ts";
 
 /** How long a tree gets to exit on SIGTERM before SIGKILL. */
@@ -37,4 +38,40 @@ async function terminateTree(child: AgentProcess): Promise<void> {
   timer.unref();
   await closed;
   clearTimeout(timer);
+}
+
+const PATH_MARK = "__PROJECTOR_PATH__";
+let userPath: Promise<string | undefined> | undefined;
+
+/**
+ * The PATH an interactive terminal would have. The server often starts from a desktop launcher
+ * or a service manager whose PATH lacks what `.bashrc`/`.zshrc` add (`~/.local/bin`, `~/.opencode/bin`),
+ * while terminal sessions run `$SHELL -i -c exec <program>`. The result is cached for the process.
+ */
+function interactiveShellPath(): Promise<string | undefined> {
+  userPath ??= new Promise((resolve) => {
+    execFile(
+      shell(),
+      ["-i", "-c", `printf '${PATH_MARK}%s${PATH_MARK}' "$PATH"`],
+      { timeout: 5000, env: process.env },
+      (error, stdout) => {
+        const match = new RegExp(`${PATH_MARK}(.*)${PATH_MARK}`, "s").exec(String(stdout));
+        resolve(error && !match ? undefined : match?.[1] || undefined);
+      },
+    );
+  });
+  return userPath;
+}
+
+/** `base` with the user's interactive-shell PATH entries added after the server's own. */
+export async function agentEnv(
+  base: Record<string, string | undefined>,
+): Promise<Record<string, string | undefined>> {
+  const extra = await interactiveShellPath();
+  if (!extra) return base;
+  const seen = new Set<string>();
+  const merged = [...(base.PATH ?? "").split(":"), ...extra.split(":")].filter(
+    (entry) => entry && !seen.has(entry) && !!seen.add(entry),
+  );
+  return { ...base, PATH: merged.join(":") };
 }

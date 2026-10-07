@@ -2,9 +2,12 @@ import { execFile, execFileSync, spawn } from "node:child_process";
 import { promisify } from "node:util";
 
 const execute = promisify(execFile);
-export function commandExists(bin: string): boolean {
+export function commandExists(bin: string, env?: Record<string, string | undefined>): boolean {
   try {
-    execFileSync("which", [bin], { stdio: "ignore" });
+    execFileSync("which", [bin], {
+      stdio: "ignore",
+      env: (env ?? process.env) as NodeJS.ProcessEnv,
+    });
     return true;
   } catch {
     return false;

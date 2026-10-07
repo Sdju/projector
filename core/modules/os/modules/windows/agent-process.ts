@@ -36,3 +36,10 @@ async function terminateTree(child: AgentProcess): Promise<void> {
   else child.kill();
   await closed;
 }
+
+/** Windows services inherit the user's PATH, so the environment is used as is. */
+export async function agentEnv(
+  base: Record<string, string | undefined>,
+): Promise<Record<string, string | undefined>> {
+  return base;
+}

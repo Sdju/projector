@@ -676,6 +676,32 @@ test("ACP client times out silent requests but not when disabled", async () => {
   await expect(waiting).rejects.toThrow();
 });
 
+test("agent processes resolve programs through the interactive shell PATH", async () => {
+  if (process.platform === "win32") return;
+  const { mkdtemp, writeFile, chmod } = await import("node:fs/promises");
+  const { os } = await import("../core/modules/os/index.ts");
+  const dir = await mkdtemp(join(tmpdir(), "projector-shell-path-"));
+  await writeFile(join(dir, "fake-agent"), "#!/bin/sh\n");
+  await chmod(join(dir, "fake-agent"), 0o755);
+  // A throwaway shell whose rc adds a directory, like ~/.bashrc adds ~/.opencode/bin.
+  const shellPath = join(dir, "fake-shell");
+  await writeFile(shellPath, `#!/bin/sh\nPATH="$PATH:${dir}" exec /bin/sh -c "$3"\n`);
+  await chmod(shellPath, 0o755);
+  const previous = process.env.SHELL;
+  process.env.SHELL = shellPath;
+  try {
+    const base = { PATH: "/usr/bin:/bin" };
+    expect(os.tools.commandExists("fake-agent", base)).toBe(false);
+    const env = await os.tools.agentEnv(base);
+    expect(env.PATH.split(":")).toContain(dir);
+    expect(env.PATH.startsWith("/usr/bin:/bin")).toBe(true);
+    expect(os.tools.commandExists("fake-agent", env)).toBe(true);
+  } finally {
+    if (previous === undefined) delete process.env.SHELL;
+    else process.env.SHELL = previous;
+  }
+});
+
 test("the codex npx fallback is pinned to a version", async () => {
   const { ACP_PROGRAMS } = await import("../server/modules/agent/acp-programs.ts");
   expect(ACP_PROGRAMS.codex.args.at(-1)).toMatch(/^@agentclientprotocol\/codex-acp@\d+\.\d+\.\d+$/);
