@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { useCompactViewport } from "../../../common/utilities/compact-viewport.ts";
-import { computed, nextTick, ref } from "vue";
-import { onClickOutside, useEventListener } from "@vueuse/core";
+import UiIsland from "../../../common/ui/UiIsland.vue";
+import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
+import { computed } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { layoutPresets, type LayoutPreset } from "../lib/workbench-layout.ts";
 import IconLayout from "~icons/lucide/layout-template";
@@ -28,49 +28,22 @@ const titles: Record<LayoutPreset, { title: string; caption: string }> = {
   terminal: { title: "Терминалы", caption: "Только сессии" },
 };
 const roleTitles: Record<string, string> = { editor: "Редактор", terminal: "Терминалы" };
-const compact = useCompactViewport();
-const open = ref(false);
-const trigger = ref<HTMLElement>();
-const island = ref<HTMLElement>();
-const origin = ref({ right: 0, top: 0 });
+const menu = useIslandMenu({
+  anchor: "right",
+  initialFocus: [".preset.active", ".preset", ".block"],
+  horizontalArrows: true,
+});
+const { open, toggle, close } = menu;
 const shownBlocks = computed(() => props.groups.filter((group) => group.role));
 
-async function toggle(force = !open.value) {
-  if (force === open.value) return;
-  open.value = force;
-  if (force) {
-    const bounds = trigger.value!.getBoundingClientRect();
-    origin.value = { right: window.innerWidth - bounds.right, top: bounds.top };
-    await nextTick();
-    island.value?.querySelector<HTMLElement>(".preset.active, .preset, .block")?.focus();
-  } else trigger.value?.querySelector("button")?.focus();
-}
 function run(id: string, args?: unknown, keepOpen = false) {
   emit("command", id, args);
-  if (!keepOpen) void toggle(false);
+  if (!keepOpen) close();
 }
-function keydown(event: KeyboardEvent) {
-  if (event.key === "Escape") {
-    event.preventDefault();
-    void toggle(false);
-    return;
-  }
-  const arrows = ["ArrowDown", "ArrowUp", "ArrowRight", "ArrowLeft"];
-  if (!arrows.includes(event.key)) return;
-  const items = [...island.value!.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")];
-  const index = items.indexOf(document.activeElement as HTMLButtonElement);
-  const step = event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : -1;
-  event.preventDefault();
-  items[(index + step + items.length) % items.length]?.focus();
-}
-const close = () => open.value && void toggle(false);
-onClickOutside(island, close, { ignore: [trigger] });
-useEventListener(window, "resize", close);
-useEventListener(window, "blur", close);
 </script>
 
 <template>
-  <span ref="trigger" class="layout-trigger">
+  <span :ref="menu.trigger" class="layout-trigger">
     <UiButton
       icon
       size="sm"
@@ -78,112 +51,87 @@ useEventListener(window, "blur", close);
       aria-label="Раскладка"
       aria-haspopup="dialog"
       :aria-expanded="open"
+      :aria-controls="open ? menu.id : undefined"
       @click="toggle()"
     >
       <IconLayout aria-hidden="true" />
     </UiButton>
   </span>
-  <Teleport to="body">
-    <section
-      v-if="open"
-      ref="island"
-      class="island"
-      role="dialog"
-      aria-label="Управление раскладкой"
-      :class="{ 'mobile-sheet': compact }"
-      :style="compact ? undefined : { right: `${origin.right - 4}px`, top: `${origin.top - 4}px` }"
-      @keydown="keydown"
-    >
-      <button class="island-head" aria-label="Закрыть" @click="toggle(false)">
-        <span>Раскладка</span><IconLayout aria-hidden="true" />
-      </button>
-      <div v-if="presetsAvailable" class="presets" role="group" aria-label="Готовые раскладки">
-        <button
-          v-for="name in layoutPresets"
-          :key="name"
-          class="preset"
-          :class="{ active: preset === name }"
-          :aria-pressed="preset === name"
-          data-command="ide.workbench.layout.preset"
-          @click="run('ide.workbench.layout.preset', { preset: name })"
-        >
-          <span class="diagram" :class="`is-${name}`" aria-hidden="true">
-            <i class="side" />
-            <span class="stage">
-              <i v-if="name !== 'terminal'" class="editor" />
-              <i v-if="name !== 'editor'" class="terminal" />
-            </span>
-          </span>
-          <span class="name">{{ titles[name].title }}</span>
-          <span class="caption">{{ titles[name].caption }}</span>
-        </button>
-      </div>
-      <div class="blocks" role="group" aria-label="Блоки">
-        <button
-          class="block"
-          :class="{ off: sidebarHidden }"
-          :aria-pressed="!sidebarHidden"
-          data-command="ide.workbench.sidebar.toggle"
-          @click="run('ide.workbench.sidebar.toggle', undefined, true)"
-        >
-          <IconSidebar aria-hidden="true" />
-          <span class="copy">
-            <span class="name">Боковая панель</span>
-            <span class="caption">{{ sidebarHidden ? "скрыта" : "показана" }}</span>
-          </span>
-        </button>
-        <button
-          v-for="group in shownBlocks"
-          :key="group.id"
-          class="block"
-          :class="{ off: group.hidden }"
-          :aria-pressed="!group.hidden"
-          data-command="ide.workbench.layout.group.toggle"
-          @click="run('ide.workbench.layout.group.toggle', { group: group.id }, true)"
-        >
-          <component :is="group.hidden ? IconEyeOff : IconEye" aria-hidden="true" />
-          <span class="copy">
-            <span class="name">{{ roleTitles[group.role!] ?? group.label }}</span>
-            <span class="caption">{{
-              group.hidden
-                ? "скрыт"
-                : group.label === roleTitles[group.role!]
-                  ? "показан"
-                  : group.label
-            }}</span>
-          </span>
-        </button>
-      </div>
+  <UiIsland :menu="menu" label="Управление раскладкой" gap="var(--sp-2)">
+    <button class="island-head" aria-label="Закрыть" @click="toggle(false)">
+      <span>Раскладка</span><IconLayout aria-hidden="true" />
+    </button>
+    <div v-if="presetsAvailable" class="presets" role="group" aria-label="Готовые раскладки">
       <button
-        class="reset"
-        data-command="ide.workbench.layout.reset"
-        @click="run('ide.workbench.layout.reset')"
+        v-for="name in layoutPresets"
+        :key="name"
+        class="preset"
+        :class="{ active: preset === name }"
+        :aria-pressed="preset === name"
+        data-command="ide.workbench.layout.preset"
+        @click="run('ide.workbench.layout.preset', { preset: name })"
       >
-        <IconReset aria-hidden="true" />Сбросить раскладку
+        <span class="diagram" :class="`is-${name}`" aria-hidden="true">
+          <i class="side" />
+          <span class="stage">
+            <i v-if="name !== 'terminal'" class="editor" />
+            <i v-if="name !== 'editor'" class="terminal" />
+          </span>
+        </span>
+        <span class="name">{{ titles[name].title }}</span>
+        <span class="caption">{{ titles[name].caption }}</span>
       </button>
-    </section>
-  </Teleport>
+    </div>
+    <div class="blocks" role="group" aria-label="Блоки">
+      <button
+        class="block"
+        :class="{ off: sidebarHidden }"
+        :aria-pressed="!sidebarHidden"
+        data-command="ide.workbench.sidebar.toggle"
+        @click="run('ide.workbench.sidebar.toggle', undefined, true)"
+      >
+        <IconSidebar aria-hidden="true" />
+        <span class="copy">
+          <span class="name">Боковая панель</span>
+          <span class="caption">{{ sidebarHidden ? "скрыта" : "показана" }}</span>
+        </span>
+      </button>
+      <button
+        v-for="group in shownBlocks"
+        :key="group.id"
+        class="block"
+        :class="{ off: group.hidden }"
+        :aria-pressed="!group.hidden"
+        data-command="ide.workbench.layout.group.toggle"
+        @click="run('ide.workbench.layout.group.toggle', { group: group.id }, true)"
+      >
+        <component :is="group.hidden ? IconEyeOff : IconEye" aria-hidden="true" />
+        <span class="copy">
+          <span class="name">{{ roleTitles[group.role!] ?? group.label }}</span>
+          <span class="caption">{{
+            group.hidden
+              ? "скрыт"
+              : group.label === roleTitles[group.role!]
+                ? "показан"
+                : group.label
+          }}</span>
+        </span>
+      </button>
+    </div>
+    <button
+      class="reset"
+      data-command="ide.workbench.layout.reset"
+      @click="run('ide.workbench.layout.reset')"
+    >
+      <IconReset aria-hidden="true" />Сбросить раскладку
+    </button>
+  </UiIsland>
 </template>
 
 <style scoped>
 .layout-trigger {
   display: inline-flex;
   flex-shrink: 0;
-}
-.island {
-  position: fixed;
-  z-index: var(--z-popover);
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-  width: 340px;
-  max-width: calc(100vw - var(--sp-4));
-  padding: var(--sp-1);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-lg);
-  background: var(--bg-2);
-  box-shadow: var(--shadow-popover);
-  font-size: var(--fs-xs);
 }
 /* Шапка стоит на месте кнопки: остров выглядит выросшей из неё рамкой */
 .island-head {

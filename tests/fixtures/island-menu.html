@@ -1,0 +1,344 @@
+<!doctype html>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<div id="fixture"></div>
+<pre id="result">WAITING</pre>
+<script type="module">
+  import "/src/app/styles.css";
+  import { createApp, h, ref, nextTick } from "vue";
+  import RunMenu from "/src/modules/runner/ui/RunMenu.vue";
+  import LayoutMenu from "/src/modules/workspace/ui/LayoutMenu.vue";
+  import NewSessionMenu from "/src/modules/workspace/ui/NewSessionMenu.vue";
+  import { provideIdeCommands } from "/src/modules/ide/index.ts";
+  const requests = [],
+    actions = [],
+    errors = [];
+  const originalFetch = window.fetch;
+  window.fetch = async (input, options = {}) => {
+    if (input === "/api/health")
+      return Response.json({
+        ok: true,
+        app: "projector",
+        pid: 10,
+        mode: "dev",
+        network: { mode: "local" },
+      });
+    if (typeof input === "string" && input.startsWith("/api/")) {
+      requests.push([input, options.body]);
+      return Response.json({
+        runtime: { projectId: "fixture", status: "running" },
+        url: "",
+        bindings: [],
+      });
+    }
+    return originalFetch(input, options);
+  };
+  window.addEventListener("error", (event) => errors.push(event.message));
+  const busy = ref(false),
+    agent = ref(true),
+    mounted = ref(true),
+    preset = ref("terminal");
+  const project = ref({
+    id: "fixture",
+    name: "Fixture",
+    path: "/tmp/fixture",
+    url: "",
+    icon: "",
+    mode: "server",
+    defaultCommandId: "dev",
+    createdAt: "",
+    commands: [
+      { id: "dev", name: "Dev", cmd: "echo dev" },
+      { id: "test", name: "Test", cmd: "echo test" },
+    ],
+  });
+  const groups = ref([
+    { id: "editor", role: "editor", label: "Редактор", hidden: false },
+    { id: "terminal", role: "terminal", label: "Терминалы", hidden: false },
+  ]);
+  let api;
+  const app = createApp({
+    setup() {
+      provideIdeCommands();
+      api = window.projector.ide;
+      api
+        .createScope("editor:fixture", () => ({ surface: "editor" }))
+        .registerCommand({
+          id: "ide.workbench.project.settings.open",
+          title: "Settings fixture",
+          run: () => actions.push(["settings"]),
+        });
+      const command = (id, args) => actions.push([id, args]);
+      return () =>
+        h("div", [
+          h(
+            "div",
+            {
+              style:
+                "display:flex;gap:10px;align-items:center;padding:20px;justify-content:space-between;",
+            },
+            [
+              h("input", {
+                id: "outside",
+                placeholder: "Поле вне меню",
+                "aria-label": "Поле вне меню",
+              }),
+              mounted.value
+                ? h(NewSessionMenu, { busy: busy.value, agent: agent.value, onCommand: command })
+                : null,
+              mounted.value
+                ? h(LayoutMenu, {
+                    groups: groups.value,
+                    preset: preset.value,
+                    presetsAvailable: true,
+                    sidebarHidden: false,
+                    onCommand: command,
+                  })
+                : null,
+              mounted.value ? h(RunMenu, { project: project.value }) : null,
+            ],
+          ),
+          h(
+            "button",
+            { id: "busy", onClick: () => (busy.value = !busy.value) },
+            "Переключить busy",
+          ),
+          h(
+            "button",
+            { id: "unmount", onClick: () => (mounted.value = !mounted.value) },
+            "Переключить mount",
+          ),
+        ]);
+    },
+  });
+  app.mount("#fixture");
+  window.islandFixture = { busy, agent, mounted, project, api, actions, requests, errors };
+  const check = (value, label) => {
+    if (!value) throw new Error(label);
+  };
+  const key = (value, options = {}) =>
+    document.activeElement.dispatchEvent(
+      new KeyboardEvent("keydown", { key: value, bubbles: true, cancelable: true, ...options }),
+    );
+  const click = (element) => {
+    element.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    element.click();
+  };
+  const dialog = () => document.querySelector('.island[role="dialog"]');
+  const wait = async (condition, label) => {
+    const deadline = Date.now() + 8000;
+    while (!condition()) {
+      if (Date.now() > deadline) throw new Error(label);
+      await originalFetch("/__tick");
+    }
+  };
+  const open = async (trigger) => {
+    click(trigger);
+    await nextTick();
+    await originalFetch("/__tick");
+    check(!!dialog(), "opens island");
+    for (const animation of dialog().getAnimations()) animation.finish();
+    check(trigger.getAttribute("aria-controls") === dialog().id, "trigger associates dialog");
+  };
+  const close = async (trigger) => {
+    key("Escape");
+    await nextTick();
+    check(!dialog(), "Escape closes");
+    check(document.activeElement === trigger, "Escape restores trigger");
+  };
+  if (!new URLSearchParams(location.search).has("manual"))
+    (async () => {
+      try {
+        const triggers = [
+          document.querySelector(".new-session button"),
+          document.querySelector(".layout-trigger button"),
+          document.querySelector(".run .arrow"),
+        ];
+        for (const trigger of triggers) {
+          await open(trigger);
+          check(dialog().parentElement === document.body, "Teleport to body");
+          const rect = dialog().getBoundingClientRect();
+          check(
+            rect.left >= 0 && rect.right <= innerWidth && rect.bottom <= innerHeight + 1,
+            "bounded geometry",
+          );
+          check(
+            dialog().classList.contains("mobile-sheet") === innerWidth <= 700,
+            "responsive sheet",
+          );
+          if (trigger === triggers[0]) {
+            check(document.activeElement.textContent.includes("Shell"), "first session focused");
+            key("ArrowUp");
+            await nextTick();
+            check(
+              document.activeElement.textContent.includes("Чат с агентом"),
+              "wrap reaches agent",
+            );
+            key("ArrowDown");
+            await nextTick();
+            check(document.activeElement.textContent.includes("Shell"), "wrap returns shell");
+            key("ArrowRight");
+            check(document.activeElement.textContent.includes("Shell"), "horizontal ignored");
+          } else if (trigger === triggers[1]) {
+            check(document.activeElement.classList.contains("active"), "selected preset focused");
+            key("ArrowRight");
+            check(
+              document.activeElement.classList.contains("block"),
+              "layout horizontal navigation",
+            );
+            const sidebar = dialog().querySelector('[data-command="ide.workbench.sidebar.toggle"]');
+            click(sidebar);
+            await nextTick();
+            check(!!dialog(), "visibility action keeps island open");
+            check(actions.at(-1)[0] === "ide.workbench.sidebar.toggle", "layout command emitted");
+          } else {
+            check(document.activeElement.classList.contains("main"), "scenario focused");
+            key("ArrowDown");
+            check(
+              document.activeElement.getAttribute("aria-label") === "Запустить Dev в окне",
+              "run navigates window action",
+            );
+          }
+          const focus = document.activeElement;
+          key("ArrowDown", { isComposing: true });
+          check(document.activeElement === focus, "IME composition does not navigate");
+          await close(trigger);
+          await open(trigger);
+          window.dispatchEvent(new Event("resize"));
+          await nextTick();
+          check(!dialog(), "resize closes");
+          await open(trigger);
+          window.dispatchEvent(new Event("blur"));
+          await nextTick();
+          check(!dialog(), "blur closes");
+          await open(trigger);
+          const outside = document.querySelector("#outside");
+          outside.focus();
+          click(outside);
+          await nextTick();
+          check(
+            !dialog() && document.activeElement === outside,
+            "outside click preserves target focus",
+          );
+        }
+        await open(triggers[0]);
+        key("Tab");
+        await nextTick();
+        check(!dialog(), "session closes on Tab");
+        for (const trigger of triggers.slice(1)) {
+          await open(trigger);
+          key("Tab");
+          await nextTick();
+          check(!!dialog(), "run/layout retain Tab policy");
+          await close(trigger);
+        }
+        busy.value = true;
+        await nextTick();
+        await open(triggers[0]);
+        check(
+          document.activeElement.textContent.includes("Чат с агентом"),
+          "disabled terminal rows skipped",
+        );
+        key("ArrowDown");
+        check(
+          document.activeElement.textContent.includes("Чат с агентом"),
+          "only enabled row cycles",
+        );
+        await close(triggers[0]);
+        agent.value = false;
+        await nextTick();
+        await open(triggers[0]);
+        check(
+          document.activeElement.classList.contains("island-head"),
+          "no available rows focuses close",
+        );
+        await close(triggers[0]);
+        busy.value = false;
+        agent.value = true;
+        await nextTick();
+        await open(triggers[0]);
+        click(dialog().querySelector(".row"));
+        await nextTick();
+        check(
+          !dialog() &&
+            actions.at(-1)[0] === "ide.workbench.terminal.new" &&
+            actions.at(-1)[1].program === "shell",
+          "session command and close",
+        );
+        await open(triggers[1]);
+        click(dialog().querySelector(".preset"));
+        await nextTick();
+        check(
+          !dialog() && actions.at(-1)[0] === "ide.workbench.layout.preset",
+          "preset command and close",
+        );
+        const runScope = api.getScopes().find((item) => item.context.surface === "project-run").id;
+        await api.executeCommand("ide.project.run.menu.toggle", undefined, { scope: runScope });
+        await nextTick();
+        check(!!dialog(), "SDK opens run menu");
+        click(dialog().querySelector(".item.main"));
+        await nextTick();
+        await wait(() => requests.some(([url]) => url.endsWith("/start")), "run request");
+        check(
+          !dialog() &&
+            JSON.parse(requests.find(([url]) => url.endsWith("/start"))[1]).commandId === "dev",
+          "run action uses existing command",
+        );
+        project.value = {
+          ...project.value,
+          runtime: { projectId: "fixture", status: "starting", url: null },
+        };
+        await nextTick();
+        await open(triggers[2]);
+        const enabled = [...dialog().querySelectorAll("button:not(:disabled)")];
+        for (let i = 0; i < enabled.length + 1; i++) {
+          key("ArrowDown");
+          check(!document.activeElement.disabled, "run disabled scenarios skipped");
+        }
+        await close(triggers[2]);
+        project.value = {
+          ...project.value,
+          runtime: undefined,
+          commands: Array.from({ length: 50 }, (_, index) => ({
+            id: "task-" + index,
+            name: "Task " + index,
+            cmd: "echo " + index,
+          })),
+        };
+        await nextTick();
+        await open(triggers[2]);
+        check(dialog().scrollHeight > dialog().clientHeight, "long scenario menu scrolls");
+        dialog().querySelector(".settings").focus();
+        const settingsBounds = document.activeElement.getBoundingClientRect();
+        check(
+          settingsBounds.top >= 0 && settingsBounds.bottom <= innerHeight,
+          "last scenario action remains reachable",
+        );
+        await close(triggers[2]);
+        await open(triggers[0]);
+        mounted.value = false;
+        await nextTick();
+        check(!dialog(), "unmount removes Teleport");
+        const outside = document.querySelector("#outside");
+        outside.focus();
+        window.dispatchEvent(new Event("resize"));
+        window.dispatchEvent(new Event("blur"));
+        await nextTick();
+        check(document.activeElement === outside, "disposed handlers do not steal focus");
+        mounted.value = true;
+        await nextTick();
+        const trigger = document.querySelector(".new-session button");
+        click(trigger);
+        click(trigger);
+        await nextTick();
+        check(!dialog(), "rapid toggle ignores pending opening");
+        check(errors.length === 0, "no runtime errors: " + errors.join(";"));
+        app.unmount();
+        window.fetch = originalFetch;
+        document.getElementById("result").textContent = "PASS";
+      } catch (error) {
+        document.getElementById("result").textContent = "FAIL: " + error.stack;
+        app.unmount();
+        window.fetch = originalFetch;
+      }
+    })();
+</script>
