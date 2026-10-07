@@ -3,6 +3,7 @@ import { computed, inject, ref, watch } from "vue";
 import DockTabs from "./DockTabs.vue";
 import DockSlot from "./DockSlot.ts";
 import { dockKey } from "./context.ts";
+import { activatePanel } from "../model/layout.ts";
 import { mobileDockSurfaces } from "../model/mobile-surfaces.ts";
 
 const props = defineProps<{
@@ -37,7 +38,9 @@ watch(
   (side) => {
     if (side === "files") return;
     const surface = surfaces.value.find((item) => item.side === side);
-    if (surface?.active) dock.select(surface.active);
+    // Focus the panel through the layout only: `dock.select` also cancels a file that is still being opened,
+    // and opening a file from the tree switches to this surface right after the request starts.
+    if (surface?.active) dock.update(activatePanel(dock.layout(), surface.active));
   },
   { flush: "post" },
 );
