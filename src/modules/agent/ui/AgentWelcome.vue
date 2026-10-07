@@ -5,7 +5,10 @@ import IconGit from "~icons/lucide/git-branch";
 import IconTerminal from "~icons/lucide/terminal";
 import IconCornerDownLeft from "~icons/lucide/corner-down-left";
 
-withDefaults(defineProps<{ plain?: boolean }>(), { plain: false });
+withDefaults(defineProps<{ plain?: boolean; agentName?: string }>(), {
+  plain: false,
+  agentName: "Агент",
+});
 const emit = defineEmits<{ suggest: [text: string] }>();
 const suggestions = [
   {
@@ -33,7 +36,7 @@ const suggestions = [
   <div class="welcome">
     <div class="welcome-mark"><IconBot aria-hidden="true" /></div>
     <h1>С чего начнём?</h1>
-    <p v-if="plain">Claude Code работает в папке проекта<br />так же, как в терминале.</p>
+    <p v-if="plain">{{ agentName }} работает в папке проекта<br />так же, как в терминале.</p>
     <p v-else>Помогу разобраться в проекте<br />и выполнить нужные действия.</p>
     <div v-if="!plain" class="suggestions">
       <button

@@ -3,7 +3,13 @@ import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import * as linux from "./modules/linux/index.ts";
 import * as windows from "./modules/windows/index.ts";
-import type { DesktopAction, ResidentOptions, SecretKey, ShellLaunch } from "./contract.ts";
+import type {
+  AgentProcessSpec,
+  DesktopAction,
+  ResidentOptions,
+  SecretKey,
+  ShellLaunch,
+} from "./contract.ts";
 
 export class UnsupportedPlatformError extends Error {
   readonly code = "ERR_OS_UNSUPPORTED";
@@ -66,6 +72,8 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
     },
     tools: {
       commandExists: (bin: string) => backend("commandExists").commandExists(bin),
+      spawnAgentProcess: (spec: AgentProcessSpec) =>
+        backend("spawnAgentProcess").spawnAgentProcess(spec),
       readClaudeAccessToken: () => backend("readClaudeAccessToken").readClaudeAccessToken(),
       readOpenCodeGoKey: () => backend("readOpenCodeGoKey").readOpenCodeGoKey(),
       readCursorAccessToken: () => backend("readCursorAccessToken").readCursorAccessToken(),

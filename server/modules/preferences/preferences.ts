@@ -18,7 +18,7 @@ interface Preferences {
 
 export type AgentSessionMode = "tui" | "gui";
 /** Programs whose sessions can be shown as a chat; everything else is always a terminal. */
-export const GUI_AGENT_PROGRAMS: readonly string[] = ["claude"];
+export const GUI_AGENT_PROGRAMS: readonly string[] = ["claude", "codex", "opencode", "cursor"];
 
 const preferencesPath = () => join(dataDir(), "launcher.json");
 let saving: Promise<unknown> = Promise.resolve();

@@ -95,11 +95,11 @@ export async function streamAgent(
 }
 
 /** Answers a `permission-request` event; the ID is a single-use capability from that stream. */
-export async function answerPermission(id: string, allow: boolean): Promise<void> {
+export async function answerPermission(id: string, allow: boolean, always = false): Promise<void> {
   const response = await fetch("/api/agent/tool-result", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id, output: { allow } }),
+    body: JSON.stringify({ id, output: { allow, always } }),
   });
   if (!response.ok) throw new Error("Запрос разрешения уже закрыт");
 }

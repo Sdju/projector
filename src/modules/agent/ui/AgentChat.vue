@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useIdeCommands } from "../../ide/index.ts";
 import { useProjects } from "../../project/index.ts";
 import { agentCommandHandler } from "../model/commands.ts";
+import { agentLabel } from "../model/modes.ts";
 import { useAgent } from "../model/session.ts";
 import { readoutLines, useTabReadout } from "../../../common/utilities/tab-readout.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
@@ -21,9 +22,10 @@ const props = withDefaults(
   defineProps<{ projectId: string; backend?: AgentBackendId; chatId?: string }>(),
   { backend: "projector", chatId: undefined },
 );
-/** Claude Code is the plain coding agent: no Projector tools, its own approvals. */
-const plain = computed(() => props.backend === "claude-code");
-const agentName = computed(() => (plain.value ? "Claude Code" : "Projector"));
+/** External agents are plain coding agents: no Projector tools, their own approvals. */
+const plain = computed(() => props.backend !== "projector");
+const claude = computed(() => props.backend === "claude-code");
+const agentName = computed(() => agentLabel(props.backend));
 const { api } = useIdeCommands();
 const { projects } = useProjects();
 const projectName = computed(
@@ -163,7 +165,9 @@ onBeforeUnmount(() => {
     <header class="chat-header">
       <div class="identity">
         <span class="header-mark"
-          ><IconClaude v-if="plain" aria-hidden="true" /><IconBot v-else aria-hidden="true" /></span
+          ><IconClaude v-if="claude" aria-hidden="true" /><IconBot
+            v-else
+            aria-hidden="true" /></span
         ><span class="agent-name">{{ agentName }}</span>
       </div>
       <span class="project-context" :title="projectName"
@@ -186,7 +190,12 @@ onBeforeUnmount(() => {
       </div>
     </header>
     <div ref="log" class="chat-log" @scroll.passive="trackScroll">
-      <AgentWelcome v-if="!turns.length" :plain="plain" @suggest="suggest" />
+      <AgentWelcome
+        v-if="!turns.length"
+        :plain="plain"
+        :agent-name="agentName"
+        @suggest="suggest"
+      />
       <div
         v-else
         class="conversation"
@@ -220,7 +229,7 @@ onBeforeUnmount(() => {
       @stop="stop"
       @latest="toBottom"
     >
-      <template v-if="plain" #footer>
+      <template v-if="claude" #footer>
         <AgentPermissionMode v-model="permissionMode" :disabled="busy" />
       </template>
     </AgentComposer>

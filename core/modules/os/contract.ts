@@ -1,4 +1,19 @@
+import type { ChildProcessWithoutNullStreams } from "node:child_process";
+
 export type DesktopAction = "show" | "toggle" | "tray" | "quit";
+
+/** A long-lived ACP server process a coding agent runs over stdio. */
+export interface AgentProcessSpec {
+  command: string;
+  args: string[];
+  cwd?: string;
+  env?: Record<string, string | undefined>;
+}
+
+export type AgentProcess = ChildProcessWithoutNullStreams & {
+  /** Kills the whole process tree (shell grandchildren included) and waits for exit. */
+  terminate(): Promise<void>;
+};
 
 export interface ProcessInfo {
   pid: number;

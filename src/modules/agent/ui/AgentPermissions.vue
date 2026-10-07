@@ -4,7 +4,7 @@ import type { AgentPermission } from "../model/types.ts";
 import IconShield from "~icons/lucide/shield-question";
 
 defineProps<{ permissions: AgentPermission[] }>();
-const emit = defineEmits<{ decide: [id: string, allow: boolean] }>();
+const emit = defineEmits<{ decide: [id: string, allow: boolean, always?: boolean] }>();
 </script>
 
 <template>
@@ -24,6 +24,15 @@ const emit = defineEmits<{ decide: [id: string, allow: boolean] }>();
       <div class="actions">
         <UiButton variant="solid" size="sm" @click="emit('decide', item.id, true)">
           Разрешить
+        </UiButton>
+        <UiButton
+          v-if="item.persistent"
+          variant="ghost"
+          size="sm"
+          title="Разрешить и больше не спрашивать про этот инструмент"
+          @click="emit('decide', item.id, true, true)"
+        >
+          Всегда разрешать
         </UiButton>
         <UiButton variant="ghost" size="sm" @click="emit('decide', item.id, false)">
           Отклонить

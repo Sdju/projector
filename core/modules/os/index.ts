@@ -6,4 +6,6 @@ export type {
   ResidentOptions,
   SecretKey,
   ShellLaunch,
+  AgentProcess,
+  AgentProcessSpec,
 } from "./contract.ts";

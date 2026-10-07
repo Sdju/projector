@@ -5,7 +5,23 @@ export type AgentSessionMode = "tui" | "gui";
 /** Terminal programs with a graphical chat and the IDE command that opens it. */
 export const guiPrograms: Record<string, { title: string; command: string }> = {
   claude: { title: "Claude Code", command: "ide.workbench.claude.open" },
+  codex: { title: "Codex", command: "ide.workbench.codex.open" },
+  opencode: { title: "OpenCode", command: "ide.workbench.opencode.open" },
+  cursor: { title: "Cursor", command: "ide.workbench.cursor.open" },
 };
+
+/** Chat header and welcome copy for each backend. */
+const agentLabels: Record<string, string> = {
+  projector: "Projector",
+  "claude-code": "Claude Code",
+  codex: "Codex",
+  opencode: "OpenCode",
+  cursor: "Cursor",
+};
+
+export function agentLabel(backend: string | undefined): string {
+  return agentLabels[backend ?? "projector"] ?? "Агент";
+}
 
 const state = reactive({
   modes: {} as Record<string, AgentSessionMode>,

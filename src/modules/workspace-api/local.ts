@@ -14,6 +14,23 @@ async function send(url: string, method: string, body: unknown, failure: string)
   return data;
 }
 
+/** A plain coding agent behind a chat instead of the TUI; every opening is a new conversation. */
+function agentChatTab(program: string, label: string, description: string) {
+  return defineTab<{ chatId?: string }>({
+    id: program,
+    key: (params) => `${program}:${params.chatId ?? "main"}`,
+    path: () => label,
+    title: () => `${label} в графическом чате`,
+    create: () => ({ chatId: crypto.randomUUID() }),
+    command: {
+      id: `ide.workbench.${program}.open`,
+      title: `Новая сессия ${label} (GUI)`,
+      description,
+      requires: "agent",
+    },
+  });
+}
+
 /** The project directory served by the Projector backend: full capabilities. */
 export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile {
   const read = async (action: string, params: Record<string, string>, signal?: AbortSignal) => {
@@ -36,21 +53,27 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
           requires: "agent",
         },
       }),
-      // Plain Claude Code behind a chat instead of the TUI; every opening is a new conversation.
-      defineTab<{ chatId?: string }>({
-        id: "claude",
-        key: (params) => `claude:${params.chatId ?? "main"}`,
-        path: () => "Claude Code",
-        title: () => "Claude Code в графическом чате",
-        create: () => ({ chatId: crypto.randomUUID() }),
-        command: {
-          id: "ide.workbench.claude.open",
-          title: "Новая сессия Claude Code (GUI)",
-          description:
-            "Открывает вкладку с Claude Code в графическом чате вместо терминала: отдельный диалог в папке проекта, запросы разрешений в чате.",
-          requires: "agent",
-        },
-      }),
+      // Plain coding agents behind a chat instead of the TUI; every opening is a new conversation.
+      agentChatTab(
+        "claude",
+        "Claude Code",
+        "Открывает вкладку с Claude Code в графическом чате вместо терминала: отдельный диалог в папке проекта, запросы разрешений в чате.",
+      ),
+      agentChatTab(
+        "codex",
+        "Codex",
+        "Открывает вкладку с Codex в графическом чате вместо терминала: отдельный диалог в папке проекта, запросы разрешений в чате.",
+      ),
+      agentChatTab(
+        "opencode",
+        "OpenCode",
+        "Открывает вкладку с OpenCode в графическом чате вместо терминала: отдельный диалог в папке проекта, запросы разрешений в чате.",
+      ),
+      agentChatTab(
+        "cursor",
+        "Cursor",
+        "Открывает вкладку с Cursor в графическом чате вместо терминала: отдельный диалог в папке проекта, запросы разрешений в чате.",
+      ),
       singletonTab("project", "settings:project", "Настройки проекта", "Настройки проекта", {
         subtitle: "иконка, запуск и сценарии",
         command: {

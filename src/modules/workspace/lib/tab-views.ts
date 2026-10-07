@@ -33,6 +33,17 @@ export interface TabView {
 }
 export type TabViews = Record<string, TabView>;
 
+/** A chat tab of one external agent: its own conversation, history and approvals. */
+const agentChat = (backend: string): TabView => ({
+  component: AgentChat,
+  keepAlive: true,
+  props: (tab, host) => ({
+    projectId: host.projectId,
+    backend,
+    chatId: tab.params?.chatId,
+  }),
+});
+
 /** What a view may ask of the workspace that shows it. */
 export interface TabHost {
   projectId: string;
@@ -52,15 +63,10 @@ export const baseTabViews: TabViews = {
     keepAlive: true,
     props: (_, host) => ({ projectId: host.projectId }),
   },
-  claude: {
-    component: AgentChat,
-    keepAlive: true,
-    props: (tab, host) => ({
-      projectId: host.projectId,
-      backend: "claude-code",
-      chatId: tab.params?.chatId,
-    }),
-  },
+  claude: agentChat("claude-code"),
+  codex: agentChat("codex"),
+  opencode: agentChat("opencode"),
+  cursor: agentChat("cursor"),
   issue: {
     component: IssueView,
     keepAlive: true,

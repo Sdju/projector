@@ -38,7 +38,7 @@ const saves = new Map<string, Promise<void>>();
 export function useAgent(
   projectId = "",
   commands?: (request: AgentCommandRequest) => Promise<unknown>,
-  /** `claude-code` chats are separate conversations: one per `chatId`, no Projector tools. */
+  /** External-agent chats are separate conversations: one per `chatId`, no Projector tools. */
   options: { backend?: AgentBackendId; chatId?: string } = {},
 ) {
   const backend = options.backend ?? "projector";
@@ -115,10 +115,10 @@ export function useAgent(
     return state.turns.findLast((item) => item.role === "assistant")?.session?.id;
   }
 
-  async function decide(id: string, allow: boolean): Promise<void> {
+  async function decide(id: string, allow: boolean, always = false): Promise<void> {
     state.permissions = state.permissions.filter((item) => item.id !== id);
     try {
-      await answerPermission(id, allow);
+      await answerPermission(id, allow, always);
     } catch (err) {
       state.error = err instanceof Error ? err.message : "Не удалось передать решение";
     }
@@ -171,7 +171,8 @@ export function useAgent(
               id: event.data.id,
               tool: event.data.tool,
               title: event.data.title || event.data.tool,
-              detail: summarize(event.data.input),
+              detail: event.data.detail?.trim() || summarize(event.data.input),
+              persistent: event.data.persistent === true,
             });
           if (event.event === "text") assistant.text += event.data.text;
           if (event.event === "tool") {

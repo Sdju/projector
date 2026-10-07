@@ -14,7 +14,14 @@ export interface ApprovalRequest {
   input: unknown;
   /** Backend-provided one-line label, e.g. "Edit src/main.ts". */
   title?: string;
+  /** What exactly will happen (diff, command, arguments), shown under the title. */
+  detail?: string;
+  /** The backend can remember the decision, so the prompt offers a separate "always" choice. */
+  persistent?: boolean;
 }
+
+/** `true` allows this call once, `"always"` also remembers it; `false` denies. */
+export type ApprovalAnswer = boolean | "always";
 
 type BridgeResult = { output?: unknown; error?: string };
 const pending = new Map<string, (result: BridgeResult) => void>();
@@ -66,7 +73,7 @@ export function createApprovalBridge(
   signal: AbortSignal,
   timeoutMs = 10 * 60_000,
 ) {
-  return async (request: ApprovalRequest): Promise<boolean> => {
+  return async (request: ApprovalRequest): Promise<ApprovalAnswer> => {
     const output = await bridgeRequest(
       (data) => emit("permission-request", data),
       request,
@@ -74,7 +81,9 @@ export function createApprovalBridge(
       timeoutMs,
       "Разрешение не получено вовремя",
     );
-    return (output as { allow?: unknown } | undefined)?.allow === true;
+    const answer = output as { allow?: unknown; always?: unknown } | undefined;
+    if (answer?.allow !== true) return false;
+    return answer.always === true ? "always" : true;
   };
 }
 

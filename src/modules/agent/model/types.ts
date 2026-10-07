@@ -7,7 +7,7 @@ export interface AgentToolChip {
   detail: string;
 }
 
-export type AgentBackendId = "projector" | "claude-code";
+export type AgentBackendId = "projector" | "claude-code" | "codex" | "opencode" | "cursor";
 
 export type AgentPermissionMode = "default" | "acceptEdits" | "bypassPermissions";
 
@@ -31,6 +31,8 @@ export interface AgentPermission {
   tool: string;
   title: string;
   detail: string;
+  /** The backend offers a durable "always" choice for this tool. */
+  persistent: boolean;
 }
 
 export interface AgentHistoryTurn {
@@ -51,7 +53,14 @@ export type AgentEvent =
   | { event: "command-request"; data: AgentCommandRequest }
   | {
       event: "permission-request";
-      data: { id: string; tool: string; input: unknown; title?: string };
+      data: {
+        id: string;
+        tool: string;
+        input: unknown;
+        title?: string;
+        detail?: string;
+        persistent?: boolean;
+      };
     }
   | { event: "session"; data: AgentSessionRef }
   | { event: "status"; data: { phase: string; provider?: string; model?: string } }

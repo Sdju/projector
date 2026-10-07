@@ -390,6 +390,318 @@ test("Claude Code messages become the shared chat events", async () => {
   expect(failed[0]).toStrictEqual(["error", { error: "no session" }]);
 });
 
+test("ACP session updates become the shared chat events", async () => {
+  const { createAcpEventMapper } = await import("../server/modules/agent/acp-events.ts");
+  const events = [];
+  const mapper = createAcpEventMapper((event, data) => events.push([event, data]), "OpenCode");
+  mapper.handleUpdate("s1", {
+    sessionUpdate: "agent_thought_chunk",
+    content: { type: "text", text: "думаю" },
+  });
+  mapper.handleUpdate("s1", {
+    sessionUpdate: "agent_message_chunk",
+    content: { type: "text", text: "Открываю" },
+  });
+  mapper.handleUpdate("s1", {
+    sessionUpdate: "tool_call",
+    toolCallId: "t1",
+    title: "Read file",
+    kind: "read",
+    status: "pending",
+    rawInput: { path: "x" },
+  });
+  mapper.handleUpdate("s1", {
+    sessionUpdate: "tool_call_update",
+    toolCallId: "t1",
+    status: "completed",
+    rawOutput: "ok",
+  });
+  mapper.handleUpdate("s1", {
+    sessionUpdate: "tool_call",
+    toolCallId: "t2",
+    title: "Bash",
+    kind: "execute",
+    status: "failed",
+    rawOutput: "boom",
+  });
+  mapper.handleUpdate("s1", {
+    sessionUpdate: "agent_message_chunk",
+    content: { type: "text", text: " Готово" },
+  });
+  expect(mapper.text).toBe("Открываю Готово");
+  expect(events.map(([event]) => event)).toStrictEqual([
+    "status",
+    "text",
+    "tool",
+    "tool-result",
+    "tool",
+    "tool-result",
+    "text",
+  ]);
+  expect(events[2][1]).toStrictEqual({
+    id: "t1",
+    name: "Read file",
+    input: { path: "x" },
+  });
+  expect(events[3][1]).toStrictEqual({ id: "t1", name: "Read file", output: "ok" });
+  expect(events[5][1]).toMatchObject({ id: "t2", error: "boom" });
+});
+
+test("ACP client frames JSON-RPC over a real child process", async () => {
+  const { spawn } = await import("node:child_process");
+  const { createAcpConnection } = await import("../server/modules/agent/acp-client.ts");
+  const script = `
+    const readline = require("node:readline");
+    const rl = readline.createInterface({ input: process.stdin });
+    const send = (message) => process.stdout.write(JSON.stringify(message) + "\\n");
+    rl.on("line", (line) => {
+      const message = JSON.parse(line);
+      if (message.method === "initialize")
+        send({ jsonrpc: "2.0", id: message.id, result: { protocolVersion: 1 } });
+      else if (message.method === "session/new")
+        send({ jsonrpc: "2.0", id: message.id, result: { sessionId: "s1" } });
+      else if (message.method === "session/prompt") {
+        send({
+          jsonrpc: "2.0",
+          method: "session/update",
+          params: {
+            sessionId: "s1",
+            update: {
+              sessionUpdate: "agent_message_chunk",
+              content: { type: "text", text: "hi" },
+            },
+          },
+        });
+        send({ jsonrpc: "2.0", id: message.id, result: { stopReason: "end_turn" } });
+      } else send({ jsonrpc: "2.0", id: message.id, error: { code: -32601, message: "unknown" } });
+    });
+  `;
+  const child = spawn(process.execPath, ["-e", script], { stdio: ["pipe", "pipe", "pipe"] });
+  const updates = [];
+  const connection = createAcpConnection(child, {
+    onNotification: (method, params) => updates.push([method, params.update.sessionUpdate]),
+    onRequest: () => ({}),
+  });
+  expect((await connection.request("initialize", {})).protocolVersion).toBe(1);
+  const session = await connection.request("session/new", { cwd: "/tmp", mcpServers: [] });
+  expect(session.sessionId).toBe("s1");
+  const result = await connection.request("session/prompt", { sessionId: "s1", prompt: [] });
+  expect(result.stopReason).toBe("end_turn");
+  expect(updates).toStrictEqual([["session/update", "agent_message_chunk"]]);
+  await connection.close();
+});
+
+test("stopping an agent kills its whole process tree", async () => {
+  if (process.platform === "win32") return;
+  const { os } = await import("../core/modules/os/index.ts");
+  const { createAcpConnection } = await import("../server/modules/agent/acp-client.ts");
+  const child = os.tools.spawnAgentProcess({
+    command: process.execPath,
+    args: [
+      "-e",
+      'const { spawn } = require("node:child_process"); const grandchild = spawn("sleep", ["300"]); process.stdout.write(String(grandchild.pid) + "\\n"); setInterval(() => {}, 1000);',
+    ],
+  });
+  const pid = await new Promise((resolve) =>
+    child.stdout.once("data", (chunk) => resolve(Number(String(chunk).trim()))),
+  );
+  const connection = createAcpConnection(child, { onNotification() {}, onRequest: () => ({}) });
+  await connection.close();
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  // The shell's grandchild must be gone, not only the agent process itself.
+  expect(os.processes.identity(pid)).toBe(null);
+});
+
+test("ACP permission prefers one-time options and previews the change", async () => {
+  const { decidePermission, toolCallDetail } =
+    await import("../server/modules/agent/acp-backend.ts");
+  const capture = (answer) => {
+    const state = { request: undefined };
+    return {
+      state,
+      options: {
+        approve: async (request) => {
+          state.request = request;
+          return answer;
+        },
+      },
+    };
+  };
+  // allow_always/reject_always come first: a plain allow/deny must still pick the one-time option.
+  const options = [
+    { optionId: "a-always", kind: "allow_always" },
+    { optionId: "a-once", kind: "allow_once" },
+    { optionId: "r-always", kind: "reject_always" },
+    { optionId: "r-once", kind: "reject_once" },
+  ];
+  const toolCall = { title: "Edit src/a.ts", rawInput: {} };
+
+  const allow = capture(true);
+  expect(await decidePermission(allow.options, { toolCall, options })).toStrictEqual({
+    outcome: { outcome: "selected", optionId: "a-once" },
+  });
+  expect(allow.state.request.persistent).toBe(true);
+
+  const always = capture("always");
+  expect(await decidePermission(always.options, { toolCall, options })).toStrictEqual({
+    outcome: { outcome: "selected", optionId: "a-always" },
+  });
+
+  const deny = capture(false);
+  expect(await decidePermission(deny.options, { toolCall, options })).toStrictEqual({
+    outcome: { outcome: "selected", optionId: "r-once" },
+  });
+
+  const detail = toolCallDetail({
+    content: [
+      { type: "diff", path: "src/a.ts", oldText: "old", newText: "new" },
+      { type: "content", content: { type: "text", text: "контекст" } },
+    ],
+  });
+  expect(detail).toContain("--- src/a.ts");
+  expect(detail).toContain("-old");
+  expect(detail).toContain("+new");
+  expect(detail).toContain("контекст");
+});
+
+test("approval bridge turns an always answer into a durable choice", async () => {
+  const { createApprovalBridge } = await import("../server/modules/agent/index.ts");
+  const requests = [];
+  const abort = new AbortController();
+  const approve = createApprovalBridge((_, request) => requests.push(request), abort.signal, 20);
+  const always = approve({ tool: "Edit", input: {}, persistent: true });
+  expect(requests[0]).toMatchObject({ tool: "Edit", persistent: true });
+  expect(completeCommandRequest(requests[0].id, { output: { allow: true, always: true } })).toBe(
+    true,
+  );
+  expect(await always).toBe("always");
+  const once = approve({ tool: "Edit", input: {} });
+  completeCommandRequest(requests[1].id, { output: { allow: true } });
+  expect(await once).toBe(true);
+});
+
+test("ACP resume keeps the requested session, replays history only on a fresh one", async () => {
+  const { openSession } = await import("../server/modules/agent/acp-backend.ts");
+  const calls = [];
+  const replay = [];
+  const loading = {
+    request: async (method) => {
+      calls.push(method);
+      return method === "session/load" ? {} : { sessionId: "new-1" };
+    },
+  };
+  const resumed = await openSession(loading, { sessionId: "old-1", cwd: "/tmp" }, [], (active) =>
+    replay.push(active),
+  );
+  // The ACP load response has no sessionId: the requested one must survive.
+  expect(resumed).toStrictEqual({ sessionId: "old-1", resumed: true });
+  expect(calls).toStrictEqual(["session/load"]);
+  expect(replay).toStrictEqual([true, false]);
+
+  const failed = {
+    request: async (method) => {
+      if (method === "session/load") throw new Error("no such session");
+      return { sessionId: "new-2" };
+    },
+  };
+  expect(
+    await openSession(failed, { sessionId: "old-1", cwd: "/tmp" }, [], () => {}),
+  ).toStrictEqual({ sessionId: "new-2", resumed: false });
+});
+
+test("ACP session open does not mask real failures as a missing session", async () => {
+  const { openSession } = await import("../server/modules/agent/acp-backend.ts");
+  const options = { sessionId: "old-1", cwd: "/tmp" };
+
+  // No loadSession capability: go straight to a fresh session without trying to load.
+  const calls = [];
+  const noLoad = {
+    request: async (method) => {
+      calls.push(method);
+      return { sessionId: "n" };
+    },
+  };
+  await openSession(noLoad, options, [], () => {}, false);
+  expect(calls).toStrictEqual(["session/new"]);
+
+  // A dead connection is reported as is, not retried with session/new.
+  const dead = [];
+  const fatal = Object.assign(new Error("Агент завершился до ответа: boom"), { fatal: true });
+  const broken = {
+    request: async (method) => {
+      dead.push(method);
+      throw fatal;
+    },
+  };
+  await expect(openSession(broken, options, [], () => {})).rejects.toBe(fatal);
+  expect(dead).toStrictEqual(["session/load"]);
+
+  // A missing login on load goes through authenticate, then the session is resumed.
+  const steps = [];
+  let authed = false;
+  const login = {
+    request: async (method) => {
+      steps.push(method);
+      if (method === "authenticate") authed = true;
+      if (method === "session/load" && !authed) throw new Error("Authentication required");
+      return method === "session/new" ? { sessionId: "x" } : {};
+    },
+  };
+  expect(await openSession(login, options, [{ id: "m" }], () => {})).toStrictEqual({
+    sessionId: "old-1",
+    resumed: true,
+  });
+  expect(steps).toStrictEqual(["session/load", "authenticate", "session/load"]);
+});
+
+test("ACP client times out silent requests but not when disabled", async () => {
+  const { spawn } = await import("node:child_process");
+  const { createAcpConnection, NO_TIMEOUT } = await import("../server/modules/agent/acp-client.ts");
+  const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  const connection = createAcpConnection(child, { onNotification() {}, onRequest: () => ({}) });
+  const silent = connection.request("initialize", {}, 50);
+  await expect(silent).rejects.toMatchObject({ fatal: true, message: /не ответил/ });
+  const waiting = connection.request("session/prompt", {}, NO_TIMEOUT);
+  const outcome = await Promise.race([
+    waiting.then(
+      () => "answered",
+      () => "failed",
+    ),
+    new Promise((resolve) => setTimeout(() => resolve("waiting"), 200)),
+  ]);
+  expect(outcome).toBe("waiting");
+  await connection.close();
+  await expect(waiting).rejects.toThrow();
+});
+
+test("the codex npx fallback is pinned to a version", async () => {
+  const { ACP_PROGRAMS } = await import("../server/modules/agent/acp-programs.ts");
+  expect(ACP_PROGRAMS.codex.args.at(-1)).toMatch(/^@agentclientprotocol\/codex-acp@\d+\.\d+\.\d+$/);
+});
+
+test("ACP authenticates once when the agent refuses a session", async () => {
+  const { openSession } = await import("../server/modules/agent/acp-backend.ts");
+  const calls = [];
+  let authenticated = false;
+  const connection = {
+    request: async (method) => {
+      calls.push(method);
+      if (method === "session/new") {
+        if (!authenticated) throw new Error("Authentication required");
+        return { sessionId: "after-auth" };
+      }
+      if (method === "authenticate") authenticated = true;
+      return {};
+    },
+  };
+  expect(
+    await openSession(connection, { cwd: "/tmp" }, [{ id: "cursor_login" }], () => {}),
+  ).toStrictEqual({ sessionId: "after-auth", resumed: false });
+  expect(calls).toStrictEqual(["session/new", "authenticate", "session/new"]);
+});
+
 test("chat history keeps the native session of a turn", async () => {
   const directory = await mkdtemp(join(tmpdir(), "projector-agent-session-"));
   const previous = process.env.XDG_DATA_HOME;
@@ -422,9 +734,11 @@ test("agent session modes default to the terminal and persist only a GUI choice"
     expect((await preferences()).agentModes).toStrictEqual({});
     await setAgentMode("claude", "gui");
     expect((await preferences()).agentModes).toStrictEqual({ claude: "gui" });
-    await expect(setAgentMode("codex", "gui")).rejects.toThrow(/графическ/);
+    await setAgentMode("codex", "gui");
+    expect((await preferences()).agentModes).toStrictEqual({ claude: "gui", codex: "gui" });
+    await expect(setAgentMode("shell", "gui")).rejects.toThrow(/графическ/);
     await setAgentMode("claude", "tui");
-    expect((await preferences()).agentModes).toStrictEqual({});
+    expect((await preferences()).agentModes).toStrictEqual({ codex: "gui" });
   } finally {
     if (previous === undefined) delete process.env.XDG_DATA_HOME;
     else process.env.XDG_DATA_HOME = previous;
