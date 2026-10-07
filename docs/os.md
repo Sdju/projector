@@ -51,7 +51,7 @@ core/modules/os/
 
 Capabilities означают наличие реализации, а не установленность утилит. Linux по-прежнему требует GTK, X11 и KDE для системного окна и хоткея. На Windows `nativeDesktop` равен false: GTK-палитра, трей и глобальный хоткей остаются на Linux. Работают каталоги (`LOCALAPPDATA`, с приоритетом `XDG_DATA_HOME`), процессы, перенос файлов, Git Bash или PowerShell, Credential Manager, меню Пуск и окно Chromium. Запуск на Windows — `bin/projector.cmd`.
 
-Порт сервера и модель хранения проектов — настройки приложения; они не относятся к OS-адаптеру. Импорт ключей ai-companion теперь принимает путь аргументом:
+Порт сервера и модель хранения проектов — настройки приложения; они не относятся к OS-адаптеру. Импорт ключей ai-companion принимает путь аргументом:
 
 ```bash
 node cli/app/import-companion-key.mjs /path/to/providers.json

@@ -1,6 +1,6 @@
 # IDE commands and keybindings
 
-Projector is moving toward an IDE that executes commands through a shared SDK. Menu entries, buttons and shortcuts invoke command IDs; the registered handler owns the behavior. This is the first migration slice: file-tree actions, file/terminal tabs, and explicit Markdown save/source switching.
+Projector executes user-visible actions through a shared command SDK. Menu entries, buttons and shortcuts invoke command IDs; the registered handler owns the behavior. Not everything is migrated: automatic saves, drag-and-drop transfer internals, editor text/formatting keymaps, terminal PTY input and system launcher shortcuts stay outside the registry.
 
 The model follows the [VS Code command API](https://code.visualstudio.com/api/extension-guides/command): the command is independent of the way it is invoked. Projector's implementation and IDs are its own.
 
@@ -93,37 +93,17 @@ Keys support `Mod`, `Ctrl`, `Meta`, `Alt`, `Shift` and a key name. `Mod` matches
 
 The settings endpoint is `GET /api/ide/keybindings` and same-origin `PUT /api/ide/keybindings` with `{ bindings: [...] }`. GET also returns the settings path. No localStorage is used.
 
-## Next migration slices
+## Limits and tests
 
-1. Move the remaining explicit terminal, search and project actions onto commands; keep process and filesystem services behind adapters.
-2. Add typed per-command argument/result contracts, contribution metadata, and richer context conditions; add key chords only when a real workflow needs them.
-3. Reuse the core registry from native/CLI hosts with their own focus and presentation adapters. A remote automation transport will need its own authorization and argument validation.
-
-Automatic saves, drag-and-drop transfer internals, editor text/formatting keymaps, terminal PTY input and system launcher shortcuts are not all migrated in this slice. The SDK is currently in-process; there is no arbitrary command-execution HTTP endpoint.
+The SDK is in-process: there is no arbitrary command-execution HTTP endpoint, and a remote automation transport would need its own authorization and argument validation. Command arguments and results are untyped (`description` and `arguments` are documentation for the agent). Native and CLI hosts do not reuse the registry yet.
 
 Validation: `vp test run tests/ide.test.mjs tests/markdown-editor.test.mjs tests/workspace.test.mjs tests/architecture.test.mjs`, `vp run build`, and live Chromium SDK/shortcut scenarios.
 
-## Keyboard shortcuts tab
+## Keyboard shortcuts and command center
 
-The keyboard button in the project sidebar executes `ide.workbench.keybindings.open` in the editor scope. It opens a single virtual **Горячие клавиши** tab beside files. That tab uses the same select, close, reorder and context-menu commands as file tabs; refresh, file save, rename and deletion skip its virtual content.
+`ide.workbench.keybindings.open` opens the virtual **Горячие клавиши** tab; its row actions are commands `ide.keybindings.edit|remove|reset|save` (scope `{ surface: 'keybindings' }`; `getDefaultKeybindings()` returns a detached copy of defaults). Keyboard recording is isolated from editor commands.
 
-The editor discovers registered commands and default/user bindings from the SDK. Search matches titles, IDs, shortcuts and context conditions. Click a shortcut or the pencil to record a replacement; Tab moves to Save/Cancel, Escape cancels. The remove and reset buttons unbind a row or restore all default bindings of that command. Editing one row preserves the command's other rules, conditions, arguments and input-focus setting. Changes persist through `saveKeybindings`, then take effect immediately. Save errors stay visible and retain the previous live binding. The checkbox filters user overrides.
-
-Settings actions are commands too: `ide.keybindings.edit`, `.remove`, `.reset` take `{ command, index }` for a visible row, and `.save` accepts the recorded shortcut. Their scope has `{ surface: 'keybindings' }`. `getDefaultKeybindings()` returns a detached copy of the defaults for reset/edit tools. Keyboard recording is isolated from editor commands so recording does not invoke the action being assigned.
-
-## Command center
-
-`Ctrl+Shift+P` (`Cmd+Shift+P` on macOS) or `F1` opens the command center through `ide.workbench.commandPalette.open`. Both are default keybinding rules and can be changed in the keyboard shortcuts tab. The workbench scope handles this shortcut before embedded editors or terminal input, while name dialogs and shortcut recording retain their own keys.
-
-The palette searches command titles, IDs and areas, supports Arrow Up/Down, Enter, Escape and mouse selection, and restores focus on cancellation. It captures the originating SDK scope before focusing its input. Duplicate registrations prefer the originating scope and commands from other projects are excluded. Selection executes the stored command ID with its explicit scope; the SDK rechecks availability and reports failures through the host notification. Commands unavailable in the captured context remain visible but cannot be selected for execution.
-
-`getActiveScope()` exposes the originating scope to command surfaces. Register `palette: false` for commands that require arguments supplied only by another UI, such as tab reorder and shortcut-row edits. Such commands remain in the SDK and keyboard settings, but are omitted from the command center.
-
-To open it directly from an SDK client:
-
-```js
-await ide.executeCommand("ide.workbench.commandPalette.open", undefined, { scope: "workbench" });
-```
+`Ctrl+Shift+P` / `F1` runs `ide.workbench.commandPalette.open` (workbench scope, handled before editors and terminal input). The palette captures the originating scope (`getActiveScope()`), excludes other projects' commands, shows unavailable ones disabled, and executes with an explicit scope. Register `palette: false` for commands that need arguments supplied only by another UI (tab reorder, shortcut-row edits).
 
 ## Reading tabs
 
@@ -134,27 +114,9 @@ The agent sees workspace content as text through two read-only commands in the e
 
 The terminal read is the `{ action: "read", lines }` POST on the terminal control WebSocket. It never writes to the PTY.
 
-## Reload commands
+## Reload and server mode
 
-The global `workbench` scope registers `ide.workbench.pages.reload` (**Перезагрузить открытые страницы Projector**) and
-`ide.workbench.server.restart` (**Перезапустить сервер и открытые страницы**). Both appear in the command center and
-keyboard settings; no shortcut is assigned by default. They take no arguments.
-
-Reload updates all Projector pages on the same origin using BroadcastChannel, without browser storage.
-Restart asks for confirmation because it terminates all terminals and child processes, calls the existing
-`POST /api/app/restart` endpoint, then waits for `/api/health` to report a different PID before reloading pages.
-Each page retains its URL and normal unsaved-edit unload protection. Failed requests and a 60-second
-startup timeout are shown by the IDE host; duplicate actions are disabled while waiting. Save edits before restarting.
-
-### Server mode
-
-`ide.workbench.server.mode.dev` (**Переключить сервер в режим dev (HMR)**) and `ide.workbench.server.mode.prod`
-(**Переключить сервер в режим prod (сборка)**) switch between `vp dev` and the standalone Node server over `dist`. After confirmation the page
-calls `POST /api/app/mode` with `{ mode }`; the server starts `projector mode <mode>` as a detached CLI process
-(build for `prod`, then full restart — terminals and child processes end) and answers `202`. Pages wait for a new PID in
-`/api/health` and reload; `mode` in that response reports the running mode. A build failure leaves the old server
-running; the page reports the 60-second timeout, details are in `~/.local/share/projector/server.log`. The same switch is
-available as `projector mode [dev|prod]` (see [usage](usage.md)).
+Global `workbench` scope: `ide.workbench.pages.reload` reloads all same-origin pages (BroadcastChannel). `ide.workbench.server.restart` confirms, calls `POST /api/app/restart`, waits for a new PID in `/api/health` (60 s timeout), then reloads; `ide.workbench.server.mode.dev|prod` call `POST /api/app/mode` with `{ mode }` (detached `projector mode <mode>`, see [usage](usage.md)). All of them end terminals and child processes.
 
 ## Git commands
 
@@ -269,7 +231,7 @@ The `bash` tool uses the OS adapter and defaults to the current project director
 It returns stdout, stderr and exitCode, limits execution to 30 seconds and combined
 output to 256 KiB, and stops the process group on cancellation. Environment variables
 whose names contain KEY, TOKEN, SECRET, PASSWORD or CREDENTIAL are excluded. Bash
-runs with the user's filesystem permissions; it is not an isolated sandbox.
+runs with the user's filesystem permissions; it is not an isolated sandbox. In a project with a Docker environment it runs inside the container instead (see [containers](containers-design.md)); in a trusted Dev Container project, through `devcontainer exec`.
 
 ## Общие настройки
 
