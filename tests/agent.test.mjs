@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, test } from "vite-plus/test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -20,17 +19,17 @@ test("command bridge routes concurrent replies once, expires and cancels request
   const bridge = createCommandBridge((_, request) => requests.push(request), abort.signal, 20);
   const first = bridge({ operation: "list" });
   const second = bridge({ operation: "describe", command: "test", scope: "a" });
-  assert.notEqual(requests[0].id, requests[1].id);
-  assert.equal(completeCommandRequest(requests[1].id, { output: "second" }), true);
-  assert.equal(await second, "second");
-  assert.equal(completeCommandRequest(requests[1].id, { output: "again" }), false);
-  assert.equal(completeCommandRequest(requests[0].id, { error: "failure" }), true);
-  await assert.rejects(first, /failure/);
-  await assert.rejects(bridge({ operation: "list" }), /не ответил/);
+  expect(requests[0].id).not.toBe(requests[1].id);
+  expect(completeCommandRequest(requests[1].id, { output: "second" })).toBe(true);
+  expect(await second).toBe("second");
+  expect(completeCommandRequest(requests[1].id, { output: "again" })).toBe(false);
+  expect(completeCommandRequest(requests[0].id, { error: "failure" })).toBe(true);
+  await expect(first).rejects.toThrow(/failure/);
+  await expect(bridge({ operation: "list" })).rejects.toThrow(/не ответил/);
   const cancelled = bridge({ operation: "list" });
   abort.abort();
-  await assert.rejects(cancelled, /остановлен/);
-  assert.equal(completeCommandRequest(requests.at(-1).id, {}), false);
+  await expect(cancelled).rejects.toThrow(/остановлен/);
+  expect(completeCommandRequest(requests.at(-1).id, {})).toBe(false);
 });
 
 test("agent discovers live commands, requires description, checks args and excludes other projects", async () => {
@@ -52,42 +51,36 @@ test("agent discovers live commands, requires description, checks args and exclu
   const commands = agentCommandHandler(sdk, "a");
   const tools = createAgentTools({ onProject: () => {}, commands });
   const call = (name, input) => tools[name].execute(input, { toolCallId: "test", messages: [] });
-  assert.deepEqual(
-    (await call("list_commands", {})).commands.map((c) => c.id),
-    ["ide.fileTree.file.rename"],
-  );
-  await assert.rejects(
-    async () => call("execute_command", { command: "ide.fileTree.file.rename", scope: "tree" }),
-    /Сначала/,
-  );
+  expect((await call("list_commands", {})).commands.map((c) => c.id)).toStrictEqual([
+    "ide.fileTree.file.rename",
+  ]);
+  await expect(async () =>
+    call("execute_command", { command: "ide.fileTree.file.rename", scope: "tree" }),
+  ).rejects.toThrow(/Сначала/);
   const description = await call("describe_command", {
     command: "ide.fileTree.file.rename",
     scope: "tree",
   });
-  assert.ok(description.arguments.name);
-  assert.equal(description.enabled, false);
-  await assert.rejects(
+  expect(description.arguments.name).toBeTruthy();
+  expect(description.enabled).toBe(false);
+  await expect(
     call("execute_command", { command: description.id, scope: "tree", args: { path: "bad" } }),
-    /недоступна/,
-  );
-  assert.deepEqual(
+  ).rejects.toThrow(/недоступна/);
+  expect(
     await call("execute_command", {
       command: description.id,
       scope: "tree",
       args: { path: "old.md", name: "new.md" },
     }),
-    { destination: "new.md" },
-  );
-  assert.equal(output, "new.md");
-  await assert.rejects(
+  ).toStrictEqual({ destination: "new.md" });
+  expect(output).toBe("new.md");
+  await expect(
     commands({ operation: "execute", scope: "other", command: "secret" }),
-    /недоступна/,
-  );
+  ).rejects.toThrow(/недоступна/);
   scope.dispose();
-  await assert.rejects(
+  await expect(
     commands({ operation: "execute", scope: "tree", command: description.id }),
-    /недоступна/,
-  );
+  ).rejects.toThrow(/недоступна/);
 });
 
 test("agent can navigate global settings but cannot access another project's settings scope", async () => {
@@ -103,28 +96,23 @@ test("agent can navigate global settings but cannot access another project's set
     .registerCommand(sectionCommand);
   const commands = agentCommandHandler(sdk, "a");
   const listed = await commands({ operation: "list", query: "ide.settings" });
-  assert.deepEqual(
-    listed.commands.map((command) => command.scope),
-    ["settings"],
-  );
-  assert.equal(
+  expect(listed.commands.map((command) => command.scope)).toStrictEqual(["settings"]);
+  expect(
     await commands({
       operation: "execute",
       scope: "settings",
       command: sectionCommand.id,
       args: { id: "editor" },
     }),
-    "editor",
-  );
-  await assert.rejects(
+  ).toBe("editor");
+  await expect(
     commands({
       operation: "execute",
       scope: "other-settings",
       command: sectionCommand.id,
       args: { id: "editor" },
     }),
-    /Область недоступна/,
-  );
+  ).rejects.toThrow(/Область недоступна/);
 });
 
 test("Bash uses cwd, returns failure status, bounds output and aborts subprocesses", async () => {
@@ -138,16 +126,16 @@ test("Bash uses cwd, returns failure status, bounds output and aborts subprocess
             .replace(/^\/([A-Za-z])\//, (_, drive) => `${drive.toUpperCase()}:\\`)
             .replace(/\//g, "\\")
         : result.stdout.trim();
-    assert.equal(printed.toLowerCase(), cwd.toLowerCase());
-    assert.equal(result.stderr, "failure");
-    assert.equal(result.exitCode, 7);
+    expect(printed.toLowerCase()).toBe(cwd.toLowerCase());
+    expect(result.stderr).toBe("failure");
+    expect(result.exitCode).toBe(7);
     const bounded = await os.tools.runBash("yes agent", { cwd });
-    assert.equal(bounded.terminated, true);
-    assert.ok(Buffer.byteLength(bounded.stdout) <= 256 * 1024);
+    expect(bounded.terminated).toBe(true);
+    expect(Buffer.byteLength(bounded.stdout) <= 256 * 1024).toBeTruthy();
     const abort = new AbortController();
     const running = os.tools.runBash("sleep 100 & wait", { cwd, signal: abort.signal });
     setTimeout(() => abort.abort(), 30);
-    await assert.rejects(running, /остановлен/);
+    await expect(running).rejects.toThrow(/остановлен/);
   } finally {
     await rm(cwd, { recursive: true, force: true });
   }
@@ -160,11 +148,11 @@ test("chat history persists on disk, validates data and separates project IDs", 
   try {
     const turns = [{ id: "one", role: "user", text: "hello", tools: [] }];
     await writeAgentHistory("a/../../b", turns);
-    assert.deepEqual(await readAgentHistory("a/../../b"), turns);
-    assert.deepEqual(await readAgentHistory("other"), []);
-    await assert.rejects(writeAgentHistory("a", [{ role: "system" }]));
+    expect(await readAgentHistory("a/../../b")).toStrictEqual(turns);
+    expect(await readAgentHistory("other")).toStrictEqual([]);
+    await expect(writeAgentHistory("a", [{ role: "system" }])).rejects.toThrow();
     await writeAgentHistory("a/../../b", []);
-    assert.deepEqual(await readAgentHistory("a/../../b"), []);
+    expect(await readAgentHistory("a/../../b")).toStrictEqual([]);
   } finally {
     if (previous === undefined) delete process.env.XDG_DATA_HOME;
     else process.env.XDG_DATA_HOME = previous;
@@ -251,33 +239,28 @@ test("HTTP agent streams discovery, description, execution, Bash and final text 
     await streamAgent("Run local test", [], (event) => events.push(event), undefined, {
       commands: agentCommandHandler(sdk, "a"),
     });
-    assert.equal(executed, true);
-    assert.equal(requests.length, 5);
-    assert.deepEqual(
-      events.filter((e) => e.event === "tool").map((e) => e.data.name),
+    expect(executed).toBe(true);
+    expect(requests.length).toBe(5);
+    expect(events.filter((e) => e.event === "tool").map((e) => e.data.name)).toStrictEqual(
       steps.map((s) => s[0]),
     );
-    assert.equal(
-      events.find((e) => e.event === "error"),
-      undefined,
-    );
-    assert.equal(events.find((e) => e.event === "done").data.text, "agent-http-ok");
-    assert.equal(
+    expect(events.find((e) => e.event === "error")).toBe(undefined);
+    expect(events.find((e) => e.event === "done").data.text).toBe("agent-http-ok");
+    expect(
       events.find((e) => e.event === "tool-result" && e.data.name === "bash").data.output.stdout,
-      "agent-shell-ok",
-    );
-    assert.ok(
+    ).toBe("agent-shell-ok");
+    expect(
       requests
         .at(-1)
         .messages.some((m) => m.role === "tool" && m.content.includes("agent-shell-ok")),
-    );
+    ).toBeTruthy();
     const rejected = await originalFetch(base + "/api/agent", {
       method: "POST",
       headers: { Origin: "https://foreign.example", "Content-Type": "application/json" },
       body: '{"message":"test"}',
     });
-    assert.equal(rejected.status, 403);
-    assert.equal(
+    expect(rejected.status).toBe(403);
+    expect(
       (
         await originalFetch(base + "/api/agent/tool-result", {
           method: "POST",
@@ -285,8 +268,7 @@ test("HTTP agent streams discovery, description, execution, Bash and final text 
           body: '{"id":"expired"}',
         })
       ).status,
-      410,
-    );
+    ).toBe(410);
   } finally {
     globalThis.fetch = originalFetch;
     if (previousData === undefined) delete process.env.XDG_DATA_HOME;

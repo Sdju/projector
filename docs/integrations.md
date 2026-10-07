@@ -23,7 +23,7 @@ Docker: [контейнеры, Compose и терминалы](docker.md).
 Проверка входа, файловых настроек и импорта без обращения к настоящему GitHub:
 
 ```bash
-node --test tests/integrations.test.mjs tests/launcher.test.mjs
+vp test run tests/integrations.test.mjs tests/launcher.test.mjs
 ```
 
 Тесты используют временные XDG-каталоги, подмену GitHub API и Git; проверяют обязательную авторизацию, приватные репозитории, пагинацию, Device Flow (ожидание, ограничение частоты, истечение и отмену), права файла, отсутствие токена в публичном API и Git URL, повторный и параллельный импорт.
@@ -74,7 +74,7 @@ GitHub использует общий `ProjectWorkspace`, дерево файл
 
 Пока не реализованы: Device Flow/OAuth, просмотр репозитория без клонирования (`gl:/…`), issues и история Git через API, клонирование в Docker.
 
-Проверка без настоящего GitLab: `node --test tests/gitlab.test.mjs`.
+Проверка без настоящего GitLab: `vp test run tests/gitlab.test.mjs`.
 
 ## Codex CLI
 

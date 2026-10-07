@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, onTestFinished, test } from "vite-plus/test";
 import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -116,8 +115,8 @@ finally{settingsApp?.unmount();panelApp?.unmount();window.fetch=originalFetch;}}
 
 test(
   "Network settings and LAN panel save through scoped IDE commands",
-  { skip: chromium ? false : "Set CHROMIUM_BIN for browser test", timeout: 60000 },
-  async (t) => {
+  { skip: !chromium, timeout: 60000 },
+  async () => {
     const directory = await mkdtemp(join(tmpdir(), "projector-network-ui-"));
     const loaded = await loadConfigFromFile({ command: "serve", mode: "development" });
     const fixture = {
@@ -145,7 +144,7 @@ test(
       server: { host: "127.0.0.1", port: 0, strictPort: false },
       logLevel: "error",
     });
-    t.after(async () => {
+    onTestFinished(async () => {
       await server.close();
       await rm(directory, { recursive: true, force: true });
     });
@@ -173,6 +172,6 @@ test(
         stdout.slice(-2000) + stderr.slice(-1000)
       );
     };
-    assert.equal(await dump("/__network_test", "network"), "PASS");
+    expect(await dump("/__network_test", "network")).toBe("PASS");
   },
 );

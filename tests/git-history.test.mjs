@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, test } from "vite-plus/test";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -24,9 +23,9 @@ test("log of an empty repository and of a folder without Git", async () => {
   const plain = await mkdtemp(join(tmpdir(), "projector-nogit-"));
   try {
     const empty = await projectLog(base);
-    assert.equal(empty.available, true);
-    assert.deepEqual(empty.commits, []);
-    assert.equal((await projectLog(plain)).available, false);
+    expect(empty.available).toBe(true);
+    expect(empty.commits).toStrictEqual([]);
+    expect((await projectLog(plain)).available).toBe(false);
   } finally {
     await rm(base, { recursive: true, force: true });
     await rm(plain, { recursive: true, force: true });
@@ -43,33 +42,26 @@ test("log pages commits with refs, parents and unpushed marks", async () => {
     }
     run("tag", "v1", "HEAD~2");
     const page = await projectLog(base, { limit: 2 });
-    assert.deepEqual(
-      page.commits.map((commit) => commit.subject),
-      ["commit 3", "commit 2"],
-    );
-    assert.equal(page.next, 2);
-    assert.equal(page.me, "history@example.test");
-    assert.deepEqual(page.commits[0].refs, [
+    expect(page.commits.map((commit) => commit.subject)).toStrictEqual(["commit 3", "commit 2"]);
+    expect(page.next).toBe(2);
+    expect(page.me).toBe("history@example.test");
+    expect(page.commits[0].refs).toStrictEqual([
       { name: "HEAD", kind: "head" },
       { name: "main", kind: "branch" },
     ]);
-    assert.deepEqual(page.commits[0].parents, [page.commits[1].hash]);
+    expect(page.commits[0].parents).toStrictEqual([page.commits[1].hash]);
     const rest = await projectLog(base, { skip: 2, limit: 2 });
-    assert.equal(rest.commits.length, 1);
-    assert.equal(rest.next, null);
-    assert.deepEqual(rest.commits[0].refs, [{ name: "v1", kind: "tag" }]);
-    assert.deepEqual(rest.commits[0].parents, []);
-    assert.equal(
-      page.commits.every((commit) => !commit.unpushed),
-      true,
-    );
+    expect(rest.commits.length).toBe(1);
+    expect(rest.next).toBe(null);
+    expect(rest.commits[0].refs).toStrictEqual([{ name: "v1", kind: "tag" }]);
+    expect(rest.commits[0].parents).toStrictEqual([]);
+    expect(page.commits.every((commit) => !commit.unpushed)).toBe(true);
 
-    assert.deepEqual(
+    expect(
       (await projectLog(base, { query: "COMMIT 2" })).commits.map((commit) => commit.subject),
-      ["commit 2"],
-    );
-    assert.equal((await projectLog(base, { query: "@History" })).commits.length, 3);
-    assert.equal((await projectLog(base, { query: "@nobody" })).commits.length, 0);
+    ).toStrictEqual(["commit 2"]);
+    expect((await projectLog(base, { query: "@History" })).commits.length).toBe(3);
+    expect((await projectLog(base, { query: "@nobody" })).commits.length).toBe(0);
 
     // Upstream is another local repository, so ahead/behind and unpushed marks are testable.
     const remote = await mkdtemp(join(tmpdir(), "projector-remote-"));
@@ -80,13 +72,15 @@ test("log pages commits with refs, parents and unpushed marks", async () => {
       await writeFile(join(base, "a.txt"), "4\n");
       run("commit", "-qam", "local only");
       const log = await projectLog(base);
-      assert.equal(log.upstream, "origin/main");
-      assert.equal(log.ahead, 1);
-      assert.equal(log.behind, 0);
-      assert.deepEqual(
-        log.commits.map((commit) => commit.unpushed),
-        [true, false, false, false],
-      );
+      expect(log.upstream).toBe("origin/main");
+      expect(log.ahead).toBe(1);
+      expect(log.behind).toBe(0);
+      expect(log.commits.map((commit) => commit.unpushed)).toStrictEqual([
+        true,
+        false,
+        false,
+        false,
+      ]);
     } finally {
       await rm(remote, { recursive: true, force: true });
     }
@@ -115,48 +109,47 @@ test("commit detail lists files against the first parent, limited to the folder"
     const second = run("rev-parse", "HEAD").trim();
 
     const initial = await projectCommit(base, first);
-    assert.deepEqual(
-      initial.files.map((file) => [file.path, file.status]),
-      [
-        ["root.txt", "A"],
-        ["sub/gone.txt", "A"],
-        ["sub/keep.txt", "A"],
-      ],
-    );
-    assert.deepEqual(initial.parents, []);
+    expect(initial.files.map((file) => [file.path, file.status])).toStrictEqual([
+      ["root.txt", "A"],
+      ["sub/gone.txt", "A"],
+      ["sub/keep.txt", "A"],
+    ]);
+    expect(initial.parents).toStrictEqual([]);
 
     const detail = await projectCommit(base, second.slice(0, 10));
-    assert.equal(detail.subject, "second");
-    assert.equal(detail.body, "details of second");
-    assert.equal(detail.committer, "History Test");
-    assert.deepEqual(
-      detail.files.map((file) => [file.path, file.status, file.originalPath]),
-      [
-        ["root.txt", "M", undefined],
-        ["sub/keep.txt", "M", undefined],
-        ["sub/moved.txt", "R", "sub/gone.txt"],
-        ["sub/new.txt", "A", undefined],
-      ],
-    );
-    assert.equal(detail.additions, 4);
-    assert.equal(detail.deletions, 2);
+    expect(detail.subject).toBe("second");
+    expect(detail.body).toBe("details of second");
+    expect(detail.committer).toBe("History Test");
+    expect(detail.files.map((file) => [file.path, file.status, file.originalPath])).toStrictEqual([
+      ["root.txt", "M", undefined],
+      ["sub/keep.txt", "M", undefined],
+      ["sub/moved.txt", "R", "sub/gone.txt"],
+      ["sub/new.txt", "A", undefined],
+    ]);
+    expect(detail.additions).toBe(4);
+    expect(detail.deletions).toBe(2);
 
     const scoped = await projectCommit(join(base, "sub"), second);
-    assert.deepEqual(
-      scoped.files.map((file) => file.path),
-      ["keep.txt", "moved.txt", "new.txt"],
-    );
+    expect(scoped.files.map((file) => file.path)).toStrictEqual([
+      "keep.txt",
+      "moved.txt",
+      "new.txt",
+    ]);
 
     const diff = await projectCommitComparison(base, second, "sub/keep.txt");
-    assert.equal(diff.original, "one\ntwo\n");
-    assert.equal(diff.modified, "one\nchanged\nthree\n");
-    assert.equal(diff.parent, first.slice(0, 7));
+    expect(diff.original).toBe("one\ntwo\n");
+    expect(diff.modified).toBe("one\nchanged\nthree\n");
+    expect(diff.parent).toBe(first.slice(0, 7));
     const renamed = await projectCommitComparison(base, second, "sub/moved.txt");
-    assert.equal(renamed.original, "gone\n");
-    assert.equal((await projectCommitComparison(base, second, "sub/new.txt")).original, "");
-    assert.equal((await projectCommitComparison(base, first, "root.txt")).parent, "");
-    await assert.rejects(projectCommitComparison(base, second, "sub/gone.txt"), { status: 404 });
-    await assert.rejects(projectCommitComparison(base, second, "../x"), { status: 403 });
+    expect(renamed.original).toBe("gone\n");
+    expect((await projectCommitComparison(base, second, "sub/new.txt")).original).toBe("");
+    expect((await projectCommitComparison(base, first, "root.txt")).parent).toBe("");
+    await expect(projectCommitComparison(base, second, "sub/gone.txt")).rejects.toMatchObject({
+      status: 404,
+    });
+    await expect(projectCommitComparison(base, second, "../x")).rejects.toMatchObject({
+      status: 403,
+    });
   } finally {
     await rm(base, { recursive: true, force: true });
   }
@@ -169,8 +162,8 @@ test("commit lookups reject malformed and unknown hashes", async () => {
     run("add", ".");
     run("commit", "-qm", "one");
     for (const hash of ["", "--help", "HEAD", "zzzzzzz", "abc"])
-      await assert.rejects(projectCommit(base, hash), { status: 400 });
-    await assert.rejects(projectCommit(base, "0123456789abcdef"), { status: 404 });
+      await expect(projectCommit(base, hash)).rejects.toMatchObject({ status: 400 });
+    await expect(projectCommit(base, "0123456789abcdef")).rejects.toMatchObject({ status: 404 });
   } finally {
     await rm(base, { recursive: true, force: true });
   }

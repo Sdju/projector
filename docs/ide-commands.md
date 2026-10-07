@@ -101,7 +101,7 @@ The settings endpoint is `GET /api/ide/keybindings` and same-origin `PUT /api/id
 
 Automatic saves, drag-and-drop transfer internals, editor text/formatting keymaps, terminal PTY input and system launcher shortcuts are not all migrated in this slice. The SDK is currently in-process; there is no arbitrary command-execution HTTP endpoint.
 
-Validation: `node --test tests/ide.test.mjs tests/markdown-editor.test.mjs tests/workspace.test.mjs tests/architecture.test.mjs`, `vp run build`, and live Chromium SDK/shortcut scenarios.
+Validation: `vp test run tests/ide.test.mjs tests/markdown-editor.test.mjs tests/workspace.test.mjs tests/architecture.test.mjs`, `vp run build`, and live Chromium SDK/shortcut scenarios.
 
 ## Keyboard shortcuts tab
 

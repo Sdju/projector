@@ -28,7 +28,7 @@ export function createVault(
   const key = (name: string): SecretKey => ({ service: SERVICE, account: name });
   // Temporary XDG directories do not isolate Secret Service: its keys are global.
   // Tests must inject a backend instead of accessing production credentials.
-  const isolatedTest = () => backend === os.secrets && !!process.env.NODE_TEST_CONTEXT;
+  const isolatedTest = () => backend === os.secrets && !!process.env.VITEST;
   function allowAccess() {
     if (isolatedTest()) throw new Error("Tests cannot access the Projector system keyring");
   }

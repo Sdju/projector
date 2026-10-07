@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, test } from "vite-plus/test";
 import {
   CHANGES_MIN,
   HISTORY_COLLAPSE,
@@ -8,17 +7,17 @@ import {
 } from "../src/modules/workspace/modules/git/lib/git-split.ts";
 
 test("dragging up grows the history and dragging down shrinks it", () => {
-  assert.deepEqual(resizeHistory(200, 600, -50), { height: 250 });
-  assert.deepEqual(resizeHistory(200, 600, 50), { height: 150 });
+  expect(resizeHistory(200, 600, -50)).toEqual({ height: 250 });
+  expect(resizeHistory(200, 600, 50)).toEqual({ height: 150 });
 });
 
 test("history keeps the minimum height until it is squeezed past the collapse threshold", () => {
-  assert.deepEqual(resizeHistory(200, 600, 200 - HISTORY_COLLAPSE - 4), { height: HISTORY_MIN });
-  assert.deepEqual(resizeHistory(200, 600, 200), { height: 200, collapse: true });
+  expect(resizeHistory(200, 600, 200 - HISTORY_COLLAPSE - 4)).toEqual({ height: HISTORY_MIN });
+  expect(resizeHistory(200, 600, 200)).toEqual({ height: 200, collapse: true });
 });
 
 test("the changes zone always keeps its minimum", () => {
-  assert.deepEqual(resizeHistory(200, 600, -1000), { height: 600 - CHANGES_MIN });
+  expect(resizeHistory(200, 600, -1000)).toEqual({ height: 600 - CHANGES_MIN });
   // A tiny panel never forces the history below its own minimum.
-  assert.deepEqual(resizeHistory(130, 150, -100), { height: HISTORY_MIN });
+  expect(resizeHistory(130, 150, -100)).toEqual({ height: HISTORY_MIN });
 });

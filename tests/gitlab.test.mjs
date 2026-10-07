@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test, mock } from "node:test";
+import { expect, onTestFinished, test, vi } from "vite-plus/test";
 import { mkdtemp, mkdir, writeFile, rm, access } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -10,23 +9,23 @@ import { syncBuiltinESMExports } from "node:module";
 
 process.env.PROJECTOR_SECRET_STORE = "file";
 
-await test("GitLab integration connects with a token, searches and imports nested projects", async (t) => {
+test("GitLab integration connects with a token, searches and imports nested projects", async () => {
   const root = await mkdtemp(join(tmpdir(), "projector-gitlab-"));
   process.env.XDG_DATA_HOME = join(root, "data");
   const directory = join(root, "projects");
   const secret = "glpat-never-return";
   const host = "https://git.example.com";
   const nativeFetch = globalThis.fetch;
-  mock.method(globalThis, "fetch", async (url, init) => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
     const address = String(url);
     if (!address.startsWith(`${host}/api/v4/`)) return nativeFetch(url, init);
-    assert.equal(init.redirect, "error");
+    expect(init.redirect).toBe("error");
     const path = address.slice(`${host}/api/v4`.length);
     if (init.headers["PRIVATE-TOKEN"] !== secret) return Response.json({}, { status: 401 });
     if (path === "/user") return Response.json({ username: "tanuki" });
     if (path.startsWith("/projects?")) {
       const params = new URL(address).searchParams;
-      assert.equal(params.get("simple"), "true");
+      expect(params.get("simple")).toBe("true");
       return Response.json([
         {
           path_with_namespace: "team/tools/app",
@@ -48,9 +47,9 @@ await test("GitLab integration connects with a token, searches and imports neste
   childProcess.execFile = (command, args, options, callback) => {
     if (command !== "git") return nativeExec(command, args, options, callback);
     clones.push(args.at(-2));
-    assert.ok(args.includes("core.hooksPath=/dev/null"));
-    assert.ok(!JSON.stringify(args).includes(secret));
-    assert.equal(options.env.PROJECTOR_GITLAB_TOKEN, secret);
+    expect(args.includes("core.hooksPath=/dev/null")).toBeTruthy();
+    expect(!JSON.stringify(args).includes(secret)).toBeTruthy();
+    expect(options.env.PROJECTOR_GITLAB_TOKEN).toBe(secret);
     void (async () => {
       await mkdir(args.at(-1), { recursive: true });
       await writeFile(
@@ -66,9 +65,9 @@ await test("GitLab integration connects with a token, searches and imports neste
   const server = createServer((req, res) => void handleApi(req, res));
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
-  t.after(async () => {
+  onTestFinished(async () => {
     server.close();
-    mock.restoreAll();
+    vi.restoreAllMocks();
     childProcess.execFile = nativeExec;
     syncBuiltinESMExports();
     await rm(root, { recursive: true, force: true });
@@ -81,52 +80,47 @@ await test("GitLab integration connects with a token, searches and imports neste
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const data = await res.json();
-    assert.ok(!JSON.stringify(data).includes(secret), "Public API must not expose token");
+    expect(!JSON.stringify(data).includes(secret), "Public API must not expose token").toBeTruthy();
     return { status: res.status, data };
   }
 
-  assert.equal((await request("/gitlab/repositories")).status, 400);
-  assert.equal(
+  expect((await request("/gitlab/repositories")).status).toBe(400);
+  expect(
     (await request("/gitlab", "PUT", { enabled: true, url: "ftp://x", directory })).status,
-    400,
-  );
-  assert.equal(
+  ).toBe(400);
+  expect(
     (await request("/gitlab", "PUT", { enabled: true, url: `${host}/`, directory })).status,
-    200,
-  );
-  assert.equal((await request("/gitlab/repositories")).status, 401);
-  assert.equal((await request("/gitlab/auth", "POST", { token: "wrong" })).status, 401);
+  ).toBe(200);
+  expect((await request("/gitlab/repositories")).status).toBe(401);
+  expect((await request("/gitlab/auth", "POST", { token: "wrong" })).status).toBe(401);
   const connected = await request("/gitlab/auth", "POST", { token: secret });
-  assert.equal(connected.data.account, "tanuki");
-  assert.equal(connected.data.settings.url, host);
+  expect(connected.data.account).toBe("tanuki");
+  expect(connected.data.settings.url).toBe(host);
   const listed = (await request("/gitlab/repositories")).data;
-  assert.equal(listed.repositories[0].fullName, "team/tools/app");
-  assert.equal(listed.repositories[0].private, true);
+  expect(listed.repositories[0].fullName).toBe("team/tools/app");
+  expect(listed.repositories[0].private).toBe(true);
 
   const { searchGitlabProjects } = await import("../server/modules/gitlab/index.ts");
   for (const query of ["", "team/", "TEAM/to", "to", "tools/app", "app"])
-    assert.deepEqual(
+    expect(
       (await searchGitlabProjects(query)).map((hit) => hit.fullName),
-      ["team/tools/app"],
       query,
-    );
+    ).toStrictEqual(["team/tools/app"]);
   for (const query of ["other/", "zzz", "team/zzz"])
-    assert.deepEqual(await searchGitlabProjects(query), [], query);
+    expect(await searchGitlabProjects(query), query).toStrictEqual([]);
 
-  assert.equal((await request("/gitlab/import", "POST", { repository: "a/../b" })).status, 400);
-  assert.equal(
-    (await request("/gitlab/import", "POST", { repository: "team/missing" })).status,
+  expect((await request("/gitlab/import", "POST", { repository: "a/../b" })).status).toBe(400);
+  expect((await request("/gitlab/import", "POST", { repository: "team/missing" })).status).toBe(
     404,
   );
   const imported = await request("/gitlab/import", "POST", {
     repository: `${host}/team/tools/app/-/tree/main`,
   });
-  assert.equal(imported.status, 201, JSON.stringify(imported.data));
-  assert.equal(imported.data.project.path, join(directory, "team", "tools", "app"));
-  assert.equal(imported.data.project.commands[0].cmd.includes("dev"), true);
-  assert.deepEqual(clones, [`${host}/team/tools/app.git`]);
-  assert.equal(
-    (await request("/gitlab/import", "POST", { repository: "team/tools/app" })).status,
+  expect(imported.status, JSON.stringify(imported.data)).toBe(201);
+  expect(imported.data.project.path).toBe(join(directory, "team", "tools", "app"));
+  expect(imported.data.project.commands[0].cmd.includes("dev")).toBe(true);
+  expect(clones).toStrictEqual([`${host}/team/tools/app.git`]);
+  expect((await request("/gitlab/import", "POST", { repository: "team/tools/app" })).status).toBe(
     409,
   );
 
@@ -136,5 +130,5 @@ await test("GitLab integration connects with a token, searches and imports neste
     url: "https://other.example.com",
     directory,
   });
-  assert.equal(moved.data.connected, false);
+  expect(moved.data.connected).toBe(false);
 });

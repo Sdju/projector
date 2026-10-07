@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, test } from "vite-plus/test";
 import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
@@ -20,7 +19,7 @@ const exists = (path) =>
     () => false,
   );
 
-await test(
+test(
   "a trusted dev container runs commands, and nothing runs before the decision",
   { skip: !enabled },
   async () => {
@@ -41,18 +40,15 @@ await test(
     );
     const project = { id: "live", name: "live", path };
     try {
-      assert.equal(usesDevcontainer(project), false);
-      await assert.rejects(
-        runDevcontainerCommand(project, ["/bin/bash", "-c", "id"]),
+      expect(usesDevcontainer(project)).toBe(false);
+      await expect(runDevcontainerCommand(project, ["/bin/bash", "-c", "id"])).rejects.toThrow(
         /не использует/,
       );
-      assert.equal(await exists(join(path, "host-ran.txt")), false, "nothing runs before trust");
+      expect(await exists(join(path, "host-ran.txt")), "nothing runs before trust").toBe(false);
 
       await decideDevcontainer(project, "trusted", devcontainerState(project).hash);
-      assert.equal(
-        await exists(join(path, "host-ran.txt")),
+      expect(await exists(join(path, "host-ran.txt")), "deciding does not run anything").toBe(
         false,
-        "deciding does not run anything",
       );
 
       const ok = await runDevcontainerCommand(
@@ -60,22 +56,19 @@ await test(
         ["/bin/bash", "-c", "echo out; echo err >&2; id -un; pwd"],
         240_000,
       );
-      assert.equal(ok.stdout, `out\nnode\n/workspaces/${name}\n`);
-      assert.match(ok.stderr, /^err\n/);
-      assert.equal(
-        await exists(join(path, "host-ran.txt")),
+      expect(ok.stdout).toBe(`out\nnode\n/workspaces/${name}\n`);
+      expect(ok.stderr).toMatch(/^err\n/);
+      expect(await exists(join(path, "host-ran.txt")), "initializeCommand ran on the host").toBe(
         true,
-        "initializeCommand ran on the host",
       );
-      assert.equal(await exists(join(path, "created.txt")), true, "postCreateCommand ran inside");
+      expect(await exists(join(path, "created.txt")), "postCreateCommand ran inside").toBe(true);
 
-      await assert.rejects(
+      await expect(
         runDevcontainerCommand(project, ["/bin/bash", "-c", "echo before; exit 3"]),
-        (error) => error.code === 3 && error.stdout === "before\n",
-      );
+      ).rejects.toSatisfy((error) => error.code === 3 && error.stdout === "before\n");
     } finally {
       const { removed } = await stopDevcontainer(project);
-      assert.equal(removed, 1);
+      expect(removed).toBe(1);
       // The CLI builds a derived image per project; do not leave it behind.
       const images = execFileSync(
         "docker",

@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, test } from "vite-plus/test";
 import { mkdtemp, mkdir, writeFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -16,10 +15,10 @@ test("project URLs round-trip nested paths, root and reserved characters", () =>
   });
   for (const path of ["/", "/tmp/nested/project", "/tmp/проект # ? %/child", "/tmp/%2F"]) {
     const route = router.resolve(projectRoute(path));
-    assert.equal(route.name, "project");
-    assert.equal(route.query && Object.keys(route.query).length, 0);
-    assert.equal(route.hash, "");
-    assert.equal(projectPathFromParams(route.params.projectPath), path);
+    expect(route.name).toBe("project");
+    expect(route.query && Object.keys(route.query).length).toBe(0);
+    expect(route.hash).toBe("");
+    expect(projectPathFromParams(route.params.projectPath)).toBe(path);
   }
 });
 
@@ -30,15 +29,15 @@ test("Windows project URLs use one segment per directory and restore native sepa
   });
   const path = "C:\\Users\\DChernov\\home\\pr\\my\\projector";
   const route = router.resolve(projectRoute(path));
-  assert.equal(route.href.includes("%5C"), false);
-  assert.equal(route.href, "/projects/C:/Users/DChernov/home/pr/my/projector");
-  assert.equal(projectPathFromParams(route.params.projectPath), path);
-  assert.equal(projectPathFromParams("C:\\Users\\DChernov\\home\\pr\\my\\projector"), path);
-  assert.equal(projectRoute("C:\\"), "/projects/C:");
-  assert.equal(projectPathFromParams(["C:"]), "C:\\");
+  expect(route.href.includes("%5C")).toBe(false);
+  expect(route.href).toBe("/projects/C:/Users/DChernov/home/pr/my/projector");
+  expect(projectPathFromParams(route.params.projectPath)).toBe(path);
+  expect(projectPathFromParams("C:\\Users\\DChernov\\home\\pr\\my\\projector")).toBe(path);
+  expect(projectRoute("C:\\")).toBe("/projects/C:");
+  expect(projectPathFromParams(["C:"])).toBe("C:\\");
   const unc = "\\\\server\\share\\dir";
-  assert.equal(projectPathFromParams(router.resolve(projectRoute(unc)).params.projectPath), unc);
-  assert.deepEqual(projectRefSegments(parseProjectRef(path)), [
+  expect(projectPathFromParams(router.resolve(projectRoute(unc)).params.projectPath)).toBe(unc);
+  expect(projectRefSegments(parseProjectRef(path))).toStrictEqual([
     { name: "C:", path: "C:\\" },
     { name: "Users", path: "C:\\Users" },
     { name: "DChernov", path: "C:\\Users\\DChernov" },
@@ -48,8 +47,7 @@ test("Windows project URLs use one segment per directory and restore native sepa
     { name: "projector", path: "C:\\Users\\DChernov\\home\\pr\\my\\projector" },
   ]);
   const reserved = "C:\\tmp\\проект # ? %\\child";
-  assert.equal(
-    projectPathFromParams(router.resolve(projectRoute(reserved)).params.projectPath),
+  expect(projectPathFromParams(router.resolve(projectRoute(reserved)).params.projectPath)).toBe(
     reserved,
   );
 });
@@ -98,17 +96,17 @@ test("opening a path reuses saved settings and resolves arbitrary directories on
         body: JSON.stringify({ path }),
       });
     const saved = (await (await resolve(`${savedPath}/../saved/`)).json()).project;
-    assert.equal(saved.id, "saved-id");
-    assert.equal(saved.name, "Custom name");
-    assert.equal(saved.commands[0].cmd, "custom-command");
+    expect(saved.id).toBe("saved-id");
+    expect(saved.name).toBe("Custom name");
+    expect(saved.commands[0].cmd).toBe("custom-command");
     const responses = await Promise.all([resolve(newPath), resolve(newPath)]);
-    assert.ok(responses.every((res) => res.status === 200));
+    expect(responses.every((res) => res.status === 200)).toBeTruthy();
     const [first, second] = await Promise.all(responses.map((res) => res.json()));
-    assert.equal(first.project.id, second.project.id);
-    assert.equal(first.project.path, newPath);
-    assert.equal((await loadProjects()).length, 2);
+    expect(first.project.id).toBe(second.project.id);
+    expect(first.project.path).toBe(newPath);
+    expect((await loadProjects()).length).toBe(2);
     const tree = await fetch(`${base}/api/projects/${first.project.id}/workspace/tree`);
-    assert.equal(tree.status, 200);
+    expect(tree.status).toBe(200);
     const pkgPath = join(root, "node-project");
     await mkdir(pkgPath);
     await writeFile(
@@ -116,11 +114,11 @@ test("opening a path reuses saved settings and resolves arbitrary directories on
       JSON.stringify({ name: "node-app", scripts: { dev: "vite" } }),
     );
     const pkg = (await (await resolve(pkgPath)).json()).project;
-    assert.equal(pkg.name, "node-app");
-    assert.equal(pkg.commands[0].name, "dev");
-    assert.equal((await resolve(join(root, "missing"))).status, 400);
-    assert.equal((await resolve("")).status, 400);
-    assert.equal((await loadProjects()).length, 3);
+    expect(pkg.name).toBe("node-app");
+    expect(pkg.commands[0].name).toBe("dev");
+    expect((await resolve(join(root, "missing"))).status).toBe(400);
+    expect((await resolve("")).status).toBe(400);
+    expect((await loadProjects()).length).toBe(3);
   } finally {
     server.closeAllConnections();
     await new Promise((done) => server.close(done));
@@ -170,44 +168,39 @@ test("a project whose folder disappeared can recreate it or move to a new path",
         body: JSON.stringify(body),
       });
     const resolved = await (await post("/api/projects/resolve", { path: gone })).json();
-    assert.equal(resolved.project.id, "gone-id");
-    assert.equal(resolved.missing, true);
-    assert.equal(
-      (await (await post("/api/projects/resolve", { path: other })).json()).missing,
+    expect(resolved.project.id).toBe("gone-id");
+    expect(resolved.missing).toBe(true);
+    expect((await (await post("/api/projects/resolve", { path: other })).json()).missing).toBe(
       false,
     );
 
-    assert.equal((await post("/api/projects/gone-id/directory", { mode: "bogus" })).status, 400);
-    assert.equal((await post("/api/projects/gone-id/directory", { mode: "create" })).status, 200);
-    assert.equal((await stat(gone)).isDirectory(), true);
-    assert.equal(
-      (await (await post("/api/projects/resolve", { path: gone })).json()).missing,
+    expect((await post("/api/projects/gone-id/directory", { mode: "bogus" })).status).toBe(400);
+    expect((await post("/api/projects/gone-id/directory", { mode: "create" })).status).toBe(200);
+    expect((await stat(gone)).isDirectory()).toBe(true);
+    expect((await (await post("/api/projects/resolve", { path: gone })).json()).missing).toBe(
       false,
     );
 
     await rm(gone, { recursive: true });
     const target = join(root, "moved", "deep");
-    assert.equal(
+    expect(
       (await post("/api/projects/gone-id/directory", { mode: "relocate", path: target })).status,
-      400,
-    );
-    assert.equal(
+    ).toBe(400);
+    expect(
       (await post("/api/projects/gone-id/directory", { mode: "relocate", path: "" })).status,
-      400,
-    );
-    assert.equal(
+    ).toBe(400);
+    expect(
       (await post("/api/projects/gone-id/directory", { mode: "relocate", path: other })).status,
-      409,
-    );
+    ).toBe(409);
     const moved = await post("/api/projects/gone-id/directory", {
       mode: "relocate",
       path: target,
       create: true,
     });
-    assert.equal(moved.status, 200);
-    assert.equal((await moved.json()).project.path, target);
-    assert.equal((await stat(target)).isDirectory(), true);
-    assert.equal((await loadProjects()).find((item) => item.id === "gone-id").path, target);
+    expect(moved.status).toBe(200);
+    expect((await moved.json()).project.path).toBe(target);
+    expect((await stat(target)).isDirectory()).toBe(true);
+    expect((await loadProjects()).find((item) => item.id === "gone-id").path).toBe(target);
   } finally {
     server.closeAllConnections();
     await new Promise((done) => server.close(done));
@@ -236,17 +229,13 @@ test("settings import preserves custom commands and does not duplicate scripts",
     { id: "build", name: "build", cmd: "pnpm build" },
   ];
   draft.commands.push(...missingCommands(draft.commands, found));
-  assert.deepEqual(
-    draft.commands.map((command) => command.id),
-    ["custom", "build"],
-  );
-  assert.equal(draft.defaultCommandId, "custom");
-  assert.equal(project.commands.length, 1);
-  assert.equal(settingsError(draft), "");
-  assert.match(settingsError({ ...draft, mode: "window" }), /адрес/);
-  assert.match(settingsError({ ...draft, url: "javascript:alert(1)" }), /http/);
-  assert.match(
-    settingsError({ ...draft, commands: [{ id: "custom", name: "dev", cmd: " " }] }),
+  expect(draft.commands.map((command) => command.id)).toStrictEqual(["custom", "build"]);
+  expect(draft.defaultCommandId).toBe("custom");
+  expect(project.commands.length).toBe(1);
+  expect(settingsError(draft)).toBe("");
+  expect(settingsError({ ...draft, mode: "window" })).toMatch(/адрес/);
+  expect(settingsError({ ...draft, url: "javascript:alert(1)" })).toMatch(/http/);
+  expect(settingsError({ ...draft, commands: [{ id: "custom", name: "dev", cmd: " " }] })).toMatch(
     /команда запуска/,
   );
 });
@@ -256,7 +245,7 @@ test("command discovery reads all actual scripts without running them or inventi
   const { normalizeProject } = await import("../server/modules/project-presentation/index.ts");
   const root = await mkdtemp(join(tmpdir(), "projector-settings-"));
   try {
-    assert.deepEqual(await inspectProjectCommands(root), []);
+    expect(await inspectProjectCommands(root)).toStrictEqual([]);
     await writeFile(join(root, "pnpm-lock.yaml"), "");
     await writeFile(
       join(root, "package.json"),
@@ -271,23 +260,20 @@ test("command discovery reads all actual scripts without running them or inventi
       }),
     );
     const commands = await inspectProjectCommands(root);
-    assert.deepEqual(
-      commands.map(({ name, cmd }) => [name, cmd]),
-      [
-        ["dev", "pnpm dev"],
-        ["test", "pnpm test"],
-        ["build", "pnpm build"],
-      ],
-    );
+    expect(commands.map(({ name, cmd }) => [name, cmd])).toStrictEqual([
+      ["dev", "pnpm dev"],
+      ["test", "pnpm test"],
+      ["build", "pnpm build"],
+    ]);
     const { readdir } = await import("node:fs/promises");
-    assert.equal((await readdir(root)).includes("should-never-run"), false);
+    expect((await readdir(root)).includes("should-never-run")).toBe(false);
     await writeFile(join(root, "package.json"), "{}");
-    assert.deepEqual(await inspectProjectCommands(root), []);
-    await assert.rejects(inspectProjectCommands(join(root, "missing")), /Папка не найдена/);
+    expect(await inspectProjectCommands(root)).toStrictEqual([]);
+    await expect(inspectProjectCommands(join(root, "missing"))).rejects.toThrow(/Папка не найдена/);
     const project = normalizeProject({ name: "App", path: root, icon: "old.svg", commands });
     const saved = normalizeProject({ ...project, icon: "" }, project);
-    assert.equal(saved.icon, "");
-    assert.equal(saved.id, project.id);
+    expect(saved.icon).toBe("");
+    expect(saved.id).toBe(project.id);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, test } from "vite-plus/test";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -25,21 +24,23 @@ test("site files resolve inside the project with proper types", () =>
   withSite(async (root) => {
     const css = await openProjectSiteFile(root, "docs/css/a.css");
     close(css);
-    assert.equal(css.type, "text/css; charset=utf-8");
+    expect(css.type).toBe("text/css; charset=utf-8");
     const index = await openProjectSiteFile(root, "docs/");
     close(index);
-    assert.match(index.type, /^text\/html/);
+    expect(index.type).toMatch(/^text\/html/);
   }));
 
 test("a directory without a trailing slash redirects so relative links resolve", () =>
   withSite(async (root) => {
-    assert.deepEqual(await openProjectSiteFile(root, "docs"), { redirect: true });
+    expect(await openProjectSiteFile(root, "docs")).toStrictEqual({ redirect: true });
   }));
 
 test("site files never leave the project or expose .git", () =>
   withSite(async (root) => {
-    await assert.rejects(openProjectSiteFile(root, "leak"), { status: 403 });
-    await assert.rejects(openProjectSiteFile(root, "../x"), { status: 403 });
-    await assert.rejects(openProjectSiteFile(root, ".git/config"), { status: 403 });
-    await assert.rejects(openProjectSiteFile(root, "docs/missing.js"), { status: 404 });
+    await expect(openProjectSiteFile(root, "leak")).rejects.toMatchObject({ status: 403 });
+    await expect(openProjectSiteFile(root, "../x")).rejects.toMatchObject({ status: 403 });
+    await expect(openProjectSiteFile(root, ".git/config")).rejects.toMatchObject({ status: 403 });
+    await expect(openProjectSiteFile(root, "docs/missing.js")).rejects.toMatchObject({
+      status: 404,
+    });
   }));

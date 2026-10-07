@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, test } from "vite-plus/test";
 import {
   activatePanel,
   addPanel,
@@ -23,22 +22,22 @@ import {
 const sum = (values) => values.reduce((total, value) => total + value, 0);
 function assertValid(layout) {
   const groups = dockGroups(layout);
-  assert.ok(
+  expect(
     groups.some((group) => group.id === layout.focused),
     "focused group exists",
-  );
+  ).toBeTruthy();
   const panels = dockPanels(layout);
-  assert.equal(new Set(panels).size, panels.length, "panel appears once");
+  expect(new Set(panels).size, "panel appears once").toBe(panels.length);
   const ids = new Set();
   const visit = (node) => {
-    assert.ok(!ids.has(node.id), `unique id ${node.id}`);
+    expect(!ids.has(node.id), `unique id ${node.id}`).toBeTruthy();
     ids.add(node.id);
     if (node.type === "split") {
-      assert.ok(node.children.length >= 2, "split has at least two children");
-      assert.equal(node.sizes.length, node.children.length);
-      assert.ok(Math.abs(sum(node.sizes) - 1) < 1e-9, "sizes sum to one");
+      expect(node.children.length >= 2, "split has at least two children").toBeTruthy();
+      expect(node.sizes.length).toBe(node.children.length);
+      expect(Math.abs(sum(node.sizes) - 1) < 1e-9, "sizes sum to one").toBeTruthy();
       node.children.forEach(visit);
-    } else assert.ok(node.panels.includes(node.active) || !node.panels.length);
+    } else expect(node.panels.includes(node.active) || !node.panels.length).toBeTruthy();
   };
   visit(layout.root);
 }
@@ -46,20 +45,17 @@ function assertValid(layout) {
 test("default layout has editor and terminal groups", () => {
   const layout = createDockLayout();
   assertValid(layout);
-  assert.deepEqual(
-    dockGroups(layout).map((group) => group.role),
-    ["editor", "terminal"],
-  );
+  expect(dockGroups(layout).map((group) => group.role)).toStrictEqual(["editor", "terminal"]);
 });
 
 test("panels are added to a group, activated and reuse the same reference when unchanged", () => {
   let layout = addPanel(createDockLayout(), "a.ts", { groupId: "g1" });
   layout = addPanel(layout, "b.ts", { groupId: "g1" });
-  assert.deepEqual(findDockGroup(layout, "g1").panels, ["a.ts", "b.ts"]);
-  assert.equal(findDockGroup(layout, "g1").active, "b.ts");
-  assert.equal(addPanel(layout, "b.ts", { groupId: "g1" }), layout);
-  assert.equal(activatePanel(layout, "b.ts"), layout);
-  assert.equal(activatePanel(layout, "missing"), layout);
+  expect(findDockGroup(layout, "g1").panels).toStrictEqual(["a.ts", "b.ts"]);
+  expect(findDockGroup(layout, "g1").active).toBe("b.ts");
+  expect(addPanel(layout, "b.ts", { groupId: "g1" })).toBe(layout);
+  expect(activatePanel(layout, "b.ts")).toBe(layout);
+  expect(activatePanel(layout, "missing")).toBe(layout);
   assertValid(layout);
 });
 
@@ -70,13 +66,13 @@ test("dropping on an edge splits the group beside it", () => {
   assertValid(layout);
   const editor = groupOfPanel(layout, "a");
   const split = groupOfPanel(layout, "b");
-  assert.notEqual(editor.id, split.id);
-  assert.deepEqual(editor.panels, ["a", "c"]);
-  assert.equal(layout.focused, split.id);
+  expect(editor.id).not.toBe(split.id);
+  expect(editor.panels).toStrictEqual(["a", "c"]);
+  expect(layout.focused).toBe(split.id);
   // The new group joins the existing row instead of nesting another split.
-  assert.equal(layout.root.type, "split");
-  assert.equal(layout.root.children.length, 3);
-  assert.equal(layout.root.direction, "row");
+  expect(layout.root.type).toBe("split");
+  expect(layout.root.children.length).toBe(3);
+  expect(layout.root.direction).toBe("row");
 });
 
 test("splitting against the other direction nests a column", () => {
@@ -85,17 +81,14 @@ test("splitting against the other direction nests a column", () => {
   layout = movePanel(layout, "b", { groupId: "g1", zone: "bottom" });
   assertValid(layout);
   const column = layout.root.children[0];
-  assert.equal(column.type, "split");
-  assert.equal(column.direction, "column");
-  assert.deepEqual(
-    column.children.map((child) => child.panels),
-    [["a"], ["b"]],
-  );
+  expect(column.type).toBe("split");
+  expect(column.direction).toBe("column");
+  expect(column.children.map((child) => child.panels)).toStrictEqual([["a"], ["b"]]);
 });
 
 test("a group with one tab cannot be split by that tab", () => {
   const layout = addPanel(createDockLayout(), "a", { groupId: "g1" });
-  assert.equal(movePanel(layout, "a", { groupId: "g1", zone: "left" }), layout);
+  expect(movePanel(layout, "a", { groupId: "g1", zone: "left" })).toBe(layout);
 });
 
 test("moving the last tab out removes a group that is not keepEmpty and collapses the split", () => {
@@ -106,23 +99,23 @@ test("moving the last tab out removes a group that is not keepEmpty and collapse
   const created = groupOfPanel(layout, "b").id;
   layout = movePanel(layout, "b", { groupId: "g1", zone: "center" });
   assertValid(layout);
-  assert.equal(findDockGroup(layout, created), undefined);
-  assert.deepEqual(groupOfPanel(layout, "b").panels, ["a", "b"]);
+  expect(findDockGroup(layout, created)).toBe(undefined);
+  expect(groupOfPanel(layout, "b").panels).toStrictEqual(["a", "b"]);
   // keepEmpty groups survive emptiness.
-  assert.ok(findDockGroup(layout, "g2"));
+  expect(findDockGroup(layout, "g2")).toBeTruthy();
 });
 
 test("moving between groups and reordering inside a group", () => {
   let layout = createDockLayout();
   for (const name of ["a", "b", "c"]) layout = addPanel(layout, name, { groupId: "g1" });
   layout = movePanel(layout, "c", { groupId: "g2", zone: "center" });
-  assert.deepEqual(findDockGroup(layout, "g2").panels, ["c"]);
-  assert.equal(layout.focused, "g2");
+  expect(findDockGroup(layout, "g2").panels).toStrictEqual(["c"]);
+  expect(layout.focused).toBe("g2");
   layout = movePanel(layout, "a", { groupId: "g1", zone: "center", index: 2 });
-  assert.deepEqual(findDockGroup(layout, "g1").panels, ["b", "a"]);
+  expect(findDockGroup(layout, "g1").panels).toStrictEqual(["b", "a"]);
   layout = reorderPanels(layout, "g1", ["a", "b"]);
-  assert.deepEqual(findDockGroup(layout, "g1").panels, ["a", "b"]);
-  assert.equal(reorderPanels(layout, "g1", ["a"]), layout);
+  expect(findDockGroup(layout, "g1").panels).toStrictEqual(["a", "b"]);
+  expect(reorderPanels(layout, "g1", ["a"])).toBe(layout);
   assertValid(layout);
 });
 
@@ -131,10 +124,10 @@ test("closing the active tab activates a neighbour; closing everything keeps kee
   for (const name of ["a", "b", "c"]) layout = addPanel(layout, name, { groupId: "g1" });
   layout = activatePanel(layout, "b");
   layout = removePanel(layout, "b");
-  assert.equal(findDockGroup(layout, "g1").active, "c");
+  expect(findDockGroup(layout, "g1").active).toBe("c");
   layout = removePanel(removePanel(layout, "a"), "c");
-  assert.deepEqual(findDockGroup(layout, "g1").panels, []);
-  assert.ok(findDockGroup(layout, "g1"));
+  expect(findDockGroup(layout, "g1").panels).toStrictEqual([]);
+  expect(findDockGroup(layout, "g1")).toBeTruthy();
   assertValid(layout);
 });
 
@@ -154,15 +147,14 @@ test("either half of a split terminal group disappears when its last tab closes 
           : action === "reconcile"
             ? reconcileDock(layout, { ids: [], exists: (id) => id !== panel })
             : removePanel(layout, panel);
-      assert.equal(findDockGroup(layout, removed), undefined, `${action}: ${removed}`);
-      assert.equal(layout.root.direction, "row", "empty nested split collapses");
-      assert.equal(dockGroups(layout).filter((group) => group.role === "terminal").length, 1);
+      expect(findDockGroup(layout, removed), `${action}: ${removed}`).toBe(undefined);
+      expect(layout.root.direction, "empty nested split collapses").toBe("row");
+      expect(dockGroups(layout).filter((group) => group.role === "terminal").length).toBe(1);
       for (const id of dockPanels(layout)) layout = removePanel(layout, id);
-      assert.equal(
+      expect(
         dockGroups(layout).filter((group) => group.role === "terminal").length,
-        1,
         "last empty terminal placeholder survives",
-      );
+      ).toBe(1);
       assertValid(layout);
     }
   }
@@ -183,10 +175,10 @@ test("reconcile repairs a saved split whose terminal group has no role", () => {
     exists: () => true,
     role: (id) => (id.startsWith("terminal:") ? "terminal" : "editor"),
   });
-  assert.equal(findDockGroup(layout, "g2"), undefined);
-  assert.equal(groupOfPanel(layout, "terminal:2").role, "terminal");
-  assert.equal(groupOfPanel(layout, "terminal:2").keepEmpty, true);
-  assert.equal(layout.root.direction, "row");
+  expect(findDockGroup(layout, "g2")).toBe(undefined);
+  expect(groupOfPanel(layout, "terminal:2").role).toBe("terminal");
+  expect(groupOfPanel(layout, "terminal:2").keepEmpty).toBe(true);
+  expect(layout.root.direction).toBe("row");
   assertValid(layout);
 });
 
@@ -194,34 +186,34 @@ test("edge drop onto the whole dock creates a root-level group", () => {
   let layout = addPanel(createDockLayout(), "a", { groupId: "g1" });
   layout = addPanel(layout, "t", { zone: "bottom" });
   assertValid(layout);
-  assert.equal(layout.root.direction, "column");
-  assert.deepEqual(layout.root.children[1].panels, ["t"]);
-  assert.ok(Math.abs(layout.root.sizes[1] - 0.35) < 1e-9);
+  expect(layout.root.direction).toBe("column");
+  expect(layout.root.children[1].panels).toStrictEqual(["t"]);
+  expect(Math.abs(layout.root.sizes[1] - 0.35) < 1e-9).toBeTruthy();
 });
 
 test("hiding moves focus away, showing restores it, maximize is cleared with hidden groups", () => {
   let layout = createDockLayout();
   layout = addPanel(layout, "a", { groupId: "g1" });
   layout = addPanel(layout, "t", { groupId: "g2" });
-  assert.equal(layout.focused, "g2");
+  expect(layout.focused).toBe("g2");
   layout = toggleMaximized(layout, "g2");
-  assert.equal(layout.maximized, "g2");
+  expect(layout.maximized).toBe("g2");
   layout = setGroupHidden(layout, "g2", true);
-  assert.equal(layout.focused, "g1");
-  assert.equal(layout.maximized, undefined);
-  assert.equal(findDockGroup(layout, "g2").hidden, true);
+  expect(layout.focused).toBe("g1");
+  expect(layout.maximized).toBe(undefined);
+  expect(findDockGroup(layout, "g2").hidden).toBe(true);
   layout = activatePanel(layout, "t");
-  assert.equal(findDockGroup(layout, "g2").hidden, undefined);
-  assert.equal(layout.focused, "g2");
+  expect(findDockGroup(layout, "g2").hidden).toBe(undefined);
+  expect(layout.focused).toBe("g2");
   assertValid(layout);
 });
 
 test("split sizes are normalised and validated", () => {
   const layout = createDockLayout();
   const resized = setSplitSizes(layout, "s1", [3, 1]);
-  assert.deepEqual(resized.root.sizes, [0.75, 0.25]);
-  assert.equal(setSplitSizes(layout, "s1", [1]), layout);
-  assert.equal(setSplitSizes(layout, "missing", [1, 1]), layout);
+  expect(resized.root.sizes).toStrictEqual([0.75, 0.25]);
+  expect(setSplitSizes(layout, "s1", [1])).toBe(layout);
+  expect(setSplitSizes(layout, "missing", [1, 1])).toBe(layout);
 });
 
 test("replacePanel keeps position and activity", () => {
@@ -229,9 +221,9 @@ test("replacePanel keeps position and activity", () => {
   layout = addPanel(layout, "other", { groupId: "g2" });
   layout = activatePanel(layout, "old");
   layout = replacePanel(layout, "old", "new");
-  assert.deepEqual(findDockGroup(layout, "g2").panels, ["new", "other"]);
-  assert.equal(findDockGroup(layout, "g2").active, "new");
-  assert.equal(replacePanel(layout, "new", "other"), layout);
+  expect(findDockGroup(layout, "g2").panels).toStrictEqual(["new", "other"]);
+  expect(findDockGroup(layout, "g2").active).toBe("new");
+  expect(replacePanel(layout, "new", "other")).toBe(layout);
 });
 
 test("reconcile prunes vanished panels, ignores unknown sources and places new ones", () => {
@@ -242,15 +234,15 @@ test("reconcile prunes vanished panels, ignores unknown sources and places new o
     ids: ["file:a", "terminal:1"],
     exists: (panel) => (panel.startsWith("terminal:") ? undefined : true),
   });
-  assert.equal(kept, layout);
+  expect(kept).toBe(layout);
   const next = reconcileDock(layout, {
     ids: ["terminal:2", "file:b"],
     exists: (panel) => (panel === "file:a" ? false : undefined),
     place: (panel) => ({ groupId: panel.startsWith("terminal:") ? "g2" : "g1" }),
   });
-  assert.deepEqual(findDockGroup(next, "g1").panels, ["file:b"]);
-  assert.deepEqual(findDockGroup(next, "g2").panels, ["terminal:1", "terminal:2"]);
-  assert.equal(findDockGroup(next, "g2").active, "terminal:1", "reconcile does not steal activity");
+  expect(findDockGroup(next, "g1").panels).toStrictEqual(["file:b"]);
+  expect(findDockGroup(next, "g2").panels).toStrictEqual(["terminal:1", "terminal:2"]);
+  expect(findDockGroup(next, "g2").active, "reconcile does not steal activity").toBe("terminal:1");
   assertValid(next);
 });
 
@@ -262,9 +254,9 @@ test("layouts survive serialisation; hostile data does not throw", () => {
   layout = setGroupHidden(layout, "g2", true);
   layout = toggleMaximized(layout, "g1");
   const stored = JSON.parse(JSON.stringify(serializeDockLayout(layout)));
-  assert.equal(stored.maximized, undefined);
+  expect(stored.maximized).toBe(undefined);
   const restored = parseDockLayout(stored);
-  assert.deepEqual(restored, serializeDockLayout(layout));
+  expect(restored).toStrictEqual(serializeDockLayout(layout));
 
   for (const bad of [
     null,
@@ -275,7 +267,7 @@ test("layouts survive serialisation; hostile data does not throw", () => {
     { root: { type: "split", id: "s", direction: "diagonal", children: [] } },
     { root: { type: "group", id: "g", panels: "x" } },
   ])
-    assert.equal(parseDockLayout(bad), undefined);
+    expect(parseDockLayout(bad)).toBe(undefined);
 
   const duplicated = parseDockLayout({
     root: {
@@ -291,10 +283,10 @@ test("layouts survive serialisation; hostile data does not throw", () => {
     },
     focused: "nope",
   });
-  assert.ok(duplicated);
+  expect(duplicated).toBeTruthy();
   assertValid(duplicated);
-  assert.deepEqual(dockPanels(duplicated), ["a", "b", "d"]);
-  assert.equal(findDockGroup(duplicated, "g1").active, "a");
+  expect(dockPanels(duplicated)).toStrictEqual(["a", "b", "d"]);
+  expect(findDockGroup(duplicated, "g1").active).toBe("a");
 
   let deep = { type: "group", id: "leaf", panels: ["x"] };
   for (let i = 0; i < 20; i++)
@@ -305,7 +297,7 @@ test("layouts survive serialisation; hostile data does not throw", () => {
       children: [deep, { type: "group", id: `l${i}`, panels: [] }],
     };
   const shallow = parseDockLayout({ root: deep });
-  assert.ok(!shallow || !dockPanels(shallow).includes("x"), "excessive depth is dropped");
+  expect(!shallow || !dockPanels(shallow).includes("x"), "excessive depth is dropped").toBeTruthy();
 });
 
 test("mobile surfaces separate mixed panels without changing desktop splits or hidden groups", async () => {
@@ -321,8 +313,8 @@ test("mobile surfaces separate mixed panels without changing desktop splits or h
   const isTerminal = (id) => id.startsWith("terminal:");
   const last = { editor: "b", terminal: "terminal:2" };
   let surfaces = mobileDockSurfaces(layout, isTerminal, last);
-  assert.deepEqual(surfaces[0], { side: "editor", ids: ["a", "b"], active: "b" });
-  assert.deepEqual(surfaces[1], {
+  expect(surfaces[0]).toStrictEqual({ side: "editor", ids: ["a", "b"], active: "b" });
+  expect(surfaces[1]).toStrictEqual({
     side: "terminal",
     ids: ["terminal:1", "terminal:2"],
     active: "terminal:1",
@@ -333,13 +325,12 @@ test("mobile surfaces separate mixed panels without changing desktop splits or h
     { editor: "removed", terminal: "removed" },
     { editor: ["b", "removed", "a"], terminal: [] },
   );
-  assert.equal(surfaces[0].active, "b");
-  assert.deepEqual(surfaces[0].ids, ["b", "a"]);
-  assert.deepEqual(layout, original);
-  assert.deepEqual(
+  expect(surfaces[0].active).toBe("b");
+  expect(surfaces[0].ids).toStrictEqual(["b", "a"]);
+  expect(layout).toStrictEqual(original);
+  expect(
     mobileDockSurfaces(createDockLayout(), isTerminal, last).map((item) => item.active),
-    ["", ""],
-  );
+  ).toStrictEqual(["", ""]);
 });
 
 test("tab reader lists panels and reads files, diffs, terminals and rejects unknown tabs", async () => {
@@ -383,25 +374,22 @@ test("tab reader lists panels and reads files, diffs, terminals and rejects unkn
     register: (id, _title, run) => commands.set(id, run),
   });
   const list = commands.get("ide.workbench.tabs.list")();
-  assert.deepEqual(
-    list.tabs.map((tab) => [tab.kind, tab.dirty]),
-    [
-      ["file", true],
-      ["image", false],
-      ["agent", false],
-      ["note", false],
-      ["terminal", undefined],
-    ],
-  );
+  expect(list.tabs.map((tab) => [tab.kind, tab.dirty])).toStrictEqual([
+    ["file", true],
+    ["image", false],
+    ["agent", false],
+    ["note", false],
+    ["terminal", undefined],
+  ]);
   const read = commands.get("ide.workbench.tab.read");
-  assert.equal((await read()).text, "new");
-  assert.equal((await read({ id: "img" })).text, undefined);
-  assert.ok((await read({ id: "agent:chat" })).note);
-  assert.deepEqual(
-    [(await read({ id: "note" })).text, (await read({ id: "note" })).note],
-    ["from the kind", "own reader"],
-  );
+  expect((await read()).text).toBe("new");
+  expect((await read({ id: "img" })).text).toBe(undefined);
+  expect((await read({ id: "agent:chat" })).note).toBeTruthy();
+  expect([(await read({ id: "note" })).text, (await read({ id: "note" })).note]).toStrictEqual([
+    "from the kind",
+    "own reader",
+  ]);
   const tail = await read({ id: "terminal:t1", maxChars: 4, lines: 5 });
-  assert.deepEqual([tail.text, tail.truncated, reads[0]], ["6789", true, ["t1", 5]]);
-  await assert.rejects(read({ id: "missing" }), /не найдена/);
+  expect([tail.text, tail.truncated, reads[0]]).toStrictEqual(["6789", true, ["t1", 5]]);
+  await expect(read({ id: "missing" })).rejects.toThrow(/не найдена/);
 });

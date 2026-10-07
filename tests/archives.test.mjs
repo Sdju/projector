@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, test } from "vite-plus/test";
 import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -42,39 +41,39 @@ test("native archive previews handle tar/compression/zip, unusual names and link
       "sample.txz",
     ]) {
       const preview = await previewProjectFile(root, path);
-      assert.equal(preview.path, path);
-      assert.equal(preview.archive.entries.length, 5);
-      assert.equal(preview.archive.entries[1].size, 5);
-      assert.equal(preview.archive.entries[2].path, "package/строка\nдругая.txt");
-      assert.equal(preview.archive.entries[3].path, "../outside.txt");
-      assert.equal(preview.archive.entries[4].link, "/etc/passwd");
-      assert.equal(preview.archive.entries[4].type, "symlink");
-      assert.equal(preview.archive.truncated, false);
+      expect(preview.path).toBe(path);
+      expect(preview.archive.entries.length).toBe(5);
+      expect(preview.archive.entries[1].size).toBe(5);
+      expect(preview.archive.entries[2].path).toBe("package/строка\nдругая.txt");
+      expect(preview.archive.entries[3].path).toBe("../outside.txt");
+      expect(preview.archive.entries[4].link).toBe("/etc/passwd");
+      expect(preview.archive.entries[4].type).toBe("symlink");
+      expect(preview.archive.truncated).toBe(false);
     }
     const zip = await previewProjectFile(root, "sample.zip");
-    assert.equal(zip.archive.format, "ZIP");
-    assert.equal(zip.archive.entries[0].type, "directory");
-    assert.equal(zip.archive.entries[1].size, 5);
+    expect(zip.archive.format).toBe("ZIP");
+    expect(zip.archive.entries[0].type).toBe("directory");
+    expect(zip.archive.entries[1].size).toBe(5);
     for (const ext of ["gz", "gzip", "bz2", "xz"]) {
       const preview = await previewProjectFile(root, `plain.txt.${ext}`);
-      assert.deepEqual(preview.archive.entries, [{ path: "plain.txt", type: "file", size: 5 }]);
+      expect(preview.archive.entries).toStrictEqual([{ path: "plain.txt", type: "file", size: 5 }]);
     }
     for (const path of ["many.zip", "many.tar"]) {
       const preview = await previewProjectFile(root, path);
-      assert.equal(preview.archive.truncated, true);
-      assert.equal(preview.archive.entries.length, 5000);
+      expect(preview.archive.truncated).toBe(true);
+      expect(preview.archive.entries.length).toBe(5000);
     }
-    assert.equal((await previewProjectFile(root, "empty.tar")).archive.entries.length, 0);
-    await assert.rejects(previewProjectFile(root, "large.txt.gz"), { status: 413 });
-    await assert.rejects(previewProjectFile(root, "bad.tar.gz"), { status: 422 });
+    expect((await previewProjectFile(root, "empty.tar")).archive.entries.length).toBe(0);
+    await expect(previewProjectFile(root, "large.txt.gz")).rejects.toMatchObject({ status: 413 });
+    await expect(previewProjectFile(root, "bad.tar.gz")).rejects.toMatchObject({ status: 422 });
     await writeFile(join(root, "broken.tgz"), "not gzip");
-    await assert.rejects(previewProjectFile(root, "broken.tgz"), { status: 422 });
-    await assert.rejects(previewProjectFile(root, "../outside.tar"), { status: 403 });
+    await expect(previewProjectFile(root, "broken.tgz")).rejects.toMatchObject({ status: 422 });
+    await expect(previewProjectFile(root, "../outside.tar")).rejects.toMatchObject({ status: 403 });
     await symlink("/etc/passwd", join(root, "external.tar"));
-    await assert.rejects(previewProjectFile(root, "external.tar"), { status: 403 });
+    await expect(previewProjectFile(root, "external.tar")).rejects.toMatchObject({ status: 403 });
     await writeFile(join(root, "readme.txt"), "text");
-    assert.equal((await previewProjectFile(root, "readme.txt")).content, "text");
-    await assert.rejects(readProjectFile(root, "sample.tar"), { status: 415 });
+    expect((await previewProjectFile(root, "readme.txt")).content).toBe("text");
+    await expect(readProjectFile(root, "sample.tar")).rejects.toMatchObject({ status: 415 });
   } finally {
     await rm(root, { recursive: true, force: true });
   }

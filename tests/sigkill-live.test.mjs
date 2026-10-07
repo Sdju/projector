@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, test } from "vite-plus/test";
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -15,10 +14,10 @@ const until = async (check, what) => {
     if (await check()) return;
     await sleep(250);
   }
-  assert.fail(`timed out waiting for ${what}`);
+  expect.unreachable(`timed out waiting for ${what}`);
 };
 
-await test(
+test(
   "a container orphaned by SIGKILL is removed by the next server",
   { skip: !enabled },
   async () => {
@@ -76,7 +75,7 @@ await test(
       await until(() => count() === 1, "the container to start");
       first.kill("SIGKILL");
       await sleep(1500);
-      assert.equal(count(), 1, "the orphan survives the killed server");
+      expect(count(), "the orphan survives the killed server").toBe(1);
       let log = "";
       second = spawn(process.execPath, ["server/app/standalone.ts"], {
         env: { ...env, PROJECTOR_PORT: "4393" },
@@ -84,7 +83,7 @@ await test(
       });
       second.stdout.on("data", (chunk) => (log += chunk));
       await until(() => count() === 0, "the next server to remove the orphan");
-      assert.match(log, /Удалено контейнеров от прошлого запуска Projector: 1/);
+      expect(log).toMatch(/Удалено контейнеров от прошлого запуска Projector: 1/);
     } finally {
       first.kill("SIGKILL");
       second?.kill("SIGTERM");

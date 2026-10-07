@@ -1,15 +1,14 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, onTestFinished, test } from "vite-plus/test";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { os } from "../core/modules/os/index.ts";
 
-await test("real GioUnix catalog reads desktop application keywords", async (t) => {
+test("real GioUnix catalog reads desktop application keywords", async () => {
   const directory = await mkdtemp(join(tmpdir(), "projector-catalog-gtk-"));
   const previous = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = directory;
-  t.after(async () => {
+  onTestFinished(async () => {
     if (previous === undefined) delete process.env.XDG_DATA_HOME;
     else process.env.XDG_DATA_HOME = previous;
     await rm(directory, { recursive: true, force: true });
@@ -23,8 +22,8 @@ await test("real GioUnix catalog reads desktop application keywords", async (t) 
   const app = catalog
     .listApplications()
     .find((item) => item.id === "app:projector-catalog-probe.desktop");
-  assert.ok(app, "the application is present in the native catalog");
-  assert.equal(app.name, "Projector catalog probe");
-  assert.match(app.keywords, /palette/);
-  assert.match(app.keywords, /workspace/);
+  expect(app, "the application is present in the native catalog").toBeTruthy();
+  expect(app.name).toBe("Projector catalog probe");
+  expect(app.keywords).toMatch(/palette/);
+  expect(app.keywords).toMatch(/workspace/);
 });

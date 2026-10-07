@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, onTestFinished, test } from "vite-plus/test";
 import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -87,10 +86,10 @@ const scroll = document.querySelector('.table-scroll');
 test(
   "Virtual list bounds the DOM, measures rows, preserves focus and filters safely",
   {
-    skip: chromium ? false : "Set CHROMIUM_BIN to run browser regression",
+    skip: !chromium,
     timeout: 60000,
   },
-  async (t) => {
+  async () => {
     const directory = await mkdtemp(join(tmpdir(), "projector-virtual-list-"));
     const loaded = await loadConfigFromFile({ command: "serve", mode: "development" });
     const fixture = {
@@ -118,7 +117,7 @@ test(
       server: { host: "127.0.0.1", port: 0, strictPort: false },
       logLevel: "error",
     });
-    t.after(async () => {
+    onTestFinished(async () => {
       await server.close();
       await rm(directory, { recursive: true, force: true });
     });
@@ -146,6 +145,6 @@ test(
         stdout.slice(-2000) + stderr.slice(-1000)
       );
     };
-    assert.equal(await dump("/__virtual_list_test", "virtual"), "PASS");
+    expect(await dump("/__virtual_list_test", "virtual")).toBe("PASS");
   },
 );

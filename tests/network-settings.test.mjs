@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, onTestFinished, test, vi } from "vite-plus/test";
 import { setImmediate } from "node:timers/promises";
 import { createRenderer, ref } from "vue";
 import { createCommandService } from "../core/modules/ide/index.ts";
@@ -7,7 +6,7 @@ import { commandHostKey } from "../src/common/utilities/commands.ts";
 import { useNetworkSettings } from "../src/modules/network/model.ts";
 import { waitForNetworkRestart } from "../src/modules/network/client.ts";
 
-function mount(t, view = "settings", sdk = createCommandService()) {
+function mount(view = "settings", sdk = createCommandService()) {
   const renderer = createRenderer({
     createComment: () => ({}),
     createText: () => ({}),
@@ -29,7 +28,7 @@ function mount(t, view = "settings", sdk = createCommandService()) {
   });
   app.provide(commandHostKey, { revision: ref(0), createScope: sdk.createScope, reportError() {} });
   app.mount({});
-  t.after(() => app.unmount());
+  onTestFinished(() => app.unmount());
   return { app, model, sdk, run: (id, args) => model.commands.scope.executeCommand(id, args) };
 }
 
@@ -40,12 +39,12 @@ const initial = () => ({
   lanUrls: ["http://192.0.2.1:4177"],
 });
 
-test("network scopes share operations, preserve drafts, validate arguments and report HTTP failures", async (t) => {
+test("network scopes share operations, preserve drafts, validate arguments and report HTTP failures", async () => {
   const saved = initial();
   const posts = [];
   let rejectPost = false;
   let release;
-  t.mock.method(globalThis, "fetch", async (url, options = {}) => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (url, options = {}) => {
     if (url === "/api/health") return Response.json({ pid: 10 });
     if (options.method !== "POST") return Response.json(saved);
     const body = JSON.parse(options.body);
@@ -56,37 +55,37 @@ test("network scopes share operations, preserve drafts, validate arguments and r
     return Response.json({ ok: true, restarted: false });
   });
   const sdk = createCommandService();
-  const settings = mount(t, "settings", sdk);
-  const panel = mount(t, "panel", sdk);
+  const settings = mount("settings", sdk);
+  const panel = mount("panel", sdk);
   await setImmediate();
-  assert.equal(sdk.getScopes().length, 2);
-  assert.equal(settings.model.ready.value, true);
+  expect(sdk.getScopes().length).toBe(2);
+  expect(settings.model.ready.value).toBe(true);
   settings.model.mode.value = "local";
   settings.model.password.value = "settings draft";
-  assert.equal(panel.model.mode.value, "lan");
-  assert.equal(panel.model.password.value, "");
+  expect(panel.model.mode.value).toBe("lan");
+  expect(panel.model.password.value).toBe("");
   await settings.run("ide.network.refresh");
-  assert.equal(settings.model.mode.value, "lan");
-  assert.equal(settings.model.password.value, "settings draft");
+  expect(settings.model.mode.value).toBe("lan");
+  expect(settings.model.password.value).toBe("settings draft");
   await panel.run("ide.network.save");
-  assert.deepEqual(posts.at(-1), { mode: "lan" });
+  expect(posts.at(-1)).toStrictEqual({ mode: "lan" });
   await panel.run("ide.network.save", { password: "  replacement  " });
-  assert.deepEqual(posts.at(-1), { mode: "lan", password: "  replacement  " });
-  assert.equal(panel.model.status.value, "Сохранено");
+  expect(posts.at(-1)).toStrictEqual({ mode: "lan", password: "  replacement  " });
+  expect(panel.model.status.value).toBe("Сохранено");
   await panel.run("ide.network.password.clear");
-  assert.deepEqual(posts.at(-1), { mode: "lan", password: "" });
-  assert.equal(panel.model.passwordRequired.value, false);
-  await assert.rejects(panel.run("ide.network.password.clear"), /недоступна/);
+  expect(posts.at(-1)).toStrictEqual({ mode: "lan", password: "" });
+  expect(panel.model.passwordRequired.value).toBe(false);
+  await expect(panel.run("ide.network.password.clear")).rejects.toThrow(/недоступна/);
   const before = posts.length;
-  await assert.rejects(panel.run("ide.network.save", { mode: "invalid" }), /Режим/);
-  await assert.rejects(panel.run("ide.network.save", { password: 1 }), /строкой/);
-  assert.equal(posts.length, before);
+  await expect(panel.run("ide.network.save", { mode: "invalid" })).rejects.toThrow(/Режим/);
+  await expect(panel.run("ide.network.save", { password: 1 })).rejects.toThrow(/строкой/);
+  expect(posts.length).toBe(before);
   panel.model.password.value = "retry draft";
   rejectPost = true;
-  await assert.rejects(panel.run("ide.network.save"), /Local access only/);
-  assert.equal(panel.model.error.value, "Local access only");
-  assert.equal(panel.model.password.value, "retry draft");
-  assert.equal(panel.model.busy.value, false);
+  await expect(panel.run("ide.network.save")).rejects.toThrow(/Local access only/);
+  expect(panel.model.error.value).toBe("Local access only");
+  expect(panel.model.password.value).toBe("retry draft");
+  expect(panel.model.busy.value).toBe(false);
   rejectPost = false;
   let resolve;
   release = {
@@ -96,20 +95,20 @@ test("network scopes share operations, preserve drafts, validate arguments and r
   };
   const pending = panel.run("ide.network.save");
   await setImmediate();
-  assert.equal(panel.model.busy.value, true);
-  await assert.rejects(panel.run("ide.network.save"), /недоступна/);
+  expect(panel.model.busy.value).toBe(true);
+  await expect(panel.run("ide.network.save")).rejects.toThrow(/недоступна/);
   resolve();
   await pending;
-  assert.equal(panel.model.error.value, "");
-  assert.equal(panel.model.password.value, "");
-  for (const scope of sdk.getScopes()) assert.equal("password" in scope.context, false);
+  expect(panel.model.error.value).toBe("");
+  expect(panel.model.password.value).toBe("");
+  for (const scope of sdk.getScopes()) expect("password" in scope.context).toBe(false);
 });
 
-test("failed initial load can retry and unmount aborts without applying late results", async (t) => {
+test("failed initial load can retry and unmount aborts without applying late results", async () => {
   let fail = true;
   let finish;
   let signal;
-  t.mock.method(globalThis, "fetch", async (_, options) => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (_, options) => {
     if (fail) return Response.json({ error: "Cannot load" }, { status: 500 });
     if (finish === undefined) return Response.json(initial());
     signal = options.signal;
@@ -117,26 +116,26 @@ test("failed initial load can retry and unmount aborts without applying late res
       finish = resolve;
     });
   });
-  const { app, model, run, sdk } = mount(t);
+  const { app, model, run, sdk } = mount();
   await setImmediate();
-  assert.equal(model.ready.value, false);
-  assert.equal(model.error.value, "Cannot load");
-  await assert.rejects(run("ide.network.save"), /недоступна/);
+  expect(model.ready.value).toBe(false);
+  expect(model.error.value).toBe("Cannot load");
+  await expect(run("ide.network.save")).rejects.toThrow(/недоступна/);
   fail = false;
   await run("ide.network.refresh");
-  assert.equal(model.ready.value, true);
+  expect(model.ready.value).toBe(true);
   finish = null;
   const pending = run("ide.network.refresh");
   await setImmediate();
   app.unmount();
-  assert.equal(signal.aborted, true);
-  assert.equal(sdk.getScopes().length, 0);
+  expect(signal.aborted).toBe(true);
+  expect(sdk.getScopes().length).toBe(0);
   finish(Response.json({ ...initial(), mode: "local" }));
   await pending;
-  assert.equal(model.state.value.mode, "lan");
+  expect(model.state.value.mode).toBe("lan");
 });
 
-test("mode changes wait for a new PID before reload; unavailable health blocks the change", async (t) => {
+test("mode changes wait for a new PID before reload; unavailable health blocks the change", async () => {
   let healthCalls = 0;
   let healthMissing = true;
   let writes = 0;
@@ -149,11 +148,11 @@ test("mode changes wait for a new PID before reload; unavailable health blocks t
       },
     },
   };
-  t.after(() => {
+  onTestFinished(() => {
     if (previousWindow === undefined) delete globalThis.window;
     else globalThis.window = previousWindow;
   });
-  t.mock.method(globalThis, "fetch", async (url, options = {}) => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (url, options = {}) => {
     if (url === "/api/health") {
       healthCalls++;
       return healthMissing
@@ -166,42 +165,41 @@ test("mode changes wait for a new PID before reload; unavailable health blocks t
     }
     return Response.json(initial());
   });
-  const { model, run } = mount(t);
+  const { model, run } = mount();
   await setImmediate();
-  await assert.rejects(run("ide.network.save", { mode: "local" }), /PID/);
-  assert.equal(writes, 0);
-  assert.equal(reloads, 0);
+  await expect(run("ide.network.save", { mode: "local" })).rejects.toThrow(/PID/);
+  expect(writes).toBe(0);
+  expect(reloads).toBe(0);
   healthMissing = false;
   await run("ide.network.save", { mode: "local" });
-  assert.equal(writes, 1);
-  assert.equal(reloads, 1);
-  assert.equal(healthCalls, 3);
-  assert.equal(model.password.value, "");
+  expect(writes).toBe(1);
+  expect(reloads).toBe(1);
+  expect(healthCalls).toBe(3);
+  expect(model.password.value).toBe("");
 });
 
-test("restart polling tolerates downtime, requires a different PID and has a deadline", async (t) => {
-  t.mock.timers.enable({ apis: ["Date", "setTimeout"], now: 100000 });
+test("restart polling tolerates downtime, requires a different PID and has a deadline", async () => {
+  vi.useFakeTimers({ toFake: ["Date", "setTimeout"], now: 100000 });
   const pids = [10, null, 10, 11];
-  t.mock.method(globalThis, "fetch", async () => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
     const pid = pids.shift();
     return pid === null ? Response.json({}, { status: 503 }) : Response.json({ pid });
   });
   const pending = waitForNetworkRestart(10, new AbortController().signal);
   await setImmediate();
   for (let i = 0; i < 3; i++) {
-    t.mock.timers.tick(500);
+    vi.advanceTimersByTime(500);
     await setImmediate();
   }
   await pending;
-  t.mock.method(globalThis, "fetch", async () => Response.json({ pid: 10 }));
-  const timedOut = assert.rejects(
-    waitForNetworkRestart(10, new AbortController().signal),
+  vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json({ pid: 10 }));
+  const timedOut = expect(waitForNetworkRestart(10, new AbortController().signal)).rejects.toThrow(
     /60 секунд/,
   );
   await setImmediate();
-  t.mock.timers.tick(60000);
+  vi.advanceTimersByTime(60000);
   await timedOut;
   const controller = new AbortController();
   controller.abort();
-  await assert.rejects(waitForNetworkRestart(10, controller.signal), /abort/i);
+  await expect(waitForNetworkRestart(10, controller.signal)).rejects.toThrow(/abort/i);
 });

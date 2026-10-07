@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test, mock } from "node:test";
+import { expect, test, vi } from "vite-plus/test";
 import {
   createGithubConnectionProfile,
   createGithubEnabledLocalProfile,
@@ -25,16 +24,17 @@ test("GitHub authentication opens an empty workspace without local or remote dat
     createGithubConnectionProfile("vuejs/core"),
   );
   try {
-    assert.deepEqual(await workspaceRequest(projectId, "root"), { root: projectId });
-    assert.deepEqual(await workspaceRequest(projectId, "tree"), { entries: [], truncated: false });
-    assert.ok(Object.values(workspaceCapabilities(projectId)).every((value) => !value));
-    await assert.rejects(
-      workspaceRequest(projectId, "file", { path: "README.md" }),
+    expect(await workspaceRequest(projectId, "root")).toStrictEqual({ root: projectId });
+    expect(await workspaceRequest(projectId, "tree")).toStrictEqual({
+      entries: [],
+      truncated: false,
+    });
+    expect(Object.values(workspaceCapabilities(projectId)).every((value) => !value)).toBeTruthy();
+    await expect(workspaceRequest(projectId, "file", { path: "README.md" })).rejects.toThrow(
       /Подключите GitHub/,
     );
-    await assert.rejects(workspaceRequest(projectId, "issues"), /недоступно/);
-    await assert.rejects(
-      saveWorkspaceFile(projectId, "README.md", "changed", ""),
+    await expect(workspaceRequest(projectId, "issues")).rejects.toThrow(/недоступно/);
+    await expect(saveWorkspaceFile(projectId, "README.md", "changed", "")).rejects.toThrow(
       /только для чтения/,
     );
   } finally {
@@ -114,118 +114,119 @@ test("the shared workspace uses a readonly source for tree, files, assets and re
   );
   const unregister = registerWorkspaceProfile("remote-test", profile);
   try {
-    assert.deepEqual(await workspaceRequest("remote-test", "log", { limit: "50" }), {
+    expect(await workspaceRequest("remote-test", "log", { limit: "50" })).toStrictEqual({
       action: "log",
       params: { limit: "50", repository: "octocat/repo", sha: initial.commit },
     });
     const root = await workspaceRequest("remote-test", "tree");
-    assert.deepEqual(root.entries[0], {
+    expect(root.entries[0]).toStrictEqual({
       name: "src",
       path: "src",
       directory: true,
       executable: false,
       disabled: false,
     });
-    assert.equal(root.entries[1].disabled, true);
+    expect(root.entries[1].disabled).toBe(true);
     const file = await workspaceRequest("remote-test", "file", { path: "src/main.ts" });
-    assert.equal(file.readonly, true);
-    assert.equal(file.content, "1".repeat(40));
-    assert.equal(isEditable({ ...file, key: "file" }), false);
+    expect(file.readonly).toBe(true);
+    expect(file.content).toBe("1".repeat(40));
+    expect(isEditable({ ...file, key: "file" })).toBe(false);
     await workspaceRequest("remote-test", "tree", { path: "src" });
-    assert.equal(calls.length, 2);
-    assert.ok(workspaceAssetUrl("remote-test", "docs/image.png").includes(initial.tree));
+    expect(calls.length).toBe(2);
+    expect(workspaceAssetUrl("remote-test", "docs/image.png").includes(initial.tree)).toBeTruthy();
     await profile.providers.files.refresh();
-    assert.equal(metadata.length, 1);
-    assert.equal((await workspaceRequest("remote-test", "log")).params.sha, "c".repeat(40));
-    assert.ok(workspaceAssetUrl("remote-test", "docs/image.png").includes("d".repeat(40)));
-    assert.equal(
-      (await workspaceRequest("remote-test", "file", { path: "src/main.ts" })).content,
+    expect(metadata.length).toBe(1);
+    expect((await workspaceRequest("remote-test", "log")).params.sha).toBe("c".repeat(40));
+    expect(
+      workspaceAssetUrl("remote-test", "docs/image.png").includes("d".repeat(40)),
+    ).toBeTruthy();
+    expect((await workspaceRequest("remote-test", "file", { path: "src/main.ts" })).content).toBe(
       "2".repeat(40),
     );
-    assert.equal(calls.length, 4);
-    assert.equal((await workspaceRequest("remote-test", "git")).branch, "main");
-    assert.equal(workspaceCapabilities("remote-test").git, true);
-    assert.equal(workspaceCapabilities("remote-test").issues, true);
-    assert.deepEqual(
+    expect(calls.length).toBe(4);
+    expect((await workspaceRequest("remote-test", "git")).branch).toBe("main");
+    expect(workspaceCapabilities("remote-test").git).toBe(true);
+    expect(workspaceCapabilities("remote-test").issues).toBe(true);
+    expect(
       await workspaceRequest("remote-test", "issues", { state: "open", page: "1" }),
-      {
-        action: "issues",
-        repository: "octocat/repo",
-        params: { state: "open", page: "1" },
-      },
-    );
-    assert.deepEqual(await workspaceRequest("remote-test", "issue", { number: "7" }), {
+    ).toStrictEqual({
+      action: "issues",
+      repository: "octocat/repo",
+      params: { state: "open", page: "1" },
+    });
+    expect(await workspaceRequest("remote-test", "issue", { number: "7" })).toStrictEqual({
       action: "issue",
       repository: "octocat/repo",
       number: 7,
     });
-    await assert.rejects(workspaceRequest("remote-test", "issue", { number: "nope" }));
-    assert.equal(workspaceCapabilities("remote-test").pulls, true);
-    assert.deepEqual(await workspaceRequest("remote-test", "pulls", { state: "all" }), {
+    await expect(workspaceRequest("remote-test", "issue", { number: "nope" })).rejects.toThrow();
+    expect(workspaceCapabilities("remote-test").pulls).toBe(true);
+    expect(await workspaceRequest("remote-test", "pulls", { state: "all" })).toStrictEqual({
       action: "pulls",
       repository: "octocat/repo",
       params: { state: "all" },
     });
-    assert.deepEqual(await workspaceRequest("remote-test", "pull", { number: "9" }), {
+    expect(await workspaceRequest("remote-test", "pull", { number: "9" })).toStrictEqual({
       action: "pull",
       repository: "octocat/repo",
       number: 9,
     });
-    await assert.rejects(workspaceRequest("remote-test", "pull", { number: "0" }));
-    assert.equal(workspaceCapabilities("remote-test").discussions, true);
-    assert.deepEqual(await workspaceRequest("remote-test", "discussions", { page: "Y3Vyc29y" }), {
+    await expect(workspaceRequest("remote-test", "pull", { number: "0" })).rejects.toThrow();
+    expect(workspaceCapabilities("remote-test").discussions).toBe(true);
+    expect(
+      await workspaceRequest("remote-test", "discussions", { page: "Y3Vyc29y" }),
+    ).toStrictEqual({
       action: "discussions",
       repository: "octocat/repo",
       params: { page: "Y3Vyc29y" },
     });
-    assert.deepEqual(await workspaceRequest("remote-test", "discussion", { number: "4" }), {
+    expect(await workspaceRequest("remote-test", "discussion", { number: "4" })).toStrictEqual({
       action: "discussion",
       repository: "octocat/repo",
       number: 4,
     });
-    assert.equal(profile.providers.git.write, undefined);
+    expect(profile.providers.git.write).toBe(undefined);
     for (const action of ["search", "external", "diff"])
-      await assert.rejects(workspaceRequest("remote-test", action));
-    await assert.rejects(workspaceRequest("remote-test", "file", { path: "../secret" }));
-    assert.equal(workspaceCapabilities("remote-test").terminals, false);
-    assert.equal(workspaceCapabilities("remote-test").persist, false);
-    assert.equal(
+      await expect(workspaceRequest("remote-test", action)).rejects.toThrow();
+    await expect(workspaceRequest("remote-test", "file", { path: "../secret" })).rejects.toThrow();
+    expect(workspaceCapabilities("remote-test").terminals).toBe(false);
+    expect(workspaceCapabilities("remote-test").persist).toBe(false);
+    expect(
       isMarkdown({ path: "README.md", content: "# Readonly", key: "readme", readonly: true }),
-      true,
-    );
+    ).toBe(true);
   } finally {
     unregister();
   }
-  assert.equal(workspaceCapabilities("local-test").write, true);
+  expect(workspaceCapabilities("local-test").write).toBe(true);
 });
 
 test("a local project with a GitHub origin keeps local providers and adds issues", async () => {
   const profile = createGithubEnabledLocalProfile("/tmp/app", "octocat/repo");
-  assert.equal(profile.id, "local-github");
-  assert.ok(profile.sidebar.some((section) => section.id === "issues"));
-  assert.ok(profile.sidebar.some((section) => section.id === "pulls"));
-  assert.ok(profile.tabs.some((tab) => tab.id === "repository"));
-  assert.ok(profile.tabs.some((tab) => tab.id === "issue"));
-  assert.ok(profile.tabs.some((tab) => tab.id === "pull"));
-  assert.ok(profile.sidebar.some((section) => section.id === "discussions"));
-  assert.ok(profile.tabs.some((tab) => tab.id === "discussion"));
+  expect(profile.id).toBe("local-github");
+  expect(profile.sidebar.some((section) => section.id === "issues")).toBeTruthy();
+  expect(profile.sidebar.some((section) => section.id === "pulls")).toBeTruthy();
+  expect(profile.tabs.some((tab) => tab.id === "repository")).toBeTruthy();
+  expect(profile.tabs.some((tab) => tab.id === "issue")).toBeTruthy();
+  expect(profile.tabs.some((tab) => tab.id === "pull")).toBeTruthy();
+  expect(profile.sidebar.some((section) => section.id === "discussions")).toBeTruthy();
+  expect(profile.tabs.some((tab) => tab.id === "discussion")).toBeTruthy();
   const calls = [];
-  const fetch = mock.method(globalThis, "fetch", async (url) => {
+  const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
     calls.push(String(url));
     return Response.json({ issues: [], next: null });
   });
   const unregister = registerWorkspaceProfile("local-github-test", profile);
   try {
     const capabilities = workspaceCapabilities("local-github-test");
-    assert.equal(capabilities.write, true);
-    assert.equal(capabilities.git, true);
-    assert.equal(capabilities.search, true);
-    assert.equal(capabilities.issues, true);
-    assert.equal(capabilities.terminals, true);
+    expect(capabilities.write).toBe(true);
+    expect(capabilities.git).toBe(true);
+    expect(capabilities.search).toBe(true);
+    expect(capabilities.issues).toBe(true);
+    expect(capabilities.terminals).toBe(true);
     await workspaceRequest("local-github-test", "issues", { state: "open", page: "1" });
-    assert.match(calls[0], /repository=octocat%2Frepo/);
+    expect(calls[0]).toMatch(/repository=octocat%2Frepo/);
   } finally {
-    fetch.mock.restore();
+    fetch.mockRestore();
     unregister();
   }
 });
@@ -244,7 +245,7 @@ test("readonly guards reject all shared write helpers before any HTTP request", 
       },
     },
   });
-  const fetch = mock.method(globalThis, "fetch", () => {
+  const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
     throw new Error("unexpected network mutation");
   });
   try {
@@ -255,10 +256,10 @@ test("readonly guards reject all shared write helpers before any HTTP request", 
       () => mutateWorkspaceGit("readonly-test", "stage", "file"),
       () => mutateWorkspaceBranch("readonly-test", "checkout", { name: "main" }),
     ];
-    for (const run of operations) await assert.rejects(run(), /только для чтения/);
-    assert.equal(fetch.mock.callCount(), 0);
+    for (const run of operations) await expect(run()).rejects.toThrow(/только для чтения/);
+    expect(fetch.mock.calls.length).toBe(0);
   } finally {
-    fetch.mock.restore();
+    fetch.mockRestore();
     unregister();
   }
 });
@@ -280,14 +281,16 @@ test("a profile is a set of replaceable providers and capabilities follow from t
     [{ match: (id) => id.startsWith("mem:"), create: () => memory }],
     () => ({ ...memory, id: "fallback", providers: { files: memory.providers.files } }),
   );
-  assert.equal(profiles.resolve("mem:a"), memory);
-  assert.equal(profiles.resolve("/tmp/a").id, "fallback");
+  expect(profiles.resolve("mem:a")).toBe(memory);
+  expect(profiles.resolve("/tmp/a").id).toBe("fallback");
   const capabilities = profileCapabilities(memory);
-  assert.deepEqual(
-    [capabilities.write, capabilities.git, capabilities.search, capabilities.terminals],
-    [false, true, false, true],
-  );
-  assert.equal(profileCapabilities(profiles.resolve("/tmp/a")).git, false);
-  assert.equal(workspaceProfile("/tmp/local").id, "local");
-  assert.equal(profileCapabilities(workspaceProfile("/tmp/local")).write, true);
+  expect([
+    capabilities.write,
+    capabilities.git,
+    capabilities.search,
+    capabilities.terminals,
+  ]).toStrictEqual([false, true, false, true]);
+  expect(profileCapabilities(profiles.resolve("/tmp/a")).git).toBe(false);
+  expect(workspaceProfile("/tmp/local").id).toBe("local");
+  expect(profileCapabilities(workspaceProfile("/tmp/local")).write).toBe(true);
 });

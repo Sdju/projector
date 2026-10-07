@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test, mock } from "node:test";
+import { expect, onTestFinished, test, vi } from "vite-plus/test";
 import { mkdtemp, readFile, writeFile, mkdir, stat, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -26,31 +25,30 @@ function fakeBackend({ available = true } = {}) {
   };
 }
 
-await test("the default vault never reaches production secrets under the test runner", async (t) => {
-  assert.ok(process.env.NODE_TEST_CONTEXT);
+test("the default vault never reaches production secrets under the test runner", async () => {
+  expect(process.env.VITEST).toBeTruthy();
   const previous = process.env.PROJECTOR_SECRET_STORE;
   process.env.PROJECTOR_SECRET_STORE = "keyring";
   let calls = 0;
   const guards = ["available", "get", "set", "delete"].map((method) =>
-    mock.method(os.secrets, method, async () => {
+    vi.spyOn(os.secrets, method).mockImplementation(async () => {
       calls++;
       throw new Error("Production keyring reached");
     }),
   );
-  t.after(() => {
-    guards.forEach((guard) => guard.mock.restore());
+  onTestFinished(() => {
+    guards.forEach((guard) => guard.mockRestore());
     if (previous === undefined) delete process.env.PROJECTOR_SECRET_STORE;
     else process.env.PROJECTOR_SECRET_STORE = previous;
   });
   const vault = createVault();
-  assert.equal((await vault.storage()).backend, "file");
-  await assert.rejects(vault.get("integration:github"), /Tests cannot access/);
-  await assert.rejects(
-    vault.set("integration:github", "test", "replacement"),
+  expect((await vault.storage()).backend).toBe("file");
+  await expect(vault.get("integration:github")).rejects.toThrow(/Tests cannot access/);
+  await expect(vault.set("integration:github", "test", "replacement")).rejects.toThrow(
     /Tests cannot access/,
   );
-  await assert.rejects(vault.delete("integration:github"), /Tests cannot access/);
-  assert.equal(calls, 0);
+  await expect(vault.delete("integration:github")).rejects.toThrow(/Tests cannot access/);
+  expect(calls).toBe(0);
 });
 async function withData(run) {
   const root = await mkdtemp(join(tmpdir(), "projector-secrets-"));
@@ -66,7 +64,7 @@ async function withData(run) {
   }
 }
 
-await test("credentials are stored in the keyring and never in the file", () =>
+test("credentials are stored in the keyring and never in the file", () =>
   withData(async (file) => {
     const backend = fakeBackend();
     useIntegrationVault(createVault(backend, () => undefined));
@@ -76,17 +74,17 @@ await test("credentials are stored in the keyring and never in the file", () =>
       credentials: { token: "ghp_secret", login: "octocat" },
     }));
     const text = await readFile(file, "utf8");
-    assert.ok(!text.includes("ghp_secret"));
-    assert.equal(JSON.parse(text).integrations.github.vault, "keyring");
-    assert.equal((await stat(file)).mode & 0o777, 0o600);
-    assert.equal((await integrationConfig("github")).credentials.token, "ghp_secret");
+    expect(!text.includes("ghp_secret")).toBeTruthy();
+    expect(JSON.parse(text).integrations.github.vault).toBe("keyring");
+    expect((await stat(file)).mode & 0o777).toBe(0o600);
+    expect((await integrationConfig("github")).credentials.token).toBe("ghp_secret");
 
     await updateIntegration("github", (config) => ({ ...config, credentials: {} }));
-    assert.equal(backend.items.size, 0);
-    assert.equal(JSON.parse(await readFile(file, "utf8")).integrations.github.vault, undefined);
+    expect(backend.items.size).toBe(0);
+    expect(JSON.parse(await readFile(file, "utf8")).integrations.github.vault).toBe(undefined);
   }));
 
-await test("file fallback keeps working without a keyring or when disabled", () =>
+test("file fallback keeps working without a keyring or when disabled", () =>
   withData(async (file) => {
     for (const [backend, mode] of [
       [fakeBackend({ available: false }), undefined],
@@ -94,15 +92,14 @@ await test("file fallback keeps working without a keyring or when disabled", () 
     ]) {
       useIntegrationVault(createVault(backend, () => mode));
       await updateIntegration("github", (config) => ({ ...config, credentials: { token: "t" } }));
-      assert.equal(
-        JSON.parse(await readFile(file, "utf8")).integrations.github.credentials.token,
+      expect(JSON.parse(await readFile(file, "utf8")).integrations.github.credentials.token).toBe(
         "t",
       );
-      assert.equal(backend.items.size, 0);
+      expect(backend.items.size).toBe(0);
     }
   }));
 
-await test("plaintext credentials migrate once the keyring is reachable", () =>
+test("plaintext credentials migrate once the keyring is reachable", () =>
   withData(async (file) => {
     await mkdir(join(file, ".."), { recursive: true });
     await writeFile(
@@ -114,13 +111,13 @@ await test("plaintext credentials migrate once the keyring is reachable", () =>
     );
     const backend = fakeBackend();
     useIntegrationVault(createVault(backend, () => undefined));
-    assert.deepEqual(await migrateIntegrationSecrets(), ["github"]);
-    assert.ok(!(await readFile(file, "utf8")).includes("old"));
-    assert.equal((await integrationConfig("github")).credentials.token, "old");
-    assert.deepEqual(await migrateIntegrationSecrets(), []);
+    expect(await migrateIntegrationSecrets()).toStrictEqual(["github"]);
+    expect(!(await readFile(file, "utf8")).includes("old")).toBeTruthy();
+    expect((await integrationConfig("github")).credentials.token).toBe("old");
+    expect(await migrateIntegrationSecrets()).toStrictEqual([]);
   }));
 
-await test("a failing keyring blocks writes instead of erasing the stored secret", () =>
+test("a failing keyring blocks writes instead of erasing the stored secret", () =>
   withData(async () => {
     const backend = fakeBackend();
     useIntegrationVault(createVault(backend, () => undefined));
@@ -131,40 +128,39 @@ await test("a failing keyring blocks writes instead of erasing the stored secret
     };
     broken.items = backend.items;
     useIntegrationVault(createVault(broken, () => undefined));
-    await assert.rejects(
+    await expect(
       updateIntegration("github", (config) => ({ ...config, enabled: false })),
-      /locked/,
-    );
+    ).rejects.toThrow(/locked/);
     const read = await integrationConfig("github");
-    assert.equal(read.credentialsError, "locked");
-    assert.deepEqual(read.credentials, {});
-    assert.equal(JSON.parse(backend.items.get("integration:github")).token, "keep");
+    expect(read.credentialsError).toBe("locked");
+    expect(read.credentials).toStrictEqual({});
+    expect(JSON.parse(backend.items.get("integration:github")).token).toBe("keep");
   }));
 
-await test("credentials can be revealed only while protected by the keyring", () =>
+test("credentials can be revealed only while protected by the keyring", () =>
   withData(async () => {
     useIntegrationVault(createVault(fakeBackend({ available: false }), () => undefined));
     await updateIntegration("github", (config) => ({ ...config, credentials: { token: "plain" } }));
-    assert.equal(await revealIntegrationCredential("github", "token"), undefined);
+    expect(await revealIntegrationCredential("github", "token")).toBe(undefined);
 
     useIntegrationVault(createVault(fakeBackend(), () => undefined));
     await updateIntegration("github", (config) => ({ ...config, credentials: { token: "safe" } }));
-    assert.equal(await revealIntegrationCredential("github", "token"), "safe");
-    assert.equal(await revealIntegrationCredential("github", "missing"), undefined);
+    expect(await revealIntegrationCredential("github", "token")).toBe("safe");
+    expect(await revealIntegrationCredential("github", "missing")).toBe(undefined);
   }));
 
 // Touches the real user keyring (and may show an unlock dialog), so it is opt-in.
-await test("OS secret store round-trips a value (PROJECTOR_TEST_KEYRING=1)", async (t) => {
+test("OS secret store round-trips a value (PROJECTOR_TEST_KEYRING=1)", async (t) => {
   if (!process.env.PROJECTOR_TEST_KEYRING) return t.skip("нужен PROJECTOR_TEST_KEYRING=1");
   if (!(await os.secrets.available())) return t.skip("системное хранилище секретов недоступно");
   const key = { service: "projector-test", account: `roundtrip-${process.pid}` };
   try {
     await os.secrets.set(key, "Projector test", "значение");
-    assert.equal(await os.secrets.get(key), "значение");
+    expect(await os.secrets.get(key)).toBe("значение");
     await os.secrets.set(key, "Projector test", "second");
-    assert.equal(await os.secrets.get(key), "second");
+    expect(await os.secrets.get(key)).toBe("second");
   } finally {
     await os.secrets.delete(key);
   }
-  assert.equal(await os.secrets.get(key), undefined);
+  expect(await os.secrets.get(key)).toBe(undefined);
 });

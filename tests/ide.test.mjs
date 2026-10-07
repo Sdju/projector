@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, onTestFinished, test } from "vite-plus/test";
 import { mkdtemp, readFile, writeFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,7 +10,7 @@ import {
   matchesKey,
 } from "../core/modules/ide/index.ts";
 
-function reloadHost(t, replies, confirm = true) {
+function reloadHost(replies, confirm = true) {
   const messages = [];
   const requests = [];
   const errors = [];
@@ -39,84 +38,75 @@ function reloadHost(t, replies, confirm = true) {
     requests.push({ url, options });
     const reply = replies.shift();
     if (reply instanceof Error) throw reply;
-    assert.ok(reply, `Unexpected request: ${url}`);
+    expect(reply, `Unexpected request: ${url}`).toBeTruthy();
     return { ok: reply.status !== false, json: async () => reply };
   };
   const host = createPageReload(
     (error) => errors.push(error),
     () => {},
   );
-  t.after(() => {
+  onTestFinished(() => {
     host.dispose();
     Object.assign(globalThis, originals);
   });
   return { host, messages, requests, errors, channel, reloads: () => reloads };
 }
 
-test("page reload reaches the initiating page and peers and closes its channel", (t) => {
-  const ctx = reloadHost(t, []);
+test("page reload reaches the initiating page and peers and closes its channel", () => {
+  const ctx = reloadHost([]);
   ctx.host.reloadPages();
-  assert.deepEqual(ctx.messages, [{ type: "reload" }]);
-  assert.equal(ctx.reloads(), 1);
+  expect(ctx.messages).toStrictEqual([{ type: "reload" }]);
+  expect(ctx.reloads()).toBe(1);
   ctx.channel.onmessage({ data: { type: "unrelated" } });
-  assert.equal(ctx.reloads(), 1);
+  expect(ctx.reloads()).toBe(1);
   ctx.channel.onmessage({ data: { type: "reload" } });
-  assert.equal(ctx.reloads(), 2);
+  expect(ctx.reloads()).toBe(2);
   ctx.host.dispose();
-  assert.equal(ctx.channel.closed, true);
+  expect(ctx.channel.closed).toBe(true);
 });
 
-test("server restart waits for a different PID, tolerates downtime and prevents duplicates", async (t) => {
+test("server restart waits for a different PID, tolerates downtime and prevents duplicates", async () => {
   const health = (pid) => ({ ok: true, app: "projector", pid });
-  const ctx = reloadHost(t, [
-    health(10),
-    { ok: true },
-    health(10),
-    new Error("offline"),
-    health(11),
-  ]);
+  const ctx = reloadHost([health(10), { ok: true }, health(10), new Error("offline"), health(11)]);
   const restart = ctx.host.restartServer();
-  assert.equal(ctx.host.isBusy(), true);
+  expect(ctx.host.isBusy()).toBe(true);
   await ctx.host.restartServer();
-  assert.equal(ctx.reloads(), 0);
+  expect(ctx.reloads()).toBe(0);
   await restart;
-  assert.deepEqual(ctx.messages, [{ type: "restart", pid: 10 }]);
-  assert.equal(ctx.requests.filter(({ url }) => url === "/api/app/restart").length, 1);
-  assert.equal(ctx.reloads(), 1);
-  assert.equal(ctx.host.isBusy(), false);
+  expect(ctx.messages).toStrictEqual([{ type: "restart", pid: 10 }]);
+  expect(ctx.requests.filter(({ url }) => url === "/api/app/restart").length).toBe(1);
+  expect(ctx.reloads()).toBe(1);
+  expect(ctx.host.isBusy()).toBe(false);
 });
 
-test("cancelled restart does not contact the server or reload pages", async (t) => {
-  const ctx = reloadHost(t, [], false);
+test("cancelled restart does not contact the server or reload pages", async () => {
+  const ctx = reloadHost([], false);
   await ctx.host.restartServer();
-  assert.deepEqual(ctx.requests, []);
-  assert.deepEqual(ctx.messages, []);
-  assert.equal(ctx.reloads(), 0);
+  expect(ctx.requests).toStrictEqual([]);
+  expect(ctx.messages).toStrictEqual([]);
+  expect(ctx.reloads()).toBe(0);
 });
 
-test("rejected restart preserves pages and permits retry", async (t) => {
-  const ctx = reloadHost(t, [
+test("rejected restart preserves pages and permits retry", async () => {
+  const ctx = reloadHost([
     { ok: true, app: "projector", pid: 10 },
     { status: false, error: "denied" },
   ]);
-  await assert.rejects(ctx.host.restartServer(), /denied/);
-  assert.deepEqual(ctx.messages, []);
-  assert.equal(ctx.reloads(), 0);
-  assert.equal(ctx.host.isBusy(), false);
+  await expect(ctx.host.restartServer()).rejects.toThrow(/denied/);
+  expect(ctx.messages).toStrictEqual([]);
+  expect(ctx.reloads()).toBe(0);
+  expect(ctx.host.isBusy()).toBe(false);
 });
 
-test("peer reloads only after successor health and ignores events after disposal", async (t) => {
-  const ctx = reloadHost(t, [{ ok: true, app: "projector", pid: 11 }]);
+test("peer reloads only after successor health and ignores events after disposal", async () => {
+  const ctx = reloadHost([{ ok: true, app: "projector", pid: 11 }]);
   ctx.channel.onmessage({ data: { type: "restart", pid: 10 } });
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(ctx.reloads(), 1);
-  assert.deepEqual(
-    ctx.requests.map(({ url }) => url),
-    ["/api/health"],
-  );
+  expect(ctx.reloads()).toBe(1);
+  expect(ctx.requests.map(({ url }) => url)).toStrictEqual(["/api/health"]);
   ctx.host.dispose();
   ctx.channel.onmessage({ data: { type: "reload" } });
-  assert.equal(ctx.reloads(), 1);
+  expect(ctx.reloads()).toBe(1);
 });
 
 test("SDK executes scoped async commands with arguments, checks availability, and disposes registrations", async () => {
@@ -130,31 +120,32 @@ test("SDK executes scoped async commands with arguments, checks availability, an
     run: async ({ path, name }) => ({ source: path, destination: name }),
   });
   scope.activate();
-  assert.deepEqual(
+  expect(
     await sdk.executeCommand("ide.fileTree.file.rename", { path: "old.md", name: "new.md" }),
-    { source: "old.md", destination: "new.md" },
-  );
+  ).toStrictEqual({ source: "old.md", destination: "new.md" });
   busy = true;
-  assert.equal(scope.describe("ide.fileTree.file.rename").enabled, false);
-  assert.equal(scope.resolveKeybinding({ key: "F2" }), undefined);
-  await assert.rejects(sdk.executeCommand("ide.fileTree.file.rename", {}), /недоступна/);
+  expect(scope.describe("ide.fileTree.file.rename").enabled).toBe(false);
+  expect(scope.resolveKeybinding({ key: "F2" })).toBe(undefined);
+  await expect(sdk.executeCommand("ide.fileTree.file.rename", {})).rejects.toThrow(/недоступна/);
   busy = false;
   const other = sdk.createScope("project-b", () => ({ surface: "fileTree", entryKind: "file" }));
   other.registerCommand({ id: "ide.fileTree.file.rename", title: "Rename", run: () => "other" });
-  assert.equal(
-    await sdk.executeCommand("ide.fileTree.file.rename", {}, { scope: "project-b" }),
+  expect(await sdk.executeCommand("ide.fileTree.file.rename", {}, { scope: "project-b" })).toBe(
     "other",
   );
-  assert.throws(
-    () => scope.registerCommand({ id: "ide.fileTree.file.rename", title: "x", run: () => {} }),
-    /уже зарегистрирована/,
-  );
+  expect(() =>
+    scope.registerCommand({ id: "ide.fileTree.file.rename", title: "x", run: () => {} }),
+  ).toThrow(/уже зарегистрирована/);
   remove();
-  await assert.rejects(scope.executeCommand("ide.fileTree.file.rename"), /не зарегистрирована/);
+  await expect(scope.executeCommand("ide.fileTree.file.rename")).rejects.toThrow(
+    /не зарегистрирована/,
+  );
   other.dispose();
   scope.dispose();
-  assert.deepEqual(sdk.getCommands(), []);
-  await assert.rejects(sdk.executeCommand("ide.fileTree.file.rename"), /не зарегистрирована/);
+  expect(sdk.getCommands()).toStrictEqual([]);
+  await expect(sdk.executeCommand("ide.fileTree.file.rename")).rejects.toThrow(
+    /не зарегистрирована/,
+  );
 });
 
 test("declarative overrides replace defaults, support contexts and unbinding, and protect text input", async () => {
@@ -163,37 +154,37 @@ test("declarative overrides replace defaults, support contexts and unbinding, an
   let calls = 0;
   const scope = sdk.createScope("tree", () => ({ surface: "fileTree", entryKind: kind }));
   scope.registerCommand({ id: "ide.fileTree.file.rename", title: "Rename", run: () => calls++ });
-  assert.equal(scope.resolveKeybinding({ key: "F2" }).command, "ide.fileTree.file.rename");
-  assert.equal(scope.resolveKeybinding({ key: "F2" }, true), undefined);
-  assert.equal(scope.resolveKeybinding({ key: "F2", isComposing: true }), undefined);
-  assert.equal(scope.resolveKeybinding({ key: "F2", repeat: true }), undefined);
+  expect(scope.resolveKeybinding({ key: "F2" }).command).toBe("ide.fileTree.file.rename");
+  expect(scope.resolveKeybinding({ key: "F2" }, true)).toBe(undefined);
+  expect(scope.resolveKeybinding({ key: "F2", isComposing: true })).toBe(undefined);
+  expect(scope.resolveKeybinding({ key: "F2", repeat: true })).toBe(undefined);
   sdk.setKeybindings([
     { key: "Ctrl+R", command: "ide.fileTree.file.rename", when: { entryKind: "file" } },
   ]);
-  assert.equal(scope.resolveKeybinding({ key: "F2" }), undefined);
-  assert.equal(
-    scope.resolveKeybinding({ key: "r", ctrlKey: true }).command,
+  expect(scope.resolveKeybinding({ key: "F2" })).toBe(undefined);
+  expect(scope.resolveKeybinding({ key: "r", ctrlKey: true }).command).toBe(
     "ide.fileTree.file.rename",
   );
-  assert.equal(scope.describe("ide.fileTree.file.rename").shortcut, "Ctrl+R");
+  expect(scope.describe("ide.fileTree.file.rename").shortcut).toBe("Ctrl+R");
   kind = "directory";
-  assert.equal(scope.resolveKeybinding({ key: "r", ctrlKey: true }), undefined);
+  expect(scope.resolveKeybinding({ key: "r", ctrlKey: true })).toBe(undefined);
   sdk.setKeybindings([{ key: "F2", command: "ide.fileTree.file.rename", disabled: true }]);
-  assert.equal(scope.resolveKeybinding({ key: "F2" }), undefined);
+  expect(scope.resolveKeybinding({ key: "F2" })).toBe(undefined);
   sdk.setKeybindings([]);
   kind = "file";
-  assert.equal(scope.resolveKeybinding({ key: "F2" }).command, "ide.fileTree.file.rename");
-  assert.equal(calls, 0, "Resolution and menu availability must not execute commands");
-  assert.ok(matchesKey("Mod+S", { key: "s", ctrlKey: true }));
-  assert.ok(matchesKey("Mod+S", { key: "s", metaKey: true }));
-  assert.ok(matchesKey("Mod+S", { key: "ы", code: "KeyS", ctrlKey: true }));
-  assert.ok(matchesKey("Mod+Shift+P", { key: "З", code: "KeyP", ctrlKey: true, shiftKey: true }));
-  assert.ok(!matchesKey("Mod+S", { key: "ы", code: "KeyA", ctrlKey: true }));
-  assert.ok(!matchesKey("Mod+S", { key: "s", ctrlKey: true, altKey: true }));
+  expect(scope.resolveKeybinding({ key: "F2" }).command).toBe("ide.fileTree.file.rename");
+  expect(calls, "Resolution and menu availability must not execute commands").toBe(0);
+  expect(matchesKey("Mod+S", { key: "s", ctrlKey: true })).toBeTruthy();
+  expect(matchesKey("Mod+S", { key: "s", metaKey: true })).toBeTruthy();
+  expect(matchesKey("Mod+S", { key: "ы", code: "KeyS", ctrlKey: true })).toBeTruthy();
+  expect(
+    matchesKey("Mod+Shift+P", { key: "З", code: "KeyP", ctrlKey: true, shiftKey: true }),
+  ).toBeTruthy();
+  expect(!matchesKey("Mod+S", { key: "ы", code: "KeyA", ctrlKey: true })).toBeTruthy();
+  expect(!matchesKey("Mod+S", { key: "s", ctrlKey: true, altKey: true })).toBeTruthy();
   const editor = sdk.createScope("editor", () => ({ surface: "editor" }));
   editor.registerCommand({ id: "ide.editor.file.save", title: "Save", run: () => {} });
-  assert.equal(
-    editor.resolveKeybinding({ key: "s", ctrlKey: true }, true).command,
+  expect(editor.resolveKeybinding({ key: "s", ctrlKey: true }, true).command).toBe(
     "ide.editor.file.save",
   );
 });
@@ -213,8 +204,8 @@ test("keybinding conflicts select the last applicable rule and preserve handler 
     { key: "F2", command: "one" },
     { key: "F2", command: "two", when: { surface: "tree" } },
   ]);
-  assert.equal(scope.resolveKeybinding({ key: "F2" }).command, "two");
-  await assert.rejects(scope.executeCommand("two"), /real failure/);
+  expect(scope.resolveKeybinding({ key: "F2" }).command).toBe("two");
+  await expect(scope.executeCommand("two")).rejects.toThrow(/real failure/);
   for (const value of [
     null,
     {},
@@ -224,10 +215,10 @@ test("keybinding conflicts select the last applicable rule and preserve handler 
     [{ key: "F2", command: "x", when: { bad: [] } }],
     [{ key: "F2", command: "x", disabled: "true" }],
   ])
-    assert.throws(() => parseKeybindings(value));
+    expect(() => parseKeybindings(value)).toThrow();
 });
 
-test("keybindings persist atomically with validation and local HTTP origin protection", async (t) => {
+test("keybindings persist atomically with validation and local HTTP origin protection", async () => {
   const directory = await mkdtemp(join(tmpdir(), "projector-ide-"));
   const previous = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = directory;
@@ -238,7 +229,7 @@ test("keybindings persist atomically with validation and local HTTP origin prote
   const server = createServer((req, res) => void handleApi(req, res));
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
-  t.after(async () => {
+  onTestFinished(async () => {
     await new Promise((r) => server.close(r));
     if (previous === undefined) delete process.env.XDG_DATA_HOME;
     else process.env.XDG_DATA_HOME = previous;
@@ -246,7 +237,7 @@ test("keybindings persist atomically with validation and local HTTP origin prote
   });
   const base = `http://127.0.0.1:${server.address().port}`;
   const url = base + "/api/ide/keybindings";
-  assert.deepEqual((await readKeybindings()).bindings, []);
+  expect((await readKeybindings()).bindings).toStrictEqual([]);
   const binding = { key: "F6", command: "ide.fileTree.file.rename", when: { surface: "fileTree" } };
   const put = (bindings, origin = base) =>
     fetch(url, {
@@ -254,20 +245,20 @@ test("keybindings persist atomically with validation and local HTTP origin prote
       headers: { "Content-Type": "application/json", Origin: origin },
       body: JSON.stringify({ bindings }),
     });
-  assert.equal((await put([binding], "https://foreign.test")).status, 403);
-  assert.equal((await put([binding])).status, 200);
+  expect((await put([binding], "https://foreign.test")).status).toBe(403);
+  expect((await put([binding])).status).toBe(200);
   const saved = await readKeybindings();
-  assert.deepEqual(saved.bindings, [binding]);
-  assert.equal((await stat(saved.path)).mode & 0o777, 0o600);
-  assert.equal((await put([{}])).status, 400);
-  assert.deepEqual((await readKeybindings()).bindings, [binding]);
+  expect(saved.bindings).toStrictEqual([binding]);
+  expect((await stat(saved.path)).mode & 0o777).toBe(0o600);
+  expect((await put([{}])).status).toBe(400);
+  expect((await readKeybindings()).bindings).toStrictEqual([binding]);
   const response = await fetch(url);
-  assert.equal(response.headers.get("cache-control"), "no-store");
-  assert.deepEqual((await response.json()).bindings, [binding]);
+  expect(response.headers.get("cache-control")).toBe("no-store");
+  expect((await response.json()).bindings).toStrictEqual([binding]);
   await writeKeybindings([]);
-  assert.deepEqual(JSON.parse(await readFile(saved.path, "utf8")), []);
+  expect(JSON.parse(await readFile(saved.path, "utf8"))).toStrictEqual([]);
   await writeFile(saved.path, '{"bad":true}');
-  await assert.rejects(readKeybindings(), /Ожидается/);
+  await expect(readKeybindings()).rejects.toThrow(/Ожидается/);
 });
 
 test("keyboard settings preserve other rules, conditions and arguments through edit, remove and reset", async () => {
@@ -286,40 +277,38 @@ test("keyboard settings preserve other rules, conditions and arguments through e
   const original = structuredClone(defaults);
   const untouched = { command: "save", key: "Ctrl+Shift+S" };
   const edited = editKeybinding(defaults, [untouched], "menu", 0, "F6");
-  assert.deepEqual(defaults, original);
-  assert.deepEqual(edited[0], untouched);
-  assert.deepEqual(edited[1], { ...defaults[0], key: "F6", disabled: false });
-  assert.deepEqual(edited[2], defaults[1]);
+  expect(defaults).toStrictEqual(original);
+  expect(edited[0]).toStrictEqual(untouched);
+  expect(edited[1]).toStrictEqual({ ...defaults[0], key: "F6", disabled: false });
+  expect(edited[2]).toStrictEqual(defaults[1]);
   const removed = editKeybinding(defaults, edited, "menu", 0, null);
   const sdk = createCommandService(defaults);
   sdk.setKeybindings(removed);
-  assert.deepEqual(
-    sdk.getKeybindings().map((rule) => rule.key),
-    ["Ctrl+Shift+S", "ContextMenu"],
-  );
+  expect(sdk.getKeybindings().map((rule) => rule.key)).toStrictEqual([
+    "Ctrl+Shift+S",
+    "ContextMenu",
+  ]);
   sdk.setKeybindings(removed.filter((rule) => rule.command !== "menu"));
-  assert.deepEqual(
-    sdk.getKeybindings().filter((rule) => rule.command === "menu"),
+  expect(sdk.getKeybindings().filter((rule) => rule.command === "menu")).toStrictEqual(
     defaults.slice(0, 2),
   );
   const copy = sdk.getDefaultKeybindings();
   copy[0].key = "oops";
-  assert.deepEqual(sdk.getDefaultKeybindings(), defaults);
-  assert.deepEqual(editKeybinding([], [], "unbound", 0, "F9"), [
+  expect(sdk.getDefaultKeybindings()).toStrictEqual(defaults);
+  expect(editKeybinding([], [], "unbound", 0, "F9")).toStrictEqual([
     { command: "unbound", key: "F9", disabled: false },
   ]);
 });
 
 test("shortcut recorder ignores modifiers, composition and repeats, and recorded strokes resolve", async () => {
   const { recordedKey } = await import("../core/modules/ide/index.ts");
-  assert.equal(recordedKey({ key: "Control", ctrlKey: true }), undefined);
-  assert.equal(recordedKey({ key: "a", isComposing: true }), undefined);
-  assert.equal(recordedKey({ key: "F6", repeat: true }), undefined);
-  assert.equal(recordedKey({ key: "Dead" }), undefined);
-  assert.equal(recordedKey({ key: "+", shiftKey: true }), undefined);
-  assert.equal(recordedKey({ key: "ы", code: "KeyS", ctrlKey: true }), "Ctrl+S");
-  assert.equal(
-    recordedKey({ key: "З", code: "KeyP", ctrlKey: true, shiftKey: true }),
+  expect(recordedKey({ key: "Control", ctrlKey: true })).toBe(undefined);
+  expect(recordedKey({ key: "a", isComposing: true })).toBe(undefined);
+  expect(recordedKey({ key: "F6", repeat: true })).toBe(undefined);
+  expect(recordedKey({ key: "Dead" })).toBe(undefined);
+  expect(recordedKey({ key: "+", shiftKey: true })).toBe(undefined);
+  expect(recordedKey({ key: "ы", code: "KeyS", ctrlKey: true })).toBe("Ctrl+S");
+  expect(recordedKey({ key: "З", code: "KeyP", ctrlKey: true, shiftKey: true })).toBe(
     "Ctrl+Shift+P",
   );
   for (const event of [
@@ -329,7 +318,7 @@ test("shortcut recorder ignores modifiers, composition and repeats, and recorded
     { key: "ы", code: "KeyS", ctrlKey: true },
   ]) {
     const key = recordedKey(event);
-    assert.equal(matchesKey(parseKeybindings([{ command: "test", key }])[0].key, event), true);
+    expect(matchesKey(parseKeybindings([{ command: "test", key }])[0].key, event)).toBe(true);
   }
 });
 
@@ -360,58 +349,46 @@ test("command palette preserves originating scope, chooses project commands and 
     run: () => sdk.getActiveScope(),
   });
   a.activate();
-  assert.equal(
-    global.resolveKeybinding({ key: "p", ctrlKey: true, shiftKey: true }, true).command,
+  expect(global.resolveKeybinding({ key: "p", ctrlKey: true, shiftKey: true }, true).command).toBe(
     "ide.workbench.commandPalette.open",
   );
-  assert.equal(
-    global.resolveKeybinding({ key: "F1" }, true).command,
+  expect(global.resolveKeybinding({ key: "F1" }, true).command).toBe(
     "ide.workbench.commandPalette.open",
   );
-  assert.equal(await global.executeCommand("ide.workbench.commandPalette.open"), "tree-a");
+  expect(await global.executeCommand("ide.workbench.commandPalette.open")).toBe("tree-a");
   const commands = paletteCommands(sdk.getCommands(), sdk.getScopes(), sdk.getActiveScope());
-  assert.equal(commands.find((command) => command.id === "file.rename").scope, "tree-a");
-  assert.equal(
-    commands.some((command) => command.scope === "tree-b"),
-    false,
-  );
-  assert.equal(
-    commands.some((command) => command.id === "private.reorder"),
-    false,
-  );
-  assert.equal(commands.at(-1).id, "file.save");
-  assert.equal(
+  expect(commands.find((command) => command.id === "file.rename").scope).toBe("tree-a");
+  expect(commands.some((command) => command.scope === "tree-b")).toBe(false);
+  expect(commands.some((command) => command.id === "private.reorder")).toBe(false);
+  expect(commands.at(-1).id).toBe("file.save");
+  expect(
     paletteCommands(sdk.getCommands(), sdk.getScopes(), "tree-a", "> Файлы переименовать")[0].id,
-    "file.rename",
-  );
-  assert.equal(
+  ).toBe("file.rename");
+  expect(
     paletteCommands(sdk.getCommands(), sdk.getScopes(), "tree-a", "file.rename")[0].scope,
+  ).toBe("tree-a");
+  expect(paletteCommands(sdk.getCommands(), sdk.getScopes(), "tree-a", "missing")).toStrictEqual(
+    [],
+  );
+  expect(await sdk.executeCommand(commands[0].id, undefined, { scope: commands[0].scope })).toBe(
     "tree-a",
   );
-  assert.deepEqual(paletteCommands(sdk.getCommands(), sdk.getScopes(), "tree-a", "missing"), []);
-  assert.equal(
-    await sdk.executeCommand(commands[0].id, undefined, { scope: commands[0].scope }),
-    "tree-a",
-  );
-  await assert.rejects(
-    sdk.executeCommand("file.save", undefined, { scope: "editor-a" }),
+  await expect(sdk.executeCommand("file.save", undefined, { scope: "editor-a" })).rejects.toThrow(
     /недоступна/,
   );
   sdk.setKeybindings([
     { command: "ide.workbench.commandPalette.open", key: "F6", allowInput: true },
   ]);
-  assert.equal(global.resolveKeybinding({ key: "F1" }, true), undefined);
-  assert.equal(
-    global.resolveKeybinding({ key: "p", ctrlKey: true, shiftKey: true }, true),
+  expect(global.resolveKeybinding({ key: "F1" }, true)).toBe(undefined);
+  expect(global.resolveKeybinding({ key: "p", ctrlKey: true, shiftKey: true }, true)).toBe(
     undefined,
   );
-  assert.equal(
-    global.resolveKeybinding({ key: "F6" }, true).command,
+  expect(global.resolveKeybinding({ key: "F6" }, true).command).toBe(
     "ide.workbench.commandPalette.open",
   );
 });
 
-test("editor themes default, persist, reject unknown values and protect HTTP writes", async (t) => {
+test("editor themes default, persist, reject unknown values and protect HTTP writes", async () => {
   const directory = await mkdtemp(join(tmpdir(), "projector-editor-"));
   const previous = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = directory;
@@ -423,7 +400,7 @@ test("editor themes default, persist, reject unknown values and protect HTTP wri
   const server = createServer((req, res) => void handleApi(req, res));
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
-  t.after(async () => {
+  onTestFinished(async () => {
     await new Promise((resolve) => server.close(resolve));
     if (previous === undefined) delete process.env.XDG_DATA_HOME;
     else process.env.XDG_DATA_HOME = previous;
@@ -437,23 +414,23 @@ test("editor themes default, persist, reject unknown values and protect HTTP wri
       headers: { "Content-Type": "application/json", Origin: origin },
       body: JSON.stringify({ theme }),
     });
-  assert.deepEqual(await readEditorSettings(), { theme: "projector-soft" });
-  assert.equal((await put("one-dark", "https://foreign.test")).status, 403);
-  assert.equal((await put("one-dark")).status, 200);
-  assert.deepEqual(await readEditorSettings(), { theme: "one-dark" });
-  assert.equal((await put("unknown")).status, 400);
-  assert.deepEqual(await readEditorSettings(), { theme: "one-dark" });
+  expect(await readEditorSettings()).toStrictEqual({ theme: "projector-soft" });
+  expect((await put("one-dark", "https://foreign.test")).status).toBe(403);
+  expect((await put("one-dark")).status).toBe(200);
+  expect(await readEditorSettings()).toStrictEqual({ theme: "one-dark" });
+  expect((await put("unknown")).status).toBe(400);
+  expect(await readEditorSettings()).toStrictEqual({ theme: "one-dark" });
   const response = await fetch(url);
-  assert.equal(response.headers.get("cache-control"), "no-store");
-  assert.deepEqual(await response.json(), { theme: "one-dark" });
+  expect(response.headers.get("cache-control")).toBe("no-store");
+  expect(await response.json()).toStrictEqual({ theme: "one-dark" });
   await writeEditorSettings("projector-soft");
   const file = join(directory, "projector", "editor.json");
-  assert.deepEqual(JSON.parse(await readFile(file, "utf8")), { theme: "projector-soft" });
+  expect(JSON.parse(await readFile(file, "utf8"))).toStrictEqual({ theme: "projector-soft" });
   await writeFile(file, '{"theme":"removed-theme"}');
-  assert.deepEqual(await readEditorSettings(), { theme: "projector-soft" });
+  expect(await readEditorSettings()).toStrictEqual({ theme: "projector-soft" });
 });
 
-test("files exclude defaults, persist globs, reject invalid patterns and protect HTTP writes", async (t) => {
+test("files exclude defaults, persist globs, reject invalid patterns and protect HTTP writes", async () => {
   const directory = await mkdtemp(join(tmpdir(), "projector-files-exclude-"));
   const previous = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = directory;
@@ -466,7 +443,7 @@ test("files exclude defaults, persist globs, reject invalid patterns and protect
   const server = createServer((req, res) => void handleApi(req, res));
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
-  t.after(async () => {
+  onTestFinished(async () => {
     await new Promise((resolve) => server.close(resolve));
     if (previous === undefined) delete process.env.XDG_DATA_HOME;
     else process.env.XDG_DATA_HOME = previous;
@@ -480,26 +457,24 @@ test("files exclude defaults, persist globs, reject invalid patterns and protect
       headers: { "Content-Type": "application/json", Origin: origin },
       body: JSON.stringify({ exclude }),
     });
-  assert.deepEqual(await readFilesExclude(), defaultFilesExclude());
-  assert.equal(
+  expect(await readFilesExclude()).toStrictEqual(defaultFilesExclude());
+  expect(
     (await put({ ...defaultFilesExclude(), "**/node_modules": false }, "https://foreign.test"))
       .status,
-    403,
-  );
-  assert.equal((await put({ ...defaultFilesExclude(), "**/node_modules": false })).status, 200);
-  assert.equal((await readFilesExclude())["**/node_modules"], false);
-  assert.equal(
+  ).toBe(403);
+  expect((await put({ ...defaultFilesExclude(), "**/node_modules": false })).status).toBe(200);
+  expect((await readFilesExclude())["**/node_modules"]).toBe(false);
+  expect(
     (await put({ ...defaultFilesExclude(), "../escape": true, ".projector-trash": true })).status,
-    200,
-  );
+  ).toBe(200);
   const saved = await readFilesExclude();
-  assert.equal(saved["../escape"], undefined);
-  assert.equal(saved[".projector-trash"], undefined);
-  assert.equal(saved["**/.projector-trash"], undefined);
-  assert.equal(saved["**/node_modules"], true);
+  expect(saved["../escape"]).toBe(undefined);
+  expect(saved[".projector-trash"]).toBe(undefined);
+  expect(saved["**/.projector-trash"]).toBe(undefined);
+  expect(saved["**/node_modules"]).toBe(true);
   const response = await fetch(url);
-  assert.equal(response.headers.get("cache-control"), "no-store");
-  assert.deepEqual((await response.json()).exclude, defaultFilesExclude());
+  expect(response.headers.get("cache-control")).toBe("no-store");
+  expect((await response.json()).exclude).toStrictEqual(defaultFilesExclude());
   await writeFilesExclude({
     ...defaultFilesExclude(),
     "**/custom_build": true,
@@ -507,7 +482,7 @@ test("files exclude defaults, persist globs, reject invalid patterns and protect
     "*.log": true,
   });
   const file = join(directory, "projector", "files-exclude.json");
-  assert.deepEqual(JSON.parse(await readFile(file, "utf8")), {
+  expect(JSON.parse(await readFile(file, "utf8"))).toStrictEqual({
     exclude: {
       ...defaultFilesExclude(),
       "**/custom_build": true,
@@ -517,19 +492,18 @@ test("files exclude defaults, persist globs, reject invalid patterns and protect
   });
 });
 
-test("mode switch is unavailable for the mode the server already runs in", async (t) => {
-  const ctx = reloadHost(t, [
+test("mode switch is unavailable for the mode the server already runs in", async () => {
+  const ctx = reloadHost([
     { ok: true, app: "projector", pid: 10, mode: "dev" },
     { ok: true, app: "projector", pid: 10, mode: "dev" },
   ]);
-  assert.equal(ctx.host.canSwitchMode("dev"), true, "unknown mode keeps both available");
+  expect(ctx.host.canSwitchMode("dev"), "unknown mode keeps both available").toBe(true);
   await ctx.host.refreshMode();
-  assert.equal(ctx.host.canSwitchMode("dev"), false);
-  assert.equal(ctx.host.canSwitchMode("prod"), true);
-  await assert.rejects(ctx.host.switchMode("dev"), /уже работает в режиме dev/);
-  assert.deepEqual(
+  expect(ctx.host.canSwitchMode("dev")).toBe(false);
+  expect(ctx.host.canSwitchMode("prod")).toBe(true);
+  await expect(ctx.host.switchMode("dev")).rejects.toThrow(/уже работает в режиме dev/);
+  expect(
     ctx.requests.map(({ url }) => url),
-    ["/api/health", "/api/health"],
     "no switch request is sent",
-  );
+  ).toStrictEqual(["/api/health", "/api/health"]);
 });

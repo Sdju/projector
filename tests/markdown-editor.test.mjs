@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, onTestFinished, test } from "vite-plus/test";
 import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { execFile } from "node:child_process";
@@ -18,10 +17,10 @@ const chromium =
 test(
   "visual Markdown: synchronous drafts, undo, media and source round trips",
   {
-    skip: chromium ? false : "Set CHROMIUM_BIN to run the visual editor regression",
+    skip: !chromium,
     timeout: 60000,
   },
-  async (t) => {
+  async () => {
     const directory = await mkdtemp(join(tmpdir(), "projector-markdown-browser-"));
     const fixturePlugin = {
       name: "markdown-test-fixture",
@@ -54,7 +53,7 @@ test(
       logLevel: "error",
       server: { host: "127.0.0.1", port: 0 },
     });
-    t.after(async () => {
+    onTestFinished(async () => {
       await server.close();
       await rm(directory, { recursive: true, force: true });
     });
@@ -244,10 +243,9 @@ test(
       ],
       { timeout: 50000, maxBuffer: 2 * 1024 * 1024 },
     );
-    assert.equal(
+    expect(
       stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1],
-      "PASS",
       `Markdown browser regression failed:\n${stdout.slice(-4000)}\n${stderr.slice(-2000)}`,
-    );
+    ).toBe("PASS");
   },
 );

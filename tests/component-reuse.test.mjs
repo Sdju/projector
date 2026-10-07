@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { describe, expect, onTestFinished, test } from "vite-plus/test";
 import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -159,8 +158,8 @@ finally{trackerApp?.unmount();dockerApp?.unmount();usageApp?.unmount();}})();
 
 test(
   "Shared tracker, Docker and agent quota components preserve provider behavior",
-  { skip: chromium ? false : "Set CHROMIUM_BIN for browser test", timeout: 60000 },
-  async (t) => {
+  { skip: !chromium, timeout: 60000 },
+  async () => {
     const directory = await mkdtemp(join(tmpdir(), "projector-component-reuse-"));
     const loaded = await loadConfigFromFile({ command: "serve", mode: "development" });
     const fixture = {
@@ -188,7 +187,7 @@ test(
       server: { host: "127.0.0.1", port: 0, strictPort: false },
       logLevel: "error",
     });
-    t.after(async () => {
+    onTestFinished(async () => {
       await server.close();
       await rm(directory, { recursive: true, force: true });
     });
@@ -216,6 +215,6 @@ test(
         stdout.slice(-2000) + stderr.slice(-1000)
       );
     };
-    assert.equal(await dump("/__reuse_test", "tree"), "PASS");
+    expect(await dump("/__reuse_test", "tree")).toBe("PASS");
   },
 );

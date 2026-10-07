@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test, mock } from "node:test";
+import { expect, test, vi } from "vite-plus/test";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,23 +12,22 @@ const projectPathSegments = (path) => projectRefSegments(parseProjectRef(path));
 process.env.PROJECTOR_SECRET_STORE = "file";
 
 test("GitHub paths use gh:/ in the segmented path and a dedicated browser route", () => {
-  assert.equal(projectRoute("gh:/octocat/Hello-World"), "/gh/projects/octocat/Hello-World");
-  assert.equal(
-    githubProjectRoute("https://github.com/octocat/Hello-World.git"),
+  expect(projectRoute("gh:/octocat/Hello-World")).toBe("/gh/projects/octocat/Hello-World");
+  expect(githubProjectRoute("https://github.com/octocat/Hello-World.git")).toBe(
     "/gh/projects/octocat/Hello-World",
   );
-  assert.deepEqual(projectPathSegments("gh:/octocat/Hello-World"), [
+  expect(projectPathSegments("gh:/octocat/Hello-World")).toStrictEqual([
     { name: "gh:/", path: "gh:/" },
     { name: "octocat", path: "gh:/octocat" },
     { name: "Hello-World", path: "gh:/octocat/Hello-World" },
   ]);
-  assert.deepEqual(projectPathSegments("/tmp/repo"), [
+  expect(projectPathSegments("/tmp/repo")).toStrictEqual([
     { name: "/", path: "/" },
     { name: "tmp", path: "/tmp" },
     { name: "repo", path: "/tmp/repo" },
   ]);
   for (const path of ["../repo", "owner/..", "owner/repo/extra", "https://evil.test/a/b"])
-    assert.throws(() => githubProjectRoute(path));
+    expect(() => githubProjectRoute(path)).toThrow();
 });
 
 test("readonly GitHub browser reads snapshots, trees and blobs without cloning or persisting projects", async () => {
@@ -42,13 +40,13 @@ test("readonly GitHub browser reads snapshots, trees and blobs without cloning o
   let mode = "normal";
   const requests = [];
   let authorized = false;
-  const fetch = mock.method(globalThis, "fetch", async (address, init) => {
+  const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (address, init) => {
     const url = new URL(address);
     requests.push(url.pathname);
-    assert.equal(url.origin, "https://api.github.com");
-    assert.equal(init.headers.Authorization, authorized ? "Bearer test-secret" : undefined);
-    assert.equal(init.method, undefined);
-    assert.equal(init.redirect, "error");
+    expect(url.origin).toBe("https://api.github.com");
+    expect(init.headers.Authorization).toBe(authorized ? "Bearer test-secret" : undefined);
+    expect(init.method).toBe(undefined);
+    expect(init.redirect).toBe("error");
     if (mode === "missing") return Response.json({}, { status: 404 });
     if (mode === "limit") return Response.json({}, { status: 403 });
     if (url.pathname === "/repos/octocat/repo")
@@ -93,61 +91,71 @@ test("readonly GitHub browser reads snapshots, trees and blobs without cloning o
   });
   try {
     const repo = await api.browseGithubRepository("octocat/repo");
-    assert.equal(repo.commit, sha);
-    assert.equal(repo.tree, tree);
-    assert.equal(repo.empty, false);
-    assert.equal(repo.owner, "octocat");
-    assert.equal(repo.avatarUrl, "https://avatars.example/octocat");
-    assert.equal(repo.htmlUrl, "https://github.com/octocat/repo");
-    assert.equal(repo.defaultBranch, "main");
-    assert.equal(repo.stars, 42);
-    assert.equal(repo.forks, 7);
-    assert.equal(repo.watchers, 3);
-    assert.equal(repo.openIssues, 5);
-    assert.equal(repo.language, "TypeScript");
-    assert.equal(repo.license, "MIT");
-    assert.equal(repo.homepage, "https://example.test");
-    assert.deepEqual(repo.topics, ["demo", "test"]);
-    assert.equal(repo.createdAt, "2020-01-01T00:00:00Z");
-    assert.equal(repo.updatedAt, "2026-01-01T00:00:00Z");
+    expect(repo.commit).toBe(sha);
+    expect(repo.tree).toBe(tree);
+    expect(repo.empty).toBe(false);
+    expect(repo.owner).toBe("octocat");
+    expect(repo.avatarUrl).toBe("https://avatars.example/octocat");
+    expect(repo.htmlUrl).toBe("https://github.com/octocat/repo");
+    expect(repo.defaultBranch).toBe("main");
+    expect(repo.stars).toBe(42);
+    expect(repo.forks).toBe(7);
+    expect(repo.watchers).toBe(3);
+    expect(repo.openIssues).toBe(5);
+    expect(repo.language).toBe("TypeScript");
+    expect(repo.license).toBe("MIT");
+    expect(repo.homepage).toBe("https://example.test");
+    expect(repo.topics).toStrictEqual(["demo", "test"]);
+    expect(repo.createdAt).toBe("2020-01-01T00:00:00Z");
+    expect(repo.updatedAt).toBe("2026-01-01T00:00:00Z");
     await api.browseGithubRepository("octocat/repo", "feature/test");
-    assert.ok(requests.at(-1).endsWith("/feature%2Ftest"));
+    expect(requests.at(-1).endsWith("/feature%2Ftest")).toBeTruthy();
     const directory = await api.browseGithubTree("octocat/repo", tree);
-    assert.equal(directory.entries[0].name, "src");
-    assert.ok(directory.entries.some((entry) => entry.name === "README.md"));
+    expect(directory.entries[0].name).toBe("src");
+    expect(directory.entries.some((entry) => entry.name === "README.md")).toBeTruthy();
     const file = await api.browseGithubFile("octocat/repo", sha, "README.md");
-    assert.equal(file.content, "# Hello");
-    assert.equal(file.binary, false);
+    expect(file.content).toBe("# Hello");
+    expect(file.binary).toBe(false);
     mode = "binary";
-    assert.equal((await api.browseGithubFile("octocat/repo", sha, "data.bin")).binary, true);
+    expect((await api.browseGithubFile("octocat/repo", sha, "data.bin")).binary).toBe(true);
     const image = await api.browseGithubFile("octocat/repo", sha, "image.png");
-    assert.ok(image.image.startsWith("data:image/png;base64,"));
+    expect(image.image.startsWith("data:image/png;base64,")).toBeTruthy();
     mode = "large";
-    await assert.rejects(api.browseGithubFile("octocat/repo", sha, "large.txt"), { status: 413 });
-    mode = "empty";
-    assert.equal((await api.browseGithubRepository("octocat/repo")).empty, true);
-    await assert.rejects(api.browseGithubRepository("octocat/repo", "missing"), { status: 409 });
-    mode = "truncated";
-    assert.equal((await api.browseGithubTree("octocat/repo", tree)).truncated, true);
-    mode = "missing";
-    await assert.rejects(api.browseGithubRepository("octocat/repo"), { status: 404 });
-    mode = "limit";
-    await assert.rejects(api.browseGithubRepository("octocat/repo"), { status: 403 });
-    const count = requests.length;
-    await assert.rejects(api.browseGithubTree("octocat/repo", "../../evil"), { status: 400 });
-    await assert.rejects(api.browseGithubRepository("owner/repo/../other"), { status: 400 });
-    assert.equal(requests.length, count);
-    assert.deepEqual(await readdir(root), []);
-    mode = "normal";
-    const asset = await api.browseGithubAsset("octocat/repo", tree, "src/image.png");
-    assert.equal(asset.mime, "image/png");
-    assert.equal(asset.bytes.toString(), "# Hello");
-    await assert.rejects(api.browseGithubAsset("octocat/repo", tree, "missing.png"), {
-      status: 404,
+    await expect(api.browseGithubFile("octocat/repo", sha, "large.txt")).rejects.toMatchObject({
+      status: 413,
     });
-    await assert.rejects(api.browseGithubAsset("octocat/repo", tree, "../image.png"), {
+    mode = "empty";
+    expect((await api.browseGithubRepository("octocat/repo")).empty).toBe(true);
+    await expect(api.browseGithubRepository("octocat/repo", "missing")).rejects.toMatchObject({
+      status: 409,
+    });
+    mode = "truncated";
+    expect((await api.browseGithubTree("octocat/repo", tree)).truncated).toBe(true);
+    mode = "missing";
+    await expect(api.browseGithubRepository("octocat/repo")).rejects.toMatchObject({ status: 404 });
+    mode = "limit";
+    await expect(api.browseGithubRepository("octocat/repo")).rejects.toMatchObject({ status: 403 });
+    const count = requests.length;
+    await expect(api.browseGithubTree("octocat/repo", "../../evil")).rejects.toMatchObject({
       status: 400,
     });
+    await expect(api.browseGithubRepository("owner/repo/../other")).rejects.toMatchObject({
+      status: 400,
+    });
+    expect(requests.length).toBe(count);
+    expect(await readdir(root)).toStrictEqual([]);
+    mode = "normal";
+    const asset = await api.browseGithubAsset("octocat/repo", tree, "src/image.png");
+    expect(asset.mime).toBe("image/png");
+    expect(asset.bytes.toString()).toBe("# Hello");
+    await expect(api.browseGithubAsset("octocat/repo", tree, "missing.png")).rejects.toMatchObject({
+      status: 404,
+    });
+    await expect(api.browseGithubAsset("octocat/repo", tree, "../image.png")).rejects.toMatchObject(
+      {
+        status: 400,
+      },
+    );
     await updateIntegration("github", (config) => ({
       ...config,
       enabled: true,
@@ -155,12 +163,12 @@ test("readonly GitHub browser reads snapshots, trees and blobs without cloning o
     }));
     authorized = true;
     const privateRepo = await api.browseGithubRepository("octocat/repo");
-    assert.ok(!JSON.stringify(privateRepo).includes("test-secret"));
+    expect(!JSON.stringify(privateRepo).includes("test-secret")).toBeTruthy();
     await updateIntegration("github", (config) => ({ ...config, enabled: false }));
     authorized = false;
     await api.browseGithubRepository("octocat/repo");
   } finally {
-    fetch.mock.restore();
+    fetch.mockRestore();
     await rm(root, { recursive: true, force: true });
   }
 });
@@ -184,7 +192,7 @@ test("GitHub history paginates filtered commits and reads exact before/after blo
   let mode = "rename";
   let total = 105;
   const requests = [];
-  const fetch = mock.method(globalThis, "fetch", async (address) => {
+  const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (address) => {
     const url = new URL(address);
     requests.push(url);
     if (url.pathname.endsWith("/commits")) {
@@ -253,42 +261,40 @@ test("GitHub history paginates filtered commits and reads exact before/after blo
   });
   try {
     const first = await browseGithubLog("octocat/repo", { sha: head, limit: "50" });
-    assert.equal(first.commits.length, 50);
-    assert.equal(first.next, 50);
-    assert.equal(first.commits[0].refs[0].kind, "head");
+    expect(first.commits.length).toBe(50);
+    expect(first.next).toBe(50);
+    expect(first.commits[0].refs[0].kind).toBe("head");
     const second = await browseGithubLog("octocat/repo", { sha: head, skip: "50", limit: "50" });
-    assert.equal(second.commits[0].subject, "Commit 50");
-    assert.equal(second.next, 100);
+    expect(second.commits[0].subject).toBe("Commit 50");
+    expect(second.next).toBe(100);
     const last = await browseGithubLog("octocat/repo", { sha: head, skip: "100" });
-    assert.equal(last.commits.length, 5);
-    assert.equal(last.next, null);
-    assert.equal(
+    expect(last.commits.length).toBe(5);
+    expect(last.next).toBe(null);
+    expect(
       (await browseGithubLog("octocat/repo", { sha: head, q: "Commit 104" })).commits[0].subject,
-      "Commit 104",
-    );
-    assert.equal(
-      (await browseGithubLog("octocat/repo", { sha: head, q: "@alice" })).commits.length,
+    ).toBe("Commit 104");
+    expect((await browseGithubLog("octocat/repo", { sha: head, q: "@alice" })).commits.length).toBe(
       50,
     );
-    assert.equal((await browseGithubLog("octocat/repo", { sha: "" })).commits.length, 0);
+    expect((await browseGithubLog("octocat/repo", { sha: "" })).commits.length).toBe(0);
     total = 605;
     const scan = await browseGithubLog("octocat/repo", { sha: head, q: "Commit 599" });
-    assert.equal(scan.commits.length, 0);
-    assert.equal(scan.next, 500);
+    expect(scan.commits.length).toBe(0);
+    expect(scan.next).toBe(500);
     const continued = await browseGithubLog("octocat/repo", {
       sha: head,
       q: "Commit 599",
       skip: String(scan.next),
     });
-    assert.equal(continued.commits[0].subject, "Commit 599");
-    assert.equal(continued.next, null);
+    expect(continued.commits[0].subject).toBe("Commit 599");
+    expect(continued.next).toBe(null);
     total = 105;
     const detail = await browseGithubCommit("octocat/repo", head);
-    assert.equal(detail.body, "Details");
-    assert.equal(detail.files[0].status, "R");
-    assert.equal(detail.files[0].originalPath, "old.txt");
-    assert.equal(detail.committer, "Bob");
-    assert.deepEqual(await browseGithubComparison("octocat/repo", head, "new.txt"), {
+    expect(detail.body).toBe("Details");
+    expect(detail.files[0].status).toBe("R");
+    expect(detail.files[0].originalPath).toBe("old.txt");
+    expect(detail.committer).toBe("Bob");
+    expect(await browseGithubComparison("octocat/repo", head, "new.txt")).toStrictEqual({
       path: "new.txt",
       original: "before",
       modified: "after",
@@ -298,25 +304,33 @@ test("GitHub history paginates filtered commits and reads exact before/after blo
     for (const next of ["add", "delete", "root"]) {
       mode = next;
       const comparison = await browseGithubComparison("octocat/repo", head, "new.txt");
-      assert.equal(comparison.original, next === "delete" ? "before" : "");
-      assert.equal(comparison.modified, next === "delete" ? "" : "after");
+      expect(comparison.original).toBe(next === "delete" ? "before" : "");
+      expect(comparison.modified).toBe(next === "delete" ? "" : "after");
     }
     mode = "pages";
-    assert.equal((await browseGithubCommit("octocat/repo", head)).files.length, 101);
+    expect((await browseGithubCommit("octocat/repo", head)).files.length).toBe(101);
     mode = "binary";
-    await assert.rejects(browseGithubComparison("octocat/repo", head, "new.txt"), { status: 415 });
-    await assert.rejects(browseGithubComparison("octocat/repo", head, "missing"), { status: 404 });
+    await expect(browseGithubComparison("octocat/repo", head, "new.txt")).rejects.toMatchObject({
+      status: 415,
+    });
+    await expect(browseGithubComparison("octocat/repo", head, "missing")).rejects.toMatchObject({
+      status: 404,
+    });
     const count = requests.length;
-    await assert.rejects(browseGithubComparison("octocat/repo", head, "../secret"), {
+    await expect(browseGithubComparison("octocat/repo", head, "../secret")).rejects.toMatchObject({
       status: 400,
     });
-    await assert.rejects(browseGithubCommit("octocat/repo", "invalid"), { status: 400 });
-    await assert.rejects(browseGithubLog("octocat/repo", { sha: head, skip: "NaN" }), {
+    await expect(browseGithubCommit("octocat/repo", "invalid")).rejects.toMatchObject({
       status: 400,
     });
-    assert.equal(requests.length, count);
+    await expect(browseGithubLog("octocat/repo", { sha: head, skip: "NaN" })).rejects.toMatchObject(
+      {
+        status: 400,
+      },
+    );
+    expect(requests.length).toBe(count);
   } finally {
-    fetch.mock.restore();
+    fetch.mockRestore();
     await rm(root, { recursive: true, force: true });
   }
 });
@@ -329,11 +343,11 @@ test("GitHub path suggestions paginate owners, filter prefixes and respect authe
   const requests = [];
   let token = "";
   let total = 102;
-  const fetch = mock.method(globalThis, "fetch", async (address, init) => {
+  const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (address, init) => {
     const url = new URL(address);
     requests.push(url);
-    assert.equal(url.origin, "https://api.github.com");
-    assert.equal(init.headers.Authorization, token ? `Bearer ${token}` : undefined);
+    expect(url.origin).toBe("https://api.github.com");
+    expect(init.headers.Authorization).toBe(token ? `Bearer ${token}` : undefined);
     if (!url.pathname.endsWith("/repos"))
       return Response.json({ type: url.pathname.endsWith("/team") ? "Organization" : "User" });
     const page = Number(url.searchParams.get("page"));
@@ -346,15 +360,15 @@ test("GitHub path suggestions paginate owners, filter prefixes and respect authe
   });
   try {
     const siblings = await browseGithubDirectories("gh:/alice/current", false);
-    assert.equal(siblings.entries.length, 102);
-    assert.equal(siblings.truncated, false);
-    assert.equal(requests.at(-1).pathname, "/users/alice/repos");
-    assert.equal(requests.at(-1).searchParams.get("page"), "2");
-    assert.equal((await browseGithubDirectories("gh:/alice/REPO-10", true)).entries.length, 3);
-    assert.equal((await browseGithubDirectories("gh:/alice/", true)).entries.length, 102);
-    assert.equal((await browseGithubDirectories("gh:/alice/absent", true)).entries.length, 0);
+    expect(siblings.entries.length).toBe(102);
+    expect(siblings.truncated).toBe(false);
+    expect(requests.at(-1).pathname).toBe("/users/alice/repos");
+    expect(requests.at(-1).searchParams.get("page")).toBe("2");
+    expect((await browseGithubDirectories("gh:/alice/REPO-10", true)).entries.length).toBe(3);
+    expect((await browseGithubDirectories("gh:/alice/", true)).entries.length).toBe(102);
+    expect((await browseGithubDirectories("gh:/alice/absent", true)).entries.length).toBe(0);
     await browseGithubDirectories("gh:/team", false);
-    assert.equal(requests.at(-1).pathname, "/orgs/team/repos");
+    expect(requests.at(-1).pathname).toBe("/orgs/team/repos");
     const count = requests.length;
     for (const path of [
       "gh:/",
@@ -363,8 +377,8 @@ test("GitHub path suggestions paginate owners, filter prefixes and respect authe
       "gh:/alice/repo?x",
       "https://evil.test",
     ])
-      await assert.rejects(browseGithubDirectories(path, false), { status: 400 });
-    assert.equal(requests.length, count);
+      await expect(browseGithubDirectories(path, false)).rejects.toMatchObject({ status: 400 });
+    expect(requests.length).toBe(count);
     await updateIntegration("github", (config) => ({
       ...config,
       enabled: true,
@@ -372,16 +386,16 @@ test("GitHub path suggestions paginate owners, filter prefixes and respect authe
     }));
     token = "secret";
     await browseGithubDirectories("gh:/alice", false);
-    assert.equal(requests.at(-1).pathname, "/user/repos");
-    assert.equal(requests.at(-1).searchParams.get("type"), "owner");
+    expect(requests.at(-1).pathname).toBe("/user/repos");
+    expect(requests.at(-1).searchParams.get("type")).toBe("owner");
     await browseGithubDirectories("gh:/team", false);
-    assert.equal(requests.at(-1).pathname, "/orgs/team/repos");
+    expect(requests.at(-1).pathname).toBe("/orgs/team/repos");
     await updateIntegration("github", (config) => ({ ...config, enabled: false }));
     token = "";
     total = 1000;
-    assert.equal((await browseGithubDirectories("gh:/alice", false)).truncated, true);
+    expect((await browseGithubDirectories("gh:/alice", false)).truncated).toBe(true);
   } finally {
-    fetch.mock.restore();
+    fetch.mockRestore();
     await rm(root, { recursive: true, force: true });
   }
 });
@@ -408,10 +422,10 @@ test("GitHub issues list filters pull requests, paginates and reads discussion c
     updated_at: "2026-01-02T00:00:00Z",
     ...extra,
   });
-  const fetch = mock.method(globalThis, "fetch", async (address) => {
+  const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (address) => {
     const url = new URL(address);
     requests.push(url);
-    assert.equal(url.origin, "https://api.github.com");
+    expect(url.origin).toBe("https://api.github.com");
     if (mode === "error") return Response.json({}, { status: 403 });
     if (url.pathname === "/repos/octocat/repo/issues") {
       const page = Number(url.searchParams.get("page"));
@@ -439,38 +453,40 @@ test("GitHub issues list filters pull requests, paginates and reads discussion c
   });
   try {
     const first = await browseGithubIssues("octocat/repo", { state: "open" });
-    assert.equal(first.issues.length, 29);
-    assert.equal(first.issues[0].number, 1);
-    assert.equal(first.issues[0].author.login, "alice");
-    assert.deepEqual(first.issues[0].labels, [{ name: "bug", color: "ff0000" }]);
-    assert.equal(first.issues[0].state, "open");
-    assert.deepEqual(first.issues[0].reactions, [{ content: "heart", count: 4 }]);
-    assert.equal(first.next, 2);
-    assert.equal(requests.at(-1).searchParams.get("state"), "open");
-    assert.equal(requests.at(-1).searchParams.get("per_page"), "30");
+    expect(first.issues.length).toBe(29);
+    expect(first.issues[0].number).toBe(1);
+    expect(first.issues[0].author.login).toBe("alice");
+    expect(first.issues[0].labels).toStrictEqual([{ name: "bug", color: "ff0000" }]);
+    expect(first.issues[0].state).toBe("open");
+    expect(first.issues[0].reactions).toStrictEqual([{ content: "heart", count: 4 }]);
+    expect(first.next).toBe(2);
+    expect(requests.at(-1).searchParams.get("state")).toBe("open");
+    expect(requests.at(-1).searchParams.get("per_page")).toBe("30");
 
     const second = await browseGithubIssues("octocat/repo", { state: "open", page: "2" });
-    assert.equal(second.issues.length, 1);
-    assert.equal(second.issues[0].number, 31);
-    assert.equal(second.next, null);
+    expect(second.issues.length).toBe(1);
+    expect(second.issues[0].number).toBe(31);
+    expect(second.next).toBe(null);
 
     await browseGithubIssues("octocat/repo", { state: "weird" });
-    assert.equal(requests.at(-1).searchParams.get("state"), "open");
+    expect(requests.at(-1).searchParams.get("state")).toBe("open");
 
     const detail = await browseGithubIssue("octocat/repo", 7);
-    assert.equal(detail.issue.number, 7);
-    assert.equal(detail.issue.body, "Body");
-    assert.equal(detail.issue.assignees[0].login, "bob");
-    assert.equal(detail.comments.length, 2);
-    assert.equal(detail.comments[0].author.login, "carol");
-    assert.deepEqual(detail.comments[0].reactions, [{ content: "eyes", count: 1 }]);
-    assert.equal(detail.commentsTruncated, false);
+    expect(detail.issue.number).toBe(7);
+    expect(detail.issue.body).toBe("Body");
+    expect(detail.issue.assignees[0].login).toBe("bob");
+    expect(detail.comments.length).toBe(2);
+    expect(detail.comments[0].author.login).toBe("carol");
+    expect(detail.comments[0].reactions).toStrictEqual([{ content: "eyes", count: 1 }]);
+    expect(detail.commentsTruncated).toBe(false);
 
-    await assert.rejects(browseGithubIssue("octocat/repo", 0), { status: 400 });
+    await expect(browseGithubIssue("octocat/repo", 0)).rejects.toMatchObject({ status: 400 });
     mode = "error";
-    await assert.rejects(browseGithubIssues("octocat/repo", { state: "open" }), { status: 403 });
+    await expect(browseGithubIssues("octocat/repo", { state: "open" })).rejects.toMatchObject({
+      status: 403,
+    });
   } finally {
-    fetch.mock.restore();
+    fetch.mockRestore();
     await rm(root, { recursive: true, force: true });
   }
 });
@@ -495,10 +511,10 @@ test("GitHub pull requests list derives state and detail gathers reviews, commen
     updated_at: "2026-01-02T00:00:00Z",
     ...extra,
   });
-  const fetch = mock.method(globalThis, "fetch", async (address) => {
+  const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (address) => {
     const url = new URL(address);
     requests.push(url);
-    assert.equal(url.origin, "https://api.github.com");
+    expect(url.origin).toBe("https://api.github.com");
     if (url.pathname === "/repos/octocat/repo/pulls")
       return Response.json([
         remotePull(1),
@@ -535,38 +551,37 @@ test("GitHub pull requests list derives state and detail gathers reviews, commen
   });
   try {
     const list = await browseGithubPulls("octocat/repo", { state: "all", page: "2" });
-    assert.deepEqual(
-      list.pulls.map((item) => item.state),
-      ["open", "merged", "closed", "open"],
-    );
-    assert.equal(list.pulls[3].draft, true);
-    assert.equal(list.pulls[0].head, "fork:feature");
-    assert.equal(list.pulls[0].base, "main");
-    assert.equal(list.next, null);
-    assert.equal(requests.at(-1).searchParams.get("state"), "all");
-    assert.equal(requests.at(-1).searchParams.get("page"), "2");
+    expect(list.pulls.map((item) => item.state)).toStrictEqual([
+      "open",
+      "merged",
+      "closed",
+      "open",
+    ]);
+    expect(list.pulls[3].draft).toBe(true);
+    expect(list.pulls[0].head).toBe("fork:feature");
+    expect(list.pulls[0].base).toBe("main");
+    expect(list.next).toBe(null);
+    expect(requests.at(-1).searchParams.get("state")).toBe("all");
+    expect(requests.at(-1).searchParams.get("page")).toBe("2");
 
     const detail = await browseGithubPull("octocat/repo", 7);
-    assert.equal(detail.pull.number, 7);
-    assert.deepEqual(detail.pull.reactions, [
+    expect(detail.pull.number).toBe(7);
+    expect(detail.pull.reactions).toStrictEqual([
       { content: "+1", count: 2 },
       { content: "hooray", count: 1 },
     ]);
-    assert.equal(detail.commits, 3);
-    assert.equal(detail.additions, 10);
-    assert.deepEqual(
-      detail.reviews.map((item) => [item.id, item.state]),
-      [
-        [1, "approved"],
-        [3, "commented"],
-      ],
-    );
-    assert.equal(detail.comments[0].author.login, "carol");
-    assert.equal(detail.files[1].previousPath, "c.ts");
-    assert.equal(detail.filesTruncated, false);
-    await assert.rejects(browseGithubPull("octocat/repo", 0), { status: 400 });
+    expect(detail.commits).toBe(3);
+    expect(detail.additions).toBe(10);
+    expect(detail.reviews.map((item) => [item.id, item.state])).toStrictEqual([
+      [1, "approved"],
+      [3, "commented"],
+    ]);
+    expect(detail.comments[0].author.login).toBe("carol");
+    expect(detail.files[1].previousPath).toBe("c.ts");
+    expect(detail.filesTruncated).toBe(false);
+    await expect(browseGithubPull("octocat/repo", 0)).rejects.toMatchObject({ status: 400 });
   } finally {
-    fetch.mock.restore();
+    fetch.mockRestore();
     await rm(root, { recursive: true, force: true });
   }
 });
@@ -596,13 +611,13 @@ test("GitHub discussions need a token, page by cursor and nest replies under com
     comments: { totalCount: 2 },
     ...extra,
   });
-  const fetch = mock.method(globalThis, "fetch", async (address, init) => {
-    assert.equal(String(address), "https://api.github.com/graphql");
-    assert.equal(init.headers.Authorization, "Bearer secret");
+  const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (address, init) => {
+    expect(String(address)).toBe("https://api.github.com/graphql");
+    expect(init.headers.Authorization).toBe("Bearer secret");
     const { query, variables } = JSON.parse(init.body);
     requests.push(variables);
-    assert.equal(variables.owner, "octocat");
-    assert.equal(variables.name, "repo");
+    expect(variables.owner).toBe("octocat");
+    expect(variables.name).toBe("repo");
     if (query.includes("discussion(number")) {
       if (variables.number === 404)
         return Response.json({ data: { repository: { discussion: null } } });
@@ -647,41 +662,45 @@ test("GitHub discussions need a token, page by cursor and nest replies under com
     });
   });
   try {
-    await assert.rejects(browseGithubDiscussions("octocat/repo", {}), { status: 401 });
+    await expect(browseGithubDiscussions("octocat/repo", {})).rejects.toMatchObject({
+      status: 401,
+    });
     await updateIntegration("github", (config) => ({
       ...config,
       enabled: true,
       credentials: { token: "secret", login: "octocat" },
     }));
     const first = await browseGithubDiscussions("octocat/repo", { state: "closed", page: "1" });
-    assert.deepEqual(requests.at(-1).states, ["CLOSED"]);
-    assert.equal(requests.at(-1).after, null);
-    assert.equal(first.discussions[0].author.login, "ghost");
-    assert.equal(first.discussions[0].answered, true);
-    assert.deepEqual(first.discussions[0].reactions, [{ content: "+1", count: 5 }]);
-    assert.deepEqual(first.discussions[0].labels, [{ name: "bug", color: "ff0000" }]);
-    assert.equal(first.next, "Y3Vyc29y");
+    expect(requests.at(-1).states).toStrictEqual(["CLOSED"]);
+    expect(requests.at(-1).after).toBe(null);
+    expect(first.discussions[0].author.login).toBe("ghost");
+    expect(first.discussions[0].answered).toBe(true);
+    expect(first.discussions[0].reactions).toStrictEqual([{ content: "+1", count: 5 }]);
+    expect(first.discussions[0].labels).toStrictEqual([{ name: "bug", color: "ff0000" }]);
+    expect(first.next).toBe("Y3Vyc29y");
     const second = await browseGithubDiscussions("octocat/repo", {
       state: "all",
       page: first.next,
     });
-    assert.equal(requests.at(-1).after, "Y3Vyc29y");
-    assert.equal(requests.at(-1).states, null);
-    assert.equal(second.next, null);
+    expect(requests.at(-1).after).toBe("Y3Vyc29y");
+    expect(requests.at(-1).states).toBe(null);
+    expect(second.next).toBe(null);
     // A cursor that is not base64-like never reaches GraphQL.
     await browseGithubDiscussions("octocat/repo", { page: 'x"} injected' });
-    assert.equal(requests.at(-1).after, null);
+    expect(requests.at(-1).after).toBe(null);
 
     const detail = await browseGithubDiscussion("octocat/repo", 7);
-    assert.equal(detail.comments.length, 2);
-    assert.equal(detail.comments[0].isAnswer, true);
-    assert.equal(detail.comments[0].replies[0].author.login, "dave");
-    assert.equal(detail.comments[0].repliesTruncated, true);
-    assert.equal(detail.comments[1].repliesTruncated, false);
-    await assert.rejects(browseGithubDiscussion("octocat/repo", 0), { status: 400 });
-    await assert.rejects(browseGithubDiscussion("octocat/repo", 404), { status: 404 });
+    expect(detail.comments.length).toBe(2);
+    expect(detail.comments[0].isAnswer).toBe(true);
+    expect(detail.comments[0].replies[0].author.login).toBe("dave");
+    expect(detail.comments[0].repliesTruncated).toBe(true);
+    expect(detail.comments[1].repliesTruncated).toBe(false);
+    await expect(browseGithubDiscussion("octocat/repo", 0)).rejects.toMatchObject({ status: 400 });
+    await expect(browseGithubDiscussion("octocat/repo", 404)).rejects.toMatchObject({
+      status: 404,
+    });
   } finally {
-    fetch.mock.restore();
+    fetch.mockRestore();
     await rm(root, { recursive: true, force: true });
   }
 });

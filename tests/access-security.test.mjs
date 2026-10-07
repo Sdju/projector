@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, onTestFinished, test } from "vite-plus/test";
 import { mkdtemp, rm, writeFile, chmod, stat, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { createServer, request } from "node:http";
@@ -19,12 +18,12 @@ import { attachTerminalControlServer } from "../server/modules/terminal-control/
 import { updateProjects } from "../server/modules/projects/index.ts";
 import { WebSocket } from "ws";
 
-async function isolatedLan(t) {
+async function isolatedLan() {
   const dir = await mkdtemp("/tmp/projector-access-security-");
   const previous = { data: process.env.XDG_DATA_HOME, network: process.env.PROJECTOR_NETWORK };
   process.env.XDG_DATA_HOME = dir;
   process.env.PROJECTOR_NETWORK = "lan";
-  t.after(async () => {
+  onTestFinished(async () => {
     for (const [key, value] of [
       ["XDG_DATA_HOME", previous.data],
       ["PROJECTOR_NETWORK", previous.network],
@@ -57,18 +56,18 @@ function send(server, hostname, path, headers = {}) {
   });
 }
 
-async function listen(t, server) {
+async function listen(server) {
   server.listen(0, "0.0.0.0");
   await once(server, "listening");
-  t.after(async () => {
+  onTestFinished(async () => {
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
   });
   return server;
 }
 
-test("LAN cannot turn attacker-controlled Host/Origin into local authority", async (t) => {
-  await isolatedLan(t);
+test("LAN cannot turn attacker-controlled Host/Origin into local authority", async () => {
+  await isolatedLan();
   for (const host of [
     "attacker.invalid:4177",
     "user@localhost:4177",
@@ -77,37 +76,36 @@ test("LAN cannot turn attacker-controlled Host/Origin into local authority", asy
     "",
   ]) {
     const req = fakeRequest(host, "127.0.0.1", { origin: `http://${host}` });
-    assert.equal(accessAllowed(req, false), false, host);
+    expect(accessAllowed(req, false), host).toBe(false);
   }
-  assert.equal(
+  expect(
     accessAllowed(
       fakeRequest("127.0.0.1:4177", "127.0.0.1", { origin: "https://attacker.invalid" }),
       false,
     ),
-    false,
-  );
+  ).toBe(false);
 });
 
-test("corrupt credentials fail closed, and replacing a password restores file permissions", async (t) => {
-  await isolatedLan(t);
+test("corrupt credentials fail closed, and replacing a password restores file permissions", async () => {
+  await isolatedLan();
   const req = fakeRequest("192.0.2.1:4177", "192.0.2.10", { authorization: "Bearer arbitrary" });
   for (const data of ["", "corrupt", "ab:zz", "a".repeat(32) + ":" + "a".repeat(2)]) {
     await writeFile(lanPasswordPath(), data);
-    assert.throws(hasLanPassword, /Повреждён/);
-    assert.equal(accessAllowed(req, false), false);
-    assert.equal(accessAllowed(fakeRequest(), false), false);
+    expect(hasLanPassword).toThrow(/Повреждён/);
+    expect(accessAllowed(req, false)).toBe(false);
+    expect(accessAllowed(fakeRequest(), false)).toBe(false);
   }
   await rm(lanPasswordPath());
   await mkdir(lanPasswordPath());
-  assert.equal(accessAllowed(fakeRequest(), false), false, "unreadable credential path");
+  expect(accessAllowed(fakeRequest(), false), "unreadable credential path").toBe(false);
   await rm(lanPasswordPath(), { recursive: true });
   setLanPassword("test-only-password");
   await chmod(lanPasswordPath(), 0o644);
   setLanPassword("replacement");
-  assert.equal((await stat(lanPasswordPath())).mode & 0o777, 0o600);
+  expect((await stat(lanPasswordPath())).mode & 0o777).toBe(0o600);
 });
 
-test("fetch isolates LAN credentials and prompts only on an explicit LAN challenge", async (t) => {
+test("fetch isolates LAN credentials and prompts only on an explicit LAN challenge", async () => {
   const previous = { fetch: globalThis.fetch, window: globalThis.window };
   const calls = [];
   const responses = [];
@@ -123,7 +121,7 @@ test("fetch isolates LAN credentials and prompts only on an explicit LAN challen
     calls.push({ url, authorization: new Headers(init?.headers).get("Authorization") });
     return responses.shift() ?? new Response("{}");
   };
-  t.after(() => {
+  onTestFinished(() => {
     globalThis.fetch = previous.fetch;
     if (previous.window === undefined) delete globalThis.window;
     else globalThis.window = previous.window;
@@ -137,10 +135,10 @@ test("fetch isolates LAN credentials and prompts only on an explicit LAN challen
     "https://attacker.invalid/collect",
   ]) {
     await auth.authedFetch(url);
-    assert.equal(calls.at(-1).authorization, null, url);
+    expect(calls.at(-1).authorization, url).toBe(null);
   }
   await auth.authedFetch("/api/app/network");
-  assert.equal(calls.at(-1).authorization, "Bearer test-only-password");
+  expect(calls.at(-1).authorization).toBe("Bearer test-only-password");
   auth.clearLanPassword();
   for (const challenge of [null, 'Bearer realm="GitHub"']) {
     responses.push(
@@ -153,9 +151,9 @@ test("fetch isolates LAN credentials and prompts only on an explicit LAN challen
     const response = await auth.authedFetch(
       "/api/integrations/github/browse/repository?repository=vuejs/core",
     );
-    assert.equal(response.status, 401);
-    assert.equal(prompts, 0, "upstream authentication is not a LAN password challenge");
-    assert.equal(calls.length, before + 1, "no password retry against GitHub");
+    expect(response.status).toBe(401);
+    expect(prompts, "upstream authentication is not a LAN password challenge").toBe(0);
+    expect(calls.length, "no password retry against GitHub").toBe(before + 1);
   }
   responses.push(
     new Response("{}", {
@@ -163,14 +161,14 @@ test("fetch isolates LAN credentials and prompts only on an explicit LAN challen
       headers: { "WWW-Authenticate": 'Bearer realm="Projector LAN"' },
     }),
   );
-  assert.equal((await auth.authedFetch("/api/app/network")).status, 200);
-  assert.equal(prompts, 1);
-  assert.equal(calls.at(-1).authorization, "Bearer new-test-password");
+  expect((await auth.authedFetch("/api/app/network")).status).toBe(200);
+  expect(prompts).toBe(1);
+  expect(calls.at(-1).authorization).toBe("Bearer new-test-password");
   auth.clearLanPassword();
 });
 
 test("Vite resources require LAN authentication; session cookies survive resource loads and expire on password replacement", async (t) => {
-  const dir = await isolatedLan(t);
+  const dir = await isolatedLan();
   const address = Object.values(networkInterfaces())
     .flat()
     .find((entry) => entry?.family === "IPv4" && !entry.internal)?.address;
@@ -183,49 +181,46 @@ test("Vite resources require LAN authentication; session cookies survive resourc
     logLevel: "error",
     optimizeDeps: { noDiscovery: true, include: [] },
   });
-  t.after(() => vite.close());
-  const server = await listen(t, createServer(vite.middlewares));
+  onTestFinished(() => vite.close());
+  const server = await listen(createServer(vite.middlewares));
   const headers = { Host: "localhost:4177" };
   const unauthorized = await send(server, address, "/api/app/network", headers);
-  assert.equal(unauthorized.status, 401);
-  assert.equal(unauthorized.headers["www-authenticate"], 'Bearer realm="Projector LAN"');
+  expect(unauthorized.status).toBe(401);
+  expect(unauthorized.headers["www-authenticate"]).toBe('Bearer realm="Projector LAN"');
   for (const path of [
     "/package.json",
     `/@fs${process.cwd()}/server/modules/access/access.ts?raw`,
   ]) {
-    assert.equal((await send(server, address, path, headers)).status, 401, path);
+    expect((await send(server, address, path, headers)).status, path).toBe(401);
   }
   const login = await send(server, address, "/projects", { ...headers, Accept: "text/html" });
-  assert.equal(login.status, 200);
-  assert.match(login.body, /Пароль доступа/);
+  expect(login.status).toBe(200);
+  expect(login.body).toMatch(/Пароль доступа/);
   const accepted = await send(server, address, "/api/app/network", {
     ...headers,
     Authorization: "Bearer test-only-password",
   });
-  assert.equal(accepted.status, 200);
+  expect(accepted.status).toBe(200);
   const setCookie = accepted.headers["set-cookie"][0];
-  assert.match(setCookie, /HttpOnly; SameSite=Strict/);
-  assert.doesNotMatch(setCookie, /test-only-password/);
+  expect(setCookie).toMatch(/HttpOnly; SameSite=Strict/);
+  expect(setCookie).not.toMatch(/test-only-password/);
   const cookie = setCookie.split(";")[0];
-  assert.equal(
+  expect(
     (await send(server, address, "/package.json", { ...headers, Cookie: cookie })).status,
-    200,
-  );
-  assert.equal(
+  ).toBe(200);
+  expect(
     accessAllowed(
       fakeRequest("localhost:4177", address, { cookie, origin: "http://localhost:4177" }),
       true,
     ),
-    true,
     "WebSocket cookie",
-  );
-  assert.equal(
+  ).toBe(true);
+  expect(
     accessAllowed(
       fakeRequest("localhost:4177", address, { cookie, origin: "http://attacker.invalid" }),
       true,
     ),
-    false,
-  );
+  ).toBe(false);
   await updateProjects((projects) =>
     projects.push({
       id: "security-test",
@@ -247,23 +242,21 @@ test("Vite resources require LAN authentication; session cookies survive resourc
       headers: { Host: "localhost:4177", Cookie: cookie },
     },
   );
-  t.after(() => client.terminate());
+  onTestFinished(() => client.terminate());
   const snapshot = once(client, "message");
   await once(client, "open");
-  assert.equal(JSON.parse(String((await snapshot)[0])).type, "sessions");
+  expect(JSON.parse(String((await snapshot)[0])).type).toBe("sessions");
   const closed = once(client, "close");
   setLanPassword("test-only-password");
   await closed;
-  assert.equal(
+  expect(
     (await send(server, address, "/package.json", { ...headers, Cookie: cookie })).status,
-    401,
-  );
+  ).toBe(401);
 });
 
-test("malformed requests cannot crash HTTP or either WebSocket upgrade handler", async (t) => {
-  const dir = await isolatedLan(t);
+test("malformed requests cannot crash HTTP or either WebSocket upgrade handler", async () => {
+  const dir = await isolatedLan();
   const server = await listen(
-    t,
     createServer((req, res) => {
       if (!authorizeHttp(req, res)) return;
       void handleApi(req, res);
@@ -284,12 +277,10 @@ test("malformed requests cannot crash HTTP or either WebSocket upgrade handler",
     socket.on("end", () => resolve(raw));
     socket.on("error", reject);
   });
-  assert.match(response, /^HTTP\/1.1 400/);
-  assert.equal((await send(server, "127.0.0.1", "/api/app/network", { Host: "[" })).status, 403);
-  assert.equal(
-    (await send(server, "127.0.0.1", "/api/app/network")).status,
+  expect(response).toMatch(/^HTTP\/1.1 400/);
+  expect((await send(server, "127.0.0.1", "/api/app/network", { Host: "[" })).status).toBe(403);
+  expect((await send(server, "127.0.0.1", "/api/app/network")).status, "server remains alive").toBe(
     200,
-    "server remains alive",
   );
   const project = join(dir, "svg");
   await mkdir(project);
@@ -302,7 +293,7 @@ test("malformed requests cannot crash HTTP or either WebSocket upgrade handler",
     "127.0.0.1",
     `/api/preview-icon?path=${encodeURIComponent(project)}`,
   );
-  assert.equal(icon.status, 200);
-  assert.equal(icon.headers["content-security-policy"], "default-src 'none'; sandbox");
-  assert.equal(icon.headers["x-content-type-options"], "nosniff");
+  expect(icon.status).toBe(200);
+  expect(icon.headers["content-security-policy"]).toBe("default-src 'none'; sandbox");
+  expect(icon.headers["x-content-type-options"]).toBe("nosniff");
 });

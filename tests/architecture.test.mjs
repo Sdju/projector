@@ -1,13 +1,14 @@
-import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { after, test } from "node:test";
+import { afterAll, expect, test } from "vite-plus/test";
 import feod from "../feod.config.mjs";
 import { checkFeod } from "../scripts/check-feod.mjs";
 
 const temporary = [];
-after(() => temporary.forEach((directory) => rmSync(directory, { recursive: true, force: true })));
+afterAll(() =>
+  temporary.forEach((directory) => rmSync(directory, { recursive: true, force: true })),
+);
 
 /** Build a fixture project, lint it with Projector's real FEOD policy, group rules by file. */
 function lint(files, config = feod) {
@@ -32,7 +33,7 @@ const lines = (count) => "export {};\n" + "void 0;\n".repeat(count);
 const index = (name = "x") => `export const ${name} = 1;\n`;
 
 test("valid layers, public entries, transit adapters and shared cores pass", () => {
-  assert.deepEqual(
+  expect(
     lint({
       "src/app/entry.ts":
         'import { a } from "../modules/a"; import { t } from "../modules/agents-integration/one"; export const v = [a, t];',
@@ -51,8 +52,7 @@ test("valid layers, public entries, transit adapters and shared cores pass", () 
       "server/modules/s/index.ts": index("s"),
       "core/modules/shared-contract/index.ts": index("k"),
     }),
-    {},
-  );
+  ).toStrictEqual({});
 });
 
 test("module internals, nested modules and transit private core stay private", () => {
@@ -68,11 +68,14 @@ test("module internals, nested modules and transit private core stay private", (
       'import { m } from "../a/model"; import { b } from "../a/modules/b"; import { core } from "../agents-integration/_/core"; import { p } from "../agents-integration/one/private"; export const o = [m, b, core, p];',
     "src/modules/a/deep.ts": 'import { c } from "./modules/b/modules/c"; export const d = c;',
   });
-  assert.ok(
+  expect(
     result["src/modules/other/index.ts"]?.has("layer-imports"),
     "outsider reaches internals",
-  );
-  assert.ok(result["src/modules/a/deep.ts"], "grandchild is not a public API of its grandparent");
+  ).toBeTruthy();
+  expect(
+    result["src/modules/a/deep.ts"],
+    "grandchild is not a public API of its grandparent",
+  ).toBeTruthy();
 });
 
 test("upper layers, siblings, globals and cross-application internals are isolated", () => {
@@ -99,7 +102,7 @@ test("upper layers, siblings, globals and cross-application internals are isolat
     "server/routes/api.ts",
     "core/modules/c/index.ts",
   ])
-    assert.ok(result[file], `${file} must be rejected`);
+    expect(result[file], `${file} must be rejected`).toBeTruthy();
 });
 
 test("browser code cannot use Node infrastructure; the OS facade hides its implementation", () => {
@@ -113,10 +116,13 @@ test("browser code cannot use Node infrastructure; the OS facade hides its imple
       'import { linux } from "../../../core/modules/os/modules/linux"; export const t = linux;',
     "cli/app/launch.mjs": 'import { os } from "../../core/modules/os"; export const run = os;',
   });
-  assert.ok(result["src/modules/w/index.ts"]?.has("confine"));
-  assert.ok(result["core/modules/launcher/index.ts"]?.has("confine"));
-  assert.ok(result["server/modules/t/index.ts"], "Linux implementation is private to the facade");
-  assert.equal(result["cli/app/launch.mjs"], undefined, "applications may use the OS facade");
+  expect(result["src/modules/w/index.ts"]?.has("confine")).toBeTruthy();
+  expect(result["core/modules/launcher/index.ts"]?.has("confine")).toBeTruthy();
+  expect(
+    result["server/modules/t/index.ts"],
+    "Linux implementation is private to the facade",
+  ).toBeTruthy();
+  expect(result["cli/app/launch.mjs"], "applications may use the OS facade").toBe(undefined);
 });
 
 test("Linux and Windows operations stay inside their adapters", () => {
@@ -127,9 +133,9 @@ test("Linux and Windows operations stay inside their adapters", () => {
     "server/modules/s/index.ts":
       'export const a = "/proc/self"; export const b = "powershell.exe"; export const c = ["xdotool"];',
   });
-  assert.equal(result["core/modules/os/modules/linux/index.ts"], undefined);
-  assert.equal(result["core/modules/os/modules/windows/index.ts"], undefined);
-  assert.ok(result["server/modules/s/index.ts"]?.has("confine"));
+  expect(result["core/modules/os/modules/linux/index.ts"]).toBe(undefined);
+  expect(result["core/modules/os/modules/windows/index.ts"]).toBe(undefined);
+  expect(result["server/modules/s/index.ts"]?.has("confine")).toBeTruthy();
 });
 
 test("computed and unresolved imports are rejected; literal native file URLs are checked", () => {
@@ -142,9 +148,12 @@ test("computed and unresolved imports are rejected; literal native file URLs are
       'export const u = import(new URL("../m/index.ts", import.meta.url).href); export const bad = import(new URL("../m/internal.ts", import.meta.url).href);',
     "src/modules/m/internal.ts": index("i"),
   });
-  assert.ok(result["src/modules/computed/index.ts"]?.has("layer-imports"));
-  assert.ok(result["src/modules/missing/index.ts"]?.has("layer-imports"));
-  assert.ok(result["src/modules/url/index.ts"], "non-public literal URL target is rejected");
+  expect(result["src/modules/computed/index.ts"]?.has("layer-imports")).toBeTruthy();
+  expect(result["src/modules/missing/index.ts"]?.has("layer-imports")).toBeTruthy();
+  expect(
+    result["src/modules/url/index.ts"],
+    "non-public literal URL target is rejected",
+  ).toBeTruthy();
 });
 
 test("entries, names, globals and stray files follow the structure", () => {
@@ -158,15 +167,13 @@ test("entries, names, globals and stray files follow the structure", () => {
     "src/orphan/note.ts": index("o"),
   });
   const text = result.messages.join("\n");
-  assert.match(text, /module 'src\/modules\/no-entry' is missing a public entry/);
-  assert.match(text, /module name 'shared' is forbidden/);
-  assert.ok(result["src/globals/bad.ts"]?.has("global-files"));
-  assert.ok(result["src/orphan/note.ts"]?.has("no-unknown-files"));
-  assert.ok(!result["src/globals/ok.d.ts"]?.has("global-files"));
-  assert.doesNotMatch(
-    text,
+  expect(text).toMatch(/module 'src\/modules\/no-entry' is missing a public entry/);
+  expect(text).toMatch(/module name 'shared' is forbidden/);
+  expect(result["src/globals/bad.ts"]?.has("global-files")).toBeTruthy();
+  expect(result["src/orphan/note.ts"]?.has("no-unknown-files")).toBeTruthy();
+  expect(!result["src/globals/ok.d.ts"]?.has("global-files")).toBeTruthy();
+  expect(text, "transit container and private core need no entry").not.toMatch(
     /agents-integration/,
-    "transit container and private core need no entry",
   );
 });
 
@@ -184,11 +191,11 @@ test("module cycles are rejected, including type edges, while shared dependencie
     "src/modules/parent/modules/child/index.ts":
       'import type { p } from "../.."; export type C = typeof p;',
   });
-  assert.ok(
+  expect(
     Object.values(result).some((rules) => rules.has("no-module-cycles")),
     "a <-> b via a type edge",
-  );
-  assert.equal(Object.values(result).filter((rules) => rules.has("no-module-cycles")).length, 1);
+  ).toBeTruthy();
+  expect(Object.values(result).filter((rules) => rules.has("no-module-cycles")).length).toBe(1);
 });
 
 test("the large-file registry is a ratchet with per-extension limits", () => {
@@ -220,14 +227,14 @@ test("the large-file registry is a ratchet with per-extension limits", () => {
       "src/modules/a/gone.ts": { ceiling: 450, plan: "split" },
     }),
   );
-  assert.equal(result["src/modules/a/ok.ts"], undefined);
-  assert.equal(result["src/modules/a/ok.vue"], undefined);
+  expect(result["src/modules/a/ok.ts"]).toBe(undefined);
+  expect(result["src/modules/a/ok.vue"]).toBe(undefined);
   for (const file of ["new.ts", "big.ts", "shrunk.ts", "small.ts"]) {
-    assert.ok(result[`src/modules/a/${file}`]?.has("large-files"), file);
+    expect(result[`src/modules/a/${file}`]?.has("large-files"), file).toBeTruthy();
   }
-  assert.ok(Object.values(result).some((rules) => rules.has("large-files")));
+  expect(Object.values(result).some((rules) => rules.has("large-files"))).toBeTruthy();
 });
 
 test("the real Projector tree satisfies its FEOD policy", () => {
-  assert.deepEqual(checkFeod(), []);
+  expect(checkFeod()).toStrictEqual([]);
 });

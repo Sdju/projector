@@ -1,14 +1,13 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, test } from "vite-plus/test";
 import { dropPreviewExcept, opensAsPreview } from "../src/modules/workspace/lib/preview-tabs.ts";
 
 const tab = (key, extra = {}) => ({ key, path: key, content: "", ...extra });
 
 test("a pinned tab is never turned back into a preview", () => {
-  assert.equal(opensAsPreview(true), true);
-  assert.equal(opensAsPreview(true, tab("a", { preview: true })), true);
-  assert.equal(opensAsPreview(true, tab("a")), false);
-  assert.equal(opensAsPreview(false, tab("a", { preview: true })), false);
+  expect(opensAsPreview(true)).toBe(true);
+  expect(opensAsPreview(true, tab("a", { preview: true }))).toBe(true);
+  expect(opensAsPreview(true, tab("a"))).toBe(false);
+  expect(opensAsPreview(false, tab("a", { preview: true }))).toBe(false);
 });
 
 test("a new preview replaces the previous one and keeps pinned tabs", () => {
@@ -20,11 +19,8 @@ test("a new preview replaces the previous one and keeps pinned tabs", () => {
     () => false,
     (file) => released.push(file.key),
   );
-  assert.deepEqual(
-    tabs.map((file) => file.key),
-    ["pinned", "new"],
-  );
-  assert.deepEqual(released, ["old"]);
+  expect(tabs.map((file) => file.key)).toStrictEqual(["pinned", "new"]);
+  expect(released).toStrictEqual(["old"]);
 });
 
 test("a modified or saving preview is pinned instead of dropped", () => {
@@ -37,10 +33,7 @@ test("a modified or saving preview is pinned instead of dropped", () => {
     (file) => file === dirty,
     () => {},
   );
-  assert.deepEqual(
-    tabs.map((file) => file.key),
-    ["dirty", "saving", "new"],
-  );
-  assert.equal(dirty.preview, false);
-  assert.equal(saving.preview, false);
+  expect(tabs.map((file) => file.key)).toStrictEqual(["dirty", "saving", "new"]);
+  expect(dirty.preview).toBe(false);
+  expect(saving.preview).toBe(false);
 });

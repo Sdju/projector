@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, test } from "vite-plus/test";
 import {
   mkdtemp,
   mkdir,
@@ -53,13 +52,13 @@ test("image zoom keeps the cursor anchor fixed, including at zoom limits", () =>
   const anchor = { x: 130, y: 75 };
   for (const requested of [0.0001, 0.5, 4, 100]) {
     const next = zoomImageAt(initial, requested, anchor.x, anchor.y);
-    assert.ok(next.zoom >= 1 / 64 && next.zoom <= 32);
-    assert.equal((anchor.x - next.x) / next.zoom, (anchor.x - initial.x) / initial.zoom);
-    assert.equal((anchor.y - next.y) / next.zoom, (anchor.y - initial.y) / initial.zoom);
+    expect(next.zoom >= 1 / 64 && next.zoom <= 32).toBeTruthy();
+    expect((anchor.x - next.x) / next.zoom).toBe((anchor.x - initial.x) / initial.zoom);
+    expect((anchor.y - next.y) / next.zoom).toBe((anchor.y - initial.y) / initial.zoom);
   }
-  assert.equal(fitImage(2000, 1000, 1048, 548), 0.5);
-  assert.equal(fitImage(200, 100, 1048, 548), 5);
-  assert.equal(fitImage(20, 10, 1048, 548), 32);
+  expect(fitImage(2000, 1000, 1048, 548)).toBe(0.5);
+  expect(fitImage(200, 100, 1048, 548)).toBe(5);
+  expect(fitImage(20, 10, 1048, 548)).toBe(32);
 });
 test("incremental image zoom stops at 100% in both directions and can continue afterward", () => {
   for (const [start, requested] of [
@@ -70,36 +69,37 @@ test("incremental image zoom stops at 100% in both directions and can continue a
   ]) {
     const original = { zoom: start, x: 20, y: -40 };
     const stopped = zoomImageAt(original, requested, 120, 60);
-    assert.equal(stopped.zoom, 1);
-    assert.equal((120 - stopped.x) / stopped.zoom, (120 - original.x) / original.zoom);
-    assert.equal((60 - stopped.y) / stopped.zoom, (60 - original.y) / original.zoom);
-    assert.equal(zoomImageAt(stopped, requested, 120, 60).zoom, requested);
+    expect(stopped.zoom).toBe(1);
+    expect((120 - stopped.x) / stopped.zoom).toBe((120 - original.x) / original.zoom);
+    expect((60 - stopped.y) / stopped.zoom).toBe((60 - original.y) / original.zoom);
+    expect(zoomImageAt(stopped, requested, 120, 60).zoom).toBe(requested);
   }
-  assert.equal(zoomImageAt({ zoom: 0.5, x: 0, y: 0 }, 0.75, 0, 0).zoom, 0.75);
+  expect(zoomImageAt({ zoom: 0.5, x: 0, y: 0 }, 0.75, 0, 0).zoom).toBe(0.75);
 });
 test("file drops preserve external contents and distinguish project paths", async () => {
-  assert.equal(projectRelativePath("/tmp/project", "/tmp/project/README.md"), "README.md");
-  assert.equal(projectRelativePath("/tmp/project/", "/tmp/project/src/file.ts"), "src/file.ts");
-  assert.equal(projectRelativePath("/tmp/project", "/tmp/project-other/file.ts"), undefined);
+  expect(projectRelativePath("/tmp/project", "/tmp/project/README.md")).toBe("README.md");
+  expect(projectRelativePath("/tmp/project/", "/tmp/project/src/file.ts")).toBe("src/file.ts");
+  expect(projectRelativePath("/tmp/project", "/tmp/project-other/file.ts")).toBe(undefined);
   const file = new File(["# External\n"], "external.md");
-  assert.deepEqual(await previewBrowserFile(file), {
+  expect(await previewBrowserFile(file)).toStrictEqual({
     path: "external.md",
     content: "# External\n",
   });
-  await assert.rejects(previewBrowserFile(new File(["a\0b"], "binary.bin")), /Бинарный файл/);
-  await assert.rejects(
-    previewBrowserFile(new File([new Uint8Array(1024 * 1024 + 1)], "large.txt")),
-    /больше 1 МБ/,
+  await expect(previewBrowserFile(new File(["a\0b"], "binary.bin"))).rejects.toThrow(
+    /Бинарный файл/,
   );
+  await expect(
+    previewBrowserFile(new File([new Uint8Array(1024 * 1024 + 1)], "large.txt")),
+  ).rejects.toThrow(/больше 1 МБ/);
   const svg = "<svg xmlns='http://www.w3.org/2000/svg'/>";
-  assert.deepEqual(await previewBrowserFile(new File([svg], "external.SVG")), {
+  expect(await previewBrowserFile(new File([svg], "external.SVG"))).toStrictEqual({
     path: "external.SVG",
     content: svg,
   });
   const image = await previewBrowserFile(
     new File([new Uint8Array([137, 80, 78, 71])], "external.png"),
   );
-  assert.ok(image.image.startsWith("blob:"));
+  expect(image.image.startsWith("blob:")).toBeTruthy();
   URL.revokeObjectURL(image.image);
 });
 
@@ -111,25 +111,33 @@ test("entry actions create, copy, rename and trash without overwriting or escapi
     await mutateProjectEntry(base, "create-directory", "", "", "folder");
     await mutateProjectEntry(base, "create-file", "", "folder", "note.md");
     await writeFile(join(base, "folder/note.md"), "draft");
-    assert.deepEqual(await mutateProjectEntry(base, "rename", "folder/note.md", "", "new.md"), {
+    expect(await mutateProjectEntry(base, "rename", "folder/note.md", "", "new.md")).toStrictEqual({
       source: "folder/note.md",
       destination: "folder/new.md",
     });
     await mutateProjectEntry(base, "copy", "folder", "", "copy");
-    assert.equal(await readFile(join(base, "copy/new.md"), "utf8"), "draft");
+    expect(await readFile(join(base, "copy/new.md"), "utf8")).toBe("draft");
     for (const action of ["create-file", "create-directory", "copy"])
-      await assert.rejects(mutateProjectEntry(base, action, "folder", "", "copy"), { status: 409 });
-    await assert.rejects(mutateProjectEntry(base, "copy", "folder", "folder", "child"), {
+      await expect(mutateProjectEntry(base, action, "folder", "", "copy")).rejects.toMatchObject({
+        status: 409,
+      });
+    await expect(
+      mutateProjectEntry(base, "copy", "folder", "folder", "child"),
+    ).rejects.toMatchObject({
       status: 400,
     });
     await mutateProjectEntry(base, "create-file", "", "folder", "other.md");
-    await assert.rejects(mutateProjectEntry(base, "rename", "folder/new.md", "", "other.md"), {
+    await expect(
+      mutateProjectEntry(base, "rename", "folder/new.md", "", "other.md"),
+    ).rejects.toMatchObject({
       status: 409,
     });
     await symlink(base, join(base, "alias"));
     for (const action of ["rename", "delete", "copy"])
       for (const path of ["", "../outside", "alias", "alias/folder", ".git/config"])
-        await assert.rejects(mutateProjectEntry(base, action, path, "", "valid"), { status: 403 });
+        await expect(mutateProjectEntry(base, action, path, "", "valid")).rejects.toMatchObject({
+          status: 403,
+        });
     for (const name of [
       "../outside",
       "a/b",
@@ -141,29 +149,31 @@ test("entry actions create, copy, rename and trash without overwriting or escapi
       "\0",
       "   ",
     ])
-      await assert.rejects(mutateProjectEntry(base, "create-file", "", "", name), { status: 400 });
-    await assert.rejects(mutateProjectEntry(base, "create-file", "", "alias", "valid"), {
+      await expect(mutateProjectEntry(base, "create-file", "", "", name)).rejects.toMatchObject({
+        status: 400,
+      });
+    await expect(
+      mutateProjectEntry(base, "create-file", "", "alias", "valid"),
+    ).rejects.toMatchObject({
       status: 403,
     });
     execFileSync("git", ["-C", base, "init", "-q"]);
     await mutateProjectEntry(base, "delete", "folder");
     const trashed = await readdir(join(base, ".projector-trash"));
-    assert.equal(trashed.length, 1);
-    assert.ok(
+    expect(trashed.length).toBe(1);
+    expect(
       (await projectGit(base)).changes.every((change) => !change.path.includes(".projector-trash")),
-    );
-    assert.equal(
-      await readFile(join(base, ".projector-trash", trashed[0], "new.md"), "utf8"),
+    ).toBeTruthy();
+    expect(await readFile(join(base, ".projector-trash", trashed[0], "new.md"), "utf8")).toBe(
       "draft",
     );
-    assert.deepEqual(
-      (await listProjectDirectory(base)).entries.map((entry) => entry.name),
-      ["copy"],
-    );
+    expect((await listProjectDirectory(base)).entries.map((entry) => entry.name)).toStrictEqual([
+      "copy",
+    ]);
     await rm(join(base, ".projector-trash"), { recursive: true });
     await symlink(tmpdir(), join(base, ".projector-trash"));
-    await assert.rejects(mutateProjectEntry(base, "delete", "copy"), { status: 403 });
-    assert.equal(await readFile(join(base, "copy/new.md"), "utf8"), "draft");
+    await expect(mutateProjectEntry(base, "delete", "copy")).rejects.toMatchObject({ status: 403 });
+    expect(await readFile(join(base, "copy/new.md"), "utf8")).toBe("draft");
   } finally {
     await rm(base, { recursive: true, force: true });
   }
@@ -173,46 +183,56 @@ test("Text file saves preserve text and mode, reject stale drafts and contain wr
   try {
     await writeFile(join(base, "readme.md"), "# Original\r\n", { mode: 0o640 });
     await saveProjectFile(base, "readme.md", "# Новый текст\r\n", "# Original\r\n");
-    assert.equal(await readFile(join(base, "readme.md"), "utf8"), "# Новый текст\r\n");
-    assert.equal((await lstat(join(base, "readme.md"))).mode & 0o777, 0o640);
-    await assert.rejects(saveProjectFile(base, "readme.md", "stale", "# Original\r\n"), {
+    expect(await readFile(join(base, "readme.md"), "utf8")).toBe("# Новый текст\r\n");
+    expect((await lstat(join(base, "readme.md"))).mode & 0o777).toBe(0o640);
+    await expect(
+      saveProjectFile(base, "readme.md", "stale", "# Original\r\n"),
+    ).rejects.toMatchObject({
       status: 409,
     });
     const competing = await Promise.allSettled([
       saveProjectFile(base, "readme.md", "first", "# Новый текст\r\n"),
       saveProjectFile(base, "readme.md", "second", "# Новый текст\r\n"),
     ]);
-    assert.equal(competing.filter((result) => result.status === "fulfilled").length, 1);
-    assert.equal(competing.find((result) => result.status === "rejected").reason.status, 409);
+    expect(competing.filter((result) => result.status === "fulfilled").length).toBe(1);
+    expect(competing.find((result) => result.status === "rejected").reason.status).toBe(409);
     await symlink(join(base, "readme.md"), join(base, "alias.md"));
     await mkdir(join(base, ".git"));
     await writeFile(join(base, ".git/config.md"), "protected");
     for (const path of ["../outside.md", "/tmp/outside.md", "alias.md", ".git/config.md"])
-      await assert.rejects(saveProjectFile(base, path, "test", ""), { status: 403 });
+      await expect(saveProjectFile(base, path, "test", "")).rejects.toMatchObject({ status: 403 });
     for (const path of ["plain.ts", "settings.json", ".gitignore", "LICENSE"]) {
       await writeFile(join(base, path), "original\r\n", { mode: 0o750 });
       await saveProjectFile(base, path, "Изменено\r\n", "original\r\n");
-      assert.equal(await readFile(join(base, path), "utf8"), "Изменено\r\n");
-      assert.equal((await lstat(join(base, path))).mode & 0o777, 0o750);
-      await assert.rejects(saveProjectFile(base, path, "stale", "original\r\n"), { status: 409 });
+      expect(await readFile(join(base, path), "utf8")).toBe("Изменено\r\n");
+      expect((await lstat(join(base, path))).mode & 0o777).toBe(0o750);
+      await expect(saveProjectFile(base, path, "stale", "original\r\n")).rejects.toMatchObject({
+        status: 409,
+      });
     }
     await writeFile(join(base, "binary.bin"), Buffer.from([0, 1]));
-    await assert.rejects(saveProjectFile(base, "binary.bin", "text", ""), { status: 415 });
-    await assert.rejects(saveProjectFile(base, "readme.md", "\0", "first"), { status: 415 });
-    await assert.rejects(saveProjectFile(base, "readme.md", "x".repeat(1024 * 1024 + 1), ""), {
+    await expect(saveProjectFile(base, "binary.bin", "text", "")).rejects.toMatchObject({
+      status: 415,
+    });
+    await expect(saveProjectFile(base, "readme.md", "\0", "first")).rejects.toMatchObject({
+      status: 415,
+    });
+    await expect(
+      saveProjectFile(base, "readme.md", "x".repeat(1024 * 1024 + 1), ""),
+    ).rejects.toMatchObject({
       status: 413,
     });
     await writeFile(join(base, "picture.png"), Buffer.from([137, 80, 78, 71]));
     const image = await readProjectImage(base, "picture.png");
-    assert.equal(image.type, "image/png");
-    assert.deepEqual(image.content, Buffer.from([137, 80, 78, 71]));
-    assert.deepEqual(await previewProjectFile(base, "picture.png"), {
+    expect(image.type).toBe("image/png");
+    expect(image.content).toStrictEqual(Buffer.from([137, 80, 78, 71]));
+    expect(await previewProjectFile(base, "picture.png")).toStrictEqual({
       path: "picture.png",
       content: "",
       image: true,
     });
-    await assert.rejects(readProjectImage(base, "readme.md"), { status: 415 });
-    await assert.rejects(readProjectImage(base, "../picture.png"), { status: 403 });
+    await expect(readProjectImage(base, "readme.md")).rejects.toMatchObject({ status: 415 });
+    await expect(readProjectImage(base, "../picture.png")).rejects.toMatchObject({ status: 403 });
   } finally {
     await rm(base, { recursive: true, force: true });
   }
@@ -232,52 +252,49 @@ test("file tree and Git changes report execute bits for files, including chmod-o
       await chmod(join(base, name), mode);
     }
     const entries = (await listProjectDirectory(base)).entries;
-    assert.equal(entries.find((entry) => entry.name === "folder").executable, false);
-    assert.equal(entries.find((entry) => entry.name === "plain.ts").executable, false);
+    expect(entries.find((entry) => entry.name === "folder").executable).toBe(false);
+    expect(entries.find((entry) => entry.name === "plain.ts").executable).toBe(false);
     for (const name of ["run", "group-only", "other-only"])
-      assert.equal(entries.find((entry) => entry.name === name).executable, true, name);
+      expect(entries.find((entry) => entry.name === name).executable, name).toBe(true);
     runGit("init", "-q");
     const untracked = (await projectGit(base)).changes;
-    assert.equal(untracked.find((entry) => entry.path === "run").executable, true);
+    expect(untracked.find((entry) => entry.path === "run").executable).toBe(true);
     runGit("config", "user.name", "Test");
     runGit("config", "user.email", "test@example.test");
     runGit("config", "core.filemode", "true");
     runGit("add", "plain.ts");
     runGit("commit", "-qm", "initial");
     await chmod(join(base, "plain.ts"), 0o755);
-    assert.equal(
+    expect(
       (await projectGit(base)).changes.find((entry) => entry.path === "plain.ts").executable,
-      true,
-    );
+    ).toBe(true);
     await chmod(join(base, "run"), 0o644);
-    assert.equal(
+    expect(
       (await listProjectDirectory(base)).entries.find((entry) => entry.name === "run").executable,
-      false,
-    );
+    ).toBe(false);
     await rm(join(base, "plain.ts"));
-    assert.equal(
+    expect(
       (await projectGit(base)).changes.find((entry) => entry.path === "plain.ts").executable,
-      false,
-    );
+    ).toBe(false);
   } finally {
     await rm(base, { recursive: true, force: true });
   }
 });
 test("tree move destinations and open-file paths respect directory boundaries", () => {
-  assert.equal(parentPath("src/nested/file.ts"), "src/nested");
-  assert.equal(parentPath("file.ts"), "");
-  assert.equal(moveDestination("src/file.ts", ""), "file.ts");
-  assert.equal(moveDestination("src/file.ts", "docs"), "docs/file.ts");
+  expect(parentPath("src/nested/file.ts")).toBe("src/nested");
+  expect(parentPath("file.ts")).toBe("");
+  expect(moveDestination("src/file.ts", "")).toBe("file.ts");
+  expect(moveDestination("src/file.ts", "docs")).toBe("docs/file.ts");
   for (const [source, target] of [
     ["", "src"],
     ["src", "src"],
     ["src", "src/nested"],
     ["src/file.ts", "src"],
   ])
-    assert.equal(moveDestination(source, target), undefined);
-  assert.equal(moveDestination("src", "src-other"), "src-other/src");
-  assert.equal(relocatedPath("src/nested/file.ts", "src", "docs/src"), "docs/src/nested/file.ts");
-  assert.equal(relocatedPath("src-other/file.ts", "src", "docs/src"), "src-other/file.ts");
+    expect(moveDestination(source, target)).toBe(undefined);
+  expect(moveDestination("src", "src-other")).toBe("src-other/src");
+  expect(relocatedPath("src/nested/file.ts", "src", "docs/src")).toBe("docs/src/nested/file.ts");
+  expect(relocatedPath("src-other/file.ts", "src", "docs/src")).toBe("src-other/file.ts");
 });
 
 test("moves preserve contents, never overwrite, and reject self, traversal, excluded and symlink paths", async () => {
@@ -293,17 +310,21 @@ test("moves preserve contents, never overwrite, and reject self, traversal, excl
       await symlink("/etc", join(base, "external"));
       await symlink(join(base, "missing"), join(base, "docs/dangling"));
       await writeFile(join(base, "src/dangling"), "keep");
-      assert.deepEqual(await moveProjectEntry(base, "src/nested/файл с пробелом.ts", "docs"), {
+      expect(await moveProjectEntry(base, "src/nested/файл с пробелом.ts", "docs")).toStrictEqual({
         source: "src/nested/файл с пробелом.ts",
         destination: "docs/файл с пробелом.ts",
       });
-      assert.equal(await readFile(join(base, "docs/файл с пробелом.ts"), "utf8"), "preserved");
+      expect(await readFile(join(base, "docs/файл с пробелом.ts"), "utf8")).toBe("preserved");
       await moveProjectEntry(base, "docs/файл с пробелом.ts", "");
-      assert.equal(await readFile(join(base, "файл с пробелом.ts"), "utf8"), "preserved");
-      await assert.rejects(moveProjectEntry(base, "src/collision", "docs"), { status: 409 });
-      assert.equal(await readFile(join(base, "src/collision"), "utf8"), "source");
-      assert.equal(await readFile(join(base, "docs/collision"), "utf8"), "destination");
-      await assert.rejects(moveProjectEntry(base, "src/dangling", "docs"), { status: 409 });
+      expect(await readFile(join(base, "файл с пробелом.ts"), "utf8")).toBe("preserved");
+      await expect(moveProjectEntry(base, "src/collision", "docs")).rejects.toMatchObject({
+        status: 409,
+      });
+      expect(await readFile(join(base, "src/collision"), "utf8")).toBe("source");
+      expect(await readFile(join(base, "docs/collision"), "utf8")).toBe("destination");
+      await expect(moveProjectEntry(base, "src/dangling", "docs")).rejects.toMatchObject({
+        status: 409,
+      });
       for (const [source, target, status] of [
         ["", "docs", 400],
         ["src", "src/nested", 400],
@@ -320,23 +341,22 @@ test("moves preserve contents, never overwrite, and reject self, traversal, excl
         ["src/./collision", "docs", 403],
         ["src/collision", "src/dangling", 400],
       ])
-        await assert.rejects(moveProjectEntry(base, source, target), { status });
+        await expect(moveProjectEntry(base, source, target)).rejects.toMatchObject({ status });
       await moveProjectEntry(base, "src", "other");
-      assert.ok((await lstat(join(base, "other/src/nested"))).isDirectory());
-      assert.equal(await readFile(join(base, "other/src/collision"), "utf8"), "source");
+      expect((await lstat(join(base, "other/src/nested"))).isDirectory()).toBeTruthy();
+      expect(await readFile(join(base, "other/src/collision"), "utf8")).toBe("source");
       await writeFile(join(base, "docs/race"), "one");
       await writeFile(join(base, "other/race"), "two");
       const results = await Promise.allSettled([
         moveProjectEntry(base, "docs/race", ""),
         moveProjectEntry(base, "other/race", ""),
       ]);
-      assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
-      assert.equal(results.find((result) => result.status === "rejected").reason.status, 409);
+      expect(results.filter((result) => result.status === "fulfilled").length).toBe(1);
+      expect(results.find((result) => result.status === "rejected").reason.status).toBe(409);
       const winner = await readFile(join(base, "race"), "utf8");
-      assert.equal(
+      expect(
         await readFile(join(base, winner === "one" ? "other/race" : "docs/race"), "utf8"),
-        winner === "one" ? "two" : "one",
-      );
+      ).toBe(winner === "one" ? "two" : "one");
     } finally {
       await rm(base, { recursive: true, force: true });
     }
@@ -349,19 +369,19 @@ test("files exclude setting controls tree visibility for node_modules", async ()
     await mkdir(join(root, "node_modules"));
     await writeFile(join(root, "readme.md"), "hi");
     await withFilesExclude(defaultFilesExclude(), async () => {
-      assert.ok(
+      expect(
         !(await listProjectDirectory(root)).entries.some((entry) => entry.name === "node_modules"),
-      );
+      ).toBeTruthy();
       const next = { ...defaultFilesExclude() };
       delete next["**/node_modules"];
       await withFilesExclude(next, async () => {
-        assert.ok(
+        expect(
           (await listProjectDirectory(root)).entries.some((entry) => entry.name === "node_modules"),
-        );
+        ).toBeTruthy();
       });
-      assert.ok(
+      expect(
         !(await listProjectDirectory(root)).entries.some((entry) => entry.name === "node_modules"),
-      );
+      ).toBeTruthy();
     });
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -381,52 +401,54 @@ test("workspace tree, bounded reading, traversal and symlink containment, litera
       await writeFile(join(root, "large"), Buffer.alloc(1024 * 1024 + 1, 65));
       await symlink("/etc", join(root, "external"));
       const tree = await listProjectDirectory(root);
-      assert.equal(tree.entries[0].directory, true);
-      assert.ok(tree.entries.some((entry) => entry.name === ".gitignore"));
-      assert.ok(!tree.entries.some((entry) => ["node_modules", "external"].includes(entry.name)));
-      assert.match((await readProjectFile(root, "src/code.ts")).content, /Привет/);
-      await assert.rejects(readProjectFile(root, "../outside"), { status: 403 });
-      await assert.rejects(readProjectFile(root, "/etc/passwd"), { status: 403 });
-      await assert.rejects(readProjectFile(root, "external/passwd"), { status: 403 });
-      await assert.rejects(readProjectFile(root, "binary"), { status: 415 });
-      await assert.rejects(readProjectFile(root, "large"), { status: 413 });
-      assert.equal((await projectGit(root)).available, false);
+      expect(tree.entries[0].directory).toBe(true);
+      expect(tree.entries.some((entry) => entry.name === ".gitignore")).toBeTruthy();
+      expect(
+        !tree.entries.some((entry) => ["node_modules", "external"].includes(entry.name)),
+      ).toBeTruthy();
+      expect((await readProjectFile(root, "src/code.ts")).content).toMatch(/Привет/);
+      await expect(readProjectFile(root, "../outside")).rejects.toMatchObject({ status: 403 });
+      await expect(readProjectFile(root, "/etc/passwd")).rejects.toMatchObject({ status: 403 });
+      await expect(readProjectFile(root, "external/passwd")).rejects.toMatchObject({ status: 403 });
+      await expect(readProjectFile(root, "binary")).rejects.toMatchObject({ status: 415 });
+      await expect(readProjectFile(root, "large")).rejects.toMatchObject({ status: 413 });
+      expect((await projectGit(root)).available).toBe(false);
       git("init", "-q");
       git("config", "user.name", "Workspace Test");
       git("config", "user.email", "test@example.test");
       const search = await searchProject(root, "[WORLD]");
-      assert.deepEqual(
-        search.hits.map((hit) => [hit.path, hit.line, hit.column]),
-        [["src/code.ts", 1, 22]],
-      );
+      expect(search.hits.map((hit) => [hit.path, hit.line, hit.column])).toStrictEqual([
+        ["src/code.ts", 1, 22],
+      ]);
       git("add", "src/code.ts", ".gitignore");
       git("commit", "-qm", "initial");
       await writeFile(join(root, "src/code.ts"), "staged\n");
       git("add", "src/code.ts");
       await writeFile(join(root, "src/code.ts"), "working\n");
       const staged = await projectComparison(root, "src/code.ts", true);
-      assert.match(staged.original, /Привет/);
-      assert.equal(staged.modified, "staged\n");
+      expect(staged.original).toMatch(/Привет/);
+      expect(staged.modified).toBe("staged\n");
       const working = await projectComparison(root, "src/code.ts", false);
-      assert.equal(working.original, "staged\n");
-      assert.equal(working.modified, "working\n");
+      expect(working.original).toBe("staged\n");
+      expect(working.modified).toBe("working\n");
       const nested = await projectGit(join(root, "src"));
-      assert.equal(nested.changes[0].path, "code.ts");
-      assert.equal(
-        (await projectComparison(join(root, "src"), "code.ts", false)).original,
+      expect(nested.changes[0].path).toBe("code.ts");
+      expect((await projectComparison(join(root, "src"), "code.ts", false)).original).toBe(
         "staged\n",
       );
       await writeFile(join(root, "new file.ts"), "new\n");
-      assert.equal((await projectComparison(root, "new file.ts", false)).original, "");
+      expect((await projectComparison(root, "new file.ts", false)).original).toBe("");
       git("reset", "--hard", "-q");
       git("mv", "src/code.ts", "src/renamed.ts");
       const rename = await projectComparison(root, "src/renamed.ts", true);
-      assert.match(rename.original, /Привет/);
-      assert.equal(rename.modified, rename.original);
+      expect(rename.original).toMatch(/Привет/);
+      expect(rename.modified).toBe(rename.original);
       git("reset", "--hard", "-q");
       await rm(join(root, "src/code.ts"));
-      assert.equal((await projectComparison(root, "src/code.ts", false)).modified, "");
-      await assert.rejects(projectComparison(root, "../outside", false), { status: 403 });
+      expect((await projectComparison(root, "src/code.ts", false)).modified).toBe("");
+      await expect(projectComparison(root, "../outside", false)).rejects.toMatchObject({
+        status: 403,
+      });
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -451,24 +473,27 @@ test("Git gutter returns the index text of tracked files only", async () => {
     await writeFile(join(base, "committed.txt"), "working\n");
     await writeFile(join(base, "untracked.txt"), "x\n");
 
-    assert.deepEqual(await projectGutter(base, "committed.txt"), {
+    expect(await projectGutter(base, "committed.txt")).toStrictEqual({
       available: true,
       original: "staged\n",
     });
-    assert.deepEqual(await projectGutter(join(base, "sub"), "nested.txt"), {
+    expect(await projectGutter(join(base, "sub"), "nested.txt")).toStrictEqual({
       available: true,
       original: "nested\n",
     });
-    assert.deepEqual(await projectGutter(base, "untracked.txt"), {
+    expect(await projectGutter(base, "untracked.txt")).toStrictEqual({
       available: false,
       original: "",
     });
-    await assert.rejects(projectGutter(base, "../outside"), { status: 403 });
+    await expect(projectGutter(base, "../outside")).rejects.toMatchObject({ status: 403 });
 
     const plain = await mkdtemp(join(tmpdir(), "projector-gutter-plain-"));
     try {
       await writeFile(join(plain, "file.txt"), "content\n");
-      assert.deepEqual(await projectGutter(plain, "file.txt"), { available: false, original: "" });
+      expect(await projectGutter(plain, "file.txt")).toStrictEqual({
+        available: false,
+        original: "",
+      });
     } finally {
       await rm(plain, { recursive: true, force: true });
     }
@@ -514,82 +539,75 @@ test("workspace HTTP routes resolve catalog projects and reject foreign origins 
   const route = `${base}/api/projects/workspace-test/workspace`;
   try {
     const external = await fetch(`${route}/external?path=${encodeURIComponent(externalPath)}`);
-    assert.equal(external.status, 200);
-    assert.deepEqual(await external.json(), {
+    expect(external.status).toBe(200);
+    expect(await external.json()).toStrictEqual({
       path: externalPath,
       content: "External file contents\n",
     });
-    assert.equal((await fetch(`${route}/external?path=relative.txt`)).status, 400);
-    assert.equal(
+    expect((await fetch(`${route}/external?path=relative.txt`)).status).toBe(400);
+    expect(
       (
         await fetch(`${route}/external?path=${encodeURIComponent(externalPath)}`, {
           headers: { Origin: "https://foreign.test" },
         })
       ).status,
-      403,
-    );
+    ).toBe(403);
     const imagePath = join(externalDirectory, "outside.svg");
     const imagePreview = await (
       await fetch(`${route}/external?path=${encodeURIComponent(imagePath)}`)
     ).json();
-    assert.deepEqual(imagePreview, {
+    expect(imagePreview).toStrictEqual({
       path: imagePath,
       content: "<svg xmlns='http://www.w3.org/2000/svg'/>",
     });
     const image = await fetch(`${route}/external-asset?path=${encodeURIComponent(imagePath)}`);
-    assert.equal(image.headers.get("content-type"), "image/svg+xml");
-    assert.equal(image.headers.get("x-content-type-options"), "nosniff");
-    assert.match(await image.text(), /<svg/);
+    expect(image.headers.get("content-type")).toBe("image/svg+xml");
+    expect(image.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(await image.text()).toMatch(/<svg/);
     const file = await fetch(`${route}/file?path=sample.ts`);
-    assert.equal(file.status, 200);
-    assert.equal(file.headers.get("cache-control"), "no-store");
-    assert.equal((await file.json()).content, "const sample = true;\n");
+    expect(file.status).toBe(200);
+    expect(file.headers.get("cache-control")).toBe("no-store");
+    expect((await file.json()).content).toBe("const sample = true;\n");
     const archive = await fetch(`${route}/file?path=sample.ts.gz`);
-    assert.equal(archive.status, 200);
-    assert.equal(archive.headers.get("cache-control"), "no-store");
+    expect(archive.status).toBe(200);
+    expect(archive.headers.get("cache-control")).toBe("no-store");
     const preview = await archive.json();
-    assert.equal(preview.archive.format, "GZIP");
-    assert.deepEqual(preview.archive.entries, [{ path: "sample.ts", type: "file", size: 21 }]);
-    assert.ok(
+    expect(preview.archive.format).toBe("GZIP");
+    expect(preview.archive.entries).toStrictEqual([{ path: "sample.ts", type: "file", size: 21 }]);
+    expect(
       (await (await fetch(`${route}/tree`)).json()).entries.some(
         (entry) => entry.path === "sample.ts",
       ),
-    );
-    assert.equal(
-      (await (await fetch(`${route}/search?q=sample`)).json()).hits[0].path,
-      "sample.ts",
-    );
-    assert.equal((await (await fetch(`${route}/git`)).json()).available, false);
+    ).toBeTruthy();
+    expect((await (await fetch(`${route}/search?q=sample`)).json()).hits[0].path).toBe("sample.ts");
+    expect((await (await fetch(`${route}/git`)).json()).available).toBe(false);
     const save = (body, origin = base) =>
       fetch(`${route}/file`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Origin: origin },
         body: JSON.stringify(body),
       });
-    assert.equal(
+    expect(
       (
         await save(
           { path: "sample.md", original: "# Original\n", content: "# Saved\n" },
           "https://foreign.test",
         )
       ).status,
-      403,
-    );
-    assert.equal((await save({ path: "sample.md", content: "# Saved\n" })).status, 400);
+    ).toBe(403);
+    expect((await save({ path: "sample.md", content: "# Saved\n" })).status).toBe(400);
     const saved = await save({ path: "sample.md", original: "# Original\n", content: "# Saved\n" });
-    assert.equal(saved.status, 200);
-    assert.equal(saved.headers.get("cache-control"), "no-store");
-    assert.equal(await readFile(join(directory, "sample.md"), "utf8"), "# Saved\n");
-    assert.equal(
+    expect(saved.status).toBe(200);
+    expect(saved.headers.get("cache-control")).toBe("no-store");
+    expect(await readFile(join(directory, "sample.md"), "utf8")).toBe("# Saved\n");
+    expect(
       (await save({ path: "sample.md", original: "# Original\n", content: "stale" })).status,
-      409,
-    );
-    assert.equal((await fetch(`${route}/file?path=../outside`)).status, 403);
-    assert.equal(
+    ).toBe(409);
+    expect((await fetch(`${route}/file?path=../outside`)).status).toBe(403);
+    expect(
       (await fetch(`${route}/file?path=sample.ts`, { headers: { Origin: "https://foreign.test" } }))
         .status,
-      403,
-    );
+    ).toBe(403);
     const foreignStatus = await new Promise((resolve, reject) => {
       const request = httpRequest(
         `${route}/file?path=sample.ts`,
@@ -602,16 +620,15 @@ test("workspace HTTP routes resolve catalog projects and reject foreign origins 
       request.on("error", reject);
       request.end();
     });
-    assert.equal(foreignStatus, 403);
+    expect(foreignStatus).toBe(403);
     const folders = `${base}/api/directories?${new URLSearchParams({ path: directory })}`;
     const folderResponse = await fetch(folders);
-    assert.equal(folderResponse.status, 200);
-    assert.equal(folderResponse.headers.get("cache-control"), "no-store");
-    assert.deepEqual((await folderResponse.json()).entries, [
+    expect(folderResponse.status).toBe(200);
+    expect(folderResponse.headers.get("cache-control")).toBe("no-store");
+    expect((await folderResponse.json()).entries).toStrictEqual([
       { name: "projector", path: join(directory, "projector") },
     ]);
-    assert.equal(
-      (await fetch(folders, { headers: { Origin: "https://foreign.test" } })).status,
+    expect((await fetch(folders, { headers: { Origin: "https://foreign.test" } })).status).toBe(
       403,
     );
     const foreignFolder = await new Promise((resolve, reject) => {
@@ -622,8 +639,8 @@ test("workspace HTTP routes resolve catalog projects and reject foreign origins 
       request.on("error", reject);
       request.end();
     });
-    assert.equal(foreignFolder, 403);
-    assert.equal((await fetch(`${base}/api/projects/missing/workspace/tree`)).status, 404);
+    expect(foreignFolder).toBe(403);
+    expect((await fetch(`${base}/api/projects/missing/workspace/tree`)).status).toBe(404);
     const entry = (body, origin = base) =>
       fetch(`${route}/entry`, {
         method: "POST",
@@ -631,38 +648,36 @@ test("workspace HTTP routes resolve catalog projects and reject foreign origins 
         body: JSON.stringify(body),
       });
     const creation = { action: "create-file", path: "", directory: "", name: "created.md" };
-    assert.equal((await entry(creation, "https://foreign.test")).status, 403);
-    assert.equal((await entry({ action: "delete" })).status, 400);
-    assert.equal((await entry(creation)).status, 200);
-    assert.equal((await entry(creation)).status, 409);
-    assert.equal(
+    expect((await entry(creation, "https://foreign.test")).status).toBe(403);
+    expect((await entry({ action: "delete" })).status).toBe(400);
+    expect((await entry(creation)).status).toBe(200);
+    expect((await entry(creation)).status).toBe(409);
+    expect(
       (await entry({ ...creation, action: "rename", path: "created.md", name: "renamed.md" }))
         .status,
-      200,
-    );
-    assert.equal((await entry({ ...creation, action: "delete", path: "renamed.md" })).status, 200);
-    assert.equal((await fetch(`${route}/root`)).status, 200);
+    ).toBe(200);
+    expect((await entry({ ...creation, action: "delete", path: "renamed.md" })).status).toBe(200);
+    expect((await fetch(`${route}/root`)).status).toBe(200);
     const move = (body, origin = base) =>
       fetch(`${route}/move`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Origin: origin },
         body: JSON.stringify(body),
       });
-    assert.equal(
+    expect(
       (await move({ path: "sample.ts", directory: "projector" }, "https://foreign.test")).status,
-      403,
-    );
-    assert.equal((await move({ directory: "projector" })).status, 400);
-    assert.equal((await move({ path: "../sample.ts", directory: "projector" })).status, 403);
+    ).toBe(403);
+    expect((await move({ directory: "projector" })).status).toBe(400);
+    expect((await move({ path: "../sample.ts", directory: "projector" })).status).toBe(403);
     const moved = await move({ path: "sample.ts", directory: "projector" });
-    assert.equal(moved.status, 200);
-    assert.equal(moved.headers.get("cache-control"), "no-store");
-    assert.deepEqual(await moved.json(), {
+    expect(moved.status).toBe(200);
+    expect(moved.headers.get("cache-control")).toBe("no-store");
+    expect(await moved.json()).toStrictEqual({
       source: "sample.ts",
       destination: "projector/sample.ts",
     });
-    assert.equal((await fetch(`${route}/file?path=projector/sample.ts`)).status, 200);
-    assert.equal((await fetch(`${route}/file?path=sample.ts`)).status, 400);
+    expect((await fetch(`${route}/file?path=projector/sample.ts`)).status).toBe(200);
+    expect((await fetch(`${route}/file?path=sample.ts`)).status).toBe(400);
   } finally {
     await new Promise((resolve) => server.close(resolve));
     await rm(directory, { recursive: true, force: true });
@@ -682,22 +697,25 @@ test("path bar lists real directories and symlinks, completes prefixes and rejec
     await symlink(join(base, "alpha"), join(base, "alias"));
     await symlink(join(base, "missing"), join(base, "broken"));
     const listing = await listDirectories(base);
-    assert.equal(listing.path, base);
-    assert.deepEqual(
-      listing.entries.map((row) => row.name),
-      [".hidden", "alias", "alpha", "alphabet", "with space"],
-    );
+    expect(listing.path).toBe(base);
+    expect(listing.entries.map((row) => row.name)).toStrictEqual([
+      ".hidden",
+      "alias",
+      "alpha",
+      "alphabet",
+      "with space",
+    ]);
     const completions = await listDirectories(`${base}/alph`, true);
-    assert.deepEqual(
-      completions.entries.map((row) => row.path),
-      [join(base, "alpha"), join(base, "alphabet")],
-    );
-    assert.equal((await listDirectories(`${base}/`, true)).entries.length, 5);
-    assert.equal((await listDirectories(join(base, "with space"))).entries.length, 0);
-    await assert.rejects(listDirectories("relative/path"), { status: 400 });
-    await assert.rejects(listDirectories(`${base}\0`), { status: 400 });
-    await assert.rejects(listDirectories(join(base, "a-file")), { status: 400 });
-    await assert.rejects(listDirectories(join(base, "missing")), { status: 400 });
+    expect(completions.entries.map((row) => row.path)).toStrictEqual([
+      join(base, "alpha"),
+      join(base, "alphabet"),
+    ]);
+    expect((await listDirectories(`${base}/`, true)).entries.length).toBe(5);
+    expect((await listDirectories(join(base, "with space"))).entries.length).toBe(0);
+    await expect(listDirectories("relative/path")).rejects.toMatchObject({ status: 400 });
+    await expect(listDirectories(`${base}\0`)).rejects.toMatchObject({ status: 400 });
+    await expect(listDirectories(join(base, "a-file"))).rejects.toMatchObject({ status: 400 });
+    await expect(listDirectories(join(base, "missing"))).rejects.toMatchObject({ status: 400 });
   } finally {
     await rm(base, { recursive: true, force: true });
   }
@@ -724,21 +742,21 @@ test("Git tree backgrounds aggregate nested changes, renames, deletions and conf
   ];
   const before = structuredClone(changes);
   const decorations = gitTreeDecorations(changes);
-  assert.equal(decorations.get("src"), "modified");
-  assert.equal(decorations.get("src/deep"), "modified");
-  assert.equal(decorations.get("src/deep/edit.ts"), "modified");
-  assert.equal(decorations.get("src/new.ts"), "added");
-  assert.equal(decorations.has("src-other"), false);
-  assert.equal(decorations.get("new/folder"), "added");
-  assert.equal(decorations.get("deleted"), "deleted");
-  assert.equal(decorations.get("source"), "deleted");
-  assert.equal(decorations.get("destination"), "modified");
-  assert.equal(decorations.get("conflicts"), "conflict");
-  assert.equal(decorations.has("ignored"), false);
-  assert.equal(gitTreeDecorations([change("file", "A", "A")]).get("file"), "conflict");
-  assert.equal(gitTreeDecorations([change("file", "D", "D")]).get("file"), "conflict");
-  assert.equal(gitTreeDecorations([]).size, 0);
-  assert.deepEqual(changes, before);
+  expect(decorations.get("src")).toBe("modified");
+  expect(decorations.get("src/deep")).toBe("modified");
+  expect(decorations.get("src/deep/edit.ts")).toBe("modified");
+  expect(decorations.get("src/new.ts")).toBe("added");
+  expect(decorations.has("src-other")).toBe(false);
+  expect(decorations.get("new/folder")).toBe("added");
+  expect(decorations.get("deleted")).toBe("deleted");
+  expect(decorations.get("source")).toBe("deleted");
+  expect(decorations.get("destination")).toBe("modified");
+  expect(decorations.get("conflicts")).toBe("conflict");
+  expect(decorations.has("ignored")).toBe(false);
+  expect(gitTreeDecorations([change("file", "A", "A")]).get("file")).toBe("conflict");
+  expect(gitTreeDecorations([change("file", "D", "D")]).get("file")).toBe("conflict");
+  expect(gitTreeDecorations([]).size).toBe(0);
+  expect(changes).toStrictEqual(before);
 });
 
 test("Git actions preserve staged content, handle deleted/literal paths and trash untracked files", async () => {
@@ -756,42 +774,44 @@ test("Git actions preserve staged content, handle deleted/literal paths and tras
     await mutateProjectGit(base, "stage", "file.txt");
     await writeFile(join(base, "file.txt"), "working");
     const partial = await projectGit(base);
-    assert.equal(partial.changes.find((c) => c.path === "file.txt").index, "M");
-    assert.equal(partial.changes.find((c) => c.path === "file.txt").worktree, "M");
+    expect(partial.changes.find((c) => c.path === "file.txt").index).toBe("M");
+    expect(partial.changes.find((c) => c.path === "file.txt").worktree).toBe("M");
     await mutateProjectGit(base, "discard", "file.txt");
-    assert.equal(await readFile(join(base, "file.txt"), "utf8"), "index");
-    assert.equal(run("show", ":file.txt"), "index");
+    expect(await readFile(join(base, "file.txt"), "utf8")).toBe("index");
+    expect(run("show", ":file.txt")).toBe("index");
     await mutateProjectGit(base, "unstage", "file.txt");
-    assert.equal(run("show", ":file.txt"), "head");
-    assert.equal(await readFile(join(base, "file.txt"), "utf8"), "index");
+    expect(run("show", ":file.txt")).toBe("head");
+    expect(await readFile(join(base, "file.txt"), "utf8")).toBe("index");
     await rm(join(base, "file.txt"));
     await mutateProjectGit(base, "discard", "file.txt");
-    assert.equal(await readFile(join(base, "file.txt"), "utf8"), "head");
+    expect(await readFile(join(base, "file.txt"), "utf8")).toBe("head");
     await rm(join(base, "file.txt"));
     await mutateProjectGit(base, "stage", "file.txt");
-    assert.equal((await projectGit(base)).changes.find((c) => c.path === "file.txt").index, "D");
+    expect((await projectGit(base)).changes.find((c) => c.path === "file.txt").index).toBe("D");
     await mutateProjectGit(base, "unstage", "file.txt");
     await mutateProjectGit(base, "discard", "file.txt");
     await writeFile(join(base, "[literal].txt"), "new");
     await writeFile(join(base, "literal.txt"), "other");
     await mutateProjectGit(base, "stage", "[literal].txt");
-    assert.equal((await projectGit(base)).changes.find((c) => c.path === "literal.txt").index, "?");
+    expect((await projectGit(base)).changes.find((c) => c.path === "literal.txt").index).toBe("?");
     await mutateProjectGit(base, "unstage", "[literal].txt");
     await mutateProjectGit(base, "discard", "[literal].txt");
-    assert.ok(
+    expect(
       (await readdir(join(base, ".projector-trash"))).some((name) =>
         name.endsWith("-[literal].txt"),
       ),
-    );
+    ).toBeTruthy();
     run("mv", "other.txt", "renamed.txt");
     await mutateProjectGit(base, "unstage", "renamed.txt");
-    assert.equal(run("diff", "--cached"), "");
-    assert.equal(await readFile(join(base, "renamed.txt"), "utf8"), "head");
+    expect(run("diff", "--cached")).toBe("");
+    expect(await readFile(join(base, "renamed.txt"), "utf8")).toBe("head");
     for (const path of ["", "../outside", ".git/config", "a/../file.txt"])
-      await assert.rejects(mutateProjectGit(base, "stage", path), { status: 403 });
-    await assert.rejects(mutateProjectGit(base, "reset", "literal.txt"), { status: 400 });
+      await expect(mutateProjectGit(base, "stage", path)).rejects.toMatchObject({ status: 403 });
+    await expect(mutateProjectGit(base, "reset", "literal.txt")).rejects.toMatchObject({
+      status: 400,
+    });
     await symlink("/tmp", join(base, "escape"));
-    await assert.rejects(mutateProjectGit(base, "stage", "escape"), { status: 403 });
+    await expect(mutateProjectGit(base, "stage", "escape")).rejects.toMatchObject({ status: 403 });
   } finally {
     await rm(base, { recursive: true, force: true });
   }
@@ -808,11 +828,11 @@ test("Git unstage works before the first commit, and index writes serialize", as
       mutateProjectGit(base, "stage", "a.txt"),
       mutateProjectGit(base, "stage", "b.txt"),
     ]);
-    assert.equal(run("ls-files").trim(), "a.txt\nb.txt");
+    expect(run("ls-files").trim()).toBe("a.txt\nb.txt");
     await writeFile(join(base, "a.txt"), "modified");
     await mutateProjectGit(base, "unstage", "a.txt");
-    assert.equal(run("ls-files").trim(), "b.txt");
-    assert.equal(await readFile(join(base, "a.txt"), "utf8"), "modified");
+    expect(run("ls-files").trim()).toBe("b.txt");
+    expect(await readFile(join(base, "a.txt"), "utf8")).toBe("modified");
   } finally {
     await rm(base, { recursive: true, force: true });
   }
@@ -837,21 +857,25 @@ test("Git mutations stay within nested projects and reject conflict discard", as
       mutateProjectGit(base, "stage", "outside.txt"),
     ]);
     await mutateProjectGit(join(base, "nested"), "unstage", "inside.txt");
-    assert.equal(run("diff", "--cached", "--name-only").trim(), "outside.txt");
+    expect(run("diff", "--cached", "--name-only").trim()).toBe("outside.txt");
     await mutateProjectGit(join(base, "nested"), "discard", "inside.txt");
-    assert.equal(await readFile(join(base, "nested/inside.txt"), "utf8"), "inside");
-    assert.equal(await readFile(join(base, "outside.txt"), "utf8"), "changed outside");
+    expect(await readFile(join(base, "nested/inside.txt"), "utf8")).toBe("inside");
+    expect(await readFile(join(base, "outside.txt"), "utf8")).toBe("changed outside");
     await rm(join(base, "nested"), { recursive: true });
     await mutateProjectGit(base, "discard", "nested/inside.txt");
-    assert.equal(await readFile(join(base, "nested/inside.txt"), "utf8"), "inside");
+    expect(await readFile(join(base, "nested/inside.txt"), "utf8")).toBe("inside");
     const blob = run("rev-parse", "HEAD:nested/inside.txt").trim();
     execFileSync("git", ["-C", base, "update-index", "--index-info"], {
       input: `0 ${"0".repeat(40)}\tnested/inside.txt\n100644 ${blob} 1\tnested/inside.txt\n100644 ${blob} 2\tnested/inside.txt\n100644 ${blob} 3\tnested/inside.txt\n`,
     });
-    await assert.rejects(mutateProjectGit(base, "discard", "nested/inside.txt"), { status: 409 });
-    await assert.rejects(mutateProjectGit(base, "unstage", "nested/inside.txt"), { status: 409 });
+    await expect(mutateProjectGit(base, "discard", "nested/inside.txt")).rejects.toMatchObject({
+      status: 409,
+    });
+    await expect(mutateProjectGit(base, "unstage", "nested/inside.txt")).rejects.toMatchObject({
+      status: 409,
+    });
     await mutateProjectGit(base, "stage", "nested/inside.txt");
-    assert.equal(run("ls-files", "--unmerged"), "");
+    expect(run("ls-files", "--unmerged")).toBe("");
   } finally {
     await rm(base, { recursive: true, force: true });
   }
@@ -873,27 +897,29 @@ test("Git batch actions validate the whole selection and preserve working conten
     await rm(join(base, "folder/b.txt"));
     await writeFile(join(base, "folder/new.txt"), "new");
     await writeFile(join(base, "outside.txt"), "outside");
-    await assert.rejects(mutateProjectGit(base, "stage", ["folder/a.txt", "missing.txt"]), {
+    await expect(
+      mutateProjectGit(base, "stage", ["folder/a.txt", "missing.txt"]),
+    ).rejects.toMatchObject({
       status: 404,
     });
-    assert.equal(run("diff", "--cached"), "");
-    await assert.rejects(mutateProjectGit(base, "stage", ["folder/a.txt", "../outside"]), {
+    expect(run("diff", "--cached")).toBe("");
+    await expect(
+      mutateProjectGit(base, "stage", ["folder/a.txt", "../outside"]),
+    ).rejects.toMatchObject({
       status: 403,
     });
-    await assert.rejects(mutateProjectGit(base, "stage", []), { status: 400 });
+    await expect(mutateProjectGit(base, "stage", [])).rejects.toMatchObject({ status: 400 });
     await mutateProjectGit(base, "stage", ["folder/a.txt", "folder/b.txt", "folder/new.txt"]);
-    assert.equal(
-      run("diff", "--cached", "--name-only").trim(),
+    expect(run("diff", "--cached", "--name-only").trim()).toBe(
       "folder/a.txt\nfolder/b.txt\nfolder/new.txt",
     );
     await writeFile(join(base, "folder/a.txt"), "partially staged");
     await mutateProjectGit(base, "unstage", ["folder/a.txt", "folder/b.txt", "folder/new.txt"]);
-    assert.equal(run("diff", "--cached"), "");
-    assert.equal(await readFile(join(base, "folder/a.txt"), "utf8"), "partially staged");
-    assert.equal(await readFile(join(base, "folder/new.txt"), "utf8"), "new");
-    assert.equal(await readFile(join(base, "outside.txt"), "utf8"), "outside");
-    assert.equal(
-      (await projectGit(base)).changes.find((c) => c.path === "folder/b.txt").worktree,
+    expect(run("diff", "--cached")).toBe("");
+    expect(await readFile(join(base, "folder/a.txt"), "utf8")).toBe("partially staged");
+    expect(await readFile(join(base, "folder/new.txt"), "utf8")).toBe("new");
+    expect(await readFile(join(base, "outside.txt"), "utf8")).toBe("outside");
+    expect((await projectGit(base)).changes.find((c) => c.path === "folder/b.txt").worktree).toBe(
       "D",
     );
   } finally {
@@ -917,7 +943,7 @@ test("githubRepositoryFromRemote accepts GitHub remotes and rejects the rest", (
     ["", null],
   ];
   for (const [remote, expected] of cases)
-    assert.equal(githubRepositoryFromRemote(remote), expected, remote);
+    expect(githubRepositoryFromRemote(remote), remote).toBe(expected);
 });
 
 test("projectGithubRepository reads a local project's GitHub origin", async () => {
@@ -925,11 +951,11 @@ test("projectGithubRepository reads a local project's GitHub origin", async () =
   const run = (...args) => execFileSync("git", ["-C", base, ...args], { encoding: "utf8" });
   try {
     run("init", "-q");
-    assert.equal(await projectGithubRepository(base), null);
+    expect(await projectGithubRepository(base)).toBe(null);
     run("remote", "add", "origin", "git@github.com:Sdju/projector.git");
-    assert.equal(await projectGithubRepository(base), "Sdju/projector");
+    expect(await projectGithubRepository(base)).toBe("Sdju/projector");
     run("remote", "set-url", "origin", "https://gitlab.com/Sdju/projector.git");
-    assert.equal(await projectGithubRepository(base), null);
+    expect(await projectGithubRepository(base)).toBe(null);
   } finally {
     await rm(base, { recursive: true, force: true });
   }

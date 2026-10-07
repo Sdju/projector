@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, onTestFinished, test } from "vite-plus/test";
 import { existsSync } from "node:fs";
 import { readFile, mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -18,42 +17,37 @@ test("terminal links parse paths, diagnostic locations, quoted names and URLs", 
   const text =
     'src/main.ts:12:3 ./README.md ../file.js(9,2) "/tmp/with spaces.txt":4 `docs/русский.md` https://example.com/a?b=1 /tmp/test.ts, file:///tmp/a%20b.md';
   const links = terminalLinks(text);
-  assert.deepEqual(
-    links.map(({ path, line, column, web }) => ({ path, line, column, web })),
-    [
-      { path: "src/main.ts", line: 12, column: 3, web: undefined },
-      { path: "./README.md", line: undefined, column: undefined, web: undefined },
-      { path: "../file.js", line: 9, column: 2, web: undefined },
-      { path: "/tmp/with spaces.txt", line: 4, column: undefined, web: undefined },
-      { path: "docs/русский.md", line: undefined, column: undefined, web: undefined },
-      { path: "https://example.com/a?b=1", line: undefined, column: undefined, web: true },
-      { path: "/tmp/test.ts", line: undefined, column: undefined, web: undefined },
-      { path: "/tmp/a b.md", line: undefined, column: undefined, web: undefined },
-    ],
-  );
-  assert.equal(text.slice(links[0].start, links[0].end), "src/main.ts:12:3");
-  assert.deepEqual(
+  expect(links.map(({ path, line, column, web }) => ({ path, line, column, web }))).toStrictEqual([
+    { path: "src/main.ts", line: 12, column: 3, web: undefined },
+    { path: "./README.md", line: undefined, column: undefined, web: undefined },
+    { path: "../file.js", line: 9, column: 2, web: undefined },
+    { path: "/tmp/with spaces.txt", line: 4, column: undefined, web: undefined },
+    { path: "docs/русский.md", line: undefined, column: undefined, web: undefined },
+    { path: "https://example.com/a?b=1", line: undefined, column: undefined, web: true },
+    { path: "/tmp/test.ts", line: undefined, column: undefined, web: undefined },
+    { path: "/tmp/a b.md", line: undefined, column: undefined, web: undefined },
+  ]);
+  expect(text.slice(links[0].start, links[0].end)).toBe("src/main.ts:12:3");
+  expect(
     terminalLinks("Dockerfile .env .gitignore main.ts(12, 3)").map((link) => [
       link.path,
       link.line,
       link.column,
     ]),
-    [
-      ["Dockerfile", undefined, undefined],
-      [".env", undefined, undefined],
-      [".gitignore", undefined, undefined],
-      ["main.ts", 12, 3],
-    ],
-  );
-  assert.deepEqual(
+  ).toStrictEqual([
+    ["Dockerfile", undefined, undefined],
+    [".env", undefined, undefined],
+    [".gitignore", undefined, undefined],
+    ["main.ts", 12, 3],
+  ]);
+  expect(
     terminalLinks("hello 1.2.3 12:30 javascript:alert(1) data:text/plain / //host/path"),
-    [],
-  );
+  ).toStrictEqual([]);
 });
 
-test("terminal file resolution uses cwd, project fallback and canonical external paths", async (t) => {
+test("terminal file resolution uses cwd, project fallback and canonical external paths", async () => {
   const root = await mkdtemp(join(tmpdir(), "projector-link-path-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
+  onTestFinished(() => rm(root, { recursive: true, force: true }));
   const project = join(root, "project");
   const cwd = join(project, "nested");
   await mkdir(cwd, { recursive: true });
@@ -62,29 +56,29 @@ test("terminal file resolution uses cwd, project fallback and canonical external
   const outside = join(root, "outside.txt");
   await writeFile(outside, "external");
   await symlink(outside, join(project, "linked.txt"));
-  assert.deepEqual(await resolveTerminalPath("local.ts", project, cwd), {
+  expect(await resolveTerminalPath("local.ts", project, cwd)).toStrictEqual({
     path: "nested/local.ts",
     external: false,
   });
-  assert.deepEqual(await resolveTerminalPath("README.md", project, cwd), {
+  expect(await resolveTerminalPath("README.md", project, cwd)).toStrictEqual({
     path: "README.md",
     external: false,
   });
-  assert.deepEqual(await resolveTerminalPath("../README.md", project, cwd), {
+  expect(await resolveTerminalPath("../README.md", project, cwd)).toStrictEqual({
     path: "README.md",
     external: false,
   });
-  assert.deepEqual(await resolveTerminalPath(outside, project, cwd), {
+  expect(await resolveTerminalPath(outside, project, cwd)).toStrictEqual({
     path: outside,
     external: true,
   });
-  assert.deepEqual(await resolveTerminalPath("linked.txt", project, cwd), {
+  expect(await resolveTerminalPath("linked.txt", project, cwd)).toStrictEqual({
     path: outside,
     external: true,
   });
-  await assert.rejects(resolveTerminalPath("missing.ts", project, cwd), /не найден/);
-  await assert.rejects(resolveTerminalPath(cwd, project, cwd), /не найден/);
-  await assert.rejects(resolveTerminalPath("bad\0.ts", project, cwd), /Некорректный/);
+  await expect(resolveTerminalPath("missing.ts", project, cwd)).rejects.toThrow(/не найден/);
+  await expect(resolveTerminalPath(cwd, project, cwd)).rejects.toThrow(/не найден/);
+  await expect(resolveTerminalPath("bad\0.ts", project, cwd)).rejects.toThrow(/Некорректный/);
 });
 
 test("dropped paths survive shell quoting without command execution or Enter", async () => {
@@ -96,9 +90,9 @@ test("dropped paths survive shell quoting without command execution or Enter", a
     "/tmp/line\nnext\r\x1b",
   ];
   const text = terminalTextForPaths(paths);
-  assert.ok(!/[\r\n\x1b]/.test(text));
+  expect(!/[\r\n\x1b]/.test(text)).toBeTruthy();
   const { stdout } = await promisify(execFile)("bash", ["-c", `printf '%s\\0' ${text}`]);
-  assert.deepEqual(stdout.split("\0").slice(0, -1), paths);
+  expect(stdout.split("\0").slice(0, -1)).toStrictEqual(paths);
 });
 
 const chromium =
@@ -108,9 +102,9 @@ const chromium =
 test(
   "xterm in Chromium: IME, Unicode, controls, mouse protocols and selection",
   {
-    skip: chromium ? false : "Set CHROMIUM_BIN to run the browser input regression",
+    skip: !chromium,
   },
-  async (t) => {
+  async () => {
     const profile = await mkdtemp(join(tmpdir(), "projector-input-browser-"));
     const keyboard = ts.transpileModule(
       await readFile(new URL("../src/modules/terminal/lib/keyboard.ts", import.meta.url), "utf8"),
@@ -323,7 +317,7 @@ test(
                     : html,
       );
     });
-    t.after(async () => {
+    onTestFinished(async () => {
       await new Promise((resolve) => server.close(resolve));
       await rm(profile, { recursive: true, force: true });
     });
@@ -345,10 +339,9 @@ test(
       ],
       { timeout: 20000, maxBuffer: 1024 * 1024 },
     );
-    assert.equal(
+    expect(
       stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1],
-      "PASS",
       `Browser input regression failed:\n${stdout.slice(-4000)}\n${stderr.slice(-2000)}`,
-    );
+    ).toBe("PASS");
   },
 );

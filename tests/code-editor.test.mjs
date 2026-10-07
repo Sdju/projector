@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, onTestFinished, test } from "vite-plus/test";
 import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -119,10 +118,10 @@ const gutterPage = page(`
 test(
   "CodeMirror editor renders files, diffs and Git markers, also after an in-process Vite restart",
   {
-    skip: chromium ? false : "Set CHROMIUM_BIN to run the editor browser regression",
+    skip: !chromium,
     timeout: 90000,
   },
-  async (t) => {
+  async () => {
     const directory = await mkdtemp(join(tmpdir(), "projector-editor-browser-"));
     const loaded = await loadConfigFromFile({ command: "serve", mode: "development" });
     const pages = {
@@ -187,7 +186,7 @@ test(
       server: { host: "127.0.0.1", port: 0, strictPort: false },
       logLevel: "error",
     });
-    t.after(async () => {
+    onTestFinished(async () => {
       await server.close();
       await rm(directory, { recursive: true, force: true });
     });
@@ -218,10 +217,8 @@ test(
     for (const phase of ["cold", "restarted"]) {
       if (phase === "restarted") await server.restart();
       for (const path of Object.keys(pages)) {
-        assert.equal(
-          await dump(path, `${path.slice(3)}-${phase}`),
+        expect(await dump(path, `${path.slice(3)}-${phase}`), `${phase} ${path} failed`).toBe(
           "PASS",
-          `${phase} ${path} failed`,
         );
       }
     }

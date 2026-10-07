@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, onTestFinished, test } from "vite-plus/test";
 import { mkdtemp, mkdir, writeFile, readFile, stat, symlink, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -9,7 +8,7 @@ import { once } from "node:events";
 // Never touch the real OS keyring from tests.
 process.env.PROJECTOR_SECRET_STORE = "file";
 
-await test("Docker integration: persisted binding, explicit context, guarded actions and real PTY transport", async (t) => {
+test("Docker integration: persisted binding, explicit context, guarded actions and real PTY transport", async () => {
   const root = await mkdtemp(join(tmpdir(), "projector-docker-test-"));
   const original = { ...process.env };
   const bin = join(root, "bin");
@@ -100,7 +99,7 @@ else { console.log('OPERATION_DONE'); }
     }
     throw new Error("PTY did not exit");
   };
-  t.after(async () => {
+  onTestFinished(async () => {
     for (const session of listTerminalSessions(project.id))
       closeTerminalSession(project.id, session.id);
     server.closeAllConnections();
@@ -108,14 +107,13 @@ else { console.log('OPERATION_DONE'); }
     process.env = original;
     await rm(root, { recursive: true, force: true });
   });
-  assert.equal((await dockerSnapshot(project)).enabled, false);
-  await assert.rejects(
+  expect((await dockerSnapshot(project)).enabled).toBe(false);
+  await expect(
     dockerAction(project, { action: "start", context: "default", containerId: id }),
-    /Включите Docker/,
-  );
-  await assert.rejects(configureDocker({ enabled: true, context: "remote" }), /локальный/);
+  ).rejects.toThrow(/Включите Docker/);
+  await expect(configureDocker({ enabled: true, context: "remote" })).rejects.toThrow(/локальный/);
   await configureDocker({ enabled: true, context: "default" });
-  assert.equal((await stat(join(root, "data/projector/integrations.json"))).mode & 0o777, 0o600);
+  expect((await stat(join(root, "data/projector/integrations.json"))).mode & 0o777).toBe(0o600);
   const binding = {
     context: "default",
     name: "fixture",
@@ -124,61 +122,55 @@ else { console.log('OPERATION_DONE'); }
     envFiles: [".env.local"],
   };
   await bindDocker(project.id, directory, binding);
-  assert.deepEqual((await dockerSnapshot(project)).binding, binding);
-  await assert.rejects(
+  expect((await dockerSnapshot(project)).binding).toStrictEqual(binding);
+  await expect(
     bindDocker(project.id, directory, { ...binding, files: ["../outside.yaml"] }),
-    /внутри/,
-  );
-  await assert.rejects(
+  ).rejects.toThrow(/внутри/);
+  await expect(
     bindDocker(project.id, directory, { ...binding, files: ["escape.yaml"] }),
-    /внутри/,
-  );
-  await assert.rejects(
+  ).rejects.toThrow(/внутри/);
+  await expect(
     bindDocker(project.id, directory, { ...binding, profiles: ["--help"] }),
-    /profile/,
-  );
+  ).rejects.toThrow(/profile/);
   const snapshot = await dockerSnapshot(project);
-  assert.equal(snapshot.connected, true);
-  assert.equal(snapshot.containers[0].health, "healthy");
-  assert.equal(snapshot.containers[0].ports[0].url, "http://127.0.0.1:43210");
-  assert.equal(snapshot.containers[0].ports[1].url, "http://[::1]:43211");
-  assert.ok(!JSON.stringify(snapshot).includes("never-return"));
+  expect(snapshot.connected).toBe(true);
+  expect(snapshot.containers[0].health).toBe("healthy");
+  expect(snapshot.containers[0].ports[0].url).toBe("http://127.0.0.1:43210");
+  expect(snapshot.containers[0].ports[1].url).toBe("http://[::1]:43211");
+  expect(!JSON.stringify(snapshot).includes("never-return")).toBeTruthy();
   process.env.PROJECTOR_TEST_DOCKER_DOWN = "1";
   const down = await dockerSnapshot(project);
-  assert.equal(down.connected, false);
-  assert.equal(down.containers.length, 0);
-  assert.match(down.error, /Cannot connect/);
+  expect(down.connected).toBe(false);
+  expect(down.containers.length).toBe(0);
+  expect(down.error).toMatch(/Cannot connect/);
   delete process.env.PROJECTOR_TEST_DOCKER_DOWN;
-  await assert.rejects(
-    dockerAction(project, { action: "down", context: "default" }),
+  await expect(dockerAction(project, { action: "down", context: "default" })).rejects.toThrow(
     /Подтвердите/,
   );
-  await assert.rejects(
+  await expect(
     dockerAction(project, { action: "remove", context: "default", containerId: id, confirm: true }),
-    /Сначала остановите/,
-  );
-  await assert.rejects(
+  ).rejects.toThrow(/Сначала остановите/);
+  await expect(
     dockerAction(project, { action: "shell", context: "default", containerId: "--help" }),
-    /containerId/,
-  );
-  await assert.rejects(
+  ).rejects.toThrow(/containerId/);
+  await expect(
     dockerAction(project, {
       action: "shell",
       context: "default",
       containerId: id,
       shell: "sh; touch /tmp/bad",
     }),
-    /shell/,
-  );
-  assert.match((await dockerLogs("default", id)).text, /FIXTURE_LOG/);
+  ).rejects.toThrow(/shell/);
+  expect((await dockerLogs("default", id)).text).toMatch(/FIXTURE_LOG/);
   const build = await dockerAction(project, { action: "build", context: "default" });
-  await assert.rejects(dockerAction(project, { action: "up", context: "default" }), /Дождитесь/);
-  await bindDocker("other-project", directory, binding);
-  await assert.rejects(
-    dockerAction({ ...project, id: "other-project" }, { action: "up", context: "default" }),
+  await expect(dockerAction(project, { action: "up", context: "default" })).rejects.toThrow(
     /Дождитесь/,
   );
-  assert.equal((await waitExit(build.session)).exitCode, 0);
+  await bindDocker("other-project", directory, binding);
+  await expect(
+    dockerAction({ ...project, id: "other-project" }, { action: "up", context: "default" }),
+  ).rejects.toThrow(/Дождитесь/);
+  expect((await waitExit(build.session)).exitCode).toBe(0);
   const shell = await dockerAction(project, {
     action: "shell",
     context: "default",
@@ -190,10 +182,9 @@ else { console.log('OPERATION_DONE'); }
   internal.pty.onData((data) => output.push(data));
   await new Promise((resolve) => setTimeout(resolve, 100));
   internal.pty.write("hello Docker\r");
-  assert.equal((await waitExit(shell.session)).exitCode, 7);
-  assert.match(output.join(""), /INPUT:hello Docker/);
-  await assert.rejects(
-    resolveTerminalFile(project, shell.session.id, "/etc/passwd"),
+  expect((await waitExit(shell.session)).exitCode).toBe(7);
+  expect(output.join("")).toMatch(/INPUT:hello Docker/);
+  await expect(resolveTerminalFile(project, shell.session.id, "/etc/passwd")).rejects.toThrow(
     /не сопоставлены/,
   );
   const noOrigin = await fetch(`${url}/api/docker/settings`, {
@@ -201,24 +192,24 @@ else { console.log('OPERATION_DONE'); }
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ enabled: false, context: "default" }),
   });
-  assert.equal(noOrigin.status, 403);
+  expect(noOrigin.status).toBe(403);
   const restarted = await fetch(`${url}/api/projects/${project.id}/terminals/${shell.session.id}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Origin: url },
     body: JSON.stringify({ action: "restart" }),
   });
-  assert.equal(restarted.status, 409);
+  expect(restarted.status).toBe(409);
   const records = (await readFile(trace, "utf8")).trim().split("\n").map(JSON.parse);
-  assert.ok(records.every((item) => !item.host && !item.context));
+  expect(records.every((item) => !item.host && !item.context)).toBeTruthy();
   const buildArgs = records.find((item) => item.args.includes("build")).args;
-  assert.deepEqual(buildArgs.slice(0, 3), ["--context", "default", "compose"]);
-  assert.ok(buildArgs.includes(join(directory, "override.yaml")));
-  assert.ok(buildArgs.includes(join(directory, ".env.local")));
-  assert.ok(!buildArgs.includes("--volumes"));
+  expect(buildArgs.slice(0, 3)).toStrictEqual(["--context", "default", "compose"]);
+  expect(buildArgs.includes(join(directory, "override.yaml"))).toBeTruthy();
+  expect(buildArgs.includes(join(directory, ".env.local"))).toBeTruthy();
+  expect(!buildArgs.includes("--volumes")).toBeTruthy();
   await bindDocker(project.id, directory, { binding: null });
-  assert.equal((await dockerSnapshot(project)).binding, null);
+  expect((await dockerSnapshot(project)).binding).toBe(null);
   // Disabling must remain possible even after Docker CLI was uninstalled.
   await rm(join(bin, "docker"));
   await configureDocker({ enabled: false, context: "default" });
-  assert.equal((await dockerSnapshot(project)).enabled, false);
+  expect((await dockerSnapshot(project)).enabled).toBe(false);
 });

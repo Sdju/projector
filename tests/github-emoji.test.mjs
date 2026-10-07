@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test, mock } from "node:test";
+import { expect, test, vi } from "vite-plus/test";
 import {
   REACTION_EMOJI,
   loadGithubEmojis,
@@ -14,36 +13,36 @@ const map = {
 };
 
 test("splitEmoji replaces known shortcodes and leaves the rest as written", () => {
-  assert.deepEqual(splitEmoji("Ship :tada: now :nope: and :+1:", map), [
+  expect(splitEmoji("Ship :tada: now :nope: and :+1:", map)).toStrictEqual([
     "Ship ",
     { name: "tada", url: "https://img/tada.png" },
     " now :nope: and ",
     { name: "+1", url: "https://img/plus.png" },
   ]);
-  assert.deepEqual(splitEmoji("12:30:45", map), ["12:30:45"]);
+  expect(splitEmoji("12:30:45", map)).toStrictEqual(["12:30:45"]);
   // Object prototype keys are not emoji.
-  assert.deepEqual(splitEmoji(":constructor: :toString:", map), [":constructor: :toString:"]);
-  assert.deepEqual(splitEmoji(":TADA:", map), [{ name: "tada", url: "https://img/tada.png" }]);
+  expect(splitEmoji(":constructor: :toString:", map)).toStrictEqual([":constructor: :toString:"]);
+  expect(splitEmoji(":TADA:", map)).toStrictEqual([{ name: "tada", url: "https://img/tada.png" }]);
 });
 
 test("every reaction has an emoji name GitHub actually lists", () => {
-  assert.equal(REACTION_EMOJI.laugh, "smile");
-  assert.equal(REACTION_EMOJI.hooray, "tada");
-  assert.equal(Object.keys(REACTION_EMOJI).length, 8);
+  expect(REACTION_EMOJI.laugh).toBe("smile");
+  expect(REACTION_EMOJI.hooray).toBe("tada");
+  expect(Object.keys(REACTION_EMOJI).length).toBe(8);
 });
 
 test("the emoji list is loaded once and a failed load can be retried", async () => {
   let calls = 0;
-  const fetch = mock.method(globalThis, "fetch", async () => {
+  const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
     calls++;
     return calls === 1 ? new Response("", { status: 500 }) : Response.json(map);
   });
   try {
-    assert.deepEqual(await loadGithubEmojis(), {});
-    assert.equal((await loadGithubEmojis()).tada, "https://img/tada.png");
+    expect(await loadGithubEmojis()).toStrictEqual({});
+    expect((await loadGithubEmojis()).tada).toBe("https://img/tada.png");
     await loadGithubEmojis();
-    assert.equal(calls, 2);
+    expect(calls).toBe(2);
   } finally {
-    fetch.mock.restore();
+    fetch.mockRestore();
   }
 });

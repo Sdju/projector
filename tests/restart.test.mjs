@@ -1,47 +1,46 @@
-import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { createServer, request } from "node:http";
 import { setTimeout as sleep } from "node:timers/promises";
-import { test } from "node:test";
+import { expect, onTestFinished, test } from "vite-plus/test";
 import { restartAfterExit, waitForProcessExit } from "../cli/app/restart.mjs";
 import { handleApi } from "../server/app/api.ts";
 
-async function sleeper(t) {
+async function sleeper() {
   const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
   await once(child, "spawn");
-  t.after(() => child.kill());
+  onTestFinished(() => child.kill());
   return child;
 }
 
-test("restart launches exactly once after both old server and desktop have exited", async (t) => {
-  const server = await sleeper(t);
-  const desktop = await sleeper(t);
+test("restart launches exactly once after both old server and desktop have exited", async () => {
+  const server = await sleeper();
+  const desktop = await sleeper();
   let launches = 0;
   const restarting = restartAfterExit(server.pid, desktop.pid, () => {
     launches++;
   });
   await sleep(100);
-  assert.equal(launches, 0, "do not reuse the old server");
+  expect(launches, "do not reuse the old server").toBe(0);
   const exited = once(server, "exit");
   server.kill();
   await exited;
   await sleep(100);
-  assert.equal(launches, 0, "do not reuse the old tray");
+  expect(launches, "do not reuse the old tray").toBe(0);
   const desktopExited = once(desktop, "exit");
   desktop.kill();
   await desktopExited;
   await restarting;
-  assert.equal(launches, 1);
+  expect(launches).toBe(1);
 });
 
-test("restart refuses to launch a replacement while shutdown is stuck", async (t) => {
-  const child = await sleeper(t);
-  await assert.rejects(waitForProcessExit(child.pid, 80), /не завершился/);
-  assert.equal(child.exitCode, null);
+test("restart refuses to launch a replacement while shutdown is stuck", async () => {
+  const child = await sleeper();
+  await expect(waitForProcessExit(child.pid, 80)).rejects.toThrow(/не завершился/);
+  expect(child.exitCode).toBe(null);
 });
 
-test("restart endpoint rejects foreign origins and hosts before starting a worker", async (t) => {
+test("restart endpoint rejects foreign origins and hosts before starting a worker", async () => {
   const previousRestart = Object.getOwnPropertyDescriptor(globalThis, "projectorRestart");
   let restartAttempts = 0;
   // Even a broken access guard must not reach the user's real desktop or launcher.
@@ -52,13 +51,13 @@ test("restart endpoint rejects foreign origins and hosts before starting a worke
       throw new Error("Restart worker disabled in guard test");
     },
   });
-  t.after(() => {
+  onTestFinished(() => {
     if (previousRestart) Object.defineProperty(globalThis, "projectorRestart", previousRestart);
     else delete globalThis.projectorRestart;
   });
   const previousNetwork = process.env.PROJECTOR_NETWORK;
   process.env.PROJECTOR_NETWORK = "local";
-  t.after(() => {
+  onTestFinished(() => {
     if (previousNetwork === undefined) delete process.env.PROJECTOR_NETWORK;
     else process.env.PROJECTOR_NETWORK = previousNetwork;
   });
@@ -67,7 +66,7 @@ test("restart endpoint rejects foreign origins and hosts before starting a worke
   });
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
-  t.after(() => server.close());
+  onTestFinished(() => server.close());
   const url = `http://127.0.0.1:${server.address().port}/api/app/restart`;
   for (const headers of [{ Origin: "https://foreign.example" }, { Host: "foreign.example" }]) {
     // fetch overrides Host; a raw HTTP request exercises the actual guard.
@@ -79,7 +78,7 @@ test("restart endpoint rejects foreign origins and hosts before starting a worke
       req.once("error", reject);
       req.end();
     });
-    assert.equal(status, 403);
+    expect(status).toBe(403);
   }
-  assert.equal(restartAttempts, 0);
+  expect(restartAttempts).toBe(0);
 });

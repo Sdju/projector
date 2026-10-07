@@ -57,6 +57,16 @@ export default defineConfig({
       desktop: { command: "./bin/install-desktop", cache: false },
     },
   },
+  test: {
+    include: ["tests/**/*.test.mjs"],
+    setupFiles: ["tests/setup.mjs"],
+    pool: "forks",
+    // GTK modules load through the vio `gi:` loader hook instead of Vite.
+    execArgv: ["--import", "vio/register"],
+    server: { deps: { external: [/^gi:/] } },
+    restoreMocks: true,
+    testTimeout: 60_000,
+  },
   fmt: {},
   staged: {
     "*": "vp fmt --no-error-on-unmatched-pattern",

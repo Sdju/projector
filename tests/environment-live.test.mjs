@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, test } from "vite-plus/test";
 import { spawn, execFileSync } from "node:child_process";
 import { access, mkdtemp, realpath, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
@@ -50,58 +49,59 @@ const output = async (item, command) =>
   (await runEnvironmentCommand(item, bash(command), 60_000)).stdout;
 const failing = (item, command) => runEnvironmentCommand(item, bash(command), 60_000);
 
-await test(
+test(
   "the container is unprivileged, offline and sees nothing of the host",
   { skip: !enabled },
   async () => {
     process.env.PROJECTOR_LIVE_SECRET_TOKEN = "must-not-leak";
     const item = await project("isolation");
     const uid = process.getuid();
-    assert.equal((await output(item, "id -u")).trim(), String(uid));
-    assert.ok(
+    expect((await output(item, "id -u")).trim()).toBe(String(uid));
+    expect(
       !(await output(item, "env")).includes("must-not-leak"),
       "host secrets are not passed",
-    );
-    await assert.rejects(failing(item, "ls /var/run/docker.sock"), "no Docker socket");
-    await assert.rejects(failing(item, "touch /etc/projector-probe"), "rootfs is read-only");
-    assert.equal(
+    ).toBeTruthy();
+    await expect(failing(item, "ls /var/run/docker.sock"), "no Docker socket").rejects.toThrow();
+    await expect(
+      failing(item, "touch /etc/projector-probe"),
+      "rootfs is read-only",
+    ).rejects.toThrow();
+    expect(
       (await output(item, "ls -A /home/node | wc -l")).trim(),
-      "0",
       "HOME is empty and temporary",
-    );
-    assert.equal((await output(item, "ls /home | tr '\\n' ' '")).trim(), "node", "no host home");
-    await assert.rejects(
+    ).toBe("0");
+    expect((await output(item, "ls /home | tr '\\n' ' '")).trim(), "no host home").toBe("node");
+    await expect(
       failing(item, "timeout 3 bash -c 'echo > /dev/tcp/1.1.1.1/53'"),
       "no network",
-    );
-    assert.equal(
+    ).rejects.toThrow();
+    expect(
       (
         await output(
           item,
           "grep -c CapEff /proc/self/status; grep CapEff /proc/self/status | tr -d ' \\t'",
         )
       ).includes("CapEff:0000000000000000"),
-      true,
       "no capabilities",
-    );
+    ).toBe(true);
     await output(item, "echo kept > /workspace/probe.txt");
     const written = await stat(join(item.path, "probe.txt"));
-    assert.equal(written.uid, uid, "files written to the project belong to the host user");
+    expect(written.uid, "files written to the project belong to the host user").toBe(uid);
   },
 );
 
-await test(
+test(
   "a broken daemon context never falls back to running on the host",
   { skip: !enabled },
   async () => {
     const item = await project("nofallback", { context: "projector-nonexistent-context" });
     const marker = join(item.path, "ran-on-host");
-    await assert.rejects(runEnvironmentCommand(item, bash(`touch ${marker}`), 20_000));
-    assert.equal(await exists(marker), false);
+    await expect(runEnvironmentCommand(item, bash(`touch ${marker}`), 20_000)).rejects.toThrow();
+    expect(await exists(marker)).toBe(false);
   },
 );
 
-await test(
+test(
   "two projects can serve the same container port on separate loopback ports",
   { skip: !enabled },
   async () => {
@@ -123,16 +123,16 @@ await test(
           found = await environmentPorts("default", name).catch(() => []);
           if (!found.length) await sleep(200);
         }
-        assert.equal(found.length, 1, "port published");
+        expect(found.length, "port published").toBe(1);
         ports.push(found[0]);
       }
-      assert.notEqual(ports[0].url, ports[1].url);
+      expect(ports[0].url).not.toBe(ports[1].url);
       for (const port of ports) {
-        assert.match(port.url, /^http:\/\/127\.0\.0\.1:\d+$/, "bound to loopback only");
+        expect(port.url, "bound to loopback only").toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
         for (let i = 0; ; i++) {
           const response = await fetch(port.url).catch(() => undefined);
           if (response?.ok) break;
-          assert.ok(i < 50, `service answered at ${port.url}`);
+          expect(i < 50, `service answered at ${port.url}`).toBeTruthy();
           await sleep(200);
         }
       }
@@ -143,11 +143,11 @@ await test(
       }
     }
     for (const { name } of started)
-      assert.equal(docker("ps", "-aq", "--filter", `name=^${name}$`), "", "container removed");
+      expect(docker("ps", "-aq", "--filter", `name=^${name}$`), "container removed").toBe("");
   },
 );
 
-await test(
+test(
   "stopping while Docker is still creating the container leaves nothing behind",
   { skip: !enabled },
   async () => {
@@ -158,10 +158,10 @@ await test(
     client.kill("SIGKILL");
     await stopEnvironmentContainer("default", launch.docker.containerId, true);
     await sleep(1500);
-    assert.equal(docker("ps", "-aq", "--filter", `name=^${launch.docker.containerId}$`), "");
+    expect(docker("ps", "-aq", "--filter", `name=^${launch.docker.containerId}$`)).toBe("");
   },
 );
 
-await test("temporary project folders are removed", { skip: !enabled }, async () => {
+test("temporary project folders are removed", { skip: !enabled }, async () => {
   for (const folder of folders) await rm(folder, { recursive: true, force: true });
 });

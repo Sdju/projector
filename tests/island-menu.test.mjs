@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, onTestFinished, test } from "vite-plus/test";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -17,11 +16,11 @@ const chromium = [
   .find(existsSync);
 test(
   "three island menus preserve focus, commands, keyboard policies and mobile sheets",
-  { skip: chromium ? false : "Set CHROMIUM_BIN", timeout: 90000 },
-  async (t) => {
+  { skip: !chromium, timeout: 90000 },
+  async () => {
     const html = await readFile(new URL("./fixtures/island-menu.html", import.meta.url), "utf8");
     const fixture = await createBrowserFixture("/__island_test", html);
-    t.after(() => fixture.close());
+    onTestFinished(() => fixture.close());
     for (const [name, size] of [
       ["desktop", "1200,900"],
       ["mobile", "390,844"],
@@ -46,7 +45,7 @@ test(
       const result =
         stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1] ??
         stdout.slice(-2000) + stderr.slice(-1000);
-      assert.equal(result, "PASS", name);
+      expect(result, name).toBe("PASS");
     }
   },
 );
