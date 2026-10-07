@@ -1,4 +1,3 @@
-export { default as ProjectForm } from "./ui/ProjectForm.vue";
 export { default as ProjectSwitcher } from "./ui/ProjectSwitcher.vue";
 export { projectSettingsSection } from "./model/project-settings-nav.ts";
 export { default as PathBar } from "./ui/PathBar.vue";
