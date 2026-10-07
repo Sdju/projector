@@ -279,6 +279,7 @@ onBeforeUnmount(() => overview.cancel());
     ref="workspaceElement"
     class="workspace"
     :class="{ 'sidebar-hidden': sidebarInvisible }"
+    :data-surface="mobile ? mobileSurface : undefined"
     :style="sizes"
   >
     <div class="toolbar-host">

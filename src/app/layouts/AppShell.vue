@@ -333,11 +333,15 @@ const navigatePath = (path: string) =>
   .mobile-picker {
     display: block;
   }
+  /* Редактор и терминалы получают весь экран: шапка проекта (выбор и запуск) живёт на экране «Файлы» */
+  .shell.workspace:has(main [data-surface]:not([data-surface="files"])) .top.has-project {
+    display: none;
+  }
   .shell.workspace {
     margin-inline: 0;
     padding: max(var(--island-gap), env(safe-area-inset-top))
       max(var(--island-gap), env(safe-area-inset-right))
-      max(var(--island-gap), env(safe-area-inset-bottom))
+      max(var(--island-gap), min(env(safe-area-inset-bottom), var(--sp-3)))
       max(var(--island-gap), env(safe-area-inset-left));
     height: 100dvh;
     display: flex;
