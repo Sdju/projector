@@ -64,6 +64,7 @@ const tabViews: TabViews = {
   },
   repository: {
     component: GithubRepositoryInfo,
+    keepAlive: true,
     props: () => ({ repository: metadata.value }),
   },
 };

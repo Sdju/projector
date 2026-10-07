@@ -10,3 +10,11 @@ export interface SettingsSection {
   component: Component;
   props?: Record<string, unknown>;
 }
+
+/** Что общая рабочая область настроек отдаёт владельцу вкладки для снапшота агента. */
+export interface SettingsReadoutState {
+  section: string;
+  sectionTitle: string;
+  query: string;
+  visible: number;
+}

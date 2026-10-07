@@ -4,6 +4,7 @@ import { useIdeCommands } from "../../ide/index.ts";
 import { useProjects } from "../../project/index.ts";
 import { agentCommandHandler } from "../model/commands.ts";
 import { useAgent } from "../model/session.ts";
+import { readoutLines, useTabReadout } from "../../../common/utilities/tab-readout.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
 import AgentWelcome from "./AgentWelcome.vue";
 import AgentTurn from "./AgentTurn.vue";
@@ -33,6 +34,26 @@ const { turns, draft, busy, error, phase, permissions, permissionMode, send, cle
     backend: props.backend,
     chatId: props.chatId,
   });
+// Что штатный агент видит в чате: статус, последний ответ и чипы инструментов.
+useTabReadout(() => {
+  const last = turns.value.at(-1);
+  const answer = turns.value
+    .findLast((turn) => turn.role === "assistant")
+    ?.text.trim()
+    .slice(0, 2000);
+  const chips = last?.tools.map((tool) => `${tool.name} — ${tool.status}`).join("; ");
+  return {
+    note: `Чат агента ${agentName.value}`,
+    text: readoutLines(
+      `Бэкенд: ${props.backend ?? "projector"}`,
+      busy.value ? `Состояние: Работает (${phase.value})` : "Состояние: Готов",
+      error.value ? `Ошибка: ${error.value}` : "",
+      `Сообщений: ${turns.value.length}`,
+      answer ? `Последний ответ:\n${answer}` : "",
+      chips ? `Инструменты: ${chips}` : "",
+    ),
+  };
+});
 const log = ref<HTMLElement>();
 const composer = ref<InstanceType<typeof AgentComposer>>();
 const away = ref(false);

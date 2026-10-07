@@ -44,9 +44,9 @@ export interface TabHost {
 }
 
 export const baseTabViews: TabViews = {
-  keybindings: { component: KeybindingsEditor, ownKeys: true },
-  network: { component: LanInfoPanel, ownKeys: true },
-  docker: { component: DockerPanel },
+  keybindings: { component: KeybindingsEditor, ownKeys: true, keepAlive: true },
+  network: { component: LanInfoPanel, ownKeys: true, keepAlive: true },
+  docker: { component: DockerPanel, keepAlive: true },
   agent: {
     component: AgentChat,
     keepAlive: true,
@@ -63,6 +63,7 @@ export const baseTabViews: TabViews = {
   },
   issue: {
     component: IssueView,
+    keepAlive: true,
     props: (tab, host) => ({
       projectId: host.projectId,
       number: tab.params?.number,
@@ -71,6 +72,7 @@ export const baseTabViews: TabViews = {
   },
   pull: {
     component: PullRequestView,
+    keepAlive: true,
     props: (tab, host) => ({
       projectId: host.projectId,
       number: tab.params?.number,
@@ -79,6 +81,7 @@ export const baseTabViews: TabViews = {
   },
   discussion: {
     component: DiscussionView,
+    keepAlive: true,
     props: (tab, host) => ({
       projectId: host.projectId,
       number: tab.params?.number,
@@ -87,6 +90,7 @@ export const baseTabViews: TabViews = {
   },
   commit: {
     component: CommitOverview,
+    keepAlive: true,
     props: (tab, host) => ({
       projectId: host.projectId,
       hash: tab.params?.hash,

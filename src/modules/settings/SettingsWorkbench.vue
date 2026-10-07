@@ -5,7 +5,8 @@ import IconSearch from "~icons/lucide/search";
 import IconClose from "~icons/lucide/x";
 import UiButton from "../../common/ui/UiButton.vue";
 import { commandArgs, useCommandScope } from "../../common/utilities/commands.ts";
-import type { SettingsSection } from "./sections.ts";
+import { useTabReadout, type TabReadout } from "../../common/utilities/tab-readout.ts";
+import type { SettingsReadoutState, SettingsSection } from "./sections.ts";
 
 const props = withDefaults(
   defineProps<{
@@ -16,6 +17,8 @@ const props = withDefaults(
     title?: string;
     /** Идентификатор области команд: у одновременно открытых настроек он разный. */
     scope?: string;
+    /** Что штатный агент видит во вкладке настроек: собирает владелец вкладки. */
+    read?: (state: SettingsReadoutState) => TabReadout;
   }>(),
   { title: "Настройки", scope: "settings" },
 );
@@ -36,6 +39,15 @@ const filtered = computed(() => {
 const groups = computed(() => [...new Set(filtered.value.map((section) => section.group))]);
 const active = computed(
   () => filtered.value.find((section) => section.id === props.selected) ?? filtered.value[0],
+);
+// Владелец вкладки решает, что попадёт в снапшот; сам workbench отдаёт текущий раздел и поиск.
+useTabReadout(() =>
+  props.read?.({
+    section: active.value?.id ?? "",
+    sectionTitle: active.value?.title ?? "",
+    query: query.value,
+    visible: filtered.value.length,
+  }),
 );
 watch(
   active,

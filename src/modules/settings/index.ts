@@ -1,2 +1,2 @@
 export { default as SettingsWorkbench } from "./SettingsWorkbench.vue";
-export type { SettingsSection } from "./sections.ts";
+export type { SettingsSection, SettingsReadoutState } from "./sections.ts";

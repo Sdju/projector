@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import { useCommandScope } from "../../common/utilities/commands.ts";
+import { readoutLines, useTabReadout } from "../../common/utilities/tab-readout.ts";
 import { fetchIntegrations, integrationRequest } from "../integration-api/index.ts";
 const props = defineProps<{ repository: string }>();
 const emit = defineEmits<{ connected: [] }>();
@@ -36,6 +37,16 @@ commands.scope.registerCommand({
     }
   },
 });
+// Что штатный агент видит на вкладке подключения GitHub: репозиторий и состояние формы без токена.
+useTabReadout(() => ({
+  note: "Подключение к GitHub",
+  text: readoutLines(
+    `Репозиторий: ${props.repository}`,
+    busy.value ? "Состояние: подключение…" : "Состояние: не подключено",
+    token.value.trim() ? "Токен: введён" : "Токен: не введён",
+    error.value ? `Ошибка: ${error.value}` : "",
+  ),
+}));
 </script>
 
 <template>

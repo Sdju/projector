@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { IssueDetail } from "../../../../../../core/modules/workspace/index.ts";
+import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab-readout.ts";
 import { useTrackerDetail } from "../lib/tracker-detail.ts";
 import TrackerComments from "./TrackerComments.vue";
 import TrackerDetail from "./TrackerDetail.vue";
@@ -17,6 +18,30 @@ const { detail, loading, error } = useTrackerDetail<IssueDetail>(
 const comments = computed(() =>
   (detail.value?.comments ?? []).map((item) => ({ ...item, at: item.createdAt })),
 );
+
+// Что штатный агент видит во вкладке issue: состояние, автор, метки, тело и комментарии.
+useTabReadout(() => {
+  const note = `Issue #${detail.value?.issue.number ?? props.number}`;
+  if (error.value) return { note, text: `Ошибка: ${error.value}` };
+  const data = detail.value;
+  if (!data) return { note, text: "Загрузка…" };
+  const issue = data.issue;
+  const body = issue.body.length > 4000 ? `${issue.body.slice(0, 4000)}…` : issue.body;
+  return {
+    note,
+    text: readoutLines(
+      issue.state === "closed" ? "Состояние: закрыт" : "Состояние: открыт",
+      `${issue.title} (#${issue.number})`,
+      `Автор: ${issue.author.login}, создано ${issue.createdAt}`,
+      issue.labels.length
+        ? `Метки: ${issue.labels.map((label) => label.name).join(", ")}`
+        : "Метки: нет",
+      `Комментариев: ${issue.comments}`,
+      body,
+      data.commentsTruncated ? "Комментарии показаны не все." : "",
+    ),
+  };
+});
 </script>
 
 <template>

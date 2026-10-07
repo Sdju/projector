@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import UiButton from "../../../common/ui/UiButton.vue";
-import { SettingsWorkbench, type SettingsSection } from "../../settings/index.ts";
+import {
+  SettingsWorkbench,
+  type SettingsReadoutState,
+  type SettingsSection,
+} from "../../settings/index.ts";
+import { readoutLines } from "../../../common/utilities/tab-readout.ts";
 import type { Project } from "../../project/index.ts";
 import { shortcutKey } from "../../../../core/modules/ide/index.ts";
 import { projectSettingsSection as selected } from "../model/project-settings-nav.ts";
@@ -63,6 +68,32 @@ function saveKey(event: KeyboardEvent) {
     void form.save();
   }
 }
+
+// Что штатный агент видит во вкладке настроек проекта: черновик формы и текущий раздел.
+const readout = (state: SettingsReadoutState) => {
+  const draft = form.draft.value;
+  const commands = draft.commands.map(
+    (command) =>
+      `${command.id === draft.defaultCommandId ? "• " : "  "}${command.name || "(без имени)"} — ${
+        command.cmd || "(без команды)"
+      }`,
+  );
+  return {
+    note: `Настройки проекта · ${props.project.name}`,
+    text: readoutLines(
+      `Проект: ${draft.name || "(без имени)"}`,
+      `Путь: ${draft.path}`,
+      `Раздел: ${state.sectionTitle || state.section || "—"}`,
+      draft.url ? `Адрес: ${draft.url} · режим ${draft.mode}` : `Режим: ${draft.mode}`,
+      draft.icon ? `Иконка: ${draft.icon}` : "Иконка: не задана",
+      `Команды:\n${commands.join("\n")}`,
+      `Изменения: ${form.dirty.value ? "есть несохранённые" : "нет"}`,
+      form.error.value ? `Ошибка: ${form.error.value}` : "",
+      form.dirty.value && form.validation.value ? `Проверка: ${form.validation.value}` : "",
+      state.query ? `Поиск: «${state.query}»` : "",
+    ),
+  };
+};
 </script>
 
 <template>
@@ -78,6 +109,7 @@ function saveKey(event: KeyboardEvent) {
       scope="settings:project"
       :sections="sections"
       :selected="selected"
+      :read="readout"
       @select="selected = $event"
     >
       <template #footer>

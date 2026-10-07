@@ -9,6 +9,7 @@ import {
   type Keybinding,
 } from "../../../../core/modules/ide/index.ts";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
+import { readoutLines, useTabReadout } from "../../../common/utilities/tab-readout.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiDialog from "../../../common/ui/UiDialog.vue";
 import UiDialogActions from "../../../common/ui/UiDialogActions.vue";
@@ -54,6 +55,24 @@ const rows = computed(() => {
           .includes(query),
     )
     .sort((a, b) => a.title.localeCompare(b.title, "ru") || a.command.localeCompare(b.command));
+});
+// Что штатный агент видит во вкладке горячих клавиш: фильтры, число строк и открытый диалог.
+useTabReadout(() => {
+  const row = editing.value;
+  return {
+    note: "Горячие клавиши",
+    text: readoutLines(
+      search.value ? `Поиск: «${search.value}»` : "",
+      `Только изменённые: ${customOnly.value ? "да" : "нет"}`,
+      `Показано строк: ${rows.value.length}`,
+      `Пользовательских привязок: ${api.getKeybindingOverrides().length}`,
+      row ? `Изменить: ${row.title} (${row.command})` : "",
+      row ? `Новое сочетание: ${displayKey(shortcut.value) || "не задано"}` : "",
+      busy.value ? "Сохранение и загрузка…" : "",
+      status.value ? `Статус: ${status.value}` : "",
+      error.value ? `Ошибка: ${error.value}` : "",
+    ),
+  };
 });
 function displayKey(key?: string) {
   return (

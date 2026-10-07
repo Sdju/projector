@@ -393,3 +393,123 @@ test("tab reader lists panels and reads files, diffs, terminals and rejects unkn
   expect([tail.text, tail.truncated, reads[0]]).toStrictEqual(["6789", true, ["t1", 5]]);
   await expect(read({ id: "missing" })).rejects.toThrow(/не найдена/);
 });
+
+test("tab reader prefers the live view readout over the kind's static reader", async () => {
+  const { registerTabReader } = await import("../src/modules/workspace/lib/tab-reader.ts");
+  const { createTabRegistry, defineTab } = await import("../src/modules/workspace-api/tabs.ts");
+  const { registerTabReadout } = await import("../src/common/utilities/tab-readout.ts");
+  const tabTypes = createTabRegistry([
+    defineTab({
+      id: "note",
+      key: () => "note",
+      path: () => "Note",
+      title: () => "Note",
+      read: () => ({ text: "static", note: "static note" }),
+    }),
+    defineTab({ id: "bare", key: () => "bare", path: () => "Bare", title: () => "Bare" }),
+  ]);
+  const commands = new Map();
+  const files = new Map([
+    ["note", { key: "note", path: "Note", content: "", virtual: "note" }],
+    ["bare", { key: "bare", path: "Bare", content: "", virtual: "bare" }],
+  ]);
+  registerTabReader({
+    layout: () => ({ focused: "g1", root: {} }),
+    groups: () => [{ id: "g1", panels: ["note", "bare"], active: "note" }],
+    fileOf: (id) => files.get(id),
+    tabTypes,
+    terminalOf: () => undefined,
+    label: (id) => id,
+    isDirty: () => false,
+    readTerminal: async () => ({ text: "", totalLines: 0, truncated: false }),
+    register: (id, _title, run) => commands.set(id, run),
+  });
+  const read = commands.get("ide.workbench.tab.read");
+  // The mounted view publishes the live screen and wins over the kind's static reader.
+  const disposeNote = registerTabReadout("note", () => ({
+    text: "live screen",
+    note: "live note",
+  }));
+  expect(await read({ id: "note" })).toMatchObject({ text: "live screen", note: "live note" });
+  disposeNote();
+  // Live text without a note keeps the kind's note.
+  const disposePartial = registerTabReadout("note", () => ({ text: "only text" }));
+  expect(await read({ id: "note" })).toMatchObject({ text: "only text", note: "static note" });
+  disposePartial();
+  // An unloaded live readout falls back to the static reader.
+  const disposeEmpty = registerTabReadout("note", () => undefined);
+  expect((await read({ id: "note" })).text).toBe("static");
+  disposeEmpty();
+  // A kind without a reader stays empty until its view publishes a snapshot.
+  expect((await read({ id: "bare" })).note).toMatch(/нет текстового содержимого/);
+  const disposeBare = registerTabReadout("bare", () => ({ text: "bare live" }));
+  expect((await read({ id: "bare" })).text).toBe("bare live");
+  disposeBare();
+  expect((await read({ id: "bare" })).text).toBe(undefined);
+});
+
+test("nested readouts keep the tab owner over child views and survive their unmount", async () => {
+  const { createRenderer, defineComponent, h, ref, nextTick } = await import("vue");
+  const { provideTabReadout, readTabReadout, useTabReadout } =
+    await import("../src/common/utilities/tab-readout.ts");
+  // A minimal headless renderer exercises the real component lifecycle without a DOM.
+  const node = () => ({});
+  const renderer = createRenderer({
+    patchProp: () => {},
+    insert: () => {},
+    remove: () => {},
+    createElement: node,
+    createText: node,
+    createComment: node,
+    setText: () => {},
+    setElementText: () => {},
+    parentNode: () => null,
+    nextSibling: () => null,
+    setScopeId: () => {},
+    cloneNode: node,
+    insertStaticContent: () => node(),
+  });
+  const key = "readout:lifecycle";
+  const showChild = ref(true);
+  const Child = defineComponent({
+    setup() {
+      useTabReadout(() => ({ text: "child" }));
+      return () => null;
+    },
+  });
+  const Owner = defineComponent({
+    setup() {
+      useTabReadout(() => ({ text: "owner", note: "owner note" }));
+      return () => (showChild.value ? h(Child) : null);
+    },
+  });
+  const Host = defineComponent({
+    setup() {
+      provideTabReadout(() => key);
+      return () => h(Owner);
+    },
+  });
+  const app = renderer.createApp(Host);
+  app.mount(node());
+  // The tab's own view (owner) wins over a nested section's readout.
+  expect(readTabReadout(key)).toStrictEqual({ text: "owner", note: "owner note" });
+  // Unmounting the nested view restores the owner instead of dropping the readout.
+  showChild.value = false;
+  await nextTick();
+  expect(readTabReadout(key)).toStrictEqual({ text: "owner", note: "owner note" });
+  app.unmount();
+  expect(readTabReadout(key)).toBe(undefined);
+});
+
+test("a nested readout is used only while the owner has nothing to say", async () => {
+  const { readTabReadout, registerTabReadout } =
+    await import("../src/common/utilities/tab-readout.ts");
+  const key = "readout:fallback";
+  const disposeOwner = registerTabReadout(key, () => undefined);
+  const disposeNested = registerTabReadout(key, () => ({ text: "nested" }));
+  expect(readTabReadout(key)).toStrictEqual({ text: "nested" });
+  disposeNested();
+  expect(readTabReadout(key)).toBe(undefined);
+  disposeOwner();
+  expect(readTabReadout(key)).toBe(undefined);
+});

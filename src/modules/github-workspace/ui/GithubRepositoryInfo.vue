@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import type { GithubRepository } from "../../../../core/modules/github/index.ts";
 import { absoluteTime } from "../../../common/utilities/commit-format.ts";
+import { readoutLines, useTabReadout } from "../../../common/utilities/tab-readout.ts";
 import UiAvatar from "../../../common/ui/UiAvatar.vue";
 import IconStar from "~icons/lucide/star";
 import IconFork from "~icons/lucide/git-fork";
@@ -40,6 +41,25 @@ const details = computed(() => [
   { key: "created", label: "Создан", value: absoluteTime(props.repository.createdAt) || "—" },
   { key: "updated", label: "Обновлён", value: absoluteTime(props.repository.updatedAt) || "—" },
 ]);
+// Что штатный агент видит во вкладке «О репозитории»: метаданные GitHub без значений оформления.
+useTabReadout(() => {
+  const repo = props.repository;
+  if (!repo) return undefined;
+  return {
+    note: "О репозитории",
+    text: readoutLines(
+      `Репозиторий ${repo.fullName}`,
+      repo.description ? `Описание: ${repo.description}` : "Без описания",
+      repo.language ? `Язык: ${repo.language}` : "",
+      repo.private ? "Приватный" : "Публичный",
+      `Звёзды: ${repo.stars}, форки: ${repo.forks}, наблюдатели: ${repo.watchers}, открытые issues: ${repo.openIssues}`,
+      `Ветка по умолчанию: ${repo.defaultBranch || "—"}`,
+      repo.license ? `Лицензия: ${repo.license}` : "",
+      repo.topics.length ? `Темы: ${repo.topics.join(", ")}` : "",
+      `URL: ${repo.htmlUrl}`,
+    ),
+  };
+});
 </script>
 
 <template>

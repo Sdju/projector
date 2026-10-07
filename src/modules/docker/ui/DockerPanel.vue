@@ -1,12 +1,64 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import type { DockerContainer } from "../../../../core/modules/docker/index.ts";
 import DockerBinding from "./DockerBinding.vue";
 import { absoluteTime } from "../../../common/utilities/commit-format.ts";
+import { readoutLines, useTabReadout } from "../../../common/utilities/tab-readout.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiEmpty from "../../../common/ui/UiEmpty.vue";
 import { useDockerState } from "../model.ts";
 const { snapshot, containers, current, selected, all, busy, error, commands } = useDockerState();
 const shell = ref("sh");
+const portsOf = (item: DockerContainer) =>
+  item.ports.map((port) => `${port.publicPort}→${port.privatePort}/${port.protocol}`).join(", ") ||
+  "—";
+// Что штатный агент видит на вкладке Docker: подключение, фильтр, контейнеры и выбранный контейнер.
+useTabReadout(() => {
+  const data = snapshot.value;
+  const binding = data?.binding;
+  const items = containers.value;
+  const details = current.value;
+  const problem = error.value || data?.error || "";
+  return {
+    note: "Docker",
+    text: readoutLines(
+      data?.connected ? `Подключение: Docker ${data.version}` : "Подключение: нет",
+      data ? `Контекст: ${data.context}` : undefined,
+      data?.contexts.length
+        ? `Контексты: ${data.contexts.map((item) => item.name).join(", ")}`
+        : undefined,
+      data && !data.enabled ? "Docker выключен" : undefined,
+      all.value ? "Показаны: все контейнеры" : "Показаны: контейнеры проекта",
+      binding
+        ? `Привязка: ${binding.name}${binding.files.length ? ` · ${binding.files.join(", ")}` : ""}${binding.profiles.length ? ` · profiles ${binding.profiles.join(", ")}` : ""}`
+        : undefined,
+      problem ? `Ошибка: ${problem}` : undefined,
+      busy.value ? "Выполняется действие…" : undefined,
+      items.length
+        ? `Контейнеры:\n${items
+            .map(
+              (item) =>
+                `${item.service || item.name} — ${item.state}${item.state === "exited" ? ` (${item.exitCode})` : ""}, health ${item.health || "—"}, ${item.image}, ports ${portsOf(item)}`,
+            )
+            .join("\n")}`
+        : "Контейнеры: нет",
+      details
+        ? readoutLines(
+            `Выбран: ${details.name} (${details.id.slice(0, 12)}) · ${details.image} · ${absoluteTime(details.startedAt)}`,
+            `Порты: ${portsOf(details)}`,
+            details.mounts.length
+              ? `Монтирования:\n${details.mounts
+                  .map(
+                    (mount) =>
+                      `${mount.target} · ${mount.type} · ${mount.writable ? "rw" : "ro"} ← ${mount.source}`,
+                  )
+                  .join("\n")}`
+              : undefined,
+          )
+        : undefined,
+    ),
+  };
+});
 const actions = [
   { id: "up", title: "Поднять" },
   { id: "composeStop", title: "Остановить" },

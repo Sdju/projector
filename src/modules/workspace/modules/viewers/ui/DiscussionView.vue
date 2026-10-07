@@ -5,6 +5,7 @@ import type {
   DiscussionComment,
   DiscussionDetail,
 } from "../../../../../../core/modules/workspace/index.ts";
+import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab-readout.ts";
 import { useTrackerDetail } from "../lib/tracker-detail.ts";
 import TrackerComments, { type TrackerComment } from "./TrackerComments.vue";
 import TrackerDetail from "./TrackerDetail.vue";
@@ -42,6 +43,43 @@ const state = computed(() => {
   return discussion?.answered ? "answered" : "open";
 });
 const STATE_LABEL = { open: "открыто", closed: "закрыто", answered: "есть ответ" } as const;
+
+// Что штатный агент видит во вкладке discussion: состояние, категория, голоса и комментарии.
+useTabReadout(() => {
+  const note = `Discussion #${detail.value?.discussion.number ?? props.number}`;
+  if (error.value) return { note, text: `Ошибка: ${error.value}` };
+  const data = detail.value;
+  if (!data) return { note, text: "Загрузка…" };
+  const discussion = data.discussion;
+  const body =
+    discussion.body.length > 4000 ? `${discussion.body.slice(0, 4000)}…` : discussion.body;
+  const lines = data.comments.flatMap((comment) => [
+    `${comment.isAnswer ? "[ответ] " : ""}${comment.author.login}`,
+    ...comment.replies.map((reply) => `  ↳ ${reply.author.login}`),
+  ]);
+  const shown = lines.slice(0, 200);
+  return {
+    note,
+    text: readoutLines(
+      `Состояние: ${STATE_LABEL[state.value]}`,
+      `${discussion.title} (#${discussion.number})`,
+      `Автор: ${discussion.author.login}, создано ${discussion.createdAt}`,
+      discussion.category.name ? `Категория: ${discussion.category.name}` : "",
+      discussion.labels.length
+        ? `Метки: ${discussion.labels.map((label) => label.name).join(", ")}`
+        : "Метки: нет",
+      `Голосов: ${discussion.upvotes}`,
+      lines.length
+        ? `Комментарии (${data.comments.length}):\n${shown.join("\n")}${
+            lines.length > shown.length ? `\n… ещё ${lines.length - shown.length}` : ""
+          }`
+        : "Комментариев: нет",
+      data.commentsTruncated ? "Комментарии показаны не все." : "",
+      truncatedReplies.value ? "Ответы на комментарии показаны не все." : "",
+      body,
+    ),
+  };
+});
 </script>
 
 <template>

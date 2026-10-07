@@ -3,9 +3,39 @@ import { useId } from "vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import UiHint from "../../common/ui/UiHint.vue";
 import { commandArgs } from "../../common/utilities/commands.ts";
+import { readoutLines, useTabReadout } from "../../common/utilities/tab-readout.ts";
 import { useNetworkSettings } from "./model.ts";
 
 const { state, password, busy, status, error, commands } = useNetworkSettings("panel");
+// Что штатный агент видит во вкладке локальной сети. Значение пароля не раскрывается.
+useTabReadout(() => {
+  const note = "Локальная сеть";
+  const current = state.value;
+  if (!current)
+    return {
+      note,
+      text: readoutLines(
+        "Загрузка…",
+        busy.value && "Состояние: выполняется…",
+        error.value && `Ошибка: ${error.value}`,
+      ),
+    };
+  return {
+    note,
+    text: readoutLines(
+      `Режим: ${current.mode === "lan" ? "Локальная сеть" : "Только localhost"}`,
+      `Пароль: ${current.passwordRequired ? "задан" : "не задан"}`,
+      current.mode === "lan"
+        ? current.lanUrls.length
+          ? `Адреса: ${current.lanUrls.join(", ")}`
+          : "Адреса: нет"
+        : "Сервер доступен только на этой машине",
+      busy.value && "Состояние: выполняется…",
+      status.value && `Состояние: ${status.value}`,
+      error.value && `Ошибка: ${error.value}`,
+    ),
+  };
+});
 const passwordId = useId();
 async function copyAddress(address: string) {
   error.value = "";

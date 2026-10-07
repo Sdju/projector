@@ -5,6 +5,7 @@ import type {
   PullRequestFile,
   PullRequestReview,
 } from "../../../../../../core/modules/workspace/index.ts";
+import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab-readout.ts";
 import { useTrackerDetail } from "../lib/tracker-detail.ts";
 import TrackerComments from "./TrackerComments.vue";
 import TrackerDetail from "./TrackerDetail.vue";
@@ -52,6 +53,46 @@ const comments = computed(() =>
 const stateLabel = computed(() => {
   const pull = detail.value?.pull;
   return pull?.draft && pull.state === "open" ? "черновик" : STATE_LABEL[pull?.state ?? "open"];
+});
+
+// Что штатный агент видит во вкладке pull request: состояние, ветки, статистика, ревью и файлы.
+useTabReadout(() => {
+  const note = `PR #${detail.value?.pull.number ?? props.number}`;
+  if (error.value) return { note, text: `Ошибка: ${error.value}` };
+  const data = detail.value;
+  if (!data) return { note, text: "Загрузка…" };
+  const pull = data.pull;
+  const body = pull.body.length > 4000 ? `${pull.body.slice(0, 4000)}…` : pull.body;
+  const reviews = data.reviews.map(
+    (review) => `${REVIEW_LABEL[review.state]}: ${review.author.login}`,
+  );
+  const files = data.files.map((file) => `${FILE_MARK[file.status]} ${filePath(file)}`);
+  const shown = files.slice(0, 100);
+  return {
+    note,
+    text: readoutLines(
+      `Состояние: ${stateLabel.value}`,
+      `${pull.title} (#${pull.number})`,
+      `Автор: ${pull.author.login}, создано ${pull.createdAt}`,
+      `Ветки: ${pull.head} → ${pull.base}`,
+      `Коммитов: ${data.commits}, файлов: ${data.changedFiles}, +${data.additions} −${data.deletions}`,
+      pull.labels.length
+        ? `Метки: ${pull.labels.map((label) => label.name).join(", ")}`
+        : "Метки: нет",
+      `Комментариев: ${data.comments.length}`,
+      reviews.length ? `Ревью (${reviews.length}):\n${reviews.join("\n")}` : "Ревью: нет",
+      files.length
+        ? `Файлы (${files.length}):\n${shown.join("\n")}${
+            files.length > shown.length ? `\n… ещё ${files.length - shown.length}` : ""
+          }`
+        : "Файлы: нет",
+      data.filesTruncated
+        ? `Файлы показаны не все (${data.files.length} из ${data.changedFiles}).`
+        : "",
+      data.commentsTruncated ? "Комментарии показаны не все." : "",
+      body,
+    ),
+  };
 });
 </script>
 

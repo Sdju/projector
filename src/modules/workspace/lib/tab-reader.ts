@@ -1,4 +1,5 @@
 import { commandArgs } from "../../../common/utilities/commands.ts";
+import { readTabReadout } from "../../../common/utilities/tab-readout.ts";
 import type { DockGroup, DockLayout } from "../../dock/index.ts";
 import type { TerminalSession } from "../../../../core/modules/terminal/index.ts";
 import type { TabRegistry } from "../../workspace-api/index.ts";
@@ -41,12 +42,14 @@ function kindOf(file: OpenFile | undefined, terminal: TerminalSession | undefine
 
 /** Текстовое представление файловой вкладки; для нетекстовых вкладок — описание. */
 function fileText(file: OpenFile, types: TabRegistry): { text?: string; note?: string } {
-  if (file.virtual)
-    return (
-      types.get(file.virtual)?.read?.(file.params ?? {}, file.content) ?? {
-        note: "Служебная вкладка с интерфейсом: у неё нет текстового содержимого",
-      }
-    );
+  if (file.virtual) {
+    // A mounted view publishes the live screen (selection, options, loaded data);
+    // the kind's static reader only knows params and content.
+    const live = readTabReadout(file.key);
+    const base = types.get(file.virtual)?.read?.(file.params ?? {}, file.content);
+    if (live || base) return { text: live?.text ?? base?.text, note: live?.note ?? base?.note };
+    return { note: "Служебная вкладка с интерфейсом: у неё нет текстового содержимого" };
+  }
   if (file.image) return { note: "Изображение: текстового содержимого нет" };
   if (file.archive)
     return {

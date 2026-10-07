@@ -14,6 +14,7 @@ import { useTabHost, useWorkspaceTabs } from "../lib/tab-views.ts";
 import FilePanel from "./FilePanel.vue";
 import NewSessionMenu from "./NewSessionMenu.vue";
 import PanelHost from "./PanelHost.vue";
+import TabReadoutScope from "../../../common/ui/TabReadoutScope.vue";
 import IconDiff from "~icons/lucide/file-diff";
 import IconRestart from "~icons/lucide/rotate-ccw";
 import IconFailed from "~icons/lucide/circle-slash";
@@ -158,7 +159,9 @@ const hostOf = (key: string) => props.panelHosts.hosts[key] ?? null;
         :class="viewOf(tab)?.scroll ? 'kept-scroll' : 'kept-panel'"
         :data-own-keys="viewOf(tab)?.ownKeys || undefined"
       >
-        <component :is="viewOf(tab)!.component" v-bind="viewOf(tab)!.props?.(tab, host)" />
+        <TabReadoutScope :tab-key="tab.key">
+          <component :is="viewOf(tab)!.component" v-bind="viewOf(tab)!.props?.(tab, host)" />
+        </TabReadoutScope>
       </div>
     </Teleport>
   </div>

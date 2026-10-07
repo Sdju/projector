@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { workspaceSiteUrl } from "../../workspace-api/index.ts";
 import { useTabHost, useWorkspaceTabs } from "../lib/tab-views.ts";
 import { isEditable, isHtml, isMarkdown, type OpenFile } from "../open-file.ts";
+import TabReadoutScope from "../../../common/ui/TabReadoutScope.vue";
 import {
   ArchiveViewer,
   CodeViewer,
@@ -40,7 +41,9 @@ const subtitle = computed(() =>
       {{ file.saveError }}
     </p>
     <div class="panel-body" :data-own-keys="view?.ownKeys || undefined">
-      <component :is="view.component" v-if="view" v-bind="view.props?.(file, host)" />
+      <TabReadoutScope v-if="view" :tab-key="file.key">
+        <component :is="view.component" v-bind="view.props?.(file, host)" />
+      </TabReadoutScope>
       <p v-else-if="file.binary && !file.image" class="file-error">
         Бинарный файл · {{ file.size }} байт
       </p>

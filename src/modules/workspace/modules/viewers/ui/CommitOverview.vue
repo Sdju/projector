@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import type { GitCommitDetail } from "../../../../../../core/modules/workspace/index.ts";
 import { commandArgs, useCommandScope } from "../../../../../common/utilities/commands.ts";
+import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab-readout.ts";
 import CommitFiles from "./CommitFiles.vue";
 import CommitMeta from "./CommitMeta.vue";
 import { useCommitDiffs } from "../lib/commit-diffs.ts";
@@ -34,6 +35,30 @@ const commands = useCommandScope(`commit:${props.projectId}:${props.hash}`, () =
   hash: props.hash,
 }));
 const textFiles = computed(() => (detail.value?.files ?? []).filter((file) => !file.binary));
+// Что штатный агент видит во вкладке обзора коммита: сообщение, автор, статистика и файлы.
+useTabReadout(() => {
+  if (error.value)
+    return { note: `Обзор коммита ${props.hash.slice(0, 7)}`, text: `Ошибка Git: ${error.value}` };
+  const data = detail.value;
+  if (!data) return { note: `Обзор коммита ${props.hash.slice(0, 7)}`, text: "Загрузка коммита…" };
+  const files = data.files.map(
+    (file) => `${file.status}\t+${file.additions} -${file.deletions}\t${file.path}`,
+  );
+  return {
+    note: `Обзор коммита ${data.hash.slice(0, 7)}`,
+    text: readoutLines(
+      `Коммит ${data.hash}`,
+      data.subject,
+      data.body,
+      `Автор: ${data.author} <${data.email}>, ${data.date}`,
+      data.refs.length ? `Refs: ${data.refs.map((ref) => ref.name).join(", ")}` : "",
+      data.parents.length ? `Родители: ${data.parents.join(", ")}` : "",
+      `Итого: +${data.additions} -${data.deletions}, файлов: ${data.files.length}`,
+      files.length ? `Файлы:\n${files.join("\n")}` : "Файлы: нет",
+      expanded.value.size ? `Раскрыты: ${[...expanded.value].join(", ")}` : "",
+    ),
+  };
+});
 commands.scope.registerCommand({
   id: "ide.git.commit.file.toggle",
   title: "Показать или скрыть код файла коммита",
