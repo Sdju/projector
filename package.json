@@ -30,7 +30,8 @@
     "test:live": "PROJECTOR_TEST_DOCKER=1 PROJECTOR_TEST_DEVCONTAINER=1 node --test --test-concurrency=1 tests/environment-live.test.mjs tests/reconcile.test.mjs tests/devcontainer-live.test.mjs tests/sigkill-live.test.mjs",
     "check": "vp run test && vp run test:docker && vp run build",
     "test:virtual-list": "node --test tests/virtual-list.test.mjs",
-    "test:tree": "node --test tests/tree-page.test.mjs tests/tree-pagination.test.mjs"
+    "test:tree": "node --test tests/tree-page.test.mjs tests/tree-pagination.test.mjs",
+    "prepare": "vp hooks enable"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.54",
