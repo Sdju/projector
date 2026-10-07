@@ -1,5 +1,8 @@
 import { ref } from "vue";
-import { defaultFilesExclude, type FilesExcludeMap } from "../../../../../../core/modules/workspace/index.ts";
+import {
+  defaultFilesExclude,
+  type FilesExcludeMap,
+} from "../../../../../../core/modules/workspace/index.ts";
 
 export const filesExcludeRevision = ref(0);
 

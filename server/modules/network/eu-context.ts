@@ -23,9 +23,7 @@ export async function assertEuNetworkContext(timeoutMs: number) {
     throw new Error("Не удалось проверить сетевой контекст");
   }
   const probe =
-    body && typeof body === "object"
-      ? (body as { success?: unknown; is_eu?: unknown })
-      : null;
+    body && typeof body === "object" ? (body as { success?: unknown; is_eu?: unknown }) : null;
   if (probe?.success !== true || probe.is_eu !== true)
     throw new Error("Не удалось проверить сетевой контекст");
 }

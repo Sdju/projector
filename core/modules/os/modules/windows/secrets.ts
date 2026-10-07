@@ -84,7 +84,8 @@ let availableCache: boolean | undefined;
 export function secretsAvailable(): Promise<boolean> {
   if (availableCache !== undefined) return Promise.resolve(availableCache);
   try {
-    availableCache = runPowerShellSync(HELPER, { env: { PROJECTOR_SECRET_OP: "available" } }).trim() === "yes";
+    availableCache =
+      runPowerShellSync(HELPER, { env: { PROJECTOR_SECRET_OP: "available" } }).trim() === "yes";
   } catch {
     availableCache = false;
   }

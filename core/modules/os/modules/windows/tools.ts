@@ -84,7 +84,8 @@ function killTree(pid: number) {
 
 export function runBash(command: string, options: { cwd: string; signal?: AbortSignal }) {
   const bash = bashExecutable();
-  if (!bash) return Promise.reject(new Error("Не найден Bash. Установите Git Bash или задайте SHELL"));
+  if (!bash)
+    return Promise.reject(new Error("Не найден Bash. Установите Git Bash или задайте SHELL"));
   return new Promise<{
     stdout: string;
     stderr: string;

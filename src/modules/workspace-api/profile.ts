@@ -85,25 +85,26 @@ export function profileCapabilities(profile: WorkspaceProfile): Readonly<Workspa
 }
 
 /** Which provider serves a read action; the table is the only place that knows the split. */
-const READ_DOMAIN: Record<string, "files" | "git" | "search" | "issues" | "pulls" | "discussions"> = {
-  tree: "files",
-  file: "files",
-  root: "files",
-  git: "git",
-  branches: "git",
-  log: "git",
-  commit: "git",
-  "commit-diff": "git",
-  diff: "git",
-  gutter: "git",
-  search: "search",
-  issues: "issues",
-  issue: "issues",
-  pulls: "pulls",
-  pull: "pulls",
-  discussions: "discussions",
-  discussion: "discussions",
-};
+const READ_DOMAIN: Record<string, "files" | "git" | "search" | "issues" | "pulls" | "discussions"> =
+  {
+    tree: "files",
+    file: "files",
+    root: "files",
+    git: "git",
+    branches: "git",
+    log: "git",
+    commit: "git",
+    "commit-diff": "git",
+    diff: "git",
+    gutter: "git",
+    search: "search",
+    issues: "issues",
+    issue: "issues",
+    pulls: "pulls",
+    pull: "pulls",
+    discussions: "discussions",
+    discussion: "discussions",
+  };
 export function readProviderFor(profile: WorkspaceProfile, action: string): ReadProvider {
   const domain = READ_DOMAIN[action];
   if (!domain) throw new Error(`Неизвестное действие workspace: ${action}`);

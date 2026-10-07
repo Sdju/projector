@@ -63,7 +63,9 @@ async function save(next: FilesExcludeMap) {
 }
 
 function validate(pattern: string) {
-  return isValidExcludePattern(pattern) ? "" : "Укажите glob-паттерн вроде **/node_modules или *.log";
+  return isValidExcludePattern(pattern)
+    ? ""
+    : "Укажите glob-паттерн вроде **/node_modules или *.log";
 }
 
 function add(pattern: string) {

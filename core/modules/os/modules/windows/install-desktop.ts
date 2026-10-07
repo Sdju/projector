@@ -12,7 +12,9 @@ export function installDesktop(root: string) {
   mkdirSync(icons, { recursive: true });
   mkdirSync(bin, { recursive: true });
   const source = existsSync(png) ? png : existsSync(svg) ? svg : "";
-  const installedIcon = source ? join(icons, source.endsWith(".svg") ? "projector.svg" : "projector.png") : "";
+  const installedIcon = source
+    ? join(icons, source.endsWith(".svg") ? "projector.svg" : "projector.png")
+    : "";
   if (source) copyFileSync(source, installedIcon);
   const command = join(bin, "projector.cmd");
   writeFileSync(command, `@echo off\r\n"${process.execPath}" "${launch}" %*\r\n`);

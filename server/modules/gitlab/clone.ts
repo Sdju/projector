@@ -19,7 +19,6 @@ export async function importGitlabProject(body: Record<string, unknown>) {
   return importRepository({
     directory: config.settings.directory || GITLAB_DIRECTORY,
     segments: project.path_with_namespace.split("/"),
-    clone: ({ checkout }) =>
-      cloneOverHttps(project.http_url_to_repo, checkout, token, credentials),
+    clone: ({ checkout }) => cloneOverHttps(project.http_url_to_repo, checkout, token, credentials),
   });
 }

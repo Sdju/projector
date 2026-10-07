@@ -15,5 +15,5 @@ peerDependencyRules:
   allowedVersions:
     vite: "*"
 minimumReleaseAgeExclude:
-  - '@o-feod/eslint-structure-plugin@0.1.3'
-  - '@o-feod/oxlint-structure-plugin@0.1.3'
+  - "@o-feod/eslint-structure-plugin@0.1.3"
+  - "@o-feod/oxlint-structure-plugin@0.1.3"

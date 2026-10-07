@@ -19,12 +19,15 @@ test("OS selection is automatic; unsupported systems never fall through to Linux
   const invocation = windows.shellLaunch({ kind: "command", command: "echo hi" });
   if (/powershell|pwsh/i.test(invocation.file)) assert.ok(invocation.args.includes("-Command"));
   else assert.deepEqual(invocation.args, ["-c", "echo hi"]);
-  await assert.rejects(windows.runDesktop("http://localhost", "show", {
-    dataDirectory: "x",
-    createPalette: async () => {
-      throw new Error("палитра не создаётся");
-    },
-  }), (error) => error instanceof UnsupportedPlatformError && error.code === "ERR_OS_UNSUPPORTED");
+  await assert.rejects(
+    windows.runDesktop("http://localhost", "show", {
+      dataDirectory: "x",
+      createPalette: async () => {
+        throw new Error("палитра не создаётся");
+      },
+    }),
+    (error) => error instanceof UnsupportedPlatformError && error.code === "ERR_OS_UNSUPPORTED",
+  );
   assert.deepEqual(await windows.shortcutStatus(), {
     supported: false,
     active: false,
@@ -152,12 +155,25 @@ test(
       }
     });
     await mkdir(join(root, "resources", "icons"), { recursive: true });
-    await cp(new URL("../resources/icons/projector.svg", import.meta.url), join(root, "resources", "icons", "projector.svg"));
+    await cp(
+      new URL("../resources/icons/projector.svg", import.meta.url),
+      join(root, "resources", "icons", "projector.svg"),
+    );
     os.installDesktop(root);
     const command = join(directory, "local", "bin", "projector.cmd");
     assert.match(await readFile(command, "utf8"), /checkout with spaces/);
     assert.equal(
-      existsSync(join(directory, "roaming", "Microsoft", "Windows", "Start Menu", "Programs", "Projector.lnk")),
+      existsSync(
+        join(
+          directory,
+          "roaming",
+          "Microsoft",
+          "Windows",
+          "Start Menu",
+          "Programs",
+          "Projector.lnk",
+        ),
+      ),
       true,
     );
   },

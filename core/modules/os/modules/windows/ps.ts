@@ -25,7 +25,14 @@ function script(body: string): string[] {
     ].join("\n"),
     "utf16le",
   ).toString("base64");
-  return ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encoded];
+  return [
+    "-NoProfile",
+    "-NonInteractive",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-EncodedCommand",
+    encoded,
+  ];
 }
 
 export function runPowerShell(

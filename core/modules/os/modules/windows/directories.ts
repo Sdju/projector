@@ -7,16 +7,12 @@ import { runPowerShell } from "./ps.ts";
 
 export function dataHome() {
   return (
-    process.env.XDG_DATA_HOME ||
-    process.env.LOCALAPPDATA ||
-    join(homedir(), "AppData", "Local")
+    process.env.XDG_DATA_HOME || process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local")
   );
 }
 export function configHome() {
   return (
-    process.env.XDG_CONFIG_HOME ||
-    process.env.APPDATA ||
-    join(homedir(), "AppData", "Roaming")
+    process.env.XDG_CONFIG_HOME || process.env.APPDATA || join(homedir(), "AppData", "Roaming")
   );
 }
 export function desktopPaths() {

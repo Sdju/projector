@@ -63,8 +63,15 @@ const selection = computed(() => {
     gap: 6px;
     padding-inline: 6px;
   }
-  .status-spacer, .status-group:empty { display: none; }
-  .status-group:not(:empty) { flex-basis: 100%; }
-  .status-bar :deep(.quota-bar:not(.tooltip-bar)) { min-width: 64px; }
+  .status-spacer,
+  .status-group:empty {
+    display: none;
+  }
+  .status-group:not(:empty) {
+    flex-basis: 100%;
+  }
+  .status-bar :deep(.quota-bar:not(.tooltip-bar)) {
+    min-width: 64px;
+  }
 }
 </style>

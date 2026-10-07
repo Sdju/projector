@@ -46,8 +46,7 @@ function isWindowsPath(path: string): boolean {
 export function pathToUrlSegments(path: string): string[] {
   if (!isWindowsPath(path)) return path === "/" ? [] : path.split("/").filter(Boolean);
   const posix = path.replaceAll("\\", "/");
-  if (posix.startsWith("//"))
-    return [UNC_SEGMENT, ...posix.slice(2).split("/").filter(Boolean)];
+  if (posix.startsWith("//")) return [UNC_SEGMENT, ...posix.slice(2).split("/").filter(Boolean)];
   return posix.split("/").filter(Boolean);
 }
 

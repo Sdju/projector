@@ -117,7 +117,12 @@ defineExpose({
 </script>
 
 <template>
-  <aside v-show="rail || !hidden" class="sidebar" :class="{ 'with-rail': rail }" aria-label="Обзор проекта">
+  <aside
+    v-show="rail || !hidden"
+    class="sidebar"
+    :class="{ 'with-rail': rail }"
+    aria-label="Обзор проекта"
+  >
     <SidebarTabs
       :section="section"
       :items="items"

@@ -13,7 +13,13 @@ test("usage cache survives loader replacement during a pending HMR request", asy
   t.mock.timers.enable({ apis: ["Date"], now: 100000 });
   const state = {};
   let finish;
-  const first = createUsageCache(state, () => new Promise((resolve) => { finish = resolve; }));
+  const first = createUsageCache(
+    state,
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
   const pending = first();
   let calls = 0;
   const replacement = createUsageCache(state, async () => {
@@ -34,7 +40,9 @@ test("usage cache survives loader replacement during a pending HMR request", asy
 
 test("failed cache loads release pending state so a later request can recover", async () => {
   const state = {};
-  const broken = createUsageCache(state, async () => { throw new Error("offline"); });
+  const broken = createUsageCache(state, async () => {
+    throw new Error("offline");
+  });
   await assert.rejects(broken(), /offline/);
   assert.equal(state.pending, undefined);
   const recovered = createUsageCache(state, async () => ({ checkedAt: Date.now() }));
@@ -47,9 +55,16 @@ function mountPolling(t, options) {
   const original = globalThis.document;
   globalThis.document = document;
   const renderer = createRenderer({
-    createComment: () => ({}), createText: () => ({}), createElement: () => ({}),
-    insert() {}, remove() {}, setText() {}, setElementText() {}, patchProp() {},
-    parentNode: () => null, nextSibling: () => null,
+    createComment: () => ({}),
+    createText: () => ({}),
+    createElement: () => ({}),
+    insert() {},
+    remove() {},
+    setText() {},
+    setElementText() {},
+    patchProp() {},
+    parentNode: () => null,
+    nextSibling: () => null,
   });
   let model;
   const app = renderer.createApp({
@@ -75,7 +90,8 @@ test("polling respects server retry time, hidden pages and unmount cleanup", asy
     return Response.json({ nextCheckAt: Date.now() + 3600000 });
   });
   const { model, document, app } = mountPolling(t, {
-    intervalMs: 300000, nextCheckAt: (value) => value.nextCheckAt,
+    intervalMs: 300000,
+    nextCheckAt: (value) => value.nextCheckAt,
   });
   await setImmediate();
   assert.equal(calls, 1);

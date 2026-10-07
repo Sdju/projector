@@ -106,7 +106,8 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
     },
     /** OS secret store (Linux: Secret Service over D-Bus). `available` never throws. */
     secrets: {
-      available: () => (supported ? backend("secrets.available").secretsAvailable() : Promise.resolve(false)),
+      available: () =>
+        supported ? backend("secrets.available").secretsAvailable() : Promise.resolve(false),
       get: (key: SecretKey) => backend("secrets.get").getSecret(key),
       set: (key: SecretKey, label: string, value: string) =>
         backend("secrets.set").setSecret(key, label, value),

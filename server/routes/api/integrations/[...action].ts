@@ -141,7 +141,9 @@ export async function handleIntegrationsActions({
       return true;
     }
     // Settings, token and repository list behave identically for every code host.
-    const hostMatch = path.match(/^\/api\/integrations\/(github|gitlab)(\/auth|\/token|\/repositories)?$/);
+    const hostMatch = path.match(
+      /^\/api\/integrations\/(github|gitlab)(\/auth|\/token|\/repositories)?$/,
+    );
     if (hostMatch) {
       const host = hosts[hostMatch[1] as keyof typeof hosts];
       const action = hostMatch[2] ?? "";

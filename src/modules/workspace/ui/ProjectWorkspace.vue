@@ -46,13 +46,8 @@ const tabTypes = useWorkspaceTabTypes(profile, props.tabViews, {
 });
 const workspaceElement = ref<HTMLElement>();
 const sidebarHidden = ref(false);
-const {
-  mobile,
-  mobileSurface,
-  mobileSidebarOpen,
-  sidebarInvisible,
-  showSidebar,
-} = useMobileSurfaces(sidebarHidden);
+const { mobile, mobileSurface, mobileSidebarOpen, sidebarInvisible, showSidebar } =
+  useMobileSurfaces(sidebarHidden);
 const { treeWidth, sizes, resizeTree, resizeTreeKey } = useSidebarResize(workspaceElement);
 const sidebar = ref<InstanceType<typeof WorkspaceSidebar>>();
 const editorCommands = useCommandScope(`editor:${props.projectId}`, () => ({
@@ -363,7 +358,10 @@ onBeforeUnmount(() => overview.cancel());
 .workspace {
   --rail-w: 40px;
   display: grid;
-  grid-template-columns: var(--tree-width, clamp(240px, 21vw, 320px)) var(--island-gap) minmax(0, 1fr);
+  grid-template-columns: var(--tree-width, clamp(240px, 21vw, 320px)) var(--island-gap) minmax(
+      0,
+      1fr
+    );
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   flex: 1;
   min-height: 0;

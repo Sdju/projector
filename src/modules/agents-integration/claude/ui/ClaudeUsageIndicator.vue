@@ -11,7 +11,8 @@ import { useCommandScope } from "../../../../common/utilities/commands.ts";
 import { resetCountdown, resetTimestamp } from "../../../../common/utilities/reset-time.ts";
 
 const { usage, failed } = useUsagePolling<ClaudeUsage>("/api/claude/usage", {
-  intervalMs: 300000, nextCheckAt: (value) => value.nextCheckAt,
+  intervalMs: 300000,
+  nextCheckAt: (value) => value.nextCheckAt,
 });
 const now = useNow({ scheduler: (update) => useIntervalFn(update, 1000) });
 type WindowName = keyof NonNullable<ClaudeUsage["windows"]>;
@@ -24,18 +25,21 @@ const periods = {
 };
 const tickPositions = {
   rolling: [20, 40, 60, 80],
-  weekly: Array.from({ length: 6 }, (_, day) => (day + 1) / 7 * 100),
+  weekly: Array.from({ length: 6 }, (_, day) => ((day + 1) / 7) * 100),
 };
 const selectedWindow = ref<WindowName>("weekly");
 const commands = useCommandScope(`claudeUsage:${useId()}`, () => ({
-  surface: "statusBar", window: selectedWindow.value,
+  surface: "statusBar",
+  window: selectedWindow.value,
 }));
 commands.scope.registerCommand({
   id: "ide.claude.usage.window.cycle",
   title: "Переключить отображаемый лимит Claude Code",
-  description: "Меняет окно индикатора Claude Code в статусной строке: 5 часов → неделя. Не запрашивает лимиты заново.",
+  description:
+    "Меняет окно индикатора Claude Code в статусной строке: 5 часов → неделя. Не запрашивает лимиты заново.",
   run: () => {
-    selectedWindow.value = windowOrder[(windowOrder.indexOf(selectedWindow.value) + 1) % windowOrder.length]!;
+    selectedWindow.value =
+      windowOrder[(windowOrder.indexOf(selectedWindow.value) + 1) % windowOrder.length]!;
     return { window: selectedWindow.value };
   },
 });
@@ -48,7 +52,11 @@ const selectedTone = computed(() => {
   const window = usage.value?.windows?.[selectedWindow.value];
   if (failed.value || usage.value?.status !== "ready" || !window) return null;
   return usagePaceTone(
-    window.usedPercent, window.resetsAt, periods[selectedWindow.value], now.value.getTime(), window.limited,
+    window.usedPercent,
+    window.resetsAt,
+    periods[selectedWindow.value],
+    now.value.getTime(),
+    window.limited,
   );
 });
 publishAgentUsage("claude", remaining, selectedTone);
@@ -56,14 +64,22 @@ const tooltipRows = computed(() => {
   if (failed.value || usage.value?.status !== "ready" || !usage.value.windows) return [];
   const windows = usage.value.windows;
   const at = now.value.getTime();
-  return (Object.keys(shortLabels) as WindowName[]).filter((name) => windows[name]).map((name) => ({
-    name, label: shortLabels[name], remaining: Math.round(100 - windows[name]!.usedPercent),
-    countdown: resetCountdown(windows[name]!.resetsAt, at),
-    limited: windows[name]!.limited,
-    tone: usagePaceTone(
-      windows[name]!.usedPercent, windows[name]!.resetsAt, periods[name], at, windows[name]!.limited,
-    ),
-  }));
+  return (Object.keys(shortLabels) as WindowName[])
+    .filter((name) => windows[name])
+    .map((name) => ({
+      name,
+      label: shortLabels[name],
+      remaining: Math.round(100 - windows[name]!.usedPercent),
+      countdown: resetCountdown(windows[name]!.resetsAt, at),
+      limited: windows[name]!.limited,
+      tone: usagePaceTone(
+        windows[name]!.usedPercent,
+        windows[name]!.resetsAt,
+        periods[name],
+        at,
+        windows[name]!.limited,
+      ),
+    }));
 });
 const tooltip = computed(() => {
   const heading = `Claude Code · ${labels[selectedWindow.value]}`;
@@ -72,12 +88,16 @@ const tooltip = computed(() => {
   const windows = usage.value.windows;
   if (usage.value.status !== "ready" || !windows)
     return `${heading}\n${usage.value.message ?? "Лимиты недоступны"}`;
-  return [`${heading} · остаток`, ...Object.entries(labels).map(([name, label]) => {
-    const window = windows[name as keyof typeof windows];
-    if (!window) return `${label}: —`;
-    const reset = resetCountdown(window.resetsAt, now.value.getTime());
-    return `${label}: ${Math.round(100 - window.usedPercent)}%${window.limited ? " · исчерпан" : ""} · ${reset} (${resetTimestamp(window.resetsAt)})`;
-  }), "Клик — сменить лимит"].join("\n");
+  return [
+    `${heading} · остаток`,
+    ...Object.entries(labels).map(([name, label]) => {
+      const window = windows[name as keyof typeof windows];
+      if (!window) return `${label}: —`;
+      const reset = resetCountdown(window.resetsAt, now.value.getTime());
+      return `${label}: ${Math.round(100 - window.usedPercent)}%${window.limited ? " · исчерпан" : ""} · ${reset} (${resetTimestamp(window.resetsAt)})`;
+    }),
+    "Клик — сменить лимит",
+  ].join("\n");
 });
 </script>
 
@@ -132,15 +152,26 @@ const tooltip = computed(() => {
   font: inherit;
   cursor: pointer;
 }
-.tone-spare { color: var(--info); }
-.tone-normal { color: var(--muted); }
-.tone-hot { color: var(--warn); }
-.tone-over { color: var(--err); }
+.tone-spare {
+  color: var(--info);
+}
+.tone-normal {
+  color: var(--muted);
+}
+.tone-hot {
+  color: var(--warn);
+}
+.tone-over {
+  color: var(--err);
+}
 .claude-icon {
   width: 13px;
   height: 13px;
 }
-.tooltip-heading { display: block; margin-bottom: 5px; }
+.tooltip-heading {
+  display: block;
+  margin-bottom: 5px;
+}
 .quota-row {
   display: grid;
   grid-template-columns: 26px 160px;
@@ -148,7 +179,11 @@ const tooltip = computed(() => {
   gap: 6px;
   margin-bottom: 4px;
 }
-.tooltip-hint { display: block; margin-top: 5px; color: var(--muted); }
+.tooltip-hint {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+}
 .quota-tooltip {
   position: absolute;
   z-index: 30;

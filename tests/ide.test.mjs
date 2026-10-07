@@ -457,7 +457,8 @@ test("files exclude defaults, persist globs, reject invalid patterns and protect
   const directory = await mkdtemp(join(tmpdir(), "projector-files-exclude-"));
   const previous = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = directory;
-  const { readFilesExclude, writeFilesExclude } = await import("../server/modules/workspace/index.ts");
+  const { readFilesExclude, writeFilesExclude } =
+    await import("../server/modules/workspace/index.ts");
   const { defaultFilesExclude } = await import("../core/modules/workspace/index.ts");
   const { createServer } = await import("node:http");
   const { once } = await import("node:events");
@@ -481,7 +482,8 @@ test("files exclude defaults, persist globs, reject invalid patterns and protect
     });
   assert.deepEqual(await readFilesExclude(), defaultFilesExclude());
   assert.equal(
-    (await put({ ...defaultFilesExclude(), "**/node_modules": false }, "https://foreign.test")).status,
+    (await put({ ...defaultFilesExclude(), "**/node_modules": false }, "https://foreign.test"))
+      .status,
     403,
   );
   assert.equal((await put({ ...defaultFilesExclude(), "**/node_modules": false })).status, 200);

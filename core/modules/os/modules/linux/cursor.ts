@@ -6,14 +6,15 @@ import { configHome } from "./directories.ts";
 export async function readCursorAccessToken(): Promise<string> {
   let auth: unknown;
   try {
-    const content = process.env.CURSOR_AUTH_CONTENT ??
-      await readFile(join(configHome(), "cursor", "auth.json"), "utf8");
+    const content =
+      process.env.CURSOR_AUTH_CONTENT ??
+      (await readFile(join(configHome(), "cursor", "auth.json"), "utf8"));
     auth = JSON.parse(content);
   } catch {
     throw new Error("Авторизация Cursor недоступна; выполните agent login");
   }
-  const token = auth && typeof auth === "object"
-    ? (auth as Record<string, unknown>).accessToken : null;
+  const token =
+    auth && typeof auth === "object" ? (auth as Record<string, unknown>).accessToken : null;
   if (typeof token !== "string" || !token.trim())
     throw new Error("Авторизация Cursor недоступна; выполните agent login");
   return token;

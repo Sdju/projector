@@ -1,10 +1,14 @@
 import { createUsageCache } from "../_/usage-cache.ts";
-import type { CursorUsage, CursorUsageWindow } from "../../../../core/modules/agents-integration/cursor/index.ts";
+import type {
+  CursorUsage,
+  CursorUsageWindow,
+} from "../../../../core/modules/agents-integration/cursor/index.ts";
 import { readCursorUsage } from "./client.ts";
 
 const record = (value: unknown): Record<string, unknown> | null =>
   value !== null && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown> : null;
+    ? (value as Record<string, unknown>)
+    : null;
 
 function percent(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return null;
@@ -26,7 +30,9 @@ export function cursorWindows(payload: unknown): CursorUsage["windows"] {
   const plan = record(body?.planUsage);
   if (!plan) return null;
   const reset = resetsAt(body?.billingCycleEnd);
-  function window(name: "totalPercentUsed" | "autoPercentUsed" | "apiPercentUsed"): CursorUsageWindow | null {
+  function window(
+    name: "totalPercentUsed" | "autoPercentUsed" | "apiPercentUsed",
+  ): CursorUsageWindow | null {
     const used = percent(plan?.[name]);
     if (used === null) return null;
     return { usedPercent: used, resetsAt: reset, limited: used >= 100 };
@@ -47,12 +53,16 @@ export const cursorUsage = createUsageCache(state, async (): Promise<CursorUsage
   try {
     const windows = cursorWindows(await readCursorUsage());
     return {
-      status: windows ? "ready" : "unavailable", windows, checkedAt: Date.now(),
+      status: windows ? "ready" : "unavailable",
+      windows,
+      checkedAt: Date.now(),
       message: windows ? null : "Лимиты Cursor недоступны",
     };
   } catch (error) {
     return {
-      status: "unavailable", windows: null, checkedAt: Date.now(),
+      status: "unavailable",
+      windows: null,
+      checkedAt: Date.now(),
       message: error instanceof Error ? error.message : "Cursor недоступен",
     };
   }

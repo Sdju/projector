@@ -12,10 +12,15 @@ export function createUsageCache<T extends { checkedAt: number }>(
   return () => {
     if (state.pending) return state.pending;
     if (state.value && Date.now() < expiresAt(state.value)) return Promise.resolve(state.value);
-    state.pending = Promise.resolve().then(load).then((value) => {
-      state.value = value;
-      return value;
-    }).finally(() => { state.pending = undefined; });
+    state.pending = Promise.resolve()
+      .then(load)
+      .then((value) => {
+        state.value = value;
+        return value;
+      })
+      .finally(() => {
+        state.pending = undefined;
+      });
     return state.pending;
   };
 }

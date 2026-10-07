@@ -130,12 +130,12 @@ defineExpose({ open, openForElement, close });
           @click="activate(item)"
         >
           <span class="item-label"
-            ><component :is="item.icon" v-if="item.icon" aria-hidden="true" />{{
-              item.label
-            }}</span
-          ><span v-if="item.hint" class="hint" :class="item.hint.tone && `tone-${item.hint.tone}`">{{
-            item.hint.text
-          }}</span
+            ><component :is="item.icon" v-if="item.icon" aria-hidden="true" />{{ item.label }}</span
+          ><span
+            v-if="item.hint"
+            class="hint"
+            :class="item.hint.tone && `tone-${item.hint.tone}`"
+            >{{ item.hint.text }}</span
           ><kbd v-if="item.shortcut">{{ item.shortcut }}</kbd>
         </button>
       </template>

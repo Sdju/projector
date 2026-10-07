@@ -38,7 +38,9 @@ test("local directory paging sorts globally, preserves filters and serves every 
   const root = await mkdtemp(join(tmpdir(), "projector-tree-page-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   for (let offset = 0; offset < entries.length; offset += 30)
-    await Promise.all(entries.slice(offset, offset + 30).map((entry) => writeFile(join(root, entry.name), "")));
+    await Promise.all(
+      entries.slice(offset, offset + 30).map((entry) => writeFile(join(root, entry.name), "")),
+    );
   await mkdir(join(root, "z-folder"));
   await mkdir(join(root, "node_modules"));
   const first = await listProjectDirectory(root, "", { limit: "30" });

@@ -19,12 +19,17 @@ defineProps<{
     class="quota-bar"
     :class="[
       tone ? `tone-${tone}` : undefined,
-      { unavailable: remaining === null, exhausted, compact, 'tooltip-bar': countdown !== undefined },
+      {
+        unavailable: remaining === null,
+        exhausted,
+        compact,
+        'tooltip-bar': countdown !== undefined,
+      },
     ]"
     :role="ariaLabel && remaining !== null ? 'meter' : undefined"
     :aria-valuemin="ariaLabel && remaining !== null ? 0 : undefined"
     :aria-valuemax="ariaLabel && remaining !== null ? 100 : undefined"
-    :aria-valuenow="ariaLabel ? remaining ?? undefined : undefined"
+    :aria-valuenow="ariaLabel ? (remaining ?? undefined) : undefined"
     :aria-label="ariaLabel"
   >
     <span v-if="remaining !== null" class="quota-fill" :style="{ width: `${remaining}%` }" />
@@ -36,7 +41,9 @@ defineProps<{
       aria-hidden="true"
     />
     <span class="quota-label">
-      <span>{{ prefix ? `${prefix} · ` : "" }}{{ remaining === null ? "—" : `${remaining}%` }}</span>
+      <span
+        >{{ prefix ? `${prefix} · ` : "" }}{{ remaining === null ? "—" : `${remaining}%` }}</span
+      >
       <span v-if="countdown !== undefined" class="quota-time">{{ countdown }}</span>
     </span>
   </span>
@@ -52,7 +59,9 @@ defineProps<{
   border-radius: 3px;
   background: var(--bg-sunken);
 }
-.compact { min-width: 64px; }
+.compact {
+  min-width: 64px;
+}
 .quota-fill {
   position: absolute;
   inset: 0 auto 0 0;
@@ -72,7 +81,9 @@ defineProps<{
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
-.quota-time { opacity: 0.7; }
+.quota-time {
+  opacity: 0.7;
+}
 .quota-tick {
   position: absolute;
   top: 0;
@@ -81,12 +92,31 @@ defineProps<{
   background: color-mix(in srgb, currentColor 25%, transparent);
   pointer-events: none;
 }
-.tooltip-bar { height: 18px; }
-.tooltip-bar .quota-label { justify-content: space-between; }
-.exhausted { border-color: var(--muted); }
-.unavailable .quota-label { color: var(--muted); }
-.tone-spare { color: var(--info); border-color: color-mix(in srgb, var(--info) 55%, var(--line)); }
-.tone-normal { color: var(--muted); }
-.tone-hot { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 55%, var(--line)); }
-.tone-over { color: var(--err); border-color: color-mix(in srgb, var(--err) 55%, var(--line)); }
+.tooltip-bar {
+  height: 18px;
+}
+.tooltip-bar .quota-label {
+  justify-content: space-between;
+}
+.exhausted {
+  border-color: var(--muted);
+}
+.unavailable .quota-label {
+  color: var(--muted);
+}
+.tone-spare {
+  color: var(--info);
+  border-color: color-mix(in srgb, var(--info) 55%, var(--line));
+}
+.tone-normal {
+  color: var(--muted);
+}
+.tone-hot {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 55%, var(--line));
+}
+.tone-over {
+  color: var(--err);
+  border-color: color-mix(in srgb, var(--err) 55%, var(--line));
+}
 </style>

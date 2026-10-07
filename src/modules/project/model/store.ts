@@ -93,10 +93,16 @@ export function useProjects() {
   }
 
   /** `missing` — the project is saved but its folder no longer exists. */
-  async function openPath(path: string): Promise<{ project: Project; missing: boolean; created: boolean }> {
+  async function openPath(
+    path: string,
+  ): Promise<{ project: Project; missing: boolean; created: boolean }> {
     const data = await resolveProject(path);
     ingest(data.project);
-    return { project: data.project, missing: data.missing === true, created: data.created === true };
+    return {
+      project: data.project,
+      missing: data.missing === true,
+      created: data.created === true,
+    };
   }
 
   async function restoreDirectory(

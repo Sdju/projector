@@ -15,7 +15,9 @@ export function fetchProjects(): Promise<{ projects: Project[] }> {
   return request("/api/projects");
 }
 
-export function resolveProject(path: string): Promise<{ project: Project; missing?: boolean; created?: boolean }> {
+export function resolveProject(
+  path: string,
+): Promise<{ project: Project; missing?: boolean; created?: boolean }> {
   return request("/api/projects/resolve", { method: "POST", body: JSON.stringify({ path }) });
 }
 

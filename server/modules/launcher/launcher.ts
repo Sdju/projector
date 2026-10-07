@@ -153,8 +153,10 @@ export async function searchLauncher(
   query: string,
 ): Promise<{ items: LaunchItem[]; warning?: string }> {
   const parsed = parseLaunchQuery(query);
-  if (parsed.scope === "github") return searchHosted(GITHUB, () => searchGithubRepositories(parsed.text));
-  if (parsed.scope === "gitlab") return searchHosted(GITLAB, () => searchGitlabProjects(parsed.text));
+  if (parsed.scope === "github")
+    return searchHosted(GITHUB, () => searchGithubRepositories(parsed.text));
+  if (parsed.scope === "gitlab")
+    return searchHosted(GITLAB, () => searchGitlabProjects(parsed.text));
   let warning: string | undefined;
   const [apps, projects, prefs] = await Promise.all([
     applications().catch(() => {
@@ -259,7 +261,8 @@ export async function launchItem(
     return result;
   }
   if (id.startsWith("gl:")) {
-    if (action && action !== "import") throw new Error("Для проекта GitLab доступно только клонирование");
+    if (action && action !== "import")
+      throw new Error("Для проекта GitLab доступно только клонирование");
     const { project } = await importGitlabProject({ repository: id.slice(3) });
     result.route = workspaceRoute(project.path);
     if (!inline) await openRoute(result.route);

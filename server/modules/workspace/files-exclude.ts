@@ -17,7 +17,10 @@ let pending: Promise<unknown> = Promise.resolve();
 let cache: { path: string; value: FilesExcludeMap; patterns?: string[] } | undefined;
 
 /** Run workspace code against an in-memory exclude map (parallel-safe in tests). */
-export function withFilesExclude<T>(exclude: FilesExcludeMap, run: () => Promise<T> | T): Promise<T> {
+export function withFilesExclude<T>(
+  exclude: FilesExcludeMap,
+  run: () => Promise<T> | T,
+): Promise<T> {
   return override.run(normalizeFilesExclude(exclude), () => Promise.resolve(run()));
 }
 

@@ -83,8 +83,7 @@ function suggestInit(instance: unknown) {
   const id = initProjectId;
   initProjectId = "";
   const agent = useAgent(id);
-  if (!agent.draft.value.trim() && !agent.turns.value.length)
-    agent.draft.value = projectInitPrompt;
+  if (!agent.draft.value.trim() && !agent.turns.value.length) agent.draft.value = projectInitPrompt;
   workspace.value.openTab("agent");
 }
 const missing = ref(false);

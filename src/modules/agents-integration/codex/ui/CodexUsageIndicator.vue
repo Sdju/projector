@@ -25,7 +25,10 @@ const periodSeconds = computed(() => {
 const tone = computed(() => {
   if (failed.value || usage.value?.status !== "ready" || !weekly.value) return null;
   return usagePaceTone(
-    weekly.value.usedPercent, weekly.value.resetsAt, periodSeconds.value, now.value.getTime(),
+    weekly.value.usedPercent,
+    weekly.value.resetsAt,
+    periodSeconds.value,
+    now.value.getTime(),
   );
 });
 publishAgentUsage("codex", remaining, tone);
@@ -40,7 +43,12 @@ const tooltip = computed(() => {
 </script>
 
 <template>
-  <span class="codex-usage" :class="tone ? `tone-${tone}` : undefined" :aria-label="tooltip" tabindex="0">
+  <span
+    class="codex-usage"
+    :class="tone ? `tone-${tone}` : undefined"
+    :aria-label="tooltip"
+    tabindex="0"
+  >
     <IconCodex class="codex-icon" aria-hidden="true" />
     <UsageMeter
       :remaining="remaining"
@@ -56,7 +64,7 @@ const tooltip = computed(() => {
           <UsageMeter
             :remaining="remaining"
             :countdown="countdown"
-            :ticks="Array.from({ length: 6 }, (_, day) => (day + 1) / 7 * 100)"
+            :ticks="Array.from({ length: 6 }, (_, day) => ((day + 1) / 7) * 100)"
             :tone="tone"
           />
         </span>
@@ -75,16 +83,32 @@ const tooltip = computed(() => {
   flex-shrink: 0;
   outline-offset: 2px;
 }
-.tone-spare { color: var(--info); }
-.tone-normal { color: var(--muted); }
-.tone-hot { color: var(--warn); }
-.tone-over { color: var(--err); }
+.tone-spare {
+  color: var(--info);
+}
+.tone-normal {
+  color: var(--muted);
+}
+.tone-hot {
+  color: var(--warn);
+}
+.tone-over {
+  color: var(--err);
+}
 .codex-icon {
   width: 13px;
   height: 13px;
 }
-.tooltip-heading { display: block; margin-bottom: 5px; }
-.quota-row { display: grid; grid-template-columns: 26px 160px; align-items: center; gap: 6px; }
+.tooltip-heading {
+  display: block;
+  margin-bottom: 5px;
+}
+.quota-row {
+  display: grid;
+  grid-template-columns: 26px 160px;
+  align-items: center;
+  gap: 6px;
+}
 .quota-tooltip {
   position: absolute;
   z-index: 30;

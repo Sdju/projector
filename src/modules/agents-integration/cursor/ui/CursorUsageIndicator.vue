@@ -17,10 +17,11 @@ const windowOrder: WindowName[] = ["total", "auto", "api"];
 const labels = { total: "Всего", auto: "Авто", api: "API" };
 const shortLabels = { total: "вс", auto: "авт", api: "API" };
 // Cursor billing cycle is monthly; day ticks match OpenCode monthly scale.
-const monthTicks = [7, 14, 21, 28].map((day) => day / 30 * 100);
+const monthTicks = [7, 14, 21, 28].map((day) => (day / 30) * 100);
 const selectedWindow = ref<WindowName>("total");
 const commands = useCommandScope(`cursorUsage:${useId()}`, () => ({
-  surface: "statusBar", window: selectedWindow.value,
+  surface: "statusBar",
+  window: selectedWindow.value,
 }));
 commands.scope.registerCommand({
   id: "ide.cursor.usage.window.cycle",
@@ -28,7 +29,8 @@ commands.scope.registerCommand({
   description:
     "Меняет окно индикатора Cursor в статусной строке: всего → авто → API. Не запрашивает лимиты заново.",
   run: () => {
-    selectedWindow.value = windowOrder[(windowOrder.indexOf(selectedWindow.value) + 1) % windowOrder.length]!;
+    selectedWindow.value =
+      windowOrder[(windowOrder.indexOf(selectedWindow.value) + 1) % windowOrder.length]!;
     return { window: selectedWindow.value };
   },
 });
@@ -40,7 +42,11 @@ const selectedTone = computed(() => {
   const window = usage.value?.windows?.[selectedWindow.value];
   if (failed.value || usage.value?.status !== "ready" || !window) return null;
   return usagePaceTone(
-    window.usedPercent, window.resetsAt, USAGE_PERIOD_SECONDS.month, now.value.getTime(), window.limited,
+    window.usedPercent,
+    window.resetsAt,
+    USAGE_PERIOD_SECONDS.month,
+    now.value.getTime(),
+    window.limited,
   );
 });
 publishAgentUsage("cursor", remaining, selectedTone);
@@ -49,11 +55,17 @@ const tooltipRows = computed(() => {
   const windows = usage.value.windows;
   const at = now.value.getTime();
   return (Object.keys(shortLabels) as WindowName[]).map((name) => ({
-    name, label: shortLabels[name], remaining: Math.round(100 - windows[name].usedPercent),
+    name,
+    label: shortLabels[name],
+    remaining: Math.round(100 - windows[name].usedPercent),
     countdown: resetCountdown(windows[name].resetsAt, at),
     limited: windows[name].limited,
     tone: usagePaceTone(
-      windows[name].usedPercent, windows[name].resetsAt, USAGE_PERIOD_SECONDS.month, at, windows[name].limited,
+      windows[name].usedPercent,
+      windows[name].resetsAt,
+      USAGE_PERIOD_SECONDS.month,
+      at,
+      windows[name].limited,
     ),
   }));
 });
@@ -64,11 +76,15 @@ const tooltip = computed(() => {
   const windows = usage.value.windows;
   if (remaining.value === null || !windows)
     return `${heading}\n${usage.value.message ?? "Лимиты недоступны"}`;
-  return [`${heading} · остаток`, ...Object.entries(labels).map(([name, label]) => {
-    const window = windows[name as keyof typeof windows];
-    const reset = resetCountdown(window.resetsAt, now.value.getTime());
-    return `${label}: ${Math.round(100 - window.usedPercent)}%${window.limited ? " · исчерпан" : ""} · ${reset} (${resetTimestamp(window.resetsAt)})`;
-  }), "Клик — сменить лимит"].join("\n");
+  return [
+    `${heading} · остаток`,
+    ...Object.entries(labels).map(([name, label]) => {
+      const window = windows[name as keyof typeof windows];
+      const reset = resetCountdown(window.resetsAt, now.value.getTime());
+      return `${label}: ${Math.round(100 - window.usedPercent)}%${window.limited ? " · исчерпан" : ""} · ${reset} (${resetTimestamp(window.resetsAt)})`;
+    }),
+    "Клик — сменить лимит",
+  ].join("\n");
 });
 </script>
 
@@ -123,15 +139,26 @@ const tooltip = computed(() => {
   font: inherit;
   cursor: pointer;
 }
-.tone-spare { color: var(--info); }
-.tone-normal { color: var(--muted); }
-.tone-hot { color: var(--warn); }
-.tone-over { color: var(--err); }
+.tone-spare {
+  color: var(--info);
+}
+.tone-normal {
+  color: var(--muted);
+}
+.tone-hot {
+  color: var(--warn);
+}
+.tone-over {
+  color: var(--err);
+}
 .cursor-icon {
   width: 13px;
   height: 13px;
 }
-.tooltip-heading { display: block; margin-bottom: 5px; }
+.tooltip-heading {
+  display: block;
+  margin-bottom: 5px;
+}
 .quota-row {
   display: grid;
   grid-template-columns: 26px 160px;
@@ -139,7 +166,11 @@ const tooltip = computed(() => {
   gap: 6px;
   margin-bottom: 4px;
 }
-.tooltip-hint { display: block; margin-top: 5px; color: var(--muted); }
+.tooltip-hint {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+}
 .quota-tooltip {
   position: absolute;
   z-index: 30;

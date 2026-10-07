@@ -15,6 +15,9 @@ export function resetCountdown(resetsAt: number | null | undefined, now = Date.n
 export function resetTimestamp(resetsAt: number | null | undefined): string {
   if (!resetsAt || !Number.isFinite(resetsAt)) return "—";
   return new Date(resetsAt * 1000).toLocaleString(undefined, {
-    day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }

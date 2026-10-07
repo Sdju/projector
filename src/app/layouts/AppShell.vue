@@ -3,11 +3,7 @@ import { useCommandScope, commandArgs } from "../../common/utilities/commands.ts
 import { computed, ref } from "vue";
 import { githubProjectRoute } from "../../../core/modules/github/index.ts";
 import { useRoute, useRouter } from "vue-router";
-import {
-  useProjects,
-  projectRoute,
-  type ProjectLocation,
-} from "../../modules/project/index.ts";
+import { useProjects, projectRoute, type ProjectLocation } from "../../modules/project/index.ts";
 import { ProjectSwitcher, MobileProjectPicker } from "../../modules/catalog/index.ts";
 import { isFileDrag, pathsFromDataTransfer } from "../../modules/path-drop/index.ts";
 
@@ -120,12 +116,7 @@ const navigatePath = (path: string) =>
         :navigate="navigatePath"
       />
       <div v-if="currentProject" id="header-tools" class="header-tools" />
-      <router-link
-        v-else
-        class="brand"
-        to="/"
-        title="Открыть поиск"
-      >
+      <router-link v-else class="brand" to="/" title="Открыть поиск">
         <span>projector</span>
       </router-link>
       <nav class="nav">

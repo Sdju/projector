@@ -93,7 +93,10 @@ function globToRegExp(glob: string): RegExp {
 
 /** Match a project-relative POSIX path against one glob (VS Code–like). */
 export function matchGlob(path: string, pattern: string): boolean {
-  const input = path.replaceAll("\\", "/").replace(/^\.\/+/, "").replace(/\/+$/, "");
+  const input = path
+    .replaceAll("\\", "/")
+    .replace(/^\.\/+/, "")
+    .replace(/\/+$/, "");
   let glob = pattern.replaceAll("\\", "/").replace(/^\.\/+/, "");
   if (glob.endsWith("/")) glob = glob.slice(0, -1);
   if (!input || !glob) return false;

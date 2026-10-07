@@ -45,7 +45,10 @@ await test("the default vault never reaches production secrets under the test ru
   const vault = createVault();
   assert.equal((await vault.storage()).backend, "file");
   await assert.rejects(vault.get("integration:github"), /Tests cannot access/);
-  await assert.rejects(vault.set("integration:github", "test", "replacement"), /Tests cannot access/);
+  await assert.rejects(
+    vault.set("integration:github", "test", "replacement"),
+    /Tests cannot access/,
+  );
   await assert.rejects(vault.delete("integration:github"), /Tests cannot access/);
   assert.equal(calls, 0);
 });

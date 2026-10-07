@@ -9,12 +9,14 @@ const token = ref("");
 const busy = ref(false);
 const error = ref("");
 const commands = useCommandScope(`github-connection:${props.repository}`, () => ({
-  surface: "github-integration", repository: props.repository,
+  surface: "github-integration",
+  repository: props.repository,
 }));
 commands.scope.registerCommand({
   id: "ide.github.integration.connect",
   title: "Подключить GitHub",
-  description: "Подключает GitHub с токеном, введённым в форме интеграции, и открывает репозиторий.",
+  description:
+    "Подключает GitHub с токеном, введённым в форме интеграции, и открывает репозиторий.",
   enabled: () => !busy.value && !!token.value.trim(),
   async run() {
     busy.value = true;
@@ -55,21 +57,51 @@ commands.scope.registerCommand({
         type="submit"
         data-command="ide.github.integration.connect"
         :disabled="busy || !token.trim()"
-      >{{ busy ? "Подключаю…" : "Подключить GitHub" }}</UiButton>
+        >{{ busy ? "Подключаю…" : "Подключить GitHub" }}</UiButton
+      >
     </form>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
-    <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">Создать токен в GitHub ↗</a>
+    <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer"
+      >Создать токен в GitHub ↗</a
+    >
   </section>
 </template>
 
 <style scoped>
-.connection { max-width: 460px; padding: var(--sp-5); }
-h2 { font-size: var(--fs-md); font-weight: 500; margin: 0 0 var(--sp-3); }
-p, a, label { font-size: var(--fs-sm); }
-p, a { color: var(--muted); }
-form { display: grid; gap: var(--sp-3); margin: var(--sp-4) 0; }
-input { min-width: 0; width: 100%; }
-form :deep(button) { justify-self: start; }
-a { text-decoration: underline; }
-.error { color: var(--err); }
+.connection {
+  max-width: 460px;
+  padding: var(--sp-5);
+}
+h2 {
+  font-size: var(--fs-md);
+  font-weight: 500;
+  margin: 0 0 var(--sp-3);
+}
+p,
+a,
+label {
+  font-size: var(--fs-sm);
+}
+p,
+a {
+  color: var(--muted);
+}
+form {
+  display: grid;
+  gap: var(--sp-3);
+  margin: var(--sp-4) 0;
+}
+input {
+  min-width: 0;
+  width: 100%;
+}
+form :deep(button) {
+  justify-self: start;
+}
+a {
+  text-decoration: underline;
+}
+.error {
+  color: var(--err);
+}
 </style>

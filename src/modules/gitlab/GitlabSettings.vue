@@ -158,9 +158,9 @@ commands.scope.registerCommand({
       />
       <form class="block" @submit.prevent="commands.run('ide.gitlab.integration.connect')">
         <p class="muted help">
-          Personal Access Token со scope <code>read_api</code> и <code>read_repository</code>
-          (<code>{{ url || "https://gitlab.com" }}/-/user_settings/personal_access_tokens</code>).
-          Подключение токеном автоматически включит интеграцию.
+          Personal Access Token со scope <code>read_api</code> и <code>read_repository</code> (<code
+            >{{ url || "https://gitlab.com" }}/-/user_settings/personal_access_tokens</code
+          >). Подключение токеном автоматически включит интеграцию.
         </p>
         <label
           >Токен GitLab<input

@@ -1,5 +1,9 @@
 import { githubProjectRoute } from "../../../core/modules/github/index.ts";
-import { parseProjectRef, pathFromUrlSegments, pathToUrlSegments } from "../../../core/modules/project/index.ts";
+import {
+  parseProjectRef,
+  pathFromUrlSegments,
+  pathToUrlSegments,
+} from "../../../core/modules/project/index.ts";
 /** Route params are already decoded by Vue Router. */
 export function projectPathFromParams(value: string | string[] | undefined): string {
   const parts = Array.isArray(value) ? value : (value ?? "").split("/");

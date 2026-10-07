@@ -12,9 +12,7 @@ import { parseProjectRef, projectRefSegments } from "../core/modules/project/ind
 test("project URLs round-trip nested paths, root and reserved characters", () => {
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [
-      { path: "/projects/:projectPath(.*)+", name: "project", component: {} },
-    ],
+    routes: [{ path: "/projects/:projectPath(.*)+", name: "project", component: {} }],
   });
   for (const path of ["/", "/tmp/nested/project", "/tmp/проект # ? %/child", "/tmp/%2F"]) {
     const route = router.resolve(projectRoute(path));

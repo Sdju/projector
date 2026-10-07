@@ -282,64 +282,64 @@ test("tree move destinations and open-file paths respect directory boundaries", 
 
 test("moves preserve contents, never overwrite, and reject self, traversal, excluded and symlink paths", async () => {
   await withDefaultExcludes(async () => {
-  const base = await mkdtemp(join(tmpdir(), "projector-move-"));
-  try {
-    for (const folder of ["src/nested", "docs", "other", ".git", "node_modules"])
-      await mkdir(join(base, folder), { recursive: true });
-    await writeFile(join(base, "src/nested/файл с пробелом.ts"), "preserved");
-    await writeFile(join(base, "docs/collision"), "destination");
-    await writeFile(join(base, "src/collision"), "source");
-    await symlink(join(base, "docs"), join(base, "alias"));
-    await symlink("/etc", join(base, "external"));
-    await symlink(join(base, "missing"), join(base, "docs/dangling"));
-    await writeFile(join(base, "src/dangling"), "keep");
-    assert.deepEqual(await moveProjectEntry(base, "src/nested/файл с пробелом.ts", "docs"), {
-      source: "src/nested/файл с пробелом.ts",
-      destination: "docs/файл с пробелом.ts",
-    });
-    assert.equal(await readFile(join(base, "docs/файл с пробелом.ts"), "utf8"), "preserved");
-    await moveProjectEntry(base, "docs/файл с пробелом.ts", "");
-    assert.equal(await readFile(join(base, "файл с пробелом.ts"), "utf8"), "preserved");
-    await assert.rejects(moveProjectEntry(base, "src/collision", "docs"), { status: 409 });
-    assert.equal(await readFile(join(base, "src/collision"), "utf8"), "source");
-    assert.equal(await readFile(join(base, "docs/collision"), "utf8"), "destination");
-    await assert.rejects(moveProjectEntry(base, "src/dangling", "docs"), { status: 409 });
-    for (const [source, target, status] of [
-      ["", "docs", 400],
-      ["src", "src/nested", 400],
-      ["src", "src", 400],
-      ["src/collision", "src", 400],
-      ["../outside", "docs", 403],
-      ["/etc/passwd", "docs", 403],
-      ["src/collision", "../outside", 403],
-      ["src/collision", "alias", 403],
-      ["alias/collision", "other", 403],
-      ["src/collision", "external", 403],
-      ["src/collision", ".git", 403],
-      ["node_modules", "docs", 403],
-      ["src/./collision", "docs", 403],
-      ["src/collision", "src/dangling", 400],
-    ])
-      await assert.rejects(moveProjectEntry(base, source, target), { status });
-    await moveProjectEntry(base, "src", "other");
-    assert.ok((await lstat(join(base, "other/src/nested"))).isDirectory());
-    assert.equal(await readFile(join(base, "other/src/collision"), "utf8"), "source");
-    await writeFile(join(base, "docs/race"), "one");
-    await writeFile(join(base, "other/race"), "two");
-    const results = await Promise.allSettled([
-      moveProjectEntry(base, "docs/race", ""),
-      moveProjectEntry(base, "other/race", ""),
-    ]);
-    assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
-    assert.equal(results.find((result) => result.status === "rejected").reason.status, 409);
-    const winner = await readFile(join(base, "race"), "utf8");
-    assert.equal(
-      await readFile(join(base, winner === "one" ? "other/race" : "docs/race"), "utf8"),
-      winner === "one" ? "two" : "one",
-    );
-  } finally {
-    await rm(base, { recursive: true, force: true });
-  }
+    const base = await mkdtemp(join(tmpdir(), "projector-move-"));
+    try {
+      for (const folder of ["src/nested", "docs", "other", ".git", "node_modules"])
+        await mkdir(join(base, folder), { recursive: true });
+      await writeFile(join(base, "src/nested/файл с пробелом.ts"), "preserved");
+      await writeFile(join(base, "docs/collision"), "destination");
+      await writeFile(join(base, "src/collision"), "source");
+      await symlink(join(base, "docs"), join(base, "alias"));
+      await symlink("/etc", join(base, "external"));
+      await symlink(join(base, "missing"), join(base, "docs/dangling"));
+      await writeFile(join(base, "src/dangling"), "keep");
+      assert.deepEqual(await moveProjectEntry(base, "src/nested/файл с пробелом.ts", "docs"), {
+        source: "src/nested/файл с пробелом.ts",
+        destination: "docs/файл с пробелом.ts",
+      });
+      assert.equal(await readFile(join(base, "docs/файл с пробелом.ts"), "utf8"), "preserved");
+      await moveProjectEntry(base, "docs/файл с пробелом.ts", "");
+      assert.equal(await readFile(join(base, "файл с пробелом.ts"), "utf8"), "preserved");
+      await assert.rejects(moveProjectEntry(base, "src/collision", "docs"), { status: 409 });
+      assert.equal(await readFile(join(base, "src/collision"), "utf8"), "source");
+      assert.equal(await readFile(join(base, "docs/collision"), "utf8"), "destination");
+      await assert.rejects(moveProjectEntry(base, "src/dangling", "docs"), { status: 409 });
+      for (const [source, target, status] of [
+        ["", "docs", 400],
+        ["src", "src/nested", 400],
+        ["src", "src", 400],
+        ["src/collision", "src", 400],
+        ["../outside", "docs", 403],
+        ["/etc/passwd", "docs", 403],
+        ["src/collision", "../outside", 403],
+        ["src/collision", "alias", 403],
+        ["alias/collision", "other", 403],
+        ["src/collision", "external", 403],
+        ["src/collision", ".git", 403],
+        ["node_modules", "docs", 403],
+        ["src/./collision", "docs", 403],
+        ["src/collision", "src/dangling", 400],
+      ])
+        await assert.rejects(moveProjectEntry(base, source, target), { status });
+      await moveProjectEntry(base, "src", "other");
+      assert.ok((await lstat(join(base, "other/src/nested"))).isDirectory());
+      assert.equal(await readFile(join(base, "other/src/collision"), "utf8"), "source");
+      await writeFile(join(base, "docs/race"), "one");
+      await writeFile(join(base, "other/race"), "two");
+      const results = await Promise.allSettled([
+        moveProjectEntry(base, "docs/race", ""),
+        moveProjectEntry(base, "other/race", ""),
+      ]);
+      assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+      assert.equal(results.find((result) => result.status === "rejected").reason.status, 409);
+      const winner = await readFile(join(base, "race"), "utf8");
+      assert.equal(
+        await readFile(join(base, winner === "one" ? "other/race" : "docs/race"), "utf8"),
+        winner === "one" ? "two" : "one",
+      );
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
   });
 });
 
@@ -370,66 +370,66 @@ test("files exclude setting controls tree visibility for node_modules", async ()
 
 test("workspace tree, bounded reading, traversal and symlink containment, literal search", async () => {
   await withDefaultExcludes(async () => {
-  try {
-    await mkdir(join(root, "src"));
-    await mkdir(join(root, "node_modules"));
-    await writeFile(join(root, ".gitignore"), "ignored.txt\n");
-    await writeFile(join(root, "src/code.ts"), 'const word = "Привет [world]";\n');
-    await writeFile(join(root, "ignored.txt"), "[world]");
-    await writeFile(join(root, "node_modules/dependency.js"), "[world]");
-    await writeFile(join(root, "binary"), Buffer.from([0, 1]));
-    await writeFile(join(root, "large"), Buffer.alloc(1024 * 1024 + 1, 65));
-    await symlink("/etc", join(root, "external"));
-    const tree = await listProjectDirectory(root);
-    assert.equal(tree.entries[0].directory, true);
-    assert.ok(tree.entries.some((entry) => entry.name === ".gitignore"));
-    assert.ok(!tree.entries.some((entry) => ["node_modules", "external"].includes(entry.name)));
-    assert.match((await readProjectFile(root, "src/code.ts")).content, /Привет/);
-    await assert.rejects(readProjectFile(root, "../outside"), { status: 403 });
-    await assert.rejects(readProjectFile(root, "/etc/passwd"), { status: 403 });
-    await assert.rejects(readProjectFile(root, "external/passwd"), { status: 403 });
-    await assert.rejects(readProjectFile(root, "binary"), { status: 415 });
-    await assert.rejects(readProjectFile(root, "large"), { status: 413 });
-    assert.equal((await projectGit(root)).available, false);
-    git("init", "-q");
-    git("config", "user.name", "Workspace Test");
-    git("config", "user.email", "test@example.test");
-    const search = await searchProject(root, "[WORLD]");
-    assert.deepEqual(
-      search.hits.map((hit) => [hit.path, hit.line, hit.column]),
-      [["src/code.ts", 1, 22]],
-    );
-    git("add", "src/code.ts", ".gitignore");
-    git("commit", "-qm", "initial");
-    await writeFile(join(root, "src/code.ts"), "staged\n");
-    git("add", "src/code.ts");
-    await writeFile(join(root, "src/code.ts"), "working\n");
-    const staged = await projectComparison(root, "src/code.ts", true);
-    assert.match(staged.original, /Привет/);
-    assert.equal(staged.modified, "staged\n");
-    const working = await projectComparison(root, "src/code.ts", false);
-    assert.equal(working.original, "staged\n");
-    assert.equal(working.modified, "working\n");
-    const nested = await projectGit(join(root, "src"));
-    assert.equal(nested.changes[0].path, "code.ts");
-    assert.equal(
-      (await projectComparison(join(root, "src"), "code.ts", false)).original,
-      "staged\n",
-    );
-    await writeFile(join(root, "new file.ts"), "new\n");
-    assert.equal((await projectComparison(root, "new file.ts", false)).original, "");
-    git("reset", "--hard", "-q");
-    git("mv", "src/code.ts", "src/renamed.ts");
-    const rename = await projectComparison(root, "src/renamed.ts", true);
-    assert.match(rename.original, /Привет/);
-    assert.equal(rename.modified, rename.original);
-    git("reset", "--hard", "-q");
-    await rm(join(root, "src/code.ts"));
-    assert.equal((await projectComparison(root, "src/code.ts", false)).modified, "");
-    await assert.rejects(projectComparison(root, "../outside", false), { status: 403 });
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
+    try {
+      await mkdir(join(root, "src"));
+      await mkdir(join(root, "node_modules"));
+      await writeFile(join(root, ".gitignore"), "ignored.txt\n");
+      await writeFile(join(root, "src/code.ts"), 'const word = "Привет [world]";\n');
+      await writeFile(join(root, "ignored.txt"), "[world]");
+      await writeFile(join(root, "node_modules/dependency.js"), "[world]");
+      await writeFile(join(root, "binary"), Buffer.from([0, 1]));
+      await writeFile(join(root, "large"), Buffer.alloc(1024 * 1024 + 1, 65));
+      await symlink("/etc", join(root, "external"));
+      const tree = await listProjectDirectory(root);
+      assert.equal(tree.entries[0].directory, true);
+      assert.ok(tree.entries.some((entry) => entry.name === ".gitignore"));
+      assert.ok(!tree.entries.some((entry) => ["node_modules", "external"].includes(entry.name)));
+      assert.match((await readProjectFile(root, "src/code.ts")).content, /Привет/);
+      await assert.rejects(readProjectFile(root, "../outside"), { status: 403 });
+      await assert.rejects(readProjectFile(root, "/etc/passwd"), { status: 403 });
+      await assert.rejects(readProjectFile(root, "external/passwd"), { status: 403 });
+      await assert.rejects(readProjectFile(root, "binary"), { status: 415 });
+      await assert.rejects(readProjectFile(root, "large"), { status: 413 });
+      assert.equal((await projectGit(root)).available, false);
+      git("init", "-q");
+      git("config", "user.name", "Workspace Test");
+      git("config", "user.email", "test@example.test");
+      const search = await searchProject(root, "[WORLD]");
+      assert.deepEqual(
+        search.hits.map((hit) => [hit.path, hit.line, hit.column]),
+        [["src/code.ts", 1, 22]],
+      );
+      git("add", "src/code.ts", ".gitignore");
+      git("commit", "-qm", "initial");
+      await writeFile(join(root, "src/code.ts"), "staged\n");
+      git("add", "src/code.ts");
+      await writeFile(join(root, "src/code.ts"), "working\n");
+      const staged = await projectComparison(root, "src/code.ts", true);
+      assert.match(staged.original, /Привет/);
+      assert.equal(staged.modified, "staged\n");
+      const working = await projectComparison(root, "src/code.ts", false);
+      assert.equal(working.original, "staged\n");
+      assert.equal(working.modified, "working\n");
+      const nested = await projectGit(join(root, "src"));
+      assert.equal(nested.changes[0].path, "code.ts");
+      assert.equal(
+        (await projectComparison(join(root, "src"), "code.ts", false)).original,
+        "staged\n",
+      );
+      await writeFile(join(root, "new file.ts"), "new\n");
+      assert.equal((await projectComparison(root, "new file.ts", false)).original, "");
+      git("reset", "--hard", "-q");
+      git("mv", "src/code.ts", "src/renamed.ts");
+      const rename = await projectComparison(root, "src/renamed.ts", true);
+      assert.match(rename.original, /Привет/);
+      assert.equal(rename.modified, rename.original);
+      git("reset", "--hard", "-q");
+      await rm(join(root, "src/code.ts"));
+      assert.equal((await projectComparison(root, "src/code.ts", false)).modified, "");
+      await assert.rejects(projectComparison(root, "../outside", false), { status: 403 });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
 

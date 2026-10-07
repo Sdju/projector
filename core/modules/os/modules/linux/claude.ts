@@ -11,10 +11,10 @@ export async function readClaudeAccessToken(): Promise<string> {
   } catch {
     throw new Error("Авторизация Claude Code недоступна; выполните claude auth login");
   }
-  const oauth = auth && typeof auth === "object"
-    ? (auth as Record<string, unknown>).claudeAiOauth : null;
-  const token = oauth && typeof oauth === "object"
-    ? (oauth as Record<string, unknown>).accessToken : null;
+  const oauth =
+    auth && typeof auth === "object" ? (auth as Record<string, unknown>).claudeAiOauth : null;
+  const token =
+    oauth && typeof oauth === "object" ? (oauth as Record<string, unknown>).accessToken : null;
   if (typeof token !== "string" || !token.trim())
     throw new Error("Claude Code не подключён через OAuth; выполните claude auth login");
   return token;

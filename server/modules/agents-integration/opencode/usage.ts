@@ -1,10 +1,14 @@
 import { createUsageCache } from "../_/usage-cache.ts";
-import type { OpenCodeUsage, OpenCodeUsageWindow } from "../../../../core/modules/agents-integration/opencode/index.ts";
+import type {
+  OpenCodeUsage,
+  OpenCodeUsageWindow,
+} from "../../../../core/modules/agents-integration/opencode/index.ts";
 import { readGoUsage } from "./client.ts";
 
 const record = (value: unknown): Record<string, unknown> | null =>
   value !== null && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown> : null;
+    ? (value as Record<string, unknown>)
+    : null;
 
 export function goWindows(payload: unknown): OpenCodeUsage["windows"] {
   const usage = record(record(payload)?.usage);
@@ -22,7 +26,9 @@ export function goWindows(payload: unknown): OpenCodeUsage["windows"] {
       limited,
     };
   }
-  const rolling = window("rolling"), weekly = window("weekly"), monthly = window("monthly");
+  const rolling = window("rolling"),
+    weekly = window("weekly"),
+    monthly = window("monthly");
   return rolling && weekly && monthly ? { rolling, weekly, monthly } : null;
 }
 
@@ -36,12 +42,16 @@ export const openCodeUsage = createUsageCache(state, async (): Promise<OpenCodeU
   try {
     const windows = goWindows(await readGoUsage());
     return {
-      status: windows ? "ready" : "unavailable", windows, checkedAt: Date.now(),
+      status: windows ? "ready" : "unavailable",
+      windows,
+      checkedAt: Date.now(),
       message: windows ? null : "Лимиты OpenCode Go недоступны",
     };
   } catch (error) {
     return {
-      status: "unavailable", windows: null, checkedAt: Date.now(),
+      status: "unavailable",
+      windows: null,
+      checkedAt: Date.now(),
       message: error instanceof Error ? error.message : "OpenCode Go недоступен",
     };
   }

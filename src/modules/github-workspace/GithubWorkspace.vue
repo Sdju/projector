@@ -38,7 +38,7 @@ commands.scope.registerCommand({
   title: "Обновить репозиторий GitHub",
   description: "Перечитывает GitHub и обновляет общий workspace без клонирования.",
   enabled: () => !!workspace.value,
-  run: () => needsConnection.value ? loadRepository() : workspace.value?.refresh(),
+  run: () => (needsConnection.value ? loadRepository() : workspace.value?.refresh()),
 });
 commands.scope.registerCommand({
   id: "ide.github.repository.info",
@@ -87,14 +87,16 @@ async function loadRepository() {
     if (disposed) return;
     if (err instanceof GithubRequestError && err.status === 401) {
       disconnect?.();
-      disconnect = registerWorkspaceProfile(projectId, createGithubConnectionProfile(props.repository));
+      disconnect = registerWorkspaceProfile(
+        projectId,
+        createGithubConnectionProfile(props.repository),
+      );
       metadata.value = undefined;
       needsConnection.value = true;
       openedInitial = false;
       workspaceVersion.value++;
       profileReady.value = true;
-    } else
-      error.value = err instanceof Error ? err.message : "Не удалось открыть репозиторий";
+    } else error.value = err instanceof Error ? err.message : "Не удалось открыть репозиторий";
   }
 }
 onMounted(loadRepository);
@@ -125,15 +127,27 @@ onBeforeUnmount(() => {
 });
 </script>
 <template>
-  <ProjectWorkspace v-if="profileReady" :key="workspaceVersion" :ref="ready" :project-id="projectId" :tab-views="tabViews">
+  <ProjectWorkspace
+    v-if="profileReady"
+    :key="workspaceVersion"
+    :ref="ready"
+    :project-id="projectId"
+    :tab-views="tabViews"
+  >
     <template #terminal-actions>
       <UiButton
         icon
         size="sm"
         :title="needsConnection ? 'Подключить GitHub' : 'Информация о репозитории'"
         :aria-label="needsConnection ? 'Подключить GitHub' : 'Информация о репозитории'"
-        :data-command="needsConnection ? 'ide.github.integration.open' : 'ide.github.repository.info'"
-        @click="commands.run(needsConnection ? 'ide.github.integration.open' : 'ide.github.repository.info')"
+        :data-command="
+          needsConnection ? 'ide.github.integration.open' : 'ide.github.repository.info'
+        "
+        @click="
+          commands.run(
+            needsConnection ? 'ide.github.integration.open' : 'ide.github.repository.info',
+          )
+        "
       >
         <IconGithub aria-hidden="true" />
       </UiButton>

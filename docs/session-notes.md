@@ -11,7 +11,7 @@
 | `server/modules/launcher`, `server/modules/preferences`                                  | Поиск, история, настройки интерфейса и хоткея                                                                  |
 | `server/modules/window`                                                                  | Вызов native, Chromium, активация и скрытие в X11                                                              |
 | `native/app/entry.ts`, `native/modules/desktop`                                          | Запуск desktop через OS-адаптер, Vue/GTK-палитра и контроллер                                                  |
-| `core/modules/os`, закрытые `modules/linux` и `modules/windows`                          | Выбор ОС, каталоги, процессы, утилиты; Linux: X11, GIO, D-Bus, трей; Windows: Win32, меню Пуск |
+| `core/modules/os`, закрытые `modules/linux` и `modules/windows`                          | Выбор ОС, каталоги, процессы, утилиты; Linux: X11, GIO, D-Bus, трей; Windows: Win32, меню Пуск                 |
 | `core/modules/launcher`                                                                  | Общие контракты, HTTP-клиент и модель поведения DOM/GTK-палитры                                                |
 | `packages/vio`                                                                           | Независимый Vue renderer для GTK4, SFC loader, стили и demo                                                    |
 | `server/modules/processes`, `server/modules/terminal`, `server/modules/terminal-control` | Процессы проектов, PTY, WebSocket экрана и управления сессиями                                                 |

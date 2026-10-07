@@ -53,7 +53,10 @@ await test("GitLab integration connects with a token, searches and imports neste
     assert.equal(options.env.PROJECTOR_GITLAB_TOKEN, secret);
     void (async () => {
       await mkdir(args.at(-1), { recursive: true });
-      await writeFile(join(args.at(-1), "package.json"), JSON.stringify({ name: "app", scripts: { dev: "vite" } }));
+      await writeFile(
+        join(args.at(-1), "package.json"),
+        JSON.stringify({ name: "app", scripts: { dev: "vite" } }),
+      );
       callback(null, "", "");
     })().catch(callback);
     return { on() {} };
@@ -102,12 +105,19 @@ await test("GitLab integration connects with a token, searches and imports neste
 
   const { searchGitlabProjects } = await import("../server/modules/gitlab/index.ts");
   for (const query of ["", "team/", "TEAM/to", "to", "tools/app", "app"])
-    assert.deepEqual((await searchGitlabProjects(query)).map((hit) => hit.fullName), ["team/tools/app"], query);
+    assert.deepEqual(
+      (await searchGitlabProjects(query)).map((hit) => hit.fullName),
+      ["team/tools/app"],
+      query,
+    );
   for (const query of ["other/", "zzz", "team/zzz"])
     assert.deepEqual(await searchGitlabProjects(query), [], query);
 
   assert.equal((await request("/gitlab/import", "POST", { repository: "a/../b" })).status, 400);
-  assert.equal((await request("/gitlab/import", "POST", { repository: "team/missing" })).status, 404);
+  assert.equal(
+    (await request("/gitlab/import", "POST", { repository: "team/missing" })).status,
+    404,
+  );
   const imported = await request("/gitlab/import", "POST", {
     repository: `${host}/team/tools/app/-/tree/main`,
   });
@@ -115,9 +125,16 @@ await test("GitLab integration connects with a token, searches and imports neste
   assert.equal(imported.data.project.path, join(directory, "team", "tools", "app"));
   assert.equal(imported.data.project.commands[0].cmd.includes("dev"), true);
   assert.deepEqual(clones, [`${host}/team/tools/app.git`]);
-  assert.equal((await request("/gitlab/import", "POST", { repository: "team/tools/app" })).status, 409);
+  assert.equal(
+    (await request("/gitlab/import", "POST", { repository: "team/tools/app" })).status,
+    409,
+  );
 
   // Another instance address drops the token that belonged to the old one.
-  const moved = await request("/gitlab", "PUT", { enabled: true, url: "https://other.example.com", directory });
+  const moved = await request("/gitlab", "PUT", {
+    enabled: true,
+    url: "https://other.example.com",
+    directory,
+  });
   assert.equal(moved.data.connected, false);
 });

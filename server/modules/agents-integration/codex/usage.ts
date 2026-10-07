@@ -1,5 +1,8 @@
 import { createUsageCache } from "../_/usage-cache.ts";
-import type { CodexUsage, CodexUsageWindow } from "../../../../core/modules/agents-integration/codex/index.ts";
+import type {
+  CodexUsage,
+  CodexUsageWindow,
+} from "../../../../core/modules/agents-integration/codex/index.ts";
 import { readCodexRateLimits } from "./cli.ts";
 
 const record = (value: unknown): Record<string, unknown> | null =>

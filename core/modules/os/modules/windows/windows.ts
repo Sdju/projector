@@ -4,12 +4,42 @@ import { join } from "node:path";
 import { runPowerShellSync } from "./ps.ts";
 
 const BROWSERS = [
-  join(process.env.ProgramFiles || "C:\\Program Files", "Google", "Chrome", "Application", "chrome.exe"),
+  join(
+    process.env.ProgramFiles || "C:\\Program Files",
+    "Google",
+    "Chrome",
+    "Application",
+    "chrome.exe",
+  ),
   join(process.env.LOCALAPPDATA || "", "Google", "Chrome", "Application", "chrome.exe"),
-  join(process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)", "Microsoft", "Edge", "Application", "msedge.exe"),
-  join(process.env.ProgramFiles || "C:\\Program Files", "Microsoft", "Edge", "Application", "msedge.exe"),
-  join(process.env.ProgramFiles || "C:\\Program Files", "BraveSoftware", "Brave-Browser", "Application", "brave.exe"),
-  join(process.env.LOCALAPPDATA || "", "BraveSoftware", "Brave-Browser", "Application", "brave.exe"),
+  join(
+    process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)",
+    "Microsoft",
+    "Edge",
+    "Application",
+    "msedge.exe",
+  ),
+  join(
+    process.env.ProgramFiles || "C:\\Program Files",
+    "Microsoft",
+    "Edge",
+    "Application",
+    "msedge.exe",
+  ),
+  join(
+    process.env.ProgramFiles || "C:\\Program Files",
+    "BraveSoftware",
+    "Brave-Browser",
+    "Application",
+    "brave.exe",
+  ),
+  join(
+    process.env.LOCALAPPDATA || "",
+    "BraveSoftware",
+    "Brave-Browser",
+    "Application",
+    "brave.exe",
+  ),
 ];
 
 function findBrowser(): string | null {
@@ -128,15 +158,30 @@ export function openOrFocusApp(url: string, appClass: string, profile: string): 
 
 export function hidePalette(appClass: string): void {
   const hwnd = paletteHwnd(appClass);
-  if (hwnd) windowCall({ PROJECTOR_WINDOW_OP: "hide", PROJECTOR_HWND: hwnd, PROJECTOR_APP_CLASS: appClass });
+  if (hwnd)
+    windowCall({
+      PROJECTOR_WINDOW_OP: "hide",
+      PROJECTOR_HWND: hwnd,
+      PROJECTOR_APP_CLASS: appClass,
+    });
 }
 
-export function openWebPalette(url: string, toggle: boolean, appClass: string, profile: string): void {
+export function openWebPalette(
+  url: string,
+  toggle: boolean,
+  appClass: string,
+  profile: string,
+): void {
   const hwnd = paletteHwnd(appClass);
   if (hwnd) {
     const active = windowCall({ PROJECTOR_WINDOW_OP: "foreground", PROJECTOR_APP_CLASS: appClass });
     if (toggle && active === hwnd) hidePalette(appClass);
-    else windowCall({ PROJECTOR_WINDOW_OP: "show", PROJECTOR_HWND: hwnd, PROJECTOR_APP_CLASS: appClass });
+    else
+      windowCall({
+        PROJECTOR_WINDOW_OP: "show",
+        PROJECTOR_HWND: hwnd,
+        PROJECTOR_APP_CLASS: appClass,
+      });
     return;
   }
   const browser = findBrowser();
@@ -155,7 +200,12 @@ export function openWebPalette(url: string, toggle: boolean, appClass: string, p
 
 export function closePalette(appClass: string): void {
   const hwnd = paletteHwnd(appClass);
-  if (hwnd) windowCall({ PROJECTOR_WINDOW_OP: "close", PROJECTOR_HWND: hwnd, PROJECTOR_APP_CLASS: appClass });
+  if (hwnd)
+    windowCall({
+      PROJECTOR_WINDOW_OP: "close",
+      PROJECTOR_HWND: hwnd,
+      PROJECTOR_APP_CLASS: appClass,
+    });
 }
 
 export function activateWindow(id: number | bigint): void {

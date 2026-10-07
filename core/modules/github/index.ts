@@ -40,7 +40,8 @@ export function githubProjectRoute(repository: string): string {
   return `/gh/projects/${name.split("/").map(encodeURIComponent).join("/")}`;
 }
 
-const REMOTE_URL = /^(?:https?|git|ssh):\/\/(?:[^@/]+@)?(?:ssh\.)?github\.com(?::\d+)?\/([^/?#]+)\/([^/?#]+)/i;
+const REMOTE_URL =
+  /^(?:https?|git|ssh):\/\/(?:[^@/]+@)?(?:ssh\.)?github\.com(?::\d+)?\/([^/?#]+)\/([^/?#]+)/i;
 const REMOTE_SCP = /^(?:[^@/]+@)?github\.com:([^/]+)\/(.+)$/i;
 
 /**

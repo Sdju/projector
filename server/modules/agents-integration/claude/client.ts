@@ -36,11 +36,16 @@ export async function readClaudeUsage(timeoutMs = 10000): Promise<unknown> {
     const delay = retryAfterMs(response.headers.get("retry-after"));
     await response.body?.cancel();
     if (response.status === 401)
-      throw new ClaudeUsageError("Авторизация Claude Code истекла; откройте Claude Code или выполните claude auth login");
+      throw new ClaudeUsageError(
+        "Авторизация Claude Code истекла; откройте Claude Code или выполните claude auth login",
+      );
     if (response.status === 403)
       throw new ClaudeUsageError("Лимиты подписки Claude Code недоступны для этой авторизации");
     if (response.status === 429)
-      throw new ClaudeUsageError("Claude Code: запросы лимитов временно ограничены; повторим позже", delay ?? 0);
+      throw new ClaudeUsageError(
+        "Claude Code: запросы лимитов временно ограничены; повторим позже",
+        delay ?? 0,
+      );
     throw new ClaudeUsageError(`Claude Code: ошибка HTTP ${response.status}`);
   }
   try {

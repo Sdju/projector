@@ -1,8 +1,7 @@
 import { os } from "../../../../core/modules/os/index.ts";
 import { assertEuNetworkContext } from "../../network/index.ts";
 
-const USAGE_URL =
-  "https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage";
+const USAGE_URL = "https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage";
 
 /** Fixed official destination, bounded request, no upstream body in errors. */
 export async function readCursorUsage(timeoutMs = 10000): Promise<unknown> {

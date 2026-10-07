@@ -21,7 +21,7 @@ function parseLine(line: string): ProcessInfo | null {
 }
 
 const ROW =
-  'Write-Output ($p.ProcessId.ToString() + [char]9 + $p.ParentProcessId.ToString() + [char]9 + $name + [char]9 + $p.CreationDate.ToFileTime().ToString())';
+  "Write-Output ($p.ProcessId.ToString() + [char]9 + $p.ParentProcessId.ToString() + [char]9 + $name + [char]9 + $p.CreationDate.ToFileTime().ToString())";
 
 const LIST_SCRIPT = `
 Get-CimInstance Win32_Process | ForEach-Object {

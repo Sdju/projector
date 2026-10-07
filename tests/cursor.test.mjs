@@ -41,10 +41,13 @@ test("Cursor windows normalize percentages, billing reset and exhausted limits",
   );
   assert.equal(cursorWindows({ ...payload, billingCycleEnd: "invalid" }).total.resetsAt, null);
   for (const value of [-1, NaN, Infinity, "42", null])
-    assert.equal(cursorWindows({
-      ...payload,
-      planUsage: { ...payload.planUsage, weekly: value, autoPercentUsed: value },
-    }), null);
+    assert.equal(
+      cursorWindows({
+        ...payload,
+        planUsage: { ...payload.planUsage, weekly: value, autoPercentUsed: value },
+      }),
+      null,
+    );
   for (const value of [null, {}, { planUsage: [] }, { planUsage: { totalPercentUsed: 1 } }])
     assert.equal(cursorWindows(value), null);
 });
@@ -65,7 +68,9 @@ test("Cursor reads existing auth, bounds and sanitizes requests, shares cached A
   try {
     await t.test("missing auth is explicit and never leaks file contents", async () => {
       await writeFile(authFile, JSON.stringify({ refreshToken: "only-refresh" }));
-      globalThis.fetch = () => { throw new Error("must not request without access token"); };
+      globalThis.fetch = () => {
+        throw new Error("must not request without access token");
+      };
       const result = await cursorUsage();
       assert.equal(result.status, "unavailable");
       assert.match(result.message, /Авторизация Cursor недоступна/);
@@ -111,7 +116,14 @@ test("Cursor reads existing auth, bounds and sanitizes requests, shares cached A
       assert.equal(await cursorUsage(), a);
       const headers = {};
       let body;
-      const res = { setHeader: (key, value) => { headers[key] = value; }, end: (value) => { body = value; } };
+      const res = {
+        setHeader: (key, value) => {
+          headers[key] = value;
+        },
+        end: (value) => {
+          body = value;
+        },
+      };
       assert.equal(await handleCursor({ res, method: "GET", path: "/api/cursor/usage" }), true);
       assert.equal(headers["Cache-Control"], "no-store");
       assert.equal(res.statusCode, 200);
@@ -183,8 +195,11 @@ test("Cursor reads existing auth, bounds and sanitizes requests, shares cached A
         });
       };
       const keepAlive = setInterval(() => {}, 100);
-      try { await assert.rejects(readCursorUsage(20), /Не удалось получить лимиты/); }
-      finally { clearInterval(keepAlive); }
+      try {
+        await assert.rejects(readCursorUsage(20), /Не удалось получить лимиты/);
+      } finally {
+        clearInterval(keepAlive);
+      }
     });
   } finally {
     globalThis.fetch = previousFetch;

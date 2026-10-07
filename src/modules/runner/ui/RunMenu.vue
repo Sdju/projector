@@ -41,8 +41,12 @@ const defaultCommand = computed(
 const runningName = computed(
   () => props.project.runtime?.commandName ?? defaultCommand.value?.name ?? "запуск",
 );
-const label = computed(() => (busy.value ? runningName.value : (defaultCommand.value?.name ?? "—")));
-const stateLabel = computed(() => (busy.value ? "работает" : status.value === "stopping" ? "останавливается" : ""));
+const label = computed(() =>
+  busy.value ? runningName.value : (defaultCommand.value?.name ?? "—"),
+);
+const stateLabel = computed(() =>
+  busy.value ? "работает" : status.value === "stopping" ? "останавливается" : "",
+);
 
 const commands = useCommandScope(`project-run:${useId()}`, () => ({
   surface: "project-run",
@@ -106,7 +110,9 @@ async function toggle(force = !open.value) {
     const bounds = trigger.value!.getBoundingClientRect();
     origin.value = { right: window.innerWidth - bounds.right, top: bounds.top };
     await nextTick();
-    island.value?.querySelector<HTMLElement>("button.main:not(:disabled), button:not(:disabled)")?.focus();
+    island.value
+      ?.querySelector<HTMLElement>("button.main:not(:disabled), button:not(:disabled)")
+      ?.focus();
   } else trigger.value?.querySelector<HTMLElement>(".arrow")?.focus();
 }
 /** Действие острова закрывает его: пользователь видит результат в кнопке запуска. */
@@ -208,18 +214,29 @@ useEventListener(window, "blur", close);
         <IconContainer aria-hidden="true" />Docker · {{ project.environment.image }}
       </div>
       <div v-if="busy" class="group" role="group" aria-label="Работающий проект">
-        <button v-if="project.runtime?.url" class="item" @click="act(() => commands.run('ide.project.run.open', { mode: 'server' }))">
+        <button
+          v-if="project.runtime?.url"
+          class="item"
+          @click="act(() => commands.run('ide.project.run.open', { mode: 'server' }))"
+        >
           <IconOpen aria-hidden="true" />
           <span class="copy"
             ><span class="name">Открыть в браузере</span
             ><span class="caption">{{ project.runtime.url }}</span></span
           >
         </button>
-        <button class="item" @click="act(() => commands.run('ide.project.run.open', { mode: 'window' }))">
+        <button
+          class="item"
+          @click="act(() => commands.run('ide.project.run.open', { mode: 'window' }))"
+        >
           <IconWindow aria-hidden="true" />
           <span class="copy"><span class="name">Открыть в окне</span></span>
         </button>
-        <button class="item danger" :disabled="status === 'stopping'" @click="act(() => commands.run('ide.project.run.stop'))">
+        <button
+          class="item danger"
+          :disabled="status === 'stopping'"
+          @click="act(() => commands.run('ide.project.run.stop'))"
+        >
           <IconStop aria-hidden="true" />
           <span class="copy"><span class="name">Остановить</span></span>
         </button>
@@ -245,15 +262,22 @@ useEventListener(window, "blur", close);
             :disabled="busy || transitional"
             :title="`${command.name} в окне`"
             :aria-label="`Запустить ${command.name} в окне`"
-            @click="act(() => commands.run('ide.project.run.start', { command: command.id, mode: 'window' }))"
+            @click="
+              act(() =>
+                commands.run('ide.project.run.start', { command: command.id, mode: 'window' }),
+              )
+            "
           >
             <IconWindow aria-hidden="true" />
           </UiButton>
         </div>
         <p v-if="!project.commands.length" class="empty">Сценариев пока нет</p>
       </div>
-      <button class="item settings" data-command="ide.project.run.scenarios.edit"
-        @click="commands.run('ide.project.run.scenarios.edit')">
+      <button
+        class="item settings"
+        data-command="ide.project.run.scenarios.edit"
+        @click="commands.run('ide.project.run.scenarios.edit')"
+      >
         <IconSettings aria-hidden="true" />Настроить сценарии…
       </button>
     </section>

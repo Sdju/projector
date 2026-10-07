@@ -255,7 +255,13 @@ export async function moveProjectEntry(
   return { source: path, destination };
 }
 export async function validateEntryName(name: string) {
-  if (!name.trim() || name === "." || name === ".." || /[/\\\0]/.test(name) || (await nameExcluded(name)))
+  if (
+    !name.trim() ||
+    name === "." ||
+    name === ".." ||
+    /[/\\\0]/.test(name) ||
+    (await nameExcluded(name))
+  )
     throw new HttpError(400, "Укажите имя без разделителей пути");
 }
 export async function mutationLocation(root: string, path: string, allowRoot = false) {

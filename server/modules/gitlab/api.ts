@@ -180,7 +180,10 @@ export async function searchGitlabProjects(query: string): Promise<GitlabSearchH
       if (project.path_with_namespace.toLowerCase().includes(needle))
         found.set(project.path_with_namespace, project);
   }
-  const name = needle.split("/").pop()!.replace(/[^\w.-]/g, "");
+  const name = needle
+    .split("/")
+    .pop()!
+    .replace(/[^\w.-]/g, "");
   if (found.size < 10 && name.length >= 3) {
     const params = new URLSearchParams({ simple: "true", per_page: "10", search: name });
     const others = await gitlab<ApiProject[]>(base, `/projects?${params}`, token);

@@ -18,7 +18,8 @@ export async function readCursorAccessToken(): Promise<string> {
   } catch {
     throw new Error("Авторизация Cursor недоступна; выполните agent login");
   }
-  const token = auth && typeof auth === "object" ? (auth as Record<string, unknown>).accessToken : null;
+  const token =
+    auth && typeof auth === "object" ? (auth as Record<string, unknown>).accessToken : null;
   if (typeof token !== "string" || !token.trim())
     throw new Error("Авторизация Cursor недоступна; выполните agent login");
   return token;

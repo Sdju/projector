@@ -15,7 +15,8 @@ const payload = { usage: { rolling: window, weekly: window, monthly: window } };
 test("compact reset countdown handles missing, expired and minute/hour/day boundaries", () => {
   const now = 1791150000000;
   const reset = (seconds) => resetCountdown(now / 1000 + seconds, now);
-  for (const value of [null, undefined, NaN, Infinity]) assert.equal(resetCountdown(value, now), "—");
+  for (const value of [null, undefined, NaN, Infinity])
+    assert.equal(resetCountdown(value, now), "—");
   assert.equal(reset(-10), "сейчас");
   assert.equal(reset(0), "сейчас");
   assert.equal(reset(59), "<1м");
@@ -32,19 +33,36 @@ test("Go windows validate percentages and status, normalize resets and exhausted
   assert.equal(parsed.weekly.usedPercent, 42);
   assert.equal(parsed.weekly.resetsAt, Date.parse(window.resetsAt) / 1000);
   assert.equal(parsed.weekly.limited, false);
-  assert.equal(goWindows({ usage: { ...payload.usage, rolling: { ...window, status: "rate-limited", percent: 99 } } }).rolling.usedPercent, 100);
-  assert.equal(goWindows({ usage: { ...payload.usage, weekly: { ...window, resetsAt: "invalid" } } }).weekly.resetsAt, null);
+  assert.equal(
+    goWindows({
+      usage: { ...payload.usage, rolling: { ...window, status: "rate-limited", percent: 99 } },
+    }).rolling.usedPercent,
+    100,
+  );
+  assert.equal(
+    goWindows({ usage: { ...payload.usage, weekly: { ...window, resetsAt: "invalid" } } }).weekly
+      .resetsAt,
+    null,
+  );
   for (const percent of [-1, 101, NaN, Infinity, "42", null])
     assert.equal(goWindows({ usage: { ...payload.usage, weekly: { ...window, percent } } }), null);
-  for (const value of [null, {}, { usage: [] }, { usage: { weekly: window } },
-    { usage: { ...payload.usage, monthly: { ...window, status: "unknown" } } }])
+  for (const value of [
+    null,
+    {},
+    { usage: [] },
+    { usage: { weekly: window } },
+    { usage: { ...payload.usage, monthly: { ...window, status: "unknown" } } },
+  ])
     assert.equal(goWindows(value), null);
 });
 
 test("Go reads existing auth, bounds and sanitizes requests, shares cached API results", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "projector-opencode-"));
   const previousFetch = globalThis.fetch;
-  const previousEnv = { XDG_DATA_HOME: process.env.XDG_DATA_HOME, OPENCODE_AUTH_CONTENT: process.env.OPENCODE_AUTH_CONTENT };
+  const previousEnv = {
+    XDG_DATA_HOME: process.env.XDG_DATA_HOME,
+    OPENCODE_AUTH_CONTENT: process.env.OPENCODE_AUTH_CONTENT,
+  };
   const state = globalThis.projectorOpenCodeUsage;
   let calls = 0;
   process.env.XDG_DATA_HOME = directory;
@@ -54,13 +72,18 @@ test("Go reads existing auth, bounds and sanitizes requests, shares cached API r
   try {
     await t.test("missing Go auth is explicit; Zen auth is never substituted", async () => {
       await writeFile(authFile, JSON.stringify({ opencode: { key: "zen-only" } }));
-      globalThis.fetch = () => { throw new Error("must not request without Go auth"); };
+      globalThis.fetch = () => {
+        throw new Error("must not request without Go auth");
+      };
       const result = await openCodeUsage();
       assert.equal(result.status, "unavailable");
       assert.match(result.message, /Go не подключён/);
       assert.equal(result.windows, null);
       await writeFile(authFile, "SECRET invalid JSON");
-      await assert.rejects(os.tools.readOpenCodeGoKey(), (error) => !error.message.includes("SECRET"));
+      await assert.rejects(
+        os.tools.readOpenCodeGoKey(),
+        (error) => !error.message.includes("SECRET"),
+      );
     });
     await t.test("XDG file and OpenCode env override use only the Go entry", async () => {
       await writeFile(authFile, JSON.stringify({ "opencode-go": { key: "file-fixture" } }));
@@ -84,14 +107,24 @@ test("Go reads existing auth, bounds and sanitizes requests, shares cached API r
       assert.equal(await openCodeUsage(), a);
       const headers = {};
       let body;
-      const res = { setHeader: (key, value) => { headers[key] = value; }, end: (value) => { body = value; } };
+      const res = {
+        setHeader: (key, value) => {
+          headers[key] = value;
+        },
+        end: (value) => {
+          body = value;
+        },
+      };
       assert.equal(await handleOpenCode({ res, method: "GET", path: "/api/opencode/usage" }), true);
       assert.equal(headers["Cache-Control"], "no-store");
       assert.equal(res.statusCode, 200);
       assert.deepEqual(JSON.parse(body), a);
       assert.doesNotMatch(body, /SECRET|fixture|Authorization/);
       assert.equal(calls, 1);
-      assert.equal(await handleOpenCode({ res, method: "POST", path: "/api/opencode/usage" }), false);
+      assert.equal(
+        await handleOpenCode({ res, method: "POST", path: "/api/opencode/usage" }),
+        false,
+      );
       state.value.checkedAt -= 60001;
       await openCodeUsage();
       assert.equal(calls, 2);
@@ -114,13 +147,19 @@ test("Go reads existing auth, bounds and sanitizes requests, shares cached API r
       assert.equal((await openCodeUsage()).status, "unavailable");
     });
     await t.test("hanging requests time out without returning credentials", async () => {
-      globalThis.fetch = (_url, options) => new Promise((_resolve, reject) => {
-        options.signal.addEventListener("abort", () => reject(new Error("SECRET request")), { once: true });
-      });
+      globalThis.fetch = (_url, options) =>
+        new Promise((_resolve, reject) => {
+          options.signal.addEventListener("abort", () => reject(new Error("SECRET request")), {
+            once: true,
+          });
+        });
       // AbortSignal.timeout's timer does not keep Node alive by itself.
       const keepAlive = setInterval(() => {}, 100);
-      try { await assert.rejects(readGoUsage(20), /Не удалось получить лимиты/); }
-      finally { clearInterval(keepAlive); }
+      try {
+        await assert.rejects(readGoUsage(20), /Не удалось получить лимиты/);
+      } finally {
+        clearInterval(keepAlive);
+      }
     });
   } finally {
     globalThis.fetch = previousFetch;

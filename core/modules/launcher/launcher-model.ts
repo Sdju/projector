@@ -223,10 +223,10 @@ export function createLauncherModel(
             : chosen?.id === "import"
               ? "клонировано и добавлено"
               : chosen?.id === "open"
-              ? "открыто"
-              : chosen?.id === "stop"
-                ? "остановлено"
-                : "запущено"
+                ? "открыто"
+                : chosen?.id === "stop"
+                  ? "остановлено"
+                  : "запущено"
         }`;
         return true;
       } catch (error) {

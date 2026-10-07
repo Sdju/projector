@@ -1,11 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { setTimeout as sleep } from "node:timers/promises";
-import {
-  cancelCloneJob,
-  cloneJob,
-  startCloneJob,
-} from "../server/modules/git-import/index.ts";
+import { cancelCloneJob, cloneJob, startCloneJob } from "../server/modules/git-import/index.ts";
 
 const project = { id: "p", name: "app", path: "/tmp/app" };
 const settled = async (id) => {

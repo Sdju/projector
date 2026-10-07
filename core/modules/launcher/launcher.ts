@@ -3,7 +3,15 @@ export const shortcuts = ["", "Ctrl+Alt+Space", "Super+Space", "Alt+Space"];
 /** `launch` — запуск приложения; `open` — воркспейс проекта; `run` — основная команда проекта; `stop` — остановка запущенного; `browser`/`window` — открыть запущенный проект
  * в браузере или окне (для остановленного `window` запускает команду в окне);
  * `favorite` — добавить в избранное или убрать из него. */
-export type LaunchActionId = "launch" | "open" | "run" | "stop" | "browser" | "window" | "favorite" | "import";
+export type LaunchActionId =
+  | "launch"
+  | "open"
+  | "run"
+  | "stop"
+  | "browser"
+  | "window"
+  | "favorite"
+  | "import";
 export interface LaunchAction {
   id: LaunchActionId;
   title: string;
