@@ -436,6 +436,10 @@ onBeforeUnmount(() => {
   /* The padding lives here: FitAddon reads the parent's height, and padding on it hid half of the last row.
      No bottom padding: the fractional row left over by fitting already acts as one. */
   padding: 12px 12px 0;
+  /* Touch drags are ours (see touch-scroll.ts): without this the browser starts its own pan and overscroll
+     (pull-to-refresh) during the first pixels, before the gesture is recognised as a scroll. */
+  touch-action: none;
+  overscroll-behavior: none;
 }
 .drop-hint {
   position: absolute;
