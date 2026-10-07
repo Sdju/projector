@@ -15,6 +15,8 @@ export function zoomImageAt(
   const ratio = zoom / view.zoom;
   return { zoom, x: x - (x - view.x) * ratio, y: y - (y - view.y) * ratio };
 }
+/** Breathing room around a fitted image; a small viewport (phone in landscape) must not lose it all. */
+const margin = (size: number) => Math.min(48, size * 0.1);
 export function fitImage(
   width: number,
   height: number,
@@ -25,8 +27,8 @@ export function fitImage(
     1 / 64,
     Math.min(
       32,
-      Math.max(1, viewportWidth - 48) / width,
-      Math.max(1, viewportHeight - 48) / height,
+      Math.max(1, viewportWidth - margin(viewportWidth)) / width,
+      Math.max(1, viewportHeight - margin(viewportHeight)) / height,
     ),
   );
 }

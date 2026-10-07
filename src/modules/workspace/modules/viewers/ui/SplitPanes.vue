@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-const props = defineProps<{ topLabel?: string; bottomLabel?: string; reveal?: unknown }>();
+const props = withDefaults(
+  defineProps<{ topLabel?: string; bottomLabel?: string; reveal?: unknown; initial?: number }>(),
+  { initial: 0.45 },
+);
 const panes = ref<HTMLElement>();
-const split = ref(0.45);
-const lastSplit = ref(0.45);
+const split = ref(props.initial);
+const lastSplit = ref(props.initial);
 const dragging = ref(false);
-let dragStart = 0.45;
+let dragStart = props.initial;
 const rows = computed(() => ({
   gridTemplateRows: `minmax(0, ${split.value}fr) 12px minmax(0, ${1 - split.value}fr)`,
 }));

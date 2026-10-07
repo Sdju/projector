@@ -44,6 +44,8 @@ const imageStyle = computed(() => ({
 let initialized = false;
 let observer: ResizeObserver | undefined;
 let pointerId: number | undefined;
+const pointers = new Map<number, { x: number; y: number }>();
+let pinch: { distance: number; mid: { x: number; y: number }; view: ImageTransform } | undefined;
 let drag = { clientX: 0, clientY: 0, x: 0, y: 0 };
 let zoomStopUntil = 0;
 function reset(fit = props.fit) {
@@ -84,17 +86,58 @@ function wheel(event: WheelEvent) {
   // Briefly hold the detent so touchpad momentum cannot immediately skip it.
   if (previousZoom !== 1 && view.value.zoom === 1) zoomStopUntil = now + 180;
 }
+function beginPan(point: { x: number; y: number }) {
+  drag = { clientX: point.x, clientY: point.y, x: view.value.x, y: view.value.y };
+  panning.value = true;
+}
 function startPan(event: PointerEvent) {
-  if (event.button !== 0 || !event.isPrimary || props.error || failed.value) return;
+  if ((event.pointerType === "mouse" && event.button !== 0) || props.error || failed.value) return;
   event.preventDefault();
   const element = event.currentTarget as HTMLElement;
   element.focus({ preventScroll: true });
   element.setPointerCapture(event.pointerId);
-  pointerId = event.pointerId;
-  drag = { clientX: event.clientX, clientY: event.clientY, x: view.value.x, y: view.value.y };
-  panning.value = true;
+  pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  if (pointers.size === 1) {
+    pointerId = event.pointerId;
+    beginPan({ x: event.clientX, y: event.clientY });
+  } else if (pointers.size === 2) {
+    // A second finger turns the drag into a pinch around the midpoint of both fingers.
+    const [a, b] = [...pointers.values()];
+    const rect = element.getBoundingClientRect();
+    pinch = {
+      distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
+      mid: {
+        x: (a.x + b.x) / 2 - rect.left - rect.width / 2,
+        y: (a.y + b.y) / 2 - rect.top - rect.height / 2,
+      },
+      view: view.value,
+    };
+    panning.value = false;
+  }
 }
 function movePan(event: PointerEvent) {
+  if (!pointers.has(event.pointerId)) return;
+  pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  if (pinch && pointers.size === 2) {
+    const element = event.currentTarget as HTMLElement;
+    const rect = element.getBoundingClientRect();
+    const [a, b] = [...pointers.values()];
+    const zoom = Math.max(
+      1 / 64,
+      Math.min(32, (pinch.view.zoom * Math.hypot(a.x - b.x, a.y - b.y)) / pinch.distance),
+    );
+    const ratio = zoom / pinch.view.zoom;
+    const mid = {
+      x: (a.x + b.x) / 2 - rect.left - rect.width / 2,
+      y: (a.y + b.y) / 2 - rect.top - rect.height / 2,
+    };
+    view.value = {
+      zoom,
+      x: mid.x - (pinch.mid.x - pinch.view.x) * ratio,
+      y: mid.y - (pinch.mid.y - pinch.view.y) * ratio,
+    };
+    return;
+  }
   if (!panning.value || event.pointerId !== pointerId) return;
   view.value = {
     ...view.value,
@@ -103,11 +146,19 @@ function movePan(event: PointerEvent) {
   };
 }
 function endPan(event: PointerEvent) {
-  if (event.pointerId !== pointerId) return;
-  panning.value = false;
+  if (!pointers.delete(event.pointerId)) return;
   const element = event.currentTarget as HTMLElement;
   if (element.hasPointerCapture(event.pointerId)) element.releasePointerCapture(event.pointerId);
-  pointerId = undefined;
+  pinch = undefined;
+  // One finger left after a pinch: keep dragging from where it is, without a jump.
+  const [rest] = [...pointers.entries()];
+  if (rest) {
+    pointerId = rest[0];
+    beginPan(rest[1]);
+  } else {
+    panning.value = false;
+    pointerId = undefined;
+  }
 }
 function key(event: KeyboardEvent) {
   if (!["+", "=", "-", "0", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key))
@@ -169,10 +220,7 @@ defineExpose({ reset });
       @pointermove="movePan"
       @pointerup="endPan"
       @pointercancel="endPan"
-      @lostpointercapture="
-        panning = false;
-        pointerId = undefined;
-      "
+      @lostpointercapture="endPan"
       @dblclick="reset()"
       @keydown="key"
       @dragstart.prevent
@@ -191,7 +239,7 @@ defineExpose({ reset });
       />
     </div>
     <div class="view-controls">
-      <span>{{ Math.round(view.zoom * 100) }}%</span>
+      <span class="zoom">{{ Math.round(view.zoom * 100) }}%</span>
       <UiButton
         icon
         size="sm"
@@ -273,6 +321,11 @@ defineExpose({ reset });
   padding: var(--sp-1) var(--sp-3);
   font-size: var(--fs-2xs);
   border-top: 1px solid var(--line);
+}
+.zoom {
+  min-width: 4ch;
+  margin-right: auto;
+  font-variant-numeric: tabular-nums;
 }
 .background-control {
   display: flex;
