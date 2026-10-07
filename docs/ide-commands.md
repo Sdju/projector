@@ -56,6 +56,17 @@ await ide.executeCommand("ide.workbench.tabs.closeOthers", { id: tabId }, { scop
 
 `getCommands()` returns IDs, scopes, titles, current availability and effective shortcut labels. IDs can be registered by further adapters with `createScope(...).registerCommand(...)`. The registry rejects duplicate IDs within a scope and rejects execution of missing or unavailable commands.
 
+## Network settings
+
+The network settings section and LAN workspace panel each own a scope with `surface: "network"` and `view: "settings"` or `"panel"`. Discover its ID through `getScopes()`; drafts belong to that screen. The scope reports saved mode, readiness, busy state and password presence, never the password itself.
+
+- `ide.network.refresh` rereads mode, password presence and addresses; resets the mode draft and retains the password draft. It also retries an initial load failure.
+- `ide.network.save` accepts optional `mode: "local" | "lan"` and `password: string`. Omitted values use that screen's drafts; an empty password input preserves the existing password, while explicit `password: ""` removes it. Changing mode restarts the server and terminates terminals and child processes; changing only the password applies immediately.
+- `ide.network.password.clear` removes the password and saves that screen's mode draft.
+- `ide.network.address.copy` is registered in the LAN panel only; optional `address` selects one of its current LAN URLs, otherwise it uses the first.
+
+Saving is unavailable until state loads and while another operation is running. API failures reject SDK execution and keep the password draft for retry. Unmount aborts pending requests and removes the scope.
+
 ## Overrides
 
 ```js

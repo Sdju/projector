@@ -1,98 +1,21 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { useId } from "vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import UiHint from "../../common/ui/UiHint.vue";
+import { useNetworkSettings } from "./model.ts";
 
-interface NetworkState {
-  mode: "local" | "lan";
-  passwordRequired: boolean;
-  lanUrl: string | null;
-}
-
-const mode = ref<"local" | "lan">("local");
-const passwordRequired = ref(false);
-const lanUrl = ref<string | null>(null);
-const password = ref("");
-const busy = ref(false);
-const error = ref("");
-const status = ref("");
-const ready = ref(false);
-
-async function load() {
-  const response = await fetch("/api/app/network", { cache: "no-store" });
-  const data = (await response.json()) as NetworkState & { error?: string };
-  if (!response.ok) throw new Error(data.error || "Не удалось загрузить режим доступа");
-  mode.value = data.mode;
-  passwordRequired.value = data.passwordRequired;
-  lanUrl.value = data.lanUrl;
-  ready.value = true;
-}
-
-function health() {
-  return fetch("/api/health", { cache: "no-store", signal: AbortSignal.timeout(2000) })
-    .then(async (response) => {
-      const data = await response.json();
-      return response.ok && Number.isInteger(data.pid) ? (data.pid as number) : null;
-    })
-    .catch(() => null);
-}
-
-async function waitForRestart(pid: number): Promise<void> {
-  const deadline = Date.now() + 60_000;
-  while (Date.now() < deadline) {
-    const current = await health();
-    if (current !== null && current !== pid) return;
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-  throw new Error("Сервер не перезапустился за 60 секунд");
-}
-
-async function save() {
-  await apply(password.value.length > 0 ? password.value : undefined);
-}
-
-async function clearPassword() {
-  await apply("");
-}
-
-async function apply(nextPassword: string | undefined) {
-  busy.value = true;
-  error.value = "";
-  status.value = "";
-  const currentPid = await health();
-  try {
-    const response = await fetch("/api/app/network", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: mode.value, password: nextPassword }),
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Не удалось сохранить режим доступа");
-    if (data.restarted) {
-      status.value = "Сервер перезапускается…";
-      if (currentPid !== null) await waitForRestart(currentPid);
-      window.location.reload();
-    } else {
-      await load();
-      password.value = "";
-      status.value = "Сохранено";
-      busy.value = false;
-    }
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : "Не удалось сохранить";
-    busy.value = false;
-  }
-}
-
-onMounted(() => {
-  load().catch((err) => {
-    error.value = err instanceof Error ? err.message : "Не удалось загрузить режим доступа";
-  });
-});
+const { mode, passwordRequired, lanUrl, password, busy, error, status, ready, commands } =
+  useNetworkSettings("settings");
+const passwordId = useId();
 </script>
 
 <template>
-  <section class="network-settings">
+  <section
+    class="network-settings"
+    @focusin="commands.scope.activate()"
+    @pointerdown="commands.scope.activate()"
+    @keydown="commands.keydown"
+  >
     <h2>Доступ по локальной сети</h2>
     <fieldset :disabled="!ready || busy">
       <legend class="sr-only">Режим доступа</legend>
@@ -112,11 +35,9 @@ onMounted(() => {
       </label>
     </fieldset>
     <template v-if="mode === 'lan'">
-      <label class="password-label" for="projector-lan-password"
-        >Пароль доступа (необязательно)</label
-      >
+      <label class="password-label" :for="passwordId">Пароль доступа (необязательно)</label>
       <input
-        id="projector-lan-password"
+        :id="passwordId"
         v-model="password"
         type="password"
         autocomplete="new-password"
@@ -138,10 +59,13 @@ onMounted(() => {
       </UiHint>
     </template>
     <div class="actions">
-      <UiButton variant="solid" :disabled="!ready || busy" @click="save"
+      <UiButton variant="solid" :disabled="!ready || busy" @click="commands.run('ide.network.save')"
         >Сохранить и перезапустить</UiButton
       >
-      <UiButton v-if="passwordRequired" :disabled="!ready || busy" @click="clearPassword"
+      <UiButton
+        v-if="passwordRequired"
+        :disabled="!ready || busy"
+        @click="commands.run('ide.network.password.clear')"
         >Убрать пароль</UiButton
       >
     </div>

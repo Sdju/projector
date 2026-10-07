@@ -1,103 +1,47 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { useId } from "vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import UiHint from "../../common/ui/UiHint.vue";
+import { commandArgs } from "../../common/utilities/commands.ts";
+import { useNetworkSettings } from "./model.ts";
 
-interface NetworkState {
-  mode: "local" | "lan";
-  passwordRequired: boolean;
-  lanUrl: string | null;
-  lanUrls: string[];
-}
-
-const state = ref<NetworkState | null>(null);
-const password = ref("");
-const busy = ref(false);
-const status = ref("");
-const error = ref("");
-
-async function load() {
-  const response = await fetch("/api/app/network", { cache: "no-store" });
-  const data = (await response.json()) as NetworkState & { error?: string };
-  if (!response.ok) throw new Error(data.error || "Не удалось загрузить доступ по сети");
-  state.value = data;
-}
-
-function health() {
-  return fetch("/api/health", { cache: "no-store", signal: AbortSignal.timeout(2000) })
-    .then(async (response) => {
-      const data = await response.json();
-      return response.ok && Number.isInteger(data.pid) ? (data.pid as number) : null;
-    })
-    .catch(() => null);
-}
-
-async function waitForRestart(pid: number): Promise<void> {
-  const deadline = Date.now() + 60_000;
-  while (Date.now() < deadline) {
-    const current = await health();
-    if (current !== null && current !== pid) return;
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-  throw new Error("Сервер не перезапустился за 60 секунд");
-}
-
-async function apply(nextPassword: string | undefined) {
-  if (!state.value) return;
-  busy.value = true;
+const { state, password, busy, status, error, commands } = useNetworkSettings("panel");
+const passwordId = useId();
+async function copyAddress(address: string) {
   error.value = "";
   status.value = "";
-  const currentPid = await health();
-  try {
-    const response = await fetch("/api/app/network", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: state.value.mode, password: nextPassword }),
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Не удалось сохранить пароль");
-    if (data.restarted) {
-      status.value = "Сервер перезапускается…";
-      if (currentPid !== null) await waitForRestart(currentPid);
-      window.location.reload();
-    } else {
-      await load();
-      password.value = "";
-      status.value = "Сохранено";
-      busy.value = false;
-    }
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : "Не удалось сохранить";
-    busy.value = false;
-  }
-}
-
-async function save() {
-  await apply(password.value.length > 0 ? password.value : undefined);
-}
-
-async function clearPassword() {
-  await apply("");
-}
-
-async function copyAddress(address: string) {
   try {
     await navigator.clipboard.writeText(address);
     status.value = "Адрес скопирован";
   } catch {
     error.value = "Не удалось скопировать адрес";
+    throw new Error(error.value);
   }
 }
 
-onMounted(() => {
-  load().catch((err) => {
-    error.value = err instanceof Error ? err.message : "Не удалось загрузить доступ по сети";
-  });
+commands.scope.registerCommand({
+  id: "ide.network.address.copy",
+  title: "Скопировать LAN-адрес Projector",
+  description:
+    "Копирует один из текущих LAN-адресов в буфер обмена. Без address использует первый адрес.",
+  arguments: { address: "Один из LAN-адресов текущего сервера" },
+  enabled: () => !busy.value && state.value?.mode === "lan" && !!state.value.lanUrls.length,
+  run: (value) => {
+    const { address = state.value?.lanUrls[0] } = commandArgs(value);
+    if (typeof address !== "string" || !state.value?.lanUrls.includes(address))
+      throw new Error("Выберите LAN-адрес сервера");
+    return copyAddress(address);
+  },
 });
 </script>
 
 <template>
-  <div class="network-panel">
+  <div
+    class="network-panel"
+    @focusin="commands.scope.activate()"
+    @pointerdown="commands.scope.activate()"
+    @keydown="commands.keydown"
+  >
     <p v-if="!state" class="muted">Загрузка…</p>
     <template v-else>
       <dl class="summary">
@@ -115,7 +59,9 @@ onMounted(() => {
       <ul v-if="state.mode === 'lan' && state.lanUrls.length" class="addresses">
         <li v-for="address in state.lanUrls" :key="address">
           <code>{{ address }}</code>
-          <button :disabled="busy" @click="copyAddress(address)">копировать</button>
+          <button :disabled="busy" @click="commands.run('ide.network.address.copy', { address })">
+            копировать
+          </button>
         </li>
       </ul>
       <p v-else class="muted">
@@ -124,17 +70,26 @@ onMounted(() => {
         }}
       </p>
 
-      <h3>Пароль доступа</h3>
+      <h3><label :for="passwordId">Пароль доступа</label></h3>
       <div class="password-row">
         <input
+          :id="passwordId"
           v-model="password"
           type="password"
           autocomplete="new-password"
           placeholder="Новый пароль"
           :disabled="busy"
         />
-        <UiButton variant="solid" :disabled="busy || !password" @click="save">Сохранить</UiButton>
-        <UiButton v-if="state.passwordRequired" :disabled="busy" @click="clearPassword"
+        <UiButton
+          variant="solid"
+          :disabled="busy || !password"
+          @click="commands.run('ide.network.save')"
+          >Сохранить</UiButton
+        >
+        <UiButton
+          v-if="state.passwordRequired"
+          :disabled="busy"
+          @click="commands.run('ide.network.password.clear')"
           >Убрать</UiButton
         >
       </div>
