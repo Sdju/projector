@@ -12,7 +12,13 @@ interface Preferences {
   usage: Record<string, Usage>;
   /** Ids (`app:…`, `project:…`) pinned to the top of the palette. */
   favorites: string[];
+  /** Terminal programs that have a graphical chat, mapped to how new sessions open. */
+  agentModes: Record<string, AgentSessionMode>;
 }
+
+export type AgentSessionMode = "tui" | "gui";
+/** Programs whose sessions can be shown as a chat; everything else is always a terminal. */
+export const GUI_AGENT_PROGRAMS: readonly string[] = ["claude"];
 
 const preferencesPath = () => join(dataDir(), "launcher.json");
 let saving: Promise<unknown> = Promise.resolve();
@@ -26,10 +32,24 @@ export async function preferences(): Promise<Preferences> {
       favorites: Array.isArray(data.favorites)
         ? data.favorites.filter((id: unknown): id is string => typeof id === "string")
         : [],
+      agentModes: agentModes(data.agentModes),
     };
   } catch {
-    return { mode: "native", shortcut: "Ctrl+Alt+Space", usage: {}, favorites: [] };
+    return {
+      mode: "native",
+      shortcut: "Ctrl+Alt+Space",
+      usage: {},
+      favorites: [],
+      agentModes: {},
+    };
   }
+}
+function agentModes(value: unknown): Record<string, AgentSessionMode> {
+  const modes: Record<string, AgentSessionMode> = {};
+  if (value && typeof value === "object")
+    for (const program of GUI_AGENT_PROGRAMS)
+      if ((value as Record<string, unknown>)[program] === "gui") modes[program] = "gui";
+  return modes;
 }
 export function interfaceMode(value: unknown): InterfaceMode {
   return value === "window" || value === "browser" ? value : "native";
@@ -62,4 +82,13 @@ export async function toggleFavorite(id: string): Promise<boolean> {
       : value.favorites.filter((entry) => entry !== id);
   });
   return favorite;
+}
+/** Sets how new sessions of `program` open; TUI is the default and is stored as absence. */
+export async function setAgentMode(program: string, mode: AgentSessionMode): Promise<void> {
+  if (!GUI_AGENT_PROGRAMS.includes(program))
+    throw new Error("У этого агента нет графического режима");
+  await updatePreferences((value) => {
+    if (mode === "gui") value.agentModes[program] = "gui";
+    else delete value.agentModes[program];
+  });
 }

@@ -1,7 +1,11 @@
+import { GUI_AGENT_PROGRAMS, preferences, setAgentMode } from "../../modules/preferences/index.ts";
 import { loadProjects } from "../../modules/projects/index.ts";
 import {
-  runInstallerAgent,
+  AGENT_BACKEND_IDS,
+  AGENT_PERMISSION_MODES,
+  runAgent,
   createCommandBridge,
+  createApprovalBridge,
   completeCommandRequest,
   readAgentHistory,
   writeAgentHistory,
@@ -22,6 +26,17 @@ export async function handleAgent({ req, res, method, path }: RouteContext): Pro
         ? await readAgentHistory(id)
         : await writeAgentHistory(id, (await readBody(req)).turns);
     json(res, 200, { turns });
+    return true;
+  }
+  if (path === "/api/agent/modes" && method === "GET") {
+    json(res, 200, { modes: (await preferences()).agentModes, programs: GUI_AGENT_PROGRAMS });
+    return true;
+  }
+  if (path === "/api/agent/modes" && method === "PUT") {
+    const body = await readBody(req);
+    if (body.mode !== "tui" && body.mode !== "gui") throw new Error("Неизвестный режим сессии");
+    await setAgentMode(asString(body.program), body.mode);
+    json(res, 200, { modes: (await preferences()).agentModes, programs: GUI_AGENT_PROGRAMS });
     return true;
   }
   if (path === "/api/agent/tool-result" && method === "POST") {
@@ -64,11 +79,15 @@ export async function handleAgent({ req, res, method, path }: RouteContext): Pro
       if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     };
     try {
-      await runInstallerAgent({
+      await runAgent({
         message,
         history,
+        backend: AGENT_BACKEND_IDS.find((id) => id === body.backend),
+        permissionMode: AGENT_PERMISSION_MODES.find((mode) => mode === body.permissionMode),
+        sessionId: asString(body.sessionId) || undefined,
         cwd: project?.path,
         commands: body.commandBridge === true ? createCommandBridge(emit, abort.signal) : undefined,
+        approve: body.approvals === true ? createApprovalBridge(emit, abort.signal) : undefined,
         providerId: asString(body.providerId) || undefined,
         abort: abort.signal,
         emit,

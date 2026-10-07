@@ -279,3 +279,155 @@ test("HTTP agent streams discovery, description, execution, Bash and final text 
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("approval bridge resolves only an explicit allow and cancels with the request", async () => {
+  const { createApprovalBridge } = await import("../server/modules/agent/index.ts");
+  const requests = [];
+  const abort = new AbortController();
+  const approve = createApprovalBridge((_, request) => requests.push(request), abort.signal, 20);
+  const allowed = approve({ tool: "Edit", input: { file_path: "a" }, title: "Edit a" });
+  expect(requests[0]).toMatchObject({ tool: "Edit", title: "Edit a" });
+  expect(completeCommandRequest(requests[0].id, { output: { allow: true } })).toBe(true);
+  expect(await allowed).toBe(true);
+  const denied = approve({ tool: "Bash", input: {} });
+  completeCommandRequest(requests[1].id, { output: { allow: "yes" } });
+  expect(await denied).toBe(false);
+  await expect(approve({ tool: "Bash", input: {} })).rejects.toThrow(/вовремя/);
+  const cancelled = approve({ tool: "Bash", input: {} });
+  abort.abort();
+  await expect(cancelled).rejects.toThrow(/остановлен/);
+});
+
+test("Claude Code messages become the shared chat events", async () => {
+  const { createClaudeEventMapper } = await import("../server/modules/agent/claude-code-events.ts");
+  const events = [];
+  const mapper = createClaudeEventMapper((event, data) => events.push([event, data]));
+  const stream = (event, parent = null) => ({
+    type: "stream_event",
+    event,
+    parent_tool_use_id: parent,
+  });
+  mapper.handle({ type: "system", subtype: "init", session_id: "s1", model: "claude-x" });
+  mapper.handle(stream({ type: "message_start", message: { id: "m1" } }));
+  mapper.handle(
+    stream({ type: "content_block_delta", delta: { type: "text_delta", text: "Открываю" } }),
+  );
+  mapper.handle({
+    type: "assistant",
+    parent_tool_use_id: null,
+    message: {
+      id: "m1",
+      content: [
+        { type: "text", text: "Открываю" },
+        {
+          type: "tool_use",
+          id: "t1",
+          name: "Read",
+          input: { file_path: "x" },
+        },
+      ],
+    },
+  });
+  mapper.handle({
+    type: "user",
+    message: {
+      content: [
+        { type: "tool_result", tool_use_id: "t1", content: [{ type: "text", text: "{}" }] },
+        { type: "tool_result", tool_use_id: "t2", content: "boom", is_error: true },
+      ],
+    },
+  });
+  // Sub-agent text never becomes the answer; a message without deltas falls back to its blocks.
+  mapper.handle(stream({ type: "message_start", message: { id: "sub" } }, "t1"));
+  mapper.handle({
+    type: "assistant",
+    parent_tool_use_id: "t1",
+    message: { id: "sub", content: [{ type: "text", text: "internal" }] },
+  });
+  mapper.handle({
+    type: "assistant",
+    parent_tool_use_id: null,
+    message: { id: "m2", content: [{ type: "text", text: "Готово" }] },
+  });
+  mapper.handle({
+    type: "result",
+    subtype: "success",
+    is_error: false,
+    result: "Готово",
+    total_cost_usd: 0.01,
+  });
+  expect(mapper.sessionId).toBe("s1");
+  expect(events.map(([event]) => event)).toStrictEqual([
+    "session",
+    "status",
+    "text",
+    "tool",
+    "tool-result",
+    "tool-result",
+    "text",
+    "text",
+    "done",
+  ]);
+  expect(events[3][1]).toStrictEqual({ id: "t1", name: "Read", input: { file_path: "x" } });
+  expect(events[4][1]).toStrictEqual({ id: "t1", name: "Read", output: "{}" });
+  expect(events[5][1]).toMatchObject({ id: "t2", error: "boom" });
+  expect(
+    events
+      .filter(([event]) => event === "text")
+      .map(([, data]) => data.text)
+      .join(""),
+  ).toBe("Открываю\n\nГотово");
+  const failed = [];
+  const failing = createClaudeEventMapper((event, data) => failed.push([event, data]));
+  failing.handle({
+    type: "result",
+    subtype: "error_during_execution",
+    is_error: true,
+    errors: ["no session"],
+  });
+  expect(failing.failed).toBe(true);
+  expect(failing.started).toBe(false);
+  expect(failed[0]).toStrictEqual(["error", { error: "no session" }]);
+});
+
+test("chat history keeps the native session of a turn", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "projector-agent-session-"));
+  const previous = process.env.XDG_DATA_HOME;
+  process.env.XDG_DATA_HOME = directory;
+  try {
+    const turns = [
+      {
+        id: "1",
+        role: "assistant",
+        text: "ok",
+        tools: [],
+        session: { backend: "claude-code", id: "s1" },
+      },
+    ];
+    await writeAgentHistory("p", turns);
+    expect(await readAgentHistory("p")).toStrictEqual(turns);
+  } finally {
+    if (previous === undefined) delete process.env.XDG_DATA_HOME;
+    else process.env.XDG_DATA_HOME = previous;
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("agent session modes default to the terminal and persist only a GUI choice", async () => {
+  const { preferences, setAgentMode } = await import("../server/modules/preferences/index.ts");
+  const directory = await mkdtemp(join(tmpdir(), "projector-agent-modes-"));
+  const previous = process.env.XDG_DATA_HOME;
+  process.env.XDG_DATA_HOME = directory;
+  try {
+    expect((await preferences()).agentModes).toStrictEqual({});
+    await setAgentMode("claude", "gui");
+    expect((await preferences()).agentModes).toStrictEqual({ claude: "gui" });
+    await expect(setAgentMode("codex", "gui")).rejects.toThrow(/графическ/);
+    await setAgentMode("claude", "tui");
+    expect((await preferences()).agentModes).toStrictEqual({});
+  } finally {
+    if (previous === undefined) delete process.env.XDG_DATA_HOME;
+    else process.env.XDG_DATA_HOME = previous;
+    await rm(directory, { recursive: true, force: true });
+  }
+});

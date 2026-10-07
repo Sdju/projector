@@ -1,123 +1,16 @@
-import { isStepCount, streamText, type ModelMessage } from "ai";
-import type { CommandRequest } from "./command-bridge.ts";
-import type { Project } from "../projects/index.ts";
-import { AGENT_SYSTEM_PROMPT, createAgentTools } from "./agent-tools.ts";
-import { createQwenOpenAI } from "../providers/index.ts";
-import { envFallbackFromProcess, resolveOpenAIProvider } from "../providers/index.ts";
-import type { AgentHistoryTurn } from "../providers/index.ts";
+import type { AgentBackend, AgentRunOptions } from "./backend.ts";
+import { claudeCodeBackend } from "./claude-code-backend.ts";
+import { projectorBackend } from "./projector-backend.ts";
 
-export type AgentEventName =
-  | "command-request"
-  | "status"
-  | "text"
-  | "tool"
-  | "tool-result"
-  | "project"
-  | "done"
-  | "error";
+export type { AgentEmitter, AgentEventName, AgentRunOptions } from "./backend.ts";
+export { AGENT_BACKEND_IDS, AGENT_PERMISSION_MODES } from "./backend.ts";
+export type { AgentBackendId, AgentPermissionMode } from "./backend.ts";
 
-export type AgentEmitter = (event: AgentEventName, data: unknown) => void;
+const backends: AgentBackend[] = [projectorBackend, claudeCodeBackend];
 
-export async function runInstallerAgent(options: {
-  message: string;
-  cwd?: string;
-  commands?: (request: CommandRequest) => Promise<unknown>;
-  history?: AgentHistoryTurn[];
-  providerId?: string;
-  abort?: AbortSignal;
-  emit: AgentEmitter;
-}): Promise<void> {
-  const fallback = envFallbackFromProcess();
-  const resolved = await resolveOpenAIProvider({
-    providerId: options.providerId,
-    fallback,
-  });
-  const provider = createQwenOpenAI({
-    openaiUrl: resolved.url,
-    openaiApiKey: resolved.apiKey,
-  });
-  const model = provider.chatModel(resolved.model || "qwen3.8-flash");
-
-  const added: Project[] = [];
-  const tools = createAgentTools({
-    cwd: options.cwd,
-    commands: options.commands,
-    signal: options.abort,
-    onProject: (project) => {
-      added.push(project);
-      options.emit("project", project);
-    },
-  });
-
-  const history = (options.history ?? []).slice(-10);
-  const messages: ModelMessage[] = [
-    ...history.map((item) => ({
-      role: item.role,
-      content: item.content,
-    })),
-    { role: "user" as const, content: options.message },
-  ];
-
-  options.emit("status", {
-    phase: "thinking",
-    provider: resolved.name,
-    model: resolved.model,
-  });
-
-  const result = streamText({
-    model,
-    system: AGENT_SYSTEM_PROMPT + (options.cwd ? `\nТекущий проект: ${options.cwd}` : ""),
-    messages,
-    tools,
-    stopWhen: isStepCount(16),
-    abortSignal: options.abort,
-    providerOptions: {
-      qwenOpenai: {
-        enable_thinking: true,
-      },
-    },
-  });
-
-  let text = "";
-  for await (const part of result.fullStream) {
-    if (part.type === "text-delta") {
-      text += part.text;
-      options.emit("text", { text: part.text });
-      continue;
-    }
-    if (part.type === "tool-call") {
-      options.emit("tool", {
-        id: part.toolCallId,
-        name: part.toolName,
-        input: part.input,
-      });
-      continue;
-    }
-    if (part.type === "tool-result") {
-      options.emit("tool-result", {
-        id: part.toolCallId,
-        name: part.toolName,
-        output: part.output,
-      });
-      continue;
-    }
-    if (part.type === "tool-error") {
-      options.emit("tool-result", {
-        id: part.toolCallId,
-        name: part.toolName,
-        error: part.error instanceof Error ? part.error.message : String(part.error),
-      });
-      continue;
-    }
-    if (part.type === "error") {
-      const message = part.error instanceof Error ? part.error.message : "Ошибка агента";
-      options.emit("error", { error: message });
-      return;
-    }
-  }
-
-  options.emit("done", {
-    text: text.trim(),
-    added: added.map((item) => item.id),
-  });
+export async function runAgent(options: AgentRunOptions): Promise<void> {
+  const id = options.backend ?? "projector";
+  const backend = backends.find((item) => item.id === id);
+  if (!backend) throw new Error(`Неизвестный агент: ${id}`);
+  await backend.run(options);
 }

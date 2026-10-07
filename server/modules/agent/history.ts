@@ -9,6 +9,8 @@ const schema = z
       id: z.string().max(100),
       role: z.enum(["user", "assistant"]),
       text: z.string().max(100000),
+      /** Native session of the backend that produced this turn, used to resume it. */
+      session: z.object({ backend: z.string().max(40), id: z.string().max(200) }).optional(),
       tools: z
         .array(
           z.object({
