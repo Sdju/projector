@@ -594,7 +594,7 @@ test("ACP resume keeps the requested session, replays history only on a fresh on
     replay.push(active),
   );
   // The ACP load response has no sessionId: the requested one must survive.
-  expect(resumed).toStrictEqual({ sessionId: "old-1", resumed: true });
+  expect(resumed).toMatchObject({ sessionId: "old-1", resumed: true });
   expect(calls).toStrictEqual(["session/load"]);
   expect(replay).toStrictEqual([true, false]);
 
@@ -606,7 +606,7 @@ test("ACP resume keeps the requested session, replays history only on a fresh on
   };
   expect(
     await openSession(failed, { sessionId: "old-1", cwd: "/tmp" }, [], () => {}),
-  ).toStrictEqual({ sessionId: "new-2", resumed: false });
+  ).toMatchObject({ sessionId: "new-2", resumed: false });
 });
 
 test("ACP session open does not mask real failures as a missing session", async () => {
@@ -647,7 +647,7 @@ test("ACP session open does not mask real failures as a missing session", async 
       return method === "session/new" ? { sessionId: "x" } : {};
     },
   };
-  expect(await openSession(login, options, [{ id: "m" }], () => {})).toStrictEqual({
+  expect(await openSession(login, options, [{ id: "m" }], () => {})).toMatchObject({
     sessionId: "old-1",
     resumed: true,
   });
@@ -702,6 +702,206 @@ test("agent processes resolve programs through the interactive shell PATH", asyn
   }
 });
 
+const codexSession = {
+  sessionId: "s1",
+  models: {
+    currentModelId: "gpt-6.1-sol[medium]",
+    availableModels: [{ modelId: "gpt-6.1-sol[medium]", name: "Sol (medium)" }],
+  },
+  modes: {
+    currentModeId: "agent",
+    availableModes: [
+      { id: "agent", name: "Auto review" },
+      { id: "read-only", name: "Read-only", description: "Asks first" },
+    ],
+  },
+  configOptions: [
+    {
+      id: "mode",
+      name: "Mode",
+      category: "mode",
+      type: "select",
+      currentValue: "agent",
+      options: [
+        { value: "agent", name: "Auto review" },
+        { value: "read-only", name: "Read-only" },
+      ],
+    },
+    {
+      id: "model",
+      name: "Model",
+      category: "model",
+      type: "select",
+      currentValue: "gpt-6.1-sol",
+      options: [
+        { value: "gpt-6.1-sol", name: "Sol" },
+        { group: "older", name: "Older", options: [{ value: "gpt-6-luna", name: "Luna" }] },
+      ],
+    },
+    {
+      id: "reasoning_effort",
+      name: "Effort",
+      category: "thought_level",
+      type: "select",
+      currentValue: "medium",
+      options: [
+        { value: "low", name: "Low" },
+        { value: "medium", name: "Medium" },
+      ],
+    },
+    { id: "fast", name: "Fast", category: "model_config", type: "boolean", currentValue: false },
+    {
+      id: "collab",
+      name: "Collab",
+      category: "collaboration_mode",
+      type: "select",
+      currentValue: "default",
+      options: [{ value: "default", name: "Default" }],
+    },
+  ],
+};
+
+test("ACP controls: model, effort, mode first; config options win over the legacy lists", async () => {
+  const { controlsFromSession } = await import("../server/modules/agent/acp-controls.ts");
+  const controls = controlsFromSession(codexSession);
+  expect(controls.map((control) => [control.id, control.category])).toStrictEqual([
+    ["model", "model"],
+    ["reasoning_effort", "effort"],
+    ["mode", "mode"],
+    ["collab", "other"],
+  ]);
+  // Grouped options are flattened, and the unsupported boolean option is skipped.
+  expect(controls[0].options.map((option) => option.value)).toStrictEqual([
+    "gpt-6.1-sol",
+    "gpt-6-luna",
+  ]);
+  expect(controls.every((control) => control.via === "config")).toBe(true);
+
+  // An agent that only reports the legacy lists still gets a model and a mode control.
+  const legacy = controlsFromSession({ models: codexSession.models, modes: codexSession.modes });
+  expect(legacy.map((control) => [control.id, control.via, control.current])).toStrictEqual([
+    ["model", "model", "gpt-6.1-sol[medium]"],
+    ["mode", "mode", "agent"],
+  ]);
+  expect(controlsFromSession(undefined)).toStrictEqual([]);
+});
+
+test("ACP selection is applied in order, re-reads dependent options and skips refusals", async () => {
+  const { applySelection, controlsFromSession } =
+    await import("../server/modules/agent/acp-controls.ts");
+  const calls = [];
+  let state = codexSession.configOptions;
+  const connection = {
+    request: async (method, params) => {
+      calls.push([method, params.configId ?? params.modelId ?? params.modeId, params.value]);
+      if (params.configId === "reasoning_effort") throw new Error("refused");
+      state = state.map((option) => {
+        if (option.id === params.configId) return { ...option, currentValue: params.value };
+        // A new model brings its own effort levels.
+        if (params.configId === "model" && option.id === "reasoning_effort")
+          return { ...option, options: [{ value: "low", name: "Low" }], currentValue: "low" };
+        return option;
+      });
+      return { configOptions: state };
+    },
+  };
+  const controls = controlsFromSession(codexSession);
+  const applied = await applySelection(connection, "s1", controls, {
+    model: "gpt-6-luna",
+    reasoning_effort: "low",
+    mode: "read-only",
+    collab: "default",
+    unknown: "x",
+  });
+  // Model first; effort was refused and mode went through; same-value and unknown ids are skipped.
+  expect(calls.map(([method, id]) => `${method}:${id}`)).toStrictEqual([
+    "session/set_config_option:model",
+    "session/set_config_option:mode",
+  ]);
+  const byId = Object.fromEntries(applied.map((control) => [control.id, control.current]));
+  expect(byId).toMatchObject({ model: "gpt-6-luna", reasoning_effort: "low", mode: "read-only" });
+
+  // A value the agent does not list is never sent.
+  const none = [];
+  await applySelection({ request: async (...args) => none.push(args) }, "s1", controls, {
+    model: "not-a-model",
+  });
+  expect(none).toStrictEqual([]);
+
+  // Legacy controls go through set_model / set_mode.
+  const legacyCalls = [];
+  const legacy = controlsFromSession({ models: codexSession.models, modes: codexSession.modes });
+  await applySelection(
+    { request: async (method, params) => legacyCalls.push([method, params]) },
+    "s1",
+    legacy,
+    { mode: "read-only" },
+  );
+  expect(legacyCalls).toStrictEqual([
+    ["session/set_mode", { sessionId: "s1", modeId: "read-only" }],
+  ]);
+});
+
+test("ACP replay rebuilds the chat from a loaded session", async () => {
+  const { createAcpReplayCollector } = await import("../server/modules/agent/acp-events.ts");
+  const replay = createAcpReplayCollector("opencode", "ses_1");
+  const chunk = (sessionUpdate, text) => ({ sessionUpdate, content: { type: "text", text } });
+  replay.handleUpdate(chunk("user_message_chunk", "Создай "));
+  replay.handleUpdate(chunk("user_message_chunk", "файл"));
+  replay.handleUpdate(chunk("agent_message_chunk", "Создаю."));
+  replay.handleUpdate({
+    sessionUpdate: "tool_call",
+    toolCallId: "t1",
+    title: "write",
+    rawInput: { path: "a" },
+  });
+  replay.handleUpdate({
+    sessionUpdate: "tool_call_update",
+    toolCallId: "t1",
+    status: "completed",
+    rawOutput: "ok",
+  });
+  replay.handleUpdate(chunk("agent_message_chunk", ""));
+  replay.handleUpdate(chunk("user_message_chunk", "Спасибо"));
+  const turns = replay.turns;
+  expect(turns.map((turn) => [turn.role, turn.text])).toStrictEqual([
+    ["user", "Создай файл"],
+    ["assistant", "Создаю."],
+    ["user", "Спасибо"],
+  ]);
+  expect(turns[1].tools).toStrictEqual([{ id: "t1", name: "write", status: "done", detail: "ok" }]);
+  // Only answers carry the native session, so the next message resumes it.
+  expect(turns.map((turn) => turn.session?.id)).toStrictEqual([undefined, "ses_1", undefined]);
+});
+
+test("agent choices are stored per backend and validated", async () => {
+  const { selectionFrom } = await import("../server/modules/agent/index.ts");
+  expect(selectionFrom({ model: "opus", bad: 1, effort: "low" })).toStrictEqual({
+    model: "opus",
+    effort: "low",
+  });
+  expect(selectionFrom(null)).toStrictEqual({});
+  const directory = await mkdtemp(join(tmpdir(), "projector-agent-defaults-"));
+  const previous = process.env.XDG_DATA_HOME;
+  process.env.XDG_DATA_HOME = directory;
+  try {
+    const { preferences, setAgentDefault } = await import("../server/modules/preferences/index.ts");
+    expect((await preferences()).agentDefaults).toStrictEqual({});
+    await setAgentDefault("codex", "model", "gpt-6-luna");
+    await setAgentDefault("codex", "reasoning_effort", "high");
+    await setAgentDefault("opencode", "model", "x/y");
+    expect((await preferences()).agentDefaults).toStrictEqual({
+      codex: { model: "gpt-6-luna", reasoning_effort: "high" },
+      opencode: { model: "x/y" },
+    });
+    await expect(setAgentDefault("", "model", "x")).rejects.toThrow();
+  } finally {
+    if (previous === undefined) delete process.env.XDG_DATA_HOME;
+    else process.env.XDG_DATA_HOME = previous;
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("the codex npx fallback is pinned to a version", async () => {
   const { ACP_PROGRAMS } = await import("../server/modules/agent/acp-programs.ts");
   expect(ACP_PROGRAMS.codex.args.at(-1)).toMatch(/^@agentclientprotocol\/codex-acp@\d+\.\d+\.\d+$/);
@@ -724,7 +924,7 @@ test("ACP authenticates once when the agent refuses a session", async () => {
   };
   expect(
     await openSession(connection, { cwd: "/tmp" }, [{ id: "cursor_login" }], () => {}),
-  ).toStrictEqual({ sessionId: "after-auth", resumed: false });
+  ).toMatchObject({ sessionId: "after-auth", resumed: false });
   expect(calls).toStrictEqual(["session/new", "authenticate", "session/new"]);
 });
 

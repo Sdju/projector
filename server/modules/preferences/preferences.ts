@@ -14,6 +14,8 @@ interface Preferences {
   favorites: string[];
   /** Terminal programs that have a graphical chat, mapped to how new sessions open. */
   agentModes: Record<string, AgentSessionMode>;
+  /** Last model/effort/mode choice per agent backend, by control id; new chats start from it. */
+  agentDefaults: Record<string, Record<string, string>>;
 }
 
 export type AgentSessionMode = "tui" | "gui";
@@ -33,6 +35,7 @@ export async function preferences(): Promise<Preferences> {
         ? data.favorites.filter((id: unknown): id is string => typeof id === "string")
         : [],
       agentModes: agentModes(data.agentModes),
+      agentDefaults: agentDefaults(data.agentDefaults),
     };
   } catch {
     return {
@@ -41,8 +44,21 @@ export async function preferences(): Promise<Preferences> {
       usage: {},
       favorites: [],
       agentModes: {},
+      agentDefaults: {},
     };
   }
+}
+function agentDefaults(value: unknown): Record<string, Record<string, string>> {
+  const defaults: Record<string, Record<string, string>> = {};
+  if (!value || typeof value !== "object") return defaults;
+  for (const [backend, choice] of Object.entries(value as Record<string, unknown>)) {
+    if (!choice || typeof choice !== "object") continue;
+    const picked: Record<string, string> = {};
+    for (const [id, item] of Object.entries(choice as Record<string, unknown>))
+      if (typeof item === "string") picked[id] = item;
+    if (Object.keys(picked).length) defaults[backend] = picked;
+  }
+  return defaults;
 }
 function agentModes(value: unknown): Record<string, AgentSessionMode> {
   const modes: Record<string, AgentSessionMode> = {};
@@ -90,5 +106,13 @@ export async function setAgentMode(program: string, mode: AgentSessionMode): Pro
   await updatePreferences((value) => {
     if (mode === "gui") value.agentModes[program] = "gui";
     else delete value.agentModes[program];
+  });
+}
+/** Remembers one control choice of an agent backend as the default for new chats. */
+export async function setAgentDefault(backend: string, id: string, value: string): Promise<void> {
+  if (!backend || !id || backend.length > 40 || id.length > 100 || value.length > 300)
+    throw new Error("Некорректный выбор");
+  await updatePreferences((preferences) => {
+    preferences.agentDefaults[backend] = { ...preferences.agentDefaults[backend], [id]: value };
   });
 }

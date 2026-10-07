@@ -11,6 +11,26 @@ export type AgentBackendId = "projector" | "claude-code" | "codex" | "opencode" 
 
 export type AgentPermissionMode = "default" | "acceptEdits" | "bypassPermissions";
 
+/** A knob the agent offers for a chat: model, reasoning effort, mode. */
+export interface AgentControl {
+  id: string;
+  category: "model" | "effort" | "mode" | "other";
+  name: string;
+  description?: string;
+  current: string;
+  options: { value: string; name: string; description?: string }[];
+}
+
+/** Choices by control id. */
+export type AgentSelection = Record<string, string>;
+
+/** A past conversation of the agent in this project. */
+export interface AgentSessionInfo {
+  id: string;
+  title: string;
+  updatedAt?: string;
+}
+
 export interface AgentSessionRef {
   backend: string;
   id: string;
@@ -63,6 +83,7 @@ export type AgentEvent =
       };
     }
   | { event: "session"; data: AgentSessionRef }
+  | { event: "controls"; data: { controls: AgentControl[] } }
   | { event: "status"; data: { phase: string; provider?: string; model?: string } }
   | { event: "text"; data: { text: string } }
   | { event: "tool"; data: { id: string; name: string; input: unknown } }

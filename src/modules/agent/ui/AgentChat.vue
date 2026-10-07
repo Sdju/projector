@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useIdeCommands } from "../../ide/index.ts";
+import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import { useProjects } from "../../project/index.ts";
 import { agentCommandHandler } from "../model/commands.ts";
 import { agentLabel } from "../model/modes.ts";
@@ -12,6 +13,8 @@ import AgentTurn from "./AgentTurn.vue";
 import AgentComposer from "./AgentComposer.vue";
 import AgentPermissions from "./AgentPermissions.vue";
 import AgentPermissionMode from "./AgentPermissionMode.vue";
+import AgentControls from "./AgentControls.vue";
+import AgentSessions from "./AgentSessions.vue";
 import type { AgentBackendId } from "../model/types.ts";
 import IconClaude from "~icons/simple-icons/claude";
 import IconBot from "~icons/lucide/bot";
@@ -31,11 +34,97 @@ const { projects } = useProjects();
 const projectName = computed(
   () => projects.value.find((p) => p.id === props.projectId)?.name ?? "Текущий проект",
 );
-const { turns, draft, busy, error, phase, permissions, permissionMode, send, clear, stop, decide } =
-  useAgent(props.projectId, plain.value ? undefined : agentCommandHandler(api, props.projectId), {
+const {
+  turns,
+  draft,
+  busy,
+  error,
+  phase,
+  permissions,
+  permissionMode,
+  controls,
+  sessions,
+  sessionsLoading,
+  sessionsError,
+  loadControls,
+  setControl,
+  loadSessions,
+  resumeSession,
+  send,
+  clear,
+  stop,
+  decide,
+} = useAgent(props.projectId, plain.value ? undefined : agentCommandHandler(api, props.projectId), {
+  backend: props.backend,
+  chatId: props.chatId,
+});
+onMounted(() => void loadControls());
+const activeSession = computed(
+  () => turns.value.findLast((turn) => turn.role === "assistant")?.session?.id,
+);
+const commands = useCommandScope(
+  `agent-chat:${props.backend}:${props.chatId ?? props.projectId}`,
+  () => ({
+    surface: "agent-chat",
     backend: props.backend,
-    chatId: props.chatId,
+    projectId: props.projectId,
+  }),
+);
+if (plain.value) {
+  const idle = () => !busy.value;
+  commands.scope.registerCommand({
+    id: "ide.agent.controls.list",
+    title: `Параметры агента ${agentName.value}: модель, усилие, режим`,
+    description:
+      "Возвращает настройки открытого чата внешнего агента (модель, усилие рассуждений, режим) с текущими значениями и допустимыми вариантами.",
+    run: () =>
+      controls.value.map((control) => ({
+        id: control.id,
+        name: control.name,
+        current: control.current,
+        options: control.options.map((option) => option.value),
+      })),
   });
+  commands.scope.registerCommand({
+    id: "ide.agent.control.set",
+    title: `Выбрать модель, усилие или режим агента ${agentName.value}`,
+    description:
+      "Задаёт настройку открытого чата внешнего агента. Действует со следующего сообщения и запоминается как выбор по умолчанию для этого агента.",
+    arguments: {
+      id: "Идентификатор настройки из ide.agent.controls.list (например model)",
+      value: "Одно из допустимых значений настройки",
+    },
+    enabled: idle,
+    run: async (args) => {
+      const { id, value } = commandArgs(args);
+      if (typeof id !== "string" || typeof value !== "string")
+        throw new Error("Укажите id и value настройки");
+      await setControl(id, value);
+      return { id, value };
+    },
+  });
+  commands.scope.registerCommand({
+    id: "ide.agent.sessions.list",
+    title: `Прошлые сессии агента ${agentName.value}`,
+    description:
+      "Возвращает прошлые сессии этого агента в папке проекта, от новых к старым: идентификатор, название и время.",
+    run: () => loadSessions(),
+  });
+  commands.scope.registerCommand({
+    id: "ide.agent.session.resume",
+    title: `Продолжить прошлую сессию агента ${agentName.value}`,
+    description:
+      "Заменяет содержимое открытого чата сообщениями выбранной прошлой сессии; следующее сообщение продолжит её. Идентификаторы даёт ide.agent.sessions.list.",
+    arguments: { sessionId: "Идентификатор сессии" },
+    enabled: idle,
+    run: async (args) => {
+      const { sessionId } = commandArgs(args);
+      if (typeof sessionId !== "string") throw new Error("Укажите sessionId");
+      await resumeSession(sessionId);
+      return { sessionId };
+    },
+  });
+}
 // Что штатный агент видит в чате: статус, последний ответ и чипы инструментов.
 useTabReadout(() => {
   const last = turns.value.at(-1);
@@ -50,6 +139,10 @@ useTabReadout(() => {
       `Бэкенд: ${props.backend ?? "projector"}`,
       busy.value ? `Состояние: Работает (${phase.value})` : "Состояние: Готов",
       error.value ? `Ошибка: ${error.value}` : "",
+      ...controls.value.map(
+        (control) =>
+          `${control.name}: ${control.options.find((item) => item.value === control.current)?.name ?? control.current}`,
+      ),
       `Сообщений: ${turns.value.length}`,
       answer ? `Последний ответ:\n${answer}` : "",
       chips ? `Инструменты: ${chips}` : "",
@@ -174,6 +267,16 @@ onBeforeUnmount(() => {
         ><IconFolder aria-hidden="true" />{{ projectName }}</span
       >
       <div class="header-actions">
+        <AgentSessions
+          v-if="plain"
+          :sessions="sessions"
+          :loading="sessionsLoading"
+          :error="sessionsError"
+          :disabled="busy"
+          :active="activeSession"
+          @open="loadSessions"
+          @pick="(id) => void resumeSession(id).catch(() => {})"
+        />
         <span class="agent-status" :class="{ busy }" role="status" :title="phase"
           ><i aria-hidden="true" />{{ busy ? "Работает" : "Готов" }}</span
         >
@@ -229,6 +332,13 @@ onBeforeUnmount(() => {
       @stop="stop"
       @latest="toBottom"
     >
+      <template v-if="plain" #controls>
+        <AgentControls
+          :controls="controls"
+          :disabled="busy"
+          @change="(id, value) => void setControl(id, value)"
+        />
+      </template>
       <template v-if="claude" #footer>
         <AgentPermissionMode v-model="permissionMode" :disabled="busy" />
       </template>

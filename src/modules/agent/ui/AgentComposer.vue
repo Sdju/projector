@@ -51,6 +51,7 @@ defineExpose({ resize, focus: () => input.value?.focus() });
         rows="1"
         @keydown="keydown"
       />
+      <slot name="controls" />
       <div class="composer-footer">
         <span class="composer-context"
           ><IconFolder aria-hidden="true" /><span>{{ projectName }}</span></span

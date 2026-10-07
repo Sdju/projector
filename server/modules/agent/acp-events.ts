@@ -1,4 +1,5 @@
 import type { AgentEmitter } from "./backend.ts";
+import type { AgentSessionTurn } from "./controls.ts";
 
 interface ContentBlock {
   type?: string;
@@ -85,4 +86,74 @@ export function createAcpEventMapper(emit: AgentEmitter, label: string) {
       return text;
     },
   };
+}
+
+/**
+ * Rebuilds the chat from the updates an agent replays on `session/load`: user and agent message
+ * chunks become turns, tool calls become the chips of the answer they belong to.
+ */
+export function createAcpReplayCollector(backend: string, sessionId: string) {
+  const turns: AgentSessionTurn[] = [];
+  let counter = 0;
+  const turnFor = (role: "user" | "assistant"): AgentSessionTurn => {
+    const last = turns.at(-1);
+    if (last?.role === role) return last;
+    const turn: AgentSessionTurn = {
+      id: `replay-${++counter}`,
+      role,
+      text: "",
+      tools: [],
+      ...(role === "assistant" ? { session: { backend, id: sessionId } } : {}),
+    };
+    turns.push(turn);
+    return turn;
+  };
+
+  function handleUpdate(update: Record<string, unknown>): void {
+    const kind = update.sessionUpdate;
+    if (kind === "user_message_chunk") turnFor("user").text += contentText(update.content);
+    else if (kind === "agent_message_chunk")
+      turnFor("assistant").text += contentText(update.content);
+    else if (kind === "tool_call") {
+      const id = String(update.toolCallId ?? "");
+      if (!id) return;
+      turnFor("assistant").tools.push({
+        id,
+        name: String(update.title || update.kind || "tool"),
+        status: "running",
+        detail: toolDetail(update.rawInput),
+      });
+      finish(update, id);
+    } else if (kind === "tool_call_update") {
+      const id = String(update.toolCallId ?? "");
+      if (id) finish(update, id);
+    }
+  }
+
+  function finish(update: Record<string, unknown>, id: string): void {
+    if (update.status !== "completed" && update.status !== "failed") return;
+    const chip = turns.flatMap((turn) => turn.tools).find((item) => item.id === id);
+    if (!chip) return;
+    chip.status = update.status === "failed" ? "error" : "done";
+    const output = toolOutput(update);
+    if (output) chip.detail = output.slice(0, 8000);
+  }
+
+  return {
+    handleUpdate,
+    /** Turns with text or tools; empty chunks the agent sends between messages are dropped. */
+    get turns() {
+      return turns.filter((turn) => turn.text.trim() || turn.tools.length);
+    },
+  };
+}
+
+function toolDetail(input: unknown): string {
+  if (input == null) return "";
+  if (typeof input === "string") return input.slice(0, 8000);
+  try {
+    return JSON.stringify(input, null, 2).slice(0, 8000);
+  } catch {
+    return "";
+  }
 }

@@ -3,6 +3,17 @@ import type { Options } from "@anthropic-ai/claude-agent-sdk";
 import { agentEnv, assertHostProject, promptWithHistory } from "./agent-host.ts";
 import type { AgentBackend, AgentRunOptions } from "./backend.ts";
 import { CLAUDE_LABEL, createClaudeEventMapper } from "./claude-code-events.ts";
+import { CLAUDE_CONTROLS, claudeLoadSession, claudeSessions } from "./claude-code-sessions.ts";
+import type { AgentControl } from "./controls.ts";
+
+/** Claude Code takes the choice natively; `default` leaves the model and effort to its settings. */
+function chosen(options: AgentRunOptions) {
+  const pick = (id: string) => {
+    const value = options.selection?.[id];
+    return value && value !== "default" ? value : undefined;
+  };
+  return { model: pick("model"), effort: pick("effort") };
+}
 
 /**
  * Plain Claude Code behind a chat UI instead of the TUI: its own prompt, tools, login, `CLAUDE.md`
@@ -18,6 +29,7 @@ async function run(options: AgentRunOptions): Promise<void> {
   else options.abort?.addEventListener("abort", forwardAbort, { once: true });
 
   const mode = options.permissionMode ?? "default";
+  const selected = chosen(options);
   const base: Options = {
     cwd: options.cwd,
     abortController,
@@ -26,6 +38,8 @@ async function run(options: AgentRunOptions): Promise<void> {
     settingSources: ["user", "project", "local"],
     systemPrompt: { type: "preset", preset: "claude_code" },
     permissionMode: mode,
+    ...(selected.model ? { model: selected.model } : {}),
+    ...(selected.effort ? { effort: selected.effort as Options["effort"] } : {}),
     ...(mode === "bypassPermissions" ? { allowDangerouslySkipPermissions: true } : {}),
     canUseTool: async (toolName, input, context) => {
       if (!options.approve)
@@ -63,6 +77,7 @@ async function run(options: AgentRunOptions): Promise<void> {
   };
 
   try {
+    options.emit("controls", { controls: claudeControls(options.selection ?? {}) });
     options.emit("status", { phase: "thinking", provider: CLAUDE_LABEL, model: "" });
     await attempt(options.sessionId);
   } finally {
@@ -70,4 +85,20 @@ async function run(options: AgentRunOptions): Promise<void> {
   }
 }
 
-export const claudeCodeBackend: AgentBackend = { id: "claude-code", run };
+/** The static list with the user's current choice marked. */
+function claudeControls(selection: Record<string, string>): AgentControl[] {
+  return CLAUDE_CONTROLS.map((control) => {
+    const value = selection[control.id];
+    return value && control.options.some((option) => option.value === value)
+      ? { ...control, current: value }
+      : control;
+  });
+}
+
+export const claudeCodeBackend: AgentBackend = {
+  id: "claude-code",
+  run,
+  controls: async () => CLAUDE_CONTROLS,
+  sessions: claudeSessions,
+  loadSession: claudeLoadSession,
+};

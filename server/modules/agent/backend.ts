@@ -1,8 +1,15 @@
 import type { AgentHistoryTurn } from "../providers/index.ts";
+import type {
+  AgentControl,
+  AgentSelection,
+  AgentSessionInfo,
+  AgentSessionTurn,
+} from "./controls.ts";
 import type { ApprovalAnswer, ApprovalRequest, CommandRequest } from "./command-bridge.ts";
 
 export type AgentEventName =
   | "command-request"
+  | "controls"
   | "permission-request"
   | "status"
   | "session"
@@ -39,6 +46,8 @@ export interface AgentRunOptions {
   /** Defaults to `projector`. */
   backend?: AgentBackendId;
   permissionMode?: AgentPermissionMode;
+  /** Model, effort and mode chosen in the chat, by control id. */
+  selection?: AgentSelection;
   message: string;
   cwd?: string;
   commands?: (request: CommandRequest) => Promise<unknown>;
@@ -60,4 +69,10 @@ export interface AgentRunOptions {
 export interface AgentBackend {
   id: AgentBackendId;
   run(options: AgentRunOptions): Promise<void>;
+  /** What the user may tune before a turn (model, effort, mode). */
+  controls?(cwd: string): Promise<AgentControl[]>;
+  /** Past conversations of this agent in the project, newest first. */
+  sessions?(cwd: string): Promise<AgentSessionInfo[]>;
+  /** The messages of one past conversation, to continue it in the chat. */
+  loadSession?(cwd: string, sessionId: string): Promise<AgentSessionTurn[]>;
 }

@@ -1,5 +1,9 @@
 import type {
   AgentBackendId,
+  AgentControl,
+  AgentSelection,
+  AgentSessionInfo,
+  AgentTurn,
   AgentEvent,
   AgentHistoryTurn,
   AgentCommandRequest,
@@ -37,6 +41,7 @@ export async function streamAgent(
     sessionId?: string;
     backend?: AgentBackendId;
     permissionMode?: AgentPermissionMode;
+    selection?: AgentSelection;
     commands?: (request: AgentCommandRequest) => Promise<unknown>;
   } = {},
 ): Promise<void> {
@@ -50,6 +55,7 @@ export async function streamAgent(
       sessionId: options.sessionId,
       backend: options.backend,
       permissionMode: options.permissionMode,
+      selection: options.selection,
       approvals: true,
       commandBridge: !!options.commands,
     }),
@@ -102,4 +108,79 @@ export async function answerPermission(id: string, allow: boolean, always = fals
     body: JSON.stringify({ id, output: { allow, always } }),
   });
   if (!response.ok) throw new Error("Запрос разрешения уже закрыт");
+}
+
+async function getJson<T>(url: string, init: RequestInit | undefined, failure: string): Promise<T> {
+  const response = await fetch(url, init);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error((data as { error?: string }).error || failure);
+  return data as T;
+}
+
+const query = (backend: AgentBackendId, projectId: string) =>
+  `backend=${encodeURIComponent(backend)}&projectId=${encodeURIComponent(projectId)}`;
+
+/** Models, effort levels and modes the agent offers in this project. */
+export async function fetchControls(
+  backend: AgentBackendId,
+  projectId: string,
+): Promise<AgentControl[]> {
+  const data = await getJson<{ controls: AgentControl[] }>(
+    `/api/agent/controls?${query(backend, projectId)}`,
+    undefined,
+    "Не удалось получить настройки агента",
+  );
+  return data.controls;
+}
+
+/** The last choice per agent, remembered on disk. */
+export async function fetchDefaults(): Promise<Record<string, AgentSelection>> {
+  const data = await getJson<{ defaults: Record<string, AgentSelection> }>(
+    "/api/agent/defaults",
+    undefined,
+    "Не удалось получить выбор агента",
+  );
+  return data.defaults;
+}
+
+export async function saveDefault(backend: AgentBackendId, id: string, value: string) {
+  await getJson(
+    "/api/agent/defaults",
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ backend, id, value }),
+    },
+    "Не удалось сохранить выбор агента",
+  );
+}
+
+export async function fetchSessions(
+  backend: AgentBackendId,
+  projectId: string,
+): Promise<AgentSessionInfo[]> {
+  const data = await getJson<{ sessions: AgentSessionInfo[] }>(
+    `/api/agent/sessions?${query(backend, projectId)}`,
+    undefined,
+    "Не удалось получить сессии агента",
+  );
+  return data.sessions;
+}
+
+/** The messages of a past session, ready to show in the chat. */
+export async function loadSessionTurns(
+  backend: AgentBackendId,
+  projectId: string,
+  sessionId: string,
+): Promise<AgentTurn[]> {
+  const data = await getJson<{ turns: AgentTurn[] }>(
+    "/api/agent/sessions/load",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ backend, projectId, sessionId }),
+    },
+    "Не удалось открыть сессию",
+  );
+  return data.turns;
 }

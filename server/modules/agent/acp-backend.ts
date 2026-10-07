@@ -1,17 +1,10 @@
-import { os } from "../../../core/modules/os/index.ts";
-import {
-  createAcpConnection,
-  NO_TIMEOUT,
-  type AcpConnection,
-  type AcpError,
-} from "./acp-client.ts";
+import { type AcpConnection, type AcpError, NO_TIMEOUT } from "./acp-client.ts";
+import { applySelection, controlsFromSession } from "./acp-controls.ts";
 import { contentText, createAcpEventMapper } from "./acp-events.ts";
-import { ACP_PROGRAMS, type AcpProgram } from "./acp-programs.ts";
-import { agentEnv, assertHostProject, promptWithHistory } from "./agent-host.ts";
+import { acpProgram, initializeAcp, startAcp } from "./acp-process.ts";
+import { acpControls, acpLoadSession, acpSessions } from "./acp-tools.ts";
+import { promptWithHistory } from "./agent-host.ts";
 import type { AgentBackend, AgentBackendId, AgentRunOptions } from "./backend.ts";
-
-/** Agent Client Protocol revision this client speaks. */
-const PROTOCOL_VERSION = 1;
 
 interface PermissionOption {
   optionId?: string;
@@ -27,44 +20,27 @@ function stopReasonError(stopReason: unknown): string {
 
 /** An external agent driven through its ACP server over stdio. */
 export function createAcpBackend(id: AgentBackendId): AgentBackend {
-  return { id, run: (options) => run(options, id) };
-}
-
-/**
- * Prefer a globally installed binary. `npx` reads the working directory's `package.json`, so a
- * project that pins another package manager (`devEngines`/`packageManager`) makes npm refuse to
- * start; the `npx` fallback therefore runs outside the project. The session still gets the project
- * through `session/new`, so the agent's own config and files are unaffected.
- */
-async function resolveLaunch(program: AcpProgram, cwd: string) {
-  // Resolve programs the way a terminal session does, not through the server's own PATH.
-  const env = await os.tools.agentEnv(agentEnv());
-  if (program.binary && os.tools.commandExists(program.binary, env))
-    return { command: program.binary, args: [] as string[], cwd, env };
-  if (program.command === "npx")
-    return { command: program.command, args: program.args, cwd: os.dataHome(), env };
-  return { command: program.command, args: program.args, cwd, env };
+  return {
+    id,
+    run: (options) => run(options, id),
+    controls: (cwd) => acpControls(id, cwd),
+    sessions: (cwd) => acpSessions(id, cwd),
+    loadSession: (cwd, sessionId) => acpLoadSession(id, cwd, sessionId),
+  };
 }
 
 async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> {
-  const program = ACP_PROGRAMS[id];
-  if (!program) throw new Error(`Неизвестный ACP-агент: ${id}`);
-  if (!options.cwd)
-    throw new Error(`${program.label} работает внутри проекта: откройте чат в проекте`);
-  await assertHostProject(options.cwd, program.label);
-
-  const child = os.tools.spawnAgentProcess(await resolveLaunch(program, options.cwd));
+  const program = acpProgram(id);
   const mapper = createAcpEventMapper(options.emit, program.label);
   let sessionId = "";
   // `session/load` replays the whole conversation; those updates are history, not this answer.
   let replaying = false;
-  let connection: AcpConnection;
+  let connection: AcpConnection | undefined;
   const abort = () => {
-    if (sessionId) connection.notify("session/cancel", { sessionId });
-    void connection.close();
+    if (connection && sessionId) connection.notify("session/cancel", { sessionId });
+    void connection?.close();
   };
-  connection = createAcpConnection(child, {
-    label: program.label,
+  connection = await startAcp(id, options.cwd, {
     onNotification(method, params) {
       if (method !== "session/update" || replaying) return;
       mapper.handleUpdate(
@@ -83,14 +59,7 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
 
   options.emit("status", { phase: "thinking", provider: program.label, model: "" });
   try {
-    const init = (await connection.request("initialize", {
-      protocolVersion: PROTOCOL_VERSION,
-      clientCapabilities: {
-        fs: { readTextFile: false, writeTextFile: false },
-        terminal: false,
-      },
-      clientInfo: { name: "projector", title: "Projector", version: "1.0" },
-    })) as { authMethods?: { id?: string }[]; agentCapabilities?: { loadSession?: boolean } };
+    const init = await initializeAcp(connection);
     const session = await openSession(
       connection,
       options,
@@ -102,6 +71,12 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
     );
     sessionId = session.sessionId;
     options.emit("session", { id: sessionId, backend: id });
+    // What the agent offers for this session, with the user's choices applied before the prompt.
+    const offered = controlsFromSession(session.result);
+    if (offered.length) {
+      const applied = await applySelection(connection, sessionId, offered, options.selection ?? {});
+      options.emit("controls", { controls: applied });
+    }
     // A resumed session already holds the history; a fresh one starts from the replayed chat.
     const prompt = session.resumed
       ? options.message
@@ -139,17 +114,17 @@ export async function openSession(
   authMethods: { id?: string }[],
   replay: (active: boolean) => void,
   canLoad = true,
-): Promise<{ sessionId: string; resumed: boolean }> {
+): Promise<{ sessionId: string; resumed: boolean; result: unknown }> {
   const start = async () => {
     if (options.sessionId && canLoad) {
       replay(true);
       try {
-        await connection.request("session/load", {
+        const loaded = await connection.request("session/load", {
           sessionId: options.sessionId,
           cwd: options.cwd,
           mcpServers: [],
         });
-        return { sessionId: options.sessionId, resumed: true };
+        return { sessionId: options.sessionId, resumed: true, result: loaded };
       } catch (error) {
         // A dead connection or a missing login must surface as is; only a session that is gone
         // (moved project, pruned transcript) falls back to a fresh one.
@@ -162,7 +137,7 @@ export async function openSession(
       cwd: options.cwd,
       mcpServers: [],
     })) as { sessionId: string };
-    return { sessionId: created.sessionId, resumed: false };
+    return { sessionId: created.sessionId, resumed: false, result: created };
   };
   try {
     return await start();
