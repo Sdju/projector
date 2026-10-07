@@ -5,6 +5,7 @@ import IconGit from "~icons/lucide/git-branch";
 import IconTerminal from "~icons/lucide/terminal";
 import IconCornerDownLeft from "~icons/lucide/corner-down-left";
 
+withDefaults(defineProps<{ plain?: boolean }>(), { plain: false });
 const emit = defineEmits<{ suggest: [text: string] }>();
 const suggestions = [
   {
@@ -32,8 +33,9 @@ const suggestions = [
   <div class="welcome">
     <div class="welcome-mark"><IconBot aria-hidden="true" /></div>
     <h1>С чего начнём?</h1>
-    <p>Помогу разобраться в проекте<br />и выполнить нужные действия.</p>
-    <div class="suggestions">
+    <p v-if="plain">Claude Code работает в папке проекта<br />так же, как в терминале.</p>
+    <p v-else>Помогу разобраться в проекте<br />и выполнить нужные действия.</p>
+    <div v-if="!plain" class="suggestions">
       <button
         v-for="suggestion in suggestions"
         :key="suggestion.title"

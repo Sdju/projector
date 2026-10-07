@@ -7,7 +7,16 @@ import IconBot from "~icons/lucide/bot";
 import IconCopy from "~icons/lucide/copy";
 import IconCheck from "~icons/lucide/check";
 
-defineProps<{ turn: AgentTurn; busy: boolean; last: boolean; copied: boolean }>();
+withDefaults(
+  defineProps<{
+    turn: AgentTurn;
+    busy: boolean;
+    last: boolean;
+    copied: boolean;
+    sender?: string;
+  }>(),
+  { sender: "Projector" },
+);
 const emit = defineEmits<{ copy: [id: string, text: string] }>();
 </script>
 
@@ -20,7 +29,7 @@ const emit = defineEmits<{ copy: [id: string, text: string] }>();
     <template v-else>
       <div class="assistant-heading">
         <span class="avatar"><IconBot aria-hidden="true" /></span>
-        <span class="sender">Projector</span>
+        <span class="sender">{{ sender }}</span>
         <UiButton
           v-if="turn.text"
           icon

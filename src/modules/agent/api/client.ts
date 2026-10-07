@@ -1,4 +1,10 @@
-import type { AgentEvent, AgentHistoryTurn, AgentCommandRequest } from "../model/types.ts";
+import type {
+  AgentBackendId,
+  AgentEvent,
+  AgentHistoryTurn,
+  AgentCommandRequest,
+  AgentPermissionMode,
+} from "../model/types.ts";
 
 function parseSse(buffer: string): { events: AgentEvent[]; rest: string } {
   const events: AgentEvent[] = [];
@@ -28,6 +34,9 @@ export async function streamAgent(
   signal?: AbortSignal,
   options: {
     projectId?: string;
+    sessionId?: string;
+    backend?: AgentBackendId;
+    permissionMode?: AgentPermissionMode;
     commands?: (request: AgentCommandRequest) => Promise<unknown>;
   } = {},
 ): Promise<void> {
@@ -38,6 +47,10 @@ export async function streamAgent(
       message,
       history,
       projectId: options.projectId,
+      sessionId: options.sessionId,
+      backend: options.backend,
+      permissionMode: options.permissionMode,
+      approvals: true,
       commandBridge: !!options.commands,
     }),
     signal,
@@ -79,4 +92,14 @@ export async function streamAgent(
     const parsed = parseSse(`${buffer}\n\n`);
     for (const event of parsed.events) await handle(event);
   }
+}
+
+/** Answers a `permission-request` event; the ID is a single-use capability from that stream. */
+export async function answerPermission(id: string, allow: boolean): Promise<void> {
+  const response = await fetch("/api/agent/tool-result", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, output: { allow } }),
+  });
+  if (!response.ok) throw new Error("Запрос разрешения уже закрыт");
 }

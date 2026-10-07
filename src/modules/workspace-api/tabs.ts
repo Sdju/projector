@@ -20,6 +20,8 @@ export interface TabType<P extends TabParams = TabParams> {
   subtitle?: string;
   /** What the built-in agent sees when it reads the tab; the default says it has no text. */
   read?(params: P, content: string): { text?: string; note?: string };
+  /** Parameters for a tab opened by its command; lets a kind open a new instance each time. */
+  create?(): P;
   /** An IDE command that opens the tab; the workspace registers it with the kind. */
   command?: { id: string; title: string; description?: string; requires?: string };
 }

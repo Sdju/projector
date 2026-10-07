@@ -1,7 +1,14 @@
 import { computed, reactive } from "vue";
 import { useProjects, type Project } from "../../project/index.ts";
-import { streamAgent } from "../api/client.ts";
-import type { AgentHistoryTurn, AgentTurn, AgentCommandRequest } from "./types.ts";
+import { answerPermission, streamAgent } from "../api/client.ts";
+import type {
+  AgentBackendId,
+  AgentHistoryTurn,
+  AgentTurn,
+  AgentCommandRequest,
+  AgentPermission,
+  AgentPermissionMode,
+} from "./types.ts";
 
 const createState = () =>
   reactive({
@@ -10,6 +17,8 @@ const createState = () =>
     busy: false,
     error: "",
     phase: "",
+    permissions: [] as AgentPermission[],
+    permissionMode: "default" as AgentPermissionMode,
     abort: undefined as AbortController | undefined,
   });
 
@@ -29,14 +38,19 @@ const saves = new Map<string, Promise<void>>();
 export function useAgent(
   projectId = "",
   commands?: (request: AgentCommandRequest) => Promise<unknown>,
+  /** `claude-code` chats are separate conversations: one per `chatId`, no Projector tools. */
+  options: { backend?: AgentBackendId; chatId?: string } = {},
 ) {
-  if (!sessions.has(projectId)) sessions.set(projectId, createState());
-  const state = sessions.get(projectId)!;
+  const backend = options.backend ?? "projector";
+  const key =
+    backend === "projector" ? projectId : `${backend}:${projectId}:${options.chatId ?? "main"}`;
+  if (!sessions.has(key)) sessions.set(key, createState());
+  const state = sessions.get(key)!;
 
-  const historyUrl = `/api/agent/history/${encodeURIComponent(projectId || "catalog")}`;
-  if (!loads.has(projectId))
+  const historyUrl = `/api/agent/history/${encodeURIComponent(key || "catalog")}`;
+  if (!loads.has(key))
     loads.set(
-      projectId,
+      key,
       fetch(historyUrl)
         .then(async (response) => {
           if (!response.ok) throw new Error("Не удалось загрузить историю чата");
@@ -54,10 +68,10 @@ export function useAgent(
           state.error = error.message;
         }),
     );
-  const ready = loads.get(projectId)!;
+  const ready = loads.get(key)!;
   function persist() {
     const body = JSON.stringify({ turns: state.turns.slice(-200) });
-    const saving = (saves.get(projectId) ?? Promise.resolve())
+    const saving = (saves.get(key) ?? Promise.resolve())
       .catch(() => {})
       .then(async () => {
         const response = await fetch(historyUrl, {
@@ -67,7 +81,7 @@ export function useAgent(
         });
         if (!response.ok) throw new Error("Не удалось сохранить историю чата");
       });
-    saves.set(projectId, saving);
+    saves.set(key, saving);
     void saving.catch((error) => {
       state.error = error.message;
     });
@@ -88,6 +102,27 @@ export function useAgent(
     },
   });
   const phase = computed(() => state.phase);
+  const permissions = computed(() => state.permissions);
+  const permissionMode = computed({
+    get: () => state.permissionMode,
+    set: (value: AgentPermissionMode) => {
+      state.permissionMode = value;
+    },
+  });
+
+  /** The native session of the last answer, so Claude Code continues the same conversation. */
+  function sessionId(): string | undefined {
+    return state.turns.findLast((item) => item.role === "assistant")?.session?.id;
+  }
+
+  async function decide(id: string, allow: boolean): Promise<void> {
+    state.permissions = state.permissions.filter((item) => item.id !== id);
+    try {
+      await answerPermission(id, allow);
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : "Не удалось передать решение";
+    }
+  }
 
   function history(): AgentHistoryTurn[] {
     return state.turns
@@ -104,6 +139,7 @@ export function useAgent(
     state.busy = true;
     state.phase = "думает";
     const previousHistory = history();
+    const resume = sessionId();
     state.abort = new AbortController();
     const userTurn: AgentTurn = {
       id: crypto.randomUUID(),
@@ -129,6 +165,14 @@ export function useAgent(
               ? `${event.data.provider ?? "qwen"} · ${event.data.model}`
               : "думает";
           }
+          if (event.event === "session") assistant.session = event.data;
+          if (event.event === "permission-request")
+            state.permissions.push({
+              id: event.data.id,
+              tool: event.data.tool,
+              title: event.data.title || event.data.tool,
+              detail: summarize(event.data.input),
+            });
           if (event.event === "text") assistant.text += event.data.text;
           if (event.event === "tool") {
             if (assistant.text.trim() && !assistant.text.endsWith("\n\n")) assistant.text += "\n\n";
@@ -150,7 +194,13 @@ export function useAgent(
           if (event.event === "error") state.error = event.data.error;
         },
         state.abort.signal,
-        { projectId: projectId || undefined, commands },
+        {
+          projectId: projectId || undefined,
+          sessionId: resume,
+          commands,
+          backend,
+          permissionMode: state.permissionMode,
+        },
       );
     } catch (err) {
       if (!state.abort?.signal.aborted)
@@ -164,6 +214,7 @@ export function useAgent(
         }
       state.busy = false;
       state.phase = "";
+      state.permissions = [];
       persist();
     }
   }
@@ -179,5 +230,17 @@ export function useAgent(
   }
 
   const stop = () => state.abort?.abort();
-  return { turns, draft, busy, error, phase, send, clear, stop };
+  return {
+    turns,
+    draft,
+    busy,
+    error,
+    phase,
+    permissions,
+    permissionMode,
+    send,
+    clear,
+    stop,
+    decide,
+  };
 }

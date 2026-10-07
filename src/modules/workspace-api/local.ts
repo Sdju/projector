@@ -1,5 +1,5 @@
 import type { FileWrite, GitWrite, WorkspaceProfile } from "./profile.ts";
-import { singletonTab } from "./tabs.ts";
+import { defineTab, singletonTab } from "./tabs.ts";
 
 const base = (projectId: string) => `/api/projects/${encodeURIComponent(projectId)}/workspace`;
 
@@ -33,6 +33,21 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
         command: {
           id: "ide.workbench.agent.open",
           title: "Открыть чат с агентом",
+          requires: "agent",
+        },
+      }),
+      // Plain Claude Code behind a chat instead of the TUI; every opening is a new conversation.
+      defineTab<{ chatId?: string }>({
+        id: "claude",
+        key: (params) => `claude:${params.chatId ?? "main"}`,
+        path: () => "Claude Code",
+        title: () => "Claude Code в графическом чате",
+        create: () => ({ chatId: crypto.randomUUID() }),
+        command: {
+          id: "ide.workbench.claude.open",
+          title: "Новая сессия Claude Code (GUI)",
+          description:
+            "Открывает вкладку с Claude Code в графическом чате вместо терминала: отдельный диалог в папке проекта, запросы разрешений в чате.",
           requires: "agent",
         },
       }),

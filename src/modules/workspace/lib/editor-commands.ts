@@ -24,7 +24,7 @@ export interface EditorCommandContext {
   fileOf: (id: string) => OpenFile | undefined;
   saveFile: (file?: OpenFile) => Promise<boolean>;
   openFile: (path: string) => unknown;
-  openTab: (id: string) => void;
+  openTab: (id: string, params?: Record<string, unknown>) => void;
   onOpenTab?: () => void;
   toggleMarkdownSource: () => void;
   /** Показывает файл в дереве: открывает сайдбар и раздел «Файлы». */
@@ -137,13 +137,13 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
     ];
   }
   // A kind that wants a command declares it; the workspace does not know the kinds.
-  for (const { id, command } of ctx.tabTypes.list())
+  for (const { id, command, create } of ctx.tabTypes.list())
     if (command)
       register(
         command.id,
         command.title,
         () => {
-          openTab(id);
+          openTab(id, create?.());
           ctx.onOpenTab?.();
         },
         () => true,

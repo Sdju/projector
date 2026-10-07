@@ -8,20 +8,31 @@ import UiButton from "../../../common/ui/UiButton.vue";
 import AgentWelcome from "./AgentWelcome.vue";
 import AgentTurn from "./AgentTurn.vue";
 import AgentComposer from "./AgentComposer.vue";
+import AgentPermissions from "./AgentPermissions.vue";
+import AgentPermissionMode from "./AgentPermissionMode.vue";
+import type { AgentBackendId } from "../model/types.ts";
+import IconClaude from "~icons/simple-icons/claude";
 import IconBot from "~icons/lucide/bot";
 import IconSquarePen from "~icons/lucide/square-pen";
 import IconFolder from "~icons/lucide/folder";
 
-const props = defineProps<{ projectId: string }>();
+const props = withDefaults(
+  defineProps<{ projectId: string; backend?: AgentBackendId; chatId?: string }>(),
+  { backend: "projector", chatId: undefined },
+);
+/** Claude Code is the plain coding agent: no Projector tools, its own approvals. */
+const plain = computed(() => props.backend === "claude-code");
+const agentName = computed(() => (plain.value ? "Claude Code" : "Projector"));
 const { api } = useIdeCommands();
 const { projects } = useProjects();
 const projectName = computed(
   () => projects.value.find((p) => p.id === props.projectId)?.name ?? "Текущий проект",
 );
-const { turns, draft, busy, error, phase, send, clear, stop } = useAgent(
-  props.projectId,
-  agentCommandHandler(api, props.projectId),
-);
+const { turns, draft, busy, error, phase, permissions, permissionMode, send, clear, stop, decide } =
+  useAgent(props.projectId, plain.value ? undefined : agentCommandHandler(api, props.projectId), {
+    backend: props.backend,
+    chatId: props.chatId,
+  });
 const log = ref<HTMLElement>();
 const composer = ref<InstanceType<typeof AgentComposer>>();
 const away = ref(false);
@@ -89,6 +100,7 @@ watch(
   () => [
     turns.value.length,
     turns.value.at(-1)?.text,
+    permissions.value.length,
     turns.value
       .at(-1)
       ?.tools.map((tool) => `${tool.id}:${tool.status}:${tool.detail}`)
@@ -129,8 +141,9 @@ onBeforeUnmount(() => {
   <section class="agent-chat" aria-label="Чат с агентом">
     <header class="chat-header">
       <div class="identity">
-        <span class="header-mark"><IconBot aria-hidden="true" /></span
-        ><span class="agent-name">Projector</span>
+        <span class="header-mark"
+          ><IconClaude v-if="plain" aria-hidden="true" /><IconBot v-else aria-hidden="true" /></span
+        ><span class="agent-name">{{ agentName }}</span>
       </div>
       <span class="project-context" :title="projectName"
         ><IconFolder aria-hidden="true" />{{ projectName }}</span
@@ -152,7 +165,7 @@ onBeforeUnmount(() => {
       </div>
     </header>
     <div ref="log" class="chat-log" @scroll.passive="trackScroll">
-      <AgentWelcome v-if="!turns.length" @suggest="suggest" />
+      <AgentWelcome v-if="!turns.length" :plain="plain" @suggest="suggest" />
       <div
         v-else
         class="conversation"
@@ -168,10 +181,12 @@ onBeforeUnmount(() => {
           :busy="busy"
           :last="index === turns.length - 1"
           :copied="copied === turn.id"
+          :sender="agentName"
           @copy="copyMessage"
         />
       </div>
     </div>
+    <AgentPermissions class="permission-dock" :permissions="permissions" @decide="decide" />
     <AgentComposer
       ref="composer"
       v-model="draft"
@@ -183,7 +198,11 @@ onBeforeUnmount(() => {
       @submit="submit"
       @stop="stop"
       @latest="toBottom"
-    />
+    >
+      <template v-if="plain" #footer>
+        <AgentPermissionMode v-model="permissionMode" :disabled="busy" />
+      </template>
+    </AgentComposer>
   </section>
 </template>
 <style scoped>
@@ -273,6 +292,13 @@ onBeforeUnmount(() => {
   scrollbar-width: thin;
   scrollbar-color: var(--line-strong) transparent;
   padding: 32px 28px 28px;
+}
+.permission-dock {
+  width: 100%;
+  max-width: calc(var(--chat-width) + 56px);
+  margin: 0 auto;
+  padding: 0 28px;
+  flex-shrink: 0;
 }
 .conversation {
   width: 100%;

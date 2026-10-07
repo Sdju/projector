@@ -7,11 +7,30 @@ export interface AgentToolChip {
   detail: string;
 }
 
+export type AgentBackendId = "projector" | "claude-code";
+
+export type AgentPermissionMode = "default" | "acceptEdits" | "bypassPermissions";
+
+export interface AgentSessionRef {
+  backend: string;
+  id: string;
+}
+
 export interface AgentTurn {
   id: string;
   role: "user" | "assistant";
   text: string;
   tools: AgentToolChip[];
+  /** Native backend session (Claude Code) this turn belongs to; the next request resumes it. */
+  session?: AgentSessionRef;
+}
+
+/** A sensitive tool call waiting for the user's decision. */
+export interface AgentPermission {
+  id: string;
+  tool: string;
+  title: string;
+  detail: string;
 }
 
 export interface AgentHistoryTurn {
@@ -30,6 +49,11 @@ export interface AgentCommandRequest {
 
 export type AgentEvent =
   | { event: "command-request"; data: AgentCommandRequest }
+  | {
+      event: "permission-request";
+      data: { id: string; tool: string; input: unknown; title?: string };
+    }
+  | { event: "session"; data: AgentSessionRef }
   | { event: "status"; data: { phase: string; provider?: string; model?: string } }
   | { event: "text"; data: { text: string } }
   | { event: "tool"; data: { id: string; name: string; input: unknown } }

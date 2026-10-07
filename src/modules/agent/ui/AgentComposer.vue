@@ -55,6 +55,7 @@ defineExpose({ resize, focus: () => input.value?.focus() });
         <span class="composer-context"
           ><IconFolder aria-hidden="true" /><span>{{ projectName }}</span></span
         >
+        <slot name="footer" />
         <span class="input-hint"
           ><kbd>Enter</kbd> отправить<span> · <kbd>Shift ↵</kbd> новая строка</span></span
         >

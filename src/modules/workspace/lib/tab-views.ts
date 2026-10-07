@@ -52,6 +52,15 @@ export const baseTabViews: TabViews = {
     keepAlive: true,
     props: (_, host) => ({ projectId: host.projectId }),
   },
+  claude: {
+    component: AgentChat,
+    keepAlive: true,
+    props: (tab, host) => ({
+      projectId: host.projectId,
+      backend: "claude-code",
+      chatId: tab.params?.chatId,
+    }),
+  },
   issue: {
     component: IssueView,
     props: (tab, host) => ({

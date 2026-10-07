@@ -6,9 +6,11 @@ import UiButton from "../../../common/ui/UiButton.vue";
 import { agentUsageSummary } from "../../agents-integration/status-bar/index.ts";
 import IconPlus from "~icons/lucide/plus";
 import IconBot from "~icons/lucide/bot";
+import IconMessage from "~icons/lucide/message-square";
 import IconTerminal from "~icons/lucide/terminal";
 import IconCodex from "~icons/simple-icons/openai";
 import IconClaude from "~icons/simple-icons/claude";
+import { guiPrograms, useAgentModes } from "../../agent/index.ts";
 import IconOpenCode from "~icons/simple-icons/opencode";
 import IconCursor from "~icons/simple-icons/cursor";
 
@@ -55,6 +57,10 @@ const rows = computed(() =>
   }),
 );
 
+const { modeOf, setMode } = useAgentModes();
+/** The chat view needs the agent feature; without it the terminal is the only option. */
+const hasGui = (program: string) => props.agent && !!guiPrograms[program];
+const toggleMode = (program: string) => setMode(program, modeOf(program) === "gui" ? "tui" : "gui");
 function openChat() {
   close();
   emit("command", "ide.workbench.agent.open");
@@ -62,7 +68,8 @@ function openChat() {
 function pick(program: string) {
   if (props.busy) return;
   close();
-  emit("command", "ide.workbench.terminal.new", { program });
+  if (hasGui(program) && modeOf(program) === "gui") emit("command", guiPrograms[program]!.command);
+  else emit("command", "ide.workbench.terminal.new", { program });
 }
 </script>
 
@@ -86,26 +93,50 @@ function pick(program: string) {
       <IconPlus aria-hidden="true" /><span>Новая сессия</span>
     </button>
     <div :id="listId" class="list" role="menu">
-      <button
-        v-for="(row, index) in rows"
-        :key="row.program"
-        class="row"
-        role="menuitem"
-        :disabled="busy"
-        :tabindex="index === active ? 0 : -1"
-        data-command="ide.workbench.terminal.new"
-        @mousemove="active = index"
-        @click="pick(row.program)"
-      >
-        <component :is="row.icon" class="row-icon" aria-hidden="true" />
-        <span class="copy">
-          <span class="name">{{ row.title }}</span>
-          <span class="caption">{{ row.caption }}</span>
-        </span>
-        <span v-if="row.usage" class="hint" :class="row.usage.tone && `tone-${row.usage.tone}`"
-          >{{ row.usage.remaining }}%</span
+      <div v-for="(row, index) in rows" :key="row.program" class="entry">
+        <button
+          class="row"
+          role="menuitem"
+          :disabled="busy"
+          :tabindex="index === active ? 0 : -1"
+          :data-command="
+            hasGui(row.program) && modeOf(row.program) === 'gui'
+              ? guiPrograms[row.program]!.command
+              : 'ide.workbench.terminal.new'
+          "
+          @mousemove="active = index"
+          @click="pick(row.program)"
         >
-      </button>
+          <component :is="row.icon" class="row-icon" aria-hidden="true" />
+          <span class="copy">
+            <span class="name">{{ row.title }}</span>
+            <span class="caption">{{
+              hasGui(row.program) && modeOf(row.program) === "gui"
+                ? "Графический чат вместо терминала"
+                : row.caption
+            }}</span>
+          </span>
+          <span v-if="row.usage" class="hint" :class="row.usage.tone && `tone-${row.usage.tone}`"
+            >{{ row.usage.remaining }}%</span
+          >
+        </button>
+        <button
+          v-if="hasGui(row.program)"
+          type="button"
+          class="mode"
+          :aria-pressed="modeOf(row.program) === 'gui'"
+          :aria-label="`${row.title}: ${modeOf(row.program) === 'gui' ? 'графический чат' : 'терминал'}. Переключить режим`"
+          :title="
+            modeOf(row.program) === 'gui'
+              ? 'Графический чат — нажмите, чтобы вернуть терминал'
+              : 'Терминал — нажмите, чтобы открывать графический чат'
+          "
+          @click="toggleMode(row.program)"
+        >
+          <IconMessage v-if="modeOf(row.program) === 'gui'" aria-hidden="true" />
+          <IconTerminal v-else aria-hidden="true" />
+        </button>
+      </div>
     </div>
     <template v-if="agent">
       <div class="group-title">Projector</div>
@@ -152,6 +183,38 @@ function pick(program: string) {
 .list {
   display: flex;
   flex-direction: column;
+}
+.entry {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+.entry .row {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+.mode {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 3px 5px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  color: var(--muted);
+  font: var(--fs-2xs) var(--mono);
+}
+.mode svg {
+  width: 13px;
+  height: 13px;
+}
+.mode:hover,
+.mode:focus-visible {
+  color: var(--text);
+  border-color: var(--line-strong);
+}
+.mode[aria-pressed="true"] {
+  color: var(--info);
+  border-color: color-mix(in srgb, var(--info) 55%, var(--line));
 }
 .row {
   display: flex;

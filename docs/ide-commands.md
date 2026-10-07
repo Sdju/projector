@@ -233,6 +233,12 @@ output to 256 KiB, and stops the process group on cancellation. Environment vari
 whose names contain KEY, TOKEN, SECRET, PASSWORD or CREDENTIAL are excluded. Bash
 runs with the user's filesystem permissions; it is not an isolated sandbox. In a project with a Docker environment it runs inside the container instead (see [containers](containers-design.md)); in a trusted Dev Container project, through `devcontainer exec`.
 
+### Agent backends
+
+`runAgent` (`server/modules/agent/agent.ts`) picks a backend by the request's `backend` (`projector` by default, `claude-code`). Backends implement `AgentBackend` (`backend.ts`) and emit the shared SSE events: `text`, `tool`, `tool-result`, `project`, `status`, `done`, `error`, plus `session` (native session ID, stored on the assistant turn and sent back as `sessionId`) and `permission-request` (answered through `POST /api/agent/tool-result` with `{ output: { allow } }`; 10-minute expiry, single-use ID).
+
+`projector` is the IDE assistant (OpenAI-compatible provider, `list/describe/execute_command`, catalog tools from `tool-specs.ts`). `claude-code` is plain Claude Code through the Agent SDK: its own prompt, tools, login, `CLAUDE.md` and settings; Projector adds nothing to the model context. The chat UI is `AgentChat` with `backend="claude-code"`: tab kind `claude` (`ide.workbench.claude.open`, a new conversation per opening, history key `claude:<project>:<chatId>`), a **TUI/GUI** switch on the Claude Code row of the new-session menu and a section in settings (`agentModes` in `launcher.json`, TUI by default, only programs listed in `GUI_AGENT_PROGRAMS`; the row opens the terminal unless GUI is chosen), and a per-chat permission mode (`default` asks, `acceptEdits`, `bypassPermissions`). It requires a project and is refused in projects with a Docker environment or Dev Container. To add an agent: extend `AgentBackendId`, write a backend, register it in `agent.ts`, add a tab kind, and list its program in `GUI_AGENT_PROGRAMS` and `guiPrograms`.
+
 ## Общие настройки
 
 `ide.workbench.settings.open` (**Открыть настройки Projector**) в scope `editor:<projectId>` открывает вкладку **Настройки** рядом с файлами. Повторный вызов фокусирует вкладку `settings:app`. Кнопки настроек в шапке, мобильном выборе проекта и сайдбаре вызывают ту же команду; она доступна через командный центр. Вкладка сохраняет черновики при переключении файлов и переносе между блоками; закрытие завершает её состояние. Вне проекта настройки доступны по `/settings`.

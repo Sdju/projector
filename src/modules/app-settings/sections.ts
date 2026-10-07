@@ -6,6 +6,7 @@ import { GithubSettings } from "../github/index.ts";
 import { GitlabSettings } from "../gitlab/index.ts";
 import { DockerSettings } from "../docker/index.ts";
 import { ProviderPanel } from "../provider/index.ts";
+import { AgentModeSettings } from "../agent/index.ts";
 import { type SettingsSection } from "../settings/index.ts";
 
 export const settingsSections: SettingsSection[] = [
@@ -84,5 +85,13 @@ export const settingsSections: SettingsSection[] = [
     description: "Провайдеры OpenAI-compatible API для агента Projector.",
     keywords: "Qwen OpenAI API key ключ URL модель AI LLM",
     component: ProviderPanel,
+  },
+  {
+    id: "agent-sessions",
+    title: "Сессии агентов",
+    group: "Агент",
+    description: "Терминал или графический чат для новых сессий агентов.",
+    keywords: "GUI TUI терминал чат Claude Code режим вывод",
+    component: AgentModeSettings,
   },
 ];

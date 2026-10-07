@@ -23,6 +23,18 @@ const labels: Record<string, string> = {
   list_directory: "Обзор папки",
   add_project: "Добавление проекта",
   add_projects: "Добавление проектов",
+  list_projects: "Список проектов",
+  // Claude Code built-in tools
+  Read: "Чтение файла",
+  Edit: "Правка файла",
+  MultiEdit: "Правка файла",
+  Write: "Запись файла",
+  Grep: "Поиск в файлах",
+  Glob: "Поиск файлов",
+  WebFetch: "Загрузка страницы",
+  WebSearch: "Поиск в сети",
+  Task: "Субагент",
+  TodoWrite: "План задач",
 };
 function output(tool: AgentToolChip): {
   hint: string;
@@ -59,7 +71,10 @@ function output(tool: AgentToolChip): {
     if (tool.name === "execute_command" && data.completed)
       return { hint: "Выполнено", text: "Команда выполнена в Projector." };
     return {
-      hint: tool.status === "running" ? (data.command ?? data.query ?? data.path ?? "") : "",
+      hint:
+        tool.status === "running"
+          ? (data.command ?? data.query ?? data.path ?? data.file_path ?? data.pattern ?? "")
+          : "",
       text: tool.detail,
     };
   } catch {
@@ -82,7 +97,11 @@ const rows = computed(() => props.tools.map((tool) => ({ ...tool, ...output(tool
     <div class="activity-list">
       <details v-for="row in rows" :key="row.id" class="tool" :class="row.status">
         <summary>
-          <IconTerminal v-if="row.name === 'bash'" class="tool-icon" aria-hidden="true" />
+          <IconTerminal
+            v-if="row.name.toLowerCase() === 'bash'"
+            class="tool-icon"
+            aria-hidden="true"
+          />
           <IconSearch
             v-else-if="row.name === 'list_commands'"
             class="tool-icon"
