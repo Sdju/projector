@@ -1,40 +1,23 @@
 <script setup lang="ts">
 import EmojiText from "../../../../../common/ui/EmojiText.vue";
-import { computed, ref, watch } from "vue";
+import { computed } from "vue";
 import type {
   DiscussionComment,
   DiscussionDetail,
 } from "../../../../../../core/modules/workspace/index.ts";
-import { workspaceRequest } from "../../../../workspace-api/index.ts";
+import { useTrackerDetail } from "../lib/tracker-detail.ts";
 import TrackerComments, { type TrackerComment } from "./TrackerComments.vue";
 import TrackerDetail from "./TrackerDetail.vue";
 
 /** Вкладка discussion: метаданные, Markdown-тело, комментарии и ответы на них. */
 const props = defineProps<{ projectId: string; number: number }>();
 const emit = defineEmits<{ open: [path: string] }>();
-const detail = ref<DiscussionDetail>();
-const loading = ref(false);
-const error = ref("");
-let generation = 0;
-async function load() {
-  const current = ++generation;
-  loading.value = true;
-  error.value = "";
-  detail.value = undefined;
-  try {
-    const data = await workspaceRequest<DiscussionDetail>(props.projectId, "discussion", {
-      number: String(props.number),
-    });
-    if (current !== generation) return;
-    detail.value = data;
-  } catch (err) {
-    if (current === generation)
-      error.value = err instanceof Error ? err.message : "Не удалось открыть discussion";
-  } finally {
-    if (current === generation) loading.value = false;
-  }
-}
-watch(() => [props.projectId, props.number], load, { immediate: true });
+const { detail, loading, error } = useTrackerDetail<DiscussionDetail>(
+  () => props.projectId,
+  () => props.number,
+  "discussion",
+  "Не удалось открыть discussion",
+);
 
 const item = (comment: DiscussionComment, depth: number): TrackerComment => ({
   ...comment,

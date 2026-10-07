@@ -1,40 +1,23 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed } from "vue";
 import type {
   PullRequestDetail,
   PullRequestFile,
   PullRequestReview,
 } from "../../../../../../core/modules/workspace/index.ts";
-import { workspaceRequest } from "../../../../workspace-api/index.ts";
+import { useTrackerDetail } from "../lib/tracker-detail.ts";
 import TrackerComments from "./TrackerComments.vue";
 import TrackerDetail from "./TrackerDetail.vue";
 
 /** Вкладка pull request: метаданные, Markdown-описание, ревью, обсуждение и изменённые файлы. */
 const props = defineProps<{ projectId: string; number: number }>();
 const emit = defineEmits<{ open: [path: string] }>();
-const detail = ref<PullRequestDetail>();
-const loading = ref(false);
-const error = ref("");
-let generation = 0;
-async function load() {
-  const current = ++generation;
-  loading.value = true;
-  error.value = "";
-  detail.value = undefined;
-  try {
-    const data = await workspaceRequest<PullRequestDetail>(props.projectId, "pull", {
-      number: String(props.number),
-    });
-    if (current !== generation) return;
-    detail.value = data;
-  } catch (err) {
-    if (current === generation)
-      error.value = err instanceof Error ? err.message : "Не удалось открыть pull request";
-  } finally {
-    if (current === generation) loading.value = false;
-  }
-}
-watch(() => [props.projectId, props.number], load, { immediate: true });
+const { detail, loading, error } = useTrackerDetail<PullRequestDetail>(
+  () => props.projectId,
+  () => props.number,
+  "pull",
+  "Не удалось открыть pull request",
+);
 
 const STATE_LABEL = { open: "открыт", closed: "закрыт", merged: "влит" } as const;
 const REVIEW_LABEL: Record<PullRequestReview["state"], string> = {
