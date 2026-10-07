@@ -16,6 +16,8 @@ const props = withDefaults(
     backgroundColor?: string;
     backgroundControls?: boolean;
     error?: string;
+    /** Элементы управления масштабом плавают поверх изображения, а не занимают отдельную строку. */
+    floating?: boolean;
   }>(),
   { fit: true, background: "checker", backgroundColor: "#808080", backgroundControls: true },
 );
@@ -206,7 +208,7 @@ defineExpose({ reset });
 </script>
 
 <template>
-  <section class="image-viewport" aria-label="Просмотр изображения">
+  <section class="image-viewport" :class="{ floating }" aria-label="Просмотр изображения">
     <div
       ref="canvas"
       class="image-canvas"
@@ -390,5 +392,30 @@ defineExpose({ reset });
   background: var(--bg-2);
   font-size: var(--fs-sm);
   cursor: default;
+}
+.image-viewport {
+  position: relative;
+}
+.floating .view-controls {
+  position: absolute;
+  left: 50%;
+  bottom: max(var(--sp-3), env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  flex-wrap: nowrap;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-1) var(--sp-1) var(--sp-3);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-2) 88%, transparent);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-popover);
+  font-size: var(--fs-xs);
+}
+.floating .zoom {
+  margin-right: var(--sp-1);
+}
+.floating .view-controls :deep(.btn) {
+  border-color: transparent;
+  border-radius: 999px;
 }
 </style>

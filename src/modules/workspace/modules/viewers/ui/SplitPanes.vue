@@ -1,8 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 const props = withDefaults(
-  defineProps<{ topLabel?: string; bottomLabel?: string; reveal?: unknown; initial?: number }>(),
-  { initial: 0.45 },
+  defineProps<{
+    topLabel?: string;
+    bottomLabel?: string;
+    reveal?: unknown;
+    initial?: number;
+    solo?: boolean;
+  }>(),
+  { initial: 0.45, solo: false },
 );
 const panes = ref<HTMLElement>();
 const split = ref(props.initial);
@@ -10,7 +16,9 @@ const lastSplit = ref(props.initial);
 const dragging = ref(false);
 let dragStart = props.initial;
 const rows = computed(() => ({
-  gridTemplateRows: `minmax(0, ${split.value}fr) 12px minmax(0, ${1 - split.value}fr)`,
+  gridTemplateRows: props.solo
+    ? "minmax(0, 1fr)"
+    : `minmax(0, ${split.value}fr) 12px minmax(0, ${1 - split.value}fr)`,
 }));
 const top = computed(() => props.topLabel ?? "Рендер");
 const bottom = computed(() => props.bottomLabel ?? "Код");
@@ -79,8 +87,9 @@ watch(
 
 <template>
   <div ref="panes" class="panes" :class="{ dragging }" :style="rows">
-    <div v-show="split > 0" class="top-pane"><slot name="top" /></div>
+    <div v-show="solo || split > 0" class="top-pane"><slot name="top" /></div>
     <div
+      v-show="!solo"
       class="pane-resize"
       role="separator"
       :aria-label="`Соотношение высот: ${lower(top)} / ${lower(bottom)}`"
@@ -110,7 +119,7 @@ watch(
     >
       <span>{{ split === 0 ? `${top} ▾` : split === 1 ? `${bottom} ▴` : "" }}</span>
     </div>
-    <div v-show="split < 1" class="bottom-pane"><slot name="bottom" /></div>
+    <div v-show="!solo && split < 1" class="bottom-pane"><slot name="bottom" /></div>
   </div>
 </template>
 
