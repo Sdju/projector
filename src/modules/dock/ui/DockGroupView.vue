@@ -214,6 +214,13 @@ const focus = () => {
   flex: 1;
   min-width: 0;
 }
+.dock-header :deep(.new-session:has(+ .workspace-tabs)) {
+  align-self: stretch;
+  align-items: center;
+  padding-inline-end: var(--sp-2);
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
 .dock-fill {
   flex: 1;
   border-bottom: 1px solid var(--line);
