@@ -1,9 +1,10 @@
-import { onBeforeUnmount, watch, type Ref } from "vue";
+import { nextTick, onBeforeUnmount, watch, type Ref } from "vue";
 import { parseDockLayout, serializeDockLayout, type DockLayout } from "../../dock/index.ts";
 import type { SidebarRegistry, TabParams } from "../../workspace-api/index.ts";
 import type { OpenFile, OpenFileOptions } from "../open-file.ts";
 import { useSessionSnapshot } from "../../../common/utilities/session-snapshot.ts";
 import { workspaceSessionSchema, type WorkspaceSession } from "../session.ts";
+import type { MobileSurface } from "./mobile-surfaces.ts";
 
 export interface WorkspaceSessionContext {
   projectId: () => string;
@@ -19,6 +20,10 @@ export interface WorkspaceSessionContext {
   sections: SidebarRegistry;
   treeWidth: Ref<number | undefined>;
   sidebarHidden: Ref<boolean>;
+  mobile: Ref<boolean>;
+  mobileSurface: Ref<MobileSurface>;
+  /** Whether the profile has terminals; a saved terminal surface falls back to the editor without them. */
+  terminals: boolean;
   /** Добавляет вкладку зарегистрированного типа без выбора; `undefined` — тип неизвестен профилю. */
   ensureTab: (id: string, params?: TabParams) => string | undefined;
   openFile: (
@@ -54,6 +59,7 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
         })),
       activeKey: ctx.activeKey.value,
       section: ctx.section.value,
+      mobileSurface: ctx.mobileSurface.value,
       treeWidth: ctx.treeWidth.value,
       sidebarHidden: ctx.sidebarHidden.value,
       layout: serializeDockLayout(ctx.layout.value),
@@ -96,7 +102,14 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
       )
         ctx.activeKey.value = saved!.activeKey;
     } finally {
-      if (generation === sessionGeneration) ctx.restoringSession.value = false;
+      if (generation === sessionGeneration) {
+        ctx.restoringSession.value = false;
+        // Opening tabs resets the surface to the editor; let those reactions settle before restoring it.
+        await nextTick();
+        if (generation === sessionGeneration && ctx.mobile.value && saved?.mobileSurface)
+          ctx.mobileSurface.value =
+            saved.mobileSurface === "terminal" && !ctx.terminals ? "editor" : saved.mobileSurface;
+      }
     }
   }
 

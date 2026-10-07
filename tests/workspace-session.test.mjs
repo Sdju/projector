@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { effectScope, nextTick, ref } from "vue";
+import { effectScope, nextTick, ref, watch } from "vue";
 import { setTimeout as delay } from "node:timers/promises";
 import { useSessionSnapshot } from "../src/common/utilities/session-snapshot.ts";
 import { treeSessionSchema } from "../src/modules/workspace/modules/tree/lib/tree-session.ts";
@@ -120,5 +120,96 @@ test("continuous activity is persisted by maxWait without a quiet interval", asy
     expect(JSON.parse(f.values.get("project-a")).length >= 8).toBeTruthy();
   } finally {
     f.scope.stop();
+  }
+});
+
+async function mobileWorkspace(saved, { mobile = true, terminals = true } = {}) {
+  const { useWorkspaceSession } = await import("../src/modules/workspace/lib/workspace-session.ts");
+  const { createDockLayout } = await import("../src/modules/dock/model/layout.ts");
+  const values = new Map();
+  if (saved) values.set("projector:workspace:v1:project", JSON.stringify(saved));
+  globalThis.window = new EventTarget();
+  globalThis.document = new EventTarget();
+  globalThis.sessionStorage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+  };
+  const scope = effectScope();
+  const ctx = {
+    projectId: () => "project",
+    persist: true,
+    initialLayout: createDockLayout,
+    tabs: ref([]),
+    layout: ref(createDockLayout()),
+    restoringSession: ref(false),
+    activeKey: ref(""),
+    section: ref("files"),
+    sections: new Map([["files", {}]]),
+    treeWidth: ref(undefined),
+    sidebarHidden: ref(false),
+    mobile: ref(mobile),
+    mobileSurface: ref("editor"),
+    terminals,
+    ensureTab: () => undefined,
+    openFile: async (path) => {
+      ctx.tabs.value.push({ key: path, path });
+      ctx.activeKey.value = path;
+      return 1;
+    },
+    openCommitFile: async () => undefined,
+    fileGeneration: () => 1,
+    resetFiles: () => {},
+    resetGit: () => {},
+    reloadGit: () => {},
+  };
+  scope.run(() => {
+    // Mirrors registerMobileCommands: activating a tab shows the editor.
+    watch(ctx.activeKey, (key) => key && (ctx.mobileSurface.value = "editor"));
+    useWorkspaceSession(ctx);
+  });
+  return { ctx, scope, values };
+}
+const savedSession = (mobileSurface) => ({
+  tabs: [
+    { key: "a.ts", path: "a.ts" },
+    { key: "b.ts", path: "b.ts" },
+  ],
+  // Restoring tabs activates the last one; the saved active tab then changes activeKey once more.
+  activeKey: "a.ts",
+  section: "files",
+  mobileSurface,
+});
+
+test("the mobile surface is saved and restored after restored tabs have taken their turn", async () => {
+  const f = await mobileWorkspace(savedSession("files"));
+  try {
+    await delay(20);
+    expect(f.ctx.tabs.value.map((tab) => tab.key)).toStrictEqual(["a.ts", "b.ts"]);
+    expect(f.ctx.mobileSurface.value).toBe("files");
+    f.ctx.mobileSurface.value = "terminal";
+    await nextTick();
+    window.dispatchEvent(new Event("beforeunload"));
+    expect(JSON.parse(f.values.get("projector:workspace:v1:project")).mobileSurface).toBe(
+      "terminal",
+    );
+  } finally {
+    f.scope.stop();
+  }
+});
+
+test("a saved terminal surface falls back without terminals; desktop and old sessions keep the editor", async () => {
+  for (const [saved, options, expected] of [
+    [savedSession("terminal"), { terminals: false }, "editor"],
+    [savedSession("files"), { mobile: false }, "editor"],
+    [{ ...savedSession("files"), mobileSurface: undefined }, {}, "editor"],
+    [savedSession("terminal"), {}, "terminal"],
+  ]) {
+    const f = await mobileWorkspace(saved, options);
+    try {
+      await delay(20);
+      expect(f.ctx.mobileSurface.value).toBe(expected);
+    } finally {
+      f.scope.stop();
+    }
   }
 });

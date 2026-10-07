@@ -14,6 +14,8 @@ export const workspaceSessionSchema = z.object({
   tabs: z.array(tabSchema),
   activeKey: z.string(),
   section: z.string(),
+  /** Открытая мобильная поверхность; на десктопе не используется. */
+  mobileSurface: z.enum(["editor", "files", "terminal"]).optional(),
   treeWidth: z.number().finite().positive().optional(),
   agentWidth: z.number().finite().positive().optional(),
   sidebarHidden: z.boolean().optional(),
