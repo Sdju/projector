@@ -8,6 +8,7 @@ import { openExternalLink } from "../../../common/utilities/open-external-link.t
 import { lanPassword } from "../../../common/utilities/lan-auth.ts";
 import { deferTerminalText } from "../lib/keyboard.ts";
 import { bindTerminalInput } from "../lib/input.ts";
+import { bindTerminalTouchScroll, terminalScroller } from "../lib/touch-scroll.ts";
 import { bindTerminalLinks, type TerminalLink } from "../lib/links.ts";
 import { droppedTerminalPaths, isTerminalFileDrag, terminalTextForPaths } from "../lib/drop.ts";
 import { terminalRequest } from "../lib/api.ts";
@@ -75,6 +76,7 @@ const statusText = computed(() => {
 });
 let terminal: Terminal | undefined;
 let links: IDisposable | undefined;
+let unbindTouchScroll: (() => void) | undefined;
 let fit: FitAddon | undefined;
 let observer: ResizeObserver | undefined;
 let socket: WebSocket | undefined;
@@ -321,6 +323,7 @@ onMounted(() => {
     void openTerminalLink(link);
   });
   bindTerminalInput(terminal, send, running);
+  unbindTouchScroll = bindTerminalTouchScroll(container.value!, terminalScroller(terminal));
   terminal.attachCustomKeyEventHandler((event) => {
     if (event.type === "keydown" && event.ctrlKey && event.shiftKey && event.code === "KeyC") {
       const selection = terminal?.getSelection();
@@ -363,6 +366,7 @@ onBeforeUnmount(() => {
   cancelAnimationFrame(resizeFrame);
   observer?.disconnect();
   links?.dispose();
+  unbindTouchScroll?.();
   terminal?.dispose();
 });
 </script>
