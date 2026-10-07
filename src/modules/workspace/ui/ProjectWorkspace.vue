@@ -5,7 +5,7 @@ import {
   profileCapabilities,
   type WorkspaceCapability,
 } from "../../workspace-api/index.ts";
-import { useCommandScope } from "../../../common/utilities/commands.ts";
+import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import WorkbenchToolbar from "./WorkbenchToolbar.vue";
 import MobileSurfaces from "./MobileSurfaces.vue";
 import WorkspaceSidebar from "./WorkspaceSidebar.vue";
@@ -179,6 +179,29 @@ registerEditor(
   "Обновить раздел боковой панели",
   () => sidebar.value?.refreshSection(),
   () => true,
+);
+registerEditor(
+  "ide.workbench.section.show",
+  "Открыть раздел боковой панели",
+  (value) => {
+    const id = commandArgs(value).section;
+    if (typeof id !== "string" || !sections.has(id))
+      throw new Error(
+        `section: ${sections
+          .list()
+          .map((type) => type.id)
+          .join(", ")}`,
+      );
+    section.value = id;
+    showSidebar();
+  },
+  () => true,
+  undefined,
+  {
+    description:
+      "Переключает боковую панель на раздел проекта (файлы, поиск, Git и другие, если они есть у проекта) и показывает её.",
+    arguments: { section: "Идентификатор раздела: files, search, git, docker, issues и т. д." },
+  },
 );
 registerEditor(
   "ide.workbench.sidebar.toggle",
