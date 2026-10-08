@@ -107,11 +107,22 @@ export async function resolveTerminalFile(project: Project, id: string, path: st
       project.path,
       project.path,
     );
-  const cwd =
-    session.info.status === "running"
-      ? await os.processes.workingDirectories(session.info.pid, project.path)
-      : project.path;
-  return resolveTerminalPath(path, project.path, cwd);
+  const resolve = async () => {
+    const cwd =
+      session.info.status === "running"
+        ? await os.processes.workingDirectories(session.info.pid, project.path)
+        : project.path;
+    return resolveTerminalPath(path, project.path, cwd);
+  };
+  try {
+    return await resolve();
+  } catch (error) {
+    // A reading of the shell's directory is occasionally missed on a busy Windows machine (seen
+    // once in 80 runs, correct moments later); asking again settles it.
+    if (os.platform !== "win32" || (error as { status?: number }).status !== 404) throw error;
+    await new Promise((done) => setTimeout(done, 400));
+    return resolve();
+  }
 }
 
 function terminate(session: Session, immediate = false): void {
