@@ -385,7 +385,7 @@ await createOs("win32").runDesktop("http://127.0.0.1:9", "show", {
     {
       const { runPowerShell } = await import("../core/modules/os/modules/windows/ps.ts");
       const { stdout } = await runPowerShell(
-        `(Get-Acl -LiteralPath $env:PIPE).Access | ForEach-Object { $_.IdentityReference.Value + '|' + $_.FileSystemRights + '|' + $_.AccessControlType }`,
+        `[System.IO.File]::GetAccessControl($env:PIPE).GetAccessRules($true, $true, [System.Security.Principal.NTAccount]) | ForEach-Object { $_.IdentityReference.Value + '|' + $_.FileSystemRights + '|' + $_.AccessControlType }`,
         { env: { PIPE: process.env.PROJECTOR_LAUNCHER_PIPE } },
       );
       const writers = stdout

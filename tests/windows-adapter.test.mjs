@@ -272,11 +272,12 @@ test.skipIf(!windows)(
     const sample = async () =>
       (await os.processes.workingDirectories(child.pid, "?")).map((value) => value.toLowerCase());
     await new Promise((resolve) => setTimeout(resolve, 3500));
-    const before = await sample(); // `cd` only: reported, not asserted
+    const before = await sample(); // right after `cd`, no program started yet
     await new Promise((resolve) => setTimeout(resolve, 6000));
     const after = await sample(); // `ls` has started
     console.log("MSYS cwd before an external command:", JSON.stringify(before));
     console.log("MSYS cwd after an external command:", JSON.stringify(after));
+    expect(before, JSON.stringify(before)).toContain(nested);
     expect(after, JSON.stringify(after)).toContain(nested);
   },
 );

@@ -68,7 +68,7 @@ node cli/app/import-companion-key.mjs /path/to/providers.json
 - **Запуск агентов** (`os.tools.agentLaunch`): `.cmd`-шимы идут через shell, аргументы с пробелами и метасимволами кавычатся; тот же результат читает `cli/app/agent-host.mjs`.
 - **Права файлов:** `0600` заменён на ACL только для текущего пользователя (`os.tools.restrictToOwner`: `icacls /inheritance:r`, `/grant:r *<SID>:F`, `/remove:g` для Administrators, SYSTEM, Everyone, Users, Authenticated Users). Применяется к `integrations.json`, паролю LAN, токену резидента, файлу с токеном для Docker-клонирования и `devcontainer-trust.json`. Системные утилиты (`icacls`, `whoami`, `taskkill`) запускаются из `System32`: Git кладёт в PATH собственный `whoami`.
 - **Исполняемость файла:** по расширению из `PATHEXT` и `.ps1` (`os.tools.isExecutableFile`), а не по биту режима.
-- **Ссылки из терминала:** каталог берётся у каждого процесса оболочки (Git Bash — цепочка `bash`); MSYS применяет `cd` к Win32-каталогу, только когда запускает программу, поэтому сразу после `cd` без внешней команды ссылка может разрешиться относительно прежнего каталога.
+- **Ссылки из терминала:** каталог берётся у каждого процесса оболочки (Git Bash — цепочка `bash`); тест `windows-adapter` показывает, что Git Bash выставляет Win32-каталог сразу после `cd`, без запуска программы.
 - **Docker**: локальным считается контекст с `unix://` или `npipe://`.
 - **Архивы**: `archive.py` без `resource` на Windows — память не ограничена, работают лимиты `MAX_BYTES` и `MAX_ENTRIES`.
 - **Не проверяется на Windows** (тесты пропущены): симлинки на POSIX-пути, биты исполнения, `.desktop`, GIO, termios-PTY, фейковый `docker`.

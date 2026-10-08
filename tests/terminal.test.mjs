@@ -490,11 +490,9 @@ process.stdin.on('data', (chunk) => {
   await mkdir(join(root, "nested"));
   await writeFile(join(root, "nested/local.ts"), "const local = true;\n");
   await writeFile(join(root, "root.md"), "# Root\n");
-  // MSYS bash applies a `cd` to its Win32 directory only when it starts a program, and neither
-  // `cd` nor `printf` is one: an external command makes the directory visible from outside.
   first.send({
     type: "input",
-    data: `cd nested; ${windows ? "ls > /dev/null; " : ""}printf 'LINK_CWD_%s\\n' READY\r`,
+    data: `cd nested; printf 'LINK_CWD_%s\\n' READY\r`,
   });
   await until(() => first.output().includes("LINK_CWD_READY"), "shell changed cwd for links");
   const linkRequest = (path) => request(`/${session.id}?${new URLSearchParams({ link: path })}`);
