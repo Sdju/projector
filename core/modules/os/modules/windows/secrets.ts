@@ -1,5 +1,5 @@
 import type { SecretKey } from "../../contract.ts";
-import { runPowerShell, runPowerShellSync } from "./ps.ts";
+import { runPowerShell } from "./ps.ts";
 
 const HELPER = `
 Add-Type -TypeDefinition @"
@@ -82,17 +82,14 @@ function target({ service, account }: SecretKey) {
   return `projector:${clean(service)}:${clean(account)}`;
 }
 
-let availableCache: boolean | undefined;
+let availableCache: Promise<boolean> | undefined;
 
 export function secretsAvailable(): Promise<boolean> {
-  if (availableCache !== undefined) return Promise.resolve(availableCache);
-  try {
-    availableCache =
-      runPowerShellSync(HELPER, { env: { PROJECTOR_SECRET_OP: "available" } }).trim() === "yes";
-  } catch {
-    availableCache = false;
-  }
-  return Promise.resolve(availableCache);
+  availableCache ??= runPowerShell(HELPER, { env: { PROJECTOR_SECRET_OP: "available" } }).then(
+    ({ stdout }) => stdout.trim() === "yes",
+    () => false,
+  );
+  return availableCache;
 }
 
 export async function getSecret(key: SecretKey): Promise<string | undefined> {

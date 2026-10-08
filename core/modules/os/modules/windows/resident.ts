@@ -1,5 +1,6 @@
 import type { DesktopAction, ResidentOptions } from "../../contract.ts";
-import { randomBytes } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
+import { userInfo } from "node:os";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import net from "node:net";
 import { dirname, join } from "node:path";
@@ -12,8 +13,17 @@ const actions: DesktopAction[] = ["show", "toggle", "tray", "quit"];
 /** Same directory as `dataDir()` without importing app-paths back into the OS adapter. */
 const appDirectory = "projector";
 
+/** One pipe per Windows user: a fixed name would let a second account's session collide with it. */
 function pipeName(): string {
-  return process.env.PROJECTOR_LAUNCHER_PIPE || `\\\\.\\pipe\\${service}`;
+  const user = userInfo().username.replace(/[^\w.-]/g, "_");
+  return process.env.PROJECTOR_LAUNCHER_PIPE || `\\\\.\\pipe\\${service}.${user}`;
+}
+
+/** The pipe has the default DACL, so every command must prove it can read the user's profile. */
+function sameToken(given: string, token: string): boolean {
+  const a = Buffer.from(given);
+  const b = Buffer.from(token);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 export function launcherPidPath(dataDirectory = join(dataHome(), appDirectory)): string {
@@ -95,7 +105,7 @@ function bind(
       if (newline < 0) return;
       handled = true;
       const [given, requested = ""] = buffer.slice(0, newline).trim().split(" ");
-      if (given !== token || !isAction(requested)) {
+      if (!sameToken(given ?? "", token) || !isAction(requested)) {
         socket.destroy();
         return;
       }

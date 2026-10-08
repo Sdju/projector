@@ -28,7 +28,7 @@ export function terminalActivity(
     ? "unknown"
     : children.length || info.commandId || info.program !== "shell" || !shell || root.state === "R"
       ? "busy"
-      : root.foreground === root.group && root.state === "S"
+      : (root.foreground === null || root.foreground === root.group) && root.state === "S"
         ? "idle"
         : "unknown";
   const work = children.length ? children : root ? [root] : [];

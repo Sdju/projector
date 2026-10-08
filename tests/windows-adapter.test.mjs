@@ -139,3 +139,26 @@ test.skipIf(!windows)("agent process trees are terminated as a whole", async () 
     os.processes.descendants(child.pid).filter((entry) => entry.pid !== child.pid).length,
   ).toBe(0);
 });
+
+test.skipIf(!windows)("polling the process list does not block once a listing exists", async () => {
+  os.processes.list();
+  const started = Date.now();
+  for (let i = 0; i < 20; i++) os.processes.list();
+  expect(Date.now() - started).toBeLessThan(300);
+  const [first] = os.processes.list() ?? [];
+  expect(first.group).toBe(null);
+  expect(first.foreground).toBe(null);
+});
+
+test.skipIf(!windows)(
+  "agent launch quotes paths with spaces and metacharacters for cmd.exe",
+  () => {
+    const launch = os.tools.agentLaunch({
+      command: "C:\\Program Files\\nodejs\\node.exe",
+      args: ["plain", "with space", 'q"uote', "a&b", ""],
+    });
+    expect(launch.shell).toBe(true);
+    expect(launch.command).toBe('"C:\\Program Files\\nodejs\\node.exe"');
+    expect(launch.args).toStrictEqual(["plain", '"with space"', '"q\\"uote"', '"a&b"', '""']);
+  },
+);

@@ -12,8 +12,8 @@ async function main() {
   else if (command === "shortcut-status") console.log(JSON.stringify(await os.shortcutStatus()));
   else {
     const catalog = await os.catalog();
-    if (command === "list") console.log(JSON.stringify(catalog.listApplications()));
-    else if (command === "launch") catalog.launchApplication(value);
+    if (command === "list") console.log(JSON.stringify(await catalog.listApplications()));
+    else if (command === "launch") await catalog.launchApplication(value);
     else if (command === "icon") console.log(await catalog.applicationIcon(value));
     else throw new Error("Неизвестная команда");
   }

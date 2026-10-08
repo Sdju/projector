@@ -10,6 +10,13 @@ export interface AgentProcessSpec {
   env?: Record<string, string | undefined>;
 }
 
+/** An agent command as the OS needs it started: quoted and routed through a shell where required. */
+export interface AgentLaunch {
+  command: string;
+  args: string[];
+  shell: boolean;
+}
+
 /** The script that keeps an agent process alive across server restarts, and where it logs. */
 export interface AgentHostSpec {
   script: string;
@@ -31,8 +38,9 @@ export interface ProcessInfo {
   name: string;
   started: string;
   state: string;
-  group: number;
-  foreground: number;
+  /** Process group and terminal foreground group. Absent where the OS has no such concept. */
+  group: number | null;
+  foreground: number | null;
 }
 
 export interface DesktopPalette {

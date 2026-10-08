@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { basename } from "node:path";
 import { killTree } from "./kill-tree.ts";
-import type { AgentHostSpec, AgentProcess, AgentProcessSpec } from "../../contract.ts";
+import type { AgentHostSpec, AgentLaunch, AgentProcess, AgentProcessSpec } from "../../contract.ts";
 
 /** `shell: true` joins argv with spaces, so anything with whitespace or quotes is quoted for cmd.exe. */
 function quoteForCmd(value: string): string {
@@ -14,13 +14,19 @@ function quoteForCmd(value: string): string {
  * `.cmd` shims (npx, npm-global binaries) are not executable without a shell on Windows, and
  * `taskkill /T` stops the tree the shell started.
  */
+/** `.cmd` shims are not executable without a shell on Windows, and a shell joins argv unquoted. */
+export function agentLaunch(spec: Pick<AgentProcessSpec, "command" | "args">): AgentLaunch {
+  return { command: quoteForCmd(spec.command), args: spec.args.map(quoteForCmd), shell: true };
+}
+
 export function spawnAgentProcess(spec: AgentProcessSpec): AgentProcess {
-  const child = spawn(quoteForCmd(spec.command), spec.args.map(quoteForCmd), {
+  const launch = agentLaunch(spec);
+  const child = spawn(launch.command, launch.args, {
     cwd: spec.cwd,
     env: spec.env as NodeJS.ProcessEnv,
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
-    shell: true,
+    shell: launch.shell,
   }) as AgentProcess;
   child.terminate = () => terminateTree(child);
   return child;
@@ -29,7 +35,7 @@ export function spawnAgentProcess(spec: AgentProcessSpec): AgentProcess {
 async function terminateTree(child: AgentProcess): Promise<void> {
   if (child.exitCode !== null || child.signalCode !== null) return;
   const closed = new Promise<void>((resolve) => child.once("close", () => resolve()));
-  if (child.pid) killTree(child.pid);
+  if (child.pid) await killTree(child.pid);
   else child.kill();
   await closed;
 }
@@ -59,5 +65,5 @@ export function spawnAgentHost(spec: AgentHostSpec): number | undefined {
 }
 
 export function killAgentTree(pid: number): void {
-  killTree(pid);
+  void killTree(pid);
 }

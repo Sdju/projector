@@ -91,6 +91,7 @@ export { installDesktop } from "./install-desktop.ts";
 export { startCodexAppServer } from "./codex.ts";
 export {
   agentEnv,
+  agentLaunch,
   agentHostAddress,
   killAgentTree,
   spawnAgentHost,

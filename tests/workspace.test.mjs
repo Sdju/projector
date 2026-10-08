@@ -1,4 +1,5 @@
-import { expect, test } from "vite-plus/test";
+import { afterAll, expect, test } from "vite-plus/test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import {
   mkdtemp,
   mkdir,
@@ -48,6 +49,10 @@ function withDefaultExcludes(run) {
 }
 
 const posix = process.platform !== "win32";
+// A real directory outside every project, standing in for /etc and /tmp on every platform.
+const outside = mkdtempSync(join(tmpdir(), "projector-outside-"));
+writeFileSync(join(outside, "passwd"), "outside");
+afterAll(() => rmSync(outside, { recursive: true, force: true }));
 test("image zoom keeps the cursor anchor fixed, including at zoom limits", () => {
   const initial = { zoom: 2, x: 40, y: -30 };
   const anchor = { x: 130, y: 75 };
@@ -179,72 +184,69 @@ test("entry actions create, copy, rename and trash without overwriting or escapi
     await rm(base, { recursive: true, force: true });
   }
 });
-test.skipIf(!posix)(
-  "Text file saves preserve text and mode, reject stale drafts and contain writes",
-  async () => {
-    const base = await mkdtemp(join(tmpdir(), "projector-markdown-"));
-    try {
-      await writeFile(join(base, "readme.md"), "# Original\r\n", { mode: 0o640 });
-      await saveProjectFile(base, "readme.md", "# Новый текст\r\n", "# Original\r\n");
-      expect(await readFile(join(base, "readme.md"), "utf8")).toBe("# Новый текст\r\n");
+test("Text file saves preserve text and mode, reject stale drafts and contain writes", async () => {
+  const base = await mkdtemp(join(tmpdir(), "projector-markdown-"));
+  try {
+    await writeFile(join(base, "readme.md"), "# Original\r\n", { mode: 0o640 });
+    await saveProjectFile(base, "readme.md", "# Новый текст\r\n", "# Original\r\n");
+    expect(await readFile(join(base, "readme.md"), "utf8")).toBe("# Новый текст\r\n");
+    if (process.platform !== "win32")
+      expect((await lstat(join(base, "readme.md"))).mode & 0o777).toBe(0o640);
+    await expect(
+      saveProjectFile(base, "readme.md", "stale", "# Original\r\n"),
+    ).rejects.toMatchObject({
+      status: 409,
+    });
+    const competing = await Promise.allSettled([
+      saveProjectFile(base, "readme.md", "first", "# Новый текст\r\n"),
+      saveProjectFile(base, "readme.md", "second", "# Новый текст\r\n"),
+    ]);
+    expect(competing.filter((result) => result.status === "fulfilled").length).toBe(1);
+    expect(competing.find((result) => result.status === "rejected").reason.status).toBe(409);
+    await symlink(join(base, "readme.md"), join(base, "alias.md"));
+    await mkdir(join(base, ".git"));
+    await writeFile(join(base, ".git/config.md"), "protected");
+    for (const path of ["../outside.md", "/tmp/outside.md", "alias.md", ".git/config.md"])
+      await expect(saveProjectFile(base, path, "test", "")).rejects.toMatchObject({
+        status: 403,
+      });
+    for (const path of ["plain.ts", "settings.json", ".gitignore", "LICENSE"]) {
+      await writeFile(join(base, path), "original\r\n", { mode: 0o750 });
+      await saveProjectFile(base, path, "Изменено\r\n", "original\r\n");
+      expect(await readFile(join(base, path), "utf8")).toBe("Изменено\r\n");
       if (process.platform !== "win32")
-        expect((await lstat(join(base, "readme.md"))).mode & 0o777).toBe(0o640);
-      await expect(
-        saveProjectFile(base, "readme.md", "stale", "# Original\r\n"),
-      ).rejects.toMatchObject({
+        expect((await lstat(join(base, path))).mode & 0o777).toBe(0o750);
+      await expect(saveProjectFile(base, path, "stale", "original\r\n")).rejects.toMatchObject({
         status: 409,
       });
-      const competing = await Promise.allSettled([
-        saveProjectFile(base, "readme.md", "first", "# Новый текст\r\n"),
-        saveProjectFile(base, "readme.md", "second", "# Новый текст\r\n"),
-      ]);
-      expect(competing.filter((result) => result.status === "fulfilled").length).toBe(1);
-      expect(competing.find((result) => result.status === "rejected").reason.status).toBe(409);
-      await symlink(join(base, "readme.md"), join(base, "alias.md"));
-      await mkdir(join(base, ".git"));
-      await writeFile(join(base, ".git/config.md"), "protected");
-      for (const path of ["../outside.md", "/tmp/outside.md", "alias.md", ".git/config.md"])
-        await expect(saveProjectFile(base, path, "test", "")).rejects.toMatchObject({
-          status: 403,
-        });
-      for (const path of ["plain.ts", "settings.json", ".gitignore", "LICENSE"]) {
-        await writeFile(join(base, path), "original\r\n", { mode: 0o750 });
-        await saveProjectFile(base, path, "Изменено\r\n", "original\r\n");
-        expect(await readFile(join(base, path), "utf8")).toBe("Изменено\r\n");
-        if (process.platform !== "win32")
-          expect((await lstat(join(base, path))).mode & 0o777).toBe(0o750);
-        await expect(saveProjectFile(base, path, "stale", "original\r\n")).rejects.toMatchObject({
-          status: 409,
-        });
-      }
-      await writeFile(join(base, "binary.bin"), Buffer.from([0, 1]));
-      await expect(saveProjectFile(base, "binary.bin", "text", "")).rejects.toMatchObject({
-        status: 415,
-      });
-      await expect(saveProjectFile(base, "readme.md", "\0", "first")).rejects.toMatchObject({
-        status: 415,
-      });
-      await expect(
-        saveProjectFile(base, "readme.md", "x".repeat(1024 * 1024 + 1), ""),
-      ).rejects.toMatchObject({
-        status: 413,
-      });
-      await writeFile(join(base, "picture.png"), Buffer.from([137, 80, 78, 71]));
-      const image = await readProjectImage(base, "picture.png");
-      expect(image.type).toBe("image/png");
-      expect(image.content).toStrictEqual(Buffer.from([137, 80, 78, 71]));
-      expect(await previewProjectFile(base, "picture.png")).toStrictEqual({
-        path: "picture.png",
-        content: "",
-        image: true,
-      });
-      await expect(readProjectImage(base, "readme.md")).rejects.toMatchObject({ status: 415 });
-      await expect(readProjectImage(base, "../picture.png")).rejects.toMatchObject({ status: 403 });
-    } finally {
-      await rm(base, { recursive: true, force: true });
     }
-  },
-);
+    await writeFile(join(base, "binary.bin"), Buffer.from([0, 1]));
+    await expect(saveProjectFile(base, "binary.bin", "text", "")).rejects.toMatchObject({
+      status: 415,
+    });
+    await expect(saveProjectFile(base, "readme.md", "\0", "first")).rejects.toMatchObject({
+      status: 415,
+    });
+    await expect(
+      saveProjectFile(base, "readme.md", "x".repeat(1024 * 1024 + 1), ""),
+    ).rejects.toMatchObject({
+      status: 413,
+    });
+    await writeFile(join(base, "picture.png"), Buffer.from([137, 80, 78, 71]));
+    const image = await readProjectImage(base, "picture.png");
+    expect(image.type).toBe("image/png");
+    expect(image.content).toStrictEqual(Buffer.from([137, 80, 78, 71]));
+    expect(await previewProjectFile(base, "picture.png")).toStrictEqual({
+      path: "picture.png",
+      content: "",
+      image: true,
+    });
+    await expect(readProjectImage(base, "readme.md")).rejects.toMatchObject({ status: 415 });
+    await expect(readProjectImage(base, "../picture.png")).rejects.toMatchObject({ status: 403 });
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
 test.skipIf(!posix)(
   "file tree and Git changes report execute bits for files, including chmod-only changes",
   async () => {
@@ -308,76 +310,71 @@ test("tree move destinations and open-file paths respect directory boundaries", 
   expect(relocatedPath("src-other/file.ts", "src", "docs/src")).toBe("src-other/file.ts");
 });
 
-test.skipIf(!posix)(
-  "moves preserve contents, never overwrite, and reject self, traversal, excluded and symlink paths",
-  async () => {
-    await withDefaultExcludes(async () => {
-      const base = await mkdtemp(join(tmpdir(), "projector-move-"));
-      try {
-        for (const folder of ["src/nested", "docs", "other", ".git", "node_modules"])
-          await mkdir(join(base, folder), { recursive: true });
-        await writeFile(join(base, "src/nested/файл с пробелом.ts"), "preserved");
-        await writeFile(join(base, "docs/collision"), "destination");
-        await writeFile(join(base, "src/collision"), "source");
-        await symlink(join(base, "docs"), join(base, "alias"));
-        await symlink("/etc", join(base, "external"));
-        await symlink(join(base, "missing"), join(base, "docs/dangling"));
-        await writeFile(join(base, "src/dangling"), "keep");
-        expect(await moveProjectEntry(base, "src/nested/файл с пробелом.ts", "docs")).toStrictEqual(
-          {
-            source: "src/nested/файл с пробелом.ts",
-            destination: "docs/файл с пробелом.ts",
-          },
-        );
-        expect(await readFile(join(base, "docs/файл с пробелом.ts"), "utf8")).toBe("preserved");
-        await moveProjectEntry(base, "docs/файл с пробелом.ts", "");
-        expect(await readFile(join(base, "файл с пробелом.ts"), "utf8")).toBe("preserved");
-        await expect(moveProjectEntry(base, "src/collision", "docs")).rejects.toMatchObject({
-          status: 409,
-        });
-        expect(await readFile(join(base, "src/collision"), "utf8")).toBe("source");
-        expect(await readFile(join(base, "docs/collision"), "utf8")).toBe("destination");
-        await expect(moveProjectEntry(base, "src/dangling", "docs")).rejects.toMatchObject({
-          status: 409,
-        });
-        for (const [source, target, status] of [
-          ["", "docs", 400],
-          ["src", "src/nested", 400],
-          ["src", "src", 400],
-          ["src/collision", "src", 400],
-          ["../outside", "docs", 403],
-          ["/etc/passwd", "docs", 403],
-          ["src/collision", "../outside", 403],
-          ["src/collision", "alias", 403],
-          ["alias/collision", "other", 403],
-          ["src/collision", "external", 403],
-          ["src/collision", ".git", 403],
-          ["node_modules", "docs", 403],
-          ["src/./collision", "docs", 403],
-          ["src/collision", "src/dangling", 400],
-        ])
-          await expect(moveProjectEntry(base, source, target)).rejects.toMatchObject({ status });
-        await moveProjectEntry(base, "src", "other");
-        expect((await lstat(join(base, "other/src/nested"))).isDirectory()).toBeTruthy();
-        expect(await readFile(join(base, "other/src/collision"), "utf8")).toBe("source");
-        await writeFile(join(base, "docs/race"), "one");
-        await writeFile(join(base, "other/race"), "two");
-        const results = await Promise.allSettled([
-          moveProjectEntry(base, "docs/race", ""),
-          moveProjectEntry(base, "other/race", ""),
-        ]);
-        expect(results.filter((result) => result.status === "fulfilled").length).toBe(1);
-        expect(results.find((result) => result.status === "rejected").reason.status).toBe(409);
-        const winner = await readFile(join(base, "race"), "utf8");
-        expect(
-          await readFile(join(base, winner === "one" ? "other/race" : "docs/race"), "utf8"),
-        ).toBe(winner === "one" ? "two" : "one");
-      } finally {
-        await rm(base, { recursive: true, force: true });
-      }
-    });
-  },
-);
+test("moves preserve contents, never overwrite, and reject self, traversal, excluded and symlink paths", async () => {
+  await withDefaultExcludes(async () => {
+    const base = await mkdtemp(join(tmpdir(), "projector-move-"));
+    try {
+      for (const folder of ["src/nested", "docs", "other", ".git", "node_modules"])
+        await mkdir(join(base, folder), { recursive: true });
+      await writeFile(join(base, "src/nested/файл с пробелом.ts"), "preserved");
+      await writeFile(join(base, "docs/collision"), "destination");
+      await writeFile(join(base, "src/collision"), "source");
+      await symlink(join(base, "docs"), join(base, "alias"));
+      await symlink(outside, join(base, "external"));
+      await symlink(join(base, "missing"), join(base, "docs/dangling"));
+      await writeFile(join(base, "src/dangling"), "keep");
+      expect(await moveProjectEntry(base, "src/nested/файл с пробелом.ts", "docs")).toStrictEqual({
+        source: "src/nested/файл с пробелом.ts",
+        destination: "docs/файл с пробелом.ts",
+      });
+      expect(await readFile(join(base, "docs/файл с пробелом.ts"), "utf8")).toBe("preserved");
+      await moveProjectEntry(base, "docs/файл с пробелом.ts", "");
+      expect(await readFile(join(base, "файл с пробелом.ts"), "utf8")).toBe("preserved");
+      await expect(moveProjectEntry(base, "src/collision", "docs")).rejects.toMatchObject({
+        status: 409,
+      });
+      expect(await readFile(join(base, "src/collision"), "utf8")).toBe("source");
+      expect(await readFile(join(base, "docs/collision"), "utf8")).toBe("destination");
+      await expect(moveProjectEntry(base, "src/dangling", "docs")).rejects.toMatchObject({
+        status: 409,
+      });
+      for (const [source, target, status] of [
+        ["", "docs", 400],
+        ["src", "src/nested", 400],
+        ["src", "src", 400],
+        ["src/collision", "src", 400],
+        ["../outside", "docs", 403],
+        [join(outside, "passwd"), "docs", 403],
+        ["src/collision", "../outside", 403],
+        ["src/collision", "alias", 403],
+        ["alias/collision", "other", 403],
+        ["src/collision", "external", 403],
+        ["src/collision", ".git", 403],
+        ["node_modules", "docs", 403],
+        ["src/./collision", "docs", 403],
+        ["src/collision", "src/dangling", 400],
+      ])
+        await expect(moveProjectEntry(base, source, target)).rejects.toMatchObject({ status });
+      await moveProjectEntry(base, "src", "other");
+      expect((await lstat(join(base, "other/src/nested"))).isDirectory()).toBeTruthy();
+      expect(await readFile(join(base, "other/src/collision"), "utf8")).toBe("source");
+      await writeFile(join(base, "docs/race"), "one");
+      await writeFile(join(base, "other/race"), "two");
+      const results = await Promise.allSettled([
+        moveProjectEntry(base, "docs/race", ""),
+        moveProjectEntry(base, "other/race", ""),
+      ]);
+      expect(results.filter((result) => result.status === "fulfilled").length).toBe(1);
+      expect(results.find((result) => result.status === "rejected").reason.status).toBe(409);
+      const winner = await readFile(join(base, "race"), "utf8");
+      expect(
+        await readFile(join(base, winner === "one" ? "other/race" : "docs/race"), "utf8"),
+      ).toBe(winner === "one" ? "two" : "one");
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  });
+});
 
 test("files exclude setting controls tree visibility for node_modules", async () => {
   const root = await mkdtemp(join(tmpdir(), "projector-exclude-project-"));
@@ -404,77 +401,76 @@ test("files exclude setting controls tree visibility for node_modules", async ()
   }
 });
 
-test.skipIf(!posix)(
-  "workspace tree, bounded reading, traversal and symlink containment, literal search",
-  async () => {
-    await withDefaultExcludes(async () => {
-      try {
-        await mkdir(join(root, "src"));
-        await mkdir(join(root, "node_modules"));
-        await writeFile(join(root, ".gitignore"), "ignored.txt\n");
-        await writeFile(join(root, "src/code.ts"), 'const word = "Привет [world]";\n');
-        await writeFile(join(root, "ignored.txt"), "[world]");
-        await writeFile(join(root, "node_modules/dependency.js"), "[world]");
-        await writeFile(join(root, "binary"), Buffer.from([0, 1]));
-        await writeFile(join(root, "large"), Buffer.alloc(1024 * 1024 + 1, 65));
-        await symlink("/etc", join(root, "external"));
-        const tree = await listProjectDirectory(root);
-        expect(tree.entries[0].directory).toBe(true);
-        expect(tree.entries.some((entry) => entry.name === ".gitignore")).toBeTruthy();
-        expect(
-          !tree.entries.some((entry) => ["node_modules", "external"].includes(entry.name)),
-        ).toBeTruthy();
-        expect((await readProjectFile(root, "src/code.ts")).content).toMatch(/Привет/);
-        await expect(readProjectFile(root, "../outside")).rejects.toMatchObject({ status: 403 });
-        await expect(readProjectFile(root, "/etc/passwd")).rejects.toMatchObject({ status: 403 });
-        await expect(readProjectFile(root, "external/passwd")).rejects.toMatchObject({
-          status: 403,
-        });
-        await expect(readProjectFile(root, "binary")).rejects.toMatchObject({ status: 415 });
-        await expect(readProjectFile(root, "large")).rejects.toMatchObject({ status: 413 });
-        expect((await projectGit(root)).available).toBe(false);
-        git("init", "-q");
-        git("config", "user.name", "Workspace Test");
-        git("config", "user.email", "test@example.test");
-        const search = await searchProject(root, "[WORLD]");
-        expect(search.hits.map((hit) => [hit.path, hit.line, hit.column])).toStrictEqual([
-          ["src/code.ts", 1, 22],
-        ]);
-        git("add", "src/code.ts", ".gitignore");
-        git("commit", "-qm", "initial");
-        await writeFile(join(root, "src/code.ts"), "staged\n");
-        git("add", "src/code.ts");
-        await writeFile(join(root, "src/code.ts"), "working\n");
-        const staged = await projectComparison(root, "src/code.ts", true);
-        expect(staged.original).toMatch(/Привет/);
-        expect(staged.modified).toBe("staged\n");
-        const working = await projectComparison(root, "src/code.ts", false);
-        expect(working.original).toBe("staged\n");
-        expect(working.modified).toBe("working\n");
-        const nested = await projectGit(join(root, "src"));
-        expect(nested.changes[0].path).toBe("code.ts");
-        expect((await projectComparison(join(root, "src"), "code.ts", false)).original).toBe(
-          "staged\n",
-        );
-        await writeFile(join(root, "new file.ts"), "new\n");
-        expect((await projectComparison(root, "new file.ts", false)).original).toBe("");
-        git("reset", "--hard", "-q");
-        git("mv", "src/code.ts", "src/renamed.ts");
-        const rename = await projectComparison(root, "src/renamed.ts", true);
-        expect(rename.original).toMatch(/Привет/);
-        expect(rename.modified).toBe(rename.original);
-        git("reset", "--hard", "-q");
-        await rm(join(root, "src/code.ts"));
-        expect((await projectComparison(root, "src/code.ts", false)).modified).toBe("");
-        await expect(projectComparison(root, "../outside", false)).rejects.toMatchObject({
-          status: 403,
-        });
-      } finally {
-        await rm(root, { recursive: true, force: true });
-      }
-    });
-  },
-);
+test("workspace tree, bounded reading, traversal and symlink containment, literal search", async () => {
+  await withDefaultExcludes(async () => {
+    try {
+      await mkdir(join(root, "src"));
+      await mkdir(join(root, "node_modules"));
+      await writeFile(join(root, ".gitignore"), "ignored.txt\n");
+      await writeFile(join(root, "src/code.ts"), 'const word = "Привет [world]";\n');
+      await writeFile(join(root, "ignored.txt"), "[world]");
+      await writeFile(join(root, "node_modules/dependency.js"), "[world]");
+      await writeFile(join(root, "binary"), Buffer.from([0, 1]));
+      await writeFile(join(root, "large"), Buffer.alloc(1024 * 1024 + 1, 65));
+      await symlink(outside, join(root, "external"));
+      const tree = await listProjectDirectory(root);
+      expect(tree.entries[0].directory).toBe(true);
+      expect(tree.entries.some((entry) => entry.name === ".gitignore")).toBeTruthy();
+      expect(
+        !tree.entries.some((entry) => ["node_modules", "external"].includes(entry.name)),
+      ).toBeTruthy();
+      expect((await readProjectFile(root, "src/code.ts")).content).toMatch(/Привет/);
+      await expect(readProjectFile(root, "../outside")).rejects.toMatchObject({ status: 403 });
+      await expect(readProjectFile(root, join(outside, "passwd"))).rejects.toMatchObject({
+        status: 403,
+      });
+      await expect(readProjectFile(root, "external/passwd")).rejects.toMatchObject({
+        status: 403,
+      });
+      await expect(readProjectFile(root, "binary")).rejects.toMatchObject({ status: 415 });
+      await expect(readProjectFile(root, "large")).rejects.toMatchObject({ status: 413 });
+      expect((await projectGit(root)).available).toBe(false);
+      git("init", "-q");
+      git("config", "user.name", "Workspace Test");
+      git("config", "user.email", "test@example.test");
+      const search = await searchProject(root, "[WORLD]");
+      expect(search.hits.map((hit) => [hit.path, hit.line, hit.column])).toStrictEqual([
+        ["src/code.ts", 1, 22],
+      ]);
+      git("add", "src/code.ts", ".gitignore");
+      git("commit", "-qm", "initial");
+      await writeFile(join(root, "src/code.ts"), "staged\n");
+      git("add", "src/code.ts");
+      await writeFile(join(root, "src/code.ts"), "working\n");
+      const staged = await projectComparison(root, "src/code.ts", true);
+      expect(staged.original).toMatch(/Привет/);
+      expect(staged.modified).toBe("staged\n");
+      const working = await projectComparison(root, "src/code.ts", false);
+      expect(working.original).toBe("staged\n");
+      expect(working.modified).toBe("working\n");
+      const nested = await projectGit(join(root, "src"));
+      expect(nested.changes[0].path).toBe("code.ts");
+      expect((await projectComparison(join(root, "src"), "code.ts", false)).original).toBe(
+        "staged\n",
+      );
+      await writeFile(join(root, "new file.ts"), "new\n");
+      expect((await projectComparison(root, "new file.ts", false)).original).toBe("");
+      git("reset", "--hard", "-q");
+      git("mv", "src/code.ts", "src/renamed.ts");
+      const rename = await projectComparison(root, "src/renamed.ts", true);
+      expect(rename.original).toMatch(/Привет/);
+      expect(rename.modified).toBe(rename.original);
+      git("reset", "--hard", "-q");
+      await rm(join(root, "src/code.ts"));
+      expect((await projectComparison(root, "src/code.ts", false)).modified).toBe("");
+      await expect(projectComparison(root, "../outside", false)).rejects.toMatchObject({
+        status: 403,
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});
 
 test("Git gutter returns the index text of tracked files only", async () => {
   const base = await mkdtemp(join(tmpdir(), "projector-gutter-"));
@@ -780,70 +776,65 @@ test("Git tree backgrounds aggregate nested changes, renames, deletions and conf
   expect(changes).toStrictEqual(before);
 });
 
-test.skipIf(!posix)(
-  "Git actions preserve staged content, handle deleted/literal paths and trash untracked files",
-  async () => {
-    const base = await mkdtemp(join(tmpdir(), "projector-git-actions-"));
-    const run = (...args) => execFileSync("git", ["-C", base, ...args], { encoding: "utf8" });
-    try {
-      run("init", "-q");
-      run("config", "user.name", "Test");
-      run("config", "user.email", "test@example.test");
-      await writeFile(join(base, "file.txt"), "head");
-      await writeFile(join(base, "other.txt"), "head");
-      run("add", ".");
-      run("commit", "-qm", "initial");
-      await writeFile(join(base, "file.txt"), "index");
-      await mutateProjectGit(base, "stage", "file.txt");
-      await writeFile(join(base, "file.txt"), "working");
-      const partial = await projectGit(base);
-      expect(partial.changes.find((c) => c.path === "file.txt").index).toBe("M");
-      expect(partial.changes.find((c) => c.path === "file.txt").worktree).toBe("M");
-      await mutateProjectGit(base, "discard", "file.txt");
-      expect(await readFile(join(base, "file.txt"), "utf8")).toBe("index");
-      expect(run("show", ":file.txt")).toBe("index");
-      await mutateProjectGit(base, "unstage", "file.txt");
-      expect(run("show", ":file.txt")).toBe("head");
-      expect(await readFile(join(base, "file.txt"), "utf8")).toBe("index");
-      await rm(join(base, "file.txt"));
-      await mutateProjectGit(base, "discard", "file.txt");
-      expect(await readFile(join(base, "file.txt"), "utf8")).toBe("head");
-      await rm(join(base, "file.txt"));
-      await mutateProjectGit(base, "stage", "file.txt");
-      expect((await projectGit(base)).changes.find((c) => c.path === "file.txt").index).toBe("D");
-      await mutateProjectGit(base, "unstage", "file.txt");
-      await mutateProjectGit(base, "discard", "file.txt");
-      await writeFile(join(base, "[literal].txt"), "new");
-      await writeFile(join(base, "literal.txt"), "other");
-      await mutateProjectGit(base, "stage", "[literal].txt");
-      expect((await projectGit(base)).changes.find((c) => c.path === "literal.txt").index).toBe(
-        "?",
-      );
-      await mutateProjectGit(base, "unstage", "[literal].txt");
-      await mutateProjectGit(base, "discard", "[literal].txt");
-      expect(
-        (await readdir(join(base, ".projector-trash"))).some((name) =>
-          name.endsWith("-[literal].txt"),
-        ),
-      ).toBeTruthy();
-      run("mv", "other.txt", "renamed.txt");
-      await mutateProjectGit(base, "unstage", "renamed.txt");
-      expect(run("diff", "--cached")).toBe("");
-      expect(await readFile(join(base, "renamed.txt"), "utf8")).toBe("head");
-      for (const path of ["", "../outside", ".git/config", "a/../file.txt"])
-        await expect(mutateProjectGit(base, "stage", path)).rejects.toMatchObject({ status: 403 });
-      await expect(mutateProjectGit(base, "reset", "literal.txt")).rejects.toMatchObject({
-        status: 400,
-      });
-      await symlink("/tmp", join(base, "escape"));
-      await expect(mutateProjectGit(base, "stage", "escape")).rejects.toMatchObject({
-        status: 403,
-      });
-    } finally {
-      await rm(base, { recursive: true, force: true });
-    }
-  },
-);
+test("Git actions preserve staged content, handle deleted/literal paths and trash untracked files", async () => {
+  const base = await mkdtemp(join(tmpdir(), "projector-git-actions-"));
+  const run = (...args) => execFileSync("git", ["-C", base, ...args], { encoding: "utf8" });
+  try {
+    run("init", "-q");
+    run("config", "user.name", "Test");
+    run("config", "user.email", "test@example.test");
+    await writeFile(join(base, "file.txt"), "head");
+    await writeFile(join(base, "other.txt"), "head");
+    run("add", ".");
+    run("commit", "-qm", "initial");
+    await writeFile(join(base, "file.txt"), "index");
+    await mutateProjectGit(base, "stage", "file.txt");
+    await writeFile(join(base, "file.txt"), "working");
+    const partial = await projectGit(base);
+    expect(partial.changes.find((c) => c.path === "file.txt").index).toBe("M");
+    expect(partial.changes.find((c) => c.path === "file.txt").worktree).toBe("M");
+    await mutateProjectGit(base, "discard", "file.txt");
+    expect(await readFile(join(base, "file.txt"), "utf8")).toBe("index");
+    expect(run("show", ":file.txt")).toBe("index");
+    await mutateProjectGit(base, "unstage", "file.txt");
+    expect(run("show", ":file.txt")).toBe("head");
+    expect(await readFile(join(base, "file.txt"), "utf8")).toBe("index");
+    await rm(join(base, "file.txt"));
+    await mutateProjectGit(base, "discard", "file.txt");
+    expect(await readFile(join(base, "file.txt"), "utf8")).toBe("head");
+    await rm(join(base, "file.txt"));
+    await mutateProjectGit(base, "stage", "file.txt");
+    expect((await projectGit(base)).changes.find((c) => c.path === "file.txt").index).toBe("D");
+    await mutateProjectGit(base, "unstage", "file.txt");
+    await mutateProjectGit(base, "discard", "file.txt");
+    await writeFile(join(base, "[literal].txt"), "new");
+    await writeFile(join(base, "literal.txt"), "other");
+    await mutateProjectGit(base, "stage", "[literal].txt");
+    expect((await projectGit(base)).changes.find((c) => c.path === "literal.txt").index).toBe("?");
+    await mutateProjectGit(base, "unstage", "[literal].txt");
+    await mutateProjectGit(base, "discard", "[literal].txt");
+    expect(
+      (await readdir(join(base, ".projector-trash"))).some((name) =>
+        name.endsWith("-[literal].txt"),
+      ),
+    ).toBeTruthy();
+    run("mv", "other.txt", "renamed.txt");
+    await mutateProjectGit(base, "unstage", "renamed.txt");
+    expect(run("diff", "--cached")).toBe("");
+    expect(await readFile(join(base, "renamed.txt"), "utf8")).toBe("head");
+    for (const path of ["", "../outside", ".git/config", "a/../file.txt"])
+      await expect(mutateProjectGit(base, "stage", path)).rejects.toMatchObject({ status: 403 });
+    await expect(mutateProjectGit(base, "reset", "literal.txt")).rejects.toMatchObject({
+      status: 400,
+    });
+    await symlink(outside, join(base, "escape"));
+    await expect(mutateProjectGit(base, "stage", "escape")).rejects.toMatchObject({
+      status: 403,
+    });
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
 
 test("Git unstage works before the first commit, and index writes serialize", async () => {
   const base = await mkdtemp(join(tmpdir(), "projector-git-unborn-"));

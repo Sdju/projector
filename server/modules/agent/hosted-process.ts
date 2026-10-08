@@ -44,7 +44,7 @@ export async function startHosted(runId: string, spec: AgentProcessSpec): Promis
   const dir = runDirectory(runId);
   await writeFile(
     join(dir, "spec.json"),
-    JSON.stringify({ command: spec.command, args: spec.args, cwd: spec.cwd }),
+    JSON.stringify({ ...os.tools.agentLaunch(spec), cwd: spec.cwd }),
     { mode: 0o600 },
   );
   const address = os.tools.agentHostAddress(dir);

@@ -1,3 +1,4 @@
+import { isAbsolute, relative, sep } from "node:path";
 import { os } from "../../../core/modules/os/index.ts";
 import { loadProjects } from "../projects/index.ts";
 import { getSnapshot, processOutput } from "../processes/index.ts";
@@ -64,7 +65,12 @@ const STATE_LABELS: Record<LaunchInfo["state"], string> = {
 };
 const tildePath = (path: string) => {
   const home = os.homeDirectory();
-  return path === home ? "~" : path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path;
+  if (path === home) return "~";
+  const rel = relative(home, path);
+  // Windows paths use backslashes, but the shown form is always `~/…`.
+  return rel && rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel)
+    ? `~/${rel.split(sep).join("/")}`
+    : path;
 };
 
 async function favoriteAction(id: string): Promise<LaunchAction> {

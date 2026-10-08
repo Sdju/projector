@@ -3,7 +3,7 @@
 //
 // Usage: node agent-host.mjs <run directory> <socket address>
 //
-// The run directory holds `spec.json` ({ command, args, cwd }) and receives:
+// The run directory holds `spec.json` ({ command, args, shell, cwd }) and receives:
 //   trace.log  every JSON-RPC line in order, `< ` from the agent, `> ` to it, `! ` for events of
 //              the host itself ({"exit":...}, {"error":...}); a restarted server replays it;
 // One server at a time connects to the socket: it gets the whole trace, then `! {"live":true}`,
@@ -63,7 +63,7 @@ const child = spawn(spec.command, spec.args ?? [], {
   env: process.env,
   stdio: ["pipe", "pipe", "pipe"],
   windowsHide: true,
-  shell: process.platform === "win32",
+  shell: spec.shell === true,
 });
 child.stdin.on("error", () => {});
 child.stdout.setEncoding("utf8");

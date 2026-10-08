@@ -108,7 +108,7 @@ export function runBash(command: string, options: { cwd: string; signal?: AbortS
       }
       child.stdout.destroy();
       child.stderr.destroy();
-      if (child.pid) killTree(child.pid);
+      if (child.pid) void killTree(child.pid);
     };
     const capture = (target: Buffer[], chunk: Buffer) => {
       const available = 256 * 1024 - bytes;
@@ -130,7 +130,7 @@ export function runBash(command: string, options: { cwd: string; signal?: AbortS
     });
     child.on("close", (exitCode) => {
       cleanup();
-      if (child.pid) killTree(child.pid);
+      if (child.pid) void killTree(child.pid);
       if (options.signal?.aborted) return reject(new Error("Запрос остановлен"));
       resolve({
         stdout: Buffer.concat(stdout).toString("utf8"),

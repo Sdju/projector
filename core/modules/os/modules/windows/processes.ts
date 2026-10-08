@@ -17,8 +17,8 @@ function parseLine(line: string): ProcessInfo | null {
     name: normalizeName(name),
     started,
     state: "S",
-    group: id,
-    foreground: id,
+    group: null,
+    foreground: null,
   };
 }
 
@@ -43,15 +43,48 @@ ${ROW}
 `;
 
 let snapshot: { at: number; rows: ProcessInfo[] } | null = null;
+let refreshing: Promise<void> | null = null;
+/** Freshness for exact answers (kill lists, identity of unknown pids). */
 const TTL = 400;
+/** How old a listing may be before polling callers trigger a background refresh. */
+const STALE = 1500;
 
+const parseRows = (stdout: string) =>
+  stdout
+    .split(/\r?\n/)
+    .map((line) => parseLine(line.trim()))
+    .filter((entry): entry is ProcessInfo => entry !== null);
+
+function refresh(): Promise<void> {
+  refreshing ??= runPowerShell(LIST_SCRIPT)
+    .then(({ stdout }) => {
+      snapshot = { at: Date.now(), rows: parseRows(stdout) };
+    })
+    .catch(() => undefined)
+    .finally(() => {
+      refreshing = null;
+    });
+  return refreshing;
+}
+
+/**
+ * Polling view: never blocks once a listing exists. An older listing is returned at once while a
+ * background refresh runs; only the very first call has to wait for PowerShell.
+ */
 export function listProcesses(): ProcessInfo[] | null {
   if (snapshot && Date.now() - snapshot.at < TTL) return snapshot.rows;
+  if (snapshot && Date.now() - snapshot.at < STALE * 10) {
+    if (Date.now() - snapshot.at >= STALE) void refresh();
+    return snapshot.rows;
+  }
+  return listProcessesNow();
+}
+
+/** Exact view, for deciding what to signal: always at most TTL old, and waits for it. */
+export function listProcessesNow(): ProcessInfo[] | null {
+  if (snapshot && Date.now() - snapshot.at < TTL) return snapshot.rows;
   try {
-    const rows = runPowerShellSync(LIST_SCRIPT)
-      .split(/\r?\n/)
-      .map((line) => parseLine(line.trim()))
-      .filter((entry): entry is ProcessInfo => entry !== null);
+    const rows = parseRows(runPowerShellSync(LIST_SCRIPT));
     snapshot = { at: Date.now(), rows };
     return rows;
   } catch {
@@ -84,7 +117,7 @@ export function processIdentity(pid: number): string | null {
 }
 
 export function descendants(pid: number): ProcessInfo[] {
-  const processes = listProcesses() ?? [];
+  const processes = listProcessesNow() ?? [];
   const family = new Set([pid]);
   let changed = true;
   while (changed) {

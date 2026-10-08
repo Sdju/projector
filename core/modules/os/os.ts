@@ -89,6 +89,8 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
       agentEnv: (base: Record<string, string | undefined>) => backend("agentEnv").agentEnv(base),
       spawnAgentProcess: (spec: AgentProcessSpec) =>
         backend("spawnAgentProcess").spawnAgentProcess(spec),
+      agentLaunch: (spec: Pick<AgentProcessSpec, "command" | "args">) =>
+        backend("agentLaunch").agentLaunch(spec),
       agentHostAddress: (dir: string) => backend("agentHostAddress").agentHostAddress(dir),
       spawnAgentHost: (spec: AgentHostSpec) => backend("spawnAgentHost").spawnAgentHost(spec),
       killAgentTree: (pid: number) => backend("killAgentTree").killAgentTree(pid),
