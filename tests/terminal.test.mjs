@@ -696,7 +696,20 @@ process.stdin.on('data', (chunk) => {
         (item) => item.name === "sleep",
       ),
     "foreground process is busy",
-  );
+  ).catch(async (error) => {
+    const { os } = await import("../core/modules/os/index.ts");
+    const session = (await (await request(`/${shell.id}`)).json()).session;
+    const rows = (await os.processes.list()) ?? [];
+    const family = new Set([session.pid]);
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const row of rows)
+        if (family.has(row.parent) && !family.has(row.pid)) grew = !!family.add(row.pid);
+    }
+    throw new Error(
+      `${error.message}\n${JSON.stringify(session.activity)}\n${JSON.stringify(rows.filter((row) => family.has(row.pid)))}\n${shellOutput.output().slice(-500)}`,
+    );
+  });
   expect((await request(`/${shell.id}`, "DELETE", {})).status).toBe(409);
   shellOutput.send({ type: "input", data: "\u0003" });
   await until(
