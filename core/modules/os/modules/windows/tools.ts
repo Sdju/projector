@@ -245,13 +245,33 @@ function currentSid(): string {
 }
 const ownerOnly = (path: string) => [path, "/inheritance:r", "/grant:r", `*${currentSid()}:F`];
 
+/** Principals named in an `icacls <path>` listing. */
+function principals(listing: string): string[] {
+  return listing
+    .split(/\r?\n/)
+    .map((line) => /^\s*(?:.*?\.[^\s]*\s+)?(\S+):\(/.exec(line)?.[1])
+    .filter((name): name is string => Boolean(name));
+}
+
+/** Explicit entries from the process token (Administrators…) survive /inheritance:r. */
+const strangers = (listing: string) => {
+  const owner = `${process.env.USERNAME ?? ""}`.toLowerCase();
+  return principals(listing).filter((name) => !name.toLowerCase().endsWith(`\\${owner}`));
+};
+
 /**
  * The Windows counterpart of 0600: the inherited entries are dropped and only the current user
  * keeps access, so other local accounts cannot read tokens and passwords.
  */
 export async function restrictToOwner(path: string): Promise<void> {
   await execute("icacls.exe", ownerOnly(path), { windowsHide: true });
+  const { stdout } = await execute("icacls.exe", [path], { windowsHide: true });
+  for (const name of strangers(stdout))
+    await execute("icacls.exe", [path, "/remove:g", name], { windowsHide: true });
 }
 export function restrictToOwnerSync(path: string): void {
   execFileSync("icacls.exe", ownerOnly(path), { stdio: "ignore", windowsHide: true });
+  const listing = String(execFileSync("icacls.exe", [path], { windowsHide: true }));
+  for (const name of strangers(listing))
+    execFileSync("icacls.exe", [path, "/remove:g", name], { stdio: "ignore", windowsHide: true });
 }
