@@ -3,13 +3,19 @@ import { basename } from "node:path";
 import { killTree } from "./kill-tree.ts";
 import type { AgentHostSpec, AgentProcess, AgentProcessSpec } from "../../contract.ts";
 
+/** `shell: true` joins argv with spaces, so anything with whitespace or quotes is quoted for cmd.exe. */
+function quoteForCmd(value: string): string {
+  if (value !== "" && !/[\s"&|<>^()%]/.test(value)) return value;
+  return `"${value.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, "$1$1")}"`;
+}
+
 /**
  * A separate stdio process per chat turn: Projector never touches the user's own sessions.
  * `.cmd` shims (npx, npm-global binaries) are not executable without a shell on Windows, and
  * `taskkill /T` stops the tree the shell started.
  */
 export function spawnAgentProcess(spec: AgentProcessSpec): AgentProcess {
-  const child = spawn(spec.command, spec.args, {
+  const child = spawn(quoteForCmd(spec.command), spec.args.map(quoteForCmd), {
     cwd: spec.cwd,
     env: spec.env as NodeJS.ProcessEnv,
     stdio: ["pipe", "pipe", "pipe"],
