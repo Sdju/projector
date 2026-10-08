@@ -22,6 +22,8 @@ export {
   commandExists,
   ptyCommand,
   isExecutableFile,
+  restrictToOwner,
+  restrictToOwnerSync,
 } from "./tools.ts";
 export { dataHome, shell, shellLaunch, desktopPaths, pickFolder } from "./directories.ts";
 export {

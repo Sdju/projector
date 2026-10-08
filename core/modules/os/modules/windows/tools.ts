@@ -229,3 +229,29 @@ export function isExecutableFile(name: string, _mode: number): boolean {
   const lower = name.toLowerCase();
   return [...extensions, ".ps1"].some((extension) => lower.endsWith(extension));
 }
+
+let ownerSid: string | undefined;
+function currentSid(): string {
+  ownerSid ??= String(
+    execFileSync("whoami.exe", ["/user", "/fo", "csv", "/nh"], {
+      encoding: "utf8",
+      windowsHide: true,
+    }),
+  )
+    .trim()
+    .split(",")[1]!
+    .replace(/"/g, "");
+  return ownerSid;
+}
+const ownerOnly = (path: string) => [path, "/inheritance:r", "/grant:r", `*${currentSid()}:F`];
+
+/**
+ * The Windows counterpart of 0600: the inherited entries are dropped and only the current user
+ * keeps access, so other local accounts cannot read tokens and passwords.
+ */
+export async function restrictToOwner(path: string): Promise<void> {
+  await execute("icacls.exe", ownerOnly(path), { windowsHide: true });
+}
+export function restrictToOwnerSync(path: string): void {
+  execFileSync("icacls.exe", ownerOnly(path), { stdio: "ignore", windowsHide: true });
+}

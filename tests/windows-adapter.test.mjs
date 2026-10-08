@@ -238,3 +238,22 @@ test.skipIf(!windows)("a Git Bash process reports the directory it changed into"
     JSON.stringify(cwds),
   ).toContain(join(directory, "nested").toLowerCase());
 });
+
+test.skipIf(!windows)(
+  "restrictToOwner leaves the current user alone in the file's ACL",
+  async () => {
+    const { aclPrincipals } = await import("./fixtures/acl.mjs");
+    const directory = await scratch();
+    const file = join(directory, "secret.json");
+    await writeFile(file, "{}");
+    expect((await aclPrincipals(file)).length).toBeGreaterThan(1); // inherited entries: users, admins…
+    await os.tools.restrictToOwner(file);
+    const after = await aclPrincipals(file);
+    expect(after, JSON.stringify(after)).toHaveLength(1);
+    expect(after[0].toLowerCase()).toContain(process.env.USERNAME.toLowerCase());
+    expect(await readFile(file, "utf8")).toBe("{}"); // the owner still reads and writes
+    await writeFile(file, '{"x":1}');
+    os.tools.restrictToOwnerSync(file);
+    expect(await aclPrincipals(file)).toHaveLength(1);
+  },
+);

@@ -7,6 +7,7 @@ import { dirname, join } from "node:path";
 import { dataHome } from "./directories.ts";
 import { processIdentity } from "./processes.ts";
 import { startDesktopShell } from "./shell.ts";
+import { restrictToOwner } from "./tools.ts";
 
 const service = "dev.projector.Launcher";
 const actions: DesktopAction[] = ["show", "toggle", "tray", "quit"];
@@ -170,6 +171,7 @@ export async function runResident(
   await mkdir(dirname(pidPath), { recursive: true });
   await writeFile(pidPath, `${process.pid}\n`);
   await writeFile(launcherTokenPath(options.dataDirectory), `${token}\n`, { mode: 0o600 });
+  await restrictToOwner(launcherTokenPath(options.dataDirectory)).catch(() => undefined);
   try {
     await own(baseUrl, action, options, server, pidPath, (next) => {
       live = next;

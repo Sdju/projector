@@ -1,3 +1,4 @@
+import { os } from "../../../core/modules/os/index.ts";
 import { mkdirSync, readFileSync, writeFileSync, renameSync, rmSync } from "node:fs";
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { dirname } from "node:path";
@@ -62,6 +63,7 @@ export function setLanPassword(password: string): void {
       flag: "wx",
     });
     renameSync(temporary, file);
+    os.tools.restrictToOwnerSync(file);
     passwordChanged();
   } finally {
     rmSync(temporary, { force: true });

@@ -123,6 +123,10 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
       ) => backend("runNodeScript").runNodeScript(script, args, options),
       runBash: (command: string, options: { cwd: string; signal?: AbortSignal }) =>
         backend("runBash").runBash(command, options),
+      /** 0600 on POSIX; on Windows only the current user stays in the file's ACL. */
+      restrictToOwner: (path: string) => backend("restrictToOwner").restrictToOwner(path),
+      restrictToOwnerSync: (path: string) =>
+        backend("restrictToOwnerSync").restrictToOwnerSync(path),
       isExecutableFile: (name: string, mode: number) =>
         backend("isExecutableFile").isExecutableFile(name, mode),
       ptyCommand: (file: string, args: string[]) => backend("ptyCommand").ptyCommand(file, args),

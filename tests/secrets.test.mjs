@@ -1,4 +1,5 @@
 import { expect, onTestFinished, test, vi } from "vite-plus/test";
+import { expectPrivate } from "./fixtures/private.mjs";
 import { mkdtemp, readFile, writeFile, mkdir, stat, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -76,7 +77,7 @@ test("credentials are stored in the keyring and never in the file", () =>
     const text = await readFile(file, "utf8");
     expect(!text.includes("ghp_secret")).toBeTruthy();
     expect(JSON.parse(text).integrations.github.vault).toBe("keyring");
-    if (process.platform !== "win32") expect((await stat(file)).mode & 0o777).toBe(0o600);
+    await expectPrivate(file);
     expect((await integrationConfig("github")).credentials.token).toBe("ghp_secret");
 
     await updateIntegration("github", (config) => ({ ...config, credentials: {} }));

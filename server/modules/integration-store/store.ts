@@ -1,4 +1,5 @@
-import { mkdir, readFile, writeFile, rename, chmod } from "node:fs/promises";
+import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
+import { os } from "../../../core/modules/os/index.ts";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { dataDir } from "../../../core/modules/app-paths/index.ts";
@@ -46,7 +47,7 @@ async function writeFileRaw(file: IntegrationFile) {
   const tmp = `${integrationsPath()}.${randomUUID()}.tmp`;
   await writeFile(tmp, JSON.stringify(file, null, 2) + "\n", { mode: 0o600 });
   await rename(tmp, integrationsPath());
-  await chmod(integrationsPath(), 0o600);
+  await os.tools.restrictToOwner(integrationsPath());
 }
 /** Strict: a locked, denied or broken keyring throws instead of looking like "no credentials". */
 async function openCredentials(id: string, stored: StoredIntegration) {

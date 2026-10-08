@@ -1,4 +1,5 @@
-import { chmod, mkdir, rename, writeFile } from "node:fs/promises";
+import { mkdir, rename, writeFile } from "node:fs/promises";
+import { os } from "../../../core/modules/os/index.ts";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -42,7 +43,7 @@ export async function saveTrust(root: string, entry: TrustEntry | null): Promise
     const tmp = `${trustPath()}.${randomUUID()}.tmp`;
     await writeFile(tmp, JSON.stringify(file, null, 2) + "\n", { mode: 0o600 });
     await rename(tmp, trustPath());
-    await chmod(trustPath(), 0o600);
+    await os.tools.restrictToOwner(trustPath());
   });
   queue = operation.catch(() => {});
   await operation;

@@ -1,4 +1,5 @@
 import { expect, onTestFinished, test } from "vite-plus/test";
+import { expectPrivate } from "./fixtures/private.mjs";
 import { mkdtemp, rm, writeFile, chmod, stat, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { createServer, request } from "node:http";
@@ -102,8 +103,7 @@ test("corrupt credentials fail closed, and replacing a password restores file pe
   setLanPassword("test-only-password");
   await chmod(lanPasswordPath(), 0o644);
   setLanPassword("replacement");
-  if (process.platform !== "win32")
-    expect((await stat(lanPasswordPath())).mode & 0o777).toBe(0o600);
+  await expectPrivate(lanPasswordPath());
 });
 
 test("fetch isolates LAN credentials and prompts only on an explicit LAN challenge", async () => {
