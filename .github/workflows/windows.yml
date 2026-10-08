@@ -34,6 +34,8 @@ jobs:
         run: vp exec tsdown
       - name: Diagnose adapter
         continue-on-error: true
+        timeout-minutes: 2
         run: node scripts/windows-diagnose.mjs
       - name: Tests
+        timeout-minutes: 15
         run: vp test run

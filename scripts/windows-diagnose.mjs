@@ -12,9 +12,17 @@ for (const [file, args] of [
   try {
     const child = spawn(file, args, { cols: 80, rows: 24, cwd: process.cwd(), env: process.env });
     child.onData((data) => process.stdout.write(`[${file}] ${data}`));
-    await new Promise((resolve) => child.onExit(resolve));
-    console.log(`\n${file}: started`);
+    console.log(`${file}: started pid ${child.pid}`);
+    await new Promise((resolve) => {
+      child.onExit(resolve);
+      setTimeout(() => {
+        child.kill();
+        resolve();
+      }, 4000);
+    });
   } catch (error) {
     console.log(`${file}: ${error.message}`);
   }
 }
+
+process.exit(0);
