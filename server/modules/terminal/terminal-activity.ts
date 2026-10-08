@@ -20,7 +20,19 @@ export function terminalActivity(
   }
   const rows = (processes ?? []).filter((row) => family.has(row.pid) && row.state !== "Z");
   const root = rows.find((row) => row.pid === info.pid);
-  const children = rows.filter((row) => row.pid !== info.pid);
+  // Git's bin\bash.exe starts the real shell as a child of the same name. That chain is the
+  // shell itself, not a command running in it.
+  const launcher = new Set<number>([info.pid]);
+  if (os.platform === "win32" && root)
+    for (let found = true; found;) {
+      found = false;
+      for (const row of rows)
+        if (!launcher.has(row.pid) && launcher.has(row.parent) && row.name === root.name) {
+          launcher.add(row.pid);
+          found = true;
+        }
+    }
+  const children = rows.filter((row) => !launcher.has(row.pid));
   const shell =
     root &&
     ["bash", "sh", "zsh", "fish", "dash", "ksh", "powershell", "pwsh", "cmd"].includes(root.name);
