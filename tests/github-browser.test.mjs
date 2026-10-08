@@ -316,6 +316,7 @@ test("GitHub history paginates filtered commits and reads exact before/after blo
     await expect(browseGithubComparison("octocat/repo", head, "missing")).rejects.toMatchObject({
       status: 404,
     });
+    await new Promise((resolve) => setTimeout(resolve, 100)); // let background fetches finish
     const count = requests.length;
     await expect(browseGithubComparison("octocat/repo", head, "../secret")).rejects.toMatchObject({
       status: 400,

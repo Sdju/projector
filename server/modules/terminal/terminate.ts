@@ -7,15 +7,10 @@ const descendants = (pid: number) => os.processes.descendantsSync(pid);
 /** Ends a PTY and everything its shell started: SIGTERM first, SIGKILL after a grace period. */
 export function terminateProcessTree(pty: IPty, immediate: boolean): void {
   if (os.platform === "win32") {
-    const killRoot = () => {
-      os.tools.killAgentTree(pty.pid);
-      try {
-        // node-pty on Windows throws on any signal name.
-        pty.kill();
-      } catch {
-        /* Already exited. */
-      }
-    };
+    // pty.kill() is not used here: node-pty's version attaches to the console of that pid and
+    // kills everything listed, which hits unrelated programs once the pid has been reused.
+    // Ending the tree closes the pseudo console on its own.
+    const killRoot = () => os.tools.killAgentTree(pty.pid);
     // While the process exits there is no time to look around: the root tree is all we can end.
     if (immediate) return killRoot();
     // MSYS programs are not Win32 children of their shell; the tracked console lists them. That
