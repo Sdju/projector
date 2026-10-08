@@ -188,7 +188,20 @@ test("WS project control: push, cross-client mutations, process protection and r
   await until(
     async () => (await first.rpc("GET", session.id)).session.activity.state === "busy",
     "foreground process",
-  );
+  ).catch(async (error) => {
+    const { os } = await import("../core/modules/os/index.ts");
+    const rows = (await os.processes.list()) ?? [];
+    const root = (await first.rpc("GET", session.id)).session;
+    const family = new Set([root.pid]);
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const row of rows)
+        if (family.has(row.parent) && !family.has(row.pid)) grew = !!family.add(row.pid);
+    }
+    throw new Error(
+      `${error.message}\n${JSON.stringify(root.activity)}\n${JSON.stringify(rows.filter((row) => family.has(row.pid)))}`,
+    );
+  });
   const rejected = await first.rpc("DELETE", session.id);
   expect(rejected.error).toBe("Подтвердите прерывание процессов");
   expect(rejected.session.id).toBe(session.id);
