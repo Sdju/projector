@@ -114,7 +114,13 @@ export async function previewProjectFile(
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT")
       throw new HttpError(503, "Для просмотра архивов нужен Python 3");
-    throw new HttpError(413, "Архив слишком большой или превышено время просмотра");
+    const failure = error as NodeJS.ErrnoException & { killed?: boolean; stderr?: string };
+    if (failure.killed || failure.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER")
+      throw new HttpError(413, "Архив слишком большой или превышено время просмотра");
+    throw new HttpError(
+      422,
+      `Не удалось прочитать архив: ${(failure.stderr || failure.message).trim().split(/\r?\n/).at(-1)}`,
+    );
   }
   const data = JSON.parse(stdout) as ArchiveContent & { error?: string; status?: number };
   if (data.error) throw new HttpError(data.status ?? 422, data.error);

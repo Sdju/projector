@@ -184,7 +184,8 @@ test("Text file saves preserve text and mode, reject stale drafts and contain wr
     await writeFile(join(base, "readme.md"), "# Original\r\n", { mode: 0o640 });
     await saveProjectFile(base, "readme.md", "# Новый текст\r\n", "# Original\r\n");
     expect(await readFile(join(base, "readme.md"), "utf8")).toBe("# Новый текст\r\n");
-    expect((await lstat(join(base, "readme.md"))).mode & 0o777).toBe(0o640);
+    if (process.platform !== "win32")
+      expect((await lstat(join(base, "readme.md"))).mode & 0o777).toBe(0o640);
     await expect(
       saveProjectFile(base, "readme.md", "stale", "# Original\r\n"),
     ).rejects.toMatchObject({

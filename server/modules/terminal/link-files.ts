@@ -17,7 +17,7 @@ export async function resolveTerminalPath(path: string, projectRoot: string, cwd
       if (!(await stat(full)).isFile()) continue;
       const local = relative(root, full);
       const external = local === ".." || local.startsWith(`..${sep}`) || isAbsolute(local);
-      return { path: external ? full : local, external };
+      return { path: external ? full : local.split(sep).join("/"), external };
     } catch (error) {
       if (!["ENOENT", "ENOTDIR", "EACCES"].includes((error as NodeJS.ErrnoException).code ?? ""))
         throw error;

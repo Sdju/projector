@@ -76,7 +76,7 @@ test("credentials are stored in the keyring and never in the file", () =>
     const text = await readFile(file, "utf8");
     expect(!text.includes("ghp_secret")).toBeTruthy();
     expect(JSON.parse(text).integrations.github.vault).toBe("keyring");
-    expect((await stat(file)).mode & 0o777).toBe(0o600);
+    if (process.platform !== "win32") expect((await stat(file)).mode & 0o777).toBe(0o600);
     expect((await integrationConfig("github")).credentials.token).toBe("ghp_secret");
 
     await updateIntegration("github", (config) => ({ ...config, credentials: {} }));

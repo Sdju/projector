@@ -147,7 +147,7 @@ test("GitHub integration persists authorization and imports authenticated reposi
   expect(JSON.parse(await readFile(file, "utf8")).integrations.github.credentials.token).toBe(
     secret,
   );
-  expect((await stat(file)).mode & 0o777).toBe(0o600);
+  if (process.platform !== "win32") expect((await stat(file)).mode & 0o777).toBe(0o600);
   expect((await request("")).headers.get("cache-control")).toBe("no-store");
   const reloaded = await import("../server/modules/integration-store/index.ts?reload-check");
   expect((await reloaded.integrationConfig("github")).credentials.login).toBe("octocat");

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { createServer, request } from "node:http";
 import { connect } from "node:net";
 import { once } from "node:events";
-import { networkInterfaces } from "node:os";
+import { networkInterfaces, tmpdir } from "node:os";
 import {
   accessAllowed,
   authorizeHttp,
@@ -19,7 +19,7 @@ import { updateProjects } from "../server/modules/projects/index.ts";
 import { WebSocket } from "ws";
 
 async function isolatedLan() {
-  const dir = await mkdtemp("/tmp/projector-access-security-");
+  const dir = await mkdtemp(join(tmpdir(), "projector-access-security-"));
   const previous = { data: process.env.XDG_DATA_HOME, network: process.env.PROJECTOR_NETWORK };
   process.env.XDG_DATA_HOME = dir;
   process.env.PROJECTOR_NETWORK = "lan";

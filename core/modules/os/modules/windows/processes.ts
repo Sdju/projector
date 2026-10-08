@@ -9,6 +9,8 @@ function parseLine(line: string): ProcessInfo | null {
   const [pid, parent, name, started] = line.split("\t");
   const id = Number(pid);
   if (!Number.isSafeInteger(id) || id <= 0 || !name || !started) return null;
+  // The console host is plumbing around every PTY, not a program the user started.
+  if (/^(?:conhost|openconsole)$/.test(normalizeName(name))) return null;
   return {
     pid: id,
     parent: Number(parent) || 0,

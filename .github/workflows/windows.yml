@@ -32,5 +32,8 @@ jobs:
       - name: Build vio
         working-directory: packages/vio
         run: vp exec tsdown
+      - name: Diagnose adapter
+        continue-on-error: true
+        run: node scripts/windows-diagnose.mjs
       - name: Tests
         run: vp test run

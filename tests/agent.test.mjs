@@ -118,7 +118,10 @@ test("agent can navigate global settings but cannot access another project's set
 test("Bash uses cwd, returns failure status, bounds output and aborts subprocesses", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "projector-agent-shell-"));
   try {
-    const result = await os.tools.runBash("pwd; printf failure >&2; exit 7", { cwd });
+    const result = await os.tools.runBash(
+      `${process.platform === "win32" ? "pwd -W" : "pwd"}; printf failure >&2; exit 7`,
+      { cwd },
+    );
     const printed =
       process.platform === "win32"
         ? result.stdout
