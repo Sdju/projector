@@ -380,7 +380,7 @@ test("Cursor launches agent CLI in project cwd with an interactive PTY", async (
   await mkdir(bin, { recursive: true });
   await writeFile(
     join(bin, "agent"),
-    '#!/bin/sh\ntest -t 0 && test -t 1 || exit 1\nprintf "CURSOR_READY:%s\\n" "$(pwd -W 2>/dev/null || pwd)"\n',
+    '#!/bin/sh\ntest -t 0 && test -t 1 || exit 1\nprintf "CURSOR_READY:%s\\n" "$(pwd -W 2>/dev/null || pwd)"\nsleep 1\n',
     { mode: 0o700 },
   );
   const previousPath = process.env.PATH;
