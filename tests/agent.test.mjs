@@ -512,7 +512,7 @@ test("stopping an agent kills its whole process tree", async () => {
   await connection.close();
   await new Promise((resolve) => setTimeout(resolve, 300));
   // The shell's grandchild must be gone, not only the agent process itself.
-  expect(os.processes.identity(pid)).toBe(null);
+  expect(await os.processes.identity(pid)).toBe(null);
 });
 
 test("ACP permission prefers one-time options and previews the change", async () => {

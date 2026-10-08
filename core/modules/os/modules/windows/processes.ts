@@ -1,5 +1,5 @@
 import type { ProcessInfo } from "../../contract.ts";
-import { runPowerShell, runPowerShellSync } from "./ps.ts";
+import { runPowerShell } from "./ps.ts";
 
 function normalizeName(name: string) {
   return name.replace(/\.exe$/i, "").toLowerCase();
@@ -43,7 +43,7 @@ ${ROW}
 `;
 
 let snapshot: { at: number; rows: ProcessInfo[] } | null = null;
-let refreshing: Promise<void> | null = null;
+let refreshing: Promise<ProcessInfo[] | null> | null = null;
 /** Freshness for exact answers (kill lists, identity of unknown pids). */
 const TTL = 400;
 /** How old a listing may be before polling callers trigger a background refresh. */
@@ -55,12 +55,14 @@ const parseRows = (stdout: string) =>
     .map((line) => parseLine(line.trim()))
     .filter((entry): entry is ProcessInfo => entry !== null);
 
-function refresh(): Promise<void> {
+function refresh(): Promise<ProcessInfo[] | null> {
   refreshing ??= runPowerShell(LIST_SCRIPT)
     .then(({ stdout }) => {
-      snapshot = { at: Date.now(), rows: parseRows(stdout) };
+      const rows = parseRows(stdout);
+      snapshot = { at: Date.now(), rows };
+      return rows;
     })
-    .catch(() => undefined)
+    .catch(() => null)
     .finally(() => {
       refreshing = null;
     });
@@ -68,56 +70,54 @@ function refresh(): Promise<void> {
 }
 
 /**
- * Polling view: never blocks once a listing exists. An older listing is returned at once while a
- * background refresh runs; only the very first call has to wait for PowerShell.
+ * Polling view that never blocks and never spawns anything itself on the caller's time: the last
+ * known listing is returned at once and a stale one starts a background refresh. Before the first
+ * listing exists it is null.
  */
-export function listProcesses(): ProcessInfo[] | null {
-  if (snapshot && Date.now() - snapshot.at < TTL) return snapshot.rows;
-  if (snapshot && Date.now() - snapshot.at < STALE * 10) {
-    if (Date.now() - snapshot.at >= STALE) void refresh();
-    return snapshot.rows;
-  }
-  return listProcessesNow();
+export function snapshotProcesses(): ProcessInfo[] | null {
+  if (!snapshot || Date.now() - snapshot.at >= STALE) void refresh();
+  return snapshot?.rows ?? null;
 }
 
-/** Exact view, for deciding what to signal: always at most TTL old, and waits for it. */
-export function listProcessesNow(): ProcessInfo[] | null {
+/** Exact view, for deciding what to signal: at most TTL old. */
+export async function listProcesses(): Promise<ProcessInfo[] | null> {
   if (snapshot && Date.now() - snapshot.at < TTL) return snapshot.rows;
-  try {
-    const rows = parseRows(runPowerShellSync(LIST_SCRIPT));
-    snapshot = { at: Date.now(), rows };
-    return rows;
-  } catch {
-    return null;
-  }
+  return refresh();
 }
 
-export function processInfo(pid: number): ProcessInfo | null {
-  if (!Number.isSafeInteger(pid) || pid <= 0) return null;
-  // A cached listing may still hold a process that has just exited.
+const alive = (pid: number) => {
   try {
     process.kill(pid, 0);
+    return true;
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "EPERM") return null;
+    return (error as NodeJS.ErrnoException).code === "EPERM";
   }
+};
+
+export async function processInfo(pid: number): Promise<ProcessInfo | null> {
+  if (!Number.isSafeInteger(pid) || pid <= 0) return null;
+  // A cached listing may still hold a process that has just exited.
+  if (!alive(pid)) return null;
   if (snapshot && Date.now() - snapshot.at < TTL)
     return snapshot.rows.find((entry) => entry.pid === pid) ?? null;
   try {
-    const row = parseLine(
-      runPowerShellSync(ONE_SCRIPT, { env: { PROJECTOR_PID: String(pid) }, timeout: 8000 }).trim(),
-    );
+    const { stdout } = await runPowerShell(ONE_SCRIPT, {
+      env: { PROJECTOR_PID: String(pid) },
+      timeout: 8000,
+    });
+    const row = parseLine(stdout.trim());
     return row?.pid === pid ? row : null;
   } catch {
     return null;
   }
 }
 
-export function processIdentity(pid: number): string | null {
-  return processInfo(pid)?.started ?? null;
+export async function processIdentity(pid: number): Promise<string | null> {
+  return (await processInfo(pid))?.started ?? null;
 }
 
-export function descendants(pid: number): ProcessInfo[] {
-  const processes = listProcessesNow() ?? [];
+export async function descendants(pid: number): Promise<ProcessInfo[]> {
+  const processes = (await listProcesses()) ?? [];
   const family = new Set([pid]);
   let changed = true;
   while (changed) {
@@ -129,6 +129,11 @@ export function descendants(pid: number): ProcessInfo[] {
       }
   }
   return processes.filter((entry) => family.has(entry.pid));
+}
+
+/** Only POSIX can answer synchronously; Windows callers use `descendants`. */
+export function descendantsSync(): never {
+  throw new Error("Синхронный список потомков недоступен на Windows");
 }
 
 export function signalProcess(pid: number, signal: NodeJS.Signals): void {
@@ -195,7 +200,7 @@ function normalizeDirectory(path: string) {
 }
 
 export async function workingDirectory(pid: number, fallback: string): Promise<string> {
-  if (!processInfo(pid)) return fallback;
+  if (!(await processInfo(pid))) return fallback;
   try {
     const { stdout } = await runPowerShell(CWD_SCRIPT, {
       env: { PROJECTOR_PID: String(pid) },

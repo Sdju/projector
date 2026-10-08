@@ -22,25 +22,25 @@ test.skipIf(!windows)(
       stdio: "ignore",
     });
     onTestFinished(() => child.kill());
-    const listed = os.processes.list();
+    const listed = await os.processes.list();
     expect(listed?.some((entry) => entry.pid === child.pid)).toBe(true);
-    const identity = os.processes.identity(child.pid);
+    const identity = await os.processes.identity(child.pid);
     expect(identity).toMatch(/^\d+$/);
-    expect(os.processes.identity(child.pid)).toBe(identity);
-    expect(os.processes.descendants(process.pid).some((entry) => entry.pid === child.pid)).toBe(
-      true,
-    );
+    expect(await os.processes.identity(child.pid)).toBe(identity);
+    expect(
+      (await os.processes.descendants(process.pid)).some((entry) => entry.pid === child.pid),
+    ).toBe(true);
     expect((await os.processes.workingDirectory(child.pid, "fallback")).toLowerCase()).toBe(
       directory.toLowerCase(),
     );
     child.kill();
     await os.processes.waitForExit(child.pid, 5000);
-    expect(os.processes.identity(child.pid)).toBe(null);
+    expect(await os.processes.identity(child.pid)).toBe(null);
   },
 );
 
-test.skipIf(!windows)("console host helpers never appear as user processes", () => {
-  const names = (os.processes.list() ?? []).map((entry) => entry.name);
+test.skipIf(!windows)("console host helpers never appear as user processes", async () => {
+  const names = ((await os.processes.list()) ?? []).map((entry) => entry.name);
   expect(names).not.toContain("conhost");
   expect(names).not.toContain("openconsole");
 });
@@ -131,21 +131,21 @@ test.skipIf(!windows)("agent process trees are terminated as a whole", async () 
     env: process.env,
   });
   await new Promise((resolve) => setTimeout(resolve, 1500));
-  const before = os.processes.descendants(child.pid).length;
+  const before = (await os.processes.descendants(child.pid)).length;
   expect(before).toBeGreaterThanOrEqual(2);
   await child.terminate();
   await new Promise((resolve) => setTimeout(resolve, 500));
   expect(
-    os.processes.descendants(child.pid).filter((entry) => entry.pid !== child.pid).length,
+    (await os.processes.descendants(child.pid)).filter((entry) => entry.pid !== child.pid).length,
   ).toBe(0);
 });
 
-test.skipIf(!windows)("polling the process list does not block once a listing exists", async () => {
-  os.processes.list();
+test.skipIf(!windows)("polling the process snapshot never waits", async () => {
+  await os.processes.list();
   const started = Date.now();
-  for (let i = 0; i < 20; i++) os.processes.list();
-  expect(Date.now() - started).toBeLessThan(300);
-  const [first] = os.processes.list() ?? [];
+  for (let i = 0; i < 200; i++) os.processes.snapshot();
+  expect(Date.now() - started).toBeLessThan(100);
+  const [first] = os.processes.snapshot() ?? [];
   expect(first.group).toBe(null);
   expect(first.foreground).toBe(null);
 });
@@ -160,5 +160,42 @@ test.skipIf(!windows)(
     expect(launch.shell).toBe(true);
     expect(launch.command).toBe('"C:\\Program Files\\nodejs\\node.exe"');
     expect(launch.args).toStrictEqual(["plain", '"with space"', '"q\\"uote"', '"a&b"', '""']);
+  },
+);
+
+test.skipIf(!windows)(
+  "a Job Object ends an agent's whole tree when its owner goes away",
+  async () => {
+    const { bindTreeToJob, closeJob, warmJob } =
+      await import("../core/modules/os/modules/windows/job.ts");
+    expect(await warmJob()).toBe(true);
+    const script =
+      "const {spawn}=require('child_process');setTimeout(()=>{const c=spawn(process.execPath,['-e','setTimeout(()=>{},60000)'],{stdio:'ignore'});console.log('GRANDCHILD '+c.pid)},1500);setTimeout(()=>{},60000)";
+    const child = os.tools.spawnAgentProcess({
+      command: process.execPath,
+      args: ["-e", script],
+      env: process.env,
+    });
+    let output = "";
+    child.stdout.on("data", (chunk) => (output += chunk));
+    expect(await bindTreeToJob(child.pid)).toBe(true);
+    for (let i = 0; i < 100 && !output.includes("GRANDCHILD"); i++)
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    const grandchild = Number(/GRANDCHILD (\d+)/.exec(output)?.[1]);
+    expect(grandchild).toBeGreaterThan(0);
+    const alive = (pid) => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    expect(alive(child.pid) && alive(grandchild)).toBe(true);
+    closeJob(); // what a crashing server does implicitly: the helper's handle to the job closes
+    for (let i = 0; i < 50 && (alive(child.pid) || alive(grandchild)); i++)
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(alive(child.pid)).toBe(false);
+    expect(alive(grandchild)).toBe(false);
   },
 );

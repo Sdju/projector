@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { basename } from "node:path";
+import { bindTreeToJob, warmJob } from "./job.ts";
 import { killTree } from "./kill-tree.ts";
 import type { AgentHostSpec, AgentLaunch, AgentProcess, AgentProcessSpec } from "../../contract.ts";
 
@@ -28,6 +29,8 @@ export function spawnAgentProcess(spec: AgentProcessSpec): AgentProcess {
     windowsHide: true,
     shell: launch.shell,
   }) as AgentProcess;
+  // Bound to the server's lifetime: a crashed server no longer leaves the agent tree behind.
+  if (child.pid) void bindTreeToJob(child.pid);
   child.terminate = () => terminateTree(child);
   return child;
 }
@@ -44,6 +47,7 @@ async function terminateTree(child: AgentProcess): Promise<void> {
 export async function agentEnv(
   base: Record<string, string | undefined>,
 ): Promise<Record<string, string | undefined>> {
+  void warmJob();
   return base;
 }
 

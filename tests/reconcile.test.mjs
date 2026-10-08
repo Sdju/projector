@@ -56,7 +56,7 @@ test("a real daemon: orphans go, ours and foreign containers stay", { skip: !liv
     foreign: `${tag}-foreign`,
   };
   // Another Projector that is still running (the test runner's parent) must not be touched.
-  const liveOwner = `${process.ppid}-${os.processes.identity(process.ppid)}`;
+  const liveOwner = `${process.ppid}-${await os.processes.identity(process.ppid)}`;
   try {
     start(names.orphan, "io.projector.environment=x", "io.projector.server=99999999-1");
     start(names.mine, "io.projector.environment=x", `io.projector.server=${serverId}`);

@@ -3,7 +3,9 @@ export {
   signalProcess,
   processIdentity,
   listProcesses,
+  snapshotProcesses,
   descendants,
+  descendantsSync,
   workingDirectory,
 } from "./processes.ts";
 export {

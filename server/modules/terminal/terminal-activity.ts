@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { os } from "../../../core/modules/os/index.ts";
 import type { TerminalActivity, TerminalSession } from "../../../core/modules/terminal/index.ts";
 
-export const readTerminalProcesses = () => os.processes.list();
+export const readTerminalProcesses = () => os.processes.snapshot();
 export function terminalActivity(
   info: TerminalSession,
   processes: ReturnType<typeof readTerminalProcesses>,

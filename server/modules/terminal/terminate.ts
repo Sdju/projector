@@ -1,7 +1,8 @@
 import type { IPty } from "node-pty";
 import { os } from "../../../core/modules/os/index.ts";
 
-const descendants = (pid: number) => os.processes.descendants(pid);
+// Only the POSIX branch below uses these: it must list the family before the shell exits.
+const descendants = (pid: number) => os.processes.descendantsSync(pid);
 
 /** Ends a PTY and everything its shell started: SIGTERM first, SIGKILL after a grace period. */
 export function terminateProcessTree(pty: IPty, immediate: boolean): void {
@@ -30,10 +31,10 @@ export function terminateProcessTree(pty: IPty, immediate: boolean): void {
     /* Already exited. */
   }
   if (immediate) return;
-  const timer = setTimeout(() => {
+  const timer = setTimeout(async () => {
     for (const entry of family) {
       try {
-        if (os.processes.identity(entry.pid) === entry.started) {
+        if ((await os.processes.identity(entry.pid)) === entry.started) {
           for (const child of descendants(entry.pid).reverse()) {
             try {
               os.processes.signal(child.pid, "SIGKILL");

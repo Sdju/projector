@@ -39,7 +39,7 @@ test("OS selection is automatic; unsupported systems never fall through to Linux
     const adapter = createOs(platform);
     expect(adapter.supported).toBe(false);
     expect(adapter.capabilities.nativeDesktop).toBe(false);
-    expect(adapter.processes.list()).toBe(null);
+    expect(await adapter.processes.list()).toBe(null);
     for (const operation of [
       () => adapter.shell(),
       () => adapter.catalog(),
@@ -95,10 +95,11 @@ test(
     });
     onTestFinished(() => child.kill());
     await once(child, "spawn");
-    const identity = os.processes.identity(child.pid);
+    const identity = await os.processes.identity(child.pid);
     expect(identity).toBeTruthy();
     expect(
-      os.processes.descendants(process.pid).find((entry) => entry.pid === child.pid)?.started,
+      (await os.processes.descendants(process.pid)).find((entry) => entry.pid === child.pid)
+        ?.started,
     ).toBe(identity);
     expect((await os.processes.workingDirectory(child.pid, "fallback")).toLowerCase()).toBe(
       directory.toLowerCase(),
@@ -108,7 +109,7 @@ test(
     child.kill();
     await exited;
     await os.processes.waitForExit(child.pid, 1000);
-    expect(os.processes.identity(child.pid)).toBe(null);
+    expect(await os.processes.identity(child.pid)).toBe(null);
     expect(await os.processes.workingDirectory(child.pid, "fallback")).toBe("fallback");
   },
 );
@@ -206,18 +207,18 @@ test(
     });
     onTestFinished(() => child.kill());
     await once(child, "spawn");
-    const identity = os.processes.identity(child.pid);
+    const identity = await os.processes.identity(child.pid);
     expect(identity).toBeTruthy();
-    expect(os.processes.descendants(process.pid).find((p) => p.pid === child.pid)?.started).toBe(
-      identity,
-    );
+    expect(
+      (await os.processes.descendants(process.pid)).find((p) => p.pid === child.pid)?.started,
+    ).toBe(identity);
     expect(await os.processes.workingDirectory(child.pid, "/fallback")).toBe(directory);
     await expect(os.processes.waitForExit(child.pid, 60)).rejects.toThrow(/не завершился/);
     const exited = once(child, "exit");
     child.kill();
     await exited;
     await os.processes.waitForExit(child.pid, 100);
-    expect(os.processes.identity(child.pid)).toBe(null);
+    expect(await os.processes.identity(child.pid)).toBe(null);
     expect(await os.processes.workingDirectory(child.pid, "/fallback")).toBe("/fallback");
   },
 );

@@ -38,6 +38,8 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
       /** Linux catalog reads GIO inside the helper. Windows loads GTK only for the palette. */
       giLoader: platform === "linux",
       processInspection: supported,
+      /** Process queries that can be answered without waiting (/proc). */
+      syncProcessInspection: platform === "linux",
       fileOperations: supported,
     }),
     homeDirectory: homedir,
@@ -57,15 +59,19 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
         throw new UnsupportedPlatformError(platform, operation);
     },
     processes: {
-      list: () => (supported ? backend("processes.list").listProcesses() : null),
+      /** Last known listing without waiting; null before one exists (Windows) or when unsupported. */
+      snapshot: () => (supported ? backend("processes.snapshot").snapshotProcesses() : null),
+      list: async () => (supported ? await backend("processes.list").listProcesses() : null),
       signal: (pid: number, signal: NodeJS.Signals) =>
         backend("processes.signal").signalProcess(pid, signal),
-      descendants: (pid: number) => backend("processes.descendants").descendants(pid),
-      identity: (pid: number) => backend("processes.identity").processIdentity(pid),
+      descendants: async (pid: number) => await backend("processes.descendants").descendants(pid),
+      /** Only where `capabilities.syncProcessInspection`: needed while the process is exiting. */
+      descendantsSync: (pid: number) => backend("processes.descendantsSync").descendantsSync(pid),
+      identity: async (pid: number) => await backend("processes.identity").processIdentity(pid),
       workingDirectory: (pid: number, fallback: string) =>
         backend("processes.workingDirectory").workingDirectory(pid, fallback),
       async waitForExit(pid: number, timeoutMs = 15000) {
-        if (adapter.processes.identity(pid) === null) return;
+        if ((await adapter.processes.identity(pid)) === null) return;
         // Signal 0 only probes existence. Reading the identity on every tick would start a
         // process listing per tick on Windows; a pid cannot be recycled within the timeout.
         const alive = () => {

@@ -98,7 +98,7 @@ test("an agent run survives its server and is rejoined with the whole answer rep
     const { pid, identity } = JSON.parse(
       await readFile(join(directory, "projector/agent/runs", runId, "process.json"), "utf8"),
     );
-    expect(os.processes.identity(pid)).toBe(identity);
+    expect(await os.processes.identity(pid)).toBe(identity);
 
     // The next server repeats the request; the host replays what happened and the agent goes on.
     const rejoined = await attachHosted(runId);
@@ -129,7 +129,7 @@ test("an agent run survives its server and is rejoined with the whole answer rep
       .map((message) => message.method ?? `answer:${message.id}`);
     expect(methods).toStrictEqual(["initialize", "session/new", "session/prompt", "answer:100"]);
     await second.close();
-    await until(() => os.processes.identity(pid) === null);
+    await until(async () => (await os.processes.identity(pid)) === null);
 
     // After the host is gone the trace on disk still replays, and answered questions stay answered.
     const finished = await attachHosted(runId);
@@ -186,7 +186,7 @@ test("stopping a hosted run kills the agent and everything it started", async ()
     });
     const connection = createAcpConnection(child, { onNotification() {}, onRequest: () => ({}) });
     await connection.close();
-    await until(() => os.processes.identity(pid) === null);
+    await until(async () => (await os.processes.identity(pid)) === null);
   } finally {
     if (previous === undefined) delete process.env.XDG_DATA_HOME;
     else process.env.XDG_DATA_HOME = previous;
@@ -218,11 +218,11 @@ test("a run started by an earlier server is stopped from its identity, never by 
     await writeFile(processFile, JSON.stringify({ pid, identity: "someone else" }));
     await stopRun(runId);
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(os.processes.identity(pid)).toBe(identity);
+    expect(await os.processes.identity(pid)).toBe(identity);
     // The matching identity stops the host and the cancel removes the run.
     await writeFile(processFile, JSON.stringify({ pid, identity }));
     await cancelRun(runId);
-    await until(() => os.processes.identity(pid) === null);
+    await until(async () => (await os.processes.identity(pid)) === null);
     expect(await readRun(runId)).toBe(null);
   } finally {
     if (previous === undefined) delete process.env.XDG_DATA_HOME;
