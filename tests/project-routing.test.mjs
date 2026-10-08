@@ -65,7 +65,11 @@ test("opening a path reuses saved settings and resolves arbitrary directories on
   });
   try {
     const savedPath = join(root, "saved");
-    const newPath = join(root, "вложенный # ? %", "project");
+    const newPath = join(
+      root,
+      process.platform === "win32" ? "вложенный # %" : "вложенный # ? %",
+      "project",
+    );
     await mkdir(savedPath);
     await mkdir(newPath, { recursive: true });
     await mkdir(join(root, "projector"));

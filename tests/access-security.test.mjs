@@ -102,7 +102,8 @@ test("corrupt credentials fail closed, and replacing a password restores file pe
   setLanPassword("test-only-password");
   await chmod(lanPasswordPath(), 0o644);
   setLanPassword("replacement");
-  expect((await stat(lanPasswordPath())).mode & 0o777).toBe(0o600);
+  if (process.platform !== "win32")
+    expect((await stat(lanPasswordPath())).mode & 0o777).toBe(0o600);
 });
 
 test("fetch isolates LAN credentials and prompts only on an explicit LAN challenge", async () => {

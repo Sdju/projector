@@ -1,6 +1,6 @@
 import { afterAll, expect, test } from "vite-plus/test";
 import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, request as httpRequest } from "node:http";
 import { once } from "node:events";
@@ -46,10 +46,13 @@ test("mouse encoding survives snapshots, fragmented modes, disable, RIS and reta
 const root = await mkdtemp(join(tmpdir(), "projector-terminal-"));
 process.env.XDG_DATA_HOME = root;
 // Keep PTY probes independent of the runner's interactive shell startup files.
-process.env.SHELL = join(root, "test-shell");
-await writeFile(process.env.SHELL, '#!/bin/sh\nexec /bin/bash --noprofile --norc "$@"\n', {
-  mode: 0o700,
-});
+// Windows has no /bin/sh shim: the adapter finds Git Bash itself.
+if (process.platform !== "win32") {
+  process.env.SHELL = join(root, "test-shell");
+  await writeFile(process.env.SHELL, '#!/bin/sh\nexec /bin/bash --noprofile --norc "$@"\n', {
+    mode: 0o700,
+  });
+}
 await mkdir(join(root, "projector"));
 const project = {
   id: "terminal-probe",
@@ -320,7 +323,7 @@ test("OpenCode uses project cwd and an interactive PTY, reconnects and restarts"
     { mode: 0o700 },
   );
   const previousPath = process.env.PATH;
-  process.env.PATH = `${bin}:${previousPath}`;
+  process.env.PATH = `${bin}${delimiter}${previousPath}`;
   try {
     const created = await request("", "POST", { program: "opencode" });
     expect(created.status, await created.clone().text()).toBe(201);
@@ -363,7 +366,7 @@ test("Cursor launches agent CLI in project cwd with an interactive PTY", async (
     { mode: 0o700 },
   );
   const previousPath = process.env.PATH;
-  process.env.PATH = `${bin}:${previousPath}`;
+  process.env.PATH = `${bin}${delimiter}${previousPath}`;
   try {
     const created = await request("", "POST", { program: "cursor" });
     expect(created.status, await created.clone().text()).toBe(201);

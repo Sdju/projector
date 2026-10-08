@@ -272,7 +272,7 @@ test("GitHub integration persists authorization and imports authenticated reposi
       await mkdir(join(source, "checkout"));
       await writeFile(join(source, "checkout", "README"), "Docker clone fixture");
       const credentials = args[args.indexOf("--env-file") + 1];
-      expect((await stat(credentials)).mode & 0o777).toBe(0o600);
+      if (process.platform !== "win32") expect((await stat(credentials)).mode & 0o777).toBe(0o600);
     }
     if (args[0] === "context")
       return {

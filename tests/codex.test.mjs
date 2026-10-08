@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { weeklyWindow, codexUsage } from "../server/modules/agents-integration/codex/usage.ts";
 import { readCodexRateLimits } from "../server/modules/agents-integration/codex/cli.ts";
 import { NETWORK_CONTEXT_URL } from "../server/modules/network/index.ts";
@@ -66,7 +66,11 @@ process.stdin.on('data', chunk => {
 });
 `;
     await writeFile(join(directory, "codex"), fixture, { mode: 0o755 });
-    process.env.PATH = `${directory}:${originalPath}`;
+    if (process.platform === "win32") {
+      await writeFile(join(directory, "codex.js"), fixture.replace(/^#!.*\n/, ""));
+      await writeFile(join(directory, "codex.cmd"), `@echo off\r\nnode "%~dp0codex.js" %*\r\n`);
+    }
+    process.env.PATH = `${directory}${delimiter}${originalPath}`;
     process.env.PROJECTOR_CODEX_TRACE = trace;
     globalThis.fetch = async (url, options) => {
       expect(url).toBe(NETWORK_CONTEXT_URL);

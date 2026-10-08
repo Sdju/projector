@@ -121,7 +121,8 @@ test("projects without a config have nothing to decide", async () => {
 
 const { containerToHost } = await import("../server/modules/terminal/link-files.ts");
 test("terminal links map container paths into the project and refuse escapes", () => {
-  const map = (path) => containerToHost(path, "/workspaces/app", "/home/me/app");
+  const map = (path) =>
+    containerToHost(path, "/workspaces/app", "/home/me/app").replaceAll("\\", "/");
   expect(map("/workspaces/app/src/a.ts")).toBe("/home/me/app/src/a.ts");
   expect(map("src/a.ts")).toBe("/home/me/app/src/a.ts");
   expect(map("/workspaces/app")).toBe("/home/me/app");
