@@ -226,8 +226,9 @@ function windowHandle(handle: unknown): number | bigint | null {
 export async function activateSurface(surface: object): Promise<void> {
   try {
     const { default: GdkWin32 } = await import("gi:GdkWin32-4.0");
-    if (!(surface instanceof GdkWin32.Win32Surface)) return;
-    const handle = windowHandle(surface.getHandle());
+    const Win32Surface = (GdkWin32 as { Win32Surface?: abstract new () => object }).Win32Surface;
+    if (!Win32Surface || !(surface instanceof Win32Surface)) return;
+    const handle = windowHandle((surface as { getHandle(): unknown }).getHandle());
     if (handle !== null) activateWindow(handle);
   } catch {
     /* The surface is not a Win32 window yet. */

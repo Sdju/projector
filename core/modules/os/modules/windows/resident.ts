@@ -1,4 +1,5 @@
 import type { DesktopAction, ResidentOptions } from "../../contract.ts";
+import { randomBytes } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import net from "node:net";
 import { dirname, join } from "node:path";
@@ -33,11 +34,26 @@ export async function desktopPid(name: string): Promise<number | undefined> {
   }
 }
 
+export function launcherTokenPath(dataDirectory = join(dataHome(), appDirectory)): string {
+  return join(dataDirectory, "launcher.token");
+}
+
+/** Named pipes carry no per-user ACL here, so commands must quote the secret kept in the profile. */
+async function readToken(dataDirectory: string): Promise<string> {
+  try {
+    return (await readFile(launcherTokenPath(dataDirectory), "utf8")).trim();
+  } catch {
+    return "";
+  }
+}
+
 function isAction(value: string): value is DesktopAction {
   return actions.includes(value as DesktopAction);
 }
 
-function forward(action: DesktopAction): Promise<boolean> {
+async function forward(action: DesktopAction, dataDirectory: string): Promise<boolean> {
+  const token = await readToken(dataDirectory);
+  if (!token) return false;
   return new Promise((resolve) => {
     const socket = net.connect(pipeName());
     let buffer = "";
@@ -55,7 +71,7 @@ function forward(action: DesktopAction): Promise<boolean> {
       if (buffer.includes("READY")) finish(true);
     });
     socket.on("connect", () => {
-      socket.write(`${action}\n`);
+      socket.write(`${token} ${action}\n`);
     });
   });
 }
@@ -65,7 +81,10 @@ function taken(error: unknown): boolean {
   return code === "EADDRINUSE" || code === "EACCES";
 }
 
-function bind(dispatch: (action: DesktopAction) => Promise<void>): Promise<net.Server> {
+function bind(
+  token: string,
+  dispatch: (action: DesktopAction) => Promise<void>,
+): Promise<net.Server> {
   const server = net.createServer((socket) => {
     let buffer = "";
     let handled = false;
@@ -75,8 +94,8 @@ function bind(dispatch: (action: DesktopAction) => Promise<void>): Promise<net.S
       const newline = buffer.indexOf("\n");
       if (newline < 0) return;
       handled = true;
-      const requested = buffer.slice(0, newline).trim();
-      if (!isAction(requested)) {
+      const [given, requested = ""] = buffer.slice(0, newline).trim().split(" ");
+      if (given !== token || !isAction(requested)) {
         socket.destroy();
         return;
       }
@@ -108,7 +127,7 @@ export async function runResident(
   options: ResidentOptions,
 ) {
   if (!isAction(action)) throw new Error("Неизвестная команда");
-  if (await forward(action)) {
+  if (await forward(action, options.dataDirectory)) {
     console.log("READY");
     return;
   }
@@ -117,11 +136,12 @@ export async function runResident(
     return;
   }
 
+  const token = randomBytes(24).toString("hex");
   const queued: Array<() => Promise<void>> = [];
   let live: ((action: DesktopAction) => Promise<void>) | undefined;
   let server: net.Server;
   try {
-    server = await bind(async (requested) => {
+    server = await bind(token, async (requested) => {
       if (live) {
         await live(requested);
         return;
@@ -131,7 +151,7 @@ export async function runResident(
       });
     });
   } catch (error) {
-    if (!taken(error) || !(await forward(action))) throw error;
+    if (!taken(error) || !(await forward(action, options.dataDirectory))) throw error;
     console.log("READY");
     return;
   }
@@ -139,6 +159,7 @@ export async function runResident(
   const pidPath = launcherPidPath(options.dataDirectory);
   await mkdir(dirname(pidPath), { recursive: true });
   await writeFile(pidPath, `${process.pid}\n`);
+  await writeFile(launcherTokenPath(options.dataDirectory), `${token}\n`, { mode: 0o600 });
   try {
     await own(baseUrl, action, options, server, pidPath, (next) => {
       live = next;
@@ -147,6 +168,7 @@ export async function runResident(
   } catch (error) {
     server.close();
     await rm(pidPath, { force: true });
+    await rm(launcherTokenPath(options.dataDirectory), { force: true });
     throw error;
   }
 }
@@ -164,15 +186,20 @@ async function own(
   Gtk.init();
   const loop = GLib.MainLoop.new(null, false);
   // Node owns the thread. Blocking in MainLoop.run does not deliver named-pipe
-  // events on Windows, so GTK is pumped from the libuv timer instead.
+  // events on Windows, so GTK is pumped from a libuv timer: fast while events
+  // flow, slow while idle so a hidden palette costs almost nothing.
   const context = loop.getContext();
-  const pulse = setInterval(() => {
+  let lastActive = Date.now();
+  let pulse: ReturnType<typeof setTimeout> | undefined;
+  const pump = () => {
     try {
-      context.iteration(false);
+      for (let step = 0; step < 64 && context.iteration(false); step++) lastActive = Date.now();
     } catch (error) {
       console.error(error instanceof Error ? error.message : error);
     }
-  }, 10);
+    pulse = setTimeout(pump, Date.now() - lastActive < 2000 ? 10 : 50);
+  };
+  pump();
   try {
     const palette = await options.createPalette(baseUrl);
     let stopping = false;
@@ -211,11 +238,12 @@ async function own(
     async function stop() {
       if (stopping) return;
       stopping = true;
-      clearInterval(pulse);
+      clearTimeout(pulse);
       await shell.stop();
       palette.dispose();
       server.close();
       await rm(pidPath, { force: true });
+      await rm(launcherTokenPath(options.dataDirectory), { force: true });
       release();
     }
     const dispatch = async (requested: DesktopAction) => {
@@ -246,6 +274,6 @@ async function own(
     console.log("READY");
     await untilStop;
   } finally {
-    clearInterval(pulse);
+    clearTimeout(pulse);
   }
 }

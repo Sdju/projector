@@ -16,19 +16,28 @@ export interface HttpsCredentials {
   failure: string;
 }
 
-/** Shell helper on Linux; `.cmd` on Windows, where Git cannot execute a shebang script. */
-function askpassHelper(credentials: HttpsCredentials): { filename: string; contents: string } {
-  if (process.platform === "win32")
+/**
+ * Shell helper on Linux; `.cmd` on Windows, where Git cannot execute a shebang script.
+ * Both values are spliced into script text, so anything but plain identifiers is refused.
+ */
+export function askpassHelper(
+  credentials: HttpsCredentials,
+  platform: NodeJS.Platform = process.platform,
+): { filename: string; contents: string } {
+  if (!/^[\w.-]+$/.test(credentials.username) || !/^[A-Za-z_]\w*$/.test(credentials.tokenEnv))
+    throw new Error("Недопустимые параметры askpass");
+  if (platform === "win32")
     return {
       filename: "askpass.cmd",
       contents: [
         "@echo off",
-        "setlocal EnableExtensions",
-        `echo %~1 | findstr /I /C:"Username" >nul`,
-        "if errorlevel 1 (",
-        `  echo.%${credentials.tokenEnv}%`,
+        "setlocal EnableExtensions EnableDelayedExpansion",
+        // Quoted assignment and delayed expansion keep `&`, `^` and `%` in the prompt or token inert.
+        `set "ask=%~1"`,
+        `if not "!ask:Username=!"=="!ask!" (`,
+        `  echo(${credentials.username}`,
         ") else (",
-        `  echo.${credentials.username}`,
+        `  echo(!${credentials.tokenEnv}!`,
         ")",
         "",
       ].join("\r\n"),

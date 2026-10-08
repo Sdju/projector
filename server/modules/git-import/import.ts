@@ -22,6 +22,40 @@ export interface ImportOptions {
   hooks?: ImportHooks;
 }
 
+/** Moves the finished checkout into place without ever overwriting an existing folder. */
+async function publish(checkout: string, destination: string) {
+  const exists = () =>
+    lstat(destination).then(
+      () => true,
+      () => false,
+    );
+  if (process.platform === "win32") {
+    // Windows refuses to rename onto an existing directory, so the rename itself is the
+    // atomic claim, also against another Projector process. No window with an empty stub.
+    try {
+      await rename(checkout, destination);
+    } catch (error) {
+      if (await exists()) throw new HttpError(409, "Папка уже существует");
+      throw error;
+    }
+    return;
+  }
+  // POSIX rename replaces an empty directory, so claim the destination first.
+  try {
+    await mkdir(destination);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST")
+      throw new HttpError(409, "Папка уже существует");
+    throw error;
+  }
+  try {
+    await rename(checkout, destination);
+  } catch (error) {
+    await rmdir(destination).catch(() => {});
+    throw error;
+  }
+}
+
 /**
  * Host-independent import: claims the destination, clones into staging, describes the project
  * and registers it. Nothing is installed or run; existing folders are never overwritten.
@@ -75,22 +109,7 @@ export async function importRepository({
         defaultCommandId: command.id,
       };
     }
-    // Claim the destination atomically, including against another Projector process.
-    try {
-      await mkdir(destination);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "EEXIST")
-        throw new HttpError(409, "Папка уже существует");
-      throw error;
-    }
-    try {
-      // POSIX rename replaces an empty directory. Windows MoveFileEx returns EPERM instead.
-      if (process.platform === "win32") await rmdir(destination);
-      await rename(checkout, destination);
-    } catch (error) {
-      await rmdir(destination).catch(() => {});
-      throw error;
-    }
+    await publish(checkout, destination);
     const project: Project = {
       ...draft,
       path: await realpath(destination),
