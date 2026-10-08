@@ -219,3 +219,13 @@ export function ptyCommand(file: string, args: string[]): { file: string; args: 
     }
   return { file, args };
 }
+
+/** Windows has no execute bit: a file runs when its extension is one of PATHEXT (plus scripts). */
+export function isExecutableFile(name: string, _mode: number): boolean {
+  const extensions = (process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD")
+    .split(";")
+    .filter(Boolean)
+    .map((extension) => extension.toLowerCase());
+  const lower = name.toLowerCase();
+  return [...extensions, ".ps1"].some((extension) => lower.endsWith(extension));
+}

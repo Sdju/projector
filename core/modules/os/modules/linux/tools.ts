@@ -157,3 +157,8 @@ export function searchFiles(
 export function ptyCommand(file: string, args: string[]): { file: string; args: string[] } {
   return { file, args };
 }
+
+/** POSIX: any execute bit. */
+export function isExecutableFile(_name: string, mode: number): boolean {
+  return !!(mode & 0o111);
+}

@@ -158,7 +158,7 @@ finally{trackerApp?.unmount();dockerApp?.unmount();usageApp?.unmount();}})();
 
 test(
   "Shared tracker, Docker and agent quota components preserve provider behavior",
-  { skip: !chromium, timeout: 60000, retry: 2 },
+  { skip: !chromium, timeout: 60000 },
   async () => {
     const directory = await mkdtemp(join(tmpdir(), "projector-component-reuse-"));
     const loaded = await loadConfigFromFile({ command: "serve", mode: "development" });

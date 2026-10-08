@@ -64,7 +64,7 @@ jobs:
       - name: Repeat PTY, process and integration tests
         shell: bash
         run: |
-          for i in 1 2 3 4 5 6; do
+          for i in 1 2 3 4 5 6 7 8 9 10; do
             echo "::group::round $i"
             vp test run tests/terminal.test.mjs tests/integrations.test.mjs tests/agent.test.mjs tests/windows-adapter.test.mjs tests/docker.test.mjs tests/reconcile.test.mjs || exit 1
             echo "::endgroup::"

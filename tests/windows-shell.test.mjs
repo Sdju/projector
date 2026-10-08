@@ -43,3 +43,44 @@ test(
     expect(await os.shortcutStatus()).toEqual({ supported: true, active: false, shortcut: "" });
   },
 );
+
+test(
+  "pressing the registered hotkey reaches the palette handler",
+  { skip: process.platform !== "win32" },
+  async () => {
+    const { runPowerShell } = await import("../core/modules/os/modules/windows/ps.ts");
+    const root = await mkdtemp(join(tmpdir(), "projector-win-hotkey-"));
+    const data = join(root, "projector");
+    await mkdir(data);
+    let pressed = 0;
+    const shell = await startDesktopShell(data, {
+      onActivate() {},
+      onHotkey() {
+        pressed++;
+      },
+      onSettings() {},
+      onRestart() {},
+      onQuit() {},
+    });
+    onTestFinished(async () => {
+      await shell.stop();
+      await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    });
+    expect(await shell.configure("Ctrl+Alt+Space")).toBe("registered");
+    const press = () =>
+      runPowerShell(`
+Add-Type -TypeDefinition @"
+using System; using System.Runtime.InteropServices;
+public static class K { [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra); }
+"@
+foreach ($k in 0x11, 0x12, 0x20) { [K]::keybd_event($k, 0, 0, [UIntPtr]::Zero) }
+Start-Sleep -Milliseconds 100
+foreach ($k in 0x20, 0x12, 0x11) { [K]::keybd_event($k, 0, 2, [UIntPtr]::Zero) }
+`);
+    for (let attempt = 0; attempt < 5 && pressed === 0; attempt++) {
+      await press();
+      for (let i = 0; i < 20 && pressed === 0; i++) await new Promise((r) => setTimeout(r, 100));
+    }
+    expect(pressed, "the hotkey press reached onHotkey").toBeGreaterThan(0);
+  },
+);

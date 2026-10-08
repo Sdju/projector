@@ -103,7 +103,6 @@ test(
   "xterm in Chromium: IME, Unicode, controls, mouse protocols and selection",
   {
     skip: !chromium,
-    retry: 2,
   },
   async () => {
     const profile = await mkdtemp(join(tmpdir(), "projector-input-browser-"));

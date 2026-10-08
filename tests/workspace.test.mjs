@@ -247,52 +247,67 @@ test("Text file saves preserve text and mode, reject stale drafts and contain wr
     await rm(base, { recursive: true, force: true });
   }
 });
-test.skipIf(!posix)(
-  "file tree and Git changes report execute bits for files, including chmod-only changes",
-  async () => {
-    const base = await mkdtemp(join(tmpdir(), "projector-executable-"));
-    const runGit = (...args) => execFileSync("git", ["-C", base, ...args]);
-    try {
-      await mkdir(join(base, "folder"), { mode: 0o755 });
-      for (const [name, mode] of [
-        ["plain.ts", 0o644],
-        ["run", 0o755],
-        ["group-only", 0o610],
-        ["other-only", 0o601],
-      ]) {
+test("file tree and Git changes report execute bits for files, including chmod-only changes", async () => {
+  const base = await mkdtemp(join(tmpdir(), "projector-executable-"));
+  const runGit = (...args) => execFileSync("git", ["-C", base, ...args]);
+  try {
+    if (!posix) {
+      // No execute bits here: a file counts as executable by its PATHEXT extension.
+      for (const name of ["plain.ts", "run.cmd", "tool.EXE", "script.ps1"])
         await writeFile(join(base, name), "test\n");
-        await chmod(join(base, name), mode);
-      }
-      const entries = (await listProjectDirectory(base)).entries;
-      expect(entries.find((entry) => entry.name === "folder").executable).toBe(false);
-      expect(entries.find((entry) => entry.name === "plain.ts").executable).toBe(false);
-      for (const name of ["run", "group-only", "other-only"])
-        expect(entries.find((entry) => entry.name === name).executable, name).toBe(true);
+      const found = (await listProjectDirectory(base)).entries;
+      const flag = (name) => found.find((entry) => entry.name === name).executable;
+      expect([
+        flag("plain.ts"),
+        flag("run.cmd"),
+        flag("tool.EXE"),
+        flag("script.ps1"),
+      ]).toStrictEqual([false, true, true, true]);
       runGit("init", "-q");
-      const untracked = (await projectGit(base)).changes;
-      expect(untracked.find((entry) => entry.path === "run").executable).toBe(true);
-      runGit("config", "user.name", "Test");
-      runGit("config", "user.email", "test@example.test");
-      runGit("config", "core.filemode", "true");
-      runGit("add", "plain.ts");
-      runGit("commit", "-qm", "initial");
-      await chmod(join(base, "plain.ts"), 0o755);
-      expect(
-        (await projectGit(base)).changes.find((entry) => entry.path === "plain.ts").executable,
-      ).toBe(true);
-      await chmod(join(base, "run"), 0o644);
-      expect(
-        (await listProjectDirectory(base)).entries.find((entry) => entry.name === "run").executable,
-      ).toBe(false);
-      await rm(join(base, "plain.ts"));
-      expect(
-        (await projectGit(base)).changes.find((entry) => entry.path === "plain.ts").executable,
-      ).toBe(false);
-    } finally {
-      await rm(base, { recursive: true, force: true });
+      const changes = (await projectGit(base)).changes;
+      const executable = (path) => changes.find((entry) => entry.path === path).executable;
+      expect([executable("plain.ts"), executable("run.cmd")]).toStrictEqual([false, true]);
+      return;
     }
-  },
-);
+    await mkdir(join(base, "folder"), { mode: 0o755 });
+    for (const [name, mode] of [
+      ["plain.ts", 0o644],
+      ["run", 0o755],
+      ["group-only", 0o610],
+      ["other-only", 0o601],
+    ]) {
+      await writeFile(join(base, name), "test\n");
+      await chmod(join(base, name), mode);
+    }
+    const entries = (await listProjectDirectory(base)).entries;
+    expect(entries.find((entry) => entry.name === "folder").executable).toBe(false);
+    expect(entries.find((entry) => entry.name === "plain.ts").executable).toBe(false);
+    for (const name of ["run", "group-only", "other-only"])
+      expect(entries.find((entry) => entry.name === name).executable, name).toBe(true);
+    runGit("init", "-q");
+    const untracked = (await projectGit(base)).changes;
+    expect(untracked.find((entry) => entry.path === "run").executable).toBe(true);
+    runGit("config", "user.name", "Test");
+    runGit("config", "user.email", "test@example.test");
+    runGit("config", "core.filemode", "true");
+    runGit("add", "plain.ts");
+    runGit("commit", "-qm", "initial");
+    await chmod(join(base, "plain.ts"), 0o755);
+    expect(
+      (await projectGit(base)).changes.find((entry) => entry.path === "plain.ts").executable,
+    ).toBe(true);
+    await chmod(join(base, "run"), 0o644);
+    expect(
+      (await listProjectDirectory(base)).entries.find((entry) => entry.name === "run").executable,
+    ).toBe(false);
+    await rm(join(base, "plain.ts"));
+    expect(
+      (await projectGit(base)).changes.find((entry) => entry.path === "plain.ts").executable,
+    ).toBe(false);
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
 test("tree move destinations and open-file paths respect directory boundaries", () => {
   expect(parentPath("src/nested/file.ts")).toBe("src/nested");
   expect(parentPath("file.ts")).toBe("");

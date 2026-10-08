@@ -1,8 +1,4 @@
-import { afterAll, expect, test, vi } from "vite-plus/test";
-
-// Git Bash under ConPTY occasionally loses the first output of a fresh session on a loaded
-// runner; a second attempt tells that apart from a regression.
-if (process.platform === "win32") vi.setConfig({ retry: 2 });
+import { afterAll, expect, test } from "vite-plus/test";
 import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { delimiter, join } from "node:path";
 import { tmpdir } from "node:os";

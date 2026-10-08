@@ -189,7 +189,7 @@ export async function listProjectDirectory(
         executable:
           entry.isFile() &&
           (await lstat(resolve(full, entry.name)).then(
-            (info) => info.isFile() && !!(info.mode & 0o111),
+            (info) => info.isFile() && os.tools.isExecutableFile(entry.name, info.mode),
             () => false,
           )),
       })),
