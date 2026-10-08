@@ -53,6 +53,8 @@ const {
   send,
   clear,
   stop,
+  attach,
+  release,
   decide,
 } = useAgent(props.projectId, plain.value ? undefined : agentCommandHandler(api, props.projectId), {
   backend: props.backend,
@@ -125,6 +127,7 @@ if (plain.value) {
     },
   });
 }
+attach();
 // Что штатный агент видит в чате: статус, последний ответ и чипы инструментов.
 useTabReadout(() => {
   const last = turns.value.at(-1);
@@ -246,7 +249,7 @@ function observeContent() {
 }
 let observed: Element | undefined;
 onBeforeUnmount(() => {
-  stop();
+  release();
   observer?.disconnect();
   cancelAnimationFrame(frame);
   clearTimeout(copyTimer);

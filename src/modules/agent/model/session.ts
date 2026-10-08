@@ -1,62 +1,25 @@
 import { computed, reactive } from "vue";
 import { useProjects, type Project } from "../../project/index.ts";
+import { answerPermission, streamAgent } from "../api/client.ts";
 import {
-  answerPermission,
-  fetchControls,
-  fetchDefaults,
-  fetchSessions,
-  loadSessionTurns,
-  saveDefault,
-  streamAgent,
-} from "../api/client.ts";
+  RELEASE_DELAY_MS,
+  createState,
+  loads,
+  releases,
+  saves,
+  sessions,
+  summarize,
+  viewers,
+} from "./chat-state.ts";
+import { useExternalAgent } from "./external.ts";
 import type {
   AgentBackendId,
-  AgentControl,
-  AgentSelection,
-  AgentSessionInfo,
   AgentHistoryTurn,
   AgentTurn,
   AgentCommandRequest,
-  AgentPermission,
   AgentPermissionMode,
 } from "./types.ts";
 
-const createState = () =>
-  reactive({
-    turns: [] as AgentTurn[],
-    draft: "",
-    busy: false,
-    error: "",
-    phase: "",
-    permissions: [] as AgentPermission[],
-    permissionMode: "default" as AgentPermissionMode,
-    controls: [] as AgentControl[],
-    selection: {} as AgentSelection,
-    controlsError: "",
-    sessions: [] as AgentSessionInfo[],
-    sessionsLoading: false,
-    sessionsError: "",
-    abort: undefined as AbortController | undefined,
-  });
-
-function summarize(value: unknown): string {
-  if (value == null) return "";
-  if (typeof value === "string") return value.slice(0, 8000);
-  try {
-    return JSON.stringify(value, null, 2).slice(0, 8000);
-  } catch {
-    return "";
-  }
-}
-
-/** The saved choice per agent is read once; new chats start from it. */
-let defaultsLoad: Promise<Record<string, AgentSelection>> | undefined;
-const savedDefaults = () =>
-  (defaultsLoad ??= fetchDefaults().catch((): Record<string, AgentSelection> => ({})));
-
-const sessions = new Map<string, ReturnType<typeof createState>>();
-const loads = new Map<string, Promise<void>>();
-const saves = new Map<string, Promise<void>>();
 export function useAgent(
   projectId = "",
   commands?: (request: AgentCommandRequest) => Promise<unknown>,
@@ -66,6 +29,8 @@ export function useAgent(
   const backend = options.backend ?? "projector";
   const key =
     backend === "projector" ? projectId : `${backend}:${projectId}:${options.chatId ?? "main"}`;
+  clearTimeout(releases.get(key));
+  releases.delete(key);
   if (!sessions.has(key)) sessions.set(key, createState());
   const state = sessions.get(key)!;
 
@@ -78,6 +43,12 @@ export function useAgent(
           if (!response.ok) throw new Error("Не удалось загрузить историю чата");
           const data = await response.json();
           state.turns = data.turns;
+          // A turn saved at its start but never finished: the page or server went away mid-answer.
+          const last = state.turns.at(-1);
+          if (last?.role === "assistant" && !last.text.trim() && !last.tools.length) {
+            last.text =
+              "Ответ прерван: страница или сервер были перезапущены. Отправьте сообщение ещё раз — разговор продолжится.";
+          }
           for (const turn of state.turns)
             for (const chip of turn.tools) {
               if (chip.status === "running") {
@@ -132,77 +103,15 @@ export function useAgent(
     },
   });
 
-  const external = backend !== "projector";
-  const controls = computed(() => state.controls);
-  const selection = computed(() => state.selection);
-  const sessionList = computed(() => state.sessions);
-
-  /** Marks the chosen option as the control's current one, so the UI shows what will be used. */
-  function withChoice(list: AgentControl[]): AgentControl[] {
-    return list.map((control) => {
-      const chosen = state.selection[control.id];
-      return chosen && control.options.some((option) => option.value === chosen)
-        ? { ...control, current: chosen }
-        : control;
-    });
-  }
-
-  /** Reads what the agent offers and starts from the saved choice for this agent. */
-  async function loadControls(): Promise<void> {
-    if (!external || !projectId) return;
-    state.selection = { ...((await savedDefaults())[backend] ?? {}), ...state.selection };
-    try {
-      state.controls = withChoice(await fetchControls(backend, projectId));
-      state.controlsError = "";
-    } catch (err) {
-      state.controlsError = err instanceof Error ? err.message : "Не удалось получить настройки";
-    }
-  }
-
-  /** Chooses a model, effort or mode; it applies from the next message and is remembered. */
-  async function setControl(id: string, value: string): Promise<void> {
-    const control = state.controls.find((item) => item.id === id);
-    if (!control) throw new Error(`Нет настройки «${id}»`);
-    if (!control.options.some((option) => option.value === value))
-      throw new Error(`У настройки «${control.name}» нет значения «${value}»`);
-    state.selection = { ...state.selection, [id]: value };
-    state.controls = withChoice(state.controls);
-    try {
-      await saveDefault(backend, id, value);
-    } catch (err) {
-      state.error = err instanceof Error ? err.message : "Не удалось сохранить выбор";
-    }
-  }
-
-  /** Past sessions of this agent in the project, newest first. */
-  async function loadSessions(): Promise<AgentSessionInfo[]> {
-    if (!external || !projectId) return [];
-    state.sessionsLoading = true;
-    try {
-      state.sessions = await fetchSessions(backend, projectId);
-      state.sessionsError = "";
-    } catch (err) {
-      state.sessionsError = err instanceof Error ? err.message : "Не удалось получить сессии";
-    } finally {
-      state.sessionsLoading = false;
-    }
-    return state.sessions;
-  }
-
-  /** Replaces this chat with a past session of the agent and continues it from the next message. */
-  async function resumeSession(id: string): Promise<void> {
-    await ready;
-    if (state.busy) throw new Error("Дождитесь окончания ответа");
-    state.error = "";
-    try {
-      state.turns = await loadSessionTurns(backend, projectId, id);
-      persist();
-    } catch (err) {
-      state.error = err instanceof Error ? err.message : "Не удалось открыть сессию";
-      throw err;
-    }
-  }
-
+  const {
+    controls,
+    selection,
+    sessions: sessionList,
+    loadControls,
+    setControl,
+    loadSessions,
+    resumeSession,
+  } = useExternalAgent(state, { backend, projectId, ready, persist });
   /** The native session of the last answer, so Claude Code continues the same conversation. */
   function sessionId(): string | undefined {
     return state.turns.findLast((item) => item.role === "assistant")?.session?.id;
@@ -247,6 +156,9 @@ export function useAgent(
       tools: [],
     });
     state.turns.push(userTurn, assistant);
+    // Saved now, not only at the end: a reload or restart mid-answer must not lose the question
+    // or the native session the next message resumes.
+    persist();
 
     try {
       await streamAgent(
@@ -258,7 +170,10 @@ export function useAgent(
               ? `${event.data.provider ?? "qwen"} · ${event.data.model}`
               : "думает";
           }
-          if (event.event === "session") assistant.session = event.data;
+          if (event.event === "session") {
+            assistant.session = event.data;
+            persist();
+          }
           if (event.event === "controls") {
             // What the agent really applied wins over a choice it refused.
             state.controls = event.data.controls;
@@ -333,6 +248,23 @@ export function useAgent(
   }
 
   const stop = () => state.abort?.abort();
+  /** A chat view starts showing this chat; pair it with `release`. */
+  function attach() {
+    viewers.set(key, (viewers.get(key) ?? 0) + 1);
+  }
+  /** The chat view went away: stop its request unless the same chat is shown again shortly. */
+  function release() {
+    viewers.set(key, Math.max(0, (viewers.get(key) ?? 1) - 1));
+    if (viewers.get(key)) return;
+    clearTimeout(releases.get(key));
+    releases.set(
+      key,
+      setTimeout(() => {
+        releases.delete(key);
+        if (!viewers.get(key)) state.abort?.abort();
+      }, RELEASE_DELAY_MS),
+    );
+  }
   return {
     turns,
     draft,
@@ -354,6 +286,8 @@ export function useAgent(
     send,
     clear,
     stop,
+    attach,
+    release,
     decide,
   };
 }
