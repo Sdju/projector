@@ -90,7 +90,7 @@ const rows = computed(() => props.tools.map((tool) => ({ ...tool, ...output(tool
       <IconLoader v-if="running" class="spin" aria-hidden="true" />
       <IconAlert v-else-if="failed" class="error-icon" aria-hidden="true" />
       <IconCheck v-else class="done-icon" aria-hidden="true" />
-      <span>{{ running ? "Выполняет действия" : "Действия агента" }}</span>
+      <span>{{ running ? "Выполняет действия" : "Действия" }}</span>
       <span class="count">{{ tools.length }}</span>
       <IconChevron class="group-chevron" aria-hidden="true" />
     </summary>
@@ -130,7 +130,6 @@ const rows = computed(() => props.tools.map((tool) => ({ ...tool, ...output(tool
             class="state-icon error-icon"
             aria-label="Ошибка"
           />
-          <IconCheck v-else class="state-icon done-icon" aria-label="Завершено" />
           <IconChevron class="row-chevron" aria-hidden="true" />
         </summary>
         <pre>{{ row.text || "Ожидание результата…" }}</pre>
@@ -141,7 +140,7 @@ const rows = computed(() => props.tools.map((tool) => ({ ...tool, ...output(tool
 
 <style scoped>
 .activity {
-  margin: 0 0 16px;
+  margin: 0 0 var(--sp-3);
   max-width: 100%;
   color: var(--muted);
   font-size: var(--fs-2xs);
@@ -176,13 +175,7 @@ svg {
   flex-shrink: 0;
 }
 .count {
-  font: var(--fs-2xs) var(--mono);
-  color: var(--muted);
-  background: var(--bg-3);
-  border-radius: var(--r-sm);
-  min-width: 18px;
-  text-align: center;
-  padding: 2px 4px;
+  color: var(--faint);
 }
 .group-chevron {
   width: 12px;
@@ -193,37 +186,30 @@ svg {
   transform: rotate(90deg);
 }
 .activity-list {
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  margin-top: 8px;
-  overflow: hidden;
-  background: var(--bg-sunken);
-}
-.tool + .tool {
-  border-top: 1px solid var(--line);
+  margin-top: var(--sp-1);
+  padding-left: var(--sp-3);
+  border-left: 1px solid var(--line);
 }
 .tool > summary {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 11px 12px;
+  gap: var(--sp-2);
+  padding: var(--sp-1) 0;
   min-width: 0;
 }
 .tool > summary:hover {
-  background: var(--bg-2);
+  color: var(--text);
 }
 .tool-name {
-  color: var(--text-2);
   flex-shrink: 0;
 }
 .tool-hint {
   min-width: 0;
   flex: 1;
-  text-align: right;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--fs-2xs);
+  color: var(--faint);
 }
 .tool-icon {
   color: var(--muted);
@@ -247,10 +233,10 @@ svg {
 pre {
   font: var(--fs-2xs)/1.7 var(--mono);
   color: var(--text-2);
-  margin: 0;
-  padding: 12px 14px;
-  background: var(--bg-sunken);
-  border-top: 1px solid var(--line);
+  margin: var(--sp-1) 0 var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-height: 240px;

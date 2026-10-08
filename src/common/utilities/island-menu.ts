@@ -5,6 +5,8 @@ import { useCompactViewport } from "./compact-viewport.ts";
 /** Общий lifecycle острова; содержимое и политика обхода остаются у владельца. */
 export function useIslandMenu(options: {
   anchor: "left" | "right";
+  /** `above` растёт вверх от нижнего края триггера, для триггеров у нижней кромки окна. */
+  placement?: "below" | "above";
   initialFocus: string | readonly string[];
   returnFocus?: string;
   items?: string;
@@ -44,10 +46,12 @@ export function useIslandMenu(options: {
     if (!bounds) return;
     const current = ++generation;
     const top = Math.max(8, bounds.top - 4);
+    const bottom = Math.max(8, window.innerHeight - bounds.bottom - 4);
     origin.value = {
       [options.anchor]: `${options.anchor === "left" ? bounds.left - 4 : window.innerWidth - bounds.right - 4}px`,
-      top: `${top}px`,
-      "--island-top": `${top}px`,
+      ...(options.placement === "above"
+        ? { bottom: `${bottom}px`, maxHeight: `calc(100dvh - ${bottom}px - 8px)` }
+        : { top: `${top}px`, "--island-top": `${top}px` }),
     };
     active.value = 0;
     open.value = true;

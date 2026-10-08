@@ -2,7 +2,6 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useIdeCommands } from "../../ide/index.ts";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
-import { useProjects } from "../../project/index.ts";
 import { agentCommandHandler } from "../model/commands.ts";
 import { agentLabel } from "../model/modes.ts";
 import { useAgent } from "../model/session.ts";
@@ -12,14 +11,10 @@ import AgentWelcome from "./AgentWelcome.vue";
 import AgentTurn from "./AgentTurn.vue";
 import AgentComposer from "./AgentComposer.vue";
 import AgentPermissions from "./AgentPermissions.vue";
-import AgentPermissionMode from "./AgentPermissionMode.vue";
 import AgentControls from "./AgentControls.vue";
 import AgentSessions from "./AgentSessions.vue";
-import type { AgentBackendId } from "../model/types.ts";
-import IconClaude from "~icons/simple-icons/claude";
-import IconBot from "~icons/lucide/bot";
+import type { AgentBackendId, AgentControl, AgentPermissionMode } from "../model/types.ts";
 import IconSquarePen from "~icons/lucide/square-pen";
-import IconFolder from "~icons/lucide/folder";
 
 const props = withDefaults(
   defineProps<{ projectId: string; backend?: AgentBackendId; chatId?: string }>(),
@@ -30,10 +25,6 @@ const plain = computed(() => props.backend !== "projector");
 const claude = computed(() => props.backend === "claude-code");
 const agentName = computed(() => agentLabel(props.backend));
 const { api } = useIdeCommands();
-const { projects } = useProjects();
-const projectName = computed(
-  () => projects.value.find((p) => p.id === props.projectId)?.name ?? "Текущий проект",
-);
 const {
   turns,
   draft,
@@ -61,6 +52,40 @@ const {
   chatId: props.chatId,
 });
 onMounted(() => void loadControls());
+const PERMISSION_CONTROL = "permission-mode";
+const permissionOptions: { value: AgentPermissionMode; name: string; description: string }[] = [
+  { value: "default", name: "Спрашивать", description: "Запрос перед правками и командами" },
+  {
+    value: "acceptEdits",
+    name: "Правки без вопросов",
+    description: "Файлы меняются сразу, команды — по запросу",
+  },
+  {
+    value: "bypassPermissions",
+    name: "Всё без вопросов",
+    description: "Без запросов разрешений",
+  },
+];
+/** Параметры из бэкенда плюс режим разрешений Claude Code: всё в одном острове. */
+const allControls = computed<AgentControl[]>(() => [
+  ...controls.value,
+  ...(claude.value
+    ? [
+        {
+          id: PERMISSION_CONTROL,
+          category: "mode" as const,
+          name: "Разрешения",
+          description: "Когда агент спрашивает подтверждение",
+          current: permissionMode.value,
+          options: permissionOptions,
+        },
+      ]
+    : []),
+]);
+function changeControl(id: string, value: string) {
+  if (id === PERMISSION_CONTROL) permissionMode.value = value as AgentPermissionMode;
+  else void setControl(id, value);
+}
 const activeSession = computed(
   () => turns.value.findLast((turn) => turn.role === "assistant")?.session?.id,
 );
@@ -74,6 +99,14 @@ const commands = useCommandScope(
 );
 if (plain.value) {
   const idle = () => !busy.value;
+  commands.scope.registerCommand({
+    id: "ide.agent.controls.menu.toggle",
+    title: `Открыть или закрыть параметры агента ${agentName.value}`,
+    description:
+      "Показывает остров над полем ввода: модель, усилие, режим и разрешения с пояснениями.",
+    enabled: idle,
+    run: () => controlsMenu.value?.toggle(),
+  });
   commands.scope.registerCommand({
     id: "ide.agent.controls.list",
     title: `Параметры агента ${agentName.value}: модель, усилие, режим`,
@@ -153,6 +186,7 @@ useTabReadout(() => {
   };
 });
 const log = ref<HTMLElement>();
+const controlsMenu = ref<InstanceType<typeof AgentControls>>();
 const composer = ref<InstanceType<typeof AgentComposer>>();
 const away = ref(false);
 const copied = ref("");
@@ -258,43 +292,29 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="agent-chat" aria-label="Чат с агентом">
-    <header class="chat-header">
-      <div class="identity">
-        <span class="header-mark"
-          ><IconClaude v-if="claude" aria-hidden="true" /><IconBot
-            v-else
-            aria-hidden="true" /></span
-        ><span class="agent-name">{{ agentName }}</span>
-      </div>
-      <span class="project-context" :title="projectName"
-        ><IconFolder aria-hidden="true" />{{ projectName }}</span
+    <div class="chat-tools">
+      <AgentSessions
+        v-if="plain"
+        :sessions="sessions"
+        :loading="sessionsLoading"
+        :error="sessionsError"
+        :disabled="busy"
+        :active="activeSession"
+        @open="loadSessions"
+        @pick="(id) => void resumeSession(id).catch(() => {})"
+      />
+      <UiButton
+        v-if="turns.length"
+        icon
+        size="sm"
+        title="Новый чат"
+        aria-label="Новый чат"
+        :disabled="busy"
+        @click="newChat"
       >
-      <div class="header-actions">
-        <AgentSessions
-          v-if="plain"
-          :sessions="sessions"
-          :loading="sessionsLoading"
-          :error="sessionsError"
-          :disabled="busy"
-          :active="activeSession"
-          @open="loadSessions"
-          @pick="(id) => void resumeSession(id).catch(() => {})"
-        />
-        <span class="agent-status" :class="{ busy }" role="status" :title="phase"
-          ><i aria-hidden="true" />{{ busy ? "Работает" : "Готов" }}</span
-        >
-        <UiButton
-          icon
-          size="sm"
-          title="Новый чат"
-          aria-label="Новый чат"
-          :disabled="busy || !turns.length"
-          @click="newChat"
-        >
-          <IconSquarePen aria-hidden="true" />
-        </UiButton>
-      </div>
-    </header>
+        <IconSquarePen aria-hidden="true" />
+      </UiButton>
+    </div>
     <div ref="log" class="chat-log" @scroll.passive="trackScroll">
       <AgentWelcome
         v-if="!turns.length"
@@ -317,7 +337,6 @@ onBeforeUnmount(() => {
           :busy="busy"
           :last="index === turns.length - 1"
           :copied="copied === turn.id"
-          :sender="agentName"
           @copy="copyMessage"
         />
       </div>
@@ -330,102 +349,40 @@ onBeforeUnmount(() => {
       :away="away"
       :error="error || copyError"
       :copied="!!copied"
-      :project-name="projectName"
       @submit="submit"
       @stop="stop"
       @latest="toBottom"
     >
       <template v-if="plain" #controls>
         <AgentControls
-          :controls="controls"
+          ref="controlsMenu"
+          :controls="allControls"
           :disabled="busy"
-          @change="(id, value) => void setControl(id, value)"
+          @change="changeControl"
         />
-      </template>
-      <template v-if="claude" #footer>
-        <AgentPermissionMode v-model="permissionMode" :disabled="busy" />
       </template>
     </AgentComposer>
   </section>
 </template>
 <style scoped>
 .agent-chat {
-  --chat-width: 720px;
+  --chat-width: 680px;
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
   min-width: 0;
-  background: var(--bg-sunken);
+  background: var(--bg);
   container-type: inline-size;
   position: relative;
 }
-.chat-header {
+.chat-tools {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-3);
+  z-index: var(--z-sticky);
   display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 12px 20px;
-  border-bottom: 1px solid var(--line);
-  min-height: 53px;
-}
-.identity {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-.header-mark {
-  color: var(--text-2);
-  display: flex;
-}
-.header-mark svg {
-  width: 17px;
-  height: 17px;
-}
-.agent-name {
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-.project-context {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  color: var(--muted);
-  font-size: var(--fs-2xs);
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.project-context svg {
-  width: 12px;
-  height: 12px;
-  flex-shrink: 0;
-}
-.header-actions {
-  margin-left: auto;
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-shrink: 0;
-}
-.agent-status {
-  font-size: var(--fs-2xs);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted);
-}
-.agent-status i {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--run);
-}
-.agent-status.busy i {
-  background: var(--warn);
-  animation: pulse 1.4s ease-in-out infinite;
+  gap: var(--sp-1);
 }
 .chat-log {
   flex: 1;
@@ -434,13 +391,13 @@ onBeforeUnmount(() => {
   overflow-anchor: none;
   scrollbar-width: thin;
   scrollbar-color: var(--line-strong) transparent;
-  padding: 32px 28px 28px;
+  padding: var(--sp-6) var(--sp-5) var(--sp-4);
 }
 .permission-dock {
   width: 100%;
   max-width: calc(var(--chat-width) + 56px);
   margin: 0 auto;
-  padding: 0 28px;
+  padding: 0 var(--sp-5);
   flex-shrink: 0;
 }
 .conversation {
@@ -448,30 +405,9 @@ onBeforeUnmount(() => {
   max-width: var(--chat-width);
   margin: auto;
 }
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 0.35;
-  }
-  50% {
-    opacity: 1;
-  }
-}
 @container (max-width: 500px) {
-  .chat-header {
-    gap: 10px;
-    padding: 10px 14px;
-  }
-  .project-context {
-    display: none;
-  }
   .chat-log {
-    padding: 24px 16px;
-  }
-}
-@container (max-width: 300px) {
-  .agent-status {
-    display: none;
+    padding: var(--sp-5) var(--sp-4);
   }
 }
 @media (prefers-reduced-motion: reduce) {

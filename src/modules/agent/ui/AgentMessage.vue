@@ -13,7 +13,7 @@ const html = computed(() => renderChatMarkdown(props.text));
 .agent-message {
   color: var(--text);
   font-size: var(--fs-sm);
-  line-height: 1.8;
+  line-height: 1.7;
   overflow-wrap: anywhere;
 }
 .agent-message :deep(> :first-child) {
@@ -32,7 +32,7 @@ const html = computed(() => renderChatMarkdown(props.text));
   font-size: var(--fs-md);
   font-weight: 600;
   line-height: 1.5;
-  margin: 24px 0 10px;
+  margin: var(--sp-5) 0 var(--sp-2);
   letter-spacing: -0.02em;
 }
 .agent-message :deep(h1) {
@@ -79,10 +79,9 @@ const html = computed(() => renderChatMarkdown(props.text));
 }
 .agent-message :deep(pre) {
   margin: 14px 0;
-  padding: 15px 17px;
-  border-radius: var(--r-lg);
-  border: 1px solid var(--line);
-  background: var(--bg-sunken);
+  padding: var(--sp-3);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
   overflow-x: auto;
   max-width: 100%;
 }

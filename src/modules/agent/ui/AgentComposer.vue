@@ -3,7 +3,6 @@ import { nextTick, onMounted, ref, watch } from "vue";
 import IconArrowUp from "~icons/lucide/arrow-up";
 import IconArrowDown from "~icons/lucide/arrow-down";
 import IconSquare from "~icons/lucide/square";
-import IconFolder from "~icons/lucide/folder";
 import IconAlert from "~icons/lucide/circle-alert";
 
 const draft = defineModel<string>({ required: true });
@@ -12,7 +11,6 @@ defineProps<{
   away: boolean;
   error: string;
   copied: boolean;
-  projectName: string;
 }>();
 const emit = defineEmits<{ submit: []; stop: []; latest: [] }>();
 const input = ref<HTMLTextAreaElement>();
@@ -51,15 +49,8 @@ defineExpose({ resize, focus: () => input.value?.focus() });
         rows="1"
         @keydown="keydown"
       />
-      <slot name="controls" />
       <div class="composer-footer">
-        <span class="composer-context"
-          ><IconFolder aria-hidden="true" /><span>{{ projectName }}</span></span
-        >
-        <slot name="footer" />
-        <span class="input-hint"
-          ><kbd>Enter</kbd> отправить<span> · <kbd>Shift ↵</kbd> новая строка</span></span
-        >
+        <slot name="controls" />
         <button
           v-if="busy"
           type="button"
@@ -74,7 +65,7 @@ defineExpose({ resize, focus: () => input.value?.focus() });
           v-else
           type="submit"
           class="send-button"
-          title="Отправить сообщение"
+          title="Отправить (Enter)"
           aria-label="Отправить сообщение"
           :disabled="!draft.trim()"
         >
@@ -92,15 +83,14 @@ defineExpose({ resize, focus: () => input.value?.focus() });
   max-width: calc(var(--chat-width) + 56px);
   margin: 0 auto;
   flex-shrink: 0;
-  padding: 8px 28px 20px;
+  padding: var(--sp-2) var(--sp-5) var(--sp-4);
   position: relative;
 }
 .composer {
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--line);
   border-radius: var(--r-lg);
   background: var(--bg-2);
-  padding: 3px 4px 5px;
-  box-shadow: var(--shadow-popover);
+  padding: 2px var(--sp-1) var(--sp-1);
   transition:
     border-color var(--t-fast),
     box-shadow var(--t-fast);
@@ -111,9 +101,9 @@ defineExpose({ resize, focus: () => input.value?.focus() });
 .composer textarea {
   display: block;
   width: 100%;
-  min-height: 53px;
+  min-height: 44px;
   max-height: 180px;
-  padding: 14px 13px 8px;
+  padding: var(--sp-3) var(--sp-3) var(--sp-1);
   background: none;
   border: 0;
   border-radius: 0;
@@ -129,61 +119,30 @@ defineExpose({ resize, focus: () => input.value?.focus() });
 .composer-footer {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 7px 1px 12px;
-  min-height: 34px;
-}
-.composer-context {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  max-width: 30%;
-  font: var(--fs-2xs) var(--mono);
-  color: var(--muted);
-}
-.composer-context svg {
-  width: 11px;
-  height: 11px;
-  flex-shrink: 0;
-}
-.composer-context span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.input-hint {
-  margin-left: auto;
-  font-size: var(--fs-2xs);
-  color: var(--faint);
-  white-space: nowrap;
-}
-kbd {
-  font-family: inherit;
-  color: var(--muted);
+  gap: var(--sp-2);
+  padding: 0 var(--sp-1) 0 var(--sp-3);
+  min-height: var(--control-h-sm);
 }
 .send-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 31px;
-  height: 31px;
+  width: 26px;
+  height: 26px;
+  margin-left: auto;
   flex-shrink: 0;
-  border-radius: var(--r-lg);
-  color: var(--faint);
+  border-radius: var(--r-md);
+  color: var(--bg);
   background: var(--text);
-  transition:
-    background var(--t-fast),
-    transform var(--t-fast);
+  transition: background var(--t-fast);
 }
 .send-button svg {
-  width: 18px;
-  height: 18px;
+  width: 15px;
+  height: 15px;
   stroke-width: 2;
 }
 .send-button:hover:not(:disabled) {
   background: var(--text-2);
-  transform: translateY(-1px);
 }
 .send-button:disabled {
   background: var(--bg-4);
@@ -194,8 +153,8 @@ kbd {
   background: var(--text);
 }
 .stop-button svg {
-  width: 11px;
-  height: 11px;
+  width: 10px;
+  height: 10px;
   fill: currentColor;
 }
 .latest-button {
@@ -206,14 +165,13 @@ kbd {
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 8px 12px;
-  border-radius: var(--r-lg);
-  border: 1px solid var(--line-strong);
-  background: var(--bg-3);
+  padding: 6px var(--sp-3);
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+  background: var(--bg-2);
   color: var(--text-2);
   font-size: var(--fs-2xs);
   white-space: nowrap;
-  box-shadow: var(--shadow-popover);
 }
 .latest-button svg {
   width: 12px;
@@ -252,21 +210,7 @@ kbd {
 }
 @container (max-width: 500px) {
   .composer-area {
-    padding: 8px 16px 16px;
-  }
-  .input-hint > span {
-    display: none;
-  }
-}
-@container (max-width: 300px) {
-  .input-hint {
-    display: none;
-  }
-  .send-button {
-    margin-left: auto;
-  }
-  .composer-context {
-    max-width: 70%;
+    padding: var(--sp-2) var(--sp-3) var(--sp-3);
   }
 }
 @media (prefers-reduced-motion: reduce) {
