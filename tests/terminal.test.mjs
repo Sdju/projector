@@ -92,7 +92,7 @@ const base = `http://127.0.0.1:${server.address().port}`;
 const sockets = new Set();
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function until(predicate, description) {
-  const deadline = Date.now() + 6000;
+  const deadline = Date.now() + (process.platform === "win32" ? 25_000 : 6000); // Git Bash starts slowly
   while (Date.now() < deadline) {
     if (await predicate()) return;
     await pause(20);
