@@ -386,11 +386,21 @@ await createOs("win32").runDesktop("http://127.0.0.1:9", "show", {
       const { runPowerShell } = await import("../core/modules/os/modules/windows/ps.ts");
       const { stdout } = await runPowerShell(
         `
-$name = $env:PIPE.Substring(9) # after the \\.\pipe\ prefix
-$pipe = New-Object System.IO.Pipes.NamedPipeClientStream('.', $name, [System.IO.Pipes.PipeAccessRights]::ReadPermissions, [System.IO.Pipes.PipeOptions]::None, [System.Security.Principal.TokenImpersonationLevel]::None, [System.IO.HandleInheritability]::None)
-$pipe.Connect(5000)
-$pipe.GetAccessControl().GetAccessRules($true, $true, [System.Security.Principal.NTAccount]) | ForEach-Object { $_.IdentityReference.Value + '|' + $_.PipeAccessRights + '|' + $_.AccessControlType }
-$pipe.Dispose()
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+public static class PipeHandle {
+  [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
+  static extern SafeFileHandle CreateFile(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
+  public static SafeFileHandle Open(string path) { return CreateFile(path, 0x20000, 3, IntPtr.Zero, 3, 0, IntPtr.Zero); }
+}
+"@
+$handle = [PipeHandle]::Open($env:PIPE)
+if ($handle.IsInvalid) { throw ('CreateFile failed: ' + [Runtime.InteropServices.Marshal]::GetLastWin32Error()) }
+$stream = New-Object System.IO.FileStream($handle, [System.IO.FileAccess]::Read, 1, $false)
+$stream.GetAccessControl().GetAccessRules($true, $true, [System.Security.Principal.NTAccount]) | ForEach-Object { $_.IdentityReference.Value + '|' + $_.FileSystemRights + '|' + $_.AccessControlType }
+$stream.Dispose()
 `,
         { env: { PIPE: process.env.PROJECTOR_LAUNCHER_PIPE } },
       );
