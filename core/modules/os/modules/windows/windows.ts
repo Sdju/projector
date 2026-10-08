@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { runPowerShellSync } from "./ps.ts";
+import { runPowerShell } from "./ps.ts";
 
 const BROWSERS = [
   join(
@@ -130,28 +130,36 @@ switch ($env:PROJECTOR_WINDOW_OP) {
 }
 `;
 
-function windowCall(env: Record<string, string>): string {
+async function windowCall(env: Record<string, string>): Promise<string> {
   try {
-    return runPowerShellSync(WINDOW_HELPER, { timeout: 8000, env }).trim();
+    return (await runPowerShell(WINDOW_HELPER, { timeout: 8000, env })).stdout.trim();
   } catch {
     return "";
   }
 }
 
-function paletteHwnd(appClass: string): string | null {
-  const hwnd = windowCall({ PROJECTOR_WINDOW_OP: "find", PROJECTOR_APP_CLASS: appClass });
+async function paletteHwnd(appClass: string): Promise<string | null> {
+  const hwnd = await windowCall({ PROJECTOR_WINDOW_OP: "find", PROJECTOR_APP_CLASS: appClass });
   return hwnd && hwnd !== "0" ? hwnd : null;
 }
 
-export function focusAppWindow(appClass: string): boolean {
-  const hwnd = paletteHwnd(appClass);
+export async function focusAppWindow(appClass: string): Promise<boolean> {
+  const hwnd = await paletteHwnd(appClass);
   if (!hwnd) return false;
-  windowCall({ PROJECTOR_WINDOW_OP: "show", PROJECTOR_HWND: hwnd, PROJECTOR_APP_CLASS: appClass });
+  await windowCall({
+    PROJECTOR_WINDOW_OP: "show",
+    PROJECTOR_HWND: hwnd,
+    PROJECTOR_APP_CLASS: appClass,
+  });
   return true;
 }
 
-export function openOrFocusApp(url: string, appClass: string, profile: string): void {
-  if (focusAppWindow(appClass)) return;
+export async function openOrFocusApp(
+  url: string,
+  appClass: string,
+  profile: string,
+): Promise<void> {
+  if (await focusAppWindow(appClass)) return;
   mkdirSync(profile, { recursive: true });
   const browser = findBrowser();
   if (!browser) {
@@ -167,28 +175,31 @@ export function openOrFocusApp(url: string, appClass: string, profile: string): 
   ]);
 }
 
-export function hidePalette(appClass: string): void {
-  const hwnd = paletteHwnd(appClass);
+export async function hidePalette(appClass: string): Promise<void> {
+  const hwnd = await paletteHwnd(appClass);
   if (hwnd)
-    windowCall({
+    await windowCall({
       PROJECTOR_WINDOW_OP: "hide",
       PROJECTOR_HWND: hwnd,
       PROJECTOR_APP_CLASS: appClass,
     });
 }
 
-export function openWebPalette(
+export async function openWebPalette(
   url: string,
   toggle: boolean,
   appClass: string,
   profile: string,
-): void {
-  const hwnd = paletteHwnd(appClass);
+): Promise<void> {
+  const hwnd = await paletteHwnd(appClass);
   if (hwnd) {
-    const active = windowCall({ PROJECTOR_WINDOW_OP: "foreground", PROJECTOR_APP_CLASS: appClass });
-    if (toggle && active === hwnd) hidePalette(appClass);
+    const active = await windowCall({
+      PROJECTOR_WINDOW_OP: "foreground",
+      PROJECTOR_APP_CLASS: appClass,
+    });
+    if (toggle && active === hwnd) await hidePalette(appClass);
     else
-      windowCall({
+      await windowCall({
         PROJECTOR_WINDOW_OP: "show",
         PROJECTOR_HWND: hwnd,
         PROJECTOR_APP_CLASS: appClass,
@@ -209,18 +220,18 @@ export function openWebPalette(
   ]);
 }
 
-export function closePalette(appClass: string): void {
-  const hwnd = paletteHwnd(appClass);
+export async function closePalette(appClass: string): Promise<void> {
+  const hwnd = await paletteHwnd(appClass);
   if (hwnd)
-    windowCall({
+    await windowCall({
       PROJECTOR_WINDOW_OP: "close",
       PROJECTOR_HWND: hwnd,
       PROJECTOR_APP_CLASS: appClass,
     });
 }
 
-export function activateWindow(id: number | bigint): void {
-  windowCall({
+export async function activateWindow(id: number | bigint): Promise<void> {
+  await windowCall({
     PROJECTOR_WINDOW_OP: "activate",
     PROJECTOR_HWND: String(id),
     PROJECTOR_APP_CLASS: "",
@@ -240,7 +251,7 @@ export async function activateSurface(surface: object): Promise<void> {
     const Win32Surface = (GdkWin32 as { Win32Surface?: abstract new () => object }).Win32Surface;
     if (!Win32Surface || !(surface instanceof Win32Surface)) return;
     const handle = windowHandle((surface as { getHandle(): unknown }).getHandle());
-    if (handle !== null) activateWindow(handle);
+    if (handle !== null) await activateWindow(handle);
   } catch {
     /* The surface is not a Win32 window yet. */
   }

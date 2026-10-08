@@ -57,7 +57,7 @@ export function startTray(url: string): Promise<void> {
 }
 
 export async function quitDesktop(url: string): Promise<void> {
-  os.windows.closePalette(PALETTE_CLASS);
+  await os.windows.closePalette(PALETTE_CLASS);
   await desktopCommand(url, "quit").catch(() => undefined);
 }
 
@@ -71,7 +71,7 @@ export async function openLauncher(
   else {
     await startTray(url).catch((error) => console.warn("Трей недоступен:", error.message));
     if (selected === "window")
-      os.windows.openPalette(url, toggle, PALETTE_CLASS, `${chromeProfileDir()}-launcher`);
+      await os.windows.openPalette(url, toggle, PALETTE_CLASS, `${chromeProfileDir()}-launcher`);
     else openBrowser(url);
   }
   return selected;

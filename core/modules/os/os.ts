@@ -65,10 +65,19 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
       workingDirectory: (pid: number, fallback: string) =>
         backend("processes.workingDirectory").workingDirectory(pid, fallback),
       async waitForExit(pid: number, timeoutMs = 15000) {
-        const identity = adapter.processes.identity(pid);
-        if (identity === null) return;
+        if (adapter.processes.identity(pid) === null) return;
+        // Signal 0 only probes existence. Reading the identity on every tick would start a
+        // process listing per tick on Windows; a pid cannot be recycled within the timeout.
+        const alive = () => {
+          try {
+            process.kill(pid, 0);
+            return true;
+          } catch (error) {
+            return (error as NodeJS.ErrnoException).code === "EPERM";
+          }
+        };
         const deadline = Date.now() + timeoutMs;
-        while (adapter.processes.identity(pid) === identity) {
+        while (alive()) {
           if (Date.now() >= deadline) throw new Error(`Процесс ${pid} не завершился`);
           await sleep(50);
         }
