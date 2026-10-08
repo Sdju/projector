@@ -100,4 +100,4 @@ Workspace не знает конкретных видов служебных в�
 
 ## Системный адаптер
 
-`core/modules/os/index.ts` — единый Node API для CLI, сервера и native. Подмодули `os/modules/linux` и `os/modules/windows` приватны; внешние потребители не импортируют их напрямую. Linux содержит `/proc`, X11, KDE/D-Bus и GIO; Windows — процессы Win32, Credential Manager, меню Пуск, окно Chromium и резидент GTK-палитры без трея и хоткея. [Контракт адаптера](os.md).
+`core/modules/os/index.ts` — единый Node API для CLI, сервера и native. Подмодули `os/modules/linux` и `os/modules/windows` приватны; внешние потребители не импортируют их напрямую. Linux содержит `/proc`, X11, KDE/D-Bus и GIO; Windows — процессы Win32, Credential Manager, меню Пуск, окно Chromium, резидент GTK-палитры, трей и глобальный хоткей. [Контракт адаптера](os.md).

@@ -1,4 +1,4 @@
-import { execFile, execFileSync } from "node:child_process";
+import { execFile, execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { promisify } from "node:util";
 
 const execute = promisify(execFile);
@@ -58,11 +58,26 @@ export function runPowerShell(
   }));
 }
 
+export function spawnPowerShell(
+  body: string,
+  options: { sta?: boolean; env?: NodeJS.ProcessEnv } = {},
+): ChildProcess {
+  const args = script(body);
+  if (options.sta) args.unshift("-STA");
+  return spawn("powershell.exe", args, {
+    windowsHide: true,
+    stdio: ["pipe", "pipe", "pipe"],
+    env: { ...process.env, ...options.env },
+  });
+}
+
 export function runPowerShellSync(
   body: string,
-  options: { timeout?: number; env?: NodeJS.ProcessEnv } = {},
+  options: { timeout?: number; env?: NodeJS.ProcessEnv; sta?: boolean } = {},
 ): string {
-  const stdout = execFileSync("powershell.exe", script(body), {
+  const args = script(body);
+  if (options.sta) args.unshift("-STA");
+  const stdout = execFileSync("powershell.exe", args, {
     timeout: options.timeout ?? 15000,
     maxBuffer: 4 * 1024 * 1024,
     windowsHide: true,

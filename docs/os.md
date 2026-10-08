@@ -23,7 +23,7 @@ core/modules/os/
   os.ts                     выбор адаптера, capabilities и единый фасад
   contract.ts               процесс и интерфейс контроллера палитры
   modules/linux/            /proc, X11, GIO, D-Bus, Secret Service, трей
-  modules/windows/          Win32-процессы, Credential Manager, меню Пуск, окно Chromium, резидент GTK-палитры
+  modules/windows/          Win32-процессы, Credential Manager, меню Пуск, окно Chromium, GTK-палитра, трей, хоткей
 ```
 
 Подмодули `linux` и `windows` приватны для фасада. Новая ОС регистрируется в `createOs`; потребители сохраняют вызовы `os.*`. Фабрика экспортирована для проверки выбора платформы. Singleton `os` выбирает систему один раз, а пользовательские настройки окружения (XDG, LOCALAPPDATA, SHELL) читаются при обращении.
@@ -50,7 +50,7 @@ core/modules/os/
 
 Для неподдерживаемых ОС (`darwin` и остальные) `supported` и capabilities равны false. Список процессов возвращает `null`, сведения о хоткее показывают отсутствие поддержки. Операции с отсутствующей реализацией выбрасывают `UnsupportedPlatformError` с кодом `ERR_OS_UNSUPPORTED`, а не запускают команды другой ОС.
 
-Capabilities означают наличие реализации, а не установленность утилит. Linux по-прежнему требует GTK, X11 и KDE для трея и глобального хоткея. На Windows `nativeDesktop` тоже true: палитра запускается через GTK4 из `node-gtk` отдельным процессом, команды между запусками идут по именованному каналу, фокус окна — по HWND. Трей и глобальный хоткей на Windows остаются без реализации (`shortcutStatus.supported === false`). Каталог меню Пуск читается без GTK (`giLoader === false`). Работают каталоги (`LOCALAPPDATA`, с приоритетом `XDG_DATA_HOME`), процессы, перенос файлов, Git Bash или PowerShell, Credential Manager, меню Пуск и окно Chromium. Запуск на Windows — `bin/projector.cmd`.
+Capabilities означают наличие реализации, а не установленность утилит. Linux для трея и глобального хоткея требует KDE (StatusNotifier и KGlobalAccel). На Windows `nativeDesktop` тоже true: палитра запускается через GTK4 из `node-gtk` отдельным процессом, команды между запусками идут по именованному каналу, фокус окна — по HWND. Трей — иконка области уведомлений, хоткей — `RegisterHotKey`; оба живут в резиденте палитры. Каталог меню Пуск читается без GTK (`giLoader === false`). Работают каталоги (`LOCALAPPDATA`, с приоритетом `XDG_DATA_HOME`), процессы, перенос файлов, Git Bash или PowerShell, Credential Manager, меню Пуск и окно Chromium. Запуск на Windows — `bin/projector.cmd`.
 
 Порт сервера и модель хранения проектов — настройки приложения; они не относятся к OS-адаптеру. Импорт ключей ai-companion принимает путь аргументом:
 

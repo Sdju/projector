@@ -31,7 +31,7 @@ test("OS selection is automatic; unsupported systems never fall through to Linux
     }),
   ).rejects.toThrow("Неизвестная команда");
   expect(await windows.shortcutStatus()).toStrictEqual({
-    supported: false,
+    supported: true,
     active: false,
     shortcut: "",
   });

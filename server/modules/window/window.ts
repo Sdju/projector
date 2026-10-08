@@ -17,7 +17,8 @@ function desktopCommand(url: string, action: "show" | "toggle" | "tray" | "quit"
   os.requireSupported("native desktop");
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [...nativeArgs(), "native", url, action], {
-      detached: true,
+      // Та же группа, что и сервер: Ctrl+C в `vp dev` доходит до резидента и снимает трей.
+      windowsHide: true,
       stdio: ["ignore", "pipe", "pipe"],
     });
     let output = "";
@@ -27,7 +28,10 @@ function desktopCommand(url: string, action: "show" | "toggle" | "tray" | "quit"
       reject(new Error("Системное окно не ответило. Проверьте GTK4 и desktop-сессию."));
     }, 8000);
     child.stderr.on("data", (chunk) => {
-      errors = (errors + chunk.toString()).slice(-8000);
+      const text = chunk.toString();
+      errors = (errors + text).slice(-8000);
+      const line = text.trim();
+      if (line) console.warn(line);
     });
     child.stdout.on("data", (chunk) => {
       output += chunk.toString();

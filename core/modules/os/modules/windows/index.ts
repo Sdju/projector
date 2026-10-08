@@ -42,12 +42,18 @@ export async function desktopPid(service: string): Promise<number | undefined> {
   return readPid(service);
 }
 
-export function shortcutStatus() {
-  return Promise.resolve({ supported: false, active: false, shortcut: "" });
+export async function shortcutStatus() {
+  const { shortcutStatus: readStatus } = await (import(
+    new URL("./shortcut.ts", import.meta.url).href
+  ) as Promise<typeof import("./shortcut.ts")>);
+  return readStatus();
 }
 
-export function shortcutAvailable(_shortcut: string) {
-  return Promise.resolve({ supported: false, available: false });
+export async function shortcutAvailable(shortcut: string) {
+  const { shortcutAvailable: readAvailable } = await (import(
+    new URL("./shortcut.ts", import.meta.url).href
+  ) as Promise<typeof import("./shortcut.ts")>);
+  return readAvailable(shortcut);
 }
 
 export { installDesktop } from "./install-desktop.ts";

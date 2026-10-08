@@ -4,6 +4,7 @@ import net from "node:net";
 import { dirname, join } from "node:path";
 import { dataHome } from "./directories.ts";
 import { processIdentity } from "./processes.ts";
+import { startDesktopShell } from "./shell.ts";
 
 const service = "dev.projector.Launcher";
 const actions: DesktopAction[] = ["show", "toggle", "tray", "quit"];
@@ -100,7 +101,7 @@ function bind(dispatch: (action: DesktopAction) => Promise<void>): Promise<net.S
   });
 }
 
-/** Owns the palette process. A second launch only forwards show, toggle or quit. Tray stays unsupported. */
+/** Owns the palette process. A second launch only forwards show, toggle, tray or quit. */
 export async function runResident(
   baseUrl: string,
   action: DesktopAction,
@@ -111,7 +112,7 @@ export async function runResident(
     console.log("READY");
     return;
   }
-  if (action === "tray" || action === "quit") {
+  if (action === "quit") {
     console.log("READY");
     return;
   }
@@ -179,10 +180,39 @@ async function own(
     const untilStop = new Promise<void>((resolve) => {
       release = resolve;
     });
+    const shell = await startDesktopShell(options.dataDirectory, {
+      onActivate: () => {
+        void palette.invokeSelected();
+      },
+      onHotkey: () => {
+        void palette.invokeSelected(true);
+      },
+      onSettings: () => palette.openPage("/settings"),
+      onRestart: () => {
+        void palette.restartProjector();
+      },
+      onQuit: () => {
+        void palette.quitProjector();
+      },
+    });
+    const configuredShortcut = async () => {
+      try {
+        const shortcut = JSON.parse(
+          await readFile(join(options.dataDirectory, "launcher.json"), "utf8"),
+        ).shortcut;
+        return typeof shortcut === "string" ? shortcut : "Ctrl+Alt+Space";
+      } catch {
+        return "Ctrl+Alt+Space";
+      }
+    };
+    await shell.configure(await configuredShortcut()).catch((error: unknown) => {
+      console.error("Хоткей:", error instanceof Error ? error.message : error);
+    });
     async function stop() {
       if (stopping) return;
       stopping = true;
       clearInterval(pulse);
+      await shell.stop();
       palette.dispose();
       server.close();
       await rm(pidPath, { force: true });
@@ -195,7 +225,12 @@ async function own(
         }, 50);
         return;
       }
-      if (requested === "tray") return;
+      if (requested === "tray") {
+        await shell.configure(await configuredShortcut()).catch((error: unknown) => {
+          console.error("Хоткей:", error instanceof Error ? error.message : error);
+        });
+        return;
+      }
       if (requested === "toggle") await palette.toggle();
       else await palette.show();
     };
