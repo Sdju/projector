@@ -78,3 +78,29 @@ jobs:
             vp test run tests/terminal.test.mjs tests/integrations.test.mjs tests/agent.test.mjs tests/windows-adapter.test.mjs tests/docker.test.mjs tests/reconcile.test.mjs || exit 1
             echo "::endgroup::"
           done
+
+  # Hunts the rare "terminal link not found" failure: the test prints the directories and the
+  # process tree it saw when it happens. Remove once the cause is known.
+  link-flake:
+    runs-on: windows-2025
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: voidzero-dev/setup-vp@v1.21.1
+        with:
+          node-version-file: .node-version
+          cache: true
+          run-install: false
+      - name: Install locked dependencies
+        run: vp install --frozen-lockfile
+      - name: Build vio
+        working-directory: packages/vio
+        run: vp exec tsdown
+      - name: Repeat the terminal test
+        shell: bash
+        run: |
+          failures=0
+          for i in $(seq 1 40); do
+            vp test run tests/terminal.test.mjs > "round-$i.log" 2>&1 || { failures=$((failures+1)); echo "::group::round $i FAILED"; grep -E "cwds:|session pid|Error|FAIL" "round-$i.log" | head -20; echo "::endgroup::"; }
+          done
+          echo "failures: $failures / 40"
