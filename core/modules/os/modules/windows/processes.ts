@@ -65,7 +65,9 @@ public static class ProjectorConsole {
 "@
   foreach ($root in $env:PROJECTOR_CONSOLE_ROOTS.Split(',')) {
     $members = [ProjectorConsole]::Members([uint32]$root)
-    if ($members) { Write-Output ('console' + [char]9 + $root + [char]9 + $members) }
+    # The helper itself is attached to the console while it asks.
+    $others = @($members.Split(',') | Where-Object { $_ -ne [string]$PID }) -join ','
+    if ($others) { Write-Output ('console' + [char]9 + $root + [char]9 + $others) }
   }
 }
 `;
