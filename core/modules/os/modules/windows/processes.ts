@@ -140,6 +140,11 @@ export function snapshotProcesses(): ProcessInfo[] | null {
   return snapshot?.rows ?? null;
 }
 
+/** The last listing if it is at most `maxAgeMs` old; never waits and never names reused pids. */
+export function recentProcesses(maxAgeMs: number): ProcessInfo[] | null {
+  return snapshot && Date.now() - snapshot.at <= maxAgeMs ? snapshot.rows : null;
+}
+
 /** Exact view, for deciding what to signal: at most TTL old. */
 export async function listProcesses(): Promise<ProcessInfo[] | null> {
   if (snapshot && Date.now() - snapshot.at < TTL) return snapshot.rows;

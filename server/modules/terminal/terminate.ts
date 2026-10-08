@@ -13,22 +13,17 @@ export function terminateProcessTree(pty: IPty, immediate: boolean): void {
     const killRoot = () => os.tools.killAgentTree(pty.pid);
     // While the process exits there is no time to look around: the root tree is all we can end.
     if (immediate) return killRoot();
-    // MSYS programs are not Win32 children of their shell; the tracked console lists them. That
-    // listing is read fresh and before the root goes: a cached one could name reused pids, and
-    // once the root is gone its console can no longer be inspected.
-    void os.processes
-      .list()
-      .then((rows = []) => {
-        const family = new Set([pty.pid]);
-        for (let grew = true; grew;) {
-          grew = false;
-          for (const row of rows ?? [])
-            if (family.has(row.parent) && !family.has(row.pid)) grew = !!family.add(row.pid);
-        }
-        for (const pid of family) if (pid !== pty.pid) os.tools.killAgentTree(pid);
-      })
-      .catch(() => undefined)
-      .finally(killRoot);
+    // MSYS programs are not Win32 children of their shell; the tracked console lists them, but
+    // only a young listing is trusted: an old one could name pids that have been reused.
+    const rows = os.processes.recent(2500) ?? [];
+    const family = new Set([pty.pid]);
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const row of rows)
+        if (family.has(row.parent) && !family.has(row.pid)) grew = !!family.add(row.pid);
+    }
+    for (const pid of family) if (pid !== pty.pid) os.tools.killAgentTree(pid);
+    killRoot();
     return;
   }
   const family = descendants(pty.pid);

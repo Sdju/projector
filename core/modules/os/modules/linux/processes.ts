@@ -77,3 +77,5 @@ export function signalProcess(pid: number, signal: NodeJS.Signals): void {
 /** Linux parents every program to its shell; nothing needs tracking. */
 export function trackConsole(_pid: number): void {}
 export function untrackConsole(_pid: number): void {}
+
+export const recentProcesses = (_maxAgeMs: number): ProcessInfo[] | null => listProcesses();

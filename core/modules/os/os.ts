@@ -64,6 +64,9 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
         supported ? backend("processes.trackConsole").trackConsole(pid) : undefined,
       untrackConsole: (pid: number) =>
         supported ? backend("processes.untrackConsole").untrackConsole(pid) : undefined,
+      /** The last listing only if it is younger than `maxAgeMs`. */
+      recent: (maxAgeMs: number) =>
+        supported ? backend("processes.recent").recentProcesses(maxAgeMs) : null,
       snapshot: () => (supported ? backend("processes.snapshot").snapshotProcesses() : null),
       list: async () => (supported ? await backend("processes.list").listProcesses() : null),
       signal: (pid: number, signal: NodeJS.Signals) =>
