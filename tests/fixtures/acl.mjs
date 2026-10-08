@@ -9,6 +9,6 @@ export async function aclPrincipals(path) {
   const { stdout } = await execute("icacls.exe", [path], { windowsHide: true });
   return stdout
     .split(/\r?\n/)
-    .map((line) => /^\s*(?:.*?\.[^\s]*\s+)?(\S+):\(/.exec(line)?.[1])
+    .map((line) => /(\S+):\([A-Z,()]+\)\s*$/.exec(line.trimEnd())?.[1])
     .filter(Boolean);
 }
