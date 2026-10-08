@@ -30,6 +30,7 @@ jobs:
       - name: Architecture
         run: vp run architecture
       - name: Build vio
-        run: vp run vio:build
+        working-directory: packages/vio
+        run: vp exec tsdown
       - name: Tests
         run: vp test run
