@@ -10,6 +10,7 @@ export {
   descendants,
   descendants as descendantsSync,
   workingDirectory,
+  workingDirectories,
 } from "./processes.ts";
 export {
   moveNoReplace,

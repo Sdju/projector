@@ -79,3 +79,7 @@ export function trackConsole(_pid: number): void {}
 export function untrackConsole(_pid: number): void {}
 
 export const recentProcesses = (_maxAgeMs: number): ProcessInfo[] | null => listProcesses();
+
+export async function workingDirectories(pid: number, fallback: string): Promise<string[]> {
+  return [await workingDirectory(pid, fallback)];
+}

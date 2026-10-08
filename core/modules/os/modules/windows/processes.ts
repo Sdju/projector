@@ -296,3 +296,15 @@ export async function workingDirectory(pid: number, fallback: string): Promise<s
     }
   return fallback;
 }
+
+/**
+ * Git Bash runs as a chain of `bash` processes, and which of them has the user's directory is
+ * not worth guessing: every one of them is asked, the deepest first.
+ */
+export async function workingDirectories(pid: number, fallback: string): Promise<string[]> {
+  const root = await processInfo(pid);
+  if (!root) return [fallback];
+  const chain = (await descendants(pid)).filter((entry) => entry.name === root.name).reverse();
+  const found = await Promise.all(chain.map((entry) => workingDirectory(entry.pid, "")));
+  return [...new Set([...found.filter(Boolean), fallback])];
+}

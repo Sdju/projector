@@ -75,6 +75,8 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
       /** Only where `capabilities.syncProcessInspection`: needed while the process is exiting. */
       descendantsSync: (pid: number) => backend("processes.descendantsSync").descendantsSync(pid),
       identity: async (pid: number) => await backend("processes.identity").processIdentity(pid),
+      workingDirectories: (pid: number, fallback: string) =>
+        backend("processes.workingDirectories").workingDirectories(pid, fallback),
       workingDirectory: (pid: number, fallback: string) =>
         backend("processes.workingDirectory").workingDirectory(pid, fallback),
       async waitForExit(pid: number, timeoutMs = 15000) {

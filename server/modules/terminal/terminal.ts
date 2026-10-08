@@ -109,7 +109,7 @@ export async function resolveTerminalFile(project: Project, id: string, path: st
     );
   const cwd =
     session.info.status === "running"
-      ? await os.processes.workingDirectory(session.info.pid, project.path)
+      ? await os.processes.workingDirectories(session.info.pid, project.path)
       : project.path;
   return resolveTerminalPath(path, project.path, cwd);
 }
