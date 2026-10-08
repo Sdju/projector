@@ -29,5 +29,7 @@ jobs:
         run: vp install --frozen-lockfile
       - name: Architecture
         run: vp run architecture
+      - name: Build vio
+        run: vp run vio:build
       - name: Tests
         run: vp test run
