@@ -281,14 +281,18 @@ async function shellProcess(pid: number): Promise<number> {
 export async function workingDirectory(pid: number, fallback: string): Promise<string> {
   if (!(await processInfo(pid))) return fallback;
   pid = await shellProcess(pid);
-  try {
-    const { stdout } = await runPowerShell(CWD_SCRIPT, {
-      env: { PROJECTOR_PID: String(pid) },
-      timeout: 8000,
-    });
-    const directory = normalizeDirectory(stdout.trim());
-    return directory || fallback;
-  } catch {
-    return fallback;
-  }
+  // PowerShell and the C# compile occasionally time out on a loaded machine; one more try is
+  // cheaper than reporting the project root as the shell's directory.
+  for (let attempt = 0; attempt < 2; attempt++)
+    try {
+      const { stdout } = await runPowerShell(CWD_SCRIPT, {
+        env: { PROJECTOR_PID: String(pid) },
+        timeout: 15000,
+      });
+      const directory = normalizeDirectory(stdout.trim());
+      if (directory) return directory;
+    } catch {
+      if (!(await processInfo(pid))) return fallback;
+    }
+  return fallback;
 }
