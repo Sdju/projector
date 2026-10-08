@@ -40,7 +40,16 @@ jobs:
         run: node scripts/windows-diagnose.mjs
       - name: Tests
         timeout-minutes: 15
+        env:
+          PROJECTOR_SHOT_DIR: ${{ runner.temp }}\shots
         run: vp test run
+      - name: Keep the photographed palette
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: palette-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}\shots
+          if-no-files-found: warn
 
   # The suite once lost two unrelated test workers in one run. Repeating the PTY, process and
   # integration tests shows whether workers still disappear.

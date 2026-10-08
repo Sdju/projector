@@ -257,3 +257,26 @@ test.skipIf(!windows)(
     expect(await aclPrincipals(file)).toHaveLength(1);
   },
 );
+
+test.skipIf(!windows)(
+  "Git Bash shows a new directory to Win32 once it has started a program",
+  async () => {
+    const directory = await scratch();
+    await mkdir(join(directory, "nested"));
+    const child = spawn(os.shell(), ["-c", "cd nested; read -t 7; ls > /dev/null; read -t 40"], {
+      cwd: directory,
+      stdio: "pipe",
+    });
+    onTestFinished(() => child.kill());
+    const nested = join(directory, "nested").toLowerCase();
+    const sample = async () =>
+      (await os.processes.workingDirectories(child.pid, "?")).map((value) => value.toLowerCase());
+    await new Promise((resolve) => setTimeout(resolve, 3500));
+    const before = await sample(); // `cd` only: reported, not asserted
+    await new Promise((resolve) => setTimeout(resolve, 6000));
+    const after = await sample(); // `ls` has started
+    console.log("MSYS cwd before an external command:", JSON.stringify(before));
+    console.log("MSYS cwd after an external command:", JSON.stringify(after));
+    expect(after, JSON.stringify(after)).toContain(nested);
+  },
+);

@@ -381,6 +381,23 @@ await createOs("win32").runDesktop("http://127.0.0.1:9", "show", {
         reject(new Error(errors.trim() || output.trim() || `палитра завершилась (${code})`));
       });
     });
+    // The pipe keeps Windows' default DACL: nobody but the owner, SYSTEM and administrators may write.
+    {
+      const { runPowerShell } = await import("../core/modules/os/modules/windows/ps.ts");
+      const { stdout } = await runPowerShell(
+        `(Get-Acl -LiteralPath $env:PIPE).Access | ForEach-Object { $_.IdentityReference.Value + '|' + $_.FileSystemRights + '|' + $_.AccessControlType }`,
+        { env: { PIPE: process.env.PROJECTOR_LAUNCHER_PIPE } },
+      );
+      const writers = stdout
+        .trim()
+        .split(/\r?\n/)
+        .filter((line) => /Allow$/.test(line) && /Write|FullControl|Modify|CreateFiles/.test(line))
+        .map((line) => line.split("|")[0]);
+      for (const name of writers)
+        expect(name, `writers of the pipe: ${writers}`).not.toMatch(
+          /Everyone|Users|Anonymous|Authenticated/i,
+        );
+    }
     expect(await os.desktopPid("dev.projector.Launcher")).toBe(child.pid);
     await os.runDesktop("http://127.0.0.1:9", "toggle", {
       dataDirectory,
