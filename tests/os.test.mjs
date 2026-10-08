@@ -368,7 +368,7 @@ await createOs("win32").runDesktop("http://127.0.0.1:9", "show", {
     await new Promise((resolve, reject) => {
       const timer = setTimeout(
         () => reject(new Error(errors.trim() || output.trim() || "палитра не ответила")),
-        15000,
+        40000,
       );
       child.stdout.on("data", () => {
         if (!output.includes("READY")) return;
