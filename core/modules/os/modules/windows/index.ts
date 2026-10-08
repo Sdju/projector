@@ -26,21 +26,20 @@ export {
   openWebPalette,
   closePalette,
   activateWindow,
+  activateSurface,
 } from "./windows.ts";
 
 export const catalog = () =>
   import(new URL("./catalog.ts", import.meta.url).href) as Promise<typeof import("./catalog.ts")>;
 
-export function resident() {
-  return Promise.resolve({
-    runResident(_url: string, _action: string, _options: unknown): Promise<void> {
-      return Promise.reject(new Error("GTK-палитра доступна только на Linux"));
-    },
-  });
-}
+export const resident = () =>
+  import(new URL("./resident.ts", import.meta.url).href) as Promise<typeof import("./resident.ts")>;
 
-export function desktopPid(_service: string): Promise<number | undefined> {
-  return Promise.resolve(undefined);
+export async function desktopPid(service: string): Promise<number | undefined> {
+  const { desktopPid: readPid } = await (import(
+    new URL("./resident.ts", import.meta.url).href
+  ) as Promise<typeof import("./resident.ts")>);
+  return readPid(service);
 }
 
 export function shortcutStatus() {

@@ -28,7 +28,7 @@
 
 ## Native и vio
 
-GTK работает отдельным Node-процессом. Resident владеет D-Bus именем `dev.projector.Launcher`, интерфейсом `dev.projector.Launcher.Control` на `/dev/projector/Launcher`. GLib MainLoop обслуживает скрытое окно, трей и хоткей. Сервер ждёт `READY` до восьми секунд.
+GTK работает отдельным Node-процессом. На Linux resident владеет D-Bus именем `dev.projector.Launcher`, интерфейсом `dev.projector.Launcher.Control` на `/dev/projector/Launcher`; GLib MainLoop обслуживает окно, трей и хоткей. На Windows тот же цикл GTK слушает именованный канал `dev.projector.Launcher`; трея и хоткея нет. Сервер ждёт `READY` до восьми секунд.
 
 Native не имеет HMR. После изменений пересоберите `vio`, если менялся renderer, и перезапустите только native:
 

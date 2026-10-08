@@ -43,9 +43,9 @@
 
 ## Требования интерфейсов
 
-- Системное окно: Linux, Node.js 24, GTK4 и GObject Introspection (с GioUnix); работает отдельным Node-процессом, вызывается через D-Bus.
+- Системное окно: Node.js 24 и GTK4. На Linux процесс вызывается через D-Bus и требует GObject Introspection с GioUnix. На Windows GTK4 берётся из поставки `node-gtk`, второй запуск передаёт команду уже живущему процессу.
 - Отдельное веб-окно: Chromium-совместимый браузер с отдельным профилем Projector; фокус и скрытие через `xdotool` и `xprop` (X11).
-- Windows: только браузер и окно Chromium; запуск `bin\projector.cmd`, данные в `%LOCALAPPDATA%\projector`. GTK-палитра, трей и хоткей — только Linux.
+- Windows: браузер, окно Chromium и GTK-палитра; запуск `bin\projector.cmd`, данные в `%LOCALAPPDATA%\projector`. Трей и глобальный хоткей остаются только на Linux.
 - Поиск приложений использует GIO через `node-gtk`. Трей и хоткей — `dbus-next`; биндинг `usocket` отключён.
 
 ## Проекты

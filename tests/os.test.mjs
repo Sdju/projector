@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn, execFileSync } from "node:child_process";
 import { once } from "node:events";
+import { pathToFileURL } from "node:url";
 import { os, createOs, UnsupportedPlatformError } from "../core/modules/os/index.ts";
 
 // This file runs without GI loaders/display: importing os must not load GTK or D-Bus.
@@ -12,7 +13,9 @@ test("OS selection is automatic; unsupported systems never fall through to Linux
   expect(os.platform).toBe(process.platform);
   const windows = createOs("win32");
   expect(windows.supported).toBe(true);
-  expect(windows.capabilities.nativeDesktop).toBe(false);
+  expect(windows.capabilities.nativeDesktop).toBe(true);
+  expect(windows.capabilities.giLoader).toBe(false);
+  expect(createOs("linux").capabilities.giLoader).toBe(true);
   expect(windows.capabilities.processInspection).toBe(true);
   expect(windows.capabilities.fileOperations).toBe(true);
   const invocation = windows.shellLaunch({ kind: "command", command: "echo hi" });
@@ -20,15 +23,13 @@ test("OS selection is automatic; unsupported systems never fall through to Linux
     expect(invocation.args.includes("-Command")).toBeTruthy();
   else expect(invocation.args).toStrictEqual(["-c", "echo hi"]);
   await expect(
-    windows.runDesktop("http://localhost", "show", {
+    windows.runDesktop("http://localhost", "nope", {
       dataDirectory: "x",
       createPalette: async () => {
         throw new Error("палитра не создаётся");
       },
     }),
-  ).rejects.toSatisfy(
-    (error) => error instanceof UnsupportedPlatformError && error.code === "ERR_OS_UNSUPPORTED",
-  );
+  ).rejects.toThrow("Неизвестная команда");
   expect(await windows.shortcutStatus()).toStrictEqual({
     supported: false,
     active: false,
@@ -283,7 +284,7 @@ test(
       process.execPath,
       [
         "--import",
-        require.resolve("vio/register"),
+        pathToFileURL(require.resolve("vio/register")).href,
         "--input-type=module",
         "-e",
         `import { os } from ${JSON.stringify(facade)};const catalog=await os.catalog();catalog.launchApplication("projector.desktop");`,
@@ -300,5 +301,101 @@ test(
       }
     }
     expect.unreachable("GIO did not launch the relocated executable");
+  },
+);
+
+test(
+  "Windows palette resident accepts a second command and quits",
+  { skip: process.platform !== "win32" },
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "projector-win-palette-"));
+    const dataDirectory = join(root, "projector");
+    const marker = join(root, "palette.log");
+    const previousData = process.env.XDG_DATA_HOME;
+    const previousPipe = process.env.PROJECTOR_LAUNCHER_PIPE;
+    process.env.XDG_DATA_HOME = root;
+    process.env.PROJECTOR_LAUNCHER_PIPE = `\\\\.\\pipe\\projector-test-${process.pid}-${Date.now()}`;
+    const { createRequire } = await import("node:module");
+    const require = createRequire(import.meta.url);
+    const facade = pathToFileURL(join(process.cwd(), "core/modules/os/index.ts")).href;
+    const env = { ...process.env };
+    delete env.NODE_OPTIONS;
+    const child = spawn(
+      process.execPath,
+      [
+        "--import",
+        pathToFileURL(require.resolve("vio/register")).href,
+        "--input-type=module",
+        "-e",
+        `import { appendFileSync } from "node:fs";
+import { createOs } from ${JSON.stringify(facade)};
+const marker = ${JSON.stringify(marker)};
+const note = (line) => appendFileSync(marker, line + "\\n");
+await createOs("win32").runDesktop("http://127.0.0.1:9", "show", {
+  dataDirectory: ${JSON.stringify(dataDirectory)},
+  async createPalette() {
+    note("create");
+    return {
+      show: async () => note("show"),
+      toggle: async () => note("toggle"),
+      invokeSelected: async () => undefined,
+      openPage() {},
+      quitProjector: async () => undefined,
+      restartProjector: async () => undefined,
+      dispose() { note("dispose"); },
+    };
+  },
+});`,
+      ],
+      { env },
+    );
+    let output = "";
+    let errors = "";
+    child.stdout.on("data", (chunk) => {
+      output += chunk.toString();
+    });
+    child.stderr.on("data", (chunk) => {
+      errors += chunk.toString();
+    });
+    onTestFinished(async () => {
+      if (child.exitCode === null) child.kill();
+      if (previousData === undefined) delete process.env.XDG_DATA_HOME;
+      else process.env.XDG_DATA_HOME = previousData;
+      if (previousPipe === undefined) delete process.env.PROJECTOR_LAUNCHER_PIPE;
+      else process.env.PROJECTOR_LAUNCHER_PIPE = previousPipe;
+      await rm(root, { recursive: true, force: true });
+    });
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error(errors.trim() || output.trim() || "палитра не ответила")),
+        15000,
+      );
+      child.stdout.on("data", () => {
+        if (!output.includes("READY")) return;
+        clearTimeout(timer);
+        resolve(undefined);
+      });
+      child.once("exit", (code) => {
+        clearTimeout(timer);
+        reject(new Error(errors.trim() || output.trim() || `палитра завершилась (${code})`));
+      });
+    });
+    expect(await os.desktopPid("dev.projector.Launcher")).toBe(child.pid);
+    await os.runDesktop("http://127.0.0.1:9", "toggle", {
+      dataDirectory,
+      createPalette: async () => {
+        throw new Error("вторая палитра не создаётся");
+      },
+    });
+    await os.runDesktop("http://127.0.0.1:9", "quit", {
+      dataDirectory,
+      createPalette: async () => {
+        throw new Error("палитра не создаётся");
+      },
+    });
+    const [code] = await once(child, "exit");
+    expect(code).toBe(0);
+    expect(await readFile(marker, "utf8")).toBe("create\nshow\ntoggle\ndispose\n");
+    expect(await os.desktopPid("dev.projector.Launcher")).toBeUndefined();
   },
 );

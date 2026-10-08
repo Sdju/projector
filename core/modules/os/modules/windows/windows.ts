@@ -215,3 +215,21 @@ export function activateWindow(id: number | bigint): void {
     PROJECTOR_APP_CLASS: "",
   });
 }
+
+function windowHandle(handle: unknown): number | bigint | null {
+  if (typeof handle === "bigint" || typeof handle === "number") return handle > 0 ? handle : null;
+  const value = Number(handle);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+/** Win32 foreground rules ignore a plain present(); raise the HWND explicitly. */
+export async function activateSurface(surface: object): Promise<void> {
+  try {
+    const { default: GdkWin32 } = await import("gi:GdkWin32-4.0");
+    if (!(surface instanceof GdkWin32.Win32Surface)) return;
+    const handle = windowHandle(surface.getHandle());
+    if (handle !== null) activateWindow(handle);
+  } catch {
+    /* The surface is not a Win32 window yet. */
+  }
+}

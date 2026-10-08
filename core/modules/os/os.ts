@@ -24,7 +24,7 @@ export class UnsupportedPlatformError extends Error {
 export function createOs(platform: NodeJS.Platform = process.platform) {
   const implementation = platform === "linux" ? linux : platform === "win32" ? windows : null;
   const supported = implementation !== null;
-  const nativeDesktop = platform === "linux";
+  const nativeDesktop = platform === "linux" || platform === "win32";
   const backend = (operation: string) => {
     if (!implementation) throw new UnsupportedPlatformError(platform, operation);
     return implementation;
@@ -34,6 +34,8 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
     supported,
     capabilities: Object.freeze({
       nativeDesktop,
+      /** Linux catalog reads GIO inside the helper. Windows loads GTK only for the palette. */
+      giLoader: platform === "linux",
       processInspection: supported,
       fileOperations: supported,
     }),
@@ -117,6 +119,7 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
         backend("openPalette").openWebPalette(url, toggle, appClass, profile),
       closePalette: (appClass: string) => backend("closePalette").closePalette(appClass),
       activate: (id: number | bigint) => backend("activateWindow").activateWindow(id),
+      activateSurface: (surface: object) => backend("activateSurface").activateSurface(surface),
     },
     /** OS secret store (Linux: Secret Service over D-Bus). `available` never throws. */
     secrets: {

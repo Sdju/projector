@@ -26,6 +26,7 @@ export {
   openWebPalette,
   closePalette,
   activateWindow,
+  activateSurface,
 } from "./windows.ts";
 export const catalog = () =>
   import(new URL("./catalog.ts", import.meta.url).href) as Promise<typeof import("./catalog.ts")>;

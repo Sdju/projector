@@ -181,15 +181,7 @@ function activeChanged() {
 }
 async function focusWindow() {
   const surface = windowRef.value?.widget?.getSurface();
-  if (!surface) return;
-  try {
-    const { default: GdkX11 } = await import("gi:GdkX11-4.0");
-    if (surface instanceof GdkX11.X11Surface) {
-      os.windows.activate(surface.getXid());
-    }
-  } catch {
-    /* Wayland uses compositor activation. */
-  }
+  if (surface) await os.windows.activateSurface(surface);
 }
 async function launch(index = state.value.selected, secondary = false) {
   const item = state.value.items[index];

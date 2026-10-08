@@ -158,3 +158,13 @@ export function activateWindow(id: number | bigint): void {
   const child = spawn("xdotool", ["windowactivate", "--sync", String(id)], { stdio: "ignore" });
   child.on("error", () => {});
 }
+
+/** X11 needs an explicit raise. Wayland activates the window through the compositor. */
+export async function activateSurface(surface: object): Promise<void> {
+  try {
+    const { default: GdkX11 } = await import("gi:GdkX11-4.0");
+    if (surface instanceof GdkX11.X11Surface) activateWindow(surface.getXid());
+  } catch {
+    /* The surface is not an X11 window. */
+  }
+}

@@ -3,7 +3,7 @@ import { os } from "../../../core/modules/os/index.ts";
 import { APP_CLASS, chromeProfileDir } from "../../../core/modules/app-paths/index.ts";
 import { preferences } from "../preferences/index.ts";
 import type { InterfaceMode } from "../../../core/modules/launcher/index.ts";
-import { desktopArgs } from "./desktop.ts";
+import { nativeArgs } from "./desktop.ts";
 
 const PALETTE_CLASS = "ProjectorLauncher";
 export const focusAppWindow = () => os.windows.focusApp(APP_CLASS);
@@ -16,7 +16,7 @@ export const hidePalette = () => os.windows.hidePalette(PALETTE_CLASS);
 function desktopCommand(url: string, action: "show" | "toggle" | "tray" | "quit"): Promise<void> {
   os.requireSupported("native desktop");
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [...desktopArgs(), "native", url, action], {
+    const child = spawn(process.execPath, [...nativeArgs(), "native", url, action], {
       detached: true,
       stdio: ["ignore", "pipe", "pipe"],
     });

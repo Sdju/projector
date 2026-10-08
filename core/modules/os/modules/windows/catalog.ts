@@ -21,9 +21,9 @@ function allowed(id: string) {
   });
 }
 
-/** GTK-палитра есть только на Linux; заглушка держит общий тип каталога. */
-export function desktopApp(_id: string): { getIcon(): never } {
-  throw new Error("GTK-палитра доступна только на Linux");
+/** Start Menu shortcuts have no Gio icon. The palette row falls back to a text glyph. */
+export function desktopApp(_id: string): { getIcon(): null } {
+  return { getIcon: () => null };
 }
 
 export function listApplications(): LaunchItem[] {
