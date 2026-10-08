@@ -512,7 +512,7 @@ process.stdin.on('data', (chunk) => {
     "PTY size and partial output",
   );
   first.send({ type: "input", data: "sleep 30\r" });
-  await pause(150);
+  await pause(process.platform === "win32" ? 1500 : 150); // a Windows process takes a moment to start
   first.send({ type: "input", data: "\x03" });
   first.send({ type: "input", data: "printf 'INTERRUPT_%s\\n' OK\r" });
   await until(() => first.output().includes("INTERRUPT_OK"), "Ctrl+C restores prompt");
