@@ -1,3 +1,4 @@
+import { isAbsolute } from "node:path";
 import { parseDockerEnvironment, prepareDockerEnvironment } from "../environments/index.ts";
 import { cloneGithubContainer } from "./container.ts";
 import { integrationConfig } from "../integration-store/index.ts";
@@ -6,6 +7,13 @@ import type { DockerEnvironment } from "../../../core/modules/environment/index.
 import { cloneOverHttps, importRepository } from "../git-import/index.ts";
 import type { CloneHooks } from "../git-import/index.ts";
 import { DEFAULT_DIRECTORY, authorized, github, repositoryName } from "./api.ts";
+
+/** Host absolute path, or a `~` / `~/…` home shortcut. Drive letters count on Windows. */
+function acceptsCloneDirectory(directory: string): boolean {
+  if (directory.includes("\0")) return false;
+  const value = directory.trim();
+  return isAbsolute(value) || value === "~" || value.startsWith("~/") || value.startsWith("~\\");
+}
 
 const credentials = {
   username: "x-access-token",
@@ -37,11 +45,7 @@ export async function cloneGithubProject(body: Record<string, unknown>, hooks: C
     docker.settings.context || "default",
   );
   const directory = body.directory ?? (config.settings.directory || DEFAULT_DIRECTORY);
-  if (
-    typeof directory !== "string" ||
-    !/^(\/|~(?:\/|$))/.test(directory.trim()) ||
-    directory.includes("\0")
-  )
+  if (typeof directory !== "string" || !acceptsCloneDirectory(directory))
     throw new HttpError(400, "Укажите абсолютный путь к папке или ~/папка");
   if (environment) {
     if (directory.includes(","))
@@ -71,7 +75,7 @@ async function saveGithubProject(
   await github(`/repos/${repository}`, token);
   return importRepository({
     directory: base,
-    segments: repository.split("/"),
+    segments: [repository.slice(repository.lastIndexOf("/") + 1)],
     environment,
     hooks,
     clone: ({ staging, checkout }) =>

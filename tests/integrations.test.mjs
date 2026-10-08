@@ -172,17 +172,17 @@ test("GitHub integration persists authorization and imports authenticated reposi
     repository: "https://github.com/octocat/app.git",
   });
   expect(imported.status, JSON.stringify(imported.data)).toBe(201);
-  expect(imported.data.project.path).toBe(join(directory, "octocat", "app"));
+  expect(imported.data.project.path).toBe(join(directory, "app"));
   expect(imported.data.project.commands[0].cmd).toBe("pnpm dev");
   expect((await request("/github/import", "POST", { repository: "octocat/app" })).status).toBe(409);
   expect(clones).toBe(1);
-  await mkdir(join(directory, "octocat", "existing"));
+  await mkdir(join(directory, "existing"));
   expect((await request("/github/import", "POST", { repository: "octocat/existing" })).status).toBe(
     409,
   );
   const failure = await request("/github/import", "POST", { repository: "octocat/failure" });
   expect(failure.status).toBe(400);
-  await expect(access(join(directory, "octocat", "failure"))).rejects.toThrow();
+  await expect(access(join(directory, "failure"))).rejects.toThrow();
   const simultaneous = await Promise.all(
     ["one", "two", "plain"].map((name) =>
       request("/github/import", "POST", { repository: `octocat/${name}` }),
@@ -200,7 +200,7 @@ test("GitHub integration persists authorization and imports authenticated reposi
     directory: selectedDirectory,
   });
   expect(cloned.status, JSON.stringify(cloned.data)).toBe(201);
-  expect(cloned.data.project.path).toBe(join(selectedDirectory, "octocat", "app"));
+  expect(cloned.data.project.path).toBe(join(selectedDirectory, "app"));
   expect(
     (
       await request("/github/clone", "POST", {
@@ -253,14 +253,14 @@ test("GitHub integration persists authorization and imports authenticated reposi
     directory: selectedDirectory,
   });
   expect(publicClone.status, JSON.stringify(publicClone.data)).toBe(201);
-  expect(publicClone.data.project.path).toBe(join(selectedDirectory, "octocat", "public"));
+  expect(publicClone.data.project.path).toBe(join(selectedDirectory, "public"));
   expect(!JSON.stringify(publicClone.data).includes(secret)).toBeTruthy();
   const failedClone = await request("/github/clone", "POST", {
     repository: "octocat/failure",
     directory: selectedDirectory,
   });
   expect(failedClone.status).toBe(400);
-  await expect(access(join(selectedDirectory, "octocat", "failure"))).rejects.toThrow();
+  await expect(access(join(selectedDirectory, "failure"))).rejects.toThrow();
   const { os } = await import("../core/modules/os/index.ts");
   const { parseDockerEnvironment, environmentLaunch, environmentForPath, runEnvironmentCommand } =
     await import("../server/modules/environments/index.ts");

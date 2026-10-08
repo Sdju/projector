@@ -53,7 +53,8 @@ function toCommand(name: string, prefix: string): ProjectCommand {
 export function expandPath(input: string): string {
   const trimmed = input.trim();
   if (trimmed === "~") return os.homeDirectory();
-  if (trimmed.startsWith("~/")) return resolve(join(os.homeDirectory(), trimmed.slice(2)));
+  if (trimmed.startsWith("~/") || trimmed.startsWith("~\\"))
+    return resolve(join(os.homeDirectory(), trimmed.slice(2)));
   return resolve(trimmed);
 }
 

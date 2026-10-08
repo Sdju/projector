@@ -1,13 +1,18 @@
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createConfig } from "@o-feod/oxlint-structure-plugin/configs";
 import feodConfig from "../feod.config.mjs";
 
 const projectRoot = fileURLToPath(new URL("..", import.meta.url));
-const oxlint = join(projectRoot, "node_modules/.bin/oxlint");
+// The `.bin` shim is a shell script. Windows `spawn` reports ENOENT for it, so run the JS entry.
+const oxlintBin = join(
+  dirname(fileURLToPath(import.meta.resolve("oxlint/package.json"))),
+  "bin",
+  "oxlint",
+);
 const plugin = fileURLToPath(import.meta.resolve("@o-feod/oxlint-structure-plugin"));
 
 /** Run only the FEOD rules over the configured roots; policy lives in feod.config.mjs. */
@@ -15,7 +20,7 @@ export function checkFeod({ rootDir = projectRoot, config = feodConfig } = {}) {
   const run = prepare(rootDir, config);
   if (!run) return [];
   try {
-    const result = spawnSync(oxlint, run.args, {
+    const result = spawnSync(process.execPath, [oxlintBin, ...run.args], {
       cwd: rootDir,
       encoding: "utf8",
       maxBuffer: 64 * 1024 * 1024,
@@ -39,7 +44,10 @@ export function checkFeodAsync({
   const run = prepare(rootDir, config);
   if (!run) return Promise.resolve([]);
   return new Promise((resolve, reject) => {
-    const child = spawn(oxlint, run.args, { cwd: rootDir, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(process.execPath, [oxlintBin, ...run.args], {
+      cwd: rootDir,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     let stdout = "";
     let stderr = "";
     let settled = false;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { DEFAULT_ENVIRONMENT_IMAGE } from "../../../core/modules/environment/index.ts";
-import { nextTick, onBeforeUnmount, ref, useId } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, useId } from "vue";
 import IconFolder from "~icons/lucide/folder-open";
 import { commandArgs, useCommandScope } from "../../common/utilities/commands.ts";
 import UiButton from "../../common/ui/UiButton.vue";
@@ -95,7 +95,7 @@ commands.scope.registerCommand({
   id: "ide.github.repository.clone",
   title: "Клонировать и открыть локальный проект",
   description:
-    "Клонирует текущий репозиторий в directory/owner/repository, добавляет в каталог и открывает /projects. Существующие папки не перезаписывает.",
+    "Клонирует текущий репозиторий в папку/имя репозитория, добавляет в каталог и открывает /projects. Существующие папки не перезаписывает.",
   arguments: {
     directory: "Абсолютная папка назначения или ~/папка",
     environment:
@@ -174,6 +174,13 @@ commands.scope.registerCommand({
     }
   },
 });
+const destination = computed(() => {
+  const base = directory.value.trim().replace(/[\\/]+$/, "");
+  const name = props.repository.split("/").pop();
+  if (!base || !name) return "";
+  const sep = base.includes("\\") ? "\\" : "/";
+  return `${base}${sep}${name}`;
+});
 function cancel(event: Event) {
   event.preventDefault();
   if (!busy.value) commands.run("ide.github.repository.clone.cancel");
@@ -205,9 +212,7 @@ function cancel(event: Event) {
             ><IconFolder aria-hidden="true"
           /></UiButton>
         </div>
-        <p v-if="directory" class="destination">
-          {{ directory.replace(/\/$/, "") }}/{{ repository }}
-        </p>
+        <p v-if="destination" class="destination">{{ destination }}</p>
         <label :for="`${id}-mode`">Окружение</label>
         <select :id="`${id}-mode`" v-model="mode" :disabled="busy || !!cloned">
           <option value="docker">Docker — изолированный запуск</option>

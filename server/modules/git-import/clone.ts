@@ -16,6 +16,29 @@ export interface HttpsCredentials {
   failure: string;
 }
 
+/** Shell helper on Linux; `.cmd` on Windows, where Git cannot execute a shebang script. */
+function askpassHelper(credentials: HttpsCredentials): { filename: string; contents: string } {
+  if (process.platform === "win32")
+    return {
+      filename: "askpass.cmd",
+      contents: [
+        "@echo off",
+        "setlocal EnableExtensions",
+        `echo %~1 | findstr /I /C:"Username" >nul`,
+        "if errorlevel 1 (",
+        `  echo.%${credentials.tokenEnv}%`,
+        ") else (",
+        `  echo.${credentials.username}`,
+        ")",
+        "",
+      ].join("\r\n"),
+    };
+  return {
+    filename: "askpass",
+    contents: `#!/bin/sh\ncase "$1" in *Username*) printf "%s\\n" "${credentials.username}" ;; *) printf "%s\\n" "$${credentials.tokenEnv}" ;; esac\n`,
+  };
+}
+
 /** Hardened HTTPS clone: no hooks, no redirects, token only through a temporary askpass helper. */
 export async function cloneOverHttps(
   url: string,
@@ -26,12 +49,9 @@ export async function cloneOverHttps(
 ) {
   const helper = await mkdtemp(join(tmpdir(), "projector-git-"));
   try {
-    const askpass = join(helper, "askpass");
-    await writeFile(
-      askpass,
-      `#!/bin/sh\ncase "$1" in *Username*) printf "%s\\n" "${credentials.username}" ;; *) printf "%s\\n" "$${credentials.tokenEnv}" ;; esac\n`,
-      { mode: 0o700 },
-    );
+    const script = askpassHelper(credentials);
+    const askpass = join(helper, script.filename);
+    await writeFile(askpass, script.contents, { mode: 0o700 });
     await exec(
       "git",
       [
