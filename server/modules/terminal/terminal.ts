@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import { containerToHost, resolveTerminalPath } from "./link-files.ts";
 import { rmSync } from "node:fs";
 import { os } from "../../../core/modules/os/index.ts";
+import { terminateProcessTree } from "./terminate.ts";
 import { saveDroppedFile } from "./drop-files.ts";
 import { HttpError } from "../http/index.ts";
 import { devcontainerLaunch } from "../devcontainer/index.ts";
@@ -113,8 +114,6 @@ export async function resolveTerminalFile(project: Project, id: string, path: st
   return resolveTerminalPath(path, project.path, cwd);
 }
 
-const descendants = (pid: number) => os.processes.descendants(pid);
-
 function terminate(session: Session, immediate = false): void {
   if (session.info.status !== "running") return;
   if (session.info.docker?.kind === "environment") {
@@ -122,51 +121,7 @@ function terminate(session: Session, immediate = false): void {
     if (immediate) stopEnvironmentContainerSync(context, containerId!);
     else void stopEnvironmentContainer(context, containerId!, true);
   }
-  if (os.platform === "win32") {
-    // One taskkill /T on the root ends the whole tree atomically. Signalling pids taken from a
-    // process listing could hit an unrelated process that reused a pid in the meantime.
-    os.tools.killAgentTree(session.pty.pid);
-    try {
-      // node-pty on Windows throws on any signal name.
-      session.pty.kill();
-    } catch {
-      /* Already exited. */
-    }
-    return;
-  }
-  const family = descendants(session.pty.pid);
-  for (const entry of family.reverse()) {
-    try {
-      os.processes.signal(entry.pid, immediate ? "SIGKILL" : "SIGTERM");
-    } catch {
-      /* Already exited. */
-    }
-  }
-  try {
-    session.pty.kill(immediate ? "SIGKILL" : "SIGTERM");
-  } catch {
-    /* Already exited. */
-  }
-  if (immediate) return;
-  const timer = setTimeout(() => {
-    for (const entry of family) {
-      try {
-        if (os.processes.identity(entry.pid) === entry.started) {
-          for (const child of descendants(entry.pid).reverse()) {
-            try {
-              os.processes.signal(child.pid, "SIGKILL");
-            } catch {
-              /* Already exited. */
-            }
-          }
-          os.processes.signal(entry.pid, "SIGKILL");
-        }
-      } catch {
-        /* Already exited; never kill a reused pid. */
-      }
-    }
-  }, 1500);
-  timer.unref();
+  terminateProcessTree(session.pty, immediate);
 }
 
 export function stopTerminalSession(projectId: string, id: string): void {
