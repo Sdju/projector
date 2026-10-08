@@ -7,24 +7,33 @@ const descendants = (pid: number) => os.processes.descendantsSync(pid);
 /** Ends a PTY and everything its shell started: SIGTERM first, SIGKILL after a grace period. */
 export function terminateProcessTree(pty: IPty, immediate: boolean): void {
   if (os.platform === "win32") {
-    // taskkill /T ends the tree atomically; pids from a listing may have been reused already.
-    // MSYS programs are not Win32 children of their shell; the tracked console lists them.
-    // The listing is read first: once the root is gone its console can no longer be inspected.
-    const rows = os.processes.snapshot() ?? [];
-    const family = new Set([pty.pid]);
-    for (let grew = true; grew;) {
-      grew = false;
-      for (const row of rows)
-        if (family.has(row.parent) && !family.has(row.pid)) grew = !!family.add(row.pid);
-    }
-    os.tools.killAgentTree(pty.pid);
-    for (const pid of family) if (pid !== pty.pid) os.tools.killAgentTree(pid);
-    try {
-      // node-pty on Windows throws on any signal name.
-      pty.kill();
-    } catch {
-      /* Already exited. */
-    }
+    const killRoot = () => {
+      os.tools.killAgentTree(pty.pid);
+      try {
+        // node-pty on Windows throws on any signal name.
+        pty.kill();
+      } catch {
+        /* Already exited. */
+      }
+    };
+    // While the process exits there is no time to look around: the root tree is all we can end.
+    if (immediate) return killRoot();
+    // MSYS programs are not Win32 children of their shell; the tracked console lists them. That
+    // listing is read fresh and before the root goes: a cached one could name reused pids, and
+    // once the root is gone its console can no longer be inspected.
+    void os.processes
+      .list()
+      .then((rows = []) => {
+        const family = new Set([pty.pid]);
+        for (let grew = true; grew;) {
+          grew = false;
+          for (const row of rows ?? [])
+            if (family.has(row.parent) && !family.has(row.pid)) grew = !!family.add(row.pid);
+        }
+        for (const pid of family) if (pid !== pty.pid) os.tools.killAgentTree(pid);
+      })
+      .catch(() => undefined)
+      .finally(killRoot);
     return;
   }
   const family = descendants(pty.pid);
