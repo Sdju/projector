@@ -5,7 +5,7 @@ import { killTree } from "./kill-tree.ts";
 import type { AgentHostSpec, AgentLaunch, AgentProcess, AgentProcessSpec } from "../../contract.ts";
 
 /** `shell: true` joins argv with spaces, so anything with whitespace or quotes is quoted for cmd.exe. */
-function quoteForCmd(value: string): string {
+export function quoteForCmd(value: string): string {
   if (value !== "" && !/[\s"&|<>^()%]/.test(value)) return value;
   return `"${value.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, "$1$1")}"`;
 }

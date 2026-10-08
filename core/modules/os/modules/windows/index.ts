@@ -17,6 +17,7 @@ export {
   runDockerSync,
   runNodeScript,
   commandExists,
+  ptyCommand,
 } from "./tools.ts";
 export { dataHome, shell, shellLaunch, desktopPaths, pickFolder } from "./directories.ts";
 export {

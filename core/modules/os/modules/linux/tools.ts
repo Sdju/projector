@@ -152,3 +152,8 @@ export function searchFiles(
 ) {
   return execute("rg", args, options);
 }
+
+/** POSIX resolves a bare name itself. */
+export function ptyCommand(file: string, args: string[]): { file: string; args: string[] } {
+  return { file, args };
+}

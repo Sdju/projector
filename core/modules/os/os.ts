@@ -116,6 +116,7 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
       ) => backend("runNodeScript").runNodeScript(script, args, options),
       runBash: (command: string, options: { cwd: string; signal?: AbortSignal }) =>
         backend("runBash").runBash(command, options),
+      ptyCommand: (file: string, args: string[]) => backend("ptyCommand").ptyCommand(file, args),
       gitAskpass: (spec: AskpassSpec) => backend("gitAskpass").gitAskpass(spec),
       /** Moves `source` to a new `destination`; an existing one rejects with code `EEXIST`. */
       publishDirectory: (source: string, destination: string) =>

@@ -1,8 +1,10 @@
 import { execFile, execFileSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { lstat } from "node:fs/promises";
+import { join } from "node:path";
 import { promisify } from "node:util";
 import { bashExecutable } from "./directories.ts";
+import { quoteForCmd } from "./agent-process.ts";
 import { killTree } from "./kill-tree.ts";
 import { runPowerShell } from "./ps.ts";
 
@@ -191,4 +193,29 @@ export function searchFiles(
   options: { cwd: string; timeout: number; maxBuffer: number },
 ) {
   return execute("rg", args, { ...options, windowsHide: true });
+}
+
+/**
+ * node-pty looks for the exact file name on PATH, without PATHEXT: a bare `docker` is not found
+ * although `docker.exe` is. Batch files cannot be started by CreateProcess at all, so they run
+ * through cmd.exe.
+ */
+export function ptyCommand(file: string, args: string[]): { file: string; args: string[] } {
+  const direct = /[\\/]/.test(file);
+  const directories = direct ? [""] : (process.env.Path ?? process.env.PATH ?? "").split(";");
+  const extensions = /\.[A-Za-z0-9]+$/.test(file)
+    ? [""]
+    : (process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean);
+  for (const directory of directories)
+    for (const extension of extensions) {
+      const candidate = directory ? join(directory, file + extension) : file + extension;
+      if (!existsSync(candidate)) continue;
+      if (/\.(?:cmd|bat)$/i.test(candidate))
+        return {
+          file: process.env.ComSpec || "cmd.exe",
+          args: ["/d", "/s", "/c", [candidate, ...args].map(quoteForCmd).join(" ")],
+        };
+      return { file: candidate, args };
+    }
+  return { file, args };
 }

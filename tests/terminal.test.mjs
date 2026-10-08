@@ -480,7 +480,8 @@ process.stdin.on('data', (chunk) => {
   first.send({ type: "input", data: "cd nested; printf 'LINK_CWD_%s\\n' READY\r" });
   await until(() => first.output().includes("LINK_CWD_READY"), "shell changed cwd for links");
   const linkRequest = (path) => request(`/${session.id}?${new URLSearchParams({ link: path })}`);
-  expect(await (await linkRequest("local.ts")).json()).toStrictEqual({
+  const localLink = await (await linkRequest("local.ts")).json();
+  expect(localLink, JSON.stringify(localLink)).toStrictEqual({
     path: "nested/local.ts",
     external: false,
   });

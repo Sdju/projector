@@ -199,3 +199,42 @@ test.skipIf(!windows)(
     expect(alive(grandchild)).toBe(false);
   },
 );
+
+test.skipIf(!windows)(
+  "PTY commands resolve bare names and batch files for CreateProcess",
+  async () => {
+    const cmd = os.tools.ptyCommand("cmd", ["/c", "echo"]);
+    expect(cmd.file.toLowerCase()).toMatch(/cmd\.exe$/);
+    expect(cmd.args).toStrictEqual(["/c", "echo"]);
+    const directory = await scratch();
+    await writeFile(join(directory, "tool.cmd"), "@echo off\r\necho tool\r\n");
+    const previous = process.env.Path;
+    process.env.Path = `${directory};${previous}`;
+    onTestFinished(() => (process.env.Path = previous));
+    const batch = os.tools.ptyCommand("tool", ["a b"]);
+    expect(batch.file.toLowerCase()).toMatch(/cmd\.exe$/);
+    expect(batch.args.slice(0, 3)).toStrictEqual(["/d", "/s", "/c"]);
+    expect(batch.args[3]).toContain("tool.cmd");
+    expect(os.tools.ptyCommand("no-such-program-xyz", ["x"])).toStrictEqual({
+      file: "no-such-program-xyz",
+      args: ["x"],
+    });
+  },
+);
+
+test.skipIf(!windows)("a Git Bash process reports the directory it changed into", async () => {
+  const directory = await scratch();
+  await mkdir(join(directory, "nested"));
+  const child = spawn(os.shell(), ["-c", "cd nested && sleep 20"], {
+    cwd: directory,
+    stdio: "ignore",
+  });
+  onTestFinished(() => child.kill());
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+  const found = (await os.processes.descendants(child.pid)).map((entry) => entry.pid);
+  const cwds = await Promise.all(found.map((pid) => os.processes.workingDirectory(pid, "?")));
+  expect(
+    cwds.map((value) => value.toLowerCase()),
+    JSON.stringify(cwds),
+  ).toContain(join(directory, "nested").toLowerCase());
+});

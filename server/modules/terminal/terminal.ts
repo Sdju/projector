@@ -244,7 +244,8 @@ export function createTerminalSession(
   const mouseEncoding = trackMouseEncoding(screen);
   let child: IPty;
   try {
-    child = spawn(launch?.file ?? invocation.file, launch?.args ?? args, {
+    const command = os.tools.ptyCommand(launch?.file ?? invocation.file, launch?.args ?? args);
+    child = spawn(command.file, command.args, {
       name: "xterm-256color",
       ...dimensions,
       cwd: project.path,

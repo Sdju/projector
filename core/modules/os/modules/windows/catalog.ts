@@ -71,7 +71,7 @@ foreach ($root in $roots) {
 
 export async function launchApplication(id: string) {
   if (!allowed(id)) throw new Error("Приложение больше не доступно");
-  await runPowerShell("Start-Process -LiteralPath $env:PROJECTOR_SHORTCUT", {
+  await runPowerShell("Start-Process -FilePath $env:PROJECTOR_SHORTCUT", {
     env: { PROJECTOR_SHORTCUT: id },
   });
 }
