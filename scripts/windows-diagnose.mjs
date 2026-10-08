@@ -12,10 +12,24 @@ const child = spawn(command.file, command.args, {
   cwd: process.cwd(),
   env: process.env,
 });
+os.processes.trackConsole(child.pid);
 let output = "";
 child.onData((data) => (output += data));
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-await wait(4000);
+await wait(5000);
+{
+  const rows = (await os.processes.list()) ?? [];
+  const family = new Set([child.pid]);
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const row of rows)
+      if (family.has(row.parent) && !family.has(row.pid)) grew = !!family.add(row.pid);
+  }
+  console.log(
+    "idle family:",
+    JSON.stringify(rows.filter((row) => family.has(row.pid)).map((r) => [r.pid, r.parent, r.name])),
+  );
+}
 child.write("sleep 20\r");
 for (const delay of [1000, 3000, 6000]) {
   await wait(delay === 1000 ? 1000 : delay - (delay === 3000 ? 1000 : 3000));
