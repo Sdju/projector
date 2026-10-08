@@ -230,10 +230,13 @@ export function isExecutableFile(name: string, _mode: number): boolean {
   return [...extensions, ".ps1"].some((extension) => lower.endsWith(extension));
 }
 
+/** Git for Windows puts its own coreutils (`whoami`, `find`…) on PATH; the system tools are meant. */
+const system32 = (name: string) => join(process.env.SystemRoot ?? "C:\\Windows", "System32", name);
+
 let ownerSid: string | undefined;
 function currentSid(): string {
   ownerSid ??= String(
-    execFileSync("whoami.exe", ["/user", "/fo", "csv", "/nh"], {
+    execFileSync(system32("whoami.exe"), ["/user", "/fo", "csv", "/nh"], {
       encoding: "utf8",
       windowsHide: true,
     }),
@@ -261,8 +264,8 @@ const ownerOnly = (path: string) => [
  * keeps access, so other local accounts cannot read tokens and passwords.
  */
 export async function restrictToOwner(path: string): Promise<void> {
-  await execute("icacls.exe", ownerOnly(path), { windowsHide: true });
+  await execute(system32("icacls.exe"), ownerOnly(path), { windowsHide: true });
 }
 export function restrictToOwnerSync(path: string): void {
-  execFileSync("icacls.exe", ownerOnly(path), { stdio: "ignore", windowsHide: true });
+  execFileSync(system32("icacls.exe"), ownerOnly(path), { stdio: "ignore", windowsHide: true });
 }

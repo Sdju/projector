@@ -6,7 +6,9 @@ const execute = promisify(execFile);
 
 /** Principals in the file's ACL, e.g. ["RUNNER\\runneradmin"]. */
 export async function aclPrincipals(path) {
-  const { stdout } = await execute("icacls.exe", [path], { windowsHide: true });
+  const { stdout } = await execute(`${process.env.SystemRoot}\\System32\\icacls.exe`, [path], {
+    windowsHide: true,
+  });
   return stdout
     .split(/\r?\n/)
     .map((line) => /(\S+):\([A-Z,()]+\)\s*$/.exec(line.trimEnd())?.[1])

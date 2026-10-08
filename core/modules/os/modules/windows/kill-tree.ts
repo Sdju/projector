@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { join } from "node:path";
 
 /**
  * Stops a process and everything it started with `taskkill /T /F`, bounded to two seconds. The
@@ -7,10 +8,14 @@ import { spawn } from "node:child_process";
  */
 export function killTree(pid: number): Promise<void> {
   return new Promise((resolve) => {
-    const killer = spawn("taskkill.exe", ["/PID", String(pid), "/T", "/F"], {
-      stdio: "ignore",
-      windowsHide: true,
-    });
+    const killer = spawn(
+      join(process.env.SystemRoot ?? "C:\\Windows", "System32", "taskkill.exe"),
+      ["/PID", String(pid), "/T", "/F"],
+      {
+        stdio: "ignore",
+        windowsHide: true,
+      },
+    );
     const timer = setTimeout(() => {
       killer.kill();
       resolve();
