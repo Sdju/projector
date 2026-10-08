@@ -514,8 +514,14 @@ process.stdin.on('data', (chunk) => {
   first.send({ type: "input", data: "sleep 30\r" });
   await pause(process.platform === "win32" ? 1500 : 150); // a Windows process takes a moment to start
   first.send({ type: "input", data: "\x03" });
+  // Typed-ahead input is dropped by an interrupted shell on Windows; wait for its prompt.
+  if (process.platform === "win32") await pause(1500);
   first.send({ type: "input", data: "printf 'INTERRUPT_%s\\n' OK\r" });
-  await until(() => first.output().includes("INTERRUPT_OK"), "Ctrl+C restores prompt");
+  await until(() => first.output().includes("INTERRUPT_OK"), "Ctrl+C restores prompt").catch(
+    (error) => {
+      throw new Error(`${error.message}\n--- terminal tail ---\n${first.output().slice(-800)}`);
+    },
+  );
   first.send({
     type: "input",
     data: "printf '\\033[?1049h\\033[?1000h\\033[?1006h\\033[2J\\033[HALT_SCREEN_%s' OK\r",
