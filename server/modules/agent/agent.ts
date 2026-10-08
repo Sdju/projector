@@ -4,7 +4,7 @@ import { claudeCodeBackend } from "./claude-code-backend.ts";
 import { projectorBackend } from "./projector-backend.ts";
 
 export type { AgentEmitter, AgentEventName, AgentRunOptions } from "./backend.ts";
-export { AGENT_BACKEND_IDS, AGENT_PERMISSION_MODES } from "./backend.ts";
+export { AGENT_BACKEND_IDS, AGENT_PERMISSION_MODES, HOSTED_AGENT_BACKENDS } from "./backend.ts";
 export type { AgentBackendId, AgentPermissionMode } from "./backend.ts";
 export type {
   AgentControl,

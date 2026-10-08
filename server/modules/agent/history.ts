@@ -11,6 +11,8 @@ const schema = z
       text: z.string().max(100000),
       /** Native session of the backend that produced this turn, used to resume it. */
       session: z.object({ backend: z.string().max(40), id: z.string().max(200) }).optional(),
+      /** The agent process still answering this turn; lets a reloaded page rejoin it. */
+      run: z.string().max(40).optional(),
       tools: z
         .array(
           z.object({

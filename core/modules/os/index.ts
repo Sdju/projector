@@ -7,5 +7,6 @@ export type {
   SecretKey,
   ShellLaunch,
   AgentProcess,
+  AgentHostSpec,
   AgentProcessSpec,
 } from "./contract.ts";

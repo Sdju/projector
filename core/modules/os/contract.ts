@@ -10,6 +10,16 @@ export interface AgentProcessSpec {
   env?: Record<string, string | undefined>;
 }
 
+/** The script that keeps an agent process alive across server restarts, and where it logs. */
+export interface AgentHostSpec {
+  script: string;
+  dir: string;
+  address: string;
+  env: Record<string, string | undefined>;
+  /** File descriptor for the host's own stdout and stderr. */
+  log: number;
+}
+
 export type AgentProcess = ChildProcessWithoutNullStreams & {
   /** Kills the whole process tree (shell grandchildren included) and waits for exit. */
   terminate(): Promise<void>;

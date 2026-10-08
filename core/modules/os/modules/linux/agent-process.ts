@@ -1,6 +1,8 @@
 import { execFile, spawn } from "node:child_process";
+import { tmpdir } from "node:os";
+import { basename, join } from "node:path";
 import { shell } from "./directories.ts";
-import type { AgentProcess, AgentProcessSpec } from "../../contract.ts";
+import type { AgentHostSpec, AgentProcess, AgentProcessSpec } from "../../contract.ts";
 
 /** How long a tree gets to exit on SIGTERM before SIGKILL. */
 const TERM_GRACE_MS = 3000;
@@ -74,4 +76,41 @@ export async function agentEnv(
     (entry) => entry && !seen.has(entry) && !!seen.add(entry),
   );
   return { ...base, PATH: merged.join(":") };
+}
+
+/** A unix socket path is limited to about 108 bytes, so a deep data directory falls back to /tmp. */
+export function agentHostAddress(dir: string): string {
+  const path = join(dir, "host.sock");
+  return path.length < 100 ? path : join(tmpdir(), `projector-agent-${basename(dir)}.sock`);
+}
+
+/**
+ * Starts the script that holds an agent process outside the server's own life: its own session,
+ * no inherited stdio, so a server restart or crash leaves it (and the answer in progress) running.
+ */
+export function spawnAgentHost(spec: AgentHostSpec): number | undefined {
+  const child = spawn(process.execPath, [spec.script, spec.dir, spec.address], {
+    env: spec.env as NodeJS.ProcessEnv,
+    stdio: ["ignore", spec.log, spec.log],
+    detached: true,
+  });
+  child.on("error", () => {});
+  child.unref();
+  return child.pid;
+}
+
+/** Stops a hosted agent and everything it started: SIGTERM to the group, SIGKILL after a grace period. */
+export function killAgentTree(pid: number): void {
+  try {
+    process.kill(-pid, "SIGTERM");
+  } catch {
+    return;
+  }
+  setTimeout(() => {
+    try {
+      process.kill(-pid, "SIGKILL");
+    } catch {
+      /* The group is already gone. */
+    }
+  }, TERM_GRACE_MS).unref();
 }

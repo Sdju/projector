@@ -43,6 +43,8 @@ export interface AgentTurn {
   tools: AgentToolChip[];
   /** Native backend session (Claude Code) this turn belongs to; the next request resumes it. */
   session?: AgentSessionRef;
+  /** The agent process still answering this turn; set until the turn ends, so it can be rejoined. */
+  run?: string;
 }
 
 /** A sensitive tool call waiting for the user's decision. */
@@ -82,6 +84,7 @@ export type AgentEvent =
         persistent?: boolean;
       };
     }
+  | { event: "run"; data: { id: string } }
   | { event: "session"; data: AgentSessionRef }
   | { event: "controls"; data: { controls: AgentControl[] } }
   | { event: "status"; data: { phase: string; provider?: string; model?: string } }

@@ -4,6 +4,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import * as linux from "./modules/linux/index.ts";
 import * as windows from "./modules/windows/index.ts";
 import type {
+  AgentHostSpec,
   AgentProcessSpec,
   DesktopAction,
   ResidentOptions,
@@ -76,6 +77,9 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
       agentEnv: (base: Record<string, string | undefined>) => backend("agentEnv").agentEnv(base),
       spawnAgentProcess: (spec: AgentProcessSpec) =>
         backend("spawnAgentProcess").spawnAgentProcess(spec),
+      agentHostAddress: (dir: string) => backend("agentHostAddress").agentHostAddress(dir),
+      spawnAgentHost: (spec: AgentHostSpec) => backend("spawnAgentHost").spawnAgentHost(spec),
+      killAgentTree: (pid: number) => backend("killAgentTree").killAgentTree(pid),
       readClaudeAccessToken: () => backend("readClaudeAccessToken").readClaudeAccessToken(),
       readOpenCodeGoKey: () => backend("readOpenCodeGoKey").readOpenCodeGoKey(),
       readCursorAccessToken: () => backend("readCursorAccessToken").readCursorAccessToken(),

@@ -1,6 +1,6 @@
 import { computed, reactive } from "vue";
-import { useProjects, type Project } from "../../project/index.ts";
-import { answerPermission, streamAgent } from "../api/client.ts";
+import { useProjects } from "../../project/index.ts";
+import { AgentRunGone, answerPermission, cancelAgentRun, streamAgent } from "../api/client.ts";
 import {
   RELEASE_DELAY_MS,
   createState,
@@ -8,17 +8,24 @@ import {
   releases,
   saves,
   sessions,
-  summarize,
   viewers,
 } from "./chat-state.ts";
 import { useExternalAgent } from "./external.ts";
+import { applyAgentEvent } from "./turn-events.ts";
 import type {
   AgentBackendId,
+  AgentEvent,
   AgentHistoryTurn,
   AgentTurn,
   AgentCommandRequest,
   AgentPermissionMode,
 } from "./types.ts";
+
+/** A restarting server answers again within seconds; this much patience covers a slow restart. */
+const REJOIN_DELAY_MS = 1000;
+const REJOIN_ATTEMPTS = 60;
+const INTERRUPTED =
+  "Ответ прерван: страница или сервер были перезапущены. Отправьте сообщение ещё раз — разговор продолжится.";
 
 export function useAgent(
   projectId = "",
@@ -44,11 +51,10 @@ export function useAgent(
           const data = await response.json();
           state.turns = data.turns;
           // A turn saved at its start but never finished: the page or server went away mid-answer.
+          // One with a live agent process behind it is rejoined instead (`resumeRun`).
           const last = state.turns.at(-1);
-          if (last?.role === "assistant" && !last.text.trim() && !last.tools.length) {
-            last.text =
-              "Ответ прерван: страница или сервер были перезапущены. Отправьте сообщение ещё раз — разговор продолжится.";
-          }
+          if (last?.role === "assistant" && !last.run && !last.text.trim() && !last.tools.length)
+            last.text = INTERRUPTED;
           for (const turn of state.turns)
             for (const chip of turn.tools) {
               if (chip.status === "running") {
@@ -132,17 +138,73 @@ export function useAgent(
       .map((item) => ({ role: item.role, content: item.text }));
   }
 
+  /**
+   * Runs one answer on the chat: `start` streams events, which are folded into `assistant`.
+   * The agent process outlives the server, so when the stream breaks while the answer is still
+   * open (a server restart), the chat rejoins the run and takes the whole answer again.
+   */
+  async function runTurn(
+    assistant: AgentTurn,
+    start: (
+      onEvent: (event: AgentEvent) => void,
+      signal: AbortSignal,
+      attach?: string,
+    ) => Promise<void>,
+    firstAttach?: string,
+  ): Promise<void> {
+    state.busy = true;
+    state.phase = "думает";
+    state.abort = new AbortController();
+    const { signal } = state.abort;
+    const onEvent = (event: AgentEvent) => {
+      if (applyAgentEvent(state, assistant, event, catalog.ingest)) persist();
+    };
+    try {
+      let attach = firstAttach;
+      for (let attempt = 0; ; attempt++) {
+        if (attach) {
+          assistant.text = "";
+          assistant.tools.splice(0);
+        }
+        try {
+          await start(onEvent, signal, attach);
+          if (signal.aborted || !assistant.run) break;
+        } catch (err) {
+          if (err instanceof AgentRunGone || signal.aborted || !assistant.run) throw err;
+          if (attempt >= REJOIN_ATTEMPTS) throw err;
+        }
+        await new Promise((resolve) => setTimeout(resolve, REJOIN_DELAY_MS));
+        attach = assistant.run;
+        if (signal.aborted || !attach) break;
+      }
+    } catch (err) {
+      if (err instanceof AgentRunGone) {
+        assistant.run = undefined;
+        if (!assistant.text.trim()) assistant.text = INTERRUPTED;
+      } else if (!signal.aborted)
+        state.error = err instanceof Error ? err.message : "Агент не ответил";
+    } finally {
+      state.abort?.abort();
+      for (const chip of assistant.tools)
+        if (chip.status === "running") {
+          chip.status = "error";
+          chip.detail = "Выполнение прервано";
+        }
+      state.busy = false;
+      state.phase = "";
+      state.permissions = [];
+      persist();
+    }
+  }
+
   async function send(text?: string): Promise<void> {
     await ready;
     const message = (text ?? state.draft).trim();
     if (!message || state.busy) return;
     state.draft = "";
     state.error = "";
-    state.busy = true;
-    state.phase = "думает";
     const previousHistory = history();
     const resume = sessionId();
-    state.abort = new AbortController();
     const userTurn: AgentTurn = {
       id: crypto.randomUUID(),
       role: "user",
@@ -159,83 +221,40 @@ export function useAgent(
     // Saved now, not only at the end: a reload or restart mid-answer must not lose the question
     // or the native session the next message resumes.
     persist();
+    await runTurn(assistant, (onEvent, signal, attach) =>
+      streamAgent(message, previousHistory, onEvent, signal, {
+        projectId: projectId || undefined,
+        sessionId: resume,
+        commands,
+        backend,
+        permissionMode: state.permissionMode,
+        selection: state.selection,
+        attach,
+      }),
+    );
+  }
 
-    try {
-      await streamAgent(
-        message,
-        previousHistory,
-        (event) => {
-          if (event.event === "status") {
-            state.phase = event.data.model
-              ? `${event.data.provider ?? "qwen"} · ${event.data.model}`
-              : "думает";
-          }
-          if (event.event === "session") {
-            assistant.session = event.data;
-            persist();
-          }
-          if (event.event === "controls") {
-            // What the agent really applied wins over a choice it refused.
-            state.controls = event.data.controls;
-            state.selection = {
-              ...state.selection,
-              ...Object.fromEntries(event.data.controls.map((item) => [item.id, item.current])),
-            };
-          }
-          if (event.event === "permission-request")
-            state.permissions.push({
-              id: event.data.id,
-              tool: event.data.tool,
-              title: event.data.title || event.data.tool,
-              detail: event.data.detail?.trim() || summarize(event.data.input),
-              persistent: event.data.persistent === true,
-            });
-          if (event.event === "text") assistant.text += event.data.text;
-          if (event.event === "tool") {
-            if (assistant.text.trim() && !assistant.text.endsWith("\n\n")) assistant.text += "\n\n";
-            assistant.tools.push({
-              id: event.data.id,
-              name: event.data.name,
-              status: "running",
-              detail: summarize(event.data.input),
-            });
-          }
-          if (event.event === "tool-result") {
-            const chip = assistant.tools.find((item) => item.id === event.data.id);
-            if (chip) {
-              chip.status = event.data.error ? "error" : "done";
-              chip.detail = event.data.error || summarize(event.data.output);
-            }
-          }
-          if (event.event === "project") catalog.ingest(event.data as Project);
-          if (event.event === "error") state.error = event.data.error;
-        },
-        state.abort.signal,
-        {
+  /**
+   * An answer that was still being produced when the page or the server went away: the agent
+   * process kept working, so its whole answer is replayed into the same turn.
+   */
+  async function resumeRun(): Promise<void> {
+    await ready;
+    const assistant = state.turns.at(-1);
+    if (state.busy || assistant?.role !== "assistant" || !assistant.run) return;
+    await runTurn(
+      assistant,
+      (onEvent, signal, attach) =>
+        streamAgent("", [], onEvent, signal, {
           projectId: projectId || undefined,
-          sessionId: resume,
           commands,
           backend,
-          permissionMode: state.permissionMode,
-          selection: state.selection,
-        },
-      );
-    } catch (err) {
-      if (!state.abort?.signal.aborted)
-        state.error = err instanceof Error ? err.message : "Агент не ответил";
-    } finally {
-      state.abort?.abort();
-      for (const chip of assistant.tools)
-        if (chip.status === "running") {
-          chip.status = "error";
-          chip.detail = "Выполнение прервано";
-        }
-      state.busy = false;
-      state.phase = "";
-      state.permissions = [];
-      persist();
-    }
+          attach,
+        }),
+      assistant.run,
+    );
   }
+  void resumeRun();
 
   async function clear(): Promise<void> {
     await ready;
@@ -247,7 +266,16 @@ export function useAgent(
     persist();
   }
 
-  const stop = () => state.abort?.abort();
+  /** Stops the answer. Only this cancels an agent process; closing the page just detaches from it. */
+  function stop() {
+    const assistant = state.turns.at(-1);
+    const run = assistant?.run;
+    if (assistant && run) {
+      assistant.run = undefined;
+      void cancelAgentRun(run).catch(() => {});
+    }
+    state.abort?.abort();
+  }
   /** A chat view starts showing this chat; pair it with `release`. */
   function attach() {
     viewers.set(key, (viewers.get(key) ?? 0) + 1);

@@ -40,20 +40,25 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
     if (connection && sessionId) connection.notify("session/cancel", { sessionId });
     void connection?.close();
   };
-  connection = await startAcp(id, options.cwd, {
-    onNotification(method, params) {
-      if (method !== "session/update" || replaying) return;
-      mapper.handleUpdate(
-        String(params.sessionId ?? ""),
-        (params.update ?? {}) as Record<string, unknown>,
-      );
+  connection = await startAcp(
+    id,
+    options.cwd,
+    {
+      onNotification(method, params) {
+        if (method !== "session/update" || replaying) return;
+        mapper.handleUpdate(
+          String(params.sessionId ?? ""),
+          (params.update ?? {}) as Record<string, unknown>,
+        );
+      },
+      onRequest(method, params) {
+        if (method !== "session/request_permission")
+          throw new Error(`Клиент не поддерживает ${method}`);
+        return decidePermission(options, params);
+      },
     },
-    onRequest(method, params) {
-      if (method !== "session/request_permission")
-        throw new Error(`Клиент не поддерживает ${method}`);
-      return decidePermission(options, params);
-    },
-  });
+    options.run,
+  );
   options.abort?.addEventListener("abort", abort, { once: true });
   if (options.abort?.aborted) abort();
 

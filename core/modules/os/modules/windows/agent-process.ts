@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
-import type { AgentProcess, AgentProcessSpec } from "../../contract.ts";
+import { basename } from "node:path";
+import type { AgentHostSpec, AgentProcess, AgentProcessSpec } from "../../contract.ts";
 
 /**
  * A separate stdio process per chat turn: Projector never touches the user's own sessions.
@@ -42,4 +43,25 @@ export async function agentEnv(
   base: Record<string, string | undefined>,
 ): Promise<Record<string, string | undefined>> {
   return base;
+}
+
+export function agentHostAddress(dir: string): string {
+  return `\\\\.\\pipe\\projector-agent-${basename(dir)}`;
+}
+
+/** Starts the script that holds an agent process outside the server's own life. */
+export function spawnAgentHost(spec: AgentHostSpec): number | undefined {
+  const child = spawn(process.execPath, [spec.script, spec.dir, spec.address], {
+    env: spec.env as NodeJS.ProcessEnv,
+    stdio: ["ignore", spec.log, spec.log],
+    detached: true,
+    windowsHide: true,
+  });
+  child.on("error", () => {});
+  child.unref();
+  return child.pid;
+}
+
+export function killAgentTree(pid: number): void {
+  killTree(pid);
 }

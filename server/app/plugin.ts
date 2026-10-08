@@ -7,6 +7,7 @@ import { APP_PORT, appUrl } from "../../core/modules/app-paths/index.ts";
 import { openLauncher } from "../modules/window/index.ts";
 import type { ServerMode } from "../../core/modules/server-mode/index.ts";
 import { attachTerminalServer } from "../modules/terminal/index.ts";
+import { pruneRuns } from "../modules/agent/index.ts";
 import { reconcileOnStartup } from "../modules/environments/index.ts";
 
 import { attachTerminalControlServer } from "../modules/terminal-control/index.ts";
@@ -43,6 +44,7 @@ export function bindRuntime(httpServer: HttpServer | null, mode: ServerMode): vo
     const port = address && typeof address === "object" ? address.port : APP_PORT;
     void writeInstance(port);
     bindHooks();
+    void pruneRuns().catch(() => {});
     void reconcileOnStartup().catch((error) =>
       console.error("Очистка контейнеров:", error.message),
     );

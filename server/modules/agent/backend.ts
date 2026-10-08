@@ -11,6 +11,7 @@ export type AgentEventName =
   | "command-request"
   | "controls"
   | "permission-request"
+  | "run"
   | "status"
   | "session"
   | "text"
@@ -33,6 +34,9 @@ export const AGENT_BACKEND_IDS: readonly AgentBackendId[] = [
   "cursor",
 ];
 
+/** Agents driven over ACP: their process is held by a host that survives a server restart. */
+export const HOSTED_AGENT_BACKENDS: readonly AgentBackendId[] = ["codex", "opencode", "cursor"];
+
 /** Claude Code permission policy: `default` asks in the chat before edits and shell commands. */
 export type AgentPermissionMode = "default" | "acceptEdits" | "bypassPermissions";
 
@@ -42,7 +46,15 @@ export const AGENT_PERMISSION_MODES: readonly AgentPermissionMode[] = [
   "bypassPermissions",
 ];
 
+/** A run whose agent process lives outside the server, so a server restart can rejoin it. */
+export interface AgentRunHandle {
+  id: string;
+  /** Replay the run an earlier server started instead of starting the agent. */
+  attach: boolean;
+}
+
 export interface AgentRunOptions {
+  run?: AgentRunHandle;
   /** Defaults to `projector`. */
   backend?: AgentBackendId;
   permissionMode?: AgentPermissionMode;

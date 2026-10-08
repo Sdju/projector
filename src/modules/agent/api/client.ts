@@ -31,6 +31,9 @@ function parseSse(buffer: string): { events: AgentEvent[]; rest: string } {
   return { events, rest };
 }
 
+/** The run to rejoin no longer exists on the server (finished and collected, or pruned). */
+export class AgentRunGone extends Error {}
+
 export async function streamAgent(
   message: string,
   history: AgentHistoryTurn[],
@@ -43,27 +46,34 @@ export async function streamAgent(
     permissionMode?: AgentPermissionMode;
     selection?: AgentSelection;
     commands?: (request: AgentCommandRequest) => Promise<unknown>;
+    /** Rejoin the answer an agent process is still producing instead of asking again. */
+    attach?: string;
   } = {},
 ): Promise<void> {
   const response = await fetch("/api/agent", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      message,
-      history,
-      projectId: options.projectId,
-      sessionId: options.sessionId,
-      backend: options.backend,
-      permissionMode: options.permissionMode,
-      selection: options.selection,
-      approvals: true,
-      commandBridge: !!options.commands,
-    }),
+    body: JSON.stringify(
+      options.attach
+        ? { attach: options.attach, approvals: true, commandBridge: !!options.commands }
+        : {
+            message,
+            history,
+            projectId: options.projectId,
+            sessionId: options.sessionId,
+            backend: options.backend,
+            permissionMode: options.permissionMode,
+            selection: options.selection,
+            approvals: true,
+            commandBridge: !!options.commands,
+          },
+    ),
     signal,
   });
   if (!response.ok || !response.body) {
     const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(payload?.error || "Агент недоступен");
+    const message = payload?.error || "Агент недоступен";
+    throw response.status === 404 ? new AgentRunGone(message) : new Error(message);
   }
 
   async function handle(event: AgentEvent) {
@@ -98,6 +108,15 @@ export async function streamAgent(
     const parsed = parseSse(`${buffer}\n\n`);
     for (const event of parsed.events) await handle(event);
   }
+}
+
+/** Stops an answer in progress; closing the page only detaches from it. */
+export async function cancelAgentRun(runId: string): Promise<void> {
+  await fetch("/api/agent/cancel", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ runId }),
+  });
 }
 
 /** Answers a `permission-request` event; the ID is a single-use capability from that stream. */

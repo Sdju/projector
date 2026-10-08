@@ -87,7 +87,13 @@ export async function shortcutAvailable(shortcut: string) {
 export { installDesktop } from "./install-desktop.ts";
 
 export { startCodexAppServer } from "./codex.ts";
-export { agentEnv, spawnAgentProcess } from "./agent-process.ts";
+export {
+  agentEnv,
+  agentHostAddress,
+  killAgentTree,
+  spawnAgentHost,
+  spawnAgentProcess,
+} from "./agent-process.ts";
 export { readOpenCodeGoKey } from "./opencode.ts";
 export { readCursorAccessToken } from "./cursor.ts";
 

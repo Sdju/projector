@@ -6,7 +6,8 @@ import {
 } from "./acp-client.ts";
 import { ACP_PROGRAMS, type AcpProgram } from "./acp-programs.ts";
 import { agentEnv, assertHostProject } from "./agent-host.ts";
-import type { AgentBackendId } from "./backend.ts";
+import type { AgentBackendId, AgentRunHandle } from "./backend.ts";
+import { attachHosted, startHosted } from "./hosted-process.ts";
 
 /** Agent Client Protocol revision this client speaks. */
 const PROTOCOL_VERSION = 1;
@@ -41,16 +42,25 @@ export function acpProgram(id: AgentBackendId): AcpProgram {
   return program;
 }
 
-/** Spawns the agent's ACP server for `cwd` and wraps it in a connection; nothing is sent yet. */
+/**
+ * Spawns the agent's ACP server for `cwd` and wraps it in a connection; nothing is sent yet.
+ * With a `run` the process is held by a host that outlives this server (see `hosted-process.ts`)
+ * and may be an earlier server's run that is rejoined; without one it is a plain child process.
+ */
 export async function startAcp(
   id: AgentBackendId,
   cwd: string | undefined,
   handlers: Omit<AcpConnectionHandlers, "label">,
+  run?: AgentRunHandle,
 ): Promise<AcpConnection> {
   const program = acpProgram(id);
   if (!cwd) throw new Error(`${program.label} работает внутри проекта: откройте чат в проекте`);
   await assertHostProject(cwd, program.label);
-  const child = os.tools.spawnAgentProcess(await resolveLaunch(program, cwd));
+  const child = run?.attach
+    ? await attachHosted(run.id)
+    : run
+      ? await startHosted(run.id, await resolveLaunch(program, cwd))
+      : os.tools.spawnAgentProcess(await resolveLaunch(program, cwd));
   return createAcpConnection(child, { ...handlers, label: program.label });
 }
 
