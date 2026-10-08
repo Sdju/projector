@@ -216,7 +216,7 @@ else { console.log('OPERATION_DONE'); }
   await bindDocker(project.id, directory, { binding: null });
   expect((await dockerSnapshot(project)).binding).toBe(null);
   // Disabling must remain possible even after Docker CLI was uninstalled.
-  await rm(join(bin, "docker"));
+  await rm(join(bin, process.platform === "win32" ? "docker.exe" : "docker"));
   await configureDocker({ enabled: false, context: "default" });
   expect((await dockerSnapshot(project)).enabled).toBe(false);
 });
