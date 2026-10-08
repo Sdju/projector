@@ -122,6 +122,18 @@ function terminate(session: Session, immediate = false): void {
     if (immediate) stopEnvironmentContainerSync(context, containerId!);
     else void stopEnvironmentContainer(context, containerId!, true);
   }
+  if (os.platform === "win32") {
+    // One taskkill /T on the root ends the whole tree atomically. Signalling pids taken from a
+    // process listing could hit an unrelated process that reused a pid in the meantime.
+    os.tools.killAgentTree(session.pty.pid);
+    try {
+      // node-pty on Windows throws on any signal name.
+      session.pty.kill();
+    } catch {
+      /* Already exited. */
+    }
+    return;
+  }
   const family = descendants(session.pty.pid);
   for (const entry of family.reverse()) {
     try {
@@ -131,9 +143,7 @@ function terminate(session: Session, immediate = false): void {
     }
   }
   try {
-    // node-pty on Windows throws on any signal name; a plain kill ends the console tree.
-    if (os.platform === "win32") session.pty.kill();
-    else session.pty.kill(immediate ? "SIGKILL" : "SIGTERM");
+    session.pty.kill(immediate ? "SIGKILL" : "SIGTERM");
   } catch {
     /* Already exited. */
   }
