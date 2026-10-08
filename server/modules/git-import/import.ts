@@ -84,6 +84,8 @@ export async function importRepository({
       throw error;
     }
     try {
+      // POSIX rename replaces an empty directory. Windows MoveFileEx returns EPERM instead.
+      if (process.platform === "win32") await rmdir(destination);
       await rename(checkout, destination);
     } catch (error) {
       await rmdir(destination).catch(() => {});
