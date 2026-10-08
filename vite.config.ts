@@ -81,6 +81,8 @@ export default defineConfig({
     server: { deps: { external: [/^gi:/] } },
     restoreMocks: true,
     testTimeout: 60_000,
+    // Cleanup waits for killed process trees to release their folders; Windows is slower at it.
+    hookTimeout: 40_000,
   },
   fmt: {},
   staged: {
