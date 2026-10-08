@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { DEFAULT_ENVIRONMENT_IMAGE } from "../../../core/modules/environment/index.ts";
 import { nextTick, onBeforeUnmount, ref, useId } from "vue";
-import IconDownload from "~icons/lucide/download";
 import IconFolder from "~icons/lucide/folder-open";
 import { commandArgs, useCommandScope } from "../../common/utilities/commands.ts";
 import UiButton from "../../common/ui/UiButton.vue";
@@ -13,7 +12,6 @@ import { fetchIntegrations, integrationRequest } from "../integration-api/index.
 const props = defineProps<{ repository: string; navigate: (path: string) => Promise<void> }>();
 const id = useId();
 const dialog = ref<InstanceType<typeof UiDialog>>();
-const trigger = ref<HTMLButtonElement>();
 const input = ref<HTMLInputElement>();
 const directory = ref("");
 const mode = ref("docker");
@@ -62,9 +60,10 @@ onBeforeUnmount(() => {
   if (jobId) void integrationRequest(`/github/clone-jobs/${jobId}`, "DELETE").catch(() => {});
 });
 const projects = useProjects();
-const commands = useCommandScope(`github-clone:${id}`, () => ({
+const projectId = `gh:/${props.repository}`;
+const commands = useCommandScope(`github-clone:${projectId}`, () => ({
   surface: "github-clone",
-  projectId: `gh:/${props.repository}`,
+  projectId,
 }));
 commands.scope.registerCommand({
   id: "ide.github.repository.clone.dialog",
@@ -156,6 +155,7 @@ commands.scope.registerCommand({
   id: "ide.github.repository.clone.cancel",
   title: "Закрыть окно клонирования",
   description: "Закрывает окно клонирования и возвращает фокус в строку пути.",
+  palette: false,
   enabled: () => !busy.value,
   run: () => dialog.value?.close(),
 });
@@ -163,6 +163,7 @@ commands.scope.registerCommand({
   id: "ide.github.repository.clone.directory",
   title: "Выбрать папку клонирования",
   description: "Открывает системный выбор папки для локальной копии репозитория.",
+  palette: false,
   enabled: () => !busy.value && !loading.value && !cloned.value,
   run: async () => {
     try {
@@ -180,26 +181,8 @@ function cancel(event: Event) {
 </script>
 
 <template>
-  <button
-    ref="trigger"
-    class="clone-trigger"
-    title="Клонировать репозиторий"
-    aria-label="Клонировать репозиторий"
-    aria-haspopup="dialog"
-    :disabled="busy"
-    @click="commands.run('ide.github.repository.clone.dialog')"
-  >
-    <IconDownload aria-hidden="true" />
-  </button>
   <Teleport to="body">
-    <UiDialog
-      ref="dialog"
-      :labelledby="id"
-      width="520px"
-      @keydown.stop
-      @cancel="cancel"
-      @close="trigger?.focus()"
-    >
+    <UiDialog ref="dialog" :labelledby="id" width="520px" @keydown.stop @cancel="cancel">
       <form @submit.prevent="commands.run('ide.github.repository.clone')" :aria-busy="busy">
         <h2 :id="id">Клонировать репозиторий</h2>
         <p class="repository">{{ repository }}</p>
@@ -275,22 +258,6 @@ function cancel(event: Event) {
 </template>
 
 <style scoped>
-.clone-trigger {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 26px;
-  border-radius: var(--r-sm);
-  color: var(--faint);
-}
-.clone-trigger:hover {
-  background: var(--active);
-  color: var(--text);
-}
-.clone-trigger svg {
-  width: 13px;
-  height: 13px;
-}
 h2 {
   margin: 0 0 var(--sp-3);
   font-size: var(--fs-md);
@@ -339,11 +306,5 @@ label {
 }
 .error {
   color: var(--err);
-}
-@media (max-width: 700px) {
-  .clone-trigger {
-    width: 32px;
-    min-height: var(--control-h-sm);
-  }
 }
 </style>

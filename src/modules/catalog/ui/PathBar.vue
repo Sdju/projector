@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from "vue";
 import IconChevronRight from "~icons/lucide/chevron-right";
+import IconDownload from "~icons/lucide/download";
 import IconFolder from "~icons/lucide/folder";
 import { fetchDirectories, parseProjectRef, projectRefSegments } from "../../project/index.ts";
 import { useCommandScope, commandArgs } from "../../../common/utilities/commands.ts";
-import { GithubClone } from "../../github/index.ts";
+import { useIdeCommands } from "../../ide/index.ts";
 import PathDropdown from "./PathDropdown.vue";
 import { useDirectoryListing } from "../model/directory-listing.ts";
 const props = defineProps<{ path: string; navigate: (path: string) => Promise<void> }>();
@@ -40,6 +41,15 @@ commands.scope.registerCommand({
     return toggle(path);
   },
 });
+// Диалог клонирования живёт на уровне страницы репозитория, поэтому команда стабильна.
+const { api, reportError } = useIdeCommands();
+function openClone() {
+  void api
+    .executeCommand("ide.github.repository.clone.dialog", undefined, {
+      scope: `github-clone:${props.path}`,
+    })
+    .catch(reportError);
+}
 const githubOwnerPath = computed(() => {
   const project = parseProjectRef(props.path);
   return project.kind === "github" ? `gh:/${project.repository.split("/")[0]}` : "";
@@ -215,11 +225,17 @@ onBeforeUnmount(() => {
         >
           {{ segment.name }}
         </button>
-        <GithubClone
+        <button
           v-if="remoteProject && segment.path === path"
-          :repository="path.slice(4)"
-          :navigate="props.navigate"
-        />
+          class="clone-trigger"
+          title="Клонировать репозиторий"
+          aria-label="Клонировать репозиторий"
+          aria-haspopup="dialog"
+          :disabled="busy"
+          @click="openClone"
+        >
+          <IconDownload aria-hidden="true" />
+        </button>
         <button
           v-else
           class="segment-arrow"
@@ -342,7 +358,8 @@ button {
 .segment:last-of-type .segment-label {
   color: var(--text);
 }
-.segment-arrow {
+.segment-arrow,
+.clone-trigger {
   display: grid;
   place-items: center;
   width: 22px;
@@ -354,11 +371,16 @@ button {
   width: 12px;
   height: 12px;
 }
+.clone-trigger svg {
+  width: 13px;
+  height: 13px;
+}
 .segment-arrow[aria-expanded="true"] svg {
   transform: rotate(90deg);
 }
 .segment-label:hover,
 .segment-arrow:hover,
+.clone-trigger:hover,
 .segment-arrow[aria-expanded="true"] {
   background: var(--active);
   color: var(--text);
@@ -427,10 +449,12 @@ button {
     font-size: var(--fs-input);
   }
   .segment-label,
-  .segment-arrow {
+  .segment-arrow,
+  .clone-trigger {
     min-height: var(--control-h-sm);
   }
-  .segment-arrow {
+  .segment-arrow,
+  .clone-trigger {
     width: 32px;
   }
   .key-hint {

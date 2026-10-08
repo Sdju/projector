@@ -1,20 +1,22 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import type { GithubRepository } from "../../../core/modules/github/index.ts";
 import { ProjectWorkspace, type TabViews } from "../workspace/index.ts";
 import { settingsTabViews } from "../app-settings/index.ts";
 import { registerWorkspaceProfile, workspaceRequest } from "../workspace-api/index.ts";
 import { useCommandScope } from "../../common/utilities/commands.ts";
 import UiButton from "../../common/ui/UiButton.vue";
-import { formatProjectRef } from "../project/index.ts";
-import { GithubConnection } from "../github/index.ts";
+import { formatProjectRef, projectRoute } from "../project/index.ts";
+import { GithubClone, GithubConnection } from "../github/index.ts";
 import IconGithub from "~icons/simple-icons/github";
 import { GithubRequestError, readRepository } from "./client.ts";
 import { createGithubConnectionProfile, createGithubWorkspaceProfile } from "./source.ts";
 import GithubRepositoryInfo from "./ui/GithubRepositoryInfo.vue";
 const props = defineProps<{ repository: string }>();
 const route = useRoute();
+const router = useRouter();
+const navigate = (path: string) => router.push(projectRoute(path)).then(() => undefined);
 const metadata = ref<GithubRepository>();
 const error = ref("");
 const needsConnection = ref(false);
@@ -128,6 +130,7 @@ onBeforeUnmount(() => {
 });
 </script>
 <template>
+  <GithubClone :repository="props.repository" :navigate="navigate" />
   <ProjectWorkspace
     v-if="profileReady"
     :key="workspaceVersion"
