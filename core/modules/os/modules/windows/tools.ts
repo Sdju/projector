@@ -243,21 +243,18 @@ function currentSid(): string {
     .replace(/"/g, "");
   return ownerSid;
 }
-const ownerOnly = (path: string) => [path, "/inheritance:r", "/grant:r", `*${currentSid()}:F`];
 
-/** Principals named in an `icacls <path>` listing. */
-function principals(listing: string): string[] {
-  return listing
-    .split(/\r?\n/)
-    .map((line) => /^\s*(?:.*?\.[^\s]*\s+)?(\S+):\(/.exec(line)?.[1])
-    .filter((name): name is string => Boolean(name));
-}
+/** Well-known groups that carry explicit entries on new files: Administrators, SYSTEM, Everyone, Users, Authenticated Users. */
+const others = ["S-1-5-32-544", "S-1-5-18", "S-1-1-0", "S-1-5-32-545", "S-1-5-11"];
 
-/** Explicit entries from the process token (Administrators…) survive /inheritance:r. */
-const strangers = (listing: string) => {
-  const owner = `${process.env.USERNAME ?? ""}`.toLowerCase();
-  return principals(listing).filter((name) => !name.toLowerCase().endsWith(`\\${owner}`));
-};
+/** Everything after the grant: inheritance is gone, and the groups above lose their entries. */
+const ownerOnly = (path: string) => [
+  path,
+  "/inheritance:r",
+  "/grant:r",
+  `*${currentSid()}:F`,
+  ...others.filter((sid) => sid !== currentSid()).flatMap((sid) => ["/remove:g", `*${sid}`]),
+];
 
 /**
  * The Windows counterpart of 0600: the inherited entries are dropped and only the current user
@@ -265,13 +262,7 @@ const strangers = (listing: string) => {
  */
 export async function restrictToOwner(path: string): Promise<void> {
   await execute("icacls.exe", ownerOnly(path), { windowsHide: true });
-  const { stdout } = await execute("icacls.exe", [path], { windowsHide: true });
-  for (const name of strangers(stdout))
-    await execute("icacls.exe", [path, "/remove:g", name], { windowsHide: true });
 }
 export function restrictToOwnerSync(path: string): void {
   execFileSync("icacls.exe", ownerOnly(path), { stdio: "ignore", windowsHide: true });
-  const listing = String(execFileSync("icacls.exe", [path], { windowsHide: true }));
-  for (const name of strangers(listing))
-    execFileSync("icacls.exe", [path, "/remove:g", name], { stdio: "ignore", windowsHide: true });
 }
