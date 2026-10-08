@@ -4,12 +4,24 @@ import { chmod, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { runPowerShell } from "../../core/modules/os/modules/windows/ps.ts";
 
-const stub = (node, script) => `
+const stub = (node, script) => String.raw`
 using System;
 using System.Diagnostics;
+using System.Text;
 public static class Shim {
+  // CommandLineToArgvW rules: backslashes only matter in front of a quote or the closing quote.
   static string Quote(string value) {
-    return "\\"" + value.Replace("\\\\", "\\\\\\\\").Replace("\\"", "\\\\\\"") + "\\"";
+    var text = new StringBuilder("\"");
+    int slashes = 0;
+    foreach (char c in value) {
+      if (c == '\\') { slashes++; continue; }
+      if (c == '"') { text.Append('\\', slashes * 2 + 1); text.Append('"'); }
+      else { text.Append('\\', slashes); text.Append(c); }
+      slashes = 0;
+    }
+    text.Append('\\', slashes * 2);
+    text.Append('"');
+    return text.ToString();
   }
   public static int Main(string[] args) {
     var line = Quote(@"${script}");

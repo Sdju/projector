@@ -4,6 +4,7 @@ import { runPowerShell } from "../../core/modules/os/modules/windows/ps.ts";
 
 const { default: Gtk } = await import("gi:Gtk-4.0");
 const { default: GLib } = await import("gi:GLib-2.0");
+await import("gi:GdkWin32-4.0"); // before any surface exists, so it is wrapped as a Win32Surface
 Gtk.init();
 const context = GLib.MainLoop.new(null, false).getContext();
 const pump = async (ms) => {

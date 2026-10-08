@@ -193,6 +193,8 @@ async function own(
 ) {
   const { default: Gtk } = await import("gi:Gtk-4.0");
   const { default: GLib } = await import("gi:GLib-2.0");
+  // Loaded before any window exists: only then is its surface wrapped as a Win32Surface.
+  await import("gi:GdkWin32-4.0").catch(() => undefined);
   Gtk.init();
   const loop = GLib.MainLoop.new(null, false);
   // Node owns the thread. Blocking in MainLoop.run does not deliver named-pipe

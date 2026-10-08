@@ -199,8 +199,22 @@ function normalizeDirectory(path: string) {
   return stripped.replace(/[\\/]+$/, "");
 }
 
+/**
+ * Git's `bin\\bash.exe` is a launcher that starts the real shell as a child and never changes
+ * directory itself. The deepest descendant with the same name is the shell the user is typing in.
+ */
+async function shellProcess(pid: number): Promise<number> {
+  const root = await processInfo(pid);
+  if (!root) return pid;
+  let current = pid;
+  for (const entry of await descendants(pid))
+    if (entry.name === root.name && entry.parent === current) current = entry.pid;
+  return current;
+}
+
 export async function workingDirectory(pid: number, fallback: string): Promise<string> {
   if (!(await processInfo(pid))) return fallback;
+  pid = await shellProcess(pid);
   try {
     const { stdout } = await runPowerShell(CWD_SCRIPT, {
       env: { PROJECTOR_PID: String(pid) },

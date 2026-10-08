@@ -214,7 +214,7 @@ test.skipIf(!windows)(
     const batch = os.tools.ptyCommand("tool", ["a b"]);
     expect(batch.file.toLowerCase()).toMatch(/cmd\.exe$/);
     expect(batch.args.slice(0, 3)).toStrictEqual(["/d", "/s", "/c"]);
-    expect(batch.args[3]).toContain("tool.cmd");
+    expect(batch.args[3].toLowerCase()).toContain("tool.cmd");
     expect(os.tools.ptyCommand("no-such-program-xyz", ["x"])).toStrictEqual({
       file: "no-such-program-xyz",
       args: ["x"],
