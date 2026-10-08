@@ -58,6 +58,19 @@ Capabilities означают наличие реализации, а не ус�
 node cli/app/import-companion-key.mjs /path/to/providers.json
 ```
 
+## Windows: как устроено и что не поддерживается
+
+- **Нативные вызовы идут через PowerShell** (`ps.ts`): `Add-Type` компилирует C# при каждом запуске. Окна (`windows.ts`) и секреты асинхронны; список процессов, `identity` и каталог меню Пуск пока синхронны (`execFileSync`) и блокируют event loop на время запуска PowerShell. `waitForExit` не опрашивает identity в цикле — только `kill(pid, 0)`.
+- **Секреты** передаются дочернему PowerShell через stdin (base64), а не через окружение или командную строку.
+- **Адрес для браузера** принимается только `http(s)://` и передаётся через окружение, а не вставляется в текст скрипта.
+- **Дерево процессов** завершает один `killTree` (`taskkill /T /F`); Job Object пока не используется. `ProcessInfo.state/group/foreground` — заглушки; `conhost`/`OpenConsole` из списка исключены, иначе каждый PTY выглядел бы занятым.
+- **Права файлов** (`0600`, `chmod`) на Windows не действуют: секреты защищены только ACL профиля.
+- **Docker**: локальным считается контекст с `unix://` или `npipe://`.
+- **Архивы**: `archive.py` без `resource` на Windows — память не ограничена, работают лимиты `MAX_BYTES` и `MAX_ENTRIES`.
+- **Не проверяется на Windows** (тесты пропущены): симлинки на POSIX-пути, биты исполнения, `.desktop`, GIO, termios-PTY, фейковый `docker`.
+
 ## Проверка
+
+`.github/workflows/windows.yml` запускает на `windows-2025` архитектурную проверку и весь `vp test run`, включая `tests/windows-adapter.test.mjs` (реальные процессы, Credential Manager, перенос файлов, окна, дерево процессов). Типы проверяет Linux-job: GIR-типы на Windows не генерируются.
 
 `tests/os.test.mjs` проверяет выбор ОС, отсутствие чужого fallback, каталоги, реальные процессы/cwd и перенос файлов с Unicode и конфликтом имён. Входит в `vp run test`. Архитектурные тесты запрещают прямой доступ к подмодулям Linux и Windows и импорт Node OS-инфраструктуры в браузер.
