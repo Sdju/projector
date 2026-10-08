@@ -140,7 +140,7 @@ test("Bash uses cwd, returns failure status, bounds output and aborts subprocess
     setTimeout(() => abort.abort(), 30);
     await expect(running).rejects.toThrow(/остановлен/);
   } finally {
-    await rm(cwd, { recursive: true, force: true });
+    await rm(cwd, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 });
 
