@@ -4,22 +4,37 @@ import Icons from "unplugin-icons/vite";
 import { defineConfig, type Plugin } from "vite-plus";
 import { createConfig as createFeodConfig } from "@o-feod/oxlint-structure-plugin/configs";
 import feod from "./feod.config.mjs";
-import { checkFeod } from "./scripts/check-feod.mjs";
+import { checkFeod, checkFeodAsync } from "./scripts/check-feod.mjs";
 import { APP_PORT, readNetworkMode } from "./core/modules/app-paths/index.ts";
 import { networkHost } from "./core/modules/network-mode/index.ts";
 import { projectorPlugin } from "./server/app/plugin.ts";
 
 function architecturePlugin(): Plugin {
-  // Full check on build and dev start; per-change feedback comes from `vp lint` and the editor.
-  function validate() {
-    const errors = checkFeod();
-    if (errors.length)
-      throw new Error(
-        "FEOD architecture violations:\n" +
-          errors.map((item) => `${item.file}: ${item.message}`).join("\n"),
+  const describe = (errors: ReturnType<typeof checkFeod>) =>
+    "FEOD architecture violations:\n" +
+    errors.map((item) => `${item.file}: ${item.message}`).join("\n");
+  let serving = false;
+  return {
+    name: "projector-feod",
+    configResolved(config) {
+      serving = config.command === "serve";
+    },
+    // A build is the gate: the full check, blocking. The dev server only reports: the check runs
+    // beside it, so a violation, a slow check or an oxlint crash never stops or freezes the server.
+    buildStart() {
+      if (serving) return;
+      const errors = checkFeod();
+      if (errors.length) throw new Error(describe(errors));
+    },
+    configureServer(server) {
+      checkFeodAsync().then(
+        (errors) => {
+          if (errors.length) server.config.logger.error(describe(errors));
+        },
+        (error) => server.config.logger.warn(`Проверка FEOD не выполнена: ${error.message}`),
       );
-  }
-  return { name: "projector-feod", buildStart: validate };
+    },
+  };
 }
 
 const feodLint = createFeodConfig(feod, { rootDir: fileURLToPath(new URL(".", import.meta.url)) });
