@@ -251,6 +251,7 @@ export function createTerminalSession(
       cwd: project.path,
       env,
     });
+    os.processes.trackConsole(child.pid);
   } catch (error) {
     screen.dispose();
     throw error;
@@ -326,6 +327,7 @@ export function createTerminalSession(
     });
   });
   child.onExit(({ exitCode }) => {
+    os.processes.untrackConsole(child.pid);
     session.info.status = "exited";
     session.info.exitCode = exitCode;
     observer?.exit(exitCode);

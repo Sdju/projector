@@ -4,6 +4,8 @@ export {
   processIdentity,
   listProcesses,
   snapshotProcesses,
+  trackConsole,
+  untrackConsole,
   descendants,
   descendantsSync,
   workingDirectory,

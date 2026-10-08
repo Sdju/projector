@@ -60,6 +60,10 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
     },
     processes: {
       /** Last known listing without waiting; null before one exists (Windows) or when unsupported. */
+      trackConsole: (pid: number) =>
+        supported ? backend("processes.trackConsole").trackConsole(pid) : undefined,
+      untrackConsole: (pid: number) =>
+        supported ? backend("processes.untrackConsole").untrackConsole(pid) : undefined,
       snapshot: () => (supported ? backend("processes.snapshot").snapshotProcesses() : null),
       list: async () => (supported ? await backend("processes.list").listProcesses() : null),
       signal: (pid: number, signal: NodeJS.Signals) =>

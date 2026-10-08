@@ -8,7 +8,17 @@ const descendants = (pid: number) => os.processes.descendantsSync(pid);
 export function terminateProcessTree(pty: IPty, immediate: boolean): void {
   if (os.platform === "win32") {
     // taskkill /T ends the tree atomically; pids from a listing may have been reused already.
+    // MSYS programs are not Win32 children of their shell; the tracked console lists them.
+    // The listing is read first: once the root is gone its console can no longer be inspected.
+    const rows = os.processes.snapshot() ?? [];
+    const family = new Set([pty.pid]);
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const row of rows)
+        if (family.has(row.parent) && !family.has(row.pid)) grew = !!family.add(row.pid);
+    }
     os.tools.killAgentTree(pty.pid);
+    for (const pid of family) if (pid !== pty.pid) os.tools.killAgentTree(pid);
     try {
       // node-pty on Windows throws on any signal name.
       pty.kill();

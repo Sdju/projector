@@ -35,6 +35,41 @@ Get-CimInstance Win32_Process | ForEach-Object {
 }
 `;
 
+/**
+ * MSYS/Cygwin `exec` leaves the new program with a dead Win32 parent, so the parent chain loses
+ * every command run from Git Bash. The processes attached to a pseudo console are the reliable
+ * answer: that is what GetConsoleProcessList reports for the console of a tracked shell.
+ */
+const CONSOLE_SCRIPT = `
+if ($env:PROJECTOR_CONSOLE_ROOTS) {
+  Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public static class ProjectorConsole {
+  [DllImport("kernel32.dll")] static extern bool FreeConsole();
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool AttachConsole(uint pid);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern uint GetConsoleProcessList(uint[] list, uint count);
+  public static string Members(uint pid) {
+    FreeConsole();
+    if (!AttachConsole(pid)) return "";
+    try {
+      var list = new uint[512];
+      uint n = GetConsoleProcessList(list, (uint)list.Length);
+      if (n == 0 || n > list.Length) return "";
+      var ids = new string[n];
+      for (int i = 0; i < n; i++) ids[i] = list[i].ToString();
+      return string.Join(",", ids);
+    } finally { FreeConsole(); }
+  }
+}
+"@
+  foreach ($root in $env:PROJECTOR_CONSOLE_ROOTS.Split(',')) {
+    $members = [ProjectorConsole]::Members([uint32]$root)
+    if ($members) { Write-Output ('console' + [char]9 + $root + [char]9 + $members) }
+  }
+}
+`;
+
 const ONE_SCRIPT = `
 $p = Get-CimInstance Win32_Process -Filter ("ProcessId=" + $env:PROJECTOR_PID)
 if (-not $p -or -not $p.CreationDate) { exit 2 }
@@ -49,14 +84,38 @@ const TTL = 400;
 /** How old a listing may be before polling callers trigger a background refresh. */
 const STALE = 1500;
 
-const parseRows = (stdout: string) =>
-  stdout
-    .split(/\r?\n/)
-    .map((line) => parseLine(line.trim()))
+const consoleRoots = new Set<number>();
+
+/** Shells whose pseudo console is inspected for programs Win32 does not parent to them. */
+export function trackConsole(pid: number): void {
+  consoleRoots.add(pid);
+  void refresh();
+}
+export function untrackConsole(pid: number): void {
+  consoleRoots.delete(pid);
+}
+
+function parseRows(stdout: string): ProcessInfo[] {
+  const lines = stdout.split(/\r?\n/).map((line) => line.trim());
+  const rows = lines
+    .map((line) => parseLine(line))
     .filter((entry): entry is ProcessInfo => entry !== null);
+  const pids = new Set(rows.map((row) => row.pid));
+  for (const line of lines) {
+    const [tag, root, members] = line.split("\t");
+    if (tag !== "console" || !root || !members) continue;
+    const attached = new Set(members.split(",").map(Number));
+    for (const row of rows)
+      if (attached.has(row.pid) && row.pid !== Number(root) && !attached.has(row.parent))
+        row.parent = pids.has(Number(root)) ? Number(root) : row.parent;
+  }
+  return rows;
+}
 
 function refresh(): Promise<ProcessInfo[] | null> {
-  refreshing ??= runPowerShell(LIST_SCRIPT)
+  refreshing ??= runPowerShell(LIST_SCRIPT + CONSOLE_SCRIPT, {
+    env: { PROJECTOR_CONSOLE_ROOTS: [...consoleRoots].join(",") },
+  })
     .then(({ stdout }) => {
       const rows = parseRows(stdout);
       snapshot = { at: Date.now(), rows };

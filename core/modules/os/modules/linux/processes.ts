@@ -73,3 +73,7 @@ export async function workingDirectory(pid: number, fallback: string): Promise<s
 export function signalProcess(pid: number, signal: NodeJS.Signals): void {
   process.kill(pid, signal);
 }
+
+/** Linux parents every program to its shell; nothing needs tracking. */
+export function trackConsole(_pid: number): void {}
+export function untrackConsole(_pid: number): void {}
