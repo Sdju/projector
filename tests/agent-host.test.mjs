@@ -154,7 +154,7 @@ test("an agent run survives its server and is rejoined with the whole answer rep
   } finally {
     if (previous === undefined) delete process.env.XDG_DATA_HOME;
     else process.env.XDG_DATA_HOME = previous;
-    await rm(directory, { recursive: true, force: true });
+    await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 }, 30000);
 
@@ -190,7 +190,7 @@ test("stopping a hosted run kills the agent and everything it started", async ()
   } finally {
     if (previous === undefined) delete process.env.XDG_DATA_HOME;
     else process.env.XDG_DATA_HOME = previous;
-    await rm(directory, { recursive: true, force: true });
+    await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 }, 30000);
 
@@ -227,7 +227,7 @@ test("a run started by an earlier server is stopped from its identity, never by 
   } finally {
     if (previous === undefined) delete process.env.XDG_DATA_HOME;
     else process.env.XDG_DATA_HOME = previous;
-    await rm(directory, { recursive: true, force: true });
+    await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 }, 30000);
 
@@ -252,6 +252,6 @@ test("finished runs nobody rejoined are collected after their retention", async 
   } finally {
     if (previous === undefined) delete process.env.XDG_DATA_HOME;
     else process.env.XDG_DATA_HOME = previous;
-    await rm(directory, { recursive: true, force: true });
+    await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
