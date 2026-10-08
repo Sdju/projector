@@ -61,6 +61,12 @@ export function listProcesses(): ProcessInfo[] | null {
 
 export function processInfo(pid: number): ProcessInfo | null {
   if (!Number.isSafeInteger(pid) || pid <= 0) return null;
+  // A cached listing may still hold a process that has just exited.
+  try {
+    process.kill(pid, 0);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EPERM") return null;
+  }
   if (snapshot && Date.now() - snapshot.at < TTL)
     return snapshot.rows.find((entry) => entry.pid === pid) ?? null;
   try {
