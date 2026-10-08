@@ -52,8 +52,7 @@ export async function readRun(id: string): Promise<AgentRunRecord | null> {
 export async function removeRun(id: string): Promise<void> {
   const dir = runDirectory(id);
   // A deep data directory puts the socket in /tmp instead (see `agentHostAddress`).
-  const address = os.tools.agentHostAddress(dir);
-  if (process.platform !== "win32" && !address.startsWith(dir)) await rm(address, { force: true });
+  await os.tools.removeAgentHostAddress(dir, os.tools.agentHostAddress(dir));
   await rm(dir, { recursive: true, force: true });
 }
 

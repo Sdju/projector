@@ -61,3 +61,15 @@ export type ShellLaunch =
   | { kind: "interactive" }
   | { kind: "command"; command: string }
   | { kind: "program"; executable: string };
+
+/** Credentials a Git helper answers with; both values end up inside script text. */
+export interface AskpassSpec {
+  username: string;
+  tokenEnv: string;
+}
+
+/** A helper script Git runs to ask for a password, and the name it must be saved under. */
+export interface AskpassScript {
+  filename: string;
+  contents: string;
+}

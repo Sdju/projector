@@ -3,6 +3,7 @@ import { promisify } from "node:util";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { os } from "../../../core/modules/os/index.ts";
 import { HttpError } from "../http/index.ts";
 
 const exec = promisify(execFile);
@@ -16,38 +17,6 @@ export interface HttpsCredentials {
   failure: string;
 }
 
-/**
- * Shell helper on Linux; `.cmd` on Windows, where Git cannot execute a shebang script.
- * Both values are spliced into script text, so anything but plain identifiers is refused.
- */
-export function askpassHelper(
-  credentials: HttpsCredentials,
-  platform: NodeJS.Platform = process.platform,
-): { filename: string; contents: string } {
-  if (!/^[\w.-]+$/.test(credentials.username) || !/^[A-Za-z_]\w*$/.test(credentials.tokenEnv))
-    throw new Error("Недопустимые параметры askpass");
-  if (platform === "win32")
-    return {
-      filename: "askpass.cmd",
-      contents: [
-        "@echo off",
-        "setlocal EnableExtensions EnableDelayedExpansion",
-        // Quoted assignment and delayed expansion keep `&`, `^` and `%` in the prompt or token inert.
-        `set "ask=%~1"`,
-        `if not "!ask:Username=!"=="!ask!" (`,
-        `  echo(${credentials.username}`,
-        ") else (",
-        `  echo(!${credentials.tokenEnv}!`,
-        ")",
-        "",
-      ].join("\r\n"),
-    };
-  return {
-    filename: "askpass",
-    contents: `#!/bin/sh\ncase "$1" in *Username*) printf "%s\\n" "${credentials.username}" ;; *) printf "%s\\n" "$${credentials.tokenEnv}" ;; esac\n`,
-  };
-}
-
 /** Hardened HTTPS clone: no hooks, no redirects, token only through a temporary askpass helper. */
 export async function cloneOverHttps(
   url: string,
@@ -58,7 +27,7 @@ export async function cloneOverHttps(
 ) {
   const helper = await mkdtemp(join(tmpdir(), "projector-git-"));
   try {
-    const script = askpassHelper(credentials);
+    const script = os.tools.gitAskpass(credentials);
     const askpass = join(helper, script.filename);
     await writeFile(askpass, script.contents, { mode: 0o700 });
     await exec(

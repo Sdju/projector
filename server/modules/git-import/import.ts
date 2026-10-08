@@ -1,7 +1,8 @@
-import { mkdir, mkdtemp, rm, rename, lstat, rmdir, realpath } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, lstat, realpath } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { DockerEnvironment } from "../../../core/modules/environment/index.ts";
+import { os } from "../../../core/modules/os/index.ts";
 import { HttpError } from "../http/index.ts";
 import { expandPath, inspectProject, loadProjects, updateProjects } from "../projects/index.ts";
 import type { Project } from "../projects/index.ts";
@@ -24,34 +25,11 @@ export interface ImportOptions {
 
 /** Moves the finished checkout into place without ever overwriting an existing folder. */
 async function publish(checkout: string, destination: string) {
-  const exists = () =>
-    lstat(destination).then(
-      () => true,
-      () => false,
-    );
-  if (process.platform === "win32") {
-    // Windows refuses to rename onto an existing directory, so the rename itself is the
-    // atomic claim, also against another Projector process. No window with an empty stub.
-    try {
-      await rename(checkout, destination);
-    } catch (error) {
-      if (await exists()) throw new HttpError(409, "Папка уже существует");
-      throw error;
-    }
-    return;
-  }
-  // POSIX rename replaces an empty directory, so claim the destination first.
   try {
-    await mkdir(destination);
+    await os.tools.publishDirectory(checkout, destination);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "EEXIST")
       throw new HttpError(409, "Папка уже существует");
-    throw error;
-  }
-  try {
-    await rename(checkout, destination);
-  } catch (error) {
-    await rmdir(destination).catch(() => {});
     throw error;
   }
 }

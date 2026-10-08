@@ -5,6 +5,7 @@ import * as linux from "./modules/linux/index.ts";
 import * as windows from "./modules/windows/index.ts";
 import type {
   AgentHostSpec,
+  AskpassSpec,
   AgentProcessSpec,
   DesktopAction,
   ResidentOptions,
@@ -98,6 +99,12 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
       ) => backend("runNodeScript").runNodeScript(script, args, options),
       runBash: (command: string, options: { cwd: string; signal?: AbortSignal }) =>
         backend("runBash").runBash(command, options),
+      gitAskpass: (spec: AskpassSpec) => backend("gitAskpass").gitAskpass(spec),
+      /** Moves `source` to a new `destination`; an existing one rejects with code `EEXIST`. */
+      publishDirectory: (source: string, destination: string) =>
+        backend("publishDirectory").publishDirectory(source, destination),
+      removeAgentHostAddress: (dir: string, address: string) =>
+        backend("removeAgentHostAddress").removeAgentHostAddress(dir, address),
       moveNoReplace: (source: string, target: string) =>
         backend("moveNoReplace").moveNoReplace(source, target),
       runPython: (

@@ -46,19 +46,30 @@ function findBrowser(): string | null {
   return BROWSERS.find((path) => path && existsSync(path)) ?? null;
 }
 
-function spawnDetached(bin: string, args: string[]): void {
-  const child = spawn(bin, args, { detached: true, stdio: "ignore", windowsHide: true });
+function spawnDetached(bin: string, args: string[], env?: NodeJS.ProcessEnv): void {
+  const child = spawn(bin, args, {
+    detached: true,
+    stdio: "ignore",
+    windowsHide: true,
+    env: env ? { ...process.env, ...env } : process.env,
+  });
   child.unref();
 }
 
 function openDefault(url: string): void {
-  spawnDetached("powershell.exe", [
-    "-NoProfile",
-    "-WindowStyle",
-    "Hidden",
-    "-Command",
-    `Start-Process ${JSON.stringify(url)}`,
-  ]);
+  if (!/^https?:\/\//i.test(url)) throw new Error("Можно открыть только http(s)-адрес");
+  // The address travels in the environment: it is never parsed as PowerShell source.
+  spawnDetached(
+    "powershell.exe",
+    [
+      "-NoProfile",
+      "-WindowStyle",
+      "Hidden",
+      "-Command",
+      "Start-Process -FilePath $env:PROJECTOR_URL",
+    ],
+    { PROJECTOR_URL: url },
+  );
 }
 
 export function openBrowser(url: string): void {

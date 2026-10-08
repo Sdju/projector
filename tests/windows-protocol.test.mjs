@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { askpassHelper } from "../server/modules/git-import/clone.ts";
+import { createOs } from "../core/modules/os/index.ts";
 import { expandPath } from "../server/modules/projects/index.ts";
 import { hotkeys } from "../core/modules/os/modules/windows/shortcut.ts";
 import { startDesktopShell } from "../core/modules/os/modules/windows/shell.ts";
@@ -82,14 +82,18 @@ test("a late reply is not taken for the answer to the next request", async () =>
 });
 
 test("askpass helper keeps shell metacharacters out of the script", () => {
-  const windows = askpassHelper(credentials, "win32");
+  const windows = createOs("win32").tools.gitAskpass(credentials);
   expect(windows.filename).toBe("askpass.cmd");
   expect(windows.contents).toContain("\r\n");
   expect(windows.contents).toContain("!PROJECTOR_GITHUB_TOKEN!");
-  expect(askpassHelper(credentials, "linux").filename).toBe("askpass");
+  expect(createOs("linux").tools.gitAskpass(credentials).filename).toBe("askpass");
   for (const platform of ["win32", "linux"]) {
-    expect(() => askpassHelper({ ...credentials, username: 'a"&calc' }, platform)).toThrow();
-    expect(() => askpassHelper({ ...credentials, tokenEnv: "X%Y" }, platform)).toThrow();
+    expect(() =>
+      createOs(platform).tools.gitAskpass({ ...credentials, username: 'a"&calc' }),
+    ).toThrow();
+    expect(() =>
+      createOs(platform).tools.gitAskpass({ ...credentials, tokenEnv: "X%Y" }),
+    ).toThrow();
   }
 });
 

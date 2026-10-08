@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { basename } from "node:path";
+import { killTree } from "./kill-tree.ts";
 import type { AgentHostSpec, AgentProcess, AgentProcessSpec } from "../../contract.ts";
 
 /**
@@ -17,17 +18,6 @@ export function spawnAgentProcess(spec: AgentProcessSpec): AgentProcess {
   }) as AgentProcess;
   child.terminate = () => terminateTree(child);
   return child;
-}
-
-function killTree(pid: number) {
-  const killer = spawn("taskkill.exe", ["/PID", String(pid), "/T", "/F"], {
-    stdio: "ignore",
-    windowsHide: true,
-  });
-  killer.unref();
-  const timer = setTimeout(() => killer.kill(), 2000);
-  timer.unref();
-  killer.on("exit", () => clearTimeout(timer));
 }
 
 async function terminateTree(child: AgentProcess): Promise<void> {

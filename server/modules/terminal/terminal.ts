@@ -131,7 +131,9 @@ function terminate(session: Session, immediate = false): void {
     }
   }
   try {
-    session.pty.kill(immediate ? "SIGKILL" : "SIGTERM");
+    // node-pty on Windows throws on any signal name; a plain kill ends the console tree.
+    if (os.platform === "win32") session.pty.kill();
+    else session.pty.kill(immediate ? "SIGKILL" : "SIGTERM");
   } catch {
     /* Already exited. */
   }

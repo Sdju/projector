@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { lstat } from "node:fs/promises";
 import { promisify } from "node:util";
 import { bashExecutable } from "./directories.ts";
+import { killTree } from "./kill-tree.ts";
 import { runPowerShell } from "./ps.ts";
 
 const execute = promisify(execFile);
@@ -71,19 +72,6 @@ export function runDockerSync(args: string[]) {
     stdio: "ignore",
     windowsHide: true,
   });
-}
-
-function killTree(pid: number) {
-  const killer = spawn("taskkill.exe", ["/PID", String(pid), "/T", "/F"], {
-    stdio: "ignore",
-    windowsHide: true,
-  });
-  killer.unref();
-  const timer = setTimeout(() => {
-    killer.kill();
-  }, 2000);
-  timer.unref();
-  killer.on("exit", () => clearTimeout(timer));
 }
 
 export function runBash(command: string, options: { cwd: string; signal?: AbortSignal }) {

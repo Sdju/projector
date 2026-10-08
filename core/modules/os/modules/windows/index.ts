@@ -56,6 +56,7 @@ export async function shortcutAvailable(shortcut: string) {
   return readAvailable(shortcut);
 }
 
+export { gitAskpass, publishDirectory, removeAgentHostAddress } from "./git.ts";
 export { installDesktop } from "./install-desktop.ts";
 export { startCodexAppServer } from "./codex.ts";
 export {
