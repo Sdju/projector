@@ -497,6 +497,14 @@ process.stdin.on('data', (chunk) => {
   await until(() => first.output().includes("LINK_CWD_READY"), "shell changed cwd for links");
   const linkRequest = (path) => request(`/${session.id}?${new URLSearchParams({ link: path })}`);
   const localLink = await (await linkRequest("local.ts")).json();
+  if (localLink.error) {
+    const { os } = await import("../core/modules/os/index.ts");
+    const rows = (await os.processes.list()) ?? [];
+    const directories = await os.processes.workingDirectories(session.pid, "(fallback)");
+    throw new Error(
+      `${JSON.stringify(localLink)}\ncwds: ${JSON.stringify(directories)}\nsession pid ${session.pid}: ${JSON.stringify(rows.filter((row) => /bash|sleep|ls/.test(row.name)).map((row) => [row.pid, row.parent, row.name]))}`,
+    );
+  }
   expect(localLink, JSON.stringify(localLink)).toStrictEqual({
     path: "nested/local.ts",
     external: false,

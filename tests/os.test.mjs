@@ -385,7 +385,13 @@ await createOs("win32").runDesktop("http://127.0.0.1:9", "show", {
     {
       const { runPowerShell } = await import("../core/modules/os/modules/windows/ps.ts");
       const { stdout } = await runPowerShell(
-        `[System.IO.File]::GetAccessControl($env:PIPE).GetAccessRules($true, $true, [System.Security.Principal.NTAccount]) | ForEach-Object { $_.IdentityReference.Value + '|' + $_.FileSystemRights + '|' + $_.AccessControlType }`,
+        `
+$name = $env:PIPE -replace '^\\\\\.\\pipe\\', ''
+$pipe = New-Object System.IO.Pipes.NamedPipeClientStream('.', $name, [System.IO.Pipes.PipeAccessRights]::ReadPermissions, [System.IO.Pipes.PipeOptions]::None, [System.Security.Principal.TokenImpersonationLevel]::None, [System.IO.HandleInheritability]::None)
+$pipe.Connect(5000)
+$pipe.GetAccessControl().GetAccessRules($true, $true, [System.Security.Principal.NTAccount]) | ForEach-Object { $_.IdentityReference.Value + '|' + $_.PipeAccessRights + '|' + $_.AccessControlType }
+$pipe.Dispose()
+`,
         { env: { PIPE: process.env.PROJECTOR_LAUNCHER_PIPE } },
       );
       const writers = stdout
