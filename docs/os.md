@@ -63,15 +63,16 @@ node cli/app/import-companion-key.mjs /path/to/providers.json
 
 ## macOS: как устроено и что не поддерживается
 
-- **Резидент без GTK:** `nativeDesktop` true, `gtkPalette` и `giLoader` false. Значок в строке меню и глобальный хоткей (`Ctrl+Alt+Space`, `Alt+Space`) обслуживает Swift-помощник `helper.swift`: он собирается `swiftc` при первом запуске в `<данные>/projector/native` (нужны Xcode Command Line Tools). Палитра — окно Chromium (`--app`), поэтому «toggle» открывает окно, но не скрывает его.
+- **Палитра:** при установленном GTK4 (`brew install gtk4 gobject-introspection`; `gtkPalette` true) резидент открывает ту же GTK-палитру, что на Linux и Windows: GTK обслуживается таймером из Node, а после показа процесс выводится на передний план помощником. Без GTK4 палитра — окно Chromium (`--app`, помечено `--class=<имя>`); оно находится по `ps`, а `NSRunningApplication` в помощнике даёт фокус, скрытие, возврат и закрытие (toggle работает). Резидент печатает `PALETTE:gtk|web`.
+- **Трей и хоткей:** значок в строке меню и глобальный хоткей (`Ctrl+Alt+Space`, `Alt+Space`) обслуживает Swift-помощник `helper.swift`: он собирается `swiftc` при первом запуске в `<данные>/projector/native` (нужны Xcode Command Line Tools). С `PROJECTOR_SHELL_TEST=1` он принимает `menu N` и `press-hotkey`, чтобы тест прогонял настоящие обработчики без прав на ввод.
 - **Один экземпляр:** unix-сокет `launcher.sock` в каталоге данных (0600) + токен `launcher.token`; повторный запуск пересылает команду.
 - **Каталог** — `.app` из `/Applications`, `/System/Applications`, `~/Applications`; запуск `open -a`, иконка — `.icns` → PNG через `sips`.
 - **Процессы** — `ps -axo` (в том числе `tpgid` для foreground-группы), cwd — `lsof -d cwd`. Общий POSIX-код (агенты, process groups, Git askpass, Docker, bash, права `0600`) живёт в модуле `core/modules/os-posix`.
 - **Секреты** — Keychain через `security -i`: значение идёт по stdin (не попадает в `ps`) и хранится в base64.
 - **Данные** — `~/Library/Application Support` (с приоритетом `XDG_DATA_HOME`); `moveNoReplace` — атомарное «занять и переименовать» вместо GNU `mv`.
 - **Окна** — `open -na <Chromium-браузер> --args --app=…`; фокус окна по классу недоступен. Выбор папки — `osascript`.
-- **Не проверяется:** нативные меню по клику мышью и реальное срабатывание хоткея (CI проверяет сборку помощника, регистрацию и единственность резидента); тест лаунчера с `.desktop` пропущен.
-- **Проверка** — `.github/workflows/macos.yml` (`macos-15`): архитектура и `vp test run`, включая `tests/macos-adapter.test.mjs`.
+- **Не проверяется:** физический клик мышью и нажатие клавиш (обработчики меню и хоткея гоняются через `menu N`/`press-hotkey`); тест лаунчера с `.desktop` пропущен.
+- **Проверка** — `.github/workflows/macos.yml` (`macos-15`, Homebrew GTK4): архитектура, `vp test run` (включая `tests/macos-adapter.test.mjs`: каталог, процессы, резидент с GTK-палитрой, меню/хоткей помощника, окно Chromium) и `vio:gtk-test`.
 
 ## Windows: как устроено и что не поддерживается
 
