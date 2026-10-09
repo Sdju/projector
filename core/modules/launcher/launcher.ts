@@ -2,7 +2,8 @@ export type InterfaceMode = "native" | "window" | "browser";
 export const shortcuts = ["", "Ctrl+Alt+Space", "Super+Space", "Alt+Space"];
 /** `launch` — запуск приложения; `open` — воркспейс проекта; `run` — основная команда проекта; `stop` — остановка запущенного; `browser`/`window` — открыть запущенный проект
  * в браузере или окне (для остановленного `window` запускает команду в окне);
- * `favorite` — добавить в избранное или убрать из него. */
+ * `favorite` — добавить в избранное или убрать из него; `create` — создать проект в избранной папке (имя в `arg`);
+ * `folder` — добавить папку проекта в избранные папки или убрать её. */
 export type LaunchActionId =
   | "launch"
   | "open"
@@ -11,7 +12,9 @@ export type LaunchActionId =
   | "browser"
   | "window"
   | "favorite"
-  | "import";
+  | "import"
+  | "create"
+  | "folder";
 export interface LaunchAction {
   id: LaunchActionId;
   title: string;
@@ -32,11 +35,13 @@ export interface LaunchItem {
   name: string;
   description: string;
   keywords: string;
-  kind: "application" | "project" | "github" | "gitlab";
+  kind: "application" | "project" | "directory" | "github" | "gitlab";
   icon?: string;
   section?: LaunchSection;
   /** В избранном: такие результаты идут первыми и в поиске, и в обзоре. */
   favorite?: boolean;
+  /** Проект лежит в избранной папке: в списках идёт раньше остальных. */
+  folder?: boolean;
   /** Живое состояние проекта; у приложений нет. */
   status?: { state: "running" | "starting" | "stopping" | "error"; label: string };
   /** Первое действие выполняется по Enter, второе — по Ctrl+Enter. */
