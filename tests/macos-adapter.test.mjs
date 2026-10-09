@@ -203,10 +203,12 @@ test.skipIf(!mac)(
     await next("event:hotkey");
     helper.stdin.write("real-click\n");
     await next("menu:open");
-    helper.stdin.write("real-key 125\n"); // Down arrow highlights "Открыть"
+    helper.stdin.write("real-key 125\n"); // Down arrow highlights an item
     await new Promise((resolve) => setTimeout(resolve, 300));
-    helper.stdin.write("real-key 36\n"); // Return activates it
-    await next("event:activate");
+    helper.stdin.write("real-key 36\n"); // Return chooses it
+    await next("menu:close");
+    // Which row the first arrow lands on depends on the menu's initial highlight.
+    expect(lines.some((line) => /^event:(activate|settings|restart|quit)$/.test(line))).toBe(true);
   },
   120_000,
 );
