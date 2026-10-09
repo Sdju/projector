@@ -38,7 +38,7 @@ export {
   activateWindow,
   activateSurface,
 } from "./windows.ts";
-export { catalog, resident, desktopPid, shortcutStatus, shortcutAvailable } from "./unsupported.ts";
+export { resident, desktopPid, shortcutStatus, shortcutAvailable } from "./unsupported.ts";
 export { deleteSecret, getSecret, secretsAvailable, setSecret } from "./secrets.ts";
 export { installDesktop } from "./install-desktop.ts";
 export {
@@ -56,3 +56,5 @@ export {
   spawnAgentHost,
   spawnAgentProcess,
 } from "../../../os-posix/index.ts";
+export const catalog = () =>
+  import(new URL("./catalog.ts", import.meta.url).href) as Promise<typeof import("./catalog.ts")>;

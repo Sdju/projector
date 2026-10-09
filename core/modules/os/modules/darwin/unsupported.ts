@@ -1,8 +1,5 @@
 const unsupported = (what: string) => new Error(`${what} не поддерживается на macOS`);
 
-export const catalog = async (): Promise<never> => {
-  throw unsupported("Каталог приложений");
-};
 export const resident = async (): Promise<never> => {
   throw unsupported("Резидентная палитра");
 };
