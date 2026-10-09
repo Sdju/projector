@@ -18,7 +18,7 @@
     "build": "vp run architecture && vp run gtk:types && vp run vio:build && vue-tsc --noEmit && vp build",
     "preview": "node server/app/standalone.ts",
     "gtk:types": "node scripts/gtk-types.mjs",
-    "test": "vp run architecture && vp run vio:test && vp test run",
+    "test": "vp run architecture && vp run vio:test && node scripts/run-tests.mjs",
     "vio:build": "vp run --filter vio build",
     "vio:test": "vp run --filter vio test",
     "vio:demo": "vp run --filter vio demo",
