@@ -6,7 +6,7 @@ import type { RouteContext } from "../../../modules/transport/index.ts";
 
 export async function handleAppHide({ res, method, path }: RouteContext): Promise<boolean> {
   if (path === "/api/app/hide" && method === "POST") {
-    hidePalette();
+    await hidePalette();
     json(res, 200, { ok: true });
     return true;
   }

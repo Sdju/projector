@@ -3,12 +3,19 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { dataHome } from "./directories.ts";
 import { processIdentity } from "./processes.ts";
-import { runPowerShellSync } from "./ps.ts";
+import { runPowerShell } from "./ps.ts";
 
-/** MOD_NOREPEAT plus the modifiers RegisterHotKey expects. VK_SPACE is 0x20. */
-const hotkeys: Record<string, { mod: number; vk: number }> = {
+export interface HotkeySpec {
+  mod: number;
+  vk: number;
+}
+
+/**
+ * MOD_NOREPEAT plus the modifiers RegisterHotKey expects. VK_SPACE is 0x20. Win+Space is
+ * absent on purpose: Windows reserves it for switching the input language.
+ */
+export const hotkeys: Record<string, HotkeySpec> = {
   "Ctrl+Alt+Space": { mod: 0x4003, vk: 0x20 },
-  "Super+Space": { mod: 0x4008, vk: 0x20 },
   "Alt+Space": { mod: 0x4001, vk: 0x20 },
 };
 
@@ -43,27 +50,33 @@ async function residentAlive(): Promise<boolean> {
   }
 }
 
-function probe(spec: { mod: number; vk: number }): boolean {
-  const stdout = runPowerShellSync(
+const probeTtl = 30_000;
+const probed = new Map<string, { at: number; free: Promise<boolean> }>();
+
+/**
+ * A thread-level RegisterHotKey needs no window, so the probe skips WinForms. Compiling the
+ * P/Invoke stub still takes a moment: the check is async and cached per shortcut.
+ */
+function probe(shortcut: string, spec: HotkeySpec): Promise<boolean> {
+  const cached = probed.get(shortcut);
+  if (cached && Date.now() - cached.at < probeTtl) return cached.free;
+  const free = runPowerShell(
     `
-Add-Type -AssemblyName System.Windows.Forms
 Add-Type -TypeDefinition 'using System;
 using System.Runtime.InteropServices;
 public static class ProjectorHotkeyProbe {
   [DllImport("user32.dll")] public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
   [DllImport("user32.dll")] public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 }'
-$form = New-Object System.Windows.Forms.Form
-$form.ShowInTaskbar = $false
-$null = $form.Handle
-$ok = [ProjectorHotkeyProbe]::RegisterHotKey($form.Handle, 1, ${spec.mod}, ${spec.vk})
-if ($ok) { [void][ProjectorHotkeyProbe]::UnregisterHotKey($form.Handle, 1) }
-$form.Dispose()
+$ok = [ProjectorHotkeyProbe]::RegisterHotKey([IntPtr]::Zero, 1, ${spec.mod}, ${spec.vk})
+if ($ok) { [void][ProjectorHotkeyProbe]::UnregisterHotKey([IntPtr]::Zero, 1) }
 Write-Output $(if ($ok) { "free" } else { "busy" })
 `,
-    { sta: true, timeout: 8000 },
-  );
-  return stdout.trim() === "free";
+    { timeout: 8000 },
+  ).then(({ stdout }) => stdout.trim() === "free");
+  probed.set(shortcut, { at: Date.now(), free });
+  free.catch(() => probed.delete(shortcut));
+  return free;
 }
 
 export async function shortcutAvailable(shortcut: string) {
@@ -74,7 +87,7 @@ export async function shortcutAvailable(shortcut: string) {
   if (state?.active && state.shortcut === shortcut && (await residentAlive()))
     return { supported: true, available: true };
   try {
-    return { supported: true, available: probe(spec) };
+    return { supported: true, available: await probe(shortcut, spec) };
   } catch {
     return { supported: false, available: false };
   }

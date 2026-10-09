@@ -52,14 +52,13 @@ export async function readRun(id: string): Promise<AgentRunRecord | null> {
 export async function removeRun(id: string): Promise<void> {
   const dir = runDirectory(id);
   // A deep data directory puts the socket in /tmp instead (see `agentHostAddress`).
-  const address = os.tools.agentHostAddress(dir);
-  if (process.platform !== "win32" && !address.startsWith(dir)) await rm(address, { force: true });
+  await os.tools.removeAgentHostAddress(dir, os.tools.agentHostAddress(dir));
   await rm(dir, { recursive: true, force: true });
 }
 
 /** The host's process identity, so a pid reused by another program later is never signalled. */
 export async function rememberHost(id: string, pid: number): Promise<void> {
-  const identity = os.processes.identity(pid);
+  const identity = await os.processes.identity(pid);
   await writeFile(join(runDirectory(id), "process.json"), JSON.stringify({ pid, identity }));
 }
 
@@ -68,7 +67,7 @@ async function liveHost(id: string): Promise<number | undefined> {
     const { pid, identity } = JSON.parse(
       await readFile(join(runDirectory(id), "process.json"), "utf8"),
     );
-    return Number.isInteger(pid) && identity && os.processes.identity(pid) === identity
+    return Number.isInteger(pid) && identity && (await os.processes.identity(pid)) === identity
       ? pid
       : undefined;
   } catch {

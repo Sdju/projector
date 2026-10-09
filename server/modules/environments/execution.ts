@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
-import { resolve, relative, isAbsolute } from "node:path";
+import { resolve, relative, isAbsolute, sep } from "node:path";
 import { os } from "../../../core/modules/os/index.ts";
 import type { Project } from "../../../core/modules/project/index.ts";
 import { loadProjects } from "../projects/index.ts";
@@ -102,7 +102,7 @@ export async function environmentForPath(path: string): Promise<Project | undefi
   const root = resolve(path);
   return (await loadProjects(true)).find((project) => {
     const rel = relative(project.path, root);
-    return project.environment && rel !== ".." && !rel.startsWith("../") && !isAbsolute(rel);
+    return project.environment && rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
   });
 }
 export async function runEnvironmentCommand(

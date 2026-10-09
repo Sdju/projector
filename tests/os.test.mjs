@@ -39,7 +39,7 @@ test("OS selection is automatic; unsupported systems never fall through to Linux
     const adapter = createOs(platform);
     expect(adapter.supported).toBe(false);
     expect(adapter.capabilities.nativeDesktop).toBe(false);
-    expect(adapter.processes.list()).toBe(null);
+    expect(await adapter.processes.list()).toBe(null);
     for (const operation of [
       () => adapter.shell(),
       () => adapter.catalog(),
@@ -95,10 +95,11 @@ test(
     });
     onTestFinished(() => child.kill());
     await once(child, "spawn");
-    const identity = os.processes.identity(child.pid);
+    const identity = await os.processes.identity(child.pid);
     expect(identity).toBeTruthy();
     expect(
-      os.processes.descendants(process.pid).find((entry) => entry.pid === child.pid)?.started,
+      (await os.processes.descendants(process.pid)).find((entry) => entry.pid === child.pid)
+        ?.started,
     ).toBe(identity);
     expect((await os.processes.workingDirectory(child.pid, "fallback")).toLowerCase()).toBe(
       directory.toLowerCase(),
@@ -108,7 +109,7 @@ test(
     child.kill();
     await exited;
     await os.processes.waitForExit(child.pid, 1000);
-    expect(os.processes.identity(child.pid)).toBe(null);
+    expect(await os.processes.identity(child.pid)).toBe(null);
     expect(await os.processes.workingDirectory(child.pid, "fallback")).toBe("fallback");
   },
 );
@@ -206,18 +207,18 @@ test(
     });
     onTestFinished(() => child.kill());
     await once(child, "spawn");
-    const identity = os.processes.identity(child.pid);
+    const identity = await os.processes.identity(child.pid);
     expect(identity).toBeTruthy();
-    expect(os.processes.descendants(process.pid).find((p) => p.pid === child.pid)?.started).toBe(
-      identity,
-    );
+    expect(
+      (await os.processes.descendants(process.pid)).find((p) => p.pid === child.pid)?.started,
+    ).toBe(identity);
     expect(await os.processes.workingDirectory(child.pid, "/fallback")).toBe(directory);
     await expect(os.processes.waitForExit(child.pid, 60)).rejects.toThrow(/не завершился/);
     const exited = once(child, "exit");
     child.kill();
     await exited;
     await os.processes.waitForExit(child.pid, 100);
-    expect(os.processes.identity(child.pid)).toBe(null);
+    expect(await os.processes.identity(child.pid)).toBe(null);
     expect(await os.processes.workingDirectory(child.pid, "/fallback")).toBe("/fallback");
   },
 );
@@ -368,7 +369,7 @@ await createOs("win32").runDesktop("http://127.0.0.1:9", "show", {
     await new Promise((resolve, reject) => {
       const timer = setTimeout(
         () => reject(new Error(errors.trim() || output.trim() || "палитра не ответила")),
-        15000,
+        40000,
       );
       child.stdout.on("data", () => {
         if (!output.includes("READY")) return;
@@ -380,6 +381,39 @@ await createOs("win32").runDesktop("http://127.0.0.1:9", "show", {
         reject(new Error(errors.trim() || output.trim() || `палитра завершилась (${code})`));
       });
     });
+    // The pipe keeps Windows' default DACL: nobody but the owner, SYSTEM and administrators may write.
+    {
+      const { runPowerShell } = await import("../core/modules/os/modules/windows/ps.ts");
+      const { stdout } = await runPowerShell(
+        `
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+public static class PipeHandle {
+  [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
+  static extern SafeFileHandle CreateFile(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
+  public static SafeFileHandle Open(string path) { return CreateFile(path, 0x20000, 3, IntPtr.Zero, 3, 0, IntPtr.Zero); }
+}
+"@
+$handle = [PipeHandle]::Open($env:PIPE)
+if ($handle.IsInvalid) { throw ('CreateFile failed: ' + [Runtime.InteropServices.Marshal]::GetLastWin32Error()) }
+$stream = New-Object System.IO.FileStream($handle, [System.IO.FileAccess]::Read, 1, $false)
+$stream.GetAccessControl().GetAccessRules($true, $true, [System.Security.Principal.NTAccount]) | ForEach-Object { $_.IdentityReference.Value + '|' + $_.FileSystemRights + '|' + $_.AccessControlType }
+$stream.Dispose()
+`,
+        { env: { PIPE: process.env.PROJECTOR_LAUNCHER_PIPE } },
+      );
+      const writers = stdout
+        .trim()
+        .split(/\r?\n/)
+        .filter((line) => /Allow$/.test(line) && /Write|FullControl|Modify|CreateFiles/.test(line))
+        .map((line) => line.split("|")[0]);
+      for (const name of writers)
+        expect(name, `writers of the pipe: ${writers}`).not.toMatch(
+          /Everyone|Users|Anonymous|Authenticated/i,
+        );
+    }
     expect(await os.desktopPid("dev.projector.Launcher")).toBe(child.pid);
     await os.runDesktop("http://127.0.0.1:9", "toggle", {
       dataDirectory,

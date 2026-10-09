@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import { containerToHost, resolveTerminalPath } from "./link-files.ts";
 import { rmSync } from "node:fs";
 import { os } from "../../../core/modules/os/index.ts";
+import { terminateProcessTree } from "./terminate.ts";
 import { saveDroppedFile } from "./drop-files.ts";
 import { HttpError } from "../http/index.ts";
 import { devcontainerLaunch } from "../devcontainer/index.ts";
@@ -106,14 +107,23 @@ export async function resolveTerminalFile(project: Project, id: string, path: st
       project.path,
       project.path,
     );
-  const cwd =
-    session.info.status === "running"
-      ? await os.processes.workingDirectory(session.info.pid, project.path)
-      : project.path;
-  return resolveTerminalPath(path, project.path, cwd);
+  const resolve = async () => {
+    const cwd =
+      session.info.status === "running"
+        ? await os.processes.workingDirectories(session.info.pid, project.path)
+        : project.path;
+    return resolveTerminalPath(path, project.path, cwd);
+  };
+  try {
+    return await resolve();
+  } catch (error) {
+    // A reading of the shell's directory is occasionally missed on a busy Windows machine (seen
+    // once in 80 runs, correct moments later); asking again settles it.
+    if (os.platform !== "win32" || (error as { status?: number }).status !== 404) throw error;
+    await new Promise((done) => setTimeout(done, 400));
+    return resolve();
+  }
 }
-
-const descendants = (pid: number) => os.processes.descendants(pid);
 
 function terminate(session: Session, immediate = false): void {
   if (session.info.status !== "running") return;
@@ -122,39 +132,7 @@ function terminate(session: Session, immediate = false): void {
     if (immediate) stopEnvironmentContainerSync(context, containerId!);
     else void stopEnvironmentContainer(context, containerId!, true);
   }
-  const family = descendants(session.pty.pid);
-  for (const entry of family.reverse()) {
-    try {
-      os.processes.signal(entry.pid, immediate ? "SIGKILL" : "SIGTERM");
-    } catch {
-      /* Already exited. */
-    }
-  }
-  try {
-    session.pty.kill(immediate ? "SIGKILL" : "SIGTERM");
-  } catch {
-    /* Already exited. */
-  }
-  if (immediate) return;
-  const timer = setTimeout(() => {
-    for (const entry of family) {
-      try {
-        if (os.processes.identity(entry.pid) === entry.started) {
-          for (const child of descendants(entry.pid).reverse()) {
-            try {
-              os.processes.signal(child.pid, "SIGKILL");
-            } catch {
-              /* Already exited. */
-            }
-          }
-          os.processes.signal(entry.pid, "SIGKILL");
-        }
-      } catch {
-        /* Already exited; never kill a reused pid. */
-      }
-    }
-  }, 1500);
-  timer.unref();
+  terminateProcessTree(session.pty, immediate);
 }
 
 export function stopTerminalSession(projectId: string, id: string): void {
@@ -277,12 +255,14 @@ export function createTerminalSession(
   const mouseEncoding = trackMouseEncoding(screen);
   let child: IPty;
   try {
-    child = spawn(launch?.file ?? invocation.file, launch?.args ?? args, {
+    const command = os.tools.ptyCommand(launch?.file ?? invocation.file, launch?.args ?? args);
+    child = spawn(command.file, command.args, {
       name: "xterm-256color",
       ...dimensions,
       cwd: project.path,
       env,
     });
+    os.processes.trackConsole(child.pid);
   } catch (error) {
     screen.dispose();
     throw error;
@@ -358,6 +338,7 @@ export function createTerminalSession(
     });
   });
   child.onExit(({ exitCode }) => {
+    os.processes.untrackConsole(child.pid);
     session.info.status = "exited";
     session.info.exitCode = exitCode;
     observer?.exit(exitCode);

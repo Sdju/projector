@@ -1,6 +1,6 @@
 import { afterAll, expect, test } from "vite-plus/test";
 import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, request as httpRequest } from "node:http";
 import { once } from "node:events";
@@ -46,10 +46,15 @@ test("mouse encoding survives snapshots, fragmented modes, disable, RIS and reta
 const root = await mkdtemp(join(tmpdir(), "projector-terminal-"));
 process.env.XDG_DATA_HOME = root;
 // Keep PTY probes independent of the runner's interactive shell startup files.
-process.env.SHELL = join(root, "test-shell");
-await writeFile(process.env.SHELL, '#!/bin/sh\nexec /bin/bash --noprofile --norc "$@"\n', {
-  mode: 0o700,
-});
+// Windows has no /bin/sh shim: the adapter finds Git Bash itself.
+if (process.platform !== "win32") {
+  process.env.SHELL = join(root, "test-shell");
+  await writeFile(process.env.SHELL, '#!/bin/sh\nexec /bin/bash --noprofile --norc "$@"\n', {
+    mode: 0o700,
+  });
+}
+// Git Bash prints Windows paths with forward slashes (`pwd -W`).
+const shellRoot = process.platform === "win32" ? root.replaceAll("\\", "/") : root;
 await mkdir(join(root, "projector"));
 const project = {
   id: "terminal-probe",
@@ -87,7 +92,7 @@ const base = `http://127.0.0.1:${server.address().port}`;
 const sockets = new Set();
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function until(predicate, description) {
-  const deadline = Date.now() + 6000;
+  const deadline = Date.now() + (process.platform === "win32" ? 25_000 : 6000); // Git Bash starts slowly
   while (Date.now() < deadline) {
     if (await predicate()) return;
     await pause(20);
@@ -140,7 +145,7 @@ afterAll(async () => {
   for (const session of listTerminalSessions(project.id))
     closeTerminalSession(project.id, session.id);
   await new Promise((resolve) => server.close(resolve));
-  await rm(root, { recursive: true, force: true });
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 });
 test("WS project control: push, cross-client mutations, process protection and reconnect", async () => {
   async function control(projectId = project.id) {
@@ -316,11 +321,11 @@ test("OpenCode uses project cwd and an interactive PTY, reconnects and restarts"
   await mkdir(bin);
   await writeFile(
     join(bin, "opencode"),
-    '#!/bin/sh\ntest -t 0 && test -t 1 || exit 1\nprintf "OPENCODE_READY:%s\\n" "$PWD"\nread value\nprintf "OPENCODE_INPUT:%s\\n" "$value"\n',
+    '#!/bin/sh\ntest -t 0 && test -t 1 || exit 1\nprintf "OPENCODE_READY:%s\\n" "$(pwd -W 2>/dev/null || pwd)"\nread value\nprintf "OPENCODE_INPUT:%s\\n" "$value"\n',
     { mode: 0o700 },
   );
   const previousPath = process.env.PATH;
-  process.env.PATH = `${bin}:${previousPath}`;
+  process.env.PATH = `${bin}${delimiter}${previousPath}`;
   try {
     const created = await request("", "POST", { program: "opencode" });
     expect(created.status, await created.clone().text()).toBe(201);
@@ -328,11 +333,14 @@ test("OpenCode uses project cwd and an interactive PTY, reconnects and restarts"
     expect(session.program).toBe("opencode");
     expect(session.title).toBe("OpenCode");
     const first = await connect(session.id);
-    await until(() => first.output().includes(`OPENCODE_READY:${root}`), "OpenCode PTY and cwd");
+    await until(
+      () => first.output().includes(`OPENCODE_READY:${shellRoot}`),
+      "OpenCode PTY and cwd",
+    );
     first.client.close();
     await once(first.client, "close");
     const reconnected = await connect(session.id);
-    expect(reconnected.output().includes(`OPENCODE_READY:${root}`)).toBeTruthy();
+    expect(reconnected.output().includes(`OPENCODE_READY:${shellRoot}`)).toBeTruthy();
     reconnected.send({ type: "input", data: "привет OpenCode\r" });
     await until(
       () => reconnected.output().includes("OPENCODE_INPUT:привет OpenCode"),
@@ -348,7 +356,7 @@ test("OpenCode uses project cwd and an interactive PTY, reconnects and restarts"
     expect(fresh.program).toBe("opencode");
     expect(fresh.title).toBe("OpenCode");
     const output = await connect(fresh.id);
-    await until(() => output.output().includes(`OPENCODE_READY:${root}`), "OpenCode restart");
+    await until(() => output.output().includes(`OPENCODE_READY:${shellRoot}`), "OpenCode restart");
     expect((await request(`/${fresh.id}`, "DELETE")).status).toBe(200);
   } finally {
     process.env.PATH = previousPath;
@@ -359,11 +367,11 @@ test("Cursor launches agent CLI in project cwd with an interactive PTY", async (
   await mkdir(bin, { recursive: true });
   await writeFile(
     join(bin, "agent"),
-    '#!/bin/sh\ntest -t 0 && test -t 1 || exit 1\nprintf "CURSOR_READY:%s\\n" "$PWD"\n',
+    '#!/bin/sh\ntest -t 0 && test -t 1 || exit 1\nprintf "CURSOR_READY:%s\\n" "$(pwd -W 2>/dev/null || pwd)"\nsleep 1\n',
     { mode: 0o700 },
   );
   const previousPath = process.env.PATH;
-  process.env.PATH = `${bin}:${previousPath}`;
+  process.env.PATH = `${bin}${delimiter}${previousPath}`;
   try {
     const created = await request("", "POST", { program: "cursor" });
     expect(created.status, await created.clone().text()).toBe(201);
@@ -371,7 +379,10 @@ test("Cursor launches agent CLI in project cwd with an interactive PTY", async (
     expect(session.program).toBe("cursor");
     expect(session.title).toBe("Cursor");
     const first = await connect(session.id);
-    await until(() => first.output().includes(`CURSOR_READY:${root}`), "Cursor agent PTY and cwd");
+    await until(
+      () => first.output().includes(`CURSOR_READY:${shellRoot}`),
+      "Cursor agent PTY and cwd",
+    );
     expect((await request(`/${session.id}`, "DELETE")).status).toBe(200);
   } finally {
     process.env.PATH = previousPath;
@@ -402,7 +413,9 @@ test("real PTY: input, Unicode, resize, interrupt, reconnect, alternate screen, 
   const first = await connect(session.id);
   const mouseBytes = Buffer.from([27, 91, 77, 32, 143, 43]);
   const unicodeBytes = Buffer.from("привет🙂");
-  const expectedBytes = Buffer.concat([mouseBytes, unicodeBytes]);
+  // ConPTY re-encodes VT mouse reports itself, so on Windows only the text bytes are compared.
+  const windows = process.platform === "win32";
+  const expectedBytes = windows ? unicodeBytes : Buffer.concat([mouseBytes, unicodeBytes]);
   await writeFile(
     join(root, "read-input.py"),
     `import os, termios, tty
@@ -418,9 +431,27 @@ finally:
 print('RAW_HEX=' + data.hex(), flush=True)
 `,
   );
-  first.send({ type: "input", data: "python3 read-input.py\r" });
+  await writeFile(
+    join(root, "read-input.mjs"),
+    `process.stdin.setRawMode(true);
+process.stdout.write('RAW_READY');
+let data = Buffer.alloc(0);
+process.stdin.on('data', (chunk) => {
+  data = Buffer.concat([data, chunk]);
+  if (data.length >= ${expectedBytes.length}) {
+    process.stdout.write('\\nRAW_HEX=' + data.toString('hex') + '\\n');
+    process.exit(0);
+  }
+});
+`,
+  );
+  first.send({
+    type: "input",
+    data: windows ? "node read-input.mjs\r" : "python3 read-input.py\r",
+  });
   await until(() => first.output().includes("RAW_READY"), "raw PTY reader");
-  first.send({ type: "input", data: mouseBytes.toString("latin1"), encoding: "binary" });
+  if (!windows)
+    first.send({ type: "input", data: mouseBytes.toString("latin1"), encoding: "binary" });
   first.send({ type: "input", data: "привет🙂" });
   await until(
     () => first.output().includes(`RAW_HEX=${expectedBytes.toString("hex")}`),
@@ -434,22 +465,34 @@ print('RAW_HEX=' + data.hex(), flush=True)
   );
   first.send({
     type: "input",
-    data: "test -t 0 && test -t 1 && printf 'PTY_%s\\n' OK; pwd; printf 'Привет_日本語\\n'\r",
+    data: `test -t 0 && test -t 1 && printf 'PTY_%s\\n' OK; ${windows ? "pwd -W" : "pwd"}; printf 'Привет_日本語\\n'\r`,
   });
   await until(
     () =>
       first.output().includes("PTY_OK") &&
       first.output().includes("Привет_日本語") &&
-      first.output().includes(root),
+      first.output().includes(shellRoot),
     "interactive input and cwd",
   );
   await mkdir(join(root, "nested"));
   await writeFile(join(root, "nested/local.ts"), "const local = true;\n");
   await writeFile(join(root, "root.md"), "# Root\n");
-  first.send({ type: "input", data: "cd nested; printf 'LINK_CWD_%s\\n' READY\r" });
+  first.send({
+    type: "input",
+    data: `cd nested; printf 'LINK_CWD_%s\\n' READY\r`,
+  });
   await until(() => first.output().includes("LINK_CWD_READY"), "shell changed cwd for links");
   const linkRequest = (path) => request(`/${session.id}?${new URLSearchParams({ link: path })}`);
-  expect(await (await linkRequest("local.ts")).json()).toStrictEqual({
+  const localLink = await (await linkRequest("local.ts")).json();
+  if (localLink.error) {
+    const { os } = await import("../core/modules/os/index.ts");
+    const rows = (await os.processes.list()) ?? [];
+    const directories = await os.processes.workingDirectories(session.pid, "(fallback)");
+    throw new Error(
+      `${JSON.stringify(localLink)}\ncwds: ${JSON.stringify(directories)}\nsession pid ${session.pid}: ${JSON.stringify(rows.filter((row) => /bash|sleep|ls/.test(row.name)).map((row) => [row.pid, row.parent, row.name]))}`,
+    );
+  }
+  expect(localLink, JSON.stringify(localLink)).toStrictEqual({
     path: "nested/local.ts",
     external: false,
   });
@@ -480,10 +523,16 @@ print('RAW_HEX=' + data.hex(), flush=True)
     "PTY size and partial output",
   );
   first.send({ type: "input", data: "sleep 30\r" });
-  await pause(150);
+  await pause(process.platform === "win32" ? 1500 : 150); // a Windows process takes a moment to start
   first.send({ type: "input", data: "\x03" });
+  // Typed-ahead input is dropped by an interrupted shell on Windows; wait for its prompt.
+  if (process.platform === "win32") await pause(1500);
   first.send({ type: "input", data: "printf 'INTERRUPT_%s\\n' OK\r" });
-  await until(() => first.output().includes("INTERRUPT_OK"), "Ctrl+C restores prompt");
+  await until(() => first.output().includes("INTERRUPT_OK"), "Ctrl+C restores prompt").catch(
+    (error) => {
+      throw new Error(`${error.message}\n--- terminal tail ---\n${first.output().slice(-800)}`);
+    },
+  );
   first.send({
     type: "input",
     data: "printf '\\033[?1049h\\033[?1000h\\033[?1006h\\033[2J\\033[HALT_SCREEN_%s' OK\r",
@@ -645,7 +694,20 @@ print('RAW_HEX=' + data.hex(), flush=True)
         (item) => item.name === "sleep",
       ),
     "foreground process is busy",
-  );
+  ).catch(async (error) => {
+    const { os } = await import("../core/modules/os/index.ts");
+    const session = (await (await request(`/${shell.id}`)).json()).session;
+    const rows = (await os.processes.list()) ?? [];
+    const family = new Set([session.pid]);
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const row of rows)
+        if (family.has(row.parent) && !family.has(row.pid)) grew = !!family.add(row.pid);
+    }
+    throw new Error(
+      `${error.message}\n${JSON.stringify(session.activity)}\n${JSON.stringify(rows.filter((row) => family.has(row.pid)))}\n${shellOutput.output().slice(-500)}`,
+    );
+  });
   expect((await request(`/${shell.id}`, "DELETE", {})).status).toBe(409);
   shellOutput.send({ type: "input", data: "\u0003" });
   await until(

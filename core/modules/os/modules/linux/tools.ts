@@ -1,3 +1,4 @@
+import { chmodSync } from "node:fs";
 import { execFile, execFileSync, spawn } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -151,4 +152,23 @@ export function searchFiles(
   options: { cwd: string; timeout: number; maxBuffer: number },
 ) {
   return execute("rg", args, options);
+}
+
+/** POSIX resolves a bare name itself. */
+export function ptyCommand(file: string, args: string[]): { file: string; args: string[] } {
+  return { file, args };
+}
+
+/** POSIX: any execute bit. */
+export function isExecutableFile(_name: string, mode: number): boolean {
+  return !!(mode & 0o111);
+}
+
+/** 0600: readable and writable by the owner only. */
+export async function restrictToOwner(path: string): Promise<void> {
+  const { chmod } = await import("node:fs/promises");
+  await chmod(path, 0o600);
+}
+export function restrictToOwnerSync(path: string): void {
+  chmodSync(path, 0o600);
 }

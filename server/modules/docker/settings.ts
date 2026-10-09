@@ -1,5 +1,5 @@
 import { realpath, stat } from "node:fs/promises";
-import { resolve, relative, isAbsolute } from "node:path";
+import { resolve, relative, isAbsolute, sep } from "node:path";
 import { os } from "../../../core/modules/os/index.ts";
 import type { DockerBinding, DockerContext } from "../../../core/modules/docker/index.ts";
 import { integrationConfig, updateIntegration } from "../integration-store/index.ts";
@@ -16,7 +16,7 @@ export async function dockerContexts(): Promise<DockerContext[]> {
       return {
         name: item.Name,
         endpoint: item.DockerEndpoint,
-        local: String(item.DockerEndpoint).startsWith("unix://"),
+        local: /^(?:unix|npipe):\/\//.test(String(item.DockerEndpoint)),
       };
     });
 }
@@ -30,7 +30,7 @@ export async function configureDocker(input: Record<string, unknown>) {
   if (input.enabled) {
     const contexts = await dockerContexts();
     if (!contexts.some((item) => item.name === input.context && item.local))
-      throw new HttpError(400, "Выберите локальный Docker context (Unix socket)");
+      throw new HttpError(400, "Выберите локальный Docker context (Unix socket или named pipe)");
   }
   await updateIntegration("docker", (config) => ({
     ...config,
@@ -79,7 +79,7 @@ export async function projectFile(path: string, name: string) {
   if (
     !rel ||
     rel === ".." ||
-    rel.startsWith("../") ||
+    rel.startsWith(`..${sep}`) ||
     isAbsolute(rel) ||
     !(await stat(file)).isFile()
   )

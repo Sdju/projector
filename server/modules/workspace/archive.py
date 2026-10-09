@@ -5,12 +5,16 @@ import gzip
 import json
 import lzma
 import os
-import resource
 import sys
 import tarfile
 import zipfile
 
-resource.setrlimit(resource.RLIMIT_AS, (256 * 1024 * 1024,) * 2)
+try:
+    import resource
+
+    resource.setrlimit(resource.RLIMIT_AS, (256 * 1024 * 1024,) * 2)
+except ImportError:  # Windows has no rlimit; MAX_BYTES and MAX_ENTRIES still bound the work.
+    pass
 MAX_ENTRIES = 5000
 MAX_BYTES = 256 * 1024 * 1024
 

@@ -1,10 +1,11 @@
 import { expect, onTestFinished, test } from "vite-plus/test";
+import { expectPrivate } from "./fixtures/private.mjs";
 import { mkdtemp, rm, writeFile, chmod, stat, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { createServer, request } from "node:http";
 import { connect } from "node:net";
 import { once } from "node:events";
-import { networkInterfaces } from "node:os";
+import { networkInterfaces, tmpdir } from "node:os";
 import {
   accessAllowed,
   authorizeHttp,
@@ -19,7 +20,7 @@ import { updateProjects } from "../server/modules/projects/index.ts";
 import { WebSocket } from "ws";
 
 async function isolatedLan() {
-  const dir = await mkdtemp("/tmp/projector-access-security-");
+  const dir = await mkdtemp(join(tmpdir(), "projector-access-security-"));
   const previous = { data: process.env.XDG_DATA_HOME, network: process.env.PROJECTOR_NETWORK };
   process.env.XDG_DATA_HOME = dir;
   process.env.PROJECTOR_NETWORK = "lan";
@@ -102,7 +103,7 @@ test("corrupt credentials fail closed, and replacing a password restores file pe
   setLanPassword("test-only-password");
   await chmod(lanPasswordPath(), 0o644);
   setLanPassword("replacement");
-  expect((await stat(lanPasswordPath())).mode & 0o777).toBe(0o600);
+  await expectPrivate(lanPasswordPath());
 });
 
 test("fetch isolates LAN credentials and prompts only on an explicit LAN challenge", async () => {

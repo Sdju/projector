@@ -2,7 +2,8 @@ import { createInterface } from "node:readline";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { hotkeyPath } from "./shortcut.ts";
+import type { ChildProcess } from "node:child_process";
+import { hotkeyPath, hotkeys } from "./shortcut.ts";
 import { spawnPowerShell } from "./ps.ts";
 
 const iconPath = fileURLToPath(new URL("../../../../../resources/icons/64.png", import.meta.url));
@@ -23,6 +24,7 @@ public delegate void HotkeyHandler();
 public static class ProjectorHotkey {
   [DllImport("user32.dll")] public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
   [DllImport("user32.dll")] public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+  [DllImport("user32.dll")] public static extern bool DestroyIcon(IntPtr handle);
 }
 public class ProjectorCommands {
   readonly ConcurrentQueue<string> queue = new ConcurrentQueue<string>();
@@ -56,11 +58,6 @@ function Emit([string]$text) {
   [Console]::Out.WriteLine($text)
   [Console]::Out.Flush()
 }
-$mods = @{
-  "Ctrl+Alt+Space" = 0x4003
-  "Super+Space" = 0x4008
-  "Alt+Space" = 0x4001
-}
 $script:form = New-Object ProjectorTrayForm
 $form.ShowInTaskbar = $false
 $form.Opacity = 0
@@ -69,7 +66,9 @@ $notify = New-Object System.Windows.Forms.NotifyIcon
 $notify.Text = "Projector"
 try {
   $bitmap = New-Object System.Drawing.Bitmap $env:PROJECTOR_TRAY_ICON
-  $notify.Icon = [System.Drawing.Icon]::FromHandle($bitmap.GetHicon())
+  $handle = $bitmap.GetHicon()
+  try { $notify.Icon = [System.Drawing.Icon]::FromHandle($handle).Clone() }
+  finally { [void][ProjectorHotkey]::DestroyIcon($handle); $bitmap.Dispose() }
 } catch {
   $notify.Icon = [System.Drawing.SystemIcons]::Application
 }
@@ -90,13 +89,11 @@ $notify.Add_MouseClick({
   if ($mouse.Button -eq [System.Windows.Forms.MouseButtons]::Left) { Emit "activate" }
 })
 $script:hotkeyId = 1
-function Set-Hotkey([string]$name) {
+function Set-Hotkey([string]$id, [string]$mod, [string]$vk) {
   [void][ProjectorHotkey]::UnregisterHotKey($form.Handle, $script:hotkeyId)
-  if (-not $name) { Emit "cleared"; return }
-  $mod = $mods[$name]
-  if (-not $mod) { Emit "busy"; return }
-  $ok = [ProjectorHotkey]::RegisterHotKey($form.Handle, $script:hotkeyId, [uint32]$mod, [uint32]0x20)
-  Emit $(if ($ok) { "registered" } else { "busy" })
+  if ($mod -eq "clear") { Emit "result $id cleared"; return }
+  $ok = [ProjectorHotkey]::RegisterHotKey($form.Handle, $script:hotkeyId, [uint32]$mod, [uint32]$vk)
+  Emit "result $id $(if ($ok) { 'registered' } else { 'busy' })"
 }
 $script:commands = New-Object ProjectorCommands
 $script:commands.Start()
@@ -107,7 +104,11 @@ $timer.Add_Tick({
   if ($null -eq $lines) { return }
   foreach ($line in @($lines)) {
     if ($line -eq "quit") { $script:form.Close(); return }
-    if ($line.StartsWith("shortcut ")) { Set-Hotkey $line.Substring(9).Trim() }
+    $parts = $line.Trim().Split(" ")
+    if ($parts[0] -eq "hotkey" -and $parts.Length -ge 3) {
+      $vk = if ($parts.Length -ge 4) { $parts[3] } else { "0" }
+      Set-Hotkey $parts[1] $parts[2] $vk
+    }
   }
 })
 $form.Add_FormClosing({
@@ -124,9 +125,19 @@ $form.Add_Shown({
 [System.Windows.Forms.Application]::Run($form)
 `;
 
+export type HotkeyResult = "registered" | "cleared" | "busy";
+
 export interface DesktopShell {
-  configure(shortcut: string): Promise<"registered" | "cleared" | "busy">;
+  configure(shortcut: string): Promise<HotkeyResult>;
   stop(): Promise<void>;
+}
+
+export interface ShellHandlers {
+  onActivate: () => void;
+  onHotkey: () => void;
+  onSettings: () => void;
+  onRestart: () => void;
+  onQuit: () => void;
 }
 
 const idle: DesktopShell = {
@@ -136,19 +147,24 @@ const idle: DesktopShell = {
   stop: async () => undefined,
 };
 
-/** Win32 tray icon and global hotkey. Lives beside the GTK palette and talks over stdin. */
+const defaultReplyTimeout = 3000;
+
+function spawnHost(): ChildProcess {
+  return spawnPowerShell(host, { sta: true, env: { PROJECTOR_TRAY_ICON: iconPath } });
+}
+
+/**
+ * Win32 tray icon and global hotkey. Lives beside the GTK palette and talks over stdin.
+ * `spawnProcess` is replaceable so the line protocol can be exercised without Windows.
+ */
 export async function startDesktopShell(
   dataDirectory: string,
-  handlers: {
-    onActivate: () => void;
-    onHotkey: () => void;
-    onSettings: () => void;
-    onRestart: () => void;
-    onQuit: () => void;
-  },
+  handlers: ShellHandlers,
+  spawnProcess: () => ChildProcess = spawnHost,
+  replyTimeout = defaultReplyTimeout,
 ): Promise<DesktopShell> {
   try {
-    return await launch(dataDirectory, handlers);
+    return await launch(dataDirectory, handlers, spawnProcess, replyTimeout);
   } catch (error) {
     console.error("Трей:", error instanceof Error ? error.message : error);
     await remember(dataDirectory, "", false);
@@ -156,23 +172,25 @@ export async function startDesktopShell(
   }
 }
 
+interface Pending {
+  shortcut: string;
+  settle: (result: HotkeyResult) => void;
+}
+
 async function launch(
   dataDirectory: string,
-  handlers: {
-    onActivate: () => void;
-    onHotkey: () => void;
-    onSettings: () => void;
-    onRestart: () => void;
-    onQuit: () => void;
-  },
+  handlers: ShellHandlers,
+  spawnProcess: () => ChildProcess,
+  replyTimeout: number,
 ): Promise<DesktopShell> {
-  const child = spawnPowerShell(host, { sta: true, env: { PROJECTOR_TRAY_ICON: iconPath } });
+  const child = spawnProcess();
   let stopped = false;
-  let requested = "";
-  let pending: ((result: "registered" | "cleared" | "busy") => void) | undefined;
+  let nextId = 0;
+  // Replies carry the request id, so an answer that arrives after its timeout cannot
+  // be mistaken for the answer to the next request.
+  const pending = new Map<string, Pending>();
   const failPending = () => {
-    pending?.("busy");
-    pending = undefined;
+    for (const request of [...pending.values()]) request.settle("busy");
   };
   child.on("error", (error) => console.error("Трей:", error.message));
   child.once("exit", () => failPending());
@@ -189,15 +207,24 @@ async function launch(
   const input = child.stdin;
   const output = child.stdout;
   if (!input || !output) throw new Error("Не удалось запустить трей");
+  input.on("error", () => undefined);
   const lines = createInterface({ input: output });
   lines.on("line", (line) => {
     const text = line.trim();
     if (text === "ready") return;
-    if (text === "registered" || text === "cleared" || text === "busy") {
-      const resolve = pending;
-      pending = undefined;
-      const shortcut = text === "registered" ? requested : "";
-      void remember(dataDirectory, shortcut, text === "registered").finally(() => resolve?.(text));
+    const reply = /^result (\S+) (registered|cleared|busy)$/.exec(text);
+    if (reply) {
+      const request = pending.get(reply[1]);
+      if (!request) return;
+      const result = reply[2] as HotkeyResult;
+      pending.delete(reply[1]);
+      void remember(
+        dataDirectory,
+        result === "registered" ? request.shortcut : "",
+        result === "registered",
+      )
+        .catch(() => undefined)
+        .finally(() => request.settle(result));
       return;
     }
     if (text === "hotkey") handlers.onHotkey();
@@ -228,17 +255,26 @@ async function launch(
     configure(shortcut: string) {
       const task = chain.then(
         () =>
-          new Promise<"registered" | "cleared" | "busy">((resolve) => {
-            requested = shortcut;
-            const timer = setTimeout(() => {
-              pending = undefined;
+          new Promise<HotkeyResult>((resolve) => {
+            const spec = hotkeys[shortcut];
+            if (shortcut && !spec) {
               resolve("busy");
-            }, 3000);
-            pending = (result) => {
-              clearTimeout(timer);
-              resolve(result);
-            };
-            input.write(`shortcut ${shortcut}\n`);
+              return;
+            }
+            const id = String(++nextId);
+            const timer = setTimeout(() => {
+              pending.delete(id);
+              resolve("busy");
+            }, replyTimeout);
+            pending.set(id, {
+              shortcut,
+              settle: (result) => {
+                clearTimeout(timer);
+                pending.delete(id);
+                resolve(result);
+              },
+            });
+            input.write(spec ? `hotkey ${id} ${spec.mod} ${spec.vk}\n` : `hotkey ${id} clear\n`);
           }),
       );
       chain = task.then(

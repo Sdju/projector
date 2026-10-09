@@ -1,4 +1,5 @@
 import { expect, onTestFinished, test, vi } from "vite-plus/test";
+import { expectPrivate } from "./fixtures/private.mjs";
 import { mkdtemp, mkdir, writeFile, readFile, stat, access, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -147,7 +148,7 @@ test("GitHub integration persists authorization and imports authenticated reposi
   expect(JSON.parse(await readFile(file, "utf8")).integrations.github.credentials.token).toBe(
     secret,
   );
-  expect((await stat(file)).mode & 0o777).toBe(0o600);
+  await expectPrivate(file);
   expect((await request("")).headers.get("cache-control")).toBe("no-store");
   const reloaded = await import("../server/modules/integration-store/index.ts?reload-check");
   expect((await reloaded.integrationConfig("github")).credentials.login).toBe("octocat");
@@ -272,7 +273,7 @@ test("GitHub integration persists authorization and imports authenticated reposi
       await mkdir(join(source, "checkout"));
       await writeFile(join(source, "checkout", "README"), "Docker clone fixture");
       const credentials = args[args.indexOf("--env-file") + 1];
-      expect((await stat(credentials)).mode & 0o777).toBe(0o600);
+      await expectPrivate(credentials);
     }
     if (args[0] === "context")
       return {

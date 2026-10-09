@@ -44,7 +44,7 @@ export async function startHosted(runId: string, spec: AgentProcessSpec): Promis
   const dir = runDirectory(runId);
   await writeFile(
     join(dir, "spec.json"),
-    JSON.stringify({ command: spec.command, args: spec.args, cwd: spec.cwd }),
+    JSON.stringify({ ...os.tools.agentLaunch(spec), cwd: spec.cwd }),
     { mode: 0o600 },
   );
   const address = os.tools.agentHostAddress(dir);
@@ -68,7 +68,7 @@ export async function startHosted(runId: string, spec: AgentProcessSpec): Promis
     try {
       return await openHosted(dir, address);
     } catch (error) {
-      if (Date.now() > deadline || os.processes.identity(pid) === null) {
+      if (Date.now() > deadline || (await os.processes.identity(pid)) === null) {
         const tail = (await readFile(join(dir, "host.log"), "utf8").catch(() => "")).trim();
         throw new Error(tail ? `Не удалось запустить агента: ${tail.slice(-500)}` : String(error));
       }
@@ -282,7 +282,7 @@ async function openHosted(
 async function hostedPid(dir: string): Promise<number | undefined> {
   try {
     const { pid, identity } = JSON.parse(await readFile(join(dir, "process.json"), "utf8"));
-    return os.processes.identity(pid) === identity ? pid : undefined;
+    return (await os.processes.identity(pid)) === identity ? pid : undefined;
   } catch {
     return undefined;
   }

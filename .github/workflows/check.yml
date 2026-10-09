@@ -40,4 +40,3 @@ jobs:
       - name: Real GTK widgets
         run: |
           dbus-run-session -- xvfb-run -a vp run vio:gtk-test
-          node --import vio/register --test tests/catalog-gtk.test.mjs

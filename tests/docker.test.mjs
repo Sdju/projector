@@ -1,6 +1,7 @@
 import { expect, onTestFinished, test } from "vite-plus/test";
 import { mkdtemp, mkdir, writeFile, readFile, stat, symlink, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
+import { installNodeCommand } from "./fixtures/node-shim.mjs";
 import { tmpdir } from "node:os";
 import { createServer } from "node:http";
 import { once } from "node:events";
@@ -17,7 +18,7 @@ test("Docker integration: persisted binding, explicit context, guarded actions a
   await mkdir(bin);
   await mkdir(directory);
   process.env.XDG_DATA_HOME = join(root, "data");
-  process.env.PATH = `${bin}:${process.env.PATH}`;
+  process.env.PATH = `${bin}${delimiter}${process.env.PATH}`;
   process.env.PROJECTOR_DOCKER_TEST_TRACE = trace;
   process.env.DOCKER_HOST = "tcp://must-not-use:2375";
   process.env.DOCKER_CONTEXT = "must-not-use";
@@ -39,13 +40,13 @@ test("Docker integration: persisted binding, explicit context, guarded actions a
     Mounts: [{ Type: "bind", Source: directory, Destination: "/work", RW: true }],
   };
   // Fake Docker engine/CLI, but use the real execFile and node-pty transports.
-  await writeFile(
-    join(bin, "docker"),
-    `#!/usr/bin/env node
-import { appendFileSync } from 'node:fs';
+  await installNodeCommand(
+    bin,
+    "docker",
+    `import { appendFileSync } from 'node:fs';
 const args = process.argv.slice(2);
 appendFileSync(process.env.PROJECTOR_DOCKER_TEST_TRACE, JSON.stringify({ args, host: process.env.DOCKER_HOST, context: process.env.DOCKER_CONTEXT }) + '\\n');
-if (args[0] === 'context') console.log(JSON.stringify({ Name: 'default', DockerEndpoint: 'unix:///fixture.sock' }) + '\\n' + JSON.stringify({ Name: 'remote', DockerEndpoint: 'ssh://remote' }));
+if (args[0] === 'context') console.log(JSON.stringify({ Name: 'default', DockerEndpoint: '${process.platform === "win32" ? "npipe:////./pipe/fixture" : "unix:///fixture.sock"}' }) + '\\n' + JSON.stringify({ Name: 'remote', DockerEndpoint: 'ssh://remote' }));
 else if (args.includes('info')) { if (process.env.PROJECTOR_TEST_DOCKER_DOWN) { console.error('Cannot connect to Docker daemon'); process.exit(1); } console.log('27.5.1'); }
 else if (args.includes('version')) console.log('5.5.1');
 else if (args.includes('ps')) console.log('${id}');
@@ -55,7 +56,6 @@ else if (args.includes('logs')) console.log('FIXTURE_LOG');
 else if (args.includes('build')) setTimeout(() => { console.log('BUILD_DONE'); process.exit(0); }, 1000);
 else { console.log('OPERATION_DONE'); }
 `,
-    { mode: 0o700 },
   );
   await writeFile(
     join(directory, "compose.yaml"),
@@ -113,7 +113,9 @@ else { console.log('OPERATION_DONE'); }
   ).rejects.toThrow(/Включите Docker/);
   await expect(configureDocker({ enabled: true, context: "remote" })).rejects.toThrow(/локальный/);
   await configureDocker({ enabled: true, context: "default" });
-  expect((await stat(join(root, "data/projector/integrations.json"))).mode & 0o777).toBe(0o600);
+  if (process.platform !== "win32")
+    if (process.platform !== "win32")
+      expect((await stat(join(root, "data/projector/integrations.json"))).mode & 0o777).toBe(0o600);
   const binding = {
     context: "default",
     name: "fixture",
@@ -148,7 +150,12 @@ else { console.log('OPERATION_DONE'); }
     /Подтвердите/,
   );
   await expect(
-    dockerAction(project, { action: "remove", context: "default", containerId: id, confirm: true }),
+    dockerAction(project, {
+      action: "remove",
+      context: "default",
+      containerId: id,
+      confirm: true,
+    }),
   ).rejects.toThrow(/Сначала остановите/);
   await expect(
     dockerAction(project, { action: "shell", context: "default", containerId: "--help" }),
@@ -209,7 +216,7 @@ else { console.log('OPERATION_DONE'); }
   await bindDocker(project.id, directory, { binding: null });
   expect((await dockerSnapshot(project)).binding).toBe(null);
   // Disabling must remain possible even after Docker CLI was uninstalled.
-  await rm(join(bin, "docker"));
+  await rm(join(bin, process.platform === "win32" ? "docker.exe" : "docker"));
   await configureDocker({ enabled: false, context: "default" });
   expect((await dockerSnapshot(project)).enabled).toBe(false);
 });

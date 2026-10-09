@@ -2,7 +2,7 @@ import { execFile, spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { shell } from "./directories.ts";
-import type { AgentHostSpec, AgentProcess, AgentProcessSpec } from "../../contract.ts";
+import type { AgentHostSpec, AgentLaunch, AgentProcess, AgentProcessSpec } from "../../contract.ts";
 
 /** How long a tree gets to exit on SIGTERM before SIGKILL. */
 const TERM_GRACE_MS = 3000;
@@ -12,6 +12,10 @@ const TERM_GRACE_MS = 3000;
  * its shell started — can be stopped with one signal to the group. The trade-off is that a
  * Projector crash mid-turn leaves the group orphaned; turns are short-lived, so no accounting yet.
  */
+export function agentLaunch(spec: Pick<AgentProcessSpec, "command" | "args">): AgentLaunch {
+  return { command: spec.command, args: spec.args, shell: false };
+}
+
 export function spawnAgentProcess(spec: AgentProcessSpec): AgentProcess {
   const child = spawn(spec.command, spec.args, {
     cwd: spec.cwd,

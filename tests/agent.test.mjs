@@ -118,7 +118,10 @@ test("agent can navigate global settings but cannot access another project's set
 test("Bash uses cwd, returns failure status, bounds output and aborts subprocesses", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "projector-agent-shell-"));
   try {
-    const result = await os.tools.runBash("pwd; printf failure >&2; exit 7", { cwd });
+    const result = await os.tools.runBash(
+      `${process.platform === "win32" ? "pwd -W" : "pwd"}; printf failure >&2; exit 7`,
+      { cwd },
+    );
     const printed =
       process.platform === "win32"
         ? result.stdout
@@ -137,7 +140,7 @@ test("Bash uses cwd, returns failure status, bounds output and aborts subprocess
     setTimeout(() => abort.abort(), 30);
     await expect(running).rejects.toThrow(/остановлен/);
   } finally {
-    await rm(cwd, { recursive: true, force: true });
+    await rm(cwd, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 });
 
@@ -509,7 +512,7 @@ test("stopping an agent kills its whole process tree", async () => {
   await connection.close();
   await new Promise((resolve) => setTimeout(resolve, 300));
   // The shell's grandchild must be gone, not only the agent process itself.
-  expect(os.processes.identity(pid)).toBe(null);
+  expect(await os.processes.identity(pid)).toBe(null);
 });
 
 test("ACP permission prefers one-time options and previews the change", async () => {

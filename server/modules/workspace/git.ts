@@ -1,3 +1,4 @@
+import { os } from "../../../core/modules/os/index.ts";
 import { environmentForPath, runEnvironmentCommand } from "../environments/index.ts";
 import { lstat, realpath } from "node:fs/promises";
 import { HttpError } from "../http/index.ts";
@@ -77,7 +78,11 @@ export async function projectGit(root: string): Promise<GitOverview> {
   await Promise.all(
     changes.map(async (change) => {
       change.executable = await location(root, change.path)
-        .then((full) => lstat(full).then((info) => info.isFile() && !!(info.mode & 0o111)))
+        .then((full) =>
+          lstat(full).then(
+            (info) => info.isFile() && os.tools.isExecutableFile(change.path, info.mode),
+          ),
+        )
         .catch(() => false);
     }),
   );

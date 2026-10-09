@@ -1,3 +1,4 @@
+import { os } from "../../../core/modules/os/index.ts";
 import { join } from "node:path";
 import { realpath, writeFile, rm } from "node:fs/promises";
 import type { Project } from "../../../core/modules/project/index.ts";
@@ -28,6 +29,7 @@ export async function cloneGithubContainer(
     throw new HttpError(400, "Некорректный GitHub token");
   const credentials = join(staging, ".clone-credentials");
   await writeFile(credentials, `PROJECTOR_GITHUB_TOKEN=${token}\n`, { mode: 0o600 });
+  await os.tools.restrictToOwner(credentials);
   const project: Project = {
     id: "github-clone",
     name: repository,

@@ -160,10 +160,9 @@ export async function searchLauncher(
   let warning: string | undefined;
   const [apps, projects, prefs] = await Promise.all([
     applications().catch(() => {
-      warning =
-        os.platform === "win32"
-          ? "Системные приложения недоступны."
-          : "Системные приложения недоступны. Проверьте node-gtk и системные библиотеки GIO.";
+      warning = os.capabilities.giLoader
+        ? "Системные приложения недоступны. Проверьте node-gtk и системные библиотеки GIO."
+        : "Системные приложения недоступны.";
       return [];
     }),
     loadProjects(),

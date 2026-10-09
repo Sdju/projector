@@ -1,0 +1,39 @@
+name: Windows
+
+on:
+  push:
+    branches: [master, windows-ci]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: voidzero-dev/setup-vp@v1.21.1
+        with:
+          node-version-file: .node-version
+          cache: true
+          run-install: false
+      - name: Install ripgrep
+        run: choco install ripgrep -y --no-progress
+      - name: Install locked dependencies
+        run: vp install --frozen-lockfile
+      - name: Architecture
+        run: vp run architecture
+      - name: Build vio
+        working-directory: packages/vio
+        run: vp exec tsdown
+      - name: Tests
+        timeout-minutes: 15
+        run: vp test run

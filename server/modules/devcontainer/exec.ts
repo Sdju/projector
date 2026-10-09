@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { realpathSync } from "node:fs";
-import { isAbsolute, relative, resolve } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import { os } from "../../../core/modules/os/index.ts";
 import type { Project } from "../../../core/modules/project/index.ts";
 import { loadProjects } from "../projects/index.ts";
@@ -64,7 +64,9 @@ export async function devcontainerForPath(path: string): Promise<Project | undef
   const root = resolve(path);
   return (await loadProjects(true)).find((project) => {
     const rel = relative(project.path, root);
-    return rel !== ".." && !rel.startsWith("../") && !isAbsolute(rel) && usesDevcontainer(project);
+    return (
+      rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel) && usesDevcontainer(project)
+    );
   });
 }
 

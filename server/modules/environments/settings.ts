@@ -46,7 +46,7 @@ export async function prepareDockerEnvironment(
 ) {
   const result = await os.tools.runDocker(["context", "inspect", environment.context]);
   const context = JSON.parse(result.stdout)[0];
-  if (!context?.Endpoints?.docker?.Host?.startsWith("unix://"))
+  if (!/^(?:unix|npipe):\/\//.test(context?.Endpoints?.docker?.Host ?? ""))
     throw new HttpError(400, "Docker-окружения поддерживают только локальный Unix socket");
   await os.tools.runDocker([
     "--context",

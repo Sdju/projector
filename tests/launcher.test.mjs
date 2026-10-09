@@ -77,220 +77,223 @@ if (process.argv.includes("--prepare")) {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
 
-  test("shared launcher handles installed apps, desktop Exec codes, projects and saved settings", async () => {
-    onTestFinished(() => server.close());
-    const results = await searchLauncher("Projector Probe");
-    expect(results.warning).toBe(undefined);
-    expect(results.items[0].id).toBe("app:projector probe.desktop");
-    expect((await searchLauncher("Projector Hidden")).items.length).toBe(0);
-    expect((await searchLauncher("Probe workspace")).items[0].id).toBe("project:probe-project");
-    expect((await searchLauncher("qzxv-no-such-app")).items.length).toBe(0);
-    expect(
-      matchScore({ name: "Chromium", keywords: "", description: "" }, "chrm") > 0,
-    ).toBeTruthy();
-    expect(matchScore({ name: "Chromium", keywords: "", description: "" }, "qqq")).toBe(-1);
-    const initialSettings = await (await request("/api/launcher/settings")).json();
-    expect(initialSettings.mode).toBe("native");
-    expect(initialSettings.shortcut).toBe("Ctrl+Alt+Space");
-    expect((await request("/api/launcher/settings", "PUT", { mode: "bogus" })).status).toBe(400);
-    expect(
-      (await request("/api/launcher/settings", "PUT", { mode: "native", shortcut: "invalid" }))
-        .status,
-    ).toBe(400);
-    for (const mode of ["browser", "window", "native"]) {
-      expect((await request("/api/launcher/settings", "PUT", { mode })).status).toBe(200);
-      expect((await (await request("/api/launcher/settings")).json()).mode).toBe(mode);
-    }
-    expect(
-      (await request("/api/launcher/launch", "POST", { id: "app:/tmp/untrusted.desktop" })).status,
-    ).toBe(400);
-    expect(
-      (
-        await request(
-          "/api/launcher/launch",
-          "POST",
-          { id: "app:projector probe.desktop" },
-          { Origin: "https://untrusted.example" },
-        )
-      ).status,
-    ).toBe(403);
-    const launches = await Promise.all(
-      [1, 2].map(() =>
-        request("/api/launcher/launch", "POST", { id: "app:projector probe.desktop" }),
-      ),
-    );
-    for (const response of launches) expect(response.status, await response.text()).toBe(200);
-    // GIO confirms process creation, before the launched Node script writes its result.
-    const launchDeadline = Date.now() + 3000;
-    let launched;
-    while (!launched && Date.now() < launchDeadline) {
-      launched = await readFile(join(root, "launched.json"), "utf8").catch(() => undefined);
-      if (!launched) await new Promise((resolve) => setTimeout(resolve, 20));
-    }
-    expect(launched, "The desktop application produced its result").toBeTruthy();
-    const args = JSON.parse(launched);
-    expect(args[0]).toBe("Projector Probe");
-    expect(args[1]).toBe(join(apps, "projector probe.desktop"));
-    const settings = JSON.parse(await readFile(join(data, "projector", "launcher.json"), "utf8"));
-    expect(settings.usage["app:projector probe.desktop"].count).toBe(2);
-    expect((await searchLauncher("")).items[0].id).toBe("app:projector probe.desktop");
-    const browsed = (await searchLauncher("")).items;
-    expect(browsed[0].section).toBe("recent");
-    expect(browsed.every((item) => item.section)).toBeTruthy();
-    expect(new Set(browsed.map((item) => item.id)).size).toBe(browsed.length);
-    expect(
-      browsed.some((item) => item.id === "project:probe-project" && item.section === "projects"),
-    ).toBeTruthy();
-    expect((await searchLauncher("Probe workspace")).items[0].section).toBe(undefined);
-    const projectItem = (await searchLauncher("Probe workspace")).items[0];
-    expect(projectItem.actions.map((action) => action.id)).toStrictEqual(["open", "run"]);
-    expect(
-      (await searchLauncher("Projector Probe")).items[0].actions.map((action) => action.id),
-    ).toStrictEqual(["launch"]);
-    const opened = await (
-      await request("/api/launcher/launch", "POST", {
-        id: "project:probe-project",
-        action: "open",
-        inline: true,
-      })
-    ).json();
-    expect(opened.route).toMatch(/^\/projects\//);
-    expect(projectItem.status).toBe(undefined);
-    expect(
-      (
-        await request("/api/launcher/launch", "POST", {
-          id: "project:probe-project",
-          action: "stop",
-        })
-      ).status,
-    ).toBe(200);
-    expect(getSnapshot("probe-project").status).toBe("idle");
-    expect(
-      (
-        await request("/api/launcher/launch", "POST", {
-          id: "app:projector probe.desktop",
-          action: "open",
-        })
-      ).status,
-    ).toBe(400);
-    expect(
-      (
-        await request("/api/launcher/launch", "POST", {
-          id: "project:probe-project",
-          action: "run",
-        })
-      ).status,
-    ).toBe(200);
-    const deadline = Date.now() + 3000;
-    while (
-      ["starting", "running"].includes(getSnapshot("probe-project").status) &&
-      Date.now() < deadline
-    ) {
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    }
-    const runtime = getSnapshot("probe-project");
-    expect(runtime.commandId).toBe("dev");
-    expect(runtime.status).toBe("idle");
-    expect(runtime.exitCode).toBe(0);
-    // Prefixes: "/" keeps only projects, "gh/" switches to GitHub.
-    const scoped = await searchLauncher("/");
-    expect(
-      scoped.items.length >= 2 && scoped.items.every((item) => item.kind === "project"),
-    ).toBeTruthy();
-    expect((await searchLauncher("/workspace")).items.map((item) => item.id).sort()).toStrictEqual([
-      "project:fail-project",
-      "project:probe-project",
-    ]);
-    expect(
-      (await searchLauncher("/Projector Probe")).items.every((item) => item.kind === "project"),
-    ).toBeTruthy();
-    const noToken = await searchLauncher("gh/");
-    expect(noToken.items).toStrictEqual([]);
-    expect(noToken.warning).toMatch(/GitHub/);
-    // Favorites float to the top of text search and open the browse view; unknown ids are refused.
-    const toggle = (id) =>
-      request("/api/launcher/launch", "POST", { id, action: "favorite" }).then((res) =>
-        res.status === 200 ? res.json() : res.status,
+  test.skipIf(process.platform === "win32")(
+    "shared launcher handles installed apps, desktop Exec codes, projects and saved settings",
+    async () => {
+      onTestFinished(() => server.close());
+      const results = await searchLauncher("Projector Probe");
+      expect(results.warning).toBe(undefined);
+      expect(results.items[0].id).toBe("app:projector probe.desktop");
+      expect((await searchLauncher("Projector Hidden")).items.length).toBe(0);
+      expect((await searchLauncher("Probe workspace")).items[0].id).toBe("project:probe-project");
+      expect((await searchLauncher("qzxv-no-such-app")).items.length).toBe(0);
+      expect(
+        matchScore({ name: "Chromium", keywords: "", description: "" }, "chrm") > 0,
+      ).toBeTruthy();
+      expect(matchScore({ name: "Chromium", keywords: "", description: "" }, "qqq")).toBe(-1);
+      const initialSettings = await (await request("/api/launcher/settings")).json();
+      expect(initialSettings.mode).toBe("native");
+      expect(initialSettings.shortcut).toBe("Ctrl+Alt+Space");
+      expect((await request("/api/launcher/settings", "PUT", { mode: "bogus" })).status).toBe(400);
+      expect(
+        (await request("/api/launcher/settings", "PUT", { mode: "native", shortcut: "invalid" }))
+          .status,
+      ).toBe(400);
+      for (const mode of ["browser", "window", "native"]) {
+        expect((await request("/api/launcher/settings", "PUT", { mode })).status).toBe(200);
+        expect((await (await request("/api/launcher/settings")).json()).mode).toBe(mode);
+      }
+      expect(
+        (await request("/api/launcher/launch", "POST", { id: "app:/tmp/untrusted.desktop" }))
+          .status,
+      ).toBe(400);
+      expect(
+        (
+          await request(
+            "/api/launcher/launch",
+            "POST",
+            { id: "app:projector probe.desktop" },
+            { Origin: "https://untrusted.example" },
+          )
+        ).status,
+      ).toBe(403);
+      const launches = await Promise.all(
+        [1, 2].map(() =>
+          request("/api/launcher/launch", "POST", { id: "app:projector probe.desktop" }),
+        ),
       );
-    expect(await toggle("project:nope")).toBe(400);
-    expect(await toggle("gh:Sdju/projector")).toBe(400);
-    expect(await toggle("app:../../etc.desktop")).toBe(400);
-    const before = (await searchLauncher("workspace")).items.map((item) => item.id);
-    expect(before.includes("project:fail-project")).toBe(true);
-    expect((await toggle("project:fail-project")).favorite).toBe(true);
-    const after = (await searchLauncher("workspace")).items;
-    expect(after[0].id).toBe("project:fail-project");
-    expect(after[0].favorite).toBe(true);
-    expect(after.find((item) => item.id === "project:probe-project").favorite).toBe(undefined);
-    expect((await toggle("app:projector probe.desktop")).favorite).toBe(true);
-    const favoriteBrowse = (await searchLauncher("")).items;
-    expect(
-      favoriteBrowse
-        .filter((item) => item.section === "favorites")
-        .map((item) => item.id)
-        .sort(),
-    ).toStrictEqual(["app:projector probe.desktop", "project:fail-project"]);
-    expect(favoriteBrowse[0].section).toBe("favorites");
-    expect(new Set(favoriteBrowse.map((item) => item.id)).size).toBe(favoriteBrowse.length);
-    expect((await launchDetail("project:fail-project")).actions.at(-1).title).toBe(
-      "Убрать из избранного",
-    );
-    expect((await launchDetail("app:projector probe.desktop")).actions.at(-1).title).toBe(
-      "Убрать из избранного",
-    );
-    expect((await toggle("project:fail-project")).favorite).toBe(false);
-    expect((await toggle("app:projector probe.desktop")).favorite).toBe(false);
-    expect((await launchDetail("project:fail-project")).actions.at(-1).title).toBe(
-      "Добавить в избранное",
-    );
-    expect((await searchLauncher("")).items.some((item) => item.section === "favorites")).toBe(
-      false,
-    );
-    // Detail lists a run action per command; a failed run exposes its terminal output.
-    const idleDetail = await launchDetail("project:fail-project");
-    expect(idleDetail.actions.map((action) => [action.id, action.arg])).toStrictEqual([
-      ["open", undefined],
-      ["run", "boom"],
-      ["run", "other"],
-      ["window", "boom"],
-      ["favorite", undefined],
-    ]);
-    expect(idleDetail.failure).toBe(undefined);
-    expect(idleDetail.info.state).toBe("idle");
-    expect(idleDetail.info.docker).toBe(undefined);
-    expect(idleDetail.info.path.length > 0).toBeTruthy();
-    expect(
-      (
+      for (const response of launches) expect(response.status, await response.text()).toBe(200);
+      // GIO confirms process creation, before the launched Node script writes its result.
+      const launchDeadline = Date.now() + 3000;
+      let launched;
+      while (!launched && Date.now() < launchDeadline) {
+        launched = await readFile(join(root, "launched.json"), "utf8").catch(() => undefined);
+        if (!launched) await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      expect(launched, "The desktop application produced its result").toBeTruthy();
+      const args = JSON.parse(launched);
+      expect(args[0]).toBe("Projector Probe");
+      expect(args[1]).toBe(join(apps, "projector probe.desktop"));
+      const settings = JSON.parse(await readFile(join(data, "projector", "launcher.json"), "utf8"));
+      expect(settings.usage["app:projector probe.desktop"].count).toBe(2);
+      expect((await searchLauncher("")).items[0].id).toBe("app:projector probe.desktop");
+      const browsed = (await searchLauncher("")).items;
+      expect(browsed[0].section).toBe("recent");
+      expect(browsed.every((item) => item.section)).toBeTruthy();
+      expect(new Set(browsed.map((item) => item.id)).size).toBe(browsed.length);
+      expect(
+        browsed.some((item) => item.id === "project:probe-project" && item.section === "projects"),
+      ).toBeTruthy();
+      expect((await searchLauncher("Probe workspace")).items[0].section).toBe(undefined);
+      const projectItem = (await searchLauncher("Probe workspace")).items[0];
+      expect(projectItem.actions.map((action) => action.id)).toStrictEqual(["open", "run"]);
+      expect(
+        (await searchLauncher("Projector Probe")).items[0].actions.map((action) => action.id),
+      ).toStrictEqual(["launch"]);
+      const opened = await (
         await request("/api/launcher/launch", "POST", {
-          id: "project:fail-project",
-          action: "browser",
+          id: "project:probe-project",
+          action: "open",
+          inline: true,
         })
-      ).status,
-    ).toBe(400);
-    expect(
-      (
-        await request("/api/launcher/launch", "POST", {
-          id: "project:fail-project",
-          action: "run",
-          arg: "boom",
-        })
-      ).status,
-    ).toBe(200);
-    const failDeadline = Date.now() + 5000;
-    while (getSnapshot("fail-project").status !== "error" && Date.now() < failDeadline) {
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    }
-    expect(getSnapshot("fail-project").commandId).toBe("boom");
-    const failed = await (await request("/api/launcher/detail?id=project%3Afail-project")).json();
-    expect(failed.failure.exitCode).toBe(3);
-    expect(failed.info.state).toBe("error");
-    expect(failed.info.stateLabel).toBe("ошибка запуска");
-    expect(failed.info.command).toBe("boom");
-    expect(failed.failure.command).toBe("boom");
-    expect(failed.failure.output).toMatch(/boom-output/);
-    expect((await searchLauncher("Failing workspace")).items[0].status.state).toBe("error");
-    const reloaded = await import("../server/modules/processes/processes.ts?reload-check");
-    expect(reloaded.getSnapshot("probe-project").commandId).toBe("dev");
-    expect(reloaded.getSnapshot("probe-project").exitCode).toBe(0);
-  });
+      ).json();
+      expect(opened.route).toMatch(/^\/projects\//);
+      expect(projectItem.status).toBe(undefined);
+      expect(
+        (
+          await request("/api/launcher/launch", "POST", {
+            id: "project:probe-project",
+            action: "stop",
+          })
+        ).status,
+      ).toBe(200);
+      expect(getSnapshot("probe-project").status).toBe("idle");
+      expect(
+        (
+          await request("/api/launcher/launch", "POST", {
+            id: "app:projector probe.desktop",
+            action: "open",
+          })
+        ).status,
+      ).toBe(400);
+      expect(
+        (
+          await request("/api/launcher/launch", "POST", {
+            id: "project:probe-project",
+            action: "run",
+          })
+        ).status,
+      ).toBe(200);
+      const deadline = Date.now() + 3000;
+      while (
+        ["starting", "running"].includes(getSnapshot("probe-project").status) &&
+        Date.now() < deadline
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      const runtime = getSnapshot("probe-project");
+      expect(runtime.commandId).toBe("dev");
+      expect(runtime.status).toBe("idle");
+      expect(runtime.exitCode).toBe(0);
+      // Prefixes: "/" keeps only projects, "gh/" switches to GitHub.
+      const scoped = await searchLauncher("/");
+      expect(
+        scoped.items.length >= 2 && scoped.items.every((item) => item.kind === "project"),
+      ).toBeTruthy();
+      expect(
+        (await searchLauncher("/workspace")).items.map((item) => item.id).sort(),
+      ).toStrictEqual(["project:fail-project", "project:probe-project"]);
+      expect(
+        (await searchLauncher("/Projector Probe")).items.every((item) => item.kind === "project"),
+      ).toBeTruthy();
+      const noToken = await searchLauncher("gh/");
+      expect(noToken.items).toStrictEqual([]);
+      expect(noToken.warning).toMatch(/GitHub/);
+      // Favorites float to the top of text search and open the browse view; unknown ids are refused.
+      const toggle = (id) =>
+        request("/api/launcher/launch", "POST", { id, action: "favorite" }).then((res) =>
+          res.status === 200 ? res.json() : res.status,
+        );
+      expect(await toggle("project:nope")).toBe(400);
+      expect(await toggle("gh:Sdju/projector")).toBe(400);
+      expect(await toggle("app:../../etc.desktop")).toBe(400);
+      const before = (await searchLauncher("workspace")).items.map((item) => item.id);
+      expect(before.includes("project:fail-project")).toBe(true);
+      expect((await toggle("project:fail-project")).favorite).toBe(true);
+      const after = (await searchLauncher("workspace")).items;
+      expect(after[0].id).toBe("project:fail-project");
+      expect(after[0].favorite).toBe(true);
+      expect(after.find((item) => item.id === "project:probe-project").favorite).toBe(undefined);
+      expect((await toggle("app:projector probe.desktop")).favorite).toBe(true);
+      const favoriteBrowse = (await searchLauncher("")).items;
+      expect(
+        favoriteBrowse
+          .filter((item) => item.section === "favorites")
+          .map((item) => item.id)
+          .sort(),
+      ).toStrictEqual(["app:projector probe.desktop", "project:fail-project"]);
+      expect(favoriteBrowse[0].section).toBe("favorites");
+      expect(new Set(favoriteBrowse.map((item) => item.id)).size).toBe(favoriteBrowse.length);
+      expect((await launchDetail("project:fail-project")).actions.at(-1).title).toBe(
+        "Убрать из избранного",
+      );
+      expect((await launchDetail("app:projector probe.desktop")).actions.at(-1).title).toBe(
+        "Убрать из избранного",
+      );
+      expect((await toggle("project:fail-project")).favorite).toBe(false);
+      expect((await toggle("app:projector probe.desktop")).favorite).toBe(false);
+      expect((await launchDetail("project:fail-project")).actions.at(-1).title).toBe(
+        "Добавить в избранное",
+      );
+      expect((await searchLauncher("")).items.some((item) => item.section === "favorites")).toBe(
+        false,
+      );
+      // Detail lists a run action per command; a failed run exposes its terminal output.
+      const idleDetail = await launchDetail("project:fail-project");
+      expect(idleDetail.actions.map((action) => [action.id, action.arg])).toStrictEqual([
+        ["open", undefined],
+        ["run", "boom"],
+        ["run", "other"],
+        ["window", "boom"],
+        ["favorite", undefined],
+      ]);
+      expect(idleDetail.failure).toBe(undefined);
+      expect(idleDetail.info.state).toBe("idle");
+      expect(idleDetail.info.docker).toBe(undefined);
+      expect(idleDetail.info.path.length > 0).toBeTruthy();
+      expect(
+        (
+          await request("/api/launcher/launch", "POST", {
+            id: "project:fail-project",
+            action: "browser",
+          })
+        ).status,
+      ).toBe(400);
+      expect(
+        (
+          await request("/api/launcher/launch", "POST", {
+            id: "project:fail-project",
+            action: "run",
+            arg: "boom",
+          })
+        ).status,
+      ).toBe(200);
+      const failDeadline = Date.now() + 5000;
+      while (getSnapshot("fail-project").status !== "error" && Date.now() < failDeadline) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      expect(getSnapshot("fail-project").commandId).toBe("boom");
+      const failed = await (await request("/api/launcher/detail?id=project%3Afail-project")).json();
+      expect(failed.failure.exitCode).toBe(3);
+      expect(failed.info.state).toBe("error");
+      expect(failed.info.stateLabel).toBe("ошибка запуска");
+      expect(failed.info.command).toBe("boom");
+      expect(failed.failure.command).toBe("boom");
+      expect(failed.failure.output).toMatch(/boom-output/);
+      expect((await searchLauncher("Failing workspace")).items[0].status.state).toBe("error");
+      const reloaded = await import("../server/modules/processes/processes.ts?reload-check");
+      expect(reloaded.getSnapshot("probe-project").commandId).toBe("dev");
+      expect(reloaded.getSnapshot("probe-project").exitCode).toBe(0);
+    },
+  );
 }

@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { join, sep } from "node:path";
 import type { LaunchItem } from "../../../launcher/index.ts";
-import { runPowerShell, runPowerShellSync } from "./ps.ts";
+import { runPowerShell } from "./ps.ts";
 
 function roots() {
   const roaming = process.env.APPDATA || join(homedir(), "AppData", "Roaming");
@@ -26,7 +26,7 @@ export function desktopApp(_id: string): { getIcon(): null } {
   return { getIcon: () => null };
 }
 
-export function listApplications(): LaunchItem[] {
+export async function listApplications(): Promise<LaunchItem[]> {
   const script = `
 $shell = New-Object -ComObject WScript.Shell
 $roots = $env:PROJECTOR_START_ROOTS -split '\\|'
@@ -42,10 +42,10 @@ foreach ($root in $roots) {
 `;
   let stdout = "";
   try {
-    stdout = runPowerShellSync(script, {
+    ({ stdout } = await runPowerShell(script, {
       timeout: 20000,
       env: { PROJECTOR_START_ROOTS: roots().join("|") },
-    });
+    }));
   } catch {
     return [];
   }
@@ -69,9 +69,9 @@ foreach ($root in $roots) {
     });
 }
 
-export function launchApplication(id: string) {
+export async function launchApplication(id: string) {
   if (!allowed(id)) throw new Error("Приложение больше не доступно");
-  runPowerShellSync("Start-Process -LiteralPath $env:PROJECTOR_SHORTCUT", {
+  await runPowerShell("Start-Process -FilePath $env:PROJECTOR_SHORTCUT", {
     env: { PROJECTOR_SHORTCUT: id },
   });
 }

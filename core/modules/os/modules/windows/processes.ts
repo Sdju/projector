@@ -1,5 +1,5 @@
 import type { ProcessInfo } from "../../contract.ts";
-import { runPowerShell, runPowerShellSync } from "./ps.ts";
+import { runPowerShell } from "./ps.ts";
 
 function normalizeName(name: string) {
   return name.replace(/\.exe$/i, "").toLowerCase();
@@ -9,14 +9,16 @@ function parseLine(line: string): ProcessInfo | null {
   const [pid, parent, name, started] = line.split("\t");
   const id = Number(pid);
   if (!Number.isSafeInteger(id) || id <= 0 || !name || !started) return null;
+  // The console host is plumbing around every PTY, not a program the user started.
+  if (/^(?:conhost|openconsole)$/.test(normalizeName(name))) return null;
   return {
     pid: id,
     parent: Number(parent) || 0,
     name: normalizeName(name),
     started,
     state: "S",
-    group: id,
-    foreground: id,
+    group: null,
+    foreground: null,
   };
 }
 
@@ -33,6 +35,43 @@ Get-CimInstance Win32_Process | ForEach-Object {
 }
 `;
 
+/**
+ * MSYS/Cygwin `exec` leaves the new program with a dead Win32 parent, so the parent chain loses
+ * every command run from Git Bash. The processes attached to a pseudo console are the reliable
+ * answer: that is what GetConsoleProcessList reports for the console of a tracked shell.
+ */
+const CONSOLE_SCRIPT = `
+if ($env:PROJECTOR_CONSOLE_ROOTS) {
+  Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public static class ProjectorConsole {
+  [DllImport("kernel32.dll")] static extern bool FreeConsole();
+  [DllImport("kernel32.dll", SetLastError=true)] static extern bool AttachConsole(uint pid);
+  [DllImport("kernel32.dll", SetLastError=true)] static extern uint GetConsoleProcessList(uint[] list, uint count);
+  public static string Members(uint pid) {
+    FreeConsole();
+    if (!AttachConsole(pid)) return "";
+    try {
+      var list = new uint[512];
+      uint n = GetConsoleProcessList(list, (uint)list.Length);
+      if (n == 0 || n > list.Length) return "";
+      var ids = new string[n];
+      for (int i = 0; i < n; i++) ids[i] = list[i].ToString();
+      return string.Join(",", ids);
+    } finally { FreeConsole(); }
+  }
+}
+"@
+  foreach ($root in $env:PROJECTOR_CONSOLE_ROOTS.Split(',')) {
+    $members = [ProjectorConsole]::Members([uint32]$root)
+    # The helper itself is attached to the console while it asks.
+    $others = @($members.Split(',') | Where-Object { $_ -ne [string]$PID }) -join ','
+    if ($others) { Write-Output ('console' + [char]9 + $root + [char]9 + $others) }
+  }
+}
+`;
+
 const ONE_SCRIPT = `
 $p = Get-CimInstance Win32_Process -Filter ("ProcessId=" + $env:PROJECTOR_PID)
 if (-not $p -or -not $p.CreationDate) { exit 2 }
@@ -41,42 +80,110 @@ ${ROW}
 `;
 
 let snapshot: { at: number; rows: ProcessInfo[] } | null = null;
+let refreshing: Promise<ProcessInfo[] | null> | null = null;
+/** Freshness for exact answers (kill lists, identity of unknown pids). */
 const TTL = 400;
+/** How old a listing may be before polling callers trigger a background refresh. */
+const STALE = 1500;
 
-export function listProcesses(): ProcessInfo[] | null {
-  if (snapshot && Date.now() - snapshot.at < TTL) return snapshot.rows;
-  try {
-    const rows = runPowerShellSync(LIST_SCRIPT)
-      .split(/\r?\n/)
-      .map((line) => parseLine(line.trim()))
-      .filter((entry): entry is ProcessInfo => entry !== null);
-    snapshot = { at: Date.now(), rows };
-    return rows;
-  } catch {
-    return null;
-  }
+const consoleRoots = new Set<number>();
+
+/** Shells whose pseudo console is inspected for programs Win32 does not parent to them. */
+export function trackConsole(pid: number): void {
+  consoleRoots.add(pid);
+  void refresh();
+}
+export function untrackConsole(pid: number): void {
+  consoleRoots.delete(pid);
 }
 
-export function processInfo(pid: number): ProcessInfo | null {
+function parseRows(stdout: string): ProcessInfo[] {
+  const lines = stdout.split(/\r?\n/).map((line) => line.trim());
+  const rows = lines
+    .map((line) => parseLine(line))
+    .filter((entry): entry is ProcessInfo => entry !== null);
+  const pids = new Set(rows.map((row) => row.pid));
+  for (const line of lines) {
+    const [tag, root, members] = line.split("\t");
+    if (tag !== "console" || !root || !members) continue;
+    const attached = new Set(members.split(",").map(Number));
+    for (const row of rows)
+      if (attached.has(row.pid) && row.pid !== Number(root) && !attached.has(row.parent))
+        row.parent = pids.has(Number(root)) ? Number(root) : row.parent;
+  }
+  return rows;
+}
+
+function refresh(): Promise<ProcessInfo[] | null> {
+  refreshing ??= runPowerShell(LIST_SCRIPT + CONSOLE_SCRIPT, {
+    env: { PROJECTOR_CONSOLE_ROOTS: [...consoleRoots].join(",") },
+  })
+    .then(({ stdout }) => {
+      const rows = parseRows(stdout);
+      snapshot = { at: Date.now(), rows };
+      return rows;
+    })
+    .catch(() => null)
+    .finally(() => {
+      refreshing = null;
+    });
+  return refreshing;
+}
+
+/**
+ * Polling view that never blocks and never spawns anything itself on the caller's time: the last
+ * known listing is returned at once and a stale one starts a background refresh. Before the first
+ * listing exists it is null.
+ */
+export function snapshotProcesses(): ProcessInfo[] | null {
+  if (!snapshot || Date.now() - snapshot.at >= STALE) void refresh();
+  return snapshot?.rows ?? null;
+}
+
+/** The last listing if it is at most `maxAgeMs` old; never waits and never names reused pids. */
+export function recentProcesses(maxAgeMs: number): ProcessInfo[] | null {
+  return snapshot && Date.now() - snapshot.at <= maxAgeMs ? snapshot.rows : null;
+}
+
+/** Exact view, for deciding what to signal: at most TTL old. */
+export async function listProcesses(): Promise<ProcessInfo[] | null> {
+  if (snapshot && Date.now() - snapshot.at < TTL) return snapshot.rows;
+  return refresh();
+}
+
+const alive = (pid: number) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+};
+
+export async function processInfo(pid: number): Promise<ProcessInfo | null> {
   if (!Number.isSafeInteger(pid) || pid <= 0) return null;
+  // A cached listing may still hold a process that has just exited.
+  if (!alive(pid)) return null;
   if (snapshot && Date.now() - snapshot.at < TTL)
     return snapshot.rows.find((entry) => entry.pid === pid) ?? null;
   try {
-    const row = parseLine(
-      runPowerShellSync(ONE_SCRIPT, { env: { PROJECTOR_PID: String(pid) }, timeout: 8000 }).trim(),
-    );
+    const { stdout } = await runPowerShell(ONE_SCRIPT, {
+      env: { PROJECTOR_PID: String(pid) },
+      timeout: 8000,
+    });
+    const row = parseLine(stdout.trim());
     return row?.pid === pid ? row : null;
   } catch {
     return null;
   }
 }
 
-export function processIdentity(pid: number): string | null {
-  return processInfo(pid)?.started ?? null;
+export async function processIdentity(pid: number): Promise<string | null> {
+  return (await processInfo(pid))?.started ?? null;
 }
 
-export function descendants(pid: number): ProcessInfo[] {
-  const processes = listProcesses() ?? [];
+export async function descendants(pid: number): Promise<ProcessInfo[]> {
+  const processes = (await listProcesses()) ?? [];
   const family = new Set([pid]);
   let changed = true;
   while (changed) {
@@ -88,6 +195,11 @@ export function descendants(pid: number): ProcessInfo[] {
       }
   }
   return processes.filter((entry) => family.has(entry.pid));
+}
+
+/** Only POSIX can answer synchronously; Windows callers use `descendants`. */
+export function descendantsSync(): never {
+  throw new Error("Синхронный список потомков недоступен на Windows");
 }
 
 export function signalProcess(pid: number, signal: NodeJS.Signals): void {
@@ -153,16 +265,46 @@ function normalizeDirectory(path: string) {
   return stripped.replace(/[\\/]+$/, "");
 }
 
+/**
+ * Git's `bin\\bash.exe` is a launcher that starts the real shell as a child and never changes
+ * directory itself. The deepest descendant with the same name is the shell the user is typing in.
+ */
+async function shellProcess(pid: number): Promise<number> {
+  const root = await processInfo(pid);
+  if (!root) return pid;
+  let current = pid;
+  for (const entry of await descendants(pid))
+    if (entry.name === root.name && entry.parent === current) current = entry.pid;
+  return current;
+}
+
 export async function workingDirectory(pid: number, fallback: string): Promise<string> {
-  if (!processInfo(pid)) return fallback;
-  try {
-    const { stdout } = await runPowerShell(CWD_SCRIPT, {
-      env: { PROJECTOR_PID: String(pid) },
-      timeout: 8000,
-    });
-    const directory = normalizeDirectory(stdout.trim());
-    return directory || fallback;
-  } catch {
-    return fallback;
-  }
+  if (!(await processInfo(pid))) return fallback;
+  pid = await shellProcess(pid);
+  // PowerShell and the C# compile occasionally time out on a loaded machine; one more try is
+  // cheaper than reporting the project root as the shell's directory.
+  for (let attempt = 0; attempt < 2; attempt++)
+    try {
+      const { stdout } = await runPowerShell(CWD_SCRIPT, {
+        env: { PROJECTOR_PID: String(pid) },
+        timeout: 15000,
+      });
+      const directory = normalizeDirectory(stdout.trim());
+      if (directory) return directory;
+    } catch {
+      if (!(await processInfo(pid))) return fallback;
+    }
+  return fallback;
+}
+
+/**
+ * Git Bash runs as a chain of `bash` processes, and which of them has the user's directory is
+ * not worth guessing: every one of them is asked, the deepest first.
+ */
+export async function workingDirectories(pid: number, fallback: string): Promise<string[]> {
+  const root = await processInfo(pid);
+  if (!root) return [fallback];
+  const chain = (await descendants(pid)).filter((entry) => entry.name === root.name).reverse();
+  const found = await Promise.all(chain.map((entry) => workingDirectory(entry.pid, "")));
+  return [...new Set([...found.filter(Boolean), fallback])];
 }

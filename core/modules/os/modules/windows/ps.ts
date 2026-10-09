@@ -42,17 +42,22 @@ export function runPowerShell(
     env?: NodeJS.ProcessEnv;
     maxBuffer?: number;
     sta?: boolean;
+    /** Written to stdin, for values that must not appear in the environment or command line. */
+    input?: string;
   } = {},
 ) {
   const args = script(body);
   if (options.sta) args.unshift("-STA");
-  return execute("powershell.exe", args, {
+  const running = execute("powershell.exe", args, {
     timeout: options.timeout ?? 15000,
     maxBuffer: options.maxBuffer ?? 4 * 1024 * 1024,
     windowsHide: true,
     encoding: "buffer",
     env: options.env ? { ...process.env, ...options.env } : process.env,
-  }).then(({ stdout, stderr }) => ({
+  });
+  running.child.stdin?.on("error", () => undefined);
+  running.child.stdin?.end(options.input ?? "");
+  return running.then(({ stdout, stderr }) => ({
     stdout: decodeOutput(stdout as unknown as Buffer),
     stderr: decodeOutput(stderr as unknown as Buffer),
   }));

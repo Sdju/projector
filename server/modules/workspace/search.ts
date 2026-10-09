@@ -60,7 +60,10 @@ export async function searchProject(root: string, query: string, options: Search
       matches.push({ start, end: Math.min(charOffset(submatch.end), text.length) });
     }
     hits.push({
-      path: data.path.text.replace(/^\.\//, ""),
+      path: (os.platform === "win32"
+        ? data.path.text.replaceAll("\\", "/")
+        : data.path.text
+      ).replace(/^\.\//, ""),
       line: data.line_number,
       column: charOffset(data.submatches?.[0]?.start ?? 0) + 1,
       text,

@@ -5,6 +5,7 @@ import * as linux from "./modules/linux/index.ts";
 import * as windows from "./modules/windows/index.ts";
 import type {
   AgentHostSpec,
+  AskpassSpec,
   AgentProcessSpec,
   DesktopAction,
   ResidentOptions,
@@ -37,6 +38,8 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
       /** Linux catalog reads GIO inside the helper. Windows loads GTK only for the palette. */
       giLoader: platform === "linux",
       processInspection: supported,
+      /** Process queries that can be answered without waiting (/proc). */
+      syncProcessInspection: platform === "linux",
       fileOperations: supported,
     }),
     homeDirectory: homedir,
@@ -56,18 +59,40 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
         throw new UnsupportedPlatformError(platform, operation);
     },
     processes: {
-      list: () => (supported ? backend("processes.list").listProcesses() : null),
+      /** Last known listing without waiting; null before one exists (Windows) or when unsupported. */
+      trackConsole: (pid: number) =>
+        supported ? backend("processes.trackConsole").trackConsole(pid) : undefined,
+      untrackConsole: (pid: number) =>
+        supported ? backend("processes.untrackConsole").untrackConsole(pid) : undefined,
+      /** The last listing only if it is younger than `maxAgeMs`. */
+      recent: (maxAgeMs: number) =>
+        supported ? backend("processes.recent").recentProcesses(maxAgeMs) : null,
+      snapshot: () => (supported ? backend("processes.snapshot").snapshotProcesses() : null),
+      list: async () => (supported ? await backend("processes.list").listProcesses() : null),
       signal: (pid: number, signal: NodeJS.Signals) =>
         backend("processes.signal").signalProcess(pid, signal),
-      descendants: (pid: number) => backend("processes.descendants").descendants(pid),
-      identity: (pid: number) => backend("processes.identity").processIdentity(pid),
+      descendants: async (pid: number) => await backend("processes.descendants").descendants(pid),
+      /** Only where `capabilities.syncProcessInspection`: needed while the process is exiting. */
+      descendantsSync: (pid: number) => backend("processes.descendantsSync").descendantsSync(pid),
+      identity: async (pid: number) => await backend("processes.identity").processIdentity(pid),
+      workingDirectories: (pid: number, fallback: string) =>
+        backend("processes.workingDirectories").workingDirectories(pid, fallback),
       workingDirectory: (pid: number, fallback: string) =>
         backend("processes.workingDirectory").workingDirectory(pid, fallback),
       async waitForExit(pid: number, timeoutMs = 15000) {
-        const identity = adapter.processes.identity(pid);
-        if (identity === null) return;
+        if ((await adapter.processes.identity(pid)) === null) return;
+        // Signal 0 only probes existence. Reading the identity on every tick would start a
+        // process listing per tick on Windows; a pid cannot be recycled within the timeout.
+        const alive = () => {
+          try {
+            process.kill(pid, 0);
+            return true;
+          } catch (error) {
+            return (error as NodeJS.ErrnoException).code === "EPERM";
+          }
+        };
         const deadline = Date.now() + timeoutMs;
-        while (adapter.processes.identity(pid) === identity) {
+        while (alive()) {
           if (Date.now() >= deadline) throw new Error(`Процесс ${pid} не завершился`);
           await sleep(50);
         }
@@ -79,6 +104,8 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
       agentEnv: (base: Record<string, string | undefined>) => backend("agentEnv").agentEnv(base),
       spawnAgentProcess: (spec: AgentProcessSpec) =>
         backend("spawnAgentProcess").spawnAgentProcess(spec),
+      agentLaunch: (spec: Pick<AgentProcessSpec, "command" | "args">) =>
+        backend("agentLaunch").agentLaunch(spec),
       agentHostAddress: (dir: string) => backend("agentHostAddress").agentHostAddress(dir),
       spawnAgentHost: (spec: AgentHostSpec) => backend("spawnAgentHost").spawnAgentHost(spec),
       killAgentTree: (pid: number) => backend("killAgentTree").killAgentTree(pid),
@@ -98,6 +125,19 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
       ) => backend("runNodeScript").runNodeScript(script, args, options),
       runBash: (command: string, options: { cwd: string; signal?: AbortSignal }) =>
         backend("runBash").runBash(command, options),
+      /** 0600 on POSIX; on Windows only the current user stays in the file's ACL. */
+      restrictToOwner: (path: string) => backend("restrictToOwner").restrictToOwner(path),
+      restrictToOwnerSync: (path: string) =>
+        backend("restrictToOwnerSync").restrictToOwnerSync(path),
+      isExecutableFile: (name: string, mode: number) =>
+        backend("isExecutableFile").isExecutableFile(name, mode),
+      ptyCommand: (file: string, args: string[]) => backend("ptyCommand").ptyCommand(file, args),
+      gitAskpass: (spec: AskpassSpec) => backend("gitAskpass").gitAskpass(spec),
+      /** Moves `source` to a new `destination`; an existing one rejects with code `EEXIST`. */
+      publishDirectory: (source: string, destination: string) =>
+        backend("publishDirectory").publishDirectory(source, destination),
+      removeAgentHostAddress: (dir: string, address: string) =>
+        backend("removeAgentHostAddress").removeAgentHostAddress(dir, address),
       moveNoReplace: (source: string, target: string) =>
         backend("moveNoReplace").moveNoReplace(source, target),
       runPython: (

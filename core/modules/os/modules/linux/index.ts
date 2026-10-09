@@ -3,8 +3,14 @@ export {
   signalProcess,
   processIdentity,
   listProcesses,
+  listProcesses as snapshotProcesses,
+  recentProcesses,
+  trackConsole,
+  untrackConsole,
   descendants,
+  descendants as descendantsSync,
   workingDirectory,
+  workingDirectories,
 } from "./processes.ts";
 export {
   moveNoReplace,
@@ -15,6 +21,10 @@ export {
   runDockerSync,
   runNodeScript,
   commandExists,
+  ptyCommand,
+  isExecutableFile,
+  restrictToOwner,
+  restrictToOwnerSync,
 } from "./tools.ts";
 export { dataHome, shell, shellLaunch, desktopPaths, pickFolder } from "./directories.ts";
 export {
@@ -85,11 +95,13 @@ export async function shortcutAvailable(shortcut: string) {
   }
 }
 
+export { gitAskpass, publishDirectory, removeAgentHostAddress } from "./git.ts";
 export { installDesktop } from "./install-desktop.ts";
 
 export { startCodexAppServer } from "./codex.ts";
 export {
   agentEnv,
+  agentLaunch,
   agentHostAddress,
   killAgentTree,
   spawnAgentHost,

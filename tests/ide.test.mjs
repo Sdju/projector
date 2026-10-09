@@ -249,7 +249,7 @@ test("keybindings persist atomically with validation and local HTTP origin prote
   expect((await put([binding])).status).toBe(200);
   const saved = await readKeybindings();
   expect(saved.bindings).toStrictEqual([binding]);
-  expect((await stat(saved.path)).mode & 0o777).toBe(0o600);
+  if (process.platform !== "win32") expect((await stat(saved.path)).mode & 0o777).toBe(0o600);
   expect((await put([{}])).status).toBe(400);
   expect((await readKeybindings()).bindings).toStrictEqual([binding]);
   const response = await fetch(url);

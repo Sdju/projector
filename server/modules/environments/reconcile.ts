@@ -3,13 +3,13 @@ import { loadProjects } from "../projects/index.ts";
 
 const host = globalThis as typeof globalThis & { projectorReconciled?: boolean };
 /** Names this server process: pid plus start time, so a reused pid is not mistaken for it. */
-export const serverId = `${process.pid}-${os.processes.identity(process.pid) ?? "0"}`;
+export const serverId = `${process.pid}-${(await os.processes.identity(process.pid)) ?? "0"}`;
 
 /** True while the process named by an owner label is still running. */
-function ownerAlive(owner: string) {
+async function ownerAlive(owner: string) {
   const match = /^(\d+)-(\d+)$/.exec(owner);
   if (!match) return undefined;
-  return os.processes.identity(Number(match[1])) === match[2];
+  return (await os.processes.identity(Number(match[1]))) === match[2];
 }
 
 /**
@@ -35,12 +35,14 @@ export async function reconcileEnvironmentContainers(
         "--format",
         '{{.ID}} {{.Label "io.projector.server"}}',
       ]);
-      const orphans = stdout.split("\n").flatMap((line) => {
+      const orphans: string[] = [];
+      for (const line of stdout.split("\n")) {
         const [id, owner = ""] = line.trim().split(" ");
-        if (!/^[a-f0-9]{12,64}$/.test(id ?? "")) return [];
-        if (owner === "") return [id]; // created before owners were recorded
-        return ownerAlive(owner) === false ? [id] : [];
-      });
+        if (!/^[a-f0-9]{12,64}$/.test(id ?? "")) continue;
+        if (owner === "")
+          orphans.push(id!); // created before owners were recorded
+        else if ((await ownerAlive(owner)) === false) orphans.push(id!);
+      }
       if (orphans.length) await run(["--context", context, "rm", "--force", ...orphans]);
       removed += orphans.length;
     } catch {

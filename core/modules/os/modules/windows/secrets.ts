@@ -1,5 +1,5 @@
 import type { SecretKey } from "../../contract.ts";
-import { runPowerShell, runPowerShellSync } from "./ps.ts";
+import { runPowerShell } from "./ps.ts";
 
 const HELPER = `
 Add-Type -TypeDefinition @"
@@ -69,7 +69,10 @@ public static class ProjectorVault {
 switch ($env:PROJECTOR_SECRET_OP) {
   'available' { if ([ProjectorVault]::Available()) { 'yes' } else { 'no' } }
   'get' { [ProjectorVault]::Read($env:PROJECTOR_SECRET_TARGET) }
-  'set' { [ProjectorVault]::Write($env:PROJECTOR_SECRET_TARGET, $env:PROJECTOR_SECRET_ACCOUNT, $env:PROJECTOR_SECRET_LABEL, $env:PROJECTOR_SECRET_VALUE) }
+  'set' {
+    $value = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(([Console]::In.ReadToEnd()).Trim()))
+    [ProjectorVault]::Write($env:PROJECTOR_SECRET_TARGET, $env:PROJECTOR_SECRET_ACCOUNT, $env:PROJECTOR_SECRET_LABEL, $value)
+  }
   'delete' { [ProjectorVault]::Remove($env:PROJECTOR_SECRET_TARGET) }
 }
 `;
@@ -79,17 +82,14 @@ function target({ service, account }: SecretKey) {
   return `projector:${clean(service)}:${clean(account)}`;
 }
 
-let availableCache: boolean | undefined;
+let availableCache: Promise<boolean> | undefined;
 
 export function secretsAvailable(): Promise<boolean> {
-  if (availableCache !== undefined) return Promise.resolve(availableCache);
-  try {
-    availableCache =
-      runPowerShellSync(HELPER, { env: { PROJECTOR_SECRET_OP: "available" } }).trim() === "yes";
-  } catch {
-    availableCache = false;
-  }
-  return Promise.resolve(availableCache);
+  availableCache ??= runPowerShell(HELPER, { env: { PROJECTOR_SECRET_OP: "available" } }).then(
+    ({ stdout }) => stdout.trim() === "yes",
+    () => false,
+  );
+  return availableCache;
 }
 
 export async function getSecret(key: SecretKey): Promise<string | undefined> {
@@ -108,8 +108,8 @@ export async function setSecret(key: SecretKey, label: string, value: string): P
       PROJECTOR_SECRET_TARGET: target(key),
       PROJECTOR_SECRET_ACCOUNT: key.account,
       PROJECTOR_SECRET_LABEL: label,
-      PROJECTOR_SECRET_VALUE: value,
     },
+    input: Buffer.from(value, "utf8").toString("base64"),
   });
 }
 

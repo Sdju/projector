@@ -3,13 +3,20 @@ import { os } from "../../../core/modules/os/index.ts";
 import { isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
 import { HttpError } from "../http/index.ts";
 
-export async function resolveTerminalPath(path: string, projectRoot: string, cwd: string) {
+export async function resolveTerminalPath(
+  path: string,
+  projectRoot: string,
+  cwd: string | string[],
+) {
   if (!path || path.length > 4096 || /[\x00-\x1f\x7f]/.test(path))
     throw new HttpError(400, "Некорректный путь к файлу");
   const expanded = path.startsWith("~/") ? resolve(os.homeDirectory(), path.slice(2)) : path;
   const candidates = isAbsolute(expanded)
     ? [expanded]
-    : [resolve(cwd, expanded), resolve(projectRoot, expanded)];
+    : [
+        ...[cwd].flat().map((directory) => resolve(directory, expanded)),
+        resolve(projectRoot, expanded),
+      ];
   const root = await realpath(projectRoot);
   for (const candidate of new Set(candidates)) {
     try {
@@ -17,7 +24,7 @@ export async function resolveTerminalPath(path: string, projectRoot: string, cwd
       if (!(await stat(full)).isFile()) continue;
       const local = relative(root, full);
       const external = local === ".." || local.startsWith(`..${sep}`) || isAbsolute(local);
-      return { path: external ? full : local, external };
+      return { path: external ? full : local.split(sep).join("/"), external };
     } catch (error) {
       if (!["ENOENT", "ENOTDIR", "EACCES"].includes((error as NodeJS.ErrnoException).code ?? ""))
         throw error;

@@ -227,8 +227,13 @@ test("the large-file registry is a ratchet with per-extension limits", () => {
       "src/modules/a/gone.ts": { ceiling: 450, plan: "split" },
     }),
   );
-  expect(result["src/modules/a/ok.ts"]).toBe(undefined);
-  expect(result["src/modules/a/ok.vue"]).toBe(undefined);
+  // Inventory-wide findings (the stale `gone.ts` entry) attach to whichever file is walked first,
+  // and the walk order is up to the file system: judge the small files by what is said about them.
+  for (const file of ["ok.ts", "ok.vue"])
+    expect(
+      result.messages.filter((message) => message.includes(`src/modules/a/${file}`)),
+      file,
+    ).toStrictEqual([]);
   for (const file of ["new.ts", "big.ts", "shrunk.ts", "small.ts"]) {
     expect(result[`src/modules/a/${file}`]?.has("large-files"), file).toBeTruthy();
   }

@@ -1,7 +1,7 @@
 import { expect, test } from "vite-plus/test";
 import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { previewProjectFile, readProjectFile } from "../server/modules/workspace/index.ts";
 
@@ -69,7 +69,9 @@ test("native archive previews handle tar/compression/zip, unusual names and link
     await writeFile(join(root, "broken.tgz"), "not gzip");
     await expect(previewProjectFile(root, "broken.tgz")).rejects.toMatchObject({ status: 422 });
     await expect(previewProjectFile(root, "../outside.tar")).rejects.toMatchObject({ status: 403 });
-    await symlink("/etc/passwd", join(root, "external.tar"));
+    const outside = join(root, "..", `${basename(root)}-outside.tar`);
+    await writeFile(outside, "x");
+    await symlink(outside, join(root, "external.tar"));
     await expect(previewProjectFile(root, "external.tar")).rejects.toMatchObject({ status: 403 });
     await writeFile(join(root, "readme.txt"), "text");
     expect((await previewProjectFile(root, "readme.txt")).content).toBe("text");

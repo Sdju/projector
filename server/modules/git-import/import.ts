@@ -1,7 +1,8 @@
-import { mkdir, mkdtemp, rm, rename, lstat, rmdir, realpath } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, lstat, realpath } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { DockerEnvironment } from "../../../core/modules/environment/index.ts";
+import { os } from "../../../core/modules/os/index.ts";
 import { HttpError } from "../http/index.ts";
 import { expandPath, inspectProject, loadProjects, updateProjects } from "../projects/index.ts";
 import type { Project } from "../projects/index.ts";
@@ -20,6 +21,17 @@ export interface ImportOptions {
   clone: (target: { staging: string; checkout: string }) => Promise<void>;
   environment?: DockerEnvironment;
   hooks?: ImportHooks;
+}
+
+/** Moves the finished checkout into place without ever overwriting an existing folder. */
+async function publish(checkout: string, destination: string) {
+  try {
+    await os.tools.publishDirectory(checkout, destination);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST")
+      throw new HttpError(409, "Папка уже существует");
+    throw error;
+  }
 }
 
 /**
@@ -75,22 +87,7 @@ export async function importRepository({
         defaultCommandId: command.id,
       };
     }
-    // Claim the destination atomically, including against another Projector process.
-    try {
-      await mkdir(destination);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "EEXIST")
-        throw new HttpError(409, "Папка уже существует");
-      throw error;
-    }
-    try {
-      // POSIX rename replaces an empty directory. Windows MoveFileEx returns EPERM instead.
-      if (process.platform === "win32") await rmdir(destination);
-      await rename(checkout, destination);
-    } catch (error) {
-      await rmdir(destination).catch(() => {});
-      throw error;
-    }
+    await publish(checkout, destination);
     const project: Project = {
       ...draft,
       path: await realpath(destination),

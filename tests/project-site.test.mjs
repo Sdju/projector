@@ -1,7 +1,7 @@
 import { expect, test } from "vite-plus/test";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { openProjectSiteFile } from "../server/modules/workspace/index.ts";
 
 async function withSite(run) {
@@ -12,7 +12,9 @@ async function withSite(run) {
     await writeFile(join(root, "docs/index.html"), "<h1>hi</h1>");
     await writeFile(join(root, "docs/css/a.css"), "h1{}");
     await writeFile(join(root, ".git/config"), "");
-    await symlink("/etc/passwd", join(root, "leak"));
+    const outside = join(root, "..", `${basename(root)}-outside.txt`);
+    await writeFile(outside, "secret");
+    await symlink(outside, join(root, "leak"));
     await run(root);
   } finally {
     await rm(root, { recursive: true, force: true });

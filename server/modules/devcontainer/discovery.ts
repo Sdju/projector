@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFileSync, realpathSync, statSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { parse, type ParseError } from "jsonc-parser";
 
 const CANDIDATES = [".devcontainer/devcontainer.json", ".devcontainer.json"];
@@ -15,7 +15,7 @@ export interface DevcontainerConfig {
 }
 const inside = (root: string, path: string) => {
   const rel = relative(root, path);
-  return rel !== "" && rel !== ".." && !rel.startsWith("../") && !isAbsolute(rel);
+  return rel !== "" && rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
 };
 // Small files, read synchronously so the trust check can run inside synchronous terminal launches.
 function readLimited(path: string) {

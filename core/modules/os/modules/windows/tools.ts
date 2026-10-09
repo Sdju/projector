@@ -1,8 +1,11 @@
 import { execFile, execFileSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { lstat } from "node:fs/promises";
+import { join } from "node:path";
 import { promisify } from "node:util";
 import { bashExecutable } from "./directories.ts";
+import { quoteForCmd } from "./agent-process.ts";
+import { killTree } from "./kill-tree.ts";
 import { runPowerShell } from "./ps.ts";
 
 const execute = promisify(execFile);
@@ -73,19 +76,6 @@ export function runDockerSync(args: string[]) {
   });
 }
 
-function killTree(pid: number) {
-  const killer = spawn("taskkill.exe", ["/PID", String(pid), "/T", "/F"], {
-    stdio: "ignore",
-    windowsHide: true,
-  });
-  killer.unref();
-  const timer = setTimeout(() => {
-    killer.kill();
-  }, 2000);
-  timer.unref();
-  killer.on("exit", () => clearTimeout(timer));
-}
-
 export function runBash(command: string, options: { cwd: string; signal?: AbortSignal }) {
   const bash = bashExecutable();
   if (!bash)
@@ -120,7 +110,7 @@ export function runBash(command: string, options: { cwd: string; signal?: AbortS
       }
       child.stdout.destroy();
       child.stderr.destroy();
-      if (child.pid) killTree(child.pid);
+      if (child.pid) void killTree(child.pid);
     };
     const capture = (target: Buffer[], chunk: Buffer) => {
       const available = 256 * 1024 - bytes;
@@ -142,7 +132,7 @@ export function runBash(command: string, options: { cwd: string; signal?: AbortS
     });
     child.on("close", (exitCode) => {
       cleanup();
-      if (child.pid) killTree(child.pid);
+      if (child.pid) void killTree(child.pid);
       if (options.signal?.aborted) return reject(new Error("Запрос остановлен"));
       resolve({
         stdout: Buffer.concat(stdout).toString("utf8"),
@@ -203,4 +193,79 @@ export function searchFiles(
   options: { cwd: string; timeout: number; maxBuffer: number },
 ) {
   return execute("rg", args, { ...options, windowsHide: true });
+}
+
+/**
+ * node-pty looks for the exact file name on PATH, without PATHEXT: a bare `docker` is not found
+ * although `docker.exe` is. Batch files cannot be started by CreateProcess at all, so they run
+ * through cmd.exe.
+ */
+export function ptyCommand(file: string, args: string[]): { file: string; args: string[] } {
+  const direct = /[\\/]/.test(file);
+  const directories = direct ? [""] : (process.env.Path ?? process.env.PATH ?? "").split(";");
+  const extensions = /\.[A-Za-z0-9]+$/.test(file)
+    ? [""]
+    : (process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean);
+  for (const directory of directories)
+    for (const extension of extensions) {
+      const candidate = directory ? join(directory, file + extension) : file + extension;
+      if (!existsSync(candidate)) continue;
+      if (/\.(?:cmd|bat)$/i.test(candidate))
+        return {
+          file: process.env.ComSpec || "cmd.exe",
+          args: ["/d", "/s", "/c", [candidate, ...args].map(quoteForCmd).join(" ")],
+        };
+      return { file: candidate, args };
+    }
+  return { file, args };
+}
+
+/** Windows has no execute bit: a file runs when its extension is one of PATHEXT (plus scripts). */
+export function isExecutableFile(name: string, _mode: number): boolean {
+  const extensions = (process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD")
+    .split(";")
+    .filter(Boolean)
+    .map((extension) => extension.toLowerCase());
+  const lower = name.toLowerCase();
+  return [...extensions, ".ps1"].some((extension) => lower.endsWith(extension));
+}
+
+/** Git for Windows puts its own coreutils (`whoami`, `find`…) on PATH; the system tools are meant. */
+const system32 = (name: string) => join(process.env.SystemRoot ?? "C:\\Windows", "System32", name);
+
+let ownerSid: string | undefined;
+function currentSid(): string {
+  ownerSid ??= String(
+    execFileSync(system32("whoami.exe"), ["/user", "/fo", "csv", "/nh"], {
+      encoding: "utf8",
+      windowsHide: true,
+    }),
+  )
+    .trim()
+    .split(",")[1]!
+    .replace(/"/g, "");
+  return ownerSid;
+}
+
+/** Well-known groups that carry explicit entries on new files: Administrators, SYSTEM, Everyone, Users, Authenticated Users. */
+const others = ["S-1-5-32-544", "S-1-5-18", "S-1-1-0", "S-1-5-32-545", "S-1-5-11"];
+
+/** Everything after the grant: inheritance is gone, and the groups above lose their entries. */
+const ownerOnly = (path: string) => [
+  path,
+  "/inheritance:r",
+  "/grant:r",
+  `*${currentSid()}:F`,
+  ...others.filter((sid) => sid !== currentSid()).flatMap((sid) => ["/remove:g", `*${sid}`]),
+];
+
+/**
+ * The Windows counterpart of 0600: the inherited entries are dropped and only the current user
+ * keeps access, so other local accounts cannot read tokens and passwords.
+ */
+export async function restrictToOwner(path: string): Promise<void> {
+  await execute(system32("icacls.exe"), ownerOnly(path), { windowsHide: true });
+}
+export function restrictToOwnerSync(path: string): void {
+  execFileSync(system32("icacls.exe"), ownerOnly(path), { stdio: "ignore", windowsHide: true });
 }
