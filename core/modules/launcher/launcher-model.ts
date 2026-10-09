@@ -220,13 +220,19 @@ export function createLauncherModel(
             ? result?.favorite
               ? "добавлено в избранное"
               : "убрано из избранного"
-            : chosen?.id === "import"
-              ? "клонировано и добавлено"
-              : chosen?.id === "open"
-                ? "открыто"
-                : chosen?.id === "stop"
-                  ? "остановлено"
-                  : "запущено"
+            : chosen?.id === "folder"
+              ? result?.favorite
+                ? "папка добавлена в избранные"
+                : "папка убрана из избранных"
+              : chosen?.id === "create"
+                ? "проект создан"
+                : chosen?.id === "import"
+                  ? "клонировано и добавлено"
+                  : chosen?.id === "open"
+                    ? "открыто"
+                    : chosen?.id === "stop"
+                      ? "остановлено"
+                      : "запущено"
         }`;
         return true;
       } catch (error) {

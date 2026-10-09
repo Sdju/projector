@@ -1,4 +1,4 @@
-import { InterfaceSettings } from "../launcher/index.ts";
+import { FavoriteFolders, InterfaceSettings } from "../launcher/index.ts";
 import { EditorSettings, FilesExcludeSettings } from "../workspace/index.ts";
 import { KeybindingsEditor } from "../ide/index.ts";
 import { NetworkSettings } from "../network/index.ts";
@@ -17,6 +17,14 @@ export const settingsSections: SettingsSection[] = [
     description: "Режим запуска и системная горячая клавиша.",
     keywords: "окно браузер GTK трей хоткей shortcut запуск",
     component: InterfaceSettings,
+  },
+  {
+    id: "folders",
+    title: "Избранные папки",
+    group: "Среда",
+    description: "Папки с проектами: их проекты идут первыми, внутри создаются новые.",
+    keywords: "избранное папки проекты создать новый проект каталог favorite folder",
+    component: FavoriteFolders,
   },
   {
     id: "editor",

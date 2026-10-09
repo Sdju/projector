@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { appUrl } from "../../../../core/modules/app-paths/index.ts";
 
 import { startTray } from "../../../modules/window/index.ts";
@@ -8,6 +9,9 @@ import {
   shortcuts,
   checkShortcut,
   shortcutStatus,
+  favoriteFolderPath,
+  createProjectIn,
+  setFavoriteDirectory,
 } from "../../../modules/launcher/index.ts";
 
 import { json, readBody, asString } from "../../../modules/transport/index.ts";
@@ -20,6 +24,26 @@ export async function handleLauncherSettings({
   method,
   path,
 }: RouteContext): Promise<boolean> {
+  if (path === "/api/launcher/folders" && method === "GET") {
+    json(res, 200, { folders: (await preferences()).directories });
+    return true;
+  }
+  if (path === "/api/launcher/folders" && (method === "POST" || method === "DELETE")) {
+    const body = await readBody(req);
+    const folder =
+      method === "POST" ? await favoriteFolderPath(asString(body.path)) : asString(body.path);
+    await setFavoriteDirectory(folder, method === "POST");
+    json(res, 200, { folders: (await preferences()).directories });
+    return true;
+  }
+  if (path === "/api/launcher/folders/create" && method === "POST") {
+    const body = await readBody(req);
+    const { project, route } = await createProjectIn(
+      join(await favoriteFolderPath(asString(body.folder)), asString(body.name)),
+    );
+    json(res, 201, { project: { id: project.id, name: project.name, path: project.path }, route });
+    return true;
+  }
   if (path === "/api/launcher/settings" && method === "GET") {
     const prefs = await preferences();
     json(res, 200, {

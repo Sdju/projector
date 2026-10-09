@@ -1,4 +1,4 @@
-import { isAbsolute, relative, sep } from "node:path";
+import { dirname, isAbsolute, relative, sep } from "node:path";
 import { os } from "../../../core/modules/os/index.ts";
 import { loadProjects } from "../projects/index.ts";
 import { getSnapshot, processOutput } from "../processes/index.ts";
@@ -63,7 +63,7 @@ const STATE_LABELS: Record<LaunchInfo["state"], string> = {
   stopping: "останавливается",
   error: "ошибка запуска",
 };
-const tildePath = (path: string) => {
+export const tildePath = (path: string) => {
   const home = os.homeDirectory();
   if (path === home) return "~";
   const rel = relative(home, path);
@@ -78,7 +78,19 @@ async function favoriteAction(id: string): Promise<LaunchAction> {
   return { id: "favorite", title: favorite ? "Убрать из избранного" : "Добавить в избранное" };
 }
 
+async function favoriteFolder(path: string) {
+  return (await preferences()).directories.includes(dirname(path));
+}
+
 export async function launchDetail(id: string): Promise<LaunchDetail> {
+  if (id.startsWith("dir:"))
+    return {
+      actions: [
+        { id: "open", title: "Открыть папку" },
+        { id: "folder", title: "Убрать из избранных папок" },
+      ],
+    };
+  if (id.startsWith("new:")) return { actions: [{ id: "create", title: "Создать проект" }] };
   if (!id.startsWith("project:")) {
     if (id.startsWith("gh:")) return { actions: [{ id: "open", title: "Открыть репозиторий" }] };
     if (id.startsWith("gl:"))
@@ -115,6 +127,11 @@ export async function launchDetail(id: string): Promise<LaunchDetail> {
         arg: commands[0].id,
       });
   }
+  const folder = await favoriteFolder(project.path);
+  actions.push({
+    id: "folder",
+    title: folder ? "Убрать папку проекта из избранных" : "Добавить папку проекта в избранные",
+  });
   actions.push(await favoriteAction(id));
   const info: LaunchInfo = {
     path: tildePath(project.path),
