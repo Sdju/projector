@@ -120,3 +120,16 @@ export async function activateSurface(_surface: object): Promise<void> {}
 export function focusSelf(): void {
   control(process.pid, "activate");
 }
+
+/** Whether this process has a window on screen (the GTK palette is visible). */
+export function ownWindowVisible(): boolean {
+  try {
+    const out = execFileSync(ensureHelperSync(), ["--windows", String(process.pid)], {
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+    return Number(/windows:(\d+)/.exec(out)?.[1] ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}

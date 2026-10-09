@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gtkAvailable } from "./gtk.ts";
 import { startDesktopShell } from "./shell.ts";
-import { focusSelf, openBrowser, openWebPalette } from "./windows.ts";
+import { focusSelf, openBrowser, openWebPalette, ownWindowVisible } from "./windows.ts";
 
 const actions: DesktopAction[] = ["show", "toggle", "tray", "quit"];
 const PALETTE_CLASS = "ProjectorLauncher";
@@ -99,11 +99,19 @@ async function gtkPalette(
   };
   pump();
   const inner = await options.createPalette(baseUrl);
-  const raise = <T>(result: Promise<T>) => result.finally(() => focusSelf());
+  /** Raising after a hide would bring the app, and with it the window, back to the front. */
+  const raise = async (action: () => Promise<void>, toggles: boolean) => {
+    const wasVisible = toggles && ownWindowVisible();
+    await action();
+    if (!wasVisible) focusSelf();
+  };
   return {
-    show: () => raise(inner.show()),
-    toggle: () => raise(inner.toggle()),
-    invokeSelected: (toggle) => raise(inner.invokeSelected(toggle)),
+    show: () => raise(() => inner.show(), false),
+    toggle: () => {
+      const wasVisible = ownWindowVisible();
+      return inner.toggle().then(() => (wasVisible ? undefined : focusSelf()));
+    },
+    invokeSelected: (toggle) => raise(() => inner.invokeSelected(toggle), toggle === true),
     openPage: (path) => inner.openPage(path),
     quitProjector: () => inner.quitProjector(),
     restartProjector: () => inner.restartProjector(),
