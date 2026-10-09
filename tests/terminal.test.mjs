@@ -97,7 +97,9 @@ async function until(predicate, description) {
     if (await predicate()) return;
     await pause(20);
   }
-  expect.unreachable(`Timed out: ${description}`);
+  expect.unreachable(
+    `Timed out: ${typeof description === "function" ? description() : description}`,
+  );
 }
 async function request(suffix = "", method = "GET", body, headers = {}) {
   if (method === "DELETE" && body === undefined) {
@@ -594,21 +596,29 @@ process.stdin.on('data', (chunk) => {
   const running = await connect(other.session.id);
   running.send({
     type: "input",
-    data: `bash -c 'trap "" TERM; sleep 60' & printf '%s' "$!" > '${join(root, "child-pid")}'\r`,
+    data: `bash -c 'trap "" TERM; sleep 60' & printf '%s' $! > '${join(root, "child-pid")}'\r`,
   });
   await until(
     () =>
       readFile(join(root, "child-pid"), "utf8")
         .then(Boolean)
         .catch(() => false),
-    "background child started",
+    () => `background child started: ${JSON.stringify(running.output())}`,
   );
   const childPid = Number(await readFile(join(root, "child-pid"), "utf8"));
+  const { os } = await import("../core/modules/os/index.ts");
+  // The confirmation hashes the process tree, which must stop changing before it is read.
+  // Git Bash reports MSYS pids, which Windows process queries do not know.
+  if (process.platform !== "win32")
+    await until(
+      async () => (await os.processes.descendants(childPid)).some((row) => row.name === "sleep"),
+      "background sleep started",
+    );
   expect((await request(`/${other.session.id}`, "DELETE")).status).toBe(200);
-  await until(async () => {
-    const stat = await readFile(`/proc/${childPid}/stat`, "utf8").catch(() => "");
-    return !stat || stat.slice(stat.lastIndexOf(")") + 2).startsWith("Z ");
-  }, "background child terminated");
+  await until(
+    async () => (await os.processes.identity(childPid)) === null,
+    "background child terminated",
+  );
   // Project commands use the same interactive PTY and reconnectable screen as shells.
   const { getSnapshot } = await import("../server/modules/processes/index.ts");
   const run = (action, body) =>

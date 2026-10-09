@@ -1,8 +1,7 @@
 import { execFile, spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
-import { shell } from "./directories.ts";
-import type { AgentHostSpec, AgentLaunch, AgentProcess, AgentProcessSpec } from "../../contract.ts";
+import type { AgentHostSpec, AgentLaunch, AgentProcess, AgentProcessSpec } from "./contract.ts";
 
 /** How long a tree gets to exit on SIGTERM before SIGKILL. */
 const TERM_GRACE_MS = 3000;
@@ -57,7 +56,7 @@ let userPath: Promise<string | undefined> | undefined;
 function interactiveShellPath(): Promise<string | undefined> {
   userPath ??= new Promise((resolve) => {
     execFile(
-      shell(),
+      process.env.SHELL || "/bin/bash",
       ["-i", "-c", `printf '${PATH_MARK}%s${PATH_MARK}' "$PATH"`],
       { timeout: 5000, env: process.env },
       (error, stdout) => {

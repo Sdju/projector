@@ -95,10 +95,10 @@ export async function shortcutAvailable(shortcut: string) {
   }
 }
 
-export { gitAskpass, publishDirectory, removeAgentHostAddress } from "./git.ts";
+export { gitAskpass, publishDirectory, removeAgentHostAddress } from "../../../os-posix/index.ts";
 export { installDesktop } from "./install-desktop.ts";
 
-export { startCodexAppServer } from "./codex.ts";
+export { startCodexAppServer } from "../../../os-posix/index.ts";
 export {
   agentEnv,
   agentLaunch,
@@ -106,9 +106,9 @@ export {
   killAgentTree,
   spawnAgentHost,
   spawnAgentProcess,
-} from "./agent-process.ts";
-export { readOpenCodeGoKey } from "./opencode.ts";
-export { readCursorAccessToken } from "./cursor.ts";
+} from "../../../os-posix/index.ts";
+export { readOpenCodeGoKey } from "../../../os-posix/index.ts";
+export { readCursorAccessToken } from "../../../os-posix/index.ts";
 
 const secrets = () =>
   import(new URL("./secrets.ts", import.meta.url).href) as Promise<typeof import("./secrets.ts")>;
@@ -121,4 +121,4 @@ export const deleteSecret = async (
   ...args: Parameters<typeof import("./secrets.ts").deleteSecret>
 ) => (await secrets()).deleteSecret(...args);
 
-export { readClaudeAccessToken } from "./claude.ts";
+export { readClaudeAccessToken } from "../../../os-posix/index.ts";

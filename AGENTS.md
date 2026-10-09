@@ -4,7 +4,7 @@
 
 ## Начало работы
 
-Linux, Node.js 24, Vite+ (`vp`), GTK4 и GObject Introspection с GioUnix. Для сборки `node-pty` нужны Python 3, make и C++ compiler. Для обзора проектов — `git`, `rg` и GNU `mv`; Python 3 также читает архивы. Проверенное desktop-окружение — KDE Plasma/X11.
+Linux, Windows и macOS (на macOS: Xcode Command Line Tools для Swift-помощника меню/хоткея и `brew install gtk4 gobject-introspection pkg-config` для GTK-палитры, его ставит `projector install`; без GTK4 нативный режим недоступен, как на Linux без GTK), Node.js 24, Vite+ (`vp`), GTK4 и GObject Introspection с GioUnix. Для сборки `node-pty` нужны Python 3, make и C++ compiler. Для обзора проектов — `git`, `rg` и GNU `mv`; Python 3 также читает архивы. Проверенное desktop-окружение — KDE Plasma/X11.
 
 ```bash
 vp install

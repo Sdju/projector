@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { configHome } from "./directories.ts";
+import { configHome } from "./xdg.ts";
 
 /** Use Cursor Agent CLI credentials; never write or publish the auth file. */
 export async function readCursorAccessToken(): Promise<string> {

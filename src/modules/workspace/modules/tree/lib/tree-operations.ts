@@ -1,7 +1,5 @@
 import { computed, nextTick, useId, type Ref } from "vue";
 import { useCommandScope, commandArgs } from "../../../../../common/utilities/commands.ts";
-import type ContextMenu from "../../../../../common/ui/ContextMenu.vue";
-import type EntryDialog from "../../../../../common/ui/EntryDialog.vue";
 import type { ContextMenuItem } from "../../../../../common/ui/context-menu.ts";
 import {
   workspaceRequest,
@@ -17,6 +15,20 @@ import type { FileEntry } from "../../../../../../core/modules/workspace/index.t
 import { ref } from "vue";
 import { registerTreePagingCommand, type createTreePaging } from "./tree-listing.ts";
 
+/** What the tree calls on its context menu and entry dialog (their `defineExpose`). */
+export interface TreeMenuHandle {
+  openForElement(element: HTMLElement): unknown;
+}
+export interface TreeDialogHandle {
+  open(options: {
+    title: string;
+    value?: string;
+    description?: string;
+    confirm?: boolean;
+  }): unknown;
+  close(): void;
+  fail(message: string): void;
+}
 export interface TreeEmit {
   (event: "open", path: string, pinned?: boolean): void;
   (event: "moved", source: string, destination: string): void;
@@ -29,8 +41,8 @@ export interface TreeContext {
   selection: ReturnType<typeof createTreeSelection>;
   drag: ReturnType<typeof createTreeDrag>;
   tree: Ref<HTMLElement | undefined>;
-  menu: Ref<InstanceType<typeof ContextMenu> | undefined>;
-  dialog: Ref<InstanceType<typeof EntryDialog> | undefined>;
+  menu: Ref<TreeMenuHandle | undefined>;
+  dialog: Ref<TreeDialogHandle | undefined>;
   toggle: (path: string) => void;
   paging: ReturnType<typeof createTreePaging>;
 }

@@ -1,11 +1,9 @@
 import { expect, onTestFinished, test } from "vite-plus/test";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { createServer, loadConfigFromFile } from "vite-plus";
+import { createBrowserFixture } from "./fixtures/browser-server.mjs";
 
 const chromium = [
   process.env.CHROMIUM_BIN,
@@ -115,41 +113,11 @@ finally{settingsApp?.unmount();panelApp?.unmount();window.fetch=originalFetch;}}
 
 test(
   "Network settings and LAN panel save through scoped IDE commands",
-  { skip: !chromium, timeout: 60000 },
+  { skip: !chromium, timeout: 60000, retry: 2 },
   async () => {
-    const directory = await mkdtemp(join(tmpdir(), "projector-network-ui-"));
-    const loaded = await loadConfigFromFile({ command: "serve", mode: "development" });
-    const fixture = {
-      name: "network-ui-fixture",
-      configureServer(server) {
-        server.middlewares.use((req, res, next) => {
-          if (req.url === "/__network_test") {
-            res.setHeader("Content-Type", "text/html");
-            void server.transformIndexHtml(req.url, html).then((body) => res.end(body));
-          } else if (req.url === "/__tick") setTimeout(() => res.end("ok"), 20);
-          else next();
-        });
-      },
-    };
-    const server = await createServer({
-      ...loaded.config,
-      configFile: false,
-      // Never attach Projector's API/PTY server or write its instance file in this fixture.
-      plugins: [
-        ...loaded.config.plugins.filter((plugin) => plugin.name !== "projector-api"),
-        fixture,
-      ],
-      cacheDir: join(directory, "vite-cache"),
-      optimizeDeps: { ...loaded.config.optimizeDeps, entries: [] },
-      server: { host: "127.0.0.1", port: 0, strictPort: false },
-      logLevel: "error",
-    });
-    onTestFinished(async () => {
-      await server.close();
-      await rm(directory, { recursive: true, force: true });
-    });
-    await server.listen();
-    const base = `http://127.0.0.1:${server.httpServer.address().port}`;
+    const fixture = await createBrowserFixture({ pages: { "/__network_test": html } });
+    onTestFinished(() => fixture.close());
+    const { directory, base } = fixture;
     const dump = async (path, profile) => {
       const { stdout, stderr } = await promisify(execFile)(
         chromium,

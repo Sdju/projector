@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { dataHome } from "./directories.ts";
+import { xdgDataHome } from "./xdg.ts";
 
 /** Use OpenCode's existing Go credentials; never write or publish the auth file. */
 export async function readOpenCodeGoKey(): Promise<string> {
@@ -8,7 +8,7 @@ export async function readOpenCodeGoKey(): Promise<string> {
   try {
     const content =
       process.env.OPENCODE_AUTH_CONTENT ??
-      (await readFile(join(dataHome(), "opencode", "auth.json"), "utf8"));
+      (await readFile(join(xdgDataHome(), "opencode", "auth.json"), "utf8"));
     auth = JSON.parse(content);
   } catch {
     throw new Error("Авторизация OpenCode недоступна; выполните opencode auth login");

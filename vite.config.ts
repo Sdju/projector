@@ -12,7 +12,9 @@ import { projectorPlugin } from "./server/app/plugin.ts";
 function architecturePlugin(): Plugin {
   const describe = (errors: ReturnType<typeof checkFeod>) =>
     "FEOD architecture violations:\n" +
-    errors.map((item) => `${item.file}: ${item.message}`).join("\n");
+    errors
+      .map((item: { file: string; message: string }) => `${item.file}: ${item.message}`)
+      .join("\n");
   let serving = false;
   return {
     name: "projector-feod",
@@ -97,6 +99,7 @@ export default defineConfig({
       "vite-plus/prefer-vite-plus-imports": "error",
       ...(feodLint.rules as Record<string, "error" | "warn" | "off" | [string, object]>),
     },
+    ignorePatterns: ["packages/vio/examples/**"],
     options: { typeAware: true, typeCheck: true },
   },
 });

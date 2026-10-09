@@ -53,7 +53,8 @@ export async function removeRun(id: string): Promise<void> {
   const dir = runDirectory(id);
   // A deep data directory puts the socket in /tmp instead (see `agentHostAddress`).
   await os.tools.removeAgentHostAddress(dir, os.tools.agentHostAddress(dir));
-  await rm(dir, { recursive: true, force: true });
+  // A host that was just signalled may still write; retry instead of failing on ENOTEMPTY.
+  await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 }
 
 /** The host's process identity, so a pid reused by another program later is never signalled. */

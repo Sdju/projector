@@ -1,5 +1,5 @@
 import { mkdir, rename, rmdir } from "node:fs/promises";
-import type { AskpassScript, AskpassSpec } from "../../contract.ts";
+import type { AskpassScript, AskpassSpec } from "./contract.ts";
 
 export function gitAskpass({ username, tokenEnv }: AskpassSpec): AskpassScript {
   if (!/^[\w.-]+$/.test(username) || !/^[A-Za-z_]\w*$/.test(tokenEnv))

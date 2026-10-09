@@ -6,8 +6,9 @@
 import { os } from "../../../core/modules/os/index.ts";
 
 os.platform; // process.platform, определяется при загрузке
-os.supported; // true для Linux и Windows
-os.capabilities.nativeDesktop; // GTK-палитра: Linux и Windows
+os.supported; // true для Linux, Windows и macOS
+os.capabilities.nativeDesktop; // резидент (трей, хоткей): Linux, Windows, macOS
+os.capabilities.gtkPalette; // GTK-палитра: Linux и Windows
 os.capabilities.giLoader; // предзагрузка GIO в helper: только Linux
 os.capabilities.processInspection;
 const processes = os.processes.list();
@@ -23,6 +24,8 @@ core/modules/os/
   os.ts                     выбор адаптера, capabilities и единый фасад
   contract.ts               процесс и интерфейс контроллера палитры
   modules/linux/            /proc, X11, GIO, D-Bus, Secret Service, трей
+  modules/darwin/           macOS: ps/lsof, Keychain (security), open, osascript; без GTK-палитры
+  ../os-posix/              общий POSIX-код Linux и macOS: агенты, Git askpass, Docker/bash, токены CLI
   modules/windows/          Win32-процессы, Credential Manager, меню Пуск, окно Chromium, GTK-палитра, трей, хоткей
 ```
 
@@ -48,7 +51,7 @@ core/modules/os/
 
 Импорт `os` не загружает GTK, GIO или D-Bus и не создаёт соединения. Native-компоненты загружаются по буквальным file URL: это сохраняет ленивость при сборке Vite-конфигурации; архитектурный checker проверяет такие зависимости.
 
-Для неподдерживаемых ОС (`darwin` и остальные) `supported` и capabilities равны false. Список процессов возвращает `null`, сведения о хоткее показывают отсутствие поддержки. Операции с отсутствующей реализацией выбрасывают `UnsupportedPlatformError` с кодом `ERR_OS_UNSUPPORTED`, а не запускают команды другой ОС.
+Для неподдерживаемых ОС (всё, кроме Linux, Windows и macOS) `supported` и capabilities равны false. Список процессов возвращает `null`, сведения о хоткее показывают отсутствие поддержки. Операции с отсутствующей реализацией выбрасывают `UnsupportedPlatformError` с кодом `ERR_OS_UNSUPPORTED`, а не запускают команды другой ОС.
 
 Capabilities означают наличие реализации, а не установленность утилит. Linux для трея и глобального хоткея требует KDE (StatusNotifier и KGlobalAccel). На Windows `nativeDesktop` тоже true: палитра запускается через GTK4 из `node-gtk` отдельным процессом, команды между запусками идут по именованному каналу, фокус окна — по HWND. Трей — иконка области уведомлений, хоткей — `RegisterHotKey`; оба живут в резиденте палитры. Каталог меню Пуск читается без GTK (`giLoader === false`). Работают каталоги (`LOCALAPPDATA`, с приоритетом `XDG_DATA_HOME`), процессы, перенос файлов, Git Bash или PowerShell, Credential Manager, меню Пуск и окно Chromium. Запуск на Windows — `bin/projector.cmd`.
 
@@ -57,6 +60,19 @@ Capabilities означают наличие реализации, а не ус�
 ```bash
 node cli/app/import-companion-key.mjs /path/to/providers.json
 ```
+
+## macOS: как устроено и что не поддерживается
+
+- **Палитра:** всегда GTK, как на Linux и Windows. GTK4 ставится через Homebrew (`projector install` пробует сам; `nativeDesktop` и `gtkPalette` true только при его наличии, иначе нативный режим недоступен, как на Linux без GTK). GTK обслуживается таймером из Node, а после показа процесс выводится на передний план помощником. Режим «окно» остаётся пользовательским выбором: Chromium `--app` помечается `--class=<имя>`, находится по `ps`, а `NSRunningApplication` в помощнике даёт фокус, скрытие, возврат и закрытие. Резидент печатает `PALETTE:gtk`.
+- **Трей и хоткей:** значок в строке меню и глобальный хоткей (`Ctrl+Alt+Space`, `Alt+Space`) обслуживает Swift-помощник `helper.swift`: он собирается `swiftc` при первом запуске в `<данные>/projector/native` (нужны Xcode Command Line Tools). С `PROJECTOR_SHELL_TEST=1` он принимает `menu N` и `press-hotkey`, чтобы тест прогонял настоящие обработчики без прав на ввод.
+- **Один экземпляр:** команда, уже доставленная резиденту, повторно не отправляется (иначе `toggle` выполнился бы дважды); пока процесс резидента жив, второй не стартует. Unix-сокет `launcher.sock` в каталоге данных (0600) + токен `launcher.token`; повторный запуск пересылает команду.
+- **Каталог** — `.app` из `/Applications`, `/System/Applications`, `~/Applications`; запуск `open -a`, иконка — `.icns` → PNG через `sips`.
+- **Процессы** — `ps -axo` (в том числе `tpgid` для foreground-группы), cwd — `lsof -d cwd`. Общий POSIX-код (агенты, process groups, Git askpass, Docker, bash, права `0600`) живёт в модуле `core/modules/os-posix`.
+- **Секреты** — Keychain через `security -i`: значение идёт по stdin (не попадает в `ps`) и хранится в base64.
+- **Данные** — `~/Library/Application Support` (с приоритетом `XDG_DATA_HOME`); `moveNoReplace` — атомарное «занять и переименовать» вместо GNU `mv`.
+- **Окна** — `open -na <Chromium-браузер> --args --app=…`; фокус окна по классу недоступен. Выбор папки — `osascript`.
+- **Ввод в CI:** хоткей и меню проверяются настоящими HID-событиями (`CGEvent`): нажатие `Ctrl+Alt+Space`, клик по значку, реальный указатель наводится на каждую из четырёх строк меню и кликает по ней (проверяются подсветка и событие строки). Окно GTK-палитры проверяется по `CGWindowListCopyWindowInfo`: показ, скрытие `toggle` (с учётом автоскрытия при потере фокуса) и повторный показ. Тест лаунчера работает с `.app`: скрытыми считаются бандлы с `LSUIElement`/`LSBackgroundOnly`, а запуск подтверждается скриптом внутри бандла.
+- **Проверка** — `.github/workflows/macos.yml` (`macos-15`, Homebrew GTK4): архитектура, `vp test run` (включая `tests/macos-adapter.test.mjs`: каталог, процессы, резидент с GTK-палитрой, меню/хоткей помощника, окно Chromium) и `vio:gtk-test`.
 
 ## Windows: как устроено и что не поддерживается
 
