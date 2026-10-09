@@ -96,8 +96,8 @@ test.skipIf(!mac)(
       await new Promise((resolve) => setTimeout(resolve, 100));
     expect(output).toContain("READY");
     // Hosted runners install GTK4: a silent fall back to Chromium would hide a broken palette.
-    if (process.env.CI) expect(os.capabilities.gtkPalette).toBe(true);
-    expect(output).toContain(os.capabilities.gtkPalette ? "PALETTE:gtk" : "PALETTE:web");
+    expect(os.capabilities.gtkPalette).toBe(true);
+    expect(output).toContain("PALETTE:gtk");
     const { ensureHelper } = await import("../core/modules/os/modules/darwin/shell.ts");
     const windows = async () =>
       Number(

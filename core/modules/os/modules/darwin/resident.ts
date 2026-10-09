@@ -7,10 +7,9 @@ import { join } from "node:path";
 import { gtkAvailable } from "./gtk.ts";
 import { processIdentity } from "./processes.ts";
 import { startDesktopShell } from "./shell.ts";
-import { focusSelf, openBrowser, openWebPalette, ownWindowVisible } from "./windows.ts";
+import { focusSelf, ownWindowVisible } from "./windows.ts";
 
 const actions: DesktopAction[] = ["show", "toggle", "tray", "quit"];
-const PALETTE_CLASS = "ProjectorLauncher";
 
 const isAction = (value: string): value is DesktopAction =>
   actions.includes(value as DesktopAction);
@@ -67,29 +66,6 @@ function sameToken(given: string, token: string) {
   const a = Buffer.from(given);
   const b = Buffer.from(token);
   return a.length === b.length && timingSafeEqual(a, b);
-}
-
-/** The palette is the Chromium app window; macOS has no GTK palette. */
-function webPalette(baseUrl: string, directory: string): DesktopPalette {
-  const profile = `${join(directory, "chrome-profile")}-launcher`;
-  const post = async (path: string) => {
-    const response = await fetch(baseUrl + path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Origin: baseUrl },
-      body: "{}",
-    });
-    if (!response.ok) throw new Error(`Не удалось выполнить ${path}`);
-  };
-  const open = async (toggle: boolean) => openWebPalette(baseUrl, toggle, PALETTE_CLASS, profile);
-  return {
-    show: () => open(false),
-    toggle: () => open(true),
-    invokeSelected: (toggle = false) => open(toggle),
-    openPage: (path) => openBrowser(baseUrl + path),
-    quitProjector: () => post("/api/app/quit"),
-    restartProjector: () => post("/api/app/restart"),
-    dispose: () => {},
-  };
 }
 
 /**
@@ -169,12 +145,7 @@ export async function runResident(
   await mkdir(directory, { recursive: true });
   const token = randomBytes(24).toString("hex");
   let pulse: ReturnType<typeof setTimeout> | undefined;
-  let kind = "gtk";
-  const palette = await gtkPalette(baseUrl, options, (timer) => (pulse = timer)).catch((error) => {
-    kind = "web";
-    console.warn("GTK-палитра недоступна, используется окно Chromium:", error.message);
-    return webPalette(baseUrl, directory);
-  });
+  const palette = await gtkPalette(baseUrl, options, (timer) => (pulse = timer));
   let stopping = false;
   let release = () => {};
   const untilStop = new Promise<void>((resolve) => (release = resolve));
@@ -256,7 +227,7 @@ export async function runResident(
   process.once("SIGTERM", () => void stop());
   process.once("SIGINT", () => void stop());
   await dispatch(action);
-  console.log(`PALETTE:${kind}`);
+  console.log("PALETTE:gtk");
   console.log("READY");
   await untilStop;
 }

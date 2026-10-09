@@ -33,7 +33,10 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
           ? darwin
           : null;
   const supported = implementation !== null;
-  const nativeDesktop = platform === "linux" || platform === "win32" || platform === "darwin";
+  const nativeDesktop =
+    platform === "linux" ||
+    platform === "win32" ||
+    (platform === "darwin" && darwin.gtkAvailable());
   const backend = (operation: string) => {
     if (!implementation) throw new UnsupportedPlatformError(platform, operation);
     return implementation;
@@ -44,7 +47,6 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
     capabilities: Object.freeze({
       nativeDesktop,
       /** Linux catalog reads GIO inside the helper. Windows loads GTK only for the palette. */
-      /** The palette is a GTK window. macOS hosts the tray and hotkey but opens a Chromium window. */
       gtkPalette:
         platform === "linux" ||
         platform === "win32" ||
