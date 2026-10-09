@@ -13,6 +13,7 @@ import { expect, onTestFinished, test } from "vite-plus/test";
 
 const execute = promisify(execFile);
 const mac = process.platform === "darwin";
+const { os } = await import("../core/modules/os/index.ts");
 
 test.skipIf(!mac)("the application catalog lists, launches and resolves .app bundles", async () => {
   const home = await realpath(await mkdtemp(join(tmpdir(), "projector-mac-home-")));
@@ -284,4 +285,20 @@ test.skipIf(!mac || !existsSync("/Applications/Google Chrome.app"))(
     expect(await until(() => !os.windows.focusApp(cls))).toBe(true);
   },
   300_000,
+);
+
+test.skipIf(!mac || !os.capabilities.gtkPalette)(
+  "a GTK window is removed from the screen",
+  async () => {
+    const data = await realpath(await mkdtemp(join(tmpdir(), "projector-mac-hide-")));
+    const script = fileURLToPath(new URL("./fixtures/gtk-hide-mac.mjs", import.meta.url));
+    const loader = pathToFileURL(createRequire(import.meta.url).resolve("vio/register")).href;
+    const { stdout } = await execute(process.execPath, ["--import", loader, script], {
+      env: { ...process.env, XDG_DATA_HOME: data },
+      timeout: 120_000,
+    });
+    const result = JSON.parse(stdout.trim().split("\n").at(-1));
+    expect(result, stdout).toMatchObject({ hide: { shown: 1, after: 0 } });
+  },
+  180_000,
 );
