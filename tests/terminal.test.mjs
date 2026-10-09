@@ -608,10 +608,12 @@ process.stdin.on('data', (chunk) => {
   const childPid = Number(await readFile(join(root, "child-pid"), "utf8"));
   const { os } = await import("../core/modules/os/index.ts");
   // The confirmation hashes the process tree, which must stop changing before it is read.
-  await until(
-    async () => (await os.processes.descendants(childPid)).some((row) => row.name === "sleep"),
-    "background sleep started",
-  );
+  // Git Bash reports MSYS pids, which Windows process queries do not know.
+  if (process.platform !== "win32")
+    await until(
+      async () => (await os.processes.descendants(childPid)).some((row) => row.name === "sleep"),
+      "background sleep started",
+    );
   expect((await request(`/${other.session.id}`, "DELETE")).status).toBe(200);
   await until(
     async () => (await os.processes.identity(childPid)) === null,
