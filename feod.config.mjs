@@ -32,6 +32,7 @@ const nodeOnly = [
 ];
 
 /** FEOD architecture policy for every Projector root. Docs: docs/architecture.md */
+/** @type {import("@o-feod/oxlint-structure-plugin").FeodConfig} */
 export default {
   rootDefault: {
     // Only the configured roots are architecture; tooling, tests and docs are not.
