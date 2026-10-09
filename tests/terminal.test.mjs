@@ -596,7 +596,7 @@ process.stdin.on('data', (chunk) => {
   const running = await connect(other.session.id);
   running.send({
     type: "input",
-    data: `bash -c 'trap "" TERM; sleep 60' & printf '%s' "$!" > '${join(root, "child-pid")}'\r`,
+    data: `bash -c 'trap "" TERM; sleep 60' & printf '%s' $! > '${join(root, "child-pid")}'\r`,
   });
   await until(
     () =>
