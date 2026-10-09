@@ -117,6 +117,23 @@ DispatchQueue.global().async {
               .post(tap: .cghidEventTap)
           }
         }
+        else if line.hasPrefix("real-row "), let row = Int(line.dropFirst(9)) {
+          // Moves the real pointer over a row of the open menu and clicks it.
+          let screenHeight = NSScreen.screens[0].frame.height
+          let windows = NSApp.windows.filter { $0.frame.width > 100 && $0.level.rawValue > 0 && $0.frame.height > 60 && $0 != item.button?.window }
+          guard let window = windows.max(by: { $0.frame.height < $1.frame.height }) else { emit("row:nomenu"); return }
+          let frame = window.frame
+          let rowHeight = (frame.height - 10) / CGFloat(menu.numberOfItems)
+          let point = CGPoint(x: frame.midX, y: screenHeight - (frame.maxY - 5 - rowHeight * (CGFloat(row) + 0.5)))
+          CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: point, mouseButton: .left)?
+            .post(tap: .cghidEventTap)
+          DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            for type in [CGEventType.leftMouseDown, CGEventType.leftMouseUp] {
+              CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: point, mouseButton: .left)?
+                .post(tap: .cghidEventTap)
+            }
+          }
+        }
         else if line.hasPrefix("real-key "), let code = UInt16(line.dropFirst(9)) {
           for down in [true, false] {
             CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: down)?.post(tap: .cghidEventTap)
