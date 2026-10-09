@@ -1,6 +1,6 @@
-import { execFile, spawn, type ChildProcess } from "node:child_process";
+import { execFile, execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
@@ -30,6 +30,19 @@ export async function ensureHelper(): Promise<string> {
     );
   }
   await rename(partial, binary);
+  return binary;
+}
+
+/** Synchronous variant for window control, which the OS facade exposes without promises. */
+export function ensureHelperSync(): string {
+  const hash = createHash("sha256").update(readFileSync(source)).digest("hex").slice(0, 12);
+  const directory = join(dataHome(), "projector", "native");
+  const binary = join(directory, `shell-${hash}`);
+  if (existsSync(binary)) return binary;
+  mkdirSync(directory, { recursive: true });
+  const partial = `${binary}.${process.pid}.tmp`;
+  execFileSync("swiftc", ["-O", "-o", partial, source], { timeout: 180_000, stdio: "ignore" });
+  renameSync(partial, binary);
   return binary;
 }
 

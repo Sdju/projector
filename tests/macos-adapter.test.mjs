@@ -1,5 +1,8 @@
 // Desktop pieces that only exist on macOS: the .app catalog, Keychain and process queries.
 import { execFile, spawn } from "node:child_process";
+import { once } from "node:events";
+import { existsSync } from "node:fs";
+import { createServer } from "node:http";
 import { mkdir, mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -90,6 +93,74 @@ test.skipIf(!mac)(
       await new Promise((resolve) => setTimeout(resolve, 100));
     expect(resident.exitCode).toBe(0);
     expect(JSON.parse((await run("shortcut-status")).stdout).active).toBe(false);
+  },
+  300_000,
+);
+
+test.skipIf(!mac)(
+  "the helper routes menu items and the registered hotkey to Projector events",
+  async () => {
+    const data = await realpath(await mkdtemp(join(tmpdir(), "projector-mac-helper-")));
+    process.env.XDG_DATA_HOME = data;
+    const { ensureHelper } = await import("../core/modules/os/modules/darwin/shell.ts");
+    const helper = spawn(await ensureHelper(), [], {
+      env: { ...process.env, PROJECTOR_SHELL_TEST: "1" },
+      stdio: ["pipe", "pipe", "inherit"],
+    });
+    onTestFinished(() => helper.kill());
+    const lines = [];
+    helper.stdout.on("data", (chunk) => lines.push(...String(chunk).split("\n").filter(Boolean)));
+    const next = async (line) => {
+      for (let i = 0; i < 100 && !lines.includes(line); i++)
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(lines, line).toContain(line);
+      lines.splice(lines.indexOf(line), 1);
+    };
+    await next("ready");
+    helper.stdin.write("hotkey Ctrl+Alt+Space\n");
+    await next("hotkey:ok");
+    helper.stdin.write("press-hotkey\n");
+    await next("event:hotkey");
+    for (const [index, event] of ["activate", "settings", "restart", "quit"].entries()) {
+      helper.stdin.write(`menu ${index}\n`);
+      await next(`event:${event}`);
+    }
+    helper.stdin.write("hotkey Nonsense\n");
+    await next("hotkey:none");
+  },
+  300_000,
+);
+
+test.skipIf(!mac || !existsSync("/Applications/Google Chrome.app"))(
+  "the palette window is found by class, hidden, toggled back and closed",
+  async () => {
+    const data = await realpath(await mkdtemp(join(tmpdir(), "projector-mac-window-")));
+    process.env.XDG_DATA_HOME = data;
+    const { os } = await import("../core/modules/os/index.ts");
+    const server = createServer((_, response) => response.end("<title>Palette</title>")).listen(0);
+    await once(server, "listening");
+    const url = `http://127.0.0.1:${server.address().port}/`;
+    const cls = `ProjectorTest${process.pid}`;
+    onTestFinished(() => {
+      os.windows.closePalette(cls);
+      server.close();
+    });
+    expect(os.windows.focusApp(cls)).toBe(false);
+    os.windows.openPalette(url, false, cls, join(data, "profile"));
+    const until = async (check) => {
+      for (let i = 0; i < 300; i++) {
+        if (await check()) return true;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      return false;
+    };
+    expect(await until(() => os.windows.focusApp(cls))).toBe(true);
+    os.windows.hidePalette(cls);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    os.windows.openPalette(url, true, cls, join(data, "profile"));
+    expect(os.windows.focusApp(cls)).toBe(true);
+    os.windows.closePalette(cls);
+    expect(await until(() => !os.windows.focusApp(cls))).toBe(true);
   },
   300_000,
 );

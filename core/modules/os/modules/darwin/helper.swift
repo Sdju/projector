@@ -31,6 +31,24 @@ if arguments.count > 2 && arguments[1] == "--probe" {
   exit(0)
 }
 
+if arguments.count > 3 && arguments[1] == "--app" {
+  guard let pid = Int32(arguments[2]), let running = NSRunningApplication(processIdentifier: pid) else {
+    emit("gone")
+    exit(1)
+  }
+  switch arguments[3] {
+  case "activate":
+    running.unhide()
+    running.activate(options: [.activateIgnoringOtherApps])
+  case "hide": running.hide()
+  case "terminate": running.terminate()
+  default: break
+  }
+  RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.3))
+  emit(running.isHidden ? "hidden" : running.isActive ? "active" : "visible")
+  exit(0)
+}
+
 final class Target: NSObject {
   @objc func activate() { emit("event:activate") }
   @objc func settings() { emit("event:settings") }
@@ -62,6 +80,17 @@ DispatchQueue.global().async {
     DispatchQueue.main.async {
       if line.hasPrefix("hotkey ") { emit(registerHotkey(String(line.dropFirst(7)))) }
       else if line == "quit" { NSApp.terminate(nil) }
+      else if ProcessInfo.processInfo.environment["PROJECTOR_SHELL_TEST"] == "1" {
+        // Drives the same handlers a click or key press reaches, without needing input permissions.
+        if line.hasPrefix("menu "), let index = Int(line.dropFirst(5)) { menu.performActionForItem(at: index) }
+        else if line == "press-hotkey" {
+          var event: EventRef?
+          CreateEvent(nil, UInt32(kEventClassKeyboard), UInt32(kEventHotKeyPressed), 0, 0, &event)
+          var id = EventHotKeyID(signature: OSType(0x504A4B59), id: 1)
+          SetEventParameter(event, UInt32(kEventParamDirectObject), UInt32(typeEventHotKeyID), MemoryLayout<EventHotKeyID>.size, &id)
+          SendEventToEventTarget(event, GetApplicationEventTarget())
+        }
+      }
     }
   }
   DispatchQueue.main.async { NSApp.terminate(nil) }
