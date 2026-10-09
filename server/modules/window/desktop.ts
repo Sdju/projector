@@ -14,4 +14,4 @@ const helperArgs = (preloadGtk: boolean) =>
 export const desktopArgs = () => helperArgs(os.capabilities.giLoader);
 
 /** Palette process. Loads GTK when this OS can host the native window. */
-export const nativeArgs = () => helperArgs(os.capabilities.nativeDesktop);
+export const nativeArgs = () => helperArgs(os.capabilities.gtkPalette);

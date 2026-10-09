@@ -38,7 +38,8 @@ export {
   activateWindow,
   activateSurface,
 } from "./windows.ts";
-export { resident, desktopPid, shortcutStatus, shortcutAvailable } from "./unsupported.ts";
+export { desktopPid } from "./resident.ts";
+export { shortcutStatus, shortcutAvailable } from "./shortcut.ts";
 export { deleteSecret, getSecret, secretsAvailable, setSecret } from "./secrets.ts";
 export { installDesktop } from "./install-desktop.ts";
 export {
@@ -58,3 +59,5 @@ export {
 } from "../../../os-posix/index.ts";
 export const catalog = () =>
   import(new URL("./catalog.ts", import.meta.url).href) as Promise<typeof import("./catalog.ts")>;
+export const resident = () =>
+  import(new URL("./resident.ts", import.meta.url).href) as Promise<typeof import("./resident.ts")>;

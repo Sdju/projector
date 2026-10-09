@@ -1,8 +1,9 @@
 // Desktop pieces that only exist on macOS: the .app catalog, Keychain and process queries.
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { expect, onTestFinished, test } from "vite-plus/test";
 
@@ -58,4 +59,37 @@ test.skipIf(!mac)(
     expect(await os.processes.identity(child.pid)).toBe(null);
     void execute;
   },
+);
+
+test.skipIf(!mac)(
+  "the resident compiles its helper, owns one menu-bar item and registers the hotkey",
+  async () => {
+    const data = await realpath(await mkdtemp(join(tmpdir(), "projector-mac-resident-")));
+    const entry = fileURLToPath(new URL("../native/app/entry.ts", import.meta.url));
+    const env = { ...process.env, XDG_DATA_HOME: data };
+    const run = (...args) => execute(process.execPath, [entry, ...args], { env, timeout: 240_000 });
+    const resident = spawn(process.execPath, [entry, "native", "http://127.0.0.1:9", "tray"], {
+      env,
+      stdio: ["ignore", "pipe", "inherit"],
+    });
+    onTestFinished(async () => {
+      await run("native", "http://127.0.0.1:9", "quit").catch(() => undefined);
+      resident.kill();
+    });
+    let output = "";
+    resident.stdout.on("data", (chunk) => (output += chunk));
+    for (let i = 0; i < 2400 && !output.includes("READY"); i++)
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(output).toContain("READY");
+    const status = JSON.parse((await run("shortcut-status")).stdout);
+    expect(status).toMatchObject({ supported: true, active: true, shortcut: "Ctrl+Alt+Space" });
+    // A second launch forwards to the running resident instead of starting another.
+    expect((await run("native", "http://127.0.0.1:9", "tray")).stdout).toContain("READY");
+    await run("native", "http://127.0.0.1:9", "quit");
+    for (let i = 0; i < 100 && resident.exitCode === null; i++)
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(resident.exitCode).toBe(0);
+    expect(JSON.parse((await run("shortcut-status")).stdout).active).toBe(false);
+  },
+  300_000,
 );

@@ -37,9 +37,10 @@ test("OS selection is automatic; unsupported systems never fall through to Linux
   });
   const mac = createOs("darwin");
   expect(mac.supported).toBe(true);
-  expect(mac.capabilities.nativeDesktop).toBe(false);
+  expect(mac.capabilities.nativeDesktop).toBe(true);
+  expect(mac.capabilities.gtkPalette).toBe(false);
   expect(mac.capabilities.giLoader).toBe(false);
-  expect(() => mac.requireSupported("native desktop")).toThrow(/darwin/);
+  expect(() => mac.requireSupported("native desktop")).not.toThrow();
   for (const platform of ["freebsd"]) {
     const adapter = createOs(platform);
     expect(adapter.supported).toBe(false);
