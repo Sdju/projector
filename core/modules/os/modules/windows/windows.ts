@@ -1,14 +1,7 @@
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import {
-  activateHwnd,
-  closeWindow,
-  findWindow,
-  foregroundWindow,
-  hideWindow,
-  showWindow,
-} from "./hwnd.ts";
+import { closeWindow, findWindow, foregroundWindow, hideWindow, showWindow } from "./hwnd.ts";
 
 const BROWSERS = [
   join(
@@ -158,7 +151,7 @@ export async function closePalette(appClass: string): Promise<void> {
 }
 
 export async function activateWindow(id: number | bigint): Promise<void> {
-  await activateHwnd(String(id));
+  await showWindow(String(id));
 }
 
 function windowHandle(handle: unknown): number | bigint | null {

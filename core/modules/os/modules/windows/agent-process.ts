@@ -1,6 +1,5 @@
 import { spawn } from "node:child_process";
 import { basename } from "node:path";
-import { bindTreeToJob, warmJob } from "./job.ts";
 import { killTree } from "./kill-tree.ts";
 import type { AgentHostSpec, AgentLaunch, AgentProcess, AgentProcessSpec } from "../../contract.ts";
 
@@ -10,11 +9,7 @@ export function quoteForCmd(value: string): string {
   return `"${value.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, "$1$1")}"`;
 }
 
-/**
- * A separate stdio process per chat turn: Projector never touches the user's own sessions.
- * `.cmd` shims (npx, npm-global binaries) are not executable without a shell on Windows, and
- * `taskkill /T` stops the tree the shell started.
- */
+/** A separate stdio process per chat turn: Projector never touches the user's own sessions. */
 /** `.cmd` shims are not executable without a shell on Windows, and a shell joins argv unquoted. */
 export function agentLaunch(spec: Pick<AgentProcessSpec, "command" | "args">): AgentLaunch {
   return { command: quoteForCmd(spec.command), args: spec.args.map(quoteForCmd), shell: true };
@@ -29,8 +24,6 @@ export function spawnAgentProcess(spec: AgentProcessSpec): AgentProcess {
     windowsHide: true,
     shell: launch.shell,
   }) as AgentProcess;
-  // Bound to the server's lifetime: a crashed server no longer leaves the agent tree behind.
-  if (child.pid) void bindTreeToJob(child.pid);
   child.terminate = () => terminateTree(child);
   return child;
 }
@@ -47,7 +40,6 @@ async function terminateTree(child: AgentProcess): Promise<void> {
 export async function agentEnv(
   base: Record<string, string | undefined>,
 ): Promise<Record<string, string | undefined>> {
-  void warmJob();
   return base;
 }
 

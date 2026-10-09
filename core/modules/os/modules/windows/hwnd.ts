@@ -34,18 +34,18 @@ public static class ProjectorWindows {
   public static void Show(long hwnd) { var h = new IntPtr(hwnd); ShowWindow(h, 9); SetForegroundWindow(h); }
   public static void Hide(long hwnd) { ShowWindow(new IntPtr(hwnd), 0); }
   public static void Close(long hwnd) { PostMessage(new IntPtr(hwnd), 0x0010, IntPtr.Zero, IntPtr.Zero); }
-  public static void Activate(long hwnd) { var h = new IntPtr(hwnd); ShowWindow(h, 9); SetForegroundWindow(h); }
 }
 "@
 $marker = '--class=' + $env:PROJECTOR_APP_CLASS
-$pids = @(Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine.Contains($marker) } | ForEach-Object { $_.ProcessId }) -join ','
 switch ($env:PROJECTOR_WINDOW_OP) {
-  'find' { if ($pids) { [ProjectorWindows]::Find($pids) } }
+  'find' {
+    $pids = @(Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine.Contains($marker) } | ForEach-Object { $_.ProcessId }) -join ','
+    if ($pids) { [ProjectorWindows]::Find($pids) }
+  }
   'foreground' { [ProjectorWindows]::Foreground() }
   'show' { $h = [int64]$env:PROJECTOR_HWND; [ProjectorWindows]::Show($h) }
   'hide' { $h = [int64]$env:PROJECTOR_HWND; [ProjectorWindows]::Hide($h) }
   'close' { $h = [int64]$env:PROJECTOR_HWND; [ProjectorWindows]::Close($h) }
-  'activate' { $h = [int64]$env:PROJECTOR_HWND; [ProjectorWindows]::Activate($h) }
 }
 `;
 
@@ -70,5 +70,3 @@ export const closeWindow = (hwnd: string, appClass = "") =>
   windowCall({ PROJECTOR_WINDOW_OP: "close", PROJECTOR_HWND: hwnd, PROJECTOR_APP_CLASS: appClass });
 export const foregroundWindow = (appClass: string) =>
   windowCall({ PROJECTOR_WINDOW_OP: "foreground", PROJECTOR_APP_CLASS: appClass });
-export const activateHwnd = (hwnd: string) =>
-  windowCall({ PROJECTOR_WINDOW_OP: "activate", PROJECTOR_HWND: hwnd, PROJECTOR_APP_CLASS: "" });

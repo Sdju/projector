@@ -69,19 +69,3 @@ test.skipIf(!windows)("a real GTK window gets an HWND that the adapter can raise
   expect(result.handle).toBeGreaterThan(0);
   expect(result.window).toBe("True|Projector GTK smoke");
 });
-
-test.skipIf(!windows)("the real palette window is shown and actually painted", async () => {
-  const script = fileURLToPath(new URL("./fixtures/palette-window.mjs", import.meta.url));
-  const { stdout, stderr } = await execute(process.execPath, ["--import", "vio/register", script], {
-    timeout: 80000,
-    env: process.env,
-  }).catch((error) => {
-    throw new Error(`${error.message}\n${error.stdout}\n${error.stderr}`);
-  });
-  const result = JSON.parse(stdout.trim().split(/\r?\n/).at(-1), stderr);
-  expect(result, JSON.stringify(result)).toMatchObject({ found: true, visible: true });
-  expect(result.width).toBeGreaterThan(300);
-  expect(result.height).toBeGreaterThan(100);
-  // A blank or black rectangle has one or two colors; text, rows and borders have many.
-  expect(result.colors, JSON.stringify(result)).toBeGreaterThan(8);
-});

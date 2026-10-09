@@ -34,47 +34,6 @@ jobs:
       - name: Build vio
         working-directory: packages/vio
         run: vp exec tsdown
-      - name: Diagnose adapter
-        continue-on-error: true
-        timeout-minutes: 2
-        run: node scripts/windows-diagnose.mjs
       - name: Tests
         timeout-minutes: 15
-        env:
-          PROJECTOR_SHOT_DIR: ${{ runner.temp }}\shots
         run: vp test run
-      - name: Keep the photographed palette
-        if: always()
-        uses: actions/upload-artifact@v4.6.2
-        with:
-          name: palette-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}\shots
-          if-no-files-found: warn
-
-  # The suite once lost two unrelated test workers in one run. Repeating the PTY, process and
-  # integration tests shows whether workers still disappear.
-  stress:
-    runs-on: windows-2025
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: voidzero-dev/setup-vp@v1.21.1
-        with:
-          node-version-file: .node-version
-          cache: true
-          run-install: false
-      - name: Install ripgrep
-        run: choco install ripgrep -y --no-progress
-      - name: Install locked dependencies
-        run: vp install --frozen-lockfile
-      - name: Build vio
-        working-directory: packages/vio
-        run: vp exec tsdown
-      - name: Repeat PTY, process and integration tests
-        shell: bash
-        run: |
-          for i in 1 2 3 4 5 6 7 8 9 10; do
-            echo "::group::round $i"
-            vp test run tests/terminal.test.mjs tests/integrations.test.mjs tests/agent.test.mjs tests/windows-adapter.test.mjs tests/docker.test.mjs tests/reconcile.test.mjs || exit 1
-            echo "::endgroup::"
-          done

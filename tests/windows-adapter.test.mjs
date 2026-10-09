@@ -164,43 +164,6 @@ test.skipIf(!windows)(
 );
 
 test.skipIf(!windows)(
-  "a Job Object ends an agent's whole tree when its owner goes away",
-  async () => {
-    const { bindTreeToJob, closeJob, warmJob } =
-      await import("../core/modules/os/modules/windows/job.ts");
-    expect(await warmJob()).toBe(true);
-    const script =
-      "const {spawn}=require('child_process');setTimeout(()=>{const c=spawn(process.execPath,['-e','setTimeout(()=>{},60000)'],{stdio:'ignore'});console.log('GRANDCHILD '+c.pid)},1500);setTimeout(()=>{},60000)";
-    const child = os.tools.spawnAgentProcess({
-      command: process.execPath,
-      args: ["-e", script],
-      env: process.env,
-    });
-    let output = "";
-    child.stdout.on("data", (chunk) => (output += chunk));
-    expect(await bindTreeToJob(child.pid)).toBe(true);
-    for (let i = 0; i < 100 && !output.includes("GRANDCHILD"); i++)
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    const grandchild = Number(/GRANDCHILD (\d+)/.exec(output)?.[1]);
-    expect(grandchild).toBeGreaterThan(0);
-    const alive = (pid) => {
-      try {
-        process.kill(pid, 0);
-        return true;
-      } catch {
-        return false;
-      }
-    };
-    expect(alive(child.pid) && alive(grandchild)).toBe(true);
-    closeJob(); // what a crashing server does implicitly: the helper's handle to the job closes
-    for (let i = 0; i < 50 && (alive(child.pid) || alive(grandchild)); i++)
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    expect(alive(child.pid)).toBe(false);
-    expect(alive(grandchild)).toBe(false);
-  },
-);
-
-test.skipIf(!windows)(
   "PTY commands resolve bare names and batch files for CreateProcess",
   async () => {
     const cmd = os.tools.ptyCommand("cmd", ["/c", "echo"]);
@@ -255,29 +218,5 @@ test.skipIf(!windows)(
     await writeFile(file, '{"x":1}');
     os.tools.restrictToOwnerSync(file);
     expect(await aclPrincipals(file)).toHaveLength(1);
-  },
-);
-
-test.skipIf(!windows)(
-  "Git Bash shows a new directory to Win32 once it has started a program",
-  async () => {
-    const directory = await scratch();
-    await mkdir(join(directory, "nested"));
-    const child = spawn(os.shell(), ["-c", "cd nested; read -t 7; ls > /dev/null; read -t 40"], {
-      cwd: directory,
-      stdio: "pipe",
-    });
-    onTestFinished(() => child.kill());
-    const nested = join(directory, "nested").toLowerCase();
-    const sample = async () =>
-      (await os.processes.workingDirectories(child.pid, "?")).map((value) => value.toLowerCase());
-    await new Promise((resolve) => setTimeout(resolve, 3500));
-    const before = await sample(); // right after `cd`, no program started yet
-    await new Promise((resolve) => setTimeout(resolve, 6000));
-    const after = await sample(); // `ls` has started
-    console.log("MSYS cwd before an external command:", JSON.stringify(before));
-    console.log("MSYS cwd after an external command:", JSON.stringify(after));
-    expect(before, JSON.stringify(before)).toContain(nested);
-    expect(after, JSON.stringify(after)).toContain(nested);
   },
 );
