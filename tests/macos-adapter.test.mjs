@@ -119,9 +119,10 @@ test.skipIf(!mac)(
       const hiddenOk = await until(async () => (await windows()) === 0);
       const state = (await execute(await ensureHelper(), ["--app", String(resident.pid), "status"]))
         .stdout;
-      expect(hiddenOk, `palette hidden (windows ${await windows()}, app ${state.trim()})`).toBe(
-        true,
-      );
+      const detail = (
+        await execute(await ensureHelper(), ["--windows", String(resident.pid), "-v"])
+      ).stdout;
+      expect(hiddenOk, `palette hidden (app ${state.trim()}) ${detail}`).toBe(true);
       await run("native", "http://127.0.0.1:9", "toggle");
       expect(await until(async () => (await windows()) > 0), "palette shown again").toBe(true);
     }
