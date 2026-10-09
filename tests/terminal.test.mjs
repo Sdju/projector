@@ -97,7 +97,9 @@ async function until(predicate, description) {
     if (await predicate()) return;
     await pause(20);
   }
-  expect.unreachable(`Timed out: ${description}`);
+  expect.unreachable(
+    `Timed out: ${typeof description === "function" ? description() : description}`,
+  );
 }
 async function request(suffix = "", method = "GET", body, headers = {}) {
   if (method === "DELETE" && body === undefined) {
@@ -601,14 +603,15 @@ process.stdin.on('data', (chunk) => {
       readFile(join(root, "child-pid"), "utf8")
         .then(Boolean)
         .catch(() => false),
-    "background child started",
+    () => `background child started: ${JSON.stringify(running.output())}`,
   );
   const childPid = Number(await readFile(join(root, "child-pid"), "utf8"));
   expect((await request(`/${other.session.id}`, "DELETE")).status).toBe(200);
-  await until(async () => {
-    const stat = await readFile(`/proc/${childPid}/stat`, "utf8").catch(() => "");
-    return !stat || stat.slice(stat.lastIndexOf(")") + 2).startsWith("Z ");
-  }, "background child terminated");
+  const { os } = await import("../core/modules/os/index.ts");
+  await until(
+    async () => (await os.processes.identity(childPid)) === null,
+    "background child terminated",
+  );
   // Project commands use the same interactive PTY and reconnectable screen as shells.
   const { getSnapshot } = await import("../server/modules/processes/index.ts");
   const run = (action, body) =>

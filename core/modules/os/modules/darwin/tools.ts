@@ -1,5 +1,5 @@
 import { chmodSync, existsSync } from "node:fs";
-import { lstat, rename } from "node:fs/promises";
+import { lstat, mkdir, open, rename, rmdir, unlink } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { ptyCommand as posixPtyCommand } from "../../../os-posix/index.ts";
@@ -17,15 +17,25 @@ export {
 } from "../../../os-posix/index.ts";
 
 /**
- * BSD `mv` has no `--no-target-directory`: a directory would be moved *into* an existing one.
+ * BSD `mv` has no `--no-target-directory`. The destination is claimed atomically first (mkdir for
+ * a directory, exclusive create for anything else) and `rename` then replaces the empty claim.
  * An existing destination stays untouched and the source stays in place, as with GNU `mv`.
  */
 export async function moveNoReplace(source: string, target: string) {
-  const exists = await lstat(target).then(
-    () => true,
-    () => false,
-  );
-  if (!exists) await rename(source, target);
+  const directory = (await lstat(source)).isDirectory();
+  try {
+    if (directory) await mkdir(target);
+    else await (await open(target, "wx")).close();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") return;
+    throw error;
+  }
+  try {
+    await rename(source, target);
+  } catch (error) {
+    await (directory ? rmdir(target) : unlink(target)).catch(() => {});
+    throw error;
+  }
 }
 
 let helperChecked = false;
