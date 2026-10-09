@@ -71,7 +71,7 @@ node cli/app/import-companion-key.mjs /path/to/providers.json
 - **Секреты** — Keychain через `security -i`: значение идёт по stdin (не попадает в `ps`) и хранится в base64.
 - **Данные** — `~/Library/Application Support` (с приоритетом `XDG_DATA_HOME`); `moveNoReplace` — атомарное «занять и переименовать» вместо GNU `mv`.
 - **Окна** — `open -na <Chromium-браузер> --args --app=…`; фокус окна по классу недоступен. Выбор папки — `osascript`.
-- **Не проверяется:** физический клик мышью и нажатие клавиш (обработчики меню и хоткея гоняются через `menu N`/`press-hotkey`); тест лаунчера с `.desktop` пропущен.
+- **Ввод в CI:** хоткей и меню проверяются настоящими HID-событиями (`CGEvent`: нажатие `Ctrl+Alt+Space`, клик по значку, стрелка и Return) и дополнительно командами `menu N`/`press-hotkey`. Тест лаунчера на macOS работает с `.app` вместо `.desktop`.
 - **Проверка** — `.github/workflows/macos.yml` (`macos-15`, Homebrew GTK4): архитектура, `vp test run` (включая `tests/macos-adapter.test.mjs`: каталог, процессы, резидент с GTK-палитрой, меню/хоткей помощника, окно Chromium) и `vio:gtk-test`.
 
 ## Windows: как устроено и что не поддерживается
