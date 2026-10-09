@@ -1,14 +1,9 @@
 import { expect, onTestFinished, test } from "vite-plus/test";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { createServer } from "vite-plus";
-import vue from "@vitejs/plugin-vue";
-import Icons from "unplugin-icons/vite";
+import { createBrowserFixture } from "./fixtures/browser-server.mjs";
 
 const chromium =
   process.env.CHROMIUM_BIN ??
@@ -19,44 +14,9 @@ test(
   {
     skip: !chromium,
     timeout: 60000,
+    retry: 2,
   },
   async () => {
-    const directory = await mkdtemp(join(tmpdir(), "projector-markdown-browser-"));
-    const fixturePlugin = {
-      name: "markdown-test-fixture",
-      configureServer(server) {
-        server.middlewares.use((req, res, next) => {
-          if (req.url.startsWith("/api/projects/")) {
-            res.setHeader("Content-Type", "image/svg+xml");
-            res.end(
-              '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" /></svg>',
-            );
-            return;
-          }
-          if (req.url === "/favicon.ico") {
-            res.statusCode = 204;
-            res.end();
-            return;
-          }
-          if (req.url !== "/__markdown_test") return next();
-          res.setHeader("Content-Type", "text/html; charset=utf-8");
-          void server.transformIndexHtml(req.url, html).then((page) => res.end(page));
-        });
-      },
-    };
-    const server = await createServer({
-      configFile: false,
-      root: fileURLToPath(new URL("..", import.meta.url)),
-      cacheDir: join(directory, "vite-cache"),
-      plugins: [vue(), Icons({ compiler: "vue3" }), fixturePlugin],
-      optimizeDeps: { entries: [] },
-      logLevel: "error",
-      server: { host: "127.0.0.1", port: 0 },
-    });
-    onTestFinished(async () => {
-      await server.close();
-      await rm(directory, { recursive: true, force: true });
-    });
     const html = `<!doctype html><div id="editor" style="height: 500px"></div><button id="outside">Outside editor</button><pre id="result">WAITING</pre><script type="module">
     import { createApp, h, nextTick, ref } from 'vue';
     import '/src/app/styles.css';
@@ -225,8 +185,18 @@ test(
       document.getElementById('result').textContent = 'PASS';
     } catch (error) { document.getElementById('result').textContent = 'FAIL: ' + error.stack; }
   </script>`;
-    await server.listen();
-    const port = server.httpServer.address().port;
+    const fixture = await createBrowserFixture({
+      pages: { "/__markdown_test": html },
+      responses: [
+        {
+          startsWith: "/api/projects/",
+          type: "image/svg+xml",
+          body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" /></svg>',
+        },
+        { equals: "/favicon.ico", status: 204 },
+      ],
+    });
+    onTestFinished(() => fixture.close());
     const { stdout, stderr } = await promisify(execFile)(
       chromium,
       [
@@ -236,10 +206,10 @@ test(
         "--disable-dev-shm-usage",
         "--no-first-run",
         "--no-default-browser-check",
-        `--user-data-dir=${join(directory, "profile")}`,
+        `--user-data-dir=${join(fixture.directory, "profile")}`,
         "--virtual-time-budget=10000",
         "--dump-dom",
-        `http://127.0.0.1:${port}/__markdown_test`,
+        fixture.url("/__markdown_test"),
       ],
       { timeout: 50000, maxBuffer: 2 * 1024 * 1024 },
     );

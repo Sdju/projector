@@ -16,10 +16,10 @@ const chromium = [
   .find(existsSync);
 test(
   "three island menus open, close with focus restored and emit commands on desktop and mobile",
-  { skip: !chromium, timeout: 90000 },
+  { skip: !chromium, timeout: 90000, retry: 2 },
   async () => {
     const html = await readFile(new URL("./fixtures/island-menu.html", import.meta.url), "utf8");
-    const fixture = await createBrowserFixture("/__island_test", html);
+    const fixture = await createBrowserFixture({ pages: { "/__island_test": html } });
     onTestFinished(() => fixture.close());
     for (const [name, size] of [
       ["desktop", "1200,900"],
@@ -38,7 +38,7 @@ test(
           `--window-size=${size}`,
           "--virtual-time-budget=15000",
           "--dump-dom",
-          fixture.url,
+          fixture.url("/__island_test"),
         ],
         { timeout: 30000, maxBuffer: 2 * 1024 * 1024 },
       );

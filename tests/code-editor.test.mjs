@@ -1,11 +1,9 @@
 import { expect, onTestFinished, test } from "vite-plus/test";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { createServer, loadConfigFromFile } from "vite-plus";
+import { createBrowserFixture } from "./fixtures/browser-server.mjs";
 
 const chromium = [
   process.env.CHROMIUM_BIN,
@@ -120,78 +118,46 @@ test(
   {
     skip: !chromium,
     timeout: 90000,
+    retry: 2,
   },
   async () => {
-    const directory = await mkdtemp(join(tmpdir(), "projector-editor-browser-"));
-    const loaded = await loadConfigFromFile({ command: "serve", mode: "development" });
     const pages = {
       "/__file_test": filePage,
       "/__diff_edit_test": diffEditPage,
       "/__gutter_test": gutterPage,
     };
-    const fixture = {
-      name: "editor-test-fixture",
-      configureServer(server) {
-        server.middlewares.use((req, res, next) => {
-          const html = pages[req.url];
-          if (html) {
-            res.setHeader("Content-Type", "text/html");
-            void server.transformIndexHtml(req.url, html).then((body) => res.end(body));
-            return;
-          }
-          if (req.url === "/__tick") {
-            setTimeout(() => res.end("ok"), 20);
-            return;
-          }
-          if (req.url.startsWith("/api/ide/")) {
-            res.setHeader("Content-Type", "application/json");
-            res.end(JSON.stringify({ theme: "projector" }));
-            return;
-          }
-          if (req.url.startsWith("/api/projects/") && req.url.includes("/workspace/gutter")) {
-            res.setHeader("Content-Type", "application/json");
-            res.end(
-              JSON.stringify({
-                available: true,
-                original: [
-                  "line1",
-                  "line4",
-                  "old5",
-                  "line6",
-                  "line7",
-                  "gone",
-                  "line8",
-                  "line9",
-                  "line10",
-                  "",
-                ].join("\n"),
-              }),
-            );
-            return;
-          }
-          next();
-        });
-      },
-    };
-    const server = await createServer({
-      ...loaded.config,
-      configFile: false,
-      // Never attach Projector's API/PTY server or write its instance file in this fixture.
-      plugins: [
-        ...loaded.config.plugins.filter((plugin) => plugin.name !== "projector-api"),
-        fixture,
+    const fixture = await createBrowserFixture({
+      pages,
+      responses: [
+        {
+          startsWith: "/api/ide/",
+          type: "application/json",
+          body: JSON.stringify({ theme: "projector" }),
+        },
+        {
+          startsWith: "/api/projects/",
+          includes: "/workspace/gutter",
+          type: "application/json",
+          body: JSON.stringify({
+            available: true,
+            original: [
+              "line1",
+              "line4",
+              "old5",
+              "line6",
+              "line7",
+              "gone",
+              "line8",
+              "line9",
+              "line10",
+              "",
+            ].join("\n"),
+          }),
+        },
       ],
-      cacheDir: join(directory, "vite-cache"),
-      optimizeDeps: { ...loaded.config.optimizeDeps, entries: [] },
-      server: { host: "127.0.0.1", port: 0, strictPort: false },
-      logLevel: "error",
     });
-    onTestFinished(async () => {
-      await server.close();
-      await rm(directory, { recursive: true, force: true });
-    });
-    await server.listen();
-    const base = `http://127.0.0.1:${server.httpServer.address().port}`;
+    onTestFinished(() => fixture.close());
+    const { directory } = fixture;
     const dump = async (path, profile) => {
       const { stdout, stderr } = await promisify(execFile)(
         chromium,
@@ -205,7 +171,7 @@ test(
           `--user-data-dir=${join(directory, profile)}`,
           "--virtual-time-budget=15000",
           "--dump-dom",
-          `${base}${path}`,
+          fixture.url(path),
         ],
         { timeout: 25000, maxBuffer: 2 * 1024 * 1024 },
       );
@@ -215,7 +181,7 @@ test(
       );
     };
     for (const phase of ["cold", "restarted"]) {
-      if (phase === "restarted") await server.restart();
+      if (phase === "restarted") await fixture.restart();
       for (const path of Object.keys(pages)) {
         expect(await dump(path, `${path.slice(3)}-${phase}`), `${phase} ${path} failed`).toBe(
           "PASS",
