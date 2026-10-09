@@ -5,6 +5,7 @@ import net from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gtkAvailable } from "./gtk.ts";
+import { processIdentity } from "./processes.ts";
 import { startDesktopShell } from "./shell.ts";
 import { focusSelf, openBrowser, openWebPalette, ownWindowVisible } from "./windows.ts";
 
@@ -133,9 +134,15 @@ export async function runResident(
 ) {
   if (!isAction(action)) throw new Error("Неизвестная команда");
   const directory = options.dataDirectory;
-  if (await forward(action, directory)) {
-    console.log("READY");
-    return;
+  // A busy resident can answer slowly. While its process lives, never start a second one.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    if (await forward(action, directory)) {
+      console.log("READY");
+      return;
+    }
+    const pid = Number((await readFile(pidPath(directory), "utf8").catch(() => "")).trim());
+    if (!pid || !processIdentity(pid)) break;
+    if (attempt === 4) throw new Error("Резидент не отвечает");
   }
   if (action === "quit") {
     console.log("READY");
