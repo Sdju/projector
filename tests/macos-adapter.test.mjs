@@ -77,7 +77,7 @@ test.skipIf(!mac)(
       ? ["--import", pathToFileURL(createRequire(import.meta.url).resolve("vio/register")).href]
       : [];
     const run = (...args) =>
-      execute(process.execPath, [...loader, entry, ...args], { env, timeout: 240_000 });
+      execute(process.execPath, [...loader, entry, ...args], { env, timeout: 40_000 });
     const resident = spawn(
       process.execPath,
       [...loader, entry, "native", "http://127.0.0.1:9", "tray"],
@@ -106,7 +106,7 @@ test.skipIf(!mac)(
         )[1],
       );
     const until = async (check) => {
-      for (let i = 0; i < 100; i++) {
+      for (let i = 0; i < 30; i++) {
         if (await check()) return true;
         await new Promise((resolve) => setTimeout(resolve, 200));
       }
