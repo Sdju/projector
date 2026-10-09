@@ -53,10 +53,13 @@ if arguments.count > 2 && arguments[1] == "--windows" {
   // On-screen, normal-layer windows of a process: proves a palette is really shown.
   let owner = Int(arguments[2]) ?? -1
   let list = (CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]]) ?? []
+  let verbose = arguments.contains("-v")
   let count = list.filter { info in
     guard (info[kCGWindowOwnerPID as String] as? Int) == owner, (info[kCGWindowLayer as String] as? Int) == 0,
           let bounds = info[kCGWindowBounds as String] as? [String: Any] else { return false }
-    return ((bounds["Width"] as? Double) ?? 0) > 100 && ((bounds["Height"] as? Double) ?? 0) > 100
+    let big = ((bounds["Width"] as? Double) ?? 0) > 100 && ((bounds["Height"] as? Double) ?? 0) > 100
+    if verbose && big { emit("window:\(bounds) alpha=\(info[kCGWindowAlpha as String] ?? "?") name=\(info[kCGWindowName as String] ?? "")") }
+    return big
   }.count
   emit("windows:\(count)")
   exit(0)

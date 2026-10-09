@@ -243,6 +243,7 @@ test.skipIf(!mac)(
       helper.stdin.write(`real-row ${rows.findIndex(([name]) => name === title)}\n`);
       await next(`highlight:${title}`);
       await next(`event:${event}`);
+      await next("menu:close");
     }
     helper.stdin.write("hotkey Nonsense\n");
     await next("hotkey:none");
@@ -282,54 +283,4 @@ test.skipIf(!mac || !existsSync("/Applications/Google Chrome.app"))(
     expect(await until(() => !os.windows.focusApp(cls))).toBe(true);
   },
   300_000,
-);
-
-// Real HID events need the Accessibility/Input Monitoring grant; hosted runners allow it.
-test.skipIf(!mac)(
-  "a real key press and a real click on the menu-bar item reach the helper",
-  async () => {
-    const data = await realpath(await mkdtemp(join(tmpdir(), "projector-mac-input-")));
-    process.env.XDG_DATA_HOME = data;
-    const { ensureHelper } = await import("../core/modules/os/modules/darwin/shell.ts");
-    const helper = spawn(await ensureHelper(), [], {
-      env: { ...process.env, PROJECTOR_SHELL_TEST: "1" },
-      stdio: ["pipe", "pipe", "inherit"],
-    });
-    onTestFinished(() => helper.kill());
-    const lines = [];
-    helper.stdout.on("data", (chunk) => lines.push(...String(chunk).split("\n").filter(Boolean)));
-    const next = async (line, seconds = 15) => {
-      for (let i = 0; i < seconds * 10 && !lines.includes(line); i++)
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      expect(lines, line).toContain(line);
-      lines.splice(lines.indexOf(line), 1);
-    };
-    await next("ready");
-    helper.stdin.write("hotkey Ctrl+Alt+Space\n");
-    await next("hotkey:ok");
-    helper.stdin.write("real-hotkey\n");
-    await next("event:hotkey");
-    const rows = [
-      ["Открыть", "activate"],
-      ["Настройки", "settings"],
-      ["Перезапустить", "restart"],
-      ["Выйти", "quit"],
-    ];
-    for (const [title, event] of rows) {
-      helper.stdin.write("real-click\n");
-      await next("menu:open");
-      // Real arrow keys move the highlight until the wanted row is under it.
-      for (let i = 0; i < 8 && !lines.includes(`highlight:${title}`); i++) {
-        helper.stdin.write("real-key 125\n");
-        await new Promise((resolve) => setTimeout(resolve, 250));
-      }
-      expect(lines, title).toContain(`highlight:${title}`);
-      lines.length = 0;
-      helper.stdin.write("real-key 36\n"); // Return chooses the highlighted row
-      await next(`event:${event}`);
-      await next("menu:close");
-      lines.length = 0;
-    }
-  },
-  120_000,
 );
