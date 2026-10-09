@@ -30,6 +30,23 @@ export function desktopApp(_id: string): { getIcon(): null } {
   return { getIcon: () => null };
 }
 
+/** Agents and background-only bundles have no window to open: the analogue of NoDisplay. */
+async function hidden(app: string): Promise<boolean> {
+  for (const key of ["LSUIElement", "LSBackgroundOnly"]) {
+    try {
+      const { stdout } = await execute(
+        "plutil",
+        ["-extract", key, "raw", "-o", "-", join(app, "Contents/Info.plist")],
+        { timeout: 5000 },
+      );
+      if (["true", "1"].includes(stdout.trim().toLowerCase())) return true;
+    } catch {
+      /* The key is absent. */
+    }
+  }
+  return false;
+}
+
 export async function listApplications(): Promise<LaunchItem[]> {
   const seen = new Set<string>();
   const items: LaunchItem[] = [];
@@ -56,7 +73,13 @@ export async function listApplications(): Promise<LaunchItem[]> {
       });
     }
   }
-  return items.sort((a, b) => a.name.localeCompare(b.name));
+  const visible: LaunchItem[] = [];
+  for (let start = 0; start < items.length; start += 24) {
+    const batch = items.slice(start, start + 24);
+    const flags = await Promise.all(batch.map((item) => hidden(item.id.slice(4))));
+    visible.push(...batch.filter((_, index) => !flags[index]));
+  }
+  return visible.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function launchApplication(id: string) {

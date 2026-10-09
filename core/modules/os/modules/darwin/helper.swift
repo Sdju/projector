@@ -49,8 +49,22 @@ if arguments.count > 3 && arguments[1] == "--app" {
   exit(0)
 }
 
+if arguments.count > 2 && arguments[1] == "--windows" {
+  // On-screen, normal-layer windows of a process: proves a palette is really shown.
+  let owner = Int(arguments[2]) ?? -1
+  let list = (CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]]) ?? []
+  let count = list.filter { info in
+    guard (info[kCGWindowOwnerPID as String] as? Int) == owner, (info[kCGWindowLayer as String] as? Int) == 0,
+          let bounds = info[kCGWindowBounds as String] as? [String: Any] else { return false }
+    return ((bounds["Width"] as? Double) ?? 0) > 100 && ((bounds["Height"] as? Double) ?? 0) > 100
+  }.count
+  emit("windows:\(count)")
+  exit(0)
+}
+
 final class Target: NSObject, NSMenuDelegate {
   func menuWillOpen(_ menu: NSMenu) { emit("menu:open") }
+  func menu(_ menu: NSMenu, willHighlight item: NSMenuItem?) { emit("highlight:\(item?.title ?? "")") }
   func menuDidClose(_ menu: NSMenu) { emit("menu:close") }
   @objc func activate() { emit("event:activate") }
   @objc func settings() { emit("event:settings") }

@@ -94,7 +94,32 @@ test.skipIf(!mac)(
     for (let i = 0; i < 2400 && !output.includes("READY"); i++)
       await new Promise((resolve) => setTimeout(resolve, 100));
     expect(output).toContain("READY");
+    // Hosted runners install GTK4: a silent fall back to Chromium would hide a broken palette.
+    if (process.env.CI) expect(os.capabilities.gtkPalette).toBe(true);
     expect(output).toContain(os.capabilities.gtkPalette ? "PALETTE:gtk" : "PALETTE:web");
+    const { ensureHelper } = await import("../core/modules/os/modules/darwin/shell.ts");
+    const windows = async () =>
+      Number(
+        (await execute(await ensureHelper(), ["--windows", String(resident.pid)])).stdout.match(
+          /windows:(\d+)/,
+        )[1],
+      );
+    const until = async (check) => {
+      for (let i = 0; i < 100; i++) {
+        if (await check()) return true;
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+      return false;
+    };
+    if (os.capabilities.gtkPalette) {
+      expect(await windows()).toBe(0);
+      await run("native", "http://127.0.0.1:9", "show");
+      expect(await until(async () => (await windows()) > 0), "palette shown").toBe(true);
+      await run("native", "http://127.0.0.1:9", "toggle");
+      expect(await until(async () => (await windows()) === 0), "palette hidden").toBe(true);
+      await run("native", "http://127.0.0.1:9", "toggle");
+      expect(await until(async () => (await windows()) > 0), "palette shown again").toBe(true);
+    }
     const status = JSON.parse((await run("shortcut-status")).stdout);
     expect(status).toMatchObject({ supported: true, active: true, shortcut: "Ctrl+Alt+Space" });
     // A second launch forwards to the running resident instead of starting another.
@@ -201,14 +226,27 @@ test.skipIf(!mac)(
     await next("hotkey:ok");
     helper.stdin.write("real-hotkey\n");
     await next("event:hotkey");
-    helper.stdin.write("real-click\n");
-    await next("menu:open");
-    helper.stdin.write("real-key 125\n"); // Down arrow highlights an item
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    helper.stdin.write("real-key 36\n"); // Return chooses it
-    await next("menu:close");
-    // Which row the first arrow lands on depends on the menu's initial highlight.
-    expect(lines.some((line) => /^event:(activate|settings|restart|quit)$/.test(line))).toBe(true);
+    const rows = [
+      ["Открыть", "activate"],
+      ["Настройки", "settings"],
+      ["Перезапустить", "restart"],
+      ["Выйти", "quit"],
+    ];
+    for (const [title, event] of rows) {
+      helper.stdin.write("real-click\n");
+      await next("menu:open");
+      // Real arrow keys move the highlight until the wanted row is under it.
+      for (let i = 0; i < 8 && !lines.includes(`highlight:${title}`); i++) {
+        helper.stdin.write("real-key 125\n");
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+      expect(lines, title).toContain(`highlight:${title}`);
+      lines.length = 0;
+      helper.stdin.write("real-key 36\n"); // Return chooses the highlighted row
+      await next(`event:${event}`);
+      await next("menu:close");
+      lines.length = 0;
+    }
   },
   120_000,
 );

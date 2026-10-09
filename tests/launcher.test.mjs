@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, writeFile, readFile } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:http";
@@ -21,10 +21,17 @@ if (mac) {
     join(bundle, "Contents/Info.plist"),
     `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>probe</string><key>CFBundleIdentifier</key><string>dev.projector.launcher-probe</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>`,
   );
+  // The bundle reports the name and path it was really started from.
   await writeFile(
     join(bundle, "Contents/MacOS/probe"),
-    `#!/bin/sh\nprintf '["Projector Probe","${bundle}"]' > '${join(root, "launched.json")}'\n`,
+    `#!/bin/sh\nroot="$(cd "$(dirname "$0")/../.." && pwd -P)"\nprintf '["%s","%s"]' "$(basename "$root" .app)" "$root" > '${join(root, "launched.json")}'\n`,
     { mode: 0o755 },
+  );
+  const background = join(root, "Applications", "Projector Hidden.app");
+  await mkdir(join(background, "Contents"), { recursive: true });
+  await writeFile(
+    join(background, "Contents/Info.plist"),
+    `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>dev.projector.hidden</string><key>LSBackgroundOnly</key><true/></dict></plist>`,
   );
 }
 const probe = join(root, "launch probe.mjs");
@@ -148,7 +155,7 @@ if (process.argv.includes("--prepare")) {
       expect(launched, "The desktop application produced its result").toBeTruthy();
       const args = JSON.parse(launched);
       expect(args[0]).toBe("Projector Probe");
-      expect(args[1]).toBe(mac ? bundle : join(apps, "projector probe.desktop"));
+      expect(args[1]).toBe(mac ? await realpath(bundle) : join(apps, "projector probe.desktop"));
       const settings = JSON.parse(await readFile(join(data, "projector", "launcher.json"), "utf8"));
       expect(settings.usage[appId].count).toBe(2);
       expect((await searchLauncher("")).items[0].id).toBe(appId);
