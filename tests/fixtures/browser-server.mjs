@@ -37,7 +37,7 @@ export async function createBrowserFixture(route, html) {
     url: `http://127.0.0.1:${server.httpServer.address().port}${route}`,
     async close() {
       await server.close();
-      await rm(directory, { recursive: true, force: true });
+      await rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     },
   };
 }

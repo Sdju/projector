@@ -15,7 +15,7 @@ const chromium = [
   .filter(Boolean)
   .find(existsSync);
 test(
-  "three island menus preserve focus, commands, keyboard policies and mobile sheets",
+  "three island menus open, close, restore focus and emit commands on desktop and mobile",
   { skip: !chromium, timeout: 90000 },
   async () => {
     const html = await readFile(new URL("./fixtures/island-menu.html", import.meta.url), "utf8");

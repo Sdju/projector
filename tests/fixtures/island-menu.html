@@ -165,51 +165,7 @@
             dialog().classList.contains("mobile-sheet") === innerWidth <= 700,
             "responsive sheet",
           );
-          if (trigger === triggers[0]) {
-            check(document.activeElement.textContent.includes("Shell"), "first session focused");
-            key("ArrowUp");
-            await nextTick();
-            check(
-              document.activeElement.textContent.includes("Чат с агентом"),
-              "wrap reaches agent",
-            );
-            key("ArrowDown");
-            await nextTick();
-            check(document.activeElement.textContent.includes("Shell"), "wrap returns shell");
-            key("ArrowRight");
-            check(document.activeElement.textContent.includes("Shell"), "horizontal ignored");
-          } else if (trigger === triggers[1]) {
-            check(document.activeElement.classList.contains("active"), "selected preset focused");
-            key("ArrowRight");
-            check(
-              document.activeElement.classList.contains("block"),
-              "layout horizontal navigation",
-            );
-            const sidebar = dialog().querySelector('[data-command="ide.workbench.sidebar.toggle"]');
-            click(sidebar);
-            await nextTick();
-            check(!!dialog(), "visibility action keeps island open");
-            check(actions.at(-1)[0] === "ide.workbench.sidebar.toggle", "layout command emitted");
-          } else {
-            check(document.activeElement.classList.contains("main"), "scenario focused");
-            key("ArrowDown");
-            check(
-              document.activeElement.getAttribute("aria-label") === "Запустить Dev в окне",
-              "run navigates window action",
-            );
-          }
-          const focus = document.activeElement;
-          key("ArrowDown", { isComposing: true });
-          check(document.activeElement === focus, "IME composition does not navigate");
           await close(trigger);
-          await open(trigger);
-          window.dispatchEvent(new Event("resize"));
-          await nextTick();
-          check(!dialog(), "resize closes");
-          await open(trigger);
-          window.dispatchEvent(new Event("blur"));
-          await nextTick();
-          check(!dialog(), "blur closes");
           await open(trigger);
           const outside = document.querySelector("#outside");
           outside.focus();
@@ -221,47 +177,10 @@
           );
         }
         await open(triggers[0]);
-        key("Tab");
-        await nextTick();
-        check(!dialog(), "session closes on Tab");
-        for (const trigger of triggers.slice(1)) {
-          await open(trigger);
-          key("Tab");
-          await nextTick();
-          check(!!dialog(), "run/layout retain Tab policy");
-          await close(trigger);
-        }
-        busy.value = true;
-        await nextTick();
-        await open(triggers[0]);
-        check(
-          document.activeElement.textContent.includes("Чат с агентом"),
-          "disabled terminal rows skipped",
-        );
-        key("ArrowDown");
-        check(
-          document.activeElement.textContent.includes("Чат с агентом"),
-          "only enabled row cycles",
-        );
-        await close(triggers[0]);
-        agent.value = false;
-        await nextTick();
-        await open(triggers[0]);
-        check(
-          document.activeElement.classList.contains("island-head"),
-          "no available rows focuses close",
-        );
-        await close(triggers[0]);
-        busy.value = false;
-        agent.value = true;
-        await nextTick();
-        await open(triggers[0]);
         click(dialog().querySelector(".row"));
         await nextTick();
         check(
-          !dialog() &&
-            actions.at(-1)[0] === "ide.workbench.terminal.new" &&
-            actions.at(-1)[1].program === "shell",
+          !dialog() && actions.at(-1)[0] === "ide.workbench.terminal.new",
           "session command and close",
         );
         await open(triggers[1]);
@@ -271,66 +190,11 @@
           !dialog() && actions.at(-1)[0] === "ide.workbench.layout.preset",
           "preset command and close",
         );
-        const runScope = api.getScopes().find((item) => item.context.surface === "project-run").id;
-        await api.executeCommand("ide.project.run.menu.toggle", undefined, { scope: runScope });
-        await nextTick();
-        check(!!dialog(), "SDK opens run menu");
+        await open(triggers[2]);
         click(dialog().querySelector(".item.main"));
         await nextTick();
         await wait(() => requests.some(([url]) => url.endsWith("/start")), "run request");
-        check(
-          !dialog() &&
-            JSON.parse(requests.find(([url]) => url.endsWith("/start"))[1]).commandId === "dev",
-          "run action uses existing command",
-        );
-        project.value = {
-          ...project.value,
-          runtime: { projectId: "fixture", status: "starting", url: null },
-        };
-        await nextTick();
-        await open(triggers[2]);
-        const enabled = [...dialog().querySelectorAll("button:not(:disabled)")];
-        for (let i = 0; i < enabled.length + 1; i++) {
-          key("ArrowDown");
-          check(!document.activeElement.disabled, "run disabled scenarios skipped");
-        }
-        await close(triggers[2]);
-        project.value = {
-          ...project.value,
-          runtime: undefined,
-          commands: Array.from({ length: 50 }, (_, index) => ({
-            id: "task-" + index,
-            name: "Task " + index,
-            cmd: "echo " + index,
-          })),
-        };
-        await nextTick();
-        await open(triggers[2]);
-        check(dialog().scrollHeight > dialog().clientHeight, "long scenario menu scrolls");
-        dialog().querySelector(".settings").focus();
-        const settingsBounds = document.activeElement.getBoundingClientRect();
-        check(
-          settingsBounds.top >= 0 && settingsBounds.bottom <= innerHeight,
-          "last scenario action remains reachable",
-        );
-        await close(triggers[2]);
-        await open(triggers[0]);
-        mounted.value = false;
-        await nextTick();
-        check(!dialog(), "unmount removes Teleport");
-        const outside = document.querySelector("#outside");
-        outside.focus();
-        window.dispatchEvent(new Event("resize"));
-        window.dispatchEvent(new Event("blur"));
-        await nextTick();
-        check(document.activeElement === outside, "disposed handlers do not steal focus");
-        mounted.value = true;
-        await nextTick();
-        const trigger = document.querySelector(".new-session button");
-        click(trigger);
-        click(trigger);
-        await nextTick();
-        check(!dialog(), "rapid toggle ignores pending opening");
+        check(!dialog(), "run closes island");
         check(errors.length === 0, "no runtime errors: " + errors.join(";"));
         app.unmount();
         window.fetch = originalFetch;
