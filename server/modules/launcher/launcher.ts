@@ -19,7 +19,7 @@ import {
   createProjectIn,
   creationItems,
   favoriteFolderPath,
-  folderItems,
+  parseNewId,
   inFavoriteFolder,
   setFavoriteDirectory,
 } from "./folders.ts";
@@ -162,6 +162,7 @@ export async function searchLauncher(
   query: string,
 ): Promise<{ items: LaunchItem[]; warning?: string }> {
   const parsed = parseLaunchQuery(query);
+  if (parsed.scope === "new") return creationItems(parsed.text, (await preferences()).directories);
   if (parsed.scope === "github")
     return searchHosted(GITHUB, () => searchGithubRepositories(parsed.text));
   if (parsed.scope === "gitlab")
@@ -178,9 +179,7 @@ export async function searchLauncher(
     preferences(),
   ]);
   const { scope, text } = parseLaunchQuery(query);
-  const folders = await folderItems(prefs.directories, projects);
   const items: LaunchItem[] = [
-    ...(scope === "all" ? folders : []),
     ...(scope === "all"
       ? apps.map((app): LaunchItem => ({ ...app, actions: [{ id: "launch", title: "Запустить" }] }))
       : []),
@@ -190,7 +189,7 @@ export async function searchLauncher(
     })),
   ].map((item) => (prefs.favorites.includes(item.id) ? { ...item, favorite: true } : item));
   if (!text) return { items: browse(items, prefs.usage), warning };
-  const created = scope === "all" ? creationItems(text, prefs.directories) : [];
+
   const ranked = items.map((item) => ({
     item,
     score: matchScore(item, text),
@@ -206,13 +205,10 @@ export async function searchLauncher(
       a.item.name.localeCompare(b.item.name),
   );
   return {
-    items: [
-      ...created,
-      ...ranked
-        .filter((row) => row.score >= 0)
-        .slice(0, 10)
-        .map((row) => row.item),
-    ],
+    items: ranked
+      .filter((row) => row.score >= 0)
+      .slice(0, 10)
+      .map((row) => row.item),
     warning,
   };
 }
@@ -245,7 +241,6 @@ function browse(
   const byFolder = (a: LaunchItem, b: LaunchItem) =>
     Number(!!b.folder) - Number(!!a.folder) || byName(a, b);
   return [
-    ...take("folders", items.filter((item) => item.kind === "directory").sort(byName)),
     ...take("favorites", items.filter((item) => item.favorite).sort(byRecent)),
     ...take(
       "running",
@@ -275,19 +270,10 @@ export async function launchItem(
   const result: LaunchResult = { ok: true };
   if (action === "create" || id.startsWith("new:")) {
     if (!id.startsWith("new:") || (action && action !== "create"))
-      throw new Error("Создать проект можно в избранной папке");
-    const created = await createProjectIn(id.slice(4));
+      throw new Error("Создать проект можно в избранной папке: new/имя");
+    const target = parseNewId(id);
+    const created = await createProjectIn(target.folder, target.segments);
     result.route = created.route;
-    if (!inline) await openRoute(result.route);
-    return result;
-  }
-  if (id.startsWith("dir:")) {
-    if (action === "folder" || action === "favorite") {
-      result.favorite = await setFavoriteDirectory(id.slice(4), false);
-      return result;
-    }
-    if (action && action !== "open") throw new Error("Для папки доступны открытие и удаление");
-    result.route = workspaceRoute(id.slice(4));
     if (!inline) await openRoute(result.route);
     return result;
   }

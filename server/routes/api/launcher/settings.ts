@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import { appUrl } from "../../../../core/modules/app-paths/index.ts";
 
 import { startTray } from "../../../modules/window/index.ts";
@@ -11,6 +10,7 @@ import {
   shortcutStatus,
   favoriteFolderPath,
   createProjectIn,
+  projectPath,
   setFavoriteDirectory,
 } from "../../../modules/launcher/index.ts";
 
@@ -39,7 +39,8 @@ export async function handleLauncherSettings({
   if (path === "/api/launcher/folders/create" && method === "POST") {
     const body = await readBody(req);
     const { project, route } = await createProjectIn(
-      join(await favoriteFolderPath(asString(body.folder)), asString(body.name)),
+      await favoriteFolderPath(asString(body.folder)),
+      projectPath(asString(body.name)),
     );
     json(res, 201, { project: { id: project.id, name: project.name, path: project.path }, route });
     return true;

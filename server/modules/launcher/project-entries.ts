@@ -83,13 +83,6 @@ async function favoriteFolder(path: string) {
 }
 
 export async function launchDetail(id: string): Promise<LaunchDetail> {
-  if (id.startsWith("dir:"))
-    return {
-      actions: [
-        { id: "open", title: "Открыть папку" },
-        { id: "folder", title: "Убрать из избранных папок" },
-      ],
-    };
   if (id.startsWith("new:")) return { actions: [{ id: "create", title: "Создать проект" }] };
   if (!id.startsWith("project:")) {
     if (id.startsWith("gh:")) return { actions: [{ id: "open", title: "Открыть репозиторий" }] };

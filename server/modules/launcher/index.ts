@@ -9,4 +9,9 @@ export { checkShortcut } from "./launcher.ts";
 export { shortcutStatus } from "./launcher.ts";
 export { matchScore } from "./launcher.ts";
 export { launchDetail } from "./project-entries.ts";
-export { favoriteFolderPath, createProjectIn, setFavoriteDirectory } from "./folders.ts";
+export {
+  favoriteFolderPath,
+  createProjectIn,
+  projectPath,
+  setFavoriteDirectory,
+} from "./folders.ts";

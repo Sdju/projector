@@ -1,17 +1,20 @@
 import { mkdir, realpath, stat } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
+import { dirname, join } from "node:path";
 import { HttpError } from "../http/index.ts";
 import { expandPath, inspectProject, loadProjects, updateProjects } from "../projects/index.ts";
 import type { Project } from "../projects/index.ts";
 import { normalizeProject } from "../project-presentation/index.ts";
 import { preferences, setFavoriteDirectory } from "../preferences/index.ts";
-import type { LaunchAction, LaunchItem } from "../../../core/modules/launcher/index.ts";
+import type { LaunchItem } from "../../../core/modules/launcher/index.ts";
 import { tildePath, workspaceRoute } from "./project-entries.ts";
 
 export { workspaceRoute };
 
-const normalize = (value: string) =>
-  value.toLocaleLowerCase().normalize("NFKD").replace(/\p{M}/gu, "");
+/** Launcher id `new:<folder>\n<path>` → its parts. */
+export function parseNewId(id: string): { folder: string; segments: string[] } {
+  const [folder = "", path = ""] = id.slice(4).split("\n");
+  return { folder, segments: projectPath(path) };
+}
 
 /** True when the project folder is a direct child of a favorite folder. */
 export const inFavoriteFolder = (project: Pick<Project, "path">, folders: string[]) =>
@@ -43,67 +46,72 @@ export async function favoriteFolderPath(input: string): Promise<string> {
   return realpath(path);
 }
 
-/** Folder results: first in the palette, they show how many projects they hold. */
-export async function folderItems(folders: string[], projects: Project[]): Promise<LaunchItem[]> {
-  const present: LaunchItem[] = [];
-  for (const path of folders) {
-    if (!(await isDirectory(path))) continue;
-    const count = projects.filter((project) => dirname(expandPath(project.path)) === path).length;
-    present.push({
-      id: `dir:${path}`,
-      name: basename(path) || path,
-      kind: "directory",
-      description: `папка · ${tildePath(path)} · проектов: ${count} · «${basename(path)}/имя» создаёт проект`,
-      keywords: path,
-      favorite: true,
-      actions: [
-        { id: "open", title: "Открыть папку" },
-        { id: "folder", title: "Убрать из избранных папок" },
-      ],
-    });
-  }
-  return present;
+/** Splits `new/…` text into plain folder names; every segment is validated like a project name. */
+export function projectPath(text: string): string[] {
+  const segments = text
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (!segments.length) throw new HttpError(400, "Укажите имя проекта");
+  return segments.map(validProjectName);
 }
 
+const newId = (folder: string, segments: string[]) => `new:${folder}\n${segments.join("/")}`;
+
 /**
- * `папка/имя` creates a project: the head picks a favorite folder by name, the tail names the
- * new project. An existing folder is offered as nothing, never overwritten.
+ * `new/имя` results. One favorite folder creates the project right away; several folders are
+ * offered as choices, so the user says where the project goes.
  */
-export function creationItems(text: string, folders: string[]): LaunchItem[] {
-  const slash = text.indexOf("/");
-  if (slash <= 0) return [];
-  const head = normalize(text.slice(0, slash).trim());
-  const name = text.slice(slash + 1).trim();
-  if (!head || !name) return [];
+export async function creationItems(
+  text: string,
+  folders: string[],
+): Promise<{ items: LaunchItem[]; warning?: string }> {
+  if (!folders.length)
+    return {
+      items: [],
+      warning: "Нет избранных папок: добавьте папку в карточке проекта или в настройках",
+    };
+  if (!text) return { items: [], warning: "Введите имя проекта: new/имя или new/группа/имя" };
+  let segments: string[];
   try {
-    validProjectName(name);
-  } catch {
-    return [];
+    segments = projectPath(text);
+  } catch (error) {
+    return { items: [], warning: error instanceof Error ? error.message : String(error) };
   }
-  return folders
-    .filter((folder) => normalize(basename(folder)).startsWith(head))
-    .map((folder) => ({
-      id: `new:${join(folder, name)}`,
-      name: `Создать проект «${name}»`,
-      kind: "directory" as const,
-      description: `новая папка в ${tildePath(folder)}`,
+  const items: LaunchItem[] = [];
+  for (const folder of folders) {
+    if (!(await isDirectory(folder))) continue;
+    const exists = await isDirectory(join(folder, ...segments));
+    items.push({
+      id: newId(folder, segments),
+      name: folders.length > 1 ? tildePath(folder) : `Создать «${segments.join("/")}»`,
+      kind: "directory",
+      description: exists
+        ? "такая папка уже существует"
+        : folders.length > 1
+          ? `создать «${segments.join("/")}» здесь`
+          : `новый проект в ${tildePath(folder)}`,
       keywords: "",
-      section: "folders" as const,
-      actions: [{ id: "create", title: "Создать проект" } satisfies LaunchAction],
-    }));
+      actions: exists ? [] : [{ id: "create", title: "Создать проект" }],
+    });
+  }
+  return {
+    items,
+    warning: items.length > 1 ? `В какой папке создать «${segments.join("/")}»?` : undefined,
+  };
 }
 
 /** Creates the folder, registers it as a project and returns its workspace route. */
 export async function createProjectIn(
-  target: string,
+  parent: string,
+  segments: string[],
 ): Promise<{ project: Project; route: string }> {
-  const parent = dirname(target);
-  const name = validProjectName(basename(target));
   if (!(await preferences()).directories.includes(parent))
     throw new HttpError(400, "Создавать проекты можно только в избранных папках");
   if (!(await isDirectory(parent))) throw new HttpError(400, "Избранная папка не найдена");
-  const path = join(await realpath(parent), name);
+  const path = join(await realpath(parent), ...segments);
   try {
+    await mkdir(dirname(path), { recursive: true });
     await mkdir(path);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "EEXIST")

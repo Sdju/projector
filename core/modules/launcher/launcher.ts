@@ -22,9 +22,8 @@ export interface LaunchAction {
   arg?: string;
 }
 /** Секции пустого запроса; при поиске по тексту список плоский. */
-export type LaunchSection = "folders" | "favorites" | "running" | "recent" | "projects" | "apps";
+export type LaunchSection = "favorites" | "running" | "recent" | "projects" | "apps";
 export const launchSectionTitles: Record<LaunchSection, string> = {
-  folders: "Папки",
   favorites: "Избранное",
   running: "Работает",
   recent: "Недавние",

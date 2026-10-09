@@ -104,8 +104,8 @@ commands.scope.registerCommand({
   <section class="favorite-folders">
     <h2>Избранные папки</h2>
     <UiHint class="hint"
-      >Проекты из этих папок идут в списке запуска первыми. В поиске наберите
-      <code>папка/имя</code>, чтобы создать проект.</UiHint
+      >Проекты из этих папок идут в списке запуска первыми. В поиске наберите <code>new/имя</code>,
+      чтобы создать проект в одной из них.</UiHint
     >
     <ul v-if="folders.length">
       <li v-for="item in folders" :key="item">

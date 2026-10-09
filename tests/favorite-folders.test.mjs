@@ -11,8 +11,7 @@ const work = join(root, "work");
 await mkdir(join(data, "projector"), { recursive: true });
 await mkdir(join(work, "alpha"), { recursive: true });
 process.env.XDG_DATA_HOME = data;
-const { searchLauncher, launchItem, launchDetail } =
-  await import("../server/modules/launcher/index.ts");
+const { searchLauncher, launchItem } = await import("../server/modules/launcher/index.ts");
 const { handleApi } = await import("../server/app/api.ts");
 const server = createServer((req, res) => void handleApi(req, res));
 server.listen(0, "127.0.0.1");
@@ -33,30 +32,39 @@ test("favorite folders rank first and create projects", async () => {
   const added = await (await request("/api/launcher/folders", "POST", { path: work })).json();
   expect(added.folders).toEqual([work]);
 
-  // The folder opens the empty list and is a section of its own.
-  const browse = await searchLauncher("");
-  expect(browse.items[0]).toMatchObject({
-    id: `dir:${work}`,
-    section: "folders",
-    kind: "directory",
-  });
-  expect((await launchDetail(`dir:${work}`)).actions.map((a) => a.id)).toEqual(["open", "folder"]);
+  // Folders are not launch targets: they never appear in the lists.
+  expect((await searchLauncher("")).items.some((i) => i.kind === "directory")).toBe(false);
+  expect((await searchLauncher("work")).items.some((i) => i.kind === "directory")).toBe(false);
 
-  // "folder/name" offers to create a project there.
-  const offer = (await searchLauncher("wor/gamma")).items[0];
-  expect(offer).toMatchObject({ id: `new:${join(work, "gamma")}`, actions: [{ id: "create" }] });
-  expect((await searchLauncher("wor/.hidden")).items.some((i) => i.id.startsWith("new:"))).toBe(
-    false,
-  );
-
-  const created = await launchItem(offer.id, "create", true);
+  // new/<path> with one favorite folder offers a single, immediate creation.
+  expect((await searchLauncher("new/")).warning).toContain("имя проекта");
+  expect((await searchLauncher("new/.hidden")).items).toEqual([]);
+  const offer = (await searchLauncher("new/gamma")).items;
+  expect(offer).toHaveLength(1);
+  expect(offer[0]).toMatchObject({ id: `new:${work}\ngamma`, actions: [{ id: "create" }] });
+  const created = await launchItem(offer[0].id, "create", true);
   expect(created.route).toContain("gamma");
   expect((await stat(join(work, "gamma"))).isDirectory()).toBe(true);
-  // Never overwrites, and refuses folders that are not favorites.
-  await expect(launchItem(offer.id, "create", true)).rejects.toThrow("уже существует");
-  await expect(launchItem(`new:${join(root, "other")}`, "create", true)).rejects.toThrow(
+  // A complex path creates the groups too; an existing folder is never overwritten.
+  const nested = (await searchLauncher("new/group/delta")).items[0];
+  await launchItem(nested.id, "create", true);
+  expect((await stat(join(work, "group", "delta"))).isDirectory()).toBe(true);
+  expect((await searchLauncher("new/gamma")).items[0].actions).toEqual([]);
+  await expect(launchItem(offer[0].id, "create", true)).rejects.toThrow("уже существует");
+  await expect(launchItem(`new:${join(root, "other")}\nx`, "create", true)).rejects.toThrow(
     "избранных",
   );
+
+  // Several favorite folders: the user picks where the project goes.
+  const second = join(root, "second");
+  await mkdir(second);
+  await request("/api/launcher/folders", "POST", { path: second });
+  const choice = await searchLauncher("new/epsilon");
+  expect(choice.warning).toContain("В какой папке");
+  expect(choice.items.map((i) => i.id)).toEqual([`new:${work}\nepsilon`, `new:${second}\nepsilon`]);
+  await launchItem(choice.items[1].id, "create", true);
+  expect((await stat(join(second, "epsilon"))).isDirectory()).toBe(true);
+  await request("/api/launcher/folders", "DELETE", { path: second });
 
   // Projects of the favorite folder go first in the project list.
   const alpha = await (

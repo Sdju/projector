@@ -1,8 +1,8 @@
 /**
- * Префикс запроса сужает область поиска: `/` — проекты, `gh/` — репозитории GitHub, `gl/` — проекты GitLab.
+ * Префикс запроса сужает область поиска: `/` — проекты, `gh/` — репозитории GitHub, `gl/` — проекты GitLab, `new/` — создать проект в избранной папке (`new/имя` или `new/группа/имя`).
  * Ссылка `https://github.com/owner/repo` равна `gh/owner/repo`; ссылка на любой хост со словом gitlab в имени равна `gl/путь`.
  */
-export type LaunchScope = "all" | "projects" | "github" | "gitlab";
+export type LaunchScope = "all" | "projects" | "github" | "gitlab" | "new";
 export interface ParsedQuery {
   scope: LaunchScope;
   text: string;
@@ -11,6 +11,7 @@ export const launchScopeTitles: Record<Exclude<LaunchScope, "all">, string> = {
   projects: "Проекты",
   github: "GitHub",
   gitlab: "GitLab",
+  new: "Новый проект",
 };
 
 /** Any host with "gitlab" in its name: gitlab.com and self-hosted (gitlab.example.com, git.gitlab-x.org). */
@@ -40,6 +41,7 @@ export function parseLaunchQuery(raw: string): ParsedQuery {
   const gitlabUrl = GITLAB_URL.exec(query);
   if (gitlabUrl) return { scope: "gitlab", text: gitlabUrlText(query.slice(gitlabUrl[0].length)) };
   if (/^gh\//i.test(query)) return { scope: "github", text: query.slice(3).trim() };
+  if (/^new\//i.test(query)) return { scope: "new", text: query.slice(4).trim() };
   if (/^gl\//i.test(query)) return { scope: "gitlab", text: query.slice(3).trim() };
   if (query.startsWith("/")) return { scope: "projects", text: query.slice(1).trim() };
   return { scope: "all", text: raw.trim() };
