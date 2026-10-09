@@ -128,7 +128,13 @@ test.skipIf(!mac)(
       ).stdout;
       expect(hidden, `palette hidden ${detail}`).toBe(true);
       await run("native", "http://127.0.0.1:9", "toggle");
-      expect(await until(async () => (await windows()) > 0), "palette shown again").toBe(true);
+      // Sampled fast: a palette that lost focus may hide again within a moment.
+      let seen = false;
+      for (let i = 0; i < 100 && !seen; i++) {
+        seen = (await windows()) > 0;
+        if (!seen) await new Promise((resolve) => setTimeout(resolve, 30));
+      }
+      expect(seen, "palette shown again").toBe(true);
     }
     const status = JSON.parse((await run("shortcut-status")).stdout);
     expect(status).toMatchObject({ supported: true, active: true, shortcut: "Ctrl+Alt+Space" });
