@@ -127,10 +127,10 @@ export async function launchDetail(id: string): Promise<LaunchDetail> {
         arg: commands[0].id,
       });
   }
-  const folder = await favoriteFolder(project.path);
+  const parent = dirname(project.path);
   actions.push({
     id: "folder",
-    title: folder ? "Убрать папку проекта из избранных" : "Добавить папку проекта в избранные",
+    title: `${(await favoriteFolder(project.path)) ? "Убрать из избранных папок" : "Добавить в избранные папки"}: ${tildePath(parent)}`,
   });
   actions.push(await favoriteAction(id));
   const info: LaunchInfo = {
