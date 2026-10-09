@@ -79,7 +79,10 @@ export async function startDesktopShell(dataDirectory: string, handlers: ShellHa
     else if (line === "event:restart") handlers.onRestart();
     else if (line === "event:quit") handlers.onQuit();
   });
-  child.once("exit", () => handlers.onQuit());
+  child.once("exit", (code, signal) => {
+    console.error(`Помощник меню завершился: code=${code} signal=${signal}`);
+    handlers.onQuit();
+  });
   await started;
   const writeState = (shortcut: string, active: boolean) =>
     mkdir(dataDirectory, { recursive: true }).then(() =>
