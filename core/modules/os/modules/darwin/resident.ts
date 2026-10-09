@@ -23,6 +23,7 @@ function socketPath(directory: string): string {
   return path.length < 100 ? path : join(tmpdir(), `projector-launcher-${process.getuid?.()}.sock`);
 }
 
+let lastFailure = "";
 async function forward(action: DesktopAction, directory: string): Promise<boolean> {
   const token = (await readFile(tokenPath(directory), "utf8").catch(() => "")).trim();
   if (!token) return false;
@@ -33,8 +34,14 @@ async function forward(action: DesktopAction, directory: string): Promise<boolea
       socket.destroy();
       resolve(accepted);
     };
-    socket.setTimeout(3000, () => finish(false));
-    socket.on("error", () => finish(false));
+    socket.setTimeout(3000, () => {
+      lastFailure = "тайм-аут ответа";
+      finish(false);
+    });
+    socket.on("error", (error) => {
+      lastFailure = error.message;
+      finish(false);
+    });
     socket.on("connect", () => socket.write(`${token} ${action}\n`));
     socket.on("data", (chunk) => {
       buffer += chunk.toString();
@@ -44,7 +51,10 @@ async function forward(action: DesktopAction, directory: string): Promise<boolea
         finish(true);
       }
     });
-    socket.on("end", () => finish(buffer.includes("READY")));
+    socket.on("end", () => {
+      if (!buffer.includes("READY")) lastFailure = `соединение закрыто: ${buffer.trim()}`;
+      finish(buffer.includes("READY"));
+    });
   });
 }
 
@@ -145,7 +155,7 @@ export async function runResident(
     }
     const pid = Number((await readFile(pidPath(directory), "utf8").catch(() => "")).trim());
     if (!pid || !processIdentity(pid)) break;
-    if (attempt === 4) throw new Error("Резидент не отвечает");
+    if (attempt === 4) throw new Error(`Резидент не отвечает (${lastFailure})`);
   }
   if (action === "quit") {
     console.log("READY");
