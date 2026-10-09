@@ -109,6 +109,7 @@ async function gtkPalette(
     show: () => raise(() => inner.show(), false),
     toggle: () => {
       const wasVisible = ownWindowVisible();
+      if (process.env.PROJECTOR_DEBUG_PALETTE) console.error(`toggle: visible=${wasVisible}`);
       return inner.toggle().then(() => (wasVisible ? undefined : focusSelf()));
     },
     invokeSelected: (toggle) => raise(() => inner.invokeSelected(toggle), toggle === true),

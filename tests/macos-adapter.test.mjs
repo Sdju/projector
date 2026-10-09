@@ -70,7 +70,7 @@ test.skipIf(!mac)(
   async () => {
     const data = await realpath(await mkdtemp(join(tmpdir(), "projector-mac-resident-")));
     const entry = fileURLToPath(new URL("../native/app/entry.ts", import.meta.url));
-    const env = { ...process.env, XDG_DATA_HOME: data };
+    const env = { ...process.env, XDG_DATA_HOME: data, PROJECTOR_DEBUG_PALETTE: "1" };
     const { os } = await import("../core/modules/os/index.ts");
     const loader = os.capabilities.gtkPalette
       ? ["--import", pathToFileURL(createRequire(import.meta.url).resolve("vio/register")).href]
