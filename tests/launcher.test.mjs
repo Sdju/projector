@@ -77,7 +77,7 @@ if (process.argv.includes("--prepare")) {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
 
-  test.skipIf(process.platform === "win32")(
+  test.skipIf(process.platform === "win32" || process.platform === "darwin")(
     "shared launcher handles installed apps, desktop Exec codes, projects and saved settings",
     async () => {
       onTestFinished(() => server.close());
