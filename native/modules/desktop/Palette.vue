@@ -149,7 +149,6 @@ function rowHint(item: LaunchItem) {
     : item.description;
 }
 async function show() {
-  if (process.env.PROJECTOR_DEBUG_PALETTE) console.error(`palette show\n${new Error().stack}`);
   clearTimeout(blurTimer);
   model.live(true);
   model.setQuery("");
@@ -162,7 +161,6 @@ async function show() {
   void focusWindow();
 }
 function hide() {
-  if (process.env.PROJECTOR_DEBUG_PALETTE) console.error(`palette hide\n${new Error().stack}`);
   clearTimeout(blurTimer);
   model.live(false);
   windowRef.value?.widget?.hide();

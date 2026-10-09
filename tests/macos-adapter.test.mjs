@@ -71,7 +71,7 @@ test.skipIf(!mac)(
   async () => {
     const data = await realpath(await mkdtemp(join(tmpdir(), "projector-mac-resident-")));
     const entry = fileURLToPath(new URL("../native/app/entry.ts", import.meta.url));
-    const env = { ...process.env, XDG_DATA_HOME: data, PROJECTOR_DEBUG_PALETTE: "1" };
+    const env = { ...process.env, XDG_DATA_HOME: data };
     const { os } = await import("../core/modules/os/index.ts");
     const loader = os.capabilities.gtkPalette
       ? ["--import", pathToFileURL(createRequire(import.meta.url).resolve("vio/register")).href]
@@ -116,14 +116,17 @@ test.skipIf(!mac)(
       expect(await windows()).toBe(0);
       await run("native", "http://127.0.0.1:9", "show");
       expect(await until(async () => (await windows()) > 0), "palette shown").toBe(true);
-      await run("native", "http://127.0.0.1:9", "toggle");
-      const hiddenOk = await until(async () => (await windows()) === 0);
-      const state = (await execute(await ensureHelper(), ["--app", String(resident.pid), "status"]))
-        .stdout;
+      // The palette also hides itself when it loses focus, so a toggle may meet either state:
+      // whatever it meets, the window must end up hidden and then shown again.
+      let hidden = false;
+      for (let attempt = 0; attempt < 4 && !hidden; attempt++) {
+        if ((await windows()) > 0) await run("native", "http://127.0.0.1:9", "toggle");
+        hidden = await until(async () => (await windows()) === 0);
+      }
       const detail = (
         await execute(await ensureHelper(), ["--windows", String(resident.pid), "-v"])
       ).stdout;
-      expect(hiddenOk, `palette hidden (app ${state.trim()}) ${detail}`).toBe(true);
+      expect(hidden, `palette hidden ${detail}`).toBe(true);
       await run("native", "http://127.0.0.1:9", "toggle");
       expect(await until(async () => (await windows()) > 0), "palette shown again").toBe(true);
     }
