@@ -56,5 +56,8 @@ jobs:
         run: |
           ls node_modules/.pnpm | grep node-gtk || true
           find node_modules/.pnpm -name "node_gtk*.node" -o -name "node-gtk*.node" | head
+      - name: Build vio
+        working-directory: packages/vio
+        run: vp exec tsdown
       - name: Real GTK widgets
         run: vp run vio:gtk-test
