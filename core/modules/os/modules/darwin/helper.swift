@@ -49,19 +49,33 @@ if arguments.count > 3 && arguments[1] == "--app" {
   exit(0)
 }
 
-if arguments.count > 2 && arguments[1] == "--windows" {
+func onScreenWindows(_ owner: Int, verbose: Bool) -> Int {
   // On-screen, normal-layer windows of a process: proves a palette is really shown.
-  let owner = Int(arguments[2]) ?? -1
   let list = (CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]]) ?? []
-  let verbose = arguments.contains("-v")
-  let count = list.filter { info in
+  return list.filter { info in
     guard (info[kCGWindowOwnerPID as String] as? Int) == owner, (info[kCGWindowLayer as String] as? Int) == 0,
           let bounds = info[kCGWindowBounds as String] as? [String: Any] else { return false }
     let big = ((bounds["Width"] as? Double) ?? 0) > 100 && ((bounds["Height"] as? Double) ?? 0) > 100
     if verbose && big { emit("window:\(bounds) alpha=\(info[kCGWindowAlpha as String] ?? "?") name=\(info[kCGWindowName as String] ?? "")") }
     return big
   }.count
-  emit("windows:\(count)")
+}
+
+if arguments.count > 2 && arguments[1] == "--windows" {
+  emit("windows:\(onScreenWindows(Int(arguments[2]) ?? -1, verbose: arguments.contains("-v")))")
+  exit(0)
+}
+
+if arguments.count > 3 && arguments[1] == "--watch" {
+  // Polls fast for `seconds`: a window that appears only briefly is still seen.
+  let owner = Int(arguments[2]) ?? -1
+  let deadline = Date(timeIntervalSinceNow: Double(arguments[3]) ?? 5)
+  while Date() < deadline {
+    let count = onScreenWindows(owner, verbose: false)
+    if count > 0 { emit("windows:\(count)"); exit(0) }
+    usleep(10_000)
+  }
+  emit("windows:0")
   exit(0)
 }
 

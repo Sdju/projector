@@ -71,7 +71,7 @@ test.skipIf(!mac)(
   async () => {
     const data = await realpath(await mkdtemp(join(tmpdir(), "projector-mac-resident-")));
     const entry = fileURLToPath(new URL("../native/app/entry.ts", import.meta.url));
-    const env = { ...process.env, XDG_DATA_HOME: data, PROJECTOR_DEBUG_PALETTE: "1" };
+    const env = { ...process.env, XDG_DATA_HOME: data };
     const { os } = await import("../core/modules/os/index.ts");
     const loader = os.capabilities.gtkPalette
       ? ["--import", pathToFileURL(createRequire(import.meta.url).resolve("vio/register")).href]
@@ -127,14 +127,12 @@ test.skipIf(!mac)(
         await execute(await ensureHelper(), ["--windows", String(resident.pid), "-v"])
       ).stdout;
       expect(hidden, `palette hidden ${detail}`).toBe(true);
+      // The watcher polls every 10 ms from before the toggle, so even a palette that hides
+      // itself again after losing focus is caught while it is on screen.
+      const watcher = execute(await ensureHelper(), ["--watch", String(resident.pid), "10"]);
+      await new Promise((resolve) => setTimeout(resolve, 200));
       await run("native", "http://127.0.0.1:9", "toggle");
-      // Sampled fast: a palette that lost focus may hide again within a moment.
-      let seen = false;
-      for (let i = 0; i < 100 && !seen; i++) {
-        seen = (await windows()) > 0;
-        if (!seen) await new Promise((resolve) => setTimeout(resolve, 30));
-      }
-      expect(seen, "palette shown again").toBe(true);
+      expect((await watcher).stdout, "palette shown again").toContain("windows:1");
     }
     const status = JSON.parse((await run("shortcut-status")).stdout);
     expect(status).toMatchObject({ supported: true, active: true, shortcut: "Ctrl+Alt+Space" });
