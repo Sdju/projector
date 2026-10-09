@@ -35,7 +35,12 @@ test("OS selection is automatic; unsupported systems never fall through to Linux
     active: false,
     shortcut: "",
   });
-  for (const platform of ["darwin", "freebsd"]) {
+  const mac = createOs("darwin");
+  expect(mac.supported).toBe(true);
+  expect(mac.capabilities.nativeDesktop).toBe(false);
+  expect(mac.capabilities.giLoader).toBe(false);
+  expect(() => mac.requireSupported("native desktop")).toThrow(/darwin/);
+  for (const platform of ["freebsd"]) {
     const adapter = createOs(platform);
     expect(adapter.supported).toBe(false);
     expect(adapter.capabilities.nativeDesktop).toBe(false);

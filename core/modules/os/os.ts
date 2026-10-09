@@ -2,6 +2,7 @@ import { homedir, userInfo } from "node:os";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import * as linux from "./modules/linux/index.ts";
+import * as darwin from "./modules/darwin/index.ts";
 import * as windows from "./modules/windows/index.ts";
 import type {
   AgentHostSpec,
@@ -23,7 +24,14 @@ export class UnsupportedPlatformError extends Error {
 
 /** OS selection happens once; user environment/settings are read when needed. */
 export function createOs(platform: NodeJS.Platform = process.platform) {
-  const implementation = platform === "linux" ? linux : platform === "win32" ? windows : null;
+  const implementation =
+    platform === "linux"
+      ? linux
+      : platform === "win32"
+        ? windows
+        : platform === "darwin"
+          ? darwin
+          : null;
   const supported = implementation !== null;
   const nativeDesktop = platform === "linux" || platform === "win32";
   const backend = (operation: string) => {
@@ -39,7 +47,7 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
       giLoader: platform === "linux",
       processInspection: supported,
       /** Process queries that can be answered without waiting (/proc). */
-      syncProcessInspection: platform === "linux",
+      syncProcessInspection: platform === "linux" || platform === "darwin",
       fileOperations: supported,
     }),
     homeDirectory: homedir,

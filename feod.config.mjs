@@ -13,6 +13,12 @@ const adapters = [
     allowedIn: ["core/modules/os/modules/windows/**"],
     message: "Windows-specific operations must live in the os Windows adapter",
   },
+  {
+    name: "darwin-adapter",
+    literals: ["^/usr/bin/security$|^osascript$|Library/Application Support"],
+    allowedIn: ["core/modules/os/modules/darwin/**"],
+    message: "macOS-specific operations must live in the os darwin adapter",
+  },
 ];
 
 /** Node-only infrastructure stays out of browser/domain roots except these modules. */
@@ -20,13 +26,13 @@ const nodeOnly = [
   {
     name: "node-platform",
     imports: ["node:**", "node-gtk", "dbus-next", "node-pty", "ws"],
-    allowedIn: ["core/modules/app-paths/**", "core/modules/os/**"],
+    allowedIn: ["core/modules/app-paths/**", "core/modules/os/**", "core/modules/os-posix/**"],
     message: "Platform dependency in browser/domain code",
   },
   {
     name: "node-infrastructure-modules",
     imports: ["@core/os", "@core/os/**", "@core/app-paths", "@core/app-paths/**"],
-    allowedIn: ["core/modules/app-paths/**", "core/modules/os/**"],
+    allowedIn: ["core/modules/app-paths/**", "core/modules/os/**", "core/modules/os-posix/**"],
     message: "Browser/domain code cannot consume Node OS infrastructure",
   },
 ];

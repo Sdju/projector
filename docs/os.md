@@ -6,7 +6,7 @@
 import { os } from "../../../core/modules/os/index.ts";
 
 os.platform; // process.platform, определяется при загрузке
-os.supported; // true для Linux и Windows
+os.supported; // true для Linux, Windows и macOS
 os.capabilities.nativeDesktop; // GTK-палитра: Linux и Windows
 os.capabilities.giLoader; // предзагрузка GIO в helper: только Linux
 os.capabilities.processInspection;
@@ -23,6 +23,8 @@ core/modules/os/
   os.ts                     выбор адаптера, capabilities и единый фасад
   contract.ts               процесс и интерфейс контроллера палитры
   modules/linux/            /proc, X11, GIO, D-Bus, Secret Service, трей
+  modules/darwin/           macOS: ps/lsof, Keychain (security), open, osascript; без GTK-палитры
+  ../os-posix/              общий POSIX-код Linux и macOS: агенты, Git askpass, Docker/bash, токены CLI
   modules/windows/          Win32-процессы, Credential Manager, меню Пуск, окно Chromium, GTK-палитра, трей, хоткей
 ```
 
@@ -48,7 +50,7 @@ core/modules/os/
 
 Импорт `os` не загружает GTK, GIO или D-Bus и не создаёт соединения. Native-компоненты загружаются по буквальным file URL: это сохраняет ленивость при сборке Vite-конфигурации; архитектурный checker проверяет такие зависимости.
 
-Для неподдерживаемых ОС (`darwin` и остальные) `supported` и capabilities равны false. Список процессов возвращает `null`, сведения о хоткее показывают отсутствие поддержки. Операции с отсутствующей реализацией выбрасывают `UnsupportedPlatformError` с кодом `ERR_OS_UNSUPPORTED`, а не запускают команды другой ОС.
+Для неподдерживаемых ОС (всё, кроме Linux, Windows и macOS) `supported` и capabilities равны false. Список процессов возвращает `null`, сведения о хоткее показывают отсутствие поддержки. Операции с отсутствующей реализацией выбрасывают `UnsupportedPlatformError` с кодом `ERR_OS_UNSUPPORTED`, а не запускают команды другой ОС.
 
 Capabilities означают наличие реализации, а не установленность утилит. Linux для трея и глобального хоткея требует KDE (StatusNotifier и KGlobalAccel). На Windows `nativeDesktop` тоже true: палитра запускается через GTK4 из `node-gtk` отдельным процессом, команды между запусками идут по именованному каналу, фокус окна — по HWND. Трей — иконка области уведомлений, хоткей — `RegisterHotKey`; оба живут в резиденте палитры. Каталог меню Пуск читается без GTK (`giLoader === false`). Работают каталоги (`LOCALAPPDATA`, с приоритетом `XDG_DATA_HOME`), процессы, перенос файлов, Git Bash или PowerShell, Credential Manager, меню Пуск и окно Chromium. Запуск на Windows — `bin/projector.cmd`.
 
@@ -57,6 +59,15 @@ Capabilities означают наличие реализации, а не ус�
 ```bash
 node cli/app/import-companion-key.mjs /path/to/providers.json
 ```
+
+## macOS: как устроено и что не поддерживается
+
+- **Режим — браузерный:** `nativeDesktop` и `giLoader` равны false, GTK-палитра, трей и глобальный хоткей не реализованы; `catalog`/`runDesktop` бросают ошибку, `shortcutStatus` сообщает об отсутствии поддержки.
+- **Процессы** — `ps -axo` (в том числе `tpgid` для foreground-группы), cwd — `lsof -d cwd`. Общий POSIX-код (агенты, process groups, Git askpass, Docker, bash, права `0600`) живёт в модуле `core/modules/os-posix`.
+- **Секреты** — Keychain через `security -i`: значение идёт по stdin (не попадает в `ps`) и хранится в base64.
+- **Данные** — `~/Library/Application Support` (с приоритетом `XDG_DATA_HOME`); `moveNoReplace` — BSD `mv -n`.
+- **Окна** — `open -na <Chromium-браузер> --args --app=…`; фокус окна по классу и скрытие палитры недоступны. Выбор папки — `osascript`.
+- **Проверка** — `.github/workflows/macos.yml` (`macos-15`): архитектура и `vp test run`.
 
 ## Windows: как устроено и что не поддерживается
 
