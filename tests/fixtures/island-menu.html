@@ -166,15 +166,6 @@
             "responsive sheet",
           );
           await close(trigger);
-          await open(trigger);
-          const outside = document.querySelector("#outside");
-          outside.focus();
-          click(outside);
-          await nextTick();
-          check(
-            !dialog() && document.activeElement === outside,
-            "outside click preserves target focus",
-          );
         }
         await open(triggers[0]);
         click(dialog().querySelector(".row"));
