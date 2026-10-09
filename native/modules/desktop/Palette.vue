@@ -171,10 +171,6 @@ async function toggle() {
   else await show();
 }
 function activeChanged() {
-  if (process.env.PROJECTOR_DEBUG_PALETTE)
-    console.error(
-      `palette active=${windowRef.value?.widget?.isActive()} visible=${windowRef.value?.widget?.getVisible()}`,
-    );
   clearTimeout(blurTimer);
   const window = windowRef.value?.widget;
   if (window?.isActive()) wasActive = true;

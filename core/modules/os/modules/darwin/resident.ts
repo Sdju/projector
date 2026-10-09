@@ -34,15 +34,20 @@ async function forward(action: DesktopAction, directory: string): Promise<boolea
       socket.destroy();
       resolve(accepted);
     };
-    socket.setTimeout(3000, () => {
+    // Once the command is sent it is never re-sent: a retry would run it a second time.
+    let sent = false;
+    socket.setTimeout(30_000, () => {
       lastFailure = "тайм-аут ответа";
-      finish(false);
+      finish(sent);
     });
     socket.on("error", (error) => {
       lastFailure = error.message;
       finish(false);
     });
-    socket.on("connect", () => socket.write(`${token} ${action}\n`));
+    socket.on("connect", () => {
+      sent = true;
+      socket.write(`${token} ${action}\n`);
+    });
     socket.on("data", (chunk) => {
       buffer += chunk.toString();
       if (buffer.includes("READY")) finish(true);
