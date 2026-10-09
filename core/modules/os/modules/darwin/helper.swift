@@ -49,7 +49,9 @@ if arguments.count > 3 && arguments[1] == "--app" {
   exit(0)
 }
 
-final class Target: NSObject {
+final class Target: NSObject, NSMenuDelegate {
+  func menuWillOpen(_ menu: NSMenu) { emit("menu:open") }
+  func menuDidClose(_ menu: NSMenu) { emit("menu:close") }
   @objc func activate() { emit("event:activate") }
   @objc func settings() { emit("event:settings") }
   @objc func restart() { emit("event:restart") }
@@ -73,6 +75,7 @@ for (title, action) in [("Открыть", #selector(Target.activate)), ("Нас
   entry.target = target
   menu.addItem(entry)
 }
+menu.delegate = target
 item.menu = menu
 
 DispatchQueue.global().async {
@@ -83,6 +86,28 @@ DispatchQueue.global().async {
       else if ProcessInfo.processInfo.environment["PROJECTOR_SHELL_TEST"] == "1" {
         // Drives the same handlers a click or key press reaches, without needing input permissions.
         if line.hasPrefix("menu "), let index = Int(line.dropFirst(5)) { menu.performActionForItem(at: index) }
+        else if line == "real-hotkey" {
+          // Hardware-level events: they travel the same path as a physical key press.
+          for down in [true, false] {
+            let event = CGEvent(keyboardEventSource: nil, virtualKey: 49, keyDown: down)
+            event?.flags = [.maskControl, .maskAlternate]
+            event?.post(tap: .cghidEventTap)
+          }
+        }
+        else if line == "real-click", let window = item.button?.window {
+          let frame = window.frame
+          let screenHeight = NSScreen.screens[0].frame.height
+          let point = CGPoint(x: frame.midX, y: screenHeight - frame.midY)
+          for type in [CGEventType.leftMouseDown, CGEventType.leftMouseUp] {
+            CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: point, mouseButton: .left)?
+              .post(tap: .cghidEventTap)
+          }
+        }
+        else if line.hasPrefix("real-key "), let code = UInt16(line.dropFirst(9)) {
+          for down in [true, false] {
+            CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: down)?.post(tap: .cghidEventTap)
+          }
+        }
         else if line == "press-hotkey" {
           var event: EventRef?
           CreateEvent(nil, UInt32(kEventClassKeyboard), UInt32(kEventHotKeyPressed), 0, 0, &event)

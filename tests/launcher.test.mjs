@@ -10,6 +10,23 @@ const data = join(root, "data");
 const apps = join(data, "applications");
 await mkdir(apps, { recursive: true });
 await mkdir(join(data, "projector"), { recursive: true });
+const mac = process.platform === "darwin";
+// macOS lists .app bundles from ~/Applications instead of .desktop entries.
+const bundle = join(root, "Applications", "Projector Probe.app");
+const appId = mac ? `app:${bundle}` : "app:projector probe.desktop";
+if (mac) {
+  process.env.HOME = root;
+  await mkdir(join(bundle, "Contents/MacOS"), { recursive: true });
+  await writeFile(
+    join(bundle, "Contents/Info.plist"),
+    `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>probe</string><key>CFBundleIdentifier</key><string>dev.projector.launcher-probe</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>`,
+  );
+  await writeFile(
+    join(bundle, "Contents/MacOS/probe"),
+    `#!/bin/sh\nprintf '["Projector Probe","${bundle}"]' > '${join(root, "launched.json")}'\n`,
+    { mode: 0o755 },
+  );
+}
 const probe = join(root, "launch probe.mjs");
 await writeFile(
   probe,
@@ -77,13 +94,13 @@ if (process.argv.includes("--prepare")) {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
 
-  test.skipIf(process.platform === "win32" || process.platform === "darwin")(
+  test.skipIf(process.platform === "win32")(
     "shared launcher handles installed apps, desktop Exec codes, projects and saved settings",
     async () => {
       onTestFinished(() => server.close());
       const results = await searchLauncher("Projector Probe");
       expect(results.warning).toBe(undefined);
-      expect(results.items[0].id).toBe("app:projector probe.desktop");
+      expect(results.items[0].id).toBe(appId);
       expect((await searchLauncher("Projector Hidden")).items.length).toBe(0);
       expect((await searchLauncher("Probe workspace")).items[0].id).toBe("project:probe-project");
       expect((await searchLauncher("qzxv-no-such-app")).items.length).toBe(0);
@@ -112,15 +129,13 @@ if (process.argv.includes("--prepare")) {
           await request(
             "/api/launcher/launch",
             "POST",
-            { id: "app:projector probe.desktop" },
+            { id: appId },
             { Origin: "https://untrusted.example" },
           )
         ).status,
       ).toBe(403);
       const launches = await Promise.all(
-        [1, 2].map(() =>
-          request("/api/launcher/launch", "POST", { id: "app:projector probe.desktop" }),
-        ),
+        [1, 2].map(() => request("/api/launcher/launch", "POST", { id: appId })),
       );
       for (const response of launches) expect(response.status, await response.text()).toBe(200);
       // GIO confirms process creation, before the launched Node script writes its result.
@@ -133,10 +148,10 @@ if (process.argv.includes("--prepare")) {
       expect(launched, "The desktop application produced its result").toBeTruthy();
       const args = JSON.parse(launched);
       expect(args[0]).toBe("Projector Probe");
-      expect(args[1]).toBe(join(apps, "projector probe.desktop"));
+      expect(args[1]).toBe(mac ? bundle : join(apps, "projector probe.desktop"));
       const settings = JSON.parse(await readFile(join(data, "projector", "launcher.json"), "utf8"));
-      expect(settings.usage["app:projector probe.desktop"].count).toBe(2);
-      expect((await searchLauncher("")).items[0].id).toBe("app:projector probe.desktop");
+      expect(settings.usage[appId].count).toBe(2);
+      expect((await searchLauncher("")).items[0].id).toBe(appId);
       const browsed = (await searchLauncher("")).items;
       expect(browsed[0].section).toBe("recent");
       expect(browsed.every((item) => item.section)).toBeTruthy();
@@ -171,7 +186,7 @@ if (process.argv.includes("--prepare")) {
       expect(
         (
           await request("/api/launcher/launch", "POST", {
-            id: "app:projector probe.desktop",
+            id: appId,
             action: "open",
           })
         ).status,
@@ -224,24 +239,22 @@ if (process.argv.includes("--prepare")) {
       expect(after[0].id).toBe("project:fail-project");
       expect(after[0].favorite).toBe(true);
       expect(after.find((item) => item.id === "project:probe-project").favorite).toBe(undefined);
-      expect((await toggle("app:projector probe.desktop")).favorite).toBe(true);
+      expect((await toggle(appId)).favorite).toBe(true);
       const favoriteBrowse = (await searchLauncher("")).items;
       expect(
         favoriteBrowse
           .filter((item) => item.section === "favorites")
           .map((item) => item.id)
           .sort(),
-      ).toStrictEqual(["app:projector probe.desktop", "project:fail-project"]);
+      ).toStrictEqual([appId, "project:fail-project"]);
       expect(favoriteBrowse[0].section).toBe("favorites");
       expect(new Set(favoriteBrowse.map((item) => item.id)).size).toBe(favoriteBrowse.length);
       expect((await launchDetail("project:fail-project")).actions.at(-1).title).toBe(
         "Убрать из избранного",
       );
-      expect((await launchDetail("app:projector probe.desktop")).actions.at(-1).title).toBe(
-        "Убрать из избранного",
-      );
+      expect((await launchDetail(appId)).actions.at(-1).title).toBe("Убрать из избранного");
       expect((await toggle("project:fail-project")).favorite).toBe(false);
-      expect((await toggle("app:projector probe.desktop")).favorite).toBe(false);
+      expect((await toggle(appId)).favorite).toBe(false);
       expect((await launchDetail("project:fail-project")).actions.at(-1).title).toBe(
         "Добавить в избранное",
       );

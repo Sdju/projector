@@ -175,3 +175,38 @@ test.skipIf(!mac || !existsSync("/Applications/Google Chrome.app"))(
   },
   300_000,
 );
+
+// Real HID events need the Accessibility/Input Monitoring grant; hosted runners allow it.
+test.skipIf(!mac)(
+  "a real key press and a real click on the menu-bar item reach the helper",
+  async () => {
+    const data = await realpath(await mkdtemp(join(tmpdir(), "projector-mac-input-")));
+    process.env.XDG_DATA_HOME = data;
+    const { ensureHelper } = await import("../core/modules/os/modules/darwin/shell.ts");
+    const helper = spawn(await ensureHelper(), [], {
+      env: { ...process.env, PROJECTOR_SHELL_TEST: "1" },
+      stdio: ["pipe", "pipe", "inherit"],
+    });
+    onTestFinished(() => helper.kill());
+    const lines = [];
+    helper.stdout.on("data", (chunk) => lines.push(...String(chunk).split("\n").filter(Boolean)));
+    const next = async (line, seconds = 15) => {
+      for (let i = 0; i < seconds * 10 && !lines.includes(line); i++)
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(lines, line).toContain(line);
+      lines.splice(lines.indexOf(line), 1);
+    };
+    await next("ready");
+    helper.stdin.write("hotkey Ctrl+Alt+Space\n");
+    await next("hotkey:ok");
+    helper.stdin.write("real-hotkey\n");
+    await next("event:hotkey");
+    helper.stdin.write("real-click\n");
+    await next("menu:open");
+    helper.stdin.write("real-key 125\n"); // Down arrow highlights "Открыть"
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    helper.stdin.write("real-key 36\n"); // Return activates it
+    await next("event:activate");
+  },
+  120_000,
+);
