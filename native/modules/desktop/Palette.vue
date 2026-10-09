@@ -149,6 +149,8 @@ function rowHint(item: LaunchItem) {
     : item.description;
 }
 async function show() {
+  if (process.env.PROJECTOR_DEBUG_PALETTE)
+    console.error(`palette show ${new Error().stack?.split("\n")[2]}`);
   clearTimeout(blurTimer);
   model.live(true);
   model.setQuery("");
@@ -161,6 +163,8 @@ async function show() {
   void focusWindow();
 }
 function hide() {
+  if (process.env.PROJECTOR_DEBUG_PALETTE)
+    console.error(`palette hide ${new Error().stack?.split("\n")[2]}`);
   clearTimeout(blurTimer);
   model.live(false);
   windowRef.value?.widget?.hide();
@@ -171,6 +175,10 @@ async function toggle() {
   else await show();
 }
 function activeChanged() {
+  if (process.env.PROJECTOR_DEBUG_PALETTE)
+    console.error(
+      `palette active=${windowRef.value?.widget?.isActive()} visible=${windowRef.value?.widget?.getVisible()}`,
+    );
   clearTimeout(blurTimer);
   const window = windowRef.value?.widget;
   if (window?.isActive()) wasActive = true;
