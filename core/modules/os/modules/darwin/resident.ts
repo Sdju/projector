@@ -39,6 +39,10 @@ async function forward(action: DesktopAction, directory: string): Promise<boolea
     socket.on("data", (chunk) => {
       buffer += chunk.toString();
       if (buffer.includes("READY")) finish(true);
+      else if (buffer.includes("ERROR ")) {
+        console.error(buffer.trim());
+        finish(true);
+      }
     });
     socket.on("end", () => finish(buffer.includes("READY")));
   });
@@ -190,7 +194,11 @@ export async function runResident(
       if (!sameToken(given, token) || !isAction(requested)) return void socket.destroy();
       void dispatch(requested)
         .then(() => socket.end("READY\n"))
-        .catch(() => socket.destroy());
+        .catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : String(error);
+          console.error("Команда резиденту:", message);
+          socket.end(`ERROR ${message.replace(/\s+/g, " ")}\n`);
+        });
     });
   });
   const path = socketPath(directory);
