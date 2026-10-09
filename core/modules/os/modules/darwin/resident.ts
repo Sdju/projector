@@ -4,13 +4,11 @@ import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import net from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { dataHome } from "./directories.ts";
-import { processIdentity } from "./processes.ts";
+import { gtkAvailable } from "./gtk.ts";
 import { startDesktopShell } from "./shell.ts";
-import { openBrowser, openWebPalette } from "./windows.ts";
+import { focusSelf, openBrowser, openWebPalette } from "./windows.ts";
 
 const actions: DesktopAction[] = ["show", "toggle", "tray", "quit"];
-const appDirectory = "projector";
 const PALETTE_CLASS = "ProjectorLauncher";
 
 const isAction = (value: string): value is DesktopAction =>
@@ -22,16 +20,6 @@ const tokenPath = (directory: string) => join(directory, "launcher.token");
 function socketPath(directory: string): string {
   const path = join(directory, "launcher.sock");
   return path.length < 100 ? path : join(tmpdir(), `projector-launcher-${process.getuid?.()}.sock`);
-}
-
-export async function desktopPid(name: string): Promise<number | undefined> {
-  if (name !== "dev.projector.Launcher") return;
-  try {
-    const pid = Number((await readFile(pidPath(join(dataHome(), appDirectory)), "utf8")).trim());
-    return processIdentity(pid) ? pid : undefined;
-  } catch {
-    return;
-  }
 }
 
 async function forward(action: DesktopAction, directory: string): Promise<boolean> {
@@ -84,6 +72,48 @@ function webPalette(baseUrl: string, directory: string): DesktopPalette {
   };
 }
 
+/**
+ * Node owns the thread, so GTK is pumped from a timer: fast while events flow, slow while idle.
+ * Every show also asks the helper to raise the process: a bare binary is not frontmost by itself.
+ */
+async function gtkPalette(
+  baseUrl: string,
+  options: ResidentOptions,
+  setTimer: (timer: ReturnType<typeof setTimeout>) => void,
+): Promise<DesktopPalette> {
+  if (!gtkAvailable()) throw new Error("GTK4 не установлен (brew install gtk4)");
+  const { default: Gtk } = await import("gi:Gtk-4.0");
+  const { default: GLib } = await import("gi:GLib-2.0");
+  Gtk.init();
+  const context = GLib.MainLoop.new(null, false).getContext();
+  let lastActive = Date.now();
+  let stopped = false;
+  const pump = () => {
+    if (stopped) return;
+    try {
+      for (let step = 0; step < 64 && context.iteration(false); step++) lastActive = Date.now();
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : error);
+    }
+    setTimer(setTimeout(pump, Date.now() - lastActive < 2000 ? 10 : 50));
+  };
+  pump();
+  const inner = await options.createPalette(baseUrl);
+  const raise = <T>(result: Promise<T>) => result.finally(() => focusSelf());
+  return {
+    show: () => raise(inner.show()),
+    toggle: () => raise(inner.toggle()),
+    invokeSelected: (toggle) => raise(inner.invokeSelected(toggle)),
+    openPage: (path) => inner.openPage(path),
+    quitProjector: () => inner.quitProjector(),
+    restartProjector: () => inner.restartProjector(),
+    dispose: () => {
+      stopped = true;
+      inner.dispose();
+    },
+  };
+}
+
 /** Owns the menu-bar item and hotkey. A second launch only forwards show, toggle, tray or quit. */
 export async function runResident(
   baseUrl: string,
@@ -102,7 +132,13 @@ export async function runResident(
   }
   await mkdir(directory, { recursive: true });
   const token = randomBytes(24).toString("hex");
-  const palette = webPalette(baseUrl, directory);
+  let pulse: ReturnType<typeof setTimeout> | undefined;
+  let kind = "gtk";
+  const palette = await gtkPalette(baseUrl, options, (timer) => (pulse = timer)).catch((error) => {
+    kind = "web";
+    console.warn("GTK-палитра недоступна, используется окно Chromium:", error.message);
+    return webPalette(baseUrl, directory);
+  });
   let stopping = false;
   let release = () => {};
   const untilStop = new Promise<void>((resolve) => (release = resolve));
@@ -152,7 +188,9 @@ export async function runResident(
   async function stop() {
     if (stopping) return;
     stopping = true;
+    clearTimeout(pulse);
     await shell?.stop();
+    palette.dispose();
     server.close();
     await rm(path, { force: true });
     await rm(pidPath(directory), { force: true });
@@ -178,6 +216,7 @@ export async function runResident(
   process.once("SIGTERM", () => void stop());
   process.once("SIGINT", () => void stop());
   await dispatch(action);
+  console.log(`PALETTE:${kind}`);
   console.log("READY");
   await untilStop;
 }

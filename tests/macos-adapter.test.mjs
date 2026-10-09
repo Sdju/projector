@@ -6,7 +6,8 @@ import { createServer } from "node:http";
 import { mkdir, mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { expect, onTestFinished, test } from "vite-plus/test";
 
@@ -70,11 +71,20 @@ test.skipIf(!mac)(
     const data = await realpath(await mkdtemp(join(tmpdir(), "projector-mac-resident-")));
     const entry = fileURLToPath(new URL("../native/app/entry.ts", import.meta.url));
     const env = { ...process.env, XDG_DATA_HOME: data };
-    const run = (...args) => execute(process.execPath, [entry, ...args], { env, timeout: 240_000 });
-    const resident = spawn(process.execPath, [entry, "native", "http://127.0.0.1:9", "tray"], {
-      env,
-      stdio: ["ignore", "pipe", "inherit"],
-    });
+    const { os } = await import("../core/modules/os/index.ts");
+    const loader = os.capabilities.gtkPalette
+      ? ["--import", pathToFileURL(createRequire(import.meta.url).resolve("vio/register")).href]
+      : [];
+    const run = (...args) =>
+      execute(process.execPath, [...loader, entry, ...args], { env, timeout: 240_000 });
+    const resident = spawn(
+      process.execPath,
+      [...loader, entry, "native", "http://127.0.0.1:9", "tray"],
+      {
+        env,
+        stdio: ["ignore", "pipe", "inherit"],
+      },
+    );
     onTestFinished(async () => {
       await run("native", "http://127.0.0.1:9", "quit").catch(() => undefined);
       resident.kill();
@@ -84,6 +94,7 @@ test.skipIf(!mac)(
     for (let i = 0; i < 2400 && !output.includes("READY"); i++)
       await new Promise((resolve) => setTimeout(resolve, 100));
     expect(output).toContain("READY");
+    expect(output).toContain(os.capabilities.gtkPalette ? "PALETTE:gtk" : "PALETTE:web");
     const status = JSON.parse((await run("shortcut-status")).stdout);
     expect(status).toMatchObject({ supported: true, active: true, shortcut: "Ctrl+Alt+Space" });
     // A second launch forwards to the running resident instead of starting another.

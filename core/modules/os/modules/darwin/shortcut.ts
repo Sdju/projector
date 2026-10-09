@@ -53,3 +53,15 @@ export async function shortcutStatus(): Promise<ShortcutStatus> {
     return { supported: true, active: false, shortcut: "" };
   return { supported: true, active: true, shortcut: state.shortcut };
 }
+
+export async function desktopPid(name: string): Promise<number | undefined> {
+  if (name !== "dev.projector.Launcher") return;
+  try {
+    const pid = Number(
+      (await readFile(join(dataHome(), appDirectory, "launcher.pid"), "utf8")).trim(),
+    );
+    return processIdentity(pid) ? pid : undefined;
+  } catch {
+    return;
+  }
+}

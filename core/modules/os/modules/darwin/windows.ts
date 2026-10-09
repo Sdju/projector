@@ -115,3 +115,8 @@ export function openWebPalette(
 }
 export function activateWindow(_id: number | bigint): void {}
 export async function activateSurface(_surface: object): Promise<void> {}
+
+/** Raises this very process (the GTK palette is a plain binary, not an app bundle). */
+export function focusSelf(): void {
+  control(process.pid, "activate");
+}

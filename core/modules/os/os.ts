@@ -45,7 +45,10 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
       nativeDesktop,
       /** Linux catalog reads GIO inside the helper. Windows loads GTK only for the palette. */
       /** The palette is a GTK window. macOS hosts the tray and hotkey but opens a Chromium window. */
-      gtkPalette: platform === "linux" || platform === "win32",
+      gtkPalette:
+        platform === "linux" ||
+        platform === "win32" ||
+        (platform === "darwin" && darwin.gtkAvailable()),
       giLoader: platform === "linux",
       processInspection: supported,
       /** Process queries that can be answered without waiting (/proc). */
