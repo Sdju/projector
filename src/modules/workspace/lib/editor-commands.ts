@@ -23,6 +23,10 @@ export interface EditorCommandContext {
   activeKey: () => string;
   fileOf: (id: string) => OpenFile | undefined;
   saveFile: (file?: OpenFile) => Promise<boolean>;
+  /** Отбрасывает правки вкладки и берёт версию с диска. */
+  reloadFromDisk: (file: OpenFile) => Promise<void>;
+  /** Оставляет правки вкладки при расхождении с диском. */
+  keepMine: (file: OpenFile) => void;
   openFile: (path: string) => unknown;
   openTab: (id: string, params?: Record<string, unknown>) => void;
   onOpenTab?: () => void;
@@ -71,6 +75,34 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
     },
     (args) => !!commandFile(args) && isEditable(commandFile(args)!),
     "write",
+  );
+  register(
+    "ide.editor.file.reloadFromDisk",
+    "Загрузить файл с диска",
+    async (args) => {
+      await ctx.reloadFromDisk(commandFile(args)!);
+    },
+    (args) => !!commandFile(args) && !commandFile(args)!.readonly,
+    undefined,
+    {
+      description:
+        "Перечитывает файл с диска и отбрасывает несохранённые правки во вкладке. Разрешает конфликт, когда файл изменили снаружи (например, агент), пока он был открыт с правками.",
+      arguments: { id: "Ключ вкладки; по умолчанию активная вкладка" },
+    },
+  );
+  register(
+    "ide.editor.file.keepMine",
+    "Оставить мою версию файла",
+    (args) => {
+      ctx.keepMine(commandFile(args)!);
+    },
+    (args) => commandFile(args)?.conflict?.disk !== undefined,
+    "write",
+    {
+      description:
+        "При конфликте с изменением на диске оставляет правки во вкладке: следующее сохранение перезапишет версию на диске. Доступна только пока конфликт есть.",
+      arguments: { id: "Ключ вкладки; по умолчанию активная вкладка" },
+    },
   );
   register(
     "ide.editor.file.reveal",

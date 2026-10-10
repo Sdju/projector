@@ -72,6 +72,8 @@ const hostOf = (key: string) => props.panelHosts.hosts[key] ?? null;
         @save="files.saveFile(fileOf(id))"
         @mode="fileOf(id)!.markdownMode = $event"
         @open="files.openFile($event)"
+        @reload="files.reloadFromDisk(fileOf(id)!)"
+        @keep="files.keepMine(fileOf(id)!)"
       />
       <TerminalView
         v-else-if="terminalPanels.get(id)"

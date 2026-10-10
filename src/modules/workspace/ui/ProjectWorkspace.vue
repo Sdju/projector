@@ -153,6 +153,8 @@ const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
   activeKey: () => activeKey.value,
   fileOf,
   saveFile,
+  reloadFromDisk: files.reloadFromDisk,
+  keepMine: files.keepMine,
   openFile,
   openTab,
   onOpenTab: () => (mobileSidebarOpen.value = false),

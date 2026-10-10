@@ -1,5 +1,6 @@
 import { commandArgs, type CommandScope } from "../../../../../common/utilities/commands.ts";
 import { ref, watch, onBeforeUnmount, nextTick, type Ref, type InjectionKey } from "vue";
+import { useDirectoryWatch } from "./directory-watch.ts";
 import { workspaceRequest } from "../../../../workspace-api/index.ts";
 import {
   TREE_PAGE_SIZE,
@@ -102,6 +103,7 @@ export function useTreeListing(
     () => void load(),
     { immediate: true },
   );
+  useDirectoryWatch(props, () => void load());
   onBeforeUnmount(() => {
     ++generation;
     controller?.abort();

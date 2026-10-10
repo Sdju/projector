@@ -1,5 +1,6 @@
 import { computed, reactive } from "vue";
 import { useProjects, type ProcessSnapshot } from "../../project/index.ts";
+import { pageClientId } from "../../../common/utilities/page-client.ts";
 import { openProject, startProject, stopProject } from "../api/client.ts";
 
 const state = reactive({
@@ -19,13 +20,36 @@ export function useRunner() {
   function connect(): void {
     if (connected) return;
     connected = true;
-    const source = new EventSource("/api/events");
+    const source = new EventSource(`/api/events?client=${pageClientId}`);
     source.addEventListener("launcher-show", () =>
       window.dispatchEvent(new Event("projector:show")),
     );
     source.addEventListener("status", (event) => {
       applyStatus(JSON.parse((event as MessageEvent).data) as ProcessSnapshot);
     });
+    source.addEventListener("file-changed", (event) => {
+      window.dispatchEvent(
+        new CustomEvent("projector:file-changed", {
+          detail: JSON.parse((event as MessageEvent).data),
+        }),
+      );
+    });
+    source.addEventListener("dir-changed", (event) => {
+      window.dispatchEvent(
+        new CustomEvent("projector:dir-changed", {
+          detail: JSON.parse((event as MessageEvent).data),
+        }),
+      );
+    });
+    source.addEventListener("watch-error", (event) => {
+      window.dispatchEvent(
+        new CustomEvent("projector:watch-error", {
+          detail: JSON.parse((event as MessageEvent).data),
+        }),
+      );
+    });
+    // After a reconnect the server has dropped this page's watchers and files may have changed meanwhile.
+    source.addEventListener("open", () => window.dispatchEvent(new Event("projector:events-open")));
     source.addEventListener("terminal-started", (event) => {
       window.dispatchEvent(
         new CustomEvent("projector:terminal-started", {

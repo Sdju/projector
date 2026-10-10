@@ -22,6 +22,8 @@ export interface OpenFile extends FileContent {
   markdownMode?: "document" | "source";
   /** Счётчик ручных перезагрузок страницы в iframe. */
   htmlReload?: number;
+  /** Файл на диске расходится с правками во вкладке (`disk`) или недоступен (`error`). */
+  conflict?: { disk?: string; error?: string };
   saving?: boolean;
   saveError?: string;
   /** Вкладка предварительного просмотра: одна на блок, курсивом; закрепляется двойным щелчком. */

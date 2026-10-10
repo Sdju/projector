@@ -20,6 +20,8 @@ const emit = defineEmits<{
   save: [];
   mode: [mode: "document" | "source"];
   open: [path: string];
+  reload: [];
+  keep: [];
 }>();
 const tabs = useWorkspaceTabs();
 const host = useTabHost();
@@ -40,6 +42,21 @@ const subtitle = computed(() =>
     <p v-if="file.saveError && !isMarkdown(file)" class="file-error" role="alert">
       {{ file.saveError }}
     </p>
+    <div v-if="file.conflict" class="file-conflict" role="alert">
+      <span>
+        {{
+          file.conflict.error
+            ? `Файл недоступен на диске: ${file.conflict.error}`
+            : "Файл изменён на диске, а во вкладке есть несохранённые правки"
+        }}
+      </span>
+      <button type="button" @click="emit('reload')">
+        {{ file.conflict.error ? "Проверить снова" : "Загрузить с диска" }}
+      </button>
+      <button v-if="file.conflict.disk !== undefined" type="button" @click="emit('keep')">
+        Оставить мою версию
+      </button>
+    </div>
     <div class="panel-body" :data-own-keys="view?.ownKeys || undefined">
       <TabReadoutScope v-if="view" :tab-key="file.key">
         <component :is="view.component" v-bind="view.props?.(file, host)" />
@@ -142,6 +159,31 @@ const subtitle = computed(() =>
   color: var(--err);
   font-size: var(--fs-xs);
   border-bottom: 1px solid var(--line);
+}
+.file-conflict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-xs);
+}
+.file-conflict span {
+  flex: 1;
+  min-width: 200px;
+}
+.file-conflict button {
+  padding: 2px var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.file-conflict button:hover {
+  background: var(--active);
 }
 .panel-body {
   flex: 1;

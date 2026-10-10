@@ -1,3 +1,4 @@
+import { pageClientId } from "../../common/utilities/page-client.ts";
 import {
   createWorkspaceProfiles,
   profileCapabilities,
@@ -52,6 +53,31 @@ export const workspaceSiteUrl = (projectId: string, path: string) =>
   workspaceProfile(projectId).providers.files.siteUrl?.(path) ?? "";
 export const refreshWorkspace = (projectId: string) =>
   workspaceProfile(projectId).providers.files.refresh?.();
+
+/** Слежение за файлами умеет только проект на сервере Projector; остальные источники молчат. */
+export const workspaceWatchable = (projectId: string) => workspaceProfile(projectId).id === "local";
+
+/**
+ * Сообщает серверу, что страница показывает: открытые файлы (`paths`) и раскрытые папки дерева
+ * (`directories`). Пропущенное поле остаётся как было. Ответом приходят события `file-changed` и
+ * `dir-changed` (окно `projector:file-changed`, `projector:dir-changed`).
+ */
+export function watchWorkspace(
+  projectId: string,
+  patch: { paths?: string[]; directories?: string[] },
+  keepalive = false,
+) {
+  if (!workspaceWatchable(projectId)) return Promise.resolve(false);
+  return fetch(`/api/projects/${encodeURIComponent(projectId)}/workspace/watch`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ client: pageClientId, ...patch }),
+    keepalive,
+  }).then(
+    (response) => response.ok,
+    () => false,
+  );
+}
 
 const READONLY = "Проект открыт только для чтения";
 function fileWriter(projectId: string) {

@@ -14,6 +14,7 @@ import { isEditable, isMarkdown, type OpenFile, type OpenFileOptions } from "../
 import { dropPreviewExcept as dropPreviewTabs, opensAsPreview } from "./preview-tabs.ts";
 import { ensureTab } from "./service-tabs.ts";
 import { useDirtyGuard } from "./dirty-guard.ts";
+import { useFileSync } from "./file-sync.ts";
 import { treeDragType } from "../modules/tree/index.ts";
 import type {
   CommitComparison,
@@ -42,6 +43,12 @@ export function useOpenFiles(ctx: OpenFilesContext) {
   const { tabs } = ctx;
   const fileError = ref("");
   const loading = ref(false);
+  const sync = useFileSync({
+    projectId: ctx.projectId,
+    tabs,
+    isDirty: ctx.isDirty,
+    changed: ctx.saved,
+  });
   let fileGeneration = 0;
   let dropGeneration = 0;
   async function openFile(
@@ -280,6 +287,10 @@ export function useOpenFiles(ctx: OpenFilesContext) {
   const pendingSaves = new Map<OpenFile, Promise<boolean>>();
   function saveFile(file = ctx.active()): Promise<boolean> {
     if (!file || !isEditable(file)) return Promise.resolve(true);
+    if (file.conflict && ctx.isDirty(file)) {
+      file.saveError = "Файл изменён на диске: выберите версию, чтобы продолжить";
+      return Promise.resolve(false);
+    }
     const pending = pendingSaves.get(file);
     if (pending) return pending;
     if (!ctx.isDirty(file)) return Promise.resolve(true);
@@ -298,6 +309,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
         return true;
       } catch (error) {
         file.saveError = error instanceof Error ? error.message : "Не удалось сохранить файл";
+        void sync.check(file);
         return false;
       } finally {
         file.saving = false;
@@ -374,5 +386,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
     prepareEntryChange,
     toggleMarkdownSource,
     pinPreview,
+    reloadFromDisk: sync.reloadFromDisk,
+    keepMine: sync.keepMine,
   };
 }
