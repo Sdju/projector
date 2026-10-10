@@ -40,6 +40,10 @@ export function applyAgentEvent(
     case "session":
       assistant.session = event.data;
       return true;
+    case "commands":
+      // An agent that lists its commands while answering knows more than the list asked for.
+      state.commands = event.data.commands;
+      return false;
     case "controls":
       // What the agent really applied wins over a choice it refused.
       state.controls = event.data.controls;

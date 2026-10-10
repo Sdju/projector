@@ -51,6 +51,13 @@ export type MessageChip =
 /** A message as written: text with chips between it. */
 export type MessagePart = { type: "text"; text: string } | MessageChip;
 
+/** A slash command the agent understands. */
+export interface AgentCommand {
+  name: string;
+  description?: string;
+  hint?: string;
+}
+
 /** How full the agent's context window is, as the agent last reported it. */
 export interface AgentContext {
   used: number;
@@ -118,6 +125,7 @@ export type AgentEvent =
     }
   | { event: "run"; data: { id: string } }
   | { event: "session"; data: AgentSessionRef }
+  | { event: "commands"; data: { commands: AgentCommand[] } }
   | { event: "context"; data: AgentContext }
   | { event: "controls"; data: { controls: AgentControl[] } }
   | { event: "status"; data: { phase: string; provider?: string; model?: string } }

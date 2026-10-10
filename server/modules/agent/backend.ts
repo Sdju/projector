@@ -10,6 +10,7 @@ import type { ApprovalAnswer, ApprovalRequest, CommandRequest } from "./command-
 export type AgentEventName =
   | "command-request"
   | "context"
+  | "commands"
   | "controls"
   | "permission-request"
   | "run"
@@ -62,6 +63,13 @@ export type MessagePart =
   | { type: "image"; id: string; name: string; mime: string }
   | { type: "command"; name: string };
 
+/** A slash command of an agent: `/name`, typed at the start of a message. */
+export interface AgentCommand {
+  name: string;
+  description?: string;
+  hint?: string;
+}
+
 export interface AgentRunOptions {
   run?: AgentRunHandle;
   /** Defaults to `projector`. */
@@ -94,6 +102,8 @@ export interface AgentBackend {
   run(options: AgentRunOptions): Promise<void>;
   /** What the user may tune before a turn (model, effort, mode). */
   controls?(cwd: string): Promise<AgentControl[]>;
+  /** Slash commands the agent understands in this project, when it can tell before a turn. */
+  commands?(cwd: string): Promise<AgentCommand[]>;
   /** Past conversations of this agent in the project, newest first. */
   sessions?(cwd: string): Promise<AgentSessionInfo[]>;
   /** The messages of one past conversation, to continue it in the chat. */

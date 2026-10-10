@@ -42,6 +42,8 @@ interface Suggestion {
   key: string;
   label: string;
   detail?: string;
+  /** The detail is a path: its end matters, so a long one is cut at the start. */
+  path?: boolean;
   chip: MessageChip;
   icon: string;
 }
@@ -79,7 +81,11 @@ async function refresh() {
   if (current.kind === "command") {
     const query = current.query.toLowerCase();
     suggestions.value = (props.commands ?? [])
-      .filter((command) => command.name.toLowerCase().includes(query))
+      .map((command) => ({ command, at: command.name.toLowerCase().indexOf(query) }))
+      .filter((item) => item.at >= 0)
+      // Names starting with the query first, then by how early it appears.
+      .sort((a, b) => a.at - b.at || a.command.name.localeCompare(b.command.name))
+      .map((item) => item.command)
       .slice(0, 30)
       .map((command) => ({
         key: command.name,
@@ -103,6 +109,7 @@ async function refresh() {
           key: item.path,
           label: item.path.split("/").pop() || item.path,
           detail: item.path.includes("/") ? item.path.slice(0, item.path.lastIndexOf("/")) : "",
+          path: true,
           chip,
           icon: chipIcon(chip),
         };
@@ -360,7 +367,9 @@ defineExpose({
       >
         <span class="icon" aria-hidden="true" v-html="item.icon" />
         <span class="label">{{ item.label }}</span>
-        <span v-if="item.detail" class="detail">{{ item.detail }}</span>
+        <span v-if="item.detail" class="detail" :class="{ path: item.path }">{{
+          item.detail
+        }}</span>
       </button>
     </div>
   </div>
@@ -473,6 +482,8 @@ defineExpose({
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--faint);
+}
+.detail.path {
   direction: rtl;
   text-align: left;
 }

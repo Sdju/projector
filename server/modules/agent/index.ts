@@ -19,6 +19,7 @@ export {
   AGENT_BACKEND_IDS,
   HOSTED_AGENT_BACKENDS,
   AGENT_PERMISSION_MODES,
+  agentCommands,
   agentControls,
   agentSessions,
   loadAgentSession,

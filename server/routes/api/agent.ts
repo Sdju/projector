@@ -8,6 +8,7 @@ import { loadProjects } from "../../modules/projects/index.ts";
 import {
   AGENT_BACKEND_IDS,
   AGENT_PERMISSION_MODES,
+  agentCommands,
   agentControls,
   agentSessions,
   loadAgentSession,
@@ -99,6 +100,12 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
     const cwd = await projectPath(url.searchParams.get("projectId") ?? "");
     const backend = url.searchParams.get("backend") ?? undefined;
     json(res, 200, { controls: await agentControls(backend, cwd) });
+    return true;
+  }
+  if (path === "/api/agent/commands" && method === "GET") {
+    const cwd = await projectPath(url.searchParams.get("projectId") ?? "");
+    const backend = url.searchParams.get("backend") ?? undefined;
+    json(res, 200, { commands: await agentCommands(backend, cwd) });
     return true;
   }
   if (path === "/api/agent/sessions" && method === "GET") {

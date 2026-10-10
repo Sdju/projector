@@ -5,7 +5,7 @@ import type {
   SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import { agentEnv, assertHostProject, attachedImages, promptWithHistory } from "./agent-host.ts";
-import type { AgentBackend, AgentRunOptions } from "./backend.ts";
+import type { AgentBackend, AgentCommand, AgentRunOptions } from "./backend.ts";
 import { CLAUDE_LABEL, createClaudeEventMapper } from "./claude-code-events.ts";
 import { CLAUDE_CONTROLS, claudeLoadSession, claudeSessions } from "./claude-code-sessions.ts";
 import type { AgentControl } from "./controls.ts";
@@ -121,6 +121,40 @@ async function* withImages(
   };
 }
 
+const COMMANDS_TTL_MS = 60_000;
+const commandCache = new Map<string, { at: number; commands: Promise<AgentCommand[]> }>();
+
+/**
+ * The slash commands (built in, user's, project's, plugins', skills') Claude Code offers in a
+ * folder. They are only known to a running session, so one is started without a prompt, asked and
+ * closed; the answer is kept for a minute.
+ */
+function claudeCommands(cwd: string): Promise<AgentCommand[]> {
+  const cached = commandCache.get(cwd);
+  if (cached && Date.now() - cached.at < COMMANDS_TTL_MS) return cached.commands;
+  const commands = (async () => {
+    const idle = (async function* (): AsyncGenerator<SDKUserMessage> {
+      await new Promise<never>(() => {});
+    })();
+    const session = query({
+      prompt: idle,
+      options: { cwd, env: agentEnv(), settingSources: ["user", "project", "local"] },
+    });
+    try {
+      return (await session.supportedCommands()).map((item) => ({
+        name: item.name,
+        description: item.description || undefined,
+        hint: item.argumentHint || undefined,
+      }));
+    } finally {
+      session.close();
+    }
+  })();
+  commandCache.set(cwd, { at: Date.now(), commands });
+  commands.catch(() => commandCache.delete(cwd));
+  return commands;
+}
+
 /** How full the context window is after the turn; a failure only means no indicator. */
 async function emitContext(
   conversation: { getContextUsage(options: { detail: "summary" }): Promise<ContextUsage> },
@@ -156,6 +190,7 @@ export const claudeCodeBackend: AgentBackend = {
   id: "claude-code",
   run,
   controls: async () => CLAUDE_CONTROLS,
+  commands: claudeCommands,
   sessions: claudeSessions,
   loadSession: claudeLoadSession,
 };

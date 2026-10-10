@@ -1,5 +1,6 @@
 import { computed } from "vue";
 import {
+  fetchCommands,
   fetchControls,
   fetchDefaults,
   fetchSessions,
@@ -55,6 +56,16 @@ export function useExternalAgent(
     }
   }
 
+  /** Reads the slash commands the agent offers; without them `/` suggests nothing. */
+  async function loadCommands(): Promise<void> {
+    if (!external || !projectId) return;
+    try {
+      state.commands = await fetchCommands(backend, projectId);
+    } catch {
+      // Agents that only list commands during a turn (ACP) have none until then.
+    }
+  }
+
   /** Chooses a model, effort or mode; it applies from the next message and is remembered. */
   async function setControl(id: string, value: string): Promise<void> {
     const control = state.controls.find((item) => item.id === id);
@@ -104,6 +115,7 @@ export function useExternalAgent(
     selection,
     sessions: sessionList,
     loadControls,
+    loadCommands,
     setControl,
     loadSessions,
     resumeSession,

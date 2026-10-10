@@ -40,6 +40,8 @@ const {
   sessionsLoading,
   sessionsError,
   loadControls,
+  loadCommands,
+  commands: slashCommands,
   setControl,
   loadSessions,
   resumeSession,
@@ -53,7 +55,10 @@ const {
   backend: props.backend,
   chatId: props.chatId,
 });
-onMounted(() => void loadControls());
+onMounted(() => {
+  void loadControls();
+  void loadCommands();
+});
 const PERMISSION_CONTROL = "permission-mode";
 const permissionOptions: { value: AgentPermissionMode; name: string; description: string }[] = [
   { value: "default", name: "Спрашивать", description: "Запрос перед правками и командами" },
@@ -366,6 +371,7 @@ onBeforeUnmount(() => {
       v-model="draft"
       v-model:parts="draftParts"
       :project-id="projectId"
+      :commands="slashCommands"
       :busy="busy"
       :away="away"
       :error="error || copyError"

@@ -1,5 +1,6 @@
 import { reactive } from "vue";
 import type {
+  AgentCommand,
   AgentControl,
   AgentPermission,
   AgentPermissionMode,
@@ -20,6 +21,7 @@ export const createState = () =>
     permissions: [] as AgentPermission[],
     permissionMode: "default" as AgentPermissionMode,
     controls: [] as AgentControl[],
+    commands: [] as AgentCommand[],
     selection: {} as AgentSelection,
     controlsError: "",
     sessions: [] as AgentSessionInfo[],

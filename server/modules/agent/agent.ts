@@ -5,7 +5,7 @@ import { projectorBackend } from "./projector-backend.ts";
 
 export type { AgentEmitter, AgentEventName, AgentRunOptions } from "./backend.ts";
 export { AGENT_BACKEND_IDS, AGENT_PERMISSION_MODES, HOSTED_AGENT_BACKENDS } from "./backend.ts";
-export type { AgentBackendId, AgentPermissionMode, MessagePart } from "./backend.ts";
+export type { AgentBackendId, AgentCommand, AgentPermissionMode, MessagePart } from "./backend.ts";
 export type {
   AgentControl,
   AgentSelection,
@@ -31,6 +31,10 @@ function backendFor(id: string | undefined): AgentBackend {
 /** Model, effort and mode choices the agent offers; empty for agents without any. */
 export async function agentControls(id: string | undefined, cwd: string) {
   return (await backendFor(id).controls?.(cwd)) ?? [];
+}
+
+export async function agentCommands(id: string | undefined, cwd: string) {
+  return (await backendFor(id).commands?.(cwd)) ?? [];
 }
 
 export async function agentSessions(id: string | undefined, cwd: string) {

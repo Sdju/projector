@@ -1,4 +1,5 @@
 import type {
+  AgentCommand,
   AgentBackendId,
   AgentControl,
   AgentSelection,
@@ -168,6 +169,19 @@ export async function fetchControls(
     "Не удалось получить настройки агента",
   );
   return data.controls;
+}
+
+/** Slash commands the agent understands in this project. */
+export async function fetchCommands(
+  backend: AgentBackendId,
+  projectId: string,
+): Promise<AgentCommand[]> {
+  const data = await getJson<{ commands: AgentCommand[] }>(
+    `/api/agent/commands?${query(backend, projectId)}`,
+    undefined,
+    "Не удалось получить команды агента",
+  );
+  return data.commands;
 }
 
 /** The last choice per agent, remembered on disk. */

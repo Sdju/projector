@@ -56,6 +56,27 @@ export function createAcpEventMapper(emit: AgentEmitter, label: string) {
       emit("text", { text: chunk });
       return;
     }
+    if (kind === "available_commands_update") {
+      const list = Array.isArray(update.availableCommands) ? update.availableCommands : [];
+      emit("commands", {
+        commands: list.flatMap((item) => {
+          const { name, description, input } = item as {
+            name?: unknown;
+            description?: unknown;
+            input?: { hint?: unknown } | null;
+          };
+          if (typeof name !== "string" || !name) return [];
+          return [
+            {
+              name,
+              ...(typeof description === "string" && description ? { description } : {}),
+              ...(typeof input?.hint === "string" ? { hint: input.hint } : {}),
+            },
+          ];
+        }),
+      });
+      return;
+    }
     if (kind === "usage_update") {
       const { used, size, cost } = update as { used?: unknown; size?: unknown; cost?: unknown };
       if (typeof used === "number" && typeof size === "number" && size > 0) {
