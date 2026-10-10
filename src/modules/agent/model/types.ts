@@ -42,6 +42,17 @@ export interface AgentSessionRef {
   id: string;
 }
 
+/** How full the agent's context window is, as the agent last reported it. */
+export interface AgentContext {
+  used: number;
+  size: number;
+  model?: string;
+  /** Tokens at which the agent compacts the conversation on its own. */
+  compactAt?: number;
+  categories?: { name: string; tokens: number }[];
+  cost?: { amount: number; currency: string };
+}
+
 export interface AgentTurn {
   id: string;
   role: "user" | "assistant";
@@ -49,6 +60,8 @@ export interface AgentTurn {
   tools: AgentToolChip[];
   /** Order of text and tool calls; absent in turns saved before it existed. */
   parts?: AgentPart[];
+  /** Context fullness after this turn; the chat shows the latest one. */
+  context?: AgentContext;
   /** Native backend session (Claude Code) this turn belongs to; the next request resumes it. */
   session?: AgentSessionRef;
   /** The agent process still answering this turn; set until the turn ends, so it can be rejoined. */
@@ -94,6 +107,7 @@ export type AgentEvent =
     }
   | { event: "run"; data: { id: string } }
   | { event: "session"; data: AgentSessionRef }
+  | { event: "context"; data: AgentContext }
   | { event: "controls"; data: { controls: AgentControl[] } }
   | { event: "status"; data: { phase: string; provider?: string; model?: string } }
   | { event: "text"; data: { text: string } }

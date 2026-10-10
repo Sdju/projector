@@ -1,5 +1,8 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import type { Options } from "@anthropic-ai/claude-agent-sdk";
+import type {
+  Options,
+  SDKControlGetContextUsageResponse as ContextUsage,
+} from "@anthropic-ai/claude-agent-sdk";
 import { agentEnv, assertHostProject, promptWithHistory } from "./agent-host.ts";
 import type { AgentBackend, AgentRunOptions } from "./backend.ts";
 import { CLAUDE_LABEL, createClaudeEventMapper } from "./claude-code-events.ts";
@@ -66,7 +69,10 @@ async function run(options: AgentRunOptions): Promise<void> {
       : promptWithHistory(options.message, options.history ?? []);
     const conversation = query({ prompt, options: { ...base, ...(resume ? { resume } : {}) } });
     try {
-      for await (const message of conversation) mapper.handle(message);
+      for await (const message of conversation) {
+        mapper.handle(message);
+        if (message.type === "result") await emitContext(conversation, emit);
+      }
     } finally {
       conversation.close();
     }
@@ -82,6 +88,27 @@ async function run(options: AgentRunOptions): Promise<void> {
     await attempt(options.sessionId);
   } finally {
     options.abort?.removeEventListener("abort", forwardAbort);
+  }
+}
+
+/** How full the context window is after the turn; a failure only means no indicator. */
+async function emitContext(
+  conversation: { getContextUsage(options: { detail: "summary" }): Promise<ContextUsage> },
+  emit: AgentRunOptions["emit"],
+): Promise<void> {
+  try {
+    const usage = await conversation.getContextUsage({ detail: "summary" });
+    emit("context", {
+      used: usage.totalTokens,
+      size: usage.maxTokens,
+      model: usage.model,
+      compactAt: usage.isAutoCompactEnabled ? usage.autoCompactThreshold : undefined,
+      categories: usage.categories
+        .filter((item) => item.kind === "used" && item.tokens > 0)
+        .map((item) => ({ name: item.name, tokens: item.tokens })),
+    });
+  } catch {
+    // The answer is already complete; the indicator just keeps its previous value.
   }
 }
 

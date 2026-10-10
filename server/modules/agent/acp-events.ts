@@ -56,6 +56,20 @@ export function createAcpEventMapper(emit: AgentEmitter, label: string) {
       emit("text", { text: chunk });
       return;
     }
+    if (kind === "usage_update") {
+      const { used, size, cost } = update as { used?: unknown; size?: unknown; cost?: unknown };
+      if (typeof used === "number" && typeof size === "number" && size > 0) {
+        const { amount, currency } = (cost ?? {}) as { amount?: unknown; currency?: unknown };
+        emit("context", {
+          used,
+          size,
+          ...(typeof amount === "number" && typeof currency === "string"
+            ? { cost: { amount, currency } }
+            : {}),
+        });
+      }
+      return;
+    }
     if (kind === "agent_thought_chunk") {
       emit("status", { phase: "thinking", provider: label, model: "" });
       return;

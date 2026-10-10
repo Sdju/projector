@@ -24,6 +24,19 @@ const schema = z
           }),
         )
         .max(100),
+      context: z
+        .object({
+          used: z.number(),
+          size: z.number(),
+          model: z.string().max(100).optional(),
+          compactAt: z.number().optional(),
+          categories: z
+            .array(z.object({ name: z.string().max(100), tokens: z.number() }))
+            .max(40)
+            .optional(),
+          cost: z.object({ amount: z.number(), currency: z.string().max(10) }).optional(),
+        })
+        .optional(),
       parts: z
         .array(
           z.discriminatedUnion("type", [

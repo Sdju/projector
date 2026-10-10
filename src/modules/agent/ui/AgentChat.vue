@@ -11,6 +11,7 @@ import AgentWelcome from "./AgentWelcome.vue";
 import AgentTurn from "./AgentTurn.vue";
 import AgentComposer from "./AgentComposer.vue";
 import AgentPermissions from "./AgentPermissions.vue";
+import AgentContextMeter from "./AgentContextMeter.vue";
 import AgentControls from "./AgentControls.vue";
 import AgentSessions from "./AgentSessions.vue";
 import type { AgentBackendId, AgentControl, AgentPermissionMode } from "../model/types.ts";
@@ -91,6 +92,7 @@ function changeControl(id: string, value: string) {
   if (id === PERMISSION_CONTROL) permissionMode.value = value as AgentPermissionMode;
   else void setControl(id, value);
 }
+const latestContext = computed(() => turns.value.findLast((turn) => turn.context)?.context);
 const activeSession = computed(
   () => turns.value.findLast((turn) => turn.role === "assistant")?.session?.id,
 );
@@ -369,6 +371,9 @@ onBeforeUnmount(() => {
       @stop="stop"
       @latest="toBottom"
     >
+      <template v-if="latestContext" #status>
+        <AgentContextMeter :context="latestContext" />
+      </template>
       <template v-if="plain" #controls>
         <AgentControls
           ref="controlsMenu"

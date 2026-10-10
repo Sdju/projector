@@ -51,26 +51,29 @@ defineExpose({ resize, focus: () => input.value?.focus() });
       />
       <div class="composer-footer">
         <slot name="controls" />
-        <button
-          v-if="busy"
-          type="button"
-          class="send-button stop-button"
-          title="Остановить"
-          aria-label="Остановить"
-          @click="emit('stop')"
-        >
-          <IconSquare aria-hidden="true" />
-        </button>
-        <button
-          v-else
-          type="submit"
-          class="send-button"
-          title="Отправить (Enter)"
-          aria-label="Отправить сообщение"
-          :disabled="!draft.trim()"
-        >
-          <IconArrowUp aria-hidden="true" />
-        </button>
+        <div class="footer-end">
+          <slot name="status" />
+          <button
+            v-if="busy"
+            type="button"
+            class="send-button stop-button"
+            title="Остановить"
+            aria-label="Остановить"
+            @click="emit('stop')"
+          >
+            <IconSquare aria-hidden="true" />
+          </button>
+          <button
+            v-else
+            type="submit"
+            class="send-button"
+            title="Отправить (Enter)"
+            aria-label="Отправить сообщение"
+            :disabled="!draft.trim()"
+          >
+            <IconArrowUp aria-hidden="true" />
+          </button>
+        </div>
       </div>
     </form>
     <span class="sr-only" role="status">{{ copied ? "Ответ скопирован" : "" }}</span>
@@ -123,13 +126,18 @@ defineExpose({ resize, focus: () => input.value?.focus() });
   padding: 0 var(--sp-1) 0 var(--sp-3);
   min-height: var(--control-h-sm);
 }
+.footer-end {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-left: auto;
+}
 .send-button {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 26px;
   height: 26px;
-  margin-left: auto;
   flex-shrink: 0;
   border-radius: var(--r-md);
   color: var(--bg);

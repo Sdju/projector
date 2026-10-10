@@ -48,6 +48,9 @@ export function applyAgentEvent(
         ...Object.fromEntries(event.data.controls.map((item) => [item.id, item.current])),
       };
       return false;
+    case "context":
+      assistant.context = event.data;
+      return false;
     case "permission-request":
       state.permissions.push({
         id: event.data.id,

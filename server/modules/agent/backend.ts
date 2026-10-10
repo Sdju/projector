@@ -9,6 +9,7 @@ import type { ApprovalAnswer, ApprovalRequest, CommandRequest } from "./command-
 
 export type AgentEventName =
   | "command-request"
+  | "context"
   | "controls"
   | "permission-request"
   | "run"
