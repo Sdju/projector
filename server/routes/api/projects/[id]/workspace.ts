@@ -26,6 +26,7 @@ import {
   importProjectEntries,
   uploadProjectEntry,
   readProjectImage,
+  watchProject,
 } from "../../../../modules/workspace/index.ts";
 import type { RouteContext } from "../../../../modules/transport/index.ts";
 
@@ -57,6 +58,28 @@ export async function handleProjectWorkspace({
       throw new HttpError(400, "Укажите путь, текст и исходное содержимое файла");
     res.setHeader("Cache-Control", "no-store");
     json(res, 200, await saveProjectFile(project.path, body.path, body.content, body.original));
+    return true;
+  }
+
+  if (sessionId === "watch" && method === "PUT") {
+    if (!accessAllowed(req, false))
+      throw new HttpError(403, "Обзор доступен только со страницы Projector");
+    const body = await readBody(req);
+    const list = (value: unknown) =>
+      value === undefined ||
+      (Array.isArray(value) && value.every((item) => typeof item === "string"));
+    if (
+      typeof body.client !== "string" ||
+      !body.client ||
+      !list(body.paths) ||
+      !list(body.directories)
+    )
+      throw new HttpError(400, "Укажите страницу, пути открытых файлов и раскрытые папки");
+    await watchProject(body.client, project.id, project.path, {
+      paths: body.paths as string[] | undefined,
+      directories: body.directories as string[] | undefined,
+    });
+    json(res, 200, { ok: true });
     return true;
   }
 

@@ -1,1 +1,7 @@
-export { bindEvents, attachSse, notifyLauncherShow } from "./implementation.ts";
+export {
+  bindEvents,
+  attachSse,
+  notifyLauncherShow,
+  broadcastEvent,
+  onEventClientClose,
+} from "./implementation.ts";

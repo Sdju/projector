@@ -4,19 +4,41 @@ import { onProcessEvent } from "../processes/index.ts";
 
 interface SseClient {
   res: ServerResponse;
+  id: string;
 }
 
-const sseClients = new Set<SseClient>();
+type CloseListener = (clientId: string) => void;
 
-let eventsBound = false;
+// Vite reloads the API modules without closing open event streams: keep the clients across reloads.
+const host = globalThis as typeof globalThis & {
+  projectorEvents?: { clients: Set<SseClient>; closeListeners: Set<CloseListener>; bound: boolean };
+};
+const state = (host.projectorEvents ??= {
+  clients: new Set<SseClient>(),
+  closeListeners: new Set<CloseListener>(),
+  bound: false,
+});
+const { clients: sseClients, closeListeners } = state;
 
 export function bindEvents(): void {
-  if (eventsBound) return;
-  eventsBound = true;
-  onProcessEvent((event, data) => {
-    const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-    for (const client of sseClients) client.res.write(payload);
-  });
+  if (state.bound) return;
+  state.bound = true;
+  onProcessEvent((event, data) => broadcastEvent(event, data));
+}
+
+/** Sends an event to every open stream; with `clientId` only to that page. */
+export function broadcastEvent(event: string, data: unknown, clientId?: string): void {
+  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const client of sseClients)
+    if (!clientId || client.id === clientId) client.res.write(payload);
+}
+
+/** Called when a page's stream closes: owners of per-page resources release them. */
+export function onEventClientClose(listener: CloseListener): () => void {
+  closeListeners.add(listener);
+  return () => {
+    closeListeners.delete(listener);
+  };
 }
 
 export function attachSse(req: IncomingMessage, res: ServerResponse): void {
@@ -27,11 +49,17 @@ export function attachSse(req: IncomingMessage, res: ServerResponse): void {
     Connection: "keep-alive",
   });
   res.write(":\n\n");
-  const client = { res };
+  const client = {
+    res,
+    id: new URL(req.url ?? "/", "http://localhost").searchParams.get("client") ?? "",
+  };
   sseClients.add(client);
-  req.on("close", () => sseClients.delete(client));
+  req.on("close", () => {
+    sseClients.delete(client);
+    if (client.id) for (const listener of closeListeners) listener(client.id);
+  });
 }
 
 export function notifyLauncherShow() {
-  for (const client of sseClients) client.res.write("event: launcher-show\ndata: {}\n\n");
+  broadcastEvent("launcher-show", {});
 }
