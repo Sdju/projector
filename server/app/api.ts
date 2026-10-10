@@ -37,7 +37,9 @@ import { handleCodex } from "../routes/api/codex.ts";
 import { handleOpenCode } from "../routes/api/opencode.ts";
 import { handleCursor } from "../routes/api/cursor.ts";
 import { handleClaude } from "../routes/api/claude.ts";
+import { handleBrowser } from "../routes/api/browser.ts";
 const routes = [
+  handleBrowser,
   handleClaude,
   handleCursor,
   handleOpenCode,

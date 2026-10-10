@@ -4,6 +4,7 @@ import SplitPanes from "./SplitPanes.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import IconRefresh from "~icons/lucide/refresh-cw";
 import IconExternal from "~icons/lucide/external-link";
+import IconPanel from "~icons/lucide/app-window";
 const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
 const props = defineProps<{
   path: string;
@@ -58,6 +59,15 @@ const frameStyle = computed(() => {
         @click="emit('command', 'ide.editor.html.reload')"
       >
         <IconRefresh aria-hidden="true" />
+      </UiButton>
+      <UiButton
+        icon
+        size="sm"
+        aria-label="Открыть во вкладке браузера"
+        title="Открыть страницу во вкладке браузера Projector"
+        @click="emit('command', 'ide.editor.html.openInBrowserTab')"
+      >
+        <IconPanel aria-hidden="true" />
       </UiButton>
       <UiButton
         icon

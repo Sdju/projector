@@ -157,6 +157,7 @@ const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
   keepMine: files.keepMine,
   openFile,
   openTab,
+  selectTab: (key) => revealPanel(key),
   onOpenTab: () => (mobileSidebarOpen.value = false),
   toggleMarkdownSource,
   revealInTree: (path) => {

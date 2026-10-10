@@ -5,6 +5,7 @@ import { commandArgs, type useCommandScope } from "../../../common/utilities/com
 import { copyWithNotice } from "../../../common/utilities/notice.ts";
 import type { TabRegistry, WorkspaceCapability } from "../../workspace-api/index.ts";
 import { workspaceSiteUrl } from "../../workspace-api/index.ts";
+import { normalizeBrowserInput } from "../../../../core/modules/browser/index.ts";
 import { isEditable, isHtml, isMarkdown, type OpenFile } from "../open-file.ts";
 
 export interface EditorCommandContext {
@@ -28,7 +29,8 @@ export interface EditorCommandContext {
   /** Оставляет правки вкладки при расхождении с диском. */
   keepMine: (file: OpenFile) => void;
   openFile: (path: string) => unknown;
-  openTab: (id: string, params?: Record<string, unknown>) => void;
+  openTab: (id: string, params?: Record<string, unknown>, options?: { preview?: boolean }) => void;
+  selectTab: (key: string) => void;
   onOpenTab?: () => void;
   toggleMarkdownSource: () => void;
   /** Показывает файл в дереве: открывает сайдбар и раздел «Файлы». */
@@ -163,6 +165,60 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
       arguments: { id: "Ключ вкладки; по умолчанию активная вкладка" },
     },
   );
+  const browserTab = (args?: unknown) => {
+    const id = commandArgs(args).id;
+    return tabs.value.find((tab) => tab.virtual === "browser" && tab.key === (id ?? activeKey()));
+  };
+  const browserUrl = (args?: unknown) => {
+    const url = commandArgs(args).url;
+    if (typeof url !== "string" || !url.trim()) throw new Error("Укажите адрес страницы");
+    return normalizeBrowserInput(url);
+  };
+  register(
+    "ide.workbench.browser.navigate",
+    "Открыть адрес в браузере",
+    (args) => {
+      const url = browserUrl(args);
+      const tab = browserTab(args);
+      if (tab) {
+        tab.params = { ...tab.params, url };
+        ctx.selectTab(tab.key);
+      } else
+        openTab("browser", { ...ctx.tabTypes.get("browser")!.create!(), url }, { preview: false });
+      ctx.onOpenTab?.();
+    },
+    () => ctx.tabTypes.has("browser"),
+    undefined,
+    {
+      description:
+        "Открывает адрес во вкладке-псевдобраузере: в активной, если она браузерная (или в вкладке с указанным id), иначе в новой. Принимает полный URL, localhost:порт, домен или поисковый запрос. Страницы из интернета загружаются через прокси Projector, localhost и локальная сеть — напрямую.",
+      arguments: {
+        url: "URL, localhost:порт, домен или поисковый запрос",
+        id: "Ключ браузерной вкладки; по умолчанию активная браузерная, иначе новая",
+      },
+    },
+  );
+  register(
+    "ide.editor.html.openInBrowserTab",
+    "Открыть HTML-страницу во вкладке браузера",
+    (args) => {
+      const file = htmlFile(args)!;
+      const url = new URL(workspaceSiteUrl(ctx.projectId, file.path), location.origin).href;
+      openTab(
+        "browser",
+        { ...ctx.tabTypes.get("browser")!.create!(), url, title: file.path },
+        { preview: false },
+      );
+      ctx.onOpenTab?.();
+    },
+    (args) => !!htmlFile(args) && ctx.tabTypes.has("browser"),
+    undefined,
+    {
+      description:
+        "Открывает HTML-файл проекта как страницу во вкладке-псевдобраузере (с адресной строкой и историей) вместо просмотра рядом с кодом.",
+      arguments: { id: "Ключ вкладки; по умолчанию активная вкладка" },
+    },
+  );
   register(
     "ide.editor.file.open",
     "Открыть файл",
@@ -180,7 +236,10 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
     return [
       ...(file.original !== undefined ? [editorCommands.item("ide.editor.file.open", { id })] : []),
       ...(isHtml(file)
-        ? [editorCommands.item("ide.editor.html.openInBrowser", { id }, { separator: true })]
+        ? [
+            editorCommands.item("ide.editor.html.openInBrowserTab", { id }, { separator: true }),
+            editorCommands.item("ide.editor.html.openInBrowser", { id }),
+          ]
         : []),
       editorCommands.item("ide.editor.file.save", { id }, { separator: true }),
       editorCommands.item("ide.editor.file.reveal", { id }),

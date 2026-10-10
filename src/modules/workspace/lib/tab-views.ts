@@ -12,6 +12,7 @@ import { KeybindingsEditor } from "../../ide/index.ts";
 import { LanInfoPanel } from "../../network/index.ts";
 import { DockerPanel } from "../../docker/index.ts";
 import { AgentChat } from "../../agent/index.ts";
+import { BrowserPanel } from "../../browser/index.ts";
 import {
   CommitOverview,
   DiscussionView,
@@ -58,6 +59,19 @@ export const baseTabViews: TabViews = {
   keybindings: { component: KeybindingsEditor, ownKeys: true, keepAlive: true },
   network: { component: LanInfoPanel, ownKeys: true, keepAlive: true },
   docker: { component: DockerPanel, keepAlive: true },
+  browser: {
+    component: BrowserPanel,
+    keepAlive: true,
+    ownKeys: true,
+    props: (tab, host) => ({
+      projectId: host.projectId,
+      url: tab.params?.url,
+      onNavigate: (url: string, title: string) => {
+        tab.params = { ...tab.params, url, title };
+        if (title) tab.path = title;
+      },
+    }),
+  },
   agent: {
     component: AgentChat,
     keepAlive: true,
