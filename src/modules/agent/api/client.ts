@@ -32,6 +32,20 @@ function parseSse(buffer: string): { events: AgentEvent[]; rest: string } {
   return { events, rest };
 }
 
+/** Stores a pasted or dropped image on the server; messages refer to it by the returned id. */
+export async function uploadAttachment(
+  file: File,
+): Promise<Extract<MessagePart, { type: "image" }>> {
+  const response = await fetch(`/api/agent/attachments?name=${encodeURIComponent(file.name)}`, {
+    method: "POST",
+    headers: { "Content-Type": file.type },
+    body: file,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || "Не удалось загрузить изображение");
+  return { type: "image", id: data.id, name: data.name, mime: data.mime };
+}
+
 /** The run to rejoin no longer exists on the server (finished and collected, or pruned). */
 export class AgentRunGone extends Error {}
 

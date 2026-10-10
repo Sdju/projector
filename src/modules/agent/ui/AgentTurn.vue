@@ -123,6 +123,10 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
   display: flex;
   color: var(--muted);
 }
+.chip-icon :deep(.chip-thumb) {
+  border-radius: 2px;
+  object-fit: cover;
+}
 .assistant-body {
   min-width: 0;
 }

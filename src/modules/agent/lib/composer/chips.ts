@@ -20,7 +20,14 @@ const icons: Record<MessageChip["type"] | "directory", string> = {
     '<path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/>',
 };
 
+/** An image chip shows the image itself; ids are hex, anything else gets the generic icon. */
 export function chipIcon(chip: MessageChip): string {
+  if (chip.type === "image" && /^[0-9a-f]{16}$/.test(chip.id))
+    return `<img class="chip-thumb" src="/api/agent/attachments/${chip.id}" alt="" width="14" height="14">`;
+  return iconSvg(chip);
+}
+
+function iconSvg(chip: MessageChip): string {
   const body = icons[chip.type === "file" && chip.directory ? "directory" : chip.type];
   return `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
 }

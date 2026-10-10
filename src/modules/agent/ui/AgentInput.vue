@@ -4,6 +4,7 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { EditorSelection, EditorState, Prec } from "@codemirror/state";
 import { EditorView, keymap, placeholder as placeholderText } from "@codemirror/view";
 import { isFileDrag, pathsFromDataTransfer } from "../../path-drop/index.ts";
+import { uploadAttachment } from "../api/client.ts";
 import { findWorkspacePaths, workspaceRequest } from "../../workspace-api/index.ts";
 import {
   chipExtensions,
@@ -25,7 +26,7 @@ const props = defineProps<{
   projectId?: string;
   commands?: { name: string; description?: string }[];
 }>();
-const emit = defineEmits<{ submit: []; open: [chip: MessageChip] }>();
+const emit = defineEmits<{ submit: []; open: [chip: MessageChip]; fail: [message: string] }>();
 
 const host = ref<HTMLElement>();
 const view = shallowRef<EditorView>();
@@ -178,6 +179,26 @@ function insertDropped(target: EditorView, chips: MessageChip[], at: number) {
   }
 }
 
+/** Uploads pasted or dropped images and puts each in as a chip where the cursor or drop was. */
+async function attachImages(files: File[], at?: number) {
+  const target = view.value;
+  if (!target) return;
+  let position = at;
+  for (const file of files) {
+    try {
+      const chip = await uploadAttachment(file);
+      const head = Math.min(position ?? target.state.selection.main.head, target.state.doc.length);
+      insertChip(target, head, head, chip);
+      position = head + chipText(chip).length + 1;
+    } catch (error) {
+      emit("fail", error instanceof Error ? error.message : "Не удалось загрузить изображение");
+    }
+  }
+  target.focus();
+}
+const imagesOf = (data: DataTransfer | null) =>
+  [...(data?.files ?? [])].filter((file) => file.type.startsWith("image/"));
+
 function commit(state: EditorState) {
   const next = contentOf(state);
   const text = messageText(next);
@@ -238,16 +259,28 @@ onMounted(() => {
           drop(event, target) {
             const data = event.dataTransfer;
             if (!data) return false;
-            const chips = droppedChips(data);
-            if (!chips.length) return false;
-            event.preventDefault();
-            insertDropped(
-              target,
-              chips,
+            const at =
               target.posAtCoords({ x: event.clientX, y: event.clientY }) ??
-                target.state.selection.main.head,
-            );
-            target.focus();
+              target.state.selection.main.head;
+            const chips = droppedChips(data);
+            if (chips.length) {
+              event.preventDefault();
+              insertDropped(target, chips, at);
+              target.focus();
+              return true;
+            }
+            // The browser gave no path (a dragged image, not a file): send the image itself.
+            const images = imagesOf(data);
+            if (!images.length) return false;
+            event.preventDefault();
+            void attachImages(images, at);
+            return true;
+          },
+          paste(event) {
+            const images = imagesOf(event.clipboardData);
+            if (!images.length) return false;
+            event.preventDefault();
+            void attachImages(images);
             return true;
           },
           mousedown(event) {
@@ -385,7 +418,8 @@ defineExpose({
   line-height: 1.5;
   vertical-align: baseline;
 }
-.editor :deep(.composer-chip svg) {
+.editor :deep(.composer-chip svg),
+.editor :deep(.chip-thumb) {
   flex-shrink: 0;
   color: var(--muted);
 }

@@ -2,8 +2,9 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 import type {
   Options,
   SDKControlGetContextUsageResponse as ContextUsage,
+  SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
-import { agentEnv, assertHostProject, promptWithHistory } from "./agent-host.ts";
+import { agentEnv, assertHostProject, attachedImages, promptWithHistory } from "./agent-host.ts";
 import type { AgentBackend, AgentRunOptions } from "./backend.ts";
 import { CLAUDE_LABEL, createClaudeEventMapper } from "./claude-code-events.ts";
 import { CLAUDE_CONTROLS, claudeLoadSession, claudeSessions } from "./claude-code-sessions.ts";
@@ -67,7 +68,11 @@ async function run(options: AgentRunOptions): Promise<void> {
     const prompt = resume
       ? options.message
       : promptWithHistory(options.message, options.history ?? []);
-    const conversation = query({ prompt, options: { ...base, ...(resume ? { resume } : {}) } });
+    const images = await attachedImages(options.parts);
+    const conversation = query({
+      prompt: images.length ? withImages(prompt, images) : prompt,
+      options: { ...base, ...(resume ? { resume } : {}) },
+    });
     try {
       for await (const message of conversation) {
         mapper.handle(message);
@@ -89,6 +94,31 @@ async function run(options: AgentRunOptions): Promise<void> {
   } finally {
     options.abort?.removeEventListener("abort", forwardAbort);
   }
+}
+
+/** A prompt with images is streamed as one user message of content blocks. */
+async function* withImages(
+  text: string,
+  images: { mime: string; data: string }[],
+): AsyncGenerator<SDKUserMessage> {
+  yield {
+    type: "user",
+    parent_tool_use_id: null,
+    message: {
+      role: "user",
+      content: [
+        { type: "text", text },
+        ...images.map((image) => ({
+          type: "image" as const,
+          source: {
+            type: "base64" as const,
+            media_type: image.mime as "image/png" | "image/jpeg" | "image/gif" | "image/webp",
+            data: image.data,
+          },
+        })),
+      ],
+    },
+  };
 }
 
 /** How full the context window is after the turn; a failure only means no indicator. */

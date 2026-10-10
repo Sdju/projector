@@ -3,7 +3,7 @@ import { applySelection, controlsFromSession } from "./acp-controls.ts";
 import { contentText, createAcpEventMapper } from "./acp-events.ts";
 import { acpProgram, initializeAcp, startAcp } from "./acp-process.ts";
 import { acpControls, acpLoadSession, acpSessions } from "./acp-tools.ts";
-import { promptWithHistory } from "./agent-host.ts";
+import { attachedImages, promptWithHistory } from "./agent-host.ts";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { AgentBackend, AgentBackendId, AgentRunOptions, MessagePart } from "./backend.ts";
@@ -24,7 +24,12 @@ function stopReasonError(stopReason: unknown): string {
  * The prompt as ACP blocks: the text, which already names every file as `@path`, plus a link to
  * each file or folder so an agent can open it without guessing what the name refers to.
  */
-function promptBlocks(text: string, parts: MessagePart[] | undefined, cwd: string | undefined) {
+function promptBlocks(
+  text: string,
+  parts: MessagePart[] | undefined,
+  cwd: string | undefined,
+  images: { mime: string; data: string }[],
+) {
   const links = (parts ?? []).flatMap((part) =>
     part.type === "file"
       ? [
@@ -36,7 +41,11 @@ function promptBlocks(text: string, parts: MessagePart[] | undefined, cwd: strin
         ]
       : [],
   );
-  return [{ type: "text", text }, ...links];
+  return [
+    { type: "text", text },
+    ...links,
+    ...images.map((image) => ({ type: "image", mimeType: image.mime, data: image.data })),
+  ];
 }
 
 /** An external agent driven through its ACP server over stdio. */
@@ -109,7 +118,17 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
       : promptWithHistory(options.message, options.history ?? []);
     const result = (await connection.request(
       "session/prompt",
-      { sessionId, prompt: promptBlocks(prompt, options.parts, options.cwd) },
+      {
+        sessionId,
+        prompt: promptBlocks(
+          prompt,
+          options.parts,
+          options.cwd,
+          init.agentCapabilities?.promptCapabilities?.image === true
+            ? await attachedImages(options.parts)
+            : [],
+        ),
+      },
       NO_TIMEOUT,
     )) as { stopReason?: unknown };
     if (options.abort?.aborted) return;

@@ -17,6 +17,8 @@ export interface AcpInitResult {
   agentCapabilities?: {
     loadSession?: boolean;
     sessionCapabilities?: Record<string, unknown>;
+    /** What a prompt may contain besides text and links. */
+    promptCapabilities?: { image?: boolean; embeddedContext?: boolean };
   };
 }
 

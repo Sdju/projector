@@ -1,6 +1,8 @@
 import { devcontainerForPath } from "../devcontainer/index.ts";
 import { environmentForPath } from "../environments/index.ts";
 import type { AgentHistoryTurn } from "../providers/index.ts";
+import { readAttachment } from "./attachments.ts";
+import type { MessagePart } from "./backend.ts";
 
 /** Env names that must not leak from Projector's server into a coding agent's shell. */
 const PRIVATE_ENV = [
@@ -18,6 +20,18 @@ export function agentEnv(): Record<string, string | undefined> {
 }
 
 /** Without a native session the earlier chat is replayed as text. */
+/** The bytes and type of an attached image, for the agents that take images in a prompt. */
+export async function attachedImages(parts: MessagePart[] | undefined) {
+  const images: { name: string; mime: string; data: string }[] = [];
+  for (const part of parts ?? []) {
+    if (part.type !== "image") continue;
+    const stored = await readAttachment(part.id);
+    if (stored)
+      images.push({ name: part.name, mime: stored.mime, data: stored.content.toString("base64") });
+  }
+  return images;
+}
+
 export function promptWithHistory(message: string, history: AgentHistoryTurn[]): string {
   if (!history.length) return message;
   const transcript = history

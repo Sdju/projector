@@ -17,7 +17,13 @@ defineProps<{
   projectId?: string;
   commands?: { name: string; description?: string }[];
 }>();
-const emit = defineEmits<{ submit: []; stop: []; latest: []; open: [chip: MessageChip] }>();
+const emit = defineEmits<{
+  submit: [];
+  stop: [];
+  latest: [];
+  open: [chip: MessageChip];
+  fail: [message: string];
+}>();
 const input = ref<InstanceType<typeof AgentInput>>();
 defineExpose({ resize: () => {}, focus: () => input.value?.focus() });
 </script>
@@ -37,6 +43,7 @@ defineExpose({ resize: () => {}, focus: () => input.value?.focus() });
         :commands="commands"
         @submit="emit('submit')"
         @open="(chip) => emit('open', chip)"
+        @fail="(message) => emit('fail', message)"
       />
       <div class="composer-footer">
         <slot name="controls" />

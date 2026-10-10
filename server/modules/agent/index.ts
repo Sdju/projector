@@ -1,3 +1,4 @@
+export { readAttachment, saveAttachment } from "./attachments.ts";
 export { readAgentHistory, writeAgentHistory } from "./history.ts";
 export {
   createCommandBridge,

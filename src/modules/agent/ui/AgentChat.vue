@@ -371,6 +371,7 @@ onBeforeUnmount(() => {
       :error="error || copyError"
       :copied="!!copied"
       @submit="submit"
+      @fail="(message) => (error = message)"
       @stop="stop"
       @latest="toBottom"
     >

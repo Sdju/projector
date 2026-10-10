@@ -25,11 +25,15 @@ import {
   trackRun,
   HOSTED_AGENT_BACKENDS,
   readAgentHistory,
+  readAttachment,
+  saveAttachment,
   writeAgentHistory,
 } from "../../modules/agent/index.ts";
 
 import type { AgentHistoryTurn } from "../../modules/providers/index.ts";
 
+import { accessAllowed } from "../../modules/access/index.ts";
+import { HttpError } from "../../modules/http/index.ts";
 import { readBody, asString, json } from "../../modules/transport/index.ts";
 
 import type { MessagePart } from "../../modules/agent/index.ts";
@@ -61,6 +65,24 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
     if (body.mode !== "tui" && body.mode !== "gui") throw new Error("Неизвестный режим сессии");
     await setAgentMode(asString(body.program), body.mode);
     json(res, 200, { modes: (await preferences()).agentModes, programs: GUI_AGENT_PROGRAMS });
+    return true;
+  }
+  if (path === "/api/agent/attachments" && method === "POST") {
+    if (!accessAllowed(req, true))
+      throw new HttpError(403, "Загрузка доступна только со страницы Projector");
+    const type = (req.headers["content-type"] ?? "").split(";")[0]!.trim();
+    json(res, 201, await saveAttachment(req, type, url.searchParams.get("name") ?? ""));
+    return true;
+  }
+  const attachment = path.match(/^\/api\/agent\/attachments\/([0-9a-f]+)$/);
+  if (attachment && method === "GET") {
+    const image = await readAttachment(attachment[1]!);
+    if (!image) throw new HttpError(404, "Изображение не найдено");
+    res.setHeader("Content-Type", image.mime);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Cache-Control", "private, max-age=31536000, immutable");
+    res.setHeader("Content-Security-Policy", "sandbox; default-src 'none'");
+    res.end(image.content);
     return true;
   }
   if (path === "/api/agent/defaults" && method === "GET") {
