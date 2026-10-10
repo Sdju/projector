@@ -10,7 +10,10 @@ import {
   AGENT_PERMISSION_MODES,
   agentCommands,
   agentControls,
+  agentMcpServers,
   agentSessions,
+  rewindAgentFiles,
+  updateAgentSession,
   loadAgentSession,
   selectionFrom,
   runAgent,
@@ -108,10 +111,49 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
     json(res, 200, { commands: await agentCommands(backend, cwd) });
     return true;
   }
+  if (path === "/api/agent/mcp" && method === "GET") {
+    const cwd = await projectPath(url.searchParams.get("projectId") ?? "");
+    const backend = url.searchParams.get("backend") ?? undefined;
+    json(res, 200, { servers: await agentMcpServers(backend, cwd) });
+    return true;
+  }
+  if (path === "/api/agent/rewind-files" && method === "POST") {
+    if (!accessAllowed(req, true))
+      throw new HttpError(403, "Откат доступен только со страницы Projector");
+    const body = await readBody(req);
+    const cwd = await projectPath(asString(body.projectId));
+    const backend = asString(body.backend) || undefined;
+    json(
+      res,
+      200,
+      await rewindAgentFiles(
+        backend,
+        cwd,
+        asString(body.sessionId),
+        asString(body.messageId),
+        body.dryRun === true,
+      ),
+    );
+    return true;
+  }
   if (path === "/api/agent/sessions" && method === "GET") {
     const cwd = await projectPath(url.searchParams.get("projectId") ?? "");
     const backend = url.searchParams.get("backend") ?? undefined;
     json(res, 200, { sessions: await agentSessions(backend, cwd) });
+    return true;
+  }
+  if (path === "/api/agent/sessions/update" && method === "POST") {
+    if (!accessAllowed(req, true))
+      throw new HttpError(403, "Изменение доступно только со страницы Projector");
+    const body = await readBody(req);
+    const cwd = await projectPath(asString(body.projectId));
+    const sessionId = asString(body.sessionId);
+    if (!sessionId) throw new Error("Укажите сессию");
+    await updateAgentSession(asString(body.backend) || undefined, cwd, sessionId, {
+      ...(typeof body.title === "string" ? { title: body.title } : {}),
+      ...(typeof body.pinned === "boolean" ? { pinned: body.pinned } : {}),
+    });
+    json(res, 200, { ok: true });
     return true;
   }
   if (path === "/api/agent/sessions/load" && method === "POST") {
@@ -250,6 +292,8 @@ async function requestFrom(body: Record<string, unknown>) {
     permissionMode: AGENT_PERMISSION_MODES.find((mode) => mode === body.permissionMode),
     selection: selectionFrom(body.selection),
     sessionId: asString(body.sessionId) || undefined,
+    messageId: asString(body.messageId) || undefined,
+    tail: asString(body.tail) || undefined,
     cwd: project?.path,
     providerId: asString(body.providerId) || undefined,
   };

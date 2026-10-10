@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useIdeCommands } from "../../ide/index.ts";
-import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
+import { workspaceRequest } from "../../workspace-api/index.ts";
 import { agentCommandHandler } from "../model/commands.ts";
 import { agentLabel, guiPrograms } from "../model/modes.ts";
 import { useAgent } from "../model/session.ts";
@@ -15,13 +15,22 @@ import AgentContextMeter from "./AgentContextMeter.vue";
 import AgentChipPreview from "./AgentChipPreview.vue";
 import AgentControls from "./AgentControls.vue";
 import AgentSessions from "./AgentSessions.vue";
+import AgentPlan from "./AgentPlan.vue";
+import AgentQueue from "./AgentQueue.vue";
+import AgentRewind from "./AgentRewind.vue";
+import { chatMarkdown } from "../lib/export.ts";
+import { latestPlan } from "../lib/plan.ts";
+import { fetchMcpServers, type RewindSummary } from "../api/client.ts";
+import { activateChat, registerChat, type ChatController } from "../model/chat-registry.ts";
 import type {
   AgentBackendId,
   AgentControl,
   AgentPermissionMode,
   MessageChip,
+  RewindScope,
 } from "../model/types.ts";
 import IconSquarePen from "~icons/lucide/square-pen";
+import IconDownload from "~icons/lucide/download";
 
 const props = withDefaults(
   defineProps<{ projectId: string; backend?: AgentBackendId; chatId?: string }>(),
@@ -50,8 +59,17 @@ const {
   commands: slashCommands,
   setControl,
   loadSessions,
+  changeSession,
   resumeSession,
   send,
+  queue,
+  sendQueuedNow,
+  removeQueued,
+  edit,
+  retry,
+  showVersion,
+  canRewindFiles,
+  rewindFiles,
   clear,
   stop,
   attach,
@@ -68,6 +86,11 @@ onMounted(() => {
 const PERMISSION_CONTROL = "permission-mode";
 const permissionOptions: { value: AgentPermissionMode; name: string; description: string }[] = [
   { value: "default", name: "Спрашивать", description: "Запрос перед правками и командами" },
+  {
+    value: "plan",
+    name: "План",
+    description: "Агент сначала составляет план без правок и ждёт вашего согласия",
+  },
   {
     value: "acceptEdits",
     name: "Правки без вопросов",
@@ -118,77 +141,6 @@ function openCoder(program: string) {
       error.value = cause instanceof Error ? cause.message : "Не удалось открыть агента";
     });
 }
-const commands = useCommandScope(
-  `agent-chat:${props.backend}:${props.chatId ?? props.projectId}`,
-  () => ({
-    surface: "agent-chat",
-    backend: props.backend,
-    projectId: props.projectId,
-  }),
-);
-if (plain.value) {
-  const idle = () => !busy.value;
-  commands.scope.registerCommand({
-    id: "ide.agent.controls.menu.toggle",
-    title: `Открыть или закрыть параметры агента ${agentName.value}`,
-    description:
-      "Показывает остров над полем ввода: модель, усилие, режим и разрешения с пояснениями.",
-    enabled: idle,
-    run: () => controlsMenu.value?.toggle(),
-  });
-  commands.scope.registerCommand({
-    id: "ide.agent.controls.list",
-    title: `Параметры агента ${agentName.value}: модель, усилие, режим`,
-    description:
-      "Возвращает настройки открытого чата внешнего агента (модель, усилие рассуждений, режим) с текущими значениями и допустимыми вариантами.",
-    run: () =>
-      controls.value.map((control) => ({
-        id: control.id,
-        name: control.name,
-        current: control.current,
-        options: control.options.map((option) => option.value),
-      })),
-  });
-  commands.scope.registerCommand({
-    id: "ide.agent.control.set",
-    title: `Выбрать модель, усилие или режим агента ${agentName.value}`,
-    description:
-      "Задаёт настройку открытого чата внешнего агента. Действует со следующего сообщения и запоминается как выбор по умолчанию для этого агента.",
-    arguments: {
-      id: "Идентификатор настройки из ide.agent.controls.list (например model)",
-      value: "Одно из допустимых значений настройки",
-    },
-    enabled: idle,
-    run: async (args) => {
-      const { id, value } = commandArgs(args);
-      if (typeof id !== "string" || typeof value !== "string")
-        throw new Error("Укажите id и value настройки");
-      await setControl(id, value);
-      return { id, value };
-    },
-  });
-  commands.scope.registerCommand({
-    id: "ide.agent.sessions.list",
-    title: `Прошлые сессии агента ${agentName.value}`,
-    description:
-      "Возвращает прошлые сессии этого агента в папке проекта, от новых к старым: идентификатор, название и время.",
-    run: () => loadSessions(),
-  });
-  commands.scope.registerCommand({
-    id: "ide.agent.session.resume",
-    title: `Продолжить прошлую сессию агента ${agentName.value}`,
-    description:
-      "Заменяет содержимое открытого чата сообщениями выбранной прошлой сессии; следующее сообщение продолжит её. Идентификаторы даёт ide.agent.sessions.list.",
-    arguments: { sessionId: "Идентификатор сессии" },
-    enabled: idle,
-    run: async (args) => {
-      const { sessionId } = commandArgs(args);
-      if (typeof sessionId !== "string") throw new Error("Укажите sessionId");
-      await resumeSession(sessionId);
-      return { sessionId };
-    },
-  });
-}
 attach();
 // Что штатный агент видит в чате: статус, последний ответ и чипы инструментов.
 useTabReadout(() => {
@@ -218,6 +170,149 @@ const log = ref<HTMLElement>();
 const controlsMenu = ref<InstanceType<typeof AgentControls>>();
 const composer = ref<InstanceType<typeof AgentComposer>>();
 const root = ref<HTMLElement>();
+
+// The project folder: edited files and dropped paths are shown relative to it.
+const projectRoot = ref("");
+void workspaceRequest<{ root: string }>(props.projectId, "root")
+  .then((data) => {
+    projectRoot.value = data.root;
+  })
+  .catch(() => {});
+
+const plan = computed(() => latestPlan(turns.value.at(-1)));
+const contextShare = computed(() =>
+  latestContext.value ? latestContext.value.used / Math.max(1, latestContext.value.size) : 0,
+);
+
+// Rolling back to a message: the panel asks what to undo, shows what the files would change, then does it.
+const rewinding = ref<{ id: string; scope: RewindScope } | null>(null);
+const rewindPreview = ref<RewindSummary>();
+const rewindPreviewError = ref("");
+const rewindResult = ref<RewindSummary>();
+const rewindWorking = ref(false);
+function askRewind(id: string, scope: RewindScope = "conversation") {
+  rewinding.value = { id, scope };
+  rewindPreview.value = undefined;
+  rewindPreviewError.value = "";
+  rewindResult.value = undefined;
+}
+async function previewRewind(scope: RewindScope) {
+  const target = rewinding.value;
+  if (!target) return;
+  target.scope = scope;
+  if (scope === "conversation" || rewindPreview.value || rewindPreviewError.value) return;
+  try {
+    rewindPreview.value = await rewindFiles(target.id, true);
+  } catch (cause) {
+    rewindPreviewError.value =
+      cause instanceof Error ? cause.message : "Не удалось посчитать откат";
+  }
+}
+/** Does the rollback; used by the panel and by `ide.agent.chat.rewind`. */
+async function rewindTo(id: string, scope: RewindScope): Promise<RewindSummary | undefined> {
+  let result: RewindSummary | undefined;
+  if (scope !== "conversation") result = await rewindFiles(id, false);
+  if (scope !== "files" && (!result || result.ok)) edit(id);
+  return result;
+}
+async function confirmRewind(scope: RewindScope) {
+  const target = rewinding.value;
+  if (!target || rewindWorking.value) return;
+  rewindWorking.value = true;
+  try {
+    const result = await rewindTo(target.id, scope);
+    // A real rewind reports no file list; the preview already told which files it changes.
+    if (result)
+      rewindResult.value = {
+        ...result,
+        files: result.files.length ? result.files : (rewindPreview.value?.files ?? []),
+      };
+    else rewinding.value = null;
+    if (scope !== "files") await nextTick();
+    composer.value?.focus();
+  } catch (cause) {
+    rewindResult.value = {
+      ok: false,
+      files: [],
+      error: cause instanceof Error ? cause.message : "Не удалось откатить",
+    };
+  } finally {
+    rewindWorking.value = false;
+  }
+}
+function closeRewind() {
+  rewinding.value = null;
+  rewindResult.value = undefined;
+}
+// A request's own answers belong to the user message before them.
+function precedingUser(id: string): string {
+  const index = turns.value.findIndex((turn) => turn.id === id);
+  return turns.value.slice(0, index + 1).findLast((turn) => turn.role === "user")?.id ?? "";
+}
+function canRevert(id: string): boolean {
+  return canRewindFiles(precedingUser(id));
+}
+async function editMessage(id: string) {
+  edit(id);
+  await nextTick();
+  composer.value?.focus();
+}
+async function retryMessage(id: string) {
+  void toBottom();
+  await retry(id);
+}
+
+async function compact() {
+  void toBottom();
+  await send("/compact");
+}
+function exportMarkdown() {
+  return chatMarkdown(turns.value, `${agentName.value} · ${new Date().toLocaleString("ru")}`);
+}
+function downloadChat() {
+  const url = URL.createObjectURL(
+    new Blob([exportMarkdown()], { type: "text/markdown;charset=utf-8" }),
+  );
+  const link = Object.assign(document.createElement("a"), {
+    href: url,
+    download: `${props.backend}-chat.md`,
+  });
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// The chat publishes itself to the workspace's commands (see `registerAgentCommands`).
+const chatKey = `${props.backend}:${props.chatId ?? props.projectId}`;
+const controller: ChatController = {
+  key: chatKey,
+  projectId: props.projectId,
+  backend: props.backend,
+  label: agentName.value,
+  busy: () => busy.value,
+  visible: () => !!root.value && root.value.getClientRects().length > 0,
+  turns: () => turns.value,
+  queue: () => queue.value,
+  controls: () => controls.value,
+  setControl,
+  loadSessions,
+  resumeSession,
+  toggleControlsMenu: () => controlsMenu.value?.toggle(),
+  send: (text) => send(text),
+  stop,
+  edit,
+  retry,
+  rewind: async (id, scope) => {
+    const result = await rewindTo(id, scope);
+    return result ?? { ok: true, files: [] };
+  },
+  showVersion,
+  removeQueued,
+  exportMarkdown,
+  compact,
+  mcpServers: () => fetchMcpServers(props.backend, props.projectId),
+};
+const unregisterChat = registerChat(controller);
+onBeforeUnmount(unregisterChat);
 // A file chip opens its file in the editor; an image chip opens the picture itself.
 function openChip(chip: MessageChip) {
   if (chip.type === "image")
@@ -265,7 +360,7 @@ async function toBottom() {
   pin();
 }
 async function submit() {
-  if (busy.value || !draft.value.trim()) return;
+  if (!draft.value.trim()) return;
   void toBottom();
   await send();
   composer.value?.focus();
@@ -336,7 +431,13 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section ref="root" class="agent-chat" aria-label="Чат с агентом">
+  <section
+    ref="root"
+    class="agent-chat"
+    aria-label="Чат с агентом"
+    @focusin="activateChat(controller)"
+    @pointerdown.capture="activateChat(controller)"
+  >
     <div class="chat-tools">
       <AgentSessions
         v-if="plain"
@@ -345,9 +446,21 @@ onBeforeUnmount(() => {
         :error="sessionsError"
         :disabled="busy"
         :active="activeSession"
+        :editable="claude"
         @open="loadSessions"
+        @change="changeSession"
         @pick="(id) => void resumeSession(id).catch(() => {})"
       />
+      <UiButton
+        v-if="turns.length"
+        icon
+        size="sm"
+        title="Сохранить чат в Markdown"
+        aria-label="Сохранить чат в Markdown"
+        @click="downloadChat"
+      >
+        <IconDownload aria-hidden="true" />
+      </UiButton>
       <UiButton
         v-if="turns.length"
         icon
@@ -383,12 +496,42 @@ onBeforeUnmount(() => {
           :busy="busy"
           :last="index === turns.length - 1"
           :copied="copied === turn.id"
+          :root="projectRoot"
+          :can-revert="canRevert(turn.id)"
           @copy="copyMessage"
           @open="openChip"
+          @edit="editMessage"
+          @rewind="askRewind"
+          @retry="retryMessage"
+          @version="showVersion"
+          @open-file="(path) => openChip({ type: 'file', path })"
+          @revert="(id) => askRewind(precedingUser(id), 'files')"
         />
       </div>
     </div>
-    <AgentPermissions class="permission-dock" :permissions="permissions" @decide="decide" />
+    <div class="dock">
+      <AgentPermissions :permissions="permissions" @decide="decide" />
+      <AgentRewind
+        v-if="rewinding"
+        :key="rewinding.id"
+        :can-files="canRewindFiles(rewinding.id)"
+        :preview="rewindPreview"
+        :preview-error="rewindPreviewError"
+        :working="rewindWorking"
+        :result="rewindResult"
+        :root="projectRoot"
+        :initial="rewinding.scope"
+        @scope="previewRewind"
+        @confirm="confirmRewind"
+        @cancel="closeRewind"
+      />
+      <AgentPlan :items="plan" :busy="busy" />
+      <p v-if="claude && contextShare >= 0.8 && !busy" class="compact-hint" role="status">
+        Контекст заполнен на {{ Math.round(contextShare * 100) }}%.
+        <button type="button" @click="compact">Сжать</button>
+      </p>
+      <AgentQueue :items="queue" :busy="busy" @now="sendQueuedNow" @remove="removeQueued" />
+    </div>
     <AgentComposer
       ref="composer"
       v-model="draft"
@@ -449,12 +592,22 @@ onBeforeUnmount(() => {
   scrollbar-color: var(--line-strong) transparent;
   padding: var(--sp-6) var(--sp-5) var(--sp-4);
 }
-.permission-dock {
+.dock {
   width: 100%;
   max-width: calc(var(--chat-width) + 56px);
   margin: 0 auto;
   padding: 0 var(--sp-5);
   flex-shrink: 0;
+}
+.compact-hint {
+  margin: 0 0 var(--sp-2);
+  color: var(--warn);
+  font-size: var(--fs-2xs);
+}
+.compact-hint button {
+  color: var(--text-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .conversation {
   width: 100%;

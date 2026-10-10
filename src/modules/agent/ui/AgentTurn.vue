@@ -2,29 +2,61 @@
 import UiButton from "../../../common/ui/UiButton.vue";
 import { computed } from "vue";
 import { chipIcon, chipLabel, chipTitle } from "../lib/composer/chips.ts";
+import { versionsOf } from "../model/branches.ts";
 import { legacyParts } from "../model/turn-events.ts";
-import type { AgentToolChip, AgentTurn, MessageChip } from "../model/types.ts";
+import type { AgentToolChip, AgentToolView, AgentTurn, MessageChip } from "../model/types.ts";
 import AgentMessage from "./AgentMessage.vue";
 import AgentActivity from "./AgentActivity.vue";
+import AgentChanges from "./AgentChanges.vue";
 import IconCopy from "~icons/lucide/copy";
 import IconCheck from "~icons/lucide/check";
+import IconPencil from "~icons/lucide/pencil";
+import IconUndo from "~icons/lucide/undo-2";
+import IconRefresh from "~icons/lucide/refresh-cw";
+import IconPrev from "~icons/lucide/chevron-left";
+import IconNext from "~icons/lucide/chevron-right";
 
 const props = defineProps<{
   turn: AgentTurn;
   busy: boolean;
   last: boolean;
   copied: boolean;
+  /** The project folder, to show edited files relative to it. */
+  root?: string;
+  /** Files can be taken back to before the request this answer belongs to. */
+  canRevert?: boolean;
 }>();
-const emit = defineEmits<{ copy: [id: string, text: string]; open: [chip: MessageChip] }>();
+const emit = defineEmits<{
+  copy: [id: string, text: string];
+  open: [chip: MessageChip];
+  edit: [id: string];
+  rewind: [id: string];
+  retry: [id: string];
+  version: [id: string, target: number];
+  openFile: [path: string];
+  revert: [id: string];
+}>();
+
+const versions = computed(() => versionsOf(props.turn));
 
 type Segment =
   | { key: string; type: "text"; text: string }
-  | { key: string; type: "tools"; tools: AgentToolChip[] };
+  | { key: string; type: "tools"; tools: AgentToolView[] };
 
 // Text and tool calls in the order they happened; neighbouring calls form one group.
 const segments = computed(() => {
   const result: Segment[] = [];
-  const byId = new Map(props.turn.tools.map((tool) => [tool.id, tool]));
+  // Calls a subagent made are shown inside its own call, not among the main ones.
+  const known = new Set(props.turn.tools.map((tool) => tool.id));
+  const children = new Map<string, AgentToolChip[]>();
+  for (const tool of props.turn.tools)
+    if (tool.parent && known.has(tool.parent))
+      children.set(tool.parent, [...(children.get(tool.parent) ?? []), tool]);
+  const byId = new Map(
+    props.turn.tools
+      .filter((tool) => !tool.parent || !known.has(tool.parent))
+      .map((tool) => [tool.id, { ...tool, children: children.get(tool.id) }]),
+  );
   for (const [index, part] of (props.turn.parts ?? legacyParts(props.turn)).entries()) {
     if (part.type === "text") {
       if (part.text.trim()) result.push({ key: `t${index}`, type: "text", text: part.text });
@@ -43,29 +75,78 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
 
 <template>
   <article class="turn" :class="turn.role">
-    <p v-if="turn.role === 'user'" class="user-message">
-      <template v-if="turn.content?.length">
-        <template v-for="(part, index) in turn.content" :key="index">
-          <template v-if="part.type === 'text'">{{ part.text }}</template>
-          <span
-            v-else
-            class="chip"
-            :class="part.type"
-            :title="chipTitle(part)"
-            :data-chip="JSON.stringify(part)"
-            role="button"
-            tabindex="0"
-            @click="emit('open', part)"
-            @keydown.enter="emit('open', part)"
+    <div v-if="turn.role === 'user'" class="user-row">
+      <div class="turn-actions" :class="{ pinned: versions.count > 1 }">
+        <span v-if="versions.count > 1" class="versions" role="group" aria-label="Версии">
+          <UiButton
+            icon
+            size="sm"
+            title="Предыдущая версия"
+            aria-label="Предыдущая версия"
+            :disabled="busy || versions.position === 0"
+            @click="emit('version', turn.id, versions.position - 1)"
           >
-            <span class="chip-icon" aria-hidden="true" v-html="chipIcon(part)" />{{
-              chipLabel(part)
-            }}</span
+            <IconPrev aria-hidden="true" />
+          </UiButton>
+          <span class="version-count">{{ versions.position + 1 }} / {{ versions.count }}</span>
+          <UiButton
+            icon
+            size="sm"
+            title="Следующая версия"
+            aria-label="Следующая версия"
+            :disabled="busy || versions.position === versions.count - 1"
+            @click="emit('version', turn.id, versions.position + 1)"
           >
+            <IconNext aria-hidden="true" />
+          </UiButton>
+        </span>
+        <UiButton
+          icon
+          size="sm"
+          class="turn-action"
+          title="Править и отправить заново"
+          aria-label="Править сообщение"
+          :disabled="busy"
+          @click="emit('edit', turn.id)"
+        >
+          <IconPencil aria-hidden="true" />
+        </UiButton>
+        <UiButton
+          icon
+          size="sm"
+          class="turn-action"
+          title="Откатить к этому сообщению"
+          aria-label="Откатить к этому сообщению"
+          :disabled="busy"
+          @click="emit('rewind', turn.id)"
+        >
+          <IconUndo aria-hidden="true" />
+        </UiButton>
+      </div>
+      <p class="user-message">
+        <template v-if="turn.content?.length">
+          <template v-for="(part, index) in turn.content" :key="index">
+            <template v-if="part.type === 'text'">{{ part.text }}</template>
+            <span
+              v-else
+              class="chip"
+              :class="part.type"
+              :title="chipTitle(part)"
+              :data-chip="JSON.stringify(part)"
+              role="button"
+              tabindex="0"
+              @click="emit('open', part)"
+              @keydown.enter="emit('open', part)"
+            >
+              <span class="chip-icon" aria-hidden="true" v-html="chipIcon(part)" />{{
+                chipLabel(part)
+              }}</span
+            >
+          </template>
         </template>
-      </template>
-      <template v-else>{{ turn.text }}</template>
-    </p>
+        <template v-else>{{ turn.text }}</template>
+      </p>
+    </div>
     <div v-else class="assistant-body">
       <template v-for="segment in segments" :key="segment.key">
         <AgentMessage v-if="segment.type === 'text'" :text="segment.text" />
@@ -75,18 +156,39 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
         <span class="thinking-dots" aria-hidden="true"><i /><i /><i /></span
         >{{ turn.tools.some((t) => t.status === "running") ? "Выполняет задачу" : "Думает" }}
       </div>
-      <UiButton
-        v-if="turn.text"
-        icon
-        size="sm"
-        class="copy-button"
-        :class="{ copied: copied }"
-        :aria-label="copied ? 'Ответ скопирован' : 'Копировать ответ'"
-        :title="copied ? 'Скопировано' : 'Копировать ответ'"
-        @click="emit('copy', turn.id, turn.text)"
-      >
-        <IconCheck v-if="copied" aria-hidden="true" /><IconCopy v-else aria-hidden="true" />
-      </UiButton>
+      <AgentChanges
+        v-if="!busy || !last"
+        :tools="turn.tools"
+        :root="root ?? ''"
+        :can-revert="canRevert === true && !busy"
+        @open="(path) => emit('openFile', path)"
+        @revert="emit('revert', turn.id)"
+      />
+      <div v-if="turn.text && !(busy && last)" class="turn-footer">
+        <UiButton
+          icon
+          size="sm"
+          class="copy-button"
+          :class="{ copied: copied }"
+          :aria-label="copied ? 'Ответ скопирован' : 'Копировать ответ'"
+          :title="copied ? 'Скопировано' : 'Копировать ответ'"
+          @click="emit('copy', turn.id, turn.text)"
+        >
+          <IconCheck v-if="copied" aria-hidden="true" /><IconCopy v-else aria-hidden="true" />
+        </UiButton>
+        <UiButton
+          v-if="last"
+          icon
+          size="sm"
+          class="copy-button"
+          title="Повторить: получить другой ответ"
+          aria-label="Повторить ответ"
+          :disabled="busy"
+          @click="emit('retry', turn.id)"
+        >
+          <IconRefresh aria-hidden="true" />
+        </UiButton>
+      </div>
     </div>
   </article>
 </template>
@@ -100,9 +202,36 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
   margin-bottom: 0;
 }
 .user {
-  display: flex;
-  justify-content: flex-end;
   padding-left: var(--sp-6);
+}
+.user-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.turn-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: var(--control-h-sm);
+  opacity: 0;
+  color: var(--muted);
+}
+.user:hover .turn-actions,
+.turn-actions:focus-within,
+.turn-actions.pinned {
+  opacity: 1;
+}
+.versions {
+  display: flex;
+  align-items: center;
+  font-size: var(--fs-2xs);
+  font-variant-numeric: tabular-nums;
+}
+.turn-footer {
+  display: flex;
+  gap: 2px;
 }
 .user-message {
   max-width: 90%;

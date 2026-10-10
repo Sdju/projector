@@ -3,7 +3,7 @@ import { computed } from "vue";
 import AgentCodeBlock from "./AgentCodeBlock.vue";
 import { formatToolInput, inputHint, isEditTool } from "../lib/tool-input.ts";
 import { toolLabel } from "../lib/tool-labels.ts";
-import type { AgentToolChip } from "../model/types.ts";
+import type { AgentToolChip, AgentToolView } from "../model/types.ts";
 import IconChevron from "~icons/lucide/chevron-right";
 import IconLoader from "~icons/lucide/loader-circle";
 import IconAlert from "~icons/lucide/circle-alert";
@@ -14,7 +14,7 @@ import IconPlay from "~icons/lucide/play";
 import IconFolder from "~icons/lucide/folder";
 import IconFile from "~icons/lucide/file-text";
 
-const props = defineProps<{ tool: AgentToolChip }>();
+const props = defineProps<{ tool: AgentToolView }>();
 
 /** The result as shown: the tools Projector knows get a readable summary instead of raw JSON. */
 function output(tool: AgentToolChip): {
@@ -105,6 +105,10 @@ const kind = computed(() => {
     <AgentCodeBlock v-if="view.showInput" :text="view.input" :diff="view.diff" />
     <div v-if="view.showInput" class="io-label">Результат</div>
     <AgentCodeBlock :text="view.result || 'Ожидание результата…'" />
+    <div v-if="tool.children?.length" class="nested">
+      <div class="io-label">Вызовы субагента: {{ tool.children.length }}</div>
+      <AgentToolCall v-for="child in tool.children" :key="child.id" :tool="child" />
+    </div>
   </details>
 </template>
 
@@ -170,6 +174,11 @@ svg {
 .io-label {
   margin-top: var(--sp-1);
   color: var(--faint);
+}
+.nested {
+  margin: var(--sp-1) 0 0 var(--sp-2);
+  padding-left: var(--sp-3);
+  border-left: 1px solid var(--line);
 }
 @keyframes spin {
   to {

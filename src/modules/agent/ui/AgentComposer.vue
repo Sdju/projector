@@ -60,11 +60,11 @@ defineExpose({ resize: () => {}, focus: () => input.value?.focus() });
             <IconSquare aria-hidden="true" />
           </button>
           <button
-            v-else
+            v-if="!busy || draft.trim()"
             type="submit"
             class="send-button"
-            title="Отправить (Enter)"
-            aria-label="Отправить сообщение"
+            :title="busy ? 'В очередь: уйдёт, когда агент закончит (Enter)' : 'Отправить (Enter)'"
+            :aria-label="busy ? 'Поставить сообщение в очередь' : 'Отправить сообщение'"
             :disabled="!draft.trim()"
           >
             <IconArrowUp aria-hidden="true" />

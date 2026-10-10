@@ -63,6 +63,10 @@ export async function streamAgent(
     selection?: AgentSelection;
     /** The message with its chips; `message` carries the same text for agents that read text. */
     parts?: MessagePart[];
+    /** The message's own ID, which the agent's transcript keeps (a later rewind refers to it). */
+    messageId?: string;
+    /** Where the kept conversation ends in the agent's transcript. */
+    tail?: string;
     commands?: (request: AgentCommandRequest) => Promise<unknown>;
     /** Rejoin the answer an agent process is still producing instead of asking again. */
     attach?: string;
@@ -83,6 +87,8 @@ export async function streamAgent(
             permissionMode: options.permissionMode,
             selection: options.selection,
             parts: options.parts,
+            messageId: options.messageId,
+            tail: options.tail,
             approvals: true,
             commandBridge: !!options.commands,
           },
@@ -234,4 +240,70 @@ export async function loadSessionTurns(
     "Не удалось открыть сессию",
   );
   return data.turns;
+}
+
+/** What taking the project's files back to a step changed, or would change. */
+export interface RewindSummary {
+  ok: boolean;
+  error?: string;
+  files: string[];
+  insertions?: number;
+  deletions?: number;
+}
+
+/** Puts the files back to how they were before the message; `dryRun` only reports the change. */
+export async function rewindAgentFiles(options: {
+  backend: AgentBackendId;
+  projectId: string;
+  sessionId: string;
+  messageId: string;
+  dryRun: boolean;
+}): Promise<RewindSummary> {
+  return getJson<RewindSummary>(
+    "/api/agent/rewind-files",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(options),
+    },
+    "Не удалось вернуть файлы",
+  );
+}
+
+export interface McpServer {
+  name: string;
+  status: string;
+  tools: number;
+  error?: string;
+}
+
+/** MCP servers the agent starts in this project. */
+export async function fetchMcpServers(
+  backend: AgentBackendId,
+  projectId: string,
+): Promise<McpServer[]> {
+  const data = await getJson<{ servers: McpServer[] }>(
+    `/api/agent/mcp?${query(backend, projectId)}`,
+    undefined,
+    "Не удалось получить MCP-серверы",
+  );
+  return data.servers;
+}
+
+/** Renames a past session or pins it to the top of the list. */
+export async function updateSession(
+  backend: AgentBackendId,
+  projectId: string,
+  sessionId: string,
+  change: { title?: string; pinned?: boolean },
+): Promise<void> {
+  await getJson(
+    "/api/agent/sessions/update",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ backend, projectId, sessionId, ...change }),
+    },
+    "Не удалось изменить сессию",
+  );
 }

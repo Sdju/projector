@@ -15,6 +15,7 @@ import { useSidebarResize } from "../lib/sidebar-resize.ts";
 import { useOpenFiles } from "../lib/open-files.ts";
 import { ensureTab } from "../lib/service-tabs.ts";
 import { useWorkbenchLayout } from "../lib/workbench-layout.ts";
+import { registerAgentCommands } from "../../agent/index.ts";
 import { registerEditorCommands } from "../lib/editor-commands.ts";
 import { useWorkspaceSession } from "../lib/workspace-session.ts";
 import WorkbenchDock from "./WorkbenchDock.vue";
@@ -69,6 +70,8 @@ const registerEditor = (
     run,
     enabled: (args) => (!requires || capabilities[requires]) && enabled(args),
   });
+// The agent chats are tabs that come and go; their commands live as long as this workspace.
+registerAgentCommands(registerEditor, props.projectId);
 function treeChanged() {
   revision.value++;
   void loadGit();

@@ -7,7 +7,19 @@ import type {
 import { agentEnv, assertHostProject, attachedImages, promptWithHistory } from "./agent-host.ts";
 import type { AgentBackend, AgentCommand, AgentRunOptions } from "./backend.ts";
 import { CLAUDE_LABEL, createClaudeEventMapper } from "./claude-code-events.ts";
-import { CLAUDE_CONTROLS, claudeLoadSession, claudeSessions } from "./claude-code-sessions.ts";
+import {
+  chainTail,
+  claudeMcpServers,
+  isUuid,
+  rewindClaudeFiles,
+  sessionAt,
+} from "./claude-code-checkpoints.ts";
+import {
+  CLAUDE_CONTROLS,
+  claudeLoadSession,
+  claudeSessions,
+  claudeUpdateSession,
+} from "./claude-code-sessions.ts";
 import type { AgentControl } from "./controls.ts";
 
 /** Claude Code takes the choice natively; `default` leaves the model and effort to its settings. */
@@ -16,7 +28,16 @@ function chosen(options: AgentRunOptions) {
     const value = options.selection?.[id];
     return value && value !== "default" ? value : undefined;
   };
-  return { model: pick("model"), effort: pick("effort") };
+  const number = (id: string) => {
+    const value = Number(pick(id));
+    return Number.isFinite(value) && value > 0 ? value : undefined;
+  };
+  return {
+    model: pick("model"),
+    effort: pick("effort"),
+    budget: number("budget"),
+    steps: number("steps"),
+  };
 }
 
 /**
@@ -25,7 +46,8 @@ function chosen(options: AgentRunOptions) {
  */
 async function run(options: AgentRunOptions): Promise<void> {
   if (!options.cwd) throw new Error("Claude Code работает внутри проекта: откройте чат в проекте");
-  await assertHostProject(options.cwd, CLAUDE_LABEL);
+  const cwd = options.cwd;
+  await assertHostProject(cwd, CLAUDE_LABEL);
 
   const abortController = new AbortController();
   const forwardAbort = () => abortController.abort();
@@ -35,25 +57,39 @@ async function run(options: AgentRunOptions): Promise<void> {
   const mode = options.permissionMode ?? "default";
   const selected = chosen(options);
   const base: Options = {
-    cwd: options.cwd,
+    cwd,
     abortController,
     env: agentEnv(),
     includePartialMessages: true,
     settingSources: ["user", "project", "local"],
     systemPrompt: { type: "preset", preset: "claude_code" },
     permissionMode: mode,
+    // Files are backed up before the agent changes them, so a step can be taken back later.
+    enableFileCheckpointing: true,
     ...(selected.model ? { model: selected.model } : {}),
     ...(selected.effort ? { effort: selected.effort as Options["effort"] } : {}),
+    ...(selected.budget ? { maxBudgetUsd: selected.budget } : {}),
+    ...(selected.steps ? { maxTurns: selected.steps } : {}),
     ...(mode === "bypassPermissions" ? { allowDangerouslySkipPermissions: true } : {}),
     canUseTool: async (toolName, input, context) => {
       if (!options.approve)
         return { behavior: "deny", message: "Клиент не может показать запрос разрешения" };
-      const allowed = await options
-        .approve({ tool: toolName, input, title: context.title ?? context.displayName })
+      const suggestions = context.suggestions ?? [];
+      const answer = await options
+        .approve({
+          tool: toolName,
+          input,
+          title: context.title ?? context.displayName,
+          persistent: suggestions.length > 0,
+        })
         .catch(() => false);
-      return allowed
-        ? { behavior: "allow", updatedInput: input }
-        : { behavior: "deny", message: "Пользователь отклонил действие" };
+      if (!answer) return { behavior: "deny", message: "Пользователь отклонил действие" };
+      // "Always" turns the rule Claude Code itself suggests into a saved permission.
+      return {
+        behavior: "allow",
+        updatedInput: input,
+        ...(answer === "always" && suggestions.length ? { updatedPermissions: suggestions } : {}),
+      };
     },
   };
 
@@ -70,7 +106,11 @@ async function run(options: AgentRunOptions): Promise<void> {
       : promptWithHistory(options.message, options.history ?? []);
     const images = await attachedImages(options.parts);
     const conversation = query({
-      prompt: images.length ? withImages(prompt, images) : prompt,
+      prompt: userMessage(
+        prompt,
+        images,
+        isUuid(options.messageId) ? options.messageId : undefined,
+      ),
       options: { ...base, ...(resume ? { resume } : {}) },
     });
     try {
@@ -81,6 +121,11 @@ async function run(options: AgentRunOptions): Promise<void> {
     } finally {
       conversation.close();
     }
+    // Where this answer ends in the transcript: the next message can branch off here.
+    if (!mapper.failed && mapper.sessionId) {
+      const tail = await chainTail(cwd, mapper.sessionId);
+      if (tail) options.emit("checkpoint", { tail });
+    }
     // The session may be gone (project moved, transcript pruned): start over from the history.
     if (resume && mapper.failed && !mapper.started && !abortController.signal.aborted)
       return attempt(undefined);
@@ -90,19 +135,27 @@ async function run(options: AgentRunOptions): Promise<void> {
   try {
     options.emit("controls", { controls: claudeControls(options.selection ?? {}) });
     options.emit("status", { phase: "thinking", provider: CLAUDE_LABEL, model: "" });
-    await attempt(options.sessionId);
+    const resume = options.sessionId
+      ? await sessionAt(cwd, options.sessionId, options.tail)
+      : undefined;
+    await attempt(resume);
   } finally {
     options.abort?.removeEventListener("abort", forwardAbort);
   }
 }
 
-/** A prompt with images is streamed as one user message of content blocks. */
-async function* withImages(
+/**
+ * The prompt as one streamed user message: text and images as content blocks, and an ID of our own
+ * that the transcript keeps, which is what a later rewind of the files refers to.
+ */
+async function* userMessage(
   text: string,
   images: { mime: string; data: string }[],
+  uuid: string | undefined,
 ): AsyncGenerator<SDKUserMessage> {
   yield {
     type: "user",
+    ...(uuid ? { uuid: uuid as SDKUserMessage["uuid"] } : {}),
     parent_tool_use_id: null,
     message: {
       role: "user",
@@ -193,4 +246,8 @@ export const claudeCodeBackend: AgentBackend = {
   commands: claudeCommands,
   sessions: claudeSessions,
   loadSession: claudeLoadSession,
+  updateSession: claudeUpdateSession,
+  rewindFiles: (cwd, sessionId, messageId, dryRun) =>
+    rewindClaudeFiles(cwd, sessionId, messageId, dryRun),
+  mcpServers: claudeMcpServers,
 };

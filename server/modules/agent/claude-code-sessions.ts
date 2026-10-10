@@ -1,4 +1,9 @@
-import { getSessionMessages, listSessions } from "@anthropic-ai/claude-agent-sdk";
+import {
+  getSessionMessages,
+  listSessions,
+  renameSession,
+  tagSession,
+} from "@anthropic-ai/claude-agent-sdk";
 import type { AgentControl, AgentSessionInfo, AgentSessionTurn } from "./controls.ts";
 import { SESSION_LIST_LIMIT } from "./controls.ts";
 
@@ -34,6 +39,34 @@ export const CLAUDE_CONTROLS: AgentControl[] = [
       { value: "max", name: "Max" },
     ],
   },
+  {
+    id: "budget",
+    category: "other",
+    name: "Бюджет хода",
+    description: "Ход прекращается, когда его стоимость достигает предела (доллары США)",
+    current: "default",
+    via: "native",
+    options: [
+      { value: "default", name: "Без предела" },
+      { value: "1", name: "1 $" },
+      { value: "5", name: "5 $" },
+      { value: "20", name: "20 $" },
+    ],
+  },
+  {
+    id: "steps",
+    category: "other",
+    name: "Шагов в ходе",
+    description: "Сколько раз агент может обратиться к модели за один ход",
+    current: "default",
+    via: "native",
+    options: [
+      { value: "default", name: "Без предела" },
+      { value: "10", name: "10" },
+      { value: "30", name: "30" },
+      { value: "100", name: "100" },
+    ],
+  },
 ];
 
 export async function claudeSessions(cwd: string): Promise<AgentSessionInfo[]> {
@@ -41,10 +74,34 @@ export async function claudeSessions(cwd: string): Promise<AgentSessionInfo[]> {
   return sessions
     .map((session) => ({
       id: session.sessionId,
-      title: (session.summary || session.firstPrompt || "").trim() || "Без названия",
+      title:
+        (session.customTitle || session.summary || session.firstPrompt || "").trim() ||
+        "Без названия",
       updatedAt: new Date(session.lastModified).toISOString(),
+      ...(session.tag === PINNED_TAG ? { pinned: true } : {}),
     }))
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    .sort(
+      (a, b) =>
+        Number(b.pinned === true) - Number(a.pinned === true) ||
+        b.updatedAt.localeCompare(a.updatedAt),
+    );
+}
+
+const PINNED_TAG = "pinned";
+
+/** Renames a session and pins or unpins it; Claude Code keeps both in its own transcript. */
+export async function claudeUpdateSession(
+  cwd: string,
+  sessionId: string,
+  change: { title?: string; pinned?: boolean },
+): Promise<void> {
+  if (change.title !== undefined) {
+    const title = change.title.trim();
+    if (!title) throw new Error("Название не может быть пустым");
+    await renameSession(sessionId, title.slice(0, 200), { dir: cwd });
+  }
+  if (change.pinned !== undefined)
+    await tagSession(sessionId, change.pinned ? PINNED_TAG : null, { dir: cwd });
 }
 
 interface Block {

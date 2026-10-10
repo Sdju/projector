@@ -1,6 +1,9 @@
 import { computed, reactive } from "vue";
 import { useProjects } from "../../project/index.ts";
 import { AgentRunGone, answerPermission, cancelAgentRun, streamAgent } from "../api/client.ts";
+import { addVersion } from "./branches.ts";
+import { useChatActions } from "./chat-actions.ts";
+import { notifyAnswer, notifyPermission, requestNotifications } from "../lib/notify.ts";
 import {
   RELEASE_DELAY_MS,
   createState,
@@ -20,6 +23,7 @@ import type {
   AgentTurn,
   AgentCommandRequest,
   AgentPermissionMode,
+  MessagePart,
 } from "./types.ts";
 
 /** A restarting server answers again within seconds; this much patience covers a slow restart. */
@@ -124,13 +128,18 @@ export function useAgent(
     loadCommands,
     setControl,
     loadSessions,
+    changeSession,
     resumeSession,
   } = useExternalAgent(state, { backend, projectId, ready, persist });
   /** The native session of the last answer, so Claude Code continues the same conversation. */
   function sessionId(): string | undefined {
-    return state.turns.findLast((item) => item.role === "assistant")?.session?.id;
+    const last = state.turns.findLast((item) => item.role === "assistant");
+    return last && !last.detached ? last.session?.id : undefined;
   }
-
+  /** Where the kept conversation ends in the agent's transcript (Claude Code branches from it). */
+  function tail(): string | undefined {
+    return state.turns.findLast((item) => item.role === "assistant")?.tail;
+  }
   async function decide(id: string, allow: boolean, always = false): Promise<void> {
     state.permissions = state.permissions.filter((item) => item.id !== id);
     try {
@@ -145,6 +154,9 @@ export function useAgent(
       .filter((item) => item.text.trim())
       .map((item) => ({ role: item.role, content: item.text }));
   }
+
+  const actions = useChatActions(state, { backend, projectId, ready, persist, send, stop });
+  const { drainQueue } = actions;
 
   /**
    * Runs one answer on the chat: `start` streams events, which are folded into `assistant`.
@@ -165,6 +177,8 @@ export function useAgent(
     state.abort = new AbortController();
     const { signal } = state.abort;
     const onEvent = (event: AgentEvent) => {
+      if (event.event === "permission-request")
+        notifyPermission(event.data.title || event.data.tool);
       if (applyAgentEvent(state, assistant, event, catalog.ingest)) persist();
     };
     try {
@@ -193,6 +207,7 @@ export function useAgent(
       } else if (!signal.aborted)
         state.error = err instanceof Error ? err.message : "Агент не ответил";
     } finally {
+      const stopped = signal.aborted;
       state.abort?.abort();
       for (const chip of assistant.tools)
         if (chip.status === "running") {
@@ -203,22 +218,37 @@ export function useAgent(
       state.phase = "";
       state.permissions = [];
       persist();
+      if (!stopped) notifyAnswer(assistant.text, !!state.error);
+      drainQueue(stopped && !state.interrupting);
     }
   }
 
-  async function send(text?: string): Promise<void> {
+  /**
+   * Sends the draft, or `text` (with its `chips`). While an answer is running the message waits in
+   * the queue and goes out when the answer ends.
+   */
+  async function send(text?: string, chips?: MessagePart[]): Promise<void> {
     await ready;
     const message = (text ?? state.draft).trim();
-    if (!message || state.busy) return;
+    if (!message) return;
     // The chips are the draft's own: a message passed in is plain text.
     const written =
-      text === undefined && messageText(state.draftParts) === state.draft ? state.draftParts : [];
+      chips ??
+      (text === undefined && messageText(state.draftParts) === state.draft ? state.draftParts : []);
     const content = hasChips(written) ? normalizeParts(written) : undefined;
-    state.draft = "";
-    state.draftParts = [];
+    if (text === undefined) {
+      state.draft = "";
+      state.draftParts = [];
+    }
+    if (state.busy) {
+      state.queue.push({ id: crypto.randomUUID(), text: message, parts: content ?? [] });
+      return;
+    }
     state.error = "";
+    void requestNotifications();
     const previousHistory = history();
     const resume = sessionId();
+    const branchFrom = tail();
     const userTurn: AgentTurn = {
       id: crypto.randomUUID(),
       role: "user",
@@ -226,6 +256,9 @@ export function useAgent(
       ...(content ? { content } : {}),
       tools: [],
     };
+    // The message replaces others that were cut off: they stay as versions of this point.
+    if (state.stash?.index === state.turns.length) addVersion(userTurn, state.stash.versions);
+    state.stash = undefined;
     const assistant = reactive<AgentTurn>({
       id: crypto.randomUUID(),
       role: "assistant",
@@ -245,6 +278,8 @@ export function useAgent(
         permissionMode: state.permissionMode,
         selection: state.selection,
         parts: content,
+        messageId: userTurn.id,
+        tail: branchFrom,
         attach,
       }),
     );
@@ -276,6 +311,8 @@ export function useAgent(
     await ready;
     if (state.busy) return;
     state.turns = [];
+    state.queue = [];
+    state.stash = undefined;
     state.error = "";
     state.phase = "";
     state.draft = "";
@@ -329,8 +366,17 @@ export function useAgent(
     commands: computed(() => state.commands),
     setControl,
     loadSessions,
+    changeSession,
     resumeSession,
     send,
+    queue: computed(() => state.queue),
+    sendQueuedNow: actions.sendQueuedNow,
+    removeQueued: actions.removeQueued,
+    edit: actions.edit,
+    retry: actions.retry,
+    showVersion: actions.showVersion,
+    canRewindFiles: actions.canRewindFiles,
+    rewindFiles: actions.rewindFiles,
     clear,
     stop,
     attach,

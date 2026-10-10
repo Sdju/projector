@@ -72,7 +72,12 @@ export function createClaudeEventMapper(emit: AgentEmitter) {
             if (toolNames.has(block.id)) continue;
             const name = block.name;
             toolNames.set(block.id, name);
-            emit("tool", { id: block.id, name, input: block.input });
+            emit("tool", {
+              id: block.id,
+              name,
+              input: block.input,
+              ...(message.parent_tool_use_id ? { parent: message.parent_tool_use_id } : {}),
+            });
           } else if (
             block.type === "text" &&
             !message.parent_tool_use_id &&

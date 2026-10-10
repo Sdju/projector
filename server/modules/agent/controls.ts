@@ -30,6 +30,8 @@ export interface AgentSessionInfo {
   title: string;
   /** ISO time of the last activity. */
   updatedAt?: string;
+  /** Kept at the top of the list by the user. */
+  pinned?: boolean;
 }
 
 /** One replayed message of a past session, in the shape the chat stores. */

@@ -15,6 +15,8 @@ export interface AgentRunRecord {
   history: AgentHistoryTurn[];
   cwd?: string;
   sessionId?: string;
+  messageId?: string;
+  tail?: string;
   selection?: AgentSelection;
   permissionMode?: AgentPermissionMode;
   providerId?: string;

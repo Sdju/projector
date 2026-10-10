@@ -5,7 +5,14 @@ import { projectorBackend } from "./projector-backend.ts";
 
 export type { AgentEmitter, AgentEventName, AgentRunOptions } from "./backend.ts";
 export { AGENT_BACKEND_IDS, AGENT_PERMISSION_MODES, HOSTED_AGENT_BACKENDS } from "./backend.ts";
-export type { AgentBackendId, AgentCommand, AgentPermissionMode, MessagePart } from "./backend.ts";
+export type {
+  AgentBackendId,
+  AgentCommand,
+  AgentPermissionMode,
+  McpServerInfo,
+  MessagePart,
+  RewindResult,
+} from "./backend.ts";
 export type {
   AgentControl,
   AgentSelection,
@@ -35,6 +42,33 @@ export async function agentControls(id: string | undefined, cwd: string) {
 
 export async function agentCommands(id: string | undefined, cwd: string) {
   return (await backendFor(id).commands?.(cwd)) ?? [];
+}
+
+export async function rewindAgentFiles(
+  id: string | undefined,
+  cwd: string,
+  sessionId: string,
+  messageId: string,
+  dryRun: boolean,
+) {
+  const backend = backendFor(id);
+  if (!backend.rewindFiles) throw new Error("Этот агент не умеет возвращать файлы к прошлому шагу");
+  return backend.rewindFiles(cwd, sessionId, messageId, dryRun);
+}
+
+export async function updateAgentSession(
+  id: string | undefined,
+  cwd: string,
+  sessionId: string,
+  change: { title?: string; pinned?: boolean },
+) {
+  const backend = backendFor(id);
+  if (!backend.updateSession) throw new Error("Этот агент не умеет переименовывать сессии");
+  await backend.updateSession(cwd, sessionId, change);
+}
+
+export async function agentMcpServers(id: string | undefined, cwd: string) {
+  return (await backendFor(id).mcpServers?.(cwd)) ?? [];
 }
 
 export async function agentSessions(id: string | undefined, cwd: string) {

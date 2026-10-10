@@ -4,3 +4,4 @@ export { useAgent } from "./model/session.ts";
 export { useAgentModes, guiPrograms } from "./model/modes.ts";
 export type { AgentSessionMode } from "./model/modes.ts";
 export { default as AgentModeSettings } from "./ui/AgentModeSettings.vue";
+export { registerAgentCommands } from "./model/agent-commands.ts";

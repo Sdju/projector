@@ -8,6 +8,7 @@ import type {
   AgentSessionInfo,
   AgentTurn,
   MessagePart,
+  QueuedMessage,
 } from "./types.ts";
 
 export const createState = () =>
@@ -28,6 +29,12 @@ export const createState = () =>
     sessionsLoading: false,
     sessionsError: "",
     abort: undefined as AbortController | undefined,
+    /** Messages written while an answer was running; each is sent when it ends. */
+    queue: [] as QueuedMessage[],
+    /** The queued message to send right after the answer is stopped. */
+    interrupting: false,
+    /** The turns cut off by an edit or rewind, waiting for the new message to become their sibling. */
+    stash: undefined as { index: number; versions: AgentTurn[][] } | undefined,
   });
 
 export type ChatState = ReturnType<typeof createState>;

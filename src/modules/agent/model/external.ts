@@ -6,6 +6,7 @@ import {
   fetchSessions,
   loadSessionTurns,
   saveDefault,
+  updateSession,
 } from "../api/client.ts";
 import type { ChatState } from "./chat-state.ts";
 import type { AgentBackendId, AgentControl, AgentSelection, AgentSessionInfo } from "./types.ts";
@@ -96,6 +97,19 @@ export function useExternalAgent(
     return state.sessions;
   }
 
+  /** Renames a past session or pins it; the list is read again to show the result. */
+  async function changeSession(
+    id: string,
+    change: { title?: string; pinned?: boolean },
+  ): Promise<void> {
+    try {
+      await updateSession(backend, projectId, id, change);
+      await loadSessions();
+    } catch (err) {
+      state.sessionsError = err instanceof Error ? err.message : "Не удалось изменить сессию";
+    }
+  }
+
   /** Replaces this chat with a past session of the agent and continues it from the next message. */
   async function resumeSession(id: string): Promise<void> {
     await ready;
@@ -118,6 +132,7 @@ export function useExternalAgent(
     loadCommands,
     setControl,
     loadSessions,
+    changeSession,
     resumeSession,
   };
 }

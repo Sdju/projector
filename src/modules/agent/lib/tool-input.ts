@@ -58,6 +58,8 @@ export function formatToolInput(name: string, raw: string): string {
         ...diffLines(edit.old_string, edit.new_string),
       ]),
     ].join("\n");
+  // A plan the agent asks to carry out (`ExitPlanMode`) is its own text.
+  if (tool === "exitplanmode" && typeof data.plan === "string") return data.plan;
   const entries = Object.entries(data).filter(([, value]) => value !== undefined && value !== "");
   if (!entries.length) return "";
   return entries

@@ -40,6 +40,9 @@ export function applyAgentEvent(
     case "session":
       assistant.session = event.data;
       return true;
+    case "checkpoint":
+      assistant.tail = event.data.tail;
+      return true;
     case "commands":
       // An agent that lists its commands while answering knows more than the list asked for.
       state.commands = event.data.commands;
@@ -72,14 +75,17 @@ export function applyAgentEvent(
       return false;
     case "tool":
       if (assistant.text.trim() && !assistant.text.endsWith("\n\n")) assistant.text += "\n\n";
+      // Taken before the call is added: a turn without parts yet derives them from its tools.
+      const parts = (assistant.parts ??= legacyParts(assistant));
       assistant.tools.push({
         id: event.data.id,
         name: event.data.name,
         status: "running",
         input: summarize(event.data.input),
         detail: summarize(event.data.input),
+        ...(event.data.parent ? { parent: event.data.parent } : {}),
       });
-      (assistant.parts ??= legacyParts(assistant)).push({ type: "tool", id: event.data.id });
+      parts.push({ type: "tool", id: event.data.id });
       return false;
     case "tool-result": {
       const chip = assistant.tools.find((item) => item.id === event.data.id);

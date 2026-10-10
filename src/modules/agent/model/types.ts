@@ -8,14 +8,19 @@ export interface AgentToolChip {
   input?: string;
   /** The result once it arrives (the input while the tool is still running). */
   detail: string;
+  /** The call of a subagent (`Task`) this call was made inside of. */
+  parent?: string;
 }
+
+/** A call with the calls a subagent made inside of it, for showing. */
+export type AgentToolView = AgentToolChip & { children?: AgentToolChip[] };
 
 /** The answer in the order it happened: text and tool calls interleave. */
 export type AgentPart = { type: "text"; text: string } | { type: "tool"; id: string };
 
 export type AgentBackendId = "projector" | "claude-code" | "codex" | "opencode" | "cursor";
 
-export type AgentPermissionMode = "default" | "acceptEdits" | "auto" | "bypassPermissions";
+export type AgentPermissionMode = "default" | "plan" | "acceptEdits" | "auto" | "bypassPermissions";
 
 /** A knob the agent offers for a chat: model, reasoning effort, mode. */
 export interface AgentControl {
@@ -35,6 +40,7 @@ export interface AgentSessionInfo {
   id: string;
   title: string;
   updatedAt?: string;
+  pinned?: boolean;
 }
 
 export interface AgentSessionRef {
@@ -84,6 +90,27 @@ export interface AgentTurn {
   session?: AgentSessionRef;
   /** The agent process still answering this turn; set until the turn ends, so it can be rejoined. */
   run?: string;
+  /** Where this answer ends in the agent's transcript; the next message branches off from here. */
+  tail?: string;
+  /** The agent's own session cannot go on from this turn (the chat was cut back): replay instead. */
+  detached?: boolean;
+  /**
+   * On a user turn: the other versions of the conversation from this message on, which exist
+   * after the message was edited or its answer repeated. Each version starts with a user turn.
+   */
+  variants?: AgentTurn[][];
+  /** Which place the shown version takes among `variants` and itself. */
+  slot?: number;
+}
+
+/** What rolling the chat back to a message undoes: the conversation, the files, or both. */
+export type RewindScope = "conversation" | "files" | "both";
+
+/** A message waiting for the answer in progress to end. */
+export interface QueuedMessage {
+  id: string;
+  text: string;
+  parts: MessagePart[];
 }
 
 /** A sensitive tool call waiting for the user's decision. */
@@ -124,13 +151,14 @@ export type AgentEvent =
       };
     }
   | { event: "run"; data: { id: string } }
+  | { event: "checkpoint"; data: { tail: string } }
   | { event: "session"; data: AgentSessionRef }
   | { event: "commands"; data: { commands: AgentCommand[] } }
   | { event: "context"; data: AgentContext }
   | { event: "controls"; data: { controls: AgentControl[] } }
   | { event: "status"; data: { phase: string; provider?: string; model?: string } }
   | { event: "text"; data: { text: string } }
-  | { event: "tool"; data: { id: string; name: string; input: unknown } }
+  | { event: "tool"; data: { id: string; name: string; input: unknown; parent?: string } }
   | { event: "tool-result"; data: { id: string; name: string; output?: unknown; error?: string } }
   | { event: "project"; data: Project }
   | { event: "done"; data: { text: string } }

@@ -21,9 +21,19 @@ export {
   AGENT_PERMISSION_MODES,
   agentCommands,
   agentControls,
+  agentMcpServers,
   agentSessions,
+  rewindAgentFiles,
+  updateAgentSession,
   loadAgentSession,
   runAgent,
   selectionFrom,
 } from "./agent.ts";
-export type { AgentControl, AgentSessionInfo, AgentSessionTurn, MessagePart } from "./agent.ts";
+export type {
+  AgentControl,
+  AgentSessionInfo,
+  AgentSessionTurn,
+  McpServerInfo,
+  MessagePart,
+  RewindResult,
+} from "./agent.ts";

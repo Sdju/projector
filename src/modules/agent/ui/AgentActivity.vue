@@ -2,14 +2,14 @@
 import { computed } from "vue";
 import { inputHint } from "../lib/tool-input.ts";
 import { toolLabel } from "../lib/tool-labels.ts";
-import type { AgentToolChip } from "../model/types.ts";
+import type { AgentToolView } from "../model/types.ts";
 import AgentToolCall from "./AgentToolCall.vue";
 import IconChevron from "~icons/lucide/chevron-right";
 import IconCheck from "~icons/lucide/check";
 import IconLoader from "~icons/lucide/loader-circle";
 import IconAlert from "~icons/lucide/circle-alert";
 
-const props = defineProps<{ tools: AgentToolChip[] }>();
+const props = defineProps<{ tools: AgentToolView[] }>();
 const current = computed(() => props.tools.findLast((tool) => tool.status === "running"));
 const failed = computed(() => props.tools.some((tool) => tool.status === "error"));
 const hint = computed(() => {

@@ -8,6 +8,7 @@ import type {
 import type { ApprovalAnswer, ApprovalRequest, CommandRequest } from "./command-bridge.ts";
 
 export type AgentEventName =
+  | "checkpoint"
   | "command-request"
   | "context"
   | "commands"
@@ -40,10 +41,11 @@ export const AGENT_BACKEND_IDS: readonly AgentBackendId[] = [
 export const HOSTED_AGENT_BACKENDS: readonly AgentBackendId[] = ["codex", "opencode", "cursor"];
 
 /** Claude Code permission policy: `default` asks in the chat before edits and shell commands. */
-export type AgentPermissionMode = "default" | "acceptEdits" | "auto" | "bypassPermissions";
+export type AgentPermissionMode = "default" | "plan" | "acceptEdits" | "auto" | "bypassPermissions";
 
 export const AGENT_PERMISSION_MODES: readonly AgentPermissionMode[] = [
   "default",
+  "plan",
   "acceptEdits",
   "auto",
   "bypassPermissions",
@@ -87,6 +89,13 @@ export interface AgentRunOptions {
   history?: AgentHistoryTurn[];
   /** Native conversation of the backend (Claude Code session ID) to continue instead of `history`. */
   sessionId?: string;
+  /** The message's own ID (a UUID): the transcript keeps it, so files can be rewound to it later. */
+  messageId?: string;
+  /**
+   * Where in `sessionId` the conversation stands: the transcript position after the last answer
+   * the user keeps. A session that has moved past it is branched from there, not continued.
+   */
+  tail?: string;
   providerId?: string;
   abort?: AbortSignal;
   emit: AgentEmitter;
@@ -108,4 +117,35 @@ export interface AgentBackend {
   sessions?(cwd: string): Promise<AgentSessionInfo[]>;
   /** The messages of one past conversation, to continue it in the chat. */
   loadSession?(cwd: string, sessionId: string): Promise<AgentSessionTurn[]>;
+  /** Renames a past conversation or pins it to the top of the list. */
+  updateSession?(
+    cwd: string,
+    sessionId: string,
+    change: { title?: string; pinned?: boolean },
+  ): Promise<void>;
+  /** Puts the project's files back to how they were before a message; `dryRun` only reports. */
+  rewindFiles?(
+    cwd: string,
+    sessionId: string,
+    messageId: string,
+    dryRun: boolean,
+  ): Promise<RewindResult>;
+  /** Servers, tools and limits the agent runs with in the project, for the chat to show. */
+  mcpServers?(cwd: string): Promise<McpServerInfo[]>;
+}
+
+/** What rewinding files changed (or, for a dry run, would change). */
+export interface RewindResult {
+  ok: boolean;
+  error?: string;
+  files: string[];
+  insertions?: number;
+  deletions?: number;
+}
+
+export interface McpServerInfo {
+  name: string;
+  status: string;
+  tools: number;
+  error?: string;
 }
