@@ -280,6 +280,15 @@ export async function mutationLocation(root: string, path: string, allowRoot = f
     throw new HttpError(403, "Операции через символические ссылки недоступны");
   return full;
 }
+/** Keeps deleted entries on disk so accidental deletion is recoverable. */
+export async function trashProjectEntry(root: string, path: string) {
+  const source = await mutationLocation(root, path);
+  const base = await realpath(root);
+  const trash = resolve(base, ".projector-trash");
+  await mkdir(trash, { recursive: true, mode: 0o700 });
+  if ((await realpath(trash)) !== trash) throw new HttpError(403, "Некорректная папка корзины");
+  await rename(source, resolve(trash, `${randomUUID()}-${path.split("/").at(-1)}`));
+}
 export async function mutateProjectEntry(
   root: string,
   action: string,
@@ -293,13 +302,7 @@ export async function mutateProjectEntry(
     return moveProjectEntry(root, path, path.split("/").slice(0, -1).join("/"), name);
   }
   if (action === "delete") {
-    const source = await mutationLocation(root, path);
-    // Keep deleted entries on disk so accidental deletion is recoverable.
-    const base = await realpath(root);
-    const trash = resolve(base, ".projector-trash");
-    await mkdir(trash, { recursive: true, mode: 0o700 });
-    if ((await realpath(trash)) !== trash) throw new HttpError(403, "Некорректная папка корзины");
-    await rename(source, resolve(trash, `${randomUUID()}-${path.split("/").at(-1)}`));
+    await trashProjectEntry(root, path);
     return { source: path };
   }
   if (!["create-file", "create-directory", "copy"].includes(action))

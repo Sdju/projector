@@ -7,6 +7,12 @@ export {
   moveProjectEntry,
   mutateProjectEntry,
 } from "./files.ts";
+export {
+  checkImportNames,
+  clearImportNames,
+  importProjectEntries,
+  uploadProjectEntry,
+} from "./import.ts";
 export { openProjectSiteFile } from "./site.ts";
 export { searchProject } from "./search.ts";
 export { findProjectPaths } from "./find-paths.ts";

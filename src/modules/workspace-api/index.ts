@@ -138,6 +138,54 @@ export async function moveWorkspaceEntry(projectId: string, path: string, direct
   )) as { source: string; destination: string };
 }
 
+export interface ImportConflict {
+  name: string;
+  /** A name next to the taken one that is still free (`a (2).txt`). */
+  free: string;
+}
+/** Which of the top-level names are already taken in the target folder. */
+export async function checkWorkspaceImport(projectId: string, directory: string, names: string[]) {
+  return (await fileWriter(projectId)(
+    "import",
+    { action: "check", directory, names },
+    "Не удалось проверить имена",
+  )) as { conflicts: ImportConflict[] };
+}
+/** Moves taken names to `.projector-trash` so the import can reuse them. */
+export async function clearWorkspaceImport(projectId: string, directory: string, names: string[]) {
+  await fileWriter(projectId)(
+    "import",
+    { action: "clear", directory, names },
+    "Не удалось освободить имена",
+  );
+}
+/** Copies files and folders by their disk paths; the sources stay as they are. */
+export async function copyWorkspaceEntries(
+  projectId: string,
+  directory: string,
+  entries: { source: string; name: string }[],
+) {
+  return (await fileWriter(projectId)(
+    "import",
+    { action: "copy", directory, entries },
+    "Не удалось скопировать файлы",
+  )) as { copied: string[] };
+}
+/** Browser files without a disk path can be uploaded only where the profile accepts uploads. */
+export const workspaceCanUpload = (projectId: string) =>
+  !!workspaceProfile(projectId).providers.files.upload;
+export function uploadWorkspaceEntry(
+  projectId: string,
+  directory: string,
+  path: string,
+  body?: Blob,
+  signal?: AbortSignal,
+) {
+  const upload = workspaceProfile(projectId).providers.files.upload;
+  if (!upload) throw new Error(READONLY);
+  return upload(directory, path, body, signal);
+}
+
 export async function mutateWorkspaceEntry(
   projectId: string,
   action: string,

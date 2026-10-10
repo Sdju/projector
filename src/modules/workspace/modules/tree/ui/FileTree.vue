@@ -16,8 +16,10 @@ import { treeSessionSchema } from "../lib/tree-session.ts";
 import { useTreeOperations } from "../lib/tree-operations.ts";
 import { useTreeKeyboard } from "../lib/tree-keyboard.ts";
 import { useTreeDragDrop } from "../lib/tree-dnd.ts";
+import { useTreeImport } from "../lib/tree-import.ts";
 import ContextMenu from "../../../../../common/ui/ContextMenu.vue";
 import EntryDialog from "../../../../../common/ui/EntryDialog.vue";
+import ImportConflictDialog from "./ImportConflictDialog.vue";
 import IconChevronRight from "~icons/lucide/chevron-right";
 import { FileIcon } from "../../../../file-icons/index.ts";
 import { useFileIconTheme } from "../../../../file-icons/index.ts";
@@ -67,6 +69,7 @@ const selection = props.depth === 0 ? createTreeSelection() : inject(treeSelecti
 if (props.depth === 0) provide(treeSelectionKey, selection);
 const menu = ref<InstanceType<typeof ContextMenu>>();
 const dialog = ref<InstanceType<typeof EntryDialog>>();
+const conflictDialog = ref<InstanceType<typeof ImportConflictDialog>>();
 type OpenContext = (event: MouseEvent | KeyboardEvent, entry?: FileEntry) => void;
 const showContext: OpenContext =
   props.depth === 0
@@ -124,7 +127,7 @@ if (props.depth === 0) {
   provide("workspace-entry-key", entryKey);
   provide("workspace-entry-focus", activateEntry);
 }
-const { source, target, busy, expanded, error: moveError, message } = drag;
+const { source, target, busy, expanded, error: moveError, message, hint, progress } = drag;
 if (props.depth === 0) {
   const session = workspaceCapabilities(props.projectId).persist
     ? useSessionSnapshot(
@@ -213,7 +216,13 @@ const keys =
   props.depth === 0
     ? useTreeKeyboard({ tree, selection, expanded, busy, contextEntry, treeCommands, toggle })
     : undefined;
-const { startDrag, dragOver, dragLeave, drop } = useTreeDragDrop(context);
+// Импорт файлов с диска живёт у корня; вложенные ветки передают ему drop через inject.
+const importer =
+  props.depth === 0
+    ? useTreeImport(context, { commands: treeCommands, dialog: conflictDialog, reveal })
+    : inject<ReturnType<typeof useTreeImport>>("workspace-tree-import")!;
+if (props.depth === 0) provide("workspace-tree-import", importer);
+const { startDrag, dragOver, dragLeave, drop } = useTreeDragDrop(context, importer);
 onBeforeUnmount(() => {
   revealObserver?.disconnect();
   clearTimeout(revealTimer);
@@ -224,7 +233,11 @@ defineExpose({ reveal });
   <ul
     ref="tree"
     class="tree"
-    :class="{ 'tree-root': depth === 0, 'root-target': depth === 0 && target === '' }"
+    :class="{
+      'tree-root': depth === 0,
+      'root-target': depth === 0 && target === '',
+      'drop-zone': depth > 0 && target === path,
+    }"
     :role="depth === 0 ? 'tree' : 'group'"
     :aria-multiselectable="depth === 0 ? true : undefined"
     :aria-label="path || 'Файлы проекта'"
@@ -235,6 +248,10 @@ defineExpose({ reveal });
     @dragleave="dragLeave"
   >
     <li v-if="depth === 0 && busy" class="notice" role="status">выполняется…</li>
+    <li v-if="depth === 0 && progress" class="notice" role="status">
+      Загрузка: {{ progress.done }} из {{ progress.total }}
+      <button class="cancel" type="button" @click="progress.cancel()">Отменить</button>
+    </li>
     <li v-if="depth === 0 && moveError" class="notice error" role="alert">{{ moveError }}</li>
     <li v-if="depth === 0 && message" class="notice" role="status">{{ message }}</li>
     <li v-if="error" class="notice error" role="alert">{{ error }}</li>
@@ -309,6 +326,7 @@ defineExpose({ reveal });
         <span class="remaining">{{ total - entries.length }} осталось</span>
       </button>
     </li>
+    <li v-if="depth === 0 && hint" class="drop-hint" role="status">{{ hint }}</li>
     <li
       v-if="depth === 0"
       class="root-space"
@@ -318,6 +336,7 @@ defineExpose({ reveal });
   </ul>
   <ContextMenu v-if="depth === 0" ref="menu" :items="menuItems" label="Действия с файлами" />
   <EntryDialog v-if="depth === 0" ref="dialog" @submit="runOperation($event)" />
+  <ImportConflictDialog v-if="depth === 0" ref="conflictDialog" />
 </template>
 <style scoped>
 .tree {
@@ -335,6 +354,25 @@ defineExpose({ reveal });
 }
 .root-target {
   box-shadow: inset 0 0 0 1px var(--accent);
+}
+.drop-zone {
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.drop-hint {
+  position: sticky;
+  bottom: 0;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--bg-2);
+  border-top: 1px solid var(--accent);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+button.cancel {
+  display: inline;
+  width: auto;
+  padding: 0 var(--sp-2);
+  color: var(--accent);
 }
 button.dragging {
   opacity: 0.45;

@@ -1,5 +1,7 @@
 import { moveWorkspaceEntry, workspaceCapabilities } from "../../../../workspace-api/index.ts";
-import { treeDragType } from "./tree-drag.ts";
+import { autoScrollDuringDrag, treeDragType } from "./tree-drag.ts";
+import { readDrop } from "./drop-entries.ts";
+import type { useTreeImport } from "./tree-import.ts";
 import { topLevelTreePaths } from "./tree-selection.ts";
 import {
   moveDestination,
@@ -10,7 +12,10 @@ import type { FileEntry } from "../../../../../../core/modules/workspace/index.t
 import type { TreeContext } from "./tree-operations.ts";
 
 /** Перетаскивание записей дерева: выбор цели, подсветка и перенос. */
-export function useTreeDragDrop({ props, emit, selection, drag }: TreeContext) {
+export function useTreeDragDrop(
+  { props, emit, selection, drag }: TreeContext,
+  importer: Pick<ReturnType<typeof useTreeImport>, "accepts" | "importInto">,
+) {
   const { source, busy, expanded, error: moveError, message } = drag;
   function startDrag(event: DragEvent, entry: FileEntry) {
     if (busy.value || !event.dataTransfer) {
@@ -35,22 +40,45 @@ export function useTreeDragDrop({ props, emit, selection, drag }: TreeContext) {
   function destinationFor(entry?: FileEntry) {
     return entry ? (entry.directory ? entry.path : parentPath(entry.path)) : props.path;
   }
+  /** Куда упадёт запись: подсвечиваем папку (для файла — его родителя) и подписываем действие. */
+  function aim(event: DragEvent, entry: FileEntry | undefined, verb: string, valid = true) {
+    autoScrollDuringDrag(event);
+    const directory = destinationFor(entry);
+    drag.hint.value = valid ? `${verb} в «${directory || "корень проекта"}»` : "";
+    drag.hover(valid ? directory : undefined, valid && !!entry?.directory);
+  }
   function dragOver(event: DragEvent, entry?: FileEntry) {
     if (!workspaceCapabilities(props.projectId).write) return;
+    if (!source.value && !busy.value && importer.accepts(event.dataTransfer)) {
+      event.preventDefault();
+      event.dataTransfer!.dropEffect = "copy";
+      aim(event, entry, "Копировать");
+      return;
+    }
     if (!source.value || busy.value || !event.dataTransfer?.types.includes(treeDragType)) return;
     event.preventDefault();
     const directory = destinationFor(entry);
     const valid = selection.dragged.value.every((path) => !!moveDestination(path, directory));
     event.dataTransfer.dropEffect = valid ? "move" : "none";
-    drag.hover(valid ? directory : undefined, valid && !!entry?.directory);
+    aim(event, entry, "Перенести", valid);
   }
   function dragLeave(event: DragEvent) {
-    if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null))
-      drag.hover();
+    if ((event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) return;
+    drag.hint.value = "";
+    drag.hover();
   }
   async function drop(event: DragEvent, entry?: FileEntry) {
     if (!workspaceCapabilities(props.projectId).write) {
       drag.clear();
+      return;
+    }
+    if (!source.value && !busy.value && importer.accepts(event.dataTransfer)) {
+      event.preventDefault();
+      const directory = destinationFor(entry);
+      // DataTransfer пустеет после первого await: читаем его сразу.
+      const dropped = readDrop(event.dataTransfer!);
+      drag.clear();
+      await importer.importInto(directory, dropped, "ask");
       return;
     }
     if (!source.value || busy.value || !event.dataTransfer?.types.includes(treeDragType)) return;

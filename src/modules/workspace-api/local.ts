@@ -100,6 +100,15 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
           `${base(projectId)}/${external ? "external-asset" : "asset"}?${new URLSearchParams({ path })}`,
         siteUrl: (path) =>
           `/api/projects/${encodeURIComponent(projectId)}/site/${path.split("/").map(encodeURIComponent).join("/")}`,
+        upload: async (directory, path, body, signal) => {
+          const response = await fetch(
+            `${base(projectId)}/upload?${new URLSearchParams({ directory, path, ...(body ? {} : { kind: "directory" }) })}`,
+            { method: "PUT", body, signal },
+          );
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || "Не удалось загрузить файл");
+          return data;
+        },
         write: (endpoint: FileWrite, body, failure = "Не удалось выполнить действие") =>
           send(
             `${base(projectId)}/${endpoint}`,

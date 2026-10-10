@@ -20,13 +20,20 @@ export type WorkspaceParams = Record<string, string>;
 export interface ReadProvider {
   read(action: string, params: WorkspaceParams, signal?: AbortSignal): Promise<unknown>;
 }
-export type FileWrite = "file" | "move" | "entry";
+export type FileWrite = "file" | "move" | "entry" | "import";
 export interface FilesProvider extends ReadProvider {
   assetUrl(path: string, external?: boolean): string;
   /** Address that serves the file as part of a site (relative links resolve); absent when it cannot. */
   siteUrl?(path: string): string;
   /** Present only when the files can change. */
   write?(endpoint: FileWrite, body: unknown, failure?: string): Promise<unknown>;
+  /** Loads one browser file (or an empty folder when `body` is absent) into the project; present only where uploads are possible. */
+  upload?(
+    directory: string,
+    path: string,
+    body: Blob | undefined,
+    signal?: AbortSignal,
+  ): Promise<{ destination: string }>;
   /** Re-reads a mutable snapshot (a remote ref moved). */
   refresh?(): Promise<void>;
 }

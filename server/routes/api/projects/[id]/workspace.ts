@@ -1,7 +1,7 @@
 import { findProject } from "../../../../modules/projects/index.ts";
 import { HttpError } from "../../../../modules/http/index.ts";
 import { json, readBody } from "../../../../modules/transport/index.ts";
-import { accessAllowed } from "../../../../modules/access/index.ts";
+import { accessAllowed, isLocalRequest } from "../../../../modules/access/index.ts";
 import {
   listProjectDirectory,
   previewExternalFile,
@@ -21,6 +21,10 @@ import {
   moveProjectEntry,
   mutateProjectEntry,
   saveProjectFile,
+  checkImportNames,
+  clearImportNames,
+  importProjectEntries,
+  uploadProjectEntry,
   readProjectImage,
 } from "../../../../modules/workspace/index.ts";
 import type { RouteContext } from "../../../../modules/transport/index.ts";
@@ -53,6 +57,62 @@ export async function handleProjectWorkspace({
       throw new HttpError(400, "Укажите путь, текст и исходное содержимое файла");
     res.setHeader("Cache-Control", "no-store");
     json(res, 200, await saveProjectFile(project.path, body.path, body.content, body.original));
+    return true;
+  }
+
+  if (sessionId === "import" && method === "POST") {
+    if (!accessAllowed(req, true))
+      throw new HttpError(403, "Импорт доступен только со страницы Projector");
+    const body = await readBody(req);
+    const names = (value: unknown) =>
+      Array.isArray(value) && value.every((item) => typeof item === "string")
+        ? (value as string[])
+        : undefined;
+    if (typeof body.directory !== "string") throw new HttpError(400, "Укажите папку назначения");
+    res.setHeader("Cache-Control", "no-store");
+    if (body.action === "check" || body.action === "clear") {
+      const list = names(body.names);
+      if (!list) throw new HttpError(400, "Укажите имена записей");
+      json(
+        res,
+        200,
+        body.action === "check"
+          ? await checkImportNames(project.path, body.directory, list)
+          : (await clearImportNames(project.path, body.directory, list), { ok: true }),
+      );
+      return true;
+    }
+    if (body.action === "copy") {
+      // Пути диска имеют смысл только на машине сервера: удалённая страница загружает файлы.
+      if (!isLocalRequest(req))
+        throw new HttpError(403, "Копирование по пути доступно только на этом компьютере");
+      const entries = body.entries;
+      if (
+        !Array.isArray(entries) ||
+        !entries.every(
+          (entry) => entry && typeof entry.source === "string" && typeof entry.name === "string",
+        )
+      )
+        throw new HttpError(400, "Укажите пути и имена записей");
+      json(res, 200, await importProjectEntries(project.path, body.directory, entries));
+      return true;
+    }
+    throw new HttpError(400, "Неизвестное действие импорта");
+  }
+
+  if (sessionId === "upload" && method === "PUT") {
+    if (!accessAllowed(req, true))
+      throw new HttpError(403, "Загрузка доступна только со страницы Projector");
+    const directory = url.searchParams.get("directory") ?? "";
+    const entry = url.searchParams.get("path") ?? "";
+    res.setHeader("Cache-Control", "no-store");
+    json(
+      res,
+      200,
+      await uploadProjectEntry(project.path, directory, entry, req, {
+        directory: url.searchParams.get("kind") === "directory",
+      }),
+    );
     return true;
   }
 
