@@ -37,6 +37,8 @@ export const createState = () =>
     queue: [] as QueuedMessage[],
     /** The queued message to send right after the answer is stopped. */
     interrupting: false,
+    /** The user message being edited; sending the input replaces it and what follows. */
+    editing: "",
     /** The turns cut off by an edit or rewind, waiting for the new message to become their sibling. */
     stash: undefined as { index: number; versions: AgentTurn[][] } | undefined,
   });
@@ -79,3 +81,10 @@ const registry: ChatRegistry = (hot.chats ??= {
   saves: new Map(),
 });
 export const { releases, viewers, sessions, loads, saves } = registry;
+
+/** The conversation as plain text turns, for an agent that has no session of its own to continue. */
+export function chatHistory(turns: AgentTurn[]): { role: "user" | "assistant"; content: string }[] {
+  return turns
+    .filter((item) => item.text.trim())
+    .map((item) => ({ role: item.role, content: item.text }));
+}

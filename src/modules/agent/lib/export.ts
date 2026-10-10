@@ -18,6 +18,10 @@ export function chatMarkdown(turns: AgentTurn[], title: string): string {
         if (part.text.trim()) body.push(part.text.trim());
         continue;
       }
+      if (part.type === "note") {
+        body.push(`**Вы добавили:** ${part.text.trim()}`);
+        continue;
+      }
       const tool = byId.get(part.id);
       if (!tool) continue;
       const hint = inputHint(tool.input ?? "");

@@ -2,6 +2,7 @@ import { computed, reactive } from "vue";
 import { useProjects } from "../../project/index.ts";
 import { AgentRunGone, answerPermission, cancelAgentRun, streamAgent } from "../api/client.ts";
 import { addVersion } from "./branches.ts";
+import { chatHistory } from "./chat-state.ts";
 import { useChatActions } from "./chat-actions.ts";
 import { notifyAnswer, notifyPermission, requestNotifications } from "../lib/notify.ts";
 import {
@@ -19,7 +20,6 @@ import { hasChips, messageText, normalizeParts } from "../lib/message-parts.ts";
 import type {
   AgentBackendId,
   AgentEvent,
-  AgentHistoryTurn,
   AgentTurn,
   AgentCommandRequest,
   AgentPermissionMode,
@@ -149,12 +149,6 @@ export function useAgent(
     }
   }
 
-  function history(): AgentHistoryTurn[] {
-    return state.turns
-      .filter((item) => item.text.trim())
-      .map((item) => ({ role: item.role, content: item.text }));
-  }
-
   const actions = useChatActions(state, { backend, projectId, ready, persist, send, stop });
   const { drainQueue, worktreeId } = actions;
 
@@ -244,9 +238,11 @@ export function useAgent(
       state.queue.push({ id: crypto.randomUUID(), text: message, parts: content ?? [] });
       return;
     }
+    // The edited message replaces the old one only now that it is really sent.
+    if (text === undefined) actions.applyEdit();
     state.error = "";
     void requestNotifications();
-    const previousHistory = history();
+    const previousHistory = chatHistory(state.turns);
     const resume = sessionId();
     const branchFrom = tail();
     const copy = worktreeId();
@@ -319,6 +315,7 @@ export function useAgent(
     state.turns = [];
     state.queue = [];
     state.stash = undefined;
+    state.editing = "";
     state.error = "";
     state.phase = "";
     state.draft = "";
@@ -380,6 +377,8 @@ export function useAgent(
     injectQueued: actions.injectQueued,
     removeQueued: actions.removeQueued,
     edit: actions.edit,
+    cancelEdit: actions.cancelEdit,
+    editing: computed(() => state.editing),
     retry: actions.retry,
     showVersion: actions.showVersion,
     canRewindFiles: actions.canRewindFiles,

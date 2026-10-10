@@ -19,6 +19,8 @@ export interface AcpInitResult {
     sessionCapabilities?: Record<string, unknown>;
     /** What a prompt may contain besides text and links. */
     promptCapabilities?: { image?: boolean; embeddedContext?: boolean };
+    /** Which kinds of MCP server the agent can be given besides stdio ones. */
+    mcpCapabilities?: { http?: boolean; sse?: boolean };
   };
 }
 

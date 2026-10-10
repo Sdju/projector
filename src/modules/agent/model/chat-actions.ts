@@ -8,7 +8,7 @@ import {
   type RewindSummary,
   type WorktreeInfo,
 } from "../api/client.ts";
-import { appendText } from "./turn-events.ts";
+import { legacyParts } from "./turn-events.ts";
 import { cutAt, switchVersion } from "./branches.ts";
 import type { ChatState } from "./chat-state.ts";
 import type { AgentBackendId, AgentTurn, MessagePart } from "./types.ts";
@@ -65,7 +65,7 @@ export function useChatActions(
 
   /**
    * Adds a queued message to the answer being written, so the agent takes it into account now
-   * (Claude Code reads it ahead of what it was doing). The note stays in the answer as a quote.
+   * (Claude Code reads it ahead of what it was doing). It stays in the answer as the user's own bubble.
    */
   async function injectQueued(id: string): Promise<boolean> {
     const item = state.queue.find((entry) => entry.id === id);
@@ -83,9 +83,7 @@ export function useChatActions(
     removeQueued(id);
     const answer = state.turns.at(-1);
     if (answer?.role === "assistant") {
-      const note = `\n\n> Вы добавили: ${item.text.replace(/\n+/g, " ")}\n\n`;
-      answer.text += note;
-      appendText(answer, note);
+      (answer.parts ??= legacyParts(answer)).push({ type: "note", text: item.text });
       persist();
     }
     return true;
@@ -111,12 +109,36 @@ export function useChatActions(
     return { ...user, text, content, tools: [] };
   }
 
-  /** Takes a sent message back into the input to be changed and sent again. */
+  /**
+   * Takes a sent message into the input to be changed. Nothing is cut yet: the chat shows what the
+   * new message will replace, and only sending it (`applyEdit`) turns that into another version, so
+   * a reload or a change of mind loses nothing.
+   */
   function edit(id: string): void {
-    const user = cutBack(id);
-    if (!user) return;
+    const user = state.turns.find((turn) => turn.id === id && turn.role === "user");
+    if (!user || state.busy) return;
+    state.editing = id;
     state.draft = user.text;
     state.draftParts = user.content ?? [];
+  }
+
+  /** Gives up the change: the message stays as it was and the input is emptied. */
+  function cancelEdit(): void {
+    if (!state.editing) return;
+    state.editing = "";
+    state.draft = "";
+    state.draftParts = [];
+  }
+
+  /** Sending the edited message: what it replaces is cut off and kept as another version. */
+  function applyEdit(): void {
+    const id = state.editing;
+    state.editing = "";
+    const index = state.turns.findIndex((turn) => turn.id === id && turn.role === "user");
+    if (index < 0) return;
+    state.stash = { index, versions: cutAt(state.turns, index) };
+    state.error = "";
+    detach();
   }
 
   /** Asks the same question again; the earlier answer stays as another version. */
@@ -133,6 +155,7 @@ export function useChatActions(
     const index = state.turns.findIndex((turn) => turn.id === id);
     if (state.busy || index < 0 || !switchVersion(state.turns, index, target)) return;
     state.stash = undefined;
+    state.editing = "";
     detach();
     persist();
   }
@@ -144,14 +167,9 @@ export function useChatActions(
     return answer?.role === "assistant" ? answer.session?.id : undefined;
   }
 
-  /**
-   * Whether the files can be taken back to before this message: Claude Code keeps backups per
-   * session, the other agents get a snapshot of the project (a git repository) before each message.
-   */
+  /** Whether the files can be taken back to before this message (only Claude Code keeps backups). */
   function canRewindFiles(id: string): boolean {
-    const index = state.turns.findIndex((turn) => turn.id === id && turn.role === "user");
-    if (index < 0 || state.turns[index + 1]?.role !== "assistant") return false;
-    return backend === "claude-code" ? !!sessionOf(id) : true;
+    return backend === "claude-code" && !!sessionOf(id);
   }
 
   /** Puts the project's files back to how they were before the message; `dryRun` only reports. */
@@ -219,6 +237,8 @@ export function useChatActions(
     injectQueued,
     removeQueued,
     edit,
+    cancelEdit,
+    applyEdit,
     retry,
     showVersion,
     canRewindFiles,

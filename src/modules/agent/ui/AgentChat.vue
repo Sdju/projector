@@ -21,13 +21,10 @@ import AgentRewind from "./AgentRewind.vue";
 import AgentWorktree from "./AgentWorktree.vue";
 import { chatMarkdown } from "../lib/export.ts";
 import { latestPlan } from "../lib/plan.ts";
-import {
-  fetchMcpServers,
-  type McpServer,
-  type RewindSummary,
-  type WorktreeInfo,
-} from "../api/client.ts";
+import { fetchMcpServers, type McpServer } from "../api/client.ts";
 import { activateChat, registerChat, type ChatController } from "../model/chat-registry.ts";
+import { useRewindPanel } from "../model/rewind-panel.ts";
+import { useWorktreePanel } from "../model/worktree-panel.ts";
 import type {
   AgentBackendId,
   AgentControl,
@@ -74,6 +71,8 @@ const {
   injectQueued,
   removeQueued,
   edit,
+  cancelEdit,
+  editing,
   retry,
   showVersion,
   canRewindFiles,
@@ -203,98 +202,47 @@ async function loadMcp() {
   }
 }
 
-// The isolated copy this chat works in: what it changed, and what to do with it.
-const copy = computed(() => {
-  void turns.value.length;
-  return turns.value.findLast((turn) => turn.role === "assistant" && turn.worktree)?.worktree;
+const { copy, copyInfo, copyWorking, copyNote, endCopy } = useWorktreePanel(turns, busy, {
+  worktreeInfo,
+  mergeCopy,
+  discardCopy,
 });
-const copyInfo = ref<WorktreeInfo>();
-const copyWorking = ref(false);
-const copyNote = ref("");
-async function refreshCopy() {
-  try {
-    copyInfo.value = copy.value ? await worktreeInfo() : undefined;
-  } catch {
-    copyInfo.value = undefined;
-  }
-}
-watch([() => copy.value?.id, busy], refreshCopy, { immediate: true });
-async function endCopy(action: () => Promise<string | void>) {
-  copyWorking.value = true;
-  try {
-    copyNote.value = (await action()) ?? "";
-  } catch (cause) {
-    copyNote.value = cause instanceof Error ? cause.message : "Не удалось выполнить";
-  } finally {
-    copyWorking.value = false;
-  }
-}
 
-const plan = computed(() => latestPlan(turns.value.at(-1)));
+// While a message is being edited, the turns its replacement will cut off are shown faded.
+const editFrom = computed(() =>
+  editing.value ? turns.value.findIndex((turn) => turn.id === editing.value) : -1,
+);
+
+// The plan stays pinned while it has unfinished items, even after later messages; a finished one
+// only shows for the answer that finished it.
+const plan = computed(() => {
+  const answers = turns.value.filter((turn) => turn.role === "assistant");
+  for (const turn of answers.toReversed()) {
+    const items = latestPlan(turn);
+    if (!items.length) continue;
+    return turn === answers.at(-1) || items.some((item) => item.status !== "completed")
+      ? items
+      : [];
+  }
+  return [];
+});
 const contextShare = computed(() =>
   latestContext.value ? latestContext.value.used / Math.max(1, latestContext.value.size) : 0,
 );
 
 // Rolling back to a message: the panel asks what to undo, shows what the files would change, then does it.
-const rewinding = ref<{ id: string; scope: RewindScope } | null>(null);
-const rewindPreview = ref<RewindSummary>();
-const rewindPreviewError = ref("");
-const rewindResult = ref<RewindSummary>();
-const rewindWorking = ref(false);
-function askRewind(id: string, scope: RewindScope = "conversation") {
-  rewinding.value = { id, scope };
-  rewindPreview.value = undefined;
-  rewindPreviewError.value = "";
-  rewindResult.value = undefined;
-}
-async function previewRewind(scope: RewindScope) {
-  const target = rewinding.value;
-  if (!target) return;
-  target.scope = scope;
-  if (scope === "conversation" || rewindPreview.value || rewindPreviewError.value) return;
-  try {
-    rewindPreview.value = await rewindFiles(target.id, true);
-  } catch (cause) {
-    rewindPreviewError.value =
-      cause instanceof Error ? cause.message : "Не удалось посчитать откат";
-  }
-}
-/** Does the rollback; used by the panel and by `ide.agent.chat.rewind`. */
-async function rewindTo(id: string, scope: RewindScope): Promise<RewindSummary | undefined> {
-  let result: RewindSummary | undefined;
-  if (scope !== "conversation") result = await rewindFiles(id, false);
-  if (scope !== "files" && (!result || result.ok)) edit(id);
-  return result;
-}
-async function confirmRewind(scope: RewindScope) {
-  const target = rewinding.value;
-  if (!target || rewindWorking.value) return;
-  rewindWorking.value = true;
-  try {
-    const result = await rewindTo(target.id, scope);
-    // A real rewind reports no file list; the preview already told which files it changes.
-    if (result)
-      rewindResult.value = {
-        ...result,
-        files: result.files.length ? result.files : (rewindPreview.value?.files ?? []),
-      };
-    else rewinding.value = null;
-    if (scope !== "files") await nextTick();
-    composer.value?.focus();
-  } catch (cause) {
-    rewindResult.value = {
-      ok: false,
-      files: [],
-      error: cause instanceof Error ? cause.message : "Не удалось откатить",
-    };
-  } finally {
-    rewindWorking.value = false;
-  }
-}
-function closeRewind() {
-  rewinding.value = null;
-  rewindResult.value = undefined;
-}
+const {
+  rewinding,
+  rewindPreview,
+  rewindPreviewError,
+  rewindResult,
+  rewindWorking,
+  askRewind,
+  previewRewind,
+  rewindTo,
+  confirmRewind,
+  closeRewind,
+} = useRewindPanel({ rewindFiles, edit, focus: () => composer.value?.focus() });
 // A request's own answers belong to the user message before them.
 function precedingUser(id: string): string {
   const index = turns.value.findIndex((turn) => turn.id === id);
@@ -312,6 +260,14 @@ async function retryMessage(id: string) {
   void toBottom();
   await retry(id);
 }
+
+// A full context is compacted once the answer is over, unless the last message already was that.
+watch(busy, (working) => {
+  if (working || !claude.value || contextShare.value < 0.9 || queue.value.length) return;
+  if (turns.value.findLast((turn) => turn.role === "user")?.text === "/compact") return;
+  if (error.value) return;
+  void compact();
+});
 
 async function compact() {
   void toBottom();
@@ -571,6 +527,7 @@ onBeforeUnmount(() => {
           :busy="busy"
           :last="index === turns.length - 1"
           :copied="copied === turn.id"
+          :faded="editFrom >= 0 && index >= editFrom"
           :root="projectRoot"
           :can-revert="canRevert(turn.id)"
           @copy="copyMessage"
@@ -585,6 +542,11 @@ onBeforeUnmount(() => {
       </div>
     </div>
     <div class="dock">
+      <p v-if="editing" class="edit-hint" role="status">
+        Правка сообщения: новое заменит выделенное и всё после него, старый вариант останется
+        версией.
+        <button type="button" @click="cancelEdit">Отмена</button>
+      </p>
       <AgentPermissions :permissions="permissions" @decide="decide" />
       <AgentRewind
         v-if="rewinding"
@@ -610,9 +572,18 @@ onBeforeUnmount(() => {
         @discard="endCopy(discardCopy)"
       />
       <AgentPlan :items="plan" :busy="busy" />
-      <p v-if="claude && contextShare >= 0.8 && !busy" class="compact-hint" role="status">
-        Контекст заполнен на {{ Math.round(contextShare * 100) }}%.
-        <button type="button" @click="compact">Сжать</button>
+      <p
+        v-if="claude && contextShare >= 0.8 && !busy"
+        class="compact-hint"
+        :class="{ urgent: contextShare >= 0.9 }"
+        role="status"
+      >
+        <template v-if="contextShare >= 0.9"
+          >Контекст почти заполнен ({{ Math.round(contextShare * 100) }}%): после этого ответа он
+          сожмётся сам.</template
+        >
+        <template v-else>Контекст заполнен на {{ Math.round(contextShare * 100) }}%.</template>
+        <button type="button" @click="compact">Сжать сейчас</button>
       </p>
       <AgentQueue
         :items="queue"
@@ -701,6 +672,15 @@ onBeforeUnmount(() => {
   color: var(--warn);
   font-size: var(--fs-2xs);
 }
+.compact-hint.urgent {
+  color: var(--err);
+}
+.edit-hint {
+  margin: 0 0 var(--sp-2);
+  color: var(--muted);
+  font-size: var(--fs-2xs);
+}
+.edit-hint button,
 .compact-hint button {
   color: var(--text-2);
   text-decoration: underline;

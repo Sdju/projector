@@ -2,7 +2,6 @@ import type { AgentBackend, AgentRunOptions } from "./backend.ts";
 import { createAcpBackend } from "./acp-backend.ts";
 import { claudeCodeBackend } from "./claude-code-backend.ts";
 import { projectorBackend } from "./projector-backend.ts";
-import { rewindToSnapshot, snapshotProject } from "./snapshots.ts";
 
 export type { AgentEmitter, AgentEventName, AgentRunOptions } from "./backend.ts";
 export { AGENT_BACKEND_IDS, AGENT_PERMISSION_MODES, HOSTED_AGENT_BACKENDS } from "./backend.ts";
@@ -53,10 +52,8 @@ export async function rewindAgentFiles(
   dryRun: boolean,
 ) {
   const backend = backendFor(id);
-  // Claude Code keeps its own backups; for the others the snapshot taken before the message is used.
-  return backend.rewindFiles
-    ? backend.rewindFiles(cwd, sessionId, messageId, dryRun)
-    : rewindToSnapshot(cwd, messageId, dryRun);
+  if (!backend.rewindFiles) throw new Error("Этот агент не умеет возвращать файлы к прошлому шагу");
+  return backend.rewindFiles(cwd, sessionId, messageId, dryRun);
 }
 
 export async function updateAgentSession(
@@ -88,8 +85,5 @@ export async function runAgent(options: AgentRunOptions): Promise<void> {
   const id = options.backend ?? "projector";
   const backend = backends.find((item) => item.id === id);
   if (!backend) throw new Error(`Неизвестный агент: ${id}`);
-  // A rejoined run repeats a request whose snapshot was taken when it started.
-  if (!backend.rewindFiles && options.cwd && options.messageId && !options.run?.attach)
-    await snapshotProject(options.cwd, options.messageId).catch(() => {});
   await backend.run(options);
 }

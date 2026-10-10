@@ -89,7 +89,15 @@ async function run(options: AgentRunOptions): Promise<void> {
       return {
         behavior: "allow",
         updatedInput: input,
-        ...(answer === "always" && suggestions.length ? { updatedPermissions: suggestions } : {}),
+        ...(answer === "always" && suggestions.length
+          ? {
+              // Kept in the user's own settings, so it holds in every project and for the terminal too.
+              updatedPermissions: suggestions.map((rule) => ({
+                ...rule,
+                destination: "userSettings" as const,
+              })),
+            }
+          : {}),
       };
     },
   };
@@ -115,9 +123,15 @@ async function run(options: AgentRunOptions): Promise<void> {
       prompt: input.stream,
       options: { ...base, ...(resume ? { resume } : {}) },
     });
+    // The ring follows the answer: asked again after tool results, but not more often than this.
+    let contextAt = 0;
     try {
       for await (const message of conversation) {
         mapper.handle(message);
+        if (message.type === "user" && Date.now() - contextAt > CONTEXT_REFRESH_MS) {
+          contextAt = Date.now();
+          void emitContext(conversation, emit);
+        }
         if (message.type === "result") {
           await emitContext(conversation, emit);
           input.settled();
@@ -181,6 +195,8 @@ function userMessage(
   };
 }
 
+/** The least time between two readings of how full the context is during one answer. */
+const CONTEXT_REFRESH_MS = 4000;
 const COMMANDS_TTL_MS = 60_000;
 const commandCache = new Map<string, { at: number; commands: Promise<AgentCommand[]> }>();
 

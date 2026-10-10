@@ -21,6 +21,8 @@ const props = defineProps<{
   busy: boolean;
   last: boolean;
   copied: boolean;
+  /** What an edit in progress is about to replace. */
+  faded?: boolean;
   /** The project folder, to show edited files relative to it. */
   root?: string;
   /** Files can be taken back to before the request this answer belongs to. */
@@ -41,6 +43,7 @@ const versions = computed(() => versionsOf(props.turn));
 
 type Segment =
   | { key: string; type: "text"; text: string }
+  | { key: string; type: "note"; text: string }
   | { key: string; type: "tools"; tools: AgentToolView[] };
 
 // Text and tool calls in the order they happened; neighbouring calls form one group.
@@ -62,6 +65,10 @@ const segments = computed(() => {
       if (part.text.trim()) result.push({ key: `t${index}`, type: "text", text: part.text });
       continue;
     }
+    if (part.type === "note") {
+      result.push({ key: `n${index}`, type: "note", text: part.text });
+      continue;
+    }
     const tool = byId.get(part.id);
     if (!tool) continue;
     const last = result.at(-1);
@@ -74,7 +81,7 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
 </script>
 
 <template>
-  <article class="turn" :class="turn.role">
+  <article class="turn" :class="[turn.role, { faded }]">
     <div v-if="turn.role === 'user'" class="user-row">
       <div class="turn-actions" :class="{ pinned: versions.count > 1 }">
         <span v-if="versions.count > 1" class="versions" role="group" aria-label="Версии">
@@ -150,6 +157,7 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
     <div v-else class="assistant-body">
       <template v-for="segment in segments" :key="segment.key">
         <AgentMessage v-if="segment.type === 'text'" :text="segment.text" />
+        <p v-else-if="segment.type === 'note'" class="user-message note">{{ segment.text }}</p>
         <AgentActivity v-else :tools="segment.tools" />
       </template>
       <div v-if="busy && last && waiting" class="thinking" role="status">
@@ -198,6 +206,9 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
   min-width: 0;
   margin-bottom: var(--sp-5);
 }
+.turn.faded {
+  opacity: 0.45;
+}
 .turn:last-child {
   margin-bottom: 0;
 }
@@ -244,6 +255,9 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
   line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.note {
+  margin: 0 0 var(--sp-3) auto;
 }
 .chip {
   display: inline-flex;

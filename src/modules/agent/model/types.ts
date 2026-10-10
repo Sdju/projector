@@ -16,7 +16,11 @@ export interface AgentToolChip {
 export type AgentToolView = AgentToolChip & { children?: AgentToolChip[] };
 
 /** The answer in the order it happened: text and tool calls interleave. */
-export type AgentPart = { type: "text"; text: string } | { type: "tool"; id: string };
+export type AgentPart =
+  | { type: "text"; text: string }
+  | { type: "tool"; id: string }
+  /** A message the user added while the answer was being written. */
+  | { type: "note"; text: string };
 
 export type AgentBackendId = "projector" | "claude-code" | "codex" | "opencode" | "cursor";
 

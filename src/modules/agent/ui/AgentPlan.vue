@@ -18,6 +18,9 @@ const current = computed(() => props.items.find((item) => item.status === "in_pr
       <span class="plan-title">План</span>
       <span class="plan-count">{{ done }} / {{ items.length }}</span>
       <span v-if="current" class="plan-current">{{ current.active ?? current.content }}</span>
+      <span class="plan-bar" aria-hidden="true"
+        ><span :style="{ width: `${(done / items.length) * 100}%` }"
+      /></span>
     </summary>
     <ol>
       <li v-for="(item, index) in items" :key="index" :class="item.status">
@@ -33,12 +36,26 @@ const current = computed(() => props.items.find((item) => item.status === "in_pr
 <style scoped>
 .plan {
   margin: 0 0 var(--sp-2);
-  padding: var(--sp-2) var(--sp-3);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  background: var(--bg-2);
+  padding: 0 var(--sp-1);
   color: var(--muted);
   font-size: var(--fs-2xs);
+}
+.plan:hover {
+  color: var(--text-2);
+}
+.plan-bar {
+  flex: 0 0 48px;
+  height: 2px;
+  margin-left: auto;
+  border-radius: var(--r-full);
+  background: var(--line);
+  overflow: hidden;
+}
+.plan-bar span {
+  display: block;
+  height: 100%;
+  background: var(--run);
+  transition: width var(--t-fast);
 }
 summary {
   display: flex;
@@ -70,8 +87,9 @@ svg {
   color: var(--faint);
 }
 ol {
-  margin: var(--sp-2) 0 0;
-  padding: 0;
+  margin: var(--sp-2) 0 var(--sp-1) var(--sp-1);
+  padding: 0 0 0 var(--sp-3);
+  border-left: 1px solid var(--line);
   list-style: none;
   display: grid;
   gap: 4px;

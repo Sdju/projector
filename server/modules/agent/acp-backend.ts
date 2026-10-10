@@ -1,4 +1,4 @@
-import { configuredMcpServers, projectMcpServers } from "./mcp-config.ts";
+import { configuredMcpServers, projectMcpServers, type McpSupport } from "./mcp-config.ts";
 import { type AcpConnection, type AcpError, NO_TIMEOUT } from "./acp-client.ts";
 import { applySelection, controlsFromSession } from "./acp-controls.ts";
 import { contentText, createAcpEventMapper } from "./acp-events.ts";
@@ -105,6 +105,7 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
         replaying = active;
       },
       init.agentCapabilities?.loadSession === true,
+      init.agentCapabilities?.mcpCapabilities,
     );
     sessionId = session.sessionId;
     options.emit("session", { id: sessionId, backend: id });
@@ -161,6 +162,7 @@ export async function openSession(
   authMethods: { id?: string }[],
   replay: (active: boolean) => void,
   canLoad = true,
+  mcp: McpSupport = {},
 ): Promise<{ sessionId: string; resumed: boolean; result: unknown }> {
   const start = async () => {
     if (options.sessionId && canLoad) {
@@ -169,7 +171,7 @@ export async function openSession(
         const loaded = await connection.request("session/load", {
           sessionId: options.sessionId,
           cwd: options.cwd,
-          mcpServers: await projectMcpServers(options.cwd),
+          mcpServers: await projectMcpServers(options.cwd, mcp),
         });
         return { sessionId: options.sessionId, resumed: true, result: loaded };
       } catch (error) {
@@ -182,7 +184,7 @@ export async function openSession(
     }
     const created = (await connection.request("session/new", {
       cwd: options.cwd,
-      mcpServers: await projectMcpServers(options.cwd),
+      mcpServers: await projectMcpServers(options.cwd, mcp),
     })) as { sessionId: string };
     return { sessionId: created.sessionId, resumed: false, result: created };
   };
