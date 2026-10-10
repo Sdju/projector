@@ -1,30 +1,57 @@
 <script setup lang="ts">
 import UiButton from "../../../common/ui/UiButton.vue";
-import type { AgentTurn } from "../model/types.ts";
+import { computed } from "vue";
+import { legacyParts } from "../model/turn-events.ts";
+import type { AgentToolChip, AgentTurn } from "../model/types.ts";
 import AgentMessage from "./AgentMessage.vue";
 import AgentActivity from "./AgentActivity.vue";
 import IconCopy from "~icons/lucide/copy";
 import IconCheck from "~icons/lucide/check";
 
-defineProps<{
+const props = defineProps<{
   turn: AgentTurn;
   busy: boolean;
   last: boolean;
   copied: boolean;
 }>();
 const emit = defineEmits<{ copy: [id: string, text: string] }>();
+
+type Segment =
+  | { key: string; type: "text"; text: string }
+  | { key: string; type: "tools"; tools: AgentToolChip[] };
+
+// Text and tool calls in the order they happened; neighbouring calls form one group.
+const segments = computed(() => {
+  const result: Segment[] = [];
+  const byId = new Map(props.turn.tools.map((tool) => [tool.id, tool]));
+  for (const [index, part] of (props.turn.parts ?? legacyParts(props.turn)).entries()) {
+    if (part.type === "text") {
+      if (part.text.trim()) result.push({ key: `t${index}`, type: "text", text: part.text });
+      continue;
+    }
+    const tool = byId.get(part.id);
+    if (!tool) continue;
+    const last = result.at(-1);
+    if (last?.type === "tools") last.tools.push(tool);
+    else result.push({ key: `a${index}`, type: "tools", tools: [tool] });
+  }
+  return result;
+});
+const waiting = computed(() => segments.value.at(-1)?.type !== "text");
 </script>
 
 <template>
   <article class="turn" :class="turn.role">
     <p v-if="turn.role === 'user'" class="user-message">{{ turn.text }}</p>
     <div v-else class="assistant-body">
-      <div v-if="busy && last && !turn.text" class="thinking" role="status">
+      <template v-for="segment in segments" :key="segment.key">
+        <AgentMessage v-if="segment.type === 'text'" :text="segment.text" />
+        <AgentActivity v-else :tools="segment.tools" />
+      </template>
+      <div v-if="busy && last && waiting" class="thinking" role="status">
         <span class="thinking-dots" aria-hidden="true"><i /><i /><i /></span
         >{{ turn.tools.some((t) => t.status === "running") ? "Выполняет задачу" : "Думает" }}
       </div>
-      <AgentActivity v-if="turn.tools.length" :tools="turn.tools" />
-      <AgentMessage v-if="turn.text" :text="turn.text" />
       <UiButton
         v-if="turn.text"
         icon

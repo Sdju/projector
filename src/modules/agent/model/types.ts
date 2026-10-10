@@ -4,12 +4,18 @@ export interface AgentToolChip {
   id: string;
   name: string;
   status: "running" | "done" | "error";
+  /** What the agent passed to the tool. */
+  input?: string;
+  /** The result once it arrives (the input while the tool is still running). */
   detail: string;
 }
 
+/** The answer in the order it happened: text and tool calls interleave. */
+export type AgentPart = { type: "text"; text: string } | { type: "tool"; id: string };
+
 export type AgentBackendId = "projector" | "claude-code" | "codex" | "opencode" | "cursor";
 
-export type AgentPermissionMode = "default" | "acceptEdits" | "bypassPermissions";
+export type AgentPermissionMode = "default" | "acceptEdits" | "auto" | "bypassPermissions";
 
 /** A knob the agent offers for a chat: model, reasoning effort, mode. */
 export interface AgentControl {
@@ -41,6 +47,8 @@ export interface AgentTurn {
   role: "user" | "assistant";
   text: string;
   tools: AgentToolChip[];
+  /** Order of text and tool calls; absent in turns saved before it existed. */
+  parts?: AgentPart[];
   /** Native backend session (Claude Code) this turn belongs to; the next request resumes it. */
   session?: AgentSessionRef;
   /** The agent process still answering this turn; set until the turn ends, so it can be rejoined. */

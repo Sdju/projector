@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import { guiPrograms } from "../model/modes.ts";
 withDefaults(defineProps<{ plain?: boolean; agentName?: string }>(), {
   plain: false,
   agentName: "Агент",
 });
-const emit = defineEmits<{ suggest: [text: string] }>();
+const emit = defineEmits<{ suggest: [text: string]; open: [program: string] }>();
+const coders = Object.entries(guiPrograms);
 const suggestions = [
   {
     title: "Разобраться в проекте",
@@ -33,6 +35,16 @@ const suggestions = [
       >
         {{ suggestion.title }}
       </button>
+    </div>
+    <div v-if="!plain" class="coders">
+      <span class="coders-label" title="Я управляю Projector и не пишу код в файлах">
+        Писать код — в агенте
+      </span>
+      <div class="coders-list">
+        <button v-for="[id, program] in coders" :key="id" type="button" @click="emit('open', id)">
+          {{ program.title }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -66,6 +78,27 @@ h1 {
   gap: var(--sp-2);
   margin-top: var(--sp-2);
 }
+.coders {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-6);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--line);
+  width: 100%;
+}
+.coders-label {
+  color: var(--faint);
+  font-size: var(--fs-2xs);
+}
+.coders-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--sp-1);
+}
+.coders button,
 .suggestions button {
   padding: var(--sp-1) var(--sp-3);
   border: 1px solid var(--line);
@@ -76,6 +109,7 @@ h1 {
     border-color var(--t-fast),
     color var(--t-fast);
 }
+.coders button:hover,
 .suggestions button:hover {
   border-color: var(--line-strong);
   color: var(--text);

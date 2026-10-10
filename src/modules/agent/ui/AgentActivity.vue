@@ -1,139 +1,47 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { inputHint } from "../lib/tool-input.ts";
+import { toolLabel } from "../lib/tool-labels.ts";
 import type { AgentToolChip } from "../model/types.ts";
+import AgentToolCall from "./AgentToolCall.vue";
 import IconChevron from "~icons/lucide/chevron-right";
 import IconCheck from "~icons/lucide/check";
 import IconLoader from "~icons/lucide/loader-circle";
 import IconAlert from "~icons/lucide/circle-alert";
-import IconTerminal from "~icons/lucide/terminal";
-import IconSearch from "~icons/lucide/search";
-import IconInfo from "~icons/lucide/info";
-import IconPlay from "~icons/lucide/play";
-import IconFolder from "~icons/lucide/folder";
+
 const props = defineProps<{ tools: AgentToolChip[] }>();
-const running = computed(() => props.tools.some((tool) => tool.status === "running"));
-const failed = computed(() => rows.value.some((tool) => tool.status === "error"));
-const labels: Record<string, string> = {
-  list_commands: "Поиск команд",
-  describe_command: "Описание команды",
-  execute_command: "Вызов команды",
-  bash: "Bash",
-  find_projects: "Поиск проектов",
-  inspect_path: "Обзор проекта",
-  list_directory: "Обзор папки",
-  add_project: "Добавление проекта",
-  add_projects: "Добавление проектов",
-  list_projects: "Список проектов",
-  // Claude Code built-in tools
-  Read: "Чтение файла",
-  Edit: "Правка файла",
-  MultiEdit: "Правка файла",
-  Write: "Запись файла",
-  Grep: "Поиск в файлах",
-  Glob: "Поиск файлов",
-  WebFetch: "Загрузка страницы",
-  WebSearch: "Поиск в сети",
-  Task: "Субагент",
-  TodoWrite: "План задач",
-};
-function output(tool: AgentToolChip): {
-  hint: string;
-  text: string;
-  status?: AgentToolChip["status"];
-} {
-  try {
-    const data = JSON.parse(tool.detail);
-    if (tool.name === "bash" && tool.status !== "running")
-      return {
-        hint: data.terminated ? "Прервано" : `Код ${data.exitCode ?? "—"}`,
-        status: data.terminated || data.exitCode !== 0 ? "error" : "done",
-        text: [data.stdout, data.stderr].filter(Boolean).join("\n") || "Без вывода",
-      };
-    if (tool.name === "list_commands" && Array.isArray(data.commands))
-      return {
-        hint: `${data.commands.length} найдено`,
-        text:
-          data.commands
-            .map((c: { title: string; id: string }) => `${c.title}\n${c.id}`)
-            .join("\n\n") || "Подходящих команд нет",
-      };
-    if (tool.name === "describe_command")
-      return {
-        hint: data.title ?? data.command ?? "",
-        text: data.description
-          ? [
-              data.id,
-              data.description,
-              ...Object.entries(data.arguments ?? {}).map(([key, value]) => `${key}: ${value}`),
-            ].join("\n\n")
-          : tool.detail,
-      };
-    if (tool.name === "execute_command" && data.completed)
-      return { hint: "Выполнено", text: "Команда выполнена в Projector." };
-    return {
-      hint:
-        tool.status === "running"
-          ? (data.command ?? data.query ?? data.path ?? data.file_path ?? data.pattern ?? "")
-          : "",
-      text: tool.detail,
-    };
-  } catch {
-    return { hint: "", text: tool.detail };
-  }
-}
-const rows = computed(() => props.tools.map((tool) => ({ ...tool, ...output(tool) })));
+const current = computed(() => props.tools.findLast((tool) => tool.status === "running"));
+const failed = computed(() => props.tools.some((tool) => tool.status === "error"));
+const hint = computed(() => {
+  const tool = current.value;
+  return tool ? inputHint(tool.input ?? tool.detail) : "";
+});
+// A finished group of one kind of call reads as "Запись файла ×2"; a mixed one, as a count.
+const title = computed(() => {
+  if (current.value) return toolLabel(current.value.name);
+  const names = new Set(props.tools.map((tool) => tool.name));
+  return names.size === 1
+    ? `${toolLabel(props.tools[0]!.name)} ×${props.tools.length}`
+    : "Действия";
+});
 </script>
 
 <template>
-  <details class="activity" :class="{ working: running, failed }">
+  <div v-if="tools.length === 1" class="activity single">
+    <AgentToolCall :tool="tools[0]!" />
+  </div>
+  <details v-else class="activity" :class="{ working: current, failed }">
     <summary class="activity-summary">
-      <IconLoader v-if="running" class="spin" aria-hidden="true" />
+      <IconLoader v-if="current" class="spin" aria-hidden="true" />
       <IconAlert v-else-if="failed" class="error-icon" aria-hidden="true" />
       <IconCheck v-else class="done-icon" aria-hidden="true" />
-      <span>{{ running ? "Выполняет действия" : "Действия" }}</span>
-      <span class="count">{{ tools.length }}</span>
+      <span>{{ title }}</span>
+      <span v-if="current" class="tool-hint" :title="hint">{{ hint }}</span>
+      <span v-if="current || title === 'Действия'" class="count">{{ tools.length }}</span>
       <IconChevron class="group-chevron" aria-hidden="true" />
     </summary>
     <div class="activity-list">
-      <details v-for="row in rows" :key="row.id" class="tool" :class="row.status">
-        <summary>
-          <IconTerminal
-            v-if="row.name.toLowerCase() === 'bash'"
-            class="tool-icon"
-            aria-hidden="true"
-          />
-          <IconSearch
-            v-else-if="row.name === 'list_commands'"
-            class="tool-icon"
-            aria-hidden="true"
-          />
-          <IconInfo
-            v-else-if="row.name === 'describe_command'"
-            class="tool-icon"
-            aria-hidden="true"
-          />
-          <IconPlay
-            v-else-if="row.name === 'execute_command'"
-            class="tool-icon"
-            aria-hidden="true"
-          />
-          <IconFolder v-else class="tool-icon" aria-hidden="true" />
-          <span class="tool-name">{{ labels[row.name] || row.name }}</span>
-          <span class="tool-hint" :title="row.hint">{{ row.hint }}</span>
-          <IconLoader
-            v-if="row.status === 'running'"
-            class="state-icon spin"
-            aria-label="Выполняется"
-          />
-          <IconAlert
-            v-else-if="row.status === 'error'"
-            class="state-icon error-icon"
-            aria-label="Ошибка"
-          />
-          <IconChevron class="row-chevron" aria-hidden="true" />
-        </summary>
-        <pre>{{ row.text || "Ожидание результата…" }}</pre>
-      </details>
+      <AgentToolCall v-for="tool in tools" :key="tool.id" :tool="tool" />
     </div>
   </details>
 </template>
@@ -161,6 +69,7 @@ summary:focus-visible {
 }
 .activity-summary {
   display: flex;
+  max-width: 100%;
   width: fit-content;
   align-items: center;
   gap: 7px;
@@ -177,49 +86,25 @@ svg {
 .count {
   color: var(--faint);
 }
+.tool-hint {
+  min-width: 0;
+  max-width: 40ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--faint);
+}
 .group-chevron {
   width: 12px;
   transition: transform var(--t-fast);
 }
-.activity[open] > summary .group-chevron,
-.tool[open] > summary .row-chevron {
+.activity[open] > summary .group-chevron {
   transform: rotate(90deg);
 }
 .activity-list {
   margin-top: var(--sp-1);
   padding-left: var(--sp-3);
   border-left: 1px solid var(--line);
-}
-.tool > summary {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-1) 0;
-  min-width: 0;
-}
-.tool > summary:hover {
-  color: var(--text);
-}
-.tool-name {
-  flex-shrink: 0;
-}
-.tool-hint {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--faint);
-}
-.tool-icon {
-  color: var(--muted);
-}
-.row-chevron {
-  width: 11px;
-  color: var(--faint);
-}
-.state-icon {
-  width: 12px;
 }
 .done-icon {
   color: var(--run);
@@ -229,18 +114,6 @@ svg {
 }
 .spin {
   animation: spin 1s linear infinite;
-}
-pre {
-  font: var(--fs-2xs)/1.7 var(--mono);
-  color: var(--text-2);
-  margin: var(--sp-1) 0 var(--sp-2);
-  padding: var(--sp-2) var(--sp-3);
-  border-radius: var(--r-md);
-  background: var(--bg-2);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  max-height: 240px;
-  overflow-y: auto;
 }
 @keyframes spin {
   to {
@@ -253,14 +126,6 @@ pre {
   }
   .group-chevron {
     transition: none;
-  }
-}
-@container (max-width: 400px) {
-  .tool-hint {
-    display: none;
-  }
-  .state-icon {
-    margin-left: auto;
   }
 }
 </style>

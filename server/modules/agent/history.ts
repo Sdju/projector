@@ -19,10 +19,20 @@ const schema = z
             id: z.string().max(100),
             name: z.string().max(100),
             status: z.enum(["running", "done", "error"]),
+            input: z.string().max(8000).optional(),
             detail: z.string().max(8000),
           }),
         )
         .max(100),
+      parts: z
+        .array(
+          z.discriminatedUnion("type", [
+            z.object({ type: z.literal("text"), text: z.string().max(100000) }),
+            z.object({ type: z.literal("tool"), id: z.string().max(100) }),
+          ]),
+        )
+        .max(400)
+        .optional(),
     }),
   )
   .max(200);

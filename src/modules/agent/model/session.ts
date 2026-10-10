@@ -165,6 +165,7 @@ export function useAgent(
         if (attach) {
           assistant.text = "";
           assistant.tools.splice(0);
+          assistant.parts = [];
         }
         try {
           await start(onEvent, signal, attach);

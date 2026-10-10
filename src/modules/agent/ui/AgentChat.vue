@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useIdeCommands } from "../../ide/index.ts";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import { agentCommandHandler } from "../model/commands.ts";
-import { agentLabel } from "../model/modes.ts";
+import { agentLabel, guiPrograms } from "../model/modes.ts";
 import { useAgent } from "../model/session.ts";
 import { readoutLines, useTabReadout } from "../../../common/utilities/tab-readout.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
@@ -61,6 +61,11 @@ const permissionOptions: { value: AgentPermissionMode; name: string; description
     description: "Файлы меняются сразу, команды — по запросу",
   },
   {
+    value: "auto",
+    name: "Авто",
+    description: "Классификатор сам разрешает безопасное и спрашивает о рискованном",
+  },
+  {
     value: "bypassPermissions",
     name: "Всё без вопросов",
     description: "Без запросов разрешений",
@@ -89,6 +94,16 @@ function changeControl(id: string, value: string) {
 const activeSession = computed(
   () => turns.value.findLast((turn) => turn.role === "assistant")?.session?.id,
 );
+// Opening a chat is a workspace command, not one of this chat's own.
+function openCoder(program: string) {
+  void api
+    .executeCommand(guiPrograms[program]!.command, undefined, {
+      scope: `editor:${props.projectId}`,
+    })
+    .catch((cause) => {
+      error.value = cause instanceof Error ? cause.message : "Не удалось открыть агента";
+    });
+}
 const commands = useCommandScope(
   `agent-chat:${props.backend}:${props.chatId ?? props.projectId}`,
   () => ({
@@ -321,6 +336,7 @@ onBeforeUnmount(() => {
         :plain="plain"
         :agent-name="agentName"
         @suggest="suggest"
+        @open="openCoder"
       />
       <div
         v-else

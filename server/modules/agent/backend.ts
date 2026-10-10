@@ -38,11 +38,12 @@ export const AGENT_BACKEND_IDS: readonly AgentBackendId[] = [
 export const HOSTED_AGENT_BACKENDS: readonly AgentBackendId[] = ["codex", "opencode", "cursor"];
 
 /** Claude Code permission policy: `default` asks in the chat before edits and shell commands. */
-export type AgentPermissionMode = "default" | "acceptEdits" | "bypassPermissions";
+export type AgentPermissionMode = "default" | "acceptEdits" | "auto" | "bypassPermissions";
 
 export const AGENT_PERMISSION_MODES: readonly AgentPermissionMode[] = [
   "default",
   "acceptEdits",
+  "auto",
   "bypassPermissions",
 ];
 

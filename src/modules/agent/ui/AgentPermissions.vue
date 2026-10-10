@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import UiButton from "../../../common/ui/UiButton.vue";
+import { isEditTool } from "../lib/tool-input.ts";
+import AgentCodeBlock from "./AgentCodeBlock.vue";
 import type { AgentPermission } from "../model/types.ts";
 import IconShield from "~icons/lucide/shield-question";
 
@@ -20,7 +22,7 @@ const emit = defineEmits<{ decide: [id: string, allow: boolean, always?: boolean
         <span class="title">{{ item.title }}</span>
         <code class="tool">{{ item.tool }}</code>
       </header>
-      <pre v-if="item.detail">{{ item.detail }}</pre>
+      <AgentCodeBlock v-if="item.detail" :text="item.detail" :diff="isEditTool(item.tool)" />
       <div class="actions">
         <UiButton variant="solid" size="sm" @click="emit('decide', item.id, true)">
           Разрешить
@@ -78,18 +80,6 @@ header svg {
   margin-left: auto;
   color: var(--muted);
   font-family: var(--mono);
-}
-pre {
-  margin: 0;
-  max-height: 160px;
-  overflow: auto;
-  padding: 8px 10px;
-  border-radius: var(--r-md);
-  background: var(--bg-sunken);
-  color: var(--text-2);
-  font: var(--fs-2xs) / 1.6 var(--mono);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
 }
 .actions {
   display: flex;
