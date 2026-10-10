@@ -12,6 +12,7 @@ import {
 } from "./chat-state.ts";
 import { useExternalAgent } from "./external.ts";
 import { applyAgentEvent } from "./turn-events.ts";
+import { hasChips, messageText, normalizeParts } from "../lib/message-parts.ts";
 import type {
   AgentBackendId,
   AgentEvent,
@@ -87,6 +88,12 @@ export function useAgent(
   }
   const catalog = useProjects();
   const turns = computed(() => state.turns);
+  const draftParts = computed({
+    get: () => state.draftParts,
+    set: (value) => {
+      state.draftParts = value;
+    },
+  });
   const draft = computed({
     get: () => state.draft,
     set: (value: string) => {
@@ -202,7 +209,12 @@ export function useAgent(
     await ready;
     const message = (text ?? state.draft).trim();
     if (!message || state.busy) return;
+    // The chips are the draft's own: a message passed in is plain text.
+    const written =
+      text === undefined && messageText(state.draftParts) === state.draft ? state.draftParts : [];
+    const content = hasChips(written) ? normalizeParts(written) : undefined;
     state.draft = "";
+    state.draftParts = [];
     state.error = "";
     const previousHistory = history();
     const resume = sessionId();
@@ -210,6 +222,7 @@ export function useAgent(
       id: crypto.randomUUID(),
       role: "user",
       text: message,
+      ...(content ? { content } : {}),
       tools: [],
     };
     const assistant = reactive<AgentTurn>({
@@ -230,6 +243,7 @@ export function useAgent(
         backend,
         permissionMode: state.permissionMode,
         selection: state.selection,
+        parts: content,
         attach,
       }),
     );
@@ -297,6 +311,7 @@ export function useAgent(
   return {
     turns,
     draft,
+    draftParts,
     busy,
     error,
     phase,

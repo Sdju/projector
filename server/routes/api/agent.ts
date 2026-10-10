@@ -32,6 +32,7 @@ import type { AgentHistoryTurn } from "../../modules/providers/index.ts";
 
 import { readBody, asString, json } from "../../modules/transport/index.ts";
 
+import type { MessagePart } from "../../modules/agent/index.ts";
 import type { RouteContext } from "../../modules/transport/index.ts";
 
 async function projectPath(projectId: string): Promise<string> {
@@ -169,6 +170,30 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
   return false;
 }
 
+/** The chips of a message; anything that is not a well-formed part is dropped. */
+function partsFrom(value: unknown): MessagePart[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const parts = value.flatMap((item): MessagePart[] => {
+    if (!item || typeof item !== "object") return [];
+    const part = item as Record<string, unknown>;
+    if (part.type === "text" && typeof part.text === "string")
+      return [{ type: "text", text: part.text }];
+    if (part.type === "file" && typeof part.path === "string" && part.path)
+      return [{ type: "file", path: part.path, directory: part.directory === true || undefined }];
+    if (part.type === "command" && typeof part.name === "string" && part.name)
+      return [{ type: "command", name: part.name }];
+    if (
+      part.type === "image" &&
+      typeof part.id === "string" &&
+      typeof part.name === "string" &&
+      typeof part.mime === "string"
+    )
+      return [{ type: "image", id: part.id, name: part.name, mime: part.mime }];
+    return [];
+  });
+  return parts.some((part) => part.type !== "text") ? parts.slice(0, 200) : undefined;
+}
+
 /** A new request from the body of `POST /api/agent`. */
 async function requestFrom(body: Record<string, unknown>) {
   const message = asString(body.message);
@@ -190,6 +215,7 @@ async function requestFrom(body: Record<string, unknown>) {
     : [];
   return {
     message,
+    parts: partsFrom(body.parts),
     history,
     backend: AGENT_BACKEND_IDS.find((id) => id === body.backend) ?? "projector",
     permissionMode: AGENT_PERMISSION_MODES.find((mode) => mode === body.permissionMode),

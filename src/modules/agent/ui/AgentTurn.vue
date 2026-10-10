@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import UiButton from "../../../common/ui/UiButton.vue";
 import { computed } from "vue";
+import { chipIcon, chipLabel, chipTitle } from "../lib/composer/chips.ts";
 import { legacyParts } from "../model/turn-events.ts";
 import type { AgentToolChip, AgentTurn } from "../model/types.ts";
 import AgentMessage from "./AgentMessage.vue";
@@ -42,7 +43,19 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
 
 <template>
   <article class="turn" :class="turn.role">
-    <p v-if="turn.role === 'user'" class="user-message">{{ turn.text }}</p>
+    <p v-if="turn.role === 'user'" class="user-message">
+      <template v-if="turn.content?.length">
+        <template v-for="(part, index) in turn.content" :key="index">
+          <template v-if="part.type === 'text'">{{ part.text }}</template>
+          <span v-else class="chip" :class="part.type" :title="chipTitle(part)">
+            <span class="chip-icon" aria-hidden="true" v-html="chipIcon(part)" />{{
+              chipLabel(part)
+            }}</span
+          >
+        </template>
+      </template>
+      <template v-else>{{ turn.text }}</template>
+    </p>
     <div v-else class="assistant-body">
       <template v-for="segment in segments" :key="segment.key">
         <AgentMessage v-if="segment.type === 'text'" :text="segment.text" />
@@ -92,6 +105,23 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
   line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 0 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  vertical-align: baseline;
+}
+.chip-icon {
+  display: flex;
+  color: var(--muted);
 }
 .assistant-body {
   min-width: 0;

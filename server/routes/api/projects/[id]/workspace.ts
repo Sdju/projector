@@ -8,6 +8,7 @@ import {
   readExternalImage,
   previewProjectFile,
   searchProject,
+  findProjectPaths,
   projectGit,
   projectComparison,
   projectGutter,
@@ -167,6 +168,10 @@ export async function handleProjectWorkspace({
           regex: url.searchParams.get("regex") === "true",
         }),
       );
+    else if (sessionId === "paths")
+      json(res, 200, {
+        paths: await findProjectPaths(project.path, url.searchParams.get("q") ?? ""),
+      });
     else if (sessionId === "git") json(res, 200, await projectGit(project.path));
     else if (sessionId === "branches") json(res, 200, await projectBranches(project.path));
     else if (sessionId === "log")

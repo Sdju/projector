@@ -9,6 +9,7 @@ export {
 } from "./files.ts";
 export { openProjectSiteFile } from "./site.ts";
 export { searchProject } from "./search.ts";
+export { findProjectPaths } from "./find-paths.ts";
 export {
   projectGit,
   projectGithubRepository,

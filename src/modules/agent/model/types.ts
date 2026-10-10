@@ -42,6 +42,15 @@ export interface AgentSessionRef {
   id: string;
 }
 
+/** A reference inside a message: a project file or folder, an attached image, a slash command. */
+export type MessageChip =
+  | { type: "file"; path: string; directory?: boolean }
+  | { type: "image"; id: string; name: string; mime: string }
+  | { type: "command"; name: string };
+
+/** A message as written: text with chips between it. */
+export type MessagePart = { type: "text"; text: string } | MessageChip;
+
 /** How full the agent's context window is, as the agent last reported it. */
 export interface AgentContext {
   used: number;
@@ -58,6 +67,8 @@ export interface AgentTurn {
   role: "user" | "assistant";
   text: string;
   tools: AgentToolChip[];
+  /** What the user wrote, with chips; `text` holds the same message as plain text. */
+  content?: MessagePart[];
   /** Order of text and tool calls; absent in turns saved before it existed. */
   parts?: AgentPart[];
   /** Context fullness after this turn; the chat shows the latest one. */

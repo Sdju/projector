@@ -4,6 +4,7 @@ import type {
   AgentSelection,
   AgentSessionInfo,
   AgentTurn,
+  MessagePart,
   AgentEvent,
   AgentHistoryTurn,
   AgentCommandRequest,
@@ -45,6 +46,8 @@ export async function streamAgent(
     backend?: AgentBackendId;
     permissionMode?: AgentPermissionMode;
     selection?: AgentSelection;
+    /** The message with its chips; `message` carries the same text for agents that read text. */
+    parts?: MessagePart[];
     commands?: (request: AgentCommandRequest) => Promise<unknown>;
     /** Rejoin the answer an agent process is still producing instead of asking again. */
     attach?: string;
@@ -64,6 +67,7 @@ export async function streamAgent(
             backend: options.backend,
             permissionMode: options.permissionMode,
             selection: options.selection,
+            parts: options.parts,
             approvals: true,
             commandBridge: !!options.commands,
           },

@@ -1,36 +1,25 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref, watch } from "vue";
+import { ref } from "vue";
+import type { MessageChip, MessagePart } from "../model/types.ts";
+import AgentInput from "./AgentInput.vue";
 import IconArrowUp from "~icons/lucide/arrow-up";
 import IconArrowDown from "~icons/lucide/arrow-down";
 import IconSquare from "~icons/lucide/square";
 import IconAlert from "~icons/lucide/circle-alert";
 
 const draft = defineModel<string>({ required: true });
+const parts = defineModel<MessagePart[]>("parts", { default: () => [] });
 defineProps<{
   busy: boolean;
   away: boolean;
   error: string;
   copied: boolean;
+  projectId?: string;
+  commands?: { name: string; description?: string }[];
 }>();
-const emit = defineEmits<{ submit: []; stop: []; latest: [] }>();
-const input = ref<HTMLTextAreaElement>();
-function resize() {
-  if (!input.value) return;
-  input.value.style.height = "auto";
-  input.value.style.height = `${Math.min(input.value.scrollHeight, 180)}px`;
-}
-function keydown(event: KeyboardEvent) {
-  if (event.key === "Enter" && !event.shiftKey && !event.isComposing && !event.repeat) {
-    event.preventDefault();
-    emit("submit");
-  }
-}
-watch(draft, async () => {
-  await nextTick();
-  resize();
-});
-onMounted(resize);
-defineExpose({ resize, focus: () => input.value?.focus() });
+const emit = defineEmits<{ submit: []; stop: []; latest: []; open: [chip: MessageChip] }>();
+const input = ref<InstanceType<typeof AgentInput>>();
+defineExpose({ resize: () => {}, focus: () => input.value?.focus() });
 </script>
 
 <template>
@@ -40,14 +29,14 @@ defineExpose({ resize, focus: () => input.value?.focus() });
     </button>
     <p v-if="error" class="chat-error" role="alert"><IconAlert aria-hidden="true" />{{ error }}</p>
     <form class="composer" :class="{ working: busy }" @submit.prevent="emit('submit')">
-      <textarea
+      <AgentInput
         ref="input"
         v-model="draft"
-        name="agent-message"
-        aria-label="Сообщение агенту"
-        placeholder="Что нужно сделать в проекте?"
-        rows="1"
-        @keydown="keydown"
+        v-model:parts="parts"
+        :project-id="projectId"
+        :commands="commands"
+        @submit="emit('submit')"
+        @open="(chip) => emit('open', chip)"
       />
       <div class="composer-footer">
         <slot name="controls" />
@@ -100,24 +89,6 @@ defineExpose({ resize, focus: () => input.value?.focus() });
 }
 .composer:focus-within {
   border-color: var(--focus);
-}
-.composer textarea {
-  display: block;
-  width: 100%;
-  min-height: 44px;
-  max-height: 180px;
-  padding: var(--sp-3) var(--sp-3) var(--sp-1);
-  background: none;
-  border: 0;
-  border-radius: 0;
-  outline: none;
-  resize: none;
-  font: var(--fs-sm)/1.7 var(--sans);
-  color: var(--text);
-  scrollbar-width: thin;
-}
-.composer textarea::placeholder {
-  color: var(--muted);
 }
 .composer-footer {
   display: flex;

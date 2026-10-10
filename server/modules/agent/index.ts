@@ -24,4 +24,4 @@ export {
   runAgent,
   selectionFrom,
 } from "./agent.ts";
-export type { AgentControl, AgentSessionInfo, AgentSessionTurn } from "./agent.ts";
+export type { AgentControl, AgentSessionInfo, AgentSessionTurn, MessagePart } from "./agent.ts";

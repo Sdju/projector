@@ -55,6 +55,13 @@ export interface AgentRunHandle {
   attach: boolean;
 }
 
+/** A message as the user wrote it: text with project files, images and commands between it. */
+export type MessagePart =
+  | { type: "text"; text: string }
+  | { type: "file"; path: string; directory?: boolean }
+  | { type: "image"; id: string; name: string; mime: string }
+  | { type: "command"; name: string };
+
 export interface AgentRunOptions {
   run?: AgentRunHandle;
   /** Defaults to `projector`. */
@@ -63,6 +70,8 @@ export interface AgentRunOptions {
   /** Model, effort and mode chosen in the chat, by control id. */
   selection?: AgentSelection;
   message: string;
+  /** `message` with its chips; the text already names every file (`@path`). */
+  parts?: MessagePart[];
   cwd?: string;
   commands?: (request: CommandRequest) => Promise<unknown>;
   /** Asks the user before a sensitive tool runs; absent when the client cannot show a prompt. */

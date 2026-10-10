@@ -6,12 +6,14 @@ import type {
   AgentSelection,
   AgentSessionInfo,
   AgentTurn,
+  MessagePart,
 } from "./types.ts";
 
 export const createState = () =>
   reactive({
     turns: [] as AgentTurn[],
     draft: "",
+    draftParts: [] as MessagePart[],
     busy: false,
     error: "",
     phase: "",

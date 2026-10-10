@@ -24,6 +24,26 @@ const schema = z
           }),
         )
         .max(100),
+      content: z
+        .array(
+          z.discriminatedUnion("type", [
+            z.object({ type: z.literal("text"), text: z.string().max(100000) }),
+            z.object({
+              type: z.literal("file"),
+              path: z.string().max(1000),
+              directory: z.boolean().optional(),
+            }),
+            z.object({
+              type: z.literal("image"),
+              id: z.string().max(100),
+              name: z.string().max(200),
+              mime: z.string().max(100),
+            }),
+            z.object({ type: z.literal("command"), name: z.string().max(200) }),
+          ]),
+        )
+        .max(200)
+        .optional(),
       context: z
         .object({
           used: z.number(),

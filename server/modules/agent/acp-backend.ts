@@ -4,7 +4,9 @@ import { contentText, createAcpEventMapper } from "./acp-events.ts";
 import { acpProgram, initializeAcp, startAcp } from "./acp-process.ts";
 import { acpControls, acpLoadSession, acpSessions } from "./acp-tools.ts";
 import { promptWithHistory } from "./agent-host.ts";
-import type { AgentBackend, AgentBackendId, AgentRunOptions } from "./backend.ts";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import type { AgentBackend, AgentBackendId, AgentRunOptions, MessagePart } from "./backend.ts";
 
 interface PermissionOption {
   optionId?: string;
@@ -16,6 +18,25 @@ function stopReasonError(stopReason: unknown): string {
   if (stopReason === "max_turn_requests") return "Достигнут лимит шагов агента";
   if (stopReason === "refusal") return "Агент отказался выполнять запрос";
   return "Агент завершился с ошибкой";
+}
+
+/**
+ * The prompt as ACP blocks: the text, which already names every file as `@path`, plus a link to
+ * each file or folder so an agent can open it without guessing what the name refers to.
+ */
+function promptBlocks(text: string, parts: MessagePart[] | undefined, cwd: string | undefined) {
+  const links = (parts ?? []).flatMap((part) =>
+    part.type === "file"
+      ? [
+          {
+            type: "resource_link",
+            name: part.path.split("/").pop() || part.path,
+            uri: pathToFileURL(resolve(cwd ?? "/", part.path)).href,
+          },
+        ]
+      : [],
+  );
+  return [{ type: "text", text }, ...links];
 }
 
 /** An external agent driven through its ACP server over stdio. */
@@ -88,7 +109,7 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
       : promptWithHistory(options.message, options.history ?? []);
     const result = (await connection.request(
       "session/prompt",
-      { sessionId, prompt: [{ type: "text", text: prompt }] },
+      { sessionId, prompt: promptBlocks(prompt, options.parts, options.cwd) },
       NO_TIMEOUT,
     )) as { stopReason?: unknown };
     if (options.abort?.aborted) return;

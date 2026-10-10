@@ -98,6 +98,7 @@ const READ_DOMAIN: Record<string, "files" | "git" | "search" | "issues" | "pulls
     diff: "git",
     gutter: "git",
     search: "search",
+    paths: "files",
     issues: "issues",
     issue: "issues",
     pulls: "pulls",

@@ -29,6 +29,7 @@ const { api } = useIdeCommands();
 const {
   turns,
   draft,
+  draftParts,
   busy,
   error,
   phase,
@@ -363,6 +364,8 @@ onBeforeUnmount(() => {
     <AgentComposer
       ref="composer"
       v-model="draft"
+      v-model:parts="draftParts"
+      :project-id="projectId"
       :busy="busy"
       :away="away"
       :error="error || copyError"

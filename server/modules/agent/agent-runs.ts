@@ -4,13 +4,14 @@ import { join } from "node:path";
 import { dataDir } from "../../../core/modules/app-paths/index.ts";
 import { os } from "../../../core/modules/os/index.ts";
 import type { AgentHistoryTurn } from "../providers/index.ts";
-import type { AgentBackendId, AgentPermissionMode } from "./backend.ts";
+import type { AgentBackendId, AgentPermissionMode, MessagePart } from "./backend.ts";
 import type { AgentSelection } from "./controls.ts";
 
 /** What a restarted server needs to repeat a run and so rejoin its answer in progress. */
 export interface AgentRunRecord {
   backend: AgentBackendId;
   message: string;
+  parts?: MessagePart[];
   history: AgentHistoryTurn[];
   cwd?: string;
   sessionId?: string;

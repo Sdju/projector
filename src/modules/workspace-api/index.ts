@@ -97,6 +97,17 @@ export function searchWorkspace(
   );
 }
 
+/** Files and folders of the project whose path matches the query, best first. */
+export async function findWorkspacePaths(projectId: string, query: string, signal?: AbortSignal) {
+  const { paths } = await workspaceRequest<{ paths: { path: string; directory: boolean }[] }>(
+    projectId,
+    "paths",
+    { q: query },
+    signal,
+  );
+  return paths;
+}
+
 export function gutterRequest(projectId: string, path: string, signal?: AbortSignal) {
   return workspaceRequest<import("../../../core/modules/workspace/index.ts").GitGutter>(
     projectId,
