@@ -13,6 +13,7 @@ import { reconcileOnStartup } from "../modules/environments/index.ts";
 
 import { attachTerminalControlServer } from "../modules/terminal-control/index.ts";
 import { authorizeHttp } from "../modules/access/index.ts";
+import { handleProxyHost, isProxyHost } from "../modules/browser/index.ts";
 
 let hooksBound = false;
 
@@ -64,6 +65,11 @@ export function bindRuntime(httpServer: HttpServer | null, mode: ServerMode): vo
 function attach(server: ViteDevServer | PreviewServer, mode: ServerMode): void {
   bindRuntime(server.httpServer, mode);
   server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
+    // Origin прокси псевдобраузера имеет собственную проверку и не проходит общую по Host.
+    if (isProxyHost(req)) {
+      void handleProxyHost(req, res);
+      return;
+    }
     if (!authorizeHttp(req, res, true)) return;
     void handleApi(req, res)
       .then((handled) => {

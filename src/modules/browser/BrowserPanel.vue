@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useEventListener } from "@vueuse/core";
 import UiButton from "../../common/ui/UiButton.vue";
 import { readoutLines, useTabReadout } from "../../common/utilities/tab-readout.ts";
 import {
-  browserFrameSrc,
-  fromProxyPath,
   isLocalBrowserTarget,
   normalizeBrowserInput,
+  proxyAvailableFor,
+  proxySuffix,
+  proxyUrl,
 } from "../../../core/modules/browser/index.ts";
+import { browserProxyKey } from "./proxy-key.ts";
 import { useProjects } from "../project/index.ts";
 import IconBack from "~icons/lucide/arrow-left";
 import IconForward from "~icons/lucide/arrow-right";
@@ -35,16 +37,34 @@ const devUrl = computed(
   () => projects.value.find((item) => item.id === props.projectId)?.runtime?.url ?? "",
 );
 
-const viaProxy = computed(() =>
+const wantsProxy = computed(() =>
   proxy.value === "auto" ? !isLocalBrowserTarget(current.value) : proxy.value === "on",
 );
-const src = computed(() =>
-  browserFrameSrc(current.value, proxy.value === "auto" ? "auto" : proxy.value === "on"),
-);
-/** Прямые страницы (dev-серверы) держат свой origin; проксируемые и сам Projector — без него. */
+// `*.localhost` указывает на этот компьютер только при открытии Projector на нём же.
+const proxyReady = proxyAvailableFor(location.hostname);
+const viaProxy = computed(() => wantsProxy.value && proxyReady);
+const proxyKey = ref("");
+const proxyError = ref("");
+onMounted(() => {
+  if (proxyReady)
+    browserProxyKey().then(
+      (value) => (proxyKey.value = value),
+      (error: Error) => (proxyError.value = error.message),
+    );
+});
+const src = computed(() => {
+  if (!current.value) return "about:blank";
+  if (!viaProxy.value) return current.value;
+  if (!proxyKey.value) return "about:blank";
+  return proxyUrl(current.value, proxySuffix(proxyKey.value, location.port)) ?? current.value;
+});
+/**
+ * Страница прокси живёт на своём origin (`*.proxy.localhost`), поэтому получает настоящий origin;
+ * прямая страница тоже, кроме самого Projector: с его origin она дотянулась бы до API.
+ */
 const sandbox = computed(() => {
   const base = "allow-scripts allow-forms allow-popups allow-modals";
-  if (viaProxy.value) return base;
+  if (viaProxy.value) return `${base} allow-same-origin`;
   try {
     return new URL(current.value).origin === location.origin ? base : `${base} allow-same-origin`;
   } catch {
@@ -118,14 +138,13 @@ useTabReadout(() => ({
     current.value ? `Адрес: ${current.value}` : "Адрес не задан",
     title.value && `Заголовок: ${title.value}`,
     current.value && `Режим: ${viaProxy.value ? "через прокси Projector" : "напрямую"}`,
+    proxyError.value && `Ошибка прокси: ${proxyError.value}`,
     devUrl.value && `Dev-сервер проекта: ${devUrl.value}`,
   ),
 }));
-// Заголовок и адрес прямой страницы недоступны (чужой origin): показываем адрес без схемы.
 const hostname = computed(() => {
-  const real = fromProxyPath(src.value) ?? current.value;
   try {
-    return new URL(real).host;
+    return new URL(current.value).host;
   } catch {
     return "";
   }
@@ -205,6 +224,11 @@ const hostname = computed(() => {
       </UiButton>
     </form>
     <p v-if="problem" class="note error" role="alert">{{ problem }}</p>
+    <p v-else-if="proxyError" class="note error" role="alert">{{ proxyError }}</p>
+    <p v-else-if="current && wantsProxy && !proxyReady" class="note">
+      Прокси работает, только когда Projector открыт на этом компьютере (localhost). Страница
+      загружается напрямую и откроется, если сайт разрешает встраивание.
+    </p>
     <p v-else-if="current && proxy === 'off' && !isLocalBrowserTarget(current)" class="note">
       Напрямую страница откроется, только если сайт разрешает встраивание. Иначе выберите «Авто».
     </p>

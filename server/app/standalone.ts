@@ -7,6 +7,7 @@ import { serveStatic } from "./static.ts";
 import { APP_PORT, readNetworkMode } from "../../core/modules/app-paths/index.ts";
 import { networkHost } from "../../core/modules/network-mode/index.ts";
 import { authorizeHttp } from "../modules/access/index.ts";
+import { handleProxyHost, isProxyHost } from "../modules/browser/index.ts";
 
 /** Prod-сервер без Vite: собранный `dist` и API Projector на чистом Node. */
 const root = fileURLToPath(new URL("../../dist", import.meta.url));
@@ -16,6 +17,10 @@ if (!existsSync(root + "/index.html")) {
 }
 
 const server = createServer((req, res) => {
+  if (isProxyHost(req)) {
+    void handleProxyHost(req, res);
+    return;
+  }
   if (!authorizeHttp(req, res, true)) return;
   void handleApi(req, res)
     .then((handled) => (handled ? undefined : serveStatic(root, req, res)))

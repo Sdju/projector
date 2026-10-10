@@ -1,71 +1,41 @@
-import { request as httpRequest, type IncomingHttpHeaders, type IncomingMessage } from "node:http";
+import { request as httpRequest, type IncomingMessage, type ServerResponse } from "node:http";
 import { request as httpsRequest } from "node:https";
-import { lookup } from "node:dns";
-import { BlockList, isIP } from "node:net";
-import { HttpError } from "../http/index.ts";
-import { toProxyPath } from "../../../core/modules/browser/index.ts";
+import {
+  fromProxyUrl,
+  parseProxyHost,
+  proxyUrl,
+  type ProxyHost,
+} from "../../../core/modules/browser/index.ts";
+import { isLocalRequest } from "../access/index.ts";
+import { INTERNAL_MESSAGE, guardedLookup, isInternalLiteral } from "./guard.ts";
+import { cookieHeader, siteOf, storeCookie } from "./cookies.ts";
+import { proxyKey } from "./key.ts";
+import { rewriteCss, rewriteHtml, type RewriteContext } from "./rewrite.ts";
 
 const MAX_REWRITE = 20 * 1024 * 1024;
 const REQUEST_TIMEOUT = 30_000;
+const METHODS = new Set(["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]);
 
-/** Адреса машины и локальной сети: прокси их не открывает, чтобы страница из интернета не ходила во внутренние сервисы. */
-const internal = new BlockList();
-for (const [net, prefix] of [
-  ["0.0.0.0", 8],
-  ["10.0.0.0", 8],
-  ["100.64.0.0", 10],
-  ["127.0.0.0", 8],
-  ["169.254.0.0", 16],
-  ["172.16.0.0", 12],
-  ["192.0.0.0", 24],
-  ["192.168.0.0", 16],
-  ["198.18.0.0", 15],
-  ["224.0.0.0", 3],
-] as const)
-  internal.addSubnet(net, prefix, "ipv4");
-for (const [net, prefix] of [
-  ["::", 128],
-  ["::1", 128],
-  ["fc00::", 7],
-  ["fe80::", 10],
-  ["ff00::", 8],
-] as const)
-  internal.addSubnet(net, prefix, "ipv6");
-
-function isInternalAddress(address: string): boolean {
-  const mapped = address.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
-  const value = mapped?.[1] ?? address;
-  const family = isIP(value);
-  return !family || internal.check(value, family === 6 ? "ipv6" : "ipv4");
-}
-
-/** DNS-разрешение с проверкой: тот же адрес, к которому подключается сокет, а значит DNS rebinding не обойдёт запрет. */
-const guardedLookup: typeof lookup = ((hostname: string, options: unknown, callback: unknown) => {
-  const done = (typeof options === "function" ? options : callback) as (
-    error: Error | null,
-    address?: string | { address: string; family: number }[],
-    family?: number,
-  ) => void;
-  const all = typeof options === "object" && !!options && (options as { all?: boolean }).all;
-  lookup(hostname, { all: true }, (error, addresses) => {
-    if (error) return done(error);
-    const allowed = addresses.filter((item) => !isInternalAddress(item.address));
-    if (!allowed.length)
-      return done(new HttpError(403, "Прокси не открывает адреса локальной сети") as Error);
-    if (all) return done(null, allowed);
-    done(null, allowed[0]!.address, allowed[0]!.family);
-  });
-}) as typeof lookup;
-
-const REQUEST_HEADERS = [
+/** Заголовки запроса, которые переходят к сайту как есть. Cookie, Origin и Referer собираются отдельно. */
+const FORWARDED = [
   "accept",
   "accept-language",
   "user-agent",
   "range",
+  "if-range",
   "if-none-match",
   "if-modified-since",
+  "content-type",
+  "content-length",
+  "authorization",
+  "cache-control",
+  "pragma",
+  "x-requested-with",
+  "access-control-request-method",
+  "access-control-request-headers",
 ];
-const DROPPED_RESPONSE = new Set([
+/** Заголовки ответа, которые запрещали бы встраивание, привязывали к настоящему origin или ломают переписанное тело. */
+const DROPPED = new Set([
   "x-frame-options",
   "content-security-policy",
   "content-security-policy-report-only",
@@ -75,119 +45,64 @@ const DROPPED_RESPONSE = new Set([
   "set-cookie",
   "set-cookie2",
   "strict-transport-security",
-  "content-length",
   "content-encoding",
   "transfer-encoding",
   "connection",
+  "keep-alive",
   "location",
   "content-location",
   "link",
-  "refresh",
   "report-to",
   "nel",
   "alt-svc",
   "public-key-pins",
+  "clear-site-data",
+  "origin-agent-cluster",
+  "permissions-policy",
 ]);
 
-export interface ProxyResponse {
-  status: number;
-  headers: Record<string, string>;
-  /** Тело целиком, если его переписали; иначе поток от сервера. */
-  body: Buffer | IncomingMessage;
+class ProxyError extends Error {
+  readonly status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
 }
 
-function resolveTarget(value: string, base: string): string | undefined {
-  const text = value.trim();
-  if (!text || text.startsWith("#") || /^(?:javascript|data|mailto|tel|blob|about):/i.test(text))
-    return;
+function fail(res: ServerResponse, status: number, message: string) {
+  if (res.headersSent) return res.destroy();
+  res.writeHead(status, {
+    "Content-Type": "text/plain; charset=utf-8",
+    "Cache-Control": "no-store",
+  });
+  res.end(message);
+}
+
+/** Настоящий origin, который сайт должен увидеть вместо origin прокси; `undefined`, если это не страница прокси. */
+function realOrigin(value: string | undefined): string | undefined {
+  if (!value) return;
   try {
-    const url = new URL(text, base);
-    if (url.protocol !== "http:" && url.protocol !== "https:") return;
-    url.hash = "";
-    return toProxyPath(url.href) + (new URL(text, base).hash || "");
+    const host = parseProxyHost(new URL(value).host);
+    return host?.origin;
   } catch {
     return;
   }
 }
 
-export function rewriteCss(css: string, base: string): string {
-  return css
-    .replace(/url\(\s*(["']?)([^"')]*?)\1\s*\)/gi, (whole, quote: string, value: string) => {
-      const target = resolveTarget(value, base);
-      return target ? `url(${quote}${target}${quote})` : whole;
-    })
-    .replace(/@import\s+(["'])([^"']+)\1/gi, (whole, quote: string, value: string) => {
-      const target = resolveTarget(value, base);
-      return target ? `@import ${quote}${target}${quote}` : whole;
-    });
-}
-
-const URL_ATTRIBUTES =
-  /(\s(?:src|href|action|formaction|poster|data|background)\s*=\s*)(?:"([^"]*)"|'([^']*)')/gi;
-const SRCSET = /(\ssrcset\s*=\s*)(?:"([^"]*)"|'([^']*)')/gi;
-const STRIPPED_ATTRIBUTES =
-  /\s(?:integrity|nonce|crossorigin)(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?(?=[\s>/])/gi;
-const STYLE_ATTRIBUTE = /(\sstyle\s*=\s*)(?:"([^"]*)"|'([^']*)')/gi;
-const STYLE_BLOCK = /(<style\b[^>]*>)([\s\S]*?)(<\/style>)/gi;
-const META_BLOCKED =
-  /<meta\b[^>]*http-equiv\s*=\s*["']?(?:content-security-policy|refresh|set-cookie)[^>]*>/gi;
-const BASE_TAG = /<base\b[^>]*>/i;
-
-/** Переписывает ссылки HTML на прокси и добавляет скрипт, сообщающий родителю адрес и заголовок. */
-export function rewriteHtml(html: string, pageUrl: string): string {
-  let base = pageUrl;
-  const baseTag = html.match(BASE_TAG)?.[0];
-  const baseHref = baseTag?.match(/href\s*=\s*(?:"([^"]*)"|'([^']*)')/i);
-  if (baseHref)
-    try {
-      base = new URL(baseHref[1] ?? baseHref[2] ?? "", pageUrl).href;
-    } catch {
-      // A broken <base> is ignored by browsers too.
-    }
-  const quoted = (
-    prefix: string,
-    double: string | undefined,
-    single: string | undefined,
-    map: (value: string) => string,
-  ) => {
-    const quote = double !== undefined ? '"' : "'";
-    return `${prefix}${quote}${map(double ?? single ?? "")}${quote}`;
-  };
-  const rewritten = html
-    .replace(BASE_TAG, "")
-    .replace(META_BLOCKED, "")
-    .replace(STRIPPED_ATTRIBUTES, "")
-    .replace(
-      STYLE_BLOCK,
-      (_, open: string, css: string, close: string) => open + rewriteCss(css, base) + close,
-    )
-    .replace(STYLE_ATTRIBUTE, (_whole, prefix, d, s) =>
-      quoted(prefix, d, s, (value) => rewriteCss(value, base)),
-    )
-    .replace(SRCSET, (_whole, prefix, d, s) =>
-      quoted(prefix, d, s, (value) =>
-        value
-          .split(",")
-          .map((part) => {
-            const [link, ...rest] = part.trim().split(/\s+/);
-            return [(link && resolveTarget(link, base)) || link, ...rest].join(" ");
-          })
-          .join(", "),
-      ),
-    )
-    .replace(URL_ATTRIBUTES, (_whole, prefix, d, s) =>
-      quoted(prefix, d, s, (value) => resolveTarget(value, base) ?? value),
-    );
-  return injectShim(rewritten, pageUrl);
-}
-
-function injectShim(html: string, pageUrl: string): string {
-  const data = JSON.stringify(pageUrl).replace(/</g, "\\u003c");
-  const script = `<script>(function(){var u=${data};function s(){try{parent.postMessage({projectorBrowser:true,url:u,title:document.title},"*")}catch(e){}}addEventListener("DOMContentLoaded",s);addEventListener("load",s);new MutationObserver(s).observe(document.documentElement,{childList:true,subtree:true,characterData:true});})()</script>`;
-  const head = html.match(/<head\b[^>]*>/i);
-  if (head) return html.replace(head[0], head[0] + script);
-  const root = html.match(/<html\b[^>]*>/i);
-  return root ? html.replace(root[0], root[0] + script) : script + html;
+function charsetOf(type: string, head: Buffer): string {
+  const label =
+    type.match(/charset\s*=\s*["']?([\w:.-]+)/i)?.[1] ??
+    (type.startsWith("text/html")
+      ? head
+          .subarray(0, 2048)
+          .toString("latin1")
+          .match(/<meta[^>]+charset\s*=\s*["']?([\w:.-]+)/i)?.[1]
+      : undefined);
+  try {
+    return new TextDecoder(label ?? "utf-8").encoding;
+  } catch {
+    return "utf-8";
+  }
 }
 
 function readLimited(response: IncomingMessage): Promise<Buffer> {
@@ -198,7 +113,7 @@ function readLimited(response: IncomingMessage): Promise<Buffer> {
       size += chunk.length;
       if (size > MAX_REWRITE) {
         response.destroy();
-        reject(new HttpError(413, "Страница слишком большая для просмотра"));
+        reject(new ProxyError(413, "Страница слишком большая для просмотра"));
         return;
       }
       chunks.push(chunk);
@@ -208,79 +123,148 @@ function readLimited(response: IncomingMessage): Promise<Buffer> {
   });
 }
 
-function charsetOf(contentType: string): BufferEncoding {
-  const label = contentType.match(/charset\s*=\s*["']?([\w-]+)/i)?.[1]?.toLowerCase();
-  return label === "latin1" || label === "iso-8859-1" || label === "windows-1252"
-    ? "latin1"
-    : "utf8";
-}
-
-/** Загружает страницу как её увидел бы браузер, снимает запреты встраивания и переписывает ссылки. */
-export function fetchThroughProxy(
-  target: URL,
-  incoming: IncomingHttpHeaders,
-  method: string,
-): Promise<ProxyResponse> {
-  if (target.protocol !== "http:" && target.protocol !== "https:")
-    throw new HttpError(400, "Допустимы только http и https");
-  if (target.username || target.password)
-    throw new HttpError(400, "Адрес не должен содержать пароль");
-  // Для адреса-литерала Node не вызывает lookup, поэтому проверяем его здесь.
-  const literal = target.hostname.replace(/^\[|\]$/g, "");
-  if (isIP(literal) && isInternalAddress(literal))
-    throw new HttpError(403, "Прокси не открывает адреса локальной сети");
+/** Заголовки запроса к сайту: Origin и Referer возвращаются к настоящим адресам, cookies берутся из jar. */
+function upstreamHeaders(req: IncomingMessage, target: URL): Record<string, string> {
   const headers: Record<string, string> = { "accept-encoding": "identity" };
-  for (const name of REQUEST_HEADERS) {
-    const value = incoming[name];
+  for (const name of FORWARDED) {
+    const value = req.headers[name];
     if (typeof value === "string") headers[name] = value;
   }
-  return new Promise((resolve, reject) => {
-    const send = target.protocol === "https:" ? httpsRequest : httpRequest;
-    const upstream = send(
+  const origin = realOrigin(req.headers.origin);
+  if (origin) headers.origin = origin;
+  const referer =
+    typeof req.headers.referer === "string" ? fromProxyUrl(req.headers.referer) : undefined;
+  if (referer) headers.referer = referer;
+  const initiator = origin ?? (referer ? new URL(referer).origin : undefined);
+  const sameSite = !initiator || siteOf(new URL(initiator).hostname) === siteOf(target.hostname);
+  const navigation = req.headers["sec-fetch-mode"] === "navigate" && req.method === "GET";
+  const cookie = cookieHeader(target, { navigation, sameSite });
+  if (cookie) headers.cookie = cookie;
+  return headers;
+}
+
+function responseHeaders(
+  upstream: IncomingMessage,
+  target: URL,
+  host: ProxyHost,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [name, value] of Object.entries(upstream.headers)) {
+    if (DROPPED.has(name) || value === undefined) continue;
+    if (name === "access-control-allow-origin") {
+      let mapped = value as string;
+      if (mapped !== "*" && mapped !== "null")
+        mapped = (proxyUrl(mapped, host.suffix) ?? mapped).replace(/\/$/, "");
+      out[name] = mapped;
+      continue;
+    }
+    out[name] = Array.isArray(value) ? value.join(", ") : value;
+  }
+  const location = upstream.headers.location;
+  if (location) {
+    try {
+      const next = new URL(location, target);
+      out.location = proxyUrl(next, host.suffix) ?? location;
+    } catch {
+      out.location = location;
+    }
+  }
+  for (const header of upstream.headers["set-cookie"] ?? []) storeCookie(header, target);
+  return out;
+}
+
+async function serve(req: IncomingMessage, res: ServerResponse, host: ProxyHost): Promise<void> {
+  if (!isLocalRequest(req)) throw new ProxyError(403, "Прокси доступен только на этом компьютере");
+  if (host.nonce !== proxyKey()) throw new ProxyError(404, "Не найдено");
+  const method = req.method ?? "GET";
+  if (!METHODS.has(method)) throw new ProxyError(405, "Метод не поддерживается");
+  if (!req.url?.startsWith("/") || req.url.startsWith("//"))
+    throw new ProxyError(400, "Некорректный адрес");
+  const target = new URL(req.url, host.origin);
+  if (target.origin !== host.origin) throw new ProxyError(400, "Некорректный адрес");
+  if (isInternalLiteral(target.hostname)) throw new ProxyError(403, INTERNAL_MESSAGE);
+
+  const context: RewriteContext = { page: target, suffix: host.suffix };
+  const send = target.protocol === "https:" ? httpsRequest : httpRequest;
+  const upstream = await new Promise<IncomingMessage>((resolve, reject) => {
+    const outgoing = send(
       target,
-      { method, headers, lookup: guardedLookup, timeout: REQUEST_TIMEOUT },
-      (response) => {
-        void answer(response).then(resolve, reject);
+      {
+        method,
+        headers: upstreamHeaders(req, target),
+        lookup: guardedLookup,
+        timeout: REQUEST_TIMEOUT,
       },
+      resolve,
     );
-    upstream.on("timeout", () => upstream.destroy(new HttpError(504, "Сайт не отвечает")));
-    upstream.on("error", (error) =>
+    outgoing.on("timeout", () => outgoing.destroy(new ProxyError(504, "Сайт не отвечает")));
+    outgoing.on("error", (error) =>
       reject(
-        error instanceof HttpError
+        error instanceof ProxyError
           ? error
-          : new HttpError(502, `Не удалось открыть сайт: ${error.message}`),
+          : new ProxyError(
+              error.message === INTERNAL_MESSAGE ? 403 : 502,
+              error.message === INTERNAL_MESSAGE
+                ? INTERNAL_MESSAGE
+                : `Не удалось открыть сайт: ${error.message}`,
+            ),
       ),
     );
-    upstream.end();
-
-    async function answer(response: IncomingMessage): Promise<ProxyResponse> {
-      const status = response.statusCode ?? 502;
-      const out: Record<string, string> = {};
-      for (const [name, value] of Object.entries(response.headers)) {
-        if (DROPPED_RESPONSE.has(name) || value === undefined) continue;
-        out[name] = Array.isArray(value) ? value.join(", ") : value;
-      }
-      const location = response.headers.location;
-      if (location && status >= 300 && status < 400) {
-        const next = resolveTarget(location, target.href);
-        if (next) out.location = next;
-        response.resume();
-        return { status, headers: out, body: Buffer.alloc(0) };
-      }
-      const type = (response.headers["content-type"] ?? "").toLowerCase();
-      const rewrite = type.startsWith("text/html") || type.startsWith("text/css");
-      if (!rewrite || method === "HEAD" || status === 204 || status === 304) {
-        if (method === "HEAD") response.resume();
-        return { status, headers: out, body: method === "HEAD" ? Buffer.alloc(0) : response };
-      }
-      const source = (await readLimited(response)).toString(charsetOf(type));
-      const text = type.startsWith("text/html")
-        ? rewriteHtml(source, target.href)
-        : rewriteCss(source, target.href);
-      const body = Buffer.from(text, "utf8");
-      out["content-type"] = `${type.split(";")[0]}; charset=utf-8`;
-      out["content-length"] = String(body.length);
-      return { status, headers: out, body };
-    }
+    res.on("close", () => outgoing.destroy());
+    if (method === "GET" || method === "HEAD") outgoing.end();
+    else req.pipe(outgoing);
   });
+
+  const status = upstream.statusCode ?? 502;
+  const headers = responseHeaders(upstream, target, host);
+  const type = (upstream.headers["content-type"] ?? "").toLowerCase();
+  const rewrite =
+    method !== "HEAD" &&
+    status !== 204 &&
+    status !== 304 &&
+    (type.startsWith("text/html") || type.startsWith("text/css"));
+  if (!rewrite) {
+    if (upstream.headers["content-length"])
+      headers["content-length"] = upstream.headers["content-length"];
+    res.writeHead(status, headers);
+    if (method === "HEAD") {
+      upstream.resume();
+      res.end();
+      return;
+    }
+    upstream.pipe(res);
+    upstream.on("error", () => res.destroy());
+    return;
+  }
+  const raw = await readLimited(upstream);
+  const text = new TextDecoder(charsetOf(type, raw)).decode(raw);
+  const html = type.startsWith("text/html");
+  const body = Buffer.from(html ? rewriteHtml(text, context) : rewriteCss(text, context), "utf8");
+  delete headers.etag;
+  delete headers["last-modified"];
+  headers["content-type"] = `${type.split(";")[0]}; charset=utf-8`;
+  headers["content-length"] = String(body.length);
+  headers["cache-control"] = "no-store";
+  res.writeHead(status, headers);
+  res.end(body);
 }
+
+/**
+ * Запрос к origin прокси (`<хост>.<тег>.<nonce>.proxy.localhost`). Выполняется до общей проверки
+ * доступа: Host такого запроса не доверенный, поэтому обработчик сам требует loopback-клиента и nonce.
+ * Возвращает `false`, если запрос не к прокси.
+ */
+export async function handleProxyHost(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
+  const host = parseProxyHost(req.headers.host ?? "");
+  if (!host) return false;
+  try {
+    await serve(req, res, host);
+  } catch (error) {
+    if (error instanceof ProxyError) fail(res, error.status, error.message);
+    else fail(res, 500, "Ошибка прокси");
+  }
+  return true;
+}
+
+/** Запрос адресован origin прокси (по заголовку Host). */
+export const isProxyHost = (req: IncomingMessage) => !!parseProxyHost(req.headers.host ?? "");
