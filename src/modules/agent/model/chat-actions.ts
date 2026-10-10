@@ -1,4 +1,14 @@
-import { rewindAgentFiles, type RewindSummary } from "../api/client.ts";
+import { computed } from "vue";
+import {
+  discardWorktree,
+  fetchWorktree,
+  injectAgentMessage,
+  mergeWorktree,
+  rewindAgentFiles,
+  type RewindSummary,
+  type WorktreeInfo,
+} from "../api/client.ts";
+import { appendText } from "./turn-events.ts";
 import { cutAt, switchVersion } from "./branches.ts";
 import type { ChatState } from "./chat-state.ts";
 import type { AgentBackendId, AgentTurn, MessagePart } from "./types.ts";
@@ -51,6 +61,34 @@ export function useChatActions(
     if (!state.busy) return drainQueue(false);
     state.interrupting = true;
     stop();
+  }
+
+  /**
+   * Adds a queued message to the answer being written, so the agent takes it into account now
+   * (Claude Code reads it ahead of what it was doing). The note stays in the answer as a quote.
+   */
+  async function injectQueued(id: string): Promise<boolean> {
+    const item = state.queue.find((entry) => entry.id === id);
+    if (!item || !state.busy || backend !== "claude-code" || !state.activeMessage) return false;
+    let accepted = false;
+    try {
+      accepted = await injectAgentMessage(state.activeMessage, item.text);
+    } catch {
+      accepted = false;
+    }
+    if (!accepted) {
+      state.error = "Ответ уже закончился: сообщение осталось в очереди";
+      return false;
+    }
+    removeQueued(id);
+    const answer = state.turns.at(-1);
+    if (answer?.role === "assistant") {
+      const note = `\n\n> Вы добавили: ${item.text.replace(/\n+/g, " ")}\n\n`;
+      answer.text += note;
+      appendText(answer, note);
+      persist();
+    }
+    return true;
   }
 
   function removeQueued(id: string): void {
@@ -106,35 +144,94 @@ export function useChatActions(
     return answer?.role === "assistant" ? answer.session?.id : undefined;
   }
 
-  /** Whether the files can be taken back to before this message (only Claude Code keeps backups). */
+  /**
+   * Whether the files can be taken back to before this message: Claude Code keeps backups per
+   * session, the other agents get a snapshot of the project (a git repository) before each message.
+   */
   function canRewindFiles(id: string): boolean {
-    return backend === "claude-code" && !!sessionOf(id);
+    const index = state.turns.findIndex((turn) => turn.id === id && turn.role === "user");
+    if (index < 0 || state.turns[index + 1]?.role !== "assistant") return false;
+    return backend === "claude-code" ? !!sessionOf(id) : true;
   }
 
   /** Puts the project's files back to how they were before the message; `dryRun` only reports. */
   async function rewindFiles(id: string, dryRun: boolean): Promise<RewindSummary> {
     await ready;
-    const session = sessionOf(id);
-    if (!canRewindFiles(id) || !session)
-      throw new Error("Файлы к этому шагу вернуть нельзя: резервной копии нет");
+    if (!canRewindFiles(id)) throw new Error("Файлы к этому шагу вернуть нельзя: копии нет");
     if (state.busy) throw new Error("Дождитесь окончания ответа");
     return rewindAgentFiles({
       backend,
       projectId,
-      sessionId: session,
+      sessionId: sessionOf(id) ?? "",
       messageId: id,
       dryRun,
+      worktree: worktreeId(),
     });
+  }
+
+  /** The isolated copy of the project this chat works in, if it was started in one. */
+  function worktreeId(): string | undefined {
+    return state.turns.findLast((turn) => turn.role === "assistant" && turn.worktree)?.worktree?.id;
+  }
+
+  function forget(turns: AgentTurn[], id: string) {
+    for (const turn of turns) {
+      if (turn.worktree?.id === id) turn.worktree = undefined;
+      for (const version of turn.variants ?? []) forget(version, id);
+    }
+  }
+
+  /** The copy is gone: the agent's own session cannot go on from where it stood. */
+  function endWorktree(id: string) {
+    forget(state.turns, id);
+    const last = state.turns.findLast((turn) => turn.role === "assistant");
+    if (last) last.detached = true;
+    persist();
+  }
+
+  async function worktreeInfo(): Promise<WorktreeInfo | undefined> {
+    const id = worktreeId();
+    return id ? fetchWorktree(projectId, id) : undefined;
+  }
+
+  /** Brings what the agent did in the isolated copy into the project. */
+  async function mergeCopy(): Promise<string> {
+    const id = worktreeId();
+    if (!id) throw new Error("Чат работает не в изолированной копии");
+    if (state.busy) throw new Error("Дождитесь окончания ответа");
+    const result = await mergeWorktree(projectId, id);
+    endWorktree(id);
+    return result.message ?? "";
+  }
+
+  /** Throws the isolated copy away. */
+  async function discardCopy(): Promise<void> {
+    const id = worktreeId();
+    if (!id) throw new Error("Чат работает не в изолированной копии");
+    if (state.busy) throw new Error("Дождитесь окончания ответа");
+    await discardWorktree(projectId, id);
+    endWorktree(id);
   }
 
   return {
     drainQueue,
     sendQueuedNow,
+    injectQueued,
     removeQueued,
     edit,
     retry,
     showVersion,
     canRewindFiles,
     rewindFiles,
+    isolate: computed({
+      get: () => state.isolate,
+      set: (value: boolean) => {
+        state.isolate = value;
+      },
+    }),
+    worktreeId,
+    worktreeInfo,
+    mergeCopy,
+    discardCopy,
   };
 }

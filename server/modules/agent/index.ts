@@ -1,3 +1,12 @@
+export {
+  createWorktree,
+  mergeWorktree,
+  removeWorktree,
+  worktreeCwd,
+  worktreeStatus,
+  type AgentWorktree,
+} from "./worktrees.ts";
+export { injectMessage } from "./claude-code-input.ts";
 export { readAttachment, saveAttachment } from "./attachments.ts";
 export { readAgentHistory, writeAgentHistory } from "./history.ts";
 export {

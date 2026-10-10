@@ -1,3 +1,4 @@
+import { configuredMcpServers, projectMcpServers } from "./mcp-config.ts";
 import { type AcpConnection, type AcpError, NO_TIMEOUT } from "./acp-client.ts";
 import { applySelection, controlsFromSession } from "./acp-controls.ts";
 import { contentText, createAcpEventMapper } from "./acp-events.ts";
@@ -56,6 +57,7 @@ export function createAcpBackend(id: AgentBackendId): AgentBackend {
     controls: (cwd) => acpControls(id, cwd),
     sessions: (cwd) => acpSessions(id, cwd),
     loadSession: (cwd, sessionId) => acpLoadSession(id, cwd, sessionId),
+    mcpServers: configuredMcpServers,
   };
 }
 
@@ -167,7 +169,7 @@ export async function openSession(
         const loaded = await connection.request("session/load", {
           sessionId: options.sessionId,
           cwd: options.cwd,
-          mcpServers: [],
+          mcpServers: await projectMcpServers(options.cwd),
         });
         return { sessionId: options.sessionId, resumed: true, result: loaded };
       } catch (error) {
@@ -180,7 +182,7 @@ export async function openSession(
     }
     const created = (await connection.request("session/new", {
       cwd: options.cwd,
-      mcpServers: [],
+      mcpServers: await projectMcpServers(options.cwd),
     })) as { sessionId: string };
     return { sessionId: created.sessionId, resumed: false, result: created };
   };

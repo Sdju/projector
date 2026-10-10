@@ -67,6 +67,10 @@ export async function streamAgent(
     messageId?: string;
     /** Where the kept conversation ends in the agent's transcript. */
     tail?: string;
+    /** The isolated copy of the project the chat works in. */
+    worktree?: string;
+    /** Start the chat in a new isolated copy of the project. */
+    isolate?: boolean;
     commands?: (request: AgentCommandRequest) => Promise<unknown>;
     /** Rejoin the answer an agent process is still producing instead of asking again. */
     attach?: string;
@@ -89,6 +93,8 @@ export async function streamAgent(
             parts: options.parts,
             messageId: options.messageId,
             tail: options.tail,
+            worktree: options.worktree,
+            isolate: options.isolate,
             approvals: true,
             commandBridge: !!options.commands,
           },
@@ -258,6 +264,7 @@ export async function rewindAgentFiles(options: {
   sessionId: string;
   messageId: string;
   dryRun: boolean;
+  worktree?: string;
 }): Promise<RewindSummary> {
   return getJson<RewindSummary>(
     "/api/agent/rewind-files",
@@ -307,3 +314,47 @@ export async function updateSession(
     "Не удалось изменить сессию",
   );
 }
+
+/** Adds a message to the answer being written; `false` when that answer has just ended. */
+export async function injectAgentMessage(messageId: string, text: string): Promise<boolean> {
+  const response = await fetch("/api/agent/inject", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messageId, text }),
+  });
+  return response.ok;
+}
+
+/** How far an isolated copy of the project has moved from the project. */
+export interface WorktreeInfo {
+  id: string;
+  branch: string;
+  changed: number;
+}
+
+export async function fetchWorktree(projectId: string, id: string): Promise<WorktreeInfo> {
+  return getJson<WorktreeInfo>(
+    `/api/agent/worktree?projectId=${encodeURIComponent(projectId)}&id=${encodeURIComponent(id)}`,
+    undefined,
+    "Не удалось получить состояние копии",
+  );
+}
+
+const post = (url: string, projectId: string, id: string, failure: string) =>
+  getJson<{ merged?: boolean; message?: string }>(
+    url,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId, id }),
+    },
+    failure,
+  );
+
+/** Brings the isolated copy's changes into the project and deletes the copy. */
+export const mergeWorktree = (projectId: string, id: string) =>
+  post("/api/agent/worktree/merge", projectId, id, "Не удалось влить изменения");
+
+/** Deletes the isolated copy with everything the agent did in it. */
+export const discardWorktree = (projectId: string, id: string) =>
+  post("/api/agent/worktree/discard", projectId, id, "Не удалось удалить копию");

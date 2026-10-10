@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, watch, type Component } from "vue";
 import UiIsland from "../../../common/ui/UiIsland.vue";
 import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
+import type { McpServer } from "../api/client.ts";
 import type { AgentControl } from "../model/types.ts";
 import IconChevron from "~icons/lucide/chevron-up";
 import IconNext from "~icons/lucide/chevron-right";
@@ -12,8 +13,13 @@ import IconEffort from "~icons/lucide/brain";
 import IconMode from "~icons/lucide/shield-check";
 import IconOther from "~icons/lucide/sliders-horizontal";
 
-const props = defineProps<{ controls: AgentControl[]; disabled: boolean }>();
-const emit = defineEmits<{ change: [id: string, value: string] }>();
+const props = defineProps<{
+  controls: AgentControl[];
+  disabled: boolean;
+  /** MCP servers the agent works with in this project. */
+  mcp?: McpServer[];
+}>();
+const emit = defineEmits<{ change: [id: string, value: string]; opened: [] }>();
 
 /** Остров над полем ввода: все параметры агента с пояснениями, а в триггере — суть выбора. */
 const menu = useIslandMenu({
@@ -48,6 +54,7 @@ const view = ref<string>();
 const selected = computed(() => props.controls.find((control) => control.id === view.value));
 watch(open, (value) => {
   if (!value) view.value = undefined;
+  else emit("opened");
 });
 async function show(id?: string) {
   view.value = id;
@@ -112,6 +119,22 @@ defineExpose({ toggle: () => menu.toggle() });
         >
         <IconNext class="next" aria-hidden="true" />
       </button>
+      <div v-if="mcp?.length" class="mcp" role="group" aria-label="MCP-серверы">
+        <span class="mcp-title">MCP-серверы</span>
+        <span
+          v-for="server in mcp"
+          :key="server.name"
+          class="mcp-row"
+          :title="server.error || server.status"
+        >
+          <i :class="server.status === 'connected' ? 'on' : server.error ? 'bad' : ''" />
+          <span class="mcp-name">{{ server.name }}</span>
+          <span class="mcp-state"
+            >{{ server.status === "connected" ? "работает" : server.status
+            }}{{ server.tools ? ` · ${server.tools}` : "" }}</span
+          >
+        </span>
+      </div>
     </div>
     <div v-else class="options" role="group" :aria-label="selected.name" @keydown.left="back">
       <button type="button" class="head" @click="show()">
@@ -190,6 +213,48 @@ defineExpose({ toggle: () => menu.toggle() });
 }
 .chip[data-category="mode"] {
   color: var(--faint);
+}
+.mcp {
+  display: grid;
+  gap: 2px;
+  margin-top: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3);
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-2xs);
+  color: var(--muted);
+}
+.mcp-title {
+  color: var(--faint);
+}
+.mcp-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.mcp-row i {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--faint);
+}
+.mcp-row i.on {
+  background: var(--run);
+}
+.mcp-row i.bad {
+  background: var(--err);
+}
+.mcp-name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+}
+.mcp-state {
+  flex-shrink: 0;
 }
 .rows,
 .options,

@@ -15,6 +15,7 @@ export type AgentEventName =
   | "controls"
   | "permission-request"
   | "run"
+  | "worktree"
   | "status"
   | "session"
   | "text"

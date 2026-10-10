@@ -28,6 +28,9 @@ import {
   schedulePrune,
   trackRun,
   HOSTED_AGENT_BACKENDS,
+  createWorktree,
+  injectMessage,
+  worktreeCwd,
   readAgentHistory,
   readAttachment,
   saveAttachment,
@@ -47,6 +50,12 @@ async function projectPath(projectId: string): Promise<string> {
   const project = (await loadProjects()).find((item) => item.id === projectId);
   if (!project) throw new Error("Проект не найден");
   return project.path;
+}
+
+/** The folder a chat's agent works in: the project, or the isolated copy the chat was given. */
+async function agentFolder(projectId: string, worktree: string): Promise<string> {
+  const path = await projectPath(projectId);
+  return worktree ? worktreeCwd(projectId, worktree, path) : path;
 }
 
 export async function handleAgent({ req, res, url, method, path }: RouteContext): Promise<boolean> {
@@ -121,7 +130,7 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
     if (!accessAllowed(req, true))
       throw new HttpError(403, "Откат доступен только со страницы Projector");
     const body = await readBody(req);
-    const cwd = await projectPath(asString(body.projectId));
+    const cwd = await agentFolder(asString(body.projectId), asString(body.worktree));
     const backend = asString(body.backend) || undefined;
     json(
       res,
@@ -173,6 +182,16 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
     json(res, accepted ? 200 : 410, { accepted });
     return true;
   }
+  if (path === "/api/agent/inject" && method === "POST") {
+    if (!accessAllowed(req, true))
+      throw new HttpError(403, "Доступно только со страницы Projector");
+    const body = await readBody(req);
+    const text = asString(body.text).trim();
+    if (!text) throw new Error("Напишите сообщение агенту");
+    const accepted = injectMessage(asString(body.messageId), text);
+    json(res, accepted ? 200 : 410, { accepted });
+    return true;
+  }
   if (path === "/api/agent/cancel" && method === "POST") {
     const body = await readBody(req);
     await cancelRun(asString(body.runId));
@@ -188,7 +207,8 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
       json(res, 404, { error: "Ход агента не найден" });
       return true;
     }
-    const request = stored ?? (await requestFrom(body));
+    const created = stored ? undefined : await requestFrom(body);
+    const request = stored ?? created!.request;
     const backend = request.backend;
     const hosted = HOSTED_AGENT_BACKENDS.includes(backend);
     const run = hosted
@@ -217,6 +237,7 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
       res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     };
     if (run) emit("run", { id: run.id });
+    if (created?.worktree) emit("worktree", created.worktree);
     try {
       await runAgent({
         ...request,
@@ -274,6 +295,15 @@ async function requestFrom(body: Record<string, unknown>) {
     ? (await loadProjects()).find((item) => item.id === projectId)
     : undefined;
   if (projectId && !project) throw new Error("Проект не найден");
+  let folder = project?.path;
+  let worktree: { id: string; branch: string } | undefined;
+  const reused = asString(body.worktree);
+  if (project && reused) folder = await worktreeCwd(project.id, reused, project.path);
+  else if (project && body.isolate === true && !asString(body.sessionId)) {
+    const copy = await createWorktree(project.id, project.path);
+    folder = copy.cwd;
+    worktree = { id: copy.id, branch: copy.branch };
+  }
   const history = Array.isArray(body.history)
     ? body.history.flatMap((item): AgentHistoryTurn[] => {
         if (!item || typeof item !== "object") return [];
@@ -284,7 +314,7 @@ async function requestFrom(body: Record<string, unknown>) {
         return [{ role, content }];
       })
     : [];
-  return {
+  const request = {
     message,
     parts: partsFrom(body.parts),
     history,
@@ -294,7 +324,8 @@ async function requestFrom(body: Record<string, unknown>) {
     sessionId: asString(body.sessionId) || undefined,
     messageId: asString(body.messageId) || undefined,
     tail: asString(body.tail) || undefined,
-    cwd: project?.path,
+    cwd: folder,
     providerId: asString(body.providerId) || undefined,
   };
+  return { request, worktree };
 }

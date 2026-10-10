@@ -11,7 +11,7 @@ export function legacyParts(turn: AgentTurn): AgentPart[] {
   ];
 }
 
-function appendText(turn: AgentTurn, text: string) {
+export function appendText(turn: AgentTurn, text: string) {
   const parts = (turn.parts ??= legacyParts({ ...turn, text: turn.text.slice(0, -text.length) }));
   const last = parts.at(-1);
   if (last?.type === "text") last.text += text;
@@ -39,6 +39,9 @@ export function applyAgentEvent(
       return true;
     case "session":
       assistant.session = event.data;
+      return true;
+    case "worktree":
+      assistant.worktree = event.data;
       return true;
     case "checkpoint":
       assistant.tail = event.data.tail;

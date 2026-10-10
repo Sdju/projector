@@ -90,6 +90,8 @@ export interface AgentTurn {
   session?: AgentSessionRef;
   /** The agent process still answering this turn; set until the turn ends, so it can be rejoined. */
   run?: string;
+  /** The isolated copy of the project this answer was written in. */
+  worktree?: { id: string; branch: string };
   /** Where this answer ends in the agent's transcript; the next message branches off from here. */
   tail?: string;
   /** The agent's own session cannot go on from this turn (the chat was cut back): replay instead. */
@@ -152,6 +154,7 @@ export type AgentEvent =
     }
   | { event: "run"; data: { id: string } }
   | { event: "checkpoint"; data: { tail: string } }
+  | { event: "worktree"; data: { id: string; branch: string } }
   | { event: "session"; data: AgentSessionRef }
   | { event: "commands"; data: { commands: AgentCommand[] } }
   | { event: "context"; data: AgentContext }

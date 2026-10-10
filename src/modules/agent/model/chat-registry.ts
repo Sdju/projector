@@ -1,4 +1,4 @@
-import type { McpServer } from "../api/client.ts";
+import type { McpServer, WorktreeInfo } from "../api/client.ts";
 import type {
   AgentBackendId,
   AgentControl,
@@ -29,6 +29,8 @@ export interface ChatController {
   resumeSession(id: string): Promise<void>;
   toggleControlsMenu(): void;
   send(text: string): Promise<void>;
+  /** Adds a message to the answer being written; `false` when it could not be added. */
+  inject(text: string): Promise<boolean>;
   stop(): void;
   edit(turnId: string): void;
   retry(turnId: string): Promise<void>;
@@ -38,6 +40,12 @@ export interface ChatController {
   exportMarkdown(): string;
   compact(): Promise<void>;
   mcpServers(): Promise<McpServer[]>;
+  /** The isolated copy of the project the chat works in, if any. */
+  worktree(): Promise<WorktreeInfo | undefined>;
+  mergeWorktree(): Promise<string>;
+  discardWorktree(): Promise<void>;
+  /** Starts the chat's first message in an isolated copy of the project. */
+  setIsolate(on: boolean): void;
 }
 
 const chats = new Map<string, ChatController>();

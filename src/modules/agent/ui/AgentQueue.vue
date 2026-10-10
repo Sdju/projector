@@ -3,9 +3,10 @@ import UiButton from "../../../common/ui/UiButton.vue";
 import type { QueuedMessage } from "../model/types.ts";
 import IconX from "~icons/lucide/x";
 import IconSend from "~icons/lucide/corner-down-right";
+import IconInject from "~icons/lucide/message-square-plus";
 
-defineProps<{ items: QueuedMessage[]; busy: boolean }>();
-const emit = defineEmits<{ now: [id: string]; remove: [id: string] }>();
+defineProps<{ items: QueuedMessage[]; busy: boolean; canInject?: boolean }>();
+const emit = defineEmits<{ now: [id: string]; inject: [id: string]; remove: [id: string] }>();
 </script>
 
 <template>
@@ -13,6 +14,16 @@ const emit = defineEmits<{ now: [id: string]; remove: [id: string] }>();
     <li v-for="item in items" :key="item.id">
       <span class="label">В очереди</span>
       <span class="text" :title="item.text">{{ item.text }}</span>
+      <UiButton
+        v-if="busy && canInject"
+        icon
+        size="sm"
+        title="Добавить в ответ, который пишется сейчас: агент учтёт это, не останавливаясь"
+        aria-label="Добавить в ответ"
+        @click="emit('inject', item.id)"
+      >
+        <IconInject aria-hidden="true" />
+      </UiButton>
       <UiButton
         v-if="busy"
         icon

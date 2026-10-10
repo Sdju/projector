@@ -4,6 +4,7 @@ import type {
   SDKControlGetContextUsageResponse as ContextUsage,
   SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
+import { createInput, registerInjector } from "./claude-code-input.ts";
 import { agentEnv, assertHostProject, attachedImages, promptWithHistory } from "./agent-host.ts";
 import type { AgentBackend, AgentCommand, AgentRunOptions } from "./backend.ts";
 import { CLAUDE_LABEL, createClaudeEventMapper } from "./claude-code-events.ts";
@@ -105,20 +106,26 @@ async function run(options: AgentRunOptions): Promise<void> {
       ? options.message
       : promptWithHistory(options.message, options.history ?? []);
     const images = await attachedImages(options.parts);
+    const messageId = isUuid(options.messageId) ? options.messageId : undefined;
+    const input = createInput(userMessage(prompt, images, messageId));
+    const unregister = messageId
+      ? registerInjector(messageId, (text) => input.push(text))
+      : undefined;
     const conversation = query({
-      prompt: userMessage(
-        prompt,
-        images,
-        isUuid(options.messageId) ? options.messageId : undefined,
-      ),
+      prompt: input.stream,
       options: { ...base, ...(resume ? { resume } : {}) },
     });
     try {
       for await (const message of conversation) {
         mapper.handle(message);
-        if (message.type === "result") await emitContext(conversation, emit);
+        if (message.type === "result") {
+          await emitContext(conversation, emit);
+          input.settled();
+        } else if (message.type === "assistant" || message.type === "stream_event") input.busy();
       }
     } finally {
+      unregister?.();
+      input.close();
       conversation.close();
     }
     // Where this answer ends in the transcript: the next message can branch off here.
@@ -148,12 +155,12 @@ async function run(options: AgentRunOptions): Promise<void> {
  * The prompt as one streamed user message: text and images as content blocks, and an ID of our own
  * that the transcript keeps, which is what a later rewind of the files refers to.
  */
-async function* userMessage(
+function userMessage(
   text: string,
   images: { mime: string; data: string }[],
   uuid: string | undefined,
-): AsyncGenerator<SDKUserMessage> {
-  yield {
+): SDKUserMessage {
+  return {
     type: "user",
     ...(uuid ? { uuid: uuid as SDKUserMessage["uuid"] } : {}),
     parent_tool_use_id: null,

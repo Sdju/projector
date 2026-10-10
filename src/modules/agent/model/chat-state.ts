@@ -29,6 +29,10 @@ export const createState = () =>
     sessionsLoading: false,
     sessionsError: "",
     abort: undefined as AbortController | undefined,
+    /** The next message starts the chat in an isolated copy of the project. */
+    isolate: false,
+    /** The message that started the answer being written (what a live addition refers to). */
+    activeMessage: "",
     /** Messages written while an answer was running; each is sent when it ends. */
     queue: [] as QueuedMessage[],
     /** The queued message to send right after the answer is stopped. */

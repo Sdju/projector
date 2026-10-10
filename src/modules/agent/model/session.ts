@@ -156,7 +156,7 @@ export function useAgent(
   }
 
   const actions = useChatActions(state, { backend, projectId, ready, persist, send, stop });
-  const { drainQueue } = actions;
+  const { drainQueue, worktreeId } = actions;
 
   /**
    * Runs one answer on the chat: `start` streams events, which are folded into `assistant`.
@@ -249,6 +249,9 @@ export function useAgent(
     const previousHistory = history();
     const resume = sessionId();
     const branchFrom = tail();
+    const copy = worktreeId();
+    const isolate = state.isolate && !copy && !resume && backend !== "projector";
+    state.isolate = false;
     const userTurn: AgentTurn = {
       id: crypto.randomUUID(),
       role: "user",
@@ -259,6 +262,7 @@ export function useAgent(
     // The message replaces others that were cut off: they stay as versions of this point.
     if (state.stash?.index === state.turns.length) addVersion(userTurn, state.stash.versions);
     state.stash = undefined;
+    state.activeMessage = userTurn.id;
     const assistant = reactive<AgentTurn>({
       id: crypto.randomUUID(),
       role: "assistant",
@@ -280,6 +284,8 @@ export function useAgent(
         parts: content,
         messageId: userTurn.id,
         tail: branchFrom,
+        worktree: copy,
+        isolate,
         attach,
       }),
     );
@@ -371,12 +377,18 @@ export function useAgent(
     send,
     queue: computed(() => state.queue),
     sendQueuedNow: actions.sendQueuedNow,
+    injectQueued: actions.injectQueued,
     removeQueued: actions.removeQueued,
     edit: actions.edit,
     retry: actions.retry,
     showVersion: actions.showVersion,
     canRewindFiles: actions.canRewindFiles,
     rewindFiles: actions.rewindFiles,
+    isolate: actions.isolate,
+    worktreeId,
+    worktreeInfo: actions.worktreeInfo,
+    mergeCopy: actions.mergeCopy,
+    discardCopy: actions.discardCopy,
     clear,
     stop,
     attach,

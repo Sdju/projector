@@ -18,9 +18,15 @@ import AgentSessions from "./AgentSessions.vue";
 import AgentPlan from "./AgentPlan.vue";
 import AgentQueue from "./AgentQueue.vue";
 import AgentRewind from "./AgentRewind.vue";
+import AgentWorktree from "./AgentWorktree.vue";
 import { chatMarkdown } from "../lib/export.ts";
 import { latestPlan } from "../lib/plan.ts";
-import { fetchMcpServers, type RewindSummary } from "../api/client.ts";
+import {
+  fetchMcpServers,
+  type McpServer,
+  type RewindSummary,
+  type WorktreeInfo,
+} from "../api/client.ts";
 import { activateChat, registerChat, type ChatController } from "../model/chat-registry.ts";
 import type {
   AgentBackendId,
@@ -31,6 +37,7 @@ import type {
 } from "../model/types.ts";
 import IconSquarePen from "~icons/lucide/square-pen";
 import IconDownload from "~icons/lucide/download";
+import IconBranch from "~icons/lucide/git-branch";
 
 const props = withDefaults(
   defineProps<{ projectId: string; backend?: AgentBackendId; chatId?: string }>(),
@@ -64,12 +71,18 @@ const {
   send,
   queue,
   sendQueuedNow,
+  injectQueued,
   removeQueued,
   edit,
   retry,
   showVersion,
   canRewindFiles,
   rewindFiles,
+  isolate,
+  worktreeId,
+  worktreeInfo,
+  mergeCopy,
+  discardCopy,
   clear,
   stop,
   attach,
@@ -178,6 +191,44 @@ void workspaceRequest<{ root: string }>(props.projectId, "root")
     projectRoot.value = data.root;
   })
   .catch(() => {});
+
+// MCP servers shown in the parameters island; read when it opens, as that starts a probe process.
+const mcp = ref<McpServer[]>([]);
+async function loadMcp() {
+  if (!plain.value) return;
+  try {
+    mcp.value = await fetchMcpServers(props.backend, props.projectId);
+  } catch {
+    mcp.value = [];
+  }
+}
+
+// The isolated copy this chat works in: what it changed, and what to do with it.
+const copy = computed(() => {
+  void turns.value.length;
+  return turns.value.findLast((turn) => turn.role === "assistant" && turn.worktree)?.worktree;
+});
+const copyInfo = ref<WorktreeInfo>();
+const copyWorking = ref(false);
+const copyNote = ref("");
+async function refreshCopy() {
+  try {
+    copyInfo.value = copy.value ? await worktreeInfo() : undefined;
+  } catch {
+    copyInfo.value = undefined;
+  }
+}
+watch([() => copy.value?.id, busy], refreshCopy, { immediate: true });
+async function endCopy(action: () => Promise<string | void>) {
+  copyWorking.value = true;
+  try {
+    copyNote.value = (await action()) ?? "";
+  } catch (cause) {
+    copyNote.value = cause instanceof Error ? cause.message : "Не удалось выполнить";
+  } finally {
+    copyWorking.value = false;
+  }
+}
 
 const plan = computed(() => latestPlan(turns.value.at(-1)));
 const contextShare = computed(() =>
@@ -298,6 +349,12 @@ const controller: ChatController = {
   resumeSession,
   toggleControlsMenu: () => controlsMenu.value?.toggle(),
   send: (text) => send(text),
+  inject: async (text) => {
+    await send(text);
+    const item = queue.value.findLast((entry) => entry.text === text.trim());
+    if (!item) return false;
+    return injectQueued(item.id);
+  },
   stop,
   edit,
   retry,
@@ -310,6 +367,12 @@ const controller: ChatController = {
   exportMarkdown,
   compact,
   mcpServers: () => fetchMcpServers(props.backend, props.projectId),
+  worktree: async () => (worktreeId() ? worktreeInfo() : undefined),
+  mergeWorktree: mergeCopy,
+  discardWorktree: discardCopy,
+  setIsolate: (on) => {
+    isolate.value = on;
+  },
 };
 const unregisterChat = registerChat(controller);
 onBeforeUnmount(unregisterChat);
@@ -452,6 +515,18 @@ onBeforeUnmount(() => {
         @pick="(id) => void resumeSession(id).catch(() => {})"
       />
       <UiButton
+        v-if="plain && !turns.length"
+        icon
+        size="sm"
+        :class="{ on: isolate }"
+        :aria-pressed="isolate"
+        title="Работать в изолированной копии проекта (git worktree): изменения агента не затронут файлы, пока вы их не влёте"
+        aria-label="Работать в изолированной копии проекта"
+        @click="isolate = !isolate"
+      >
+        <IconBranch aria-hidden="true" />
+      </UiButton>
+      <UiButton
         v-if="turns.length"
         icon
         size="sm"
@@ -525,12 +600,28 @@ onBeforeUnmount(() => {
         @confirm="confirmRewind"
         @cancel="closeRewind"
       />
+      <AgentWorktree
+        v-if="copy"
+        :branch="copy.branch"
+        :info="copyInfo"
+        :working="copyWorking || busy"
+        :note="copyNote"
+        @merge="endCopy(mergeCopy)"
+        @discard="endCopy(discardCopy)"
+      />
       <AgentPlan :items="plan" :busy="busy" />
       <p v-if="claude && contextShare >= 0.8 && !busy" class="compact-hint" role="status">
         Контекст заполнен на {{ Math.round(contextShare * 100) }}%.
         <button type="button" @click="compact">Сжать</button>
       </p>
-      <AgentQueue :items="queue" :busy="busy" @now="sendQueuedNow" @remove="removeQueued" />
+      <AgentQueue
+        :items="queue"
+        :busy="busy"
+        :can-inject="claude"
+        @now="sendQueuedNow"
+        @inject="injectQueued"
+        @remove="removeQueued"
+      />
     </div>
     <AgentComposer
       ref="composer"
@@ -556,6 +647,8 @@ onBeforeUnmount(() => {
           ref="controlsMenu"
           :controls="allControls"
           :disabled="busy"
+          :mcp="mcp"
+          @opened="loadMcp"
           @change="changeControl"
         />
       </template>
@@ -582,6 +675,10 @@ onBeforeUnmount(() => {
   z-index: var(--z-sticky);
   display: flex;
   gap: var(--sp-1);
+}
+.chat-tools .on {
+  color: var(--text);
+  background: var(--bg-4);
 }
 .chat-log {
   flex: 1;

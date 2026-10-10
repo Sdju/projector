@@ -177,6 +177,22 @@ export function registerAgentCommands(register: RegisterCommand, projectId: stri
     },
   );
   register(
+    "ide.agent.chat.inject",
+    "Добавить сообщение в идущий ответ агента",
+    async (args) => {
+      const chat = find(args, (item) => item.busy() && item.backend === "claude-code");
+      const added = await chat.inject(text(commandArgs(args), "text"));
+      return { added };
+    },
+    () => chatsOf(projectId).some((chat) => chat.busy() && chat.backend === "claude-code"),
+    undefined,
+    {
+      description:
+        "Добавляет уточнение в ответ, который Claude Code пишет сейчас: он учтёт его, не останавливаясь. Если ответ уже закончился, сообщение остаётся в очереди (added: false).",
+      arguments: { text: "Текст уточнения", chat: CHAT },
+    },
+  );
+  register(
     "ide.agent.chat.stop",
     "Остановить ответ агента",
     (args) => find(args, (chat) => chat.busy()).stop(),
@@ -307,14 +323,71 @@ export function registerAgentCommands(register: RegisterCommand, projectId: stri
     },
   );
   register(
-    "ide.agent.mcp.list",
-    "MCP-серверы агента",
-    (args) => find(args, claudeChat).mcpServers(),
-    () => chatsOf(projectId).some(claudeChat),
+    "ide.agent.worktree.status",
+    "Изолированная копия проекта у чата",
+    async (args) => (await find(args, notProjector).worktree()) ?? null,
+    external,
     undefined,
     {
       description:
-        "Возвращает MCP-серверы, которые Claude Code запускает в проекте (из настроек пользователя, проекта и .mcp.json): имя, состояние, число инструментов и ошибку.",
+        "Возвращает изолированную копию проекта (git worktree), в которой работает чат: ветку и число изменённых файлов; null, если чат работает в самом проекте.",
+      arguments: { chat: CHAT },
+    },
+  );
+  register(
+    "ide.agent.worktree.merge",
+    "Влить изолированную копию в проект",
+    (args) => find(args, (chat) => notProjector(chat) && !chat.busy()).mergeWorktree(),
+    idle,
+    undefined,
+    {
+      description:
+        "Коммитит изменения агента в его изолированной копии и вливает ветку копии в ветку проекта (git merge), затем удаляет копию. Меняет файлы проекта и историю git: используйте по просьбе пользователя. При конфликте слияние отменяется, проект остаётся как был.",
+      arguments: { chat: CHAT },
+    },
+  );
+  register(
+    "ide.agent.worktree.discard",
+    "Отбросить изолированную копию проекта",
+    async (args) => {
+      await find(args, (chat) => notProjector(chat) && !chat.busy()).discardWorktree();
+    },
+    idle,
+    undefined,
+    {
+      description:
+        "Удаляет изолированную копию чата и всё, что агент в ней сделал. Необратимо: используйте по просьбе пользователя.",
+      arguments: { chat: CHAT },
+    },
+  );
+  register(
+    "ide.agent.chat.isolate",
+    "Начать чат в изолированной копии проекта",
+    (args) => {
+      const on = commandArgs(args).on !== false;
+      find(
+        args,
+        (chat) => notProjector(chat) && !chat.busy() && chat.turns().length === 0,
+      ).setIsolate(on);
+      return { isolate: on };
+    },
+    () => chatsOf(projectId).some((chat) => notProjector(chat) && chat.turns().length === 0),
+    undefined,
+    {
+      description:
+        "Включает (on: true, по умолчанию) или выключает режим, при котором первое сообщение пустого чата запускает агента в отдельной копии проекта (git worktree на своей ветке). Так несколько агентов не мешают друг другу. Работает только в git-проекте и в чате без сообщений.",
+      arguments: { on: "true или false", chat: CHAT },
+    },
+  );
+  register(
+    "ide.agent.mcp.list",
+    "MCP-серверы агента",
+    (args) => find(args, notProjector).mcpServers(),
+    external,
+    undefined,
+    {
+      description:
+        "Возвращает MCP-серверы агента в проекте. У Claude Code это серверы из его настроек и .mcp.json (имя, состояние, число инструментов, ошибка); остальным агентам Projector передаёт stdio-серверы из .mcp.json проекта.",
       arguments: { chat: CHAT },
     },
   );
