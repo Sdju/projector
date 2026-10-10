@@ -43,6 +43,26 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
     return tabs.value.find((tab) => !tab.virtual && tab.key === (args.id ?? activeKey()));
   }
   register(
+    "ide.editor.path.open",
+    "Открыть файл или папку проекта по пути",
+    (value) => {
+      const args = commandArgs(value);
+      if (typeof args.path !== "string" || !args.path) throw new Error("Укажите путь");
+      if (args.directory === true) ctx.revealInTree(args.path);
+      else return openFile(args.path);
+    },
+    () => true,
+    undefined,
+    {
+      description:
+        "Открывает файл проекта во вкладке редактора (или показывает папку в дереве) по пути, относительному корню проекта. Так открываются ссылки на файлы из чата.",
+      arguments: {
+        path: "Путь относительно корня проекта",
+        directory: "true, если путь — папка: она будет показана в дереве",
+      },
+    },
+  );
+  register(
     "ide.editor.file.save",
     "Сохранить",
     async (args) => {

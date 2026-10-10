@@ -3,7 +3,7 @@ import UiButton from "../../../common/ui/UiButton.vue";
 import { computed } from "vue";
 import { chipIcon, chipLabel, chipTitle } from "../lib/composer/chips.ts";
 import { legacyParts } from "../model/turn-events.ts";
-import type { AgentToolChip, AgentTurn } from "../model/types.ts";
+import type { AgentToolChip, AgentTurn, MessageChip } from "../model/types.ts";
 import AgentMessage from "./AgentMessage.vue";
 import AgentActivity from "./AgentActivity.vue";
 import IconCopy from "~icons/lucide/copy";
@@ -15,7 +15,7 @@ const props = defineProps<{
   last: boolean;
   copied: boolean;
 }>();
-const emit = defineEmits<{ copy: [id: string, text: string] }>();
+const emit = defineEmits<{ copy: [id: string, text: string]; open: [chip: MessageChip] }>();
 
 type Segment =
   | { key: string; type: "text"; text: string }
@@ -47,7 +47,17 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
       <template v-if="turn.content?.length">
         <template v-for="(part, index) in turn.content" :key="index">
           <template v-if="part.type === 'text'">{{ part.text }}</template>
-          <span v-else class="chip" :class="part.type" :title="chipTitle(part)">
+          <span
+            v-else
+            class="chip"
+            :class="part.type"
+            :title="chipTitle(part)"
+            :data-chip="JSON.stringify(part)"
+            role="button"
+            tabindex="0"
+            @click="emit('open', part)"
+            @keydown.enter="emit('open', part)"
+          >
             <span class="chip-icon" aria-hidden="true" v-html="chipIcon(part)" />{{
               chipLabel(part)
             }}</span
@@ -118,6 +128,12 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
   font-size: var(--fs-xs);
   line-height: 1.5;
   vertical-align: baseline;
+}
+.chip:hover,
+.chip:focus-visible {
+  border-color: var(--focus);
+  color: var(--text);
+  cursor: pointer;
 }
 .chip-icon {
   display: flex;

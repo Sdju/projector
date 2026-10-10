@@ -292,7 +292,7 @@ onMounted(() => {
           },
           mousedown(event) {
             const element = (event.target as HTMLElement).closest<HTMLElement>(".composer-chip");
-            if (!element?.dataset.chip || !(event.metaKey || event.ctrlKey)) return false;
+            if (!element?.dataset.chip) return false;
             event.preventDefault();
             emit("open", JSON.parse(element.dataset.chip) as MessageChip);
             return true;
@@ -426,6 +426,13 @@ defineExpose({
   font-size: var(--fs-xs);
   line-height: 1.5;
   vertical-align: baseline;
+}
+.editor :deep(.composer-chip) {
+  cursor: pointer;
+}
+.editor :deep(.composer-chip:hover) {
+  border-color: var(--focus);
+  color: var(--text);
 }
 .editor :deep(.composer-chip svg),
 .editor :deep(.chip-thumb) {

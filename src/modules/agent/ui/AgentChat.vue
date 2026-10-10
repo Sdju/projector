@@ -12,9 +12,15 @@ import AgentTurn from "./AgentTurn.vue";
 import AgentComposer from "./AgentComposer.vue";
 import AgentPermissions from "./AgentPermissions.vue";
 import AgentContextMeter from "./AgentContextMeter.vue";
+import AgentChipPreview from "./AgentChipPreview.vue";
 import AgentControls from "./AgentControls.vue";
 import AgentSessions from "./AgentSessions.vue";
-import type { AgentBackendId, AgentControl, AgentPermissionMode } from "../model/types.ts";
+import type {
+  AgentBackendId,
+  AgentControl,
+  AgentPermissionMode,
+  MessageChip,
+} from "../model/types.ts";
 import IconSquarePen from "~icons/lucide/square-pen";
 
 const props = withDefaults(
@@ -211,6 +217,22 @@ useTabReadout(() => {
 const log = ref<HTMLElement>();
 const controlsMenu = ref<InstanceType<typeof AgentControls>>();
 const composer = ref<InstanceType<typeof AgentComposer>>();
+const root = ref<HTMLElement>();
+// A file chip opens its file in the editor; an image chip opens the picture itself.
+function openChip(chip: MessageChip) {
+  if (chip.type === "image")
+    window.open(`/api/agent/attachments/${encodeURIComponent(chip.id)}`, "_blank", "noopener");
+  else if (chip.type === "file")
+    void api
+      .executeCommand(
+        "ide.editor.path.open",
+        { path: chip.path, directory: chip.directory === true },
+        { scope: `editor:${props.projectId}` },
+      )
+      .catch((cause) => {
+        error.value = cause instanceof Error ? cause.message : "Не удалось открыть файл";
+      });
+}
 const away = ref(false);
 const copied = ref("");
 const copyError = ref("");
@@ -314,7 +336,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="agent-chat" aria-label="Чат с агентом">
+  <section ref="root" class="agent-chat" aria-label="Чат с агентом">
     <div class="chat-tools">
       <AgentSessions
         v-if="plain"
@@ -362,6 +384,7 @@ onBeforeUnmount(() => {
           :last="index === turns.length - 1"
           :copied="copied === turn.id"
           @copy="copyMessage"
+          @open="openChip"
         />
       </div>
     </div>
@@ -377,6 +400,7 @@ onBeforeUnmount(() => {
       :error="error || copyError"
       :copied="!!copied"
       @submit="submit"
+      @open="openChip"
       @fail="(message) => (error = message)"
       @stop="stop"
       @latest="toBottom"
@@ -393,6 +417,7 @@ onBeforeUnmount(() => {
         />
       </template>
     </AgentComposer>
+    <AgentChipPreview :project-id="projectId" :scope="root" />
   </section>
 </template>
 <style scoped>
