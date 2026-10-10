@@ -66,6 +66,20 @@ function tabDrop(event: DragEvent) {
   if (allowed(target))
     dock.update(movePanel(dock.layout(), drag.id, { groupId: props.group.id, zone: target }));
 }
+/** Полоса пустой группы принимает вкладку так же, как полоса с вкладками. */
+function stripOver(event: DragEvent) {
+  if (!tabDrag.value) return;
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+}
+function stripDrop(event: DragEvent) {
+  const drag = tabDrag.value;
+  if (!drag) return;
+  event.preventDefault();
+  event.stopPropagation();
+  tabDrag.value = undefined;
+  dock.update(movePanel(dock.layout(), drag.id, { groupId: props.group.id, zone: "center" }));
+}
 function externalOver(event: DragEvent) {
   if (tabDrag.value || !dock.acceptsDrop?.(event.dataTransfer)) return;
   event.preventDefault();
@@ -133,7 +147,7 @@ const focus = () => {
           <DockSlot v-if="dock.slots.icon" :render="dock.slots.icon" :args="{ tab }" />
         </template>
       </DockTabs>
-      <div v-else class="dock-fill" />
+      <div v-else class="dock-fill" @dragover="stripOver" @drop="stripDrop" />
       <div class="dock-actions">
         <DockSlot
           v-if="dock.slots.actions"
