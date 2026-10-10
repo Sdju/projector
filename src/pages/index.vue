@@ -53,7 +53,7 @@ async function launch(item = items.value[selected.value], action?: LaunchAction)
   const chosen = action ?? item?.actions?.[0];
   if (!item || !chosen) return;
   const ok = await model.launch(item, chosen, !webWindow);
-  if (chosen.id === "favorite") {
+  if (chosen.id === "favorite" || chosen.id === "folder") {
     // Pinning keeps the palette and the open card in place; only the lists change.
     if (ok) await model.refresh();
     await nextTick();
@@ -76,7 +76,8 @@ async function launch(item = items.value[selected.value], action?: LaunchAction)
   input.value?.focus();
 }
 function toggleFavorite(item = focus.value ?? items.value[selected.value]) {
-  if (!item || item.kind === "github" || item.kind === "gitlab") return;
+  if (!item || item.kind === "github" || item.kind === "gitlab" || item.id.startsWith("new:"))
+    return;
   void launch(item, { id: "favorite", title: "" });
 }
 function key(event: KeyboardEvent) {

@@ -197,10 +197,10 @@ function focusEntryAtEnd() {
   entry.grabFocus();
   entry.setPosition(-1);
 }
-async function pin(item: LaunchItem | undefined) {
-  if (!item || item.kind === "github") return;
+async function pin(item: LaunchItem | undefined, action: "favorite" | "folder" = "favorite") {
+  if (!item || item.kind === "github" || item.id.startsWith("new:")) return;
   // Pinning keeps the palette and the open card in place; only the lists change.
-  const ok = await model.launch(item, { id: "favorite", title: "" });
+  const ok = await model.launch(item, { id: action, title: "" });
   if (ok) await model.refresh();
   // The entry is insensitive while the action runs and loses its caret.
   await nextTick();
@@ -210,8 +210,8 @@ async function launchDetail() {
   const item = state.value.focus;
   const action: LaunchAction | undefined = detailActions.value[detailIndex.value];
   if (!item || !action) return;
-  if (action.id === "favorite") {
-    await pin(item);
+  if (action.id === "favorite" || action.id === "folder") {
+    await pin(item, action.id);
     return;
   }
   if (await model.launch(item, action)) {
@@ -413,7 +413,7 @@ defineExpose({ show, hide, toggle, invokeSelected, openPage, quitProjector, rest
                 <VImage
                   v-else
                   :icon-name="
-                    item.kind === 'project'
+                    item.kind === 'project' || item.kind === 'directory'
                       ? 'folder'
                       : item.kind === 'github'
                         ? 'folder-remote'

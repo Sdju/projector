@@ -16,7 +16,18 @@ export async function handleLauncherLaunch({
     const action = asString(body.action);
     if (
       action &&
-      !["launch", "open", "run", "stop", "browser", "window", "favorite", "import"].includes(action)
+      ![
+        "launch",
+        "open",
+        "run",
+        "stop",
+        "browser",
+        "window",
+        "favorite",
+        "import",
+        "create",
+        "folder",
+      ].includes(action)
     )
       throw new Error("Неизвестное действие");
     json(

@@ -275,6 +275,7 @@ if (process.argv.includes("--prepare")) {
         ["run", "boom"],
         ["run", "other"],
         ["window", "boom"],
+        ["folder", undefined],
         ["favorite", undefined],
       ]);
       expect(idleDetail.failure).toBe(undefined);

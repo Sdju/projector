@@ -12,6 +12,8 @@ interface Preferences {
   usage: Record<string, Usage>;
   /** Ids (`app:…`, `project:…`) pinned to the top of the palette. */
   favorites: string[];
+  /** Absolute folders whose projects rank first and in which new projects are created. */
+  directories: string[];
   /** Terminal programs that have a graphical chat, mapped to how new sessions open. */
   agentModes: Record<string, AgentSessionMode>;
   /** Last model/effort/mode choice per agent backend, by control id; new chats start from it. */
@@ -34,6 +36,9 @@ export async function preferences(): Promise<Preferences> {
       favorites: Array.isArray(data.favorites)
         ? data.favorites.filter((id: unknown): id is string => typeof id === "string")
         : [],
+      directories: Array.isArray(data.directories)
+        ? data.directories.filter((path: unknown): path is string => typeof path === "string")
+        : [],
       agentModes: agentModes(data.agentModes),
       agentDefaults: agentDefaults(data.agentDefaults),
     };
@@ -43,6 +48,7 @@ export async function preferences(): Promise<Preferences> {
       shortcut: "Ctrl+Alt+Space",
       usage: {},
       favorites: [],
+      directories: [],
       agentModes: {},
       agentDefaults: {},
     };
@@ -96,6 +102,16 @@ export async function toggleFavorite(id: string): Promise<boolean> {
     value.favorites = favorite
       ? [...value.favorites, id]
       : value.favorites.filter((entry) => entry !== id);
+  });
+  return favorite;
+}
+/** Adds or removes a favorite folder; `on` forces the state, otherwise it toggles. Returns the new state. */
+export async function setFavoriteDirectory(path: string, on?: boolean): Promise<boolean> {
+  let favorite = false;
+  await updatePreferences((value) => {
+    favorite = on ?? !value.directories.includes(path);
+    const rest = value.directories.filter((entry) => entry !== path);
+    value.directories = favorite ? [...rest, path] : rest;
   });
   return favorite;
 }
