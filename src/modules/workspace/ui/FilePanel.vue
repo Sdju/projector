@@ -7,10 +7,12 @@ import TabReadoutScope from "../../../common/ui/TabReadoutScope.vue";
 import {
   ArchiveViewer,
   CodeViewer,
+  EditorStatusLine,
   HtmlViewer,
   ImageViewport,
   MarkdownViewer,
   SvgViewer,
+  provideEditorStatus,
 } from "../modules/viewers/index.ts";
 
 /** Содержимое одной вкладки файла: хлебные крошки, ошибка сохранения и подходящий просмотрщик. */
@@ -25,10 +27,15 @@ const emit = defineEmits<{
 }>();
 const tabs = useWorkspaceTabs();
 const host = useTabHost();
+provideEditorStatus();
 const siteUrl = computed(() => workspaceSiteUrl(props.projectId, props.file.path));
 const view = computed(() => (props.file.virtual ? tabs.views[props.file.virtual] : undefined));
 const subtitle = computed(() =>
   props.file.virtual ? tabs.types.get(props.file.virtual)?.subtitle : undefined,
+);
+/** Текстовый файл: у него есть строка состояния с позицией, языком и переводом строк. */
+const hasStatusLine = computed(
+  () => !props.file.virtual && !props.file.binary && !props.file.image && !props.file.archive,
 );
 </script>
 
@@ -124,6 +131,11 @@ const subtitle = computed(() =>
         @save="emit('save')"
       />
     </div>
+    <EditorStatusLine
+      v-if="hasStatusLine"
+      :path="file.path"
+      :content="file.draft ?? file.content"
+    />
   </div>
 </template>
 

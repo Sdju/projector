@@ -1,10 +1,10 @@
-import { reactive } from "vue";
+import { inject, provide, reactive, type InjectionKey } from "vue";
 
 export type LineEnding = "LF" | "CRLF";
 
-/** Снимок позиции каретки и параметров активного редактора для нижней строки состояния. */
+/** Снимок позиции каретки и выделения редактора для строки состояния вкладки. */
 export interface EditorStatus {
-  /** Есть ли сейчас активный редактор с фокусом. */
+  /** В этой вкладке сейчас есть редактор. */
   active: boolean;
   /** Номер строки каретки, начиная с 1. */
   line: number;
@@ -14,8 +14,22 @@ export interface EditorStatus {
   selectedChars: number;
   /** Строк охватывает выделение; 0, если выделения нет. */
   selectedLines: number;
-  /** Перевод строк документа. */
-  lineEnding: LineEnding | null;
+}
+
+/** Отчёт редактора: всё, кроме признака активности, которым распоряжается строка состояния. */
+export type EditorStatusReport = Omit<EditorStatus, "active">;
+
+/** Независимый источник статуса одной вкладки: редактор пишет, строка состояния читает. */
+export interface EditorStatusStore {
+  readonly status: EditorStatus;
+  /** Регистрирует редактор и возвращает идентификатор для последующих отчётов. */
+  acquire(): number;
+  /** Редактор уничтожен: если он был текущим источником статуса, строка очищается. */
+  release(id: number): void;
+  /** Редактор стал активным (смонтирован или получил фокус): становится источником статуса. */
+  activate(id: number, next: EditorStatusReport): void;
+  /** Обновление статуса от редактора, если он остаётся текущим. */
+  update(id: number, next: EditorStatusReport): void;
 }
 
 const initial: EditorStatus = {
@@ -24,38 +38,50 @@ const initial: EditorStatus = {
   column: 1,
   selectedChars: 0,
   selectedLines: 0,
-  lineEnding: null,
 };
 
-const status = reactive<EditorStatus>({ ...initial });
-let nextId = 0;
-let currentId = 0;
-
-/** Регистрирует редактор и возвращает идентификатор для последующих отчётов. */
-export function acquireEditorStatus(): number {
-  return ++nextId;
+/** Создаёт источник статуса для одной вкладки. */
+export function createEditorStatusStore(): EditorStatusStore {
+  const status = reactive<EditorStatus>({ ...initial });
+  let nextId = 0;
+  let currentId = 0;
+  return {
+    status,
+    acquire: () => ++nextId,
+    release(id) {
+      if (currentId !== id) return;
+      currentId = 0;
+      Object.assign(status, initial);
+    },
+    activate(id, next) {
+      currentId = id;
+      Object.assign(status, next, { active: true });
+    },
+    update(id, next) {
+      if (currentId !== id) return;
+      Object.assign(status, next, { active: true });
+    },
+  };
 }
 
-/** Редактор уничтожен: если он был текущим источником статуса, строка очищается. */
-export function releaseEditorStatus(id: number): void {
-  if (currentId !== id) return;
-  currentId = 0;
-  Object.assign(status, initial);
+const editorStatusKey: InjectionKey<EditorStatusStore> = Symbol("editor-status");
+
+/** Создаёт статус вкладки и отдаёт его потомкам: редактору и строке состояния. */
+export function provideEditorStatus(): EditorStatusStore {
+  const store = createEditorStatusStore();
+  provide(editorStatusKey, store);
+  return store;
 }
 
-/** Редактор стал активным (смонтирован или получил фокус): становится источником статуса. */
-export function activateEditorStatus(id: number, next: Omit<EditorStatus, "active">): void {
-  currentId = id;
-  Object.assign(status, next, { active: true });
+let fallback: EditorStatusStore | undefined;
+
+/** Источник статуса ближайшей вкладки; вне вкладки — общий, чтобы редактор работал сам по себе. */
+export function useEditorStatusStore(): EditorStatusStore {
+  return inject(editorStatusKey, null) ?? (fallback ??= createEditorStatusStore());
 }
 
-/** Обновление статуса от редактора, если он остаётся текущим. */
-export function updateEditorStatus(id: number, next: Omit<EditorStatus, "active">): void {
-  if (currentId !== id) return;
-  Object.assign(status, next, { active: true });
-}
-
-/** Реактивный снимок статуса для строки состояния. */
-export function useEditorStatus(): EditorStatus {
-  return status;
+/** Перевод строк документа по первому переводу в тексте. */
+export function detectLineEnding(content: string): LineEnding {
+  const index = content.indexOf("\n");
+  return index > 0 && content[index - 1] === "\r" ? "CRLF" : "LF";
 }

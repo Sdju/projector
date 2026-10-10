@@ -88,8 +88,16 @@ export function themeExtension(theme: EditorTheme): Extension {
 export const themeCompartment = new Compartment();
 export const languageCompartment = new Compartment();
 
+const languageOf = (path: string) =>
+  LanguageDescription.matchFilename(languages, path.split("/").at(-1) ?? path);
+
+/** Язык подсветки, определённый по имени файла, или `null`, если он неизвестен. */
+export function languageLabel(path: string): string | null {
+  return languageOf(path)?.name ?? null;
+}
+
 export async function languageExtension(path: string): Promise<Extension> {
-  const description = LanguageDescription.matchFilename(languages, path.split("/").at(-1) ?? path);
+  const description = languageOf(path);
   return description ? await description.load() : [];
 }
 

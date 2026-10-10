@@ -10,4 +10,11 @@ export const MarkdownViewer = defineAsyncComponent(() => import("./ui/MarkdownVi
 export const SvgViewer = defineAsyncComponent(() => import("./ui/SvgViewer.vue"));
 export const HtmlViewer = defineAsyncComponent(() => import("./ui/HtmlViewer.vue"));
 export const EditorSettings = defineAsyncComponent(() => import("./ui/EditorSettings.vue"));
-export { useEditorStatus, type EditorStatus, type LineEnding } from "./lib/editor-status.ts";
+export { default as EditorStatusLine } from "./ui/EditorStatusLine.vue";
+export {
+  provideEditorStatus,
+  useEditorStatusStore,
+  type EditorStatus,
+  type EditorStatusStore,
+  type LineEnding,
+} from "./lib/editor-status.ts";
