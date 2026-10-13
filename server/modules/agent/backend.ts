@@ -5,7 +5,13 @@ import type {
   AgentSessionInfo,
   AgentSessionTurn,
 } from "./controls.ts";
-import type { ApprovalAnswer, ApprovalRequest, CommandRequest } from "./command-bridge.ts";
+import type {
+  ApprovalAnswer,
+  ApprovalRequest,
+  CommandRequest,
+  QuestionAnswer,
+  QuestionRequest,
+} from "./command-bridge.ts";
 
 export type AgentEventName =
   | "checkpoint"
@@ -14,6 +20,7 @@ export type AgentEventName =
   | "commands"
   | "controls"
   | "permission-request"
+  | "question-request"
   | "run"
   | "worktree"
   | "status"
@@ -87,6 +94,8 @@ export interface AgentRunOptions {
   commands?: (request: CommandRequest) => Promise<unknown>;
   /** Asks the user before a sensitive tool runs; absent when the client cannot show a prompt. */
   approve?: (request: ApprovalRequest) => Promise<ApprovalAnswer>;
+  /** Puts a question to the user; absent when the client cannot show one. */
+  ask?: (request: QuestionRequest) => Promise<QuestionAnswer>;
   history?: AgentHistoryTurn[];
   /** Native conversation of the backend (Claude Code session ID) to continue instead of `history`. */
   sessionId?: string;

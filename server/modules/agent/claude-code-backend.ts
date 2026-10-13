@@ -21,6 +21,7 @@ import {
   claudeSessions,
   claudeUpdateSession,
 } from "./claude-code-sessions.ts";
+import { askClaudeQuestions } from "./questions.ts";
 import type { AgentControl } from "./controls.ts";
 
 /** Claude Code takes the choice natively; `default` leaves the model and effort to its settings. */
@@ -73,6 +74,7 @@ async function run(options: AgentRunOptions): Promise<void> {
     ...(selected.steps ? { maxTurns: selected.steps } : {}),
     ...(mode === "bypassPermissions" ? { allowDangerouslySkipPermissions: true } : {}),
     canUseTool: async (toolName, input, context) => {
+      if (toolName === "AskUserQuestion") return askClaudeQuestions(options, input);
       if (!options.approve)
         return { behavior: "deny", message: "Клиент не может показать запрос разрешения" };
       const suggestions = context.suggestions ?? [];

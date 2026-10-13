@@ -1,4 +1,6 @@
 import { configuredMcpServers, projectMcpServers, type McpSupport } from "./mcp-config.ts";
+import { askCursorQuestions } from "./questions.ts";
+import { elicitForm } from "./acp-elicitation.ts";
 import { type AcpConnection, type AcpError, NO_TIMEOUT } from "./acp-client.ts";
 import { applySelection, controlsFromSession } from "./acp-controls.ts";
 import { contentText, createAcpEventMapper } from "./acp-events.ts";
@@ -84,6 +86,8 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
         );
       },
       onRequest(method, params) {
+        if (method === "cursor/ask_question") return askCursorQuestions(options, params);
+        if (method === "elicitation/create") return elicitForm(options, params);
         if (method !== "session/request_permission")
           throw new Error(`Клиент не поддерживает ${method}`);
         return decidePermission(options, params);

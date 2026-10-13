@@ -9,9 +9,11 @@ export {
 export { injectMessage } from "./claude-code-input.ts";
 export { readAttachment, saveAttachment } from "./attachments.ts";
 export { readAgentHistory, writeAgentHistory } from "./history.ts";
+export { closeHistoryStore } from "./history-store.ts";
 export {
   createCommandBridge,
   createApprovalBridge,
+  createQuestionBridge,
   completeCommandRequest,
 } from "./command-bridge.ts";
 export {

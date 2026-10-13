@@ -1,9 +1,7 @@
-import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { z } from "zod";
-import { dataDir } from "../../../core/modules/app-paths/index.ts";
+import { importLegacyHistory, loadHistory, saveHistory } from "./history-store.ts";
 interface StoredTurn {
+  id: string;
   variants?: StoredTurn[][];
 }
 
@@ -23,6 +21,7 @@ const turnSchema: z.ZodType<StoredTurn> = z.lazy(() =>
         status: z.enum(["running", "done", "error"]),
         input: z.string().optional(),
         detail: z.string(),
+        parent: z.string().optional(),
       }),
     ),
     content: z
@@ -43,7 +42,6 @@ const turnSchema: z.ZodType<StoredTurn> = z.lazy(() =>
           z.object({ type: z.literal("command"), name: z.string() }),
         ]),
       )
-
       .optional(),
     context: z
       .object({
@@ -51,10 +49,7 @@ const turnSchema: z.ZodType<StoredTurn> = z.lazy(() =>
         size: z.number(),
         model: z.string().optional(),
         compactAt: z.number().optional(),
-        categories: z
-          .array(z.object({ name: z.string(), tokens: z.number() }))
-
-          .optional(),
+        categories: z.array(z.object({ name: z.string(), tokens: z.number() })).optional(),
         cost: z.object({ amount: z.number(), currency: z.string() }).optional(),
       })
       .optional(),
@@ -63,10 +58,12 @@ const turnSchema: z.ZodType<StoredTurn> = z.lazy(() =>
         z.discriminatedUnion("type", [
           z.object({ type: z.literal("text"), text: z.string() }),
           z.object({ type: z.literal("tool"), id: z.string() }),
+          z.object({ type: z.literal("note"), text: z.string() }),
         ]),
       )
-
       .optional(),
+    /** The isolated copy of the project this answer was written in. */
+    worktree: z.object({ id: z.string(), branch: z.string() }).optional(),
     /** Transcript position after this answer: the next message branches off here if needed. */
     tail: z.string().optional(),
     /** The native session cannot be continued from this turn: the chat is replayed instead. */
@@ -78,23 +75,12 @@ const turnSchema: z.ZodType<StoredTurn> = z.lazy(() =>
   }),
 );
 const schema = z.array(turnSchema);
-function historyPath(id: string) {
-  return join(dataDir(), "agent", `${createHash("sha256").update(id).digest("hex")}.json`);
-}
 export async function readAgentHistory(id: string) {
-  try {
-    return schema.parse(JSON.parse(await readFile(historyPath(id), "utf8")));
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
-    throw error;
-  }
+  const saved = loadHistory(id) ?? (await importLegacyHistory(id, (value) => schema.parse(value)));
+  return schema.parse(saved ?? []);
 }
 export async function writeAgentHistory(id: string, value: unknown) {
   const turns = schema.parse(value);
-  const path = historyPath(id);
-  await mkdir(join(dataDir(), "agent"), { recursive: true, mode: 0o700 });
-  const temp = `${path}.${randomUUID()}.tmp`;
-  await writeFile(temp, JSON.stringify(turns), { mode: 0o600 });
-  await rename(temp, path);
+  saveHistory(id, turns);
   return turns;
 }

@@ -23,6 +23,31 @@ export interface ApprovalRequest {
 /** `true` allows this call once, `"always"` also remembers it; `false` denies. */
 export type ApprovalAnswer = boolean | "always";
 
+/** One question an agent puts to the user, with the answers it suggests. */
+export interface AgentQuestion {
+  /** Stable within the request; answers are keyed by it. */
+  id: string;
+  question: string;
+  header?: string;
+  options: { id: string; label: string; description?: string }[];
+  /** More than one option can be chosen. */
+  multiple: boolean;
+  /** The user may write an answer of their own to this question. */
+  custom?: boolean;
+  /** The agent accepts the form without an answer to this one. */
+  optional?: boolean;
+}
+
+export interface QuestionRequest {
+  title?: string;
+  questions: AgentQuestion[];
+  /** The user may write an answer of their own instead of choosing an option. */
+  custom: boolean;
+}
+
+/** Answers by question ID: option IDs, or the user's own words; `null` when the user skipped. */
+export type QuestionAnswer = Record<string, string[]> | null;
+
 type BridgeResult = { output?: unknown; error?: string };
 const pending = new Map<string, (result: BridgeResult) => void>();
 
@@ -84,6 +109,31 @@ export function createApprovalBridge(
     const answer = output as { allow?: unknown; always?: unknown } | undefined;
     if (answer?.allow !== true) return false;
     return answer.always === true ? "always" : true;
+  };
+}
+
+/** Resolves the user's answers, `null` when they skip; abort and timeout reject. */
+export function createQuestionBridge(
+  emit: (event: "question-request", data: unknown) => void,
+  signal: AbortSignal,
+  timeoutMs = 60 * 60_000,
+) {
+  return async (request: QuestionRequest): Promise<QuestionAnswer> => {
+    const output = await bridgeRequest(
+      (data) => emit("question-request", data),
+      request,
+      signal,
+      timeoutMs,
+      "Ответ на вопрос не получен вовремя",
+    );
+    const answers = (output as { answers?: unknown } | undefined)?.answers;
+    if (!answers || typeof answers !== "object") return null;
+    const result: Record<string, string[]> = {};
+    for (const [id, value] of Object.entries(answers)) {
+      if (!Array.isArray(value)) continue;
+      result[id] = value.filter((item): item is string => typeof item === "string").slice(0, 50);
+    }
+    return result;
   };
 }
 

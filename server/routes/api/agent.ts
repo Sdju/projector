@@ -19,6 +19,7 @@ import {
   runAgent,
   createCommandBridge,
   createApprovalBridge,
+  createQuestionBridge,
   completeCommandRequest,
   cancelRun,
   createRun,
@@ -245,6 +246,7 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
         run,
         commands: body.commandBridge === true ? createCommandBridge(emit, abort.signal) : undefined,
         approve: body.approvals === true ? createApprovalBridge(emit, abort.signal) : undefined,
+        ask: body.approvals === true ? createQuestionBridge(emit, abort.signal) : undefined,
         abort: abort.signal,
         emit,
       });
