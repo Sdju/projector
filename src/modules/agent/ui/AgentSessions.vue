@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import UiPopupSurface from "../../../common/ui/UiPopupSurface.vue";
+import UiInline from "../../../common/ui/UiInline.vue";
+import UiControl, { type UiControlHandle } from "../../../common/ui/UiControl.vue";
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import type { AgentSessionInfo } from "../model/types.ts";
@@ -25,23 +28,35 @@ const shown = ref(false);
 const search = ref("");
 const renaming = ref("");
 const draft = ref("");
-const searchInput = ref<HTMLInputElement>();
+const searchInput = ref<UiControlHandle>();
 const visible = computed(() => {
   const needle = search.value.trim().toLocaleLowerCase();
   return needle
     ? props.sessions.filter((item) => item.title.toLocaleLowerCase().includes(needle))
     : props.sessions;
 });
-function startRename(session: AgentSessionInfo) {
+let renameRow: HTMLElement | undefined;
+function startRename(session: AgentSessionInfo, event: MouseEvent) {
+  renameRow = (event.currentTarget as HTMLElement).closest<HTMLElement>(".row") ?? undefined;
   renaming.value = session.id;
   draft.value = session.title;
 }
-function finishRename(save: boolean) {
+function finishRename(save: boolean, restoreFocus = false) {
+  const row = renameRow;
+  renameRow = undefined;
   const id = renaming.value;
   renaming.value = "";
   const title = draft.value.trim();
   if (save && id && title && title !== props.sessions.find((item) => item.id === id)?.title)
     emit("change", id, { title });
+  if (restoreFocus)
+    void nextTick(() => {
+      if (!shown.value) return;
+      const target = row?.isConnected
+        ? row.querySelector<HTMLButtonElement>(".mini:last-child")
+        : searchInput.value;
+      target?.focus();
+    });
 }
 const root = ref<HTMLElement>();
 
@@ -61,7 +76,8 @@ function outside(event: Event) {
   if (shown.value && !root.value?.contains(event.target as Node)) shown.value = false;
 }
 function escape(event: KeyboardEvent) {
-  if (shown.value && event.key === "Escape") shown.value = false;
+  // Let the rename field cancel before unmount can trigger its blur-save.
+  if (shown.value && event.key === "Escape" && !renaming.value) shown.value = false;
 }
 watch(shown, (open) => {
   if (open) {
@@ -92,7 +108,7 @@ function age(value?: string): string {
 <template>
   <div ref="root" class="agent-sessions">
     <UiButton
-      icon
+      shape="icon"
       size="sm"
       title="Прошлые сессии"
       aria-label="Прошлые сессии"
@@ -102,8 +118,14 @@ function age(value?: string): string {
     >
       <IconHistory aria-hidden="true" />
     </UiButton>
-    <div v-if="shown" class="panel" role="menu" aria-label="Прошлые сессии">
-      <input
+    <UiPopupSurface
+      flow="column"
+      v-if="shown"
+      class="panel"
+      role="menu"
+      aria-label="Прошлые сессии"
+    >
+      <UiControl
         v-if="sessions.length > 4"
         ref="searchInput"
         v-model="search"
@@ -116,15 +138,21 @@ function age(value?: string): string {
       <p v-else-if="error" class="note error" role="alert">{{ error }}</p>
       <p v-else-if="!sessions.length" class="note">В этой папке пока нет сессий</p>
       <p v-else-if="!visible.length" class="note">Ничего не найдено</p>
-      <div v-for="session in visible" :key="session.id" class="row">
-        <input
+      <UiInline
+        v-for="session in visible"
+        :key="session.id"
+        class="row"
+        :gap="0.5"
+        justify="normal"
+      >
+        <UiControl
           v-if="renaming === session.id"
           v-model="draft"
           class="rename"
           aria-label="Название сессии"
           autofocus
-          @keydown.enter.prevent="finishRename(true)"
-          @keydown.esc.stop.prevent="finishRename(false)"
+          @keydown.enter.prevent="finishRename(true, true)"
+          @keydown.esc.stop.prevent="finishRename(false, true)"
           @blur="finishRename(true)"
         />
         <button
@@ -137,10 +165,17 @@ function age(value?: string): string {
           @click="pick(session.id)"
         >
           <IconPin v-if="session.pinned" class="pinned" aria-hidden="true" />
-          <span class="title">{{ session.title }}</span>
+          <span class="title u-truncate">{{ session.title }}</span>
           <span class="age">{{ age(session.updatedAt) }}</span>
         </button>
-        <span v-if="editable && renaming !== session.id" class="row-actions">
+        <UiInline
+          as="span"
+          v-if="editable && renaming !== session.id"
+          class="row-actions"
+          :gap="0.5"
+          align="normal"
+          justify="normal"
+        >
           <button
             type="button"
             class="mini"
@@ -155,13 +190,13 @@ function age(value?: string): string {
             class="mini"
             title="Переименовать"
             aria-label="Переименовать сессию"
-            @click="startRename(session)"
+            @click="startRename(session, $event)"
           >
             <IconPencil aria-hidden="true" />
           </button>
-        </span>
-      </div>
-    </div>
+        </UiInline>
+      </UiInline>
+    </UiPopupSurface>
   </div>
 </template>
 
@@ -174,17 +209,11 @@ function age(value?: string): string {
   top: calc(100% + 6px);
   right: 0;
   z-index: 20;
-  display: flex;
-  flex-direction: column;
   width: 320px;
   max-width: 80vw;
   max-height: 340px;
   overflow: auto;
   padding: 4px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-lg);
-  background: var(--bg-2);
-  box-shadow: var(--shadow-popover);
   scrollbar-width: thin;
 }
 .note {
@@ -194,7 +223,7 @@ function age(value?: string): string {
   font-size: var(--fs-2xs);
 }
 .note.error {
-  color: var(--danger, var(--warn));
+  color: var(--warn);
 }
 .item {
   display: flex;
@@ -232,18 +261,12 @@ function age(value?: string): string {
 .rename {
   flex: 1;
 }
-.row {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
 .row .item {
   flex: 1;
   min-width: 0;
 }
 .row-actions {
   display: none;
-  gap: 2px;
 }
 .row:hover .row-actions,
 .row:focus-within .row-actions {
@@ -271,9 +294,6 @@ function age(value?: string): string {
 }
 .title {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .age {
   flex-shrink: 0;

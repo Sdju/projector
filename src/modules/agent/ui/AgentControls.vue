@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import UiInline from "../../../common/ui/UiInline.vue";
+import UiStatusDot from "../../../common/ui/UiStatusDot.vue";
+import UiStack from "../../../common/ui/UiStack.vue";
+import UiActionRow from "../../../common/ui/UiActionRow.vue";
+import UiActionCopy from "../../../common/ui/UiActionCopy.vue";
 import { computed, nextTick, ref, watch, type Component } from "vue";
 import UiIsland from "../../../common/ui/UiIsland.vue";
 import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
@@ -87,24 +92,35 @@ defineExpose({ toggle: () => menu.toggle() });
       aria-label="Параметры агента"
       @click="toggle()"
     >
-      <span
+      <UiInline
+        as="span"
+        inline
+        :gap="1.25"
+        justify="normal"
         v-for="item in summary"
         :key="item.id"
         class="chip"
         :data-category="item.category"
         :title="`${item.name}: ${item.value}`"
       >
-        <component :is="icons[item.category]" aria-hidden="true" /><span class="value">{{
+        <component :is="icons[item.category]" aria-hidden="true" /><span class="value u-truncate">{{
           item.value
         }}</span>
-      </span>
+      </UiInline>
       <IconOther v-if="!summary.length" aria-hidden="true" />
       <IconChevron class="arrow" aria-hidden="true" />
     </button>
   </div>
   <UiIsland :menu="menu" label="Параметры агента" :width="300">
-    <div v-if="!selected" class="rows" role="group" aria-label="Параметры агента">
-      <button
+    <UiStack
+      flow="flex"
+      gap="none"
+      v-if="!selected"
+      class="rows"
+      role="group"
+      aria-label="Параметры агента"
+    >
+      <UiActionRow
         v-for="control in controls"
         :key="control.id"
         type="button"
@@ -113,12 +129,14 @@ defineExpose({ toggle: () => menu.toggle() });
         @click="show(control.id)"
       >
         <component :is="icons[control.category]" class="lead" aria-hidden="true" />
-        <span class="copy"
-          ><span class="name">{{ control.name }}</span
-          ><span class="caption">{{ currentName(control) }}</span></span
-        >
+        <UiActionCopy
+          :title="control.name"
+          :description="currentName(control)"
+          description-mode="wrap"
+          description-tone="secondary"
+        />
         <IconNext class="next" aria-hidden="true" />
-      </button>
+      </UiActionRow>
       <div v-if="mcp?.length" class="mcp" role="group" aria-label="MCP-серверы">
         <span class="mcp-title">MCP-серверы</span>
         <span
@@ -127,25 +145,39 @@ defineExpose({ toggle: () => menu.toggle() });
           class="mcp-row"
           :title="server.error || server.status"
         >
-          <i :class="server.status === 'connected' ? 'on' : server.error ? 'bad' : ''" />
-          <span class="mcp-name">{{ server.name }}</span>
+          <UiStatusDot
+            as="i"
+            :size="6"
+            radius="circle"
+            :tone="server.status === 'connected' ? 'success' : server.error ? 'danger' : 'faint'"
+          />
+          <span class="mcp-name u-truncate">{{ server.name }}</span>
           <span class="mcp-state"
             >{{ server.status === "connected" ? "работает" : server.status
             }}{{ server.tools ? ` · ${server.tools}` : "" }}</span
           >
         </span>
       </div>
-    </div>
-    <div v-else class="options" role="group" :aria-label="selected.name" @keydown.left="back">
-      <button type="button" class="head" @click="show()">
+    </UiStack>
+    <UiStack
+      flow="flex"
+      gap="none"
+      v-else
+      class="options"
+      role="group"
+      :aria-label="selected.name"
+      @keydown.left="back"
+    >
+      <UiActionRow separator="after" tone="neutral" type="button" class="head" @click="show()">
         <IconBack aria-hidden="true" />
-        <span class="copy"
-          ><span class="name">{{ selected.name }}</span
-          ><span v-if="selected.description" class="caption">{{ selected.description }}</span></span
-        >
-      </button>
-      <div class="list">
-        <button
+        <UiActionCopy
+          :title="selected.name"
+          :description="selected.description"
+          description-mode="wrap"
+        />
+      </UiActionRow>
+      <UiStack flow="flex" gap="none" class="list">
+        <UiActionRow
           v-for="option in selected.options"
           :key="option.value"
           type="button"
@@ -155,14 +187,16 @@ defineExpose({ toggle: () => menu.toggle() });
           :aria-checked="option.value === selected.current"
           @click="pick(selected, option.value)"
         >
-          <span class="copy"
-            ><span class="name">{{ option.name }}</span
-            ><span v-if="option.description" class="caption">{{ option.description }}</span></span
-          >
+          <UiActionCopy
+            :title="option.name"
+            :description="option.description"
+            description-mode="wrap"
+            :emphasized="option.value === selected.current"
+          />
           <IconCheck v-if="option.value === selected.current" class="check" aria-hidden="true" />
-        </button>
-      </div>
-    </div>
+        </UiActionRow>
+      </UiStack>
+    </UiStack>
   </UiIsland>
 </template>
 
@@ -194,9 +228,6 @@ defineExpose({ toggle: () => menu.toggle() });
   opacity: 0.6;
 }
 .chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
   min-width: 0;
 }
 .chip svg,
@@ -206,10 +237,7 @@ defineExpose({ toggle: () => menu.toggle() });
   flex-shrink: 0;
 }
 .value {
-  overflow: hidden;
   max-width: 150px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .chip[data-category="mode"] {
   color: var(--faint);
@@ -232,66 +260,18 @@ defineExpose({ toggle: () => menu.toggle() });
   gap: var(--sp-2);
   min-width: 0;
 }
-.mcp-row i {
-  width: 6px;
-  height: 6px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--faint);
-}
-.mcp-row i.on {
-  background: var(--run);
-}
-.mcp-row i.bad {
-  background: var(--err);
-}
 .mcp-name {
   min-width: 0;
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   color: var(--text-2);
 }
 .mcp-state {
   flex-shrink: 0;
 }
-.rows,
-.options,
-.list {
-  display: flex;
-  flex-direction: column;
-}
 .list {
   max-height: 320px;
   overflow-y: auto;
   scrollbar-width: thin;
-}
-.row,
-.option,
-.head {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  width: 100%;
-  padding: 6px var(--sp-2);
-  border-radius: var(--r-md);
-  text-align: left;
-}
-.row:hover,
-.row:focus-visible,
-.option:hover,
-.option:focus-visible,
-.head:hover,
-.head:focus-visible {
-  background: var(--active);
-  outline: none;
-}
-.head {
-  margin-bottom: var(--sp-1);
-  border-bottom: 1px solid var(--line);
-  border-radius: var(--r-md) var(--r-md) 0 0;
-  color: var(--text);
 }
 .lead,
 .head svg,
@@ -303,27 +283,6 @@ defineExpose({ toggle: () => menu.toggle() });
 }
 .next {
   color: var(--faint);
-}
-.copy {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-}
-.name {
-  font-size: var(--fs-sm);
-}
-.caption {
-  color: var(--muted);
-  font-size: var(--fs-2xs);
-  line-height: 1.4;
-}
-.row .caption {
-  color: var(--text-2);
-}
-.option.current .name {
-  color: var(--text);
-  font-weight: 600;
 }
 .check {
   width: 14px;

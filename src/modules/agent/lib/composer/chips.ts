@@ -59,7 +59,7 @@ class ChipWidget extends WidgetType {
     element.dataset.chip = JSON.stringify(this.chip);
     element.innerHTML = chipIcon(this.chip);
     const label = document.createElement("span");
-    label.className = "composer-chip-label";
+    label.className = "composer-chip-label u-truncate";
     label.textContent = chipLabel(this.chip);
     element.append(label);
     return element;

@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import UiControl from "../../../common/ui/UiControl.vue";
+import { computed, ref, watch, useId } from "vue";
+import UiCard from "../../../common/ui/UiCard.vue";
+import UiInline from "../../../common/ui/UiInline.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import type { RewindSummary } from "../api/client.ts";
 import type { RewindScope } from "../model/types.ts";
 import IconUndo from "~icons/lucide/undo-2";
 
+const radioName = useId();
 const props = defineProps<{
   /** Whether the agent kept backups, so files can be taken back too. */
   canFiles: boolean;
@@ -53,21 +57,24 @@ const options = computed(
 </script>
 
 <template>
-  <section class="rewind" role="dialog" aria-label="Откат к сообщению">
-    <header>
+  <UiCard class="rewind" role="dialog" aria-label="Откат к сообщению">
+    <UiInline as="header" align="center" justify="normal">
       <IconUndo aria-hidden="true" />
       <span>Откатить к этому сообщению</span>
-    </header>
+    </UiInline>
     <template v-if="!result">
-      <label
+      <UiInline
+        as="label"
+        align="start"
+        justify="normal"
         v-for="option in options"
         :key="option.value"
         :class="{ off: option.files && !canFiles }"
       >
-        <input
+        <UiControl
           v-model="scope"
           type="radio"
-          name="rewind-scope"
+          :name="radioName"
           :value="option.value"
           :disabled="option.files && !canFiles"
         />
@@ -77,7 +84,7 @@ const options = computed(
             option.files && !canFiles ? "Этот агент не хранит резервные копии файлов" : option.note
           }}</small>
         </span>
-      </label>
+      </UiInline>
       <div v-if="withFiles" class="preview" aria-live="polite">
         <template v-if="previewError">{{ previewError }}</template>
         <template v-else-if="!preview">Считаю, что изменится…</template>
@@ -93,46 +100,35 @@ const options = computed(
           </ul>
         </template>
       </div>
-      <div class="actions">
+      <UiInline align="stretch">
         <UiButton
-          variant="solid"
+          appearance="solid"
           size="sm"
           :disabled="working || (withFiles && (!preview || !preview.ok))"
           @click="emit('confirm', scope)"
         >
           Откатить
         </UiButton>
-        <UiButton variant="ghost" size="sm" @click="emit('cancel')">Отмена</UiButton>
-      </div>
+        <UiButton size="sm" @click="emit('cancel')">Отмена</UiButton>
+      </UiInline>
     </template>
     <template v-else>
       <p class="preview" role="status">
         <template v-if="result.ok"> Файлов возвращено: {{ result.files.length }}. </template>
         <template v-else>{{ result.error || "Не удалось вернуть файлы" }}</template>
       </p>
-      <div class="actions">
-        <UiButton variant="ghost" size="sm" @click="emit('cancel')">Закрыть</UiButton>
-      </div>
+      <UiInline align="stretch">
+        <UiButton size="sm" @click="emit('cancel')">Закрыть</UiButton>
+      </UiInline>
     </template>
-  </section>
+  </UiCard>
 </template>
 
 <style scoped>
 .rewind {
-  display: grid;
-  gap: var(--sp-2);
   margin: 0 0 var(--sp-2);
-  padding: var(--sp-3);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-lg);
-  background: var(--bg-2);
-  font-size: var(--fs-2xs);
-  color: var(--muted);
 }
 header {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
   color: var(--text);
 }
 svg {
@@ -140,9 +136,6 @@ svg {
   height: 14px;
 }
 label {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--sp-2);
   cursor: pointer;
 }
 label.off {
@@ -182,9 +175,5 @@ ul {
 .removed {
   color: var(--err);
   font-family: var(--mono);
-}
-.actions {
-  display: flex;
-  gap: var(--sp-2);
 }
 </style>

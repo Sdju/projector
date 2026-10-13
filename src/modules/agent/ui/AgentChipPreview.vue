@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiPopupSurface from "../../../common/ui/UiPopupSurface.vue";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { workspaceAssetUrl } from "../../workspace-api/index.ts";
 import type { MessageChip } from "../model/types.ts";
@@ -80,7 +81,7 @@ onBeforeUnmount(() => {
 
 <template>
   <Teleport to="body">
-    <div
+    <UiPopupSurface
       v-if="chip && source && !failed"
       class="chip-preview"
       :class="{ below: place.below }"
@@ -89,7 +90,7 @@ onBeforeUnmount(() => {
       :aria-label="chip.type === 'image' ? chip.name : chip.type === 'file' ? chip.path : ''"
     >
       <img :src="source" alt="" @error="failed = true" />
-    </div>
+    </UiPopupSurface>
   </Teleport>
 </template>
 
@@ -99,10 +100,6 @@ onBeforeUnmount(() => {
   z-index: var(--z-popover);
   transform: translateY(-100%);
   padding: var(--sp-1);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-lg);
-  background: var(--bg-2);
-  box-shadow: var(--shadow-popover);
   pointer-events: none;
 }
 .chip-preview.below {

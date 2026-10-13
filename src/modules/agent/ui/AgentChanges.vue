@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiDisclosureSummary from "../../../common/ui/UiDisclosureSummary.vue";
 import { computed } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { turnChanges } from "../lib/turn-changes.ts";
@@ -17,15 +18,20 @@ const totals = computed(() => ({
 
 <template>
   <details v-if="changes.length" class="changes">
-    <summary>
+    <UiDisclosureSummary>
       <IconFileDiff aria-hidden="true" />
       <span>Изменено файлов: {{ changes.length }}</span>
       <span class="added">+{{ totals.added }}</span>
       <span class="removed">−{{ totals.removed }}</span>
-    </summary>
+    </UiDisclosureSummary>
     <ul>
       <li v-for="change in changes" :key="change.path">
-        <button type="button" class="file" :title="change.path" @click="emit('open', change.path)">
+        <button
+          type="button"
+          class="file u-truncate"
+          :title="change.path"
+          @click="emit('open', change.path)"
+        >
           {{ change.path }}
         </button>
         <span class="added">+{{ change.added }}</span>
@@ -35,7 +41,6 @@ const totals = computed(() => ({
     <UiButton
       v-if="canRevert"
       size="sm"
-      variant="ghost"
       title="Вернуть файлы к состоянию до этого запроса"
       @click="emit('revert')"
     >
@@ -49,19 +54,6 @@ const totals = computed(() => ({
   margin-top: var(--sp-3);
   color: var(--muted);
   font-size: var(--fs-2xs);
-}
-summary {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  cursor: pointer;
-  list-style: none;
-}
-summary::-webkit-details-marker {
-  display: none;
-}
-summary:hover {
-  color: var(--text);
 }
 svg {
   width: 13px;
@@ -83,9 +75,6 @@ li {
 .file {
   min-width: 0;
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   text-align: left;
   direction: rtl;
   font: var(--fs-2xs) var(--mono);

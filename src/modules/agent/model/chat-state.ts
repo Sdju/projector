@@ -4,6 +4,7 @@ import type {
   AgentControl,
   AgentPermission,
   AgentPermissionMode,
+  AgentQuestionRequest,
   AgentSelection,
   AgentSessionInfo,
   AgentTurn,
@@ -20,6 +21,7 @@ export const createState = () =>
     error: "",
     phase: "",
     permissions: [] as AgentPermission[],
+    questions: [] as AgentQuestionRequest[],
     permissionMode: "default" as AgentPermissionMode,
     controls: [] as AgentControl[],
     commands: [] as AgentCommand[],
@@ -68,6 +70,8 @@ interface ChatRegistry {
   sessions: Map<string, ChatState>;
   loads: Map<string, Promise<void>>;
   saves: Map<string, Promise<void>>;
+  /** Chats with a save waiting behind the running one. */
+  queued: Set<string>;
 }
 
 // Kept in `import.meta.hot.data`: editing this file re-evaluates it, and a running answer must
@@ -79,8 +83,10 @@ const registry: ChatRegistry = (hot.chats ??= {
   sessions: new Map(),
   loads: new Map(),
   saves: new Map(),
+  queued: new Set(),
 });
-export const { releases, viewers, sessions, loads, saves } = registry;
+registry.queued ??= new Set();
+export const { releases, viewers, sessions, loads, saves, queued } = registry;
 
 /** The conversation as plain text turns, for an agent that has no session of its own to continue. */
 export function chatHistory(turns: AgentTurn[]): { role: "user" | "assistant"; content: string }[] {

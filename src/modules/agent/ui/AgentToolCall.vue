@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import UiDisclosureSummary from "../../../common/ui/UiDisclosureSummary.vue";
 import { computed } from "vue";
 import AgentCodeBlock from "./AgentCodeBlock.vue";
 import { formatToolInput, inputHint, isEditTool } from "../lib/tool-input.ts";
 import { toolLabel } from "../lib/tool-labels.ts";
 import type { AgentToolChip, AgentToolView } from "../model/types.ts";
 import IconChevron from "~icons/lucide/chevron-right";
-import IconLoader from "~icons/lucide/loader-circle";
+import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import IconAlert from "~icons/lucide/circle-alert";
 import IconTerminal from "~icons/lucide/terminal";
 import IconSearch from "~icons/lucide/search";
@@ -85,22 +86,18 @@ const kind = computed(() => {
 
 <template>
   <details class="tool" :class="view.status">
-    <summary>
+    <UiDisclosureSummary variant="padded">
       <component :is="kind" class="tool-icon" aria-hidden="true" />
-      <span class="tool-name" :title="view.label">{{ view.label }}</span>
-      <span class="tool-hint" :title="view.hint">{{ view.hint }}</span>
-      <IconLoader
-        v-if="tool.status === 'running'"
-        class="state-icon spin"
-        aria-label="Выполняется"
-      />
+      <span class="tool-name u-truncate" :title="view.label">{{ view.label }}</span>
+      <span class="tool-hint u-truncate" :title="view.hint">{{ view.hint }}</span>
+      <UiSpinner v-if="tool.status === 'running'" class="state-icon" label="Выполняется" />
       <IconAlert
         v-else-if="view.status === 'error'"
         class="state-icon error-icon"
         aria-label="Ошибка"
       />
       <IconChevron class="row-chevron" aria-hidden="true" />
-    </summary>
+    </UiDisclosureSummary>
     <div v-if="view.showInput" class="io-label">Вход</div>
     <AgentCodeBlock v-if="view.showInput" :text="view.input" :diff="view.diff" />
     <div v-if="view.showInput" class="io-label">Результат</div>
@@ -119,27 +116,6 @@ const kind = computed(() => {
   color: var(--muted);
   font-size: var(--fs-2xs);
 }
-summary {
-  list-style: none;
-  cursor: pointer;
-}
-summary::-webkit-details-marker {
-  display: none;
-}
-summary:focus-visible {
-  outline-offset: 3px;
-  border-radius: var(--r-md);
-}
-.tool > summary {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-1) 0;
-  min-width: 0;
-}
-.tool > summary:hover {
-  color: var(--text);
-}
 svg {
   width: 13px;
   height: 13px;
@@ -149,16 +125,10 @@ svg {
 .tool-name {
   min-width: 0;
   flex: 0 1 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .tool-hint {
   min-width: 0;
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   color: var(--faint);
 }
 .row-chevron {
@@ -175,9 +145,6 @@ svg {
 .error-icon {
   color: var(--err);
 }
-.spin {
-  animation: spin 1s linear infinite;
-}
 .io-label {
   margin-top: var(--sp-1);
   color: var(--faint);
@@ -187,15 +154,7 @@ svg {
   padding-left: var(--sp-3);
   border-left: 1px solid var(--line);
 }
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 @media (prefers-reduced-motion: reduce) {
-  .spin {
-    animation: none;
-  }
   .row-chevron {
     transition: none;
   }

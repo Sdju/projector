@@ -1,19 +1,23 @@
 import { computed, reactive } from "vue";
 import { useProjects } from "../../project/index.ts";
-import { AgentRunGone, answerPermission, cancelAgentRun, streamAgent } from "../api/client.ts";
+import {
+  AgentRunGone,
+  answerPermission,
+  answerQuestion,
+  cancelAgentRun,
+  streamAgent,
+} from "../api/client.ts";
 import { addVersion } from "./branches.ts";
 import { chatHistory } from "./chat-state.ts";
 import { useChatActions } from "./chat-actions.ts";
-import { notifyAnswer, notifyPermission, requestNotifications } from "../lib/notify.ts";
 import {
-  RELEASE_DELAY_MS,
-  createState,
-  loads,
-  releases,
-  saves,
-  sessions,
-  viewers,
-} from "./chat-state.ts";
+  notifyAnswer,
+  notifyPermission,
+  notifyQuestion,
+  requestNotifications,
+} from "../lib/notify.ts";
+import { RELEASE_DELAY_MS, createState, loads, releases, sessions, viewers } from "./chat-state.ts";
+import { saveChat } from "./save-chat.ts";
 import { useExternalAgent } from "./external.ts";
 import { applyAgentEvent } from "./turn-events.ts";
 import { hasChips, messageText, normalizeParts } from "../lib/message-parts.ts";
@@ -73,23 +77,7 @@ export function useAgent(
         }),
     );
   const ready = loads.get(key)!;
-  function persist() {
-    const body = JSON.stringify({ turns: state.turns.slice(-200) });
-    const saving = (saves.get(key) ?? Promise.resolve())
-      .catch(() => {})
-      .then(async () => {
-        const response = await fetch(historyUrl, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body,
-        });
-        if (!response.ok) throw new Error("Не удалось сохранить историю чата");
-      });
-    saves.set(key, saving);
-    void saving.catch((error) => {
-      state.error = error.message;
-    });
-  }
+  const persist = () => saveChat(key, historyUrl, state);
   const catalog = useProjects();
   const turns = computed(() => state.turns);
   const draftParts = computed({
@@ -113,6 +101,7 @@ export function useAgent(
   });
   const phase = computed(() => state.phase);
   const permissions = computed(() => state.permissions);
+  const questions = computed(() => state.questions);
   const permissionMode = computed({
     get: () => state.permissionMode,
     set: (value: AgentPermissionMode) => {
@@ -149,6 +138,15 @@ export function useAgent(
     }
   }
 
+  async function answer(id: string, answers: Record<string, string[]> | null): Promise<void> {
+    state.questions = state.questions.filter((item) => item.id !== id);
+    try {
+      await answerQuestion(id, answers);
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : "Не удалось передать ответ";
+    }
+  }
+
   const actions = useChatActions(state, { backend, projectId, ready, persist, send, stop });
   const { drainQueue, worktreeId } = actions;
 
@@ -171,6 +169,8 @@ export function useAgent(
     state.abort = new AbortController();
     const { signal } = state.abort;
     const onEvent = (event: AgentEvent) => {
+      if (event.event === "question-request")
+        notifyQuestion(event.data.questions[0]?.question ?? "");
       if (event.event === "permission-request")
         notifyPermission(event.data.title || event.data.tool);
       if (applyAgentEvent(state, assistant, event, catalog.ingest)) persist();
@@ -211,6 +211,7 @@ export function useAgent(
       state.busy = false;
       state.phase = "";
       state.permissions = [];
+      state.questions = [];
       persist();
       if (!stopped) notifyAnswer(assistant.text, !!state.error);
       drainQueue(stopped && !state.interrupting);
@@ -357,6 +358,7 @@ export function useAgent(
     error,
     phase,
     permissions,
+    questions,
     permissionMode,
     controls,
     selection,
@@ -393,5 +395,6 @@ export function useAgent(
     attach,
     release,
     decide,
+    answer,
   };
 }

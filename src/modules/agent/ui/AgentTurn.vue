@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiInline from "../../../common/ui/UiInline.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { computed } from "vue";
 import { chipIcon, chipLabel, chipTitle } from "../lib/composer/chips.ts";
@@ -83,10 +84,23 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
 <template>
   <article class="turn" :class="[turn.role, { faded }]">
     <div v-if="turn.role === 'user'" class="user-row">
-      <div class="turn-actions" :class="{ pinned: versions.count > 1 }">
-        <span v-if="versions.count > 1" class="versions" role="group" aria-label="Версии">
+      <UiInline
+        :gap="0.5"
+        justify="normal"
+        class="turn-actions"
+        :class="{ pinned: versions.count > 1 }"
+      >
+        <UiInline
+          as="span"
+          gap="none"
+          justify="normal"
+          v-if="versions.count > 1"
+          class="versions"
+          role="group"
+          aria-label="Версии"
+        >
           <UiButton
-            icon
+            shape="icon"
             size="sm"
             title="Предыдущая версия"
             aria-label="Предыдущая версия"
@@ -97,7 +111,7 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
           </UiButton>
           <span class="version-count">{{ versions.position + 1 }} / {{ versions.count }}</span>
           <UiButton
-            icon
+            shape="icon"
             size="sm"
             title="Следующая версия"
             aria-label="Следующая версия"
@@ -106,9 +120,9 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
           >
             <IconNext aria-hidden="true" />
           </UiButton>
-        </span>
+        </UiInline>
         <UiButton
-          icon
+          shape="icon"
           size="sm"
           class="turn-action"
           title="Править и отправить заново"
@@ -119,7 +133,7 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
           <IconPencil aria-hidden="true" />
         </UiButton>
         <UiButton
-          icon
+          shape="icon"
           size="sm"
           class="turn-action"
           title="Откатить к этому сообщению"
@@ -129,7 +143,7 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
         >
           <IconUndo aria-hidden="true" />
         </UiButton>
-      </div>
+      </UiInline>
       <p class="user-message">
         <template v-if="turn.content?.length">
           <template v-for="(part, index) in turn.content" :key="index">
@@ -160,10 +174,23 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
         <p v-else-if="segment.type === 'note'" class="user-message note">{{ segment.text }}</p>
         <AgentActivity v-else :tools="segment.tools" />
       </template>
-      <div v-if="busy && last && waiting" class="thinking" role="status">
-        <span class="thinking-dots" aria-hidden="true"><i /><i /><i /></span
+      <UiInline
+        v-if="busy && last && waiting"
+        :gap="2"
+        justify="normal"
+        class="thinking"
+        role="status"
+      >
+        <UiInline
+          as="span"
+          :gap="0.75"
+          align="normal"
+          justify="normal"
+          class="thinking-dots"
+          aria-hidden="true"
+          ><i /><i /><i /></UiInline
         >{{ turn.tools.some((t) => t.status === "running") ? "Выполняет задачу" : "Думает" }}
-      </div>
+      </UiInline>
       <AgentChanges
         v-if="!busy || !last"
         :tools="turn.tools"
@@ -172,9 +199,15 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
         @open="(path) => emit('openFile', path)"
         @revert="emit('revert', turn.id)"
       />
-      <div v-if="turn.text && !(busy && last)" class="turn-footer">
+      <UiInline
+        v-if="turn.text && !(busy && last)"
+        :gap="0.5"
+        align="normal"
+        justify="normal"
+        class="turn-footer"
+      >
         <UiButton
-          icon
+          shape="icon"
           size="sm"
           class="copy-button"
           :class="{ copied: copied }"
@@ -186,7 +219,7 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
         </UiButton>
         <UiButton
           v-if="last"
-          icon
+          shape="icon"
           size="sm"
           class="copy-button"
           title="Повторить: получить другой ответ"
@@ -196,7 +229,7 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
         >
           <IconRefresh aria-hidden="true" />
         </UiButton>
-      </div>
+      </UiInline>
     </div>
   </article>
 </template>
@@ -222,9 +255,6 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
   gap: 2px;
 }
 .turn-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
   min-height: var(--control-h-sm);
   opacity: 0;
   color: var(--muted);
@@ -235,14 +265,8 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
   opacity: 1;
 }
 .versions {
-  display: flex;
-  align-items: center;
   font-size: var(--fs-2xs);
   font-variant-numeric: tabular-nums;
-}
-.turn-footer {
-  display: flex;
-  gap: 2px;
 }
 .user-message {
   max-width: 90%;
@@ -305,16 +329,9 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
   color: var(--run);
 }
 .thinking {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
   font-size: var(--fs-xs);
   color: var(--muted);
   padding: var(--sp-1) 0;
-}
-.thinking-dots {
-  display: flex;
-  gap: 3px;
 }
 .thinking-dots i {
   height: 4px;

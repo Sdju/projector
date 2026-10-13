@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import UiDisclosureSummary from "../../../common/ui/UiDisclosureSummary.vue";
 import { computed } from "vue";
 import type { PlanItem } from "../lib/plan.ts";
 import IconListChecks from "~icons/lucide/list-checks";
 import IconCheck from "~icons/lucide/check";
-import IconLoader from "~icons/lucide/loader-circle";
+import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import IconCircle from "~icons/lucide/circle";
 
 const props = defineProps<{ items: PlanItem[]; busy: boolean }>();
@@ -13,19 +14,21 @@ const current = computed(() => props.items.find((item) => item.status === "in_pr
 
 <template>
   <details v-if="items.length" class="plan" :open="busy">
-    <summary>
+    <UiDisclosureSummary :highlight="false">
       <IconListChecks aria-hidden="true" />
       <span class="plan-title">План</span>
       <span class="plan-count">{{ done }} / {{ items.length }}</span>
-      <span v-if="current" class="plan-current">{{ current.active ?? current.content }}</span>
+      <span v-if="current" class="plan-current u-truncate">{{
+        current.active ?? current.content
+      }}</span>
       <span class="plan-bar" aria-hidden="true"
         ><span :style="{ width: `${(done / items.length) * 100}%` }"
       /></span>
-    </summary>
+    </UiDisclosureSummary>
     <ol>
       <li v-for="(item, index) in items" :key="index" :class="item.status">
         <IconCheck v-if="item.status === 'completed'" aria-hidden="true" />
-        <IconLoader v-else-if="item.status === 'in_progress'" class="spin" aria-hidden="true" />
+        <UiSpinner v-else-if="item.status === 'in_progress'" />
         <IconCircle v-else aria-hidden="true" />
         <span>{{ item.content }}</span>
       </li>
@@ -58,15 +61,7 @@ const current = computed(() => props.items.find((item) => item.status === "in_pr
   transition: width var(--t-fast);
 }
 summary {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
   min-width: 0;
-  cursor: pointer;
-  list-style: none;
-}
-summary::-webkit-details-marker {
-  display: none;
 }
 svg {
   width: 13px;
@@ -81,9 +76,6 @@ svg {
 }
 .plan-current {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   color: var(--faint);
 }
 ol {
@@ -109,18 +101,5 @@ li.completed {
 }
 li.in_progress {
   color: var(--text);
-}
-.spin {
-  animation: spin 1s linear infinite;
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .spin {
-    animation: none;
-  }
 }
 </style>

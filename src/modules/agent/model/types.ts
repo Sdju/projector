@@ -129,6 +129,25 @@ export interface AgentPermission {
   persistent: boolean;
 }
 
+/** A question the agent put to the user and waits for. */
+export interface AgentQuestionRequest {
+  id: string;
+  title?: string;
+  questions: {
+    id: string;
+    question: string;
+    header?: string;
+    options: { id: string; label: string; description?: string }[];
+    multiple: boolean;
+    /** The user may write an answer of their own to this question. */
+    custom?: boolean;
+    /** The agent goes on without an answer to this one. */
+    optional?: boolean;
+  }[];
+  /** The user may write an answer of their own. */
+  custom: boolean;
+}
+
 export interface AgentHistoryTurn {
   role: "user" | "assistant";
   content: string;
@@ -156,6 +175,7 @@ export type AgentEvent =
         persistent?: boolean;
       };
     }
+  | { event: "question-request"; data: AgentQuestionRequest }
   | { event: "run"; data: { id: string } }
   | { event: "checkpoint"; data: { tail: string } }
   | { event: "worktree"; data: { id: string; branch: string } }

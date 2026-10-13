@@ -13,10 +13,10 @@ const emit = defineEmits<{ now: [id: string]; inject: [id: string]; remove: [id:
   <ul v-if="items.length" class="queue" aria-label="Сообщения в очереди">
     <li v-for="item in items" :key="item.id">
       <span class="label">В очереди</span>
-      <span class="text" :title="item.text">{{ item.text }}</span>
+      <span class="text u-truncate" :title="item.text">{{ item.text }}</span>
       <UiButton
         v-if="busy && canInject"
-        icon
+        shape="icon"
         size="sm"
         title="Добавить в ответ, который пишется сейчас: агент учтёт это, не останавливаясь"
         aria-label="Добавить в ответ"
@@ -26,7 +26,7 @@ const emit = defineEmits<{ now: [id: string]; inject: [id: string]; remove: [id:
       </UiButton>
       <UiButton
         v-if="busy"
-        icon
+        shape="icon"
         size="sm"
         title="Остановить ответ и отправить это сообщение сразу"
         aria-label="Отправить сразу"
@@ -35,7 +35,7 @@ const emit = defineEmits<{ now: [id: string]; inject: [id: string]; remove: [id:
         <IconSend aria-hidden="true" />
       </UiButton>
       <UiButton
-        icon
+        shape="icon"
         size="sm"
         title="Убрать из очереди"
         aria-label="Убрать из очереди"
@@ -73,9 +73,6 @@ li {
 .text {
   min-width: 0;
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   color: var(--text-2);
 }
 svg {

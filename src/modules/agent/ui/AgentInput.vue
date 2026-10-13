@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiPopupSurface from "../../../common/ui/UiPopupSurface.vue";
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { EditorSelection, EditorState, Prec } from "@codemirror/state";
@@ -351,7 +352,15 @@ defineExpose({
 <template>
   <div class="agent-input">
     <div ref="host" class="editor" />
-    <div v-if="open" class="suggest" role="listbox" aria-label="Подсказки">
+    <UiPopupSurface
+      v-if="open"
+      class="suggest"
+      role="listbox"
+      aria-label="Подсказки"
+      flow="column"
+      border="strong"
+      radius="lg"
+    >
       <button
         v-for="(item, index) in suggestions"
         :key="item.key"
@@ -367,11 +376,11 @@ defineExpose({
       >
         <span class="icon" aria-hidden="true" v-html="item.icon" />
         <span class="label">{{ item.label }}</span>
-        <span v-if="item.detail" class="detail" :class="{ path: item.path }">{{
+        <span v-if="item.detail" class="detail u-truncate" :class="{ path: item.path }">{{
           item.detail
         }}</span>
       </button>
-    </div>
+    </UiPopupSurface>
   </div>
 </template>
 
@@ -439,26 +448,16 @@ defineExpose({
   flex-shrink: 0;
   color: var(--muted);
 }
-.editor :deep(.composer-chip-label) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+
 .suggest {
   position: absolute;
   z-index: var(--z-popover);
   left: 0;
   right: 0;
   bottom: calc(100% + var(--sp-2));
-  display: flex;
-  flex-direction: column;
   max-height: 240px;
   overflow-y: auto;
   padding: var(--sp-1);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-lg);
-  background: var(--bg-2);
-  box-shadow: var(--shadow-popover);
   font-size: var(--fs-xs);
 }
 .suggestion {
@@ -485,9 +484,6 @@ defineExpose({
 }
 .detail {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   color: var(--faint);
 }
 .detail.path {

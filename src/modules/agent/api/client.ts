@@ -160,6 +160,19 @@ export async function answerPermission(id: string, allow: boolean, always = fals
   if (!response.ok) throw new Error("Запрос разрешения уже закрыт");
 }
 
+/** Answers a `question-request` event: answers by question ID, or `null` to skip the questions. */
+export async function answerQuestion(
+  id: string,
+  answers: Record<string, string[]> | null,
+): Promise<void> {
+  const response = await fetch("/api/agent/tool-result", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, output: answers ? { answers } : {} }),
+  });
+  if (!response.ok) throw new Error("Вопрос уже закрыт");
+}
+
 async function getJson<T>(url: string, init: RequestInit | undefined, failure: string): Promise<T> {
   const response = await fetch(url, init);
   const data = await response.json().catch(() => ({}));

@@ -114,7 +114,7 @@ const hide = () => menu.close(false);
       <p class="note">Свободно {{ tokens(left) }}</p>
       <ul v-if="categories.length" class="categories">
         <li v-for="item in categories" :key="item.name">
-          <span class="cat-name">{{ item.name }}</span>
+          <span class="cat-name u-truncate">{{ item.name }}</span>
           <span class="cat-bar" aria-hidden="true"
             ><span :style="{ width: `${Math.max(2, item.share)}%` }"
           /></span>
@@ -244,11 +244,7 @@ circle {
   align-items: center;
   gap: var(--sp-2);
 }
-.cat-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+
 .cat-bar {
   height: 3px;
   border-radius: var(--r-full);

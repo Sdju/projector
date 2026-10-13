@@ -6,10 +6,13 @@ import { agentCommandHandler } from "../model/commands.ts";
 import { agentLabel, guiPrograms } from "../model/modes.ts";
 import { useAgent } from "../model/session.ts";
 import { readoutLines, useTabReadout } from "../../../common/utilities/tab-readout.ts";
+import UiPanel from "../../../common/ui/UiPanel.vue";
+import UiInline from "../../../common/ui/UiInline.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import AgentWelcome from "./AgentWelcome.vue";
 import AgentTurn from "./AgentTurn.vue";
 import AgentComposer from "./AgentComposer.vue";
+import AgentQuestions from "./AgentQuestions.vue";
 import AgentPermissions from "./AgentPermissions.vue";
 import AgentContextMeter from "./AgentContextMeter.vue";
 import AgentChipPreview from "./AgentChipPreview.vue";
@@ -53,6 +56,7 @@ const {
   error,
   phase,
   permissions,
+  questions,
   permissionMode,
   controls,
   sessions,
@@ -87,6 +91,7 @@ const {
   attach,
   release,
   decide,
+  answer,
 } = useAgent(props.projectId, plain.value ? undefined : agentCommandHandler(api, props.projectId), {
   backend: props.backend,
   chatId: props.chatId,
@@ -181,7 +186,8 @@ useTabReadout(() => {
 const log = ref<HTMLElement>();
 const controlsMenu = ref<InstanceType<typeof AgentControls>>();
 const composer = ref<InstanceType<typeof AgentComposer>>();
-const root = ref<HTMLElement>();
+const panel = ref<InstanceType<typeof UiPanel>>();
+const root = computed(() => panel.value?.element);
 
 // The project folder: edited files and dropped paths are shown relative to it.
 const projectRoot = ref("");
@@ -417,6 +423,7 @@ watch(
     turns.value.length,
     turns.value.at(-1)?.text,
     permissions.value.length,
+    questions.value.length,
     turns.value
       .at(-1)
       ?.tools.map((tool) => `${tool.id}:${tool.status}:${tool.detail}`)
@@ -454,14 +461,14 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section
-    ref="root"
+  <UiPanel
+    ref="panel"
     class="agent-chat"
     aria-label="Чат с агентом"
     @focusin="activateChat(controller)"
     @pointerdown.capture="activateChat(controller)"
   >
-    <div class="chat-tools">
+    <UiInline class="chat-tools" :gap="1" align="normal" justify="normal">
       <AgentSessions
         v-if="plain"
         :sessions="sessions"
@@ -476,7 +483,7 @@ onBeforeUnmount(() => {
       />
       <UiButton
         v-if="plain && !turns.length"
-        icon
+        shape="icon"
         size="sm"
         :class="{ on: isolate }"
         :aria-pressed="isolate"
@@ -488,7 +495,7 @@ onBeforeUnmount(() => {
       </UiButton>
       <UiButton
         v-if="turns.length"
-        icon
+        shape="icon"
         size="sm"
         title="Сохранить чат в Markdown"
         aria-label="Сохранить чат в Markdown"
@@ -498,7 +505,7 @@ onBeforeUnmount(() => {
       </UiButton>
       <UiButton
         v-if="turns.length"
-        icon
+        shape="icon"
         size="sm"
         title="Новый чат"
         aria-label="Новый чат"
@@ -507,7 +514,7 @@ onBeforeUnmount(() => {
       >
         <IconSquarePen aria-hidden="true" />
       </UiButton>
-    </div>
+    </UiInline>
     <div ref="log" class="chat-log" @scroll.passive="trackScroll">
       <AgentWelcome
         v-if="!turns.length"
@@ -552,6 +559,7 @@ onBeforeUnmount(() => {
         <button type="button" @click="cancelEdit">Отмена</button>
       </p>
       <AgentPermissions :permissions="permissions" @decide="decide" />
+      <AgentQuestions :requests="questions" @answer="answer" />
       <AgentRewind
         v-if="rewinding"
         :key="rewinding.id"
@@ -630,15 +638,11 @@ onBeforeUnmount(() => {
       </template>
     </AgentComposer>
     <AgentChipPreview :project-id="projectId" :scope="root" />
-  </section>
+  </UiPanel>
 </template>
 <style scoped>
 .agent-chat {
   --chat-width: 680px;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
   min-width: 0;
   background: var(--bg);
   container-type: inline-size;
@@ -649,8 +653,6 @@ onBeforeUnmount(() => {
   top: var(--sp-2);
   right: var(--sp-3);
   z-index: var(--z-sticky);
-  display: flex;
-  gap: var(--sp-1);
 }
 .chat-tools .on {
   color: var(--text);
@@ -666,6 +668,7 @@ onBeforeUnmount(() => {
   padding: var(--sp-6) var(--sp-5) var(--sp-4);
 }
 .dock {
+  position: relative;
   width: 100%;
   max-width: calc(var(--chat-width) + 56px);
   margin: 0 auto;

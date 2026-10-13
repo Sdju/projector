@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import UiInline from "../../../common/ui/UiInline.vue";
 import type { MessageChip, MessagePart } from "../model/types.ts";
 import AgentInput from "./AgentInput.vue";
 import IconArrowUp from "~icons/lucide/arrow-up";
@@ -71,9 +72,9 @@ defineExpose({ resize: () => {}, focus: () => input.value?.focus() });
         @open="(chip) => emit('open', chip)"
         @fail="(message) => emit('fail', message)"
       />
-      <div class="composer-footer">
+      <UiInline class="composer-footer" justify="normal">
         <slot name="controls" />
-        <div class="footer-end">
+        <UiInline class="footer-end" justify="normal">
           <slot name="status" />
           <button
             v-if="busy"
@@ -95,8 +96,8 @@ defineExpose({ resize: () => {}, focus: () => input.value?.focus() });
           >
             <IconArrowUp aria-hidden="true" />
           </button>
-        </div>
-      </div>
+        </UiInline>
+      </UiInline>
     </form>
     <span class="sr-only" role="status">{{ copied ? "Ответ скопирован" : "" }}</span>
   </div>
@@ -124,16 +125,10 @@ defineExpose({ resize: () => {}, focus: () => input.value?.focus() });
   border-color: var(--focus);
 }
 .composer-footer {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
   padding: 0 var(--sp-1) 0 var(--sp-3);
   min-height: var(--control-h-sm);
 }
 .footer-end {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
   margin-left: auto;
 }
 .send-button {

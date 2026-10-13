@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiDisclosureSummary from "../../../common/ui/UiDisclosureSummary.vue";
 import { computed } from "vue";
 import { inputHint } from "../lib/tool-input.ts";
 import { toolLabel } from "../lib/tool-labels.ts";
@@ -6,7 +7,7 @@ import type { AgentToolView } from "../model/types.ts";
 import AgentToolCall from "./AgentToolCall.vue";
 import IconChevron from "~icons/lucide/chevron-right";
 import IconCheck from "~icons/lucide/check";
-import IconLoader from "~icons/lucide/loader-circle";
+import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import IconAlert from "~icons/lucide/circle-alert";
 
 const props = defineProps<{ tools: AgentToolView[] }>();
@@ -31,15 +32,15 @@ const title = computed(() => {
     <AgentToolCall :tool="tools[0]!" />
   </div>
   <details v-else class="activity" :class="{ working: current, failed }">
-    <summary class="activity-summary">
-      <IconLoader v-if="current" class="spin" aria-hidden="true" />
+    <UiDisclosureSummary variant="fit" class="activity-summary">
+      <UiSpinner v-if="current" />
       <IconAlert v-else-if="failed" class="error-icon" aria-hidden="true" />
       <IconCheck v-else class="done-icon" aria-hidden="true" />
       <span>{{ title }}</span>
-      <span v-if="current" class="tool-hint" :title="hint">{{ hint }}</span>
+      <span v-if="current" class="tool-hint u-truncate" :title="hint">{{ hint }}</span>
       <span v-if="current || title === 'Действия'" class="count">{{ tools.length }}</span>
       <IconChevron class="group-chevron" aria-hidden="true" />
-    </summary>
+    </UiDisclosureSummary>
     <div class="activity-list">
       <AgentToolCall v-for="tool in tools" :key="tool.id" :tool="tool" />
     </div>
@@ -56,28 +57,6 @@ const title = computed(() => {
 .activity:last-child {
   margin-bottom: 0;
 }
-summary {
-  list-style: none;
-  cursor: pointer;
-}
-summary::-webkit-details-marker {
-  display: none;
-}
-summary:focus-visible {
-  outline-offset: 3px;
-  border-radius: var(--r-md);
-}
-.activity-summary {
-  display: flex;
-  max-width: 100%;
-  width: fit-content;
-  align-items: center;
-  gap: 7px;
-  padding: 5px 0;
-}
-.activity-summary:hover {
-  color: var(--text);
-}
 svg {
   width: 13px;
   height: 13px;
@@ -89,9 +68,6 @@ svg {
 .tool-hint {
   min-width: 0;
   max-width: 40ch;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   color: var(--faint);
 }
 .group-chevron {
@@ -112,18 +88,7 @@ svg {
 .error-icon {
   color: var(--err);
 }
-.spin {
-  animation: spin 1s linear infinite;
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 @media (prefers-reduced-motion: reduce) {
-  .spin {
-    animation: none;
-  }
   .group-chevron {
     transition: none;
   }

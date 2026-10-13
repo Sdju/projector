@@ -30,6 +30,10 @@ export function notifyAnswer(text: string, failed: boolean): void {
   show(failed ? "Агент остановился с ошибкой" : "Агент закончил", text.trim(), "agent-answer");
 }
 
+export function notifyQuestion(what: string): void {
+  show("Агент задаёт вопрос", what, "agent-question");
+}
+
 export function notifyPermission(what: string): void {
   show("Агент ждёт разрешения", what, "agent-permission");
 }

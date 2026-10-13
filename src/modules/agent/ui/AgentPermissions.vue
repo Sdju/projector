@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import UiCard from "../../../common/ui/UiCard.vue";
+import UiInline from "../../../common/ui/UiInline.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { isEditTool } from "../lib/tool-input.ts";
 import AgentCodeBlock from "./AgentCodeBlock.vue";
@@ -16,31 +18,34 @@ const emit = defineEmits<{ decide: [id: string, allow: boolean, always?: boolean
     role="alertdialog"
     aria-label="Запрос разрешения"
   >
-    <section v-for="item in permissions" :key="item.id" class="permission">
-      <header>
+    <UiCard
+      v-for="item in permissions"
+      :key="item.id"
+      class="permission"
+      tone="warning"
+      density="notice"
+    >
+      <UiInline as="header" align="center" justify="normal">
         <IconShield aria-hidden="true" />
         <span class="title">{{ item.title }}</span>
         <code class="tool">{{ item.tool }}</code>
-      </header>
+      </UiInline>
       <AgentCodeBlock v-if="item.detail" :text="item.detail" :diff="isEditTool(item.tool)" />
-      <div class="actions">
-        <UiButton variant="solid" size="sm" @click="emit('decide', item.id, true)">
+      <UiInline align="stretch">
+        <UiButton appearance="solid" size="sm" @click="emit('decide', item.id, true)">
           Разрешить
         </UiButton>
         <UiButton
           v-if="item.persistent"
-          variant="ghost"
           size="sm"
           title="Разрешить и больше не спрашивать про этот инструмент"
           @click="emit('decide', item.id, true, true)"
         >
           Всегда разрешать
         </UiButton>
-        <UiButton variant="ghost" size="sm" @click="emit('decide', item.id, false)">
-          Отклонить
-        </UiButton>
-      </div>
-    </section>
+        <UiButton size="sm" @click="emit('decide', item.id, false)"> Отклонить </UiButton>
+      </UiInline>
+    </UiCard>
   </div>
 </template>
 
@@ -50,19 +55,7 @@ const emit = defineEmits<{ decide: [id: string, allow: boolean, always?: boolean
   gap: 8px;
   margin: 0 0 10px;
 }
-.permission {
-  display: grid;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--bg-2));
-  border-radius: var(--r-lg);
-  background: color-mix(in srgb, var(--warn) 8%, var(--bg-2));
-  font-size: var(--fs-2xs);
-}
 header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   min-width: 0;
 }
 header svg {
@@ -80,9 +73,5 @@ header svg {
   margin-left: auto;
   color: var(--muted);
   font-family: var(--mono);
-}
-.actions {
-  display: flex;
-  gap: 8px;
 }
 </style>

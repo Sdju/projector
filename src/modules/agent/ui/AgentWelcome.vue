@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiButton from "../../../common/ui/UiButton.vue";
 import { guiPrograms } from "../model/modes.ts";
 withDefaults(defineProps<{ plain?: boolean; agentName?: string }>(), {
   plain: false,
@@ -27,23 +28,34 @@ const suggestions = [
     <h1>{{ plain ? agentName : "С чего начнём?" }}</h1>
     <p v-if="plain">Работает в папке проекта, как в терминале.</p>
     <div v-else class="suggestions">
-      <button
+      <UiButton
+        appearance="outline"
+        tone="muted"
+        shape="pill"
         v-for="suggestion in suggestions"
         :key="suggestion.title"
         type="button"
         @click="emit('suggest', suggestion.text)"
       >
         {{ suggestion.title }}
-      </button>
+      </UiButton>
     </div>
     <div v-if="!plain" class="coders">
       <span class="coders-label" title="Я управляю Projector и не пишу код в файлах">
         Писать код — в агенте
       </span>
       <div class="coders-list">
-        <button v-for="[id, program] in coders" :key="id" type="button" @click="emit('open', id)">
+        <UiButton
+          appearance="outline"
+          tone="muted"
+          shape="pill"
+          v-for="[id, program] in coders"
+          :key="id"
+          type="button"
+          @click="emit('open', id)"
+        >
           {{ program.title }}
-        </button>
+        </UiButton>
       </div>
     </div>
   </div>
@@ -97,21 +109,5 @@ h1 {
   flex-wrap: wrap;
   justify-content: center;
   gap: var(--sp-1);
-}
-.coders button,
-.suggestions button {
-  padding: var(--sp-1) var(--sp-3);
-  border: 1px solid var(--line);
-  border-radius: var(--r-full);
-  color: var(--muted);
-  font-size: var(--fs-xs);
-  transition:
-    border-color var(--t-fast),
-    color var(--t-fast);
-}
-.coders button:hover,
-.suggestions button:hover {
-  border-color: var(--line-strong);
-  color: var(--text);
 }
 </style>
