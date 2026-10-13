@@ -87,7 +87,7 @@ const kind = computed(() => {
   <details class="tool" :class="view.status">
     <summary>
       <component :is="kind" class="tool-icon" aria-hidden="true" />
-      <span class="tool-name">{{ view.label }}</span>
+      <span class="tool-name" :title="view.label">{{ view.label }}</span>
       <span class="tool-hint" :title="view.hint">{{ view.hint }}</span>
       <IconLoader
         v-if="tool.status === 'running'"
@@ -104,7 +104,9 @@ const kind = computed(() => {
     <div v-if="view.showInput" class="io-label">Вход</div>
     <AgentCodeBlock v-if="view.showInput" :text="view.input" :diff="view.diff" />
     <div v-if="view.showInput" class="io-label">Результат</div>
-    <AgentCodeBlock :text="view.result || 'Ожидание результата…'" />
+    <AgentCodeBlock
+      :text="view.result || (tool.status === 'running' ? 'Ожидание результата…' : 'Без вывода')"
+    />
     <div v-if="tool.children?.length" class="nested">
       <div class="io-label">Вызовы субагента: {{ tool.children.length }}</div>
       <AgentToolCall v-for="child in tool.children" :key="child.id" :tool="child" />
@@ -143,8 +145,13 @@ svg {
   height: 13px;
   flex-shrink: 0;
 }
+/* ACP agents name a call with its whole command line: it must shrink, not push the row wide. */
 .tool-name {
-  flex-shrink: 0;
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .tool-hint {
   min-width: 0;

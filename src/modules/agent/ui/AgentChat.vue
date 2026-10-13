@@ -350,6 +350,10 @@ function openChip(chip: MessageChip) {
 const away = ref(false);
 const copied = ref("");
 const copyError = ref("");
+function dismissError() {
+  error.value = "";
+  copyError.value = "";
+}
 let copyTimer: ReturnType<typeof setTimeout> | undefined;
 let observer: ResizeObserver | undefined;
 // Content growth never changes scrollTop, so only a decrease is a user scrolling up.
@@ -607,6 +611,7 @@ onBeforeUnmount(() => {
       @submit="submit"
       @open="openChip"
       @fail="(message) => (error = message)"
+      @dismiss="dismissError"
       @stop="stop"
       @latest="toBottom"
     >

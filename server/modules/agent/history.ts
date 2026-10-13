@@ -9,77 +9,75 @@ interface StoredTurn {
 
 const turnSchema: z.ZodType<StoredTurn> = z.lazy(() =>
   z.object({
-    id: z.string().max(100),
+    id: z.string(),
     role: z.enum(["user", "assistant"]),
-    text: z.string().max(100000),
+    text: z.string(),
     /** Native session of the backend that produced this turn, used to resume it. */
-    session: z.object({ backend: z.string().max(40), id: z.string().max(200) }).optional(),
+    session: z.object({ backend: z.string(), id: z.string() }).optional(),
     /** The agent process still answering this turn; lets a reloaded page rejoin it. */
-    run: z.string().max(40).optional(),
-    tools: z
-      .array(
-        z.object({
-          id: z.string().max(100),
-          name: z.string().max(100),
-          status: z.enum(["running", "done", "error"]),
-          input: z.string().max(8000).optional(),
-          detail: z.string().max(8000),
-        }),
-      )
-      .max(100),
+    run: z.string().optional(),
+    tools: z.array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        status: z.enum(["running", "done", "error"]),
+        input: z.string().optional(),
+        detail: z.string(),
+      }),
+    ),
     content: z
       .array(
         z.discriminatedUnion("type", [
-          z.object({ type: z.literal("text"), text: z.string().max(100000) }),
+          z.object({ type: z.literal("text"), text: z.string() }),
           z.object({
             type: z.literal("file"),
-            path: z.string().max(1000),
+            path: z.string(),
             directory: z.boolean().optional(),
           }),
           z.object({
             type: z.literal("image"),
-            id: z.string().max(100),
-            name: z.string().max(200),
-            mime: z.string().max(100),
+            id: z.string(),
+            name: z.string(),
+            mime: z.string(),
           }),
-          z.object({ type: z.literal("command"), name: z.string().max(200) }),
+          z.object({ type: z.literal("command"), name: z.string() }),
         ]),
       )
-      .max(200)
+
       .optional(),
     context: z
       .object({
         used: z.number(),
         size: z.number(),
-        model: z.string().max(100).optional(),
+        model: z.string().optional(),
         compactAt: z.number().optional(),
         categories: z
-          .array(z.object({ name: z.string().max(100), tokens: z.number() }))
-          .max(40)
+          .array(z.object({ name: z.string(), tokens: z.number() }))
+
           .optional(),
-        cost: z.object({ amount: z.number(), currency: z.string().max(10) }).optional(),
+        cost: z.object({ amount: z.number(), currency: z.string() }).optional(),
       })
       .optional(),
     parts: z
       .array(
         z.discriminatedUnion("type", [
-          z.object({ type: z.literal("text"), text: z.string().max(100000) }),
-          z.object({ type: z.literal("tool"), id: z.string().max(100) }),
+          z.object({ type: z.literal("text"), text: z.string() }),
+          z.object({ type: z.literal("tool"), id: z.string() }),
         ]),
       )
-      .max(400)
+
       .optional(),
     /** Transcript position after this answer: the next message branches off here if needed. */
-    tail: z.string().max(100).optional(),
+    tail: z.string().optional(),
     /** The native session cannot be continued from this turn: the chat is replayed instead. */
     detached: z.boolean().optional(),
     /** Other versions of the conversation from this message on (it was edited or repeated). */
-    variants: z.array(z.array(turnSchema).max(200)).max(20).optional(),
+    variants: z.array(z.array(turnSchema)).optional(),
     /** Where the shown version stands among `variants`. */
-    slot: z.number().int().min(0).max(20).optional(),
+    slot: z.number().int().min(0).optional(),
   }),
 );
-const schema = z.array(turnSchema).max(200);
+const schema = z.array(turnSchema);
 function historyPath(id: string) {
   return join(dataDir(), "agent", `${createHash("sha256").update(id).digest("hex")}.json`);
 }

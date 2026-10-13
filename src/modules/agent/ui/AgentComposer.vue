@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref, watch } from "vue";
 import type { MessageChip, MessagePart } from "../model/types.ts";
 import AgentInput from "./AgentInput.vue";
 import IconArrowUp from "~icons/lucide/arrow-up";
 import IconArrowDown from "~icons/lucide/arrow-down";
 import IconSquare from "~icons/lucide/square";
 import IconAlert from "~icons/lucide/circle-alert";
+import IconX from "~icons/lucide/x";
 
 const draft = defineModel<string>({ required: true });
 const parts = defineModel<MessagePart[]>("parts", { default: () => [] });
-defineProps<{
+const props = defineProps<{
   busy: boolean;
   away: boolean;
   error: string;
@@ -23,7 +24,15 @@ const emit = defineEmits<{
   latest: [];
   open: [chip: MessageChip];
   fail: [message: string];
+  dismiss: [];
 }>();
+// A long error (a validation dump, a stack) stays a short strip until asked to open.
+const expanded = ref(false);
+const long = computed(() => props.error.length > 160 || props.error.includes("\n"));
+watch(
+  () => props.error,
+  () => (expanded.value = false),
+);
 const input = ref<InstanceType<typeof AgentInput>>();
 defineExpose({ resize: () => {}, focus: () => input.value?.focus() });
 </script>
@@ -33,7 +42,24 @@ defineExpose({ resize: () => {}, focus: () => input.value?.focus() });
     <button v-if="away" type="button" class="latest-button" @click="emit('latest')">
       <IconArrowDown aria-hidden="true" />К последнему сообщению
     </button>
-    <p v-if="error" class="chat-error" role="alert"><IconAlert aria-hidden="true" />{{ error }}</p>
+    <div v-if="error" class="chat-error" role="alert">
+      <IconAlert aria-hidden="true" />
+      <p class="chat-error-text" :class="{ clamped: long && !expanded, open: expanded }">
+        {{ error }}
+      </p>
+      <button v-if="long" type="button" class="chat-error-toggle" @click="expanded = !expanded">
+        {{ expanded ? "Свернуть" : "Развернуть" }}
+      </button>
+      <button
+        type="button"
+        class="chat-error-close"
+        title="Скрыть"
+        aria-label="Скрыть ошибку"
+        @click="emit('dismiss')"
+      >
+        <IconX aria-hidden="true" />
+      </button>
+    </div>
     <form class="composer" :class="{ working: busy }" @submit.prevent="emit('submit')">
       <AgentInput
         ref="input"
@@ -182,6 +208,37 @@ defineExpose({ resize: () => {}, focus: () => input.value?.focus() });
   height: 14px;
   margin-top: 2px;
   flex-shrink: 0;
+}
+.chat-error-text {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.chat-error-text.clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.chat-error-text.open {
+  max-height: 40vh;
+  overflow: auto;
+}
+.chat-error button {
+  flex-shrink: 0;
+  color: inherit;
+  opacity: 0.8;
+}
+.chat-error button:hover {
+  opacity: 1;
+}
+.chat-error-toggle {
+  text-decoration: underline;
+  font-size: inherit;
+}
+.chat-error-close {
+  display: grid;
+  place-items: center;
 }
 .sr-only {
   position: absolute;
