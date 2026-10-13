@@ -26,7 +26,7 @@ export function checkFeod({ rootDir = projectRoot, config = feodConfig } = {}) {
       maxBuffer: 64 * 1024 * 1024,
     });
     if (result.error) throw result.error;
-    return diagnosticsOf(result.status, result.stdout, result.stderr);
+    return diagnosticsOf(result.status, result.stdout, result.stderr, result.signal);
   } finally {
     rmSync(run.directory, { recursive: true, force: true });
   }
@@ -65,10 +65,10 @@ export function checkFeodAsync({
     child.stdout.on("data", (chunk) => (stdout += chunk));
     child.stderr.on("data", (chunk) => (stderr += chunk));
     child.on("error", (error) => finish(() => reject(error)));
-    child.on("close", (status) =>
+    child.on("close", (status, signal) =>
       finish(() => {
         try {
-          resolve(diagnosticsOf(status, stdout, stderr));
+          resolve(diagnosticsOf(status, stdout, stderr, signal));
         } catch (error) {
           reject(error);
         }
@@ -91,15 +91,15 @@ function prepare(rootDir, config) {
       rules: feod.rules,
     }),
   );
-  return { directory, args: ["-c", file, "-f", "json", ...roots] };
+  return { directory, args: ["--threads=1", "-c", file, "-f", "json", ...roots] };
 }
 
-function diagnosticsOf(status, stdout, stderr) {
+function diagnosticsOf(status, stdout, stderr, signal) {
   let diagnostics;
   try {
     diagnostics = JSON.parse(stdout).diagnostics;
   } catch {
-    throw new Error(`oxlint failed (${status}): ${stderr || stdout}`);
+    throw new Error(`oxlint failed (${signal ?? status}): ${stderr || stdout}`);
   }
   return diagnostics
     .filter((item) => item.code?.startsWith("feod-structure("))
