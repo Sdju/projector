@@ -1,4 +1,5 @@
 import type { AgentEmitter } from "./backend.ts";
+import { createPlainDialect, type AcpDialect, type AcpTaskPatch } from "./acp-dialect.ts";
 import type { AgentSessionTurn } from "./controls.ts";
 
 interface ContentBlock {
@@ -32,25 +33,24 @@ function toolOutput(update: Record<string, unknown>): string {
     .join("\n");
 }
 
-/** Codex streams command output as `_meta.terminal_output_delta` chunks, not in the final update. */
-function terminalDelta(update: Record<string, unknown>): string {
-  const meta = update._meta as { terminal_output_delta?: { data?: unknown } } | undefined;
-  const data = meta?.terminal_output_delta?.data;
-  return typeof data === "string" ? data : "";
-}
-
 /**
  * Translates ACP `session/update` notifications into the chat's SSE events. Text chunks stream
  * into the answer; tool calls become chips that resolve on their `tool_call_update`.
  */
-export function createAcpEventMapper(emit: AgentEmitter, label: string) {
+export function createAcpEventMapper(
+  emit: AgentEmitter,
+  label: string,
+  dialect: AcpDialect = createPlainDialect(),
+) {
   let text = "";
   const toolNames = new Map<string, string>();
-  const streamed = new Map<string, string>();
+  const emitTasks = (patches: AcpTaskPatch[]) => {
+    for (const patch of patches) emit("task", patch);
+  };
 
   function finishTool(update: Record<string, unknown>, id: string, name: string): void {
-    const output = streamed.get(id) || toolOutput(update);
-    streamed.delete(id);
+    const output = dialect.output(id) || toolOutput(update);
+    emitTasks(dialect.end(update, id, output));
     if (update.status === "failed")
       emit("tool-result", { id, name, error: output || "Ошибка инструмента" });
     else emit("tool-result", { id, name, output });
@@ -61,6 +61,13 @@ export function createAcpEventMapper(emit: AgentEmitter, label: string) {
     if (kind === "agent_message_chunk") {
       const chunk = contentText(update.content);
       if (!chunk) return;
+      // What a subagent says is its progress, not part of the answer.
+      const progress = dialect.chunk(update, chunk);
+      if (progress) {
+        emitTasks(progress);
+        return;
+      }
+      emitTasks(dialect.speak());
       text += chunk;
       emit("text", { text: chunk });
       return;
@@ -104,33 +111,33 @@ export function createAcpEventMapper(emit: AgentEmitter, label: string) {
       emit("status", { phase: "thinking", provider: label, model: "" });
       return;
     }
-    if (kind === "tool_call" || kind === "tool_call_update") {
-      const delta = terminalDelta(update);
-      const at = String(update.toolCallId ?? "");
-      if (delta && at) streamed.set(at, (streamed.get(at) ?? "") + delta);
-    }
     if (kind === "tool_call") {
       const id = String(update.toolCallId ?? "");
       if (!id) return;
-      const name = String(update.title || update.kind || "tool");
+      const { name, parent } = dialect.tool(update);
       toolNames.set(id, name);
       emit("tool", {
         id,
         name,
         input: update.rawInput ?? { title: update.title, kind: update.kind },
+        ...(parent ? { parent } : {}),
       });
+      emitTasks(dialect.call(update, id));
       if (update.status === "completed" || update.status === "failed") finishTool(update, id, name);
       return;
     }
     if (kind === "tool_call_update") {
       const id = String(update.toolCallId ?? "");
       const name = toolNames.get(id) ?? String(update.title || "tool");
+      emitTasks(dialect.call(update, id));
       if (update.status === "completed" || update.status === "failed") finishTool(update, id, name);
     }
   }
 
   return {
     handleUpdate,
+    /** The answer ended: commands still running will outlive it. */
+    finish: () => emitTasks(dialect.finish()),
     get text() {
       return text;
     },
@@ -141,10 +148,13 @@ export function createAcpEventMapper(emit: AgentEmitter, label: string) {
  * Rebuilds the chat from the updates an agent replays on `session/load`: user and agent message
  * chunks become turns, tool calls become the chips of the answer they belong to.
  */
-export function createAcpReplayCollector(backend: string, sessionId: string) {
+export function createAcpReplayCollector(
+  backend: string,
+  sessionId: string,
+  dialect: AcpDialect = createPlainDialect(),
+) {
   const turns: AgentSessionTurn[] = [];
   let counter = 0;
-  const streamed = new Map<string, string>();
   const turnFor = (role: "user" | "assistant"): AgentSessionTurn => {
     const last = turns.at(-1);
     if (last?.role === role) return last;
@@ -161,28 +171,28 @@ export function createAcpReplayCollector(backend: string, sessionId: string) {
 
   function handleUpdate(update: Record<string, unknown>): void {
     const kind = update.sessionUpdate;
-    const delta = terminalDelta(update);
-    if (delta)
-      streamed.set(
-        String(update.toolCallId ?? ""),
-        (streamed.get(String(update.toolCallId ?? "")) ?? "") + delta,
-      );
+    const call = String(update.toolCallId ?? "");
     if (kind === "user_message_chunk") turnFor("user").text += contentText(update.content);
-    else if (kind === "agent_message_chunk")
-      turnFor("assistant").text += contentText(update.content);
-    else if (kind === "tool_call") {
-      const id = String(update.toolCallId ?? "");
-      if (!id) return;
+    else if (kind === "agent_message_chunk") {
+      const chunk = contentText(update.content);
+      // The dialect keeps what a subagent said out of the answer.
+      if (!dialect.chunk(update, chunk)) turnFor("assistant").text += chunk;
+    } else if (kind === "tool_call") {
+      if (!call) return;
+      const { name, parent } = dialect.tool(update);
       turnFor("assistant").tools.push({
-        id,
-        name: String(update.title || update.kind || "tool"),
+        id: call,
+        name,
         status: "running",
         detail: toolDetail(update.rawInput),
+        ...(parent ? { parent } : {}),
       });
-      finish(update, id);
+      dialect.call(update, call);
+      finish(update, call);
     } else if (kind === "tool_call_update") {
-      const id = String(update.toolCallId ?? "");
-      if (id) finish(update, id);
+      if (!call) return;
+      dialect.call(update, call);
+      finish(update, call);
     }
   }
 
@@ -191,7 +201,7 @@ export function createAcpReplayCollector(backend: string, sessionId: string) {
     const chip = turns.flatMap((turn) => turn.tools).find((item) => item.id === id);
     if (!chip) return;
     chip.status = update.status === "failed" ? "error" : "done";
-    const output = streamed.get(id) || toolOutput(update);
+    const output = dialect.output(id) || toolOutput(update);
     if (output) chip.detail = output.slice(0, 8000);
   }
 

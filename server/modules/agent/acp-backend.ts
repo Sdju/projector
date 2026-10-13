@@ -65,7 +65,7 @@ export function createAcpBackend(id: AgentBackendId): AgentBackend {
 
 async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> {
   const program = acpProgram(id);
-  const mapper = createAcpEventMapper(options.emit, program.label);
+  const mapper = createAcpEventMapper(options.emit, program.label, program.dialect?.());
   let sessionId = "";
   // `session/load` replays the whole conversation; those updates are history, not this answer.
   let replaying = false;
@@ -140,9 +140,10 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
     )) as { stopReason?: unknown };
     if (options.abort?.aborted) return;
     const stopReason = result?.stopReason;
-    if (stopReason === "end_turn" || stopReason === "cancelled")
+    if (stopReason === "end_turn" || stopReason === "cancelled") {
+      mapper.finish();
       options.emit("done", { text: mapper.text.trim(), added: [] });
-    else options.emit("error", { error: stopReasonError(stopReason) });
+    } else options.emit("error", { error: stopReasonError(stopReason) });
   } catch (error) {
     if (!options.abort?.aborted)
       options.emit("error", {

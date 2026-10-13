@@ -1,3 +1,6 @@
+import { createCodexDialect } from "./acp-dialect-codex.ts";
+import { createOpencodeDialect } from "./acp-dialect-opencode.ts";
+import type { AcpDialect } from "./acp-dialect.ts";
 import type { AgentBackendId } from "./backend.ts";
 
 export interface AcpProgram {
@@ -8,6 +11,8 @@ export interface AcpProgram {
   args: string[];
   /** A globally installed binary that replaces `command` when present (avoids `npx`). */
   binary?: string;
+  /** What the agent adds to ACP (subagents, background commands); plain when absent. */
+  dialect?: () => AcpDialect;
 }
 
 /**
@@ -18,12 +23,18 @@ export interface AcpProgram {
  * runs whatever was published last.
  */
 export const ACP_PROGRAMS: Partial<Record<AgentBackendId, AcpProgram>> = {
-  opencode: { label: "OpenCode", command: "opencode", args: ["acp"] },
+  opencode: {
+    label: "OpenCode",
+    command: "opencode",
+    args: ["acp"],
+    dialect: createOpencodeDialect,
+  },
   cursor: { label: "Cursor", command: "agent", args: ["acp"] },
   codex: {
     label: "Codex",
     command: "npx",
     args: ["-y", "@agentclientprotocol/codex-acp@2.1.1"],
     binary: "codex-acp",
+    dialect: createCodexDialect,
   },
 };

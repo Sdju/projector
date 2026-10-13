@@ -1,7 +1,7 @@
 import type { AcpConnection } from "./acp-client.ts";
 import { controlsFromSession } from "./acp-controls.ts";
 import { createAcpReplayCollector } from "./acp-events.ts";
-import { initializeAcp, startAcp, type AcpInitResult } from "./acp-process.ts";
+import { acpProgram, initializeAcp, startAcp, type AcpInitResult } from "./acp-process.ts";
 import type { AgentBackendId } from "./backend.ts";
 import {
   SESSION_LIST_LIMIT,
@@ -107,7 +107,7 @@ export function acpLoadSession(
   cwd: string,
   sessionId: string,
 ): Promise<AgentSessionTurn[]> {
-  const collector = createAcpReplayCollector(id, sessionId);
+  const collector = createAcpReplayCollector(id, sessionId, acpProgram(id).dialect?.());
   return withAgent(
     id,
     cwd,

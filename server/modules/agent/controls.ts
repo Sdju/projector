@@ -39,7 +39,13 @@ export interface AgentSessionTurn {
   id: string;
   role: "user" | "assistant";
   text: string;
-  tools: { id: string; name: string; status: "running" | "done" | "error"; detail: string }[];
+  tools: {
+    id: string;
+    name: string;
+    status: "running" | "done" | "error";
+    detail: string;
+    parent?: string;
+  }[];
   session?: { backend: string; id: string };
 }
 
