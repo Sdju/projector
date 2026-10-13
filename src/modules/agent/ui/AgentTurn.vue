@@ -9,6 +9,7 @@ import type { AgentToolChip, AgentToolView, AgentTurn, MessageChip } from "../mo
 import AgentMessage from "./AgentMessage.vue";
 import AgentActivity from "./AgentActivity.vue";
 import AgentTasks from "./AgentTasks.vue";
+import AgentThought from "./AgentThought.vue";
 import AgentChanges from "./AgentChanges.vue";
 import IconCopy from "~icons/lucide/copy";
 import IconCheck from "~icons/lucide/check";
@@ -46,6 +47,7 @@ const versions = computed(() => versionsOf(props.turn));
 type Segment =
   | { key: string; type: "text"; text: string }
   | { key: string; type: "note"; text: string }
+  | { key: string; type: "thought"; text: string }
   | { key: string; type: "tools"; tools: AgentToolView[] };
 
 // Text and tool calls in the order they happened; neighbouring calls form one group.
@@ -71,6 +73,10 @@ const segments = computed(() => {
       result.push({ key: `n${index}`, type: "note", text: part.text });
       continue;
     }
+    if (part.type === "thought") {
+      if (part.text.trim()) result.push({ key: `r${index}`, type: "thought", text: part.text });
+      continue;
+    }
     const tool = byId.get(part.id);
     if (!tool) continue;
     const last = result.at(-1);
@@ -79,7 +85,11 @@ const segments = computed(() => {
   }
   return result;
 });
-const waiting = computed(() => segments.value.at(-1)?.type !== "text");
+// A reasoning block shows its own progress, so the dots are only for the gaps between steps.
+const waiting = computed(() => {
+  const type = segments.value.at(-1)?.type;
+  return type !== "text" && type !== "thought";
+});
 </script>
 
 <template>
@@ -173,6 +183,11 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
       <template v-for="segment in segments" :key="segment.key">
         <AgentMessage v-if="segment.type === 'text'" :text="segment.text" />
         <p v-else-if="segment.type === 'note'" class="user-message note">{{ segment.text }}</p>
+        <AgentThought
+          v-else-if="segment.type === 'thought'"
+          :text="segment.text"
+          :streaming="busy && last && segment === segments.at(-1)"
+        />
         <AgentActivity v-else :tools="segment.tools" />
       </template>
       <AgentTasks v-if="turn.tasks?.length" :tasks="turn.tasks" />

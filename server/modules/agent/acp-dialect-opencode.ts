@@ -71,6 +71,7 @@ export function createOpencodeDialect(): AcpDialect {
       const parent = child && parentOf(child);
       return { name, ...(parent ? { parent } : {}) };
     },
+    inner: (update) => childOf(update) !== undefined,
     chunk(update, text) {
       const child = childOf(update);
       if (!child) return undefined;

@@ -18,6 +18,8 @@ export function chatMarkdown(turns: AgentTurn[], title: string): string {
         if (part.text.trim()) body.push(part.text.trim());
         continue;
       }
+      // Reasoning stays in the chat: the export keeps the answer and what was done.
+      if (part.type === "thought") continue;
       if (part.type === "note") {
         body.push(`**Вы добавили:** ${part.text.trim()}`);
         continue;

@@ -67,6 +67,10 @@ async function run(options: AgentRunOptions): Promise<void> {
       options.emit("text", { text: part.text });
       continue;
     }
+    if (part.type === "reasoning-delta") {
+      options.emit("thought", { text: part.text });
+      continue;
+    }
     if (part.type === "tool-call") {
       options.emit("tool", {
         id: part.toolCallId,

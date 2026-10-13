@@ -18,6 +18,13 @@ export function appendText(turn: AgentTurn, text: string) {
   else parts.push({ type: "text", text });
 }
 
+export function appendThought(turn: AgentTurn, text: string) {
+  const parts = (turn.parts ??= legacyParts(turn));
+  const last = parts.at(-1);
+  if (last?.type === "thought") last.text += text;
+  else parts.push({ type: "thought", text });
+}
+
 /**
  * Folds one stream event into the chat and the answer being written. Returns `true` when the
  * history should be saved now: a new session or run is what lets a reload resume the turn.
@@ -78,6 +85,9 @@ export function applyAgentEvent(
     case "text":
       assistant.text += event.data.text;
       appendText(assistant, event.data.text);
+      return false;
+    case "thought":
+      appendThought(assistant, event.data.text);
       return false;
     case "tool":
       if (assistant.text.trim() && !assistant.text.endsWith("\n\n")) assistant.text += "\n\n";

@@ -109,6 +109,9 @@ export function createAcpEventMapper(
     }
     if (kind === "agent_thought_chunk") {
       emit("status", { phase: "thinking", provider: label, model: "" });
+      // A subagent's reasoning is not the answer's.
+      const thought = contentText(update.content);
+      if (thought && !dialect.inner(update)) emit("thought", { text: thought });
       return;
     }
     if (kind === "tool_call") {

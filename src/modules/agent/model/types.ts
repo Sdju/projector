@@ -23,7 +23,9 @@ export type AgentPart =
   | { type: "text"; text: string }
   | { type: "tool"; id: string }
   /** A message the user added while the answer was being written. */
-  | { type: "note"; text: string };
+  | { type: "note"; text: string }
+  /** What the agent reasoned before answering; kept apart from the answer text. */
+  | { type: "thought"; text: string };
 
 export type AgentBackendId = "projector" | "claude-code" | "codex" | "opencode" | "cursor";
 
@@ -193,6 +195,7 @@ export type AgentEvent =
   | { event: "tool"; data: { id: string; name: string; input: unknown; parent?: string } }
   | { event: "tool-result"; data: { id: string; name: string; output?: unknown; error?: string } }
   | { event: "task"; data: AgentTaskPatch }
+  | { event: "thought"; data: { text: string } }
   | { event: "project"; data: Project }
   | { event: "done"; data: { text: string } }
   | { event: "error"; data: { error: string } };

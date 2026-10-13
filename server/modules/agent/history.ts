@@ -61,6 +61,7 @@ const turnSchema: z.ZodType<StoredTurn> = z.lazy(() =>
           z.object({ type: z.literal("text"), text: z.string() }),
           z.object({ type: z.literal("tool"), id: z.string() }),
           z.object({ type: z.literal("note"), text: z.string() }),
+          z.object({ type: z.literal("thought"), text: z.string() }),
         ]),
       )
       .optional(),

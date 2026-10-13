@@ -18,6 +18,8 @@ export interface AcpDialect {
    * and the mapper drops the text. `undefined` is a chunk of the answer itself.
    */
   chunk(update: AcpUpdate, text: string): AcpTaskPatch[] | undefined;
+  /** The update comes from inside a subagent, not from the agent answering the user. */
+  inner(update: AcpUpdate): boolean;
   /** Any tool call or its update: subagents and background commands it starts or advances. */
   call(update: AcpUpdate, id: string): AcpTaskPatch[];
   /** Command output the agent streamed outside of the final update; read once per call. */
@@ -34,6 +36,7 @@ export interface AcpDialect {
 export function createPlainDialect(): AcpDialect {
   return {
     tool: (update) => ({ name: String(update.title || update.kind || "tool") }),
+    inner: () => false,
     chunk: () => undefined,
     call: () => [],
     output: () => "",

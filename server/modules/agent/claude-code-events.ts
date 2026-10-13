@@ -31,6 +31,7 @@ function taskStatus(status: string): AgentTask["status"] {
 export function createClaudeEventMapper(emit: AgentEmitter) {
   const toolNames = new Map<string, string>();
   const streamed = new Set<string>();
+  const thoughtStreamed = new Set<string>();
   let messageId = "";
   let text = "";
   let started = false;
@@ -135,6 +136,13 @@ export function createClaudeEventMapper(emit: AgentEmitter) {
           if (text && !text.endsWith("\n")) write("\n\n");
         } else if (
           event.type === "content_block_delta" &&
+          event.delta.type === "thinking_delta" &&
+          event.delta.thinking
+        ) {
+          thoughtStreamed.add(messageId);
+          emit("thought", { text: event.delta.thinking });
+        } else if (
+          event.type === "content_block_delta" &&
           event.delta.type === "text_delta" &&
           event.delta.text
         ) {
@@ -157,6 +165,13 @@ export function createClaudeEventMapper(emit: AgentEmitter) {
               input: block.input,
               ...(message.parent_tool_use_id ? { parent: message.parent_tool_use_id } : {}),
             });
+          } else if (
+            block.type === "thinking" &&
+            block.thinking &&
+            !message.parent_tool_use_id &&
+            !thoughtStreamed.has(message.message.id)
+          ) {
+            emit("thought", { text: block.thinking });
           } else if (
             block.type === "text" &&
             !message.parent_tool_use_id &&
