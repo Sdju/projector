@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import UiPanel from "../../../common/ui/UiPanel.vue";
+import UiInline from "../../../common/ui/UiInline.vue";
+import UiControl from "../../../common/ui/UiControl.vue";
 import { computed, nextTick, onMounted, ref, useId } from "vue";
 import KeybindingsTable from "./KeybindingsTable.vue";
 import type { KeybindingRow as Row } from "./keybinding-row.ts";
@@ -187,7 +190,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section
+  <UiPanel
     class="keybindings-editor"
     :class="{ embedded }"
     aria-label="Настройки горячих клавиш"
@@ -198,14 +201,15 @@ onMounted(async () => {
     <header>
       <h2 v-if="!embedded">Горячие клавиши</h2>
       <p v-if="!embedded">Сочетания клавиш для команд IDE</p>
-      <input
+      <UiControl
         v-model="search"
         type="search"
         aria-label="Поиск горячих клавиш"
         placeholder="Найти команду или сочетание клавиш…"
       />
       <div class="filters">
-        <label><input v-model="customOnly" type="checkbox" /> Только изменённые</label
+        <UiInline as="label" justify="normal"
+          ><UiControl v-model="customOnly" type="checkbox" /> Только изменённые</UiInline
         ><span>{{ rows.length }} команд и привязок</span>
       </div>
     </header>
@@ -219,7 +223,9 @@ onMounted(async () => {
       :condition="condition"
       @action="run"
     />
-    <footer :title="path">Изменения применяются сразу{{ path ? ` · ${path}` : "" }}</footer>
+    <footer class="u-truncate" :title="path">
+      Изменения применяются сразу{{ path ? ` · ${path}` : "" }}
+    </footer>
     <UiDialog
       ref="dialog"
       labelledby="keybinding-dialog-title"
@@ -245,19 +251,17 @@ onMounted(async () => {
         <p v-if="error" class="error" role="alert">{{ error }}</p>
         <UiDialogActions>
           <UiButton :disabled="busy" @click="dialog?.close()">Отмена</UiButton>
-          <UiButton variant="solid" type="submit" :disabled="busy || !shortcut">Сохранить</UiButton>
+          <UiButton appearance="solid" type="submit" :disabled="busy || !shortcut"
+            >Сохранить</UiButton
+          >
         </UiDialogActions>
       </form>
     </UiDialog>
-  </section>
+  </UiPanel>
 </template>
 
 <style scoped>
 .keybindings-editor {
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
   font-size: var(--fs-xs);
   background: var(--bg);
 }
@@ -286,7 +290,6 @@ header p {
   color: var(--muted);
 }
 header > input {
-  width: 100%;
   font-size: var(--fs-sm);
 }
 .filters {
@@ -296,14 +299,7 @@ header > input {
   padding: var(--sp-3) 0 0;
   color: var(--muted);
 }
-.filters label {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-}
-.filters input {
-  width: auto;
-}
+
 .message {
   margin: 0;
   padding: var(--sp-1) var(--sp-5);
@@ -318,9 +314,6 @@ footer {
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: var(--fs-2xs);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 h3 {
   font-size: var(--fs-md);

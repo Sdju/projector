@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import UiCard from "../../../common/ui/UiCard.vue";
+import UiHeading from "../../../common/ui/UiHeading.vue";
+import UiInline from "../../../common/ui/UiInline.vue";
 import { computed } from "vue";
 import type { GithubRepository } from "../../../../core/modules/github/index.ts";
 import { absoluteTime } from "../../../common/utilities/commit-format.ts";
@@ -64,23 +67,33 @@ useTabReadout(() => {
 
 <template>
   <div class="repository-panel">
-    <header class="head">
-      <div class="identity">
+    <UiInline as="header" class="head" align="flex-start" :gap="3" justify="between" wrap>
+      <UiInline class="identity" wrap justify="normal">
         <UiAvatar
           :src="repository.avatarUrl"
           :alt="repository.owner || repository.fullName"
           :size="30"
         />
         <span class="owner">{{ repository.owner || repository.fullName.split("/")[0] }}/</span>
-        <h2>{{ repository.fullName.split("/").at(-1) }}</h2>
+        <UiHeading as="h2" size="lg" weight="semibold" :space-after="0">{{
+          repository.fullName.split("/").at(-1)
+        }}</UiHeading>
         <span class="visibility" :class="{ private: repository.private }">
           {{ repository.private ? "приватный" : "публичный" }}
         </span>
-      </div>
-      <a class="github-link" :href="repository.htmlUrl" target="_blank" rel="noopener noreferrer">
+      </UiInline>
+      <UiInline
+        as="a"
+        inline
+        justify="normal"
+        class="github-link"
+        :href="repository.htmlUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
         <IconExternal aria-hidden="true" />Открыть на GitHub
-      </a>
-    </header>
+      </UiInline>
+    </UiInline>
 
     <p v-if="repository.description" class="description">{{ repository.description }}</p>
     <p v-else class="description muted">Без описания</p>
@@ -90,10 +103,10 @@ useTabReadout(() => {
     </ul>
 
     <dl class="stats">
-      <div v-for="item in stats" :key="item.key" class="stat">
+      <UiCard as="div" appearance="frame" v-for="item in stats" :key="item.key" class="stat">
         <dt><component :is="item.icon" aria-hidden="true" />{{ item.label }}</dt>
         <dd>{{ number(item.value) }}</dd>
-      </div>
+      </UiCard>
     </dl>
 
     <dl class="details">
@@ -126,28 +139,12 @@ useTabReadout(() => {
   padding: var(--sp-4);
   container-type: inline-size;
 }
-.head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--sp-3);
-  flex-wrap: wrap;
-}
 .identity {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
   min-width: 0;
 }
 .owner {
   color: var(--muted);
   font-size: var(--fs-sm);
-}
-h2 {
-  margin: 0;
-  font-size: var(--fs-lg);
-  font-weight: 600;
 }
 .visibility {
   padding: 1px var(--sp-2);
@@ -161,9 +158,6 @@ h2 {
   color: var(--warn, var(--muted));
 }
 .github-link {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
@@ -207,11 +201,6 @@ h2 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--sp-3);
   margin: var(--sp-4) 0 0;
-}
-.stat {
-  padding: var(--sp-3);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
 }
 .stat dt {
   display: flex;

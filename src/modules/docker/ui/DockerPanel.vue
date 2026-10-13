@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import UiTable from "../../../common/ui/UiTable.vue";
+import UiControl from "../../../common/ui/UiControl.vue";
+import UiInline from "../../../common/ui/UiInline.vue";
+import UiMessage from "../../../common/ui/UiMessage.vue";
 import { ref } from "vue";
 import type { DockerContainer } from "../../../../core/modules/docker/index.ts";
 import DockerBinding from "./DockerBinding.vue";
@@ -74,10 +78,12 @@ const actions = [
     @pointerdown="commands.scope.activate()"
     @keydown="commands.keydown"
   >
-    <header>
-      <label
+    <UiInline as="header" wrap justify="normal">
+      <UiInline as="label" justify="normal"
         >Окружение
-        <select
+        <UiControl
+          as="select"
+          appearance="filled"
           :value="snapshot?.context"
           :disabled="busy || !snapshot"
           @change="
@@ -94,8 +100,8 @@ const actions = [
           >
             {{ item.name }}{{ item.local ? "" : " · удалённый" }}
           </option>
-        </select>
-      </label>
+        </UiControl>
+      </UiInline>
       <UiButton :active="!all" @click="commands.run('ide.docker.open')">Проект</UiButton>
       <UiButton :active="all" @click="commands.run('ide.docker.open', { all: true })"
         >Все контейнеры</UiButton
@@ -104,8 +110,16 @@ const actions = [
       <span class="muted">{{
         snapshot?.connected ? `Docker ${snapshot.version}` : "нет подключения"
       }}</span>
-    </header>
-    <p v-if="error || snapshot?.error" class="error" role="alert">{{ error || snapshot?.error }}</p>
+    </UiInline>
+    <UiMessage
+      v-if="error || snapshot?.error"
+      tone="danger"
+      role="alert"
+      variant="padded"
+      flush
+      wrap
+      >{{ error || snapshot?.error }}</UiMessage
+    >
     <UiEmpty v-if="!snapshot && !error">Подключение…</UiEmpty>
     <UiEmpty v-else-if="snapshot && !snapshot.enabled"
       >Docker выключен.
@@ -113,7 +127,12 @@ const actions = [
     >
     <template v-if="snapshot?.enabled">
       <DockerBinding v-if="!all" />
-      <div v-if="!all && snapshot.binding" class="actions compose-actions">
+      <UiInline
+        v-if="!all && snapshot.binding"
+        class="actions compose-actions"
+        wrap
+        justify="normal"
+      >
         <UiButton
           v-for="action in actions"
           :key="action.id"
@@ -122,17 +141,23 @@ const actions = [
           @click="commands.run(`ide.docker.${action.id}`)"
           >{{ action.title }}</UiButton
         >
-        <span v-if="snapshot.connected && !snapshot.composeVersion" class="error"
-          >Docker Compose не установлен</span
+        <UiMessage
+          as="span"
+          v-if="snapshot.connected && !snapshot.composeVersion"
+          tone="danger"
+          variant="padded"
+          flush
+          wrap
+          >Docker Compose не установлен</UiMessage
         >
-      </div>
+      </UiInline>
       <UiEmpty v-if="snapshot.connected && !containers.length">{{
         !all && !snapshot.binding
           ? "Сохраните привязку или откройте все контейнеры."
           : "Контейнеров нет."
       }}</UiEmpty>
       <div v-if="containers.length" class="table-wrap">
-        <table>
+        <UiTable padding="var(--sp-2) var(--sp-3)" header-tone="muted" :header-weight="400">
           <thead>
             <tr>
               <th>Контейнер / сервис</th>
@@ -172,7 +197,7 @@ const actions = [
               </td>
             </tr>
           </tbody>
-        </table>
+        </UiTable>
       </div>
       <article v-if="current" class="details">
         <h3>{{ current.name }}</h3>
@@ -180,7 +205,7 @@ const actions = [
           {{ current.id.slice(0, 12) }} · {{ current.image }} ·
           {{ absoluteTime(current.startedAt) }}
         </p>
-        <div class="actions">
+        <UiInline class="actions" wrap justify="normal">
           <UiButton
             v-if="current.state !== 'running'"
             :disabled="busy || !snapshot.connected"
@@ -201,10 +226,15 @@ const actions = [
           <UiButton :disabled="busy || !snapshot.connected" @click="commands.run('ide.docker.logs')"
             >Логи</UiButton
           >
-          <select v-model="shell" aria-label="Оболочка контейнера">
+          <UiControl
+            as="select"
+            appearance="filled"
+            v-model="shell"
+            aria-label="Оболочка контейнера"
+          >
             <option>sh</option>
             <option>bash</option>
-          </select>
+          </UiControl>
           <UiButton
             :disabled="busy || current.state !== 'running' || !snapshot.connected"
             @click="commands.run('ide.docker.shell', { shell })"
@@ -215,7 +245,7 @@ const actions = [
             @click="commands.run('ide.docker.remove')"
             >Удалить</UiButton
           >
-        </div>
+        </UiInline>
         <div v-if="current.ports.length" class="ports">
           <div
             v-for="port in current.ports"
@@ -257,69 +287,26 @@ const actions = [
   overflow: auto;
   font-size: var(--fs-xs);
 }
-header,
-.actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-}
 header {
   padding: var(--sp-3);
   border-bottom: 1px solid var(--line);
-}
-header label {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
 }
 .muted,
 small {
   color: var(--muted);
 }
-.error,
 .failed {
   color: var(--err);
 }
-.error {
-  margin: 0;
-  padding: var(--sp-3);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-input,
-select,
-textarea {
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  color: var(--text);
-  border-radius: var(--r-sm);
-  padding: var(--sp-2);
-  min-width: 0;
-}
 select {
   width: auto;
-  padding-right: 28px;
+  --ui-control-padding-right: 28px;
 }
 .compose-actions {
   padding: var(--sp-3);
 }
 .table-wrap {
   overflow: auto;
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: left;
-}
-th,
-td {
-  padding: var(--sp-2) var(--sp-3);
-  border-bottom: 1px solid var(--line);
-}
-th {
-  color: var(--muted);
-  font-weight: 400;
 }
 tr.selected {
   background: var(--bg-2);

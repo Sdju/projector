@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiHint from "../../../../../common/ui/UiHint.vue";
 import { computed } from "vue";
 import type { IssueDetail } from "../../../../../../core/modules/workspace/index.ts";
 import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab-readout.ts";
@@ -73,16 +74,14 @@ useTabReadout(() => {
       :items="comments"
       @open="emit('open', $event)"
     />
-    <p v-if="detail?.commentsTruncated" class="note">
+    <UiHint
+      size="xs"
+      leading="inherit"
+      :space-before="2"
+      v-if="detail?.commentsTruncated"
+      class="note"
+    >
       Показаны первые 500 комментариев. Откройте issue на GitHub, чтобы увидеть все.
-    </p>
+    </UiHint>
   </TrackerDetail>
 </template>
-
-<style scoped>
-.note {
-  margin: var(--sp-2) 0 0;
-  color: var(--muted);
-  font-size: var(--fs-xs);
-}
-</style>

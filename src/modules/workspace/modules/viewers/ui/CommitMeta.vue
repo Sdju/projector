@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiHeading from "../../../../../common/ui/UiHeading.vue";
 import { computed } from "vue";
 import type { GitCommitDetail } from "../../../../../../core/modules/workspace/index.ts";
 import { copyWithNotice } from "../../../../../common/utilities/notice.ts";
@@ -21,7 +22,9 @@ async function copy(event: MouseEvent) {
 
 <template>
   <div>
-    <h2>{{ detail.subject || "(без описания)" }}</h2>
+    <UiHeading size="lg" weight="semibold" :space-after="2" class="subject">{{
+      detail.subject || "(без описания)"
+    }}</UiHeading>
     <p class="refs" v-if="detail.refs.length">
       <span v-for="ref in detail.refs" :key="ref.kind + ref.name" class="ref" :class="ref.kind">
         {{ ref.name }}
@@ -33,7 +36,7 @@ async function copy(event: MouseEvent) {
       <dd>
         <code>{{ detail.hash }}</code>
         <UiButton
-          icon
+          shape="icon"
           size="sm"
           title="Копировать хеш"
           aria-label="Копировать хеш"
@@ -77,10 +80,7 @@ async function copy(event: MouseEvent) {
 </template>
 
 <style scoped>
-h2 {
-  margin: 0 0 var(--sp-2);
-  font-size: var(--fs-lg, 1.1rem);
-  font-weight: 600;
+.subject {
   overflow-wrap: anywhere;
 }
 .refs {

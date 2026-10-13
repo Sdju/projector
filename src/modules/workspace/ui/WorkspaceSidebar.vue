@@ -222,11 +222,6 @@ defineExpose({
   color: var(--text);
   background: var(--bg-4);
 }
-.side-content {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
 @media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {
   .sidebar {
     grid-column: 1;

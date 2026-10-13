@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiPanel from "../../../../../common/ui/UiPanel.vue";
 import { defineAsyncComponent, ref } from "vue";
 import VisualMarkdownEditor from "./VisualMarkdownEditor.vue";
 const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
@@ -32,7 +33,7 @@ function focusOut(event: FocusEvent) {
 </script>
 
 <template>
-  <section class="markdown-viewer" aria-label="Документ Markdown" @focusout="focusOut">
+  <UiPanel class="markdown-viewer" aria-label="Документ Markdown" @focusout="focusOut">
     <p v-if="error" class="save-error" role="alert">{{ error }}</p>
     <p v-if="editorError && mode === 'document'" class="save-error" role="alert">
       {{ editorError }} <button @click="emit('mode', 'source')">Открыть исходник</button>
@@ -60,16 +61,10 @@ function focusOut(event: FocusEvent) {
         @save="emit('save')"
       />
     </div>
-  </section>
+  </UiPanel>
 </template>
 
 <style scoped>
-.markdown-viewer {
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
 .save-error {
   color: var(--err);
   font-size: var(--fs-xs);

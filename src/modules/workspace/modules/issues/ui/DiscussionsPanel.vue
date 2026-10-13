@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiInline from "../../../../../common/ui/UiInline.vue";
 import EmojiText from "../../../../../common/ui/EmojiText.vue";
 import type { Discussion } from "../../../../../../core/modules/workspace/index.ts";
 import { usePagedList } from "../lib/paged-list.ts";
@@ -80,13 +81,17 @@ defineExpose({ refresh: () => list.load() });
           <span v-if="discussion.category.name" class="category"
             ><EmojiText :text="discussion.category.emoji" /> {{ discussion.category.name }}</span
           >
-          <span
+          <UiInline
+            as="span"
+            inline
+            :gap="0.75"
+            justify="normal"
             v-if="discussion.comments"
             class="comments"
             :title="`${discussion.comments} комментариев`"
           >
             <IconComment aria-hidden="true" />{{ discussion.comments }}
-          </span>
+          </UiInline>
         </template>
       </TrackerRow>
     </li>
@@ -104,11 +109,7 @@ defineExpose({ refresh: () => list.load() });
 .category {
   color: var(--text-2);
 }
-.comments {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-}
+
 .comments svg {
   width: 12px;
   height: 12px;

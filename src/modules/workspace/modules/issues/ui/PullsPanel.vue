@@ -79,7 +79,7 @@ defineExpose({ refresh: () => list.load() });
           />
         </template>
         <template #meta>
-          <span class="branches" :title="`${pull.head} → ${pull.base}`">
+          <span class="branches u-truncate" :title="`${pull.head} → ${pull.base}`">
             {{ pull.head }} → {{ pull.base }}
           </span>
         </template>
@@ -104,9 +104,6 @@ defineExpose({ refresh: () => list.load() });
 }
 .branches {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-family: var(--mono);
 }
 </style>

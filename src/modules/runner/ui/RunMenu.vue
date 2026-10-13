@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import UiStatusDot from "../../../common/ui/UiStatusDot.vue";
+import UiIslandHeader from "../../../common/ui/UiIslandHeader.vue";
+import UiStack from "../../../common/ui/UiStack.vue";
+import UiBadge from "../../../common/ui/UiBadge.vue";
+import UiActionRow from "../../../common/ui/UiActionRow.vue";
+import UiActionCopy from "../../../common/ui/UiActionCopy.vue";
 import UiIsland from "../../../common/ui/UiIsland.vue";
 import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
 import { computed, useId } from "vue";
@@ -122,7 +128,6 @@ async function editScenarios() {
   <div :ref="menu.trigger" class="run" role="group" aria-label="Запуск проекта">
     <UiButton
       v-if="!busy"
-      variant="ghost"
       size="sm"
       class="main"
       :disabled="!defaultCommand || transitional"
@@ -134,7 +139,6 @@ async function editScenarios() {
     </UiButton>
     <UiButton
       v-else
-      variant="ghost"
       size="sm"
       class="main running"
       :disabled="status === 'stopping'"
@@ -142,11 +146,15 @@ async function editScenarios() {
       data-command="ide.project.run.stop"
       @click="commands.run('ide.project.run.stop')"
     >
-      <span class="dot" :class="status" aria-hidden="true" /><span>{{ label }}</span>
+      <UiStatusDot
+        class="dot"
+        :tone="status === 'starting' || status === 'stopping' ? 'warning' : 'success'"
+        aria-hidden="true"
+      /><span>{{ label }}</span>
       <IconStop class="stop" aria-hidden="true" />
     </UiButton>
     <UiButton
-      icon
+      shape="icon"
       size="sm"
       class="arrow"
       title="Сценарии запуска"
@@ -161,14 +169,16 @@ async function editScenarios() {
     </UiButton>
   </div>
   <UiIsland :menu="menu" label="Сценарии запуска" :width="360">
-    <button class="island-head" aria-label="Закрыть" @click="toggle(false)">
+    <UiIslandHeader chevron class="island-head" aria-label="Закрыть" @click="toggle(false)">
       <span class="head-label"
-        ><span v-if="busy" class="dot" :class="status" aria-hidden="true" />{{
-          busy ? `${runningName} · ${stateLabel}` : "Запуск"
-        }}</span
+        ><UiStatusDot
+          v-if="busy"
+          class="dot"
+          :tone="status === 'starting' || status === 'stopping' ? 'warning' : 'success'"
+          aria-hidden="true"
+        />{{ busy ? `${runningName} · ${stateLabel}` : "Запуск" }}</span
       >
-      <IconChevron class="up" aria-hidden="true" />
-    </button>
+    </UiIslandHeader>
     <div
       v-if="project.environment"
       class="env"
@@ -176,51 +186,53 @@ async function editScenarios() {
     >
       <IconContainer aria-hidden="true" />Docker · {{ project.environment.image }}
     </div>
-    <div v-if="busy" class="group" role="group" aria-label="Работающий проект">
-      <button
+    <UiStack
+      flow="flex"
+      gap="none"
+      v-if="busy"
+      class="group"
+      role="group"
+      aria-label="Работающий проект"
+    >
+      <UiActionRow
         v-if="project.runtime?.url"
         class="item"
         @click="act(() => commands.run('ide.project.run.open', { mode: 'server' }))"
       >
         <IconOpen aria-hidden="true" />
-        <span class="copy"
-          ><span class="name">Открыть в браузере</span
-          ><span class="caption">{{ project.runtime.url }}</span></span
-        >
-      </button>
-      <button
+        <UiActionCopy title="Открыть в браузере" :description="project.runtime.url" />
+      </UiActionRow>
+      <UiActionRow
         class="item"
         @click="act(() => commands.run('ide.project.run.open', { mode: 'window' }))"
       >
         <IconWindow aria-hidden="true" />
-        <span class="copy"><span class="name">Открыть в окне</span></span>
-      </button>
-      <button
-        class="item danger"
+        <UiActionCopy title="Открыть в окне" />
+      </UiActionRow>
+      <UiActionRow
+        class="item"
+        tone="danger"
         :disabled="status === 'stopping'"
         @click="act(() => commands.run('ide.project.run.stop'))"
       >
         <IconStop aria-hidden="true" />
-        <span class="copy"><span class="name">Остановить</span></span>
-      </button>
-    </div>
-    <div :id="listId" class="group" role="group" aria-label="Сценарии">
+        <UiActionCopy title="Остановить" />
+      </UiActionRow>
+    </UiStack>
+    <UiStack flow="flex" gap="none" :id="listId" class="group" role="group" aria-label="Сценарии">
       <div v-for="command in project.commands" :key="command.id" class="scenario">
-        <button
+        <UiActionRow
           class="item main"
           :disabled="busy || transitional"
           :data-command="'ide.project.run.start'"
           @click="act(() => commands.run('ide.project.run.start', { command: command.id }))"
         >
           <IconPlay class="play" aria-hidden="true" />
-          <span class="copy"
-            ><span class="name">{{ command.name }}</span
-            ><span class="caption mono">{{ command.cmd }}</span></span
-          >
-          <span v-if="command.id === project.defaultCommandId" class="badge">основной</span>
-        </button>
+          <UiActionCopy :title="command.name" :description="command.cmd" mono />
+          <UiBadge v-if="command.id === project.defaultCommandId">основной</UiBadge>
+        </UiActionRow>
         <UiButton
-          icon
+          shape="icon"
           size="sm"
           :disabled="busy || transitional"
           :title="`${command.name} в окне`"
@@ -235,14 +247,16 @@ async function editScenarios() {
         </UiButton>
       </div>
       <p v-if="!project.commands.length" class="empty">Сценариев пока нет</p>
-    </div>
-    <button
+    </UiStack>
+    <UiActionRow
+      separator="before"
+      tone="muted"
       class="item settings"
       data-command="ide.project.run.scenarios.edit"
       @click="commands.run('ide.project.run.scenarios.edit')"
     >
       <IconSettings aria-hidden="true" />Настроить сценарии…
-    </button>
+    </UiActionRow>
   </UiIsland>
 </template>
 
@@ -252,12 +266,11 @@ async function editScenarios() {
   align-items: center;
   flex-shrink: 0;
 }
-.main {
+.run .main {
   gap: var(--sp-2);
 }
 .run svg,
 .item svg,
-.island-head svg,
 .env svg,
 .scenario svg {
   width: 14px;
@@ -270,34 +283,10 @@ async function editScenarios() {
 .running .stop {
   color: var(--err);
 }
-.dot {
-  width: 7px;
-  height: 7px;
-  flex-shrink: 0;
-  border-radius: var(--r-full);
-  background: var(--run);
-}
-.dot.starting,
-.dot.stopping {
-  background: var(--warn);
-}
-/* Шапка стоит на месте кнопки запуска */
-.island-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: var(--control-h-sm);
-  padding-inline: var(--sp-2) 7px;
-  border-radius: var(--r-md);
-  color: var(--text);
-}
 .head-label {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-}
-.up {
-  transform: rotate(180deg);
 }
 .env {
   display: flex;
@@ -307,71 +296,15 @@ async function editScenarios() {
   color: var(--muted);
   font-size: var(--fs-2xs);
 }
-.group {
-  display: flex;
-  flex-direction: column;
-}
-.group + .group,
-.settings {
+.group + .group {
   border-top: 1px solid var(--line);
   margin-top: var(--sp-1);
   padding-top: var(--sp-1);
-}
-.item {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  width: 100%;
-  padding: 6px var(--sp-2);
-  border-radius: var(--r-md);
-  text-align: left;
-}
-.item:hover:not(:disabled),
-.item:focus-visible {
-  background: var(--active);
-  outline: none;
-}
-.item:disabled {
-  opacity: 0.45;
-}
-.item.danger {
-  color: var(--err);
-}
-.settings {
-  color: var(--muted);
-  border-radius: 0 0 var(--r-md) var(--r-md);
 }
 .scenario {
   display: flex;
   align-items: center;
   gap: var(--sp-1);
-}
-.copy {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-}
-.name {
-  font-size: var(--fs-sm);
-}
-.caption {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--muted);
-  font-size: var(--fs-2xs);
-}
-.mono {
-  font-family: var(--mono);
-}
-.badge {
-  flex-shrink: 0;
-  padding: 1px 6px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  color: var(--muted);
-  font-size: var(--fs-2xs);
 }
 .empty {
   margin: 0;

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import UiHint from "../../../../../common/ui/UiHint.vue";
+import UiHeading from "../../../../../common/ui/UiHeading.vue";
 import { computed } from "vue";
 import type {
   PullRequestDetail,
@@ -134,22 +136,32 @@ useTabReadout(() => {
       @open="emit('open', $event)"
     />
     <template v-if="detail">
-      <h3>Изменённые файлы</h3>
-      <p v-if="!detail.files.length" class="note">Файлов нет</p>
+      <UiHeading as="h3" size="sm" tone="secondary" :space-before="4" :space-after="2"
+        >Изменённые файлы</UiHeading
+      >
+      <UiHint size="xs" leading="inherit" :space-before="2" v-if="!detail.files.length" class="note"
+        >Файлов нет</UiHint
+      >
       <ul v-else class="file-list">
         <li v-for="file in detail.files" :key="file.path">
           <span class="mark" :class="file.status" :title="file.status">{{
             FILE_MARK[file.status]
           }}</span>
-          <span class="path" :title="filePath(file)">{{ filePath(file) }}</span>
+          <span class="path u-truncate" :title="filePath(file)">{{ filePath(file) }}</span>
           <span class="add">+{{ file.additions }}</span>
           <span class="del">−{{ file.deletions }}</span>
         </li>
       </ul>
-      <p v-if="detail.filesTruncated" class="note">
+      <UiHint
+        size="xs"
+        leading="inherit"
+        :space-before="2"
+        v-if="detail.filesTruncated"
+        class="note"
+      >
         Показано {{ detail.files.length }} из {{ detail.changedFiles }} файлов. Остальные — на
         GitHub.
-      </p>
+      </UiHint>
     </template>
     <TrackerComments
       :project-id="projectId"
@@ -158,9 +170,15 @@ useTabReadout(() => {
       :items="comments"
       @open="emit('open', $event)"
     />
-    <p v-if="detail?.commentsTruncated" class="note">
+    <UiHint
+      size="xs"
+      leading="inherit"
+      :space-before="2"
+      v-if="detail?.commentsTruncated"
+      class="note"
+    >
       Показаны первые 500 комментариев. Откройте pull request на GitHub, чтобы увидеть все.
-    </p>
+    </UiHint>
   </TrackerDetail>
 </template>
 
@@ -183,12 +201,6 @@ useTabReadout(() => {
 .del {
   color: var(--err);
   font-family: var(--mono);
-}
-h3 {
-  margin: var(--sp-4) 0 var(--sp-2);
-  font-size: var(--fs-sm);
-  color: var(--text-2);
-  font-weight: 500;
 }
 .file-list {
   list-style: none;
@@ -222,15 +234,7 @@ h3 {
 .path {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-family: var(--mono);
   color: var(--text-2);
-}
-.note {
-  margin: var(--sp-2) 0 0;
-  color: var(--muted);
-  font-size: var(--fs-xs);
 }
 </style>

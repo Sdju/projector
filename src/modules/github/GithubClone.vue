@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import UiLabel from "../../common/ui/UiLabel.vue";
+import UiMessage from "../../common/ui/UiMessage.vue";
+import UiHeading from "../../common/ui/UiHeading.vue";
 import { DEFAULT_ENVIRONMENT_IMAGE } from "../../../core/modules/environment/index.ts";
 import { computed, nextTick, onBeforeUnmount, ref, useId } from "vue";
 import IconFolder from "~icons/lucide/folder-open";
@@ -6,13 +9,15 @@ import { commandArgs, useCommandScope } from "../../common/utilities/commands.ts
 import UiButton from "../../common/ui/UiButton.vue";
 import UiDialog from "../../common/ui/UiDialog.vue";
 import UiDialogActions from "../../common/ui/UiDialogActions.vue";
+import UiControl, { type UiControlHandle } from "../../common/ui/UiControl.vue";
+import UiInline from "../../common/ui/UiInline.vue";
 import { pickFolder, useProjects, type Project } from "../project/index.ts";
 import { fetchIntegrations, integrationRequest } from "../integration-api/index.ts";
 
 const props = defineProps<{ repository: string; navigate: (path: string) => Promise<void> }>();
 const id = useId();
 const dialog = ref<InstanceType<typeof UiDialog>>();
-const input = ref<HTMLInputElement>();
+const input = ref<UiControlHandle>();
 const directory = ref("");
 const mode = ref("docker");
 const image = ref(DEFAULT_ENVIRONMENT_IMAGE);
@@ -191,11 +196,14 @@ function cancel(event: Event) {
   <Teleport to="body">
     <UiDialog ref="dialog" :labelledby="id" width="520px" @keydown.stop @cancel="cancel">
       <form @submit.prevent="commands.run('ide.github.repository.clone')" :aria-busy="busy">
-        <h2 :id="id">Клонировать репозиторий</h2>
+        <UiHeading :id="id">Клонировать репозиторий</UiHeading>
         <p class="repository">{{ repository }}</p>
-        <label :for="`${id}-directory`">Папка назначения</label>
-        <div class="directory">
-          <input
+        <UiLabel size="xs" tone="muted" :space-after="2" :for="`${id}-directory`"
+          >Папка назначения</UiLabel
+        >
+        <UiInline class="directory" align="normal" justify="normal">
+          <UiControl
+            grow
             :id="`${id}-directory`"
             ref="input"
             v-model="directory"
@@ -211,23 +219,25 @@ function cancel(event: Event) {
             @click="commands.run('ide.github.repository.clone.directory')"
             ><IconFolder aria-hidden="true"
           /></UiButton>
-        </div>
+        </UiInline>
         <p v-if="destination" class="destination">{{ destination }}</p>
-        <label :for="`${id}-mode`">Окружение</label>
-        <select :id="`${id}-mode`" v-model="mode" :disabled="busy || !!cloned">
+        <UiLabel size="xs" tone="muted" :space-after="2" :for="`${id}-mode`">Окружение</UiLabel>
+        <UiControl as="select" :id="`${id}-mode`" v-model="mode" :disabled="busy || !!cloned">
           <option value="docker">Docker — изолированный запуск</option>
           <option value="local">Локально — запуск на хосте</option>
-        </select>
+        </UiControl>
         <template v-if="mode === 'docker'">
-          <label :for="`${id}-image`">Образ</label>
-          <input :id="`${id}-image`" v-model="image" :disabled="busy || !!cloned" required />
-          <label class="network"
-            ><input v-model="network" type="checkbox" :disabled="busy || !!cloned" /> Разрешить сеть
-            (интернет и локальная сеть)</label
+          <UiLabel size="xs" tone="muted" :space-after="2" :for="`${id}-image`">Образ</UiLabel>
+          <UiControl :id="`${id}-image`" v-model="image" :disabled="busy || !!cloned" required />
+          <UiInline as="label" class="network" justify="normal"
+            ><UiControl v-model="network" type="checkbox" :disabled="busy || !!cloned" /> Разрешить
+            сеть (интернет и локальная сеть)</UiInline
           >
           <template v-if="network">
-            <label :for="`${id}-ports`">Порты приложения</label>
-            <input
+            <UiLabel size="xs" tone="muted" :space-after="2" :for="`${id}-ports`"
+              >Порты приложения</UiLabel
+            >
+            <UiControl
               :id="`${id}-ports`"
               v-model="ports"
               placeholder="5173, 3000"
@@ -243,7 +253,7 @@ function cancel(event: Event) {
         <p v-if="busy" role="status">
           {{ cloned ? "Открываю проект…" : step || "Запускаю…" }}
         </p>
-        <p v-if="error" class="error" role="alert">{{ error }}</p>
+        <UiMessage v-if="error" tone="danger" role="alert">{{ error }}</UiMessage>
         <UiDialogActions>
           <UiButton
             v-if="busy && !cloned"
@@ -253,7 +263,11 @@ function cancel(event: Event) {
           <UiButton v-else @click="commands.run('ide.github.repository.clone.cancel')"
             >Отмена</UiButton
           >
-          <UiButton type="submit" variant="solid" :disabled="busy || loading || !directory.trim()">
+          <UiButton
+            type="submit"
+            appearance="solid"
+            :disabled="busy || loading || !directory.trim()"
+          >
             {{ cloned ? "Открыть проект" : "Клонировать" }}
           </UiButton>
         </UiDialogActions>
@@ -263,11 +277,6 @@ function cancel(event: Event) {
 </template>
 
 <style scoped>
-h2 {
-  margin: 0 0 var(--sp-3);
-  font-size: var(--fs-md);
-  font-weight: 500;
-}
 p {
   margin: var(--sp-3) 0;
   font-size: var(--fs-xs);
@@ -279,37 +288,17 @@ p {
   font-family: var(--mono);
 }
 select {
-  width: 100%;
   margin-bottom: var(--sp-3);
 }
 .network {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
   margin-top: var(--sp-3);
-}
-.network input {
-  width: auto;
-}
-label {
-  display: block;
   margin-bottom: var(--sp-2);
   font-size: var(--fs-xs);
   color: var(--muted);
 }
-.directory {
-  display: flex;
-  gap: var(--sp-2);
-}
-.directory input {
-  flex: 1;
-  min-width: 0;
-}
+
 .directory svg {
   width: 16px;
   height: 16px;
-}
-.error {
-  color: var(--err);
 }
 </style>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiPanel from "../../../common/ui/UiPanel.vue";
 import { computed, inject, ref, watch } from "vue";
 import { useEventListener } from "@vueuse/core";
 import DockTabs from "./DockTabs.vue";
@@ -121,7 +122,9 @@ const focus = () => {
 </script>
 
 <template>
-  <section
+  <UiPanel
+    as="section"
+    sizing="flex"
     class="dock-group"
     :class="{ focused, maximized }"
     :data-group="group.id"
@@ -155,7 +158,7 @@ const focus = () => {
           :args="{ group, activeId: group.active }"
         />
         <UiButton
-          icon
+          shape="icon"
           size="sm"
           :active="maximized"
           :title="maximized ? 'Вернуть размер блока' : 'Развернуть блок'"
@@ -195,16 +198,11 @@ const focus = () => {
       </div>
       <div v-if="zone" class="dock-drop" :class="zone" aria-hidden="true" />
     </div>
-  </section>
+  </UiPanel>
 </template>
 
 <style scoped>
 .dock-group {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--r-lg);

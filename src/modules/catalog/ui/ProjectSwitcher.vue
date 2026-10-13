@@ -1,4 +1,11 @@
 <script setup lang="ts">
+import UiActionCopy from "../../../common/ui/UiActionCopy.vue";
+import UiBadge from "../../../common/ui/UiBadge.vue";
+import UiControl, { type UiControlHandle } from "../../../common/ui/UiControl.vue";
+import UiInline from "../../../common/ui/UiInline.vue";
+import UiPopupSurface from "../../../common/ui/UiPopupSurface.vue";
+import UiIslandLabel from "../../../common/ui/UiIslandLabel.vue";
+import UiIslandFooter from "../../../common/ui/UiIslandFooter.vue";
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, useId, watch } from "vue";
 import { onClickOutside } from "@vueuse/core";
 import { useRouter } from "vue-router";
@@ -24,7 +31,7 @@ const props = defineProps<{
 }>();
 const router = useRouter();
 const root = ref<HTMLElement>();
-const input = ref<HTMLInputElement>();
+const input = ref<UiControlHandle>();
 const open = ref(false);
 const text = ref("");
 const listId = useId();
@@ -131,14 +138,21 @@ function keydown(event: KeyboardEvent) {
       @click="commands.run('ide.project.switcher.toggle')"
     >
       <img :src="projectIconUrl(project)" alt="" width="22" height="22" />
-      <span>{{ project.name }}</span>
+      <span class="u-truncate">{{ project.name }}</span>
       <IconChevron aria-hidden="true" />
     </button>
-    <section v-if="open" class="island" role="dialog" aria-label="Переключение проекта">
+    <UiPopupSurface
+      as="section"
+      flow="column"
+      v-if="open"
+      class="island"
+      role="dialog"
+      aria-label="Переключение проекта"
+    >
       <PathBar class="island-path" :path="project.path" :navigate="go" />
-      <label class="search">
+      <UiInline as="label" class="search" justify="normal">
         <IconSearch aria-hidden="true" />
-        <input
+        <UiControl
           ref="input"
           v-model="text"
           role="combobox"
@@ -151,10 +165,10 @@ function keydown(event: KeyboardEvent) {
           spellcheck="false"
           @keydown="keydown"
         />
-      </label>
+      </UiInline>
       <div :id="listId" class="results" role="listbox">
         <template v-for="row in rows" :key="row.item.id">
-          <div v-if="row.heading" class="heading">{{ row.heading }}</div>
+          <UiIslandLabel v-if="row.heading">{{ row.heading }}</UiIslandLabel>
           <button
             :id="`${listId}-${row.index}`"
             class="row"
@@ -166,18 +180,19 @@ function keydown(event: KeyboardEvent) {
             @click="pick(row.item)"
           >
             <img v-if="row.item.icon" :src="row.item.icon" alt="" width="28" height="28" />
-            <span class="copy">
-              <span class="name">{{ row.item.name }}</span>
-              <span class="description">{{ row.item.description }}</span>
-            </span>
-            <span v-if="row.item.status" class="badge">{{ row.item.status.label }}</span>
+            <UiActionCopy
+              :title="row.item.name"
+              :description="row.item.description"
+              truncate-title
+            />
+            <UiBadge v-if="row.item.status">{{ row.item.status.label }}</UiBadge>
           </button>
         </template>
         <p v-if="state && !state.loading && !items.length" class="empty">Ничего не найдено</p>
         <p v-if="state?.error" class="empty error" role="alert">{{ state.error }}</p>
       </div>
-      <footer class="hint">↑↓ выбрать · Enter открыть · Esc закрыть</footer>
-    </section>
+      <UiIslandFooter variant="plain">↑↓ выбрать · Enter открыть · Esc закрыть</UiIslandFooter>
+    </UiPopupSurface>
   </div>
 </template>
 
@@ -215,11 +230,7 @@ function keydown(event: KeyboardEvent) {
   object-fit: contain;
   border-radius: var(--r-sm);
 }
-.trigger span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+
 .trigger svg {
   width: 14px;
   height: 14px;
@@ -231,24 +242,15 @@ function keydown(event: KeyboardEvent) {
   top: calc(-1 * var(--sp-1));
   left: calc(-1 * var(--sp-2));
   z-index: var(--z-popover);
-  display: flex;
-  flex-direction: column;
   gap: var(--sp-2);
   width: min(560px, calc(100vw - var(--sp-4)));
   box-sizing: border-box;
   padding: calc(var(--sp-1) + 30px) var(--sp-2) var(--sp-2);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-lg);
-  background: var(--bg-2);
-  box-shadow: var(--shadow-popover);
 }
 .island-path {
   flex: none;
 }
 .search {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
   padding-inline: var(--sp-2);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
@@ -280,13 +282,6 @@ function keydown(event: KeyboardEvent) {
   max-height: min(380px, 50dvh);
   overflow-y: auto;
 }
-.heading {
-  padding: var(--sp-2) var(--sp-2) var(--sp-1);
-  color: var(--faint);
-  font-size: var(--fs-2xs);
-  letter-spacing: var(--track-label);
-  text-transform: uppercase;
-}
 .row {
   display: flex;
   align-items: center;
@@ -305,33 +300,6 @@ function keydown(event: KeyboardEvent) {
   object-fit: contain;
   border-radius: var(--r-sm);
 }
-.copy {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-}
-.name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--fs-sm);
-}
-.description {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--muted);
-  font-size: var(--fs-2xs);
-}
-.badge {
-  flex-shrink: 0;
-  padding: 1px 6px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  color: var(--muted);
-  font-size: var(--fs-2xs);
-}
 .empty {
   margin: 0;
   padding: var(--sp-3);
@@ -341,10 +309,5 @@ function keydown(event: KeyboardEvent) {
 }
 .empty.error {
   color: var(--err);
-}
-.hint {
-  padding: 0 var(--sp-2);
-  color: var(--faint);
-  font-size: var(--fs-2xs);
 }
 </style>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiInline from "../../common/ui/UiInline.vue";
 import { useCommandScope, commandArgs } from "../../common/utilities/commands.ts";
 import { computed, ref } from "vue";
 import { githubProjectRoute } from "../../../core/modules/github/index.ts";
@@ -117,17 +118,20 @@ const navigatePath = (path: string) =>
       />
       <div v-if="currentProject" id="header-tools" class="header-tools" />
       <router-link v-else class="brand" to="/" title="Открыть поиск">
-        <span>projector</span>
+        <span class="u-truncate">projector</span>
       </router-link>
       <nav class="nav">
         <router-link v-if="!currentProject" to="/settings">настройки</router-link>
-        <span
+        <UiInline
+          as="span"
+          inline
+          justify="normal"
           class="count"
           :class="{ active: running }"
           :title="`Запущено проектов: ${running}`"
           :aria-label="`Запущено проектов: ${running}`"
           role="status"
-          ><span class="count-dot" aria-hidden="true" />{{ running }}</span
+          ><span class="count-dot" aria-hidden="true" />{{ running }}</UiInline
         >
       </nav>
     </header>
@@ -195,12 +199,6 @@ const navigatePath = (path: string) =>
   letter-spacing: var(--brand-track);
   text-transform: lowercase;
   color: var(--muted);
-}
-
-.brand span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .brand img {

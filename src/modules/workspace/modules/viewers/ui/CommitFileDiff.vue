@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import UiResizeHandle from "../../../../../common/ui/UiResizeHandle.vue";
 import { computed, defineAsyncComponent, ref } from "vue";
+import { usePointerDrag } from "../../../../../common/utilities/pointer-drag.ts";
 import type { CommitComparison } from "../../../../../../core/modules/workspace/index.ts";
 import { shortHash } from "../../../../../common/utilities/commit-format.ts";
 
@@ -23,8 +25,6 @@ const initial = () => {
   return Math.min(420, Math.max(MIN + 10, lines * 20 + 76));
 };
 const current = ref(props.height ?? initial());
-const dragging = ref(false);
-let startY = 0;
 let startHeight = 0;
 const unchanged = computed(() => props.comparison.original === props.comparison.modified);
 
@@ -34,36 +34,27 @@ function setHeight(raw: number) {
     // Запоминается размер до схлопывания, а не порог.
     emit("resize", current.value);
     emit("collapse");
-    dragging.value = false;
+    drag.stop();
     return false;
   }
   current.value = Math.min(maxHeight(), Math.max(MIN, raw));
   emit("resize", current.value);
   return true;
 }
-function start(event: PointerEvent) {
-  if (event.button !== 0) return;
-  event.preventDefault();
-  const handle = event.currentTarget as HTMLElement;
-  handle.focus();
-  handle.setPointerCapture(event.pointerId);
-  startY = event.clientY;
-  startHeight = current.value;
-  dragging.value = true;
-}
-function move(event: PointerEvent) {
-  if (dragging.value) setHeight(startHeight + event.clientY - startY);
-}
-function finish(event: PointerEvent) {
-  dragging.value = false;
-  const handle = event.currentTarget as HTMLElement;
-  if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
-}
-function cancel(event: PointerEvent) {
-  current.value = startHeight;
-  emit("resize", startHeight);
-  finish(event);
-}
+const drag = usePointerDrag({
+  start: (event) => {
+    startHeight = current.value;
+    return { height: current.value, y: event.clientY };
+  },
+  move: (event, start) => setHeight(start.height + event.clientY - start.y),
+  finish: (reason, start) => {
+    if (reason === "cancel") {
+      current.value = start.height;
+      emit("resize", start.height);
+    }
+  },
+});
+const { dragging, start } = drag;
 function key(event: KeyboardEvent) {
   if (!["ArrowUp", "ArrowDown", "Home", "End", "Escape"].includes(event.key)) return;
   event.preventDefault();
@@ -72,7 +63,7 @@ function key(event: KeyboardEvent) {
       current.value = startHeight;
       emit("resize", startHeight);
     }
-    dragging.value = false;
+    drag.stop();
   } else if (event.key === "Home") setHeight(0);
   else if (event.key === "End") setHeight(maxHeight());
   else setHeight(current.value + (event.shiftKey ? 96 : 24) * (event.key === "ArrowDown" ? 1 : -1));
@@ -95,10 +86,8 @@ function reset() {
         :modified-label="shortHash(comparison.hash)"
       />
     </div>
-    <div
+    <UiResizeHandle
       class="resize"
-      role="separator"
-      aria-orientation="horizontal"
       :aria-label="`Высота кода: ${path}`"
       :aria-valuenow="current"
       :aria-valuemin="MIN"
@@ -108,10 +97,6 @@ function reset() {
       title="Высота кода · если сжать до минимума, файл сворачивается · двойной клик возвращает размер"
       tabindex="0"
       @pointerdown="start"
-      @pointermove="move"
-      @pointerup="finish"
-      @pointercancel="cancel"
-      @lostpointercapture="dragging = false"
       @dblclick="reset"
       @keydown="key"
     />
@@ -130,29 +115,6 @@ function reset() {
   min-width: 0;
   overflow: hidden;
   border-top: 1px solid var(--line);
-}
-.resize {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 12px;
-  cursor: row-resize;
-  touch-action: none;
-  user-select: none;
-  background: var(--bg-3);
-  border-block: 1px solid var(--line);
-}
-.resize::before {
-  content: "";
-  width: 36px;
-  height: 2px;
-  border-radius: var(--r-sm);
-  background: var(--faint);
-}
-.resize:hover,
-.resize:focus-visible {
-  background: var(--bg-4);
-  outline-offset: -2px;
 }
 .file-diff.dragging,
 .file-diff.dragging * {

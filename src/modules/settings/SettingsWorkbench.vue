@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import UiToolbar from "../../common/ui/UiToolbar.vue";
+import UiControl, { type UiControlHandle } from "../../common/ui/UiControl.vue";
+import UiInline from "../../common/ui/UiInline.vue";
+import UiControlScope from "../../common/ui/UiControlScope.vue";
 import { computed, nextTick, ref, watch } from "vue";
 import IconSettings from "~icons/lucide/settings-2";
 import IconSearch from "~icons/lucide/search";
@@ -24,7 +28,7 @@ const props = withDefaults(
 );
 const emit = defineEmits<{ select: [id: string] }>();
 const query = ref("");
-const search = ref<HTMLInputElement>();
+const search = ref<UiControlHandle>();
 const sidebar = ref<HTMLElement>();
 const content = ref<HTMLElement>();
 const visited = ref(new Set<string>());
@@ -126,11 +130,11 @@ function filter(event: Event) {
     :aria-label="title"
     @pointerdown="commands.scope.activate()"
   >
-    <header class="toolbar">
+    <UiToolbar as="header" class="toolbar" :gap="4" justify="between">
       <h1><IconSettings aria-hidden="true" />{{ title }}</h1>
-      <div class="search">
+      <UiInline class="search" justify="normal">
         <IconSearch aria-hidden="true" />
-        <input
+        <UiControl
           ref="search"
           :value="query"
           type="search"
@@ -141,15 +145,15 @@ function filter(event: Event) {
         />
         <UiButton
           v-if="query"
-          icon
+          shape="icon"
           size="sm"
           aria-label="Очистить поиск"
           title="Очистить поиск"
           @click="commands.run('ide.settings.search', { query: '' })"
           ><IconClose
         /></UiButton>
-      </div>
-    </header>
+      </UiInline>
+    </UiToolbar>
     <div class="layout">
       <nav ref="sidebar" class="sidebar" aria-label="Разделы настроек">
         <div v-for="group in groups" :key="group" class="group">
@@ -173,13 +177,14 @@ function filter(event: Event) {
           <p>{{ active.description }}</p>
         </header>
         <template v-for="section in sections" :key="section.id">
-          <div
+          <UiControlScope
+            density="compact"
             v-if="visited.has(section.id)"
             v-show="section.id === active?.id"
             class="section-body"
           >
             <component :is="section.component" v-bind="section.props" />
-          </div>
+          </UiControlScope>
         </template>
         <div v-if="$slots.footer && active" class="footer"><slot name="footer" /></div>
         <div v-if="!active" class="empty">
@@ -234,13 +239,7 @@ function filter(event: Event) {
   width: 100%;
 }
 .toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-4);
-  padding: var(--sp-2) var(--sp-3);
   background: var(--bg-2);
-  border-bottom: 1px solid var(--line);
 }
 h1 {
   display: flex;
@@ -257,9 +256,6 @@ svg {
   color: var(--muted);
 }
 .search {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
   width: min(100%, 300px);
   padding-left: var(--sp-2);
   background: var(--bg);
@@ -336,25 +332,10 @@ svg {
   color: var(--muted);
 }
 .section-body {
+  --ui-choice-space: var(--sp-2);
+  --ui-hint-font-size: var(--fs-xs);
+  --ui-section-margin: 0px;
   max-width: 800px;
-}
-.section-body :deep(input:not([type="checkbox"], [type="radio"])),
-.section-body :deep(select) {
-  min-height: var(--control-h);
-  padding-block: var(--sp-1);
-  font-size: var(--fs-sm);
-}
-.section-body :deep(.interface-settings),
-.section-body :deep(.network-settings),
-.section-body :deep(.editor-settings) {
-  margin-bottom: 0;
-}
-.section-body :deep(.mode) {
-  padding-block: var(--sp-2);
-}
-.section-body :deep(.hint),
-.section-body :deep(.muted) {
-  font-size: var(--fs-xs);
 }
 /* Панель действий (например, «Сохранить») закреплена внизу прокручиваемого содержимого */
 .footer {
@@ -437,10 +418,6 @@ svg {
   }
   .section-heading {
     margin-bottom: var(--sp-4);
-  }
-  .section-body :deep(input:not([type="checkbox"], [type="radio"])),
-  .section-body :deep(select) {
-    font-size: var(--fs-input);
   }
   .embedded .layout {
     display: flex;

@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import UiLabel from "../../common/ui/UiLabel.vue";
+import UiMessage from "../../common/ui/UiMessage.vue";
+import UiHeading from "../../common/ui/UiHeading.vue";
+import { ref, useId } from "vue";
+import UiControl from "../../common/ui/UiControl.vue";
+import UiStack from "../../common/ui/UiStack.vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import { useCommandScope } from "../../common/utilities/commands.ts";
 import { readoutLines, useTabReadout } from "../../common/utilities/tab-readout.ts";
@@ -7,6 +12,7 @@ import { fetchIntegrations, integrationRequest } from "../integration-api/index.
 const props = defineProps<{ repository: string }>();
 const emit = defineEmits<{ connected: [] }>();
 const token = ref("");
+const tokenId = useId();
 const busy = ref(false);
 const error = ref("");
 const commands = useCommandScope(`github-connection:${props.repository}`, () => ({
@@ -51,12 +57,12 @@ useTabReadout(() => ({
 
 <template>
   <section class="connection">
-    <h2>Подключить GitHub</h2>
+    <UiHeading>Подключить GitHub</UiHeading>
     <p>Установите токен, чтобы открыть {{ repository }}.</p>
-    <form @submit.prevent="commands.run('ide.github.integration.connect')">
-      <label for="github-connection-token">Токен GitHub</label>
-      <input
-        id="github-connection-token"
+    <UiStack as="form" @submit.prevent="commands.run('ide.github.integration.connect')">
+      <UiLabel :for="tokenId" size="sm">Токен GitHub</UiLabel>
+      <UiControl
+        :id="tokenId"
         v-model="token"
         type="password"
         autocomplete="off"
@@ -70,8 +76,8 @@ useTabReadout(() => ({
         :disabled="busy || !token.trim()"
         >{{ busy ? "Подключаю…" : "Подключить GitHub" }}</UiButton
       >
-    </form>
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
+    </UiStack>
+    <UiMessage v-if="error" tone="danger" role="alert">{{ error }}</UiMessage>
     <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer"
       >Создать токен в GitHub ↗</a
     >
@@ -83,14 +89,8 @@ useTabReadout(() => ({
   max-width: 460px;
   padding: var(--sp-5);
 }
-h2 {
-  font-size: var(--fs-md);
-  font-weight: 500;
-  margin: 0 0 var(--sp-3);
-}
 p,
-a,
-label {
+a {
   font-size: var(--fs-sm);
 }
 p,
@@ -98,21 +98,15 @@ a {
   color: var(--muted);
 }
 form {
-  display: grid;
-  gap: var(--sp-3);
   margin: var(--sp-4) 0;
 }
 input {
   min-width: 0;
-  width: 100%;
 }
 form :deep(button) {
   justify-self: start;
 }
 a {
   text-decoration: underline;
-}
-.error {
-  color: var(--err);
 }
 </style>

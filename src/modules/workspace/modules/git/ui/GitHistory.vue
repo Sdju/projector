@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import UiControl from "../../../../../common/ui/UiControl.vue";
+import UiInline from "../../../../../common/ui/UiInline.vue";
+import UiMessage from "../../../../../common/ui/UiMessage.vue";
 import { copyWithNotice } from "../../../../../common/utilities/notice.ts";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useDebounceFn } from "@vueuse/core";
@@ -201,7 +204,7 @@ watch(commits, (list) => {
       </button>
       <UiButton
         v-if="open"
-        icon
+        shape="icon"
         size="sm"
         :disabled="loading"
         title="Обновить историю"
@@ -213,8 +216,10 @@ watch(commits, (list) => {
       </UiButton>
     </div>
     <template v-if="open">
-      <div class="filter">
-        <input
+      <UiInline class="filter" :gap="1.5" align="normal" justify="normal">
+        <UiControl
+          grow
+          appearance="inset"
           v-model="search"
           type="search"
           placeholder="Сообщение или @автор"
@@ -231,13 +236,29 @@ watch(commits, (list) => {
         >
           {{ all ? "Все ветки" : "Текущая" }}
         </UiButton>
-      </div>
-      <p v-if="log.upstream" class="note">
+      </UiInline>
+      <UiMessage v-if="log.upstream" class="note" tone="muted" size="xs" flush>
         {{ log.upstream }}<template v-if="!log.ahead && !log.behind"> · синхронизировано</template>
-      </p>
-      <p v-if="error" class="note error" role="alert">{{ error }}</p>
-      <p v-else-if="loading && !commits.length" class="note" role="status">загрузка истории…</p>
-      <p v-else-if="log.available && !commits.length" class="note">
+      </UiMessage>
+      <UiMessage v-if="error" class="note" tone="danger" size="xs" flush role="alert">{{
+        error
+      }}</UiMessage>
+      <UiMessage
+        v-else-if="loading && !commits.length"
+        class="note"
+        tone="muted"
+        size="xs"
+        flush
+        role="status"
+        >загрузка истории…</UiMessage
+      >
+      <UiMessage
+        v-else-if="log.available && !commits.length"
+        class="note"
+        tone="muted"
+        size="xs"
+        flush
+      >
         {{
           query
             ? log.next === null
@@ -245,7 +266,7 @@ watch(commits, (list) => {
               : "В этой части истории совпадений нет."
             : "Коммитов пока нет."
         }}
-      </p>
+      </UiMessage>
       <ul v-if="commits.length" class="commits">
         <GitCommitRow
           v-for="(commit, index) in commits"
@@ -324,28 +345,11 @@ h3 {
   color: var(--warn);
 }
 .filter {
-  display: flex;
-  gap: 6px;
   padding: 2px var(--sp-3) 6px;
 }
-.filter input {
-  flex: 1;
-  min-width: 0;
-  padding: 3px 8px;
-  font-size: var(--fs-xs);
-  color: var(--text);
-  background: var(--bg-sunken);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-}
+
 .note {
-  margin: 0;
   padding: 0 var(--sp-3) 4px;
-  color: var(--muted);
-  font-size: var(--fs-xs);
-}
-.error {
-  color: var(--err);
 }
 .commits {
   list-style: none;

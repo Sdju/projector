@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import UiInline from "../../../../../common/ui/UiInline.vue";
+import UiStatusDot from "../../../../../common/ui/UiStatusDot.vue";
 import type { IssueLabel, IssueUser } from "../../../../../../core/modules/workspace/index.ts";
 import EmojiText from "../../../../../common/ui/EmojiText.vue";
 import UiAvatar from "../../../../../common/ui/UiAvatar.vue";
@@ -10,21 +12,29 @@ const labelDot = (label: IssueLabel) => (label.color ? `#${label.color}` : "tran
 
 <template>
   <button type="button" class="tracker-row">
-    <span class="title"
+    <UiInline as="span" class="title" :gap="1" align="normal" justify="normal"
       ><slot name="icon" /><span><EmojiText :text="title" /></span
-    ></span>
-    <span class="meta">
+    ></UiInline>
+    <UiInline as="span" class="meta" wrap justify="normal">
       <span class="number">#{{ number }}</span>
-      <span v-for="label in labels.slice(0, 3)" :key="label.name" class="label">
-        <span class="dot" :style="{ background: labelDot(label) }" />
+      <UiInline
+        as="span"
+        inline
+        :gap="1"
+        justify="normal"
+        v-for="label in labels.slice(0, 3)"
+        :key="label.name"
+        class="label"
+      >
+        <UiStatusDot class="dot" shrink :style="{ background: labelDot(label) }" />
         <EmojiText :text="label.name" />
-      </span>
-      <span class="author">
+      </UiInline>
+      <UiInline as="span" inline :gap="1" justify="normal" class="author">
         <UiAvatar :src="author.avatarUrl" :alt="author.login" :size="14" />
         {{ author.login }}
-      </span>
+      </UiInline>
       <slot name="meta" />
-    </span>
+    </UiInline>
   </button>
 </template>
 
@@ -44,16 +54,10 @@ const labelDot = (label: IssueLabel) => (label.color ? `#${label.color}` : "tran
   color: var(--text);
 }
 .title {
-  display: flex;
-  gap: var(--sp-1);
   font-size: var(--fs-xs);
   line-height: 1.35;
 }
 .meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--sp-2);
   color: var(--muted);
   font-size: var(--fs-2xs);
 }
@@ -67,16 +71,8 @@ const labelDot = (label: IssueLabel) => (label.color ? `#${label.color}` : "tran
   gap: 4px;
 }
 .label {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
   padding: 0 6px;
   border: 1px solid var(--line);
-  border-radius: var(--r-full);
-}
-.dot {
-  width: 7px;
-  height: 7px;
   border-radius: var(--r-full);
 }
 </style>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiControl from "../../common/ui/UiControl.vue";
 import { onBeforeUnmount, ref } from "vue";
 import IconEye from "~icons/lucide/eye";
 import IconEyeOff from "~icons/lucide/eye-off";
@@ -31,7 +32,7 @@ defineExpose({ hide });
 <template>
   <div class="secret">
     <span class="muted">Токен</span>
-    <input
+    <UiControl
       class="secret-value"
       readonly
       :type="revealed ? 'text' : 'password'"
@@ -63,7 +64,7 @@ defineExpose({ hide });
 .secret-value {
   flex: 1;
   min-width: 0;
-  font-family: var(--font-mono, monospace);
+  font-family: monospace;
   font-size: var(--fs-xs);
 }
 </style>

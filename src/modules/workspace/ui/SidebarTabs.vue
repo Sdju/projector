@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiStatusDot from "../../../common/ui/UiStatusDot.vue";
 import { computed, type Component } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiIsland from "../../../common/ui/UiIsland.vue";
@@ -69,13 +70,21 @@ function choose(item: SidebarItem) {
         <component :is="current?.icon" v-if="current" aria-hidden="true" />
         <span class="name">{{ current?.title ?? "Разделы" }}</span>
         <span v-if="current?.badge" class="count" aria-hidden="true">{{ current.badge }}</span>
-        <i v-else-if="otherBadges" class="dot" aria-hidden="true" />
+        <UiStatusDot
+          v-else-if="otherBadges"
+          as="i"
+          class="dot"
+          radius="circle"
+          shrink
+          tone="success"
+          aria-hidden="true"
+        />
         <IconChevron class="chevron" aria-hidden="true" />
       </button>
     </span>
     <div class="side-actions">
       <UiButton
-        icon
+        shape="icon"
         size="sm"
         title="Обновить раздел"
         aria-label="Обновить раздел"
@@ -127,7 +136,7 @@ function choose(item: SidebarItem) {
     </button>
     <div class="side-actions">
       <UiButton
-        icon
+        shape="icon"
         size="sm"
         title="Настройки Projector"
         aria-label="Настройки Projector"
@@ -285,12 +294,6 @@ function choose(item: SidebarItem) {
   font: var(--fs-2xs) var(--mono);
   line-height: 18px;
   text-align: center;
-}
-.dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--run);
 }
 .picker-bar .side-actions {
   border-left: 0;

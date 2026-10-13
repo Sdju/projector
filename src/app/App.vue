@@ -12,6 +12,7 @@ import {
 } from "../modules/project/index.ts";
 import { useRunner } from "../modules/runner/index.ts";
 import { CommandPalette, provideIdeCommands } from "../modules/ide/index.ts";
+import UiMessage from "../common/ui/UiMessage.vue";
 import UiNoticeHost from "../common/ui/UiNoticeHost.vue";
 import AppShell from "./layouts/AppShell.vue";
 
@@ -91,9 +92,16 @@ onUnmounted(() => {
 <template>
   <CommandPalette />
   <UiNoticeHost />
-  <div v-if="commandError" class="command-error" role="alert">
+  <UiMessage
+    as="div"
+    tone="danger"
+    size="xs"
+    v-if="commandError"
+    class="command-error"
+    role="alert"
+  >
     {{ commandError }}<button aria-label="Закрыть сообщение" @click="commandError = ''">×</button>
-  </div>
+  </UiMessage>
   <router-view v-if="route.name === 'launcher'" />
   <AppShell v-else :current-project="currentProject">
     <router-view />
@@ -110,9 +118,7 @@ onUnmounted(() => {
   padding: var(--sp-3) var(--sp-4);
   background: var(--bg-2);
   border: 1px solid var(--err);
-  color: var(--err);
   border-radius: var(--r-md);
-  font-size: var(--fs-xs);
 }
 .command-error button {
   margin-left: var(--sp-4);

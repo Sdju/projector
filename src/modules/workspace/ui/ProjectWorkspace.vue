@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiResizeHandle from "../../../common/ui/UiResizeHandle.vue";
 import { computed, onBeforeUnmount, ref } from "vue";
 import {
   workspaceProfile,
@@ -331,11 +332,11 @@ onBeforeUnmount(() => overview.cancel());
         @moved="entryMoved"
       />
     </Transition>
-    <div
+    <UiResizeHandle
+      appearance="gap"
+      orientation="vertical"
       v-show="!sidebarInvisible"
       class="resize-handle tree-resize"
-      role="separator"
-      aria-orientation="vertical"
       aria-label="Ширина дерева файлов"
       tabindex="0"
       @pointerdown="resizeTree"
@@ -417,30 +418,6 @@ onBeforeUnmount(() => overview.cancel());
   flex-direction: column;
   grid-column: 3;
   grid-row: 3;
-}
-/* Зазор между островами и есть зона захвата; при наведении проступает тонкая линия */
-.resize-handle {
-  position: relative;
-  z-index: 1;
-  cursor: col-resize;
-  touch-action: none;
-}
-.resize-handle::before {
-  content: "";
-  position: absolute;
-  inset: 0 calc(var(--island-gap) / 2 - 1px);
-  border-radius: var(--r-full);
-  transition: background var(--t-fast);
-}
-.resize-handle:hover::before,
-.resize-handle:active::before {
-  background: var(--line-strong);
-}
-.resize-handle:focus-visible {
-  outline: none;
-}
-.resize-handle:focus-visible::before {
-  background: var(--focus);
 }
 .file-error {
   grid-column: 1 / -1;

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiControl from "../../../common/ui/UiControl.vue";
 import { computed, nextTick, ref, useId, watch } from "vue";
 import { useCommandScope } from "../../../common/utilities/commands.ts";
 import { tabDrag } from "../../../common/utilities/tab-drag.ts";
@@ -229,7 +230,7 @@ watch(
       @mousedown="$event.button === 1 && $event.preventDefault()"
       @auxclick="middleClick($event, tab.id)"
     >
-      <input
+      <UiControl
         v-if="editing === tab.id"
         v-model="draft"
         class="tab-rename"
@@ -254,7 +255,7 @@ watch(
         @dblclick="dblclickTab(tab)"
         @keydown="navigate($event, tab.id)"
       >
-        <slot name="icon" :tab="tab" /><span>{{ tab.label }}</span>
+        <slot name="icon" :tab="tab" /><span class="u-truncate">{{ tab.label }}</span>
       </button>
       <button
         class="tab-close"
@@ -328,11 +329,7 @@ watch(
   font-size: var(--fs-xs);
   color: var(--muted);
 }
-.tab-label span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+
 .selected .tab-label {
   color: var(--text);
 }

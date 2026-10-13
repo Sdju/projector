@@ -1,11 +1,14 @@
 <script setup lang="ts">
+import UiHint from "../../../../../common/ui/UiHint.vue";
+import UiHeading from "../../../../../common/ui/UiHeading.vue";
 import type {
   IssueLabel,
   IssueUser,
   Reaction,
 } from "../../../../../../core/modules/workspace/index.ts";
 import { absoluteTime, relativeTime } from "../../../../../common/utilities/commit-format.ts";
-import UiAvatar from "../../../../../common/ui/UiAvatar.vue";
+import TrackerAuthor from "./TrackerAuthor.vue";
+import UiInline from "../../../../../common/ui/UiInline.vue";
 import EmojiText from "../../../../../common/ui/EmojiText.vue";
 import TrackerReactions from "./TrackerReactions.vue";
 import VisualMarkdownEditor from "./VisualMarkdownEditor.vue";
@@ -38,23 +41,34 @@ const emit = defineEmits<{ open: [path: string] }>();
 
 <template>
   <div class="tracker-detail">
-    <p v-if="loading" class="note" role="status">загрузка: {{ noun }}…</p>
-    <p v-else-if="error" class="note error" role="alert">{{ error }}</p>
+    <UiHint size="xs" leading="inherit" :space-before="2" v-if="loading" class="note" role="status"
+      >загрузка: {{ noun }}…</UiHint
+    >
+    <UiHint
+      size="xs"
+      leading="inherit"
+      :space-before="2"
+      v-else-if="error"
+      class="note error"
+      role="alert"
+      >{{ error }}</UiHint
+    >
     <article v-else-if="ready" class="article">
-      <header class="head">
+      <UiInline as="header" class="head" align="baseline" wrap justify="normal">
         <span class="state" :class="state">{{ stateLabel }}</span>
-        <h2>
+        <UiHeading as="h2" size="lg" weight="semibold" :space-after="0">
           <EmojiText :text="title" /> <span class="number">#{{ number }}</span>
-        </h2>
-      </header>
-      <p class="meta">
-        <span class="author">
-          <UiAvatar :src="author.avatarUrl" :alt="author.login" :size="18" />
-          {{ author.login }}
-        </span>
+        </UiHeading>
+      </UiInline>
+      <UiInline as="p" class="meta" wrap>
+        <TrackerAuthor :author="author" :size="18" />
         <slot name="meta" />
         <span :title="absoluteTime(createdAt)">открыт {{ relativeTime(createdAt) }}</span>
-        <a
+        <UiInline
+          as="a"
+          inline
+          :gap="1"
+          justify="normal"
           v-if="htmlUrl"
           class="external"
           :href="htmlUrl"
@@ -62,8 +76,8 @@ const emit = defineEmits<{ open: [path: string] }>();
           rel="noopener noreferrer"
         >
           <IconExternal aria-hidden="true" />на GitHub
-        </a>
-      </p>
+        </UiInline>
+      </UiInline>
       <slot name="stats" />
       <ul v-if="labels.length" class="labels">
         <li
@@ -84,7 +98,9 @@ const emit = defineEmits<{ open: [path: string] }>();
         compact
         @open="emit('open', $event)"
       />
-      <p v-else class="note">Без описания</p>
+      <UiHint size="xs" leading="inherit" :space-before="2" v-else class="note"
+        >Без описания</UiHint
+      >
       <TrackerReactions :reactions="reactions" />
       <slot />
     </article>
@@ -100,12 +116,6 @@ const emit = defineEmits<{ open: [path: string] }>();
 .article {
   max-width: 880px;
   margin: 0 auto;
-}
-.head {
-  display: flex;
-  align-items: baseline;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
 }
 .state {
   padding: 1px var(--sp-2);
@@ -123,35 +133,16 @@ const emit = defineEmits<{ open: [path: string] }>();
   background: color-mix(in srgb, var(--accent) 22%, transparent);
   color: var(--accent);
 }
-h2 {
-  margin: 0;
-  font-size: var(--fs-lg);
-  font-weight: 600;
-}
 .number {
   color: var(--muted);
   font: var(--fs-xs) var(--mono);
 }
 .meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
   margin: var(--sp-2) 0 0;
   color: var(--muted);
   font-size: var(--fs-xs);
 }
-.author {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-family: var(--mono);
-  color: var(--text-2);
-}
 .external {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
   color: var(--text-2);
 }
 .external svg {
@@ -178,11 +169,6 @@ h2 {
   padding: var(--sp-3);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-}
-.note {
-  margin: var(--sp-2) 0 0;
-  color: var(--muted);
-  font-size: var(--fs-xs);
 }
 .note.error {
   color: var(--err);

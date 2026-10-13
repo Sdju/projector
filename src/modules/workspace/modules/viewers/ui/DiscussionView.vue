@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiHint from "../../../../../common/ui/UiHint.vue";
 import EmojiText from "../../../../../common/ui/EmojiText.vue";
 import { computed } from "vue";
 import type {
@@ -115,23 +116,24 @@ useTabReadout(() => {
       :items="comments"
       @open="emit('open', $event)"
     />
-    <p v-if="truncatedReplies" class="note">
+    <UiHint size="xs" leading="inherit" :space-before="2" v-if="truncatedReplies" class="note">
       У некоторых комментариев показаны не все ответы. Откройте discussion на GitHub, чтобы увидеть
       все.
-    </p>
-    <p v-if="detail?.commentsTruncated" class="note">
+    </UiHint>
+    <UiHint
+      size="xs"
+      leading="inherit"
+      :space-before="2"
+      v-if="detail?.commentsTruncated"
+      class="note"
+    >
       Показаны первые 250 комментариев. Откройте discussion на GitHub, чтобы увидеть все.
-    </p>
+    </UiHint>
   </TrackerDetail>
 </template>
 
 <style scoped>
 .category {
   color: var(--text-2);
-}
-.note {
-  margin: var(--sp-2) 0 0;
-  color: var(--muted);
-  font-size: var(--fs-xs);
 }
 </style>

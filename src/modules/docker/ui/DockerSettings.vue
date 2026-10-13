@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import UiHeading from "../../../common/ui/UiHeading.vue";
+import UiStack from "../../../common/ui/UiStack.vue";
+import UiMessage from "../../../common/ui/UiMessage.vue";
+import UiControl from "../../../common/ui/UiControl.vue";
+import UiInline from "../../../common/ui/UiInline.vue";
+
 import { onMounted, ref } from "vue";
 import type { DockerSnapshot } from "../../../../core/modules/docker/index.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
@@ -59,17 +65,18 @@ onMounted(
 </script>
 <template>
   <section class="docker-settings" @pointerdown="commands.scope.activate()">
-    <header>
-      <h3>Подключение</h3>
+    <UiInline as="header" :gap="3" justify="between" wrap>
+      <UiHeading as="h3" size="sm">Подключение</UiHeading>
       <span>{{ snapshot?.connected ? `подключён · ${snapshot.version}` : "не подключён" }}</span>
-    </header>
-    <form @submit.prevent="commands.run('ide.docker.settings.save')">
-      <label
-        ><input v-model="enabled" type="checkbox" :disabled="busy" /> включить интеграцию</label
+    </UiInline>
+    <UiStack as="form" flow="flex" @submit.prevent="commands.run('ide.docker.settings.save')">
+      <UiInline as="label" justify="normal"
+        ><UiControl v-model="enabled" type="checkbox" :disabled="busy" /> включить
+        интеграцию</UiInline
       >
-      <label
+      <UiInline as="label" justify="normal"
         >Окружение
-        <select v-model="context" :disabled="busy">
+        <UiControl as="select" appearance="filled" v-model="context" :disabled="busy">
           <option
             v-for="item in snapshot?.contexts"
             :key="item.name"
@@ -78,9 +85,9 @@ onMounted(
           >
             {{ item.name }} · {{ item.endpoint }}
           </option>
-        </select></label
+        </UiControl></UiInline
       >
-      <div class="actions">
+      <UiInline class="actions" :gap="3" wrap>
         <UiButton
           type="submit"
           :disabled="
@@ -91,10 +98,12 @@ onMounted(
         ><UiButton :disabled="busy" @click="commands.run('ide.docker.settings.status')"
           >Проверить подключение</UiButton
         >
-      </div>
-    </form>
+      </UiInline>
+    </UiStack>
     <p v-if="snapshot?.composeVersion" class="muted">Compose {{ snapshot.composeVersion }}</p>
-    <p v-if="error || snapshot?.error" class="error" role="alert">{{ error || snapshot?.error }}</p>
+    <UiMessage v-if="error || snapshot?.error" tone="danger" role="alert" size="xs" wrap>{{
+      error || snapshot?.error
+    }}</UiMessage>
   </section>
 </template>
 <style scoped>
@@ -102,50 +111,16 @@ onMounted(
   margin: 0;
   font-size: var(--fs-sm);
 }
-header,
-.actions {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  flex-wrap: wrap;
-}
-header {
-  justify-content: space-between;
-}
-h3 {
-  font-size: var(--fs-sm);
-  font-weight: 500;
-  margin: 0 0 var(--sp-3);
-}
 header span,
 .muted {
   color: var(--muted);
   font-size: var(--fs-xs);
 }
 form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-}
-label {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
+  min-width: auto;
 }
 select {
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  color: var(--text);
-  padding: var(--sp-2);
-  min-width: 0;
   max-width: 100%;
   flex: 1;
-}
-.error {
-  color: var(--err);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  font-size: var(--fs-xs);
 }
 </style>

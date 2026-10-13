@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, useId } from "vue";
+import UiHeading from "../../../../../common/ui/UiHeading.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
 import UiStringList from "../../../../../common/ui/UiStringList.vue";
@@ -15,6 +16,7 @@ import {
 } from "../../../../../../core/modules/workspace/index.ts";
 
 defineProps<{ embedded?: boolean }>();
+const titleId = useId();
 
 const exclude = ref<FilesExcludeMap>(defaultFilesExclude());
 const ready = ref(false);
@@ -86,8 +88,10 @@ onMounted(load);
 </script>
 
 <template>
-  <section class="files-exclude" aria-labelledby="files-exclude-title">
-    <h2 id="files-exclude-title" :class="{ 'sr-only': embedded }">Исключения файлов</h2>
+  <section class="files-exclude" :aria-labelledby="titleId">
+    <UiHeading :id="titleId" size="sm" :class="{ 'u-sr-only': embedded }"
+      >Исключения файлов</UiHeading
+    >
     <UiHint>
       Glob-паттерны как в VS Code <code>files.exclude</code>: скрывают совпадения из дерева, поиска
       и операций с путями. Примеры: <code>**/node_modules</code>, <code>**/.git</code>,
@@ -119,22 +123,10 @@ onMounted(load);
 .files-exclude {
   margin-bottom: var(--sp-6);
 }
-h2 {
-  margin: 0 0 var(--sp-3);
-  font-size: var(--fs-sm);
-  font-weight: 500;
-}
 .list {
   margin-top: var(--sp-4);
 }
 .error {
   color: var(--err);
-}
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
 }
 </style>

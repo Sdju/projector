@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiInline from "../../../common/ui/UiInline.vue";
 import { useId } from "vue";
 import UsageMeter from "./UsageMeter.vue";
 import type { UsagePaceTone } from "./usage-pace.ts";
@@ -20,8 +21,11 @@ const tooltipId = useId();
 </script>
 
 <template>
-  <component
-    :is="interactive ? 'button' : 'span'"
+  <UiInline
+    :as="interactive ? 'button' : 'span'"
+    inline
+    :gap="1.5"
+    justify="normal"
     :type="interactive ? 'button' : undefined"
     :tabindex="interactive ? undefined : 0"
     class="usage-indicator"
@@ -55,15 +59,12 @@ const tooltipId = useId();
       </template>
       <template v-else>{{ tooltip }}</template>
     </span>
-  </component>
+  </UiInline>
 </template>
 
 <style scoped>
 .usage-indicator {
   position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
   flex-shrink: 0;
   outline-offset: 2px;
 }
@@ -122,7 +123,7 @@ const tooltipId = useId();
   padding: 7px 9px;
   border: 1px solid var(--line);
   border-radius: 5px;
-  background: var(--bg-raised, var(--bg));
+  background: var(--bg);
   color: var(--text);
   white-space: pre-line;
   overflow-wrap: anywhere;

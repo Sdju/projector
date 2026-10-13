@@ -1,7 +1,16 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import UiHeading from "../../common/ui/UiHeading.vue";
+import UiLabel from "../../common/ui/UiLabel.vue";
+import UiMessage from "../../common/ui/UiMessage.vue";
+import UiControl from "../../common/ui/UiControl.vue";
+import UiChoiceGroup from "../../common/ui/UiChoiceGroup.vue";
+import UiChoiceRow from "../../common/ui/UiChoiceRow.vue";
+import UiInline from "../../common/ui/UiInline.vue";
+
+import { onMounted, ref, useId } from "vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import UiHint from "../../common/ui/UiHint.vue";
+const shortcutId = useId();
 const mode = ref("native");
 const saved = ref("native");
 const shortcut = ref("Ctrl+Alt+Space");
@@ -82,24 +91,25 @@ async function open() {
 
 <template>
   <section class="interface-settings">
-    <h2>Как открывать Projector</h2>
-    <fieldset :disabled="!ready || busy">
-      <legend class="sr-only">Режим интерфейса</legend>
-      <label v-for="option in modes" :key="option.id" class="mode">
-        <input v-model="mode" type="radio" name="interface" :value="option.id" />
-        <span
-          ><strong>{{ option.title }}</strong
-          ><small>{{ option.description }}</small></span
-        >
-      </label>
-    </fieldset>
-    <label class="shortcut-label" for="projector-shortcut">Горячая клавиша</label>
-    <select id="projector-shortcut" v-model="shortcut" :disabled="!ready || busy">
+    <UiHeading as="h2" size="sm">Как открывать Projector</UiHeading>
+    <UiChoiceGroup v-slot="{ groupName }" label="Режим интерфейса" :disabled="!ready || busy">
+      <UiChoiceRow
+        v-for="option in modes"
+        :key="option.id"
+        :title="option.title"
+        :description="option.description"
+        ><UiControl v-model="mode" type="radio" :name="groupName" :value="option.id"
+      /></UiChoiceRow>
+    </UiChoiceGroup>
+    <UiLabel size="sm" tone="secondary" :space-before="4" :space-after="2" :for="shortcutId"
+      >Горячая клавиша</UiLabel
+    >
+    <UiControl as="select" :id="shortcutId" v-model="shortcut" :disabled="!ready || busy">
       <option value="Ctrl+Alt+Space">Ctrl + Alt + Space</option>
       <option value="Super+Space">Super + Space</option>
       <option value="Alt+Space">Alt + Space</option>
       <option value="">Выключена</option>
-    </select>
+    </UiControl>
     <UiHint class="hint" role="status">
       <template v-if="!shortcut">Горячая клавиша выключена.</template>
       <template v-else-if="hotkey?.active"
@@ -113,16 +123,16 @@ async function open() {
         <code>projector toggle</code>.</template
       >
     </UiHint>
-    <div class="actions">
+    <UiInline class="actions" align="stretch" wrap>
       <UiButton
-        variant="solid"
+        appearance="solid"
         :disabled="!ready || busy || (saved === mode && savedShortcut === shortcut)"
         @click="save"
       >
         Сохранить
       </UiButton>
       <UiButton :disabled="!ready || busy" @click="open">Открыть выбранный режим</UiButton>
-    </div>
+    </UiInline>
     <details>
       <summary>Системный хоткей и трей</summary>
       <UiHint class="hint">
@@ -130,59 +140,22 @@ async function open() {
         иконке в трее открывает поиск, меню даёт доступ к настройкам, перезапуску и выходу.
       </UiHint>
     </details>
-    <p v-if="error || status" role="status" :class="{ error }">{{ error || status }}</p>
+    <UiMessage v-if="error || status" role="status" :tone="error ? 'danger' : undefined">{{
+      error || status
+    }}</UiMessage>
   </section>
 </template>
 
 <style scoped>
 .interface-settings {
-  margin-bottom: var(--sp-6);
-}
-h2 {
-  margin: 0 0 var(--sp-3);
-  font-size: var(--fs-sm);
-  font-weight: 500;
-}
-fieldset {
-  border: 0;
-  padding: 0;
-  margin: 0;
-}
-.mode {
-  display: flex;
-  gap: var(--sp-3);
-  align-items: flex-start;
-  padding: var(--sp-3) 0;
-  cursor: pointer;
-}
-.mode input {
-  margin-top: var(--sp-1);
-}
-strong {
-  display: block;
-  font-weight: 500;
-}
-small {
-  display: block;
-  color: var(--muted);
-  font-size: var(--fs-xs);
-  margin-top: var(--sp-1);
+  margin-bottom: var(--ui-section-margin, var(--sp-6));
 }
 .actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
   margin-top: var(--sp-4);
 }
 .hint {
   margin-top: var(--sp-4);
   font-size: var(--fs-xs);
-}
-.shortcut-label {
-  display: block;
-  margin: var(--sp-4) 0 var(--sp-2);
-  font-size: var(--fs-sm);
-  color: var(--text-2);
 }
 select {
   max-width: 320px;
@@ -194,15 +167,5 @@ details {
 }
 summary {
   cursor: pointer;
-}
-.error {
-  color: var(--err);
-}
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
 }
 </style>

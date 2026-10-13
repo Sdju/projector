@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import UiScrollArea from "../../../../../common/ui/UiScrollArea.vue";
+import UiEmpty from "../../../../../common/ui/UiEmpty.vue";
+import UiMessage from "../../../../../common/ui/UiMessage.vue";
 import type { TrackerState } from "../lib/paged-list.ts";
 import IconChevronRight from "~icons/lucide/chevron-right";
 
@@ -26,7 +29,7 @@ const states: Array<{ value: TrackerState; label: string }> = [
 </script>
 
 <template>
-  <div class="side-content tracker-panel">
+  <UiScrollArea class="side-content tracker-panel">
     <button
       class="block-toggle"
       type="button"
@@ -39,7 +42,7 @@ const states: Array<{ value: TrackerState; label: string }> = [
         {{ title }} <span v-if="count" class="count">{{ count }}</span>
       </h3>
     </button>
-    <div v-show="open" class="block-body">
+    <UiScrollArea v-show="open" class="block-body">
       <div class="state-filter" role="group" :aria-label="`Состояние: ${noun}`">
         <button
           v-for="option in states"
@@ -52,9 +55,11 @@ const states: Array<{ value: TrackerState; label: string }> = [
           {{ option.label }}
         </button>
       </div>
-      <p v-if="loading" class="note" role="status">загрузка: {{ noun }}…</p>
-      <p v-else-if="error" class="note error" role="alert">{{ error }}</p>
-      <p v-else-if="!count" class="note">Нет: {{ noun }}</p>
+      <UiMessage v-if="loading" variant="note" tone="muted" role="status"
+        >загрузка: {{ noun }}…</UiMessage
+      >
+      <UiMessage v-else-if="error" variant="note" tone="danger" role="alert">{{ error }}</UiMessage>
+      <UiEmpty v-else-if="!count" density="compact" align="start">Нет: {{ noun }}</UiEmpty>
       <ul v-else class="tracker-list">
         <slot />
       </ul>
@@ -67,15 +72,14 @@ const states: Array<{ value: TrackerState; label: string }> = [
       >
         {{ loadingMore ? "загрузка…" : "Показать ещё" }}
       </button>
-    </div>
-  </div>
+    </UiScrollArea>
+  </UiScrollArea>
 </template>
 
 <style scoped>
 .tracker-panel {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 .block-toggle {
   display: flex;
@@ -109,11 +113,6 @@ h3 {
   color: var(--faint);
   font: var(--fs-2xs) var(--mono);
 }
-.block-body {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
 .state-filter {
   display: flex;
   gap: var(--sp-1);
@@ -134,15 +133,6 @@ h3 {
   border-color: var(--focus);
   color: var(--text);
   background: var(--active);
-}
-.note {
-  margin: 0;
-  padding: var(--sp-2) var(--sp-3);
-  color: var(--muted);
-  font-size: var(--fs-xs);
-}
-.note.error {
-  color: var(--err);
 }
 .tracker-list {
   list-style: none;

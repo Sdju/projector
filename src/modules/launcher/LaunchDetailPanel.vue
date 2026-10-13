@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import UiActionRow from "../../common/ui/UiActionRow.vue";
+import { launcherStatusTone } from "./status-tone.ts";
+import UiStatusDot from "../../common/ui/UiStatusDot.vue";
 import type {
   LaunchAction,
   LaunchDetail,
@@ -25,13 +28,22 @@ defineEmits<{ launch: [action: LaunchAction] }>();
     <div v-if="info" class="info-card">
       <div class="info-path">{{ info.path }}</div>
       <div class="info-state">
-        <span class="status-dot" :class="info.state" aria-hidden="true" />{{ info.stateLabel
-        }}<template v-if="info.command"> · {{ info.command }}</template
+        <UiStatusDot
+          class="status-dot"
+          :size="8"
+          inline
+          shrink
+          :tone="launcherStatusTone(info.state)"
+          aria-hidden="true"
+        />{{ info.stateLabel }}<template v-if="info.command"> · {{ info.command }}</template
         ><template v-if="info.url"> · {{ info.url }}</template>
       </div>
       <div v-if="info.docker" class="info-docker">{{ info.docker }}</div>
     </div>
-    <button
+    <UiActionRow
+      interaction="selection"
+      padding="var(--sp-3)"
+      justify="between"
       v-for="(action, position) in actions"
       :key="`${action.id}:${action.arg ?? ''}`"
       role="option"
@@ -44,7 +56,7 @@ defineEmits<{ launch: [action: LaunchAction] }>();
     >
       <span class="name">{{ action.title }}</span>
       <span v-if="position === index" class="enter" aria-hidden="true">↵</span>
-    </button>
+    </UiActionRow>
     <div v-if="failure" class="failure" role="alert">
       <div class="failure-title">
         «{{ failure.command }}» завершилась с ошибкой<template v-if="failure.exitCode !== null">
@@ -70,19 +82,6 @@ defineEmits<{ launch: [action: LaunchAction] }>();
 .back {
   color: var(--muted);
 }
-.result {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-3);
-  width: 100%;
-  padding: var(--sp-3);
-  text-align: left;
-  border-radius: var(--r-md);
-}
-.result.selected {
-  background: var(--hover);
-}
 .name {
   font-size: var(--fs-md);
 }
@@ -91,21 +90,7 @@ defineEmits<{ launch: [action: LaunchAction] }>();
   white-space: nowrap;
 }
 .status-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
   margin-right: var(--sp-2);
-  border-radius: var(--r-full);
-  background: var(--run);
-}
-.status-dot.error {
-  background: var(--err);
-}
-.status-dot.stopping {
-  background: var(--muted);
-}
-.status-dot.idle {
-  background: var(--faint);
 }
 .info-card {
   display: grid;

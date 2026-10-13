@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiPopupSurface from "../../../common/ui/UiPopupSurface.vue";
 import IconChevronRight from "~icons/lucide/chevron-right";
 import IconFolder from "~icons/lucide/folder";
 import type { DirectoryEntry } from "../../../../core/modules/directories/index.ts";
@@ -18,8 +19,8 @@ defineProps<{
 defineEmits<{ pick: [path: string] }>();
 </script>
 <template>
-  <div class="dropdown">
-    <div class="dropdown-heading">{{ heading }}</div>
+  <UiPopupSurface border="line" radius="md" class="dropdown">
+    <div class="dropdown-heading u-truncate">{{ heading }}</div>
     <p v-if="loading" class="notice" role="status">
       {{ remote ? "Читаю репозитории…" : "Читаю папки…" }}
     </p>
@@ -51,7 +52,7 @@ defineEmits<{ pick: [path: string] }>();
         @pointerdown.prevent
         @click="$emit('pick', entry.path)"
       >
-        <IconFolder aria-hidden="true" /><span>{{ entry.name }}</span
+        <IconFolder aria-hidden="true" /><span class="u-truncate">{{ entry.name }}</span
         ><IconChevronRight aria-hidden="true" />
       </button>
     </div>
@@ -60,7 +61,7 @@ defineEmits<{ pick: [path: string] }>();
         remote ? "Первые 1000 репозиториев — уточните путь" : "Первые 1000 папок — уточните путь"
       }}
     </p>
-  </div>
+  </UiPopupSurface>
 </template>
 <style scoped>
 button {
@@ -74,19 +75,12 @@ button {
   z-index: 30;
   width: min(640px, 100%);
   min-width: min(280px, 100%);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  box-shadow: var(--shadow-popover);
   padding: var(--sp-1);
 }
 .dropdown-heading {
   padding: var(--sp-2) var(--sp-2);
   font-size: var(--fs-2xs);
   color: var(--faint);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   border-bottom: 1px solid var(--line);
 }
 .options {
@@ -112,11 +106,7 @@ button {
   margin-left: auto;
   width: 12px;
 }
-.options button span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+
 .options button:hover,
 .options button.highlighted,
 .options button:focus-visible {

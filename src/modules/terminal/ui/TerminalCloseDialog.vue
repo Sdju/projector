@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiHeading from "../../../common/ui/UiHeading.vue";
 import { nextTick, useId, ref, watch } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiDialog from "../../../common/ui/UiDialog.vue";
@@ -27,7 +28,7 @@ watch(
     :labelledby="titleId"
     @cancel.prevent="$emit('cancel')"
   >
-    <h2 :id="titleId">Прервать процессы и закрыть вкладку?</h2>
+    <UiHeading :id="titleId">Прервать процессы и закрыть вкладку?</UiHeading>
     <p>
       {{ session.title }} ·
       {{
@@ -44,7 +45,7 @@ watch(
     </ul>
     <UiDialogActions>
       <UiButton autofocus :disabled="busy" @click="$emit('cancel')">Отмена</UiButton>
-      <UiButton variant="danger" :disabled="busy" @click="$emit('confirm')"
+      <UiButton tone="danger" :disabled="busy" @click="$emit('confirm')"
         >Прервать и закрыть</UiButton
       >
     </UiDialogActions>
@@ -52,11 +53,6 @@ watch(
 </template>
 
 <style scoped>
-.close-dialog h2 {
-  margin: 0 0 var(--sp-3);
-  font-size: var(--fs-md);
-  font-weight: 500;
-}
 .close-dialog p {
   color: var(--muted);
   font-size: var(--fs-xs);

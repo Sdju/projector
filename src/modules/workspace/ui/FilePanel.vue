@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import UiPanel from "../../../common/ui/UiPanel.vue";
+import UiToolbar from "../../../common/ui/UiToolbar.vue";
 import { computed } from "vue";
 import { workspaceSiteUrl } from "../../workspace-api/index.ts";
 import { useTabHost, useWorkspaceTabs } from "../lib/tab-views.ts";
@@ -40,16 +42,16 @@ const hasStatusLine = computed(
 </script>
 
 <template>
-  <div class="file-panel">
+  <UiPanel as="div" sizing="flex" class="file-panel">
     <div class="breadcrumb">
-      <span>{{ file.path }}</span>
+      <span class="u-truncate">{{ file.path }}</span>
       <span v-if="subtitle">{{ subtitle }}</span>
       <span v-if="file.external || file.readonly">только просмотр</span>
     </div>
     <p v-if="file.saveError && !isMarkdown(file)" class="file-error" role="alert">
       {{ file.saveError }}
     </p>
-    <div v-if="file.conflict" class="file-conflict" role="alert">
+    <UiToolbar v-if="file.conflict" class="file-conflict" role="alert" wrap text="xs">
       <span>
         {{
           file.conflict.error
@@ -63,7 +65,7 @@ const hasStatusLine = computed(
       <button v-if="file.conflict.disk !== undefined" type="button" @click="emit('keep')">
         Оставить мою версию
       </button>
-    </div>
+    </UiToolbar>
     <div class="panel-body" :data-own-keys="view?.ownKeys || undefined">
       <TabReadoutScope v-if="view" :tab-key="file.key">
         <component :is="view.component" v-bind="view.props?.(file, host)" />
@@ -136,17 +138,10 @@ const hasStatusLine = computed(
       :path="file.path"
       :content="file.draft ?? file.content"
     />
-  </div>
+  </UiPanel>
 </template>
 
 <style scoped>
-.file-panel {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-}
 .breadcrumb {
   display: flex;
   justify-content: space-between;
@@ -156,11 +151,7 @@ const hasStatusLine = computed(
   color: var(--muted);
   border-bottom: 1px solid var(--line);
 }
-.breadcrumb span:first-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+
 .breadcrumb span:last-child {
   flex-shrink: 0;
   color: var(--faint);
@@ -172,15 +163,7 @@ const hasStatusLine = computed(
   font-size: var(--fs-xs);
   border-bottom: 1px solid var(--line);
 }
-.file-conflict {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-3);
-  border-bottom: 1px solid var(--line);
-  font-size: var(--fs-xs);
-}
+
 .file-conflict span {
   flex: 1;
   min-width: 200px;

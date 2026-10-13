@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import UiHeading from "../../common/ui/UiHeading.vue";
+import UiControl from "../../common/ui/UiControl.vue";
 import { onMounted, ref } from "vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import UiHint from "../../common/ui/UiHint.vue";
@@ -102,7 +104,7 @@ commands.scope.registerCommand({
 
 <template>
   <section class="favorite-folders">
-    <h2>Избранные папки</h2>
+    <UiHeading as="h2" size="sm">Избранные папки</UiHeading>
     <UiHint class="hint"
       >Проекты из этих папок идут в списке запуска первыми. В поиске наберите <code>new/имя</code>,
       чтобы создать проект в одной из них.</UiHint
@@ -114,20 +116,33 @@ commands.scope.registerCommand({
       </li>
     </ul>
     <form class="row" @submit.prevent="action(() => add(path))">
-      <input v-model="path" aria-label="Путь к папке" placeholder="~/projects" :disabled="busy" />
+      <UiControl
+        grow
+        v-model="path"
+        aria-label="Путь к папке"
+        placeholder="~/projects"
+        :disabled="busy"
+      />
       <UiButton type="submit" :disabled="busy || !path.trim()">Добавить</UiButton>
     </form>
     <form v-if="folders.length" class="row" @submit.prevent="action(() => create(folder, name))">
-      <select v-model="folder" aria-label="Папка нового проекта" :disabled="busy">
+      <UiControl
+        grow
+        as="select"
+        v-model="folder"
+        aria-label="Папка нового проекта"
+        :disabled="busy"
+      >
         <option v-for="item in folders" :key="item" :value="item">{{ item }}</option>
-      </select>
-      <input
+      </UiControl>
+      <UiControl
+        grow
         v-model="name"
         aria-label="Имя нового проекта"
         placeholder="новый-проект"
         :disabled="busy"
       />
-      <UiButton type="submit" variant="solid" :disabled="busy || !name.trim()"
+      <UiButton type="submit" appearance="solid" :disabled="busy || !name.trim()"
         >Создать проект</UiButton
       >
     </form>
@@ -138,11 +153,6 @@ commands.scope.registerCommand({
 <style scoped>
 .favorite-folders {
   margin-bottom: var(--sp-6);
-}
-h2 {
-  margin: 0 0 var(--sp-3);
-  font-size: var(--fs-sm);
-  font-weight: 500;
 }
 ul {
   list-style: none;
@@ -162,12 +172,8 @@ li code {
   flex: 1;
   overflow-wrap: anywhere;
 }
-input,
-select {
-  flex: 1;
-  min-width: 0;
-}
+
 .error {
-  color: var(--danger, #c33);
+  color: #c33;
 }
 </style>

@@ -1,16 +1,27 @@
 <script setup lang="ts">
+import UiToolbar from "../../../common/ui/UiToolbar.vue";
+import UiScrollArea from "../../../common/ui/UiScrollArea.vue";
+import UiMessage from "../../../common/ui/UiMessage.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiEmpty from "../../../common/ui/UiEmpty.vue";
 import { useDockerState } from "../model.ts";
 const { snapshot, error, commands, projectContainers: containers } = useDockerState();
 </script>
 <template>
-  <div class="docker-sidebar" @pointerdown="commands.scope.activate()">
-    <header>
+  <UiScrollArea class="docker-sidebar" @pointerdown="commands.scope.activate()">
+    <UiToolbar as="header" justify="between" text="xs">
       <span>{{ snapshot?.binding?.name || "Docker" }}</span
       ><UiButton size="sm" @click="commands.run('ide.docker.open')">открыть</UiButton>
-    </header>
-    <p v-if="error || snapshot?.error" class="error" role="alert">{{ error || snapshot?.error }}</p>
+    </UiToolbar>
+    <UiMessage
+      v-if="error || snapshot?.error"
+      tone="danger"
+      role="alert"
+      variant="padded"
+      size="xs"
+      wrap
+      >{{ error || snapshot?.error }}</UiMessage
+    >
     <UiEmpty v-else-if="!snapshot">Подключение…</UiEmpty>
     <UiEmpty v-else-if="!snapshot.enabled">Включите Docker в настройках интеграций.</UiEmpty>
     <UiEmpty v-else-if="!snapshot.binding">Откройте Docker и привяжите Compose к проекту.</UiEmpty>
@@ -35,23 +46,9 @@ const { snapshot, error, commands, projectContainers: containers } = useDockerSt
         }}{{ item.state === "exited" ? ` · ${item.exitCode}` : "" }}</span
       >
     </button>
-  </div>
+  </UiScrollArea>
 </template>
 <style scoped>
-.docker-sidebar {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-3);
-  font-size: var(--fs-xs);
-  border-bottom: 1px solid var(--line);
-}
 .row {
   display: flex;
   width: 100%;
@@ -79,14 +76,7 @@ header {
 .running {
   color: var(--run);
 }
-.failed,
-.error {
+.failed {
   color: var(--err);
-}
-.error {
-  padding: var(--sp-3);
-  font-size: var(--fs-xs);
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
 }
 </style>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiPanel from "../../../common/ui/UiPanel.vue";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { Terminal, type IDisposable } from "@xterm/xterm";
@@ -372,7 +373,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="terminal-view" tabindex="-1">
+  <UiPanel class="terminal-view" tabindex="-1">
     <div v-if="session.ports?.length && session.status === 'running'" class="environment-ports">
       <button
         v-for="port in session.ports"
@@ -399,7 +400,7 @@ onBeforeUnmount(() => {
       <div v-if="draggingFiles" class="drop-hint">Бросьте файлы — вставим пути в терминал</div>
       <div ref="container" class="screen" />
     </div>
-  </section>
+  </UiPanel>
 </template>
 
 <style scoped>
@@ -411,10 +412,6 @@ onBeforeUnmount(() => {
   color: var(--muted);
 }
 .terminal-view {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
   background: var(--bg-2);
 }
 .status {

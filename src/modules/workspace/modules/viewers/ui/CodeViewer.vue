@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiPanel from "../../../../../common/ui/UiPanel.vue";
 import IconRows from "~icons/lucide/rows-2";
 import IconColumns from "~icons/lucide/columns-2";
 import { onMounted, onBeforeUnmount, ref, watch } from "vue";
@@ -219,7 +220,7 @@ onBeforeUnmount(() => {
 });
 </script>
 <template>
-  <div class="code-viewer-root">
+  <UiPanel as="div" class="code-viewer-root">
     <div v-if="original !== undefined" class="diff-layout" role="group" aria-label="Вид сравнения">
       <button
         type="button"
@@ -241,9 +242,9 @@ onBeforeUnmount(() => {
       </button>
     </div>
     <div v-if="original !== undefined" class="diff-header">
-      <span class="diff-side">{{ originalLabel ?? "Было" }}</span>
+      <span class="diff-side u-truncate">{{ originalLabel ?? "Было" }}</span>
       <span class="diff-arrow" v-if="!sideBySide">→</span>
-      <span class="diff-side">{{ modifiedLabel ?? "Стало" }}</span>
+      <span class="diff-side u-truncate">{{ modifiedLabel ?? "Стало" }}</span>
     </div>
     <div
       ref="container"
@@ -251,15 +252,11 @@ onBeforeUnmount(() => {
       @focusout="focusOut"
       :aria-label="editable ? 'Редактор файла' : 'Просмотр кода'"
     />
-  </div>
+  </UiPanel>
 </template>
 <style scoped>
 .code-viewer-root {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
 }
 .diff-header {
   display: flex;
@@ -274,9 +271,6 @@ onBeforeUnmount(() => {
   flex: 1;
   min-width: 0;
   padding: 0 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .diff-side + .diff-side {
   border-left: 1px solid var(--line);

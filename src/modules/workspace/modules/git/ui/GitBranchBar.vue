@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import UiControl from "../../../../../common/ui/UiControl.vue";
+import UiMessage from "../../../../../common/ui/UiMessage.vue";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import type { GitBranch } from "../../../../../../core/modules/workspace/index.ts";
 import ContextMenu from "../../../../../common/ui/ContextMenu.vue";
@@ -129,14 +131,14 @@ watch(open, (value) => {
         @click="commands.run('ide.git.branch.toggle')"
       >
         <IconBranch class="icon" aria-hidden="true" />
-        <span class="name">{{ label }}</span>
+        <span class="name u-truncate">{{ label }}</span>
         <span v-if="current && syncText(current)" class="sync" title="Относительно upstream">
           {{ syncText(current) }}
         </span>
         <IconChevron class="chevron" :class="{ open }" aria-hidden="true" />
       </button>
       <UiButton
-        icon
+        shape="icon"
         size="sm"
         title="Новая ветка"
         aria-label="Новая ветка"
@@ -148,16 +150,29 @@ watch(open, (value) => {
       </UiButton>
     </div>
     <div v-if="open" class="picker">
-      <input
+      <UiControl
+        appearance="inset"
         v-model="filter"
         type="search"
         placeholder="Найти ветку"
         aria-label="Найти ветку"
         @keydown.stop
       />
-      <p v-if="error" class="note error" role="alert">{{ error }}</p>
-      <p v-else-if="loading && !state.branches.length" class="note" role="status">загрузка…</p>
-      <p v-else-if="!visible.length" class="note">Веток нет.</p>
+      <UiMessage v-if="error" class="note" tone="danger" size="xs" flush role="alert">{{
+        error
+      }}</UiMessage>
+      <UiMessage
+        v-else-if="loading && !state.branches.length"
+        class="note"
+        tone="muted"
+        size="xs"
+        flush
+        role="status"
+        >загрузка…</UiMessage
+      >
+      <UiMessage v-else-if="!visible.length" class="note" tone="muted" size="xs" flush
+        >Веток нет.</UiMessage
+      >
       <template v-for="group in visible" :key="group.label">
         <h4>{{ group.label }}</h4>
         <ul>
@@ -174,7 +189,7 @@ watch(open, (value) => {
             >
               <IconCheck v-if="branch.current" class="mark" aria-label="Текущая ветка" />
               <span v-else class="mark" />
-              <span class="label">{{ branch.name }}</span>
+              <span class="label u-truncate">{{ branch.name }}</span>
               <span v-if="branch.gone" class="gone" title="Upstream удалён">upstream удалён</span>
               <span v-if="syncText(branch)" class="sync">{{ syncText(branch) }}</span>
               <span class="when">{{ relativeTime(branch.date, now) }}</span>
@@ -216,9 +231,6 @@ watch(open, (value) => {
 }
 .name {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-family: var(--mono);
 }
 .sync {
@@ -245,12 +257,6 @@ watch(open, (value) => {
 .picker input {
   width: calc(100% - 2 * var(--sp-3));
   margin: 2px var(--sp-3) 4px;
-  padding: 3px 8px;
-  font-size: var(--fs-xs);
-  color: var(--text);
-  background: var(--bg-sunken);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
 }
 h4 {
   margin: 6px var(--sp-3) 2px;
@@ -291,9 +297,6 @@ ul {
 .label {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-family: var(--mono);
 }
 .gone {
@@ -307,12 +310,6 @@ ul {
   color: var(--faint);
 }
 .note {
-  margin: 0;
   padding: 0 var(--sp-3) 4px;
-  font-size: var(--fs-xs);
-  color: var(--muted);
-}
-.error {
-  color: var(--err);
 }
 </style>

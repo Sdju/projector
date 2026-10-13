@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import UiScrollArea from "../../../../../common/ui/UiScrollArea.vue";
+import UiTable from "../../../../../common/ui/UiTable.vue";
+import UiControl from "../../../../../common/ui/UiControl.vue";
+import UiStack from "../../../../../common/ui/UiStack.vue";
+import UiMessage from "../../../../../common/ui/UiMessage.vue";
 import { computed, ref } from "vue";
 import type {
   ArchiveContent,
@@ -32,7 +37,7 @@ function date(value?: string) {
 </script>
 
 <template>
-  <section class="archive-viewer" aria-label="Содержимое архива">
+  <UiStack as="section" flow="flex" class="archive-viewer" aria-label="Содержимое архива">
     <div class="archive-summary">
       <strong>{{ archive.format }}</strong>
       <span>Архив: {{ bytes(archive.size) }}</span>
@@ -42,17 +47,17 @@ function date(value?: string) {
         {{ bytes(totalSize) }}</span
       >
     </div>
-    <input
+    <UiControl
       v-model="query"
       type="search"
       placeholder="Фильтр по пути…"
       aria-label="Фильтр содержимого архива"
     />
-    <p v-if="archive.truncated" class="notice" role="status">
+    <UiMessage v-if="archive.truncated" tone="muted" size="xs" flush role="status">
       Показана часть содержимого: достигнут лимит 5000 записей или 256 МБ чтения.
-    </p>
-    <div class="archive-list">
-      <table v-if="entries.length">
+    </UiMessage>
+    <UiScrollArea class="archive-list">
+      <UiTable v-if="entries.length" padding="10px" align="top" sticky>
         <thead>
           <tr>
             <th scope="col">Путь</th>
@@ -72,7 +77,7 @@ function date(value?: string) {
             <td>{{ date(entry.modified) }}</td>
           </tr>
         </tbody>
-      </table>
+      </UiTable>
       <p v-else class="empty">
         {{
           archive.entries.length
@@ -82,18 +87,16 @@ function date(value?: string) {
               : "Архив пуст"
         }}
       </p>
-    </div>
-  </section>
+    </UiScrollArea>
+  </UiStack>
 </template>
 
 <style scoped>
 .archive-viewer {
-  display: flex;
-  flex-direction: column;
+  min-width: auto;
   height: 100%;
   min-height: 0;
   padding: var(--sp-4);
-  gap: var(--sp-3);
   box-sizing: border-box;
 }
 .archive-summary {
@@ -107,28 +110,8 @@ function date(value?: string) {
 .archive-summary strong {
   color: var(--text);
 }
-.archive-list {
-  min-height: 0;
-  overflow: auto;
-  flex: 1;
-}
 table {
-  width: 100%;
-  border-collapse: collapse;
   font-size: var(--fs-xs);
-  text-align: left;
-}
-th {
-  position: sticky;
-  top: 0;
-  background: var(--bg-2);
-  font-weight: 500;
-}
-th,
-td {
-  padding: 10px;
-  border-bottom: 1px solid var(--line);
-  vertical-align: top;
 }
 td:not(.entry-path) {
   white-space: nowrap;
@@ -148,10 +131,5 @@ td:not(.entry-path) {
 .entry-size {
   text-align: right;
   font-variant-numeric: tabular-nums;
-}
-.notice {
-  font-size: var(--fs-xs);
-  color: var(--muted);
-  margin: 0;
 }
 </style>

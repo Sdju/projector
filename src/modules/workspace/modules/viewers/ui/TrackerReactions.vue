@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiInline from "../../../../../common/ui/UiInline.vue";
 import type { Reaction } from "../../../../../../core/modules/workspace/index.ts";
 import {
   REACTION_EMOJI,
@@ -13,7 +14,11 @@ const emojis = useGithubEmojis();
 
 <template>
   <ul v-if="reactions.length" class="reactions" aria-label="Реакции">
-    <li
+    <UiInline
+      as="li"
+      inline
+      :gap="1"
+      justify="normal"
       v-for="reaction in reactions"
       :key="reaction.content"
       :title="`${REACTION_LABEL[reaction.content]}: ${reaction.count}`"
@@ -27,7 +32,7 @@ const emojis = useGithubEmojis();
       />
       <span v-else>{{ REACTION_LABEL[reaction.content] }}</span>
       {{ reaction.count }}
-    </li>
+    </UiInline>
   </ul>
 </template>
 
@@ -41,9 +46,6 @@ const emojis = useGithubEmojis();
   padding: 0;
 }
 .reactions li {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
   padding: 1px var(--sp-2);
   border: 1px solid var(--line);
   border-radius: var(--r-full);

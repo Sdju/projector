@@ -1,4 +1,11 @@
 <script setup lang="ts">
+import UiHeading from "../../common/ui/UiHeading.vue";
+import UiMessage from "../../common/ui/UiMessage.vue";
+import UiControl from "../../common/ui/UiControl.vue";
+import UiField from "../../common/ui/UiField.vue";
+import UiInline from "../../common/ui/UiInline.vue";
+import UiStack from "../../common/ui/UiStack.vue";
+
 import { onMounted, onBeforeUnmount, ref } from "vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import { fetchIntegrations, integrationRequest, TokenReveal } from "../integration-api/index.ts";
@@ -115,13 +122,15 @@ function disconnect() {
 <template>
   <section class="integrations">
     <article v-if="github" class="plugin">
-      <header>
-        <h3>Подключение</h3>
+      <UiInline as="header" :gap="3" justify="between" wrap>
+        <UiHeading as="h3" :space-after="0">Подключение</UiHeading>
         <span class="status">{{
           github.connected ? `подключён · ${github.account}` : "не подключён"
         }}</span>
-      </header>
-      <form
+      </UiInline>
+      <UiStack
+        as="form"
+        align="start"
         @submit.prevent="
           action(async () => {
             await save();
@@ -129,23 +138,26 @@ function disconnect() {
           })
         "
       >
-        <label class="toggle"
-          ><input v-model="enabled" type="checkbox" :disabled="busy" /> включить интеграцию</label
+        <UiInline as="label" class="toggle" justify="normal"
+          ><UiControl v-model="enabled" type="checkbox" :disabled="busy" /> включить
+          интеграцию</UiInline
         >
-        <label
-          >Папка для импорта<input
+        <UiField v-slot="{ control }" layout="plain" label="Папка для импорта">
+          <UiControl
+            v-bind="control"
             v-model="directory"
             :disabled="busy"
             placeholder="~/Projects"
             required
-        /></label>
-        <label
-          >Client ID для входа через браузер<input
+        /></UiField>
+        <UiField v-slot="{ control }" layout="plain" label="Client ID для входа через браузер">
+          <UiControl
+            v-bind="control"
             v-model="clientId"
             :disabled="busy"
             placeholder="Client ID вашей GitHub OAuth App"
             autocomplete="off"
-        /></label>
+        /></UiField>
         <p class="muted help">
           Для входа по коду создайте
           <a href="https://github.com/settings/developers" target="_blank" rel="noopener noreferrer"
@@ -154,7 +166,7 @@ function disconnect() {
           и включите Device Flow. Client secret не нужен. Можно также подключиться токеном ниже.
         </p>
         <UiButton type="submit" :disabled="busy">сохранить настройки</UiButton>
-      </form>
+      </UiStack>
       <TokenReveal
         v-if="github.connected && secretStorage.backend === 'keyring'"
         ref="tokenView"
@@ -163,12 +175,12 @@ function disconnect() {
         :disabled="busy"
         @error="error = $event"
       />
-      <div class="actions">
+      <UiInline class="actions" :gap="3" wrap>
         <UiButton :disabled="busy || !enabled || !clientId.trim() || !!device" @click="login"
           >войти через GitHub</UiButton
         >
         <UiButton v-if="github.connected" :disabled="busy" @click="disconnect">выйти</UiButton>
-      </div>
+      </UiInline>
       <div v-if="device" class="device" role="status">
         <p>
           Введите код <strong>{{ device.userCode }}</strong> на странице GitHub.
@@ -181,23 +193,24 @@ function disconnect() {
       </div>
       <details>
         <summary>Войти с Personal Access Token</summary>
-        <form @submit.prevent="connectToken">
+        <UiStack as="form" align="start" @submit.prevent="connectToken">
           <p class="muted help">
             Fine-grained token: доступ к нужным репозиториям и Contents: read. Для classic token и
             приватных репозиториев — scope repo.
           </p>
           <p class="muted help">Подключение токеном автоматически включит интеграцию.</p>
-          <label
-            >Токен GitHub<input
+          <UiField v-slot="{ control }" layout="plain" label="Токен GitHub">
+            <UiControl
+              v-bind="control"
               v-model="token"
               type="password"
               autocomplete="off"
               :disabled="busy"
               placeholder="github_pat_…"
               required
-          /></label>
+          /></UiField>
           <UiButton type="submit" :disabled="busy || !token.trim()">подключить GitHub</UiButton>
-        </form>
+        </UiStack>
       </details>
     </article>
     <details class="storage">
@@ -217,7 +230,7 @@ function disconnect() {
         </template>
       </p>
     </details>
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <UiMessage v-if="error" tone="danger" role="alert">{{ error }}</UiMessage>
     <p v-if="message" class="muted" role="status">{{ message }}</p>
   </section>
 </template>
@@ -226,23 +239,8 @@ function disconnect() {
 .integrations {
   margin: 0;
 }
-h3 {
-  margin: 0;
-  font-size: var(--fs-md);
-  font-weight: 500;
-}
 .plugin {
   padding: 0;
-}
-header,
-.actions {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  flex-wrap: wrap;
-}
-header {
-  justify-content: space-between;
 }
 .status,
 .muted {
@@ -253,28 +251,18 @@ code {
   overflow-wrap: anywhere;
   font-size: var(--fs-xs);
 }
-form {
-  display: grid;
-  gap: var(--sp-3);
-  justify-items: start;
-}
 form > label,
 form > p {
   width: 100%;
 }
 label {
-  display: grid;
-  gap: var(--sp-2);
   font-size: var(--fs-sm);
 }
-.toggle {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
+.field {
+  color: inherit;
+  min-width: auto;
 }
-.toggle input {
-  width: auto;
-}
+
 .help {
   margin: 0;
 }
@@ -296,9 +284,6 @@ a {
   display: inline-block;
   margin-top: var(--sp-4);
   font-size: var(--fs-sm);
-}
-.error {
-  color: var(--err);
 }
 .device {
   padding: var(--sp-3);

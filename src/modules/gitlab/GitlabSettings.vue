@@ -1,4 +1,11 @@
 <script setup lang="ts">
+import UiHeading from "../../common/ui/UiHeading.vue";
+import UiMessage from "../../common/ui/UiMessage.vue";
+import UiControl from "../../common/ui/UiControl.vue";
+import UiField from "../../common/ui/UiField.vue";
+import UiInline from "../../common/ui/UiInline.vue";
+import UiStack from "../../common/ui/UiStack.vue";
+
 import { onMounted, ref } from "vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import { commandArgs, useCommandScope } from "../../common/utilities/commands.ts";
@@ -116,38 +123,45 @@ commands.scope.registerCommand({
 <template>
   <section class="integrations">
     <article v-if="gitlab" class="plugin">
-      <header>
-        <h3>Подключение</h3>
+      <UiInline as="header" :gap="3" justify="between" wrap>
+        <UiHeading as="h3" :space-after="0">Подключение</UiHeading>
         <span class="status">{{
           gitlab.connected ? `подключён · ${gitlab.account}` : "не подключён"
         }}</span>
-      </header>
-      <form @submit.prevent="commands.run('ide.gitlab.integration.save')">
-        <label class="toggle"
-          ><input v-model="enabled" type="checkbox" :disabled="busy" /> включить интеграцию</label
+      </UiInline>
+      <UiStack
+        as="form"
+        align="start"
+        @submit.prevent="commands.run('ide.gitlab.integration.save')"
+      >
+        <UiInline as="label" class="toggle" justify="normal"
+          ><UiControl v-model="enabled" type="checkbox" :disabled="busy" /> включить
+          интеграцию</UiInline
         >
-        <label
-          >Адрес GitLab<input
+        <UiField v-slot="{ control }" layout="plain" label="Адрес GitLab">
+          <UiControl
+            v-bind="control"
             v-model="url"
             :disabled="busy"
             placeholder="https://gitlab.com"
             autocomplete="off"
             required
-        /></label>
-        <label
-          >Папка для импорта<input
+        /></UiField>
+        <UiField v-slot="{ control }" layout="plain" label="Папка для импорта">
+          <UiControl
+            v-bind="control"
             v-model="directory"
             :disabled="busy"
             placeholder="~/Projects"
             required
-        /></label>
+        /></UiField>
         <p class="muted help">
           Для self-hosted укажите адрес вашего сервера. Смена адреса сбрасывает сохранённый токен.
         </p>
         <UiButton type="submit" data-command="ide.gitlab.integration.save" :disabled="busy"
           >сохранить настройки</UiButton
         >
-      </form>
+      </UiStack>
       <TokenReveal
         v-if="gitlab.connected && secretStorage.backend === 'keyring'"
         ref="tokenView"
@@ -156,22 +170,28 @@ commands.scope.registerCommand({
         :disabled="busy"
         @error="error = $event"
       />
-      <form class="block" @submit.prevent="commands.run('ide.gitlab.integration.connect')">
+      <UiStack
+        as="form"
+        align="start"
+        class="block"
+        @submit.prevent="commands.run('ide.gitlab.integration.connect')"
+      >
         <p class="muted help">
           Personal Access Token со scope <code>read_api</code> и <code>read_repository</code> (<code
             >{{ url || "https://gitlab.com" }}/-/user_settings/personal_access_tokens</code
           >). Подключение токеном автоматически включит интеграцию.
         </p>
-        <label
-          >Токен GitLab<input
+        <UiField v-slot="{ control }" layout="plain" label="Токен GitLab">
+          <UiControl
+            v-bind="control"
             v-model="token"
             type="password"
             autocomplete="off"
             :disabled="busy"
             placeholder="glpat-…"
             required
-        /></label>
-        <div class="actions">
+        /></UiField>
+        <UiInline class="actions" :gap="3" wrap>
           <UiButton
             type="submit"
             data-command="ide.gitlab.integration.connect"
@@ -185,20 +205,23 @@ commands.scope.registerCommand({
             @click="commands.run('ide.gitlab.integration.disconnect')"
             >выйти</UiButton
           >
-        </div>
-      </form>
-      <form
+        </UiInline>
+      </UiStack>
+      <UiStack
+        as="form"
+        align="start"
         v-if="gitlab.connected"
         class="block"
         @submit.prevent="commands.run('ide.gitlab.repository.import')"
       >
-        <label
-          >Клонировать проект<input
+        <UiField v-slot="{ control }" layout="plain" label="Клонировать проект">
+          <UiControl
+            v-bind="control"
             v-model="repository"
             :disabled="busy"
             placeholder="group/project или ссылка"
             autocomplete="off"
-        /></label>
+        /></UiField>
         <p class="muted help">
           Также доступно в палитре: введите <code>gl/</code> и название проекта.
         </p>
@@ -208,9 +231,9 @@ commands.scope.registerCommand({
           :disabled="busy || !repository.trim()"
           >клонировать</UiButton
         >
-      </form>
+      </UiStack>
     </article>
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <UiMessage v-if="error" tone="danger" role="alert">{{ error }}</UiMessage>
     <p v-if="message" class="muted" role="status">{{ message }}</p>
   </section>
 </template>
@@ -218,21 +241,6 @@ commands.scope.registerCommand({
 <style scoped>
 .integrations {
   margin: 0;
-}
-h3 {
-  margin: 0;
-  font-size: var(--fs-md);
-  font-weight: 500;
-}
-header,
-.actions {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  flex-wrap: wrap;
-}
-header {
-  justify-content: space-between;
 }
 .status,
 .muted {
@@ -243,11 +251,6 @@ code {
   overflow-wrap: anywhere;
   font-size: var(--fs-xs);
 }
-form {
-  display: grid;
-  gap: var(--sp-3);
-  justify-items: start;
-}
 form.block {
   margin-top: var(--sp-4);
 }
@@ -256,22 +259,14 @@ form > p {
   width: 100%;
 }
 label {
-  display: grid;
-  gap: var(--sp-2);
   font-size: var(--fs-sm);
 }
-.toggle {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
+.field {
+  color: inherit;
+  min-width: auto;
 }
-.toggle input {
-  width: auto;
-}
+
 .help {
   margin: 0;
-}
-.error {
-  color: var(--err);
 }
 </style>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiPanel from "../../../common/ui/UiPanel.vue";
 import { computed } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiEmpty from "../../../common/ui/UiEmpty.vue";
@@ -120,7 +121,7 @@ const hostOf = (key: string) => props.panelHosts.hosts[key] ?? null;
       <template v-if="terminalPanels.get(activeId)">
         <UiButton
           v-if="terminalPanels.get(activeId)!.status === 'running'"
-          icon
+          shape="icon"
           size="sm"
           :disabled="terminals.busy.value || terminalPanels.get(activeId)!.stopRequested"
           title="Завершить сессию"
@@ -134,7 +135,7 @@ const hostOf = (key: string) => props.panelHosts.hosts[key] ?? null;
             !terminalPanels.get(activeId)!.docker ||
             terminalPanels.get(activeId)!.docker?.kind === 'environment'
           "
-          icon
+          shape="icon"
           size="sm"
           :disabled="terminals.busy.value"
           title="Перезапустить сессию"
@@ -157,14 +158,16 @@ const hostOf = (key: string) => props.panelHosts.hosts[key] ?? null;
   </DockView>
   <div class="keep-alive" hidden>
     <Teleport v-for="tab in kept" :key="tab.key" :to="hostOf(tab.key)" :disabled="!hostOf(tab.key)">
-      <div
+      <component
+        :is="viewOf(tab)?.scroll ? 'div' : UiPanel"
+        v-bind="viewOf(tab)?.scroll ? {} : { as: 'div', sizing: 'flex' }"
         :class="viewOf(tab)?.scroll ? 'kept-scroll' : 'kept-panel'"
         :data-own-keys="viewOf(tab)?.ownKeys || undefined"
       >
         <TabReadoutScope :tab-key="tab.key">
           <component :is="viewOf(tab)!.component" v-bind="viewOf(tab)!.props?.(tab, host)" />
         </TabReadoutScope>
-      </div>
+      </component>
     </Teleport>
   </div>
 </template>
@@ -184,13 +187,6 @@ const hostOf = (key: string) => props.panelHosts.hosts[key] ?? null;
 }
 .session-state.failed {
   color: var(--err);
-}
-.kept-panel {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
 }
 .kept-scroll {
   container-type: inline-size;

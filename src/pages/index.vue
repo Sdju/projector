@@ -1,7 +1,16 @@
 <script setup lang="ts">
+import UiPopupSurface from "../common/ui/UiPopupSurface.vue";
+import UiActionRow from "../common/ui/UiActionRow.vue";
+import UiControl, { type UiControlHandle } from "../common/ui/UiControl.vue";
+import UiInline from "../common/ui/UiInline.vue";
+import UiStatusDot from "../common/ui/UiStatusDot.vue";
 import { computed, nextTick, onMounted, onUnmounted, shallowRef, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { isLauncherWindow, LaunchDetailPanel } from "../modules/launcher/index.ts";
+import {
+  isLauncherWindow,
+  LaunchDetailPanel,
+  launcherStatusTone,
+} from "../modules/launcher/index.ts";
 import {
   createLauncherClient,
   launchScopeTitles,
@@ -26,7 +35,8 @@ const busy = computed(() => state.value.busy);
 const error = computed(() => state.value.error);
 const warning = computed(() => state.value.warning);
 const notice = computed(() => state.value.notice);
-const input = ref<HTMLInputElement>();
+const inputControl = ref<UiControlHandle>();
+const input = computed(() => inputControl.value?.element as HTMLInputElement | undefined);
 const webWindow = isLauncherWindow;
 const activeId = computed(() =>
   items.value.length ? `launch-option-${selected.value}` : undefined,
@@ -81,6 +91,7 @@ function toggleFavorite(item = focus.value ?? items.value[selected.value]) {
   void launch(item, { id: "favorite", title: "" });
 }
 function key(event: KeyboardEvent) {
+  if (event.isComposing || event.keyCode === 229) return;
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d") {
     event.preventDefault();
     toggleFavorite();
@@ -156,15 +167,21 @@ onUnmounted(() => {
     <div class="launcher-heading">
       <router-link to="/">projector</router-link>
     </div>
-    <section class="palette" aria-label="Запуск приложений">
-      <div class="search-line">
+    <UiPopupSurface
+      as="section"
+      border="line"
+      radius="lg"
+      class="palette"
+      aria-label="Запуск приложений"
+    >
+      <UiInline class="search-line" :gap="4" justify="normal">
         <svg width="23" height="23" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="1.5" />
           <path d="m16 16 5 5" stroke="currentColor" stroke-width="1.5" />
         </svg>
         <span v-if="scope !== 'all'" class="scope-chip">{{ launchScopeTitles[scope] }}</span>
-        <input
-          ref="input"
+        <UiControl
+          ref="inputControl"
           v-model="query"
           role="combobox"
           aria-label="Поиск приложений и проектов"
@@ -179,7 +196,7 @@ onUnmounted(() => {
           @keydown="key"
         />
         <span v-if="loading || busy" class="activity" aria-hidden="true">⋯</span>
-      </div>
+      </UiInline>
       <div
         v-show="!focus"
         id="launch-results"
@@ -196,7 +213,9 @@ onUnmounted(() => {
           >
             {{ launchSectionTitles[item.section] }}
           </div>
-          <button
+          <UiActionRow
+            interaction="selection"
+            padding="var(--sp-3)"
             :id="`launch-option-${index}`"
             role="option"
             :aria-selected="index === selected"
@@ -212,14 +231,17 @@ onUnmounted(() => {
               ><span class="name"
                 ><span v-if="item.favorite" class="star" title="В избранном" aria-hidden="true"
                   >★</span
-                ><span
+                ><UiStatusDot
                   v-if="item.status"
                   class="status-dot"
-                  :class="item.status.state"
+                  :size="8"
+                  inline
+                  shrink
+                  :tone="launcherStatusTone(item.status.state)"
                   :title="item.status.label"
                   aria-hidden="true"
                 />{{ item.name }}</span
-              ><span class="description">{{ item.description }}</span></span
+              ><span class="description u-truncate">{{ item.description }}</span></span
             >
             <span v-if="index === selected" class="enter" aria-hidden="true"
               >↵ {{ item.actions?.[0]?.title
@@ -227,7 +249,7 @@ onUnmounted(() => {
                 · Ctrl+↵ {{ item.actions[1].title }}</template
               ></span
             >
-          </button>
+          </UiActionRow>
         </template>
       </div>
       <LaunchDetailPanel
@@ -244,7 +266,7 @@ onUnmounted(() => {
       <p v-if="error || warning || notice" class="message" :class="{ error }" role="status">
         {{ error || warning || notice }}
       </p>
-      <footer class="palette-footer">
+      <UiInline as="footer" class="palette-footer" align="normal" justify="between" :gap="3" wrap>
         <span v-if="focus"
           >↑↓ выбрать <span class="separator">·</span> Enter выполнить
           <span class="separator">·</span> ← назад</span
@@ -255,8 +277,8 @@ onUnmounted(() => {
           действия <span class="separator">·</span> Ctrl+D ★ <span class="separator">·</span> Esc
           {{ webWindow ? "закрыть" : "очистить" }}</span
         >
-      </footer>
-    </section>
+      </UiInline>
+    </UiPopupSurface>
   </main>
 </template>
 
@@ -294,16 +316,9 @@ onUnmounted(() => {
   margin: 0 var(--sp-1) var(--sp-3);
 }
 .palette {
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-popover);
   overflow: hidden;
 }
 .search-line {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-4);
   padding: var(--sp-4) var(--sp-4);
   border-bottom: 1px solid var(--line);
   color: var(--muted);
@@ -330,18 +345,6 @@ onUnmounted(() => {
 .results:empty {
   padding: 0;
 }
-.result {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  width: 100%;
-  padding: var(--sp-3) var(--sp-3);
-  text-align: left;
-  border-radius: var(--r-md);
-}
-.result.selected {
-  background: var(--hover);
-}
 .result:disabled {
   cursor: wait;
   opacity: 0.65;
@@ -363,9 +366,6 @@ onUnmounted(() => {
 .description {
   color: var(--muted);
   font-size: var(--fs-xs);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .enter {
   color: var(--muted);
@@ -383,21 +383,7 @@ onUnmounted(() => {
   color: var(--warn, var(--run));
 }
 .status-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
   margin-right: var(--sp-2);
-  border-radius: var(--r-full);
-  background: var(--run);
-}
-.status-dot.error {
-  background: var(--err);
-}
-.status-dot.stopping {
-  background: var(--muted);
-}
-.status-dot.idle {
-  background: var(--faint);
 }
 .scope-chip {
   flex-shrink: 0;
@@ -418,10 +404,6 @@ onUnmounted(() => {
   color: var(--err);
 }
 .palette-footer {
-  display: flex;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--sp-3);
   padding: var(--sp-3) var(--sp-4);
   border-top: 1px solid var(--line);
   color: var(--muted);

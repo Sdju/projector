@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiScrollArea from "../../../../../common/ui/UiScrollArea.vue";
 import { computed, ref } from "vue";
 import ContextMenu from "../../../../../common/ui/ContextMenu.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
@@ -141,7 +142,7 @@ defineExpose({
 </script>
 
 <template>
-  <div
+  <UiScrollArea
     class="side-content git-panel"
     @focusin="gitCommands.scope.activate()"
     @keydown="gitCommands.keydown($event)"
@@ -190,7 +191,7 @@ defineExpose({
             </button>
             <UiButton
               v-if="group.rows.length"
-              icon
+              shape="icon"
               size="sm"
               :disabled="
                 !gitCommands.scope.describe(group.staged ? 'ide.git.unstage' : 'ide.git.stage', {
@@ -265,7 +266,7 @@ defineExpose({
       </div>
     </div>
     <ContextMenu ref="gitMenu" :items="gitMenuItems" label="Действия Git" />
-  </div>
+  </UiScrollArea>
 </template>
 
 <style scoped>

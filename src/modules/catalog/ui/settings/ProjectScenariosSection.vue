@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import UiControl from "../../../../common/ui/UiControl.vue";
+import UiInline from "../../../../common/ui/UiInline.vue";
+import UiStack from "../../../../common/ui/UiStack.vue";
+import UiField from "../../../../common/ui/UiField.vue";
 import UiHint from "../../../../common/ui/UiHint.vue";
 import UiButton from "../../../../common/ui/UiButton.vue";
 import { useProjectSettingsForm } from "../../model/project-settings-form.ts";
@@ -10,26 +14,33 @@ const { draft, busy, discovering, discovered, candidates, selected } = form;
 </script>
 
 <template>
-  <fieldset class="section" :disabled="busy">
-    <div class="bar">
+  <UiStack as="fieldset" :disabled="busy">
+    <UiInline :gap="3" justify="between" wrap>
       <UiHint>Запускаются в терминале из папки проекта.</UiHint>
       <UiButton :disabled="discovering" @click="form.discover">{{
         discovering ? "читаю…" : "из package.json"
       }}</UiButton>
-    </div>
+    </UiInline>
     <div v-if="discovered !== null" class="script-picker">
       <template v-if="candidates.length">
-        <label v-for="command in candidates" :key="command.id" class="script-option">
-          <input v-model="selected" type="checkbox" :value="command.id" />
+        <UiInline
+          as="label"
+          v-for="command in candidates"
+          :key="command.id"
+          class="script-option"
+          align="baseline"
+          justify="normal"
+        >
+          <UiControl v-model="selected" type="checkbox" :value="command.id" />
           <span>{{ command.name }}</span
           ><code>{{ command.cmd }}</code>
-        </label>
-        <div class="picker-actions">
+        </UiInline>
+        <UiInline class="picker-actions" :gap="3" justify="between" wrap>
           <UiButton :disabled="!selected.length" @click="form.importCommands"
             >Добавить выбранные</UiButton
           >
           <UiButton @click="discovered = null">Отмена</UiButton>
-        </div>
+        </UiInline>
       </template>
       <template v-else>
         <UiHint>{{
@@ -40,26 +51,32 @@ const { draft, busy, discovering, discovered, candidates, selected } = form;
         <UiButton @click="discovered = null">Закрыть</UiButton>
       </template>
     </div>
-    <div class="commands">
+    <UiStack :gap="4">
       <div v-for="(command, index) in draft.commands" :key="command.id" class="command">
-        <label class="field"
-          >Название<input
+        <UiField v-slot="{ control }" layout="plain" label="Название" required>
+          <UiControl
+            v-bind="control"
             v-model="command.name"
             :aria-label="`Название команды ${index + 1}`"
-            required
             placeholder="dev"
-        /></label>
-        <label class="field command-input"
-          >Команда запуска<input
+        /></UiField>
+        <UiField
+          v-slot="{ control }"
+          class="command-input"
+          layout="plain"
+          label="Команда запуска"
+          required
+        >
+          <UiControl
+            v-bind="control"
             v-model="command.cmd"
             :aria-label="`Команда запуска ${index + 1}`"
             class="command-text"
-            required
+            mono
             placeholder="pnpm dev"
             spellcheck="false"
-        /></label>
+        /></UiField>
         <UiButton
-          variant="ghost"
           :disabled="draft.commands.length === 1"
           :aria-label="`Удалить команду ${command.name || index + 1}`"
           :title="draft.commands.length === 1 ? 'Нужна хотя бы одна команда' : 'Удалить команду'"
@@ -67,40 +84,14 @@ const { draft, busy, discovering, discovered, candidates, selected } = form;
           ><IconTrash aria-hidden="true"
         /></UiButton>
       </div>
-    </div>
+    </UiStack>
     <UiButton class="add-command" @click="form.addCommand"
       ><IconPlus aria-hidden="true" />Добавить команду</UiButton
     >
-  </fieldset>
+  </UiStack>
 </template>
 
 <style scoped>
-.section {
-  display: grid;
-  gap: var(--sp-3);
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-.bar,
-.picker-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--sp-3);
-}
-.field {
-  display: grid;
-  gap: var(--sp-2);
-  min-width: 0;
-  color: var(--muted);
-}
-.commands {
-  display: grid;
-  gap: var(--sp-4);
-}
 .command {
   display: grid;
   grid-template-columns: minmax(90px, 1fr) minmax(140px, 3fr) 34px;
@@ -109,9 +100,6 @@ const { draft, busy, discovering, discovered, candidates, selected } = form;
 .command button {
   align-self: end;
   padding: var(--sp-2);
-}
-.command-text {
-  font-family: var(--mono);
 }
 .add-command {
   justify-self: start;
@@ -127,13 +115,7 @@ svg {
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
 }
-.script-option {
-  display: flex;
-  gap: var(--sp-2);
-  align-items: baseline;
-}
 .script-option input {
-  width: auto;
   margin: var(--sp-1) 0 0;
   flex-shrink: 0;
 }

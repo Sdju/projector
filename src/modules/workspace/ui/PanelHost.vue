@@ -1,23 +1,15 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import UiPanel from "../../../common/ui/UiPanel.vue";
+import { onBeforeUnmount, onMounted, ref, computed } from "vue";
 import type { PanelHosts } from "../panel-hosts.ts";
 
 const props = defineProps<{ id: string; registry: PanelHosts }>();
-const element = ref<HTMLElement>();
+const panel = ref<InstanceType<typeof UiPanel>>();
+const element = computed(() => panel.value?.element);
 onMounted(() => props.registry.register(props.id, element.value!));
 onBeforeUnmount(() => props.registry.unregister(props.id, element.value!));
 </script>
 
 <template>
-  <div ref="element" class="panel-host" />
+  <UiPanel as="div" sizing="flex" ref="panel" class="panel-host" />
 </template>
-
-<style scoped>
-.panel-host {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-}
-</style>

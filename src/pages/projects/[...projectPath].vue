@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiMessage from "../../common/ui/UiMessage.vue";
 import { computed, h, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
@@ -172,7 +173,7 @@ watch(
         <RunMenu :project="project" />
         <UiButton
           v-if="repository"
-          icon
+          shape="icon"
           size="sm"
           title="Информация о репозитории"
           aria-label="Информация о репозитории"
@@ -183,23 +184,30 @@ watch(
         </UiButton>
       </template>
       <template #terminal-status>
-        <p v-if="error" class="msg" role="alert">{{ error }}</p>
+        <UiMessage
+          size="xs"
+          variant="padded"
+          tone="danger"
+          flush
+          v-if="error"
+          class="msg"
+          role="alert"
+          >{{ error }}</UiMessage
+        >
       </template>
     </ProjectWorkspace>
   </section>
   <section v-else>
-    <p class="msg" :role="openError ? 'alert' : undefined">
+    <UiMessage
+      size="xs"
+      variant="padded"
+      tone="danger"
+      flush
+      class="msg"
+      :role="openError ? 'alert' : undefined"
+    >
       {{ opening ? "открываю проект…" : openError || "проект не найден" }}
-    </p>
+    </UiMessage>
     <router-link to="/">назад</router-link>
   </section>
 </template>
-
-<style scoped>
-.msg {
-  margin: 0;
-  padding: var(--sp-3) var(--sp-3);
-  color: var(--err);
-  font-size: var(--fs-xs);
-}
-</style>

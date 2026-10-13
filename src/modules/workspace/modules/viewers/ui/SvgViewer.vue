@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import UiPanel from "../../../../../common/ui/UiPanel.vue";
+import UiToolbar from "../../../../../common/ui/UiToolbar.vue";
 import { computed, defineAsyncComponent, onBeforeUnmount, ref } from "vue";
 import { useEventListener } from "@vueuse/core";
 import UiButton from "../../../../../common/ui/UiButton.vue";
@@ -160,13 +162,13 @@ commands.scope.registerCommand({
 </script>
 
 <template>
-  <section
+  <UiPanel
     class="svg-viewer"
     :class="{ fullscreen }"
     aria-label="Просмотр SVG"
     @pointerdown="commands.scope.activate()"
   >
-    <div v-if="!compact" v-show="!fullscreen" class="toolbar">
+    <UiToolbar v-if="!compact" v-show="!fullscreen" class="toolbar" :gap="3">
       <SvgParameters
         v-model:color="color"
         v-model:size="size"
@@ -176,7 +178,7 @@ commands.scope.registerCommand({
         @reset="resetParameters"
       />
       <UiButton
-        icon
+        shape="icon"
         size="sm"
         aria-label="Во весь экран"
         title="Просмотр SVG на весь экран"
@@ -184,10 +186,10 @@ commands.scope.registerCommand({
       >
         <IconExpand aria-hidden="true" />
       </UiButton>
-    </div>
+    </UiToolbar>
     <SplitPanes :reveal="line" :initial="compact ? 1 : 0.45" :solo="fullscreen">
       <template #top>
-        <div class="render-pane">
+        <UiPanel as="div" sizing="flex" class="render-pane">
           <div v-if="!compact" v-show="!fullscreen" class="render-info">
             {{ dimensions.width }} × {{ dimensions.height }} px
             <span
@@ -213,7 +215,7 @@ commands.scope.registerCommand({
               <div class="actions">
                 <span :ref="settings.trigger">
                   <UiButton
-                    icon
+                    shape="icon"
                     class="float"
                     aria-label="Параметры"
                     title="Параметры: цвет, размер, фон"
@@ -226,7 +228,7 @@ commands.scope.registerCommand({
                   </UiButton>
                 </span>
                 <UiButton
-                  icon
+                  shape="icon"
                   class="float"
                   :aria-label="fullscreen ? 'Выйти из полноэкранного режима' : 'Во весь экран'"
                   :title="fullscreen ? 'Выйти из полноэкранного режима (Esc)' : 'На весь экран'"
@@ -237,7 +239,7 @@ commands.scope.registerCommand({
               </div>
             </template>
           </div>
-        </div>
+        </UiPanel>
       </template>
       <template #bottom>
         <CodeViewer
@@ -261,16 +263,10 @@ commands.scope.registerCommand({
         @reset="resetParameters"
       />
     </UiIsland>
-  </section>
+  </UiPanel>
 </template>
 
 <style scoped>
-.svg-viewer {
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
 /* Полный экран закрывает всё приложение, но остаётся ниже островов. */
 .svg-viewer.fullscreen {
   position: fixed;
@@ -278,22 +274,10 @@ commands.scope.registerCommand({
   z-index: calc(var(--z-popover) - 1);
   background: var(--bg);
 }
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-2) var(--sp-3);
-  border-bottom: 1px solid var(--line);
-}
 .toolbar :deep(.params) {
   flex: 1;
 }
 .render-pane {
-  flex: 1;
-  min-height: 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
   overflow: hidden;
 }
 .render-info {

@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import UiControl from "../../../common/ui/UiControl.vue";
+import UiStack from "../../../common/ui/UiStack.vue";
+import UiInline from "../../../common/ui/UiInline.vue";
+import UiField from "../../../common/ui/UiField.vue";
+import UiHeading from "../../../common/ui/UiHeading.vue";
+import UiMessage from "../../../common/ui/UiMessage.vue";
 import { ref } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiHint from "../../../common/ui/UiHint.vue";
@@ -80,56 +86,78 @@ commands.scope.registerCommand({
     return relocate(args.path, args.create === true);
   },
 });
+commands.scope.registerCommand({
+  id: "ide.project.missing.remove",
+  title: "Убрать отсутствующий проект из Projector",
+  description:
+    "После подтверждения удаляет проект из каталога Projector. Файлы на диске не затрагиваются.",
+  enabled: () => !busy.value,
+  run: () => remove(),
+});
 </script>
 
 <template>
-  <section class="project-missing" aria-label="Папка проекта не найдена">
-    <h2>Папка проекта не найдена</h2>
+  <UiStack as="section" :gap="4" class="project-missing" aria-label="Папка проекта не найдена">
+    <UiHeading :space-after="0">Папка проекта не найдена</UiHeading>
     <p class="lead">
       Проект «{{ project.name }}» сохранён, но каталог <code>{{ project.path }}</code> больше не
       существует. Создайте его заново или укажите новый путь.
     </p>
 
-    <div class="block">
-      <UiButton variant="solid" :disabled="busy" @click="recreate">Создать папку заново</UiButton>
+    <UiStack :gap="2" align="start" class="block">
+      <UiButton
+        appearance="solid"
+        :disabled="busy"
+        @click="commands.run('ide.project.directory.create')"
+        >Создать папку заново</UiButton
+      >
       <UiHint>Каталог будет создан пустым по прежнему пути.</UiHint>
-    </div>
+    </UiStack>
 
-    <form class="block" @submit.prevent="relocate()">
-      <label class="field"
-        >Новый путь<input
+    <UiStack
+      as="form"
+      :gap="2"
+      align="start"
+      class="block"
+      @submit.prevent="commands.run('ide.project.directory.relocate', { path, create })"
+    >
+      <UiField
+        v-slot="{ control }"
+        layout="plain"
+        label="Новый путь"
+        required
+        :gap="1"
+        class="field"
+      >
+        <UiControl
+          v-bind="control"
           v-model="path"
           required
           spellcheck="false"
           autocomplete="off"
           placeholder="/путь/к/проекту или ~/code/проект"
-      /></label>
-      <label class="check"
-        ><input v-model="create" type="checkbox" /> Создать папку, если её нет</label
+      /></UiField>
+      <UiInline as="label" justify="normal" class="check"
+        ><UiControl v-model="create" type="checkbox" /> Создать папку, если её нет</UiInline
       >
       <UiButton type="submit" :disabled="busy || !path.trim()">Указать путь</UiButton>
-    </form>
+    </UiStack>
 
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <UiMessage v-if="error" tone="danger" size="xs" flush role="alert">{{ error }}</UiMessage>
 
-    <div class="block footer">
-      <UiButton variant="danger" :disabled="busy" @click="remove">Убрать из Projector</UiButton>
+    <UiInline justify="between" class="block footer">
+      <UiButton tone="danger" :disabled="busy" @click="commands.run('ide.project.missing.remove')"
+        >Убрать из Projector</UiButton
+      >
       <router-link to="/">к поиску</router-link>
-    </div>
-  </section>
+    </UiInline>
+  </UiStack>
 </template>
 
 <style scoped>
 .project-missing {
-  display: grid;
-  gap: var(--sp-4);
   max-width: 560px;
   padding: var(--sp-5, var(--sp-4));
-}
-h2 {
-  margin: 0;
-  font-size: var(--fs-md);
-  font-weight: 500;
 }
 .lead {
   margin: 0;
@@ -140,33 +168,14 @@ code {
   font-family: var(--mono);
   overflow-wrap: anywhere;
 }
-.block {
-  display: grid;
-  gap: var(--sp-2);
-  justify-items: start;
-}
 .field {
-  display: grid;
-  gap: var(--sp-1);
   width: 100%;
   font-size: var(--fs-xs);
-  color: var(--muted);
 }
 .check {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  font-size: var(--fs-xs);
-}
-.error {
-  margin: 0;
-  color: var(--err);
   font-size: var(--fs-xs);
 }
 .footer {
-  grid-auto-flow: column;
-  justify-content: space-between;
-  align-items: center;
   padding-top: var(--sp-3);
   border-top: 1px solid var(--line);
 }

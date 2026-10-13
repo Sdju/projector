@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiMessage from "../../../common/ui/UiMessage.vue";
 import { onMounted, ref, watch } from "vue";
 import type { GithubRepository } from "../../../../core/modules/github/index.ts";
 import { readRepository } from "../client.ts";
@@ -31,18 +32,15 @@ watch(() => [props.repository, props.gitRef] as const, load);
 
 <template>
   <GithubRepositoryInfo v-if="metadata" :repository="metadata" :snapshot="false" />
-  <p v-else class="msg" :role="error ? 'alert' : 'status'">
+  <UiMessage
+    size="xs"
+    variant="padded"
+    :tone="error ? 'danger' : 'muted'"
+    :padding="4"
+    v-else
+    class="msg"
+    :role="error ? 'alert' : 'status'"
+  >
     {{ error || "загружаю репозиторий…" }}
-  </p>
+  </UiMessage>
 </template>
-
-<style scoped>
-.msg {
-  padding: var(--sp-4);
-  color: var(--muted);
-  font-size: var(--fs-xs);
-}
-.msg[role="alert"] {
-  color: var(--err);
-}
-</style>

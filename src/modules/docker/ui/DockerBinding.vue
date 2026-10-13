@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import UiControl from "../../../common/ui/UiControl.vue";
+import UiInline from "../../../common/ui/UiInline.vue";
+import UiFormGrid from "../../../common/ui/UiFormGrid.vue";
+
 import { ref, watch } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiField from "../../../common/ui/UiField.vue";
@@ -69,20 +73,22 @@ watch(
         })
       "
     >
-      <div class="primary-fields">
-        <UiField label="Имя окружения">
-          <input
+      <UiFormGrid layout="wide-end">
+        <UiField v-slot="{ control }" label="Имя окружения">
+          <UiControl
+            v-bind="control"
             v-model="name"
             aria-label="Имя окружения"
             required
-            pattern="[a-z0-9][a-z0-9_-]*"
+            pattern="[a-z0-9][a-z0-9_\-]*"
             :disabled="busy"
             placeholder="my-project"
             spellcheck="false"
           />
         </UiField>
-        <UiField label="Compose-файл">
-          <input
+        <UiField v-slot="{ control }" label="Compose-файл">
+          <UiControl
+            v-bind="control"
             v-model="primaryFile"
             aria-label="Compose-файл"
             required
@@ -91,12 +97,14 @@ watch(
             spellcheck="false"
           />
         </UiField>
-      </div>
+      </UiFormGrid>
       <details :open="advanced" class="advanced">
         <summary @click.prevent="commands.run('ide.docker.binding.options')">Дополнительно</summary>
-        <div class="advanced-fields">
-          <UiField label="Дополнительные Compose-файлы">
-            <textarea
+        <UiFormGrid class="advanced-fields">
+          <UiField v-slot="{ control }" label="Дополнительные Compose-файлы">
+            <UiControl
+              as="textarea"
+              v-bind="control"
               v-model="extraFiles"
               aria-label="Дополнительные Compose-файлы"
               :disabled="busy"
@@ -105,8 +113,10 @@ watch(
               spellcheck="false"
             />
           </UiField>
-          <UiField label="Env-файлы">
-            <textarea
+          <UiField v-slot="{ control }" label="Env-файлы">
+            <UiControl
+              as="textarea"
+              v-bind="control"
               v-model="envFiles"
               aria-label="Env-файлы"
               :disabled="busy"
@@ -115,8 +125,9 @@ watch(
               spellcheck="false"
             />
           </UiField>
-          <UiField label="Profiles">
-            <input
+          <UiField v-slot="{ control }" label="Profiles">
+            <UiControl
+              v-bind="control"
               v-model="profiles"
               aria-label="Profiles"
               :disabled="busy"
@@ -124,9 +135,9 @@ watch(
               spellcheck="false"
             />
           </UiField>
-        </div>
+        </UiFormGrid>
       </details>
-      <div class="actions">
+      <UiInline class="actions" align="stretch">
         <UiButton type="submit" :disabled="busy">Сохранить</UiButton>
         <UiButton
           v-if="snapshot?.binding"
@@ -134,7 +145,7 @@ watch(
           @click="commands.run('ide.docker.binding.save', { binding: null })"
           >Отвязать</UiButton
         >
-      </div>
+      </UiInline>
     </form>
   </details>
 </template>
@@ -151,11 +162,6 @@ form {
   max-width: 760px;
   padding-block: var(--sp-4) var(--sp-1);
 }
-.primary-fields {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
-  gap: var(--sp-3);
-}
 input,
 textarea {
   min-width: 0;
@@ -169,9 +175,6 @@ textarea {
   font-size: var(--fs-2xs);
 }
 .advanced-fields {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--sp-3);
   padding-top: var(--sp-3);
   color: var(--text);
 }
@@ -179,14 +182,6 @@ textarea {
   grid-column: 1 / -1;
 }
 .actions {
-  display: flex;
-  gap: var(--sp-2);
   margin-top: var(--sp-3);
-}
-@media (max-width: 700px) {
-  .primary-fields,
-  .advanced-fields {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 </style>

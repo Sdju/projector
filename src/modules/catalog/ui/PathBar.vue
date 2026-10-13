@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiControl, { type UiControlHandle } from "../../../common/ui/UiControl.vue";
 import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from "vue";
 import IconChevronRight from "~icons/lucide/chevron-right";
 import IconDownload from "~icons/lucide/download";
@@ -10,7 +11,8 @@ import PathDropdown from "./PathDropdown.vue";
 import { useDirectoryListing } from "../model/directory-listing.ts";
 const props = defineProps<{ path: string; navigate: (path: string) => Promise<void> }>();
 const root = ref<HTMLElement>();
-const input = ref<HTMLInputElement>();
+const inputControl = ref<UiControlHandle>();
+const input = computed(() => inputControl.value?.element as HTMLInputElement | undefined);
 const editing = ref(false);
 const value = ref("");
 const menuPath = ref<string | null>(null);
@@ -262,8 +264,8 @@ onBeforeUnmount(() => {
           >{{ completion }}</span
         >
       </div>
-      <input
-        ref="input"
+      <UiControl
+        ref="inputControl"
         v-model="value"
         role="combobox"
         :aria-label="remoteInput ? 'Репозиторий GitHub' : 'Путь к папке'"

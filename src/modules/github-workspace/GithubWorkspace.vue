@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import UiMessage from "../../common/ui/UiMessage.vue";
+import { onBeforeUnmount, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import type { GithubRepository } from "../../../core/modules/github/index.ts";
 import { ProjectWorkspace, type TabViews } from "../workspace/index.ts";
@@ -126,8 +127,9 @@ function ready(instance: unknown) {
 onBeforeUnmount(() => {
   disposed = true;
   controller.abort();
-  disconnect?.();
 });
+// Child cleanup still resolves this profile; release it after the subtree unmounts.
+onUnmounted(() => disconnect?.());
 </script>
 <template>
   <GithubClone :repository="props.repository" :navigate="navigate" />
@@ -140,7 +142,7 @@ onBeforeUnmount(() => {
   >
     <template #terminal-actions>
       <UiButton
-        icon
+        shape="icon"
         size="sm"
         :title="needsConnection ? 'Подключить GitHub' : 'Информация о репозитории'"
         :aria-label="needsConnection ? 'Подключить GitHub' : 'Информация о репозитории'"
@@ -158,25 +160,25 @@ onBeforeUnmount(() => {
     </template>
     <template #terminal-status
       ><span v-if="error" role="alert">{{ error }}</span
-      ><span v-if="metadata" class="github-status" :title="metadata.commit"
-        >{{ metadata.branch }} · {{ metadata.commit.slice(0, 7) }} · только чтение</span
+      ><UiMessage
+        as="span"
+        tone="muted"
+        size="xs"
+        v-if="metadata"
+        class="github-status"
+        :title="metadata.commit"
+        >{{ metadata.branch }} · {{ metadata.commit.slice(0, 7) }} · только чтение</UiMessage
       ></template
     >
   </ProjectWorkspace>
-  <p v-else class="msg" :role="error ? 'alert' : 'status'">
+  <UiMessage
+    size="xs"
+    variant="padded"
+    :tone="error ? 'danger' : 'muted'"
+    v-else
+    class="msg"
+    :role="error ? 'alert' : 'status'"
+  >
     {{ error || "открываю репозиторий…" }}
-  </p>
+  </UiMessage>
 </template>
-<style scoped>
-.github-status,
-.msg {
-  color: var(--muted);
-  font-size: var(--fs-xs);
-}
-.msg {
-  padding: var(--sp-3);
-}
-.msg[role="alert"] {
-  color: var(--err);
-}
-</style>

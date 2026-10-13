@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiActionRow from "../../../../../common/ui/UiActionRow.vue";
 import {
   computed,
   inject,
@@ -250,14 +251,28 @@ defineExpose({ reveal });
     <li v-if="depth === 0 && busy" class="notice" role="status">выполняется…</li>
     <li v-if="depth === 0 && progress" class="notice" role="status">
       Загрузка: {{ progress.done }} из {{ progress.total }}
-      <button class="cancel" type="button" @click="progress.cancel()">Отменить</button>
+      <UiActionRow
+        class="cancel"
+        interaction="item"
+        radius="none"
+        :gap="1.5"
+        :fill="false"
+        padding="0 var(--sp-2)"
+        @click="progress.cancel()"
+        >Отменить</UiActionRow
+      >
     </li>
     <li v-if="depth === 0 && moveError" class="notice error" role="alert">{{ moveError }}</li>
     <li v-if="depth === 0 && message" class="notice" role="status">{{ message }}</li>
     <li v-if="error" class="notice error" role="alert">{{ error }}</li>
     <li v-if="depth === 0 && themeError" class="notice error" role="status">{{ themeError }}</li>
     <li v-for="{ entry, icon, decoration } in rows" :key="entry.path" role="none">
-      <button
+      <UiActionRow
+        interaction="item"
+        radius="none"
+        tone="muted"
+        :gap="1.5"
+        padding="5px 10px"
         :class="{
           'git-changed': !!decoration,
           'git-ignored': entry.ignored,
@@ -291,8 +306,8 @@ defineExpose({ reveal });
           />
         </span>
         <FileIcon :icon="icon" />
-        <span class="name">{{ entry.name }}</span>
-      </button>
+        <span class="name u-truncate">{{ entry.name }}</span>
+      </UiActionRow>
       <FileTree
         v-if="entry.directory && expanded.has(entry.path)"
         :project-id="projectId"
@@ -308,7 +323,12 @@ defineExpose({ reveal });
       />
     </li>
     <li v-if="nextOffset !== null" role="none">
-      <button
+      <UiActionRow
+        interaction="item"
+        radius="none"
+        tone="muted"
+        :gap="1.5"
+        padding="5px 10px"
         class="load-more"
         :style="{ paddingLeft: `${12 + depth * 14}px` }"
         :disabled="busy || loading"
@@ -324,7 +344,7 @@ defineExpose({ reveal });
           loading ? "загрузка…" : `Показать ещё ${Math.min(TREE_PAGE_SIZE, total - entries.length)}`
         }}
         <span class="remaining">{{ total - entries.length }} осталось</span>
-      </button>
+      </UiActionRow>
     </li>
     <li v-if="depth === 0 && hint" class="drop-hint" role="status">{{ hint }}</li>
     <li
@@ -370,8 +390,6 @@ defineExpose({ reveal });
 }
 button.cancel {
   display: inline;
-  width: auto;
-  padding: 0 var(--sp-2);
   color: var(--accent);
 }
 button.dragging {
@@ -382,15 +400,6 @@ button.drop-target {
   color: var(--text);
   outline: 1px solid var(--accent);
   outline-offset: -1px;
-}
-button {
-  width: 100%;
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  text-align: left;
-  padding: 5px 10px;
-  color: var(--muted);
 }
 button.git-changed {
   --git-tint: var(--warn);
@@ -411,14 +420,6 @@ button.git-ignored:not(.selected) {
 button.git-changed.selected {
   box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--git-tint) 18%, transparent);
 }
-button:hover {
-  background: var(--hover);
-  color: var(--text);
-}
-button.selected {
-  background: var(--active);
-  color: var(--text);
-}
 .glyph {
   width: 12px;
   flex-shrink: 0;
@@ -434,11 +435,7 @@ button.selected {
 .glyph svg.expanded {
   transform: rotate(90deg);
 }
-.name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+
 .notice {
   padding: var(--sp-2) var(--sp-3);
   color: var(--faint);

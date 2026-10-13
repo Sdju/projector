@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import UiScrollArea from "../../../common/ui/UiScrollArea.vue";
+import UiTable from "../../../common/ui/UiTable.vue";
+import { computed, onScopeDispose, ref, watch } from "vue";
 import { useElementSize } from "@vueuse/core";
 import UiVirtualList from "../../../common/ui/UiVirtualList.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
@@ -18,15 +20,29 @@ defineProps<{
   condition: (rule?: Keybinding) => string;
 }>();
 const emit = defineEmits<{ action: [action: string, row: KeybindingRow] }>();
-const scrollElement = ref<HTMLElement | null>(null);
+const scrollArea = ref<InstanceType<typeof UiScrollArea>>();
+const scrollElement = computed(() => scrollArea.value?.element ?? null);
 const tableHeader = ref<HTMLElement | null>(null);
-const { height: headerHeight } = useElementSize(tableHeader);
+const { height: measuredHeaderHeight } = useElementSize(tableHeader);
+const headerHeight = ref(0);
+let headerFrame: number | undefined;
+// Updating scrollMargin during observer delivery can resize the table in the same cycle.
+watch(measuredHeaderHeight, (height) => {
+  if (headerFrame !== undefined) cancelAnimationFrame(headerFrame);
+  headerFrame = requestAnimationFrame(() => {
+    headerFrame = undefined;
+    headerHeight.value = height;
+  });
+});
+onScopeDispose(() => {
+  if (headerFrame !== undefined) cancelAnimationFrame(headerFrame);
+});
 const rowKey = (row: KeybindingRow) => `${row.command}:${row.index}`;
 </script>
 
 <template>
-  <div ref="scrollElement" class="table-scroll">
-    <table :aria-rowcount="rows.length + 1">
+  <UiScrollArea ref="scrollArea" class="table-scroll">
+    <UiTable :aria-rowcount="rows.length + 1" header-tone="muted" sticky subtle hover>
       <colgroup>
         <col class="command-column" />
         <col class="binding-column" />
@@ -40,7 +56,7 @@ const rowKey = (row: KeybindingRow) => `${row.command}:${row.index}`;
           <th>Сочетание</th>
           <th>Когда</th>
           <th>Источник</th>
-          <th><span class="sr-only">Действия</span></th>
+          <th><span class="u-sr-only">Действия</span></th>
         </tr>
       </thead>
       <UiVirtualList
@@ -84,7 +100,7 @@ const rowKey = (row: KeybindingRow) => `${row.command}:${row.index}`;
               <td>{{ row.custom ? "Пользователь" : "По умолчанию" }}</td>
               <td class="actions">
                 <UiButton
-                  icon
+                  shape="icon"
                   size="sm"
                   :disabled="busy"
                   :aria-label="`Изменить: ${row.command}`"
@@ -95,7 +111,7 @@ const rowKey = (row: KeybindingRow) => `${row.command}:${row.index}`;
                 </UiButton>
                 <UiButton
                   v-if="row.rule && !row.rule.disabled"
-                  icon
+                  shape="icon"
                   size="sm"
                   :disabled="busy"
                   :aria-label="`Удалить: ${row.command}`"
@@ -106,7 +122,7 @@ const rowKey = (row: KeybindingRow) => `${row.command}:${row.index}`;
                 </UiButton>
                 <UiButton
                   v-if="row.custom"
-                  icon
+                  shape="icon"
                   size="sm"
                   :disabled="busy"
                   :aria-label="`Сбросить: ${row.command}`"
@@ -123,21 +139,13 @@ const rowKey = (row: KeybindingRow) => `${row.command}:${row.index}`;
           </tr>
         </tbody>
       </UiVirtualList>
-    </table>
+    </UiTable>
     <UiEmpty v-if="!rows.length">Команды не найдены</UiEmpty>
-  </div>
+  </UiScrollArea>
 </template>
 
 <style scoped>
-.table-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
 table {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: left;
   table-layout: fixed;
   min-width: 760px;
 }
@@ -161,17 +169,7 @@ table {
   border: 0;
 }
 th {
-  position: sticky;
-  top: 0;
   z-index: var(--z-sticky);
-  background: var(--bg-2);
-  color: var(--muted);
-  font-weight: 500;
-  border-bottom: 1px solid var(--line);
-}
-th,
-td {
-  padding: var(--sp-3) var(--sp-3);
 }
 th:first-child,
 td:first-child {
@@ -179,10 +177,6 @@ td:first-child {
 }
 td {
   overflow-wrap: anywhere;
-  border-bottom: 1px solid color-mix(in srgb, var(--line) 50%, transparent);
-}
-tr:hover td {
-  background: var(--hover);
 }
 td:first-child {
   min-width: 180px;
@@ -213,13 +207,6 @@ small {
 svg {
   width: 13px;
   height: 13px;
-}
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
 }
 @media (max-width: 700px) {
   th:first-child,

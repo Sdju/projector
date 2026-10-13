@@ -1,4 +1,12 @@
 <script setup lang="ts">
+import UiHeading from "../../common/ui/UiHeading.vue";
+import UiLabel from "../../common/ui/UiLabel.vue";
+import UiMessage from "../../common/ui/UiMessage.vue";
+import UiControl from "../../common/ui/UiControl.vue";
+import UiChoiceGroup from "../../common/ui/UiChoiceGroup.vue";
+import UiChoiceRow from "../../common/ui/UiChoiceRow.vue";
+import UiInline from "../../common/ui/UiInline.vue";
+
 import { useId } from "vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import UiHint from "../../common/ui/UiHint.vue";
@@ -16,27 +24,24 @@ const passwordId = useId();
     @pointerdown="commands.scope.activate()"
     @keydown="commands.keydown"
   >
-    <h2>Доступ по локальной сети</h2>
-    <fieldset :disabled="!ready || busy">
-      <legend class="sr-only">Режим доступа</legend>
-      <label class="mode">
-        <input v-model="mode" type="radio" name="network" value="local" />
-        <span
-          ><strong>Только локально</strong
-          ><small>Сервер слушает localhost и недоступен другим устройствам.</small></span
-        >
-      </label>
-      <label class="mode">
-        <input v-model="mode" type="radio" name="network" value="lan" />
-        <span
-          ><strong>Локальная сеть</strong
-          ><small>Открывает интерфейс для телефона и других устройств в вашей сети.</small></span
-        >
-      </label>
-    </fieldset>
+    <UiHeading as="h2" size="sm">Доступ по локальной сети</UiHeading>
+    <UiChoiceGroup v-slot="{ groupName }" label="Режим доступа" :disabled="!ready || busy">
+      <UiChoiceRow
+        title="Только локально"
+        description="Сервер слушает localhost и недоступен другим устройствам."
+        ><UiControl v-model="mode" type="radio" :name="groupName" value="local"
+      /></UiChoiceRow>
+      <UiChoiceRow
+        title="Локальная сеть"
+        description="Открывает интерфейс для телефона и других устройств в вашей сети."
+        ><UiControl v-model="mode" type="radio" :name="groupName" value="lan"
+      /></UiChoiceRow>
+    </UiChoiceGroup>
     <template v-if="mode === 'lan'">
-      <label class="password-label" :for="passwordId">Пароль доступа (необязательно)</label>
-      <input
+      <UiLabel size="sm" tone="secondary" :space-before="4" :space-after="2" :for="passwordId"
+        >Пароль доступа (необязательно)</UiLabel
+      >
+      <UiControl
         :id="passwordId"
         v-model="password"
         type="password"
@@ -58,8 +63,11 @@ const passwordId = useId();
         Адрес для другого устройства: <code>{{ lanUrl }}</code>
       </UiHint>
     </template>
-    <div class="actions">
-      <UiButton variant="solid" :disabled="!ready || busy" @click="commands.run('ide.network.save')"
+    <UiInline class="actions" align="stretch" wrap>
+      <UiButton
+        appearance="solid"
+        :disabled="!ready || busy"
+        @click="commands.run('ide.network.save')"
         >Сохранить и перезапустить</UiButton
       >
       <UiButton
@@ -68,72 +76,25 @@ const passwordId = useId();
         @click="commands.run('ide.network.password.clear')"
         >Убрать пароль</UiButton
       >
-    </div>
-    <p v-if="error || status" role="status" :class="{ error }">{{ error || status }}</p>
+    </UiInline>
+    <UiMessage v-if="error || status" role="status" :tone="error ? 'danger' : undefined">{{
+      error || status
+    }}</UiMessage>
   </section>
 </template>
 
 <style scoped>
 .network-settings {
-  margin-bottom: var(--sp-6);
-}
-h2 {
-  margin: 0 0 var(--sp-3);
-  font-size: var(--fs-sm);
-  font-weight: 500;
-}
-fieldset {
-  border: 0;
-  padding: 0;
-  margin: 0;
-}
-.mode {
-  display: flex;
-  gap: var(--sp-3);
-  align-items: flex-start;
-  padding: var(--sp-3) 0;
-  cursor: pointer;
-}
-.mode input {
-  margin-top: var(--sp-1);
-}
-strong {
-  display: block;
-  font-weight: 500;
-}
-small {
-  display: block;
-  color: var(--muted);
-  font-size: var(--fs-xs);
-  margin-top: var(--sp-1);
+  margin-bottom: var(--ui-section-margin, var(--sp-6));
 }
 .actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
   margin-top: var(--sp-4);
 }
 .hint {
   margin-top: var(--sp-3);
   font-size: var(--fs-xs);
 }
-.password-label {
-  display: block;
-  margin: var(--sp-4) 0 var(--sp-2);
-  font-size: var(--fs-sm);
-  color: var(--text-2);
-}
 input[type="password"] {
   max-width: 320px;
-}
-.error {
-  color: var(--err);
-}
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
 }
 </style>

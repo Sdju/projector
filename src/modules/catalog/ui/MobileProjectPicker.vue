@@ -80,7 +80,7 @@ const navigate = (path: string) =>
       @click="commands.run('ide.project.picker.toggle')"
     >
       <img :src="projectIconUrl(project)" alt="" width="22" height="22" />
-      <span>{{ project.name }}</span
+      <span class="u-truncate">{{ project.name }}</span
       ><IconChevron aria-hidden="true" />
     </button>
     <button
@@ -113,8 +113,8 @@ const navigate = (path: string) =>
         >
           <img :src="projectIconUrl(item)" alt="" width="22" height="22" />
           <span
-            ><strong>{{ item.name }}</strong
-            ><small>{{ item.path }}</small></span
+            ><strong class="u-truncate">{{ item.name }}</strong
+            ><small class="u-truncate">{{ item.path }}</small></span
           >
         </button>
       </div>
@@ -149,9 +149,6 @@ const navigate = (path: string) =>
 .trigger span {
   flex: 0 1 auto;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 img {
   flex: none;
@@ -208,9 +205,6 @@ svg {
 strong,
 small {
   display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 strong {
   font-size: var(--fs-sm);

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiPanel from "../../../common/ui/UiPanel.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import {
   SettingsWorkbench,
@@ -97,7 +98,9 @@ const readout = (state: SettingsReadoutState) => {
 </script>
 
 <template>
-  <form
+  <UiPanel
+    as="form"
+    sizing="flex"
     class="project-settings"
     aria-label="Настройки проекта"
     @submit.prevent="form.save"
@@ -118,7 +121,7 @@ const readout = (state: SettingsReadoutState) => {
             notice || (dirty ? "Есть несохранённые изменения" : "Нет изменений")
           }}</span>
           <UiButton :disabled="busy || !dirty" @click="form.reset()">Сбросить</UiButton>
-          <UiButton variant="solid" type="submit" :disabled="busy || !dirty">{{
+          <UiButton appearance="solid" type="submit" :disabled="busy || !dirty">{{
             busy ? "сохраняю…" : "Сохранить"
           }}</UiButton>
         </div>
@@ -126,16 +129,11 @@ const readout = (state: SettingsReadoutState) => {
         <p v-else-if="dirty && validation" class="error" role="status">{{ validation }}</p>
       </template>
     </SettingsWorkbench>
-  </form>
+  </UiPanel>
 </template>
 
 <style scoped>
 .project-settings {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
   font-size: var(--fs-xs);
 }
 .save-bar {

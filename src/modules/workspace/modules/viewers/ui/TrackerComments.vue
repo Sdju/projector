@@ -1,7 +1,11 @@
 <script setup lang="ts">
+import UiCard from "../../../../../common/ui/UiCard.vue";
+import UiHint from "../../../../../common/ui/UiHint.vue";
+import UiHeading from "../../../../../common/ui/UiHeading.vue";
 import type { IssueUser, Reaction } from "../../../../../../core/modules/workspace/index.ts";
 import { absoluteTime, relativeTime } from "../../../../../common/utilities/commit-format.ts";
-import UiAvatar from "../../../../../common/ui/UiAvatar.vue";
+import TrackerAuthor from "./TrackerAuthor.vue";
+import UiInline from "../../../../../common/ui/UiInline.vue";
 import TrackerReactions from "./TrackerReactions.vue";
 import VisualMarkdownEditor from "./VisualMarkdownEditor.vue";
 
@@ -24,23 +28,26 @@ const emit = defineEmits<{ open: [path: string] }>();
 </script>
 
 <template>
-  <h3>{{ title }}</h3>
-  <p v-if="!items.length" class="note">{{ empty }}</p>
+  <UiHeading as="h3" size="sm" tone="secondary" :space-before="4" :space-after="2">{{
+    title
+  }}</UiHeading>
+  <UiHint size="xs" leading="inherit" :space-before="2" v-if="!items.length" class="note">{{
+    empty
+  }}</UiHint>
   <ul v-else class="comment-list">
-    <li
+    <UiCard
+      as="li"
+      appearance="frame"
       v-for="item in items"
       :key="item.id"
       :class="{ reply: item.depth }"
       :style="item.depth ? { marginLeft: `calc(var(--sp-4) * ${item.depth})` } : undefined"
     >
-      <p class="comment-meta">
-        <span class="author">
-          <UiAvatar :src="item.author.avatarUrl" :alt="item.author.login" :size="16" />
-          {{ item.author.login }}
-        </span>
+      <UiInline as="p" class="comment-meta" align="stretch">
+        <TrackerAuthor :author="item.author" :size="16" />
         <span v-if="item.badge" :class="item.badgeClass">{{ item.badge }}</span>
         <span v-if="item.at" :title="absoluteTime(item.at)">{{ relativeTime(item.at) }}</span>
-      </p>
+      </UiInline>
       <VisualMarkdownEditor
         v-if="item.body"
         :content="item.body"
@@ -51,17 +58,11 @@ const emit = defineEmits<{ open: [path: string] }>();
         @open="emit('open', $event)"
       />
       <TrackerReactions :reactions="item.reactions ?? []" />
-    </li>
+    </UiCard>
   </ul>
 </template>
 
 <style scoped>
-h3 {
-  margin: var(--sp-4) 0 var(--sp-2);
-  font-size: var(--fs-sm);
-  color: var(--text-2);
-  font-weight: 500;
-}
 .comment-list {
   list-style: none;
   margin: 0;
@@ -70,27 +71,13 @@ h3 {
   flex-direction: column;
   gap: var(--sp-3);
 }
-.comment-list li {
-  padding: var(--sp-3);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-}
 .comment-list li.reply {
   background: var(--active);
 }
 .comment-meta {
-  display: flex;
-  gap: var(--sp-2);
   margin: 0 0 var(--sp-2);
   color: var(--muted);
   font-size: var(--fs-2xs);
-}
-.author {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-family: var(--mono);
-  color: var(--text-2);
 }
 .approved,
 .answer {
@@ -98,10 +85,5 @@ h3 {
 }
 .changes_requested {
   color: var(--err);
-}
-.note {
-  margin: var(--sp-2) 0 0;
-  color: var(--muted);
-  font-size: var(--fs-xs);
 }
 </style>

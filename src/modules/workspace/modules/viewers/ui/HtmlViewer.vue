@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import UiControl from "../../../../../common/ui/UiControl.vue";
+import UiInline from "../../../../../common/ui/UiInline.vue";
+import UiPanel from "../../../../../common/ui/UiPanel.vue";
+import UiToolbar from "../../../../../common/ui/UiToolbar.vue";
 import { computed, defineAsyncComponent, ref, watch } from "vue";
 import SplitPanes from "./SplitPanes.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
@@ -42,17 +46,22 @@ const frameStyle = computed(() => {
 </script>
 
 <template>
-  <section class="html-viewer" aria-label="Просмотр HTML">
-    <div class="toolbar">
-      <label
+  <UiPanel class="html-viewer" aria-label="Просмотр HTML">
+    <UiToolbar class="toolbar" :column-gap="4" text="xs">
+      <UiInline as="label" :gap="1.5" justify="normal"
         >Ширина
-        <select v-model="width" aria-label="Ширина страницы">
+        <UiControl
+          as="select"
+          v-model="width"
+          appearance="inline-select"
+          aria-label="Ширина страницы"
+        >
           <option v-for="item in widths" :key="item.id" :value="item.id">{{ item.label }}</option>
-        </select></label
+        </UiControl></UiInline
       >
-      <span class="url" :title="siteUrl">{{ siteUrl }}</span>
+      <span class="url u-truncate" :title="siteUrl">{{ siteUrl }}</span>
       <UiButton
-        icon
+        shape="icon"
         size="sm"
         aria-label="Перезагрузить страницу"
         title="Перезагрузить страницу"
@@ -61,7 +70,7 @@ const frameStyle = computed(() => {
         <IconRefresh aria-hidden="true" />
       </UiButton>
       <UiButton
-        icon
+        shape="icon"
         size="sm"
         aria-label="Открыть во вкладке браузера"
         title="Открыть страницу во вкладке браузера Projector"
@@ -70,7 +79,7 @@ const frameStyle = computed(() => {
         <IconPanel aria-hidden="true" />
       </UiButton>
       <UiButton
-        icon
+        shape="icon"
         size="sm"
         aria-label="Открыть в браузере"
         title="Открыть страницу в новой вкладке браузера"
@@ -78,7 +87,7 @@ const frameStyle = computed(() => {
       >
         <IconExternal aria-hidden="true" />
       </UiButton>
-    </div>
+    </UiToolbar>
     <SplitPanes top-label="Страница" bottom-label="Код" :reveal="line">
       <template #top>
         <div class="page-pane">
@@ -106,39 +115,13 @@ const frameStyle = computed(() => {
         />
       </template>
     </SplitPanes>
-  </section>
+  </UiPanel>
 </template>
 
 <style scoped>
-.html-viewer {
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2) var(--sp-4);
-  padding: var(--sp-2) var(--sp-3);
-  border-bottom: 1px solid var(--line);
-  font-size: var(--fs-xs);
-}
-.toolbar label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.toolbar select {
-  width: auto;
-  padding-block: var(--sp-1);
-}
 .url {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-family: var(--mono);
   color: var(--muted);
 }

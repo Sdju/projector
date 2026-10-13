@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { resizeHistory } from "../lib/git-split.ts";
+import { ref, watch, onScopeDispose } from "vue";
+import { useResizeObserver } from "@vueuse/core";
+import UiResizeHandle from "../../../../../common/ui/UiResizeHandle.vue";
+import { usePointerDrag } from "../../../../../common/utilities/pointer-drag.ts";
+import { resizeHistory, HISTORY_MIN, CHANGES_MIN } from "../lib/git-split.ts";
 
 /**
  * Граница между изменениями и историей. Движение вверх увеличивает историю; если сжать её
@@ -13,10 +16,28 @@ const props = defineProps<{
   stack: HTMLElement | undefined;
 }>();
 const emit = defineEmits<{ resize: [height: number]; collapse: []; reset: [] }>();
+const measuredHeight = ref(0);
+const measuredMaximum = ref(HISTORY_MIN);
+let measureFrame: number | undefined;
+const updateHeight = () => {
+  measuredHeight.value = props.target?.offsetHeight ?? 0;
+  measuredMaximum.value = Math.max(HISTORY_MIN, (props.stack?.offsetHeight ?? 0) - CHANGES_MIN);
+};
+watch(() => [props.target, props.stack], updateHeight, { immediate: true });
+useResizeObserver(
+  () => [props.target, props.stack],
+  () => {
+    if (measureFrame !== undefined) return;
+    measureFrame = requestAnimationFrame(() => {
+      measureFrame = undefined;
+      updateHeight();
+    });
+  },
+);
+onScopeDispose(() => {
+  if (measureFrame !== undefined) cancelAnimationFrame(measureFrame);
+});
 const STEP = 24;
-const dragging = ref(false);
-let startY = 0;
-let startHeight = 0;
 const measure = () => ({
   height: props.target?.offsetHeight ?? 0,
   stack: props.stack?.offsetHeight ?? 0,
@@ -24,28 +45,15 @@ const measure = () => ({
 function apply(height: number, stack: number, delta: number) {
   const result = resizeHistory(height, stack, delta);
   if (result.collapse) {
-    dragging.value = false;
+    drag.stop();
     emit("collapse");
   } else emit("resize", result.height);
 }
-function down(event: PointerEvent) {
-  if (event.button !== 0) return;
-  event.preventDefault();
-  const handle = event.currentTarget as HTMLElement;
-  handle.focus();
-  handle.setPointerCapture(event.pointerId);
-  startHeight = measure().height;
-  startY = event.clientY;
-  dragging.value = true;
-}
-function move(event: PointerEvent) {
-  if (dragging.value) apply(startHeight, measure().stack, event.clientY - startY);
-}
-function up(event: PointerEvent) {
-  dragging.value = false;
-  const handle = event.currentTarget as HTMLElement;
-  if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
-}
+const drag = usePointerDrag({
+  start: (event) => ({ height: measure().height, y: event.clientY }),
+  move: (event, start) => apply(start.height, measure().stack, event.clientY - start.y),
+});
+const { dragging, start: down } = drag;
 function key(event: KeyboardEvent) {
   if (!["ArrowUp", "ArrowDown", "Home", "End", "Enter"].includes(event.key)) return;
   event.preventDefault();
@@ -58,50 +66,19 @@ function key(event: KeyboardEvent) {
 </script>
 
 <template>
-  <div
+  <UiResizeHandle
+    appearance="line"
     class="splitter"
-    :class="{ dragging }"
-    role="separator"
-    aria-orientation="horizontal"
+    :dragging="dragging"
     aria-label="Граница между изменениями и историей"
-    :aria-valuenow="Math.round(target?.offsetHeight ?? 0)"
+    :aria-valuenow="measuredHeight"
     aria-valuemin="0"
+    :aria-valuemax="measuredMaximum"
+    :aria-valuetext="`${measuredHeight} px`"
     title="Потяните, чтобы изменить высоту истории · если сжать до минимума, она сворачивается · двойной клик возвращает размер"
     tabindex="0"
     @pointerdown="down"
-    @pointermove="move"
-    @pointerup="up"
-    @pointercancel="up"
-    @lostpointercapture="dragging = false"
     @dblclick="emit('reset')"
     @keydown="key"
   />
 </template>
-
-<style scoped>
-.splitter {
-  flex: none;
-  position: relative;
-  height: 9px;
-  margin-block: -4px;
-  z-index: 2;
-  cursor: row-resize;
-  touch-action: none;
-  user-select: none;
-}
-.splitter::before {
-  content: "";
-  position: absolute;
-  inset: 4px 0;
-  background: var(--line);
-}
-.splitter:hover::before,
-.splitter:focus-visible::before,
-.splitter.dragging::before {
-  inset: 3px 0;
-  background: var(--faint);
-}
-.splitter:focus-visible {
-  outline: none;
-}
-</style>

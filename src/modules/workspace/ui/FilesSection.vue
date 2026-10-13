@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, useAttrs } from "vue";
+import UiScrollArea from "../../../common/ui/UiScrollArea.vue";
 import { FileTree } from "../modules/tree/index.ts";
 
 /** Sidebar section «Файлы»: the tree in the section frame; props and listeners go to the tree. */
@@ -10,7 +11,7 @@ defineExpose({ reveal: (path: string) => tree.value?.reveal(path) });
 </script>
 
 <template>
-  <div class="side-content">
+  <UiScrollArea class="side-content">
     <FileTree ref="tree" v-bind="attrs" />
-  </div>
+  </UiScrollArea>
 </template>

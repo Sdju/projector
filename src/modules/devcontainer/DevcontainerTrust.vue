@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import UiMessage from "../../common/ui/UiMessage.vue";
+import UiInline from "../../common/ui/UiInline.vue";
+import UiHeading from "../../common/ui/UiHeading.vue";
 import { nextTick, useId, ref, watch } from "vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import UiDialog from "../../common/ui/UiDialog.vue";
@@ -36,7 +39,7 @@ watch(
     @cancel.prevent="model.open.value = false"
     @close="model.open.value = false"
   >
-    <h2 :id="titleId">Доверять этому репозиторию?</h2>
+    <UiHeading :id="titleId">Доверять этому репозиторию?</UiHeading>
     <p>
       Проект содержит <code>{{ model.state.value.configPath }}</code
       ><template v-if="model.state.value.name"> ({{ model.state.value.name }})</template>. Он просит
@@ -47,10 +50,10 @@ watch(
     </p>
     <ul class="findings">
       <li v-for="finding in model.state.value.findings" :key="finding.id" :class="finding.risk">
-        <div class="head">
+        <UiInline class="head" align="normal" justify="between" :gap="3">
           <strong>{{ finding.title }}</strong>
           <span class="risk">{{ RISK[finding.risk] }}</span>
-        </div>
+        </UiInline>
         <p>{{ finding.detail }}</p>
         <code>{{ finding.keys.join(", ") }}</code>
       </li>
@@ -61,12 +64,14 @@ watch(
       со всеми перечисленными правами. Если файлы конфигурации изменятся, решение сбросится. Уже
       открытые терминалы не переключаются.
     </p>
-    <p v-if="model.error.value" class="error" role="alert">{{ model.error.value }}</p>
+    <UiMessage v-if="model.error.value" tone="danger" role="alert">{{
+      model.error.value
+    }}</UiMessage>
     <UiDialogActions>
       <UiButton autofocus :disabled="model.busy.value" @click="model.decide('declined')"
         >Не доверять</UiButton
       >
-      <UiButton variant="danger" :disabled="model.busy.value" @click="model.decide('trusted')"
+      <UiButton tone="danger" :disabled="model.busy.value" @click="model.decide('trusted')"
         >Доверять и использовать Dev Container</UiButton
       >
     </UiDialogActions>
@@ -74,11 +79,6 @@ watch(
 </template>
 
 <style scoped>
-.trust h2 {
-  margin: 0 0 var(--sp-3);
-  font-size: var(--fs-md);
-  font-weight: 500;
-}
 .trust p {
   margin: 0 0 var(--sp-3);
   font-size: var(--fs-sm);
@@ -114,9 +114,6 @@ watch(
   font-size: var(--fs-xs);
 }
 .head {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--sp-3);
   font-size: var(--fs-sm);
 }
 .risk {
@@ -127,8 +124,5 @@ watch(
 code {
   overflow-wrap: anywhere;
   font-size: var(--fs-xs);
-}
-.error {
-  color: var(--err);
 }
 </style>

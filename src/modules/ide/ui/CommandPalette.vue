@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import UiActionRow from "../../../common/ui/UiActionRow.vue";
+import UiControl, { type UiControlHandle } from "../../../common/ui/UiControl.vue";
+import UiInline from "../../../common/ui/UiInline.vue";
 import { computed, nextTick, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useIdeCommands } from "../ide.ts";
@@ -9,7 +12,7 @@ const { api, palette, reportError } = useIdeCommands();
 const route = useRoute();
 const dialogRef = ref<InstanceType<typeof UiDialog>>();
 const dialog = computed(() => dialogRef.value?.element);
-const input = ref<HTMLInputElement>();
+const input = ref<UiControlHandle>();
 const query = ref("");
 const selected = ref(-1);
 const results = computed(() => {
@@ -70,7 +73,7 @@ async function execute(index = selected.value) {
   }
 }
 function keydown(event: KeyboardEvent) {
-  if (event.target !== input.value || event.isComposing || event.keyCode === 229) return;
+  if (event.target !== input.value?.element || event.isComposing || event.keyCode === 229) return;
   if (event.key === "ArrowDown" || event.key === "ArrowUp") {
     event.preventDefault();
     move(event.key === "ArrowDown" ? 1 : -1);
@@ -104,9 +107,9 @@ function backdrop(event: MouseEvent) {
     @close="palette && close()"
     @click="backdrop"
   >
-    <div class="search">
+    <UiInline class="search" :gap="3" justify="normal">
       <span aria-hidden="true">&gt;</span
-      ><input
+      ><UiControl
         ref="input"
         v-model="query"
         role="combobox"
@@ -120,7 +123,7 @@ function backdrop(event: MouseEvent) {
       /><button aria-label="Закрыть командный центр" title="Закрыть (Esc)" @click="close()">
         ×
       </button>
-    </div>
+    </UiInline>
     <ul id="command-palette-results" role="listbox" aria-label="Команды IDE">
       <li
         v-for="(command, index) in results"
@@ -133,27 +136,32 @@ function backdrop(event: MouseEvent) {
         :class="{ selected: selected === index, unavailable: !command.enabled }"
         @pointermove="command.enabled && (selected = index)"
       >
-        <button :disabled="!command.enabled" tabindex="-1" @click="execute(index)">
+        <UiActionRow
+          class="palette-row"
+          interaction="selection"
+          radius="none"
+          padding="var(--sp-2) var(--sp-3)"
+          :disabled="!command.enabled"
+          tabindex="-1"
+          @click="execute(index)"
+        >
           <span class="description"
             ><span class="title">{{ command.group }}: {{ command.title }}</span
             ><small>{{ command.id }}</small></span
           ><UiKbd v-if="command.shortcut">{{ command.shortcut }}</UiKbd
           ><span v-if="!command.enabled" class="unavailable-label">Недоступно</span>
-        </button>
+        </UiActionRow>
       </li>
     </ul>
     <UiEmpty v-if="!results.length" role="status">Команды не найдены</UiEmpty>
-    <footer>
+    <UiInline as="footer" align="normal" justify="between" :gap="3">
       <span>↑ ↓ выбор · Enter запуск · Esc закрыть</span><span>{{ results.length }} команд</span>
-    </footer>
+    </UiInline>
   </UiDialog>
 </template>
 
 <style scoped>
 .search {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
   padding: var(--sp-1) var(--sp-2);
   border: 1px solid var(--focus);
   border-radius: var(--r-sm);
@@ -193,15 +201,6 @@ li.selected {
   outline: 1px solid color-mix(in srgb, var(--focus) 45%, transparent);
   outline-offset: -1px;
 }
-li button {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  width: 100%;
-  text-align: left;
-  padding: var(--sp-2) var(--sp-3);
-  color: inherit;
-}
 .description {
   flex: 1;
   min-width: 0;
@@ -228,9 +227,6 @@ kbd {
   color: var(--muted);
 }
 footer {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--sp-3);
   padding: var(--sp-2) var(--sp-3) var(--sp-1);
   border-top: 1px solid var(--line);
   font-size: var(--fs-2xs);
@@ -240,7 +236,7 @@ footer {
   ul {
     max-height: calc(100dvh - 130px);
   }
-  li button {
+  li .palette-row {
     gap: var(--sp-2);
     padding: var(--sp-2);
   }

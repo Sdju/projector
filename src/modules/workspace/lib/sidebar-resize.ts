@@ -1,4 +1,5 @@
 import { computed, onBeforeUnmount, onMounted, ref, type Ref } from "vue";
+import { usePointerDrag } from "../../../common/utilities/pointer-drag.ts";
 
 const minTree = 160;
 const minDock = 300;
@@ -13,7 +14,6 @@ export function useSidebarResize(workspace: Ref<HTMLElement | undefined>) {
     "--tree-width": treeWidth.value ? `${treeWidth.value}px` : undefined,
   }));
   let sizeObserver: ResizeObserver | undefined;
-  let stopResize: (() => void) | undefined;
   onMounted(() => {
     sizeObserver = new ResizeObserver(() => {
       const element = workspace.value;
@@ -23,34 +23,20 @@ export function useSidebarResize(workspace: Ref<HTMLElement | undefined>) {
     if (workspace.value) sizeObserver.observe(workspace.value);
   });
   onBeforeUnmount(() => {
-    stopResize?.();
     sizeObserver?.disconnect();
   });
-  function resizeTree(event: PointerEvent) {
-    const element = workspace.value;
-    if (!element || window.innerWidth <= compactWidth) return;
-    stopResize?.();
-    (event.currentTarget as HTMLElement).focus();
-    event.preventDefault();
-    const rect = element.getBoundingClientRect();
-    const move = (moveEvent: PointerEvent) => {
-      treeWidth.value = clampTree(moveEvent.clientX - rect.left, rect.width);
-    };
-    const finish = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", finish);
-      window.removeEventListener("pointercancel", finish);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      stopResize = undefined;
-    };
-    stopResize = finish;
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", finish);
-    window.addEventListener("pointercancel", finish);
-  }
+  const drag = usePointerDrag({
+    start: () => {
+      const element = workspace.value;
+      if (!element || window.innerWidth <= compactWidth) return;
+      return element.getBoundingClientRect();
+    },
+    move: (event, rect) => {
+      treeWidth.value = clampTree(event.clientX - rect.left, rect.width);
+    },
+    cursor: () => "col-resize",
+  });
+  const resizeTree = drag.start;
   function resizeTreeKey(event: KeyboardEvent) {
     if (!["ArrowLeft", "ArrowRight"].includes(event.key) || !workspace.value) return;
     event.preventDefault();

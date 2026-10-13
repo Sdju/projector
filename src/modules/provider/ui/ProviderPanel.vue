@@ -1,4 +1,12 @@
 <script setup lang="ts">
+import UiMessage from "../../../common/ui/UiMessage.vue";
+import UiActionRow from "../../../common/ui/UiActionRow.vue";
+import UiStatusDot from "../../../common/ui/UiStatusDot.vue";
+import UiControl from "../../../common/ui/UiControl.vue";
+import UiStack from "../../../common/ui/UiStack.vue";
+import UiInline from "../../../common/ui/UiInline.vue";
+import UiFormGrid from "../../../common/ui/UiFormGrid.vue";
+
 import UiHint from "../../../common/ui/UiHint.vue";
 import { computed, onMounted, ref } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
@@ -36,38 +44,44 @@ function keyDraft(): string {
 </script>
 
 <template>
-  <section class="panel">
-    <div class="row">
+  <UiStack as="section" :gap="4">
+    <UiInline wrap justify="between">
       <p class="kicker">OpenAI-compatible API</p>
-      <UiButton variant="ghost" @click="addProvider">+ провайдер</UiButton>
-    </div>
-    <p v-if="error" class="err">{{ error }}</p>
-    <div class="list">
-      <button
+      <UiButton @click="addProvider">+ провайдер</UiButton>
+    </UiInline>
+    <UiMessage v-if="error" tone="danger" size="xs" flush role="alert">{{ error }}</UiMessage>
+    <UiStack :gap="2">
+      <UiActionRow
         v-for="item in providers"
         :key="item.id"
         type="button"
         class="item"
+        interaction="selection"
+        radius="none"
+        :gap="2"
+        padding="var(--sp-2) 0"
         :class="{ on: item.id === selected?.id }"
         @click="selectedId = item.id"
       >
-        <span class="dot" :class="{ live: item.id === activeProviderId }" />
+        <UiStatusDot class="dot" :tone="item.id === activeProviderId ? 'success' : 'faint'" />
         <span>{{ item.name }}</span>
         <span class="meta">{{ item.model || "без модели" }}</span>
-      </button>
-    </div>
+      </UiActionRow>
+    </UiStack>
 
-    <div v-if="selected" class="form">
-      <div class="primary-fields">
-        <UiField label="имя">
-          <input
+    <UiStack v-if="selected" class="form" :gap="4">
+      <UiFormGrid>
+        <UiField v-slot="{ control }" label="имя">
+          <UiControl
+            v-bind="control"
             aria-label="Имя провайдера"
             :value="selected.name"
             @input="patchProvider(selected.id, { name: ($event.target as HTMLInputElement).value })"
           />
         </UiField>
-        <UiField label="модель">
-          <input
+        <UiField v-slot="{ control }" label="модель">
+          <UiControl
+            v-bind="control"
             aria-label="Модель"
             :value="selected.model"
             spellcheck="false"
@@ -77,9 +91,10 @@ function keyDraft(): string {
             "
           />
         </UiField>
-      </div>
-      <UiField label="url">
-        <input
+      </UiFormGrid>
+      <UiField v-slot="{ control }" label="url">
+        <UiControl
+          v-bind="control"
           aria-label="URL API"
           :value="selected.url"
           spellcheck="false"
@@ -87,8 +102,9 @@ function keyDraft(): string {
           @input="patchProvider(selected.id, { url: ($event.target as HTMLInputElement).value })"
         />
       </UiField>
-      <UiField label="api key">
-        <input
+      <UiField v-slot="{ control }" label="api key">
+        <UiControl
+          v-bind="control"
           aria-label="API key"
           :value="keyDraft()"
           type="password"
@@ -102,71 +118,38 @@ function keyDraft(): string {
       <UiHint>
         Ключ шифруется на диске (AES). Можно задать DASHSCOPE_API_KEY / OPENAI_URL в окружении.
       </UiHint>
-      <div class="row">
+      <UiInline wrap justify="between">
         <UiButton
-          variant="chip"
+          appearance="outline"
+          tone="muted"
+          shape="chip"
           :disabled="selected.id === activeProviderId"
           @click="setActive(selected.id)"
         >
           активный
         </UiButton>
-        <UiButton variant="danger" @click="removeProvider(selected.id)">удалить</UiButton>
-        <UiButton variant="solid" :disabled="saving" @click="save">
+        <UiButton tone="danger" @click="removeProvider(selected.id)">удалить</UiButton>
+        <UiButton appearance="solid" :disabled="saving" @click="save">
           {{ saving ? "…" : "сохранить" }}
         </UiButton>
-      </div>
-    </div>
-  </section>
+      </UiInline>
+    </UiStack>
+  </UiStack>
 </template>
 
 <style scoped>
-.panel {
-  display: grid;
-  gap: var(--sp-4);
-}
-
 .kicker {
   margin: 0;
   color: var(--muted);
   font-size: var(--fs-xs);
 }
 
-.row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-  align-items: center;
-  justify-content: space-between;
-}
-
-.list {
-  display: grid;
-  gap: var(--sp-2);
-}
-
 .item {
-  display: flex;
-  gap: var(--sp-2);
-  align-items: center;
-  width: 100%;
-  padding: var(--sp-2) 0;
   border-bottom: 1px solid var(--line);
-  text-align: left;
 }
 
 .item.on span:nth-child(2) {
   color: var(--text);
-}
-
-.dot {
-  width: 7px;
-  height: 7px;
-  border-radius: var(--r-full);
-  background: var(--faint);
-}
-
-.dot.live {
-  background: var(--run);
 }
 
 .meta {
@@ -176,34 +159,8 @@ function keyDraft(): string {
   font-size: var(--fs-xs);
 }
 
-.primary-fields {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--sp-3);
-}
 .item span:not(.dot) {
   min-width: 0;
   overflow-wrap: anywhere;
-}
-.dot {
-  flex-shrink: 0;
-}
-@media (max-width: 700px) {
-  .primary-fields {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-.form {
-  display: grid;
-  gap: var(--sp-4);
-}
-
-.err {
-  margin: 0;
-  font-size: var(--fs-xs);
-}
-
-.err {
-  color: var(--err);
 }
 </style>

@@ -64,6 +64,7 @@ export interface SidebarHost {
 /** How a section is drawn; the sidebar only mounts it and wires its button. */
 export interface SidebarView {
   icon: Component;
+  /** Root owns its fill/scroll recipe; the host keeps panels mounted with v-show. */
   component: Component;
   /** Props and listeners of the panel. */
   props(host: SidebarHost, selected: boolean): Record<string, unknown>;

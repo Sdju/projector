@@ -1,4 +1,11 @@
 <script setup lang="ts">
+import UiCard from "../../common/ui/UiCard.vue";
+import UiLabel from "../../common/ui/UiLabel.vue";
+import UiControl from "../../common/ui/UiControl.vue";
+import UiStack from "../../common/ui/UiStack.vue";
+import UiInline from "../../common/ui/UiInline.vue";
+import UiHeading from "../../common/ui/UiHeading.vue";
+import UiMessage from "../../common/ui/UiMessage.vue";
 import { useId } from "vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import UiHint from "../../common/ui/UiHint.vue";
@@ -72,37 +79,52 @@ commands.scope.registerCommand({
     @pointerdown="commands.scope.activate()"
     @keydown="commands.keydown"
   >
-    <p v-if="!state" class="muted">Загрузка…</p>
+    <UiMessage v-if="!state" tone="muted" size="sm" class="muted">Загрузка…</UiMessage>
     <template v-else>
       <dl class="summary">
-        <div>
+        <UiCard as="div" appearance="frame">
           <dt>Режим</dt>
           <dd>{{ state.mode === "lan" ? "Локальная сеть" : "Только localhost" }}</dd>
-        </div>
-        <div>
+        </UiCard>
+        <UiCard as="div" appearance="frame">
           <dt>Пароль</dt>
           <dd>{{ state.passwordRequired ? "Задан" : "Не задан" }}</dd>
-        </div>
+        </UiCard>
       </dl>
 
-      <h3>Адреса</h3>
-      <ul v-if="state.mode === 'lan' && state.lanUrls.length" class="addresses">
-        <li v-for="address in state.lanUrls" :key="address">
+      <UiHeading as="h3" size="sm" :space-after="2" class="section-heading">Адреса</UiHeading>
+      <UiStack
+        as="ul"
+        flow="flex"
+        :gap="2"
+        v-if="state.mode === 'lan' && state.lanUrls.length"
+        class="addresses"
+      >
+        <UiInline
+          as="li"
+          :gap="3"
+          justify="between"
+          v-for="address in state.lanUrls"
+          :key="address"
+        >
           <code>{{ address }}</code>
           <button :disabled="busy" @click="commands.run('ide.network.address.copy', { address })">
             копировать
           </button>
-        </li>
-      </ul>
-      <p v-else class="muted">
+        </UiInline>
+      </UiStack>
+      <UiMessage v-else tone="muted" size="sm" class="muted">
         {{
           state.mode === "lan" ? "Адреса сети не найдены" : "Сервер доступен только на этой машине"
         }}
-      </p>
+      </UiMessage>
 
-      <h3><label :for="passwordId">Пароль доступа</label></h3>
-      <div class="password-row">
-        <input
+      <UiHeading as="h3" size="sm" :space-after="2" class="section-heading"
+        ><UiLabel inline :for="passwordId">Пароль доступа</UiLabel></UiHeading
+      >
+      <UiInline class="password-row" align="normal" justify="normal">
+        <UiControl
+          grow
           :id="passwordId"
           v-model="password"
           type="password"
@@ -111,7 +133,7 @@ commands.scope.registerCommand({
           :disabled="busy"
         />
         <UiButton
-          variant="solid"
+          appearance="solid"
           :disabled="busy || !password"
           @click="commands.run('ide.network.save')"
           >Сохранить</UiButton
@@ -122,7 +144,7 @@ commands.scope.registerCommand({
           @click="commands.run('ide.network.password.clear')"
           >Убрать</UiButton
         >
-      </div>
+      </UiInline>
       <UiHint v-if="state.passwordRequired" class="hint"
         >Пароль задан. Введите новый, чтобы заменить, или нажмите «Убрать».</UiHint
       >
@@ -131,9 +153,15 @@ commands.scope.registerCommand({
       >
     </template>
 
-    <p v-if="error || status" role="status" class="message" :class="{ error }">
+    <UiMessage
+      v-if="error || status"
+      role="status"
+      size="xs"
+      class="network-message"
+      :tone="error ? 'danger' : undefined"
+    >
       {{ error || status }}
-    </p>
+    </UiMessage>
   </div>
 </template>
 
@@ -144,22 +172,15 @@ commands.scope.registerCommand({
   padding: var(--sp-4);
   container-type: inline-size;
 }
-h3 {
-  margin: var(--sp-4) 0 var(--sp-2);
-  font-size: var(--fs-sm);
+.section-heading {
+  margin-top: var(--sp-4);
   color: var(--text-2);
-  font-weight: 500;
 }
 .summary {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--sp-3);
   margin: 0;
-}
-.summary div {
-  padding: var(--sp-3);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
 }
 dt {
   color: var(--muted);
@@ -173,15 +194,8 @@ dd {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
 }
 .addresses li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-3);
   padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
@@ -196,27 +210,12 @@ dd {
   color: var(--muted);
   font-size: var(--fs-2xs);
 }
-.password-row {
-  display: flex;
-  gap: var(--sp-2);
-}
-.password-row input {
-  flex: 1;
-  min-width: 0;
-}
+
 .hint {
   margin-top: var(--sp-3);
   font-size: var(--fs-xs);
 }
-.muted {
-  color: var(--muted);
-  font-size: var(--fs-sm);
-}
-.message {
+.network-message {
   margin: var(--sp-3) 0 0;
-  font-size: var(--fs-xs);
-}
-.error {
-  color: var(--err);
 }
 </style>

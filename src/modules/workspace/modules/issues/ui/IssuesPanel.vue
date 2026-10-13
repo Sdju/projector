@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiInline from "../../../../../common/ui/UiInline.vue";
 import IconComment from "~icons/lucide/message-square";
 import { useIssues } from "../lib/issues.ts";
 import { useTrackerPanel } from "../lib/tracker-panel.ts";
@@ -56,9 +57,17 @@ defineExpose({ refresh: () => list.load() });
         "
       >
         <template #meta>
-          <span v-if="issue.comments" class="comments" :title="`${issue.comments} комментариев`">
+          <UiInline
+            as="span"
+            inline
+            :gap="0.75"
+            justify="normal"
+            v-if="issue.comments"
+            class="comments"
+            :title="`${issue.comments} комментариев`"
+          >
             <IconComment aria-hidden="true" />{{ issue.comments }}
-          </span>
+          </UiInline>
         </template>
       </TrackerRow>
     </li>
@@ -66,11 +75,6 @@ defineExpose({ refresh: () => list.load() });
 </template>
 
 <style scoped>
-.comments {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-}
 .comments svg {
   width: 12px;
   height: 12px;

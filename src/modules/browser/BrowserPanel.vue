@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import UiControl from "../../common/ui/UiControl.vue";
+import UiPanel from "../../common/ui/UiPanel.vue";
+import UiToolbar from "../../common/ui/UiToolbar.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { useEventListener } from "@vueuse/core";
 import UiButton from "../../common/ui/UiButton.vue";
@@ -152,10 +155,10 @@ const hostname = computed(() => {
 </script>
 
 <template>
-  <section class="browser" aria-label="Браузер">
-    <form class="bar" @submit.prevent="go(address)">
+  <UiPanel class="browser" aria-label="Браузер">
+    <UiToolbar as="form" class="bar" @submit.prevent="go(address)">
       <UiButton
-        icon
+        shape="icon"
         size="sm"
         type="button"
         aria-label="Назад"
@@ -166,7 +169,7 @@ const hostname = computed(() => {
         <IconBack aria-hidden="true" />
       </UiButton>
       <UiButton
-        icon
+        shape="icon"
         size="sm"
         type="button"
         aria-label="Вперёд"
@@ -177,7 +180,7 @@ const hostname = computed(() => {
         <IconForward aria-hidden="true" />
       </UiButton>
       <UiButton
-        icon
+        shape="icon"
         size="sm"
         type="button"
         aria-label="Перезагрузить страницу"
@@ -187,7 +190,7 @@ const hostname = computed(() => {
       >
         <IconRefresh aria-hidden="true" />
       </UiButton>
-      <input
+      <UiControl
         v-model="address"
         class="address"
         type="text"
@@ -206,13 +209,18 @@ const hostname = computed(() => {
       >
         <IconServer aria-hidden="true" /> Dev-сервер
       </UiButton>
-      <select v-model="proxy" aria-label="Режим загрузки" title="Как загружать страницу">
+      <UiControl
+        as="select"
+        v-model="proxy"
+        aria-label="Режим загрузки"
+        title="Как загружать страницу"
+      >
         <option value="auto">Авто</option>
         <option value="on">Через прокси</option>
         <option value="off">Напрямую</option>
-      </select>
+      </UiControl>
       <UiButton
-        icon
+        shape="icon"
         size="sm"
         type="button"
         aria-label="Открыть во внешнем браузере"
@@ -222,7 +230,7 @@ const hostname = computed(() => {
       >
         <IconExternal aria-hidden="true" />
       </UiButton>
-    </form>
+    </UiToolbar>
     <p v-if="problem" class="note error" role="alert">{{ problem }}</p>
     <p v-else-if="proxyError" class="note error" role="alert">{{ proxyError }}</p>
     <p v-else-if="current && wantsProxy && !proxyReady" class="note">
@@ -250,23 +258,10 @@ const hostname = computed(() => {
         </UiButton>
       </div>
     </div>
-  </section>
+  </UiPanel>
 </template>
 
 <style scoped>
-.browser {
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-.bar {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-3);
-  border-bottom: 1px solid var(--line);
-}
 .address {
   flex: 1;
   min-width: 0;
@@ -285,7 +280,7 @@ const hostname = computed(() => {
   border-bottom: 1px solid var(--line);
 }
 .note.error {
-  color: var(--danger, inherit);
+  color: inherit;
 }
 .stage {
   flex: 1;

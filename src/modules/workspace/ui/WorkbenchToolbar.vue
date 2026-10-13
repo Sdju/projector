@@ -23,7 +23,7 @@ const emit = defineEmits<{
 <template>
   <div class="toolbar" role="toolbar" aria-label="Блоки и терминалы">
     <slot name="terminal-status" />
-    <p v-if="terminalsError" class="toolbar-error" role="alert">
+    <p v-if="terminalsError" class="toolbar-error u-truncate" role="alert">
       {{ terminalsError }}
     </p>
     <div class="toolbar-spacer" />
@@ -54,9 +54,6 @@ const emit = defineEmits<{
 }
 .toolbar-error {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   margin: 0;
   color: var(--err);
   font-size: var(--fs-xs);

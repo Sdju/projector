@@ -1,14 +1,19 @@
 <script setup lang="ts">
+import UiMessage from "../../../../../common/ui/UiMessage.vue";
+import UiHint from "../../../../../common/ui/UiHint.vue";
 import { computed, nextTick, ref, useId } from "vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import UiDialog from "../../../../../common/ui/UiDialog.vue";
 import UiDialogActions from "../../../../../common/ui/UiDialogActions.vue";
+import UiControl, { type UiControlHandle } from "../../../../../common/ui/UiControl.vue";
+import UiField from "../../../../../common/ui/UiField.vue";
+import UiHeading from "../../../../../common/ui/UiHeading.vue";
 import type { ImportConflict } from "../../../../workspace-api/index.ts";
 import type { ImportChoice } from "../lib/tree-import.ts";
 
 const titleId = useId();
 const dialog = ref<InstanceType<typeof UiDialog>>();
-const input = ref<HTMLInputElement>();
+const input = ref<UiControlHandle>();
 const directory = ref("");
 const conflicts = ref<ImportConflict[]>([]);
 const prefix = ref("copy-");
@@ -70,13 +75,13 @@ defineExpose({ ask });
       @cancel="busy ? $event.preventDefault() : finish()"
     >
       <form @submit.prevent="single ? undefined : applyPrefix()">
-        <h2 :id="titleId">
+        <UiHeading :id="titleId" class="title">
           {{ single ? `«${conflicts[0]!.name}» уже существует` : "Имена уже заняты" }}
-        </h2>
-        <p>
+        </UiHeading>
+        <UiHint size="xs" :space-after="3" wrap>
           В папке «{{ directory || "корень проекта" }}»
           {{ single ? "уже есть запись с таким именем." : `занято записей: ${conflicts.length}:` }}
-        </p>
+        </UiHint>
         <ul v-if="!single">
           <li v-for="item in shown" :key="item.name">{{ item.name }}</li>
           <li v-if="conflicts.length > shown.length">
@@ -84,11 +89,24 @@ defineExpose({ ask });
           </li>
         </ul>
         <template v-if="!single">
-          <label>
-            Добавить префикс ко всем занятым именам
-            <input ref="input" v-model="prefix" maxlength="64" :disabled="busy" required />
-          </label>
-          <p v-if="error" class="error" role="alert">{{ error }}</p>
+          <UiField
+            v-slot="{ control }"
+            layout="plain"
+            label="Добавить префикс ко всем занятым именам"
+            class="prefix"
+            required
+          >
+            <UiControl
+              v-bind="control"
+              ref="input"
+              v-model="prefix"
+              maxlength="64"
+              :disabled="busy"
+            />
+          </UiField>
+          <UiMessage v-if="error" class="error" tone="danger" size="xs" role="alert">{{
+            error
+          }}</UiMessage>
         </template>
         <UiDialogActions>
           <UiButton :disabled="busy" @click="finish()">Отмена</UiButton>
@@ -96,9 +114,9 @@ defineExpose({ ask });
             <UiButton @click="finish({ kind: 'keep' })">
               Оставить оба ({{ conflicts[0]!.free }})
             </UiButton>
-            <UiButton variant="danger" @click="finish({ kind: 'replace' })">Заменить</UiButton>
+            <UiButton tone="danger" @click="finish({ kind: 'replace' })">Заменить</UiButton>
           </template>
-          <UiButton v-else type="submit" variant="solid" :disabled="busy || !prefix.trim()">
+          <UiButton v-else type="submit" appearance="solid" :disabled="busy || !prefix.trim()">
             {{ busy ? "Проверка…" : "Добавить префикс" }}
           </UiButton>
         </UiDialogActions>
@@ -108,16 +126,7 @@ defineExpose({ ask });
 </template>
 
 <style scoped>
-h2 {
-  margin: 0 0 var(--sp-3);
-  font-size: var(--fs-md);
-  font-weight: 500;
-  overflow-wrap: anywhere;
-}
-p {
-  margin: 0 0 var(--sp-3);
-  font-size: var(--fs-xs);
-  color: var(--muted);
+.title {
   overflow-wrap: anywhere;
 }
 ul {
@@ -127,14 +136,11 @@ ul {
   color: var(--text);
   overflow-wrap: anywhere;
 }
-label {
-  display: grid;
-  gap: var(--sp-2);
+.prefix {
   font-size: var(--fs-xs);
-  color: var(--muted);
 }
 .error {
   margin: var(--sp-2) 0 0;
-  color: var(--err);
+  overflow-wrap: anywhere;
 }
 </style>

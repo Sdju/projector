@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiHint from "../../../../../common/ui/UiHint.vue";
 import { computed } from "vue";
 import type {
   CommitComparison,
@@ -56,10 +57,18 @@ const files = computed(() =>
         {{ expanded.size ? "Свернуть всё" : "Развернуть всё" }}
       </UiButton>
     </h3>
-    <p v-if="detail.parents.length > 1" class="note">
+    <UiHint
+      size="xs"
+      leading="inherit"
+      :space-after="2"
+      v-if="detail.parents.length > 1"
+      class="note"
+    >
       Слияние: показаны изменения относительно первого родителя.
-    </p>
-    <p v-if="!files.length" class="note">В этой папке коммит ничего не менял.</p>
+    </UiHint>
+    <UiHint size="xs" leading="inherit" :space-after="2" v-if="!files.length" class="note"
+      >В этой папке коммит ничего не менял.</UiHint
+    >
     <ul v-else class="files">
       <li v-for="file in files" :key="file.path">
         <div class="file-row">
@@ -77,7 +86,7 @@ const files = computed(() =>
             <b class="status" :class="file.status">{{ file.status }}</b>
             <FileIcon :icon="file.icon" />
             <span class="name">{{ file.name }}</span>
-            <span class="dir">
+            <span class="dir u-truncate">
               <template v-if="file.originalPath">{{ file.originalPath }} → </template
               >{{ file.directory }}
             </span>
@@ -92,7 +101,7 @@ const files = computed(() =>
           </button>
           <UiButton
             v-if="!file.binary"
-            icon
+            shape="icon"
             size="sm"
             title="Открыть изменения во вкладке"
             :aria-label="`Открыть изменения во вкладке: ${file.path}`"
@@ -103,10 +112,23 @@ const files = computed(() =>
           </UiButton>
         </div>
         <div v-if="expanded.has(file.path)" class="inline">
-          <p v-if="diffs[file.path]?.loading" class="note" role="status">загрузка…</p>
-          <p v-else-if="diffs[file.path]?.error" class="note error" role="alert">
+          <UiHint
+            size="xs"
+            leading="inherit"
+            v-if="diffs[file.path]?.loading"
+            class="note"
+            role="status"
+            >загрузка…</UiHint
+          >
+          <UiHint
+            size="xs"
+            leading="inherit"
+            v-else-if="diffs[file.path]?.error"
+            class="note error"
+            role="alert"
+          >
             {{ diffs[file.path]!.error }}
-          </p>
+          </UiHint>
           <CommitFileDiff
             v-else-if="diffs[file.path]?.data"
             :comparison="diffs[file.path]!.data!"
@@ -213,9 +235,6 @@ h3 span {
 .dir {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   direction: rtl;
   text-align: left;
   color: var(--faint);
@@ -245,12 +264,7 @@ h3 span {
 .del {
   color: var(--err);
 }
-.note {
-  margin: 0 0 var(--sp-2);
-  color: var(--muted);
-  font-size: var(--fs-xs);
-}
-.error {
+.note.error {
   color: var(--err);
 }
 </style>

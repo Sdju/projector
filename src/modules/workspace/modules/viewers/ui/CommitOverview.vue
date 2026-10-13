@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiHint from "../../../../../common/ui/UiHint.vue";
 import { computed, ref, watch } from "vue";
 import type { GitCommitDetail } from "../../../../../../core/modules/workspace/index.ts";
 import { commandArgs, useCommandScope } from "../../../../../common/utilities/commands.ts";
@@ -109,8 +110,18 @@ watch(() => [props.projectId, props.hash], load, { immediate: true });
 
 <template>
   <div class="overview">
-    <p v-if="loading" class="note" role="status">загрузка коммита…</p>
-    <p v-else-if="error" class="note error" role="alert">{{ error }}</p>
+    <UiHint size="xs" leading="inherit" :space-after="2" v-if="loading" class="note" role="status"
+      >загрузка коммита…</UiHint
+    >
+    <UiHint
+      size="xs"
+      leading="inherit"
+      :space-after="2"
+      v-else-if="error"
+      class="note error"
+      role="alert"
+      >{{ error }}</UiHint
+    >
     <article v-else-if="detail">
       <CommitMeta :detail="detail" @open-commit="emit('openCommit', $event)" />
       <CommitFiles
@@ -136,12 +147,7 @@ watch(() => [props.projectId, props.hash], load, { immediate: true });
 article {
   max-width: 880px;
 }
-.note {
-  margin: 0 0 var(--sp-2);
-  color: var(--muted);
-  font-size: var(--fs-xs);
-}
-.error {
+.note.error {
   color: var(--err);
 }
 </style>

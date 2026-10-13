@@ -83,13 +83,17 @@ const refs = computed(() =>
         />
         <span class="text">
           <span class="line">
-            <span class="subject">{{ commit.subject || "(без описания)" }}</span>
-            <span v-for="ref in refs" :key="ref.kind + ref.name" class="ref" :class="ref.kind">{{
-              ref.name
-            }}</span>
+            <span class="subject u-truncate">{{ commit.subject || "(без описания)" }}</span>
+            <span
+              v-for="ref in refs"
+              :key="ref.kind + ref.name"
+              class="ref u-truncate"
+              :class="ref.kind"
+              >{{ ref.name }}</span
+            >
           </span>
           <span class="meta">
-            <span v-if="!ownCommit" class="author">{{ commit.author }}</span>
+            <span v-if="!ownCommit" class="author u-truncate">{{ commit.author }}</span>
             <span>{{ relativeTime(commit.date, now) }}</span>
             <code>{{ shortHash(commit.hash) }}</code>
             <span v-if="commit.unpushed" class="flag" title="Ещё не отправлен в upstream">↑</span>
@@ -99,7 +103,7 @@ const refs = computed(() =>
         <IconChevronRight class="chevron" :class="{ open: expanded }" aria-hidden="true" />
       </button>
       <UiButton
-        icon
+        shape="icon"
         size="sm"
         class="open"
         title="Открыть обзор коммита"
@@ -123,7 +127,7 @@ const refs = computed(() =>
             <b class="del">−{{ state.detail.deletions }}</b>
           </span>
           <UiButton
-            icon
+            shape="icon"
             size="sm"
             title="Копировать хеш"
             aria-label="Копировать хеш"
@@ -189,8 +193,6 @@ const refs = computed(() =>
 }
 .subject {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
   font-size: var(--fs-xs);
   color: var(--text);
 }
@@ -200,8 +202,6 @@ const refs = computed(() =>
   overflow: hidden;
 }
 .author {
-  overflow: hidden;
-  text-overflow: ellipsis;
   color: var(--muted);
 }
 .meta code {
@@ -213,8 +213,6 @@ const refs = computed(() =>
 .ref {
   flex-shrink: 0;
   max-width: 110px;
-  overflow: hidden;
-  text-overflow: ellipsis;
   padding: 0 5px;
   border: 1px solid var(--line);
   border-radius: var(--r-sm);

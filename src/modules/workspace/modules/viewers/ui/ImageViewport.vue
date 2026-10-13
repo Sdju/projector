@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import UiPanel from "../../../../../common/ui/UiPanel.vue";
+import UiControl from "../../../../../common/ui/UiControl.vue";
+import UiInline from "../../../../../common/ui/UiInline.vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { fitImage, zoomImageAt, type ImageTransform } from "../lib/image-viewport.ts";
 import UiButton from "../../../../../common/ui/UiButton.vue";
@@ -208,7 +211,7 @@ defineExpose({ reset });
 </script>
 
 <template>
-  <section class="image-viewport" :class="{ floating }" aria-label="Просмотр изображения">
+  <UiPanel class="image-viewport" :class="{ floating }" aria-label="Просмотр изображения">
     <div
       ref="canvas"
       class="image-canvas"
@@ -243,7 +246,7 @@ defineExpose({ reset });
     <div class="view-controls">
       <span class="zoom">{{ Math.round(view.zoom * 100) }}%</span>
       <UiButton
-        icon
+        shape="icon"
         size="sm"
         aria-label="Сбросить масштаб"
         title="Масштаб 100% и центрирование изображения"
@@ -252,7 +255,7 @@ defineExpose({ reset });
         <IconRatio aria-hidden="true" />
       </UiButton>
       <UiButton
-        icon
+        shape="icon"
         size="sm"
         aria-label="Вписать"
         title="Вписать изображение в область просмотра"
@@ -260,35 +263,38 @@ defineExpose({ reset });
       >
         <IconMaximize aria-hidden="true" />
       </UiButton>
-      <label v-if="backgroundControls" class="background-control"
+      <UiInline
+        as="label"
+        v-if="backgroundControls"
+        class="background-control"
+        :gap="1.5"
+        justify="normal"
         >Фон
-        <select v-model="localBackground" aria-label="Фон изображения">
+        <UiControl as="select" v-model="localBackground" aria-label="Фон изображения">
           <option value="light">Светлый</option>
           <option value="dark">Тёмный</option>
           <option value="checker">Шашечки</option>
           <option value="gradient">Градиент</option>
           <option value="color-gradient">Цветной градиент</option>
           <option value="custom">Свой цвет</option>
-        </select>
-      </label>
-      <input
+        </UiControl>
+      </UiInline>
+      <UiControl
         v-if="backgroundControls && localBackground === 'custom'"
         v-model="localBackgroundColor"
         type="color"
+        appearance="swatch"
+        swatch-size="sm"
         aria-label="Свой цвет фона изображения"
       />
     </div>
-  </section>
+  </UiPanel>
 </template>
 
 <style scoped>
 .image-viewport {
-  height: 100%;
   flex: 1;
   min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
 }
 .image-canvas {
   position: relative;
@@ -329,21 +335,9 @@ defineExpose({ reset });
   margin-right: auto;
   font-variant-numeric: tabular-nums;
 }
-.background-control {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
 .background-control select {
   width: auto;
   padding-block: 2px;
-}
-.view-controls input[type="color"] {
-  width: 28px;
-  height: 24px;
-  padding: 2px;
-  background: transparent;
-  cursor: pointer;
 }
 /* Тестовые фоны предпросмотра — данные, а не тема интерфейса. */
 .image-canvas {

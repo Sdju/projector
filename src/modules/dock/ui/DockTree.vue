@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import UiResizeHandle from "../../../common/ui/UiResizeHandle.vue";
 import { computed, inject, ref } from "vue";
+import { usePointerDrag } from "../../../common/utilities/pointer-drag.ts";
 import {
   isNodeVisible,
   setSplitSizes,
@@ -47,25 +49,20 @@ function cellSizes(index: number): [number, number] {
   ];
 }
 
-let drag: { index: number; origin: number; start: [number, number] } | undefined;
+let sashIndex = 0;
+const drag = usePointerDrag({
+  start: (event) => ({
+    index: sashIndex,
+    origin: row.value ? event.clientX : event.clientY,
+    start: cellSizes(sashIndex),
+  }),
+  move: (event, state) =>
+    moveSash(state.index, state.start, (row.value ? event.clientX : event.clientY) - state.origin),
+  cursor: () => (row.value ? "col-resize" : "row-resize"),
+});
 function sashDown(event: PointerEvent, index: number) {
-  if (event.button !== 0) return;
-  const target = event.currentTarget as HTMLElement;
-  event.preventDefault();
-  target.focus();
-  target.setPointerCapture(event.pointerId);
-  drag = { index, origin: row.value ? event.clientX : event.clientY, start: cellSizes(index) };
-  document.body.style.cursor = row.value ? "col-resize" : "row-resize";
-  document.body.style.userSelect = "none";
-}
-function sashMove(event: PointerEvent) {
-  if (!drag) return;
-  moveSash(drag.index, drag.start, (row.value ? event.clientX : event.clientY) - drag.origin);
-}
-function sashUp() {
-  drag = undefined;
-  document.body.style.cursor = "";
-  document.body.style.userSelect = "";
+  sashIndex = index;
+  drag.start(event);
 }
 function sashKey(event: KeyboardEvent, index: number) {
   const keys = row.value ? ["ArrowLeft", "ArrowRight"] : ["ArrowUp", "ArrowDown"];
@@ -80,18 +77,15 @@ function sashKey(event: KeyboardEvent, index: number) {
   <DockGroupView v-if="node.type === 'group'" :group="node" />
   <div v-else ref="element" class="dock-split" :class="split!.direction">
     <template v-for="(child, index) in visibleChildren" :key="child.id">
-      <div
+      <UiResizeHandle
         v-if="index"
+        appearance="gap"
         class="dock-sash"
         :class="split!.direction"
-        role="separator"
-        :aria-orientation="row ? 'vertical' : 'horizontal'"
+        :orientation="row ? 'vertical' : 'horizontal'"
         :aria-label="row ? 'Ширина блока' : 'Высота блока'"
         tabindex="0"
         @pointerdown="sashDown($event, index)"
-        @pointermove="sashMove"
-        @pointerup="sashUp"
-        @pointercancel="sashUp"
         @keydown="sashKey($event, index)"
       />
       <div class="dock-cell" :style="{ flex: `${sizeOf(child) / visibleShare} 1 0` }">
@@ -124,43 +118,6 @@ function sashKey(event: KeyboardEvent, index: number) {
 }
 .column > .dock-cell {
   min-height: 100px;
-}
-/* Зазор между островами и есть зона захвата; при наведении проступает тонкая линия */
-.dock-sash {
-  position: relative;
-  z-index: 1;
-  flex: none;
-  touch-action: none;
-}
-.dock-sash.row {
-  width: var(--island-gap);
-  cursor: col-resize;
-}
-.dock-sash.column {
-  height: var(--island-gap);
-  cursor: row-resize;
-}
-.dock-sash::before {
-  content: "";
-  position: absolute;
-  border-radius: var(--r-full);
-  transition: background var(--t-fast);
-}
-.dock-sash.row::before {
-  inset: 0 calc(var(--island-gap) / 2 - 1px);
-}
-.dock-sash.column::before {
-  inset: calc(var(--island-gap) / 2 - 1px) 0;
-}
-.dock-sash:hover::before,
-.dock-sash:active::before {
-  background: var(--line-strong);
-}
-.dock-sash:focus-visible {
-  outline: none;
-}
-.dock-sash:focus-visible::before {
-  background: var(--focus);
 }
 @media (max-width: 700px) {
   .dock-split.row {

@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import UiScrollArea from "../../../common/ui/UiScrollArea.vue";
+import UiControl from "../../../common/ui/UiControl.vue";
+import UiInline from "../../../common/ui/UiInline.vue";
+import UiMessage from "../../../common/ui/UiMessage.vue";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import type { SearchHit } from "../../../../core/modules/workspace/index.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
@@ -141,19 +145,27 @@ defineExpose({ search, refresh });
 </script>
 
 <template>
-  <div class="side-content search-panel">
+  <UiScrollArea class="side-content search-panel">
     <form class="search-form" @submit.prevent="search">
-      <div class="search-box">
-        <input
+      <UiInline class="search-box" :gap="0.5" justify="normal">
+        <UiControl
+          grow
           v-model="query"
           type="search"
           placeholder="Найти в проекте…"
           aria-label="Поиск по содержимому"
           maxlength="200"
         />
-        <div class="search-options" role="group" aria-label="Параметры поиска">
+        <UiInline
+          :gap="0.5"
+          align="normal"
+          justify="normal"
+          class="search-options"
+          role="group"
+          aria-label="Параметры поиска"
+        >
           <UiButton
-            icon
+            shape="icon"
             size="sm"
             :active="searchCase"
             :aria-pressed="searchCase"
@@ -164,7 +176,7 @@ defineExpose({ search, refresh });
             <IconCaseSensitive aria-hidden="true" />
           </UiButton>
           <UiButton
-            icon
+            shape="icon"
             size="sm"
             :active="searchWord"
             :aria-pressed="searchWord"
@@ -175,7 +187,7 @@ defineExpose({ search, refresh });
             <IconWholeWord aria-hidden="true" />
           </UiButton>
           <UiButton
-            icon
+            shape="icon"
             size="sm"
             :active="searchRegex"
             :aria-pressed="searchRegex"
@@ -185,18 +197,22 @@ defineExpose({ search, refresh });
           >
             <IconRegex aria-hidden="true" />
           </UiButton>
-        </div>
-      </div>
+        </UiInline>
+      </UiInline>
     </form>
-    <p v-if="searching" class="notice" role="status">поиск…</p>
-    <p v-if="searchError" class="notice error" role="alert">{{ searchError }}</p>
-    <p v-if="searched" class="notice">
+    <UiMessage v-if="searching" class="notice" tone="muted" size="xs" role="status"
+      >поиск…</UiMessage
+    >
+    <UiMessage v-if="searchError" class="notice" tone="danger" size="xs" role="alert">{{
+      searchError
+    }}</UiMessage>
+    <UiMessage v-if="searched" class="notice" tone="muted" size="xs">
       {{
         hits.length
           ? `${hits.length} совпадений в ${searchGroups.length} файлах${truncated ? " · показаны первые 200" : ""}`
           : "Совпадений нет"
       }}
-    </p>
+    </UiMessage>
     <div v-for="group in searchGroups" :key="group.path" class="result-group">
       <button
         class="result-group-header"
@@ -208,8 +224,8 @@ defineExpose({ search, refresh });
         <IconChevronDown v-if="!collapsedGroups.has(group.path)" aria-hidden="true" />
         <IconChevronRight v-else aria-hidden="true" />
         <IconFile class="result-file-icon" aria-hidden="true" />
-        <span class="result-file">{{ group.name }}</span>
-        <span v-if="group.directory" class="result-dir">{{ group.directory }}</span>
+        <span class="result-file u-truncate">{{ group.name }}</span>
+        <span v-if="group.directory" class="result-dir u-truncate">{{ group.directory }}</span>
         <span class="result-count">{{ group.hits.length }}</span>
       </button>
       <template v-if="!collapsedGroups.has(group.path)">
@@ -221,7 +237,7 @@ defineExpose({ search, refresh });
           @click="emit('open', hit.path, hit.line, hit.column)"
         >
           <span class="result-line">{{ hit.line }}</span>
-          <span class="snippet"
+          <span class="snippet u-truncate"
             ><template v-for="(segment, index) in snippetSegments(hit)" :key="index"
               ><mark v-if="segment.match">{{ segment.text }}</mark
               ><template v-else>{{ segment.text }}</template></template
@@ -230,35 +246,19 @@ defineExpose({ search, refresh });
         </button>
       </template>
     </div>
-  </div>
+  </UiScrollArea>
 </template>
 
 <style scoped>
 .search-panel form {
   margin: 2px 10px var(--sp-2);
 }
-.search-box {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
 .search-box input {
-  flex: 1;
-  min-width: 0;
   font-size: var(--fs-xs);
-}
-.search-options {
-  display: flex;
-  gap: 2px;
 }
 
 .notice {
   padding: 0 var(--sp-3);
-  color: var(--muted);
-  font-size: var(--fs-xs);
-}
-.error {
-  color: var(--err);
 }
 .result-group {
   border-bottom: 1px solid var(--line);
@@ -288,18 +288,12 @@ defineExpose({ search, refresh });
 .result-file {
   font-size: var(--fs-xs);
   color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .result-dir {
   flex: 1;
   min-width: 0;
   font-size: var(--fs-2xs);
   color: var(--faint);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .result-count {
   flex-shrink: 0;
@@ -334,9 +328,6 @@ defineExpose({ search, refresh });
   flex: 1;
   min-width: 0;
   font: var(--fs-2xs) var(--mono);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .snippet mark {
   color: inherit;

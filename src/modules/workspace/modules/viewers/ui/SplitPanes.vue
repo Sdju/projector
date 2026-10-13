@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import UiResizeHandle from "../../../../../common/ui/UiResizeHandle.vue";
 import { computed, ref, watch } from "vue";
+import { usePointerDrag } from "../../../../../common/utilities/pointer-drag.ts";
 const props = withDefaults(
   defineProps<{
     topLabel?: string;
@@ -13,7 +15,6 @@ const props = withDefaults(
 const panes = ref<HTMLElement>();
 const split = ref(props.initial);
 const lastSplit = ref(props.initial);
-const dragging = ref(false);
 let dragStart = props.initial;
 const rows = computed(() => ({
   gridTemplateRows: props.solo
@@ -40,32 +41,28 @@ function setSplit(value: number) {
 function restoreSplit() {
   split.value = lastSplit.value;
 }
-function startResize(event: PointerEvent) {
-  if (event.button !== 0) return;
-  event.preventDefault();
-  const handle = event.currentTarget as HTMLElement;
-  handle.focus();
-  handle.setPointerCapture(event.pointerId);
-  dragStart = split.value;
-  if (split.value > 0 && split.value < 1) lastSplit.value = split.value;
-  dragging.value = true;
-}
-function moveResize(event: PointerEvent) {
-  if (!dragging.value || !panes.value) return;
-  const rect = panes.value.getBoundingClientRect();
-  setSplit((event.clientY - rect.top - 6) / Math.max(1, rect.height - 12));
-}
-function finishResize(event: PointerEvent) {
-  dragging.value = false;
-  const handle = event.currentTarget as HTMLElement;
-  if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
-}
+const drag = usePointerDrag({
+  start: () => {
+    dragStart = split.value;
+    if (split.value > 0 && split.value < 1) lastSplit.value = split.value;
+    return dragStart;
+  },
+  move: (event) => {
+    if (!panes.value) return;
+    const rect = panes.value.getBoundingClientRect();
+    setSplit((event.clientY - rect.top - 6) / Math.max(1, rect.height - 12));
+  },
+  finish: (reason, start) => {
+    if (reason === "cancel") split.value = start;
+  },
+});
+const { dragging, start: startResize } = drag;
 function resizeKey(event: KeyboardEvent) {
   if (!["ArrowUp", "ArrowDown", "Home", "End", "Enter", "Escape"].includes(event.key)) return;
   event.preventDefault();
   if (event.key === "Escape") {
     if (dragging.value) split.value = dragStart;
-    dragging.value = false;
+    drag.stop();
   } else if (event.key === "Enter") restoreSplit();
   else if (event.key === "Home") setSplit(0);
   else if (event.key === "End") setSplit(1);
@@ -88,12 +85,11 @@ watch(
 <template>
   <div ref="panes" class="panes" :class="{ dragging }" :style="rows">
     <div v-show="solo || split > 0" class="top-pane"><slot name="top" /></div>
-    <div
+    <UiResizeHandle
       v-show="!solo"
+      :labelled="split === 0 || split === 1"
       class="pane-resize"
-      role="separator"
       :aria-label="`Соотношение высот: ${lower(top)} / ${lower(bottom)}`"
-      aria-orientation="horizontal"
       :aria-valuenow="Math.round(split * 100)"
       aria-valuemin="0"
       aria-valuemax="100"
@@ -107,18 +103,11 @@ watch(
       :title="separatorTitle"
       tabindex="0"
       @pointerdown="startResize"
-      @pointermove="moveResize"
-      @pointerup="finishResize"
-      @pointercancel="
-        split = dragStart;
-        finishResize($event);
-      "
-      @lostpointercapture="dragging = false"
       @dblclick="restoreSplit"
       @keydown="resizeKey"
     >
       <span>{{ split === 0 ? `${top} ▾` : split === 1 ? `${bottom} ▴` : "" }}</span>
-    </div>
+    </UiResizeHandle>
     <div v-show="!solo && split < 1" class="bottom-pane"><slot name="bottom" /></div>
   </div>
 </template>
@@ -132,33 +121,10 @@ watch(
 }
 .pane-resize {
   grid-row: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   position: relative;
-  cursor: row-resize;
-  touch-action: none;
-  user-select: none;
-  background: var(--bg-3);
-  border-block: 1px solid var(--line);
   color: var(--text);
   font-size: var(--fs-2xs);
   line-height: var(--fs-2xs);
-}
-.pane-resize::before {
-  content: "";
-  width: 36px;
-  height: 2px;
-  border-radius: var(--r-sm);
-  background: var(--faint);
-}
-.pane-resize:has(span:not(:empty))::before {
-  display: none;
-}
-.pane-resize:hover,
-.pane-resize:focus-visible {
-  background: var(--bg-4);
-  outline-offset: -2px;
 }
 .panes.dragging,
 .panes.dragging * {

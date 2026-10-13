@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiActionRow from "../../../../../common/ui/UiActionRow.vue";
 import { computed, ref } from "vue";
 import IconPlus from "~icons/lucide/plus";
 import IconMinus from "~icons/lucide/minus";
@@ -96,7 +97,13 @@ function toggle(path: string) {
         @contextmenu="emit('context', $event, entry.path)"
         @keydown.shift.f10.prevent="emit('context', $event, entry.path)"
       >
-        <button
+        <UiActionRow
+          interaction="item"
+          radius="none"
+          tone="muted"
+          :gap="1.5"
+          :fill="false"
+          padding="5px 10px"
           class="entry"
           :disabled="disabled"
           :class="{ selected: !entry.directory && selected === entry.path }"
@@ -121,10 +128,10 @@ function toggle(path: string) {
             />
           </span>
           <FileIcon :icon="entry.icon" />
-          <span class="name">{{ entry.name }}</span>
+          <span class="name u-truncate">{{ entry.name }}</span>
           <span v-if="entry.directory" class="count">{{ entry.changes.length }}</span>
           <b v-else class="status">{{ staged ? entry.change.index : entry.change.worktree }}</b>
-        </button>
+        </UiActionRow>
         <button
           v-if="!readonly"
           class="git-action"
@@ -180,20 +187,6 @@ function toggle(path: string) {
 .entry {
   flex: 1;
   min-width: 0;
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  text-align: left;
-  padding: 5px 10px;
-  color: var(--muted);
-}
-.entry:hover {
-  background: var(--hover);
-  color: var(--text);
-}
-.entry.selected {
-  background: var(--active);
-  color: var(--text);
 }
 .git-action {
   display: grid;
@@ -244,9 +237,6 @@ function toggle(path: string) {
 .name {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .count,
 .status {
