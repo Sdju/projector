@@ -46,6 +46,7 @@ function focusOut(event: FocusEvent) {
         :content="content"
         @change="emit('change', $event)"
         @open="emit('open', $event)"
+        @source="emit('mode', 'source')"
         @error="editorError = $event"
       />
       <CodeViewer
