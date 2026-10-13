@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="data:," />
+    <title>Native UI control contracts</title>
+  </head>
+  <body>
+    <div id="fixture"></div>
+    <script type="module">
+      import "/src/app/styles.css";
+      import { createApp, h, reactive, nextTick } from "vue";
+      import UiControl from "/src/common/ui/UiControl.vue";
+      const model = reactive({
+        text: "",
+        lazy: "",
+        trim: "",
+        number: 1,
+        memo: "",
+        checked: false,
+        choices: [],
+        radio: "a",
+        single: { id: 1 },
+        multiple: [{ id: 1 }],
+        external: "Первое значение",
+      });
+      const actions = [];
+      const free = reactive({ checked: true, value: "Начальное", tick: 0, controlled: false });
+      const refs = {};
+      const options = [model.single, { id: 2 }];
+      const field = (name, props = {}, children) =>
+        h("label", [
+          name,
+          h(
+            UiControl,
+            {
+              name,
+              "aria-label": name,
+              modelValue: model[name],
+              "onUpdate:modelValue": (value) => (model[name] = value),
+              ...props,
+            },
+            children,
+          ),
+        ]);
+      createApp({
+        render: () =>
+          h(
+            "form",
+            {
+              id: "controls",
+              onSubmit: (event) => {
+                event.preventDefault();
+                actions.push(["submit", Object.fromEntries(new FormData(event.target))]);
+              },
+            },
+            [
+              field("text", {
+                required: true,
+                onInput: (event) =>
+                  actions.push(["input", event.target.tagName, event.target.value]),
+                onCompositionstart: () => actions.push(["compositionstart"]),
+                onCompositionend: () => actions.push(["compositionend"]),
+              }),
+              field("lazy", { modelModifiers: { lazy: true } }),
+              field("trim", { modelModifiers: { trim: true } }),
+              field("number", { type: "number", modelModifiers: { number: true } }),
+              field("memo", { as: "textarea" }),
+              field("checked", { type: "checkbox" }),
+              field("choices", { type: "checkbox", value: "one" }),
+              field("choices", { type: "checkbox", value: "two" }),
+              field("radio", { type: "radio", name: "radio", value: "a" }),
+              field("radio", { type: "radio", name: "radio", value: "b" }),
+              field("single", { as: "select" }, () =>
+                options.map((value) => h("option", { value }, "Выбор " + value.id)),
+              ),
+              field("multiple", { as: "select", multiple: true }, () =>
+                options.map((value) => h("option", { value }, "Выбор " + value.id)),
+              ),
+              h("label", [
+                "external",
+                h(UiControl, {
+                  name: "external",
+                  "aria-label": "external",
+                  value: model.external,
+                  onInput: (event) => actions.push(["external", event.target.value]),
+                }),
+              ]),
+              h("fieldset", { disabled: true }, [field("disabled", { modelValue: "Недоступно" })]),
+              ...["native", "kit"].map((kind) => {
+                const tag = kind === "native" ? "input" : UiControl;
+                return h("fieldset", { "data-kind": kind }, [
+                  h(tag, {
+                    name: `${kind}-free-text`,
+                    value: free.value,
+                    "data-tick": free.tick,
+                    ref: (el) => (refs[kind] = el),
+                    "onUpdate:modelValue": (value) =>
+                      actions.push([`${kind}-unexpected-model`, value]),
+                    onInput: (event) => actions.push([`${kind}-free-input`, event.target.value]),
+                  }),
+                  h(tag, {
+                    name: `${kind}-free-check`,
+                    type: "checkbox",
+                    checked: free.checked,
+                    value: "accepted",
+                    "data-tick": free.tick,
+                    "onUpdate:modelValue": (value) =>
+                      actions.push([`${kind}-unexpected-model`, value]),
+                    onChange: (event) =>
+                      actions.push([`${kind}-free-change`, event.target.checked]),
+                  }),
+                  h(tag, {
+                    name: `${kind}-free-radio`,
+                    type: "radio",
+                    checked: true,
+                    value: "selected",
+                  }),
+                  h(kind === "native" ? "textarea" : UiControl, {
+                    as: kind === "kit" ? "textarea" : undefined,
+                    name: `${kind}-free-memo`,
+                    value: "Свободный текст",
+                    "data-tick": free.tick,
+                    ref: (el) => (refs[`${kind}-memo`] = el),
+                  }),
+                  h(
+                    kind === "native" ? "select" : UiControl,
+                    {
+                      as: kind === "kit" ? "select" : undefined,
+                      name: `${kind}-free-select`,
+                      "data-tick": free.tick,
+                      ref: (el) => (refs[`${kind}-select`] = el),
+                    },
+                    kind === "native"
+                      ? [
+                          h("option", { value: "a" }, "Первый"),
+                          h("option", { value: "b", selected: true }, "Второй"),
+                        ]
+                      : () => [
+                          h("option", { value: "a" }, "Первый"),
+                          h("option", { value: "b", selected: true }, "Второй"),
+                        ],
+                  ),
+                ]);
+              }),
+              h(UiControl, {
+                name: "dynamic",
+                type: "checkbox",
+                checked: true,
+                ...(free.controlled ? { modelValue: free.checked } : {}),
+                "onUpdate:modelValue": (value) => (free.checked = value),
+              }),
+              h("button", { type: "submit" }, "Отправить"),
+            ],
+          ),
+      }).mount("#fixture");
+      window.fixture = {
+        model,
+        actions,
+        ready: true,
+        async settle() {
+          await nextTick();
+          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        },
+        setExternal(value) {
+          model.external = value;
+        },
+        options,
+        free,
+        refs,
+      };
+    </script>
+    <style>
+      form {
+        display: grid;
+        gap: 8px;
+        max-width: 600px;
+        margin: 16px;
+      }
+      label {
+        display: block;
+      }
+      select[multiple] {
+        height: 80px;
+      }
+    </style>
+  </body>
+</html>

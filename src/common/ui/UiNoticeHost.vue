@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiPopupSurface from "./UiPopupSurface.vue";
 import { dismissNotice, notices, type Notice } from "../utilities/notice.ts";
 import IconCheck from "~icons/lucide/check";
 import IconAlert from "~icons/lucide/circle-alert";
@@ -20,7 +21,10 @@ function place(notice: Notice) {
 <template>
   <Teleport to="body">
     <div class="notice-layer" aria-live="polite">
-      <div
+      <UiPopupSurface
+        border="strong"
+        radius="md"
+        surface="tertiary"
         v-for="notice in notices"
         :key="notice.id"
         class="notice"
@@ -32,7 +36,7 @@ function place(notice: Notice) {
         <IconCheck v-if="notice.kind === 'success'" aria-hidden="true" />
         <IconAlert v-else aria-hidden="true" />
         <span>{{ notice.text }}</span>
-      </div>
+      </UiPopupSurface>
     </div>
   </Teleport>
 </template>
@@ -51,11 +55,7 @@ function place(notice: Notice) {
   gap: var(--sp-2);
   max-width: min(360px, calc(100vw - 2 * var(--sp-4)));
   padding: var(--sp-1) var(--sp-3);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-md);
-  background: var(--bg-3);
   color: var(--text);
-  box-shadow: var(--shadow-popover);
   font-size: var(--fs-xs);
   line-height: var(--lh);
   animation: notice-in var(--t-base);

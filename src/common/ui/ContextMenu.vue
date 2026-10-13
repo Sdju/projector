@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref, useId } from "vue";
+import UiPopupSurface from "./UiPopupSurface.vue";
+import UiBadge from "./UiBadge.vue";
+import { nextTick, onBeforeUnmount, ref, useId, computed } from "vue";
 import type { ContextMenuItem } from "./context-menu.ts";
 const props = defineProps<{ items: ContextMenuItem[]; label?: string }>();
-const menu = ref<HTMLElement>();
+const surface = ref<InstanceType<typeof UiPopupSurface>>();
+const menu = computed(() => surface.value?.element);
 const anchorName = `--context-${useId().replace(/[^a-z0-9-]/gi, "")}`;
 const point = ref({ x: 0, y: 0 });
 let trigger: HTMLElement | undefined;
@@ -102,6 +105,15 @@ function openForElement(element: HTMLElement) {
   return open(new KeyboardEvent("keydown"), element);
 }
 defineExpose({ open, openForElement, close });
+function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) {
+  return tone === "spare"
+    ? "info"
+    : tone === "hot"
+      ? "warning"
+      : tone === "over"
+        ? "danger"
+        : "neutral";
+}
 </script>
 <template>
   <Teleport to="body">
@@ -109,8 +121,11 @@ defineExpose({ open, openForElement, close });
       class="context-anchor"
       :style="{ left: `${point.x}px`, top: `${point.y}px`, anchorName }"
     />
-    <div
-      ref="menu"
+    <UiPopupSurface
+      ref="surface"
+      border="strong"
+      radius="md"
+      surface="tertiary"
       popover="auto"
       role="menu"
       class="context-menu"
@@ -131,15 +146,13 @@ defineExpose({ open, openForElement, close });
         >
           <span class="item-label"
             ><component :is="item.icon" v-if="item.icon" aria-hidden="true" />{{ item.label }}</span
-          ><span
-            v-if="item.hint"
-            class="hint"
-            :class="item.hint.tone && `tone-${item.hint.tone}`"
-            >{{ item.hint.text }}</span
+          ><UiBadge v-if="item.hint" class="hint" mono shrink :tone="hintTone(item.hint.tone)">{{
+            item.hint.text
+          }}</UiBadge
           ><kbd v-if="item.shortcut">{{ item.shortcut }}</kbd>
         </button>
       </template>
-    </div>
+    </UiPopupSurface>
   </Teleport>
 </template>
 <style scoped>
@@ -163,11 +176,7 @@ defineExpose({ open, openForElement, close });
   max-height: calc(100dvh - 16px);
   overflow-y: auto;
   padding: var(--sp-1);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-md);
-  background: var(--bg-3);
   color: var(--text);
-  box-shadow: var(--shadow-popover);
   font: var(--fs-xs) var(--sans);
 }
 .context-menu button {
@@ -201,26 +210,6 @@ defineExpose({ open, openForElement, close });
   width: 14px;
   height: 14px;
   flex-shrink: 0;
-}
-.hint {
-  padding: 1px 6px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  color: var(--muted);
-  font: var(--fs-2xs) var(--mono);
-  font-variant-numeric: tabular-nums;
-}
-.hint.tone-spare {
-  color: var(--info);
-  border-color: color-mix(in srgb, var(--info) 55%, var(--line));
-}
-.hint.tone-hot {
-  color: var(--warn);
-  border-color: color-mix(in srgb, var(--warn) 55%, var(--line));
-}
-.hint.tone-over {
-  color: var(--err);
-  border-color: color-mix(in srgb, var(--err) 55%, var(--line));
 }
 kbd {
   color: var(--muted);

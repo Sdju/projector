@@ -1,12 +1,13 @@
+<script setup lang="ts">
+import UiInline from "./UiInline.vue";
+</script>
+
 <template>
-  <div class="actions"><slot /></div>
+  <UiInline class="actions" align="normal" justify="flex-end"><slot /></UiInline>
 </template>
 
 <style scoped>
 .actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--sp-2);
   margin-top: var(--sp-5);
 }
 </style>

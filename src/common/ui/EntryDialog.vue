@@ -1,12 +1,17 @@
 <script setup lang="ts">
+import UiHint from "./UiHint.vue";
+import UiMessage from "./UiMessage.vue";
+import UiHeading from "./UiHeading.vue";
+import UiControl, { type UiControlHandle } from "./UiControl.vue";
 import { nextTick, ref, useId } from "vue";
 import UiButton from "./UiButton.vue";
 import UiDialog from "./UiDialog.vue";
 import UiDialogActions from "./UiDialogActions.vue";
 const emit = defineEmits<{ submit: [value: string]; cancel: [] }>();
 const titleId = useId();
+const inputId = useId();
 const dialog = ref<InstanceType<typeof UiDialog>>();
-const input = ref<HTMLInputElement>();
+const input = ref<UiControlHandle>();
 const title = ref("");
 const value = ref("");
 const description = ref("");
@@ -55,18 +60,21 @@ defineExpose({ open, close, fail });
       @cancel="busy ? $event.preventDefault() : emit('cancel')"
     >
       <form @submit.prevent="submit">
-        <h2 :id="titleId">{{ title }}</h2>
-        <p v-if="description">{{ description }}</p>
-        <input
+        <UiHeading :id="titleId">{{ title }}</UiHeading>
+        <UiHint v-if="description" size="xs" :space-after="3" wrap>{{ description }}</UiHint>
+        <UiControl
           v-if="!confirm"
           ref="input"
+          :id="inputId"
           v-model="value"
           :aria-label="title"
           :disabled="busy"
           required
           maxlength="255"
         />
-        <p v-if="error" class="error" role="alert">{{ error }}</p>
+        <UiMessage v-if="error" tone="danger" size="xs" class="error" role="alert">{{
+          error
+        }}</UiMessage>
         <UiDialogActions>
           <UiButton
             :disabled="busy"
@@ -79,7 +87,8 @@ defineExpose({ open, close, fail });
           </UiButton>
           <UiButton
             type="submit"
-            :variant="confirm ? 'danger' : 'solid'"
+            :appearance="confirm ? 'outline' : 'solid'"
+            :tone="confirm ? 'danger' : 'neutral'"
             :disabled="busy || (!confirm && !value.trim())"
           >
             {{ busy ? "Выполняется…" : confirm ? "Удалить" : "Сохранить" }}
@@ -89,19 +98,10 @@ defineExpose({ open, close, fail });
     </UiDialog>
   </Teleport>
 </template>
+
 <style scoped>
-h2 {
-  margin: 0 0 var(--sp-3);
-  font-size: var(--fs-md);
-  font-weight: 500;
-}
-p {
-  margin: 0 0 var(--sp-3);
-  font-size: var(--fs-xs);
-  overflow-wrap: anywhere;
-  color: var(--muted);
-}
 .error {
-  color: var(--err);
+  margin: 0 0 var(--sp-3);
+  overflow-wrap: anywhere;
 }
 </style>

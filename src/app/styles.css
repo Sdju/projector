@@ -227,6 +227,22 @@ select:focus-visible {
   }
 }
 
+/* Single-line ellipsis for both Vue templates and imperative editor widgets. */
+.u-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Preserve accessible content and native label/legend semantics without a DOM wrapper. */
+.u-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
 /* Попапы-острова на узком экране становятся нижней шторкой: на всю ширину между островами, со скримом */
 body .mobile-sheet.mobile-sheet {
   position: fixed;
@@ -247,11 +263,4 @@ body .mobile-sheet.mobile-sheet {
     transform: translateY(24px);
     opacity: 0;
   }
-}
-body .mobile-sheet .up {
-  transform: none;
-}
-/* Подсказки про клавиатуру на тач-экране не нужны */
-body .mobile-sheet .foot {
-  display: none;
 }

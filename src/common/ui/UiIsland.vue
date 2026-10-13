@@ -1,20 +1,29 @@
 <script setup lang="ts">
+import UiPopupSurface from "./UiPopupSurface.vue";
+import type { ComponentPublicInstance } from "vue";
 import type { useIslandMenu } from "../utilities/island-menu.ts";
 
-defineProps<{
+const props = defineProps<{
   menu: ReturnType<typeof useIslandMenu>;
   label: string;
   width?: number;
   gap?: string;
 }>();
+function bindIsland(surface: Element | ComponentPublicInstance | null) {
+  props.menu.island.value = (surface as InstanceType<typeof UiPopupSurface> | null)?.element;
+}
 </script>
 
 <template>
   <Teleport to="body">
-    <section
+    <UiPopupSurface
+      as="section"
+      border="strong"
+      radius="lg"
+      flow="column"
       v-if="menu.open.value"
       :id="menu.id"
-      :ref="menu.island"
+      :ref="bindIsland"
       class="island"
       role="dialog"
       :aria-label="label"
@@ -28,7 +37,7 @@ defineProps<{
       @focusin="menu.trackFocus"
     >
       <slot />
-    </section>
+    </UiPopupSurface>
   </Teleport>
 </template>
 
@@ -36,18 +45,16 @@ defineProps<{
 .island {
   position: fixed;
   z-index: var(--z-popover);
-  display: flex;
-  flex-direction: column;
   gap: var(--island-content-gap);
   width: var(--island-width);
   max-width: calc(100vw - var(--sp-4));
   max-height: calc(100dvh - var(--island-top, 8px) - 8px);
   overflow-y: auto;
   padding: var(--sp-1);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-lg);
-  background: var(--bg-2);
-  box-shadow: var(--shadow-popover);
   font-size: var(--fs-xs);
+}
+.mobile-sheet {
+  --ui-island-chevron-transform: none;
+  --ui-island-footer-display: none;
 }
 </style>

@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
@@ -13,6 +13,29 @@ const { pages, responses = [] } = JSON.parse(process.env.PROJECTOR_FIXTURE);
 const directory =
   process.env.PROJECTOR_FIXTURE_DIR ?? (await mkdtemp(join(tmpdir(), "projector-fixture-")));
 const loaded = await loadConfigFromFile({ command: "serve", mode: "development" });
+// Scan the actual fixture imports before serving them. An empty entries list left
+// dependencies to be discovered in successive browser requests, invalidating old
+// optimized URLs while that first page was still loading (504 Outdated Optimize Dep).
+await mkdir(directory, { recursive: true });
+const entries = await Promise.all(
+  Object.values(pages).map(async (html, index) => {
+    const path = join(directory, `entry-${index}.html`);
+    await writeFile(path, html);
+    return path;
+  }),
+);
+// Temporary HTML lives outside the checkout, so resolve its bare package imports
+// from the same dependency root as the application's Vue modules.
+const entryPackages = [
+  ...new Set(
+    Object.values(pages).flatMap((html) =>
+      [...html.matchAll(/(?:from\s*|import\s*(?:\(\s*)?)["']([^"']+)["']/g)]
+        .map((match) => match[1])
+        .filter((id) => !/^(?:[./~]|https?:|data:)/.test(id))
+        .map((id) => (id.startsWith("@") ? id.split("/").slice(0, 2).join("/") : id.split("/")[0])),
+    ),
+  ),
+];
 const matches = (rule, url) =>
   (rule.equals === undefined || rule.equals === url) &&
   (rule.startsWith === undefined || url.startsWith(rule.startsWith)) &&
@@ -46,7 +69,11 @@ const server = await createServer({
   // Never attach Projector's API/PTY server or write its instance file in this fixture.
   plugins: [...loaded.config.plugins.filter((plugin) => plugin.name !== "projector-api"), fixture],
   cacheDir: join(directory, "vite-cache"),
-  optimizeDeps: { ...loaded.config.optimizeDeps, entries: [] },
+  resolve: {
+    ...loaded.config.resolve,
+    dedupe: [...new Set([...(loaded.config.resolve?.dedupe ?? []), ...entryPackages])],
+  },
+  optimizeDeps: { ...loaded.config.optimizeDeps, entries },
   server: { host: "127.0.0.1", port: 0, strictPort: false },
   logLevel: "error",
 });

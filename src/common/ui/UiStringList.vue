@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiControl from "./UiControl.vue";
 import { ref, useId } from "vue";
 import IconRemove from "~icons/lucide/x";
 import UiButton from "./UiButton.vue";
@@ -66,7 +67,7 @@ function remove(value: string) {
       <li v-for="item in items" :key="item">
         <span class="value" :class="{ mono }">{{ item }}</span>
         <UiButton
-          icon
+          shape="icon"
           size="sm"
           :disabled="disabled"
           :aria-label="`Удалить ${item}`"
@@ -78,8 +79,8 @@ function remove(value: string) {
       <li v-if="!items.length" class="empty">{{ emptyText }}</li>
     </ul>
     <form class="add" @submit.prevent="submit">
-      <label class="sr-only" :for="inputId">{{ inputLabel }}</label>
-      <input
+      <label class="u-sr-only" :for="inputId">{{ inputLabel }}</label>
+      <UiControl
         :id="inputId"
         v-model="draft"
         type="text"
@@ -135,18 +136,11 @@ li {
 }
 .mono,
 .mono.value {
-  font-family: var(--font-mono, ui-monospace, monospace);
+  font-family: ui-monospace, monospace;
 }
 .error {
   margin: var(--sp-2) 0 0;
   color: var(--err);
   font-size: var(--fs-sm);
-}
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
 }
 </style>
