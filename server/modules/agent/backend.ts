@@ -28,6 +28,7 @@ export type AgentEventName =
   | "text"
   | "tool"
   | "tool-result"
+  | "task"
   | "project"
   | "done"
   | "error";

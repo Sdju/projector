@@ -1,4 +1,7 @@
+import type { AgentTask, AgentTaskPatch } from "../../../../core/modules/agent-task/index.ts";
 import type { Project } from "../../project/index.ts";
+
+export type { AgentTask };
 
 export interface AgentToolChip {
   id: string;
@@ -84,6 +87,8 @@ export interface AgentTurn {
   role: "user" | "assistant";
   text: string;
   tools: AgentToolChip[];
+  /** Subagents and background commands the agent started during this answer. */
+  tasks?: AgentTask[];
   /** What the user wrote, with chips; `text` holds the same message as plain text. */
   content?: MessagePart[];
   /** Order of text and tool calls; absent in turns saved before it existed. */
@@ -187,6 +192,7 @@ export type AgentEvent =
   | { event: "text"; data: { text: string } }
   | { event: "tool"; data: { id: string; name: string; input: unknown; parent?: string } }
   | { event: "tool-result"; data: { id: string; name: string; output?: unknown; error?: string } }
+  | { event: "task"; data: AgentTaskPatch }
   | { event: "project"; data: Project }
   | { event: "done"; data: { text: string } }
   | { event: "error"; data: { error: string } };

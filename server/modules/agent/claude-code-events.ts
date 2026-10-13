@@ -1,4 +1,5 @@
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import type { AgentTask, AgentTaskPatch } from "../../../core/modules/agent-task/index.ts";
 import type { AgentEmitter } from "./backend.ts";
 
 export const CLAUDE_LABEL = "Claude Code";
@@ -14,6 +15,13 @@ function flattenContent(content: unknown): string {
     })
     .filter(Boolean)
     .join("\n");
+}
+
+function taskStatus(status: string): AgentTask["status"] {
+  if (status === "completed") return "done";
+  if (status === "failed") return "error";
+  if (status === "killed") return "stopped";
+  return "running";
 }
 
 /**
@@ -34,10 +42,81 @@ export function createClaudeEventMapper(emit: AgentEmitter) {
     emit("text", { text: chunk });
   };
 
+  /** Subagents and background commands: each system message patches one row of the task panel. */
+  function handleTask(message: SDKMessage & { type: "system" }) {
+    const task = (patch: AgentTaskPatch) => emit("task", patch);
+    switch (message.subtype) {
+      case "task_started":
+        if (message.skip_transcript || message.ambient) return;
+        task({
+          id: message.task_id,
+          kind:
+            message.task_type === "local_bash"
+              ? "shell"
+              : message.subagent_type || message.task_type === "local_agent"
+                ? "agent"
+                : "other",
+          title: message.description,
+          status: "running",
+          background: message.is_backgrounded === true,
+          ...(message.subagent_type ? { subagent: message.subagent_type } : {}),
+          ...(message.tool_use_id ? { tool: message.tool_use_id } : {}),
+        });
+        return;
+      case "task_progress":
+        task({
+          id: message.task_id,
+          title: message.description,
+          ...(message.summary ? { summary: message.summary } : {}),
+          ...(message.last_tool_name ? { lastTool: message.last_tool_name } : {}),
+          tools: message.usage.tool_uses,
+          tokens: message.usage.total_tokens,
+          durationMs: message.usage.duration_ms,
+        });
+        return;
+      case "task_updated": {
+        const { status, description, is_backgrounded: background, error } = message.patch;
+        task({
+          id: message.task_id,
+          ...(status ? { status: taskStatus(status) } : {}),
+          ...(description ? { title: description } : {}),
+          ...(background === undefined ? {} : { background }),
+          ...(error ? { summary: error } : {}),
+        });
+        return;
+      }
+      case "task_notification":
+        if (message.skip_transcript || message.ambient) return;
+        task({
+          id: message.task_id,
+          status:
+            message.status === "completed"
+              ? "done"
+              : message.status === "failed"
+                ? "error"
+                : "stopped",
+          ...(message.summary ? { summary: message.summary } : {}),
+          ...(message.usage
+            ? {
+                tools: message.usage.tool_uses,
+                tokens: message.usage.total_tokens,
+                durationMs: message.usage.duration_ms,
+              }
+            : {}),
+        });
+        return;
+      default:
+        return;
+    }
+  }
+
   function handle(message: SDKMessage): void {
     switch (message.type) {
       case "system": {
-        if (message.subtype !== "init") return;
+        if (message.subtype !== "init") {
+          handleTask(message);
+          return;
+        }
         sessionId = message.session_id;
         emit("session", { id: message.session_id, backend: "claude-code" });
         emit("status", {

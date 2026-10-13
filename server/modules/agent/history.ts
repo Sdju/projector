@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { agentTaskSchema } from "../../../core/modules/agent-task/index.ts";
 import { importLegacyHistory, loadHistory, saveHistory } from "./history-store.ts";
 interface StoredTurn {
   id: string;
@@ -24,6 +25,7 @@ const turnSchema: z.ZodType<StoredTurn> = z.lazy(() =>
         parent: z.string().optional(),
       }),
     ),
+    tasks: z.array(agentTaskSchema).optional(),
     content: z
       .array(
         z.discriminatedUnion("type", [

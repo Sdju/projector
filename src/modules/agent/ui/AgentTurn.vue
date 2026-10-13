@@ -8,6 +8,7 @@ import { legacyParts } from "../model/turn-events.ts";
 import type { AgentToolChip, AgentToolView, AgentTurn, MessageChip } from "../model/types.ts";
 import AgentMessage from "./AgentMessage.vue";
 import AgentActivity from "./AgentActivity.vue";
+import AgentTasks from "./AgentTasks.vue";
 import AgentChanges from "./AgentChanges.vue";
 import IconCopy from "~icons/lucide/copy";
 import IconCheck from "~icons/lucide/check";
@@ -174,6 +175,7 @@ const waiting = computed(() => segments.value.at(-1)?.type !== "text");
         <p v-else-if="segment.type === 'note'" class="user-message note">{{ segment.text }}</p>
         <AgentActivity v-else :tools="segment.tools" />
       </template>
+      <AgentTasks v-if="turn.tasks?.length" :tasks="turn.tasks" />
       <UiInline
         v-if="busy && last && waiting"
         :gap="2"

@@ -101,6 +101,20 @@ export function applyAgentEvent(
       }
       return false;
     }
+    case "task": {
+      const tasks = (assistant.tasks ??= []);
+      const known = tasks.find((item) => item.id === event.data.id);
+      if (known) Object.assign(known, event.data);
+      else
+        tasks.push({
+          kind: "other",
+          title: "",
+          status: "running",
+          background: false,
+          ...event.data,
+        });
+      return false;
+    }
     case "project":
       ingest(event.data);
       return false;
@@ -110,6 +124,13 @@ export function applyAgentEvent(
       return false;
     case "done":
       assistant.run = undefined;
+      // A foreground task cannot outlive the answer; a background one may and reports later,
+      // unless the agent never reports (then its state is unknown once the answer is over).
+      for (const task of assistant.tasks ?? [])
+        if (task.status === "running" && (!task.background || task.untracked)) {
+          task.status = "stopped";
+          if (task.untracked) task.summary ??= "Состояние после ответа неизвестно";
+        }
       return false;
     default:
       return false;
