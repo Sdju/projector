@@ -1,7 +1,7 @@
 import { FavoriteFolders, InterfaceSettings } from "../launcher/index.ts";
 import { EditorSettings, FilesExcludeSettings } from "../workspace/index.ts";
 import { KeybindingsEditor } from "../ide/index.ts";
-import { NetworkSettings } from "../network/index.ts";
+import { NetworkSettings, OpenAiGatewaySettings } from "../network/index.ts";
 import { GithubSettings } from "../github/index.ts";
 import { GitlabSettings } from "../gitlab/index.ts";
 import { DockerSettings } from "../docker/index.ts";
@@ -61,6 +61,14 @@ export const settingsSections: SettingsSection[] = [
     description: "Доступ с других устройств и пароль локальной сети.",
     keywords: "LAN localhost телефон пароль доступ сервер",
     component: NetworkSettings,
+  },
+  {
+    id: "openai-api",
+    title: "OpenAI API",
+    group: "Подключения",
+    description: "OpenAI-совместимый API Projector для других приложений на машине.",
+    keywords: "OpenAI API шлюз gateway proxy v1 chat completions провайдер ключ AI LLM",
+    component: OpenAiGatewaySettings,
   },
   {
     id: "github",
