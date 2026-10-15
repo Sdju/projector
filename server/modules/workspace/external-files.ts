@@ -9,13 +9,13 @@ async function externalLocation(path: string) {
   const resolved = await realpath(path);
   return { root: dirname(resolved), name: basename(resolved) };
 }
-export async function previewExternalFile(path: string) {
+export async function previewExternalFile(path: string, options: { ask?: boolean } = {}) {
   const { root, name } = await externalLocation(path);
   if (/\.(?:png|jpe?g|gif|webp|avif)$/i.test(name)) {
     await readProjectImage(root, name);
     return { path, content: "", image: true };
   }
-  return { ...(await previewProjectFile(root, name)), path };
+  return { ...(await previewProjectFile(root, name, options)), path };
 }
 export async function readExternalImage(path: string) {
   const { root, name } = await externalLocation(path);

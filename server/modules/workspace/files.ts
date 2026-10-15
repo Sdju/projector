@@ -4,7 +4,12 @@ import { resolve, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { HttpError } from "../http/index.ts";
-import { moveDestination, treePageRange } from "../../../core/modules/workspace/index.ts";
+import {
+  LARGE_FILE_BYTES,
+  MAX_TEXT_BYTES,
+  moveDestination,
+  treePageRange,
+} from "../../../core/modules/workspace/index.ts";
 import { ignoredPaths } from "./ignored.ts";
 import {
   MAX_BYTES,
@@ -20,17 +25,21 @@ import { isExcludedPath } from "../../../core/modules/workspace/index.ts";
 const archiveHelper = fileURLToPath(new URL("./archive.py", import.meta.url));
 import type { FileContent, ArchiveContent } from "../../../core/modules/workspace/index.ts";
 
+const tooLarge = () =>
+  new HttpError(
+    413,
+    `Файл больше ${MAX_TEXT_BYTES / 1024 / 1024} МБ: редактор не сможет его открыть`,
+  );
 export async function readProjectFile(root: string, path: string) {
   const full = await location(root, path);
   const file = await open(full, "r");
   try {
     const info = await file.stat();
     if (!info.isFile()) throw new HttpError(400, "Выберите файл");
-    if (info.size > MAX_BYTES) throw new HttpError(413, "Файл больше 1 МБ");
-    const buffer = Buffer.alloc(MAX_BYTES + 1);
-    const { bytesRead } = await file.read(buffer, 0, buffer.length, 0);
-    if (bytesRead > MAX_BYTES) throw new HttpError(413, "Файл больше 1 МБ");
-    return { path, content: decode(buffer.subarray(0, bytesRead)) };
+    if (info.size > MAX_TEXT_BYTES) throw tooLarge();
+    const buffer = await file.readFile();
+    if (buffer.length > MAX_TEXT_BYTES) throw tooLarge();
+    return { path, content: decode(buffer) };
   } finally {
     await file.close();
   }
@@ -45,8 +54,7 @@ export async function saveProjectFile(
   validatePath(path);
   if (path.includes("\\") || (await pathExcluded(path)))
     throw new HttpError(403, "Выберите файл дерева проекта");
-  if (Buffer.byteLength(content) > MAX_BYTES || Buffer.byteLength(original) > MAX_BYTES)
-    throw new HttpError(413, "Файл больше 1 МБ");
+  if (Buffer.byteLength(content) > MAX_TEXT_BYTES) throw tooLarge();
   if (content.includes("\0"))
     throw new HttpError(415, "Бинарный файл недоступен для редактирования");
   const base = await realpath(root);
@@ -92,16 +100,26 @@ export async function saveProjectFile(
     if (pendingWrites.get(full) === write) pendingWrites.delete(full);
   }
 }
+/**
+ * What the file tab shows. With `ask`, a text file from `LARGE_FILE_BYTES` up is not read: the
+ * answer says how large it is (`large`), so the user can be asked before it is opened.
+ */
 export async function previewProjectFile(
   root: string,
   path: string,
+  options: { ask?: boolean } = {},
 ): Promise<FileContent & { image?: boolean }> {
   if (/\.(?:png|jpe?g|gif|webp|avif)$/i.test(path)) {
     await readProjectImage(root, path);
     return { path, content: "", image: true };
   }
-  if (!/\.(?:tar|tgz|gz|gzip|bz2|tbz2?|xz|txz|zip)$/i.test(path))
+  if (!/\.(?:tar|tgz|gz|gzip|bz2|tbz2?|xz|txz|zip)$/i.test(path)) {
+    if (options.ask) {
+      const { size } = await lstat(await location(root, path));
+      if (size >= LARGE_FILE_BYTES) return { path, content: "", large: size };
+    }
     return readProjectFile(root, path);
+  }
   const full = await location(root, path);
   const info = await lstat(full);
   if (!info.isFile()) throw new HttpError(400, "Выберите файл");

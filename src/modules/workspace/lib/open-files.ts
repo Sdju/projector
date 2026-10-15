@@ -15,6 +15,7 @@ import { dropPreviewExcept as dropPreviewTabs, opensAsPreview } from "./preview-
 import { ensureTab } from "./service-tabs.ts";
 import { useDirtyGuard } from "./dirty-guard.ts";
 import { useFileSync } from "./file-sync.ts";
+import { confirmBrowserFile, readFileConfirmed } from "./read-file.ts";
 import { treeDragType } from "../modules/tree/index.ts";
 import type {
   CommitComparison,
@@ -75,18 +76,22 @@ export function useOpenFiles(ctx: OpenFilesContext) {
     loading.value = true;
     fileError.value = "";
     try {
-      const data =
-        staged === undefined
-          ? await workspaceRequest<FileContent & { image?: boolean }>(
-              ctx.projectId(),
-              external ? "external" : "file",
-              { path },
-            )
-          : await workspaceRequest<FileComparison>(ctx.projectId(), "diff", {
-              path,
-              staged: String(staged),
-            });
-      if (generation !== fileGeneration) return;
+      let data: (FileContent & { image?: boolean }) | FileComparison | undefined;
+      // A tab already open is only read again: the question was answered when it was opened.
+      if (staged === undefined)
+        data = await readFileConfirmed(
+          ctx.projectId(),
+          path,
+          external,
+          !existing,
+          () => generation === fileGeneration,
+        );
+      else
+        data = await workspaceRequest<FileComparison>(ctx.projectId(), "diff", {
+          path,
+          staged: String(staged),
+        });
+      if (!data || generation !== fileGeneration) return;
       if (asPreview) dropPreviewExcept(key);
       const file: OpenFile = {
         ...data,
@@ -189,6 +194,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
     loading.value = true;
     fileError.value = "";
     try {
+      if (!confirmBrowserFile(source)) return;
       const data = await previewBrowserFile(source);
       if (generation !== fileGeneration) {
         if (data.image) URL.revokeObjectURL(data.image);

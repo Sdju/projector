@@ -13,6 +13,8 @@ export interface FileContent {
   readonly?: boolean;
   binary?: boolean;
   size?: number;
+  /** The file was not read: it is this many bytes, and the user is asked before it is opened. */
+  large?: number;
 }
 export interface ArchiveEntry {
   path: string;

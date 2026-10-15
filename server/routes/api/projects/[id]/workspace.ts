@@ -232,7 +232,8 @@ export async function handleProjectWorkspace({
       res.end(image.content);
       return true;
     }
-    if (sessionId === "external") json(res, 200, await previewExternalFile(filePath));
+    const ask = url.searchParams.get("ask") === "1";
+    if (sessionId === "external") json(res, 200, await previewExternalFile(filePath, { ask }));
     else if (sessionId === "root") json(res, 200, { root: project.path });
     else if (sessionId === "tree")
       json(
@@ -240,7 +241,8 @@ export async function handleProjectWorkspace({
         200,
         await listProjectDirectory(project.path, filePath, Object.fromEntries(url.searchParams)),
       );
-    else if (sessionId === "file") json(res, 200, await previewProjectFile(project.path, filePath));
+    else if (sessionId === "file")
+      json(res, 200, await previewProjectFile(project.path, filePath, { ask }));
     else if (sessionId === "search")
       json(
         res,

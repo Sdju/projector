@@ -94,9 +94,13 @@ test("file drops preserve external contents and distinguish project paths", asyn
   await expect(previewBrowserFile(new File(["a\0b"], "binary.bin"))).rejects.toThrow(
     /Бинарный файл/,
   );
+  // Text files have no 1 MB limit any more; only images stay capped.
+  expect(
+    (await previewBrowserFile(new File(["a".repeat(1024 * 1024 + 1)], "large.txt"))).content,
+  ).toHaveLength(1024 * 1024 + 1);
   await expect(
-    previewBrowserFile(new File([new Uint8Array(1024 * 1024 + 1)], "large.txt")),
-  ).rejects.toThrow(/больше 1 МБ/);
+    previewBrowserFile(new File([new Uint8Array(8 * 1024 * 1024 + 1)], "large.png")),
+  ).rejects.toThrow(/больше 8 МБ/);
   const svg = "<svg xmlns='http://www.w3.org/2000/svg'/>";
   expect(await previewBrowserFile(new File([svg], "external.SVG"))).toStrictEqual({
     path: "external.SVG",
@@ -226,11 +230,6 @@ test("Text file saves preserve text and mode, reject stale drafts and contain wr
     });
     await expect(saveProjectFile(base, "readme.md", "\0", "first")).rejects.toMatchObject({
       status: 415,
-    });
-    await expect(
-      saveProjectFile(base, "readme.md", "x".repeat(1024 * 1024 + 1), ""),
-    ).rejects.toMatchObject({
-      status: 413,
     });
     await writeFile(join(base, "picture.png"), Buffer.from([137, 80, 78, 71]));
     const image = await readProjectImage(base, "picture.png");
@@ -443,7 +442,18 @@ test("workspace tree, bounded reading, traversal and symlink containment, litera
         status: 403,
       });
       await expect(readProjectFile(root, "binary")).rejects.toMatchObject({ status: 415 });
-      await expect(readProjectFile(root, "large")).rejects.toMatchObject({ status: 413 });
+      // A file above the old 1 MB limit opens; one from 10 MB up is only announced when asked.
+      expect((await readProjectFile(root, "large")).content).toHaveLength(1024 * 1024 + 1);
+      expect(await previewProjectFile(root, "large", { ask: true })).toMatchObject({
+        content: expect.any(String),
+      });
+      await writeFile(join(root, "huge"), Buffer.alloc(10 * 1024 * 1024, 65));
+      expect(await previewProjectFile(root, "huge", { ask: true })).toStrictEqual({
+        path: "huge",
+        content: "",
+        large: 10 * 1024 * 1024,
+      });
+      expect((await previewProjectFile(root, "huge")).content).toHaveLength(10 * 1024 * 1024);
       expect((await projectGit(root)).available).toBe(false);
       git("init", "-q");
       git("config", "user.name", "Workspace Test");

@@ -6,6 +6,7 @@ export type { FileEntry } from "./contract.ts";
 export { TREE_PAGE_SIZE, treePageRange, type TreePage } from "./tree-page.ts";
 export type { FileContent } from "./contract.ts";
 export type { ArchiveContent, ArchiveEntry } from "./contract.ts";
+export { LARGE_FILE_BYTES, MAX_TEXT_BYTES, largeFileQuestion } from "./file-size.ts";
 export { parentPath, moveDestination, relocatedPath } from "./paths.ts";
 export { gitTreeDecorations } from "./git-decorations.ts";
 export type { GitDecoration } from "./git-decorations.ts";

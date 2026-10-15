@@ -7,13 +7,14 @@ import { MAX_BYTES, decode, exec, location, pathExcluded, validatePath } from ".
 import { isExcludedPath } from "../../../core/modules/workspace/index.ts";
 import { excludePatterns } from "./files-exclude.ts";
 import { mutateProjectEntry, mutationLocation, readProjectFile } from "./files.ts";
+import { MAX_TEXT_BYTES } from "../../../core/modules/workspace/index.ts";
 import type {
   FileComparison,
   GitGutter,
   GitOverview,
 } from "../../../core/modules/workspace/index.ts";
 
-export async function git(root: string, args: string[]) {
+export async function git(root: string, args: string[], maxBuffer = 4 * MAX_BYTES) {
   const project = await environmentForPath(root);
   if (project)
     return (
@@ -33,7 +34,7 @@ export async function git(root: string, args: string[]) {
     ).stdout;
   return (
     await exec("git", ["--literal-pathspecs", "-C", root, ...args], {
-      maxBuffer: 4 * MAX_BYTES,
+      maxBuffer,
       timeout: 10000,
       env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
     })
@@ -183,8 +184,7 @@ export async function mutateProjectGit(
 export async function gitText(root: string, ref: string, path: string) {
   validatePath(path);
   const prefix = (await git(root, ["rev-parse", "--show-prefix"])).trim();
-  const value = await git(root, ["show", `${ref}:${prefix}${path}`]);
-  if (Buffer.byteLength(value) > MAX_BYTES) throw new HttpError(413, "Файл больше 1 МБ");
+  const value = await git(root, ["show", `${ref}:${prefix}${path}`], MAX_TEXT_BYTES);
   return decode(Buffer.from(value));
 }
 export async function projectComparison(
