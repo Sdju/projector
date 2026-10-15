@@ -33,6 +33,7 @@ import {
   launchScopeTitles,
   launchSectionTitles,
   parseLaunchQuery,
+  resolveLauncherAction,
   type LaunchAction,
   type LaunchItem,
 } from "../../../core/modules/launcher/index.ts";
@@ -197,11 +198,26 @@ function focusEntryAtEnd() {
   entry.grabFocus();
   entry.setPosition(-1);
 }
+let pinPending = false;
 async function pin(item: LaunchItem | undefined, action: "favorite" | "folder" = "favorite") {
-  if (!item || item.kind === "github" || item.id.startsWith("new:")) return;
-  // Pinning keeps the palette and the open card in place; only the lists change.
-  const ok = await model.launch(item, { id: action, title: "" });
-  if (ok) await model.refresh();
+  if (!item || pinPending || state.value.busy || state.value.loading) return;
+  pinPending = true;
+  try {
+    const chosen = await resolveLauncherAction(
+      client,
+      item,
+      action,
+      state.value.focus?.id === item.id && state.value.detailReady ? state.value.detail : null,
+    );
+    if (!chosen) return;
+    // Pinning keeps the palette and the open card in place; only the lists change.
+    const ok = await model.launch(item, chosen);
+    if (ok) await model.refresh();
+  } catch (error) {
+    model.reportError(error);
+  } finally {
+    pinPending = false;
+  }
   // The entry is insensitive while the action runs and loses its caret.
   await nextTick();
   focusEntryAtEnd();

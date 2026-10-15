@@ -16,6 +16,7 @@ import {
   launchScopeTitles,
   launchSectionTitles,
   parseLaunchQuery,
+  resolveLauncherAction,
 } from "../../core/modules/launcher/index.ts";
 import type { LaunchAction } from "../../core/modules/launcher/index.ts";
 import { createLauncherModel } from "../../core/modules/launcher/index.ts";
@@ -85,11 +86,25 @@ async function launch(item = items.value[selected.value], action?: LaunchAction)
   await nextTick();
   input.value?.focus();
 }
-function toggleFavorite(item = focus.value ?? items.value[selected.value]) {
-  if (!item || item.kind === "github" || item.kind === "gitlab" || item.id.startsWith("new:"))
-    return;
-  void launch(item, { id: "favorite", title: "" });
+let pinPending = false;
+async function toggleFavorite(item = focus.value ?? items.value[selected.value]) {
+  if (!item || pinPending || state.value.busy || state.value.loading) return;
+  pinPending = true;
+  try {
+    const action = await resolveLauncherAction(
+      client,
+      item,
+      "favorite",
+      focus.value?.id === item.id && state.value.detailReady ? state.value.detail : null,
+    );
+    if (action) await launch(item, action);
+  } catch (error) {
+    model.reportError(error);
+  } finally {
+    pinPending = false;
+  }
 }
+
 function key(event: KeyboardEvent) {
   if (event.isComposing || event.keyCode === 229) return;
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d") {

@@ -15,3 +15,4 @@ export type { InterfaceMode } from "./launcher.ts";
 export { createLauncherModel } from "./launcher-model.ts";
 export { parseLaunchQuery, launchScopeTitles } from "./query.ts";
 export type { LaunchScope, ParsedQuery } from "./query.ts";
+export { resolveLauncherAction } from "./actions.ts";

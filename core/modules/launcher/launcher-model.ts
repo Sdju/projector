@@ -12,6 +12,8 @@ export interface LauncherState {
   focus: LaunchItem | null;
   detail: LaunchDetail | null;
   detailLoading: boolean;
+  /** Full detail was loaded successfully; primary search actions are only a UI fallback. */
+  detailReady: boolean;
   items: LaunchItem[];
   selected: number;
   loading: boolean;
@@ -33,6 +35,7 @@ export function createLauncherModel(
     focus: null,
     detail: null,
     detailLoading: false,
+    detailReady: false,
     items: [],
     selected: 0,
     loading: true,
@@ -55,6 +58,7 @@ export function createLauncherModel(
     detailController?.abort();
     state.focus = null;
     state.detail = null;
+    state.detailReady = false;
     state.detailLoading = false;
   };
   const invalidate = () => {
@@ -112,6 +116,7 @@ export function createLauncherModel(
         const detail = await client.detail(focused.id, AbortSignal.timeout(15000));
         if (!disposed && state.focus?.id === focused.id) {
           state.detail = detail;
+          state.detailReady = true;
           emit();
         }
       } catch {
@@ -181,6 +186,7 @@ export function createLauncherModel(
         );
         if (disposed || current.signal.aborted) return true;
         state.detail = detail;
+        state.detailReady = true;
       } catch (error) {
         if (!disposed && !current.signal.aborted)
           state.error = error instanceof Error ? error.message : "Не удалось загрузить действия";
