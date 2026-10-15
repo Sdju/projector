@@ -7,8 +7,15 @@ import UiInline from "../../common/ui/UiInline.vue";
 import UiStack from "../../common/ui/UiStack.vue";
 
 import { onMounted, onBeforeUnmount, ref } from "vue";
+import { useCommandScope } from "../../common/utilities/commands.ts";
+import { connectGithubToken } from "./connect.ts";
 import UiButton from "../../common/ui/UiButton.vue";
-import { fetchIntegrations, integrationRequest, TokenReveal } from "../integration-api/index.ts";
+import {
+  fetchIntegrations,
+  integrationRequest,
+  TokenReveal,
+  useIntegrationOperation,
+} from "../integration-api/index.ts";
 import type { Integration, DeviceLogin, SecretStorage } from "../integration-api/index.ts";
 const github = ref<Integration | null>(null);
 const file = ref("");
@@ -17,9 +24,7 @@ const enabled = ref(false);
 const clientId = ref("");
 const directory = ref("");
 const token = ref("");
-const error = ref("");
-const message = ref("");
-const busy = ref(false);
+const { error, message, busy, action } = useIntegrationOperation();
 const device = ref<DeviceLogin | null>(null);
 let timer: ReturnType<typeof setTimeout> | undefined;
 let disposed = false;
@@ -35,18 +40,6 @@ function apply(value: Integration) {
   clientId.value = value.settings.clientId;
   directory.value = value.settings.directory;
 }
-async function action(task: () => Promise<void>) {
-  error.value = "";
-  message.value = "";
-  busy.value = true;
-  try {
-    await task();
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : "Ошибка интеграции";
-  } finally {
-    busy.value = false;
-  }
-}
 onMounted(() =>
   action(async () => {
     const data = await fetchIntegrations();
@@ -54,6 +47,8 @@ onMounted(() =>
     secretStorage.value = data.secretStorage;
     const integration = data.integrations.find((item) => item.id === "github");
     if (integration) apply(integration);
+  }).catch(() => {
+    /* Initial load failures are shown by the form. */
   }),
 );
 onBeforeUnmount(() => {
@@ -103,8 +98,17 @@ function login() {
 function connectToken() {
   if (busy.value || !token.value.trim()) return;
   return action(async () => {
-    await save(true);
-    apply(await integrationRequest<Integration>("/github/auth", "POST", { token: token.value }));
+    cancelDevice();
+    apply(
+      await connectGithubToken(
+        token.value,
+        {
+          clientId: clientId.value,
+          directory: directory.value,
+        },
+        apply,
+      ),
+    );
     token.value = "";
     message.value = "GitHub подключён";
   });
@@ -117,6 +121,50 @@ function disconnect() {
     message.value = "GitHub отключён";
   });
 }
+const commands = useCommandScope("github-settings", () => ({
+  surface: "settings",
+  integration: "github",
+}));
+commands.scope.registerCommand({
+  id: "ide.github.integration.save",
+  title: "Сохранить настройки GitHub",
+  description: "Сохраняет Client ID, папку импорта и состояние интеграции GitHub.",
+  enabled: () => !busy.value && !!github.value,
+  run: () =>
+    action(async () => {
+      await save();
+      message.value = "Настройки сохранены";
+    }),
+});
+commands.scope.registerCommand({
+  id: "ide.github.integration.connect",
+  title: "Подключить GitHub",
+  description: "Включает интеграцию и подключает GitHub с токеном, введённым в форме.",
+  enabled: () => !busy.value && !!token.value.trim() && !!github.value,
+  run: connectToken,
+});
+commands.scope.registerCommand({
+  id: "ide.github.integration.disconnect",
+  title: "Отключить GitHub",
+  description: "Удаляет сохранённый токен GitHub из Projector.",
+  enabled: () => !busy.value && !!github.value?.connected,
+  run: disconnect,
+});
+commands.scope.registerCommand({
+  id: "ide.github.integration.device.start",
+  title: "Войти в GitHub через браузер",
+  description:
+    "Сохраняет настройки и получает код GitHub Device Flow для подтверждения в браузере.",
+  enabled: () => !busy.value && enabled.value && !!clientId.value.trim() && !device.value,
+  run: login,
+});
+commands.scope.registerCommand({
+  id: "ide.github.integration.device.cancel",
+  title: "Отменить вход в GitHub",
+  description: "Прекращает ожидание подтверждения текущего входа GitHub Device Flow.",
+  enabled: () => !!device.value,
+  run: cancelDevice,
+});
 </script>
 
 <template>
@@ -131,12 +179,7 @@ function disconnect() {
       <UiStack
         as="form"
         align="start"
-        @submit.prevent="
-          action(async () => {
-            await save();
-            message = 'Настройки сохранены';
-          })
-        "
+        @submit.prevent="commands.run('ide.github.integration.save')"
       >
         <UiInline as="label" class="toggle" justify="normal"
           ><UiControl v-model="enabled" type="checkbox" :disabled="busy" /> включить
@@ -165,7 +208,9 @@ function disconnect() {
           >
           и включите Device Flow. Client secret не нужен. Можно также подключиться токеном ниже.
         </p>
-        <UiButton type="submit" :disabled="busy">сохранить настройки</UiButton>
+        <UiButton type="submit" data-command="ide.github.integration.save" :disabled="busy"
+          >сохранить настройки</UiButton
+        >
       </UiStack>
       <TokenReveal
         v-if="github.connected && secretStorage.backend === 'keyring'"
@@ -176,10 +221,19 @@ function disconnect() {
         @error="error = $event"
       />
       <UiInline class="actions" :gap="3" wrap>
-        <UiButton :disabled="busy || !enabled || !clientId.trim() || !!device" @click="login"
+        <UiButton
+          :disabled="busy || !enabled || !clientId.trim() || !!device"
+          data-command="ide.github.integration.device.start"
+          @click="commands.run('ide.github.integration.device.start')"
           >войти через GitHub</UiButton
         >
-        <UiButton v-if="github.connected" :disabled="busy" @click="disconnect">выйти</UiButton>
+        <UiButton
+          v-if="github.connected"
+          :disabled="busy"
+          data-command="ide.github.integration.disconnect"
+          @click="commands.run('ide.github.integration.disconnect')"
+          >выйти</UiButton
+        >
       </UiInline>
       <div v-if="device" class="device" role="status">
         <p>
@@ -189,11 +243,19 @@ function disconnect() {
           >открыть GitHub для входа ↗</a
         >
         <p class="muted">Ожидаем подтверждения…</p>
-        <UiButton @click="cancelDevice">отменить</UiButton>
+        <UiButton
+          data-command="ide.github.integration.device.cancel"
+          @click="commands.run('ide.github.integration.device.cancel')"
+          >отменить</UiButton
+        >
       </div>
       <details>
         <summary>Войти с Personal Access Token</summary>
-        <UiStack as="form" align="start" @submit.prevent="connectToken">
+        <UiStack
+          as="form"
+          align="start"
+          @submit.prevent="commands.run('ide.github.integration.connect')"
+        >
           <p class="muted help">
             Fine-grained token: доступ к нужным репозиториям и Contents: read. Для classic token и
             приватных репозиториев — scope repo.
@@ -209,7 +271,12 @@ function disconnect() {
               placeholder="github_pat_…"
               required
           /></UiField>
-          <UiButton type="submit" :disabled="busy || !token.trim()">подключить GitHub</UiButton>
+          <UiButton
+            type="submit"
+            data-command="ide.github.integration.connect"
+            :disabled="busy || !token.trim()"
+            >подключить GitHub</UiButton
+          >
         </UiStack>
       </details>
     </article>

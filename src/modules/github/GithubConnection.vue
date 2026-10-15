@@ -8,15 +8,17 @@ import UiStack from "../../common/ui/UiStack.vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import { useCommandScope } from "../../common/utilities/commands.ts";
 import { readoutLines, useTabReadout } from "../../common/utilities/tab-readout.ts";
-import { fetchIntegrations, integrationRequest } from "../integration-api/index.ts";
+import { useIntegrationOperation } from "../integration-api/index.ts";
+import { formatProjectRef } from "../project/index.ts";
+import { connectGithubToken } from "./connect.ts";
 const props = defineProps<{ repository: string }>();
 const emit = defineEmits<{ connected: [] }>();
 const token = ref("");
 const tokenId = useId();
-const busy = ref(false);
-const error = ref("");
+const { busy, error, action } = useIntegrationOperation();
 const commands = useCommandScope(`github-connection:${props.repository}`, () => ({
   surface: "github-integration",
+  projectId: formatProjectRef({ kind: "github", repository: props.repository }),
   repository: props.repository,
 }));
 commands.scope.registerCommand({
@@ -25,23 +27,12 @@ commands.scope.registerCommand({
   description:
     "Подключает GitHub с токеном, введённым в форме интеграции, и открывает репозиторий.",
   enabled: () => !busy.value && !!token.value.trim(),
-  async run() {
-    busy.value = true;
-    error.value = "";
-    try {
-      const data = await fetchIntegrations();
-      const github = data.integrations.find((integration) => integration.id === "github");
-      if (!github?.enabled)
-        await integrationRequest("/github", "PUT", { ...github?.settings, enabled: true });
-      await integrationRequest("/github/auth", "POST", { token: token.value.trim() });
+  run: () =>
+    action(async () => {
+      await connectGithubToken(token.value);
       token.value = "";
       emit("connected");
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : "Не удалось подключить GitHub";
-    } finally {
-      busy.value = false;
-    }
-  },
+    }),
 });
 // Что штатный агент видит на вкладке подключения GitHub: репозиторий и состояние формы без токена.
 useTabReadout(() => ({

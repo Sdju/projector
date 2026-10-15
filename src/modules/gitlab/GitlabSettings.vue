@@ -9,7 +9,12 @@ import UiStack from "../../common/ui/UiStack.vue";
 import { onMounted, ref } from "vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import { commandArgs, useCommandScope } from "../../common/utilities/commands.ts";
-import { fetchIntegrations, integrationRequest, TokenReveal } from "../integration-api/index.ts";
+import {
+  fetchIntegrations,
+  integrationRequest,
+  TokenReveal,
+  useIntegrationOperation,
+} from "../integration-api/index.ts";
 import type { Integration, SecretStorage } from "../integration-api/index.ts";
 
 const gitlab = ref<Integration | null>(null);
@@ -19,9 +24,7 @@ const url = ref("");
 const directory = ref("");
 const token = ref("");
 const repository = ref("");
-const error = ref("");
-const message = ref("");
-const busy = ref(false);
+const { error, message, busy, action } = useIntegrationOperation();
 const tokenView = ref<InstanceType<typeof TokenReveal> | null>(null);
 function apply(value: Integration) {
   gitlab.value = value;
@@ -30,24 +33,14 @@ function apply(value: Integration) {
   url.value = value.settings.url ?? "";
   directory.value = value.settings.directory;
 }
-async function action(task: () => Promise<void>) {
-  error.value = "";
-  message.value = "";
-  busy.value = true;
-  try {
-    await task();
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : "Ошибка интеграции";
-  } finally {
-    busy.value = false;
-  }
-}
 onMounted(() =>
   action(async () => {
     const data = await fetchIntegrations();
     secretStorage.value = data.secretStorage;
     const integration = data.integrations.find((item) => item.id === "gitlab");
     if (integration) apply(integration);
+  }).catch(() => {
+    /* Initial load failures are shown by the form. */
   }),
 );
 
@@ -61,7 +54,10 @@ async function save(enable = enabled.value) {
   );
 }
 
-const commands = useCommandScope("gitlab-settings", () => ({ surface: "gitlab-integration" }));
+const commands = useCommandScope("gitlab-settings", () => ({
+  surface: "settings",
+  integration: "gitlab",
+}));
 commands.scope.registerCommand({
   id: "ide.gitlab.integration.save",
   title: "Сохранить настройки GitLab",
@@ -82,7 +78,11 @@ commands.scope.registerCommand({
   run: () =>
     action(async () => {
       await save(true);
-      apply(await integrationRequest<Integration>("/gitlab/auth", "POST", { token: token.value }));
+      apply(
+        await integrationRequest<Integration>("/gitlab/auth", "POST", {
+          token: token.value.trim(),
+        }),
+      );
       token.value = "";
       message.value = "GitLab подключён";
     }),
