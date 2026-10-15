@@ -49,7 +49,7 @@ test("agent discovers live commands, requires description, checks args and exclu
     .createScope("other", () => ({ projectId: "b" }))
     .registerCommand({ id: "secret", title: "Other", run: () => {} });
   const commands = agentCommandHandler(sdk, "a");
-  const tools = createAgentTools({ onProject: () => {}, commands });
+  const tools = createAgentTools({ onProject: () => {}, commands, guard: { trusting: true } });
   const call = (name, input) => tools[name].execute(input, { toolCallId: "test", messages: [] });
   expect((await call("list_commands", {})).commands.map((c) => c.id)).toStrictEqual([
     "ide.fileTree.file.rename",
@@ -239,9 +239,26 @@ test("HTTP agent streams discovery, description, execution, Bash and final text 
         },
       });
     const events = [];
-    await streamAgent("Run local test", [], (event) => events.push(event), undefined, {
-      commands: agentCommandHandler(sdk, "a"),
-    });
+    const asked = [];
+    await streamAgent(
+      "Run local test",
+      [],
+      (event) => {
+        events.push(event);
+        // A sensitive tool waits for the user's answer, which the page sends back like this.
+        if (event.event === "permission-request") {
+          asked.push(event.data.tool);
+          void originalFetch(base + "/api/agent/tool-result", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: event.data.id, output: { allow: true } }),
+          });
+        }
+      },
+      undefined,
+      { commands: agentCommandHandler(sdk, "a") },
+    );
+    expect(asked).toStrictEqual(["execute_command", "bash"]);
     expect(executed).toBe(true);
     expect(requests.length).toBe(5);
     expect(events.filter((e) => e.event === "tool").map((e) => e.data.name)).toStrictEqual(

@@ -5,13 +5,21 @@ import { AGENT_SYSTEM_PROMPT } from "./prompts.ts";
 import {
   createQwenOpenAI,
   envFallbackFromProcess,
+  loadPublicProviders,
   resolveOpenAIProvider,
 } from "../providers/index.ts";
 import type { AgentBackend, AgentRunOptions } from "./backend.ts";
+import type { AgentControl } from "./controls.ts";
+import { historyMessages, userMessage } from "./projector-history.ts";
+
+const MAX_STEPS = 24;
+/** The window of a provider's model is not reported; this is what the context ring is measured against. */
+const CONTEXT_SIZE = Number(process.env.PROJECTOR_AGENT_CONTEXT_TOKENS) || 128_000;
+const TRUST = "permission-mode";
 
 async function run(options: AgentRunOptions): Promise<void> {
   const resolved = await resolveOpenAIProvider({
-    providerId: options.providerId,
+    providerId: options.selection?.provider || options.providerId,
     fallback: envFallbackFromProcess(),
   });
   const provider = createQwenOpenAI({
@@ -25,19 +33,21 @@ async function run(options: AgentRunOptions): Promise<void> {
     cwd: options.cwd,
     commands: options.commands,
     signal: options.abort,
+    ask: options.ask,
+    guard: {
+      cwd: options.cwd,
+      approve: options.approve,
+      trusting: (options.selection?.[TRUST] ?? options.permissionMode) === "bypassPermissions",
+    },
     onProject: (project) => {
       added.push(project);
       options.emit("project", project);
     },
   });
 
-  const history = (options.history ?? []).slice(-10);
   const messages: ModelMessage[] = [
-    ...history.map((item) => ({
-      role: item.role,
-      content: item.content,
-    })),
-    { role: "user" as const, content: options.message },
+    ...historyMessages(options.history ?? []),
+    await userMessage(options.message, options.parts),
   ];
 
   options.emit("status", {
@@ -45,13 +55,14 @@ async function run(options: AgentRunOptions): Promise<void> {
     provider: resolved.name,
     model: resolved.model,
   });
+  options.emit("controls", { controls: await controls(options.selection ?? {}) });
 
   const result = streamText({
     model,
     system: AGENT_SYSTEM_PROMPT + (options.cwd ? `\nТекущий проект: ${options.cwd}` : ""),
     messages,
     tools,
-    stopWhen: isStepCount(16),
+    stopWhen: isStepCount(MAX_STEPS),
     abortSignal: options.abort,
     providerOptions: {
       qwenOpenai: {
@@ -102,11 +113,64 @@ async function run(options: AgentRunOptions): Promise<void> {
     }
   }
 
+  // The last request carried the whole conversation, so its size is how full the context is.
+  try {
+    const usage = await result.usage;
+    const used = (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0);
+    if (used) options.emit("context", { used, size: CONTEXT_SIZE, model: resolved.model });
+  } catch {
+    // The indicator keeps its previous value.
+  }
+  if ((await result.finishReason) === "tool-calls") {
+    const note = `\n\nЯ остановился на ${MAX_STEPS} шагах. Напишите «продолжай», чтобы я пошёл дальше.`;
+    text += note;
+    options.emit("text", { text: note });
+  }
+
   options.emit("done", {
     text: text.trim(),
     added: added.map((item) => item.id),
   });
 }
 
+/** The providers to choose from and whether the agent asks before changing things. */
+async function controls(selection: Record<string, string> = {}): Promise<AgentControl[]> {
+  const { providers, activeProviderId } = await loadPublicProviders(envFallbackFromProcess());
+  const list: AgentControl[] = [
+    {
+      id: TRUST,
+      via: "native",
+      category: "mode",
+      name: "Разрешения",
+      description: "Когда агент спрашивает перед командами оболочки и правками в Projector",
+      current: selection[TRUST] === "bypassPermissions" ? "bypassPermissions" : "default",
+      options: [
+        { value: "default", name: "Спрашивать", description: "Подтверждение перед изменениями" },
+        { value: "bypassPermissions", name: "Без вопросов" },
+      ],
+    },
+  ];
+  if (providers.length) {
+    const chosen = providers.find((item) => item.id === selection.provider);
+    list.unshift({
+      id: "provider",
+      via: "native",
+      category: "model",
+      name: "Модель",
+      description: "Провайдер и модель из настроек",
+      current: chosen?.id ?? activeProviderId ?? providers[0]!.id,
+      options: providers.map((item) => ({
+        value: item.id,
+        name: item.model ? `${item.name} · ${item.model}` : item.name,
+      })),
+    });
+  }
+  return list;
+}
+
 /** The Projector IDE assistant on the active OpenAI-compatible provider. */
-export const projectorBackend: AgentBackend = { id: "projector", run };
+export const projectorBackend: AgentBackend = {
+  id: "projector",
+  controls: () => controls(),
+  run,
+};

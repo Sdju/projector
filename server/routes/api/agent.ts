@@ -39,7 +39,7 @@ import {
   writeAgentHistory,
 } from "../../modules/agent/index.ts";
 
-import type { AgentHistoryTurn } from "../../modules/providers/index.ts";
+import type { AgentHistoryTool, AgentHistoryTurn } from "../../modules/providers/index.ts";
 
 import { accessAllowed } from "../../modules/access/index.ts";
 import { HttpError } from "../../modules/http/index.ts";
@@ -111,7 +111,9 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
     return true;
   }
   if (path === "/api/agent/controls" && method === "GET") {
-    const cwd = await projectPath(url.searchParams.get("projectId") ?? "");
+    const projectId = url.searchParams.get("projectId") ?? "";
+    // The Projector agent also works outside any project, on the catalog.
+    const cwd = projectId ? await projectPath(projectId) : "";
     const backend = url.searchParams.get("backend") ?? undefined;
     json(res, 200, {
       controls: await agentControls(backend, cwd),
@@ -268,6 +270,27 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
   return false;
 }
 
+/** Calls an earlier answer made; malformed ones are dropped, sizes bounded. */
+function historyTools(value: unknown): AgentHistoryTool[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 100).flatMap((item): AgentHistoryTool[] => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as Record<string, unknown>;
+    const id = asString(row.id);
+    const name = asString(row.name);
+    if (!id || !name) return [];
+    return [
+      {
+        id: id.slice(0, 200),
+        name: name.slice(0, 100),
+        ...(typeof row.input === "string" ? { input: row.input.slice(0, 20_000) } : {}),
+        output: asString(row.output).slice(0, 20_000),
+        ...(row.failed === true ? { failed: true } : {}),
+      },
+    ];
+  });
+}
+
 /** The chips of a message; anything that is not a well-formed part is dropped. */
 function partsFrom(value: unknown): MessagePart[] | undefined {
   if (!Array.isArray(value)) return undefined;
@@ -316,8 +339,9 @@ async function requestFrom(body: Record<string, unknown>) {
         const row = item as Record<string, unknown>;
         const role = row.role === "assistant" ? "assistant" : row.role === "user" ? "user" : null;
         const content = asString(row.content);
-        if (!role || !content) return [];
-        return [{ role, content }];
+        const tools = historyTools(row.tools);
+        if (!role || (!content && !tools.length)) return [];
+        return [{ role, content, ...(tools.length ? { tools } : {}) }];
       })
     : [];
   const request = {

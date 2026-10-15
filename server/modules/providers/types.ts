@@ -52,7 +52,18 @@ export interface ResolvedOpenAIProvider {
   apiKey: string;
 }
 
+/** A tool call an earlier answer made; kept so the model still sees what it did and found. */
+export interface AgentHistoryTool {
+  id: string;
+  name: string;
+  /** The call's input as JSON text. */
+  input?: string;
+  output: string;
+  failed?: boolean;
+}
+
 export interface AgentHistoryTurn {
   role: "user" | "assistant";
   content: string;
+  tools?: AgentHistoryTool[];
 }
