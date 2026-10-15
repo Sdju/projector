@@ -2,6 +2,7 @@ import { shallowReactive } from "vue";
 import type { McpServer, WorktreeInfo } from "../api/client.ts";
 import type {
   AgentBackendId,
+  AgentCapabilities,
   AgentControl,
   AgentSessionInfo,
   AgentTask,
@@ -28,6 +29,7 @@ export interface ChatController {
   tasks(): AgentTask[];
   queue(): QueuedMessage[];
   controls(): AgentControl[];
+  capabilities(): AgentCapabilities;
   setControl(id: string, value: string): Promise<void>;
   loadSessions(): Promise<AgentSessionInfo[]>;
   resumeSession(id: string): Promise<void>;

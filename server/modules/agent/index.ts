@@ -32,6 +32,7 @@ export {
   AGENT_PERMISSION_MODES,
   agentCommands,
   agentControls,
+  agentCapabilities,
   agentMcpServers,
   agentSessions,
   rewindAgentFiles,

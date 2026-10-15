@@ -1,5 +1,6 @@
 import { reactive } from "vue";
 import type {
+  AgentCapabilities,
   AgentCommand,
   AgentControl,
   AgentPermission,
@@ -24,6 +25,7 @@ export const createState = () =>
     questions: [] as AgentQuestionRequest[],
     permissionMode: "default" as AgentPermissionMode,
     controls: [] as AgentControl[],
+    capabilities: {} as AgentCapabilities,
     commands: [] as AgentCommand[],
     selection: {} as AgentSelection,
     controlsError: "",
@@ -86,6 +88,8 @@ const registry: ChatRegistry = (hot.chats ??= {
   queued: new Set(),
 });
 registry.queued ??= new Set();
+// Sessions from before capabilities were introduced survive HMR with their live process intact.
+for (const state of registry.sessions.values()) state.capabilities ??= {};
 export const { releases, viewers, sessions, loads, saves, queued } = registry;
 
 /** The conversation as plain text turns, for an agent that has no session of its own to continue. */

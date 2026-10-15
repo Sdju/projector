@@ -48,9 +48,14 @@ export function useExternalAgent(
   /** Reads what the agent offers and starts from the saved choice for this agent. */
   async function loadControls(): Promise<void> {
     if (!external || !projectId) return;
+    await ready;
+    if (state.permissionMode !== "default" && !state.selection["permission-mode"])
+      state.selection["permission-mode"] = state.permissionMode;
     state.selection = { ...((await savedDefaults())[backend] ?? {}), ...state.selection };
     try {
-      state.controls = withChoice(await fetchControls(backend, projectId));
+      const offered = await fetchControls(backend, projectId);
+      state.capabilities = offered.capabilities;
+      state.controls = withChoice(offered.controls);
       state.controlsError = "";
     } catch (err) {
       state.controlsError = err instanceof Error ? err.message : "Не удалось получить настройки";
@@ -77,6 +82,8 @@ export function useExternalAgent(
     state.controls = withChoice(state.controls);
     try {
       await saveDefault(backend, id, value);
+      const defaults = await savedDefaults();
+      defaults[backend] = { ...defaults[backend], [id]: value };
     } catch (err) {
       state.error = err instanceof Error ? err.message : "Не удалось сохранить выбор";
     }

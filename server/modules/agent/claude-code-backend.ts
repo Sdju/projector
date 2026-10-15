@@ -6,6 +6,7 @@ import type {
 } from "@anthropic-ai/claude-agent-sdk";
 import { createInput, registerInjector } from "./claude-code-input.ts";
 import { agentEnv, assertHostProject, attachedImages, promptWithHistory } from "./agent-host.ts";
+import { AGENT_PERMISSION_MODES } from "./backend.ts";
 import type { AgentBackend, AgentCommand, AgentRunOptions } from "./backend.ts";
 import { CLAUDE_LABEL, createClaudeEventMapper } from "./claude-code-events.ts";
 import {
@@ -48,6 +49,10 @@ function chosen(options: AgentRunOptions) {
  */
 async function run(options: AgentRunOptions): Promise<void> {
   if (!options.cwd) throw new Error("Claude Code работает внутри проекта: откройте чат в проекте");
+  const requestedMode =
+    options.selection?.["permission-mode"] ?? options.permissionMode ?? "default";
+  const mode = AGENT_PERMISSION_MODES.find((value) => value === requestedMode);
+  if (!mode) throw new Error("Неизвестный режим разрешений агента");
   const cwd = options.cwd;
   await assertHostProject(cwd, CLAUDE_LABEL);
 
@@ -56,7 +61,6 @@ async function run(options: AgentRunOptions): Promise<void> {
   if (options.abort?.aborted) abortController.abort();
   else options.abort?.addEventListener("abort", forwardAbort, { once: true });
 
-  const mode = options.permissionMode ?? "default";
   const selected = chosen(options);
   const base: Options = {
     cwd,
@@ -268,6 +272,11 @@ function claudeControls(selection: Record<string, string>): AgentControl[] {
 
 export const claudeCodeBackend: AgentBackend = {
   id: "claude-code",
+  capabilities: {
+    inject: true,
+    branchSession: true,
+    compact: { command: "/compact", hintAt: 0.8, autoAt: 0.9 },
+  },
   run,
   controls: async () => CLAUDE_CONTROLS,
   commands: claudeCommands,

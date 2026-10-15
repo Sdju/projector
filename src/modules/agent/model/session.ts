@@ -26,7 +26,6 @@ import type {
   AgentEvent,
   AgentTurn,
   AgentCommandRequest,
-  AgentPermissionMode,
   MessagePart,
 } from "./types.ts";
 
@@ -102,12 +101,6 @@ export function useAgent(
   const phase = computed(() => state.phase);
   const permissions = computed(() => state.permissions);
   const questions = computed(() => state.questions);
-  const permissionMode = computed({
-    get: () => state.permissionMode,
-    set: (value: AgentPermissionMode) => {
-      state.permissionMode = value;
-    },
-  });
 
   const {
     controls,
@@ -359,9 +352,9 @@ export function useAgent(
     phase,
     permissions,
     questions,
-    permissionMode,
     controls,
     selection,
+    capabilities: computed(() => state.capabilities),
     controlsError: computed(() => state.controlsError),
     sessions: sessionList,
     sessionsLoading: computed(() => state.sessionsLoading),

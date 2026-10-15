@@ -1,6 +1,7 @@
 import type {
   AgentCommand,
   AgentBackendId,
+  AgentCapabilities,
   AgentControl,
   AgentSelection,
   AgentSessionInfo,
@@ -187,13 +188,13 @@ const query = (backend: AgentBackendId, projectId: string) =>
 export async function fetchControls(
   backend: AgentBackendId,
   projectId: string,
-): Promise<AgentControl[]> {
-  const data = await getJson<{ controls: AgentControl[] }>(
+): Promise<{ controls: AgentControl[]; capabilities: AgentCapabilities }> {
+  const data = await getJson<{ controls: AgentControl[]; capabilities: AgentCapabilities }>(
     `/api/agent/controls?${query(backend, projectId)}`,
     undefined,
     "Не удалось получить настройки агента",
   );
-  return data.controls;
+  return data;
 }
 
 /** Slash commands the agent understands in this project. */

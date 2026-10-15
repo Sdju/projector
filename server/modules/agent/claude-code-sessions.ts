@@ -8,7 +8,40 @@ import type { AgentControl, AgentSessionInfo, AgentSessionTurn } from "./control
 import { SESSION_LIST_LIMIT } from "./controls.ts";
 
 /** Claude Code accepts model aliases, so the list does not go stale with every release. */
+const permissionOptions = [
+  { value: "default", name: "Спрашивать", description: "Запрос перед правками и командами" },
+  {
+    value: "plan",
+    name: "План",
+    description: "Агент сначала составляет план без правок и ждёт вашего согласия",
+  },
+  {
+    value: "acceptEdits",
+    name: "Правки без вопросов",
+    description: "Файлы меняются сразу, команды — по запросу",
+  },
+  {
+    value: "auto",
+    name: "Авто",
+    description: "Классификатор сам разрешает безопасное и спрашивает о рискованном",
+  },
+  {
+    value: "bypassPermissions",
+    name: "Всё без вопросов",
+    description: "Без запросов разрешений",
+  },
+];
+
 export const CLAUDE_CONTROLS: AgentControl[] = [
+  {
+    id: "permission-mode",
+    via: "native",
+    category: "mode",
+    name: "Разрешения",
+    description: "Когда агент спрашивает подтверждение",
+    current: "default",
+    options: permissionOptions,
+  },
   {
     id: "model",
     category: "model",

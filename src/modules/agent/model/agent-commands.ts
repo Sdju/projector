@@ -40,7 +40,6 @@ export function registerAgentCommands(register: RegisterCommand, projectId: stri
   const anyChat = () => chatsOf(projectId).length > 0;
   const external = () => chatsOf(projectId).some((chat) => chat.backend !== "projector");
   const idle = () => chatsOf(projectId).some((chat) => !chat.busy());
-  const claudeChat = (chat: ChatController) => chat.backend === "claude-code";
   const find = (args: unknown, accept?: (chat: ChatController) => boolean) =>
     resolveChat(projectId, commandArgs(args).chat, accept);
   const notProjector = (chat: ChatController) => chat.backend !== "projector";
@@ -182,15 +181,15 @@ export function registerAgentCommands(register: RegisterCommand, projectId: stri
     "ide.agent.chat.inject",
     "Добавить сообщение в идущий ответ агента",
     async (args) => {
-      const chat = find(args, (item) => item.busy() && item.backend === "claude-code");
+      const chat = find(args, (item) => item.busy() && !!item.capabilities().inject);
       const added = await chat.inject(text(commandArgs(args), "text"));
       return { added };
     },
-    () => chatsOf(projectId).some((chat) => chat.busy() && chat.backend === "claude-code"),
+    () => chatsOf(projectId).some((chat) => chat.busy() && !!chat.capabilities().inject),
     undefined,
     {
       description:
-        "Добавляет уточнение в ответ, который Claude Code пишет сейчас: он учтёт его, не останавливаясь. Если ответ уже закончился, сообщение остаётся в очереди (added: false).",
+        "Добавляет уточнение в ответ, который агент пишет сейчас: он учтёт его, не останавливаясь. Если ответ уже закончился, сообщение остаётся в очереди (added: false).",
       arguments: { text: "Текст уточнения", chat: CHAT },
     },
   );
@@ -250,7 +249,7 @@ export function registerAgentCommands(register: RegisterCommand, projectId: stri
     undefined,
     {
       description:
-        "Возвращает чат к моменту до сообщения. scope: conversation — только разговор (сообщение уходит в поле ввода), files — файлы проекта возвращаются к тому шагу (только Claude Code, хранит резервные копии), both — и то и другое. Меняет файлы на диске: используйте по просьбе пользователя.",
+        "Возвращает чат к моменту до сообщения. scope: conversation — только разговор (сообщение уходит в поле ввода), files — файлы проекта возвращаются к тому шагу (если агент хранит резервные копии), both — и то и другое. Меняет файлы на диске: используйте по просьбе пользователя.",
       arguments: {
         turnId: "Сообщение пользователя из ide.agent.turns.list; по умолчанию последнее",
         scope: "conversation | files | both",
@@ -315,12 +314,12 @@ export function registerAgentCommands(register: RegisterCommand, projectId: stri
   register(
     "ide.agent.chat.compact",
     "Сжать контекст агента",
-    (args) => find(args, (chat) => claudeChat(chat) && !chat.busy()).compact(),
-    () => chatsOf(projectId).some((chat) => claudeChat(chat) && !chat.busy()),
+    (args) => find(args, (chat) => !!chat.capabilities().compact && !chat.busy()).compact(),
+    () => chatsOf(projectId).some((chat) => !!chat.capabilities().compact && !chat.busy()),
     undefined,
     {
       description:
-        "Просит Claude Code сжать разговор (команда /compact), освобождая место в окне контекста. Подходит, когда ide.agent.* показывает заполнение выше 80%.",
+        "Просит агента сжать разговор, освобождая место в окне контекста. Подходит, когда в чате показано предупреждение о заполнении контекста.",
       arguments: { chat: CHAT },
     },
   );

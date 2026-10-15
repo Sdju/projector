@@ -37,7 +37,7 @@ export function useChatActions(
    */
   function detach() {
     const last = state.turns.findLast((item) => item.role === "assistant");
-    if (last && (backend !== "claude-code" || !last.tail)) last.detached = true;
+    if (last && (!state.capabilities.branchSession || !last.tail)) last.detached = true;
   }
 
   /** Sends the next queued message once the answer is over; a stopped or failed one waits. */
@@ -69,7 +69,7 @@ export function useChatActions(
    */
   async function injectQueued(id: string): Promise<boolean> {
     const item = state.queue.find((entry) => entry.id === id);
-    if (!item || !state.busy || backend !== "claude-code" || !state.activeMessage) return false;
+    if (!item || !state.busy || !state.capabilities.inject || !state.activeMessage) return false;
     let accepted = false;
     try {
       accepted = await injectAgentMessage(state.activeMessage, item.text);
@@ -167,9 +167,9 @@ export function useChatActions(
     return answer?.role === "assistant" ? answer.session?.id : undefined;
   }
 
-  /** Whether the files can be taken back to before this message (only Claude Code keeps backups). */
+  /** Whether the files can be taken back to before this message (when the backend keeps backups). */
   function canRewindFiles(id: string): boolean {
-    return backend === "claude-code" && !!sessionOf(id);
+    return !!state.capabilities.rewindFiles && !!sessionOf(id);
   }
 
   /** Puts the project's files back to how they were before the message; `dryRun` only reports. */

@@ -31,13 +31,7 @@ import { fetchMcpServers, type McpServer } from "../api/client.ts";
 import { activateChat, registerChat, type ChatController } from "../model/chat-registry.ts";
 import { useRewindPanel } from "../model/rewind-panel.ts";
 import { useWorktreePanel } from "../model/worktree-panel.ts";
-import type {
-  AgentBackendId,
-  AgentControl,
-  AgentPermissionMode,
-  MessageChip,
-  RewindScope,
-} from "../model/types.ts";
+import type { AgentBackendId, MessageChip, RewindScope } from "../model/types.ts";
 import IconSquarePen from "~icons/lucide/square-pen";
 import IconDownload from "~icons/lucide/download";
 import IconBranch from "~icons/lucide/git-branch";
@@ -48,7 +42,6 @@ const props = withDefaults(
 );
 /** External agents are plain coding agents: no Projector tools, their own approvals. */
 const plain = computed(() => props.backend !== "projector");
-const claude = computed(() => props.backend === "claude-code");
 const agentName = computed(() => agentLabel(props.backend));
 const { api } = useIdeCommands();
 const {
@@ -60,8 +53,8 @@ const {
   phase,
   permissions,
   questions,
-  permissionMode,
   controls,
+  capabilities,
   sessions,
   sessionsLoading,
   sessionsError,
@@ -103,50 +96,6 @@ onMounted(() => {
   void loadControls();
   void loadCommands();
 });
-const PERMISSION_CONTROL = "permission-mode";
-const permissionOptions: { value: AgentPermissionMode; name: string; description: string }[] = [
-  { value: "default", name: "Спрашивать", description: "Запрос перед правками и командами" },
-  {
-    value: "plan",
-    name: "План",
-    description: "Агент сначала составляет план без правок и ждёт вашего согласия",
-  },
-  {
-    value: "acceptEdits",
-    name: "Правки без вопросов",
-    description: "Файлы меняются сразу, команды — по запросу",
-  },
-  {
-    value: "auto",
-    name: "Авто",
-    description: "Классификатор сам разрешает безопасное и спрашивает о рискованном",
-  },
-  {
-    value: "bypassPermissions",
-    name: "Всё без вопросов",
-    description: "Без запросов разрешений",
-  },
-];
-/** Параметры из бэкенда плюс режим разрешений Claude Code: всё в одном острове. */
-const allControls = computed<AgentControl[]>(() => [
-  ...controls.value,
-  ...(claude.value
-    ? [
-        {
-          id: PERMISSION_CONTROL,
-          category: "mode" as const,
-          name: "Разрешения",
-          description: "Когда агент спрашивает подтверждение",
-          current: permissionMode.value,
-          options: permissionOptions,
-        },
-      ]
-    : []),
-]);
-function changeControl(id: string, value: string) {
-  if (id === PERMISSION_CONTROL) permissionMode.value = value as AgentPermissionMode;
-  else void setControl(id, value);
-}
 const latestContext = computed(() => turns.value.findLast((turn) => turn.context)?.context);
 const activeSession = computed(
   () => turns.value.findLast((turn) => turn.role === "assistant")?.session?.id,
@@ -300,15 +249,27 @@ async function retryMessage(id: string) {
 
 // A full context is compacted once the answer is over, unless the last message already was that.
 watch(busy, (working) => {
-  if (working || !claude.value || contextShare.value < 0.9 || queue.value.length) return;
-  if (turns.value.findLast((turn) => turn.role === "user")?.text === "/compact") return;
+  if (
+    working ||
+    !capabilities.value.compact ||
+    contextShare.value < capabilities.value.compact.autoAt ||
+    queue.value.length
+  )
+    return;
+  if (
+    turns.value.findLast((turn) => turn.role === "user")?.text ===
+    capabilities.value.compact.command
+  )
+    return;
   if (error.value) return;
   void compact();
 });
 
 async function compact() {
   void toBottom();
-  await send("/compact");
+  const policy = capabilities.value.compact;
+  if (!policy) throw new Error("Агент не поддерживает сжатие разговора");
+  await send(policy.command);
 }
 function exportMarkdown() {
   return chatMarkdown(turns.value, `${agentName.value} · ${new Date().toLocaleString("ru")}`);
@@ -338,6 +299,7 @@ const controller: ChatController = {
   tasks: () => chatTasks(turns.value),
   queue: () => queue.value,
   controls: () => controls.value,
+  capabilities: () => capabilities.value,
   setControl,
   loadSessions,
   resumeSession,
@@ -513,7 +475,7 @@ onBeforeUnmount(() => {
         :error="sessionsError"
         :disabled="busy"
         :active="activeSession"
-        :editable="claude"
+        :editable="capabilities.editSessions"
         @open="loadSessions"
         @change="changeSession"
         @pick="(id) => void resumeSession(id).catch(() => {})"
@@ -631,12 +593,12 @@ onBeforeUnmount(() => {
       />
       <AgentPlan :items="plan" :busy="busy" />
       <p
-        v-if="claude && contextShare >= 0.8 && !busy"
+        v-if="capabilities.compact && contextShare >= capabilities.compact.hintAt && !busy"
         class="compact-hint"
-        :class="{ urgent: contextShare >= 0.9 }"
+        :class="{ urgent: contextShare >= capabilities.compact.autoAt }"
         role="status"
       >
-        <template v-if="contextShare >= 0.9"
+        <template v-if="contextShare >= capabilities.compact.autoAt"
           >Контекст почти заполнен ({{ Math.round(contextShare * 100) }}%): после этого ответа он
           сожмётся сам.</template
         >
@@ -647,7 +609,7 @@ onBeforeUnmount(() => {
       <AgentQueue
         :items="queue"
         :busy="busy"
-        :can-inject="claude"
+        :can-inject="!!capabilities.inject"
         @now="sendQueuedNow"
         @inject="injectQueued"
         @remove="removeQueued"
@@ -677,11 +639,11 @@ onBeforeUnmount(() => {
       <template v-if="plain" #controls>
         <AgentControls
           ref="controlsMenu"
-          :controls="allControls"
+          :controls="controls"
           :disabled="busy"
           :mcp="mcp"
           @opened="loadMcp"
-          @change="changeControl"
+          @change="setControl"
         />
       </template>
     </AgentComposer>

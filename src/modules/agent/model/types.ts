@@ -1,3 +1,12 @@
+/** Operations and context policy published by the running backend adapter. */
+export interface AgentCapabilities {
+  inject?: boolean;
+  branchSession?: boolean;
+  rewindFiles?: boolean;
+  editSessions?: boolean;
+  compact?: { command: string; hintAt: number; autoAt: number };
+}
+
 import type { AgentTask, AgentTaskPatch } from "../../../../core/modules/agent-task/index.ts";
 import type { Project } from "../../project/index.ts";
 

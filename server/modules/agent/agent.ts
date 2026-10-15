@@ -35,6 +35,16 @@ function backendFor(id: string | undefined): AgentBackend {
   return backend;
 }
 
+/** Method-backed operations are derived from the adapter, never its name. */
+export function agentCapabilities(id: string | undefined) {
+  const backend = backendFor(id);
+  return {
+    ...backend.capabilities,
+    rewindFiles: !!backend.rewindFiles,
+    editSessions: !!backend.updateSession,
+  };
+}
+
 /** Model, effort and mode choices the agent offers; empty for agents without any. */
 export async function agentControls(id: string | undefined, cwd: string) {
   return (await backendFor(id).controls?.(cwd)) ?? [];

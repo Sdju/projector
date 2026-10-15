@@ -10,6 +10,7 @@ import {
   AGENT_PERMISSION_MODES,
   agentCommands,
   agentControls,
+  agentCapabilities,
   agentMcpServers,
   agentSessions,
   rewindAgentFiles,
@@ -112,7 +113,10 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
   if (path === "/api/agent/controls" && method === "GET") {
     const cwd = await projectPath(url.searchParams.get("projectId") ?? "");
     const backend = url.searchParams.get("backend") ?? undefined;
-    json(res, 200, { controls: await agentControls(backend, cwd) });
+    json(res, 200, {
+      controls: await agentControls(backend, cwd),
+      capabilities: agentCapabilities(backend),
+    });
     return true;
   }
   if (path === "/api/agent/commands" && method === "GET") {

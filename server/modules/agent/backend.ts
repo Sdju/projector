@@ -1,3 +1,12 @@
+/** Operations and context policy published by the running backend adapter. */
+export interface AgentCapabilities {
+  inject?: boolean;
+  branchSession?: boolean;
+  rewindFiles?: boolean;
+  editSessions?: boolean;
+  compact?: { command: string; hintAt: number; autoAt: number };
+}
+
 import type { AgentHistoryTurn } from "../providers/index.ts";
 import type {
   AgentControl,
@@ -120,6 +129,7 @@ export interface AgentRunOptions {
  */
 export interface AgentBackend {
   id: AgentBackendId;
+  capabilities?: AgentCapabilities;
   run(options: AgentRunOptions): Promise<void>;
   /** What the user may tune before a turn (model, effort, mode). */
   controls?(cwd: string): Promise<AgentControl[]>;

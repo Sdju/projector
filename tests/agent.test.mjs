@@ -434,6 +434,7 @@ test("ACP session updates become the shared chat events", async () => {
   expect(mapper.text).toBe("Открываю Готово");
   expect(events.map(([event]) => event)).toStrictEqual([
     "status",
+    "thought",
     "text",
     "tool",
     "tool-result",
@@ -441,13 +442,14 @@ test("ACP session updates become the shared chat events", async () => {
     "tool-result",
     "text",
   ]);
-  expect(events[2][1]).toStrictEqual({
+  expect(events[1]).toStrictEqual(["thought", { text: "думаю" }]);
+  expect(events[3][1]).toStrictEqual({
     id: "t1",
     name: "Read file",
     input: { path: "x" },
   });
-  expect(events[3][1]).toStrictEqual({ id: "t1", name: "Read file", output: "ok" });
-  expect(events[5][1]).toMatchObject({ id: "t2", error: "boom" });
+  expect(events[4][1]).toStrictEqual({ id: "t1", name: "Read file", output: "ok" });
+  expect(events[6][1]).toMatchObject({ id: "t2", error: "boom" });
 });
 
 test("ACP client frames JSON-RPC over a real child process", async () => {

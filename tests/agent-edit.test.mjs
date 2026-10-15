@@ -12,6 +12,7 @@ const turn = (id, role, extra = {}) => ({ id, role, text: id, tools: [], ...extr
 function chat(turns) {
   const state = createState();
   state.turns = turns;
+  state.capabilities = { branchSession: true, rewindFiles: true, inject: true };
   const sent = [];
   const actions = useChatActions(state, {
     backend: "claude-code",
