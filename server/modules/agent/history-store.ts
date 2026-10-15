@@ -36,11 +36,19 @@ const SCHEMA = `
     PRIMARY KEY (chat, id)
   );
   CREATE INDEX IF NOT EXISTS turns_parent ON turns (chat, parent, ord);
+  CREATE TABLE IF NOT EXISTS archives (
+    id TEXT PRIMARY KEY,
+    scope TEXT NOT NULL,
+    title TEXT NOT NULL,
+    updated TEXT NOT NULL,
+    pinned INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX IF NOT EXISTS archives_scope ON archives (scope, pinned, updated);
 `;
 
 const databases = new Map<string, DatabaseSync>();
 
-function database(): DatabaseSync {
+export function historyDatabase(): DatabaseSync {
   const directory = join(dataDir(), "agent");
   const file = join(directory, "history.sqlite");
   const open = databases.get(file);
@@ -118,7 +126,7 @@ export function saveHistory(chat: string, turns: HistoryTurn[]): void {
     if (seen.has(row.id)) throw new Error(`Повторяющийся ID сообщения: ${row.id}`);
     seen.add(row.id);
   }
-  const db = database();
+  const db = historyDatabase();
   db.exec("BEGIN IMMEDIATE");
   try {
     const existing = new Map<string, { hash: string; pick: string | null }>();
@@ -154,7 +162,7 @@ export function saveHistory(chat: string, turns: HistoryTurn[]): void {
 
 /** The chat as it is shown: the picked version, the others nested under the turn that forks them. */
 export function loadHistory(chat: string): HistoryTurn[] | undefined {
-  const db = database();
+  const db = historyDatabase();
   const meta = db.prepare("SELECT pick FROM chats WHERE id = ?").get(chat) as
     | { pick: string | null }
     | undefined;
@@ -216,14 +224,14 @@ export function loadHistory(chat: string): HistoryTurn[] | undefined {
 
 /** How many saved versions of a chat exist, for diagnostics and tests. */
 export function historyRevision(chat: string): number {
-  const row = database().prepare("SELECT revision FROM chats WHERE id = ?").get(chat) as
+  const row = historyDatabase().prepare("SELECT revision FROM chats WHERE id = ?").get(chat) as
     | { revision: number }
     | undefined;
   return row?.revision ?? 0;
 }
 
 export function deleteHistory(chat: string): void {
-  const db = database();
+  const db = historyDatabase();
   db.prepare("DELETE FROM turns WHERE chat = ?").run(chat);
   db.prepare("DELETE FROM chats WHERE id = ?").run(chat);
 }

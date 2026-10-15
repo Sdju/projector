@@ -8,7 +8,8 @@ import {
   saveDefault,
   updateSession,
 } from "../api/client.ts";
-import type { ChatState } from "./chat-state.ts";
+import { archiveChat, deleteChat, fetchChats, openChat, updateChat } from "../api/chats.ts";
+import { saves, type ChatState } from "./chat-state.ts";
 import type { AgentBackendId, AgentControl, AgentSelection, AgentSessionInfo } from "./types.ts";
 
 /** The saved choice per agent is read once; new chats start from it. */
@@ -27,10 +28,13 @@ export function useExternalAgent(
     projectId: string;
     ready: Promise<void>;
     persist: () => void;
+    /** Where the chat is saved; the Projector agent's past chats are kept per key. */
+    key: string;
   },
 ) {
-  const { backend, projectId, ready, persist } = chat;
+  const { backend, projectId, ready, persist, key } = chat;
   const external = backend !== "projector";
+  // The Projector agent offers a model and permission choice but has no sessions or slash commands.
   const controls = computed(() => state.controls);
   const selection = computed(() => state.selection);
   const sessionList = computed(() => state.sessions);
@@ -47,7 +51,7 @@ export function useExternalAgent(
 
   /** Reads what the agent offers and starts from the saved choice for this agent. */
   async function loadControls(): Promise<void> {
-    if (!external || !projectId) return;
+    if (external && !projectId) return;
     await ready;
     if (state.permissionMode !== "default" && !state.selection["permission-mode"])
       state.selection["permission-mode"] = state.permissionMode;
@@ -91,10 +95,10 @@ export function useExternalAgent(
 
   /** Past sessions of this agent in the project, newest first. */
   async function loadSessions(): Promise<AgentSessionInfo[]> {
-    if (!external || !projectId) return [];
+    if (external && !projectId) return [];
     state.sessionsLoading = true;
     try {
-      state.sessions = await fetchSessions(backend, projectId);
+      state.sessions = external ? await fetchSessions(backend, projectId) : await fetchChats(key);
       state.sessionsError = "";
     } catch (err) {
       state.sessionsError = err instanceof Error ? err.message : "Не удалось получить сессии";
@@ -110,10 +114,58 @@ export function useExternalAgent(
     change: { title?: string; pinned?: boolean },
   ): Promise<void> {
     try {
-      await updateSession(backend, projectId, id, change);
+      if (external) await updateSession(backend, projectId, id, change);
+      else await updateChat(id, change);
       await loadSessions();
     } catch (err) {
       state.sessionsError = err instanceof Error ? err.message : "Не удалось изменить сессию";
+    }
+  }
+
+  /** What the chat last did has reached the server, so a history action sees all of it. */
+  async function flush(): Promise<void> {
+    persist();
+    await saves.get(key)?.catch(() => {});
+  }
+
+  /** The chat is another one now: what belonged to the previous one no longer applies. */
+  function resetChat(): void {
+    state.queue = [];
+    state.stash = undefined;
+    state.editing = "";
+    state.draft = "";
+    state.draftParts = [];
+  }
+
+  /**
+   * A new, empty chat. The Projector agent keeps what was said in the history of chats; the
+   * others, whose sessions the agent itself keeps, just start over.
+   */
+  async function clear(): Promise<void> {
+    await ready;
+    if (state.busy) return;
+    try {
+      if (!external) {
+        await flush();
+        await archiveChat(key);
+      }
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : "Не удалось начать новый чат";
+      return;
+    }
+    state.turns = [];
+    resetChat();
+    state.error = "";
+    state.phase = "";
+    persist();
+  }
+
+  async function removeSession(id: string): Promise<void> {
+    try {
+      await deleteChat(id);
+      await loadSessions();
+    } catch (err) {
+      state.sessionsError = err instanceof Error ? err.message : "Не удалось удалить чат";
     }
   }
 
@@ -123,8 +175,14 @@ export function useExternalAgent(
     if (state.busy) throw new Error("Дождитесь окончания ответа");
     state.error = "";
     try {
-      state.turns = await loadSessionTurns(backend, projectId, id);
-      persist();
+      if (external) {
+        state.turns = await loadSessionTurns(backend, projectId, id);
+        persist();
+      } else {
+        await flush();
+        state.turns = (await openChat(key, id)).turns;
+        resetChat();
+      }
     } catch (err) {
       state.error = err instanceof Error ? err.message : "Не удалось открыть сессию";
       throw err;
@@ -141,5 +199,7 @@ export function useExternalAgent(
     loadSessions,
     changeSession,
     resumeSession,
+    removeSession,
+    clear,
   };
 }

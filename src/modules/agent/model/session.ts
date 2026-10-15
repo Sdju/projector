@@ -112,7 +112,9 @@ export function useAgent(
     loadSessions,
     changeSession,
     resumeSession,
-  } = useExternalAgent(state, { backend, projectId, ready, persist });
+    removeSession,
+    clear,
+  } = useExternalAgent(state, { backend, projectId, ready, persist, key });
   /** The native session of the last answer, so Claude Code continues the same conversation. */
   function sessionId(): string | undefined {
     const last = state.turns.findLast((item) => item.role === "assistant");
@@ -236,7 +238,7 @@ export function useAgent(
     if (text === undefined) actions.applyEdit();
     state.error = "";
     void requestNotifications();
-    const previousHistory = chatHistory(state.turns);
+    const previousHistory = chatHistory(state.turns, backend === "projector");
     const resume = sessionId();
     const branchFrom = tail();
     const copy = worktreeId();
@@ -303,19 +305,6 @@ export function useAgent(
   }
   void resumeRun();
 
-  async function clear(): Promise<void> {
-    await ready;
-    if (state.busy) return;
-    state.turns = [];
-    state.queue = [];
-    state.stash = undefined;
-    state.editing = "";
-    state.error = "";
-    state.phase = "";
-    state.draft = "";
-    persist();
-  }
-
   /** Stops the answer. Only this cancels an agent process; closing the page just detaches from it. */
   function stop() {
     const assistant = state.turns.at(-1);
@@ -366,6 +355,7 @@ export function useAgent(
     loadSessions,
     changeSession,
     resumeSession,
+    removeSession,
     send,
     queue: computed(() => state.queue),
     sendQueuedNow: actions.sendQueuedNow,

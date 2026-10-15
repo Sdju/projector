@@ -20,6 +20,7 @@ import { handleStatus } from "../routes/api/status.ts";
 import { handleProviders } from "../routes/api/providers.ts";
 import { handleProvidersActive } from "../routes/api/providers/active.ts";
 import { handleAgent } from "../routes/api/agent.ts";
+import { handleAgentChats } from "../routes/api/agent-chats.ts";
 import { handleAgentWorktrees } from "../routes/api/agent-worktrees.ts";
 import { handleInspect } from "../routes/api/inspect.ts";
 import { handlePickFolder } from "../routes/api/pick-folder.ts";
@@ -66,6 +67,7 @@ const routes = [
   handleProviders,
   handleProvidersActive,
   handleAgent,
+  handleAgentChats,
   handleAgentWorktrees,
   handleInspect,
   handlePickFolder,

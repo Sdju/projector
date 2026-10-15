@@ -65,6 +65,7 @@ const {
   loadSessions,
   changeSession,
   resumeSession,
+  removeSession,
   send,
   queue,
   sendQueuedNow,
@@ -469,15 +470,17 @@ onBeforeUnmount(() => {
   >
     <UiInline class="chat-tools" :gap="1" align="normal" justify="normal">
       <AgentSessions
-        v-if="plain"
         :sessions="sessions"
         :loading="sessionsLoading"
         :error="sessionsError"
         :disabled="busy"
         :active="activeSession"
-        :editable="capabilities.editSessions"
+        :editable="!plain || capabilities.editSessions"
+        :deletable="!plain"
+        :label="plain ? undefined : 'История чатов'"
         @open="loadSessions"
         @change="changeSession"
+        @remove="(id) => void removeSession(id)"
         @pick="(id) => void resumeSession(id).catch(() => {})"
       />
       <UiButton
@@ -636,7 +639,7 @@ onBeforeUnmount(() => {
       <template v-if="latestContext" #status>
         <AgentContextMeter :context="latestContext" />
       </template>
-      <template v-if="plain" #controls>
+      <template v-if="controls.length" #controls>
         <AgentControls
           ref="controlsMenu"
           :controls="controls"

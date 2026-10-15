@@ -3,6 +3,7 @@ import type {
   AgentCapabilities,
   AgentCommand,
   AgentControl,
+  AgentHistoryTurn,
   AgentPermission,
   AgentPermissionMode,
   AgentQuestionRequest,
@@ -92,9 +93,19 @@ registry.queued ??= new Set();
 for (const state of registry.sessions.values()) state.capabilities ??= {};
 export const { releases, viewers, sessions, loads, saves, queued } = registry;
 
-/** The conversation as plain text turns, for an agent that has no session of its own to continue. */
-export function chatHistory(turns: AgentTurn[]): { role: "user" | "assistant"; content: string }[] {
-  return turns
-    .filter((item) => item.text.trim())
-    .map((item) => ({ role: item.role, content: item.text }));
+/** The conversation as turns, with what the answers' tool calls returned, for an agent without a session of its own. */
+export function chatHistory(turns: AgentTurn[], withTools = false): AgentHistoryTurn[] {
+  return turns.flatMap((item): AgentHistoryTurn[] => {
+    const tools = (withTools ? item.tools : [])
+      .filter((tool) => !tool.parent && tool.status !== "running")
+      .map((tool) => ({
+        id: tool.id,
+        name: tool.name,
+        ...(tool.input ? { input: tool.input } : {}),
+        output: tool.detail,
+        ...(tool.status === "error" ? { failed: true } : {}),
+      }));
+    if (!item.text.trim() && !tools.length) return [];
+    return [{ role: item.role, content: item.text, ...(tools.length ? { tools } : {}) }];
+  });
 }

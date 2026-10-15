@@ -3,6 +3,7 @@ export const toolLabels: Record<string, string> = {
   describe_command: "Описание команды",
   execute_command: "Вызов команды",
   bash: "Bash",
+  ask_user: "Вопрос пользователю",
   find_projects: "Поиск проектов",
   inspect_path: "Обзор проекта",
   list_directory: "Обзор папки",

@@ -167,6 +167,8 @@ export interface AgentQuestionRequest {
 export interface AgentHistoryTurn {
   role: "user" | "assistant";
   content: string;
+  /** What the answer's tool calls returned, for an agent that only gets the replayed chat. */
+  tools?: { id: string; name: string; input?: string; output: string; failed?: boolean }[];
 }
 
 export interface AgentCommandRequest {

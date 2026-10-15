@@ -9,6 +9,7 @@ import type { AgentSessionInfo } from "../model/types.ts";
 import IconHistory from "~icons/lucide/history";
 import IconPin from "~icons/lucide/pin";
 import IconPencil from "~icons/lucide/pencil";
+import IconTrash from "~icons/lucide/trash-2";
 
 const props = defineProps<{
   sessions: AgentSessionInfo[];
@@ -19,11 +20,16 @@ const props = defineProps<{
   active?: string;
   /** The agent can rename and pin its sessions. */
   editable?: boolean;
+  /** A session can be removed from the list for good. */
+  deletable?: boolean;
+  /** What the list is called: past sessions of an agent, or the chat history. */
+  label?: string;
 }>();
 const emit = defineEmits<{
   open: [];
   pick: [id: string];
   change: [id: string, change: { title?: string; pinned?: boolean }];
+  remove: [id: string];
 }>();
 const menu = useIslandMenu({
   anchor: "right",
@@ -62,7 +68,7 @@ function finishRename(save: boolean, restoreFocus = false) {
     void nextTick(() => {
       if (!shown.value) return;
       const target = row?.isConnected
-        ? row.querySelector<HTMLButtonElement>(".mini:last-child")
+        ? row.querySelector<HTMLButtonElement>('.mini[aria-label="Переименовать сессию"]')
         : searchInput.value;
       target?.focus();
     });
@@ -108,15 +114,15 @@ function age(value?: string): string {
     <UiButton
       shape="icon"
       size="sm"
-      title="Прошлые сессии"
-      aria-label="Прошлые сессии"
+      :title="label ?? 'Прошлые сессии'"
+      :aria-label="label ?? 'Прошлые сессии'"
       :aria-expanded="shown"
       :disabled="disabled"
       @click="menu.toggle()"
     >
       <IconHistory aria-hidden="true" />
     </UiButton>
-    <UiIsland :menu="menu" label="Прошлые сессии" :width="320">
+    <UiIsland :menu="menu" :label="label ?? 'Прошлые сессии'" :width="320">
       <UiControl
         v-if="sessions.length > 4"
         ref="searchInput"
@@ -128,7 +134,9 @@ function age(value?: string): string {
       />
       <p v-if="loading" class="note">Загружаю…</p>
       <p v-else-if="error" class="note error" role="alert">{{ error }}</p>
-      <p v-else-if="!sessions.length" class="note">В этой папке пока нет сессий</p>
+      <p v-else-if="!sessions.length" class="note">
+        {{ deletable ? "Прошлых чатов пока нет" : "В этой папке пока нет сессий" }}
+      </p>
       <p v-else-if="!visible.length" class="note">Ничего не найдено</p>
       <UiInline
         v-for="session in visible"
@@ -161,7 +169,7 @@ function age(value?: string): string {
         </button>
         <UiInline
           as="span"
-          v-if="editable && renaming !== session.id"
+          v-if="(editable || deletable) && renaming !== session.id"
           class="row-actions"
           :gap="0.5"
           align="normal"
@@ -184,6 +192,16 @@ function age(value?: string): string {
             @click="startRename(session, $event)"
           >
             <IconPencil aria-hidden="true" />
+          </button>
+          <button
+            v-if="deletable"
+            type="button"
+            class="mini"
+            title="Удалить"
+            aria-label="Удалить чат"
+            @click="emit('remove', session.id)"
+          >
+            <IconTrash aria-hidden="true" />
           </button>
         </UiInline>
       </UiInline>

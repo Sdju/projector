@@ -11,6 +11,13 @@ export { readAttachment, saveAttachment } from "./attachments.ts";
 export { readAgentHistory, writeAgentHistory } from "./history.ts";
 export { closeHistoryStore } from "./history-store.ts";
 export {
+  archiveLiveChat,
+  listArchivedChats,
+  openArchivedChat,
+  removeArchivedChat,
+  renameArchivedChat,
+} from "./chat-archive.ts";
+export {
   createCommandBridge,
   createApprovalBridge,
   createQuestionBridge,
