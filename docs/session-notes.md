@@ -68,14 +68,18 @@ node --import vio/register native/app/entry.ts native http://localhost:4177 quit
 
 Данные находятся в `$XDG_DATA_HOME/projector`, по умолчанию `~/.local/share/projector`:
 
-| Файл                                         | Содержимое                       |
-| -------------------------------------------- | -------------------------------- |
-| `launcher.json`                              | Режим, хоткей, история запусков  |
-| `projects.json`                              | Каталог проектов                 |
-| `providers.json`, `integrations.json`        | Провайдеры, интеграции и секреты |
-| `keybindings.json`                           | Привязки команд IDE              |
-| `instance.json`, `launch.lock`, `server.log` | Запуск, блокировка и диагностика |
-| `chrome-profile-launcher`, `chrome-profile`  | Отдельные профили app-окон       |
+| Файл                                                             | Содержимое                                                                              |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `launcher.json`                                                  | Режим, хоткей, история запусков                                                         |
+| `projects.json`                                                  | Каталог проектов                                                                        |
+| `providers.json`, `integrations.json`                            | Провайдеры, интеграции и секреты                                                        |
+| `keybindings.json`                                               | Привязки команд IDE                                                                     |
+| `instance.json`, `launch.lock`, `server.log`                     | Запуск, блокировка и диагностика                                                        |
+| `chrome-profile-launcher`, `chrome-profile`                      | Отдельные профили app-окон                                                              |
+| `server-mode`, `network-mode`, `lan-password`                    | Режим сервера (dev/prod), доступ по сети и scrypt-хеш пароля LAN                        |
+| `editor.json`, `files-exclude.json`, `hotkey.json`               | Настройки редактора, исключения дерева, хоткей на Windows и macOS                       |
+| `devcontainer-trust.json`, `browser-proxy-key`, `launcher.token` | Доверие к Dev Container, ключ прокси браузера, токен резидента                          |
+| `agent/`, `worktrees/`                                           | История чатов (`history.sqlite`), журналы ходов (`runs/`), изолированные копии проектов |
 
 Не меняйте текущий профиль браузера ради тестов. Для изоляции используйте временный XDG-каталог в `/tmp`.
 
