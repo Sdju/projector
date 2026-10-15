@@ -1,10 +1,11 @@
-import { pageClientId } from "../../common/utilities/page-client.ts";
 import {
   createWorkspaceProfiles,
   profileCapabilities,
   readProviderFor,
   type WorkspaceProfile,
   type WorkspaceProfileResolver,
+  type WorkspaceWatchPatch,
+  type WorkspaceWatchHandlers,
 } from "./profile.ts";
 import { createLocalWorkspaceProfile } from "./local.ts";
 export {
@@ -18,6 +19,9 @@ export {
   type FilesProvider,
   type GitProvider,
   type ReadProvider,
+  type WorkspaceWatch,
+  type WorkspaceWatchPatch,
+  type WorkspaceWatchHandlers,
 } from "./profile.ts";
 export { createLocalWorkspaceProfile } from "./local.ts";
 export { createSidebarRegistry, type SidebarRegistry, type SidebarType } from "./sidebar.ts";
@@ -54,29 +58,22 @@ export const workspaceSiteUrl = (projectId: string, path: string) =>
 export const refreshWorkspace = (projectId: string) =>
   workspaceProfile(projectId).providers.files.refresh?.();
 
-/** Слежение за файлами умеет только проект на сервере Projector; остальные источники молчат. */
-export const workspaceWatchable = (projectId: string) => workspaceProfile(projectId).id === "local";
+export const workspaceWatchable = (projectId: string) =>
+  !!workspaceProfile(projectId).providers.files.watch;
 
 /**
- * Сообщает серверу, что страница показывает: открытые файлы (`paths`) и раскрытые папки дерева
- * (`directories`). Пропущенное поле остаётся как было. Ответом приходят события `file-changed` и
- * `dir-changed` (окно `projector:file-changed`, `projector:dir-changed`).
+ * Сообщает провайдеру открытые файлы (`paths`) и раскрытые папки (`directories`).
+ * Пропущенное поле остаётся как было; изменения приходят через `subscribeWorkspace`.
  */
-export function watchWorkspace(
-  projectId: string,
-  patch: { paths?: string[]; directories?: string[] },
-  keepalive = false,
-) {
-  if (!workspaceWatchable(projectId)) return Promise.resolve(false);
-  return fetch(`/api/projects/${encodeURIComponent(projectId)}/workspace/watch`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ client: pageClientId, ...patch }),
-    keepalive,
-  }).then(
-    (response) => response.ok,
-    () => false,
+export function watchWorkspace(projectId: string, patch: WorkspaceWatchPatch, keepalive = false) {
+  return (
+    workspaceProfile(projectId).providers.files.watch?.update(patch, keepalive) ??
+    Promise.resolve(false)
   );
+}
+
+export function subscribeWorkspace(projectId: string, handlers: WorkspaceWatchHandlers) {
+  return workspaceProfile(projectId).providers.files.watch?.subscribe(handlers) ?? (() => {});
 }
 
 const READONLY = "Проект открыт только для чтения";

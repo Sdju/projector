@@ -1,5 +1,10 @@
 import { onBeforeUnmount, onMounted, watch, type Ref } from "vue";
-import { watchWorkspace, workspaceRequest, workspaceWatchable } from "../../workspace-api/index.ts";
+import {
+  subscribeWorkspace,
+  watchWorkspace,
+  workspaceRequest,
+  workspaceWatchable,
+} from "../../workspace-api/index.ts";
 import type { FileContent } from "../../../../core/modules/workspace/index.ts";
 import type { OpenFile } from "../open-file.ts";
 
@@ -28,7 +33,7 @@ const synced = (file: OpenFile) =>
  * который решает пользователь (загрузить с диска или оставить свою версию).
  */
 export function useFileSync(ctx: FileSyncContext) {
-  const local = () => workspaceWatchable(ctx.projectId());
+  const watchable = () => workspaceWatchable(ctx.projectId());
   const trackable = () => ctx.tabs.value.filter(synced);
 
   /** Сверяет вкладку с диском. */
@@ -82,7 +87,7 @@ export function useFileSync(ctx: FileSyncContext) {
   let sentKey = "";
   let timer: ReturnType<typeof setTimeout> | undefined;
   function publish(force = false) {
-    if (!local()) return;
+    if (!watchable()) return;
     const paths = [...new Set(trackable().map((file) => file.path))].sort();
     const key = `${ctx.projectId()}\0${paths.join("\0")}`;
     if (key === sentKey && !force) return;
@@ -100,22 +105,31 @@ export function useFileSync(ctx: FileSyncContext) {
     { flush: "post" },
   );
 
-  function onChanged(event: Event) {
-    const { projectId, path } = (event as CustomEvent<{ projectId: string; path: string }>).detail;
-    if (projectId === ctx.projectId()) void checkPath(path);
-  }
   function onReconnect() {
     publish(true);
     for (const file of trackable()) void check(file);
   }
+  let stopSubscription: (() => void) | undefined;
   onMounted(() => {
-    window.addEventListener("projector:file-changed", onChanged);
-    window.addEventListener("projector:events-open", onReconnect);
+    stopSubscription = watch(
+      ctx.projectId,
+      (projectId, previous, cleanup) => {
+        if (previous) void watchWorkspace(previous, { paths: [] });
+        const unsubscribe = subscribeWorkspace(projectId, {
+          file: (path) => {
+            void checkPath(path);
+          },
+          reconnect: onReconnect,
+        });
+        cleanup(unsubscribe);
+        publish(true);
+      },
+      { immediate: true },
+    );
   });
   onBeforeUnmount(() => {
     clearTimeout(timer);
-    window.removeEventListener("projector:file-changed", onChanged);
-    window.removeEventListener("projector:events-open", onReconnect);
+    stopSubscription?.();
     void watchWorkspace(ctx.projectId(), { paths: [] }, true);
   });
   return { check, reloadFromDisk, keepMine };

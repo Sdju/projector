@@ -21,6 +21,20 @@ export interface ReadProvider {
   read(action: string, params: WorkspaceParams, signal?: AbortSignal): Promise<unknown>;
 }
 export type FileWrite = "file" | "move" | "entry" | "import";
+export interface WorkspaceWatchPatch {
+  paths?: string[];
+  directories?: string[];
+}
+export interface WorkspaceWatchHandlers {
+  file?(path: string): void;
+  directory?(path: string): void;
+  reconnect?(): void;
+  error?(message: string): void;
+}
+export interface WorkspaceWatch {
+  update(patch: WorkspaceWatchPatch, keepalive?: boolean): Promise<boolean>;
+  subscribe(handlers: WorkspaceWatchHandlers): () => void;
+}
 export interface FilesProvider extends ReadProvider {
   assetUrl(path: string, external?: boolean): string;
   /** Address that serves the file as part of a site (relative links resolve); absent when it cannot. */
@@ -36,6 +50,8 @@ export interface FilesProvider extends ReadProvider {
   ): Promise<{ destination: string }>;
   /** Re-reads a mutable snapshot (a remote ref moved). */
   refresh?(): Promise<void>;
+  /** Optional live change stream; transport and project filtering belong to the adapter. */
+  watch?: WorkspaceWatch;
 }
 export type GitWrite = "git" | "branch";
 export interface GitProvider extends ReadProvider {

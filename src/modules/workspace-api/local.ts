@@ -1,5 +1,6 @@
 import type { FileWrite, GitWrite, WorkspaceProfile } from "./profile.ts";
 import { defineTab, singletonTab } from "./tabs.ts";
+import { localWorkspaceWatch } from "./local-watch.ts";
 
 const base = (projectId: string) => `/api/projects/${encodeURIComponent(projectId)}/workspace`;
 
@@ -117,6 +118,7 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
     providers: {
       files: {
         read,
+        watch: localWorkspaceWatch(projectId),
         assetUrl: (path, external = false) =>
           `${base(projectId)}/${external ? "external-asset" : "asset"}?${new URLSearchParams({ path })}`,
         siteUrl: (path) =>
