@@ -4,7 +4,7 @@
 
 ## Начало работы
 
-Linux, Windows и macOS (на macOS: Xcode Command Line Tools для Swift-помощника меню/хоткея и `brew install gtk4 gobject-introspection pkg-config` для GTK-палитры, его ставит `projector install`; без GTK4 нативный режим недоступен, как на Linux без GTK), Node.js 24, Vite+ (`vp`), GTK4 и GObject Introspection с GioUnix. Для сборки `node-pty` нужны Python 3, make и C++ compiler. Для обзора проектов — `git`, `rg` и GNU `mv`; Python 3 также читает архивы. Проверенное desktop-окружение — KDE Plasma/X11.
+Linux, Windows и macOS (на macOS: Xcode Command Line Tools для Swift-помощника меню/хоткея и `brew install gtk4 gobject-introspection pkg-config` для GTK-палитры, его пробует поставить `vp run desktop`; без GTK4 нативный режим недоступен, как на Linux без GTK), Node.js 24, Vite+ (`vp`), GTK4 и GObject Introspection с GioUnix. Для сборки `node-pty` нужны Python 3, make и C++ compiler. Для обзора проектов — `git`, `rg` и GNU `mv`; Python 3 также читает архивы. Проверенное desktop-окружение — KDE Plasma/X11.
 
 ```bash
 vp install
@@ -23,7 +23,7 @@ vp run build
 - **Перед проверками выясните состояние сервера:** `/api/health` и `/api/status`. Обычный запуск использует `vp dev`; build пока не создаёт самостоятельный desktop-дистрибутив.
 - **Полный restart и `projector quit` завершают терминалы и дочерние процессы.** HMR должен сохранять учёт процессов и подписок без дублей. Native не имеет HMR: обновляйте его отдельно от сервера.
 - **Настройки хранятся на диске**, в `$XDG_DATA_HOME/projector` (по умолчанию `~/.local/share/projector`), а не в `localStorage`. Файлы провайдеров и интеграций содержат ключи; не включайте их в Git и отчёты.
-- **Системные операции — через `core/modules/os`.** ОС определяется при инициализации; реализации Linux и Windows закрыты внутри адаптера. GTK-палитра остаётся на Linux. [API и ограничения](docs/os.md).
+- **Системные операции — через `core/modules/os`.** ОС определяется при инициализации; реализации Linux, Windows и macOS (общий POSIX-код в `core/modules/os-posix`) закрыты внутри адаптера. GTK-палитра работает на всех трёх, если установлен GTK4. [API и ограничения](docs/os.md).
 - **Общее поведение поиска — в `core/modules/launcher`.** GTK запускается отдельным процессом; `vio` независим от Projector. D-Bus обслуживает `dbus-next`, запуск `.desktop` — GIO.
 - **Проверяйте реальное взаимодействие при изменении UI:** фокус всего окна, drag на границах, правый клик, ввод через Fcitx/IME и восстановление терминала. В браузерных инструментах указывайте `pageId` и обновляйте snapshot/UID после навигации или HMR.
 - **API/PTY/GTK-проверкам нужны сокеты и доступ к desktop.** `EPERM` или недоступный display сначала проверяйте как ограничение среды запуска.
