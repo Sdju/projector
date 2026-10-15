@@ -8,7 +8,7 @@ import { readTerminalProcesses, terminalActivity } from "./terminal-activity.ts"
 import { randomUUID } from "node:crypto";
 import { containerToHost, resolveTerminalPath } from "./link-files.ts";
 import { rmSync } from "node:fs";
-import { os } from "../../../core/modules/os/index.ts";
+import { os, bashShellLaunch, type ShellLaunch } from "../../../core/modules/os/index.ts";
 import { terminateProcessTree } from "./terminate.ts";
 import { saveDroppedFile } from "./drop-files.ts";
 import { HttpError } from "../http/index.ts";
@@ -230,14 +230,13 @@ export function createTerminalSession(
   env.COLORTERM = "truecolor";
   // Cursor Agent CLI installs as `agent` / `cursor-agent`, not `cursor`.
   const executable = program === "cursor" ? "agent" : program;
-  const invocation = command
-    ? os.shellLaunch({ kind: "command", command: command.cmd })
+  const shell: ShellLaunch = command
+    ? { kind: "command", command: command.cmd }
     : program === "shell"
-      ? os.shellLaunch({ kind: "interactive" })
-      : os.shellLaunch({ kind: "program", executable });
-  const args = invocation.args;
+      ? { kind: "interactive" }
+      : { kind: "program", executable };
   // A config the user trusted in its current form replaces the restricted environment.
-  const trusted = launch ? undefined : devcontainerLaunch(project, ["/bin/bash", ...args]);
+  const trusted = launch ? undefined : devcontainerLaunch(project, shell);
   if (trusted) launch = trusted;
   else if (project.environment) {
     if (launch)
@@ -245,7 +244,8 @@ export function createTerminalSession(
         403,
         "В изолированном проекте запрещены произвольные Docker/Compose-действия",
       );
-    launch = environmentLaunch(project, ["/bin/bash", "--noprofile", "--norc", ...args]);
+    const invocation = bashShellLaunch(shell, true);
+    launch = environmentLaunch(project, [invocation.file, ...invocation.args]);
     for (const key of Object.keys(env))
       if (/^DOCKER_(HOST|CONTEXT|TLS_VERIFY|CERT_PATH|API_VERSION)$/.test(key)) delete env[key];
   }
@@ -255,7 +255,8 @@ export function createTerminalSession(
   const mouseEncoding = trackMouseEncoding(screen);
   let child: IPty;
   try {
-    const command = os.tools.ptyCommand(launch?.file ?? invocation.file, launch?.args ?? args);
+    const invocation = launch ?? os.shellLaunch(shell);
+    const command = os.tools.ptyCommand(invocation.file, invocation.args);
     child = spawn(command.file, command.args, {
       name: "xterm-256color",
       ...dimensions,

@@ -32,7 +32,7 @@ export interface SecretKey {
   account: string;
 }
 
-/** How a host shell should be started. Containers keep their own `/bin/bash` argv. */
+/** Shell intent; host and container adapters independently choose their executable and argv. */
 export type ShellLaunch =
   | { kind: "interactive" }
   | { kind: "command"; command: string }

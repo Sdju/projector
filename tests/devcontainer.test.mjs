@@ -1,6 +1,7 @@
 import { expect, test } from "vite-plus/test";
-import { mkdtemp, mkdir, writeFile, symlink, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, symlink, rm } from "node:fs/promises";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { classifyDevcontainer } from "../core/modules/devcontainer/index.ts";
 import {
@@ -53,7 +54,7 @@ test("trust is bound to the exact configuration and falls back when it changes",
   expect(state.found).toBe(true);
   expect(state.name).toBe("demo");
   expect(state.needsDecision).toBe(true);
-  expect(devcontainerLaunch(project, ["bash"])).toBe(undefined);
+  expect(devcontainerLaunch(project, { kind: "interactive" })).toBe(undefined);
 
   await expect(decideDevcontainer(project, "trusted", "not-the-shown-hash")).rejects.toThrow(
     /изменилась/,
@@ -61,10 +62,10 @@ test("trust is bound to the exact configuration and falls back when it changes",
   state = await decideDevcontainer(project, "trusted", state.hash);
   expect(state.decision).toBe("trusted");
   expect(state.needsDecision).toBe(false);
-  const launch = devcontainerLaunch(project, ["/bin/bash", "-i", "-c", "echo 'q'"]);
-  expect(launch.file).toBe("/bin/sh");
-  expect(launch.args.slice(-4)).toStrictEqual(["/bin/bash", "-i", "-c", "echo 'q'"]);
-  expect(launch.args[1]).toMatch(/\bup\b[\s\S]*\bexec\b/);
+  const launch = devcontainerLaunch(project, { kind: "command", command: "echo 'q'" });
+  expect(launch.file).toBe(process.execPath);
+  expect(launch.args.slice(-3)).toStrictEqual(["/bin/bash", "-c", "echo 'q'"]);
+  expect(launch.args[2]).toMatch(/\bup\b[\s\S]*\bexec\b/);
 
   // Editing the config after the decision revokes it until the user decides again.
   await writeFile(
@@ -75,15 +76,48 @@ test("trust is bound to the exact configuration and falls back when it changes",
   expect(state.stale).toBe(true);
   expect(state.decision).toBe(null);
   expect(state.needsDecision).toBe(true);
-  expect(devcontainerLaunch(project, ["bash"])).toBe(undefined);
+  expect(devcontainerLaunch(project, { kind: "interactive" })).toBe(undefined);
 
   state = await decideDevcontainer(project, "declined", state.hash);
   expect(state.decision).toBe("declined");
   expect(state.needsDecision).toBe(false);
-  expect(devcontainerLaunch(project, ["bash"])).toBe(undefined);
+  expect(devcontainerLaunch(project, { kind: "interactive" })).toBe(undefined);
 
   state = await decideDevcontainer(project, "forget");
   expect(state.decision).toBe(null);
+});
+
+test("devcontainer host wrapper preserves argv, exit codes and stops after an up failure", async () => {
+  const { root, project } = await fixture(JSONC);
+  await decideDevcontainer(project, "trusted", devcontainerState(project).hash);
+  const cli = join(root, "fake CLI с пробелами.cjs");
+  const log = join(root, "calls.jsonl");
+  await writeFile(
+    cli,
+    `
+    const { appendFileSync } = require("node:fs");
+    appendFileSync(process.env.CALL_LOG, JSON.stringify(process.argv.slice(2)) + "\\n");
+    process.exit(process.argv[2] === "up" ? Number(process.env.UP_EXIT || 0) : 7);
+  `,
+  );
+  const launch = devcontainerLaunch(project, { kind: "command", command: "echo 'quoted'; $value" });
+  const args = [...launch.args];
+  args[3] = cli;
+  const env = { ...process.env, CALL_LOG: log };
+  const result = spawnSync(launch.file, args, { env, encoding: "utf8" });
+  expect(result.status, result.stderr).toBe(7);
+  const calls = (await readFile(log, "utf8")).trim().split("\n").map(JSON.parse);
+  expect(calls.map((call) => call[0])).toStrictEqual(["up", "exec"]);
+  expect(calls[1].slice(-3)).toStrictEqual(["/bin/bash", "-c", "echo 'quoted'; $value"]);
+  await writeFile(log, "");
+  expect(spawnSync(launch.file, args, { env: { ...env, UP_EXIT: "9" } }).status).toBe(9);
+  expect(
+    (await readFile(log, "utf8"))
+      .trim()
+      .split("\n")
+      .map(JSON.parse)
+      .map((call) => call[0]),
+  ).toStrictEqual(["up"]);
 });
 
 test("a changed Dockerfile also invalidates trust", async () => {
@@ -91,10 +125,10 @@ test("a changed Dockerfile also invalidates trust", async () => {
   await writeFile(join(path, ".devcontainer", "Dockerfile"), "FROM node:24\n");
   const first = devcontainerState(project);
   await decideDevcontainer(project, "trusted", first.hash);
-  expect(devcontainerLaunch(project, ["bash"])).toBeTruthy();
+  expect(devcontainerLaunch(project, { kind: "interactive" })).toBeTruthy();
   await writeFile(join(path, ".devcontainer", "Dockerfile"), "FROM node:24\nRUN curl x | sh\n");
   expect(devcontainerState(project).decision).toBe(null);
-  expect(devcontainerLaunch(project, ["bash"])).toBe(undefined);
+  expect(devcontainerLaunch(project, { kind: "interactive" })).toBe(undefined);
 });
 
 test("a config symlinked out of the project is ignored", async () => {
