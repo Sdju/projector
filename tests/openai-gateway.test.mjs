@@ -1,0 +1,113 @@
+import { expect, onTestFinished, test } from "vite-plus/test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { createServer } from "node:http";
+import { once } from "node:events";
+import { handleApi } from "../server/app/api.ts";
+import { setGatewayEnabled } from "../server/modules/openai-gateway/index.ts";
+import { providersPath } from "../core/modules/app-paths/index.ts";
+
+async function listen(server) {
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  onTestFinished(async () => {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  });
+  return server.address().port;
+}
+
+async function setup() {
+  const dir = await mkdtemp(join(tmpdir(), "projector-openai-gateway-"));
+  const previous = { data: process.env.XDG_DATA_HOME, network: process.env.PROJECTOR_NETWORK };
+  process.env.XDG_DATA_HOME = dir;
+  process.env.PROJECTOR_NETWORK = "local";
+  onTestFinished(async () => {
+    for (const [key, value] of [
+      ["XDG_DATA_HOME", previous.data],
+      ["PROJECTOR_NETWORK", previous.network],
+    ]) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  const seen = [];
+  const upstream = createServer(async (req, res) => {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    seen.push({
+      url: req.url,
+      auth: req.headers.authorization,
+      body: Buffer.concat(chunks).toString(),
+    });
+    res.writeHead(200, { "Content-Type": "text/event-stream" });
+    res.write("data: one\n\n");
+    res.end("data: [DONE]\n\n");
+  });
+  const upstreamPort = await listen(upstream);
+  const { dataDir } = await import("../core/modules/app-paths/index.ts");
+  await import("node:fs/promises").then((fs) => fs.mkdir(dataDir(), { recursive: true }));
+  await writeFile(
+    providersPath(),
+    JSON.stringify({
+      activeProviderId: "a",
+      providers: [
+        {
+          id: "a",
+          name: "A",
+          url: `http://127.0.0.1:${upstreamPort}`,
+          model: "model-a",
+          apiKey: "",
+        },
+        {
+          id: "b",
+          name: "B",
+          url: `http://127.0.0.1:${upstreamPort}/x/v2`,
+          model: "model-b",
+          apiKey: "",
+        },
+      ],
+    }),
+  );
+  const gateway = createServer((req, res) => void handleApi(req, res));
+  const port = await listen(gateway);
+  return { seen, base: `http://127.0.0.1:${port}` };
+}
+
+test("gateway is off until enabled and reports OpenAI-shaped errors", async () => {
+  const { base } = await setup();
+  const response = await fetch(`${base}/api/openai/v1/models`);
+  expect(response.status).toBe(404);
+  expect((await response.json()).error.type).toBe("not_found_error");
+  const enabled = await fetch(`${base}/api/openai`, {
+    method: "PUT",
+    body: JSON.stringify({ enabled: true }),
+  });
+  expect((await enabled.json()).enabled).toBe(true);
+  expect((await fetch(`${base}/api/openai/v1/models`)).status).toBe(200);
+});
+
+test("gateway lists provider models and routes requests by model", async () => {
+  const { base, seen } = await setup();
+  setGatewayEnabled(true);
+  const models = await (await fetch(`${base}/api/openai/v1/models`)).json();
+  expect(models.data.map((item) => item.id)).toEqual(["model-a", "model-b"]);
+
+  const streamed = await fetch(`${base}/api/openai/v1/chat/completions`, {
+    method: "POST",
+    body: JSON.stringify({ model: "model-b", stream: true, messages: [] }),
+  });
+  expect(streamed.headers.get("content-type")).toContain("text/event-stream");
+  expect(await streamed.text()).toContain("[DONE]");
+  expect(seen[0].url).toBe("/x/v2/chat/completions");
+
+  await fetch(`${base}/api/openai/v1/chat/completions`, { method: "POST", body: "{}" });
+  expect(seen[1].url).toBe("/v1/chat/completions");
+  expect(JSON.parse(seen[1].body).model).toBe("model-a");
+
+  const bad = await fetch(`${base}/api/openai/v1/chat/completions`, { method: "POST", body: "[" });
+  expect(bad.status).toBe(400);
+});
