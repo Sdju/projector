@@ -39,4 +39,6 @@ vp run vio:gtk-test  # реальные GTK-виджеты; нужен display
 - [Реестр больших файлов](docs/large-files.md): потолки размеров и планы разбиения; проверка (`extra.largeFiles` в `feod.config.mjs`) включена в `vp run architecture`.
 - [Использование](docs/usage.md): режимы, хоткей, трей, файлы и терминалы.
 - [Интеграции](docs/integrations.md): GitHub, авторизация и импорт.
+- [Архитектура](docs/architecture.md), [адаптер ОС](docs/os.md), [транспорт терминалов](docs/terminal-transport.md), [Docker](docs/docker.md) и [решения по контейнерам](docs/containers-design.md).
+- [UI-кит](docs/ui-kit.md), [виртуализация списков](docs/virtualization.md), [аудит дублей компонентов](docs/component-reuse-audit.md).
 - [SDK команд IDE](docs/ide-commands.md), [темы иконок](docs/file-icons.md), [renderer vio](packages/vio/README.md).
