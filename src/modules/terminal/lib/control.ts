@@ -4,6 +4,7 @@ import type {
   TerminalControlRequest,
 } from "../../../../core/modules/terminal/index.ts";
 import { lanPassword } from "../../../common/utilities/lan-auth.ts";
+import { openTerminalSocket, type TerminalSocket } from "./socket.ts";
 
 export class TerminalRequestError extends Error {
   readonly session?: TerminalSession;
@@ -15,7 +16,7 @@ export class TerminalRequestError extends Error {
 
 type Listener = (sessions: TerminalSession[]) => void;
 class TerminalControl {
-  private socket?: WebSocket;
+  private socket?: TerminalSocket;
   private reconnect?: ReturnType<typeof setTimeout>;
   private delay = 500;
   private nextId = 0;
@@ -66,7 +67,7 @@ class TerminalControl {
     url.searchParams.set("project", this.projectId);
     const token = lanPassword();
     if (token) url.searchParams.set("token", token);
-    const socket = (this.socket = new WebSocket(url));
+    const socket = (this.socket = openTerminalSocket(url));
     this.connecting = new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => {
         reject(new Error("Терминалы не ответили"));
@@ -95,7 +96,7 @@ class TerminalControl {
           this.release();
         }
       };
-      socket.onclose = () => {
+      socket.onclose = (event) => {
         clearTimeout(timer);
         reject(new Error("Соединение с терминалами потеряно"));
         if (this.socket !== socket) return;
@@ -106,7 +107,8 @@ class TerminalControl {
           request.reject(new Error("Соединение потеряно; проверьте результат операции"));
         }
         this.pending.clear();
-        if (this.listeners.size) {
+        // 4404: the project is gone, so reconnecting can never succeed.
+        if (this.listeners.size && event.code !== 4404) {
           this.reconnect = setTimeout(() => void this.connect().catch(() => {}), this.delay);
           this.delay = Math.min(this.delay * 2, 10000);
         } else this.release();

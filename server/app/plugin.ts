@@ -11,7 +11,10 @@ import { attachTerminalServer } from "../modules/terminal/index.ts";
 import { pruneRuns } from "../modules/agent/index.ts";
 import { reconcileOnStartup } from "../modules/environments/index.ts";
 
-import { attachTerminalControlServer } from "../modules/terminal-control/index.ts";
+import {
+  attachSharedTerminalServer,
+  attachTerminalControlServer,
+} from "../modules/terminal-control/index.ts";
 import { authorizeHttp } from "../modules/access/index.ts";
 import { handleProxyHost, isProxyHost } from "../modules/browser/index.ts";
 
@@ -43,6 +46,7 @@ export function bindRuntime(httpServer: HttpServer | null, mode: ServerMode): vo
   if (!httpServer) return;
   attachTerminalServer(httpServer);
   attachTerminalControlServer(httpServer);
+  attachSharedTerminalServer(httpServer);
   httpServer.once("listening", () => {
     const address = httpServer.address();
     const port = address && typeof address === "object" ? address.port : APP_PORT;

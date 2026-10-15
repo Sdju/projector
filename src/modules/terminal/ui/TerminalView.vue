@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { openTerminalSocket, type TerminalSocket } from "../lib/socket.ts";
 import UiPanel from "../../../common/ui/UiPanel.vue";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
@@ -80,7 +81,7 @@ let links: IDisposable | undefined;
 let unbindTouchScroll: (() => void) | undefined;
 let fit: FitAddon | undefined;
 let observer: ResizeObserver | undefined;
-let socket: WebSocket | undefined;
+let socket: TerminalSocket | undefined;
 let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 let retryDelay = 500;
 let destroyed = false;
@@ -216,9 +217,10 @@ function connect(): void {
   const url = new URL("/api/terminal/socket", location.href);
   url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
   url.searchParams.set("session", sessionId);
+  url.searchParams.set("project", props.projectId);
   const token = lanPassword();
   if (token) url.searchParams.set("token", token);
-  const client = new WebSocket(url);
+  const client = openTerminalSocket(url);
   socket = client;
   client.onmessage = (event) => {
     if (currentGeneration !== generation || destroyed || !terminal) return;

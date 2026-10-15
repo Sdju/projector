@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><title>Shared terminal acceptance</title>
+  <body>
+    <h1>Isolated terminal transport probe</h1>
+    <pre id="status">Loading…</pre>
+    <script type="module">
+      if (new URLSearchParams(location.search).has("brokenWorker")) {
+        window.SharedWorker = class {
+          constructor() {
+            throw new Error("Probe: worker unavailable");
+          }
+        };
+      }
+      const { openTerminalSocket } = await import("/src/modules/terminal/lib/socket.ts");
+      const channels = new Map();
+      let nextId = 0;
+      const until = async (predicate) => {
+        const deadline = Date.now() + 15000;
+        while (!predicate()) {
+          if (Date.now() > deadline) throw new Error("Probe timeout");
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+      };
+      function open(name, projectId, sessionId) {
+        const url = new URL(`/api/terminal/${sessionId ? "socket" : "control"}`, location.href);
+        url.protocol = "ws:";
+        url.searchParams.set("project", projectId);
+        if (sessionId) url.searchParams.set("session", sessionId);
+        const socket = openTerminalSocket(url);
+        const channel = { socket, messages: [], closed: [], autoAck: true };
+        channels.set(name, channel);
+        socket.onmessage = ({ data }) => {
+          const message = JSON.parse(data);
+          channel.messages.push(message);
+          if (channel.autoAck && message.type === "output")
+            socket.send(JSON.stringify({ type: "ack", length: message.data.length }));
+        };
+        socket.onclose = ({ code }) => channel.closed.push(code);
+        return until(() => socket.readyState === WebSocket.OPEN).then(() => true);
+      }
+      window.probe = {
+        open,
+        async rpc(name, method = "GET", sessionId, body) {
+          const channel = channels.get(name);
+          const id = ++nextId;
+          channel.socket.send(JSON.stringify({ id, method, sessionId, body }));
+          await until(() =>
+            channel.messages.some((item) => item.type === "response" && item.id === id),
+          );
+          return channel.messages.find((item) => item.type === "response" && item.id === id).data;
+        },
+        send(name, message) {
+          channels.get(name).socket.send(JSON.stringify(message));
+        },
+        close(name) {
+          channels.get(name).socket.close();
+          channels.delete(name);
+        },
+        state(name) {
+          const channel = channels.get(name);
+          return {
+            state: channel.socket.readyState,
+            messages: channel.messages,
+            closed: channel.closed,
+          };
+        },
+        pause(name) {
+          channels.get(name).autoAck = false;
+        },
+        until,
+      };
+      document.querySelector("#status").textContent = "Ready";
+    </script>
+  </body>
+</html>

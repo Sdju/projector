@@ -4,6 +4,7 @@ import { type IPty } from "node-pty";
 import headless from "@xterm/headless";
 import serialization from "@xterm/addon-serialize";
 import { WebSocket } from "ws";
+import type { EventEmitter } from "node:events";
 import type {
   TerminalServerMessage,
   TerminalSession,
@@ -16,14 +17,22 @@ const { SerializeAddon } = serialization;
 export const MAX_SESSIONS = 24;
 export const MAX_BUFFER = 1024 * 1024;
 
+export interface TerminalPeer extends EventEmitter {
+  readonly readyState: number;
+  readonly bufferedAmount: number;
+  send(data: string): void;
+  terminate(): void;
+  close(code?: number, reason?: string): void;
+}
+
 export interface Session {
   info: TerminalSession;
   pty: IPty;
   screen: InstanceType<typeof Terminal>;
   serialize: InstanceType<typeof SerializeAddon>;
   mouseEncoding: ReturnType<typeof trackMouseEncoding>;
-  clients: Set<WebSocket>;
-  pending: Map<WebSocket, number>;
+  clients: Set<TerminalPeer>;
+  pending: Map<TerminalPeer, number>;
   queued: number;
   paused: boolean;
   disposed: boolean;
@@ -83,7 +92,7 @@ export function size(cols: unknown, rows: unknown): { cols: number; rows: number
   return { cols: Number(cols), rows: Number(rows) };
 }
 
-export function send(client: WebSocket, message: TerminalServerMessage): void {
+export function send(client: TerminalPeer, message: TerminalServerMessage): void {
   if (client.readyState !== WebSocket.OPEN) return;
   // A slow client reconnects to a fresh screen instead of accumulating output.
   if (client.bufferedAmount > MAX_BUFFER) {

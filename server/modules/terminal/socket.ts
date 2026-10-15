@@ -3,7 +3,16 @@ import type { Duplex } from "node:stream";
 import type { HttpServer } from "vite";
 import { WebSocket, WebSocketServer } from "ws";
 import { loadProjects } from "../projects/index.ts";
-import { MAX_BUFFER, state, size, send, broadcast, flow, type Session } from "./session-state.ts";
+import {
+  MAX_BUFFER,
+  state,
+  size,
+  send,
+  broadcast,
+  flow,
+  type Session,
+  type TerminalPeer,
+} from "./session-state.ts";
 import { accessAllowed, protectLanSockets } from "../access/index.ts";
 
 export function attachTerminalServer(server: Server | HttpServer): void {
@@ -65,73 +74,14 @@ export function attachTerminalServer(server: Server | HttpServer): void {
           alive.add(client);
           client.on("pong", () => alive.add(client));
           client.on("error", () => client.terminate());
-          client.on("close", () => {
-            session.clients.delete(client);
-            session.pending.delete(client);
-            flow(session);
-          });
-          screenSnapshot(session, client);
-          client.on("message", (raw, binary) => {
-            try {
-              if (binary) throw new Error("Ожидается JSON");
-              const message = JSON.parse(raw.toString());
-              if (message.type === "input") {
-                if (
-                  session.info.status !== "running" ||
-                  typeof message.data !== "string" ||
-                  message.data.length > 32768 ||
-                  (message.encoding !== undefined && message.encoding !== "binary") ||
-                  (message.encoding === "binary" && /[^\x00-\xff]/.test(message.data))
-                ) {
-                  throw new Error("Ввод недоступен");
-                }
-                session.pty.write(
-                  message.encoding === "binary"
-                    ? Buffer.from(message.data, "latin1")
-                    : message.data,
-                );
-              } else if (message.type === "ack") {
-                if (
-                  !Number.isInteger(message.length) ||
-                  message.length < 1 ||
-                  message.length > MAX_BUFFER
-                )
-                  throw new Error("Некорректное подтверждение вывода");
-                session.pending.set(
-                  client,
-                  Math.max(0, (session.pending.get(client) ?? 0) - message.length),
-                );
-                flow(session);
-              } else if (message.type === "resize") {
-                const dimensions = size(message.cols, message.rows);
-                // Wait for output queued before this resize to be parsed first.
-                session.screen.write("", () => {
-                  if (session.disposed) return;
-                  session.screen.resize(dimensions.cols, dimensions.rows);
-                  try {
-                    if (session.info.status === "running")
-                      session.pty.resize(dimensions.cols, dimensions.rows);
-                  } catch {
-                    return; /* The process may have just exited. */
-                  }
-                  Object.assign(session.info, dimensions);
-                  broadcast(session, { type: "status", session: { ...session.info } });
-                });
-              } else throw new Error("Неизвестное сообщение");
-            } catch (error) {
-              send(client, {
-                type: "error",
-                message: error instanceof Error ? error.message : "Ошибка терминала",
-              });
-            }
-          });
+          connectTerminalPeer(session, client);
         });
       })
       .catch(() => socket.destroy());
   });
 }
 
-function screenSnapshot(session: Session, client: WebSocket): void {
+function screenSnapshot(session: Session, client: TerminalPeer): void {
   session.screen.write("", () => {
     if (session.disposed || client.readyState !== WebSocket.OPEN) return;
     send(client, {
@@ -141,4 +91,72 @@ function screenSnapshot(session: Session, client: WebSocket): void {
     });
     session.clients.add(client);
   });
+}
+
+export function connectTerminalPeer(session: Session, client: TerminalPeer): void {
+  client.on("close", () => {
+    session.clients.delete(client);
+    session.pending.delete(client);
+    flow(session);
+  });
+  screenSnapshot(session, client);
+  client.on("message", (raw, binary) => {
+    try {
+      if (binary) throw new Error("Ожидается JSON");
+      const message = JSON.parse(raw.toString());
+      if (message.type === "input") {
+        if (
+          session.info.status !== "running" ||
+          typeof message.data !== "string" ||
+          message.data.length > 32768 ||
+          (message.encoding !== undefined && message.encoding !== "binary") ||
+          (message.encoding === "binary" && /[^\x00-\xff]/.test(message.data))
+        ) {
+          throw new Error("Ввод недоступен");
+        }
+        session.pty.write(
+          message.encoding === "binary" ? Buffer.from(message.data, "latin1") : message.data,
+        );
+      } else if (message.type === "ack") {
+        if (!Number.isInteger(message.length) || message.length < 1 || message.length > MAX_BUFFER)
+          throw new Error("Некорректное подтверждение вывода");
+        session.pending.set(
+          client,
+          Math.max(0, (session.pending.get(client) ?? 0) - message.length),
+        );
+        flow(session);
+      } else if (message.type === "resize") {
+        const dimensions = size(message.cols, message.rows);
+        // Wait for output queued before this resize to be parsed first.
+        session.screen.write("", () => {
+          if (session.disposed) return;
+          session.screen.resize(dimensions.cols, dimensions.rows);
+          try {
+            if (session.info.status === "running")
+              session.pty.resize(dimensions.cols, dimensions.rows);
+          } catch {
+            return; /* The process may have just exited. */
+          }
+          Object.assign(session.info, dimensions);
+          broadcast(session, { type: "status", session: { ...session.info } });
+        });
+      } else throw new Error("Неизвестное сообщение");
+    } catch (error) {
+      send(client, {
+        type: "error",
+        message: error instanceof Error ? error.message : "Ошибка терминала",
+      });
+    }
+  });
+}
+
+export function subscribeTerminalPeer(
+  projectId: string,
+  sessionId: string,
+  client: TerminalPeer,
+): void {
+  const session = state.sessions.get(sessionId);
+  if (!session || session.disposed || session.info.projectId !== projectId)
+    throw new Error("Терминал не найден");
+  connectTerminalPeer(session, client);
 }

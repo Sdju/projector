@@ -15,3 +15,6 @@ export { uploadTerminalFile } from "./terminal.ts";
 export { resolveTerminalFile } from "./terminal.ts";
 
 export { onTerminalSessionsChanged } from "./session-state.ts";
+
+export { subscribeTerminalPeer } from "./socket.ts";
+export type { TerminalPeer } from "./session-state.ts";
