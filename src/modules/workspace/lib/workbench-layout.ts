@@ -25,6 +25,7 @@ import {
 import { useTerminalSessions } from "../../terminal/index.ts";
 import type { TerminalProgram } from "../../../../core/modules/terminal/index.ts";
 import type { OpenFile } from "../open-file.ts";
+import { registerTabNavigation } from "./tab-navigation.ts";
 import { registerTabReader } from "./tab-reader.ts";
 
 export interface WorkbenchLayoutContext {
@@ -94,11 +95,15 @@ export function useWorkbenchLayout(ctx: WorkbenchLayoutContext) {
     const role = roleOf(id);
     const holds = (group: DockGroup) => group.panels.some((panel) => roleOf(panel) === role);
     const groups = dockGroups(current);
+    // Назначение блока важнее содержимого: файл, перетащенный в блок терминалов, не делает его редактором.
+    const native = groups.filter((item) => item.role === role);
     const group =
-      groups.find((item) => item.id === current.focused && holds(item)) ??
-      groups.find((item) => item.id === lastGroup[role]) ??
-      groups.find(holds) ??
-      groups.find((item) => item.role === role);
+      native.find((item) => item.id === current.focused) ??
+      native.find((item) => item.id === lastGroup[role]) ??
+      native.find(holds) ??
+      native[0] ??
+      groups.find((item) => !item.role && item.id === current.focused && holds(item)) ??
+      groups.find((item) => !item.role && holds(item));
     return group
       ? { groupId: group.id, zone: "center" }
       : { zone: role === "terminal" ? "right" : "left" };
@@ -285,6 +290,7 @@ export function useWorkbenchLayout(ctx: WorkbenchLayoutContext) {
       },
       (value) => (groupOfPanel(layout.value, panelArg(value))?.panels.length ?? 0) > 1,
     );
+  registerTabNavigation(ctx.register, focusedGroup, selectPanel);
   ctx.register(
     "ide.workbench.panel.hideGroup",
     "Скрыть блок",

@@ -8,7 +8,6 @@ import { legacyParts } from "../model/turn-events.ts";
 import type { AgentToolChip, AgentToolView, AgentTurn, MessageChip } from "../model/types.ts";
 import AgentMessage from "./AgentMessage.vue";
 import AgentActivity from "./AgentActivity.vue";
-import AgentTasks from "./AgentTasks.vue";
 import AgentThought from "./AgentThought.vue";
 import AgentChanges from "./AgentChanges.vue";
 import IconCopy from "~icons/lucide/copy";
@@ -30,6 +29,8 @@ const props = defineProps<{
   root?: string;
   /** Files can be taken back to before the request this answer belongs to. */
   canRevert?: boolean;
+  /** A conversation only to read (a subagent's): no editing, retrying or rolling back. */
+  readonly?: boolean;
 }>();
 const emit = defineEmits<{
   copy: [id: string, text: string];
@@ -96,6 +97,7 @@ const waiting = computed(() => {
   <article class="turn" :class="[turn.role, { faded }]">
     <div v-if="turn.role === 'user'" class="user-row">
       <UiInline
+        v-if="!readonly"
         :gap="0.5"
         justify="normal"
         class="turn-actions"
@@ -190,7 +192,6 @@ const waiting = computed(() => {
         />
         <AgentActivity v-else :tools="segment.tools" />
       </template>
-      <AgentTasks v-if="turn.tasks?.length" :tasks="turn.tasks" />
       <UiInline
         v-if="busy && last && waiting"
         :gap="2"
@@ -212,12 +213,12 @@ const waiting = computed(() => {
         v-if="!busy || !last"
         :tools="turn.tools"
         :root="root ?? ''"
-        :can-revert="canRevert === true && !busy"
+        :can-revert="canRevert === true && !busy && !readonly"
         @open="(path) => emit('openFile', path)"
         @revert="emit('revert', turn.id)"
       />
       <UiInline
-        v-if="turn.text && !(busy && last)"
+        v-if="turn.text && !(busy && last) && !readonly"
         :gap="0.5"
         align="normal"
         justify="normal"

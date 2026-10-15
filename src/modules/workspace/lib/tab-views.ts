@@ -11,7 +11,7 @@ import type { OpenFile } from "../open-file.ts";
 import { KeybindingsEditor } from "../../ide/index.ts";
 import { LanInfoPanel } from "../../network/index.ts";
 import { DockerPanel } from "../../docker/index.ts";
-import { AgentChat } from "../../agent/index.ts";
+import { AgentChat, AgentTaskTab } from "../../agent/index.ts";
 import { BrowserPanel } from "../../browser/index.ts";
 import {
   CommitOverview,
@@ -76,6 +76,15 @@ export const baseTabViews: TabViews = {
     component: AgentChat,
     keepAlive: true,
     props: (_, host) => ({ projectId: host.projectId }),
+  },
+  "agent-task": {
+    component: AgentTaskTab,
+    keepAlive: true,
+    props: (tab, host) => ({
+      projectId: host.projectId,
+      chat: tab.params?.chat,
+      task: tab.params?.task,
+    }),
   },
   claude: agentChat("claude-code"),
   codex: agentChat("codex"),

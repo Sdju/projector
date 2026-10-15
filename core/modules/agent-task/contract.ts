@@ -13,6 +13,10 @@ export const agentTaskSchema = z.object({
   background: z.boolean(),
   /** Kind of the subagent (`Explore`, `general-purpose`, ...). */
   subagent: z.string().optional(),
+  /** The agent's own session of the subagent: its whole conversation can be read from there. */
+  session: z.string().optional(),
+  /** What it was asked to do, as the agent gave it. */
+  prompt: z.string().optional(),
   /** The tool call that started it. */
   tool: z.string().optional(),
   /** The agent does not report when it ends: its state is unknown once the answer is over. */
@@ -23,9 +27,11 @@ export const agentTaskSchema = z.object({
   tools: z.number().optional(),
   tokens: z.number().optional(),
   durationMs: z.number().optional(),
+  /** What it reported while working, oldest first; the chat collects it from the patches. */
+  log: z.array(z.string()).optional(),
 });
 
 export type AgentTask = z.infer<typeof agentTaskSchema>;
 
 /** A change of one task: the fields that changed. The first patch of a task carries all it knows. */
-export type AgentTaskPatch = Partial<AgentTask> & Pick<AgentTask, "id">;
+export type AgentTaskPatch = Partial<Omit<AgentTask, "log">> & Pick<AgentTask, "id">;

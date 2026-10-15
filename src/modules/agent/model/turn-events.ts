@@ -1,4 +1,5 @@
 import type { Project } from "../../project/index.ts";
+import { toolLabel } from "../lib/tool-labels.ts";
 import { formatToolInput } from "../lib/tool-input.ts";
 import { summarize, type ChatState } from "./chat-state.ts";
 import type { AgentEvent, AgentPart, AgentTurn } from "./types.ts";
@@ -90,6 +91,13 @@ export function applyAgentEvent(
       appendThought(assistant, event.data.text);
       return false;
     case "tool":
+      // A repeated call carries the input that completed later: update it, do not add a second one.
+      const again = assistant.tools.find((item) => item.id === event.data.id);
+      if (again) {
+        if (again.status === "running") again.detail = summarize(event.data.input);
+        again.input = summarize(event.data.input);
+        return false;
+      }
       if (assistant.text.trim() && !assistant.text.endsWith("\n\n")) assistant.text += "\n\n";
       // Taken before the call is added: a turn without parts yet derives them from its tools.
       const parts = (assistant.parts ??= legacyParts(assistant));
@@ -114,15 +122,28 @@ export function applyAgentEvent(
     case "task": {
       const tasks = (assistant.tasks ??= []);
       const known = tasks.find((item) => item.id === event.data.id);
+      // A background task reports in a later answer: carry over what the earlier one knew.
+      const earlier = known
+        ? undefined
+        : (state.turns ?? [])
+            .flatMap((turn) => turn.tasks ?? [])
+            .findLast((item) => item.id === event.data.id);
+      const task =
+        known ??
+        tasks[
+          tasks.push({
+            kind: "other",
+            title: "",
+            status: "running",
+            background: false,
+            ...earlier,
+            ...event.data,
+          }) - 1
+        ]!;
       if (known) Object.assign(known, event.data);
-      else
-        tasks.push({
-          kind: "other",
-          title: "",
-          status: "running",
-          background: false,
-          ...event.data,
-        });
+      // What the task reports along the way becomes its progress log (no repeats, bounded).
+      const line = event.data.summary || (event.data.lastTool && toolLabel(event.data.lastTool));
+      if (line && task.log?.at(-1) !== line) task.log = [...(task.log ?? []), line].slice(-100);
       return false;
     }
     case "project":

@@ -74,6 +74,27 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
         "Cursor",
         "Открывает вкладку с Cursor в графическом чате вместо терминала: отдельный диалог в папке проекта, запросы разрешений в чате.",
       ),
+      // A subagent or background command of a chat, followed in its own tab (read-only).
+      defineTab<{ chat: string; task: string; title?: string }>({
+        id: "agent-task",
+        key: ({ chat, task }) => `agent-task:${chat}:${task}`,
+        path: ({ title }) => title || "Задача агента",
+        title: ({ title }) => title || "Субагент или фоновая команда агента",
+        subtitle: "задача агента",
+        read: ({ title }, content) => ({ text: content, note: `Задача агента: ${title ?? ""}` }),
+        command: {
+          id: "ide.workbench.agent.task.open",
+          title: "Открыть задачу агента во вкладке",
+          description:
+            "Открывает субагента или фоновую команду чата в отдельной вкладке только для чтения: задание, вызовы инструментов и итог обновляются по ходу работы. Список задач и ключи даёт ide.agent.tasks.list.",
+          requires: "agent",
+          arguments: {
+            chat: "Ключ чата из ide.agent.chats.list",
+            task: "Идентификатор задачи из ide.agent.tasks.list",
+            title: "Название вкладки (необязательно)",
+          },
+        },
+      }),
       singletonTab("project", "settings:project", "Настройки проекта", "Настройки проекта", {
         subtitle: "иконка, запуск и сценарии",
         command: {

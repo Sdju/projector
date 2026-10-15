@@ -12,6 +12,8 @@ export interface DockGroup {
   id: string;
   panels: string[];
   active: string;
+  /** Прежние активные вкладки, от давних к недавним: закрытие активной возвращает к последней из них. */
+  history?: string[];
   /** Подсказка назначения («editor», «terminal»): помогает выбрать группу для новой панели. */
   role?: string;
   hidden?: boolean;

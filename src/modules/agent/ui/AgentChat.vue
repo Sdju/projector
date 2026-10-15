@@ -20,6 +20,9 @@ import AgentControls from "./AgentControls.vue";
 import AgentSessions from "./AgentSessions.vue";
 import AgentPlan from "./AgentPlan.vue";
 import AgentQueue from "./AgentQueue.vue";
+import AgentTaskBar from "./AgentTaskBar.vue";
+import AgentTaskView from "./AgentTaskView.vue";
+import { barTasks, chatTasks, taskDetail } from "../lib/task-detail.ts";
 import AgentRewind from "./AgentRewind.vue";
 import AgentWorktree from "./AgentWorktree.vue";
 import { chatMarkdown } from "../lib/export.ts";
@@ -159,6 +162,34 @@ function openCoder(program: string) {
     });
 }
 attach();
+// Subagents and background commands sit above the input; one can be read here or in a tab.
+const tasks = computed(() => barTasks(turns.value));
+const viewingTask = ref("");
+const viewed = computed(() =>
+  viewingTask.value ? taskDetail(turns.value, viewingTask.value) : undefined,
+);
+// The task left the chat (rewind, a new session): there is nothing to show any more.
+watch(
+  () => !!viewingTask.value && !viewed.value,
+  (gone) => {
+    if (gone) viewingTask.value = "";
+  },
+);
+function viewTask(id: string) {
+  viewingTask.value = viewingTask.value === id ? "" : id;
+}
+function taskInTab(id: string) {
+  const task = chatTasks(turns.value).find((item) => item.id === id);
+  void api
+    .executeCommand(
+      "ide.workbench.agent.task.open",
+      { chat: chatKey, task: id, title: task?.title },
+      { scope: `editor:${props.projectId}` },
+    )
+    .catch((cause) => {
+      error.value = cause instanceof Error ? cause.message : "Не удалось открыть задачу";
+    });
+}
 // Что штатный агент видит в чате: статус, последний ответ и чипы инструментов.
 useTabReadout(() => {
   const last = turns.value.at(-1);
@@ -304,6 +335,7 @@ const controller: ChatController = {
   busy: () => busy.value,
   visible: () => !!root.value && root.value.getClientRects().length > 0,
   turns: () => turns.value,
+  tasks: () => chatTasks(turns.value),
   queue: () => queue.value,
   controls: () => controls.value,
   setControl,
@@ -363,13 +395,17 @@ function dismissError() {
 let copyTimer: ReturnType<typeof setTimeout> | undefined;
 let observer: ResizeObserver | undefined;
 // Content growth never changes scrollTop, so only a decrease is a user scrolling up.
+// Shrinking content (a collapsing thought block) clamps scrollTop by itself: that is not the user.
 let lastTop = 0;
+let lastHeight = 0;
 function trackScroll() {
   const element = log.value;
   if (!element || !element.clientHeight) return;
   const top = element.scrollTop;
+  const shrunk = element.scrollHeight < lastHeight;
+  lastHeight = element.scrollHeight;
   if (element.scrollHeight - top - element.clientHeight <= 72) away.value = false;
-  else if (top < lastTop) away.value = true;
+  else if (top < lastTop && !shrunk) away.value = true;
   lastTop = top;
 }
 let frame = 0;
@@ -381,6 +417,7 @@ function pin() {
     if (!element || away.value) return;
     element.scrollTop = turns.value.length ? element.scrollHeight : 0;
     lastTop = element.scrollTop;
+    lastHeight = element.scrollHeight;
   });
 }
 async function toBottom() {
@@ -515,7 +552,7 @@ onBeforeUnmount(() => {
         <IconSquarePen aria-hidden="true" />
       </UiButton>
     </UiInline>
-    <div ref="log" class="chat-log" @scroll.passive="trackScroll">
+    <div v-show="!viewed" ref="log" class="chat-log" @scroll.passive="trackScroll">
       <AgentWelcome
         v-if="!turns.length"
         :plain="plain"
@@ -552,6 +589,15 @@ onBeforeUnmount(() => {
         />
       </div>
     </div>
+    <AgentTaskView
+      v-if="viewed"
+      :detail="viewed"
+      :project-id="projectId"
+      :backend="backend"
+      embedded
+      @back="viewingTask = ''"
+      @tab="taskInTab(viewed.task.id)"
+    />
     <div class="dock">
       <p v-if="editing" class="edit-hint" role="status">
         Правка сообщения: новое заменит выделенное и всё после него, старый вариант останется
@@ -597,6 +643,7 @@ onBeforeUnmount(() => {
         <template v-else>Контекст заполнен на {{ Math.round(contextShare * 100) }}%.</template>
         <button type="button" @click="compact">Сжать сейчас</button>
       </p>
+      <AgentTaskBar :tasks="tasks" :viewing="viewingTask" @view="viewTask" @tab="taskInTab" />
       <AgentQueue
         :items="queue"
         :busy="busy"
@@ -607,6 +654,7 @@ onBeforeUnmount(() => {
       />
     </div>
     <AgentComposer
+      v-show="!viewed"
       ref="composer"
       v-model="draft"
       v-model:parts="draftParts"

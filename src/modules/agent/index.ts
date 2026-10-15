@@ -1,7 +1,10 @@
 export { default as AgentChat } from "./ui/AgentChat.vue";
+export { default as AgentTaskTab } from "./ui/AgentTaskTab.vue";
 export { projectInitPrompt } from "./lib/init-prompt.ts";
 export { useAgent } from "./model/session.ts";
 export { useAgentModes, guiPrograms } from "./model/modes.ts";
 export type { AgentSessionMode } from "./model/modes.ts";
 export { default as AgentModeSettings } from "./ui/AgentModeSettings.vue";
 export { registerAgentCommands } from "./model/agent-commands.ts";
+export { useAgentActivity } from "./model/activity.ts";
+export type { AgentActivityItem } from "./model/activity.ts";

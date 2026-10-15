@@ -1,5 +1,6 @@
 import { commandArgs } from "../../../common/utilities/commands.ts";
 import { chatsOf, resolveChat, type ChatController } from "./chat-registry.ts";
+import { registerTaskCommands } from "./task-commands.ts";
 import type { RewindScope } from "./types.ts";
 
 /** How the workspace registers one of its commands (the same call as for its own). */
@@ -35,6 +36,7 @@ function turnArg(chat: ChatController, args: Record<string, unknown>, role: "use
  * reads them) must exist as long as the workspace does; each one finds the open chat when it runs.
  */
 export function registerAgentCommands(register: RegisterCommand, projectId: string): void {
+  registerTaskCommands(register, projectId);
   const anyChat = () => chatsOf(projectId).length > 0;
   const external = () => chatsOf(projectId).some((chat) => chat.backend !== "projector");
   const idle = () => chatsOf(projectId).some((chat) => !chat.busy());

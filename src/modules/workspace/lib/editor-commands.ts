@@ -253,13 +253,24 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
       register(
         command.id,
         command.title,
-        () => {
-          openTab(id, create?.());
+        (args) => {
+          let params: Record<string, unknown> | undefined;
+          if (command.arguments) {
+            // Only the declared arguments become tab parameters, and all of them are required.
+            const given = commandArgs(args);
+            params = {};
+            for (const key of Object.keys(command.arguments)) {
+              const value = given[key];
+              if (typeof value !== "string" || !value) return;
+              params[key] = value;
+            }
+          } else params = create?.();
+          openTab(id, params);
           ctx.onOpenTab?.();
         },
         () => true,
         command.requires as WorkspaceCapability | undefined,
-        { description: command.description },
+        { description: command.description, arguments: command.arguments },
       );
   function editorKeydown(event: KeyboardEvent) {
     const save = ctx.tabTypes.behaviorOf(active()?.virtual)?.save;

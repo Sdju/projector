@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import UiInline from "../../common/ui/UiInline.vue";
+import ActivityIsland from "./ActivityIsland.vue";
 import { useCommandScope, commandArgs } from "../../common/utilities/commands.ts";
 import { computed, ref } from "vue";
 import { githubProjectRoute } from "../../../core/modules/github/index.ts";
@@ -9,12 +9,9 @@ import { ProjectSwitcher, MobileProjectPicker } from "../../modules/catalog/inde
 import { isFileDrag, pathsFromDataTransfer } from "../../modules/path-drop/index.ts";
 
 defineProps<{ currentProject?: ProjectLocation }>();
-const { projects, openPath } = useProjects();
+const { openPath } = useProjects();
 const route = useRoute();
 const router = useRouter();
-const running = computed(
-  () => projects.value.filter((item) => item.runtime?.status === "running").length,
-);
 
 const commands = useCommandScope("project:path", () => ({ surface: "project-path" }));
 commands.scope.registerCommand({
@@ -122,17 +119,7 @@ const navigatePath = (path: string) =>
       </router-link>
       <nav class="nav">
         <router-link v-if="!currentProject" to="/settings">настройки</router-link>
-        <UiInline
-          as="span"
-          inline
-          justify="normal"
-          class="count"
-          :class="{ active: running }"
-          :title="`Запущено проектов: ${running}`"
-          :aria-label="`Запущено проектов: ${running}`"
-          role="status"
-          ><span class="count-dot" aria-hidden="true" />{{ running }}</UiInline
-        >
+        <ActivityIsland />
       </nav>
     </header>
     <p v-if="dropError" class="drop-error" role="alert">{{ dropError }}</p>
@@ -215,8 +202,7 @@ const navigatePath = (path: string) =>
 }
 
 .nav a,
-.nav button,
-.count {
+.nav button {
   color: var(--muted);
   font-size: var(--fs-xs);
 }
@@ -228,25 +214,6 @@ const navigatePath = (path: string) =>
 
 .nav a.router-link-active {
   color: var(--text);
-}
-
-.count {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
-}
-
-.count-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--r-full);
-  background: var(--faint);
-}
-
-.count.active .count-dot {
-  background: var(--run);
 }
 
 /* Рабочая область: один внешний отступ — зазор между островами, фон общий */

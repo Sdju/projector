@@ -63,6 +63,8 @@ async function run(options: AgentRunOptions): Promise<void> {
     abortController,
     env: agentEnv(),
     includePartialMessages: true,
+    // A background subagent streams no calls of its own: its progress arrives as these summaries.
+    agentProgressSummaries: true,
     settingSources: ["user", "project", "local"],
     systemPrompt: { type: "preset", preset: "claude_code" },
     permissionMode: mode,

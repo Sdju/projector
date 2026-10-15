@@ -143,13 +143,27 @@ export function commit(before: DockLayout, after: DockLayout): DockLayout {
   return JSON.stringify(before) === JSON.stringify(after) ? before : after;
 }
 
+/** Делает панель активной и запоминает прежнюю активную, чтобы вернуться к ней после закрытия. */
+export function setActive(group: DockGroup, panel: string) {
+  if (group.active === panel) return;
+  const history = (group.history ?? []).filter((id) => id !== panel && id !== group.active);
+  if (group.active && group.panels.includes(group.active)) history.push(group.active);
+  group.history = history.slice(-50);
+  group.active = panel;
+}
+
 export function detach(layout: DockLayout, panel: string): DockGroup | undefined {
   const group = groupOfPanel(layout, panel);
   if (!group) return;
   const index = group.panels.indexOf(panel);
   group.panels.splice(index, 1);
+  const history = (group.history ?? []).filter((id) => id !== panel && group.panels.includes(id));
+  // Сначала вкладка, где пользователь был перед этой, и только потом сосед по порядку.
+  const previous = group.active === panel ? history.pop() : undefined;
+  if (history.length) group.history = history;
+  else delete group.history;
   if (group.active === panel)
-    group.active = group.panels[Math.min(index, group.panels.length - 1)] ?? "";
+    group.active = previous ?? group.panels[Math.min(index, group.panels.length - 1)] ?? "";
   return group;
 }
 
@@ -229,7 +243,7 @@ export function placeInto(
     Math.min(target.index ?? destination.panels.length, destination.panels.length),
   );
   destination.panels.splice(index, 0, panel);
-  if (activate || !destination.active) destination.active = panel;
+  if (activate || !destination.active) setActive(destination, panel);
   if (activate) {
     delete destination.hidden;
     layout.focused = destination.id;

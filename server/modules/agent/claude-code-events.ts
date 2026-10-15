@@ -61,6 +61,7 @@ export function createClaudeEventMapper(emit: AgentEmitter) {
           status: "running",
           background: message.is_backgrounded === true,
           ...(message.subagent_type ? { subagent: message.subagent_type } : {}),
+          ...(message.prompt ? { prompt: message.prompt } : {}),
           ...(message.tool_use_id ? { tool: message.tool_use_id } : {}),
         });
         return;

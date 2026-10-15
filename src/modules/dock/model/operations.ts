@@ -16,13 +16,14 @@ import {
   insertBeside,
   newGroup,
   placeInto,
+  setActive,
 } from "./tree.ts";
 
 export function activatePanel(layout: DockLayout, panel: string): DockLayout {
   const next = copy(layout);
   const group = groupOfPanel(next, panel);
   if (!group) return layout;
-  group.active = panel;
+  setActive(group, panel);
   delete group.hidden;
   next.focused = group.id;
   if (next.maximized && next.maximized !== group.id) delete next.maximized;
@@ -82,7 +83,7 @@ export function movePanel(layout: DockLayout, panel: string, target: DockTarget)
       0,
       panel,
     );
-    from.active = panel;
+    setActive(from, panel);
     return commit(layout, finish(next, from.id));
   }
   detach(next, panel);
@@ -115,6 +116,10 @@ export function replacePanel(layout: DockLayout, from: string, to: string): Dock
   if (!group || groupOfPanel(next, to)) return layout;
   group.panels[group.panels.indexOf(from)] = to;
   if (group.active === from) group.active = to;
+  if (group.history)
+    group.history = group.history
+      .map((id) => (id === from ? to : id))
+      .filter((id, index, all) => all.indexOf(id) === index);
   return commit(layout, next);
 }
 

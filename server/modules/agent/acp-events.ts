@@ -122,7 +122,10 @@ export function createAcpEventMapper(
       emit("tool", {
         id,
         name,
-        input: update.rawInput ?? { title: update.title, kind: update.kind },
+        input:
+          update.rawInput && Object.keys(update.rawInput).length
+            ? update.rawInput
+            : { title: update.title, kind: update.kind },
         ...(parent ? { parent } : {}),
       });
       emitTasks(dialect.call(update, id));
@@ -132,6 +135,12 @@ export function createAcpEventMapper(
     if (kind === "tool_call_update") {
       const id = String(update.toolCallId ?? "");
       const name = toolNames.get(id) ?? String(update.title || "tool");
+      // The input often completes after the call began: show it once it is there.
+      const input = update.rawInput;
+      if (input && typeof input === "object" && Object.keys(input).length) {
+        const { parent } = dialect.tool(update);
+        emit("tool", { id, name, input, ...(parent ? { parent } : {}) });
+      }
       emitTasks(dialect.call(update, id));
       if (update.status === "completed" || update.status === "failed") finishTool(update, id, name);
     }

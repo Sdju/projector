@@ -28,6 +28,8 @@ export const defaultKeybindings: Keybinding[] = [
   { key: "Shift+F10", command: "ide.workbench.tabs.contextMenu" },
   { key: "ContextMenu", command: "ide.workbench.tabs.contextMenu" },
   { key: "F2", command: "ide.workbench.tabs.rename" },
+  { key: "Alt+PageDown", command: "ide.workbench.tab.next" },
+  { key: "Alt+PageUp", command: "ide.workbench.tab.previous" },
   { key: "Mod+S", command: "ide.editor.file.save", when: { surface: "editor" }, allowInput: true },
   {
     key: "Mod+Shift+M",

@@ -1,8 +1,10 @@
+import { shallowReactive } from "vue";
 import type { McpServer, WorktreeInfo } from "../api/client.ts";
 import type {
   AgentBackendId,
   AgentControl,
   AgentSessionInfo,
+  AgentTask,
   AgentTurn,
   QueuedMessage,
   RewindScope,
@@ -22,6 +24,8 @@ export interface ChatController {
   /** The chat is on screen: its tab is the shown one. */
   visible(): boolean;
   turns(): AgentTurn[];
+  /** Subagents and background commands of the chat. */
+  tasks(): AgentTask[];
   queue(): QueuedMessage[];
   controls(): AgentControl[];
   setControl(id: string, value: string): Promise<void>;
@@ -48,7 +52,8 @@ export interface ChatController {
   setIsolate(on: boolean): void;
 }
 
-const chats = new Map<string, ChatController>();
+// Shallow-reactive so a tab that follows a chat finds it when the chat opens later.
+const chats = shallowReactive(new Map<string, ChatController>());
 /** The chat the user touched last, per project. */
 const active = new Map<string, string>();
 
@@ -89,4 +94,9 @@ export function resolveChat(
   const chat = open[0];
   if (!chat) throw new Error("Нет открытого чата агента");
   return chat;
+}
+
+/** All open chats of every project, for the overview of what works now. */
+export function openChats(): ChatController[] {
+  return [...chats.values()];
 }

@@ -20,15 +20,23 @@ interface ChildSession {
 function childOf(update: AcpUpdate): ChildSession | undefined {
   const meta = (update._meta as Record<string, unknown> | undefined)?.["opencode/child-session"];
   const { id, title } = (meta ?? {}) as { id?: unknown; title?: unknown };
-  if (typeof id !== "string") return undefined;
+  if (typeof id !== "string") {
+    // Calls of a child session are also named after it: `<session id>:<call id>`.
+    const session = /^(ses_[^:]+):/.exec(String(update.toolCallId ?? ""))?.[1];
+    return session ? { id: session } : undefined;
+  }
   return { id, ...(typeof title === "string" ? { title } : {}) };
 }
 
 /** The input of the call that starts a subagent; it arrives with a later update, not the first. */
 function subagentOf(update: AcpUpdate) {
-  const { agent, description } = inputOf(update);
+  const { agent, description, prompt } = inputOf(update);
   if (typeof agent !== "string") return undefined;
-  return { agent, description: typeof description === "string" ? description : agent };
+  return {
+    agent,
+    description: typeof description === "string" ? description : agent,
+    ...(typeof prompt === "string" && prompt ? { prompt } : {}),
+  };
 }
 
 /** The result of a subagent call wraps the subagent's answer in `<subagent ...>` tags. */
@@ -54,10 +62,20 @@ export function createOpencodeDialect(): AcpDialect {
     if (known) return known;
     const taken = new Set(bound.values());
     const free = open.filter((item) => !taken.has(item.call));
-    const match = free.find((item) => item.description === child.title) ?? free[0];
-    if (match) bound.set(child.id, match.call);
+    // Without a matching title only a lone candidate is certain enough to take.
+    const match =
+      free.find((item) => child.title !== undefined && item.description === child.title) ??
+      (free.length === 1 ? free[0] : undefined);
+    if (match) {
+      bound.set(child.id, match.call);
+      found.push({ id: match.call, session: child.id });
+    }
     return match?.call;
   }
+
+  /** Sessions found for tasks since the last patch; they travel with the next one. */
+  const found: AcpTaskPatch[] = [];
+  const flush = () => found.splice(0);
 
   const dialect: AcpDialect = extendPlainDialect({
     tool(update) {
@@ -79,12 +97,13 @@ export function createOpencodeDialect(): AcpDialect {
       if (!parent) return [];
       const all = (said.get(parent) ?? "") + text;
       said.set(parent, all);
-      return all.trim() ? [{ id: parent, summary: shorten(all) }] : [];
+      return [...flush(), ...(all.trim() ? [{ id: parent, summary: shorten(all) }] : [])];
     },
     call(update, id) {
       const patches: AcpTaskPatch[] = [];
       const child = childOf(update);
       const parent = child && parentOf(child);
+      patches.push(...flush());
       if (parent && update.sessionUpdate === "tool_call") {
         const count = (counts.get(parent) ?? 0) + 1;
         counts.set(parent, count);
@@ -101,6 +120,7 @@ export function createOpencodeDialect(): AcpDialect {
           status: "running",
           background: false,
           subagent: agent.agent,
+          ...(agent.prompt ? { prompt: agent.prompt } : {}),
           tool: id,
         });
       }
@@ -122,6 +142,21 @@ export function createOpencodeDialect(): AcpDialect {
     end(update, id, output) {
       const index = open.findIndex((item) => item.call === id);
       if (index < 0) return [];
+      // A subagent started in the background answers at once with its session and keeps working:
+      // its call stays open so its later calls and messages still find the task.
+      const session = /"sessionID"\s*:\s*"([^"]+)"/.exec(output)?.[1];
+      if (session && /^\{[^]*"status"\s*:\s*"running"/.test(output.trimStart())) {
+        bound.set(session, id);
+        return [
+          {
+            id,
+            status: "running",
+            background: true,
+            untracked: true,
+            session,
+          },
+        ];
+      }
       open.splice(index, 1);
       // Without a spoken answer the output is only metadata (a JSON object), not worth showing.
       const summary = shorten(

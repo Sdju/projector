@@ -23,7 +23,14 @@ export interface TabType<P extends TabParams = TabParams> {
   /** Parameters for a tab opened by its command; lets a kind open a new instance each time. */
   create?(): P;
   /** An IDE command that opens the tab; the workspace registers it with the kind. */
-  command?: { id: string; title: string; description?: string; requires?: string };
+  command?: {
+    id: string;
+    title: string;
+    description?: string;
+    requires?: string;
+    /** The command takes the parameters of the tab to open as its arguments (described here). */
+    arguments?: Record<string, string>;
+  };
 }
 
 /**
