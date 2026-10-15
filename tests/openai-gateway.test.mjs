@@ -111,3 +111,105 @@ test("gateway lists provider models and routes requests by model", async () => {
   const bad = await fetch(`${base}/api/openai/v1/chat/completions`, { method: "POST", body: "[" });
   expect(bad.status).toBe(400);
 });
+
+test("gateway answers any origin, preflight included", async () => {
+  const { base } = await setup();
+  setGatewayEnabled(true);
+  const preflight = await fetch(`${base}/api/openai/v1/chat/completions`, {
+    method: "OPTIONS",
+    headers: { Origin: "https://example.org", "Access-Control-Request-Method": "POST" },
+  });
+  expect(preflight.status).toBe(204);
+  expect(preflight.headers.get("access-control-allow-origin")).toBe("*");
+  expect(preflight.headers.get("access-control-allow-headers")).toContain("Authorization");
+
+  const foreign = await fetch(`${base}/api/openai/v1/models`, {
+    headers: { Origin: "https://example.org" },
+  });
+  expect(foreign.status).toBe(200);
+  expect(foreign.headers.get("access-control-allow-origin")).toBe("*");
+
+  // The rest of the API keeps its same-origin rule.
+  const other = await fetch(`${base}/api/health`, { headers: { Origin: "https://example.org" } });
+  expect(other.status).toBe(403);
+  const config = await fetch(`${base}/api/openai`, { headers: { Origin: "https://example.org" } });
+  expect(config.status).toBe(403);
+});
+
+test("an access key is required once set and is never a session for the rest of the API", async () => {
+  const { base } = await setup();
+  const set = await fetch(`${base}/api/openai`, {
+    method: "PUT",
+    body: JSON.stringify({ enabled: true, apiKey: "sk-test-key" }),
+  });
+  expect(await set.json()).toMatchObject({ enabled: true, hasKey: true });
+
+  expect((await fetch(`${base}/api/openai/v1/models`)).status).toBe(401);
+  const wrong = await fetch(`${base}/api/openai/v1/models`, {
+    headers: { Authorization: "Bearer nope" },
+  });
+  expect(wrong.status).toBe(401);
+  expect((await wrong.json()).error.type).toBe("authentication_error");
+  const ok = await fetch(`${base}/api/openai/v1/models`, {
+    headers: { Authorization: "Bearer sk-test-key", Origin: "https://example.org" },
+  });
+  expect(ok.status).toBe(200);
+  expect(ok.headers.get("set-cookie")).toBeNull();
+
+  const cleared = await fetch(`${base}/api/openai`, {
+    method: "PUT",
+    body: JSON.stringify({ apiKey: "" }),
+  });
+  expect((await cleared.json()).hasKey).toBe(false);
+  expect((await fetch(`${base}/api/openai/v1/models`)).status).toBe(200);
+});
+
+test("in a password-protected LAN the gateway key replaces the password only for the gateway", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "projector-openai-lan-"));
+  const previous = { data: process.env.XDG_DATA_HOME, network: process.env.PROJECTOR_NETWORK };
+  process.env.XDG_DATA_HOME = dir;
+  process.env.PROJECTOR_NETWORK = "lan";
+  onTestFinished(async () => {
+    for (const [key, value] of [
+      ["XDG_DATA_HOME", previous.data],
+      ["PROJECTOR_NETWORK", previous.network],
+    ]) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    await rm(dir, { recursive: true, force: true });
+  });
+  const { setLanPassword, authorizeHttp } = await import("../server/modules/access/index.ts");
+  const { setGatewayKey } = await import("../server/modules/openai-gateway/index.ts");
+  setLanPassword("lan-password");
+  setGatewayKey("sk-lan-key");
+
+  const request = (url, authorization) => ({
+    url,
+    method: "GET",
+    headers: { host: "192.0.2.1:4177", authorization, origin: "https://example.org" },
+    socket: { remoteAddress: "192.0.2.10" },
+  });
+  const response = () => {
+    const headers = {};
+    return {
+      headers,
+      setHeader: (name, value) => (headers[name.toLowerCase()] = value),
+      hasHeader: (name) => name.toLowerCase() in headers,
+      writeHead() {
+        return this;
+      },
+      end() {},
+    };
+  };
+  const attempt = (url, authorization) => {
+    const res = response();
+    return { allowed: authorizeHttp(request(url, authorization), res), res };
+  };
+
+  const key = attempt("/api/openai/v1/models", "Bearer sk-lan-key");
+  expect(key.allowed).toBe(true);
+  expect(key.res.headers["set-cookie"], "no session from a gateway key").toBeUndefined();
+  expect(attempt("/api/openai/v1/models", "Bearer lan-password").allowed).toBe(false);
+  expect(attempt("/api/projects", "Bearer sk-lan-key").allowed).toBe(false);
+});

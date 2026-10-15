@@ -4,7 +4,7 @@
 
 ### Сервер
 
-- OpenAI-совместимый API под `/api/openai/v1` (`models`, `chat/completions`, `completions`, `embeddings`, потоковый ответ) проксирует запросы других приложений к провайдерам Projector. Выключен по умолчанию; включается в настройках («OpenAI API», команда `ide.openai.gateway.set`) или через `PUT /api/openai`. Подробнее — [usage](docs/usage.md#openai-совместимый-api).
+- OpenAI-совместимый API под `/api/openai/v1` (`models`, `chat/completions`, `completions`, `embeddings`, потоковый ответ) проксирует запросы других приложений к провайдерам Projector. Отвечает с любого origin (CORS), необязательный ключ доступа (Bearer). Выключен по умолчанию; включается в настройках («OpenAI API», команда `ide.openai.gateway.set`) или через `PUT /api/openai`. Подробнее — [usage](docs/usage.md#openai-совместимый-api).
 
 ### Агент
 

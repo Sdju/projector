@@ -1,7 +1,13 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { randomBytes } from "node:crypto";
 import { readNetworkMode } from "../../../core/modules/app-paths/index.ts";
-import { accessAllowed, isLocalRequest, isTrustedHost } from "./access.ts";
+import {
+  accessAllowed,
+  isLocalRequest,
+  isOpenOriginRequest,
+  isTrustedHost,
+  openOriginKeyRejected,
+} from "./access.ts";
 import { hasLanPassword } from "./password.ts";
 import { rememberLanSession } from "./session.ts";
 
@@ -11,9 +17,19 @@ export function authorizeHttp(
   res: ServerResponse,
   allowLogin = false,
 ): boolean {
+  const openOrigin = isOpenOriginRequest(req);
+  if (openOrigin) {
+    allowAnyOrigin(res);
+    if (req.method === "OPTIONS") {
+      // A preflight carries no credentials, so it cannot be held to a key or password.
+      res.writeHead(isTrustedHost(req) ? 204 : 403).end();
+      return false;
+    }
+  }
   if (accessAllowed(req, false)) {
     try {
-      if (!isLocalRequest(req)) rememberLanSession(req, res);
+      // A gateway key must never be turned into a session for the rest of the API.
+      if (!openOrigin && !isLocalRequest(req)) rememberLanSession(req, res);
     } catch {
       res.writeHead(503).end();
       return false;
@@ -22,7 +38,7 @@ export function authorizeHttp(
   }
   const scheme = "encrypted" in req.socket && req.socket.encrypted ? "https:" : "http:";
   const originAllowed =
-    !req.headers.origin || req.headers.origin === `${scheme}//${req.headers.host}`;
+    !req.headers.origin || req.headers.origin === `${scheme}//${req.headers.host}` || openOrigin;
   let status = 403;
   if (readNetworkMode() === "lan" && !isLocalRequest(req) && isTrustedHost(req) && originAllowed) {
     try {
@@ -32,6 +48,21 @@ export function authorizeHttp(
     }
   }
   res.setHeader("Cache-Control", "no-store");
+  if (isTrustedHost(req) && openOriginKeyRejected(req)) {
+    res.setHeader("WWW-Authenticate", "Bearer");
+    res.writeHead(401, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(
+      JSON.stringify({
+        error: {
+          message: "Неверный или отсутствующий ключ доступа",
+          type: "authentication_error",
+          param: null,
+          code: "invalid_api_key",
+        },
+      }),
+    );
+    return false;
+  }
   if (
     status === 401 &&
     allowLogin &&
@@ -49,6 +80,14 @@ export function authorizeHttp(
     );
   }
   return false;
+}
+
+function allowAnyOrigin(res: ServerResponse): void {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, OpenAI-Organization");
+  res.setHeader("Access-Control-Allow-Private-Network", "true");
+  res.setHeader("Access-Control-Max-Age", "600");
 }
 
 function sendLogin(res: ServerResponse): void {

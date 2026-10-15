@@ -21,6 +21,31 @@ function hostname(req: IncomingMessage): string {
   }
 }
 
+/** Prefix of the API that other applications, browser pages included, call from any Origin. */
+export const OPEN_ORIGIN_PREFIX = "/api/openai/v1";
+
+export function isOpenOriginRequest(req: IncomingMessage): boolean {
+  const path = (req.url ?? "").split("?")[0];
+  return path === OPEN_ORIGIN_PREFIX || path.startsWith(`${OPEN_ORIGIN_PREFIX}/`);
+}
+
+type OpenOriginGuard = (req: IncomingMessage) => boolean | undefined;
+const guards = globalThis as typeof globalThis & { projectorOpenOriginGuard?: OpenOriginGuard };
+
+/**
+ * Host checks still apply to the open-origin API, and the LAN session cookie is SameSite=Strict,
+ * so a foreign page carries no session. Its owner may authenticate its own requests: `true` admits them
+ * without the LAN password, `false` rejects, `undefined` leaves the default rules.
+ */
+export function registerOpenOriginGuard(guard: OpenOriginGuard): void {
+  guards.projectorOpenOriginGuard = guard;
+}
+
+/** The owner of the open-origin API turned this request away for a missing or wrong key. */
+export function openOriginKeyRejected(req: IncomingMessage): boolean {
+  return isOpenOriginRequest(req) && guards.projectorOpenOriginGuard?.(req) === false;
+}
+
 /** Numeric LAN addresses and localhost cannot be rebound by a third-party DNS owner. */
 export function isTrustedHost(req: IncomingMessage): boolean {
   const host = hostname(req);
@@ -63,8 +88,14 @@ export function accessAllowed(
   if (readNetworkMode() === "local" && (!local || !LOOPBACK.includes(host))) return false;
 
   const origin = req.headers.origin;
-  if (origin && origin !== `${scheme(req)}//${req.headers.host}`) return false;
+  if (origin && origin !== `${scheme(req)}//${req.headers.host}` && !isOpenOriginRequest(req))
+    return false;
   if (!origin && requireOrigin) return false;
+
+  if (isOpenOriginRequest(req)) {
+    const verdict = guards.projectorOpenOriginGuard?.(req);
+    if (verdict !== undefined) return verdict;
+  }
 
   try {
     if (!local && hasLanPassword()) {
