@@ -4,12 +4,9 @@
 
 Правила для любого пункта: общая абстракция выносится только при подтверждённом совпадении поведения; провайдеры и владельцы остаются тонкими адаптерами; FEOD и IDE-команды сохраняются (см. [архитектуру](architecture.md), [SDK команд](ide-commands.md)). Для dock и редактора не меняйте стабильную идентичность `DockSlot`, `PanelHost` и keepAlive-содержимого: потеря фокуса, курсора, прокрутки и xterm-процессов будет регрессией. Для UI-изменений нужна проверка в реальном браузере (GTK для палитры).
 
-## R5 · Настройки GitHub/GitLab и авторизация GitHub
+## R5 · Настройки GitHub/GitLab и авторизация GitHub — закрыто
 
-- `src/modules/github/GithubSettings.vue` и `src/modules/gitlab/GitlabSettings.vue` содержат одинаковую функцию `action` (сброс error/message, busy, try/catch/finally), загрузку интеграции, сохранение и connect/disconnect токена. `TokenReveal` уже общий.
-- `src/modules/github/GithubConnection.vue` — второй путь включения GitHub с POST `/github/auth`. Отличие: он обрезает токен через `trim`, `GithubSettings` передаёт исходную строку.
-
-Куда: общая модель состояния и операций — в `integration-api`; GitHub-специфичный connect и OAuth Device Flow остаются в `github`, URL/scope/import — в `gitlab`. GitLab не может импортировать реализацию GitHub (FEOD).
+`integration-api/useIntegrationOperation` объединяет busy/error/message и жизненный цикл запросов, включая загрузку статуса. Обе формы GitHub используют `github/connect.ts`: токен обрезается, интеграция включается до авторизации. Сохранение, подключение, отключение и start/cancel Device Flow в GitHub Settings зарегистрированы как IDE-команды. Формы, Device Flow и GitLab URL/scope/import остаются у владельцев; GitLab не зависит от GitHub.
 
 ## R6 (остаток) · Отображение статусов Docker
 
@@ -29,9 +26,9 @@ Pointer drag реализован отдельно в `dock/ui/DockTree.vue`, `w
 
 `network/LanInfoPanel.vue` и `agent/ui/AgentChat.vue` вызывают `navigator.clipboard` со своим feedback, а `CommitMeta` и `GitHistory` используют `copyWithNotice` из `common/utilities/notice.ts`. Для LAN-панели можно взять `copyWithNotice` с якорем кнопки. Чат (copied-id, галочка) — отдельная UX-модель; `TerminalView` и дерево файлов не объединять.
 
-## R11 · Политика действий web/GTK launcher
+## R11 · Политика действий web/GTK launcher — закрыто для избранного
 
-Поиск, данные и запуск уже общие через `core/modules/launcher`. Повторяется состояние выбранного detail action и политика избранного в `src/pages/index.vue` и `native/modules/desktop/Palette.vue`. Условия уже расходятся: у web `toggleFavorite` исключает github и gitlab, у native — только github. Перенести правила выбора и допустимости действий в launcher model; GTK keyval, DOM-события, фокус, прокрутку и скрытие окна оставить платформенному UI. `ProjectSwitcher.vue` сопоставлять после стабилизации общей политики.
+Обе поверхности используют `core/modules/launcher/resolveLauncherAction`: полный список действий из server detail определяет допустимость favorite/folder, отдельных списков kind больше нет. Search actions содержат только основные действия и не используются как полный набор возможностей. Выбор индекса detail action, GTK keyval, DOM-события, фокус, прокрутка и скрытие окна остаются платформенному UI.
 
 ## R3 (остаток) · Остров вне миграции
 
