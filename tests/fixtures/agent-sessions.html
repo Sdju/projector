@@ -1,0 +1,55 @@
+<!doctype html>
+<link rel="icon" href="data:," />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<div id="fixture"></div>
+<script type="module">
+  import "/src/app/styles.css";
+  import { createApp, h, ref } from "vue";
+  import AgentSessions from "/src/modules/agent/ui/AgentSessions.vue";
+  const sessions = ref([
+    { id: "one", title: "First session" },
+    { id: "two", title: "Second session" },
+  ]);
+  const loading = ref(false);
+  let loadOnOpen = false;
+  const changes = [],
+    picks = [];
+  createApp({
+    setup: () => () =>
+      h("div", { style: "padding: 30px" }, [
+        h(AgentSessions, {
+          sessions: sessions.value,
+          loading: loading.value,
+          onOpen: () => {
+            if (loadOnOpen) loading.value = true;
+          },
+          error: "",
+          disabled: false,
+          editable: true,
+          onChange: (id, change) => changes.push({ id, change }),
+          onPick: (id) => picks.push(id),
+        }),
+        h("button", { id: "outside", style: "margin-top: 200px" }, "Outside"),
+      ]),
+  }).mount("#fixture");
+  window.fixture = {
+    ready: true,
+    changes,
+    picks,
+    empty: () => {
+      sessions.value = [];
+      loadOnOpen = true;
+    },
+    loaded: () => {
+      sessions.value = [{ id: "loaded", title: "Loaded session" }];
+      loading.value = false;
+      loadOnOpen = false;
+    },
+    many: () => {
+      sessions.value = Array.from({ length: 6 }, (_, i) => ({
+        id: String(i),
+        title: `Session ${i}`,
+      }));
+    },
+  };
+</script>

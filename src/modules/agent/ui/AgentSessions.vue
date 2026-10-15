@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import UiPopupSurface from "../../../common/ui/UiPopupSurface.vue";
+import UiIsland from "../../../common/ui/UiIsland.vue";
+import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
 import UiInline from "../../../common/ui/UiInline.vue";
 import UiControl, { type UiControlHandle } from "../../../common/ui/UiControl.vue";
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import type { AgentSessionInfo } from "../model/types.ts";
 import IconHistory from "~icons/lucide/history";
@@ -24,7 +25,12 @@ const emit = defineEmits<{
   pick: [id: string];
   change: [id: string, change: { title?: string; pinned?: boolean }];
 }>();
-const shown = ref(false);
+const menu = useIslandMenu({
+  anchor: "right",
+  initialFocus: ["input[type=search]", "button.item"],
+  items: "button.item, button.mini",
+});
+const { open: shown } = menu;
 const search = ref("");
 const renaming = ref("");
 const draft = ref("");
@@ -40,6 +46,9 @@ function startRename(session: AgentSessionInfo, event: MouseEvent) {
   renameRow = (event.currentTarget as HTMLElement).closest<HTMLElement>(".row") ?? undefined;
   renaming.value = session.id;
   draft.value = session.title;
+  void nextTick(() =>
+    menu.island.value?.querySelector<HTMLElement>('[aria-label="Название сессии"]')?.focus(),
+  );
 }
 function finishRename(save: boolean, restoreFocus = false) {
   const row = renameRow;
@@ -58,40 +67,29 @@ function finishRename(save: boolean, restoreFocus = false) {
       target?.focus();
     });
 }
-const root = ref<HTMLElement>();
-
-function toggle() {
-  shown.value = !shown.value;
-  if (shown.value) {
-    emit("open");
-    search.value = "";
-    void nextTick(() => searchInput.value?.focus());
-  }
-}
 function pick(id: string) {
-  shown.value = false;
+  menu.close();
   emit("pick", id);
-}
-function outside(event: Event) {
-  if (shown.value && !root.value?.contains(event.target as Node)) shown.value = false;
-}
-function escape(event: KeyboardEvent) {
-  // Let the rename field cancel before unmount can trigger its blur-save.
-  if (shown.value && event.key === "Escape" && !renaming.value) shown.value = false;
 }
 watch(shown, (open) => {
   if (open) {
-    document.addEventListener("pointerdown", outside, true);
-    document.addEventListener("keydown", escape, true);
+    search.value = "";
+    emit("open");
   } else {
-    document.removeEventListener("pointerdown", outside, true);
-    document.removeEventListener("keydown", escape, true);
+    renaming.value = "";
+    renameRow = undefined;
   }
 });
-onBeforeUnmount(() => {
-  document.removeEventListener("pointerdown", outside, true);
-  document.removeEventListener("keydown", escape, true);
-});
+// Sessions arrive asynchronously on first open. Give the list its initial focus when ready.
+watch(
+  () => props.loading,
+  async (loading) => {
+    if (loading || !shown.value) return;
+    await nextTick();
+    if (shown.value && !menu.island.value?.contains(document.activeElement))
+      menu.island.value?.querySelector<HTMLElement>("input[type=search], button.item")?.focus();
+  },
+);
 
 const relative = new Intl.RelativeTimeFormat("ru", { numeric: "auto" });
 function age(value?: string): string {
@@ -106,7 +104,7 @@ function age(value?: string): string {
 </script>
 
 <template>
-  <div ref="root" class="agent-sessions">
+  <div :ref="menu.trigger" class="agent-sessions">
     <UiButton
       shape="icon"
       size="sm"
@@ -114,17 +112,11 @@ function age(value?: string): string {
       aria-label="Прошлые сессии"
       :aria-expanded="shown"
       :disabled="disabled"
-      @click="toggle"
+      @click="menu.toggle()"
     >
       <IconHistory aria-hidden="true" />
     </UiButton>
-    <UiPopupSurface
-      flow="column"
-      v-if="shown"
-      class="panel"
-      role="menu"
-      aria-label="Прошлые сессии"
-    >
+    <UiIsland :menu="menu" label="Прошлые сессии" :width="320">
       <UiControl
         v-if="sessions.length > 4"
         ref="searchInput"
@@ -150,7 +142,6 @@ function age(value?: string): string {
           v-model="draft"
           class="rename"
           aria-label="Название сессии"
-          autofocus
           @keydown.enter.prevent="finishRename(true, true)"
           @keydown.esc.stop.prevent="finishRename(false, true)"
           @blur="finishRename(true)"
@@ -196,25 +187,13 @@ function age(value?: string): string {
           </button>
         </UiInline>
       </UiInline>
-    </UiPopupSurface>
+    </UiIsland>
   </div>
 </template>
 
 <style scoped>
 .agent-sessions {
   position: relative;
-}
-.panel {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 20;
-  width: 320px;
-  max-width: 80vw;
-  max-height: 340px;
-  overflow: auto;
-  padding: 4px;
-  scrollbar-width: thin;
 }
 .note {
   margin: 0;
