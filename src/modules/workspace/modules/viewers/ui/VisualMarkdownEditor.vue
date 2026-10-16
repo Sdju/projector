@@ -488,13 +488,18 @@ onBeforeUnmount(() => {
 /* Таблица не обязана вмещаться по ширине: колонки получают столько места, сколько нужно тексту
    (слова не рвутся посреди), а широкая таблица прокручивается по горизонтали. */
 .visual-markdown :deep(.milkdown-table-block) {
-  overflow-x: auto;
-  /* Ручки таблицы абсолютно позиционированы: без этого они выходят из прокрутки и раздувают страницу. */
+  /* Ручки колонок и строк стоят снаружи таблицы: прокручивается только сама таблица (ниже). */
   position: relative;
   /* Узкая таблица остаётся в колонке текста, широкая растёт вправо до края окна и прокручивается. */
   width: max-content;
   min-width: 100%;
   max-width: max(100%, calc(100% + (100cqw - 100%) / 2 - var(--sp-5)));
+}
+.visual-markdown :deep(.milkdown-table-block .table-wrapper) {
+  /* Линии-ручки внутри абсолютно позиционированы: пусть обрезаются, а не растягивают прокрутку. */
+  position: relative;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 .visual-markdown :deep(.milkdown-table-block table) {
   table-layout: auto;
