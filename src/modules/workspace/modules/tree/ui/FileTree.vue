@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { toastErrors } from "../../../../../common/utilities/notice.ts";
+import UiSkeleton from "../../../../../common/ui/UiSkeleton.vue";
 import UiActionRow from "../../../../../common/ui/UiActionRow.vue";
 import {
   computed,
@@ -252,6 +253,14 @@ defineExpose({ reveal });
     @contextmenu.self="showContext($event)"
     @dragleave="dragLeave"
   >
+    <li v-if="depth === 0 && loading && !entries.length" class="skeleton" aria-hidden="true">
+      <UiSkeleton
+        v-for="width in ['58%', '72%', '46%', '64%', '52%', '68%']"
+        :key="width"
+        :width="width"
+        height="10px"
+      />
+    </li>
     <li v-if="depth === 0 && busy" class="notice" role="status">выполняется…</li>
     <li v-if="depth === 0 && progress" class="notice" role="status">
       Загрузка: {{ progress.done }} из {{ progress.total }}
@@ -440,6 +449,13 @@ button.git-changed.selected {
 .notice {
   padding: var(--sp-2) var(--sp-3);
   color: var(--faint);
+}
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  list-style: none;
 }
 .load-more {
   color: var(--text);

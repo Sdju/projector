@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import UiPanel from "../../../common/ui/UiPanel.vue";
 import { computed } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
@@ -149,6 +150,9 @@ const hostOf = (key: string) => props.panelHosts.hosts[key] ?? null;
     <template #empty="{ group }">
       <UiEmpty v-if="group.role === 'editor'">
         Откройте файл из дерева или перетащите его сюда
+      </UiEmpty>
+      <UiEmpty v-else-if="group.role === 'terminal' && !terminals.loaded.value">
+        <UiSpinner /> Загружаю сессии…
       </UiEmpty>
       <UiEmpty v-else-if="group.role === 'terminal'">
         Нет терминалов. Создайте сессию кнопками на панели выше

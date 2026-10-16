@@ -7,6 +7,7 @@ import {
   projectPathFromParams,
   projectRoute,
   fetchProjectGithub,
+  ProjectOpening,
 } from "../../modules/project/index.ts";
 import type { Project } from "../../modules/project/index.ts";
 import {
@@ -197,7 +198,8 @@ watch(
       </template>
     </ProjectWorkspace>
   </section>
-  <section v-else>
+  <section v-else-if="opening" class="project-page"><ProjectOpening /></section>
+  <section v-else class="not-found project-page">
     <UiMessage
       size="xs"
       variant="padded"
@@ -206,8 +208,16 @@ watch(
       class="msg"
       :role="openError ? 'alert' : undefined"
     >
-      {{ opening ? "открываю проект…" : openError || "проект не найден" }}
+      {{ openError || "проект не найден" }}
     </UiMessage>
-    <router-link to="/">назад</router-link>
+    <UiButton size="sm" @click="router.push('/')">К списку проектов</UiButton>
   </section>
 </template>
+
+<style scoped>
+.not-found {
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: var(--sp-4);
+}
+</style>
