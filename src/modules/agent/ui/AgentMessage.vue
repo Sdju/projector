@@ -106,6 +106,7 @@ const html = computed(() => renderChatMarkdown(props.text));
 }
 .agent-message :deep(table) {
   display: block;
+  width: max-content;
   max-width: 100%;
   overflow-x: auto;
   border-collapse: collapse;
@@ -117,6 +118,10 @@ const html = computed(() => renderChatMarkdown(props.text));
   border: 1px solid var(--line);
   padding: 8px 12px;
   text-align: left;
+  vertical-align: top;
+  /* Слова не рвутся: узкая колонка не становится столбиком из букв, таблица прокручивается. */
+  min-width: 7em;
+  max-width: 28em;
 }
 .agent-message :deep(th) {
   background: var(--bg-2);

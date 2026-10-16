@@ -416,6 +416,7 @@ onBeforeUnmount(() => {
   }
 }
 .visual-markdown :deep(.milkdown) {
+  container-type: inline-size;
   --crepe-color-background: var(--bg);
   --crepe-color-on-background: var(--text);
   --crepe-color-surface: var(--bg-2);
@@ -484,13 +485,27 @@ onBeforeUnmount(() => {
 .visual-markdown :deep(.ProseMirror img) {
   max-width: 100%;
 }
+/* Таблица не обязана вмещаться по ширине: колонки получают столько места, сколько нужно тексту
+   (слова не рвутся посреди), а широкая таблица прокручивается по горизонтали. */
+.visual-markdown :deep(.milkdown-table-block) {
+  overflow-x: auto;
+  /* Узкая таблица остаётся в колонке текста, широкая растёт вправо до края окна и прокручивается. */
+  width: max-content;
+  min-width: 100%;
+  max-width: max(100%, calc(100% + (100cqw - 100%) / 2 - var(--sp-5)));
+}
 .visual-markdown :deep(.milkdown-table-block table) {
-  /* Колонки учитывают содержимое вместо одинаковой фиксированной ширины. */
   table-layout: auto;
+  width: max-content;
+  min-width: 100%;
 }
 .visual-markdown :deep(.milkdown-table-block th),
 .visual-markdown :deep(.milkdown-table-block td) {
-  overflow-wrap: anywhere;
+  min-width: 7em;
+  max-width: 34em;
+  overflow-wrap: normal;
+  word-break: normal;
+  vertical-align: top;
 }
 .visual-markdown :deep(.markdown-html) {
   display: inline-block;
