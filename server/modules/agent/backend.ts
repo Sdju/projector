@@ -20,6 +20,7 @@ import type {
   CommandRequest,
   QuestionAnswer,
   QuestionRequest,
+  SecretRequest,
 } from "./command-bridge.ts";
 
 export type AgentEventName =
@@ -107,6 +108,8 @@ export interface AgentRunOptions {
   approve?: (request: ApprovalRequest) => Promise<ApprovalAnswer>;
   /** Puts a question to the user; absent when the client cannot show one. */
   ask?: (request: QuestionRequest) => Promise<QuestionAnswer>;
+  /** Asks the user for a secret to store directly; absent when the client cannot show one. */
+  secret?: (request: SecretRequest) => Promise<string | null>;
   history?: AgentHistoryTurn[];
   /** Native conversation of the backend (Claude Code session ID) to continue instead of `history`. */
   sessionId?: string;

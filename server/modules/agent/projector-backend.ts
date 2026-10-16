@@ -37,6 +37,7 @@ async function run(options: AgentRunOptions): Promise<void> {
     commands: options.commands,
     signal: options.abort,
     ask: options.ask,
+    secret: options.secret,
     guard: {
       cwd: options.cwd,
       approve: options.approve,

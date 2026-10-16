@@ -4,6 +4,7 @@ import {
   AgentRunGone,
   answerPermission,
   answerQuestion,
+  answerSecret,
   cancelAgentRun,
   streamAgent,
 } from "../api/client.ts";
@@ -101,6 +102,7 @@ export function useAgent(
   const phase = computed(() => state.phase);
   const permissions = computed(() => state.permissions);
   const questions = computed(() => state.questions);
+  const secrets = computed(() => state.secrets);
 
   const {
     controls,
@@ -142,6 +144,16 @@ export function useAgent(
     }
   }
 
+  /** The value is passed on once and dropped: the chat state keeps only the request. */
+  async function answerSecretRequest(id: string, value: string | null): Promise<void> {
+    state.secrets = state.secrets.filter((item) => item.id !== id);
+    try {
+      await answerSecret(id, value);
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : "Не удалось передать секрет";
+    }
+  }
+
   const actions = useChatActions(state, { backend, projectId, ready, persist, send, stop });
   const { drainQueue, worktreeId } = actions;
 
@@ -168,6 +180,7 @@ export function useAgent(
         notifyQuestion(event.data.questions[0]?.question ?? "");
       if (event.event === "permission-request")
         notifyPermission(event.data.title || event.data.tool);
+      if (event.event === "secret-request") notifyQuestion(event.data.label);
       if (applyAgentEvent(state, assistant, event, catalog.ingest)) persist();
     };
     try {
@@ -207,6 +220,7 @@ export function useAgent(
       state.phase = "";
       state.permissions = [];
       state.questions = [];
+      state.secrets = [];
       persist();
       if (!stopped) notifyAnswer(assistant.text, !!state.error);
       drainQueue(stopped && !state.interrupting);
@@ -341,6 +355,7 @@ export function useAgent(
     phase,
     permissions,
     questions,
+    secrets,
     controls,
     selection,
     capabilities: computed(() => state.capabilities),
@@ -379,5 +394,6 @@ export function useAgent(
     release,
     decide,
     answer,
+    answerSecret: answerSecretRequest,
   };
 }

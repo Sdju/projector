@@ -174,6 +174,19 @@ export async function answerQuestion(
   if (!response.ok) throw new Error("Вопрос уже закрыт");
 }
 
+/**
+ * Answers a `secret-request` event with the typed value, `null` when the user declines. The value
+ * goes to the server in this one request and is not kept by the client.
+ */
+export async function answerSecret(id: string, value: string | null): Promise<void> {
+  const response = await fetch("/api/agent/tool-result", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, output: value ? { value } : {} }),
+  });
+  if (!response.ok) throw new Error("Запрос секрета уже закрыт");
+}
+
 async function getJson<T>(url: string, init: RequestInit | undefined, failure: string): Promise<T> {
   const response = await fetch(url, init);
   const data = await response.json().catch(() => ({}));

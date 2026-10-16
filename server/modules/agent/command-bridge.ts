@@ -48,6 +48,31 @@ export interface QuestionRequest {
 /** Answers by question ID: option IDs, or the user's own words; `null` when the user skipped. */
 export type QuestionAnswer = Record<string, string[]> | null;
 
+/**
+ * Where a secret goes, as the user sees it. Paths and internal IDs stay on the server; the form
+ * shows the destination before the user types anything.
+ */
+export type SecretDestination =
+  | { kind: "env_file"; file: string; key: string; replaces: boolean }
+  | {
+      kind: "ai_provider";
+      id: string;
+      name: string;
+      url: string;
+      model: string;
+      replaces: boolean;
+    }
+  | { kind: "integration"; integration: "github" | "gitlab"; label: string; replaces: boolean };
+
+/** Asks the user for a secret; the value goes to the server code that stores it, not to the model. */
+export interface SecretRequest {
+  /** What the secret is, in the user's words. */
+  label: string;
+  destination: SecretDestination;
+  /** Why the agent needs it. */
+  reason?: string;
+}
+
 type BridgeResult = { output?: unknown; error?: string };
 const pending = new Map<string, (result: BridgeResult) => void>();
 
@@ -134,6 +159,28 @@ export function createQuestionBridge(
       result[id] = value.filter((item): item is string => typeof item === "string").slice(0, 50);
     }
     return result;
+  };
+}
+
+/**
+ * Resolves the typed secret, `null` when the user declines. The value reaches only the caller
+ * that stores it; no event, error text or log of the bridge carries it.
+ */
+export function createSecretBridge(
+  emit: (event: "secret-request", data: unknown) => void,
+  signal: AbortSignal,
+  timeoutMs = 10 * 60_000,
+) {
+  return async (request: SecretRequest): Promise<string | null> => {
+    const output = await bridgeRequest(
+      (data) => emit("secret-request", data),
+      request,
+      signal,
+      timeoutMs,
+      "Секрет не получен вовремя",
+    );
+    const value = (output as { value?: unknown } | undefined)?.value;
+    return typeof value === "string" && value ? value : null;
   };
 }
 

@@ -145,6 +145,28 @@ export interface AgentPermission {
   persistent: boolean;
 }
 
+/**
+ * The agent asks for a secret. Only what it will be stored as is known here: the value is typed
+ * into the form and sent straight to the server, never kept in the chat state.
+ */
+export interface AgentSecretRequest {
+  id: string;
+  label: string;
+  reason?: string;
+  destination:
+    | { kind: "env_file"; file: string; key: string; replaces: boolean }
+    | {
+        kind: "ai_provider";
+        id: string;
+        name: string;
+        /** Where the key will be sent: shown in full, the key is for this address. */
+        url: string;
+        model: string;
+        replaces: boolean;
+      }
+    | { kind: "integration"; integration: "github" | "gitlab"; label: string; replaces: boolean };
+}
+
 /** A question the agent put to the user and waits for. */
 export interface AgentQuestionRequest {
   id: string;
@@ -194,6 +216,7 @@ export type AgentEvent =
       };
     }
   | { event: "question-request"; data: AgentQuestionRequest }
+  | { event: "secret-request"; data: AgentSecretRequest }
   | { event: "run"; data: { id: string } }
   | { event: "checkpoint"; data: { tail: string } }
   | { event: "worktree"; data: { id: string; branch: string } }

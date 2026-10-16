@@ -83,6 +83,9 @@ export function applyAgentEvent(
     case "question-request":
       state.questions.push(event.data);
       return false;
+    case "secret-request":
+      state.secrets.push(event.data);
+      return false;
     case "text":
       assistant.text += event.data.text;
       appendText(assistant, event.data.text);

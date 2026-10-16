@@ -2,7 +2,8 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { providersPath } from "../../../core/modules/app-paths/index.ts";
 import { HttpError } from "../http/index.ts";
-import { DEFAULT_PROVIDERS_SECRET, obfuscateSecret, revealSecret } from "./secret-obfuscation.ts";
+import { vault as systemVault } from "../secrets/index.ts";
+import { DEFAULT_PROVIDERS_SECRET, revealSecret } from "./secret-obfuscation.ts";
 import type {
   EnvOpenAIFallback,
   OpenAIProviderPublic,
@@ -17,6 +18,12 @@ import type {
 const ENV_PROVIDER_ID = "env-default";
 const QWEN_PROVIDER_ID = "qwen-dashscope";
 let writeChain: Promise<unknown> = Promise.resolve();
+let providerVault = systemVault;
+/** Test hook: replaces the secret vault. */
+export const useProviderVault = (next: typeof systemVault) => {
+  providerVault = next;
+};
+const keyAccount = (id: string) => `provider:${id}`;
 
 function withWriteLock<T>(fn: () => Promise<T>): Promise<T> {
   const next = writeChain.then(fn, fn);
@@ -46,16 +53,18 @@ function sanitizeModel(value: unknown): string {
   return typeof value === "string" ? value.trim().slice(0, 200) : "";
 }
 
-function toPublic(provider: StoredOpenAIProvider): OpenAIProviderPublic {
+function toPublic(provider: StoredOpenAIProvider, envKey = ""): OpenAIProviderPublic {
+  const fromEnv = provider.id === ENV_PROVIDER_ID && envKey.trim() !== "";
   return {
     id: provider.id,
     name: provider.name,
     url: provider.url,
     model: provider.model,
-    hasApiKey: Boolean(provider.apiKey.trim()),
+    hasApiKey: provider.vault === "keyring" || Boolean(provider.apiKey.trim()) || fromEnv,
   };
 }
 
+/** The key of the environment provider is read from the process environment, never stored. */
 function envProvider(fallback: EnvOpenAIFallback): StoredOpenAIProvider | null {
   const url = fallback.url?.trim();
   if (!url) return null;
@@ -64,9 +73,7 @@ function envProvider(fallback: EnvOpenAIFallback): StoredOpenAIProvider | null {
     name: "Из .env",
     url,
     model: fallback.model?.trim() || "qwen3.8-flash",
-    apiKey: fallback.apiKey?.trim()
-      ? obfuscateSecret(fallback.apiKey.trim(), fallback.secret || DEFAULT_PROVIDERS_SECRET)
-      : "",
+    apiKey: "",
   };
 }
 
@@ -100,6 +107,7 @@ function normalizeStoredProvider(value: unknown, index: number): StoredOpenAIPro
       url: sanitizeUrl(record.url),
       model: sanitizeModel(record.model),
       apiKey: typeof record.apiKey === "string" ? record.apiKey : "",
+      ...(record.vault === "keyring" ? { vault: "keyring" as const } : {}),
     };
   } catch {
     return null;
@@ -132,10 +140,14 @@ export async function loadStoredProviders(
 export async function loadPublicProviders(
   fallback: EnvOpenAIFallback = {},
 ): Promise<OpenAIProvidersPublicState> {
+  // Keys left in the file by older versions move into the keyring on first view.
+  await migrateProviderKeys(fallback).catch((error) =>
+    console.error("Перенос ключей провайдеров в системное хранилище:", error.message),
+  );
   const stored = await loadStoredProviders(fallback);
   return {
     activeProviderId: stored.activeProviderId,
-    providers: stored.providers.map(toPublic),
+    providers: stored.providers.map((item) => toPublic(item, fallback.apiKey)),
   };
 }
 
@@ -145,28 +157,65 @@ async function writeProvidersFile(config: StoredProvidersConfig): Promise<void> 
   await writeFile(file, `${JSON.stringify(config, null, 2)}\n`, "utf8");
 }
 
-function mergeProviderWrite(
+/**
+ * Keys live only in the OS keyring; the providers file holds settings and never a new key. Without
+ * a reachable keyring a key cannot be saved, so the caller refuses before the user types one.
+ */
+export async function assertKeyStore(): Promise<void> {
+  if ((await providerVault.storage()).backend !== "keyring")
+    throw new HttpError(
+      409,
+      "Ключи провайдеров хранятся в системном хранилище секретов, оно недоступно",
+    );
+}
+
+async function storeKey(
+  id: string,
+  plain: string,
+): Promise<Pick<StoredOpenAIProvider, "apiKey" | "vault">> {
+  await assertKeyStore();
+  await providerVault.set(keyAccount(id), `Projector: провайдер ${id}`, plain);
+  return { apiKey: "", vault: "keyring" };
+}
+
+async function mergeProviderWrite(
   item: OpenAIProviderWrite,
   index: number,
   existingById: Map<string, StoredOpenAIProvider>,
-  secret: string,
-): StoredOpenAIProvider {
+): Promise<StoredOpenAIProvider> {
   const id =
     typeof item.id === "string" && item.id.trim()
       ? sanitizeProviderId(item.id)
       : `provider-${index + 1}`;
   const previous = existingById.get(id);
-  let apiKey = previous?.apiKey ?? "";
-  if (typeof item.apiKey === "string") {
-    apiKey = item.apiKey.trim() ? obfuscateSecret(item.apiKey.trim(), secret) : "";
-  }
-  return {
+  const base = {
     id,
     name: sanitizeName(item.name, `Провайдер ${index + 1}`),
     url: sanitizeUrl(item.url),
     model: sanitizeModel(item.model),
-    apiKey,
   };
+  if (typeof item.apiKey === "string") {
+    const plain = item.apiKey.trim();
+    return { ...base, ...(plain ? await storeKey(id, plain) : { apiKey: "" }) };
+  }
+  // No key in the payload: keep the one already stored, wherever it lives.
+  return {
+    ...base,
+    apiKey: previous?.apiKey ?? "",
+    ...(previous?.vault ? { vault: previous.vault } : {}),
+  };
+}
+
+/** Removes keyring entries of providers that were deleted or whose key was cleared. */
+async function dropRetiredKeys(
+  before: StoredOpenAIProvider[],
+  after: StoredOpenAIProvider[],
+): Promise<void> {
+  for (const old of before) {
+    if (old.vault !== "keyring") continue;
+    if (after.some((item) => item.id === old.id && item.vault === "keyring")) continue;
+    await providerVault.delete(keyAccount(old.id));
+  }
 }
 
 export async function saveProviders(
@@ -175,11 +224,12 @@ export async function saveProviders(
 ): Promise<OpenAIProvidersPublicState> {
   return withWriteLock(async () => {
     const existing = await loadStoredProviders(fallback);
-    const secret = fallback.secret || DEFAULT_PROVIDERS_SECRET;
     const existingById = new Map(existing.providers.map((item) => [item.id, item]));
-    const providers = payload.providers.map((item, index) =>
-      mergeProviderWrite(item, index, existingById, secret),
+    const providers = await Promise.all(
+      payload.providers.map((item, index) => mergeProviderWrite(item, index, existingById)),
     );
+    // Keyring entries go before the file, so a failed keyring write keeps the previous state.
+    await dropRetiredKeys(existing.providers, providers);
     if (providers.length === 0) {
       const next = { activeProviderId: null, providers: [] };
       await writeProvidersFile(next);
@@ -194,7 +244,10 @@ export async function saveProviders(
       : providers[0].id;
     const next = { activeProviderId, providers };
     await writeProvidersFile(next);
-    return { activeProviderId, providers: providers.map(toPublic) };
+    return {
+      activeProviderId,
+      providers: providers.map((item) => toPublic(item, fallback.apiKey)),
+    };
   });
 }
 
@@ -210,11 +263,14 @@ export async function setActiveProvider(
     }
     const next = { ...stored, activeProviderId: id };
     await writeProvidersFile(next);
-    return { activeProviderId: id, providers: stored.providers.map(toPublic) };
+    return {
+      activeProviderId: id,
+      providers: stored.providers.map((item) => toPublic(item, fallback.apiKey)),
+    };
   });
 }
 
-function revealProviderKey(storedKey: string, secret: string): string {
+function revealFileKey(storedKey: string, secret: string): string {
   if (!storedKey.trim()) return "";
   try {
     return revealSecret(storedKey, secret);
@@ -223,14 +279,60 @@ function revealProviderKey(storedKey: string, secret: string): string {
   }
 }
 
-function toResolved(provider: StoredOpenAIProvider, secret: string): ResolvedOpenAIProvider {
+async function revealProviderKey(
+  provider: StoredOpenAIProvider,
+  secret: string,
+  envKey: string,
+): Promise<string> {
+  if (provider.id === ENV_PROVIDER_ID && !provider.apiKey.trim()) return envKey.trim();
+  if (provider.vault !== "keyring") return revealFileKey(provider.apiKey, secret);
+  try {
+    return (await providerVault.get(keyAccount(provider.id))) ?? "";
+  } catch (error) {
+    console.error(`Провайдер ${provider.id}: ключ недоступен: ${(error as Error).message}`);
+    return "";
+  }
+}
+
+async function toResolved(
+  provider: StoredOpenAIProvider,
+  secret: string,
+  envKey: string,
+): Promise<ResolvedOpenAIProvider> {
   return {
     id: provider.id,
     name: provider.name,
     url: provider.url.trim(),
     model: provider.model.trim() || "qwen3.8-flash",
-    apiKey: revealProviderKey(provider.apiKey, secret),
+    apiKey: await revealProviderKey(provider, secret, envKey),
   };
+}
+
+/**
+ * Moves keys still kept in the providers file into the keyring once it is reachable. The file is
+ * rewritten only after each keyring value reads back identically.
+ */
+export function migrateProviderKeys(fallback: EnvOpenAIFallback = {}): Promise<void> {
+  return withWriteLock(async () => {
+    if ((await providerVault.storage()).backend !== "keyring") return;
+    const stored = await loadStoredProviders(fallback);
+    const secret = fallback.secret || DEFAULT_PROVIDERS_SECRET;
+    let moved = false;
+    const providers: StoredOpenAIProvider[] = [];
+    for (const item of stored.providers) {
+      const plain = item.vault || !item.apiKey.trim() ? "" : revealFileKey(item.apiKey, secret);
+      if (!plain) {
+        providers.push(item);
+        continue;
+      }
+      await providerVault.set(keyAccount(item.id), `Projector: провайдер ${item.id}`, plain);
+      if ((await providerVault.get(keyAccount(item.id))) !== plain)
+        throw new Error(`Не удалось проверить ключ провайдера ${item.id}`);
+      providers.push({ ...item, apiKey: "", vault: "keyring" });
+      moved = true;
+    }
+    if (moved) await writeProvidersFile({ activeProviderId: stored.activeProviderId, providers });
+  });
 }
 
 export async function resolveOpenAIProvider(
@@ -248,10 +350,11 @@ export async function resolveOpenAIProvider(
     stored.providers.find((item) => item.id === stored.activeProviderId) ||
     stored.providers[0];
 
-  if (selected?.url.trim()) return toResolved(selected, secret);
+  const envKey = fallback.apiKey ?? "";
+  if (selected?.url.trim()) return toResolved(selected, secret, envKey);
 
   const fromEnv = envProvider(fallback);
-  if (fromEnv?.url.trim()) return toResolved(fromEnv, secret);
+  if (fromEnv?.url.trim()) return toResolved(fromEnv, secret, envKey);
 
   throw new HttpError(400, "Провайдер Qwen/OpenAI не настроен");
 }

@@ -29,7 +29,10 @@ export interface StoredOpenAIProvider {
   name: string;
   url: string;
   model: string;
+  /** Obfuscated key kept in the providers file; empty when the key lives in the keyring. */
   apiKey: string;
+  /** On disk, `keyring` means the key is in the OS keyring under the provider's account. */
+  vault?: "keyring";
 }
 
 export interface StoredProvidersConfig {

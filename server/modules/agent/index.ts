@@ -21,6 +21,7 @@ export {
   createCommandBridge,
   createApprovalBridge,
   createQuestionBridge,
+  createSecretBridge,
   completeCommandRequest,
 } from "./command-bridge.ts";
 export {

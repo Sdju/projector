@@ -13,6 +13,7 @@ import AgentWelcome from "./AgentWelcome.vue";
 import AgentTurn from "./AgentTurn.vue";
 import AgentComposer from "./AgentComposer.vue";
 import AgentQuestions from "./AgentQuestions.vue";
+import AgentSecrets from "./AgentSecrets.vue";
 import AgentPermissions from "./AgentPermissions.vue";
 import AgentContextMeter from "./AgentContextMeter.vue";
 import AgentChipPreview from "./AgentChipPreview.vue";
@@ -53,6 +54,7 @@ const {
   phase,
   permissions,
   questions,
+  secrets,
   controls,
   capabilities,
   sessions,
@@ -89,6 +91,7 @@ const {
   release,
   decide,
   answer,
+  answerSecret,
 } = useAgent(props.projectId, plain.value ? undefined : agentCommandHandler(api, props.projectId), {
   backend: props.backend,
   chatId: props.chatId,
@@ -424,6 +427,7 @@ watch(
     turns.value.at(-1)?.text,
     permissions.value.length,
     questions.value.length,
+    secrets.value.length,
     turns.value
       .at(-1)
       ?.tools.map((tool) => `${tool.id}:${tool.status}:${tool.detail}`)
@@ -571,6 +575,7 @@ onBeforeUnmount(() => {
       </p>
       <AgentPermissions :permissions="permissions" @decide="decide" />
       <AgentQuestions :requests="questions" @answer="answer" />
+      <AgentSecrets :requests="secrets" @answer="answerSecret" />
       <AgentRewind
         v-if="rewinding"
         :key="rewinding.id"

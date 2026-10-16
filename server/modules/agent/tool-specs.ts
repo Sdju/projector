@@ -1,30 +1,18 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import type { CommandRequest } from "./command-bridge.ts";
+import type { CommandRequest, SecretRequest } from "./command-bridge.ts";
+import { createSecretToolSpecs } from "./secret-tools.ts";
+import { listSecretDestinations } from "./secret-destination.ts";
 import { findProjects, inspectProject, loadProjects, updateProjects } from "../projects/index.ts";
 import type { LaunchMode, Project } from "../projects/index.ts";
 
-/**
- * Provider-neutral tool definition. Backends adapt it to their own tool API
- * (AI SDK `tool`, Claude Code MCP `tool`, ...), so a new Projector capability is written once.
- */
-export interface ToolSpec {
-  name: string;
-  description: string;
-  shape: z.ZodRawShape;
-  run: (input: Record<string, unknown>) => unknown;
-}
-
-function defineSpec<S extends z.ZodRawShape>(spec: {
-  name: string;
-  description: string;
-  shape: S;
-  run: (input: z.infer<z.ZodObject<S>>) => unknown;
-}): ToolSpec {
-  return { ...spec, run: (input) => spec.run(input as z.infer<z.ZodObject<S>>) };
-}
+export type { ToolSpec } from "./tool-spec.ts";
+import { defineSpec, type ToolSpec } from "./tool-spec.ts";
 
 export interface ToolSpecContext {
+  cwd?: string;
+  /** Asks the user for a secret; absent when the client cannot show the prompt. */
+  secret?: (request: SecretRequest) => Promise<string | null>;
   onProject: (project: Project) => void;
   commands?: (request: CommandRequest) => Promise<unknown>;
 }
@@ -92,6 +80,14 @@ export function createToolSpecs(context: ToolSpecContext): ToolSpec[] {
           throw new Error("Сначала вызови describe_command");
         return commands({ operation: "execute", command, scope, args });
       },
+    }),
+    ...(context.secret ? createSecretToolSpecs({ cwd: context.cwd, secret: context.secret }) : []),
+    defineSpec({
+      name: "list_secret_destinations",
+      description:
+        "Куда можно записать секрет через request_secret: провайдеры ИИ (id, название, адрес, модель, есть ли ключ) и интеграции github/gitlab (включены, подключены). Значения секретов не возвращаются.",
+      shape: {},
+      run: async () => listSecretDestinations(),
     }),
     defineSpec({
       name: "list_projects",

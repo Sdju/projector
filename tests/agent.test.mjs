@@ -166,7 +166,21 @@ test("chat history persists on disk, validates data and separates project IDs", 
 test("HTTP agent streams discovery, description, execution, Bash and final text through its SSE client", async () => {
   const { createServer } = await import("node:http");
   const { once } = await import("node:events");
-  const { saveProviders } = await import("../server/modules/providers/index.ts");
+  const { saveProviders, useProviderVault } = await import("../server/modules/providers/index.ts");
+  const { createVault } = await import("../server/modules/secrets/index.ts");
+  // Provider keys live only in the keyring; the test keeps it in memory.
+  const keyring = new Map();
+  useProviderVault(
+    createVault(
+      {
+        available: async () => true,
+        get: async (key) => keyring.get(key.account),
+        set: async (key, _label, value) => void keyring.set(key.account, value),
+        delete: async (key) => void keyring.delete(key.account),
+      },
+      () => undefined,
+    ),
+  );
   const { handleApi } = await import("../server/app/api.ts");
   const { streamAgent } = await import("../src/modules/agent/api/client.ts");
   const directory = await mkdtemp(join(tmpdir(), "projector-agent-http-"));
