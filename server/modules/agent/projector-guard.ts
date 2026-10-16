@@ -6,6 +6,8 @@ export interface GuardOptions {
   approve?: (request: ApprovalRequest) => Promise<ApprovalAnswer>;
   /** The user chose not to be asked. */
   trusting: boolean;
+  /** `auto` mode: a model decides whether a shell command runs unasked; unsafe ones are asked. */
+  review?: (command: string) => Promise<{ safe: boolean; reason: string }>;
 }
 
 const READ_ONLY_BINARIES = new Set([
@@ -92,11 +94,13 @@ async function ask(options: GuardOptions, request: ApprovalRequest): Promise<App
 /** Asks before a command changes the user's machine; reading is let through. */
 export async function guardBash(options: GuardOptions, command: string): Promise<void> {
   if (options.trusting || isReadOnlyBash(command)) return;
+  const verdict = await options.review?.(command);
+  if (verdict?.safe) return;
   await ask(options, {
     tool: "bash",
     input: { command },
     title: "Выполнить команду в оболочке",
-    detail: command,
+    detail: verdict ? `${command}\n\nПроверка безопасности: ${verdict.reason}` : command,
   });
 }
 

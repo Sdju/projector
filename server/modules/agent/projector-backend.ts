@@ -10,12 +10,14 @@ import {
 } from "../providers/index.ts";
 import type { AgentBackend, AgentRunOptions } from "./backend.ts";
 import type { AgentControl } from "./controls.ts";
+import { createBashReviewer } from "./projector-review.ts";
 import { historyMessages, userMessage } from "./projector-history.ts";
 
 const MAX_STEPS = 24;
 /** The window of a provider's model is not reported; this is what the context ring is measured against. */
 const CONTEXT_SIZE = Number(process.env.PROJECTOR_AGENT_CONTEXT_TOKENS) || 128_000;
 const TRUST = "permission-mode";
+const MODES = new Set(["default", "auto", "bypassPermissions"]);
 
 async function run(options: AgentRunOptions): Promise<void> {
   const resolved = await resolveOpenAIProvider({
@@ -28,6 +30,7 @@ async function run(options: AgentRunOptions): Promise<void> {
   });
   const model = provider.chatModel(resolved.model || "qwen3.8-flash");
 
+  const mode = options.selection?.[TRUST] ?? options.permissionMode;
   const added: Project[] = [];
   const tools = createAgentTools({
     cwd: options.cwd,
@@ -37,7 +40,8 @@ async function run(options: AgentRunOptions): Promise<void> {
     guard: {
       cwd: options.cwd,
       approve: options.approve,
-      trusting: (options.selection?.[TRUST] ?? options.permissionMode) === "bypassPermissions",
+      trusting: mode === "bypassPermissions",
+      review: mode === "auto" ? createBashReviewer(model, options.cwd, options.abort) : undefined,
     },
     onProject: (project) => {
       added.push(project);
@@ -143,9 +147,15 @@ async function controls(selection: Record<string, string> = {}): Promise<AgentCo
       category: "mode",
       name: "Разрешения",
       description: "Когда агент спрашивает перед командами оболочки и правками в Projector",
-      current: selection[TRUST] === "bypassPermissions" ? "bypassPermissions" : "default",
+      current: MODES.has(selection[TRUST]!) ? selection[TRUST]! : "default",
       options: [
         { value: "default", name: "Спрашивать", description: "Подтверждение перед изменениями" },
+        {
+          value: "auto",
+          name: "Авто",
+          description:
+            "Безопасные команды оболочки выполняются сразу — их проверяет отдельный запрос к модели, остальное подтверждается",
+        },
         { value: "bypassPermissions", name: "Без вопросов" },
       ],
     },

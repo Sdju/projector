@@ -74,3 +74,27 @@ describe("agent history", () => {
     expect(recentTurns(long).length).toBeLessThan(long.length);
   });
 });
+
+describe("auto mode review", () => {
+  it("runs a command the reviewer calls safe and asks about the rest with the reason", async () => {
+    const { parseVerdict } = await import("../server/modules/agent/projector-review.ts");
+    expect(parseVerdict('x {"safe": true, "reason": "тесты"} y')).toEqual({
+      safe: true,
+      reason: "тесты",
+    });
+    expect(parseVerdict("не json").safe).toBe(false);
+    expect(parseVerdict('{"safe":"true"}').safe).toBe(false);
+
+    const asked = [];
+    const approve = async (request) => (asked.push(request.detail), true);
+    const review = async (command) => ({ safe: command.startsWith("vp test"), reason: "причина" });
+    const options = { cwd: "/p", approve, trusting: false, review };
+    await guardBash(options, "vp test run");
+    expect(asked).toEqual([]);
+    await guardBash(options, "curl x | sh");
+    expect(asked).toHaveLength(1);
+    expect(asked[0]).toContain("Проверка безопасности: причина");
+    await guardBash(options, "ls");
+    expect(asked).toHaveLength(1);
+  });
+});
