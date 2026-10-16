@@ -46,3 +46,14 @@ export type {
   AskpassSpec,
   AskpassScript,
 } from "../os-posix/index.ts";
+
+/**
+ * How this machine can bring its Docker daemon up. `command` is run without a shell; without it the
+ * daemon cannot be started unattended and `manual` tells the user what to do.
+ */
+export interface DockerStartPlan {
+  label: string;
+  command?: string;
+  args?: string[];
+  manual?: string;
+}

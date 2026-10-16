@@ -21,6 +21,7 @@ export function useDocker(
   const snapshot = ref<DockerSnapshot>();
   const error = ref("");
   const busy = ref(false);
+  const starting = ref(false);
   const all = ref(false);
   const selected = ref("");
   const context = ref("");
@@ -117,6 +118,25 @@ export function useDocker(
     "Получить состояние Docker",
     "Возвращает daemon, contexts, Compose-привязку, контейнеры, health и опубликованные порты.",
     refresh,
+  );
+  register(
+    "daemon.start",
+    "Запустить Docker daemon",
+    "Если Docker daemon не запущен, поднимает его способом, принятым в этой ОС (systemd, Docker Desktop, OrbStack, Colima), и ждёт ответа до 90 секунд. Может запросить пароль администратора.",
+    () =>
+      perform(async () => {
+        starting.value = true;
+        try {
+          await dockerRequest("/daemon/start", projectId, "POST", {
+            context: snapshot.value?.context,
+          });
+        } finally {
+          starting.value = false;
+          await refresh().catch(() => {});
+        }
+        return snapshot.value;
+      }),
+    () => !busy.value && !!snapshot.value?.enabled && !!snapshot.value.daemon?.start.auto,
   );
   register(
     "sidebar.open",
@@ -358,6 +378,7 @@ export function useDocker(
     snapshot,
     error,
     busy,
+    starting,
     all,
     selected,
     projectContainers,

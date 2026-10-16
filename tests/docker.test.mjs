@@ -145,6 +145,9 @@ else { console.log('OPERATION_DONE'); }
   expect(down.connected).toBe(false);
   expect(down.containers.length).toBe(0);
   expect(down.error).toMatch(/Cannot connect/);
+  expect(down.daemon?.state).toBe("stopped");
+  expect(down.daemon?.start.label).toBeTruthy();
+  expect(snapshot.daemon).toBeUndefined();
   delete process.env.PROJECTOR_TEST_DOCKER_DOWN;
   await expect(dockerAction(project, { action: "down", context: "default" })).rejects.toThrow(
     /Подтвердите/,

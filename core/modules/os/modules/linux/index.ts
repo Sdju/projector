@@ -26,6 +26,7 @@ export {
   restrictToOwner,
   restrictToOwnerSync,
 } from "./tools.ts";
+export { dockerStartPlan } from "./docker.ts";
 export { dataHome, shell, shellLaunch, desktopPaths, pickFolder } from "./directories.ts";
 export {
   focusAppWindow,

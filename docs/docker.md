@@ -2,7 +2,7 @@
 
 [Интеграции](integrations.md) · [IDE-команды](ide-commands.md)
 
-В настройках интеграций включите Docker и выберите локальный context. Нужны установленный Docker CLI, доступ к daemon и, для Compose-действий, плагин `docker compose`. Projector не меняет глобальный Docker context и не запускает daemon автоматически. Удалённые SSH/TCP contexts пока недоступны.
+В настройках интеграций включите Docker и выберите локальный context. Нужны установленный Docker CLI, доступ к daemon и, для Compose-действий, плагин `docker compose`. Projector не меняет глобальный Docker context. Если daemon не отвечает, вместо ошибки показывается кнопка «Запустить Docker» (в боковой панели, панели Docker и настройках): только по нажатию или команде `ide.docker.daemon.start`, сам он daemon не поднимает. Удалённые SSH/TCP contexts пока недоступны.
 
 В боковой панели проекта кнопка Docker показывает связанные сервисы. «Открыть» открывает обычную вкладку Docker: её можно закрыть, переместить, разделить и восстановить вместе с workspace. «Все контейнеры» показывает контейнеры выбранного context, включая не связанные с текущим проектом. Действия в этом режиме относятся к выбранному контейнеру.
 
@@ -45,6 +45,10 @@ Bash агента в доверенном проекте выполняется 
 
 Docker использует ядро хоста, поэтому такая изоляция не заменяет виртуальную машину для заведомо вредоносного кода. Дисковая квота папки проекта и общий лимит для нескольких одновременно запущенных контейнеров не установлены. Файловые ссылки и загрузка файлов через терминал пока имеют те же ограничения, что и другие Docker-терминалы.
 
+## Запуск daemon
+
+Способ зависит от системы (`os.tools.dockerStartPlan`). Linux: `systemctl --user start docker` (rootless) или `docker-desktop`, иначе системный `systemctl start docker` — от root напрямую, от пользователя через `pkexec` (появится запрос пароля), без `pkexec` показывается команда для терминала. macOS: Docker Desktop или OrbStack (`open -ga`), либо `colima start`. Windows: `Docker Desktop.exe`. Если Docker не найден, кнопка заменяется подсказкой по установке. После запуска Projector ждёт ответа daemon до 90 секунд (`POST /api/docker/daemon/start`); одновременно идёт один запуск. Для штатного агента это обычная IDE-команда `ide.docker.daemon.start`: «изменяющая», поэтому в режимах «Спрашивать» и «Авто» он сначала просит подтверждение.
+
 ## Compose
 
 Projector обнаруживает `compose.yaml`, `compose.yml`, `docker-compose.yaml`, `docker-compose.yml` в корне проекта. Сохраните явную привязку: context, Compose project name, упорядоченный список файлов, profiles и env-файлы. Пути файлов задаются относительно проекта; выход за его границы, включая symlinks, запрещён. Содержимое env-файлов не возвращается в браузер.
@@ -61,7 +65,7 @@ Projector обнаруживает `compose.yaml`, `compose.yml`, `docker-compos
 
 Настройки и привязки сохраняются через существующий integration store в `$XDG_DATA_HOME/projector/integrations.json`, атомарно и с правами `0600`. Секретные переменные контейнеров не включаются в публичный snapshot. Настройки и workspace не используют browser storage.
 
-В scope `docker:<projectId>` зарегистрированы `ide.docker.open`, `.sidebar.open`, `.status`, `.refresh`, `.context.select`, `.container.select`, `.binding.save`, `.logs.read`, `.port.open` и команды действий: `.start`, `.stop`, `.restart`, `.remove`, `.logs`, `.shell`, `.up`, `.composeStop`, `.composeRestart`, `.down`, `.build`, `.pull`. Передавайте полный `containerId`; Compose-команды принимают необязательный `service`. Удаление через SDK требует `confirm: true` либо интерактивного подтверждения. Scope `docker:settings` предоставляет `.settings.status` и `.settings.save` на странице настроек.
+В scope `docker:<projectId>` зарегистрированы `ide.docker.open`, `.sidebar.open`, `.status`, `.refresh`, `.context.select`, `.container.select`, `.binding.save`, `.logs.read`, `.daemon.start`, `.port.open` и команды действий: `.start`, `.stop`, `.restart`, `.remove`, `.logs`, `.shell`, `.up`, `.composeStop`, `.composeRestart`, `.down`, `.build`, `.pull`. Передавайте полный `containerId`; Compose-команды принимают необязательный `service`. Удаление через SDK требует `confirm: true` либо интерактивного подтверждения. Scope `docker:settings` предоставляет `.settings.status` и `.settings.save` на странице настроек.
 
 Живые проверки изоляции, портов, очистки и Dev Container с настоящим демоном: `vp run test:live` (в `vp run check` не входит).
 

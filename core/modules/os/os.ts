@@ -128,6 +128,7 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
       readOpenCodeGoKey: () => backend("readOpenCodeGoKey").readOpenCodeGoKey(),
       readCursorAccessToken: () => backend("readCursorAccessToken").readCursorAccessToken(),
       startCodexAppServer: () => backend("startCodexAppServer").startCodexAppServer(),
+      dockerStartPlan: () => backend("dockerStartPlan").dockerStartPlan(),
       runDockerSync: (args: string[]) => backend("runDockerSync").runDockerSync(args),
       runDocker: (
         args: string[],

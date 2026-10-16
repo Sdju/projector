@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DockerDaemonNotice from "./DockerDaemonNotice.vue";
 import UiTable from "../../../common/ui/UiTable.vue";
 import UiControl from "../../../common/ui/UiControl.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
@@ -11,7 +12,8 @@ import { readoutLines, useTabReadout } from "../../../common/utilities/tab-reado
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiEmpty from "../../../common/ui/UiEmpty.vue";
 import { useDockerState } from "../model.ts";
-const { snapshot, containers, current, selected, all, busy, error, commands } = useDockerState();
+const { snapshot, containers, current, selected, all, busy, starting, error, commands } =
+  useDockerState();
 const shell = ref("sh");
 const portsOf = (item: DockerContainer) =>
   item.ports.map((port) => `${port.publicPort}→${port.privatePort}/${port.protocol}`).join(", ") ||
@@ -111,15 +113,14 @@ const actions = [
         snapshot?.connected ? `Docker ${snapshot.version}` : "нет подключения"
       }}</span>
     </UiInline>
-    <UiMessage
+    <DockerDaemonNotice
       v-if="error || snapshot?.error"
-      tone="danger"
-      role="alert"
-      variant="padded"
-      flush
-      wrap
-      >{{ error || snapshot?.error }}</UiMessage
-    >
+      :message="error || snapshot?.error || ''"
+      :daemon="snapshot?.daemon"
+      :starting="starting"
+      size="sm"
+      @start="commands.run('ide.docker.daemon.start')"
+    />
     <UiEmpty v-if="!snapshot && !error">Подключение…</UiEmpty>
     <UiEmpty v-else-if="snapshot && !snapshot.enabled"
       >Docker выключен.

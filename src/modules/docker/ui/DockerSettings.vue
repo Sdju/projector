@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import UiHeading from "../../../common/ui/UiHeading.vue";
 import UiStack from "../../../common/ui/UiStack.vue";
-import UiMessage from "../../../common/ui/UiMessage.vue";
 import UiControl from "../../../common/ui/UiControl.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 
 import { onMounted, ref } from "vue";
 import type { DockerSnapshot } from "../../../../core/modules/docker/index.ts";
+import DockerDaemonNotice from "./DockerDaemonNotice.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { useCommandScope, commandArgs } from "../../../common/utilities/commands.ts";
 import { dockerRequest } from "../client.ts";
@@ -47,6 +47,26 @@ commands.scope.registerCommand({
         enabled: args.enabled ?? enabled.value,
         context: args.context ?? context.value,
       });
+      return await load();
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : "Ошибка Docker";
+      throw err;
+    } finally {
+      busy.value = false;
+    }
+  },
+});
+commands.scope.registerCommand({
+  id: "ide.docker.settings.daemonStart",
+  title: "Запустить Docker daemon",
+  description:
+    "Если daemon не запущен, поднимает его способом, принятым в этой ОС, и ждёт ответа до 90 секунд. Может запросить пароль администратора.",
+  enabled: () => !busy.value && !!snapshot.value?.enabled && !!snapshot.value.daemon?.start.auto,
+  run: async () => {
+    busy.value = true;
+    error.value = "";
+    try {
+      await dockerRequest("/daemon/start", undefined, "POST", { context: context.value });
       return await load();
     } catch (err) {
       error.value = err instanceof Error ? err.message : "Ошибка Docker";
@@ -101,9 +121,13 @@ onMounted(
       </UiInline>
     </UiStack>
     <p v-if="snapshot?.composeVersion" class="muted">Compose {{ snapshot.composeVersion }}</p>
-    <UiMessage v-if="error || snapshot?.error" tone="danger" role="alert" size="xs" wrap>{{
-      error || snapshot?.error
-    }}</UiMessage>
+    <DockerDaemonNotice
+      v-if="error || snapshot?.error"
+      :message="error || snapshot?.error || ''"
+      :daemon="snapshot?.daemon"
+      :starting="busy"
+      @start="commands.run('ide.docker.settings.daemonStart')"
+    />
   </section>
 </template>
 <style scoped>

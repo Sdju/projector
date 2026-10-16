@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import UiToolbar from "../../../common/ui/UiToolbar.vue";
 import UiScrollArea from "../../../common/ui/UiScrollArea.vue";
-import UiMessage from "../../../common/ui/UiMessage.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiEmpty from "../../../common/ui/UiEmpty.vue";
+import DockerDaemonNotice from "./DockerDaemonNotice.vue";
 import { useDockerState } from "../model.ts";
-const { snapshot, error, commands, projectContainers: containers } = useDockerState();
+const { snapshot, error, starting, commands, projectContainers: containers } = useDockerState();
 </script>
 <template>
   <UiScrollArea class="docker-sidebar" @pointerdown="commands.scope.activate()">
@@ -13,15 +13,13 @@ const { snapshot, error, commands, projectContainers: containers } = useDockerSt
       <span>{{ snapshot?.binding?.name || "Docker" }}</span
       ><UiButton size="sm" @click="commands.run('ide.docker.open')">открыть</UiButton>
     </UiToolbar>
-    <UiMessage
+    <DockerDaemonNotice
       v-if="error || snapshot?.error"
-      tone="danger"
-      role="alert"
-      variant="padded"
-      size="xs"
-      wrap
-      >{{ error || snapshot?.error }}</UiMessage
-    >
+      :message="error || snapshot?.error || ''"
+      :daemon="snapshot?.daemon"
+      :starting="starting"
+      @start="commands.run('ide.docker.daemon.start')"
+    />
     <UiEmpty v-else-if="!snapshot">Подключение…</UiEmpty>
     <UiEmpty v-else-if="!snapshot.enabled">Включите Docker в настройках интеграций.</UiEmpty>
     <UiEmpty v-else-if="!snapshot.binding">Откройте Docker и привяжите Compose к проекту.</UiEmpty>

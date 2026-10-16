@@ -1,5 +1,6 @@
 import { os } from "../../../core/modules/os/index.ts";
 import type { DockerContainer, DockerSnapshot } from "../../../core/modules/docker/index.ts";
+import { daemonState } from "./daemon.ts";
 import { dockerSettings, dockerContexts, readBinding, detectedComposeFiles } from "./settings.ts";
 
 export function containerSummary(item: any): DockerContainer {
@@ -103,6 +104,7 @@ export async function dockerSnapshot(
     result.connected = false;
     result.containers = [];
     result.error = error instanceof Error ? error.message : "Docker недоступен";
+    result.daemon = daemonState(error);
   }
   return result;
 }

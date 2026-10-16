@@ -30,6 +30,12 @@ export interface DockerContainer {
   }[];
   mounts: { type: string; source: string; target: string; writable: boolean }[];
 }
+export interface DockerDaemonState {
+  /** `missing`: no Docker CLI; `stopped`: CLI found but the daemon does not answer. */
+  state: "missing" | "stopped";
+  /** What starting it would run, or how to do it by hand when Projector cannot. */
+  start: { label: string; auto: boolean; manual?: string };
+}
 export interface DockerSnapshot {
   enabled: boolean;
   context: string;
@@ -38,6 +44,8 @@ export interface DockerSnapshot {
   version: string;
   composeVersion: string;
   error: string;
+  /** Set when the daemon is not reachable and the reason is known. */
+  daemon?: DockerDaemonState;
   containers: DockerContainer[];
   binding: DockerBinding | null;
   detectedFiles: string[];

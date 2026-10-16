@@ -4,6 +4,7 @@ import {
   bindDocker,
   dockerAction,
   dockerLogs,
+  startDockerDaemon,
 } from "../../modules/docker/index.ts";
 import { findProject } from "../../modules/projects/index.ts";
 import { HttpError } from "../../modules/http/index.ts";
@@ -32,6 +33,10 @@ export async function handleDocker({ req, res, url, method, path }: RouteContext
   } else if (path === "/api/docker/action" && method === "POST") {
     if (!project) throw new HttpError(400, "Укажите projectId");
     json(res, 201, await dockerAction(project, await readBody(req)));
+  } else if (path === "/api/docker/daemon/start" && method === "POST") {
+    const body = (await readBody(req)) as { context?: unknown };
+    if (typeof body.context !== "string") throw new HttpError(400, "Укажите Docker context");
+    json(res, 200, await startDockerDaemon(body.context));
   } else if (path === "/api/docker/logs" && method === "GET") {
     json(
       res,

@@ -4,6 +4,7 @@ export { bashShellLaunch } from "./bash.ts";
 export type {
   ProcessInfo,
   DesktopAction,
+  DockerStartPlan,
   DesktopPalette,
   ResidentOptions,
   SecretKey,
