@@ -1,4 +1,4 @@
-import { shallowRef } from "vue";
+import { onScopeDispose, shallowRef, watch } from "vue";
 
 export type NoticeKind = "success" | "error";
 export type NoticeAnchor = Element | { x: number; y: number } | null | undefined;
@@ -72,4 +72,48 @@ export async function copyWithNotice(
     notify(anchor, failure, "error");
     return false;
   }
+}
+
+export interface Toast {
+  id: number;
+  text: string;
+  /** Что можно сделать с ошибкой прямо из карточки (например, обновить данные). */
+  action?: { label: string; run: () => void };
+}
+
+/**
+ * Ошибки панелей: карточки в углу окна поверх интерфейса. Не двигают вёрстку, всегда закрываются
+ * (крестик, а со временем — сами) и при необходимости предлагают действие.
+ */
+export const toasts = shallowRef<Toast[]>([]);
+const toastTimers = new Map<number, ReturnType<typeof setTimeout>>();
+
+export function dismissToast(id: number) {
+  clearTimeout(toastTimers.get(id));
+  toastTimers.delete(id);
+  toasts.value = toasts.value.filter((toast) => toast.id !== id);
+}
+export function reportError(text: string, action?: Toast["action"], duration = 15000) {
+  // Та же ошибка не копится: её карточка заменяется и живёт заново.
+  toasts.value.filter((toast) => toast.text === text).forEach((toast) => dismissToast(toast.id));
+  const id = ++counter;
+  toasts.value = [...toasts.value.slice(-3), { id, text, action }];
+  toastTimers.set(
+    id,
+    setTimeout(() => dismissToast(id), duration),
+  );
+  return id;
+}
+/** Показывает ошибку из `source` карточкой, пока она не закрыта; сброс `source` убирает карточку. */
+export function toastErrors(source: () => string, action?: Toast["action"]) {
+  let shown = 0;
+  watch(
+    source,
+    (text) => {
+      if (shown) dismissToast(shown);
+      shown = text ? reportError(text, action) : 0;
+    },
+    { immediate: true },
+  );
+  onScopeDispose(() => shown && dismissToast(shown));
 }

@@ -2,7 +2,7 @@
 import UiControl from "../../../../../common/ui/UiControl.vue";
 import UiInline from "../../../../../common/ui/UiInline.vue";
 import UiMessage from "../../../../../common/ui/UiMessage.vue";
-import { copyWithNotice } from "../../../../../common/utilities/notice.ts";
+import { copyWithNotice, toastErrors } from "../../../../../common/utilities/notice.ts";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useDebounceFn } from "@vueuse/core";
 import { layoutGraph } from "../../../../../../core/modules/workspace/index.ts";
@@ -36,6 +36,7 @@ const target = defineModel<{ hash: string; path: string }>("target", {
 });
 const open = defineModel<boolean>("open", { default: false });
 const { log, commits, query, all, loading, loadingMore, error, details } = props.history;
+toastErrors(() => error.value);
 const expanded = ref(new Set<string>());
 const search = ref(query.value);
 const menu = ref<InstanceType<typeof ContextMenu>>();
@@ -240,11 +241,8 @@ watch(commits, (list) => {
       <UiMessage v-if="log.upstream" class="note" tone="muted" size="xs" flush>
         {{ log.upstream }}<template v-if="!log.ahead && !log.behind"> · синхронизировано</template>
       </UiMessage>
-      <UiMessage v-if="error" class="note" tone="danger" size="xs" flush role="alert">{{
-        error
-      }}</UiMessage>
       <UiMessage
-        v-else-if="loading && !commits.length"
+        v-if="loading && !commits.length"
         class="note"
         tone="muted"
         size="xs"

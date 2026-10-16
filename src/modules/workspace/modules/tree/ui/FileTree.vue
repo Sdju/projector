@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { toastErrors } from "../../../../../common/utilities/notice.ts";
 import UiActionRow from "../../../../../common/ui/UiActionRow.vue";
 import {
   computed,
@@ -166,6 +167,9 @@ const { entries, total, nextOffset, loading, error } = useTreeListing(props, pag
   selection.relocate(path),
 );
 const { resolver, error: themeError } = useFileIconTheme();
+toastErrors(() => (props.depth === 0 ? moveError.value : ""));
+toastErrors(() => error.value);
+toastErrors(() => (props.depth === 0 ? themeError.value : ""));
 const rows = computed(() =>
   entries.value.map((entry) => ({
     entry,
@@ -262,10 +266,7 @@ defineExpose({ reveal });
         >Отменить</UiActionRow
       >
     </li>
-    <li v-if="depth === 0 && moveError" class="notice error" role="alert">{{ moveError }}</li>
     <li v-if="depth === 0 && message" class="notice" role="status">{{ message }}</li>
-    <li v-if="error" class="notice error" role="alert">{{ error }}</li>
-    <li v-if="depth === 0 && themeError" class="notice error" role="status">{{ themeError }}</li>
     <li v-for="{ entry, icon, decoration } in rows" :key="entry.path" role="none">
       <UiActionRow
         interaction="item"
@@ -446,9 +447,6 @@ button.git-changed.selected {
 .remaining {
   color: var(--faint);
   font-size: var(--fs-2xs);
-}
-.error {
-  color: var(--err);
 }
 @media (max-width: 700px) {
   button {

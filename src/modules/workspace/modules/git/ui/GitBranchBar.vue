@@ -8,6 +8,7 @@ import EntryDialog from "../../../../../common/ui/EntryDialog.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import type { ContextMenuItem } from "../../../../../common/ui/context-menu.ts";
 import { type useCommandScope } from "../../../../../common/utilities/commands.ts";
+import { toastErrors } from "../../../../../common/utilities/notice.ts";
 import { relativeTime } from "../../../../../common/utilities/commit-format.ts";
 import { registerBranchCommands } from "../lib/branch-commands.ts";
 import type { GitBranchesState } from "../lib/git-branches.ts";
@@ -31,6 +32,7 @@ const props = defineProps<{
 const open = defineModel<boolean>("open", { default: false });
 const target = defineModel<string>("target", { default: "" });
 const { state, error, loading } = props.branches;
+toastErrors(() => error.value);
 const filter = ref("");
 const menu = ref<InstanceType<typeof ContextMenu>>();
 const dialog = ref<InstanceType<typeof EntryDialog>>();
@@ -158,11 +160,8 @@ watch(open, (value) => {
         aria-label="Найти ветку"
         @keydown.stop
       />
-      <UiMessage v-if="error" class="note" tone="danger" size="xs" flush role="alert">{{
-        error
-      }}</UiMessage>
       <UiMessage
-        v-else-if="loading && !state.branches.length"
+        v-if="loading && !state.branches.length"
         class="note"
         tone="muted"
         size="xs"
@@ -170,7 +169,7 @@ watch(open, (value) => {
         role="status"
         >загрузка…</UiMessage
       >
-      <UiMessage v-else-if="!visible.length" class="note" tone="muted" size="xs" flush
+      <UiMessage v-else-if="!visible.length && !error" class="note" tone="muted" size="xs" flush
         >Веток нет.</UiMessage
       >
       <template v-for="group in visible" :key="group.label">

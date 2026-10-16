@@ -4,6 +4,7 @@ import { computed, ref } from "vue";
 import ContextMenu from "../../../../../common/ui/ContextMenu.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import type { ContextMenuItem } from "../../../../../common/ui/context-menu.ts";
+import { toastErrors } from "../../../../../common/utilities/notice.ts";
 import { commandArgs, useCommandScope } from "../../../../../common/utilities/commands.ts";
 import type { GitOverviewState } from "../lib/git-overview.ts";
 import type { GitBranchesState } from "../lib/git-branches.ts";
@@ -38,6 +39,7 @@ const emit = defineEmits<{
   openCommitDiff: [hash: string, path: string, pinned?: boolean];
 }>();
 const { git, error: gitError, loading: gitLoading, load } = props.overview;
+toastErrors(() => gitError.value, { label: "Обновить", run: () => void load() });
 const gitBusy = ref(false);
 /** Свёрнутые блоки изменений: ключ группы — `staged` или `changed`. */
 const collapsedGroups = ref(new Set<string>());
@@ -159,11 +161,12 @@ defineExpose({
       :reload="load"
     />
     <p v-if="gitLoading" class="notice" role="status">загрузка Git…</p>
-    <p v-if="gitError" class="notice error" role="alert">{{ gitError }}</p>
-    <p v-else-if="!gitLoading && !git.available" class="notice">
+    <p v-if="!gitLoading && !gitError && !git.available" class="notice">
       В этой папке нет Git-репозитория.
     </p>
-    <p v-else-if="writable && !gitLoading && !git.changes.length" class="notice">Нет изменений.</p>
+    <p v-else-if="writable && !gitLoading && !gitError && !git.changes.length" class="notice">
+      Нет изменений.
+    </p>
     <div v-if="git.available" ref="stack" class="git-stack">
       <div v-if="writable" class="changes-zone">
         <template
@@ -320,9 +323,6 @@ defineExpose({
   padding: 0 var(--sp-3);
   color: var(--muted);
   font-size: var(--fs-xs);
-}
-.error {
-  color: var(--err);
 }
 h3 {
   padding: 10px 12px 4px;

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import UiPopupSurface from "./UiPopupSurface.vue";
-import { dismissNotice, notices, type Notice } from "../utilities/notice.ts";
+import { dismissNotice, dismissToast, notices, toasts, type Notice } from "../utilities/notice.ts";
 import IconCheck from "~icons/lucide/check";
 import IconAlert from "~icons/lucide/circle-alert";
+import IconClose from "~icons/lucide/x";
 
 /** Слой информационных тултипов (см. utilities/notice.ts). */
 const GAP = 8;
@@ -37,6 +38,32 @@ function place(notice: Notice) {
         <IconAlert v-else aria-hidden="true" />
         <span>{{ notice.text }}</span>
       </UiPopupSurface>
+    </div>
+    <div class="toast-layer" role="region" aria-label="Ошибки">
+      <div v-for="toast in toasts" :key="toast.id" class="toast" role="alert">
+        <IconAlert aria-hidden="true" />
+        <span class="toast-text">{{ toast.text }}</span>
+        <button
+          v-if="toast.action"
+          type="button"
+          class="toast-action"
+          @click="
+            toast.action.run();
+            dismissToast(toast.id);
+          "
+        >
+          {{ toast.action.label }}
+        </button>
+        <button
+          type="button"
+          class="toast-close"
+          aria-label="Закрыть"
+          title="Закрыть"
+          @click="dismissToast(toast.id)"
+        >
+          <IconClose aria-hidden="true" />
+        </button>
+      </div>
     </div>
   </Teleport>
 </template>
@@ -101,6 +128,70 @@ function place(notice: Notice) {
 .notice.error::after {
   border-color: var(--err);
 }
+.toast-layer {
+  position: fixed;
+  right: var(--sp-4);
+  bottom: 40px;
+  z-index: calc(var(--z-popover) + 10);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  width: min(380px, calc(100vw - 2 * var(--sp-4)));
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
+  border: 1px solid var(--err);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  box-shadow: var(--shadow-pop, 0 4px 16px rgb(0 0 0 / 0.3));
+  color: var(--text);
+  font-size: var(--fs-xs);
+  line-height: var(--lh);
+  pointer-events: auto;
+  animation: notice-in var(--t-base);
+}
+.toast > svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  color: var(--err);
+}
+.toast-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.toast-action,
+.toast-close {
+  flex: none;
+  border-radius: var(--r-sm);
+  color: var(--muted);
+}
+.toast-action {
+  padding: 0 var(--sp-2);
+  color: var(--text);
+  text-decoration: underline;
+}
+.toast-close {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+}
+.toast-close svg {
+  width: 12px;
+  height: 12px;
+}
+.toast-action:hover,
+.toast-close:hover {
+  background: var(--hover);
+  color: var(--text);
+}
 @keyframes notice-in {
   from {
     opacity: 0;
@@ -108,7 +199,8 @@ function place(notice: Notice) {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .notice {
+  .notice,
+  .toast {
     animation: none;
   }
 }
