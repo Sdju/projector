@@ -6,8 +6,6 @@ import { join } from "node:path";
 import { os } from "../../../core/modules/os/index.ts";
 import { HttpError } from "../http/index.ts";
 
-const exec = promisify(execFile);
-
 export interface HttpsCredentials {
   /** HTTPS user name the host expects together with the token. */
   username: string;
@@ -30,7 +28,8 @@ export async function cloneOverHttps(
     const script = os.tools.gitAskpass(credentials);
     const askpass = join(helper, script.filename);
     await writeFile(askpass, script.contents, { mode: 0o700 });
-    await exec(
+    // Resolved per call, so a `child_process` replacement installed after import still applies.
+    await promisify(execFile)(
       "git",
       [
         "-c",
