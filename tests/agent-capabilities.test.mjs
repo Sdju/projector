@@ -4,8 +4,8 @@ import { useExternalAgent } from "../src/modules/agent/model/external.ts";
 import { useChatActions } from "../src/modules/agent/model/chat-actions.ts";
 import { registerAgentCommands } from "../src/modules/agent/model/agent-commands.ts";
 import { registerChat } from "../src/modules/agent/model/chat-registry.ts";
-import { agentCapabilities, agentControls } from "../server/modules/agent/agent.ts";
-import { claudeCodeBackend } from "../server/modules/agent/claude-code-backend.ts";
+import { agentCapabilities, agentControls } from "../server/modules/agent/registry.ts";
+import { claudeCodeBackend } from "../server/modules/agents/claude-code/claude-code-backend.ts";
 
 test("permission policy is the same control for the UI and IDE commands and is saved", async () => {
   const offered = await agentControls("claude-code", "/tmp");

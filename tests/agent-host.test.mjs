@@ -56,7 +56,7 @@ test("an agent run survives its server and is rejoined with the whole answer rep
     const { createRun } = await import("../server/modules/agent/agent-runs.ts");
     const { startHosted, attachHosted } = await import("../server/modules/agent/hosted-process.ts");
     const { createAcpConnection, NO_TIMEOUT } =
-      await import("../server/modules/agent/acp-client.ts");
+      await import("../server/modules/agents/acp/acp-client.ts");
     const { os } = await import("../core/modules/os/index.ts");
 
     const script = join(directory, "fake-agent.cjs");
@@ -166,7 +166,7 @@ test("stopping a hosted run kills the agent and everything it started", async ()
   try {
     const { createRun } = await import("../server/modules/agent/agent-runs.ts");
     const { startHosted } = await import("../server/modules/agent/hosted-process.ts");
-    const { createAcpConnection } = await import("../server/modules/agent/acp-client.ts");
+    const { createAcpConnection } = await import("../server/modules/agents/acp/acp-client.ts");
     const { os } = await import("../core/modules/os/index.ts");
     const runId = await createRun({ backend: "codex", message: "hi", history: [] });
     const child = await startHosted(runId, {

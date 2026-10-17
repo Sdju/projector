@@ -17,8 +17,11 @@ import {
   completeCommandRequest,
   createSecretBridge,
 } from "../server/modules/agent/command-bridge.ts";
-import { createToolSpecs } from "../server/modules/agent/tool-specs.ts";
-import { resolveEnvTarget, writeEnvSecret } from "../server/modules/agent/secret-destination.ts";
+import { createToolSpecs } from "../server/modules/agents/projector/tool-specs.ts";
+import {
+  resolveEnvTarget,
+  writeEnvSecret,
+} from "../server/modules/agents/projector/secrets/secret-destination.ts";
 
 async function project() {
   const root = await mkdtemp(join(tmpdir(), "projector-secret-"));

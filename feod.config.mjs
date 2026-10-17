@@ -85,7 +85,7 @@ export default {
     server: {
       layers: backendLayers,
       dependencies: ["core"],
-      transitModules: ["agents-integration"],
+      transitModules: ["agents-integration", "agents"],
     },
     native: { dependencies: ["core"] },
     core: {

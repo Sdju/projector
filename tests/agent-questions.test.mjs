@@ -3,7 +3,8 @@ import {
   completeCommandRequest,
   createQuestionBridge,
 } from "../server/modules/agent/command-bridge.ts";
-import { askClaudeQuestions, askCursorQuestions } from "../server/modules/agent/questions.ts";
+import { askClaudeQuestions } from "../server/modules/agents/claude-code/questions.ts";
+import { askCursorQuestions } from "../server/modules/agents/cursor/questions.ts";
 
 const claudeInput = {
   questions: [
@@ -117,7 +118,7 @@ test("the question bridge delivers the answers of the page and null for a skip",
 });
 
 test("an OpenCode question form is shown as questions and answered with choices and own words", async () => {
-  const { elicitForm } = await import("../server/modules/agent/acp-elicitation.ts");
+  const { elicitForm } = await import("../server/modules/agents/acp/acp-elicitation.ts");
   const params = {
     mode: "form",
     message: "Questions",
@@ -172,7 +173,7 @@ test("an OpenCode question form is shown as questions and answered with choices 
 });
 
 test("a Codex user-input form keeps its note field and 'none of the above' fallback", async () => {
-  const { elicitForm } = await import("../server/modules/agent/acp-elicitation.ts");
+  const { elicitForm } = await import("../server/modules/agents/acp/acp-elicitation.ts");
   const params = {
     mode: "form",
     message: "Codex needs your input to continue.",
@@ -224,14 +225,16 @@ test("a question an ACP agent asks reaches the user through runAgent and the ans
   const { tmpdir } = await import("node:os");
   const { join } = await import("node:path");
   const { fileURLToPath } = await import("node:url");
-  const { ACP_PROGRAMS } = await import("../server/modules/agent/acp-programs.ts");
+  const { acpProgram, registerAcpProgram } =
+    await import("../server/modules/agents/acp/acp-programs.ts");
   const { runAgent } = await import("../server/modules/agent/index.ts");
   const fake = fileURLToPath(new URL("./fixtures/fake-acp-asker.mjs", import.meta.url));
   const cwd = await mkdtemp(join(tmpdir(), "projector-ask-"));
-  const saved = { ...ACP_PROGRAMS };
+  const saved = { cursor: acpProgram("cursor"), opencode: acpProgram("opencode") };
   const run = async (backend, kind, answers) => {
     process.env.FAKE_ACP_ASK = kind;
-    ACP_PROGRAMS[backend] = { label: "Fake", command: process.execPath, args: [fake] };
+    // The fake agent keeps the real program's extensions and dialect; only the command changes.
+    registerAcpProgram({ ...saved[backend], command: process.execPath, args: [fake] });
     const asked = [];
     const events = [];
     await runAgent({
@@ -264,7 +267,7 @@ test("a question an ACP agent asks reaches the user through runAgent and the ans
     expect(JSON.parse(form.text)).toEqual({ action: "accept", content: { q0_custom: "teal" } });
   } finally {
     delete process.env.FAKE_ACP_ASK;
-    Object.assign(ACP_PROGRAMS, saved);
+    for (const program of Object.values(saved)) registerAcpProgram(program);
     await rm(cwd, { recursive: true, force: true });
   }
 });

@@ -9,6 +9,7 @@ import { openLauncher, startTray } from "../modules/window/index.ts";
 import type { ServerMode } from "../../core/modules/server-mode/index.ts";
 import { attachTerminalServer } from "../modules/terminal/index.ts";
 import { pruneRuns } from "../modules/agent/index.ts";
+import { registerBuiltinAgents } from "./agents.ts";
 import { reconcileOnStartup } from "../modules/environments/index.ts";
 
 import {
@@ -40,6 +41,8 @@ function bindHooks(): void {
 
 /** Общая часть dev, preview и standalone: режим, сокеты терминалов, запись instance, окно. */
 export function bindRuntime(httpServer: HttpServer | null, mode: ServerMode): void {
+  // Регистрация при вызове, а не при импорте: импорт конфига Vite не должен трогать агентов.
+  registerBuiltinAgents();
   // Сервер, запущенный из сессии Claude Code, иначе передаёт её метки каждому терминалу и агенту.
   clearAgentSession();
   runtime.projectorRuntimeMode = mode;

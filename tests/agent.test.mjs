@@ -8,7 +8,7 @@ import {
   readAgentHistory,
   writeAgentHistory,
 } from "../server/modules/agent/index.ts";
-import { createAgentTools } from "../server/modules/agent/agent-tools.ts";
+import { createAgentTools } from "../server/modules/agents/projector/agent-tools.ts";
 import { createCommandService } from "../core/modules/ide/index.ts";
 import { agentCommandHandler } from "../src/modules/agent/model/commands.ts";
 import { os } from "../core/modules/os/index.ts";
@@ -333,7 +333,8 @@ test("approval bridge resolves only an explicit allow and cancels with the reque
 });
 
 test("Claude Code messages become the shared chat events", async () => {
-  const { createClaudeEventMapper } = await import("../server/modules/agent/claude-code-events.ts");
+  const { createClaudeEventMapper } =
+    await import("../server/modules/agents/claude-code/claude-code-events.ts");
   const events = [];
   const mapper = createClaudeEventMapper((event, data) => events.push([event, data]));
   const stream = (event, parent = null) => ({
@@ -425,7 +426,7 @@ test("Claude Code messages become the shared chat events", async () => {
 });
 
 test("ACP session updates become the shared chat events", async () => {
-  const { createAcpEventMapper } = await import("../server/modules/agent/acp-events.ts");
+  const { createAcpEventMapper } = await import("../server/modules/agents/acp/acp-events.ts");
   const events = [];
   const mapper = createAcpEventMapper((event, data) => events.push([event, data]), "OpenCode");
   mapper.handleUpdate("s1", {
@@ -485,7 +486,7 @@ test("ACP session updates become the shared chat events", async () => {
 
 test("ACP client frames JSON-RPC over a real child process", async () => {
   const { spawn } = await import("node:child_process");
-  const { createAcpConnection } = await import("../server/modules/agent/acp-client.ts");
+  const { createAcpConnection } = await import("../server/modules/agents/acp/acp-client.ts");
   const script = `
     const readline = require("node:readline");
     const rl = readline.createInterface({ input: process.stdin });
@@ -530,7 +531,7 @@ test("ACP client frames JSON-RPC over a real child process", async () => {
 test("stopping an agent kills its whole process tree", async () => {
   if (process.platform === "win32") return;
   const { os } = await import("../core/modules/os/index.ts");
-  const { createAcpConnection } = await import("../server/modules/agent/acp-client.ts");
+  const { createAcpConnection } = await import("../server/modules/agents/acp/acp-client.ts");
   const child = os.tools.spawnAgentProcess({
     command: process.execPath,
     args: [
@@ -550,7 +551,7 @@ test("stopping an agent kills its whole process tree", async () => {
 
 test("ACP permission prefers one-time options and previews the change", async () => {
   const { decidePermission, toolCallDetail } =
-    await import("../server/modules/agent/acp-backend.ts");
+    await import("../server/modules/agents/acp/acp-backend.ts");
   const capture = (answer) => {
     const state = { request: undefined };
     return {
@@ -617,7 +618,7 @@ test("approval bridge turns an always answer into a durable choice", async () =>
 });
 
 test("ACP resume keeps the requested session, replays history only on a fresh one", async () => {
-  const { openSession } = await import("../server/modules/agent/acp-backend.ts");
+  const { openSession } = await import("../server/modules/agents/acp/acp-backend.ts");
   const calls = [];
   const replay = [];
   const loading = {
@@ -646,7 +647,7 @@ test("ACP resume keeps the requested session, replays history only on a fresh on
 });
 
 test("ACP session open does not mask real failures as a missing session", async () => {
-  const { openSession } = await import("../server/modules/agent/acp-backend.ts");
+  const { openSession } = await import("../server/modules/agents/acp/acp-backend.ts");
   const options = { sessionId: "old-1", cwd: "/tmp" };
 
   // No loadSession capability: go straight to a fresh session without trying to load.
@@ -692,7 +693,8 @@ test("ACP session open does not mask real failures as a missing session", async 
 
 test("ACP client times out silent requests but not when disabled", async () => {
   const { spawn } = await import("node:child_process");
-  const { createAcpConnection, NO_TIMEOUT } = await import("../server/modules/agent/acp-client.ts");
+  const { createAcpConnection, NO_TIMEOUT } =
+    await import("../server/modules/agents/acp/acp-client.ts");
   const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
     stdio: ["pipe", "pipe", "pipe"],
   });
@@ -798,7 +800,7 @@ const codexSession = {
 };
 
 test("ACP controls: model, effort, mode first; config options win over the legacy lists", async () => {
-  const { controlsFromSession } = await import("../server/modules/agent/acp-controls.ts");
+  const { controlsFromSession } = await import("../server/modules/agents/acp/acp-controls.ts");
   const controls = controlsFromSession(codexSession);
   expect(controls.map((control) => [control.id, control.category])).toStrictEqual([
     ["model", "model"],
@@ -824,7 +826,7 @@ test("ACP controls: model, effort, mode first; config options win over the legac
 
 test("ACP selection is applied in order, re-reads dependent options and skips refusals", async () => {
   const { applySelection, controlsFromSession } =
-    await import("../server/modules/agent/acp-controls.ts");
+    await import("../server/modules/agents/acp/acp-controls.ts");
   const calls = [];
   let state = codexSession.configOptions;
   const connection = {
@@ -879,7 +881,7 @@ test("ACP selection is applied in order, re-reads dependent options and skips re
 });
 
 test("ACP replay rebuilds the chat from a loaded session", async () => {
-  const { createAcpReplayCollector } = await import("../server/modules/agent/acp-events.ts");
+  const { createAcpReplayCollector } = await import("../server/modules/agents/acp/acp-events.ts");
   const replay = createAcpReplayCollector("opencode", "ses_1");
   const chunk = (sessionUpdate, text) => ({ sessionUpdate, content: { type: "text", text } });
   replay.handleUpdate(chunk("user_message_chunk", "Создай "));
@@ -939,12 +941,12 @@ test("agent choices are stored per backend and validated", async () => {
 });
 
 test("the codex npx fallback is pinned to a version", async () => {
-  const { ACP_PROGRAMS } = await import("../server/modules/agent/acp-programs.ts");
-  expect(ACP_PROGRAMS.codex.args.at(-1)).toMatch(/^@agentclientprotocol\/codex-acp@\d+\.\d+\.\d+$/);
+  const { codexProgram } = await import("../server/modules/agents/codex/index.ts");
+  expect(codexProgram.args.at(-1)).toMatch(/^@agentclientprotocol\/codex-acp@\d+\.\d+\.\d+$/);
 });
 
 test("ACP authenticates once when the agent refuses a session", async () => {
-  const { openSession } = await import("../server/modules/agent/acp-backend.ts");
+  const { openSession } = await import("../server/modules/agents/acp/acp-backend.ts");
   const calls = [];
   let authenticated = false;
   const connection = {

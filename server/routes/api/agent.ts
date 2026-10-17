@@ -6,8 +6,7 @@ import {
 } from "../../modules/preferences/index.ts";
 import { loadProjects } from "../../modules/projects/index.ts";
 import {
-  AGENT_BACKEND_IDS,
-  AGENT_PERMISSION_MODES,
+  resolveAgentBackend,
   agentCommands,
   agentControls,
   agentCapabilities,
@@ -30,7 +29,7 @@ import {
   removeRun,
   schedulePrune,
   trackRun,
-  HOSTED_AGENT_BACKENDS,
+  isHostedAgent,
   createWorktree,
   injectMessage,
   worktreeCwd,
@@ -223,7 +222,7 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
       commandBridge: body.commandBridge === true,
     };
     const backend = request.backend;
-    const hosted = HOSTED_AGENT_BACKENDS.includes(backend);
+    const hosted = isHostedAgent(backend);
     const run = hosted
       ? { id: attachId || (await createRun(request)), attach: !!attachId }
       : undefined;
@@ -355,8 +354,8 @@ async function requestFrom(body: Record<string, unknown>) {
     message,
     parts: partsFrom(body.parts),
     history,
-    backend: AGENT_BACKEND_IDS.find((id) => id === body.backend) ?? "projector",
-    permissionMode: AGENT_PERMISSION_MODES.find((mode) => mode === body.permissionMode),
+    backend: resolveAgentBackend(body.backend),
+    permissionMode: asString(body.permissionMode) || undefined,
     selection: selectionFrom(body.selection),
     sessionId: asString(body.sessionId) || undefined,
     messageId: asString(body.messageId) || undefined,

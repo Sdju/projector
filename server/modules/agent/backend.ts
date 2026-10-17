@@ -1,5 +1,10 @@
+/** The permission policy of the chat; each backend defines its own values. */
+export type AgentPermissionMode = string;
+
 /** Operations and context policy published by the running backend adapter. */
 export interface AgentCapabilities {
+  /** The run is held by its own host process, so a server restart or hot reload does not stop it. */
+  hosted?: boolean;
   inject?: boolean;
   branchSession?: boolean;
   rewindFiles?: boolean;
@@ -46,38 +51,8 @@ export type AgentEventName =
 
 export type AgentEmitter = (event: AgentEventName, data: unknown) => void;
 
-/** Which agent serves the chat: the Projector IDE assistant or a plain external coding agent. */
-export type AgentBackendId = "projector" | "claude-code" | "codex" | "opencode" | "cursor";
-
-export const AGENT_BACKEND_IDS: readonly AgentBackendId[] = [
-  "projector",
-  "claude-code",
-  "codex",
-  "opencode",
-  "cursor",
-];
-
-/**
- * Agents whose run is held by its own host process, which survives a server restart or a hot
- * reload: ACP agents, and Claude Code through its runner (`claude-runner.ts`).
- */
-export const HOSTED_AGENT_BACKENDS: readonly AgentBackendId[] = [
-  "claude-code",
-  "codex",
-  "opencode",
-  "cursor",
-];
-
-/** Claude Code permission policy: `default` asks in the chat before edits and shell commands. */
-export type AgentPermissionMode = "default" | "plan" | "acceptEdits" | "auto" | "bypassPermissions";
-
-export const AGENT_PERMISSION_MODES: readonly AgentPermissionMode[] = [
-  "default",
-  "plan",
-  "acceptEdits",
-  "auto",
-  "bypassPermissions",
-];
+/** Which agent serves the chat: the id a backend registered with (see `registry.ts`). */
+export type AgentBackendId = string;
 
 /** A run whose agent process lives outside the server, so a server restart can rejoin it. */
 export interface AgentRunHandle {
@@ -136,7 +111,8 @@ export interface AgentRunOptions {
 /**
  * One way of running the chat agent. A backend streams the shared SSE events (`text`, `tool`,
  * `tool-result`, ...) so the client stays agent-agnostic. To add an agent, extend `AgentBackendId`,
- * implement a backend and register it in `agent.ts`.
+ * implement a backend in its own module under `server/modules/agents/` and register it in
+ * `server/app/agents.ts`.
  */
 export interface AgentBackend {
   id: AgentBackendId;

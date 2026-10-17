@@ -3,6 +3,8 @@ import { mkdtempSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, vi } from "vite-plus/test";
+// The agents the server offers are registered at startup; tests run against the same set.
+import "../server/app/agents.ts";
 
 // Windows runners hand out 8.3 names (RUNNER~1); the server resolves real paths, so tests must too.
 if (process.platform === "win32")

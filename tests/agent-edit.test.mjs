@@ -5,7 +5,10 @@ import { join } from "node:path";
 import { createState } from "../src/modules/agent/model/chat-state.ts";
 import { useChatActions } from "../src/modules/agent/model/chat-actions.ts";
 import { addVersion } from "../src/modules/agent/model/branches.ts";
-import { configuredMcpServers, projectMcpServers } from "../server/modules/agent/mcp-config.ts";
+import {
+  configuredMcpServers,
+  projectMcpServers,
+} from "../server/modules/agents/acp/mcp-config.ts";
 
 const turn = (id, role, extra = {}) => ({ id, role, text: id, tools: [], ...extra });
 
