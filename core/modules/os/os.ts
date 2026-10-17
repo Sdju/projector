@@ -124,7 +124,6 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
       agentHostAddress: (dir: string) => backend("agentHostAddress").agentHostAddress(dir),
       spawnAgentHost: (spec: AgentHostSpec) => backend("spawnAgentHost").spawnAgentHost(spec),
       killAgentTree: (pid: number) => backend("killAgentTree").killAgentTree(pid),
-      readClaudeAccessToken: () => backend("readClaudeAccessToken").readClaudeAccessToken(),
       readOpenCodeGoKey: () => backend("readOpenCodeGoKey").readOpenCodeGoKey(),
       readCursorAccessToken: () => backend("readCursorAccessToken").readCursorAccessToken(),
       startCodexAppServer: () => backend("startCodexAppServer").startCodexAppServer(),

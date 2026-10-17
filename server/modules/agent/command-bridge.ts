@@ -184,9 +184,29 @@ export function createSecretBridge(
   };
 }
 
+/**
+ * Requests asked by a run held outside this server (its own process): the answer goes back to that
+ * process, which keeps the request open. Registered by whichever server is attached to the run.
+ */
+const relayed = new Map<string, (result: BridgeResult) => void>();
+
+export function relayRequest(id: string, deliver: (result: BridgeResult) => void): void {
+  relayed.set(id, deliver);
+}
+
+export function unrelayRequests(ids: Iterable<string>): void {
+  for (const id of ids) relayed.delete(id);
+}
+
 export function completeCommandRequest(id: string, result: BridgeResult): boolean {
   const finish = pending.get(id);
-  if (!finish) return false;
+  if (!finish) {
+    const deliver = relayed.get(id);
+    if (!deliver) return false;
+    relayed.delete(id);
+    deliver(result);
+    return true;
+  }
   finish(result);
   return true;
 }

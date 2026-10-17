@@ -216,7 +216,12 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
       return true;
     }
     const created = stored ? undefined : await requestFrom(body);
-    const request = stored ?? created!.request;
+    // What the client can show is stored with the run: a runner that outlives this request needs it.
+    const request = stored ?? {
+      ...created!.request,
+      approvals: body.approvals === true,
+      commandBridge: body.commandBridge === true,
+    };
     const backend = request.backend;
     const hosted = HOSTED_AGENT_BACKENDS.includes(backend);
     const run = hosted

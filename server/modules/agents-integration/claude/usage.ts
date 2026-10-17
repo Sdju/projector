@@ -3,7 +3,7 @@ import type {
   ClaudeUsage,
   ClaudeUsageWindow,
 } from "../../../../core/modules/agents-integration/claude/index.ts";
-import { ClaudeUsageError, readClaudeUsage } from "./client.ts";
+import { readClaudeUsage } from "./client.ts";
 
 const record = (value: unknown): Record<string, unknown> | null =>
   value !== null && typeof value === "object" && !Array.isArray(value)
@@ -29,18 +29,17 @@ export function claudeWindows(payload: unknown): ClaudeUsage["windows"] {
 }
 
 const globalState = globalThis as typeof globalThis & {
-  projectorClaudeUsage?: { value?: ClaudeUsage; pending?: Promise<ClaudeUsage>; throttles: number };
+  projectorClaudeUsage?: { value?: ClaudeUsage; pending?: Promise<ClaudeUsage> };
 };
-const state = (globalState.projectorClaudeUsage ??= { throttles: 0 });
+const state = (globalState.projectorClaudeUsage ??= {});
 const interval = 5 * 60000;
 
-/** Cache for all tabs and HMR; throttle failures defer even concurrent callers. */
+/** Cache for all tabs and HMR: one Claude Code query per interval, however many tabs ask. */
 export const claudeUsage = createUsageCache(
   state,
   async (): Promise<ClaudeUsage> => {
     try {
       const windows = claudeWindows(await readClaudeUsage());
-      state.throttles = 0;
       const checkedAt = Date.now();
       return {
         status: windows ? "ready" : "unavailable",
@@ -50,20 +49,12 @@ export const claudeUsage = createUsageCache(
         message: windows ? null : "Лимиты подписки Claude Code недоступны",
       };
     } catch (error) {
-      let delay = interval;
-      if (error instanceof ClaudeUsageError && error.retryAfterMs !== null) {
-        state.throttles = Math.min(state.throttles + 1, 4);
-        delay = Math.max(
-          Math.min(interval * 2 ** (state.throttles - 1), 30 * 60000),
-          error.retryAfterMs,
-        );
-      } else state.throttles = 0;
       const checkedAt = Date.now();
       return {
         status: "unavailable",
         windows: null,
         checkedAt,
-        nextCheckAt: checkedAt + delay,
+        nextCheckAt: checkedAt + interval,
         message: error instanceof Error ? error.message : "Claude Code недоступен",
       };
     }

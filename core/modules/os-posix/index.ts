@@ -1,7 +1,6 @@
 export * from "./tools.ts";
 export { gitAskpass, publishDirectory, removeAgentHostAddress } from "./git.ts";
 export { startCodexAppServer } from "./codex.ts";
-export { readClaudeAccessToken } from "./claude.ts";
 export { readOpenCodeGoKey } from "./opencode.ts";
 export { readCursorAccessToken } from "./cursor.ts";
 export {

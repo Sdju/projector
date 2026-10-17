@@ -57,8 +57,16 @@ export const AGENT_BACKEND_IDS: readonly AgentBackendId[] = [
   "cursor",
 ];
 
-/** Agents driven over ACP: their process is held by a host that survives a server restart. */
-export const HOSTED_AGENT_BACKENDS: readonly AgentBackendId[] = ["codex", "opencode", "cursor"];
+/**
+ * Agents whose run is held by its own host process, which survives a server restart or a hot
+ * reload: ACP agents, and Claude Code through its runner (`claude-runner.ts`).
+ */
+export const HOSTED_AGENT_BACKENDS: readonly AgentBackendId[] = [
+  "claude-code",
+  "codex",
+  "opencode",
+  "cursor",
+];
 
 /** Claude Code permission policy: `default` asks in the chat before edits and shell commands. */
 export type AgentPermissionMode = "default" | "plan" | "acceptEdits" | "auto" | "bypassPermissions";

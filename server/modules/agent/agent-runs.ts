@@ -20,6 +20,10 @@ export interface AgentRunRecord {
   selection?: AgentSelection;
   permissionMode?: AgentPermissionMode;
   providerId?: string;
+  /** The client can show permission and question prompts (its answers come back to the run). */
+  approvals?: boolean;
+  /** The client can run Projector commands for the agent. */
+  commandBridge?: boolean;
 }
 
 const RUN_ID = /^[0-9a-f]{12}$/;

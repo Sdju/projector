@@ -1,3 +1,5 @@
+import { createInterface } from "node:readline";
+import { fileURLToPath } from "node:url";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type {
   Options,
@@ -6,8 +8,17 @@ import type {
 } from "@anthropic-ai/claude-agent-sdk";
 import { createInput, registerInjector } from "./claude-code-input.ts";
 import { agentEnv, assertHostProject, attachedImages, promptWithHistory } from "./agent-host.ts";
+import { runDirectory } from "./agent-runs.ts";
+import { attachHosted, startHosted } from "./hosted-process.ts";
+import { relayRequest, unrelayRequests } from "./command-bridge.ts";
 import { AGENT_PERMISSION_MODES } from "./backend.ts";
-import type { AgentBackend, AgentCommand, AgentRunOptions } from "./backend.ts";
+import type {
+  AgentBackend,
+  AgentCommand,
+  AgentEventName,
+  AgentRunHandle,
+  AgentRunOptions,
+} from "./backend.ts";
 import { CLAUDE_LABEL, createClaudeEventMapper } from "./claude-code-events.ts";
 import {
   chainTail,
@@ -43,11 +54,91 @@ function chosen(options: AgentRunOptions) {
   };
 }
 
+/** The runner process of a hosted answer (see `claude-runner.ts`). */
+const RUNNER = fileURLToPath(new URL("./claude-runner.ts", import.meta.url));
+
+/**
+ * The answer of a hosted run: its runner keeps going while this server is away, so the answer is
+ * followed through the host's trace. Questions for the user are relayed to the client; the answers
+ * come back through `completeCommandRequest` and are written to the runner.
+ */
+async function runHosted(options: AgentRunOptions, handle: AgentRunHandle): Promise<void> {
+  if (!options.cwd) throw new Error("Claude Code работает внутри проекта: откройте чат в проекте");
+  await assertHostProject(options.cwd, CLAUDE_LABEL);
+  const proc = handle.attach
+    ? await attachHosted(handle.id)
+    : await startHosted(handle.id, {
+        command: process.execPath,
+        args: [RUNNER, runDirectory(handle.id)],
+        cwd: options.cwd,
+        env: agentEnv(),
+      });
+  const relayedIds: string[] = [];
+  // An answer that arrives after the run ended has nothing to reach: it is dropped.
+  const answer = (id: string, result: object) => {
+    if (proc.stdin.writable) proc.stdin.write(`${JSON.stringify({ id, result })}\n`);
+  };
+  const lines = createInterface({ input: proc.stdout });
+  lines.on("line", (line) => {
+    let message: {
+      event?: AgentEventName;
+      data?: unknown;
+      id?: string;
+      method?: AgentEventName;
+      params?: unknown;
+    };
+    try {
+      message = JSON.parse(line);
+    } catch {
+      // Not a line the runner writes: nothing to show, and it must not take the server down.
+      return;
+    }
+    if (message.method && message.id !== undefined) {
+      const id = String(message.id);
+      relayedIds.push(id);
+      relayRequest(id, (result) => answer(id, result));
+      options.emit(message.method, message.params);
+    } else if (message.event) options.emit(message.event, message.data);
+  });
+  // A message the user adds during the answer goes to the runner's input.
+  const injectable = isUuid(options.messageId) ? options.messageId : undefined;
+  const unregister = injectable
+    ? registerInjector(injectable, (text) => {
+        if (!proc.stdin.writable) return false;
+        proc.stdin.write(
+          `${JSON.stringify({ method: "inject", params: { messageId: injectable, text } })}\n`,
+        );
+        return true;
+      })
+    : undefined;
+  const stop = () => void proc.terminate();
+  options.abort?.addEventListener("abort", stop, { once: true });
+  if (options.abort?.aborted) stop();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      proc.once("error", reject);
+      proc.once("close", () => resolve());
+    });
+  } finally {
+    options.abort?.removeEventListener("abort", stop);
+    unregister?.();
+    unrelayRequests(relayedIds);
+    lines.close();
+  }
+}
+
+/** The run: held by its own process when the route gave it one, otherwise in this process. */
+async function run(options: AgentRunOptions): Promise<void> {
+  if (options.run) return runHosted(options, options.run);
+  return runClaudeCode(options);
+}
+
 /**
  * Plain Claude Code behind a chat UI instead of the TUI: its own prompt, tools, login, `CLAUDE.md`
- * and settings. Nothing about Projector is added to the model's context.
+ * and settings. Nothing about Projector is added to the model's context. Runs in the runner process
+ * (`claude-runner.ts`) for a hosted answer, and in the server process otherwise.
  */
-async function run(options: AgentRunOptions): Promise<void> {
+export async function runClaudeCode(options: AgentRunOptions): Promise<void> {
   if (!options.cwd) throw new Error("Claude Code работает внутри проекта: откройте чат в проекте");
   const requestedMode =
     options.selection?.["permission-mode"] ?? options.permissionMode ?? "default";

@@ -47,7 +47,6 @@ export {
   publishDirectory,
   removeAgentHostAddress,
   startCodexAppServer,
-  readClaudeAccessToken,
   readOpenCodeGoKey,
   readCursorAccessToken,
   agentEnv,
