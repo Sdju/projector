@@ -6,6 +6,12 @@ export interface ProjectCommand {
   id: string;
   name: string;
   cmd: string;
+  /** Folder inside the project the command runs in; absent means the project root. */
+  cwd?: string;
+  /** Address of this scenario's app; absent means the project's address. */
+  url?: string;
+  /** Launch mode of this scenario; absent means the project's mode. */
+  mode?: LaunchMode;
 }
 
 export interface Project {

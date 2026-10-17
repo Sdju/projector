@@ -10,7 +10,7 @@
 
 ## R8 · Поля настроек проекта
 
-`catalog/ui/settings/ProjectGeneralSection.vue`, `ProjectLaunchSection.vue`, `ProjectScenariosSection.vue` отдельно определяют `.section`, `.field`, gap и цвет подписи. `common/ui/UiField.vue` выводит `<div><span>` без `<label>`, поэтому простая подстановка потеряет связь label с input: сначала доработайте `UiField`. Доменные секции в один компонент не объединять.
+`catalog/ui/settings/ProjectGeneralSection.vue`, `ProjectScenariosSection.vue` отдельно определяют `.section`, `.field`, gap и цвет подписи. `common/ui/UiField.vue` выводит `<div><span>` без `<label>`, поэтому простая подстановка потеряет связь label с input: сначала доработайте `UiField`. Доменные секции в один компонент не объединять.
 
 ## R10 · Копирование и feedback
 

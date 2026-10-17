@@ -6,7 +6,13 @@ export type {
   ProjectCommand,
   ProjectDraft,
 } from "./model/types.ts";
-export { missingCommands, projectDraft, settingsError } from "./model/project-settings.ts";
+export {
+  commandError,
+  duplicateCommand,
+  missingCommands,
+  projectDraft,
+  settingsError,
+} from "./model/project-settings.ts";
 export {
   fetchDirectories,
   fetchPathSuggestions,

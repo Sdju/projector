@@ -11,6 +11,7 @@ import { rmSync } from "node:fs";
 import { os, bashShellLaunch, type ShellLaunch } from "../../../core/modules/os/index.ts";
 import { terminateProcessTree } from "./terminate.ts";
 import { saveDroppedFile } from "./drop-files.ts";
+import { scenarioDirectory } from "./scenario-folder.ts";
 import { HttpError } from "../http/index.ts";
 import { devcontainerLaunch } from "../devcontainer/index.ts";
 import type { IncomingMessage } from "node:http";
@@ -210,6 +211,11 @@ export function createTerminalSession(
       ? undefined
       : project.commands.find((item) => item.id === input.commandId);
   if (input.commandId !== undefined && !command) throw new Error("Команда не найдена");
+  // The scenario's folder applies to a run on this machine; Docker and Dev Container runs use their own workdir.
+  const folder =
+    command?.cwd && !launch && !project.environment
+      ? scenarioDirectory(project.path, command.cwd)
+      : project.path;
   const dimensions = size(
     input.cols ?? previous?.info.cols ?? 80,
     input.rows ?? previous?.info.rows ?? 24,
@@ -260,7 +266,7 @@ export function createTerminalSession(
     child = spawn(command.file, command.args, {
       name: "xterm-256color",
       ...dimensions,
-      cwd: project.path,
+      cwd: folder,
       env,
     });
     os.processes.trackConsole(child.pid);

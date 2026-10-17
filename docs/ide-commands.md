@@ -192,8 +192,10 @@ Commit diff tabs are history: staging, discarding or moving files never closes t
 
 The page registers scope `project:settings` with `{ surface: 'project', projectId, name, icon, url, mode, defaultCommandId, dirty }`.
 Commands: `ide.project.settings.get`, `ide.project.settings.update` (`name`, `icon`, `url`, `mode`, `defaultCommandId`),
-`ide.project.command.add|update|remove|setDefault` for run commands (tasks; by `id` or `name`) and
-`ide.project.command.import` for missing `package.json` scripts. Writes use the same validation and
+`ide.project.command.add|update|remove|setDefault|move|duplicate` for scenarios (run commands; by `id` or `name`) and
+`ide.project.command.import` for missing `package.json` scripts. A scenario has a name, a command, and optional
+`cwd` (folder inside the project; applies to runs on this machine, not to Docker or Dev Container runs), `url`
+(its own address) and `mode` (`server` or `window`, otherwise the project's). Empty values clear them. Writes use the same validation and
 `catalog.save` as the settings form, and are unavailable while the open settings tab has unsaved edits.
 The chat agent uses them instead of editing Projector data files.
 

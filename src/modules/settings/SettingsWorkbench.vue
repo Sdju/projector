@@ -41,8 +41,13 @@ const filtered = computed(() => {
   });
 });
 const groups = computed(() => [...new Set(filtered.value.map((section) => section.group))]);
+/** The section that owns the selected page, or the first one when nothing matches. */
 const active = computed(
-  () => filtered.value.find((section) => section.id === props.selected) ?? filtered.value[0],
+  () =>
+    filtered.value.find(
+      (section) =>
+        section.id === props.selected || section.items?.some((item) => item.id === props.selected),
+    ) ?? filtered.value[0],
 );
 // Владелец вкладки решает, что попадёт в снапшот; сам workbench отдаёт текущий раздел и поиск.
 useTabReadout(() =>
@@ -71,6 +76,63 @@ watch(
   },
   { immediate: true },
 );
+/* Reordering nested items by dragging them, or with Alt + arrows from the keyboard. */
+const itemDrag = ref("");
+const itemTarget = ref("");
+const itemAfter = ref(false);
+function itemDragStart(event: DragEvent, id: string) {
+  itemDrag.value = id;
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", id);
+  }
+}
+function itemDragEnd() {
+  itemDrag.value = "";
+  itemTarget.value = "";
+}
+/** The row under the pointer, or the nearest one above it; gaps between rows take drops too. */
+function rowAt(list: HTMLElement, clientY: number): { id: string; after: boolean } | undefined {
+  let hit: { id: string; after: boolean } | undefined;
+  for (const row of list.querySelectorAll<HTMLElement>(":scope > li")) {
+    const bounds = row.getBoundingClientRect();
+    const id = row.dataset.id ?? "";
+    if (clientY < bounds.top) return hit ?? { id, after: false };
+    hit = { id, after: clientY > bounds.top + bounds.height / 2 };
+  }
+  return hit;
+}
+function listDragOver(event: DragEvent, section: SettingsSection) {
+  if (!itemDrag.value || !section.reorder) return;
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+  const hit = rowAt(event.currentTarget as HTMLElement, event.clientY);
+  itemTarget.value = hit && hit.id !== itemDrag.value ? hit.id : "";
+  itemAfter.value = hit?.after ?? false;
+}
+function listDrop(event: DragEvent, section: SettingsSection) {
+  if (!itemDrag.value || !section.reorder || !section.items) return;
+  event.preventDefault();
+  const hit = rowAt(event.currentTarget as HTMLElement, event.clientY);
+  const dragged = itemDrag.value;
+  itemDragEnd();
+  if (!hit || hit.id === dragged) return;
+  const ids = section.items.map((item) => item.id).filter((key) => key !== dragged);
+  const at = ids.indexOf(hit.id);
+  if (at < 0) return;
+  ids.splice(at + (hit.after ? 1 : 0), 0, dragged);
+  section.reorder(ids);
+}
+function itemKey(event: KeyboardEvent, section: SettingsSection, index: number) {
+  if (!event.altKey || !section.reorder || !section.items) return;
+  const to = event.key === "ArrowUp" ? index - 1 : event.key === "ArrowDown" ? index + 1 : -1;
+  const ids = section.items.map((item) => item.id);
+  if (to < 0 || to >= ids.length) return;
+  event.preventDefault();
+  [ids[index], ids[to]] = [ids[to]!, ids[index]!];
+  section.reorder(ids);
+}
+
 const commands = useCommandScope(props.scope, () => ({
   surface: "settings",
   section: active.value?.id ?? "",
@@ -99,8 +161,10 @@ commands.scope.registerCommand({
   arguments: { id: "string: идентификатор раздела настроек" },
   run: (value) => {
     const { id } = commandArgs(value);
-    if (typeof id !== "string" || !props.sections.some((section) => section.id === id))
-      throw new Error("Неизвестный раздел настроек");
+    const known = props.sections.some(
+      (section) => section.id === id || section.items?.some((item) => item.id === id),
+    );
+    if (typeof id !== "string" || !known) throw new Error("Неизвестный раздел настроек");
     query.value = "";
     emit("select", id);
   },
@@ -158,16 +222,50 @@ function filter(event: Event) {
       <nav ref="sidebar" class="sidebar" aria-label="Разделы настроек">
         <div v-for="group in groups" :key="group" class="group">
           <h2>{{ group }}</h2>
-          <button
+          <template
             v-for="section in filtered.filter((item) => item.group === group)"
             :key="section.id"
-            type="button"
-            :aria-current="section.id === active?.id ? 'page' : undefined"
-            :class="{ selected: section.id === active?.id }"
-            @click="commands.run('ide.settings.section.open', { id: section.id })"
           >
-            {{ section.title }}
-          </button>
+            <button
+              type="button"
+              :aria-current="section.id === selected ? 'page' : undefined"
+              :class="{ selected: section.id === selected }"
+              @click="commands.run('ide.settings.section.open', { id: section.id })"
+            >
+              {{ section.title }}
+            </button>
+            <ul
+              v-if="section.items?.length"
+              class="items"
+              @dragover="listDragOver($event, section)"
+              @drop="listDrop($event, section)"
+            >
+              <li
+                v-for="(item, at) in section.items"
+                :key="item.id"
+                :data-id="item.id"
+                :draggable="!!section.reorder"
+                :class="{
+                  dragging: itemDrag === item.id,
+                  'drop-before': itemTarget === item.id && !itemAfter,
+                  'drop-after': itemTarget === item.id && itemAfter,
+                }"
+                @dragstart="itemDragStart($event, item.id)"
+                @dragend="itemDragEnd"
+              >
+                <button
+                  type="button"
+                  :aria-current="item.id === selected ? 'page' : undefined"
+                  :class="{ selected: item.id === selected, problem: item.problem }"
+                  @click="commands.run('ide.settings.section.open', { id: item.id })"
+                  @keydown="itemKey($event, section, at)"
+                >
+                  <span class="item-title">{{ item.title }}</span>
+                  <span v-if="item.hint" class="item-hint">{{ item.hint }}</span>
+                </button>
+              </li>
+            </ul>
+          </template>
         </div>
         <p v-if="!filtered.length" class="no-results" role="status">Нет подходящих разделов</p>
       </nav>
@@ -311,6 +409,57 @@ svg {
 .group button.selected {
   background: var(--selection);
   color: var(--text);
+}
+.items {
+  display: grid;
+  gap: 1px;
+  margin: 0 0 var(--sp-1) var(--sp-3);
+  padding: 0 0 0 var(--sp-2);
+  border-left: 1px solid var(--line);
+  list-style: none;
+}
+.items button {
+  min-height: 26px;
+  font-size: var(--fs-xs);
+}
+.item-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.item-hint {
+  margin-left: auto;
+  padding-left: var(--sp-2);
+  color: var(--faint);
+  font-size: var(--fs-2xs);
+  white-space: nowrap;
+}
+.items li {
+  position: relative;
+}
+.items li.dragging {
+  opacity: 0.45;
+}
+.items li.drop-before::before,
+.items li.drop-after::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--focus);
+  pointer-events: none;
+}
+.items li.drop-before::before {
+  top: -1px;
+}
+.items li.drop-after::after {
+  bottom: -1px;
+}
+.items button.problem .item-title::after {
+  content: " •";
+  color: var(--err);
 }
 .content {
   min-width: 0;

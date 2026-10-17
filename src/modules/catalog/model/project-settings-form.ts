@@ -1,6 +1,8 @@
 import { computed, inject, onBeforeUnmount, provide, ref, watch, type InjectionKey } from "vue";
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from "vue-router";
 import {
+  commandError,
+  duplicateCommand as duplicateScenario,
   inspectCommands,
   missingCommands,
   projectDraft,
@@ -68,6 +70,23 @@ export function createProjectSettingsForm(
 
   function addCommand() {
     draft.value.commands.push({ id: crypto.randomUUID(), name: "", cmd: "" });
+  }
+  function duplicateCommand(id: string) {
+    duplicateScenario(draft.value.commands, id);
+  }
+  /** Puts the scenarios in the given order; the navigation and the run menu follow it. */
+  function setCommandOrder(ids: string[]) {
+    const byId = new Map(draft.value.commands.map((command) => [command.id, command]));
+    const next = ids.map((id) => byId.get(id)).filter((command) => !!command);
+    if (next.length === draft.value.commands.length) draft.value.commands = next;
+  }
+  function setDefaultCommand(id: string) {
+    draft.value.defaultCommandId = id;
+  }
+  /** Why one scenario cannot be saved yet, or "". */
+  function problemOf(id: string): string {
+    const command = draft.value.commands.find((item) => item.id === id);
+    return command ? commandError(command, draft.value) : "";
   }
   function removeCommand(id: string) {
     if (draft.value.commands.length <= 1) return;
@@ -151,6 +170,10 @@ export function createProjectSettingsForm(
     candidates,
     selected,
     validation,
+    setCommandOrder,
+    duplicateCommand,
+    setDefaultCommand,
+    problemOf,
     reset,
     canLeave,
     addCommand,

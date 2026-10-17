@@ -10,6 +10,29 @@ import { iconContentType, letterIconSvg } from "../projects/index.ts";
 
 import { asString, escapeHtml } from "../transport/index.ts";
 
+/** A folder inside the project, relative and without `..`; absent or "." means the root. */
+export function scenarioFolder(value: unknown): string | undefined {
+  const text = asString(value)
+    .replace(/\\/g, "/")
+    .replace(/^\.(\/|$)/, "")
+    .replace(/\/+$/, "");
+  if (!text) return undefined;
+  if (text.startsWith("/") || /^[a-zA-Z]:/.test(text) || text.split("/").includes(".."))
+    throw new Error("Папка сценария должна лежать внутри проекта");
+  return text;
+}
+
+function scenarioUrl(value: unknown): string | undefined {
+  const text = asString(value);
+  if (!text) return undefined;
+  try {
+    if (["http:", "https:"].includes(new URL(text).protocol)) return text;
+  } catch {
+    // reported below
+  }
+  throw new Error("Адрес сценария должен начинаться с http:// или https://");
+}
+
 export function parseCommands(value: unknown): ProjectCommand[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item) => {
@@ -18,7 +41,13 @@ export function parseCommands(value: unknown): ProjectCommand[] {
     const name = asString(row.name);
     const cmd = asString(row.cmd);
     if (!name || !cmd) return [];
-    return [{ id: asString(row.id) || randomUUID(), name, cmd }];
+    const command: ProjectCommand = { id: asString(row.id) || randomUUID(), name, cmd };
+    const cwd = scenarioFolder(row.cwd);
+    const url = scenarioUrl(row.url);
+    if (cwd) command.cwd = cwd;
+    if (url) command.url = url;
+    if (row.mode === "server" || row.mode === "window") command.mode = row.mode;
+    return [command];
   });
 }
 

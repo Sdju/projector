@@ -1,5 +1,6 @@
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import {
+  duplicateCommand as duplicateScenario,
   inspectCommands,
   missingCommands,
   projectDraft,
@@ -11,6 +12,27 @@ import type { LaunchMode, Project, ProjectCommand } from "../../project/index.ts
 const text = (value: unknown, name: string) => {
   if (typeof value !== "string") throw new Error(`${name} должен быть строкой`);
   return value.trim();
+};
+
+/** Scenario launch mode: "" means the project's own mode. */
+const scenarioMode = (value: unknown): LaunchMode | "" => {
+  if (value === undefined || value === "") return "";
+  if (value !== "server" && value !== "window")
+    throw new Error("mode должен быть server или window");
+  return value;
+};
+
+/** Applies the optional folder, address and mode of a scenario; empty strings clear them. */
+function applyScenarioFields(command: ProjectCommand, args: Record<string, unknown>) {
+  if (args.cwd !== undefined) command.cwd = text(args.cwd, "cwd");
+  if (args.url !== undefined) command.url = text(args.url, "url");
+  if (args.mode !== undefined) command.mode = scenarioMode(args.mode) || undefined;
+}
+
+const SCENARIO_FIELDS = {
+  cwd: "string (необязательно): папка внутри проекта, например apps/web; пустая строка — корень проекта",
+  url: "string (необязательно): адрес приложения сценария http(s)://…; пустая строка — адрес проекта",
+  mode: "string (необязательно): server — в терминале, window — в окне приложения; пустая строка — как у проекта",
 };
 
 /** IDE commands for project settings: icon, launch parameters and run commands (tasks). */
@@ -127,12 +149,13 @@ export function useProjectCommands(
   );
   register(
     "ide.project.command.add",
-    "Добавить команду запуска",
-    "Добавляет команду запуска (таск), выполняемую в терминале из папки проекта.",
+    "Добавить сценарий запуска",
+    "Добавляет сценарий запуска (команду), выполняемый в терминале из папки проекта или своей папки внутри него.",
     {
-      name: "string: название команды, например dev",
+      name: "string: название сценария, например dev",
       cmd: "string: команда запуска, например pnpm dev",
-      makeDefault: "boolean (необязательно): сделать командой по умолчанию",
+      makeDefault: "boolean (необязательно): сделать основным",
+      ...SCENARIO_FIELDS,
     },
     (args) =>
       apply((draft) => {
@@ -141,32 +164,35 @@ export function useProjectCommands(
           name: text(args.name, "name"),
           cmd: text(args.cmd, "cmd"),
         };
+        applyScenarioFields(command, args);
         if (draft.commands.some((item) => item.name === command.name))
-          throw new Error(`Команда «${command.name}» уже существует`);
+          throw new Error(`Сценарий «${command.name}» уже существует`);
         draft.commands.push(command);
         if (args.makeDefault === true) draft.defaultCommandId = command.id;
       }),
   );
   register(
     "ide.project.command.update",
-    "Изменить команду запуска",
-    "Переименовывает команду или меняет её команду запуска. Команда ищется по id или по текущему названию.",
+    "Изменить сценарий запуска",
+    "Переименовывает сценарий или меняет его команду, папку, адрес и режим. Сценарий ищется по id или по текущему названию.",
     {
-      id: "string (необязательно): id команды",
+      id: "string (необязательно): id сценария",
       name: "string (необязательно): текущее название, если id не указан",
       newName: "string (необязательно): новое название",
       cmd: "string (необязательно): новая команда запуска",
+      ...SCENARIO_FIELDS,
     },
     (args) =>
       apply((draft) => {
         const target = find({ ...current(), commands: draft.commands }, args);
         if (args.newName !== undefined) target.name = text(args.newName, "newName");
         if (args.cmd !== undefined) target.cmd = text(args.cmd, "cmd");
+        applyScenarioFields(target, args);
       }),
   );
   register(
     "ide.project.command.remove",
-    "Удалить команду запуска",
+    "Удалить сценарий запуска",
     "Удаляет команду запуска. Последнюю команду удалить нельзя; если удалена команда по умолчанию, выбирается первая оставшаяся.",
     {
       id: "string (необязательно): id команды",
@@ -182,7 +208,7 @@ export function useProjectCommands(
   );
   register(
     "ide.project.command.setDefault",
-    "Сделать команду запуска основной",
+    "Сделать сценарий основным",
     "Назначает команду, которая запускается из палитры и списка проектов.",
     {
       id: "string (необязательно): id команды",
@@ -191,6 +217,42 @@ export function useProjectCommands(
     (args) =>
       apply((draft) => {
         draft.defaultCommandId = find({ ...current(), commands: draft.commands }, args).id;
+      }),
+  );
+  register(
+    "ide.project.command.move",
+    "Переставить сценарий запуска",
+    "Сдвигает сценарий на одну позицию вверх или вниз; порядок виден в меню запуска.",
+    {
+      id: "string (необязательно): id сценария",
+      name: "string (необязательно): название, если id не указан",
+      direction: "string: up или down",
+    },
+    (args) =>
+      apply((draft) => {
+        if (args.direction !== "up" && args.direction !== "down")
+          throw new Error("direction должен быть up или down");
+        const target = find({ ...current(), commands: draft.commands }, args);
+        const from = draft.commands.indexOf(target);
+        const to = from + (args.direction === "up" ? -1 : 1);
+        if (to < 0 || to >= draft.commands.length) throw new Error("Сценарий уже у края списка");
+        [draft.commands[from], draft.commands[to]] = [draft.commands[to]!, draft.commands[from]!];
+      }),
+  );
+  register(
+    "ide.project.command.duplicate",
+    "Дублировать сценарий запуска",
+    "Копирует сценарий рядом с исходным под новым названием «… копия»; копия не становится основной.",
+    {
+      id: "string (необязательно): id сценария",
+      name: "string (необязательно): название, если id не указан",
+    },
+    (args) =>
+      apply((draft) => {
+        duplicateScenario(
+          draft.commands,
+          find({ ...current(), commands: draft.commands }, args).id,
+        );
       }),
   );
   register(

@@ -169,26 +169,28 @@ export function startProject(
     },
     replacingId,
   );
+  // A scenario's own address and mode win over the project's; the project supplies the rest.
+  const url = command.url || project.url || "";
   session = {
     project,
     commandId: command.id,
     commandName: command.name,
     terminal,
     status: "running",
-    url: project.environment ? null : project.url || null,
+    url: project.environment ? null : url || null,
     startedAt: terminal.startedAt,
     exitCode: null,
-    pendingWindow: (mode ?? project.mode) === "window",
+    pendingWindow: (mode ?? command.mode ?? project.mode) === "window",
     leftover: "",
   };
   sessions.set(project.id, session);
   emit("status", snapshot(session));
   emit("terminal-started", { projectId: project.id, sessionId: terminal.id });
 
-  if (session.pendingWindow && project.url && !project.environment) {
+  if (session.pendingWindow && url && !project.environment) {
     setTimeout(() => {
       if (sessions.get(project.id) !== session || session.status !== "running") return;
-      if (!session.url) session.url = project.url;
+      if (!session.url) session.url = url;
       maybeOpenWindow(session);
     }, 1600);
   }
@@ -200,8 +202,14 @@ export function stopProject(projectId: string): ProcessSnapshot {
   const session = sessions.get(projectId);
   if (!session || session.status === "idle") return idleSnapshot(projectId);
 
-  session.status = "stopping";
-  emit("status", snapshot(session));
-  stopTerminalSession(projectId, session.terminal.id);
+  // A run whose terminal is already gone (for example, it exited) has nothing left to stop.
+  try {
+    session.status = "stopping";
+    emit("status", snapshot(session));
+    stopTerminalSession(projectId, session.terminal.id);
+  } catch {
+    session.status = "idle";
+    emit("status", snapshot(session));
+  }
   return snapshot(session);
 }

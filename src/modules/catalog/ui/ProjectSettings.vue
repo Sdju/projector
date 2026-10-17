@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import UiPanel from "../../../common/ui/UiPanel.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import {
@@ -9,11 +10,14 @@ import {
 import { readoutLines } from "../../../common/utilities/tab-readout.ts";
 import type { Project } from "../../project/index.ts";
 import { shortcutKey } from "../../../../core/modules/ide/index.ts";
-import { projectSettingsSection as selected } from "../model/project-settings-nav.ts";
+import {
+  projectSettingsSection as selected,
+  scenarioSection,
+  scenarioOf,
+} from "../model/project-settings-nav.ts";
 import { createProjectSettingsForm } from "../model/project-settings-form.ts";
 import ProjectGeneralSection from "./settings/ProjectGeneralSection.vue";
 import ProjectScenariosSection from "./settings/ProjectScenariosSection.vue";
-import ProjectLaunchSection from "./settings/ProjectLaunchSection.vue";
 import ProjectRemoveSection from "./settings/ProjectRemoveSection.vue";
 
 const props = defineProps<{ project: Project; afterRemove: () => unknown }>();
@@ -26,7 +30,7 @@ const { dirty, busy, error, notice, validation } = form;
 defineExpose({ canLeave: form.canLeave, save: form.save });
 
 /** Новый раздел настроек проекта — одна запись здесь: список, поиск и навигация общие с настройками Projector. */
-const sections: SettingsSection[] = [
+const sections = computed<SettingsSection[]>(() => [
   {
     id: "general",
     title: "Основное",
@@ -43,14 +47,16 @@ const sections: SettingsSection[] = [
       "Команды запуска проекта: dev, build, test и свои. Можно импортировать из package.json.",
     keywords: "команды запуск scripts package.json npm pnpm dev build test сценарии",
     component: ProjectScenariosSection,
-  },
-  {
-    id: "launch",
-    title: "Параметры запуска",
-    group: "Запуск",
-    description: "Команда по умолчанию, адрес приложения и открытие в окне.",
-    keywords: "по умолчанию url адрес порт окно window browser",
-    component: ProjectLaunchSection,
+    props: { scenarioId: scenarioOf(selected.value) },
+    // Each scenario is a page of its own in the navigation, under the "Запуск" group; dragging reorders them.
+    reorder: (ids: string[]) =>
+      form.setCommandOrder(ids.map(scenarioOf).filter((id): id is string => !!id)),
+    items: form.draft.value.commands.map((command) => ({
+      id: scenarioSection(command.id),
+      title: command.name.trim() || "без названия",
+      hint: command.id === form.draft.value.defaultCommandId ? "основной" : undefined,
+      problem: !!form.problemOf(command.id),
+    })),
   },
   {
     id: "remove",
@@ -60,7 +66,7 @@ const sections: SettingsSection[] = [
     keywords: "удалить убрать delete remove",
     component: ProjectRemoveSection,
   },
-];
+]);
 
 function saveKey(event: KeyboardEvent) {
   if ((event.ctrlKey || event.metaKey) && shortcutKey(event) === "s") {
