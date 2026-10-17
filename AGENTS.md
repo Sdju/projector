@@ -36,6 +36,7 @@ vp run vio:gtk-test  # реальные GTK-виджеты; нужен display
 ## Документация
 
 - [Разработка и диагностика](docs/session-notes.md): карта кода, HMR, native, ввод и данные.
+- [Производительность](docs/performance.md): базовый замер памяти и скорости, методология.
 - [Реестр больших файлов](docs/large-files.md): потолки размеров и планы разбиения; проверка (`extra.largeFiles` в `feod.config.mjs`) включена в `vp run architecture`.
 - [Использование](docs/usage.md): режимы, хоткей, трей, файлы и терминалы.
 - [Интеграции](docs/integrations.md): GitHub, авторизация и импорт.
