@@ -21,6 +21,7 @@ import {createApp,h,ref} from 'vue';
 import FileTree from '/src/modules/workspace/modules/tree/ui/FileTree.vue';
 import {registerWorkspaceProfile} from '/src/modules/workspace-api/index.ts';
 import {commandHostKey} from '/src/common/utilities/commands.ts';
+import {toasts} from '/src/common/utilities/notice.ts';
 import {treePageRange} from '/core/modules/workspace/index.ts';
 const calls=[];
 let fail=false;
@@ -65,7 +66,7 @@ const more=path=>branch(path).querySelector(':scope > li > button[data-tree-more
  check(rows('folder-1').length===30&&rows('').length===30,'only target parent grows');
  check(document.activeElement.dataset.path==='folder-0/file-0030','focus first new item');
  more('folder-0').click();await wait(()=>rows('folder-0').length===65&&!more('folder-0'),'last partial page');
- fail=true;more('').click();await wait(()=>document.body.textContent.includes('Page failed'),'page error');
+ fail=true;more('').click();await wait(()=>toasts.value.some(toast=>toast.text==='Page failed'),'page error');
  check(rows('').length===30&&more(''),'error preserves old rows and retry');
  more('').click();await wait(()=>rows('').length===60,'retry page');
  revision.value++;await wait(()=>calls.at(-1).offset==='0'&&rows('').length===60,'refresh preserves portions');

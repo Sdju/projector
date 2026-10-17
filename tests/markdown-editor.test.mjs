@@ -57,10 +57,9 @@ test(
       for (const width of [820, 360]) {
         host.style.width = width + 'px';
         const table = editor.querySelector('.milkdown-table-block table.children');
-        const bounds = table.getBoundingClientRect();
-        const documentBounds = editor.getBoundingClientRect();
-        check(bounds.right <= documentBounds.right + 1, 'The table must fit the document at width ' + width);
-        for (const cell of table.querySelectorAll('td,th'))
+        // A wide table grows past the text column and scrolls inside its own wrapper, not the block.
+        const wrapper = table.closest('.table-wrapper');
+        check(wrapper && getComputedStyle(wrapper).overflowX === 'auto', 'The table must scroll in its wrapper at width ' + width);        for (const cell of table.querySelectorAll('td,th'))
           check(cell.scrollWidth <= cell.clientWidth + 1, 'Long inline code must fit its table cell at width ' + width);
       }
       host.style.removeProperty('width');
