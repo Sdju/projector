@@ -1,6 +1,8 @@
 export interface GatewayState {
   enabled: boolean;
   hasKey: boolean;
+  /** Origins of browser pages that may call the API. */
+  origins: string[];
   baseUrl: string;
 }
 
@@ -11,9 +13,9 @@ export async function readGatewayState(signal?: AbortSignal): Promise<GatewaySta
   return data;
 }
 
-/** `apiKey: ""` removes the key; an omitted field keeps the current value. */
+/** `apiKey: ""` removes the key, `origins: []` the whitelist; an omitted field keeps the current value. */
 export async function saveGatewayState(
-  change: { enabled?: boolean; apiKey?: string },
+  change: { enabled?: boolean; apiKey?: string; origins?: string[] },
   signal?: AbortSignal,
 ): Promise<GatewayState> {
   const response = await fetch("/api/openai", {

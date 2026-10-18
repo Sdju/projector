@@ -11,8 +11,23 @@ import UiLabel from "../../common/ui/UiLabel.vue";
 import UiHint from "../../common/ui/UiHint.vue";
 import { useGatewaySettings } from "./gateway-model.ts";
 
-const { enabled, hasKey, apiKey, url, busy, error, ready, commands } = useGatewaySettings();
+const {
+  enabled,
+  hasKey,
+  apiKey,
+  originsDraft,
+  originsDirty,
+  draftOrigins,
+  hasTemplate,
+  toggleTemplate,
+  url,
+  busy,
+  error,
+  ready,
+  commands,
+} = useGatewaySettings();
 const keyId = useId();
+const originsId = useId();
 </script>
 
 <template>
@@ -35,7 +50,8 @@ const keyId = useId();
     <template v-if="enabled">
       <UiHint class="hint">
         Базовый адрес: <code>{{ url }}</code
-        >. Доступен с любого origin; запросы тратят квоту провайдеров.
+        >. Запросы тратят квоту провайдеров; страницы других сайтов он не принимает, если их origin
+        не в списке ниже.
       </UiHint>
       <UiLabel size="sm" tone="secondary" :space-before="4" :space-after="2" :for="keyId"
         >Ключ доступа (необязательно)</UiLabel
@@ -50,7 +66,41 @@ const keyId = useId();
       />
       <UiHint class="hint">
         Клиент передаёт его как <code>Authorization: Bearer …</code> (в поле API key). Без ключа API
-        открыт любому процессу и странице в браузере на этой машине.
+        открыт любому локальному процессу.
+      </UiHint>
+      <UiChoiceGroup label="Страницы в браузере" :disabled="!ready || busy">
+        <UiChoiceRow
+          title="Любая страница этой машины"
+          description="localhost, 127.0.0.1, ::1 на любом порту: локальные dev-серверы и приложения."
+          ><UiControl
+            type="checkbox"
+            :model-value="hasTemplate('@localhost')"
+            @update:model-value="toggleTemplate('@localhost', $event)"
+        /></UiChoiceRow>
+        <UiChoiceRow
+          title="Любая страница локальной сети"
+          description="Адреса 10.x, 172.16–31.x, 192.168.x, link-local и имена *.local."
+          ><UiControl
+            type="checkbox"
+            :model-value="hasTemplate('@lan')"
+            @update:model-value="toggleTemplate('@lan', $event)"
+        /></UiChoiceRow>
+      </UiChoiceGroup>
+      <UiLabel size="sm" tone="secondary" :space-before="4" :space-after="2" :for="originsId"
+        >Другие разрешённые origin (по одному в строке)</UiLabel
+      >
+      <UiControl
+        :id="originsId"
+        v-model="originsDraft"
+        as="textarea"
+        rows="3"
+        spellcheck="false"
+        placeholder="https://app.example.com"
+        :disabled="!ready || busy"
+      />
+      <UiHint class="hint">
+        Только сайты, которым вы доверяете: их страницы смогут тратить квоту провайдеров из вашего
+        браузера. Пустой список — ни один сайт.
       </UiHint>
       <UiInline class="actions" align="stretch" wrap>
         <UiButton
@@ -58,6 +108,11 @@ const keyId = useId();
           :disabled="!ready || busy || !apiKey.trim()"
           @click="commands.run('ide.openai.gateway.set')"
           >Сохранить ключ</UiButton
+        >
+        <UiButton
+          :disabled="!ready || busy || !originsDirty"
+          @click="commands.run('ide.openai.gateway.set', { origins: draftOrigins() })"
+          >Сохранить origin</UiButton
         >
         <UiButton
           v-if="hasKey"
@@ -78,7 +133,8 @@ const keyId = useId();
 .actions {
   margin-top: var(--sp-4);
 }
-input[type="password"] {
+input[type="password"],
+textarea {
   max-width: 320px;
 }
 .hint {

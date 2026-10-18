@@ -112,28 +112,59 @@ test("gateway lists provider models and routes requests by model", async () => {
   expect(bad.status).toBe(400);
 });
 
-test("gateway answers any origin, preflight included", async () => {
+test("gateway refuses foreign origins, preflight included, and sends no CORS headers", async () => {
   const { base } = await setup();
   setGatewayEnabled(true);
   const preflight = await fetch(`${base}/api/openai/v1/chat/completions`, {
     method: "OPTIONS",
     headers: { Origin: "https://example.org", "Access-Control-Request-Method": "POST" },
   });
-  expect(preflight.status).toBe(204);
-  expect(preflight.headers.get("access-control-allow-origin")).toBe("*");
-  expect(preflight.headers.get("access-control-allow-headers")).toContain("Authorization");
+  expect(preflight.status).toBe(403);
+  expect(preflight.headers.get("access-control-allow-origin")).toBeNull();
 
   const foreign = await fetch(`${base}/api/openai/v1/models`, {
     headers: { Origin: "https://example.org" },
   });
-  expect(foreign.status).toBe(200);
-  expect(foreign.headers.get("access-control-allow-origin")).toBe("*");
+  expect(foreign.status).toBe(403);
+  expect(foreign.headers.get("access-control-allow-origin")).toBeNull();
 
-  // The rest of the API keeps its same-origin rule.
-  const other = await fetch(`${base}/api/health`, { headers: { Origin: "https://example.org" } });
+  const plain = await fetch(`${base}/api/openai/v1/models`);
+  expect(plain.status).toBe(200);
+});
+
+test("a whitelisted origin gets its own origin echoed, others stay refused", async () => {
+  const { base } = await setup();
+  setGatewayEnabled(true);
+  const put = await fetch(`${base}/api/openai`, {
+    method: "PUT",
+    body: JSON.stringify({ origins: ["https://app.example.com/path", "ftp://x", "junk"] }),
+  });
+  expect((await put.json()).origins).toEqual(["https://app.example.com"]);
+
+  const preflight = await fetch(`${base}/api/openai/v1/chat/completions`, {
+    method: "OPTIONS",
+    headers: { Origin: "https://app.example.com", "Access-Control-Request-Method": "POST" },
+  });
+  expect(preflight.status).toBe(204);
+  expect(preflight.headers.get("access-control-allow-origin")).toBe("https://app.example.com");
+
+  const allowed = await fetch(`${base}/api/openai/v1/models`, {
+    headers: { Origin: "https://app.example.com" },
+  });
+  expect(allowed.status).toBe(200);
+  expect(allowed.headers.get("access-control-allow-origin")).toBe("https://app.example.com");
+
+  const other = await fetch(`${base}/api/openai/v1/models`, {
+    headers: { Origin: "https://evil.example.org" },
+  });
   expect(other.status).toBe(403);
-  const config = await fetch(`${base}/api/openai`, { headers: { Origin: "https://example.org" } });
-  expect(config.status).toBe(403);
+  expect(other.headers.get("access-control-allow-origin")).toBeNull();
+
+  // The whitelist opens the gateway only, never the rest of the API.
+  const rest = await fetch(`${base}/api/health`, {
+    headers: { Origin: "https://app.example.com" },
+  });
+  expect(rest.status).toBe(403);
 });
 
 test("an access key is required once set and is never a session for the rest of the API", async () => {
@@ -151,7 +182,7 @@ test("an access key is required once set and is never a session for the rest of 
   expect(wrong.status).toBe(401);
   expect((await wrong.json()).error.type).toBe("authentication_error");
   const ok = await fetch(`${base}/api/openai/v1/models`, {
-    headers: { Authorization: "Bearer sk-test-key", Origin: "https://example.org" },
+    headers: { Authorization: "Bearer sk-test-key" },
   });
   expect(ok.status).toBe(200);
   expect(ok.headers.get("set-cookie")).toBeNull();
@@ -187,7 +218,7 @@ test("in a password-protected LAN the gateway key replaces the password only for
   const request = (url, authorization) => ({
     url,
     method: "GET",
-    headers: { host: "192.0.2.1:4177", authorization, origin: "https://example.org" },
+    headers: { host: "192.0.2.1:4177", authorization },
     socket: { remoteAddress: "192.0.2.10" },
   });
   const response = () => {
@@ -212,4 +243,34 @@ test("in a password-protected LAN the gateway key replaces the password only for
   expect(key.res.headers["set-cookie"], "no session from a gateway key").toBeUndefined();
   expect(attempt("/api/openai/v1/models", "Bearer lan-password").allowed).toBe(false);
   expect(attempt("/api/projects", "Bearer sk-lan-key").allowed).toBe(false);
+});
+
+test("origin templates cover this machine and the local network on any port", async () => {
+  const { base } = await setup();
+  setGatewayEnabled(true);
+  const put = await fetch(`${base}/api/openai`, {
+    method: "PUT",
+    body: JSON.stringify({ origins: ["@Localhost", "@lan", "@nope"] }),
+  });
+  expect((await put.json()).origins).toEqual(["@localhost", "@lan"]);
+  const status = async (origin) =>
+    (await fetch(`${base}/api/openai/v1/models`, { headers: { Origin: origin } })).status;
+  for (const origin of [
+    "http://localhost:5173",
+    "https://127.0.0.1:8443",
+    "http://[::1]:3000",
+    "http://192.168.1.20:8080",
+    "http://10.1.2.3",
+    "http://172.20.0.5:3000",
+    "http://nas.local:5000",
+  ])
+    expect(await status(origin), origin).toBe(200);
+  for (const origin of [
+    "https://example.org",
+    "http://172.32.0.1",
+    "http://8.8.8.8",
+    "http://localhost.evil.com",
+    "http://192.168.1.1.evil.com",
+  ])
+    expect(await status(origin), origin).toBe(403);
 });

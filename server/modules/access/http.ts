@@ -4,9 +4,10 @@ import { readNetworkMode } from "../../../core/modules/app-paths/index.ts";
 import {
   accessAllowed,
   isLocalRequest,
-  isOpenOriginRequest,
+  isGatewayOriginAllowed,
+  isGatewayRequest,
   isTrustedHost,
-  openOriginKeyRejected,
+  gatewayKeyRejected,
 } from "./access.ts";
 import { hasLanPassword } from "./password.ts";
 import { rememberLanSession } from "./session.ts";
@@ -17,9 +18,9 @@ export function authorizeHttp(
   res: ServerResponse,
   allowLogin = false,
 ): boolean {
-  const openOrigin = isOpenOriginRequest(req);
-  if (openOrigin) {
-    allowAnyOrigin(res);
+  const gateway = isGatewayRequest(req);
+  if (gateway && isGatewayOriginAllowed(req)) {
+    allowOrigin(res, req.headers.origin!);
     if (req.method === "OPTIONS") {
       // A preflight carries no credentials, so it cannot be held to a key or password.
       res.writeHead(isTrustedHost(req) ? 204 : 403).end();
@@ -29,7 +30,7 @@ export function authorizeHttp(
   if (accessAllowed(req, false)) {
     try {
       // A gateway key must never be turned into a session for the rest of the API.
-      if (!openOrigin && !isLocalRequest(req)) rememberLanSession(req, res);
+      if (!gateway && !isLocalRequest(req)) rememberLanSession(req, res);
     } catch {
       res.writeHead(503).end();
       return false;
@@ -38,7 +39,9 @@ export function authorizeHttp(
   }
   const scheme = "encrypted" in req.socket && req.socket.encrypted ? "https:" : "http:";
   const originAllowed =
-    !req.headers.origin || req.headers.origin === `${scheme}//${req.headers.host}` || openOrigin;
+    !req.headers.origin ||
+    req.headers.origin === `${scheme}//${req.headers.host}` ||
+    isGatewayOriginAllowed(req);
   let status = 403;
   if (readNetworkMode() === "lan" && !isLocalRequest(req) && isTrustedHost(req) && originAllowed) {
     try {
@@ -48,7 +51,7 @@ export function authorizeHttp(
     }
   }
   res.setHeader("Cache-Control", "no-store");
-  if (isTrustedHost(req) && openOriginKeyRejected(req)) {
+  if (isTrustedHost(req) && gatewayKeyRejected(req)) {
     res.setHeader("WWW-Authenticate", "Bearer");
     res.writeHead(401, { "Content-Type": "application/json; charset=utf-8" });
     res.end(
@@ -82,8 +85,9 @@ export function authorizeHttp(
   return false;
 }
 
-function allowAnyOrigin(res: ServerResponse): void {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+function allowOrigin(res: ServerResponse, origin: string): void {
+  res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Vary", "Origin");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, OpenAI-Organization");
   res.setHeader("Access-Control-Allow-Private-Network", "true");

@@ -21,29 +21,43 @@ function hostname(req: IncomingMessage): string {
   }
 }
 
-/** Prefix of the API that other applications, browser pages included, call from any Origin. */
-export const OPEN_ORIGIN_PREFIX = "/api/openai/v1";
+/** Prefix of the API that other applications call; it has its own optional access key. */
+export const GATEWAY_PREFIX = "/api/openai/v1";
 
-export function isOpenOriginRequest(req: IncomingMessage): boolean {
+export function isGatewayRequest(req: IncomingMessage): boolean {
   const path = (req.url ?? "").split("?")[0];
-  return path === OPEN_ORIGIN_PREFIX || path.startsWith(`${OPEN_ORIGIN_PREFIX}/`);
+  return path === GATEWAY_PREFIX || path.startsWith(`${GATEWAY_PREFIX}/`);
 }
 
-type OpenOriginGuard = (req: IncomingMessage) => boolean | undefined;
-const guards = globalThis as typeof globalThis & { projectorOpenOriginGuard?: OpenOriginGuard };
+type GatewayGuard = (req: IncomingMessage) => boolean | undefined;
+const guards = globalThis as typeof globalThis & { projectorGatewayGuard?: GatewayGuard };
 
 /**
- * Host checks still apply to the open-origin API, and the LAN session cookie is SameSite=Strict,
- * so a foreign page carries no session. Its owner may authenticate its own requests: `true` admits them
+ * Origin and Host checks apply to the gateway like to the rest of the API, so browser pages of other
+ * sites never reach it. Its owner may authenticate its own requests: `true` admits them
  * without the LAN password, `false` rejects, `undefined` leaves the default rules.
  */
-export function registerOpenOriginGuard(guard: OpenOriginGuard): void {
-  guards.projectorOpenOriginGuard = guard;
+export function registerGatewayGuard(guard: GatewayGuard): void {
+  guards.projectorGatewayGuard = guard;
 }
 
-/** The owner of the open-origin API turned this request away for a missing or wrong key. */
-export function openOriginKeyRejected(req: IncomingMessage): boolean {
-  return isOpenOriginRequest(req) && guards.projectorOpenOriginGuard?.(req) === false;
+type OriginCheck = (origin: string) => boolean;
+const originChecks = globalThis as typeof globalThis & { projectorGatewayOrigins?: OriginCheck };
+
+/** The owner of the gateway lists the foreign origins whose pages may call it. */
+export function registerGatewayOrigins(check: OriginCheck): void {
+  originChecks.projectorGatewayOrigins = check;
+}
+
+/** A foreign page of a whitelisted origin calling the gateway; every other API has no such origins. */
+export function isGatewayOriginAllowed(req: IncomingMessage): boolean {
+  const origin = req.headers.origin;
+  return !!origin && isGatewayRequest(req) && !!originChecks.projectorGatewayOrigins?.(origin);
+}
+
+/** The owner of the gateway turned this request away for a missing or wrong key. */
+export function gatewayKeyRejected(req: IncomingMessage): boolean {
+  return isGatewayRequest(req) && guards.projectorGatewayGuard?.(req) === false;
 }
 
 /** Numeric LAN addresses and localhost cannot be rebound by a third-party DNS owner. */
@@ -88,12 +102,12 @@ export function accessAllowed(
   if (readNetworkMode() === "local" && (!local || !LOOPBACK.includes(host))) return false;
 
   const origin = req.headers.origin;
-  if (origin && origin !== `${scheme(req)}//${req.headers.host}` && !isOpenOriginRequest(req))
+  if (origin && origin !== `${scheme(req)}//${req.headers.host}` && !isGatewayOriginAllowed(req))
     return false;
   if (!origin && requireOrigin) return false;
 
-  if (isOpenOriginRequest(req)) {
-    const verdict = guards.projectorOpenOriginGuard?.(req);
+  if (isGatewayRequest(req)) {
+    const verdict = guards.projectorGatewayGuard?.(req);
     if (verdict !== undefined) return verdict;
   }
 
