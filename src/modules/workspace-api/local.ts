@@ -1,3 +1,4 @@
+import { newId } from "../../common/utilities/new-id.ts";
 import type { FileWrite, GitWrite, WorkspaceProfile } from "./profile.ts";
 import { defineTab, singletonTab } from "./tabs.ts";
 import { localWorkspaceWatch } from "./local-watch.ts";
@@ -22,7 +23,7 @@ function agentChatTab(program: string, label: string, description: string) {
     key: (params) => `${program}:${params.chatId ?? "main"}`,
     path: () => label,
     title: () => `${label} в графическом чате`,
-    create: () => ({ chatId: crypto.randomUUID() }),
+    create: () => ({ chatId: newId() }),
     command: {
       id: `ide.workbench.${program}.open`,
       title: `Новая сессия ${label} (GUI)`,

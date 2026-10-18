@@ -1,3 +1,4 @@
+import { newId } from "../../../common/utilities/new-id.ts";
 import {
   registerWorkspaceProfile,
   createLocalWorkspaceProfile,
@@ -132,7 +133,7 @@ export function useProjects() {
 }
 
 export function emptyDraft(): ProjectDraft {
-  const command = { id: crypto.randomUUID(), name: "dev", cmd: "pnpm dev" };
+  const command = { id: newId(), name: "dev", cmd: "pnpm dev" };
   return {
     name: "",
     path: "",

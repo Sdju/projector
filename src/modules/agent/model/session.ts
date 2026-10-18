@@ -1,3 +1,4 @@
+import { newId } from "../../../common/utilities/new-id.ts";
 import { computed, reactive } from "vue";
 import { useProjects } from "../../project/index.ts";
 import {
@@ -221,7 +222,7 @@ export function useAgent(
       state.draftParts = [];
     }
     if (state.busy) {
-      state.queue.push({ id: crypto.randomUUID(), text: message, parts: content ?? [] });
+      state.queue.push({ id: newId(), text: message, parts: content ?? [] });
       return;
     }
     // The edited message replaces the old one only now that it is really sent.
@@ -235,7 +236,7 @@ export function useAgent(
     const isolate = state.isolate && !copy && !resume && backend !== "projector";
     state.isolate = false;
     const userTurn: AgentTurn = {
-      id: crypto.randomUUID(),
+      id: newId(),
       role: "user",
       text: message,
       ...(content ? { content } : {}),
@@ -246,7 +247,7 @@ export function useAgent(
     state.stash = undefined;
     state.activeMessage = userTurn.id;
     const assistant = reactive<AgentTurn>({
-      id: crypto.randomUUID(),
+      id: newId(),
       role: "assistant",
       text: "",
       tools: [],

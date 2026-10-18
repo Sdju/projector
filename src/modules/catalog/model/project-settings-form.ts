@@ -1,3 +1,4 @@
+import { newId } from "../../../common/utilities/new-id.ts";
 import { computed, inject, onBeforeUnmount, provide, ref, watch, type InjectionKey } from "vue";
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from "vue-router";
 import {
@@ -69,7 +70,7 @@ export function createProjectSettingsForm(
   onBeforeUnmount(() => window.removeEventListener("beforeunload", beforeUnload));
 
   function addCommand() {
-    draft.value.commands.push({ id: crypto.randomUUID(), name: "", cmd: "" });
+    draft.value.commands.push({ id: newId(), name: "", cmd: "" });
   }
   function duplicateCommand(id: string) {
     duplicateScenario(draft.value.commands, id);

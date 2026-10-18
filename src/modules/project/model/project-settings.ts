@@ -1,3 +1,4 @@
+import { newId } from "../../../common/utilities/new-id.ts";
 import type { Project, ProjectCommand, ProjectDraft } from "./types.ts";
 
 export function projectDraft(project: Project): ProjectDraft {
@@ -84,7 +85,7 @@ export function duplicateCommand(
   const names = new Set(commands.map((command) => command.name.trim()));
   let name = `${source.name.trim() || "сценарий"} копия`;
   for (let n = 2; names.has(name); n++) name = `${source.name.trim()} копия ${n}`;
-  const copy = { ...source, id: crypto.randomUUID(), name };
+  const copy = { ...source, id: newId(), name };
   commands.splice(at + 1, 0, copy);
   return copy;
 }

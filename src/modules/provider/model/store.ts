@@ -1,3 +1,4 @@
+import { newId } from "../../../common/utilities/new-id.ts";
 import { computed, reactive } from "vue";
 import { fetchProviders, saveProviders, setActiveProvider } from "../api/client.ts";
 import type { OpenAIProviderPublic } from "./types.ts";
@@ -73,7 +74,7 @@ export function useProviders() {
   }
 
   function addProvider(): void {
-    const id = `p${crypto.randomUUID().slice(0, 8)}`;
+    const id = `p${newId().slice(0, 8)}`;
     state.providers.push({
       id,
       name: `Провайдер ${state.providers.length + 1}`,

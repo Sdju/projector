@@ -1,3 +1,4 @@
+import { newId } from "../../../common/utilities/new-id.ts";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import {
   duplicateCommand as duplicateScenario,
@@ -160,7 +161,7 @@ export function useProjectCommands(
     (args) =>
       apply((draft) => {
         const command: ProjectCommand = {
-          id: crypto.randomUUID(),
+          id: newId(),
           name: text(args.name, "name"),
           cmd: text(args.cmd, "cmd"),
         };
