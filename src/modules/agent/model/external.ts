@@ -176,6 +176,7 @@ export function useExternalAgent(
     await ready;
     if (state.busy) throw new Error("Дождитесь окончания ответа");
     state.error = "";
+    state.loading = true;
     try {
       if (external) {
         state.turns = await loadSessionTurns(backend, projectId, id);
@@ -188,6 +189,8 @@ export function useExternalAgent(
     } catch (err) {
       state.error = err instanceof Error ? err.message : "Не удалось открыть сессию";
       throw err;
+    } finally {
+      state.loading = false;
     }
   }
 

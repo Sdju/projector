@@ -10,6 +10,7 @@ import { readoutLines, useTabReadout } from "../../../common/utilities/tab-reado
 import UiPanel from "../../../common/ui/UiPanel.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
+import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import AgentWelcome from "./AgentWelcome.vue";
 import AgentTurn from "./AgentTurn.vue";
 import AgentComposer from "./AgentComposer.vue";
@@ -31,6 +32,7 @@ import { chatMarkdown } from "../lib/export.ts";
 import { latestPlan } from "../lib/plan.ts";
 import { fetchMcpServers, type McpServer } from "../api/client.ts";
 import { activateChat, registerChat, type ChatController } from "../model/chat-registry.ts";
+import { useChatWindow } from "../model/chat-window.ts";
 import { useRewindPanel } from "../model/rewind-panel.ts";
 import { useWorktreePanel } from "../model/worktree-panel.ts";
 import type { AgentBackendId, MessageChip, RewindScope } from "../model/types.ts";
@@ -48,6 +50,7 @@ const agentName = computed(() => agentLabel(props.backend));
 const { api } = useIdeCommands();
 const {
   turns,
+  loading,
   draft,
   draftParts,
   busy,
@@ -354,6 +357,15 @@ function openChip(chip: MessageChip) {
       });
 }
 const away = ref(false);
+const { PRELOAD_PX, firstShown, shown, hidden, loadEarlier, topUp } = useChatWindow(
+  turns,
+  log,
+  () => {
+    lastTop = log.value!.scrollTop;
+    lastHeight = log.value!.scrollHeight;
+  },
+  loading,
+);
 const copied = ref("");
 const copyError = ref("");
 function dismissError() {
@@ -375,6 +387,7 @@ function trackScroll() {
   if (element.scrollHeight - top - element.clientHeight <= 72) away.value = false;
   else if (top < lastTop && !shrunk) away.value = true;
   lastTop = top;
+  if (top < PRELOAD_PX) void topUp();
 }
 let frame = 0;
 function pin() {
@@ -444,6 +457,8 @@ watch(
     pin();
     await nextTick();
     observeContent();
+    // A short window leaves no room to scroll: fill it from above.
+    void topUp(true);
   },
 );
 onMounted(() => {
@@ -529,8 +544,12 @@ onBeforeUnmount(() => {
       </UiButton>
     </UiInline>
     <div v-show="!viewed" ref="log" class="chat-log" @scroll.passive="trackScroll">
+      <div v-if="loading" class="chat-loading" role="status">
+        <UiSpinner />
+        <span>Загружаю чат…</span>
+      </div>
       <AgentWelcome
-        v-if="!turns.length"
+        v-else-if="!turns.length"
         :plain="plain"
         :agent-name="agentName"
         @suggest="suggest"
@@ -544,14 +563,17 @@ onBeforeUnmount(() => {
         aria-live="polite"
         aria-relevant="additions text"
       >
+        <button v-if="hidden" type="button" class="earlier" @click="loadEarlier">
+          Показать ранние запросы · скрыто {{ hidden }}
+        </button>
         <AgentTurn
-          v-for="(turn, index) in turns"
+          v-for="(turn, offset) in shown"
           :key="turn.id"
           :turn="turn"
           :busy="busy"
-          :last="index === turns.length - 1"
+          :last="firstShown + offset === turns.length - 1"
           :copied="copied === turn.id"
-          :faded="editFrom >= 0 && index >= editFrom"
+          :faded="editFrom >= 0 && firstShown + offset >= editFrom"
           :root="projectRoot"
           :can-revert="canRevert(turn.id)"
           @copy="copyMessage"
@@ -718,6 +740,31 @@ onBeforeUnmount(() => {
   color: var(--text-2);
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+.chat-loading {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+.chat-loading svg {
+  width: 16px;
+  height: 16px;
+}
+.earlier {
+  display: block;
+  margin: 0 auto var(--sp-4);
+  padding: var(--sp-1) var(--sp-3);
+  color: var(--muted);
+  font-size: var(--fs-2xs);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.earlier:hover {
+  color: var(--text);
 }
 .conversation {
   width: 100%;

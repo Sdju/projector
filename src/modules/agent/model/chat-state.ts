@@ -18,6 +18,8 @@ import type {
 export const createState = () =>
   reactive({
     turns: [] as AgentTurn[],
+    /** The saved conversation is being fetched: the turns are not the chat's yet. */
+    loading: false,
     draft: "",
     draftParts: [] as MessagePart[],
     busy: false,

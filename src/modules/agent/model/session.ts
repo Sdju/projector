@@ -18,6 +18,7 @@ import {
   requestNotifications,
 } from "../lib/notify.ts";
 import { RELEASE_DELAY_MS, createState, loads, releases, sessions, viewers } from "./chat-state.ts";
+import { INTERRUPTED, loadHistory } from "./load-history.ts";
 import { saveChat } from "./save-chat.ts";
 import { useExternalAgent } from "./external.ts";
 import { applyAgentEvent } from "./turn-events.ts";
@@ -33,8 +34,6 @@ import type {
 /** A restarting server answers again within seconds; this much patience covers a slow restart. */
 const REJOIN_DELAY_MS = 1000;
 const REJOIN_ATTEMPTS = 60;
-const INTERRUPTED =
-  "Ответ прерван: страница или сервер были перезапущены. Отправьте сообщение ещё раз — разговор продолжится.";
 
 export function useAgent(
   projectId = "",
@@ -51,31 +50,7 @@ export function useAgent(
   const state = sessions.get(key)!;
 
   const historyUrl = `/api/agent/history/${encodeURIComponent(key || "catalog")}`;
-  if (!loads.has(key))
-    loads.set(
-      key,
-      fetch(historyUrl)
-        .then(async (response) => {
-          if (!response.ok) throw new Error("Не удалось загрузить историю чата");
-          const data = await response.json();
-          state.turns = data.turns;
-          // A turn saved at its start but never finished: the page or server went away mid-answer.
-          // One with a live agent process behind it is rejoined instead (`resumeRun`).
-          const last = state.turns.at(-1);
-          if (last?.role === "assistant" && !last.run && !last.text.trim() && !last.tools.length)
-            last.text = INTERRUPTED;
-          for (const turn of state.turns)
-            for (const chip of turn.tools) {
-              if (chip.status === "running") {
-                chip.status = "error";
-                chip.detail = "Выполнение прервано";
-              }
-            }
-        })
-        .catch((error) => {
-          state.error = error.message;
-        }),
-    );
+  if (!loads.has(key)) loads.set(key, loadHistory(historyUrl, state));
   const ready = loads.get(key)!;
   const persist = () => saveChat(key, historyUrl, state);
   const catalog = useProjects();
@@ -93,6 +68,7 @@ export function useAgent(
     },
   });
   const busy = computed(() => state.busy);
+  const loading = computed(() => state.loading);
   const error = computed({
     get: () => state.error,
     set: (value: string) => {
@@ -348,6 +324,7 @@ export function useAgent(
   }
   return {
     turns,
+    loading,
     draft,
     draftParts,
     busy,
