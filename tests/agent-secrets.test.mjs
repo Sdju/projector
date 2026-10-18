@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, stat, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { providersPath } from "../core/modules/app-paths/index.ts";
@@ -194,6 +194,27 @@ test("a legacy obfuscated key moves to the keyring on first view", async () => {
   expect(keyring.items.get("provider:legacy")).toBe("sk-legacy-456");
   const resolved = await resolveOpenAIProvider({ providerId: "legacy", fallback: {} });
   expect(resolved.apiKey).toBe("sk-legacy-456");
+});
+
+test("a damaged providers file is kept aside, not overwritten by the defaults", async () => {
+  useProviderVault(createVault(fakeKeyring(), () => undefined));
+  await mkdir(dirname(providersPath()), { recursive: true });
+  await writeFile(providersPath(), '{"providers": [{"id": "mine"');
+  const state = await loadPublicProviders({});
+  expect(state.providers.length).toBeGreaterThan(0);
+  const names = await readdir(dirname(providersPath()));
+  const broken = names.find((name) => name.startsWith("providers.json.broken-"));
+  expect(broken).toBeDefined();
+  expect(await readFile(join(dirname(providersPath()), broken), "utf8")).toContain('"mine"');
+  expect(names.filter((name) => name.endsWith(".tmp"))).toEqual([]);
+});
+
+test("an unreadable providers file is an error, not a first run", async () => {
+  await mkdir(dirname(providersPath()), { recursive: true });
+  await rm(providersPath(), { force: true });
+  await mkdir(providersPath());
+  await expect(loadPublicProviders({})).rejects.toThrow();
+  await rm(providersPath(), { recursive: true });
 });
 
 test("an integration must be enabled before its token is asked for", async () => {

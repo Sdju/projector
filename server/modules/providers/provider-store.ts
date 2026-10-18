@@ -1,6 +1,6 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { readFile } from "node:fs/promises";
 import { providersPath } from "../../../core/modules/app-paths/index.ts";
+import { setAsideBroken, writeFileAtomic } from "./atomic-file.ts";
 import { HttpError } from "../http/index.ts";
 import { vault as systemVault } from "../secrets/index.ts";
 import { DEFAULT_PROVIDERS_SECRET, revealSecret } from "./secret-obfuscation.ts";
@@ -117,9 +117,20 @@ function normalizeStoredProvider(value: unknown, index: number): StoredOpenAIPro
 export async function loadStoredProviders(
   fallback: EnvOpenAIFallback = {},
 ): Promise<StoredProvidersConfig> {
+  const file = providersPath();
   try {
-    const raw = await readFile(providersPath(), "utf8");
-    const parsed = JSON.parse(raw) as { activeProviderId?: unknown; providers?: unknown };
+    let parsed: { activeProviderId?: unknown; providers?: unknown };
+    try {
+      const value: unknown = JSON.parse(await readFile(file, "utf8"));
+      if (!value || typeof value !== "object" || Array.isArray(value))
+        throw new SyntaxError("providers.json не объект");
+      parsed = value;
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
+      const backup = await setAsideBroken(file);
+      console.error(`providers.json повреждён и сохранён как ${backup}:`, error.message);
+      return seededConfig(fallback);
+    }
     const providers = Array.isArray(parsed.providers)
       ? parsed.providers
           .map((item, index) => normalizeStoredProvider(item, index))
@@ -132,8 +143,10 @@ export async function loadStoredProviders(
         ? parsed.activeProviderId
         : (providers[0]?.id ?? null);
     return { activeProviderId, providers };
-  } catch {
-    return seededConfig(fallback);
+  } catch (error) {
+    // A missing file is the first run; any other failure must not look like one.
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return seededConfig(fallback);
+    throw error;
   }
 }
 
@@ -152,9 +165,7 @@ export async function loadPublicProviders(
 }
 
 async function writeProvidersFile(config: StoredProvidersConfig): Promise<void> {
-  const file = providersPath();
-  await mkdir(dirname(file), { recursive: true });
-  await writeFile(file, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+  await writeFileAtomic(providersPath(), `${JSON.stringify(config, null, 2)}\n`);
 }
 
 /**
