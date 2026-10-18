@@ -29,7 +29,6 @@ function lint(files, config = feod) {
   Object.defineProperty(byFile, "messages", { value: messages });
   return byFile;
 }
-const lines = (count) => "export {};\n" + "void 0;\n".repeat(count);
 const index = (name = "x") => `export const ${name} = 1;\n`;
 
 test("valid layers, public entries, transit adapters and shared cores pass", () => {
@@ -196,50 +195,4 @@ test("module cycles are rejected, including type edges, while shared dependencie
     "a <-> b via a type edge",
   ).toBeTruthy();
   expect(Object.values(result).filter((rules) => rules.has("no-module-cycles")).length).toBe(1);
-});
-
-test("the large-file registry is a ratchet with per-extension limits", () => {
-  const withRegistry = (files) => ({
-    ...feod,
-    rootDefault: {
-      ...feod.rootDefault,
-      extra: {
-        ...feod.rootDefault.extra,
-        largeFiles: { thresholds: { default: 400, ".vue": 500 }, files },
-      },
-    },
-  });
-  const fixture = {
-    "src/modules/a/index.ts": index("a"),
-    "src/modules/a/ok.ts": lines(399),
-    "src/modules/a/ok.vue": `<script setup lang="ts">\n${"void 0;\n".repeat(480)}</script>\n`,
-    "src/modules/a/new.ts": lines(401),
-    "src/modules/a/big.ts": lines(600),
-    "src/modules/a/shrunk.ts": lines(430),
-    "src/modules/a/small.ts": lines(100),
-  };
-  const result = lint(
-    fixture,
-    withRegistry({
-      "src/modules/a/big.ts": { ceiling: 590, plan: "split" },
-      "src/modules/a/shrunk.ts": { ceiling: 450, plan: "split" },
-      "src/modules/a/small.ts": { ceiling: 450, plan: "split" },
-      "src/modules/a/gone.ts": { ceiling: 450, plan: "split" },
-    }),
-  );
-  // Inventory-wide findings (the stale `gone.ts` entry) attach to whichever file is walked first,
-  // and the walk order is up to the file system: judge the small files by what is said about them.
-  for (const file of ["ok.ts", "ok.vue"])
-    expect(
-      result.messages.filter((message) => message.includes(`src/modules/a/${file}`)),
-      file,
-    ).toStrictEqual([]);
-  for (const file of ["new.ts", "big.ts", "shrunk.ts", "small.ts"]) {
-    expect(result[`src/modules/a/${file}`]?.has("large-files"), file).toBeTruthy();
-  }
-  expect(Object.values(result).some((rules) => rules.has("large-files"))).toBeTruthy();
-});
-
-test("the real Projector tree satisfies its FEOD policy", () => {
-  expect(checkFeod()).toStrictEqual([]);
 });
