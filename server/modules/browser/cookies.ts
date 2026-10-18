@@ -1,7 +1,9 @@
+import { getDomain } from "tldts";
+
 /**
  * Cookie-jar прокси. Cookies сайтов хранятся на сервере, а не в браузере: страница
  * не может подбросить их чужим сайтам через `Domain=proxy.localhost`, а HttpOnly остаётся
- * недоступным скриптам. Правила RFC 6265 упрощены: списка публичных суффиксов нет.
+ * недоступным скриптам. Правила RFC 6265 упрощены; публичные суффиксы (`github.io`) проверяются по списку `tldts`.
  */
 interface Cookie {
   name: string;
@@ -52,9 +54,14 @@ export function storeCookie(header: string, url: URL, now = Date.now()): void {
     const value = rest.join("=").trim();
     if (name === "domain" && value) {
       const domain = value.replace(/^\./, "").toLowerCase();
-      if (!domain.includes(".") || !domainMatches(url.hostname, domain)) return;
-      cookie.domain = domain;
-      cookie.hostOnly = false;
+      if (!domainMatches(url.hostname, domain)) return;
+      if (!getDomain(domain, { allowPrivateDomains: true })) {
+        // Публичный суффикс или IP: Domain допустим только как сам хост и остаётся host-only.
+        if (url.hostname !== domain || !domain.includes(".")) return;
+      } else {
+        cookie.domain = domain;
+        cookie.hostOnly = false;
+      }
     } else if (name === "path" && value.startsWith("/")) cookie.path = value;
     else if (name === "secure") cookie.secure = true;
     else if (name === "samesite") {

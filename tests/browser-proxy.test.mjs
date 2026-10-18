@@ -123,3 +123,14 @@ test("the proxy refuses loopback and LAN addresses", () => {
   expect(isInternalLiteral("[::1]")).toBe(true);
   expect(isInternalLiteral("example.com")).toBe(false);
 });
+
+test("cookie jar refuses Domain set to a public suffix", () => {
+  clearCookies();
+  storeCookie("sid=attacker; Domain=github.io; Path=/", new URL("https://attacker.github.io"));
+  storeCookie("co=1; Domain=co.uk; Path=/", new URL("https://shop.example.co.uk"));
+  storeCookie("ok=2; Domain=example.co.uk; Path=/", new URL("https://shop.example.co.uk"));
+  const same = { navigation: false, sameSite: true };
+  expect(cookieHeader(new URL("https://victim.github.io/"), same)).toBe("");
+  expect(cookieHeader(new URL("https://attacker.github.io/"), same)).toBe("");
+  expect(cookieHeader(new URL("https://www.example.co.uk/"), same)).toBe("ok=2");
+});
