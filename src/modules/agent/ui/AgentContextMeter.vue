@@ -41,13 +41,25 @@ const names: Record<string, string> = {
   Skills: "Навыки",
   Messages: "Сообщения",
 };
+// Each kind of content keeps its colour, so a segment of the bar is recognised by it, not by order.
+const colors: Record<string, string> = {
+  "System prompt": "var(--info)",
+  "System tools": "#a99bd4",
+  "MCP tools": "#d49bb8",
+  "Custom agents": "#7fc4c0",
+  "Memory files": "var(--accent)",
+  Skills: "#d4a574",
+  Messages: "var(--run)",
+};
 const categories = computed(() =>
-  [...(props.context.categories ?? [])]
+  (props.context.categories ?? [])
+    .filter((item) => item.tokens > 0 && !/^free space$/i.test(item.name))
     .sort((a, b) => b.tokens - a.tokens)
     .map((item) => ({
       name: names[item.name] ?? item.name,
       tokens: item.tokens,
-      share: (item.tokens / Math.max(1, props.context.used)) * 100,
+      color: colors[item.name] ?? "var(--muted)",
+      width: Math.min(100, (item.tokens / Math.max(1, props.context.size)) * 100),
     })),
 );
 const cost = computed(() => {
@@ -105,7 +117,15 @@ const hide = () => menu.close(false);
         <span class="percent">{{ Math.round(percent) }}%</span>
       </div>
       <div class="bar" aria-hidden="true">
-        <span class="bar-fill" :style="{ width: `${percent}%` }" />
+        <template v-if="categories.length">
+          <span
+            v-for="item in categories"
+            :key="item.name"
+            class="bar-segment"
+            :style="{ width: `${item.width}%`, background: item.color }"
+          />
+        </template>
+        <span v-else class="bar-fill" :style="{ width: `${percent}%` }" />
         <span
           v-if="context.compactAt"
           class="bar-mark"
@@ -116,10 +136,8 @@ const hide = () => menu.close(false);
       <p class="note">Свободно {{ tokens(left) }}</p>
       <ul v-if="categories.length" class="categories">
         <li v-for="item in categories" :key="item.name">
+          <span class="cat-dot" :style="{ background: item.color }" aria-hidden="true" />
           <span class="cat-name u-truncate">{{ item.name }}</span>
-          <span class="cat-bar" aria-hidden="true"
-            ><span :style="{ width: `${Math.max(2, item.share)}%` }"
-          /></span>
           <span class="cat-tokens">{{ short(item.tokens) }}</span>
         </li>
       </ul>
@@ -203,9 +221,16 @@ circle {
 }
 .bar {
   position: relative;
-  height: 4px;
+  display: flex;
+  gap: 1px;
+  height: 8px;
   border-radius: var(--r-full);
   background: var(--bg-sunken);
+  overflow: hidden;
+}
+.bar-segment {
+  flex: none;
+  height: 100%;
 }
 .bar-fill {
   display: block;
@@ -215,10 +240,11 @@ circle {
 }
 .bar-mark {
   position: absolute;
-  top: -2px;
-  width: 1px;
-  height: 8px;
-  background: var(--muted);
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: var(--text);
+  opacity: 0.7;
 }
 .line,
 .note {
@@ -242,21 +268,15 @@ circle {
 }
 .categories li {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 56px 36px;
+  grid-template-columns: 8px minmax(0, 1fr) 36px;
   align-items: center;
   gap: var(--sp-2);
 }
 
-.cat-bar {
-  height: 3px;
+.cat-dot {
+  width: 8px;
+  height: 8px;
   border-radius: var(--r-full);
-  background: var(--bg-sunken);
-  overflow: hidden;
-}
-.cat-bar span {
-  display: block;
-  height: 100%;
-  background: var(--muted);
 }
 .cat-tokens {
   text-align: right;
