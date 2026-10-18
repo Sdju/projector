@@ -79,7 +79,7 @@ export default {
   roots: {
     src: {
       dependencies: ["core"],
-      transitModules: ["agents-integration"],
+      transitModules: ["agents-integration", "agent-widgets"],
       extra: { confine: [...nodeOnly, ...adapters] },
     },
     server: {
@@ -90,7 +90,7 @@ export default {
     native: { dependencies: ["core"] },
     core: {
       layers: libraryLayers,
-      transitModules: ["agents-integration"],
+      transitModules: ["agents-integration", "agent-widgets"],
       extra: { confine: [...nodeOnly, ...adapters] },
     },
     cli: { layers: libraryLayers, dependencies: ["core"] },

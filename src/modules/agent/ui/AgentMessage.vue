@@ -1,14 +1,24 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, toRef } from "vue";
 import { renderChatMarkdown } from "../lib/markdown.ts";
-import { splitMessage } from "../lib/widget-split.ts";
-import AgentWidget from "./AgentWidget.vue";
-import { isWidgetName } from "./widgets/index.ts";
+import {
+  AgentWidget,
+  isWidgetName,
+  splitMessage,
+  useMessageScope,
+} from "../../widget-runtime/index.ts";
 
 const props = defineProps<{ text: string; streaming?: boolean }>();
 // Text only grows, so earlier parts keep their position and source: Vue patches only the tail.
 const parts = computed(() =>
   splitMessage(props.text, { known: isWidgetName, streaming: props.streaming }),
+);
+// The message's own `<script>`s run once into a scope its components share.
+const scriptErrors = ref<string[]>([]);
+useMessageScope(
+  parts,
+  toRef(() => !props.streaming),
+  scriptErrors,
 );
 </script>
 
@@ -16,12 +26,21 @@ const parts = computed(() =>
   <div class="agent-message">
     <template v-for="(part, index) in parts" :key="index">
       <div v-if="part.type === 'markdown'" class="md" v-html="renderChatMarkdown(part.text)" />
-      <AgentWidget v-else :source="part.source" :complete="part.complete" />
+      <AgentWidget
+        v-else-if="part.type === 'widget'"
+        :source="part.source"
+        :complete="part.complete"
+      />
     </template>
+    <p v-for="error in scriptErrors" :key="error" class="script-error" role="alert">{{ error }}</p>
   </div>
 </template>
 
 <style scoped>
+.script-error {
+  color: var(--err);
+  font-size: var(--fs-xs);
+}
 .agent-message {
   color: var(--text);
   font-size: var(--fs-sm);

@@ -2,7 +2,8 @@ import type { AgentBackend, AgentRunOptions, AgentControl } from "../../agent/in
 import { isStepCount, streamText, type ModelMessage } from "ai";
 import type { Project } from "../../projects/index.ts";
 import { createAgentTools } from "./agent-tools.ts";
-import { AGENT_SYSTEM_PROMPT } from "./prompts.ts";
+import { buildSystemPrompt } from "./prompts.ts";
+import { widgetCatalog } from "./widgets.ts";
 import {
   createQwenOpenAI,
   envFallbackFromProcess,
@@ -63,7 +64,9 @@ async function run(options: AgentRunOptions): Promise<void> {
 
   const result = streamText({
     model,
-    system: AGENT_SYSTEM_PROMPT + (options.cwd ? `\nТекущий проект: ${options.cwd}` : ""),
+    system:
+      buildSystemPrompt(widgetCatalog.guide()) +
+      (options.cwd ? `\nТекущий проект: ${options.cwd}` : ""),
     messages,
     tools,
     stopWhen: isStepCount(MAX_STEPS),

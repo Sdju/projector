@@ -42,4 +42,5 @@ vp run vio:gtk-test  # реальные GTK-виджеты; нужен display
 - [Интеграции](docs/integrations.md): GitHub, авторизация и импорт.
 - [Архитектура](docs/architecture.md), [адаптер ОС](docs/os.md), [транспорт терминалов](docs/terminal-transport.md), [Docker](docs/docker.md) и [решения по контейнерам](docs/containers-design.md).
 - [UI-кит](docs/ui-kit.md), [виртуализация списков](docs/virtualization.md), [аудит дублей компонентов](docs/component-reuse-audit.md).
+- [Компоненты в ответах агента](docs/agent-widgets.md): каталог виджетов, прогрессивный рендер, формы и `reply`.
 - [SDK команд IDE](docs/ide-commands.md), [темы иконок](docs/file-icons.md), [renderer vio](packages/vio/README.md).

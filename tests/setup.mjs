@@ -5,8 +5,10 @@ import { join } from "node:path";
 import { afterEach, vi } from "vite-plus/test";
 // The agents the server offers are registered at startup; tests run against the same set.
 import { registerBuiltinAgents } from "../server/app/agents.ts";
+import { registerBuiltinWidgetDefinitions } from "../server/app/widgets.ts";
 
 registerBuiltinAgents();
+registerBuiltinWidgetDefinitions();
 
 // Windows runners hand out 8.3 names (RUNNER~1); the server resolves real paths, so tests must too.
 if (process.platform === "win32")

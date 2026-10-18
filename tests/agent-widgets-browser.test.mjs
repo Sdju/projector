@@ -371,13 +371,140 @@ test(
       note: "осторожно",
     });
 
-    // A script that arrives after the component (late chunk) fixes the earlier render error.
+    // A name nobody defined is an error once the message is over, and not before: while streaming a
+    // later `<script>` may still define it, and when it does the blank fills in.
     const body = "<Card>{{ late }}</Card>";
     await set(body, true);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(await browser.evaluate('document.querySelectorAll(".widget-failure").length')).toBe(0);
+    await set(body, false);
     await wait('document.querySelector(".widget-failure") !== null');
-    await set(`${body}\n\n<script>const late = ref("готово"); return { late };</script>`, true);
+    await set(`${body}\n\n<script>const late = ref("готово"); return { late };</script>`, false);
     await wait(
       'document.querySelector(".widget-failure") === null && document.body.textContent.includes("готово")',
     );
+
+    // One shared script, several blocks: a slider in one drives a stat and a chart in others.
+    const shared = `<Card><Slider label="Множитель" :min="1" :max="10" v-model="k" /></Card>
+
+<Card><Stat id="out" label="Итого" :value="k * base" /></Card>
+
+<Line :labels="['a','b']" :series="[{name:'s',data:[k, k * 2]}]" />
+
+<script>
+  const base = 100;
+  const k = ref(2);
+  return { base, k };
+</script>`;
+    await set(shared, true);
+    await wait(
+      'document.querySelector("#out") !== null && document.querySelector("#out").innerText.includes("200")',
+    );
+    expect(await browser.evaluate('document.querySelectorAll(".widget-failure").length')).toBe(0);
+    await set(shared, false);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await browser.evaluate(
+      `(() => { const r = document.querySelector(".slider input"); r.value = 7; r.dispatchEvent(new Event("input", { bubbles: true })); })()`,
+    );
+    await wait('document.querySelector("#out").innerText.includes("700")');
+    expect(await browser.evaluate('document.querySelectorAll(".widget-failure").length')).toBe(0);
+  },
+);
+
+const streamed = (script, tail) => `Отчёт:
+
+<Card title="Сводка">
+${script}
+  <Row>
+    <Stat label="Выручка" :value="total" />
+    <Stat label="Заказы" value="76" />
+  </Row>
+  <Bars :items="[{label:'a',value:1},{label:'b',value:2}]" />
+  <Line :labels="months" :series="[{name:'s',data:[1,2,3]}]" />
+  <Tabs>
+    <Tab title="Один"><Input name="x" /></Tab>
+    <Tab title="Два">второй</Tab>
+  </Tabs>
+${tail}</Card>
+
+Конец.`;
+const SCRIPT = `  <script>
+    window.__runs = (window.__runs ?? 0) + 1;
+    const total = ref(1234);
+    const months = ['a', 'b', 'c'];
+    return { total, months };
+  </script>`;
+
+test(
+  "a message grows in place: no remount, no errors, script once, inert until finished",
+  { skip: !chromium, timeout: 120000, retry: 1 },
+  async () => {
+    const html = await readFile(new URL("./fixtures/agent-widgets.html", import.meta.url), "utf8");
+    const fixture = await createBrowserFixture({ pages: { "/widgets": html } });
+    onTestFinished(() => fixture.close());
+    const browser = await createChromium(fixture.directory);
+    onTestFinished(() => browser.close());
+    await browser.open(fixture.url("/widgets"));
+    await browser.viewport(900, 1200);
+    const set = (value, live) =>
+      browser.evaluate(`window.fixture.set(${JSON.stringify(value)}, ${live})`);
+    const frame = () =>
+      browser.evaluate("new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))");
+
+    // Script first, then the template; and script last (a late setup must fill the blanks in).
+    for (const message of [streamed(SCRIPT, ""), streamed("", SCRIPT)]) {
+      await set("", true);
+      await browser.evaluate("window.__runs = 0; document.querySelector('.ui-card')?.remove?.()");
+      let marked = false;
+      let progressive = 0;
+      let inertWhileStats = false;
+      for (let at = 3; at < message.length + 3; at += 3) {
+        await set(message.slice(0, at), at < message.length);
+        await frame();
+        const probe = JSON.parse(
+          await browser.evaluate(`JSON.stringify({
+            card: Boolean(document.querySelector(".ui-card")),
+            marked: document.querySelector(".ui-card")?.__mark === 1,
+            stat: document.querySelectorAll(".stat").length,
+            statMarked: document.querySelector(".stat")?.__mark === 1,
+            inert: Boolean(document.querySelector(".widget")?.hasAttribute("inert")),
+            failures: document.querySelectorAll(".widget-failure").length,
+          })`),
+        );
+        expect(probe.failures, `error at ${at}`).toBe(0);
+        if (probe.card && !marked) {
+          await browser.evaluate(
+            'document.querySelector(".ui-card").__mark = 1; if (document.querySelector(".stat")) document.querySelector(".stat").__mark = 1; true',
+          );
+          marked = true;
+          continue;
+        }
+        if (marked) {
+          expect(probe.marked, `card remounted at ${at}`).toBe(true);
+          if (probe.stat) {
+            if (!probe.statMarked)
+              await browser.evaluate('document.querySelector(".stat").__mark = 1; true');
+            if (at < message.length) {
+              progressive = Math.max(progressive, probe.stat);
+              inertWhileStats ||= probe.inert;
+            }
+          }
+        }
+      }
+      await frame();
+      expect(marked).toBe(true);
+      // Stats showed up before the message was finished, and the half-written widget was inert.
+      expect(progressive).toBeGreaterThan(0);
+      expect(inertWhileStats).toBe(true);
+      expect(
+        await browser.evaluate('document.querySelector(".widget").hasAttribute("inert")'),
+      ).toBe(false);
+      expect(await browser.evaluate("window.__runs")).toBe(1);
+      expect(await browser.evaluate('document.querySelector(".stat").innerText')).toContain("1234");
+      expect(await browser.evaluate('document.querySelectorAll(".widget-failure").length')).toBe(0);
+      // The tabs and the form field made it into the finished widget.
+      expect(await browser.evaluate('document.querySelectorAll("[role=tab]").length')).toBe(2);
+      expect(await browser.evaluate('document.querySelectorAll(".bars li").length')).toBe(2);
+    }
   },
 );

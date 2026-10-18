@@ -6,7 +6,9 @@
   import "/src/app/styles.css";
   import { createApp, h, ref } from "vue";
   import AgentMessage from "/src/modules/agent/ui/AgentMessage.vue";
-  import { widgetReplyKey } from "/src/modules/agent/lib/widget-bridge.ts";
+  import { widgetReplyKey } from "/src/modules/widget-runtime/index.ts";
+  import { registerBuiltinWidgets } from "/src/app/widgets.ts";
+  registerBuiltinWidgets();
   const text = ref("");
   const streaming = ref(true);
   const replies = [];
