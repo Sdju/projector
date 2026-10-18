@@ -63,6 +63,8 @@ const cost = computed(() => {
 });
 
 // The island is a hint: it follows the pointer and the keyboard focus, and a click pins nothing.
+// It grows over the trigger, so it is `passive`: otherwise it takes the pointer, ends the hover
+// that opened it, closes, and the hover starts again, over and over.
 const show = () => void menu.toggle(true);
 const hide = () => menu.close(false);
 </script>
@@ -96,7 +98,7 @@ const hide = () => menu.close(false);
       </svg>
     </button>
   </div>
-  <UiIsland :menu="menu" label="Контекст агента" :width="280">
+  <UiIsland :menu="menu" passive label="Контекст агента" :width="280">
     <div class="details" :class="tone">
       <div class="headline">
         <span class="title">Контекст</span>

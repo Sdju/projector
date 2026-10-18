@@ -8,6 +8,8 @@ const props = defineProps<{
   label: string;
   width?: number;
   gap?: string;
+  /** A hint, not a menu: the pointer passes through it, so it never ends the hover that opened it. */
+  passive?: boolean;
 }>();
 function bindIsland(surface: Element | ComponentPublicInstance | null) {
   props.menu.island.value = (surface as InstanceType<typeof UiPopupSurface> | null)?.element;
@@ -27,7 +29,7 @@ function bindIsland(surface: Element | ComponentPublicInstance | null) {
       class="island"
       role="dialog"
       :aria-label="label"
-      :class="{ 'mobile-sheet': menu.compact.value }"
+      :class="{ 'mobile-sheet': menu.compact.value, passive }"
       :style="{
         ...menu.style.value,
         '--island-width': `${width ?? 340}px`,
@@ -52,6 +54,9 @@ function bindIsland(surface: Element | ComponentPublicInstance | null) {
   overflow-y: auto;
   padding: var(--sp-1);
   font-size: var(--fs-xs);
+}
+.passive {
+  pointer-events: none;
 }
 .mobile-sheet {
   --ui-island-chevron-transform: none;
