@@ -39,6 +39,7 @@ import {
   CLAUDE_CONTROLS,
   claudeLoadSession,
   claudeSessions,
+  claudeDeleteSession,
   claudeUpdateSession,
 } from "./claude-code-sessions.ts";
 import { askClaudeQuestions } from "./questions.ts";
@@ -385,6 +386,7 @@ export const claudeCodeBackend: AgentBackend = {
   sessions: claudeSessions,
   loadSession: claudeLoadSession,
   updateSession: claudeUpdateSession,
+  deleteSession: claudeDeleteSession,
   rewindFiles: (cwd, sessionId, messageId, dryRun) =>
     rewindClaudeFiles(cwd, sessionId, messageId, dryRun),
   mcpServers: claudeMcpServers,

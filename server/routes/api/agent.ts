@@ -14,6 +14,7 @@ import {
   agentSessions,
   rewindAgentFiles,
   updateAgentSession,
+  deleteAgentSession,
   loadAgentSession,
   selectionFrom,
   runAgent,
@@ -169,6 +170,17 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
       ...(typeof body.title === "string" ? { title: body.title } : {}),
       ...(typeof body.pinned === "boolean" ? { pinned: body.pinned } : {}),
     });
+    json(res, 200, { ok: true });
+    return true;
+  }
+  if (path === "/api/agent/sessions/delete" && method === "POST") {
+    if (!accessAllowed(req, true))
+      throw new HttpError(403, "Удаление доступно только со страницы Projector");
+    const body = await readBody(req);
+    const cwd = await projectPath(asString(body.projectId));
+    const sessionId = asString(body.sessionId);
+    if (!sessionId) throw new Error("Укажите сессию");
+    await deleteAgentSession(asString(body.backend) || undefined, cwd, sessionId);
     json(res, 200, { ok: true });
     return true;
   }

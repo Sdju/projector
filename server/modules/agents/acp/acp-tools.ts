@@ -102,6 +102,19 @@ export function acpSessions(id: AgentBackendId, cwd: string): Promise<AgentSessi
   });
 }
 
+/** Removes a past session through `session/delete`, for agents that offer it. */
+export function acpDeleteSession(
+  id: AgentBackendId,
+  cwd: string,
+  sessionId: string,
+): Promise<void> {
+  return withAgent(id, cwd, async (connection, init) => {
+    if (!init.agentCapabilities?.sessionCapabilities?.delete)
+      throw new Error("Агент не умеет удалять сессии");
+    await connection.request("session/delete", { sessionId });
+  });
+}
+
 /** The messages of a past session, replayed by the agent through `session/load`. */
 export function acpLoadSession(
   id: AgentBackendId,

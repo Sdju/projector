@@ -40,6 +40,7 @@ const { open: shown } = menu;
 const search = ref("");
 const renaming = ref("");
 const draft = ref("");
+const confirming = ref("");
 const searchInput = ref<UiControlHandle>();
 const visible = computed(() => {
   const needle = search.value.trim().toLocaleLowerCase();
@@ -73,6 +74,15 @@ function finishRename(save: boolean, restoreFocus = false) {
       target?.focus();
     });
 }
+/** A removal cannot be undone: the first click arms the button, the second one deletes. */
+function remove(id: string) {
+  if (confirming.value !== id) {
+    confirming.value = id;
+    return;
+  }
+  confirming.value = "";
+  emit("remove", id);
+}
 function pick(id: string) {
   menu.close();
   emit("pick", id);
@@ -83,6 +93,7 @@ watch(shown, (open) => {
     emit("open");
   } else {
     renaming.value = "";
+    confirming.value = "";
     renameRow = undefined;
   }
 });
@@ -135,7 +146,7 @@ function age(value?: string): string {
       <p v-if="loading" class="note">Загружаю…</p>
       <p v-else-if="error" class="note error" role="alert">{{ error }}</p>
       <p v-else-if="!sessions.length" class="note">
-        {{ deletable ? "Прошлых чатов пока нет" : "В этой папке пока нет сессий" }}
+        {{ label ? "Прошлых чатов пока нет" : "В этой папке пока нет сессий" }}
       </p>
       <p v-else-if="!visible.length" class="note">Ничего не найдено</p>
       <UiInline
@@ -176,6 +187,7 @@ function age(value?: string): string {
           justify="normal"
         >
           <button
+            v-if="editable"
             type="button"
             class="mini"
             :title="session.pinned ? 'Открепить' : 'Закрепить сверху'"
@@ -185,6 +197,7 @@ function age(value?: string): string {
             <IconPin aria-hidden="true" />
           </button>
           <button
+            v-if="editable"
             type="button"
             class="mini"
             title="Переименовать"
@@ -197,9 +210,13 @@ function age(value?: string): string {
             v-if="deletable"
             type="button"
             class="mini"
-            title="Удалить"
-            aria-label="Удалить чат"
-            @click="emit('remove', session.id)"
+            :class="{ danger: confirming === session.id }"
+            :title="
+              confirming === session.id ? 'Нажмите ещё раз, чтобы удалить навсегда' : 'Удалить'
+            "
+            :aria-label="confirming === session.id ? 'Подтвердить удаление' : 'Удалить сессию'"
+            @click="remove(session.id)"
+            @blur="confirming = ''"
           >
             <IconTrash aria-hidden="true" />
           </button>
@@ -278,6 +295,10 @@ function age(value?: string): string {
 .mini:hover {
   background: var(--bg-4);
   color: var(--text);
+}
+.mini.danger {
+  background: var(--bg-4);
+  color: var(--err);
 }
 .mini svg,
 .pinned {

@@ -4,6 +4,7 @@ export interface AgentCapabilities {
   branchSession?: boolean;
   rewindFiles?: boolean;
   editSessions?: boolean;
+  deleteSessions?: boolean;
   compact?: { command: string; hintAt: number; autoAt: number };
 }
 

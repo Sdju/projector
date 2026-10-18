@@ -307,6 +307,7 @@ const controller: ChatController = {
   setControl,
   loadSessions,
   resumeSession,
+  removeSession,
   toggleControlsMenu: () => controlsMenu.value?.toggle(),
   send: (text) => send(text),
   inject: async (text) => {
@@ -480,11 +481,11 @@ onBeforeUnmount(() => {
         :disabled="busy"
         :active="activeSession"
         :editable="!plain || capabilities.editSessions"
-        :deletable="!plain"
+        :deletable="!plain || capabilities.deleteSessions"
         :label="plain ? undefined : 'История чатов'"
         @open="loadSessions"
         @change="changeSession"
-        @remove="(id) => void removeSession(id)"
+        @remove="(id) => void removeSession(id).catch(() => {})"
         @pick="(id) => void resumeSession(id).catch(() => {})"
       />
       <UiButton

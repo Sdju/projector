@@ -9,6 +9,7 @@ export interface AgentCapabilities {
   branchSession?: boolean;
   rewindFiles?: boolean;
   editSessions?: boolean;
+  deleteSessions?: boolean;
   compact?: { command: string; hintAt: number; autoAt: number };
 }
 
@@ -132,6 +133,8 @@ export interface AgentBackend {
     sessionId: string,
     change: { title?: string; pinned?: boolean },
   ): Promise<void>;
+  /** Removes a past conversation for good. */
+  deleteSession?(cwd: string, sessionId: string): Promise<void>;
   /** Puts the project's files back to how they were before a message; `dryRun` only reports. */
   rewindFiles?(
     cwd: string,

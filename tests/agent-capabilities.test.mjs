@@ -85,9 +85,11 @@ test("file rewind and session branching depend on adapter capabilities, not its 
   expect(agentCapabilities("claude-code")).toMatchObject({
     inject: true,
     editSessions: true,
+    deleteSessions: true,
     rewindFiles: true,
   });
   expect(agentCapabilities("codex").rewindFiles).toBe(false);
+  expect(agentCapabilities("projector").deleteSessions).toBe(false);
 });
 
 test("new chats use the latest saved policy and concurrent control saves keep each choice", async () => {

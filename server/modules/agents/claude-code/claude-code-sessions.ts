@@ -1,4 +1,5 @@
 import {
+  deleteSession,
   getSessionMessages,
   listSessions,
   renameSession,
@@ -135,6 +136,11 @@ export async function claudeUpdateSession(
   }
   if (change.pinned !== undefined)
     await tagSession(sessionId, change.pinned ? PINNED_TAG : null, { dir: cwd });
+}
+
+/** Removes the session's transcript from Claude Code's own storage. */
+export async function claudeDeleteSession(cwd: string, sessionId: string): Promise<void> {
+  await deleteSession(sessionId, { dir: cwd });
 }
 
 interface Block {

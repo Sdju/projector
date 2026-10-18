@@ -17,6 +17,7 @@ export {
   rewindAgentFiles,
   runAgent,
   updateAgentSession,
+  deleteAgentSession,
 } from "./registry.ts";
 export type {
   AgentBackend,

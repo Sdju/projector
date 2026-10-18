@@ -6,8 +6,8 @@ import {
   fetchSessions,
   loadSessionTurns,
   saveDefault,
-  updateSession,
 } from "../api/client.ts";
+import { deleteSession, updateSession } from "../api/sessions.ts";
 import { archiveChat, deleteChat, fetchChats, openChat, updateChat } from "../api/chats.ts";
 import { saves, type ChatState } from "./chat-state.ts";
 import type { AgentBackendId, AgentControl, AgentSelection, AgentSessionInfo } from "./types.ts";
@@ -162,10 +162,12 @@ export function useExternalAgent(
 
   async function removeSession(id: string): Promise<void> {
     try {
-      await deleteChat(id);
+      if (external) await deleteSession(backend, projectId, id);
+      else await deleteChat(id);
       await loadSessions();
     } catch (err) {
       state.sessionsError = err instanceof Error ? err.message : "Не удалось удалить чат";
+      throw err;
     }
   }
 

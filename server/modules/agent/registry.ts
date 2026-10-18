@@ -60,6 +60,7 @@ export function agentCapabilities(id: string | undefined) {
     ...backend.capabilities,
     rewindFiles: !!backend.rewindFiles,
     editSessions: !!backend.updateSession,
+    deleteSessions: !!backend.deleteSession,
   };
 }
 
@@ -93,6 +94,12 @@ export async function updateAgentSession(
   const backend = backendFor(id);
   if (!backend.updateSession) throw new Error("Этот агент не умеет переименовывать сессии");
   await backend.updateSession(cwd, sessionId, change);
+}
+
+export async function deleteAgentSession(id: string | undefined, cwd: string, sessionId: string) {
+  const backend = backendFor(id);
+  if (!backend.deleteSession) throw new Error("Этот агент не умеет удалять сессии");
+  await backend.deleteSession(cwd, sessionId);
 }
 
 export async function agentMcpServers(id: string | undefined, cwd: string) {

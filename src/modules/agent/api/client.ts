@@ -187,7 +187,11 @@ export async function answerSecret(id: string, value: string | null): Promise<vo
   if (!response.ok) throw new Error("Запрос секрета уже закрыт");
 }
 
-async function getJson<T>(url: string, init: RequestInit | undefined, failure: string): Promise<T> {
+export async function getJson<T>(
+  url: string,
+  init: RequestInit | undefined,
+  failure: string,
+): Promise<T> {
   const response = await fetch(url, init);
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error((data as { error?: string }).error || failure);
@@ -322,24 +326,6 @@ export async function fetchMcpServers(
     "Не удалось получить MCP-серверы",
   );
   return data.servers;
-}
-
-/** Renames a past session or pins it to the top of the list. */
-export async function updateSession(
-  backend: AgentBackendId,
-  projectId: string,
-  sessionId: string,
-  change: { title?: string; pinned?: boolean },
-): Promise<void> {
-  await getJson(
-    "/api/agent/sessions/update",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ backend, projectId, sessionId, ...change }),
-    },
-    "Не удалось изменить сессию",
-  );
 }
 
 /** Adds a message to the answer being written; `false` when that answer has just ended. */

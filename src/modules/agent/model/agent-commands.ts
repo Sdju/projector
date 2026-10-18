@@ -1,5 +1,6 @@
 import { commandArgs } from "../../../common/utilities/commands.ts";
 import { chatsOf, resolveChat, type ChatController } from "./chat-registry.ts";
+import { registerSessionCommands } from "./session-commands.ts";
 import { registerTaskCommands } from "./task-commands.ts";
 import type { RewindScope } from "./types.ts";
 
@@ -37,6 +38,7 @@ function turnArg(chat: ChatController, args: Record<string, unknown>, role: "use
  */
 export function registerAgentCommands(register: RegisterCommand, projectId: string): void {
   registerTaskCommands(register, projectId);
+  registerSessionCommands(register, projectId);
   const anyChat = () => chatsOf(projectId).length > 0;
   const external = () => chatsOf(projectId).some((chat) => chat.backend !== "projector");
   const idle = () => chatsOf(projectId).some((chat) => !chat.busy());

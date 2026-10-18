@@ -33,6 +33,7 @@ export interface ChatController {
   setControl(id: string, value: string): Promise<void>;
   loadSessions(): Promise<AgentSessionInfo[]>;
   resumeSession(id: string): Promise<void>;
+  removeSession(id: string): Promise<void>;
   toggleControlsMenu(): void;
   send(text: string): Promise<void>;
   /** Adds a message to the answer being written; `false` when it could not be added. */
