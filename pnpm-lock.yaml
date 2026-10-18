@@ -223,6 +223,9 @@ importers:
       '@tanstack/vue-virtual':
         specifier: ^3.13.39
         version: 3.13.39(vue@3.5.43(typescript@6.0.3))
+      '@vue/compiler-dom':
+        specifier: 3.5.43
+        version: 3.5.43
       '@vueuse/core':
         specifier: ^15.0.0
         version: 15.0.0(vue@3.5.43(typescript@6.0.3))

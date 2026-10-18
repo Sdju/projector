@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from "vue";
+import { widgetReplyKey } from "../lib/widget-bridge.ts";
 import { useIdeCommands } from "../../ide/index.ts";
 import { workspaceRequest } from "../../workspace-api/index.ts";
 import { agentCommandHandler } from "../model/commands.ts";
@@ -392,6 +393,11 @@ async function toBottom() {
   await nextTick();
   pin();
 }
+// Components in the answers write back into this chat; a busy agent queues the message.
+provide(widgetReplyKey, (text) => {
+  void toBottom();
+  void send(text);
+});
 async function submit() {
   if (!draft.value.trim()) return;
   void toBottom();

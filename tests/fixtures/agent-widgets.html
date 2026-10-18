@@ -1,0 +1,29 @@
+<!doctype html>
+<link rel="icon" href="data:," />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<div id="fixture"></div>
+<script type="module">
+  import "/src/app/styles.css";
+  import { createApp, h, ref } from "vue";
+  import AgentMessage from "/src/modules/agent/ui/AgentMessage.vue";
+  import { widgetReplyKey } from "/src/modules/agent/lib/widget-bridge.ts";
+  const text = ref("");
+  const streaming = ref(true);
+  const replies = [];
+  const app = createApp({
+    setup: () => () =>
+      h("div", { style: "padding: 24px; max-width: 760px" }, [
+        h(AgentMessage, { text: text.value, streaming: streaming.value }),
+      ]),
+  });
+  app.provide(widgetReplyKey, (message) => replies.push(message));
+  app.mount("#fixture");
+  window.fixture = {
+    ready: true,
+    replies,
+    set(value, live = true) {
+      text.value = value;
+      streaming.value = live;
+    },
+  };
+</script>

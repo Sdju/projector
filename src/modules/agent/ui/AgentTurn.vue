@@ -183,7 +183,11 @@ const waiting = computed(() => {
     </div>
     <div v-else class="assistant-body">
       <template v-for="segment in segments" :key="segment.key">
-        <AgentMessage v-if="segment.type === 'text'" :text="segment.text" />
+        <AgentMessage
+          v-if="segment.type === 'text'"
+          :text="segment.text"
+          :streaming="busy && last && segment === segments.at(-1)"
+        />
         <p v-else-if="segment.type === 'note'" class="user-message note">{{ segment.text }}</p>
         <AgentThought
           v-else-if="segment.type === 'thought'"
