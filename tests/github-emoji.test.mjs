@@ -1,5 +1,9 @@
 import { expect, test, vi } from "vite-plus/test";
-import { loadGithubEmojis, splitEmoji } from "../src/common/utilities/github-emoji.ts";
+import {
+  REACTION_EMOJI,
+  loadGithubEmojis,
+  splitEmoji,
+} from "../src/common/utilities/github-emoji.ts";
 
 const map = {
   tada: "https://img/tada.png",
@@ -19,6 +23,12 @@ test("splitEmoji replaces known shortcodes and leaves the rest as written", () =
   // Object prototype keys are not emoji.
   expect(splitEmoji(":constructor: :toString:", map)).toStrictEqual([":constructor: :toString:"]);
   expect(splitEmoji(":TADA:", map)).toStrictEqual([{ name: "tada", url: "https://img/tada.png" }]);
+});
+
+test("every reaction has an emoji name GitHub actually lists", () => {
+  expect(REACTION_EMOJI.laugh).toBe("smile");
+  expect(REACTION_EMOJI.hooray).toBe("tada");
+  expect(Object.keys(REACTION_EMOJI).length).toBe(8);
 });
 
 test("the emoji list is loaded once and a failed load can be retried", async () => {

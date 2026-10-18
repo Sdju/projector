@@ -4,6 +4,8 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createOs } from "../core/modules/os/index.ts";
+import { expandPath } from "../server/modules/projects/index.ts";
+import { hotkeys } from "../core/modules/os/modules/windows/shortcut.ts";
 import { startDesktopShell } from "../core/modules/os/modules/windows/shell.ts";
 
 const credentials = { username: "x-access-token", tokenEnv: "PROJECTOR_GITHUB_TOKEN", failure: "" };
@@ -41,6 +43,14 @@ async function shellWith(script, timeout) {
   });
   return { shell, data };
 }
+
+test("Windows hotkey table has no Win+Space and agrees with RegisterHotKey flags", () => {
+  expect(hotkeys["Super+Space"]).toBeUndefined();
+  for (const spec of Object.values(hotkeys)) {
+    expect(spec.mod & 0x4000).toBe(0x4000);
+    expect(spec.vk).toBe(0x20);
+  }
+});
 
 test("shell sends the hotkey spec from the table and records the state", async () => {
   const { shell, data } = await shellWith(
@@ -85,4 +95,8 @@ test("askpass helper keeps shell metacharacters out of the script", () => {
       createOs(platform).tools.gitAskpass({ ...credentials, tokenEnv: "X%Y" }),
     ).toThrow();
   }
+});
+
+test("expandPath understands both home shortcuts", () => {
+  expect(expandPath("~\\work")).toBe(expandPath("~/work"));
 });

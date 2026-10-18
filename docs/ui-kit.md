@@ -60,6 +60,17 @@
 - API, команды, состояния загрузки, popup focus policy и domain status mapping не входят в визуальные примитивы.
 - Сохраняйте native label, form, button и summary semantics. При переносе element ref используйте `.element` вместо Vue instance.
 
+## Проверки
+
+Короткие browser tests проверяют native ввод/IME/modifiers/form/ref и взаимодействие кнопок, связей label и pointer cleanup:
+
+```bash
+vp test run tests/ui-kit-controls.test.mjs tests/ui-kit-primitives.test.mjs
+vp run build
+```
+
+Нужен установленный Chromium; без него browser tests пропускаются. Fixtures используют отдельный профиль и сервер, не меняют настройки Projector.
+
 Для визуального изменения проверяйте затронутый экран на обычной и узкой ширине и его реальное взаимодействие. Автоматизируйте воспроизводимый риск, а не каждый цвет и отступ. Для layout/panel изменений проверяйте resize и сохранение editor/terminal state; для popup — focus, Escape и правый клик. Массовые PNG-матрицы, frozen-копии экранов и требование побайтового совпадения удалены: они делали общий check медленным и нестабильным.
 
 Общий gate остаётся `vp run check`; перед коммитом — Oxfmt через `vp fmt` и `git diff --check`. Тесты UI-кита не должны превращаться в отдельный длительный gate или копию реализации.
