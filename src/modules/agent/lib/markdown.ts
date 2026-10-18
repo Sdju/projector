@@ -25,6 +25,10 @@ markdown.renderer.rules.link_open = (tokens, index, options, env, self) => {
     ? defaultLink(tokens, index, options, env, self)
     : self.renderToken(tokens, index, options);
 };
+/** Markdown as HTML, not yet sanitized. */
+export const renderMarkdown = (content: string): string => markdown.render(content);
+/** The block structure of `content`: the tokens, with the source lines each top-level block spans. */
+export const parseMarkdown = (content: string) => markdown.parse(content, {});
 export function renderChatMarkdown(content: string): string {
-  return DOMPurify.sanitize(markdown.render(content), { USE_PROFILES: { html: true } });
+  return DOMPurify.sanitize(renderMarkdown(content), { USE_PROFILES: { html: true } });
 }

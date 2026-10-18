@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, toRef } from "vue";
-import { renderChatMarkdown } from "../lib/markdown.ts";
+import AgentMarkdown from "./AgentMarkdown.vue";
 import {
   AgentWidget,
   isWidgetName,
@@ -25,7 +25,7 @@ useMessageScope(
 <template>
   <div class="agent-message">
     <template v-for="(part, index) in parts" :key="index">
-      <div v-if="part.type === 'markdown'" class="md" v-html="renderChatMarkdown(part.text)" />
+      <AgentMarkdown v-if="part.type === 'markdown'" :text="part.text" :streaming="streaming" />
       <AgentWidget
         v-else-if="part.type === 'widget'"
         :source="part.source"
@@ -47,10 +47,10 @@ useMessageScope(
   line-height: 1.7;
   overflow-wrap: anywhere;
 }
-.agent-message :deep(.md > :first-child) {
+.agent-message :deep(.md > .md-block:first-child > :first-child) {
   margin-top: 0;
 }
-.agent-message :deep(.md > :last-child) {
+.agent-message :deep(.md > .md-block:last-child > :last-child) {
   margin-bottom: 0;
 }
 .agent-message :deep(.md p) {
