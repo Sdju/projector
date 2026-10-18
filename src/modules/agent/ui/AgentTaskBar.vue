@@ -109,6 +109,7 @@ svg {
 }
 .list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 2px;
   margin: var(--sp-1) 0 0;
   padding: 0;
