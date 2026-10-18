@@ -83,6 +83,129 @@ test(
     const set = (value, live) =>
       browser.evaluate(`window.fixture.set(${JSON.stringify(value)}, ${live})`);
 
+    // Only the user's own click may message the agent: a mount hook, a watcher or a programmatic
+    // click on a button sends nothing. (This runs first: browsers keep a click "fresh" for seconds.)
+    await set(
+      `<Card>
+  <script>
+    const n = ref(0);
+    onMounted(() => reply("из onMounted"));
+    watch(n, () => reply("из watch"));
+    return { n };
+  </script>
+  <Button id="quick" send="Да, продолжай" summary="Ответ">Продолжить</Button>
+  <Button id="bump" @click="n++">+</Button>
+</Card>`,
+      false,
+    );
+    await wait('document.querySelector("#quick") !== null');
+    await browser.evaluate('document.querySelector("#bump").click()');
+    await browser.evaluate('document.querySelector("#quick").click()');
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(await browser.evaluate("window.fixture.replies")).toEqual([]);
+    expect(await browser.evaluate('document.querySelector("#quick").textContent.trim()')).toBe(
+      "Продолжить",
+    );
+    await browser.click("#quick");
+    await wait('document.querySelector("#quick").textContent.includes("Отправлено")');
+    expect(await browser.evaluate("window.fixture.replies")).toEqual(["Ответ\n\nДа, продолжай"]);
+    expect(await browser.evaluate('document.querySelector("#quick").disabled')).toBe(true);
+    await browser.evaluate("window.fixture.replies.length = 0");
+
+    // Options come as strings or as { value, label, hint } objects, whichever the model writes.
+    await set(
+      `<Card>
+  <Tabs :options="[{value:'a',label:'Альфа',hint:'первый'},'бета']" />
+  <Checks :options="['один',{value:'two',label:'Два'}]" />
+</Card>`,
+      false,
+    );
+    await wait('document.querySelector("[role=tab]") !== null');
+    expect(
+      await browser.evaluate(
+        "[...document.querySelectorAll('[role=tab]')].map((t) => t.textContent.trim())",
+      ),
+    ).toEqual(["Альфа", "бета"]);
+    expect(
+      await browser.evaluate("document.querySelector('.checks').innerText.includes('{')"),
+    ).toBe(false);
+    expect(
+      await browser.evaluate(
+        "[...document.querySelectorAll('.checks label')].map((l) => l.innerText.trim())",
+      ),
+    ).toEqual(["один", "Два"]);
+
+    // A form needs no script: named controls, preset / reset / submit buttons.
+    await set(
+      `<Card>
+<Form>
+  <Checks name="scripts" :initial="['lint']" :options="[{value:'start'},{value:'test'},{value:'lint'}]" />
+  <Input name="note" label="Комментарий" initial="без заметок" />
+  <Slider name="port" label="Порт" :min="3000" :max="9000" :initial="4000" />
+  <Tabs name="mode" :options="['server','window']" />
+  <Row>
+    <Button id="preset" :preset="{ scripts: ['start','test'], port: 8080, mode: 'window' }">Все</Button>
+    <Button id="reset" reset>Сбросить</Button>
+    <Button id="submit" submit summary="Настройки запуска">Применить</Button>
+  </Row>
+</Form>
+</Card>`,
+      false,
+    );
+    await wait('document.querySelector("#submit") !== null');
+    const field = () =>
+      browser.evaluate(`(() => {
+        const q = (s) => document.querySelector(s);
+        return JSON.stringify({
+          scripts: [...document.querySelectorAll("input[type=checkbox]")].filter((i) => i.checked).map((i) => i.closest("label").innerText.trim()),
+          note: q("input[type=text]").value,
+          port: Number(q("input[type=range]").value),
+          mode: q("[role=tab].on").textContent.trim(),
+        });
+      })()`);
+    expect(JSON.parse(await field())).toEqual({
+      scripts: ["lint"],
+      note: "без заметок",
+      port: 4000,
+      mode: "server",
+    });
+    await browser.click("#preset");
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(JSON.parse(await field())).toEqual({
+      scripts: ["start", "test"],
+      note: "без заметок",
+      port: 8080,
+      mode: "window",
+    });
+    await browser.click("#reset");
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(JSON.parse(await field())).toEqual({
+      scripts: ["lint"],
+      note: "без заметок",
+      port: 4000,
+      mode: "server",
+    });
+    await browser.click("input[type=checkbox]");
+    await browser.click("#submit");
+    await wait('document.querySelector("#submit").textContent.includes("Отправлено")');
+    const sent = await browser.evaluate("window.fixture.replies");
+    expect(sent).toHaveLength(1);
+    expect(sent[0].startsWith("Настройки запуска\n\n```json")).toBe(true);
+    expect(JSON.parse(sent[0].split("```json\n")[1].split("\n```")[0])).toEqual({
+      scripts: ["lint", "start"],
+      note: "без заметок",
+      port: 4000,
+      mode: "server",
+    });
+    // After sending, the whole form is locked and a second click sends nothing.
+    expect(await browser.evaluate('document.querySelectorAll("fieldset[disabled]").length')).toBe(
+      1,
+    );
+    expect(await browser.evaluate('document.querySelector("#reset").disabled')).toBe(true);
+    await browser.click("#submit");
+    expect(await browser.evaluate("window.fixture.replies.length")).toBe(1);
+    await browser.evaluate("window.fixture.replies.length = 0");
+
     // Stream in 40-character chunks; mark the first Card's DOM node once it is rendered.
     let marked = false;
     let mountsSeen = 0;
@@ -163,7 +286,7 @@ test(
     await browser.evaluate(
       `(() => { const i = document.querySelector("input[type=text]"); i.value = "осторожно"; i.dispatchEvent(new Event("input", { bubbles: true })); })()`,
     );
-    await browser.evaluate('document.querySelector("#apply").click()');
+    await browser.click("#apply");
     await wait('document.querySelector("#apply").textContent.includes("Отправлено")');
     const replies = await browser.evaluate("window.fixture.replies");
     expect(replies).toHaveLength(1);

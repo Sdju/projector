@@ -1,6 +1,17 @@
 <script setup lang="ts">
-defineProps<{ label?: string; min?: number; max?: number; step?: number; unit?: string }>();
-const model = defineModel<number>({ required: true });
+import { useField } from "./form.ts";
+const props = defineProps<{
+  label?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  unit?: string;
+  /** Field name inside a `<Form>`. */
+  name?: string;
+  initial?: number;
+}>();
+const model = defineModel<number>();
+useField(props.name, model, props.initial ?? props.min ?? 0);
 </script>
 
 <template>

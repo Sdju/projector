@@ -1,6 +1,6 @@
 import * as Vue from "vue";
 import type { Component } from "vue";
-import { formatWidgetReply, widgetReplyKey } from "./widget-bridge.ts";
+import { useWidgetReply } from "./widget-bridge.ts";
 
 type Compiler = typeof import("@vue/compiler-dom");
 
@@ -63,9 +63,8 @@ async function build(source: string, components: Record<string, Component>): Pro
     name: "AgentWidgetBody",
     components,
     setup() {
-      const send = Vue.inject(widgetReplyKey, undefined);
-      // `reply` is available to the template and the script alike, so a button needs no script.
-      const reply = (data: unknown, summary?: string) => send?.(formatWidgetReply(data, summary));
+      // `reply` is available to the template and the script alike; it only sends on a user's click.
+      const reply = useWidgetReply();
       return { reply, ...setup?.(...Object.values(helpers), reply) };
     },
     render,

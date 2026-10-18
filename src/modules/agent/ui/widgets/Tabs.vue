@@ -1,20 +1,30 @@
 <script setup lang="ts">
-defineProps<{ options: string[] }>();
-const model = defineModel<string>({ required: true });
+import { computed } from "vue";
+import { normalizeOptions, useField, type WidgetOption } from "./form.ts";
+const props = defineProps<{
+  options: (string | WidgetOption)[];
+  /** Field name inside a `<Form>`. */
+  name?: string;
+  initial?: string;
+}>();
+const model = defineModel<string>();
+const items = computed(() => normalizeOptions(props.options));
+useField(props.name, model, props.initial ?? items.value[0]?.value ?? "");
 </script>
 
 <template>
   <div class="tabs" role="tablist">
     <button
-      v-for="option in options"
-      :key="option"
+      v-for="option in items"
+      :key="option.value"
       type="button"
       role="tab"
-      :aria-selected="model === option"
-      :class="{ on: model === option }"
-      @click="model = option"
+      :aria-selected="model === option.value"
+      :class="{ on: model === option.value }"
+      :title="option.hint"
+      @click="model = option.value"
     >
-      {{ option }}
+      {{ option.label ?? option.value }}
     </button>
   </div>
 </template>

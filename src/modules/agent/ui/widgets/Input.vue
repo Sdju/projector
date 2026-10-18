@@ -1,6 +1,15 @@
 <script setup lang="ts">
-defineProps<{ label?: string; placeholder?: string; multiline?: boolean }>();
-const model = defineModel<string>({ required: true });
+import { useField } from "./form.ts";
+const props = defineProps<{
+  label?: string;
+  placeholder?: string;
+  multiline?: boolean;
+  /** Field name inside a `<Form>`. */
+  name?: string;
+  initial?: string;
+}>();
+const model = defineModel<string>();
+useField(props.name, model, props.initial ?? "");
 </script>
 
 <template>

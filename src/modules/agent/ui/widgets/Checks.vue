@@ -1,23 +1,34 @@
 <script setup lang="ts">
-defineProps<{ options: { value: string; label?: string; hint?: string }[]; single?: boolean }>();
-const model = defineModel<string[]>({ required: true });
+import { computed } from "vue";
+import { normalizeOptions, useField, type WidgetOption } from "./form.ts";
+const props = defineProps<{
+  options: (string | WidgetOption)[];
+  single?: boolean;
+  /** Field name inside a `<Form>`. */
+  name?: string;
+  initial?: string[];
+}>();
+const model = defineModel<string[]>();
+useField(props.name, model, props.initial ?? []);
+const items = computed(() => normalizeOptions(props.options));
+const chosen = computed(() => model.value ?? []);
 
 function toggle(value: string, single?: boolean) {
   if (single) model.value = [value];
   else
-    model.value = model.value.includes(value)
-      ? model.value.filter((item) => item !== value)
-      : [...model.value, value];
+    model.value = chosen.value.includes(value)
+      ? chosen.value.filter((item) => item !== value)
+      : [...chosen.value, value];
 }
 </script>
 
 <template>
   <ul class="checks">
-    <li v-for="option in options" :key="option.value">
+    <li v-for="option in items" :key="option.value">
       <label>
         <input
           :type="single ? 'radio' : 'checkbox'"
-          :checked="model.includes(option.value)"
+          :checked="chosen.includes(option.value)"
           @change="toggle(option.value, single)"
         />
         <span class="text">
