@@ -1,4 +1,4 @@
-import type { AgentEmitter, AgentSessionTurn } from "../../agent/index.ts";
+import { createReplay, type AgentEmitter } from "../../agent/index.ts";
 import { createPlainDialect, type AcpDialect, type AcpTaskPatch } from "./acp-dialect.ts";
 
 interface ContentBlock {
@@ -164,34 +164,23 @@ export function createAcpReplayCollector(
   sessionId: string,
   dialect: AcpDialect = createPlainDialect(),
 ) {
-  const turns: AgentSessionTurn[] = [];
-  let counter = 0;
-  const turnFor = (role: "user" | "assistant"): AgentSessionTurn => {
-    const last = turns.at(-1);
-    if (last?.role === role) return last;
-    const turn: AgentSessionTurn = {
-      id: `replay-${++counter}`,
-      role,
-      text: "",
-      tools: [],
-      ...(role === "assistant" ? { session: { backend, id: sessionId } } : {}),
-    };
-    turns.push(turn);
-    return turn;
-  };
+  const replay = createReplay(backend, sessionId);
 
   function handleUpdate(update: Record<string, unknown>): void {
     const kind = update.sessionUpdate;
     const call = String(update.toolCallId ?? "");
-    if (kind === "user_message_chunk") turnFor("user").text += contentText(update.content);
+    if (kind === "user_message_chunk") replay.user(contentText(update.content));
     else if (kind === "agent_message_chunk") {
       const chunk = contentText(update.content);
       // The dialect keeps what a subagent said out of the answer.
-      if (!dialect.chunk(update, chunk)) turnFor("assistant").text += chunk;
+      if (!dialect.chunk(update, chunk)) replay.text(chunk);
+    } else if (kind === "agent_thought_chunk") {
+      const chunk = contentText(update.content);
+      if (chunk) replay.thought(chunk);
     } else if (kind === "tool_call") {
       if (!call) return;
       const { name, parent } = dialect.tool(update);
-      turnFor("assistant").tools.push({
+      replay.tool({
         id: call,
         name,
         status: "running",
@@ -209,7 +198,7 @@ export function createAcpReplayCollector(
 
   function finish(update: Record<string, unknown>, id: string): void {
     if (update.status !== "completed" && update.status !== "failed") return;
-    const chip = turns.flatMap((turn) => turn.tools).find((item) => item.id === id);
+    const chip = replay.findTool(id);
     if (!chip) return;
     chip.status = update.status === "failed" ? "error" : "done";
     const output = dialect.output(id) || toolOutput(update);
@@ -218,9 +207,8 @@ export function createAcpReplayCollector(
 
   return {
     handleUpdate,
-    /** Turns with text or tools; empty chunks the agent sends between messages are dropped. */
     get turns() {
-      return turns.filter((turn) => turn.text.trim() || turn.tools.length);
+      return replay.turns;
     },
   };
 }

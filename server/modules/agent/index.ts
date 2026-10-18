@@ -40,8 +40,10 @@ export type {
   AgentControlOption,
   AgentSelection,
   AgentSessionInfo,
+  AgentSessionPart,
   AgentSessionTurn,
 } from "./controls.ts";
+export { createReplay } from "./replay.ts";
 export { injectMessage, registerInjector } from "./injection.ts";
 export { agentEnv, assertHostProject, attachedImages, promptWithHistory } from "./agent-host.ts";
 export { attachHosted, startHosted } from "./hosted-process.ts";

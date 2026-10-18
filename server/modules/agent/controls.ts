@@ -1,3 +1,5 @@
+import type { AgentTask } from "../../../core/modules/agent-task/index.ts";
+
 /**
  * What the chat lets the user tune for an external agent. Every agent describes its own knobs
  * (Codex: model, reasoning effort, approval preset; Cursor: model, mode; OpenCode: model, effort,
@@ -47,7 +49,17 @@ export interface AgentSessionTurn {
     parent?: string;
   }[];
   session?: { backend: string; id: string };
+  /** Text, reasoning and tool calls in the order they happened. */
+  parts?: AgentSessionPart[];
+  /** Subagents and background commands the answer started. */
+  tasks?: AgentTask[];
 }
+
+export type AgentSessionPart =
+  | { type: "text"; text: string }
+  | { type: "tool"; id: string }
+  | { type: "note"; text: string }
+  | { type: "thought"; text: string };
 
 /** Longest list sent to the client: agents may hold thousands of past sessions. */
 export const SESSION_LIST_LIMIT = 30;
