@@ -1,0 +1,39 @@
+<!doctype html>
+<link rel="icon" href="data:," />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<div id="fixture"></div>
+<script type="module">
+  import "/src/app/styles.css";
+  import { createApp, h, ref } from "vue";
+  import AgentTaskBar from "/src/modules/agent/ui/AgentTaskBar.vue";
+  const task = (n, status) => ({
+    id: `t${n}`,
+    kind: n % 2 ? "shell" : "agent",
+    title: `Задача ${n}`,
+    status,
+    background: true,
+    summary: status === "done" ? "завершено" : undefined,
+  });
+  const tasks = ref([
+    ...Array.from({ length: 22 }, (_, i) => task(i + 1, "done")),
+    task(23, "running"),
+    task(24, "running"),
+    task(25, "error"),
+  ]);
+  const views = [];
+  createApp({
+    setup: () => () =>
+      h("div", { style: "padding: 20px; width: 700px" }, [
+        h(AgentTaskBar, { tasks: tasks.value, onView: (id) => views.push(id) }),
+      ]),
+  }).mount("#fixture");
+  window.fixture = {
+    ready: true,
+    views,
+    settle: () => {
+      tasks.value = tasks.value.map((item) =>
+        item.status === "running" ? { ...item, status: "done" } : item,
+      );
+    },
+  };
+</script>
