@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 
 const props = defineProps<{
   labels: string[];
@@ -7,7 +7,19 @@ const props = defineProps<{
   height?: number;
 }>();
 const colors = ["var(--info)", "var(--run)", "var(--warn)", "var(--err)"];
-const W = 480;
+// The viewBox follows the real width, so axis text keeps its size in a narrow column too.
+const host = ref<HTMLElement>();
+const W = ref(480);
+let observer: ResizeObserver | undefined;
+onMounted(() => {
+  if (!host.value || typeof ResizeObserver === "undefined") return;
+  observer = new ResizeObserver(([entry]) => {
+    const width = Math.round(entry?.contentRect.width ?? 0);
+    if (width > 120) W.value = width;
+  });
+  observer.observe(host.value);
+});
+onBeforeUnmount(() => observer?.disconnect());
 const H = computed(() => props.height ?? 160);
 const max = computed(() => Math.max(1, ...props.series.flatMap((item) => item.data)));
 // The left margin follows the widest tick label (about 5.5 units per digit at 9px).
@@ -19,7 +31,8 @@ const pad = computed(() => ({
 }));
 
 const x = (index: number) =>
-  pad.value.l + (index / Math.max(1, props.labels.length - 1)) * (W - pad.value.l - pad.value.r);
+  pad.value.l +
+  (index / Math.max(1, props.labels.length - 1)) * (W.value - pad.value.l - pad.value.r);
 const y = (value: number) =>
   pad.value.t + (1 - value / max.value) * (H.value - pad.value.t - pad.value.b);
 const lines = computed(() =>
@@ -34,7 +47,7 @@ const ticks = computed(() => [0, 0.5, 1].map((part) => Math.round(max.value * pa
 </script>
 
 <template>
-  <figure class="line">
+  <figure ref="host" class="line">
     <svg :viewBox="`0 0 ${W} ${H}`" role="img">
       <g v-for="tick in ticks" :key="tick">
         <line :x1="pad.l" :x2="W - pad.r" :y1="y(tick)" :y2="y(tick)" class="grid" />

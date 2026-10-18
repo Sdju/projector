@@ -135,6 +135,81 @@ test(
       ),
     ).toEqual(["один", "Два"]);
 
+    // Layouts: Card with a title, Columns that stack when narrow, Tabs with panels that keep state.
+    await set(
+      `<Card title="Сводка" hint="за квартал">
+  <Columns :cols="2">
+    <Stat id="left" label="Слева" value="1" />
+    <Stat id="right" label="Справа" value="2" />
+    <Line :labels="['a','b','c']" :series="[{name:'s',data:[1,3,2]}]" />
+    <Bars :items="[{label:'x',value:2}]" />
+  </Columns>
+  <Tabs>
+    <Tab title="Данные"><Input id="typed" label="Заметка" /></Tab>
+    <Tab title="График"><Bars :items="[{label:'a',value:1}]" /></Tab>
+  </Tabs>
+  <Form>
+    <Tabs>
+      <Tab title="Один"><Input name="a" initial="первый" /></Tab>
+      <Tab title="Два"><Input name="b" initial="второй" /></Tab>
+    </Tabs>
+    <Button id="send-layout" submit>Отправить</Button>
+  </Form>
+</Card>`,
+      false,
+    );
+    await wait('document.querySelectorAll("[role=tab]").length === 4');
+    expect(await browser.evaluate("document.querySelector('.ui-card .title').textContent")).toBe(
+      "Сводка",
+    );
+    const box = (selector) =>
+      browser.evaluate(
+        `(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width }; })()`,
+      );
+    let left = await box("#left");
+    let right = await box("#right");
+    expect(right.x).toBeGreaterThan(left.x + 50);
+    expect(Math.abs(right.y - left.y)).toBeLessThan(2);
+    // The chart keeps its natural height (so its text keeps its size) in a half-width column.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const chartHeight = await browser.evaluate(
+      "document.querySelector('.columns svg').getBoundingClientRect().height",
+    );
+    expect(chartHeight).toBeGreaterThan(150);
+    expect(chartHeight).toBeLessThan(175);
+    await browser.viewport(360, 1900);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    left = await box("#left");
+    right = await box("#right");
+    expect(right.y).toBeGreaterThan(left.y + 20);
+    await browser.viewport(900, 1900);
+    // Panels: the first is shown, switching hides it without losing what was typed.
+    const shown = () =>
+      browser.evaluate(
+        "[...document.querySelectorAll('[role=tabpanel]')].map((p) => p.style.display !== 'none')",
+      );
+    expect((await shown()).slice(0, 2)).toEqual([true, false]);
+    await browser.evaluate(
+      `(() => { const i = document.querySelector("#typed input, input#typed") ?? document.querySelector("[role=tabpanel] input"); i.value = "осталось"; i.dispatchEvent(new Event("input", { bubbles: true })); })()`,
+    );
+    await browser.click("[role=tab]:nth-of-type(2)");
+    await wait("[...document.querySelectorAll('[role=tabpanel]')][0].style.display === 'none'");
+    await browser.click("[role=tab]");
+    await wait("[...document.querySelectorAll('[role=tabpanel]')][0].style.display !== 'none'");
+    expect(await browser.evaluate("document.querySelector('[role=tabpanel] input').value")).toBe(
+      "осталось",
+    );
+    // Both panels of a tabbed form are fields of that form, shown or not.
+    await browser.click("#send-layout");
+    await wait('document.querySelector("#send-layout").textContent.includes("Отправлено")');
+    const layoutReply = await browser.evaluate("window.fixture.replies.at(-1)");
+    expect(JSON.parse(layoutReply.split("```json\n")[1].split("\n```")[0])).toEqual({
+      a: "первый",
+      b: "второй",
+    });
+    await browser.evaluate("window.fixture.replies.length = 0");
+    await shot("widgets-4-layout");
+
     // A form needs no script: named controls, preset / reset / submit buttons.
     await set(
       `<Card>
