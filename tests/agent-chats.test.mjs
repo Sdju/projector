@@ -54,4 +54,9 @@ describe("Projector agent chat history", () => {
     removeArchivedChat(second.id);
     expect(listArchivedChats("p")).toEqual([]);
   });
+
+  it("keeps when a message was written", async () => {
+    await writeAgentHistory("t", [{ ...turn("1", "user", "вопрос"), at: 1760000000000 }]);
+    expect((await readAgentHistory("t"))[0].at).toBe(1760000000000);
+  });
 });

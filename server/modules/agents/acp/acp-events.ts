@@ -169,6 +169,8 @@ export function createAcpReplayCollector(
   function handleUpdate(update: Record<string, unknown>): void {
     const kind = update.sessionUpdate;
     const call = String(update.toolCallId ?? "");
+    if (kind === "user_message_chunk" || kind === "agent_message_chunk")
+      replay.mark(dialect.time(update));
     if (kind === "user_message_chunk") replay.user(contentText(update.content));
     else if (kind === "agent_message_chunk") {
       const chunk = contentText(update.content);

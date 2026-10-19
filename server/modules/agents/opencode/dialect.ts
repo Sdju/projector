@@ -17,6 +17,18 @@ interface ChildSession {
   title?: string;
 }
 
+/**
+ * OpenCode ids hold `ms * 4096 + counter` cut to 48 bits, so only the low 36 bits of the time
+ * survive (about 2.2 years): the full time is the one closest to `now`.
+ */
+export function opencodeIdTime(id: unknown, now = Date.now()): number | undefined {
+  const hex = typeof id === "string" ? /^msg_([0-9a-f]{12})/.exec(id)?.[1] : undefined;
+  if (!hex) return undefined;
+  const period = 2 ** 36;
+  const low = Math.floor(parseInt(hex, 16) / 4096);
+  return low + Math.round((now - low) / period) * period;
+}
+
 function childOf(update: AcpUpdate): ChildSession | undefined {
   const meta = (update._meta as Record<string, unknown> | undefined)?.["opencode/child-session"];
   const { id, title } = (meta ?? {}) as { id?: unknown; title?: unknown };
@@ -78,6 +90,7 @@ export function createOpencodeDialect(): AcpDialect {
   const flush = () => found.splice(0);
 
   const dialect: AcpDialect = extendPlainDialect({
+    time: (update) => opencodeIdTime(update.messageId),
     tool(update) {
       const child = childOf(update);
       const title = String(update.title || update.kind || "tool");

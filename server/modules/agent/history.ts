@@ -11,6 +11,8 @@ const turnSchema: z.ZodType<StoredTurn> = z.lazy(() =>
     id: z.string(),
     role: z.enum(["user", "assistant"]),
     text: z.string(),
+    /** When the message was written (ms since the epoch). */
+    at: z.number().optional(),
     /** Native session of the backend that produced this turn, used to resume it. */
     session: z.object({ backend: z.string(), id: z.string() }).optional(),
     /** The agent process still answering this turn; lets a reloaded page rejoin it. */

@@ -7,6 +7,7 @@ import type { AgentSessionTurn } from "./controls.ts";
 export function createReplay(backend: string, sessionId: string) {
   const turns: AgentSessionTurn[] = [];
   let counter = 0;
+  let at: number | undefined;
 
   const turnFor = (role: "user" | "assistant"): AgentSessionTurn => {
     const last = turns.at(-1);
@@ -16,6 +17,7 @@ export function createReplay(backend: string, sessionId: string) {
       role,
       text: "",
       tools: [],
+      ...(at ? { at } : {}),
       ...(role === "assistant" ? { session: { backend, id: sessionId }, parts: [] } : {}),
     };
     turns.push(turn);
@@ -24,6 +26,10 @@ export function createReplay(backend: string, sessionId: string) {
 
   return {
     turnFor,
+    /** The time of the messages that follow; a turn they open is stamped with it. */
+    mark(time: number | undefined) {
+      at = time;
+    },
     user(text: string) {
       turnFor("user").text += text;
     },

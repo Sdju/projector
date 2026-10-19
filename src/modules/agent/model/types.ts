@@ -98,6 +98,8 @@ export interface AgentTurn {
   id: string;
   role: "user" | "assistant";
   text: string;
+  /** When the message was written (ms since the epoch); absent in turns saved before it existed. */
+  at?: number;
   tools: AgentToolChip[];
   /** Subagents and background commands the agent started during this answer. */
   tasks?: AgentTask[];

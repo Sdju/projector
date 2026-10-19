@@ -239,6 +239,7 @@ export function useAgent(
       id: newId(),
       role: "user",
       text: message,
+      at: Date.now(),
       ...(content ? { content } : {}),
       tools: [],
     };
@@ -250,6 +251,7 @@ export function useAgent(
       id: newId(),
       role: "assistant",
       text: "",
+      at: Date.now(),
       tools: [],
     });
     state.turns.push(userTurn, assistant);

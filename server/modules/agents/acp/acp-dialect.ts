@@ -30,6 +30,18 @@ export interface AcpDialect {
   speak(): AcpTaskPatch[];
   /** The answer ended. */
   finish(): AcpTaskPatch[];
+  /** When a replayed message was written, if its `messageId` tells (ms since the epoch). */
+  time(update: AcpUpdate): number | undefined;
+}
+
+const UUID_V7 = /^([0-9a-f]{8})-?([0-9a-f]{4})-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** The time a UUIDv7 carries in its first 48 bits. */
+export function uuidV7Time(id: unknown): number | undefined {
+  const match = typeof id === "string" ? UUID_V7.exec(id) : null;
+  if (!match) return undefined;
+  const time = parseInt(match[1]! + match[2]!, 16);
+  return time > 0 ? time : undefined;
 }
 
 /** An agent without extensions: every call is a plain tool call. */
@@ -43,6 +55,7 @@ export function createPlainDialect(): AcpDialect {
     end: () => [],
     speak: () => [],
     finish: () => [],
+    time: (update) => uuidV7Time(update.messageId),
   };
 }
 

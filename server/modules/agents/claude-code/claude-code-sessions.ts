@@ -15,6 +15,7 @@ import {
   settleTasks,
   taskOfCall,
 } from "./claude-code-replay.ts";
+import { claudeMessageTimes } from "./claude-code-times.ts";
 
 /** Claude Code accepts model aliases, so the list does not go stale with every release. */
 const permissionOptions = [
@@ -185,10 +186,14 @@ export async function claudeLoadSession(
   cwd: string,
   sessionId: string,
 ): Promise<AgentSessionTurn[]> {
-  const messages = await getSessionMessages(sessionId, { dir: cwd });
+  const [messages, times] = await Promise.all([
+    getSessionMessages(sessionId, { dir: cwd }),
+    claudeMessageTimes(cwd, sessionId),
+  ]);
   const replay = createReplay("claude-code", sessionId);
   for (const message of messages) {
     if (message.type === "system" || message.parent_tool_use_id) continue;
+    replay.mark(times.get(message.uuid));
     const content = (message.message as { content?: unknown } | null)?.content;
     for (const block of blocksOf(content)) {
       if (message.type === "assistant") {

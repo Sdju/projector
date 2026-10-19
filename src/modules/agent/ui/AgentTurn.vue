@@ -45,6 +45,19 @@ const emit = defineEmits<{
 
 const versions = computed(() => versionsOf(props.turn));
 
+const written = computed(() => (props.turn.at ? new Date(props.turn.at) : undefined));
+const stamp = computed(() =>
+  written.value?.toLocaleString("ru", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }),
+);
+const stampFull = computed(() =>
+  written.value?.toLocaleString("ru", { dateStyle: "long", timeStyle: "medium" }),
+);
+
 type Segment =
   | { key: string; type: "text"; text: string }
   | { key: string; type: "note"; text: string }
@@ -103,6 +116,13 @@ const waiting = computed(() => {
         class="turn-actions"
         :class="{ pinned: versions.count > 1 }"
       >
+        <time
+          v-if="stamp"
+          class="turn-time"
+          :title="stampFull"
+          :datetime="written?.toISOString()"
+          >{{ stamp }}</time
+        >
         <UiInline
           as="span"
           gap="none"
@@ -251,6 +271,13 @@ const waiting = computed(() => {
         >
           <IconRefresh aria-hidden="true" />
         </UiButton>
+        <time
+          v-if="stamp"
+          class="turn-time footer-time"
+          :title="stampFull"
+          :datetime="written?.toISOString()"
+          >{{ stamp }}</time
+        >
       </UiInline>
     </div>
   </article>
@@ -349,6 +376,20 @@ const waiting = computed(() => {
 }
 .copy-button.copied {
   color: var(--run);
+}
+.turn-time {
+  align-self: center;
+  font-size: var(--fs-2xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.footer-time {
+  margin-top: var(--sp-1);
+  opacity: 0;
+  color: var(--muted);
+}
+.assistant:hover .footer-time {
+  opacity: 1;
 }
 .thinking {
   font-size: var(--fs-xs);
