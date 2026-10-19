@@ -131,8 +131,12 @@ test("the catalog's guide is made from the definitions and covers every register
       example: '<Gauge :value="1" />',
     }),
   );
-  expect(catalog.guide()).toContain("- <Gauge :value flag? label?> — стрелка");
-  expect(catalog.describe("Gauge")).toContain("value: number — значение");
+  expect(catalog.guide()).toContain("Gauge — стрелка");
+  expect(catalog.guide()).toContain("value: number; обязательное — значение");
+  expect(catalog.guide()).toContain("flag: boolean; необязательное — флаг");
+  expect(catalog.guide()).toContain('```vue\n<Gauge :value="1" />\n```');
+  expect(catalog.guide()).not.toContain("flag?");
+  expect(catalog.describe("Gauge")).toContain("value: number; обязательное — значение");
   expect(catalog.describe("Nope")).toContain("Нет компонента");
 });
 

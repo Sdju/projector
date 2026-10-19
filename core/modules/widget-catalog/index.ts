@@ -24,7 +24,7 @@ export interface WidgetDefinition {
   slot?: string;
   /** Extra rules worth the agent's tokens (behaviour that is not obvious from the props). */
   notes?: string[];
-  /** A minimal working use, shown by `describe`. */
+  /** A minimal working use, included in the guide and detailed description. */
   example: string;
 }
 
@@ -38,22 +38,33 @@ const GROUPS: Record<WidgetDefinition["group"], string> = {
   action: "Действия",
 };
 
-/** Written as an attribute, not an expression: `label="…"`, `submit`. */
-const attributeTypes = new Set(["string", "boolean"]);
-
-/** `label` or `:delta?`: props other than strings and flags are written as expressions, optional ones end in `?`. */
-function signature(definition: WidgetDefinition): string {
-  const props = Object.entries(definition.props ?? {}).map(([name, prop]) => {
-    const bound = attributeTypes.has(prop.type) ? name : `:${name}`;
-    return prop.required ? bound : `${bound}?`;
-  });
-  if (definition.model) props.push(`v-model`);
-  return [definition.name, ...props].join(" ");
+/** Metadata stays in prose; only the example contains copyable Vue markup. */
+function describeDefinition(definition: WidgetDefinition): string[] {
+  const props = Object.entries(definition.props ?? {}).map(
+    ([name, prop]) =>
+      `  ${name}: ${prop.type}; ${prop.required ? "обязательное" : "необязательное"} — ${prop.description}`,
+  );
+  return [
+    `${definition.name} — ${definition.summary}`,
+    ...(definition.slot ? [`Содержимое: ${definition.slot}`] : []),
+    ...(definition.model
+      ? [`v-model: ${definition.model.type} — ${definition.model.description}`]
+      : []),
+    ...(props.length ? ["Свойства:", ...props] : []),
+    ...(definition.notes ?? []),
+    "Пример Vue-разметки:",
+    "```vue",
+    definition.example,
+    "```",
+  ];
 }
 
 export const WIDGET_SYNTAX = [
-  'Блок начинается с новой строки тегом в PascalCase и закрыт им же (или самозакрыт). Строки пишутся как есть, всё остальное через :prop="выражение JS". Внутри — HTML и Vue-шаблон, а не markdown (жирный — <strong>).',
-  'Для расчётов, где значения зависят друг от друга, добавь <script>: в нём есть ref, reactive, computed, watch, onMounted и reply(данные, "подпись"); он заканчивается return { … } со всем, что нужно шаблону. <script> между блоками один на весь ответ: его значения видны во всех блоках (ползунок в одном управляет графиком в другом), порядок не важен; <script> внутри блока виден только ему.',
+  "Используй только компоненты из каталога ниже. Каждый блок начинается сразу с зарегистрированного компонента; дополнительная обёртка не нужна. Обычные HTML- и SVG-элементы разрешены внутри блока.",
+  "Типы и обязательность свойств описаны отдельно от примеров: эти пояснения не входят в Vue-разметку. Необязательное свойство можно просто опустить.",
+  'Числа передавай через привязку с десятичной точкой, без единиц и знака процента: например, :delta="3.6". Компонент сам добавляет процент к delta. Строки передавай обычным атрибутом, например value="3,6%", если нужен текст показателя.',
+  "В ответе пиши Vue-разметку с новой строки прямо в markdown, без кодового блока. Примеры в справке выделены кодовыми блоками только для чтения. Корневой тег должен быть закрыт или самозакрыт. Массивы и объекты передавай через привязки свойств, как в примерах ниже. Булев флаг можно включить атрибутом без значения. Внутри блока — HTML и Vue-шаблон; для жирного текста используй элемент strong.",
+  'Для расчётов, где значения зависят друг от друга, добавь <script>: в нём есть ref, reactive, computed, watch, onMounted и reply(данные, "подпись"); верни из него объект со всем, что нужно шаблону. Например, тело скрипта: const n = ref(1); return { n }; <script> между блоками один на весь ответ: его значения видны во всех блоках (ползунок в одном управляет графиком в другом), порядок не важен; <script> внутри блока виден только ему.',
   "Данные бери из фактов, которые проверил сам; не выдумывай цифры.",
 ];
 
@@ -63,7 +74,7 @@ export interface WidgetCatalog {
   has(name: string): boolean;
   get(name: string): WidgetDefinition | undefined;
   list(): WidgetDefinition[];
-  /** The instructions for the agent: syntax rules and one line per component, grouped. */
+  /** The instructions for the agent: syntax rules, properties and working examples, grouped. */
   guide(): string;
   /** Everything about one component: props with types, notes and an example. */
   describe(name: string): string;
@@ -82,10 +93,7 @@ export function createWidgetCatalog(): WidgetCatalog {
         .map((group) => {
           const lines = list()
             .filter((definition) => definition.group === group)
-            .flatMap((definition) => [
-              `- <${signature(definition)}> — ${definition.summary}`,
-              ...(definition.notes ?? []).map((note) => `  ${note}`),
-            ]);
+            .flatMap((definition) => [...describeDefinition(definition), ""]);
           return lines.length ? `${GROUPS[group]}:\n${lines.join("\n")}` : "";
         })
         .filter(Boolean);
@@ -94,20 +102,7 @@ export function createWidgetCatalog(): WidgetCatalog {
     describe(name) {
       const definition = items.get(name);
       if (!definition) return `Нет компонента ${name}`;
-      const props = Object.entries(definition.props ?? {}).map(
-        ([key, prop]) => `  ${key}${prop.required ? "" : "?"}: ${prop.type} — ${prop.description}`,
-      );
-      return [
-        `<${signature(definition)}> — ${definition.summary}`,
-        ...(definition.slot ? [`Внутри: ${definition.slot}`] : []),
-        ...(definition.model
-          ? [`v-model: ${definition.model.type} — ${definition.model.description}`]
-          : []),
-        ...(props.length ? ["Свойства:", ...props] : []),
-        ...(definition.notes ?? []),
-        "Пример:",
-        definition.example,
-      ].join("\n");
+      return describeDefinition(definition).join("\n");
     },
   };
 }

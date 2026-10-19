@@ -508,3 +508,53 @@ test(
     }
   },
 );
+
+test(
+  "static SVG inside nested slots grows during streaming without losing its elements",
+  { skip: !chromium, timeout: 60000, retry: 1 },
+  async () => {
+    const html = await readFile(new URL("./fixtures/agent-widgets.html", import.meta.url), "utf8");
+    const fixture = await createBrowserFixture({ pages: { "/widgets": html } });
+    onTestFinished(() => fixture.close());
+    const browser = await createChromium(fixture.directory);
+    onTestFinished(() => browser.close());
+    await browser.open(fixture.url("/widgets"));
+    const wait = async (expression) => {
+      for (let i = 0; i < 100; i++) {
+        if (await browser.evaluate(expression)) return;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      expect(await browser.evaluate(expression)).toBeTruthy();
+    };
+    await wait("!!window.fixture?.ready");
+    const head = '<Card title="Схема"><Columns><Card><svg viewBox="0 0 200 100" width="100%">';
+    const defs = '<defs><marker id="arrow"><path d="M0 0 L10 5 L0 10 z" /></marker></defs>';
+    const rect = '<rect x="10" y="10" width="80" height="50" fill="#6366f1" />';
+    const text = '<text x="20" y="40">Команда</text>';
+    const path = '<path d="M90 35 H180" stroke="#94a3b8" marker-end="url(#arrow)" />';
+    for (const source of [head, head + defs, head + defs + rect, head + defs + rect + text]) {
+      await browser.evaluate(`window.fixture.set(${JSON.stringify(source)}, true)`);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      await wait("document.querySelector('.widget svg') !== null");
+      if (source === head)
+        await browser.evaluate("window.originalSvg = document.querySelector('.widget svg')");
+    }
+    const full = head + defs + rect + text + path + "</svg></Card></Columns></Card>";
+    await browser.evaluate(`window.fixture.set(${JSON.stringify(full)}, false)`);
+    await wait("document.querySelector('.widget svg rect') !== null");
+    expect(
+      await browser.evaluate("document.querySelector('.widget svg') === window.originalSvg"),
+    ).toBe(true);
+    expect(await browser.evaluate("document.querySelector('.widget svg text').textContent")).toBe(
+      "Команда",
+    );
+    expect(await browser.evaluate("document.querySelectorAll('.widget svg path').length")).toBe(2);
+    expect(await browser.evaluate("document.querySelector('.widget svg rect').namespaceURI")).toBe(
+      "http://www.w3.org/2000/svg",
+    );
+    expect(
+      await browser.evaluate("document.querySelector('.widget svg rect').getBBox().width"),
+    ).toBe(80);
+    expect(await browser.evaluate("document.querySelectorAll('.widget-failure').length")).toBe(0);
+  },
+);

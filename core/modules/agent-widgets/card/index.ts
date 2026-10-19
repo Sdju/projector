@@ -10,5 +10,5 @@ export const cardWidget = defineWidget({
     tone: { type: "'neutral' | 'warning'", description: "цвет рамки" },
   },
   slot: "содержимое рамки",
-  example: '<Card title="Итоги" hint="за квартал">…</Card>',
+  example: '<Card title="Итоги" hint="за квартал">Выручка выросла на 12%.</Card>',
 });

@@ -12,6 +12,25 @@ export function loadCompiler(): Promise<Compiler> {
 export type RenderFn = (ctx: unknown, cache: unknown[]) => Vue.VNodeChild;
 const templates = new Map<string, RenderFn>();
 
+/** Slots run later, after the host restored block tracking. Their growing trees need a full diff too. */
+const templateRuntime = {
+  ...Vue,
+  withCtx(...args: Parameters<typeof Vue.withCtx>) {
+    const [slot, ...context] = args;
+    return Vue.withCtx(
+      (...slotArgs: unknown[]) => {
+        Vue.setBlockTracking(-1);
+        try {
+          return slot(...slotArgs);
+        } finally {
+          Vue.setBlockTracking(1);
+        }
+      },
+      ...context,
+    );
+  },
+};
+
 /** A template into its render function; the same template text is compiled once. */
 export function compileTemplate(template: string): RenderFn {
   const known = templates.get(template);
@@ -28,7 +47,7 @@ export function compileTemplate(template: string): RenderFn {
   // swaps one template for the next: Vue would skip re-rendering the slot content. Dynamic slots
   // (`_: 2`) are diffed in full.
   const render = new Function("Vue", code.replaceAll("_: 1 /* STABLE */", "_: 2 /* DYNAMIC */"))(
-    Vue,
+    templateRuntime,
   ) as RenderFn;
   if (templates.size >= 200) templates.delete(templates.keys().next().value!);
   templates.set(template, render);

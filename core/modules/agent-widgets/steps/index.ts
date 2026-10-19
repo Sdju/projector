@@ -5,7 +5,11 @@ export const stepsWidget = defineWidget({
   group: "data",
   summary: "этапы с отметкой готовности",
   props: {
-    items: { type: "array", description: "[{title, text?, done?}]", required: true },
+    items: {
+      type: "array",
+      description: "массив объектов: title обязателен, text и done необязательны",
+      required: true,
+    },
   },
   example: "<Steps :items=\"[{title:'Собрать',done:true},{title:'Проверить'}]\" />",
 });

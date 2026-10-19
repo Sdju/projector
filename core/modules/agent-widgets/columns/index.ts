@@ -9,5 +9,6 @@ export const columnsWidget = defineWidget({
     gap: { type: "number", description: "отступ в пикселях" },
   },
   slot: "элементы по колонкам",
-  example: '<Columns :cols="2"><Line … /><Bars … /></Columns>',
+  example:
+    '<Columns :cols="2"><Stat label="A" value="10" /><Stat label="B" value="20" /></Columns>',
 });

@@ -5,7 +5,11 @@ export const checksWidget = defineWidget({
   group: "form",
   summary: "выбор из списка: несколько (флажки) или один (single)",
   props: {
-    options: { type: "array", description: "строки или {value,label?,hint?}", required: true },
+    options: {
+      type: "array",
+      description: "массив строк или объектов: value обязателен, label и hint необязательны",
+      required: true,
+    },
     single: { type: "boolean", description: "один вариант вместо нескольких" },
     name: { type: "string", description: "имя поля в <Form>" },
     initial: { type: "array", description: "начально выбранные value" },

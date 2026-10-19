@@ -9,5 +9,5 @@ export const tabWidget = defineWidget({
     hint: { type: "string", description: "подсказка при наведении" },
   },
   slot: "содержимое вкладки",
-  example: '<Tab title="Данные">…</Tab>',
+  example: '<Tab title="Данные">Значения за месяц</Tab>',
 });
