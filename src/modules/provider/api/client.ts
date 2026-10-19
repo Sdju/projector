@@ -1,4 +1,8 @@
-import type { OpenAIProviderPublic, OpenAIProvidersPublicState } from "../model/types.ts";
+import type {
+  OpenAIProviderPublic,
+  OpenAIProvidersPublicState,
+  ProviderBalance,
+} from "../model/types.ts";
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -23,4 +27,8 @@ export function saveProviders(payload: {
 
 export function setActiveProvider(id: string): Promise<OpenAIProvidersPublicState> {
   return request("/api/providers/active", { method: "PATCH", body: JSON.stringify({ id }) });
+}
+
+export function fetchProviderBalance(id?: string): Promise<ProviderBalance> {
+  return request(`/api/providers/balance${id ? `?id=${encodeURIComponent(id)}` : ""}`);
 }

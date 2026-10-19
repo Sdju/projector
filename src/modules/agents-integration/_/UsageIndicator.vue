@@ -13,6 +13,8 @@ defineProps<{
   meterLabel: string;
   rows: readonly UsageWindowView[];
   prefix?: string;
+  /** Replaces the percent label for values that are not a share of a limit, e.g. a balance. */
+  valueText?: string;
   compact?: boolean;
   interactive?: boolean;
 }>();
@@ -38,6 +40,7 @@ const tooltipId = useId();
     <UsageMeter
       :remaining="remaining"
       :prefix="prefix"
+      :value-text="valueText"
       :compact="compact"
       :tone="tone"
       :aria-label="meterLabel"

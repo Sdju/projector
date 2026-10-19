@@ -6,6 +6,7 @@ defineProps<{
   remaining: number | null;
   ariaLabel?: string;
   prefix?: string;
+  valueText?: string;
   countdown?: string;
   ticks?: readonly number[];
   exhausted?: boolean;
@@ -20,7 +21,7 @@ defineProps<{
     :class="[
       tone ? `tone-${tone}` : undefined,
       {
-        unavailable: remaining === null,
+        unavailable: remaining === null && valueText === undefined,
         exhausted,
         compact,
         'tooltip-bar': countdown !== undefined,
@@ -42,7 +43,8 @@ defineProps<{
     />
     <span class="quota-label">
       <span
-        >{{ prefix ? `${prefix} · ` : "" }}{{ remaining === null ? "—" : `${remaining}%` }}</span
+        >{{ prefix ? `${prefix} · ` : ""
+        }}{{ valueText ?? (remaining === null ? "—" : `${remaining}%`) }}</span
       >
       <span v-if="countdown !== undefined" class="quota-time">{{ countdown }}</span>
     </span>

@@ -3,6 +3,7 @@ import { CodexUsageIndicator } from "../codex/index.ts";
 import { OpenCodeUsageIndicator } from "../opencode/index.ts";
 import { ClaudeUsageIndicator } from "../claude/index.ts";
 import { CursorUsageIndicator } from "../cursor/index.ts";
+import { ProviderBalanceIndicator } from "../provider/index.ts";
 </script>
 
 <template>
@@ -10,4 +11,5 @@ import { CursorUsageIndicator } from "../cursor/index.ts";
   <OpenCodeUsageIndicator />
   <ClaudeUsageIndicator />
   <CursorUsageIndicator />
+  <ProviderBalanceIndicator />
 </template>

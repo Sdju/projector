@@ -3,6 +3,7 @@ import { providersPath } from "../../../core/modules/app-paths/index.ts";
 import { setAsideBroken, writeFileAtomic } from "./atomic-file.ts";
 import { HttpError } from "../http/index.ts";
 import { vault as systemVault } from "../secrets/index.ts";
+import { inferProviderKind, isProviderKind } from "./kinds.ts";
 import { DEFAULT_PROVIDERS_SECRET, revealSecret } from "./secret-obfuscation.ts";
 import type {
   EnvOpenAIFallback,
@@ -58,6 +59,7 @@ function toPublic(provider: StoredOpenAIProvider, envKey = ""): OpenAIProviderPu
   return {
     id: provider.id,
     name: provider.name,
+    kind: provider.kind,
     url: provider.url,
     model: provider.model,
     hasApiKey: provider.vault === "keyring" || Boolean(provider.apiKey.trim()) || fromEnv,
@@ -71,6 +73,7 @@ function envProvider(fallback: EnvOpenAIFallback): StoredOpenAIProvider | null {
   return {
     id: ENV_PROVIDER_ID,
     name: "Из .env",
+    kind: inferProviderKind(url),
     url,
     model: fallback.model?.trim() || "qwen3.8-flash",
     apiKey: "",
@@ -81,6 +84,7 @@ function qwenSeed(): StoredOpenAIProvider {
   return {
     id: QWEN_PROVIDER_ID,
     name: "Qwen / DashScope",
+    kind: "qwencloud",
     url: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
     model: "qwen3.8-flash",
     apiKey: "",
@@ -101,10 +105,12 @@ function normalizeStoredProvider(value: unknown, index: number): StoredOpenAIPro
       typeof record.id === "string" && record.id.trim()
         ? sanitizeProviderId(record.id)
         : `provider-${index + 1}`;
+    const url = sanitizeUrl(record.url);
     return {
       id,
       name: sanitizeName(record.name, `Провайдер ${index + 1}`),
-      url: sanitizeUrl(record.url),
+      kind: isProviderKind(record.kind) ? record.kind : inferProviderKind(url),
+      url,
       model: sanitizeModel(record.model),
       apiKey: typeof record.apiKey === "string" ? record.apiKey : "",
       ...(record.vault === "keyring" ? { vault: "keyring" as const } : {}),
@@ -199,10 +205,12 @@ async function mergeProviderWrite(
       ? sanitizeProviderId(item.id)
       : `provider-${index + 1}`;
   const previous = existingById.get(id);
+  const url = sanitizeUrl(item.url);
   const base = {
     id,
     name: sanitizeName(item.name, `Провайдер ${index + 1}`),
-    url: sanitizeUrl(item.url),
+    kind: isProviderKind(item.kind) ? item.kind : (previous?.kind ?? inferProviderKind(url)),
+    url,
     model: sanitizeModel(item.model),
   };
   if (typeof item.apiKey === "string") {
@@ -313,6 +321,7 @@ async function toResolved(
   return {
     id: provider.id,
     name: provider.name,
+    kind: provider.kind,
     url: provider.url.trim(),
     model: provider.model.trim() || "qwen3.8-flash",
     apiKey: await revealProviderKey(provider, secret, envKey),

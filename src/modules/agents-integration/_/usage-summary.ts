@@ -10,6 +10,28 @@ export interface AgentUsageSummary {
 /** Последнее значение, которое показывает индикатор каждого агента: из него же строится цвет в списках. */
 export const agentUsageSummary = reactive<Record<string, AgentUsageSummary>>({});
 
+/** Баланс активного провайдера для строки «Чат с агентом»: готовый текст, а не процент. */
+export const providerBalanceSummary = reactive<{ text: string | null; tone: UsagePaceTone | null }>(
+  {
+    text: null,
+    tone: null,
+  },
+);
+
+export function publishProviderBalance(
+  text: Readonly<Ref<string | null>>,
+  tone: Readonly<Ref<UsagePaceTone | null>>,
+) {
+  watchEffect(() => {
+    providerBalanceSummary.text = text.value;
+    providerBalanceSummary.tone = tone.value;
+  });
+  onBeforeUnmount(() => {
+    providerBalanceSummary.text = null;
+    providerBalanceSummary.tone = null;
+  });
+}
+
 /** Индикатор публикует то, что рисует, чтобы другие списки показывали тот же остаток и цвет. */
 export function publishAgentUsage(
   agent: string,

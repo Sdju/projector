@@ -1,12 +1,21 @@
 import { newId } from "../../../common/utilities/new-id.ts";
 import { computed, reactive } from "vue";
-import { fetchProviders, saveProviders, setActiveProvider } from "../api/client.ts";
-import type { OpenAIProviderPublic } from "./types.ts";
+import {
+  fetchProviderBalance,
+  fetchProviders,
+  saveProviders,
+  setActiveProvider,
+} from "../api/client.ts";
+import { PROVIDER_PRESETS } from "./presets.ts";
+import type { OpenAIProviderPublic, ProviderBalance, ProviderKind } from "./types.ts";
 
 const state = reactive({
   providers: [] as OpenAIProviderPublic[],
   activeProviderId: null as string | null,
   keyDrafts: {} as Record<string, string>,
+  balances: {} as Record<string, ProviderBalance | undefined>,
+  /** Bumped when providers or keys are applied from the server; balance views refetch on it. */
+  revision: 0,
   loading: false,
   saving: false,
   error: "",
@@ -30,6 +39,23 @@ export function useProviders() {
     state.providers = payload.providers;
     state.activeProviderId = payload.activeProviderId;
     state.keyDrafts = {};
+    state.revision++;
+  }
+
+  async function loadBalance(id: string): Promise<void> {
+    try {
+      state.balances[id] = await fetchProviderBalance(id);
+    } catch {
+      state.balances[id] = undefined;
+    }
+  }
+
+  function loadBalances(): Promise<unknown> {
+    return Promise.all(
+      state.providers
+        .filter((item) => item.kind === "deepseek")
+        .map((item) => loadBalance(item.id)),
+    );
   }
 
   async function load(): Promise<void> {
@@ -38,7 +64,7 @@ export function useProviders() {
     try {
       apply(await fetchProviders());
     } catch (err) {
-      state.error = err instanceof Error ? err.message : "Не удалось загрузить Qwen";
+      state.error = err instanceof Error ? err.message : "Не удалось загрузить провайдеров";
     } finally {
       state.loading = false;
     }
@@ -73,16 +99,19 @@ export function useProviders() {
     }
   }
 
-  function addProvider(): void {
+  function addProvider(kind: ProviderKind = "custom"): string {
     const id = `p${newId().slice(0, 8)}`;
+    const preset = PROVIDER_PRESETS[kind];
     state.providers.push({
       id,
-      name: `Провайдер ${state.providers.length + 1}`,
-      url: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
-      model: "qwen3.8-flash",
+      kind,
+      name: kind === "custom" ? `Провайдер ${state.providers.length + 1}` : preset.name,
+      url: preset.url,
+      model: preset.model,
       hasApiKey: false,
     });
     if (!state.activeProviderId) state.activeProviderId = id;
+    return id;
   }
 
   function removeProvider(id: string): void {
@@ -112,6 +141,10 @@ export function useProviders() {
     saving,
     error,
     ready,
+    revision: computed(() => state.revision),
+    balances: computed(() => state.balances),
+    loadBalance,
+    loadBalances,
     keyDrafts: computed(() => state.keyDrafts),
     load,
     save,

@@ -174,7 +174,8 @@ export async function resolveProviderTarget(input: ProviderRequest): Promise<Pro
     const found = state.providers.find((item) => item.id === input.providerId);
     if (!found)
       throw new Error(`Провайдер ${input.providerId} не найден: список в list_secret_destinations`);
-    return { kind: "ai_provider", ...found, replaces: found.hasApiKey };
+    const { id, name, url, model, hasApiKey } = found;
+    return { kind: "ai_provider", id, name, url, model, replaces: hasApiKey };
   }
   const name = input.name?.trim() ?? "";
   if (!name) throw new Error("Укажите название нового провайдера");
@@ -201,12 +202,9 @@ export async function resolveProviderTarget(input: ProviderRequest): Promise<Pro
 export async function storeProviderKey(target: ProviderTarget, value: string): Promise<void> {
   const fallback = envFallbackFromProcess();
   const state = await loadPublicProviders(fallback);
-  const providers: OpenAIProviderWrite[] = state.providers.map(({ id, name, url, model }) => ({
-    id,
-    name,
-    url,
-    model,
-  }));
+  const providers: OpenAIProviderWrite[] = state.providers.map(
+    ({ id, name, kind, url, model }) => ({ id, name, kind, url, model }),
+  );
   const at = providers.findIndex((item) => item.id === target.id);
   if (at >= 0) providers[at] = { ...providers[at], apiKey: value };
   else

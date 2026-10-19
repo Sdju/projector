@@ -6,7 +6,10 @@ interface UsagePollingOptions<T> {
 }
 
 /** One request at a time; hidden or unmounted indicators do not keep polling. */
-export function useUsagePolling<T>(url: string, options: UsagePollingOptions<T> = {}) {
+export function useUsagePolling<T>(
+  url: string | (() => string),
+  options: UsagePollingOptions<T> = {},
+) {
   const usage = shallowRef<T | null>(null);
   const failed = ref(false);
   const interval = options.intervalMs ?? 60000;
@@ -19,7 +22,9 @@ export function useUsagePolling<T>(url: string, options: UsagePollingOptions<T> 
     clearTimeout(timer);
     controller = new AbortController();
     try {
-      const response = await fetch(url, { signal: controller.signal });
+      const response = await fetch(typeof url === "function" ? url() : url, {
+        signal: controller.signal,
+      });
       if (!response.ok) throw new Error("Usage unavailable");
       const value: T = await response.json();
       if (!disposed) {
@@ -50,5 +55,5 @@ export function useUsagePolling<T>(url: string, options: UsagePollingOptions<T> 
     controller?.abort();
     document.removeEventListener("visibilitychange", visibilityChanged);
   });
-  return { usage, failed };
+  return { usage, failed, refresh };
 }

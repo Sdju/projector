@@ -1,6 +1,10 @@
+/** Preset of a provider: decides which extras (balance, defaults) Projector offers. */
+export type ProviderKind = "custom" | "local" | "deepseek" | "qwencloud";
+
 export interface OpenAIProviderPublic {
   id: string;
   name: string;
+  kind: ProviderKind;
   url: string;
   model: string;
   hasApiKey: boolean;
@@ -9,6 +13,7 @@ export interface OpenAIProviderPublic {
 export interface OpenAIProviderWrite {
   id: string;
   name: string;
+  kind?: ProviderKind;
   url: string;
   model: string;
   apiKey?: string;
@@ -27,6 +32,7 @@ export interface OpenAIProvidersWriteState {
 export interface StoredOpenAIProvider {
   id: string;
   name: string;
+  kind: ProviderKind;
   url: string;
   model: string;
   /** Obfuscated key kept in the providers file; empty when the key lives in the keyring. */
@@ -50,6 +56,7 @@ export interface EnvOpenAIFallback {
 export interface ResolvedOpenAIProvider {
   id: string;
   name: string;
+  kind: ProviderKind;
   url: string;
   model: string;
   apiKey: string;
@@ -69,4 +76,22 @@ export interface AgentHistoryTurn {
   role: "user" | "assistant";
   content: string;
   tools?: AgentHistoryTool[];
+}
+
+export interface ProviderBalanceEntry {
+  currency: string;
+  /** Decimal strings as the provider returns them; never rounded. */
+  total: string;
+  granted: string;
+  toppedUp: string;
+}
+
+export interface ProviderBalance {
+  /** `unsupported`: the provider has no balance to show (local, no public API). */
+  status: "ready" | "unavailable" | "unsupported";
+  entries: ProviderBalanceEntry[];
+  /** The provider's own verdict whether calls still work; `null` when it does not say. */
+  available: boolean | null;
+  checkedAt: number;
+  message: string | null;
 }

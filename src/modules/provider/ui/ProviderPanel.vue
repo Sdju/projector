@@ -8,10 +8,14 @@ import UiInline from "../../../common/ui/UiInline.vue";
 import UiFormGrid from "../../../common/ui/UiFormGrid.vue";
 
 import UiHint from "../../../common/ui/UiHint.vue";
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiField from "../../../common/ui/UiField.vue";
+import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import { useProviders } from "../model/store.ts";
+import { PROVIDER_KINDS, PROVIDER_PRESETS } from "../model/presets.ts";
+import { formatAmount, formatBalance } from "../model/format-balance.ts";
+import type { ProviderKind } from "../model/types.ts";
 
 const {
   providers,
@@ -26,6 +30,10 @@ const {
   removeProvider,
   setKeyDraft,
   patchProvider,
+  balances,
+  loadBalance,
+  loadBalances,
+  revision,
 } = useProviders();
 const selectedId = ref<string | null>(null);
 const selected = computed(
@@ -35,6 +43,52 @@ const selected = computed(
 onMounted(async () => {
   await load();
   selectedId.value = activeProviderId.value ?? providers.value[0]?.id ?? null;
+});
+// Balances follow every load or save, so a freshly saved key shows its balance right away.
+watch(revision, () => void loadBalances());
+
+const preset = computed(() => PROVIDER_PRESETS[selected.value?.kind ?? "custom"]);
+const balance = computed(() => (selected.value ? balances.value[selected.value.id] : undefined));
+const hasBalance = computed(() => selected.value?.kind === "deepseek");
+
+function listMeta(item: { id: string; kind: ProviderKind; model: string }): string {
+  const value = balances.value[item.id];
+  if (item.kind === "deepseek" && value?.status === "ready") return formatBalance(value.entries);
+  return item.model || "без модели";
+}
+
+function add(kind: ProviderKind): string {
+  const id = addProvider(kind);
+  selectedId.value = id;
+  return id;
+}
+
+const commands = useCommandScope("provider-settings", () => ({
+  surface: "settings",
+  provider: selectedId.value,
+}));
+commands.scope.registerCommand({
+  id: "ide.providers.add",
+  title: "Добавить провайдера",
+  description:
+    "Добавляет провайдера из пресета: deepseek, qwencloud, local или custom (по умолчанию custom). Подставляет адрес и модель; ключ вводится в форме, затем «сохранить».",
+  arguments: { kind: "deepseek | qwencloud | local | custom" },
+  run: (value) => {
+    const kind = commandArgs(value).kind ?? "custom";
+    if (!PROVIDER_KINDS.includes(kind as ProviderKind))
+      throw new Error("Неизвестный тип провайдера");
+    return add(kind as ProviderKind);
+  },
+});
+commands.scope.registerCommand({
+  id: "ide.providers.balance.refresh",
+  title: "Обновить баланс провайдера",
+  description:
+    "Запрашивает баланс выбранного провайдера (сейчас только DeepSeek; у Qwen Cloud и локальных баланса по ключу нет).",
+  enabled: () => hasBalance.value,
+  run: async () => {
+    if (selected.value) await loadBalance(selected.value.id);
+  },
 });
 
 function keyDraft(): string {
@@ -47,7 +101,16 @@ function keyDraft(): string {
   <UiStack as="section" :gap="4">
     <UiInline wrap justify="between">
       <p class="kicker">OpenAI-compatible API</p>
-      <UiButton @click="addProvider">+ провайдер</UiButton>
+      <UiInline wrap :gap="2">
+        <UiButton
+          v-for="kind in PROVIDER_KINDS"
+          :key="kind"
+          :title="PROVIDER_PRESETS[kind].label"
+          @click="commands.run('ide.providers.add', { kind })"
+        >
+          + {{ kind === "custom" ? "другой" : PROVIDER_PRESETS[kind].name.split(" ")[0] }}
+        </UiButton>
+      </UiInline>
     </UiInline>
     <UiMessage v-if="error" tone="danger" size="xs" flush role="alert">{{ error }}</UiMessage>
     <UiStack :gap="2">
@@ -65,11 +128,28 @@ function keyDraft(): string {
       >
         <UiStatusDot class="dot" :tone="item.id === activeProviderId ? 'success' : 'faint'" />
         <span>{{ item.name }}</span>
-        <span class="meta">{{ item.model || "без модели" }}</span>
+        <span class="meta">{{ listMeta(item) }}</span>
       </UiActionRow>
     </UiStack>
 
     <UiStack v-if="selected" class="form" :gap="4">
+      <UiField v-slot="{ control }" label="тип">
+        <UiControl
+          as="select"
+          v-bind="control"
+          aria-label="Тип провайдера"
+          :value="selected.kind"
+          @change="
+            patchProvider(selected.id, {
+              kind: ($event.target as HTMLSelectElement).value as ProviderKind,
+            })
+          "
+        >
+          <option v-for="kind in PROVIDER_KINDS" :key="kind" :value="kind">
+            {{ PROVIDER_PRESETS[kind].label }}
+          </option>
+        </UiControl>
+      </UiField>
       <UiFormGrid>
         <UiField v-slot="{ control }" label="имя">
           <UiControl
@@ -110,14 +190,46 @@ function keyDraft(): string {
           type="password"
           autocomplete="off"
           :placeholder="
-            selected.hasApiKey ? 'ключ сохранён — введите чтобы заменить' : 'DASHSCOPE / QWENCLOUD'
+            selected.hasApiKey ? 'ключ сохранён — введите чтобы заменить' : preset.keyPlaceholder
           "
           @input="setKeyDraft(selected.id, ($event.target as HTMLInputElement).value)"
         />
       </UiField>
       <UiHint>
-        Ключ шифруется на диске (AES). Можно задать DASHSCOPE_API_KEY / OPENAI_URL в окружении.
+        Ключ хранится в системном хранилище секретов. Можно задать DASHSCOPE_API_KEY / OPENAI_URL в
+        окружении. {{ preset.hint }}
       </UiHint>
+      <UiStack v-if="hasBalance" class="balance" :gap="1">
+        <UiInline wrap justify="between">
+          <span class="kicker">баланс</span>
+          <UiButton
+            appearance="outline"
+            tone="muted"
+            shape="chip"
+            @click="commands.run('ide.providers.balance.refresh')"
+          >
+            обновить
+          </UiButton>
+        </UiInline>
+        <template v-if="balance?.status === 'ready'">
+          <UiInline v-for="entry in balance.entries" :key="entry.currency" wrap :gap="3">
+            <strong>{{ formatAmount(entry.currency, entry.total) }}</strong>
+            <span class="meta">
+              пополнено {{ formatAmount(entry.currency, entry.toppedUp) }} · подарочные
+              {{ formatAmount(entry.currency, entry.granted) }}
+            </span>
+          </UiInline>
+          <UiMessage v-if="balance.available === false" tone="danger" size="xs" flush>
+            Провайдер сообщает, что средств для вызовов недостаточно.
+          </UiMessage>
+        </template>
+        <UiHint v-else>
+          {{
+            balance?.message ??
+            (selected.hasApiKey ? "загрузка…" : "Сохраните ключ, чтобы увидеть баланс.")
+          }}
+        </UiHint>
+      </UiStack>
       <UiInline wrap justify="between">
         <UiButton
           appearance="outline"
@@ -150,6 +262,11 @@ function keyDraft(): string {
 
 .item.on span:nth-child(2) {
   color: var(--text);
+}
+
+.balance {
+  padding: var(--sp-2) 0;
+  border-top: 1px solid var(--line);
 }
 
 .meta {

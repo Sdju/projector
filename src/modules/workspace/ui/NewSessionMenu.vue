@@ -10,7 +10,12 @@ import UiIsland from "../../../common/ui/UiIsland.vue";
 import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
 import { computed, useId } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
-import { agentUsageSummary } from "../../agents-integration/status-bar/index.ts";
+import {
+  AgentUsageIndicators,
+  agentUsageSummary,
+  providerBalanceSummary,
+} from "../../agents-integration/status-bar/index.ts";
+import { useCompactViewport } from "../../../common/utilities/compact-viewport.ts";
 import IconPlus from "~icons/lucide/plus";
 import IconBot from "~icons/lucide/bot";
 import IconMessage from "~icons/lucide/message-square";
@@ -64,6 +69,9 @@ const rows = computed(() =>
   }),
 );
 
+/** The status bar is hidden on mobile, so the limits shown below are polled only while this menu is open. */
+const compact = useCompactViewport();
+
 const { modeOf, setMode } = useAgentModes();
 /** The chat view needs the agent feature; without it the terminal is the only option. */
 const hasGui = (program: string) => props.agent && !!guiPrograms[program];
@@ -90,6 +98,7 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
 </script>
 
 <template>
+  <span v-if="compact && open" hidden><AgentUsageIndicators /></span>
   <span :ref="menu.trigger" class="new-session">
     <UiButton
       shape="icon"
@@ -169,6 +178,13 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
           title="Чат с агентом"
           description="Встроенный агент Projector, история разговоров"
         />
+        <UiBadge
+          v-if="providerBalanceSummary.text"
+          class="hint"
+          mono
+          :tone="hintTone(providerBalanceSummary.tone)"
+          >{{ providerBalanceSummary.text }}</UiBadge
+        >
       </UiActionRow>
     </template>
     <UiIslandFooter hide-on-compact
