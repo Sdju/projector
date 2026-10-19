@@ -20,15 +20,19 @@ const TRUST = "permission-mode";
 const MODES = new Set(["default", "auto", "bypassPermissions"]);
 
 async function run(options: AgentRunOptions): Promise<void> {
+  const [providerId, ...rest] = (options.selection?.provider || options.providerId || "").split(
+    ":",
+  );
   const resolved = await resolveOpenAIProvider({
-    providerId: options.selection?.provider || options.providerId,
+    providerId,
+    model: rest.join(":"),
     fallback: envFallbackFromProcess(),
   });
   const provider = createQwenOpenAI({
     openaiUrl: resolved.url,
     openaiApiKey: resolved.apiKey,
   });
-  const model = provider.chatModel(resolved.model || "qwen3.8-flash");
+  const model = provider.chatModel(resolved.model);
 
   const mode = options.selection?.[TRUST] ?? options.permissionMode;
   const added: Project[] = [];
@@ -163,19 +167,34 @@ async function controls(selection: Record<string, string> = {}): Promise<AgentCo
       ],
     },
   ];
-  if (providers.length) {
-    const chosen = providers.find((item) => item.id === selection.provider);
+  // One option per registered model of every enabled provider; `provider:alias` picks both.
+  const options = providers
+    .filter((item) => item.enabled && item.url)
+    .flatMap((item) =>
+      item.models.length
+        ? item.models.map((model) => ({
+            value: `${item.id}:${model.alias}`,
+            name: `${item.name} · ${model.alias}`,
+          }))
+        : [{ value: item.id, name: item.name }],
+    );
+  if (options.length) {
+    const wanted = selection.provider ?? "";
+    const byProvider = (id: string) => options.find((item) => item.value.split(":")[0] === id);
+    // A bare provider id (older chats) means its first model; an unknown choice, the default provider.
+    const current =
+      options.find((item) => item.value === wanted) ??
+      byProvider(wanted) ??
+      byProvider(activeProviderId ?? "") ??
+      options[0]!;
     list.unshift({
       id: "provider",
       via: "native",
       category: "model",
       name: "Модель",
       description: "Провайдер и модель из настроек",
-      current: chosen?.id ?? activeProviderId ?? providers[0]!.id,
-      options: providers.map((item) => ({
-        value: item.id,
-        name: item.model ? `${item.name} · ${item.model}` : item.name,
-      })),
+      current: current.value,
+      options,
     });
   }
   return list;

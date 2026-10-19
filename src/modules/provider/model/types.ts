@@ -1,11 +1,18 @@
 export type ProviderKind = "custom" | "local" | "deepseek" | "qwencloud";
 
+/** `id` goes upstream; `alias` is the name the agent and other clients see. */
+export interface ProviderModel {
+  id: string;
+  alias: string;
+}
+
 export interface OpenAIProviderPublic {
   id: string;
   name: string;
   kind: ProviderKind;
   url: string;
-  model: string;
+  enabled: boolean;
+  models: ProviderModel[];
   hasApiKey: boolean;
 }
 

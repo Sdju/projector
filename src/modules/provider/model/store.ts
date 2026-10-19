@@ -2,6 +2,7 @@ import { newId } from "../../../common/utilities/new-id.ts";
 import { computed, reactive } from "vue";
 import {
   fetchProviderBalance,
+  fetchProviderModels,
   fetchProviders,
   saveProviders,
   setActiveProvider,
@@ -14,6 +15,10 @@ const state = reactive({
   activeProviderId: null as string | null,
   keyDrafts: {} as Record<string, string>,
   balances: {} as Record<string, ProviderBalance | undefined>,
+  /** Ids the provider offers upstream, per provider; not saved, only offered for registering. */
+  remoteModels: {} as Record<string, string[] | undefined>,
+  fetchingModels: {} as Record<string, boolean | undefined>,
+  modelsError: {} as Record<string, string | undefined>,
   /** Bumped when providers or keys are applied from the server; balance views refetch on it. */
   revision: 0,
   loading: false,
@@ -107,7 +112,8 @@ export function useProviders() {
       kind,
       name: kind === "custom" ? `Провайдер ${state.providers.length + 1}` : preset.name,
       url: preset.url,
-      model: preset.model,
+      enabled: true,
+      models: preset.model ? [{ id: preset.model, alias: preset.model }] : [],
       hasApiKey: false,
     });
     if (!state.activeProviderId) state.activeProviderId = id;
@@ -133,7 +139,53 @@ export function useProviders() {
     Object.assign(item, patch);
   }
 
+  async function fetchModels(id: string): Promise<void> {
+    const item = state.providers.find((row) => row.id === id);
+    if (!item) return;
+    state.fetchingModels[id] = true;
+    state.modelsError[id] = undefined;
+    try {
+      state.remoteModels[id] = await fetchProviderModels({
+        id,
+        url: item.url,
+        apiKey: state.keyDrafts[id],
+      });
+    } catch (err) {
+      state.modelsError[id] = err instanceof Error ? err.message : "Не удалось получить список";
+    } finally {
+      state.fetchingModels[id] = false;
+    }
+  }
+
+  /** Registers an upstream model under a name; the name stays unique within the provider. */
+  function registerModel(providerId: string, id: string, alias = ""): void {
+    const item = state.providers.find((row) => row.id === providerId);
+    const modelId = id.trim();
+    if (!item || !modelId) return;
+    const taken = new Set(item.models.map((row) => row.alias));
+    let name = alias.trim() || modelId;
+    for (let n = 2; taken.has(name); n++) name = `${alias.trim() || modelId}-${n}`;
+    item.models.push({ id: modelId, alias: name });
+  }
+
+  function unregisterModel(providerId: string, id: string): void {
+    const item = state.providers.find((row) => row.id === providerId);
+    if (item) item.models = item.models.filter((row) => row.id !== id);
+  }
+
+  function renameModel(providerId: string, id: string, alias: string): void {
+    const row = state.providers.find((p) => p.id === providerId)?.models.find((m) => m.id === id);
+    if (row) row.alias = alias;
+  }
+
   return {
+    fetchModels,
+    registerModel,
+    unregisterModel,
+    renameModel,
+    remoteModels: computed(() => state.remoteModels),
+    fetchingModels: computed(() => state.fetchingModels),
+    modelsError: computed(() => state.modelsError),
     providers,
     activeProviderId,
     activeProvider,

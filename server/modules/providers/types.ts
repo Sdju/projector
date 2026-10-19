@@ -1,12 +1,20 @@
 /** Preset of a provider: decides which extras (balance, defaults) Projector offers. */
 export type ProviderKind = "custom" | "local" | "deepseek" | "qwencloud";
 
+/** A model of a provider that Projector offers: `id` goes upstream, `alias` is the name clients see. */
+export interface ProviderModel {
+  id: string;
+  alias: string;
+}
+
 export interface OpenAIProviderPublic {
   id: string;
   name: string;
   kind: ProviderKind;
   url: string;
-  model: string;
+  /** A disabled provider offers none of its models to the agent or the gateway. */
+  enabled: boolean;
+  models: ProviderModel[];
   hasApiKey: boolean;
 }
 
@@ -15,7 +23,10 @@ export interface OpenAIProviderWrite {
   name: string;
   kind?: ProviderKind;
   url: string;
-  model: string;
+  enabled?: boolean;
+  models?: Array<{ id: string; alias?: string }>;
+  /** Shorthand for a single model, for callers that only know one. */
+  model?: string;
   apiKey?: string;
 }
 
@@ -34,7 +45,8 @@ export interface StoredOpenAIProvider {
   name: string;
   kind: ProviderKind;
   url: string;
-  model: string;
+  enabled: boolean;
+  models: ProviderModel[];
   /** Obfuscated key kept in the providers file; empty when the key lives in the keyring. */
   apiKey: string;
   /** On disk, `keyring` means the key is in the OS keyring under the provider's account. */
@@ -58,7 +70,10 @@ export interface ResolvedOpenAIProvider {
   name: string;
   kind: ProviderKind;
   url: string;
+  /** Upstream id of the chosen model: what goes into the request. */
   model: string;
+  /** The registered name of the chosen model. */
+  modelName: string;
   apiKey: string;
 }
 

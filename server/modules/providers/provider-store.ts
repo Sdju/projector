@@ -4,6 +4,7 @@ import { setAsideBroken, writeFileAtomic } from "./atomic-file.ts";
 import { HttpError } from "../http/index.ts";
 import { vault as systemVault } from "../secrets/index.ts";
 import { inferProviderKind, isProviderKind } from "./kinds.ts";
+import { pickModel, sanitizeModels } from "./models.ts";
 import { DEFAULT_PROVIDERS_SECRET, revealSecret } from "./secret-obfuscation.ts";
 import type {
   EnvOpenAIFallback,
@@ -18,6 +19,7 @@ import type {
 
 const ENV_PROVIDER_ID = "env-default";
 const QWEN_PROVIDER_ID = "qwen-dashscope";
+const DEFAULT_MODEL = "qwen3.8-flash";
 let writeChain: Promise<unknown> = Promise.resolve();
 let providerVault = systemVault;
 /** Test hook: replaces the secret vault. */
@@ -46,13 +48,8 @@ function sanitizeName(value: unknown, fallback: string): string {
   return value.replace(/\s+/g, " ").trim().slice(0, 80) || fallback;
 }
 
-function sanitizeUrl(value: unknown): string {
-  return typeof value === "string" ? value.trim().slice(0, 500) : "";
-}
-
-function sanitizeModel(value: unknown): string {
-  return typeof value === "string" ? value.trim().slice(0, 200) : "";
-}
+const sanitizeUrl = (value: unknown): string =>
+  typeof value === "string" ? value.trim().slice(0, 500) : "";
 
 function toPublic(provider: StoredOpenAIProvider, envKey = ""): OpenAIProviderPublic {
   const fromEnv = provider.id === ENV_PROVIDER_ID && envKey.trim() !== "";
@@ -61,7 +58,8 @@ function toPublic(provider: StoredOpenAIProvider, envKey = ""): OpenAIProviderPu
     name: provider.name,
     kind: provider.kind,
     url: provider.url,
-    model: provider.model,
+    enabled: provider.enabled,
+    models: provider.models,
     hasApiKey: provider.vault === "keyring" || Boolean(provider.apiKey.trim()) || fromEnv,
   };
 }
@@ -75,7 +73,8 @@ function envProvider(fallback: EnvOpenAIFallback): StoredOpenAIProvider | null {
     name: "Из .env",
     kind: inferProviderKind(url),
     url,
-    model: fallback.model?.trim() || "qwen3.8-flash",
+    enabled: true,
+    models: sanitizeModels(null, fallback.model?.trim() || DEFAULT_MODEL),
     apiKey: "",
   };
 }
@@ -86,7 +85,8 @@ function qwenSeed(): StoredOpenAIProvider {
     name: "Qwen / DashScope",
     kind: "qwencloud",
     url: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
-    model: "qwen3.8-flash",
+    enabled: true,
+    models: sanitizeModels(null, DEFAULT_MODEL),
     apiKey: "",
   };
 }
@@ -111,7 +111,8 @@ function normalizeStoredProvider(value: unknown, index: number): StoredOpenAIPro
       name: sanitizeName(record.name, `Провайдер ${index + 1}`),
       kind: isProviderKind(record.kind) ? record.kind : inferProviderKind(url),
       url,
-      model: sanitizeModel(record.model),
+      enabled: record.enabled !== false,
+      models: sanitizeModels(record.models, record.model),
       apiKey: typeof record.apiKey === "string" ? record.apiKey : "",
       ...(record.vault === "keyring" ? { vault: "keyring" as const } : {}),
     };
@@ -211,7 +212,11 @@ async function mergeProviderWrite(
     name: sanitizeName(item.name, `Провайдер ${index + 1}`),
     kind: isProviderKind(item.kind) ? item.kind : (previous?.kind ?? inferProviderKind(url)),
     url,
-    model: sanitizeModel(item.model),
+    enabled: item.enabled === undefined ? (previous?.enabled ?? true) : item.enabled !== false,
+    models:
+      item.models === undefined && !item.model
+        ? (previous?.models ?? [])
+        : sanitizeModels(item.models, item.model),
   };
   if (typeof item.apiKey === "string") {
     const plain = item.apiKey.trim();
@@ -317,13 +322,16 @@ async function toResolved(
   provider: StoredOpenAIProvider,
   secret: string,
   envKey: string,
+  modelName?: string,
 ): Promise<ResolvedOpenAIProvider> {
+  const chosen = pickModel(provider.models, modelName);
   return {
     id: provider.id,
     name: provider.name,
     kind: provider.kind,
     url: provider.url.trim(),
-    model: provider.model.trim() || "qwen3.8-flash",
+    model: chosen?.id ?? DEFAULT_MODEL,
+    modelName: chosen?.alias ?? DEFAULT_MODEL,
     apiKey: await revealProviderKey(provider, secret, envKey),
   };
 }
@@ -358,6 +366,8 @@ export function migrateProviderKeys(fallback: EnvOpenAIFallback = {}): Promise<v
 export async function resolveOpenAIProvider(
   options: {
     providerId?: string;
+    /** Registered name of the model; without a match the provider's first model. */
+    model?: string;
     fallback?: EnvOpenAIFallback;
   } = {},
 ): Promise<ResolvedOpenAIProvider> {
@@ -371,10 +381,10 @@ export async function resolveOpenAIProvider(
     stored.providers[0];
 
   const envKey = fallback.apiKey ?? "";
-  if (selected?.url.trim()) return toResolved(selected, secret, envKey);
+  if (selected?.url.trim()) return toResolved(selected, secret, envKey, options.model);
 
   const fromEnv = envProvider(fallback);
-  if (fromEnv?.url.trim()) return toResolved(fromEnv, secret, envKey);
+  if (fromEnv?.url.trim()) return toResolved(fromEnv, secret, envKey, options.model);
 
   throw new HttpError(400, "Провайдер Qwen/OpenAI не настроен");
 }
@@ -387,11 +397,4 @@ export function envFallbackFromProcess(): EnvOpenAIFallback {
     model: process.env.OPENAI_MODEL || process.env.QWEN_MODEL,
     secret: process.env.PROVIDERS_SECRET,
   };
-}
-
-export function isDashScopeProviderUrl(url: string): boolean {
-  const value = url.trim().toLowerCase();
-  return (
-    value.includes("dashscope") || value.includes("aliyuncs.com") || value.includes("qwencloud")
-  );
 }

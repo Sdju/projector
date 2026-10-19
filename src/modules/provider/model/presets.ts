@@ -4,6 +4,7 @@ export interface ProviderPreset {
   label: string;
   name: string;
   url: string;
+  /** Model registered with a new provider of this kind; the rest come from "load the list". */
   model: string;
   keyPlaceholder: string;
   /** What Projector can show about the account besides chat. */

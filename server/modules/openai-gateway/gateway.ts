@@ -48,16 +48,18 @@ async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> 
   throw new HttpError(400, "Тело запроса должно быть JSON-объектом");
 }
 
-/** Every configured provider's model, so a client picks a provider by asking for its model. */
+/** Every registered model of every enabled provider, so a client picks a provider by its model. */
 export async function listModels(): Promise<{ object: "list"; data: unknown[] }> {
   const { providers } = await loadStoredProviders(envFallbackFromProcess());
   const seen = new Set<string>();
   const data: unknown[] = [];
   for (const provider of providers) {
-    const model = provider.model.trim();
-    if (!provider.url.trim() || !model || seen.has(model)) continue;
-    seen.add(model);
-    data.push({ id: model, object: "model", created: 0, owned_by: provider.id });
+    if (!provider.enabled || !provider.url.trim()) continue;
+    for (const { alias } of provider.models) {
+      if (seen.has(alias)) continue;
+      seen.add(alias);
+      data.push({ id: alias, object: "model", created: 0, owned_by: provider.id });
+    }
   }
   return { object: "list", data };
 }
@@ -65,9 +67,12 @@ export async function listModels(): Promise<{ object: "list"; data: unknown[] }>
 async function providerForModel(model: unknown) {
   const fallback = envFallbackFromProcess();
   if (typeof model === "string" && model.trim()) {
+    const name = model.trim();
     const { providers } = await loadStoredProviders(fallback);
-    const match = providers.find((item) => item.model.trim() === model.trim() && item.url.trim());
-    if (match) return resolveOpenAIProvider({ providerId: match.id, fallback });
+    const match = providers.find(
+      (item) => item.enabled && item.url.trim() && item.models.some((row) => row.alias === name),
+    );
+    if (match) return resolveOpenAIProvider({ providerId: match.id, model: name, fallback });
   }
   return resolveOpenAIProvider({ fallback });
 }
@@ -76,7 +81,8 @@ async function providerForModel(model: unknown) {
 export async function forward(req: IncomingMessage, res: ServerResponse, endpoint: string) {
   const body = await readJson(req);
   const provider = await providerForModel(body.model);
-  if (typeof body.model !== "string" || !body.model.trim()) body.model = provider.model;
+  // The client asks by registered name; upstream knows the model by its own id.
+  body.model = provider.model;
   const base = normalizeOpenAiBaseUrl(provider.url);
 
   const abort = new AbortController();

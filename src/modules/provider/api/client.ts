@@ -32,3 +32,16 @@ export function setActiveProvider(id: string): Promise<OpenAIProvidersPublicStat
 export function fetchProviderBalance(id?: string): Promise<ProviderBalance> {
   return request(`/api/providers/balance${id ? `?id=${encodeURIComponent(id)}` : ""}`);
 }
+
+/** Model ids the provider offers; a draft passes its own address and key. */
+export async function fetchProviderModels(draft: {
+  id: string;
+  url: string;
+  apiKey?: string;
+}): Promise<string[]> {
+  const { models } = await request<{ models: string[] }>("/api/providers/models", {
+    method: "POST",
+    body: JSON.stringify(draft),
+  });
+  return models;
+}
