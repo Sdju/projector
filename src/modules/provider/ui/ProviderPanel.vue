@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import UiMessage from "../../../common/ui/UiMessage.vue";
-import UiActionRow from "../../../common/ui/UiActionRow.vue";
-import UiStatusDot from "../../../common/ui/UiStatusDot.vue";
 import UiControl from "../../../common/ui/UiControl.vue";
 import UiStack from "../../../common/ui/UiStack.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
@@ -9,14 +7,19 @@ import UiFormGrid from "../../../common/ui/UiFormGrid.vue";
 import UiScrollArea from "../../../common/ui/UiScrollArea.vue";
 
 import UiHint from "../../../common/ui/UiHint.vue";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiField from "../../../common/ui/UiField.vue";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import { useProviders } from "../model/store.ts";
 import { PROVIDER_KINDS, PROVIDER_PRESETS } from "../model/presets.ts";
-import { formatAmount, formatBalance } from "../model/format-balance.ts";
-import type { ProviderKind, ProviderModel } from "../model/types.ts";
+import { formatAmount } from "../model/format-balance.ts";
+import type { ProviderKind } from "../model/types.ts";
+
+/** The provider whose page the navigation opened. Without one, the section is the overview. */
+const props = defineProps<{ providerId?: string }>();
+/** Opening a provider goes through the navigation, so the page and its entry stay in step. */
+const emit = defineEmits<{ open: [id: string | undefined] }>();
 
 const {
   providers,
@@ -24,7 +27,6 @@ const {
   error,
   saving,
   keyDrafts,
-  load,
   save,
   setActive,
   addProvider,
@@ -33,8 +35,6 @@ const {
   patchProvider,
   balances,
   loadBalance,
-  loadBalances,
-  revision,
   fetchModels,
   registerModel,
   unregisterModel,
@@ -43,27 +43,15 @@ const {
   fetchingModels,
   modelsError,
 } = useProviders();
-const selectedId = ref<string | null>(null);
-const selected = computed(
-  () => providers.value.find((item) => item.id === selectedId.value) ?? providers.value[0] ?? null,
+const selected = computed(() => providers.value.find((item) => item.id === props.providerId));
+const enabledCount = computed(() => providers.value.filter((item) => item.enabled).length);
+const modelCount = computed(() =>
+  providers.value.reduce((sum, item) => sum + (item.enabled ? item.models.length : 0), 0),
 );
-
-onMounted(async () => {
-  await load();
-  selectedId.value = activeProviderId.value ?? providers.value[0]?.id ?? null;
-});
-// Balances follow every load or save, so a freshly saved key shows its balance right away.
-watch(revision, () => void loadBalances());
 
 const preset = computed(() => PROVIDER_PRESETS[selected.value?.kind ?? "custom"]);
 const balance = computed(() => (selected.value ? balances.value[selected.value.id] : undefined));
 const hasBalance = computed(() => selected.value?.kind === "deepseek");
-
-function listMeta(item: { id: string; kind: ProviderKind; models: ProviderModel[] }): string {
-  const value = balances.value[item.id];
-  if (item.kind === "deepseek" && value?.status === "ready") return formatBalance(value.entries);
-  return item.models.length ? `${item.models.length} мод.` : "без моделей";
-}
 
 interface ModelRow {
   id: string;
@@ -117,13 +105,18 @@ function addManual(): void {
 
 function add(kind: ProviderKind): string {
   const id = addProvider(kind);
-  selectedId.value = id;
+  emit("open", id);
   return id;
+}
+
+function remove(id: string): void {
+  removeProvider(id);
+  emit("open", undefined);
 }
 
 const commands = useCommandScope("provider-settings", () => ({
   surface: "settings",
-  provider: selectedId.value,
+  provider: props.providerId ?? null,
 }));
 commands.scope.registerCommand({
   id: "ide.providers.add",
@@ -193,8 +186,12 @@ function keyDraft(): string {
 
 <template>
   <UiStack as="section" :gap="4">
-    <UiInline wrap justify="between">
-      <p class="kicker">OpenAI-compatible API</p>
+    <UiMessage v-if="error" tone="danger" size="xs" flush role="alert">{{ error }}</UiMessage>
+    <template v-if="!selected">
+      <UiHint>
+        Провайдеры OpenAI-compatible API перечислены слева: у каждого своя страница. Включённых
+        может быть сколько угодно, агент выбирает любую их модель.
+      </UiHint>
       <UiInline wrap :gap="2">
         <UiButton
           v-for="kind in PROVIDER_KINDS"
@@ -205,31 +202,13 @@ function keyDraft(): string {
           + {{ kind === "custom" ? "другой" : PROVIDER_PRESETS[kind].name.split(" ")[0] }}
         </UiButton>
       </UiInline>
-    </UiInline>
-    <UiMessage v-if="error" tone="danger" size="xs" flush role="alert">{{ error }}</UiMessage>
-    <UiStack :gap="1">
-      <UiActionRow
-        v-for="item in providers"
-        :key="item.id"
-        type="button"
-        class="item"
-        interaction="selection"
-        radius="none"
-        :gap="2"
-        padding="var(--sp-2) 0"
-        :class="{ on: item.id === selected?.id, off: !item.enabled }"
-        @click="selectedId = item.id"
-      >
-        <UiStatusDot
-          class="dot"
-          :tone="!item.enabled ? 'faint' : item.id === activeProviderId ? 'success' : 'muted'"
-        />
-        <span>{{ item.name }}</span>
-        <span class="meta">{{ listMeta(item) }}</span>
-      </UiActionRow>
-    </UiStack>
+      <UiHint v-if="providers.length">
+        Включено {{ enabledCount }} из {{ providers.length }} · моделей {{ modelCount }}
+      </UiHint>
+      <UiHint v-else>Провайдеров нет: добавьте первого кнопкой выше.</UiHint>
+    </template>
 
-    <UiStack v-if="selected" class="form" :gap="3">
+    <UiStack v-else class="form" :gap="3">
       <UiFormGrid layout="wide-end">
         <UiField v-slot="{ control }" label="имя">
           <UiControl
@@ -404,7 +383,7 @@ function keyDraft(): string {
           </UiButton>
         </UiInline>
         <UiInline wrap :gap="2">
-          <UiButton tone="danger" @click="removeProvider(selected.id)">удалить</UiButton>
+          <UiButton tone="danger" @click="remove(selected.id)">удалить</UiButton>
           <UiButton appearance="solid" :disabled="saving" @click="save">
             {{ saving ? "…" : "сохранить" }}
           </UiButton>
@@ -421,14 +400,6 @@ function keyDraft(): string {
   font-size: var(--fs-xs);
 }
 
-.item {
-  border-bottom: 1px solid var(--line);
-}
-
-.item.on span:nth-child(2) {
-  color: var(--text);
-}
-
 .balance {
   padding: var(--sp-2) 0;
   border-top: 1px solid var(--line);
@@ -439,11 +410,6 @@ function keyDraft(): string {
   color: var(--muted);
   font-family: var(--mono);
   font-size: var(--fs-xs);
-}
-
-.item.off span:nth-child(2) {
-  color: var(--muted);
-  text-decoration: line-through;
 }
 
 .models {
@@ -496,10 +462,5 @@ function keyDraft(): string {
   align-items: center;
   font-size: var(--fs-xs);
   cursor: pointer;
-}
-
-.item span:not(.dot) {
-  min-width: 0;
-  overflow-wrap: anywhere;
 }
 </style>
