@@ -28,6 +28,12 @@ describe("agent guard", () => {
 
   it("asks before changing commands and only looks without asking", () => {
     expect(commandIsSafe("ide.workbench.tab.read")).toBe(true);
+    expect(commandIsSafe("ide.agent.jobs.list")).toBe(true);
+    expect(commandIsSafe("ide.agent.job.result")).toBe(true);
+    expect(commandIsSafe("ide.agent.job.open")).toBe(true);
+    expect(commandIsSafe("ide.agent.job.start")).toBe(false);
+    expect(commandIsSafe("ide.agent.job.stop")).toBe(false);
+    expect(commandIsSafe("ide.agent.job.answer")).toBe(false);
     expect(commandIsSafe("ide.project.settings.get")).toBe(true);
     expect(commandIsSafe("ide.docker.container.remove")).toBe(false);
     expect(commandIsSafe("ide.workbench.terminal.new")).toBe(false);

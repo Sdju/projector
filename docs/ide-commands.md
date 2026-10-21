@@ -247,6 +247,17 @@ runs with the user's filesystem permissions; it is not an isolated sandbox. In a
 
 `codex`, `opencode` and `cursor` are external agents driven through their **Agent Client Protocol** server over stdio (`server/modules/agents/acp/` with the program of each agent in its own folder: `agents/codex`, `agents/opencode`, `agents/cursor`): `opencode acp`, `agent acp` and Codex's `codex-acp` adapter (a global binary is preferred; otherwise `npx -y @agentclientprotocol/codex-acp` runs outside the project so its `package.json` cannot make npm refuse to start). One client speaks JSON-RPC 2.0 (`acp-client.ts`), maps `session/update` notifications onto the shared events (`acp-events.ts`), resumes with `session/load` or starts `session/new`, answers `session/request_permission` from the chat's allow/deny prompt and cancels through `session/cancel`. Each program keeps its own login, config and project rules; the process is spawned through `os.tools.spawnAgentProcess` (a fresh process per turn, never the user's own sessions) and, like Claude Code, is refused in isolating environments. Adding another ACP agent means one module under `server/modules/agents/` whose `index.ts` declares its program and calls `createAcpBackend` (models, modes, sessions and resume then work from its capabilities), its registration in `server/app/agents.ts`, a tab kind and the `GUI_AGENT_PROGRAMS`/`guiPrograms` lists; a non-ACP agent is a new module exporting an `AgentBackend`, registered in the same place.
 
+### Фоновые агенты
+
+Команды заданий регистрируются вместе с командами чатов (`model/job-commands.ts`) в scope проекта; пользователь и штатный агент видят одно и то же. Подробности и модель данных — [фоновые агенты](agent-background.md).
+
+- `ide.agent.job.start` `{ agent, task, isolate?, mode? }` — запускает задание (`claude-code`, `codex`, `opencode`, `cursor`); изменяющая команда, штатный агент перед ней спрашивает подтверждение.
+- `ide.agent.jobs.list` — задания проекта: состояние, запросы, файлы, начало итога.
+- `ide.agent.job.result` `{ job, wait? }` — итог до 8000 символов; `wait` (до 45 с) держит ответ, пока состояние не сменится. Итог сверяют с `git diff`.
+- `ide.agent.job.stop` `{ job }`, `ide.agent.job.answer` `{ job, answer, request? }` (`allow`, `always`, `deny` или текст ответа на вопрос; спрашивает подтверждение), `ide.agent.job.open` `{ job }` (вкладка `agent-job`, `ide.workbench.agent.job.open`).
+
+Штатный агент поручает код фоновым агентам, не пишет его сам; независимые задачи отдаёт разным заданиям с `isolate: true`; копию вливает (`ide.agent.worktree.merge`) только по просьбе пользователя. `projector-guard` считает безопасными `result`, `list` и `open`, остальные команды заданий спрашивают подтверждение.
+
 ## Общие настройки
 
 `ide.workbench.settings.open` (**Открыть настройки Projector**) в scope `editor:<projectId>` открывает вкладку **Настройки** рядом с файлами. Повторный вызов фокусирует вкладку `settings:app`. Кнопки настроек в шапке, мобильном выборе проекта и сайдбаре вызывают ту же команду; она доступна через командный центр. Вкладка сохраняет черновики при переключении файлов и переносе между блоками; закрытие завершает её состояние. Вне проекта настройки доступны по `/settings`.
