@@ -38,15 +38,18 @@ export function applyAgentEvent(
 ): boolean {
   switch (event.event) {
     case "status":
-      state.phase = event.data.model
-        ? `${event.data.provider ?? "qwen"} · ${event.data.model}`
-        : event.data.phase === "compacting"
-          ? "сжимаю историю"
-          : event.data.phase === "retrying"
-            ? `провайдер не ответил, повтор ${event.data.attempt}`
-            : event.data.phase === "background"
-              ? "ждёт фоновых агентов"
-              : "думает";
+      state.phase =
+        event.data.phase === "fallback"
+          ? `запасная модель · ${event.data.model}`
+          : event.data.model
+            ? `${event.data.provider ?? "qwen"} · ${event.data.model}`
+            : event.data.phase === "compacting"
+              ? "сжимаю историю"
+              : event.data.phase === "retrying"
+                ? `провайдер не ответил, повтор ${event.data.attempt}`
+                : event.data.phase === "background"
+                  ? "ждёт фоновых агентов"
+                  : "думает";
       return false;
     case "run":
       assistant.run = event.data.id;

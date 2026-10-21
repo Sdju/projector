@@ -25,6 +25,8 @@ export interface OpenAIProviderPublic {
   name: string;
   kind: ProviderKind;
   thinkingStyle: ThinkingStyle;
+  /** Registered name of the model that answers when the chosen one keeps failing. */
+  fallbackModel?: string;
   url: string;
   enabled: boolean;
   models: ProviderModel[];

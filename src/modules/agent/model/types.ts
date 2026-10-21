@@ -121,7 +121,7 @@ export interface AgentTurn {
   /** Order of text and tool calls; absent in turns saved before it existed. */
   parts?: AgentPart[];
   /** The turn ended on its budget, not on an answer: the chat offers to continue it. */
-  stopped?: "steps" | "loop";
+  stopped?: "steps" | "loop" | "tokens" | "time";
   /** Context fullness after this turn; the chat shows the latest one. */
   context?: AgentContext;
   /** Tokens of this answer and how much of the prompt the cache served. */
@@ -255,5 +255,5 @@ export type AgentEvent =
   | { event: "task"; data: AgentTaskPatch }
   | { event: "thought"; data: { text: string } }
   | { event: "project"; data: Project }
-  | { event: "done"; data: { text: string; stopped?: "steps" | "loop" } }
+  | { event: "done"; data: { text: string; stopped?: "steps" | "loop" | "tokens" | "time" } }
   | { event: "error"; data: { error: string } };

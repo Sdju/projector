@@ -57,11 +57,23 @@ function toPublic(provider: StoredOpenAIProvider, envKey = ""): OpenAIProviderPu
     name: provider.name,
     kind: provider.kind,
     thinkingStyle: provider.thinkingStyle,
+    ...(provider.fallbackModel ? { fallbackModel: provider.fallbackModel } : {}),
     url: provider.url,
     enabled: provider.enabled,
     models: provider.models,
     hasApiKey: provider.vault === "keyring" || Boolean(provider.apiKey.trim()) || fromEnv,
   };
+}
+
+const fallbackOf = (value: unknown) =>
+  typeof value === "string" && value.trim() ? { fallbackModel: value.trim().slice(0, 200) } : {};
+
+/** The fallback model of a provider, when it is still one of the registered models. */
+function fallbackModelOf(provider: StoredOpenAIProvider): ResolvedOpenAIProvider["fallback"] {
+  const chosen = provider.models.find((item) => item.alias === provider.fallbackModel);
+  return chosen
+    ? { model: chosen.id, modelName: chosen.alias, thinking: chosen.thinking }
+    : undefined;
 }
 
 function normalizeStoredProvider(value: unknown, index: number): StoredOpenAIProvider | null {
@@ -81,6 +93,7 @@ function normalizeStoredProvider(value: unknown, index: number): StoredOpenAIPro
       thinkingStyle: isThinkingStyle(record.thinkingStyle)
         ? record.thinkingStyle
         : defaultThinkingStyle(kind),
+      ...fallbackOf(record.fallbackModel),
       url,
       enabled: record.enabled !== false,
       models: sanitizeModels(record.models, record.model),
@@ -186,6 +199,7 @@ async function mergeProviderWrite(
     thinkingStyle: isThinkingStyle(item.thinkingStyle)
       ? item.thinkingStyle
       : (previous?.thinkingStyle ?? defaultThinkingStyle(kind)),
+    ...fallbackOf(item.fallbackModel ?? previous?.fallbackModel),
     url,
     enabled: item.enabled === undefined ? (previous?.enabled ?? true) : item.enabled !== false,
     models:
@@ -306,6 +320,7 @@ async function toResolved(
     thinkingStyle: provider.thinkingStyle,
     url: provider.url.trim(),
     ...resolveModel(provider.models, modelName, DEFAULT_MODEL),
+    fallback: fallbackModelOf(provider),
     apiKey: await revealProviderKey(provider, secret, envKey),
   };
 }

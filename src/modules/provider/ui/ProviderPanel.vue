@@ -263,6 +263,24 @@ function keyDraft(): string {
           </option>
         </UiControl>
       </UiField>
+      <UiField v-slot="{ control }" label="запасная модель">
+        <UiControl
+          as="select"
+          v-bind="control"
+          aria-label="Запасная модель при сбоях провайдера"
+          :value="selected.fallbackModel ?? ''"
+          @change="
+            patchProvider(selected.id, {
+              fallbackModel: ($event.target as HTMLSelectElement).value,
+            })
+          "
+        >
+          <option value="">Нет</option>
+          <option v-for="model in selected.models" :key="model.id" :value="model.alias">
+            {{ model.alias }}
+          </option>
+        </UiControl>
+      </UiField>
       <UiFormGrid layout="wide-end">
         <UiField v-slot="{ control }" label="url">
           <UiControl

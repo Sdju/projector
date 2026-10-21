@@ -19,6 +19,8 @@ export interface OpenAIProviderPublic {
   kind: ProviderKind;
   /** The dialect in which the provider is asked to think. */
   thinkingStyle: ThinkingStyle;
+  /** Registered name of the model that answers when the chosen one keeps failing. */
+  fallbackModel?: string;
   url: string;
   /** A disabled provider offers none of its models to the agent or the gateway. */
   enabled: boolean;
@@ -31,6 +33,7 @@ export interface OpenAIProviderWrite {
   name: string;
   kind?: ProviderKind;
   thinkingStyle?: ThinkingStyle;
+  fallbackModel?: string;
   url: string;
   enabled?: boolean;
   models?: Array<{ id: string; alias?: string; contextTokens?: number; thinking?: boolean }>;
@@ -54,6 +57,7 @@ export interface StoredOpenAIProvider {
   name: string;
   kind: ProviderKind;
   thinkingStyle: ThinkingStyle;
+  fallbackModel?: string;
   url: string;
   enabled: boolean;
   models: ProviderModel[];
@@ -80,6 +84,8 @@ export interface ResolvedOpenAIProvider {
   name: string;
   kind: ProviderKind;
   thinkingStyle: ThinkingStyle;
+  /** Upstream id and thinking dialect of the fallback model, when one is set and registered. */
+  fallback?: { model: string; modelName: string; thinking?: boolean };
   url: string;
   /** Upstream id of the chosen model: what goes into the request. */
   model: string;

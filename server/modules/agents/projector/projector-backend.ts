@@ -116,7 +116,10 @@ async function run(options: AgentRunOptions): Promise<void> {
     summarySection(summary);
 
   const budget = turnBudget();
-  const thinking = thinkingBody(style, options.selection?.[THINKING]);
+  const wanted = options.selection?.[THINKING];
+  let answering = model;
+  let thinking = thinkingBody(style, wanted);
+  let fallback = resolved.fallback;
   let text = "";
   /** What the first request of the answer found in the provider cache. */
   let firstRequest: Tokens | undefined;
@@ -124,7 +127,7 @@ async function run(options: AgentRunOptions): Promise<void> {
   // A request that fails before the model said anything is repeated; later the turn would replay.
   for (let attempt = 0; ; attempt++) {
     result = streamText({
-      model,
+      model: answering,
       system,
       messages,
       tools,
@@ -178,6 +181,19 @@ async function run(options: AgentRunOptions): Promise<void> {
       options.emit("status", { phase: "retrying", attempt: attempt + 1, delay });
       await pause(delay, options.abort);
       if (!options.abort?.aborted) continue;
+    }
+    // The model keeps failing: the fallback of the provider answers instead, once.
+    if (!started && fallback && !options.abort?.aborted && isRetryable(failure)) {
+      options.emit("status", {
+        phase: "fallback",
+        model: fallback.modelName,
+        provider: resolved.name,
+      });
+      answering = provider.chatModel(fallback.model);
+      thinking = thinkingBody(fallback.thinking === false ? "none" : style, wanted);
+      fallback = undefined;
+      attempt = -1;
+      continue;
     }
     const message = failure instanceof Error ? failure.message : "Ошибка агента";
     options.emit("error", { error: message });
