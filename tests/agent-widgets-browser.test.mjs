@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from "vite-plus/test";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { createBrowserFixture } from "./fixtures/browser-server.mjs";
 import { chromium, createChromium } from "./fixtures/chromium-driver.mjs";
 
@@ -75,10 +75,6 @@ test(
         await new Promise((resolve) => setTimeout(resolve, 50));
       }
       expect(await browser.evaluate(expression)).toBeTruthy();
-    };
-    const shot = async (name) => {
-      const { data } = await browser.call("Page.captureScreenshot", { format: "png" });
-      await writeFile(`/tmp/${name}.png`, Buffer.from(data, "base64"));
     };
     const set = (value, live) =>
       browser.evaluate(`window.fixture.set(${JSON.stringify(value)}, ${live})`);
@@ -208,7 +204,6 @@ test(
       b: "второй",
     });
     await browser.evaluate("window.fixture.replies.length = 0");
-    await shot("widgets-4-layout");
 
     // A form needs no script: named controls, preset / reset / submit buttons.
     await set(
@@ -305,7 +300,6 @@ test(
     await wait('document.querySelectorAll(".steps li").length === 3');
     await wait('document.querySelector(".widget-pending") === null');
     expect(await browser.evaluate('document.querySelectorAll(".widget-failure").length')).toBe(0);
-    await shot("widgets-1-initial");
 
     // Tabs switch the plotted series (state lives in the widget's script).
     const lineText = 'document.querySelector("figcaption").textContent.trim()';
@@ -326,7 +320,6 @@ test(
       'document.querySelector("#count").click(); document.querySelector("#count").click()',
     );
     await wait('document.querySelector("#count").textContent.includes("2")');
-    await shot("widgets-2-interacted");
 
     // More text after the widgets must not reset their state.
     await set(`${message}\n\nИ ещё абзац после.`, true);
@@ -338,7 +331,6 @@ test(
     await set("До\n\n<Card><div></Card>\n\nПосле", false);
     await wait('document.querySelector(".widget-failure") !== null');
     expect(await browser.evaluate("document.body.textContent")).toContain("После");
-    await shot("widgets-3-error");
 
     // A component answers the agent: the chosen options and a text become one chat message.
     await set(
@@ -458,7 +450,13 @@ test(
       let marked = false;
       let progressive = 0;
       let inertWhileStats = false;
-      for (let at = 3; at < message.length + 3; at += 3) {
+      // Exercise incomplete tags, expressions and scripts at their boundaries.
+      // Exhaustive prefix compilation is covered by the autoClose unit test.
+      const cuts = new Set([message.length]);
+      for (const match of message.matchAll(/<\/?[\w]+|[<>]|{{|}}|return/g)) {
+        for (const at of [match.index + 1, match.index + match[0].length]) cuts.add(at);
+      }
+      for (const at of [...cuts].sort((a, b) => a - b)) {
         await set(message.slice(0, at), at < message.length);
         await frame();
         const probe = JSON.parse(

@@ -66,8 +66,13 @@ const fixture = {
 const server = await createServer({
   ...loaded.config,
   configFile: false,
-  // Never attach Projector's API/PTY server or write its instance file in this fixture.
-  plugins: [...loaded.config.plugins.filter((plugin) => plugin.name !== "projector-api"), fixture],
+  // API/PTY state and whole-repository FEOD checks belong to the app and the separate gate.
+  plugins: [
+    ...loaded.config.plugins.filter(
+      (plugin) => !["projector-api", "projector-feod"].includes(plugin.name),
+    ),
+    fixture,
+  ],
   cacheDir: join(directory, "vite-cache"),
   resolve: {
     ...loaded.config.resolve,

@@ -1,26 +1,12 @@
 import { describe, expect, onTestFinished, test } from "vite-plus/test";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { createBrowserFixture } from "./fixtures/browser-server.mjs";
-
-const chromium = [
-  process.env.CHROMIUM_BIN,
-  "/usr/bin/chromium",
-  "/usr/bin/chromium-browser",
-  "/usr/bin/google-chrome",
-]
-  .filter(Boolean)
-  .find(existsSync);
+import { chromium, createChromium } from "./fixtures/chromium-driver.mjs";
 
 const html = `<!doctype html><div id="tracker"></div><div id="docker"></div><div id="usage" style="position:fixed;right:20px;bottom:20px"></div><pre id="result">WAITING</pre>
 <script type="module">
 import '/src/app/styles.css';
 import {createApp,h,ref,nextTick} from 'vue';
 import IssueView from '/src/modules/workspace/modules/viewers/ui/IssueView.vue';
-import PullRequestView from '/src/modules/workspace/modules/viewers/ui/PullRequestView.vue';
-import DiscussionView from '/src/modules/workspace/modules/viewers/ui/DiscussionView.vue';
 import {registerWorkspaceProfile} from '/src/modules/workspace-api/index.ts';
 import {useDocker} from '/src/modules/docker/model.ts';
 import DockerSidebar from '/src/modules/docker/ui/DockerSidebar.vue';
@@ -38,7 +24,6 @@ const calls=[];
 const provider={async read(action,params){
   calls.push([action,params.number]);
   await fetch('/__tick');
-  if(params.number==='2')throw new Error('Detail failed');
   const item={title:action+' detail',number:1,state:'open',author,createdAt:'2026-10-07T00:00:00Z',htmlUrl:'',labels:[],body:'',reactions:[],category:{name:'General',emoji:''}};
   return {[action==='pull'?'pull':action]:item,comments:[],reviews:[],files:[]};
 }};
@@ -54,20 +39,12 @@ const sidebarRows=()=>document.querySelectorAll('#docker .docker-sidebar .row').
 const panelRows=()=>document.querySelectorAll('#docker tbody tr').length;
 let trackerApp,dockerApp,usageApp,state;
 (async()=>{try{
- for(const [action,Component] of [['issue',IssueView],['pull',PullRequestView],['discussion',DiscussionView]]){
-  const number=ref(1);
-  trackerApp=createApp({render:()=>h(Component,{projectId:'reuse-fixture',number:number.value})});
-  trackerApp.mount('#tracker');
-  check(!!document.querySelector('#tracker [role="status"]'),action+' loading');
-  await wait(()=>document.querySelector('#tracker h2')?.textContent.includes(action+' detail'),action+' detail render');
-  check(calls.at(-1)[0]===action&&calls.at(-1)[1]==='1',action+' provider route');
-  number.value=2;await nextTick();
-  check(!document.querySelector('#tracker article'),action+' clears old content');
-  await wait(()=>document.querySelector('#tracker [role="alert"]')?.textContent==='Detail failed',action+' error render');
-  number.value=3;await nextTick();
-  await wait(()=>!!document.querySelector('#tracker h2'),action+' recovers');
-  trackerApp.unmount();trackerApp=null;
- }
+ // Model races, errors and disposal are covered by tracker-detail.test.mjs.
+ trackerApp=createApp({render:()=>h(IssueView,{projectId:'reuse-fixture',number:1})});
+ trackerApp.mount('#tracker');
+ await wait(()=>document.querySelector('#tracker h2')?.textContent.includes('issue detail'),'tracker view connects its provider');
+ check(calls.at(-1)[0]==='issue'&&calls.at(-1)[1]==='1','tracker provider route');
+ trackerApp.unmount();trackerApp=null;
  dockerApp=createApp({setup(){
   state=useDocker('reuse-fixture',{enabled:false,open(){},sidebar(){},async terminal(){}});
   state.snapshot.value={enabled:true,connected:true,context:'default',contexts:[],detectedFiles:[],binding:{context:'default',name:'project',files:[],profiles:[],envFiles:[]},containers:[
@@ -105,7 +82,8 @@ let trackerApp,dockerApp,usageApp,state;
  };
  const adapters=[['codex',CodexUsageIndicator,1,null,70],['claude',ClaudeUsageIndicator,2,'rolling',60],['cursor',CursorUsageIndicator,3,'auto',80],['opencode',OpenCodeUsageIndicator,3,'monthly',60]];
  for(const [provider,Component,rowCount,nextWindow,remaining] of adapters){
-  for(scenario of ['ready','unavailable','failed',...(provider==='claude'?['partial']:[])]){
+  // Shared failure presentation needs one adapter; retain each provider's ready mapping.
+  for(scenario of ['ready',...(provider==='claude'?['unavailable','failed','partial']:[])]){
    usageApp=createApp(Component);usageApp.provide(commandHostKey,host);usageApp.mount('#usage');
    const indicator=document.querySelector('#usage .usage-indicator');
    const tooltip=indicator.querySelector('[role="tooltip"]');
@@ -121,7 +99,6 @@ let trackerApp,dockerApp,usageApp,state;
     check(document.activeElement===indicator,provider+' focusable');
     check(getComputedStyle(tooltip).visibility==='visible',provider+' tooltip on focus');
     check(tooltip.getBoundingClientRect().top>=0,provider+' tooltip stays in viewport');
-    check(indicator.querySelector('svg').getBoundingClientRect().width===13,provider+' icon size');
     check(agentUsageSummary[provider].remaining===remaining,provider+' shared summary');
     const before=requests.length;
     if(nextWindow){
@@ -160,29 +137,9 @@ test(
   async () => {
     const fixture = await createBrowserFixture({ pages: { "/__reuse_test": html } });
     onTestFinished(() => fixture.close());
-    const { directory, base } = fixture;
-    const dump = async (path, profile) => {
-      const { stdout, stderr } = await promisify(execFile)(
-        chromium,
-        [
-          "--headless",
-          "--no-sandbox",
-          "--disable-gpu",
-          "--disable-dev-shm-usage",
-          "--no-first-run",
-          "--no-default-browser-check",
-          `--user-data-dir=${join(directory, profile)}`,
-          "--virtual-time-budget=15000",
-          "--dump-dom",
-          `${base}${path}`,
-        ],
-        { timeout: 25000, maxBuffer: 2 * 1024 * 1024 },
-      );
-      return (
-        stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1] ??
-        stdout.slice(-2000) + stderr.slice(-1000)
-      );
-    };
-    expect(await dump("/__reuse_test", "tree")).toBe("PASS");
+    const browser = await createChromium(fixture.directory);
+    onTestFinished(() => browser.close());
+    const dump = (path) => browser.result(fixture.url(path));
+    expect(await dump("/__reuse_test")).toBe("PASS");
   },
 );

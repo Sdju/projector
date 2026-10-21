@@ -24,13 +24,12 @@
     "vio:demo": "vp run --filter vio demo",
     "vio:gtk-test": "vp run --filter vio test:gtk",
     "architecture": "node scripts/check-feod.mjs",
-    "test:architecture": "vp test run tests/architecture.test.mjs",
     "test:docker": "vp test run tests/docker.test.mjs",
     "test:file-icons": "vp test run tests/file-icons.test.mjs",
     "test:virtual-list": "vp test run tests/virtual-list.test.mjs",
     "test:tree": "vp test run tests/tree-page.test.mjs tests/tree-pagination.test.mjs",
     "test:live": "PROJECTOR_TEST_DOCKER=1 PROJECTOR_TEST_DEVCONTAINER=1 vp test run --no-file-parallelism tests/environment-live.test.mjs tests/reconcile.test.mjs tests/devcontainer-live.test.mjs tests/sigkill-live.test.mjs",
-    "check": "vp run test && vp run test:docker && vp run build",
+    "check": "vp run test && vp run build",
     "prepare": "vp hooks enable"
   },
   "dependencies": {

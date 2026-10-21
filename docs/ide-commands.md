@@ -97,7 +97,7 @@ The settings endpoint is `GET /api/ide/keybindings` and same-origin `PUT /api/id
 
 The SDK is in-process: there is no arbitrary command-execution HTTP endpoint, and a remote automation transport would need its own authorization and argument validation. Command arguments and results are untyped (`description` and `arguments` are documentation for the agent). Native and CLI hosts do not reuse the registry yet.
 
-Validation: `vp test run tests/ide.test.mjs tests/markdown-editor.test.mjs tests/workspace.test.mjs tests/architecture.test.mjs`, `vp run build`, and live Chromium SDK/shortcut scenarios.
+Validation: `vp test run tests/ide.test.mjs tests/markdown-editor.test.mjs tests/workspace.test.mjs`, `vp run build`, and live Chromium SDK/shortcut scenarios.
 
 ## Keyboard shortcuts and command center
 

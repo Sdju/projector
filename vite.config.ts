@@ -78,6 +78,8 @@ export default defineConfig({
     include: ["tests/**/*.test.mjs"],
     setupFiles: ["tests/setup.mjs"],
     pool: "forks",
+    // Browser tests also start Vite and Chromium processes; leave room for the desktop.
+    maxWorkers: 2,
     // GTK modules load through the vio `gi:` loader hook instead of Vite.
     execArgv: ["--import", "vio/register"],
     server: { deps: { external: [/^gi:/] } },

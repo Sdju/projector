@@ -1,13 +1,6 @@
 import { expect, onTestFinished, test } from "vite-plus/test";
-import { existsSync } from "node:fs";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-import { join } from "node:path";
 import { createBrowserFixture } from "./fixtures/browser-server.mjs";
-
-const chromium =
-  process.env.CHROMIUM_BIN ??
-  ["/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome"].find(existsSync);
+import { chromium, createChromium } from "./fixtures/chromium-driver.mjs";
 
 test(
   "visual Markdown: synchronous drafts, undo, media and source round trips",
@@ -196,25 +189,8 @@ test(
       ],
     });
     onTestFinished(() => fixture.close());
-    const { stdout, stderr } = await promisify(execFile)(
-      chromium,
-      [
-        "--headless",
-        "--no-sandbox",
-        "--disable-gpu",
-        "--disable-dev-shm-usage",
-        "--no-first-run",
-        "--no-default-browser-check",
-        `--user-data-dir=${join(fixture.directory, "profile")}`,
-        "--virtual-time-budget=10000",
-        "--dump-dom",
-        fixture.url("/__markdown_test"),
-      ],
-      { timeout: 50000, maxBuffer: 2 * 1024 * 1024 },
-    );
-    expect(
-      stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1],
-      `Markdown browser regression failed:\n${stdout.slice(-4000)}\n${stderr.slice(-2000)}`,
-    ).toBe("PASS");
+    const browser = await createChromium(fixture.directory);
+    onTestFinished(() => browser.close());
+    expect(await browser.result(fixture.url("/__markdown_test"))).toBe("PASS");
   },
 );

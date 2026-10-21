@@ -1,18 +1,6 @@
 import { expect, onTestFinished, test } from "vite-plus/test";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { createBrowserFixture } from "./fixtures/browser-server.mjs";
-
-const chromium = [
-  process.env.CHROMIUM_BIN,
-  "/usr/bin/chromium",
-  "/usr/bin/chromium-browser",
-  "/usr/bin/google-chrome",
-]
-  .filter(Boolean)
-  .find(existsSync);
+import { chromium, createChromium } from "./fixtures/chromium-driver.mjs";
 
 const html = `<!doctype html><div id="settings"></div><div id="panel"></div><pre id="result">WAITING</pre>
 <script type="module">
@@ -117,29 +105,9 @@ test(
   async () => {
     const fixture = await createBrowserFixture({ pages: { "/__network_test": html } });
     onTestFinished(() => fixture.close());
-    const { directory, base } = fixture;
-    const dump = async (path, profile) => {
-      const { stdout, stderr } = await promisify(execFile)(
-        chromium,
-        [
-          "--headless",
-          "--no-sandbox",
-          "--disable-gpu",
-          "--disable-dev-shm-usage",
-          "--no-first-run",
-          "--no-default-browser-check",
-          `--user-data-dir=${join(directory, profile)}`,
-          "--virtual-time-budget=15000",
-          "--dump-dom",
-          `${base}${path}`,
-        ],
-        { timeout: 25000, maxBuffer: 2 * 1024 * 1024 },
-      );
-      return (
-        stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1] ??
-        stdout.slice(-2000) + stderr.slice(-1000)
-      );
-    };
-    expect(await dump("/__network_test", "network")).toBe("PASS");
+    const browser = await createChromium(fixture.directory);
+    onTestFinished(() => browser.close());
+    const dump = (path) => browser.result(fixture.url(path));
+    expect(await dump("/__network_test")).toBe("PASS");
   },
 );

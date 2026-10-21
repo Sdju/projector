@@ -25,7 +25,10 @@ with tarfile.open(root / 'many.tar', 'w') as out:
 with tarfile.open(root / 'empty.tar', 'w'): pass
 for ext, encode in [('gz', gzip.compress), ('gzip', gzip.compress), ('bz2', bz2.compress), ('xz', lzma.compress)]:
     (root / ('plain.txt.' + ext)).write_bytes(encode(b'hello'))
-(root / 'large.txt.gz').write_bytes(gzip.compress(b'x' * (256 * 1024 * 1024 + 1)))
+# Cross the real preview limit without allocating a 256 MiB fixture buffer.
+with gzip.open(root / 'large.txt.gz', 'wb') as out:
+    for _ in range(256): out.write(b'x' * (1024 * 1024))
+    out.write(b'x')
 (root / 'bad.tar.gz').write_bytes(gzip.compress(b'not a tar'))
 `;
 

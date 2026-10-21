@@ -129,6 +129,20 @@ export async function createChromium(directory) {
       get diagnostics() {
         return { stderr: stderr.slice(-3000), lifecycle };
       },
+      // Self-running fixtures signal completion explicitly; no virtual-time budget or DOM dump.
+      async result(url) {
+        const navigation = await call("Page.navigate", { url });
+        if (navigation.errorText) throw new Error(navigation.errorText);
+        const deadline = Date.now() + 30000;
+        while (Date.now() < deadline) {
+          const result = await evaluate("document.querySelector('#result')?.textContent");
+          if (result && result !== "WAITING") return result;
+          await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+        throw new Error(
+          `Fixture did not finish: ${url}\n${JSON.stringify(errors)}\n${stderr.slice(-2000)}`,
+        );
+      },
       async open(url) {
         await call("Page.navigate", { url });
         const deadline = Date.now() + 30000;

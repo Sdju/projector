@@ -37,8 +37,10 @@ test(
     );
     expect(box[0]).toBeLessThanOrEqual(320);
     expect(box[1]).toBeGreaterThan(box[0]);
-    const shot = await browser.call("Page.captureScreenshot", { format: "png" });
-    if (process.env.TASK_BAR_SHOT) await writeFile(process.env.TASK_BAR_SHOT, shot.data, "base64");
+    if (process.env.TASK_BAR_SHOT) {
+      const shot = await browser.call("Page.captureScreenshot", { format: "png" });
+      await writeFile(process.env.TASK_BAR_SHOT, shot.data, "base64");
+    }
 
     // Nothing runs any more: the finished ones become the list itself.
     await browser.evaluate("window.fixture.settle()");

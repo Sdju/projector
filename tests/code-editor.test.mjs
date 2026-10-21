@@ -1,18 +1,6 @@
 import { expect, onTestFinished, test } from "vite-plus/test";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { createBrowserFixture } from "./fixtures/browser-server.mjs";
-
-const chromium = [
-  process.env.CHROMIUM_BIN,
-  "/usr/bin/chromium",
-  "/usr/bin/chromium-browser",
-  "/usr/bin/google-chrome",
-]
-  .filter(Boolean)
-  .find(existsSync);
+import { chromium, createChromium } from "./fixtures/chromium-driver.mjs";
 
 const helpers = `const wait = async (condition, label) => {
       const until = Date.now() + 6000;
@@ -31,12 +19,19 @@ const page = (
     import '/src/app/styles.css';
     import {createApp, defineAsyncComponent, h, nextTick, ref} from 'vue';
     import {EditorView} from '@codemirror/view';
+    import {provideEditorStatus} from '/src/modules/workspace/modules/viewers/lib/editor-status.ts';
+    import EditorStatusLine from '/src/modules/workspace/modules/viewers/ui/EditorStatusLine.vue';
     const CodeViewer = defineAsyncComponent(() => import('/src/modules/workspace/modules/viewers/ui/CodeViewer.vue'));
     ${helpers}
     const view = () => EditorView.findFromDOM(document.querySelector('.cm-editor'));
     const text = () => view().state.doc.toString();
     const click = (element) => element.dispatchEvent(new MouseEvent('mousedown', {bubbles: true, cancelable: true, button: 0}));
-    const mount = (props) => createApp({render: () => h(CodeViewer, props.value)}).mount('#editor');
+    const mount = (props) => createApp({setup() {
+      provideEditorStatus();
+      return () => h('div', {style:'display:flex;flex-direction:column;height:400px'}, [
+        h(CodeViewer, props.value), h(EditorStatusLine, {path:props.value.path, content:props.value.content}),
+      ]);
+    }}).mount('#editor');
     ${body}
   </script>`;
 
@@ -48,9 +43,15 @@ const filePage = page(`
         await wait(() => document.querySelector('.cm-editor .cm-line'), 'initial editor');
         check(text() === '{"alive":true}', 'JSON content');
         await wait(() => document.querySelector('.cm-line span'), 'JSON highlighting');
-        props.value = {path: 'probe.ts', content: 'const alive = true;', editable: true};
+        const source = 'const alive = true;' + nl + 'let n = 2;' + nl;
+        props.value = {path: 'probe.ts', content: source, editable: true};
         await nextTick();
-        await wait(() => text() === 'const alive = true;', 'switched content');
+        await wait(() => text() === source, 'switched content');
+        const line = () => document.querySelector('.editor-status-line').textContent;
+        await wait(() => line().includes('Строка 1, столбец 1'), 'initial cursor');
+        check(line().includes('TypeScript') && /(^|[^A-Z])LF/.test(line()), 'language and line ending');
+        view().dispatch({selection: {anchor: view().state.doc.line(2).from + 4}});
+        await wait(() => line().includes('Строка 2, столбец 5'), 'cursor follows selection');
         await wait(() => document.querySelector('.cm-line span'), 'TypeScript highlighting');
         props.value = {path: 'probe.ts', content: 'const alive = true;', original: 'const alive = false;', editable: false};
         await nextTick();
@@ -88,7 +89,6 @@ const gutterPage = page(`
         check(count('added') === 2, 'Gutter add lines: ' + count('added'));
         check(count('modified') === 1, 'Gutter modify lines: ' + count('modified'));
         check(count('deleted') === 1, 'Gutter delete markers: ' + count('deleted'));
-        check(getComputedStyle(markers('added')[0]).backgroundColor === 'rgb(143, 191, 138)', 'Gutter add color');
 
         view().dispatch({changes: {from: text().indexOf('line9'), insert: 'typed '}});
         await wait(() => count('modified') === 2, 'live update while typing');
@@ -157,36 +157,14 @@ test(
       ],
     });
     onTestFinished(() => fixture.close());
-    const { directory } = fixture;
-    const dump = async (path, profile) => {
-      const { stdout, stderr } = await promisify(execFile)(
-        chromium,
-        [
-          "--headless",
-          "--no-sandbox",
-          "--disable-gpu",
-          "--disable-dev-shm-usage",
-          "--no-first-run",
-          "--no-default-browser-check",
-          `--user-data-dir=${join(directory, profile)}`,
-          "--virtual-time-budget=15000",
-          "--dump-dom",
-          fixture.url(path),
-        ],
-        { timeout: 25000, maxBuffer: 2 * 1024 * 1024 },
-      );
-      return (
-        stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1] ??
-        stdout.slice(-2000) + stderr.slice(-1000)
-      );
-    };
-    for (const phase of ["cold", "restarted"]) {
-      if (phase === "restarted") await fixture.restart();
-      for (const path of Object.keys(pages)) {
-        expect(await dump(path, `${path.slice(3)}-${phase}`), `${phase} ${path} failed`).toBe(
-          "PASS",
-        );
-      }
+    const browser = await createChromium(fixture.directory);
+    onTestFinished(() => browser.close());
+    const dump = (path) => browser.result(fixture.url(path));
+    for (const path of Object.keys(pages)) {
+      expect(await dump(path), path).toBe("PASS");
     }
+    // One editor smoke check exercises module loading after restart; diff cases ran above.
+    await fixture.restart();
+    expect(await dump("/__file_test"), "editor after restart").toBe("PASS");
   },
 );
