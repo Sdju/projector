@@ -1,5 +1,5 @@
 import type { AgentBackend, AgentRunOptions, AgentControl } from "../../agent/index.ts";
-import { isStepCount, streamText, type LanguageModel, type ModelMessage } from "ai";
+import { streamText, type LanguageModel, type ModelMessage } from "ai";
 import type { Project } from "../../projects/index.ts";
 import { createAgentTools } from "./agent-tools.ts";
 import { buildSystemPrompt } from "./prompts.ts";
@@ -10,6 +10,7 @@ import {
   loadPublicProviders,
   resolveOpenAIProvider,
 } from "../../providers/index.ts";
+import { budgetNote, turnBudget } from "./projector-budget.ts";
 import { isRetryable, MAX_RETRIES, pause, retryDelay } from "./projector-retry.ts";
 import { projectInstructions } from "./project-instructions.ts";
 import { createBashReviewer } from "./projector-review.ts";
@@ -22,7 +23,6 @@ import {
   summarySection,
 } from "./projector-compaction.ts";
 
-const MAX_STEPS = 24;
 /** The window of a model that has none registered in the provider settings; the context ring is measured against it. */
 const DEFAULT_CONTEXT_SIZE = Number(process.env.PROJECTOR_AGENT_CONTEXT_TOKENS) || 128_000;
 const TRUST = "permission-mode";
@@ -91,8 +91,9 @@ async function run(options: AgentRunOptions): Promise<void> {
     (await projectInstructions(options.cwd)) +
     summarySection(summary);
 
+  const budget = turnBudget();
   let text = "";
-  let result: ReturnType<typeof streamText>;
+  let result: ReturnType<typeof streamText<typeof tools>>;
   // A request that fails before the model said anything is repeated; later the turn would replay.
   for (let attempt = 0; ; attempt++) {
     result = streamText({
@@ -100,7 +101,7 @@ async function run(options: AgentRunOptions): Promise<void> {
       system,
       messages,
       tools,
-      stopWhen: isStepCount(MAX_STEPS),
+      stopWhen: budget.stopWhen,
       abortSignal: options.abort,
       maxRetries: 0,
       providerOptions: {
@@ -171,7 +172,7 @@ async function run(options: AgentRunOptions): Promise<void> {
     // The indicator keeps its previous value.
   }
   if ((await result.finishReason) === "tool-calls") {
-    const note = `\n\nЯ остановился на ${MAX_STEPS} шагах. Напишите «продолжай», чтобы я пошёл дальше.`;
+    const note = budgetNote(budget.reason());
     text += note;
     options.emit("text", { text: note });
   }

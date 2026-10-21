@@ -243,7 +243,10 @@ export type AgentEvent =
   | { event: "context"; data: AgentContext }
   | { event: "usage"; data: AgentUsage }
   | { event: "controls"; data: { controls: AgentControl[] } }
-  | { event: "status"; data: { phase: string; provider?: string; model?: string } }
+  | {
+      event: "status";
+      data: { phase: string; provider?: string; model?: string; attempt?: number };
+    }
   | { event: "text"; data: { text: string } }
   | { event: "tool"; data: { id: string; name: string; input: unknown; parent?: string } }
   | { event: "tool-result"; data: { id: string; name: string; output?: unknown; error?: string } }
