@@ -62,7 +62,12 @@ export type SecretDestination =
       model: string;
       replaces: boolean;
     }
-  | { kind: "integration"; integration: "github" | "gitlab"; label: string; replaces: boolean };
+  | {
+      kind: "integration";
+      integration: "github" | "gitlab" | "web_search";
+      label: string;
+      replaces: boolean;
+    };
 
 /** Asks the user for a secret; the value goes to the server code that stores it, not to the model. */
 export interface SecretRequest {

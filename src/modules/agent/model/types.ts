@@ -184,7 +184,12 @@ export interface AgentSecretRequest {
         model: string;
         replaces: boolean;
       }
-    | { kind: "integration"; integration: "github" | "gitlab"; label: string; replaces: boolean };
+    | {
+        kind: "integration";
+        integration: "github" | "gitlab" | "web_search";
+        label: string;
+        replaces: boolean;
+      };
 }
 
 /** A question the agent put to the user and waits for. */

@@ -35,8 +35,12 @@ export function createSecretToolSpecs(context: SecretToolContext): ToolSpec[] {
           model: str(input.model),
         });
       case "integration":
-        if (input.integration !== "github" && input.integration !== "gitlab")
-          throw new Error("Для kind integration укажите github или gitlab");
+        if (
+          input.integration !== "github" &&
+          input.integration !== "gitlab" &&
+          input.integration !== "web_search"
+        )
+          throw new Error("Для kind integration укажите github, gitlab или web_search");
         return resolveIntegrationTarget(input.integration);
       default:
         throw new Error("kind: env, ai_provider или integration");
@@ -47,7 +51,7 @@ export function createSecretToolSpecs(context: SecretToolContext): ToolSpec[] {
     defineSpec({
       name: "request_secret",
       description:
-        "Запросить у пользователя секрет и записать его напрямую в место назначения. Пользователь вводит значение в закрытом поле; тебе возвращается только факт записи, сам секрет нет. kind=env — переменная .env проекта (key, file). kind=ai_provider — ключ провайдера: providerId существующего или name, url, model нового; адрес не должен быть придуман. kind=integration — токен github или gitlab. Места и провайдеры узнай через list_secret_destinations. Значение не угадывай и не придумывай.",
+        "Запросить у пользователя секрет и записать его напрямую в место назначения. Пользователь вводит значение в закрытом поле; тебе возвращается только факт записи, сам секрет нет. kind=env — переменная .env проекта (key, file). kind=ai_provider — ключ провайдера: providerId существующего или name, url, model нового; адрес не должен быть придуман. kind=integration — токен github или gitlab, либо ключ веб-поиска web_search. Места и провайдеры узнай через list_secret_destinations. Значение не угадывай и не придумывай.",
       shape: {
         kind: z.enum(["env", "ai_provider", "integration"]).describe("Куда записать"),
         label: z.string().max(200).optional().describe("Что за секрет, в словах пользователя"),
@@ -62,7 +66,10 @@ export function createSecretToolSpecs(context: SecretToolContext): ToolSpec[] {
           .optional()
           .describe("ai_provider: адрес API нового провайдера, http или https"),
         model: z.string().max(200).optional().describe("ai_provider: модель по умолчанию"),
-        integration: z.enum(["github", "gitlab"]).optional().describe("integration: какой токен"),
+        integration: z
+          .enum(["github", "gitlab", "web_search"])
+          .optional()
+          .describe("integration: какой токен; web_search — ключ Brave Search для web_search"),
       },
       run: async (input) => {
         const target = await resolve(input);

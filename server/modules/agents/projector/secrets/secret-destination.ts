@@ -13,6 +13,7 @@ import type { OpenAIProviderWrite } from "../../../providers/index.ts";
 import { integrationConfig } from "../../../integration-store/index.ts";
 import { connectGithub } from "../../../github/index.ts";
 import { connectGitlab } from "../../../gitlab/index.ts";
+import { storeSearchKey } from "../projector-web-search.ts";
 
 /** Where the user's secret is written; the agent names it, never sees what ends up there. */
 export interface EnvFileTarget {
@@ -118,7 +119,7 @@ export interface ProviderTarget {
 /** A service account token, stored by the integration's own connect step (it checks the token). */
 export interface IntegrationTarget {
   kind: "integration";
-  integration: "github" | "gitlab";
+  integration: "github" | "gitlab" | "web_search";
   label: string;
   replaces: boolean;
 }
@@ -219,15 +220,26 @@ export async function storeProviderKey(target: ProviderTarget, value: string): P
 }
 
 /** Only the integrations that accept a token from the user. */
-const TOKEN_INTEGRATIONS = { github: "GitHub", gitlab: "GitLab" } as const;
+const TOKEN_INTEGRATIONS = {
+  github: "GitHub",
+  gitlab: "GitLab",
+  web_search: "веб-поиска",
+} as const;
+const SECRET_INTEGRATION_ID = {
+  github: "github",
+  gitlab: "gitlab",
+  web_search: "web-search",
+} as const;
 
 /** The integration must be enabled; a token already connected is reported as `replaces`. */
 export async function resolveIntegrationTarget(
-  integration: "github" | "gitlab",
+  integration: "github" | "gitlab" | "web_search",
 ): Promise<IntegrationTarget> {
   const label = TOKEN_INTEGRATIONS[integration];
-  const config = await integrationConfig(integration);
-  if (!config.enabled) throw new Error(`Включите интеграцию ${label} в настройках`);
+  const config = await integrationConfig(SECRET_INTEGRATION_ID[integration]);
+  // The search key can be the first thing set up, so that integration needs no switch.
+  if (integration !== "web_search" && !config.enabled)
+    throw new Error(`Включите интеграцию ${label} в настройках`);
   return {
     kind: "integration",
     integration,
@@ -242,7 +254,8 @@ export async function storeIntegrationToken(
   value: string,
 ): Promise<void> {
   if (target.integration === "github") await connectGithub({ token: value });
-  else await connectGitlab({ token: value });
+  else if (target.integration === "gitlab") await connectGitlab({ token: value });
+  else await storeSearchKey(value);
 }
 
 /** One entry point for every destination; the value is checked here, once, for all of them. */
@@ -259,7 +272,7 @@ export async function listSecretDestinations() {
   const state = await loadPublicProviders(envFallbackFromProcess());
   const integrations = await Promise.all(
     (Object.keys(TOKEN_INTEGRATIONS) as Array<keyof typeof TOKEN_INTEGRATIONS>).map(async (id) => {
-      const config = await integrationConfig(id);
+      const config = await integrationConfig(SECRET_INTEGRATION_ID[id]);
       return {
         integration: id,
         label: TOKEN_INTEGRATIONS[id],

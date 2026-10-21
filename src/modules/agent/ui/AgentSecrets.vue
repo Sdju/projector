@@ -47,9 +47,10 @@ function decline(id: string) {
         <span v-if="request.destination.replaces">заменит текущий ключ. </span>Агент его не увидит.
       </p>
       <p v-else class="destination">
-        Токен {{ request.destination.label }}: проверим у сервиса и сохраним в системном хранилище
-        секретов<span v-if="request.destination.replaces">, заменит текущий</span>. Агент его не
-        увидит.
+        Ключ или токен {{ request.destination.label }}: сохраним в системном хранилище секретов<span
+          v-if="request.destination.replaces"
+          >, заменит текущий</span
+        >. Агент его не увидит.
       </p>
       <form class="entry" @submit.prevent="submit(request.id)">
         <input

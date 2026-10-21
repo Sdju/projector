@@ -6,7 +6,12 @@ import { GithubSettings } from "../github/index.ts";
 import { GitlabSettings } from "../gitlab/index.ts";
 import { DockerSettings } from "../docker/index.ts";
 import { ProviderPanel } from "../provider/index.ts";
-import { AgentMcpSettings, AgentMemorySettings, AgentModeSettings } from "../agent/index.ts";
+import {
+  AgentMcpSettings,
+  AgentWebSettings,
+  AgentMemorySettings,
+  AgentModeSettings,
+} from "../agent/index.ts";
 import { type SettingsSection } from "../settings/index.ts";
 
 export const settingsSections: SettingsSection[] = [
@@ -125,5 +130,13 @@ export const settingsSections: SettingsSection[] = [
     description: "Внешние серверы с инструментами для штатного агента.",
     keywords: "mcp сервер инструменты model context protocol агент Projector stdio http sse",
     component: AgentMcpSettings,
+  },
+  {
+    id: "agent-web",
+    title: "Веб-поиск агента",
+    group: "Агент",
+    description: "Поисковый сервис, через который штатный агент ищет в интернете.",
+    keywords: "веб поиск интернет search brave searxng агент Projector ключ",
+    component: AgentWebSettings,
   },
 ];

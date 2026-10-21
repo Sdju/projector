@@ -155,6 +155,28 @@ export async function guardMcpServer(
   });
 }
 
+const knownHosts = new Set<string>();
+
+/** Asks before the agent opens a site: the address itself can carry what it has read. Remembered by host. */
+export async function guardWebFetch(options: GuardOptions, address: string): Promise<void> {
+  if (options.trusting) return;
+  let host = "";
+  try {
+    host = new URL(address).host;
+  } catch {
+    return;
+  }
+  if (knownHosts.has(host)) return;
+  const answer = await ask(options, {
+    tool: "web_fetch",
+    input: { url: address },
+    title: `Открыть страницу на ${host}`,
+    detail: address,
+    persistent: true,
+  });
+  if (answer === "always") knownHosts.add(host);
+}
+
 /** Asks before an MCP tool runs, unless the server says the tool only reads. */
 export async function guardMcpTool(
   options: GuardOptions,
