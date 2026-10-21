@@ -97,6 +97,26 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
           },
         },
       }),
+      // A background agent job followed in its own tab: the journal, the answer, the requests.
+      defineTab<{ job: string; title?: string }>({
+        id: "agent-job",
+        key: ({ job }) => `agent-job:${job}`,
+        path: ({ title }) => title || "Фоновое задание",
+        title: ({ title }) => title || "Фоновое задание агента",
+        subtitle: "фоновое задание",
+        read: ({ title }, content) => ({
+          text: content,
+          note: `Фоновое задание агента: ${title ?? ""}`,
+        }),
+        command: {
+          id: "ide.workbench.agent.job.open",
+          title: "Открыть фоновое задание агента во вкладке",
+          description:
+            "Открывает фоновое задание агента в отдельной вкладке: лента событий, итог, изменённые файлы, запросы, которые ждут ответа, кнопки остановки и продолжения в чате. Идентификаторы заданий даёт ide.agent.jobs.list.",
+          requires: "agent",
+          arguments: { job: "Идентификатор задания из ide.agent.jobs.list" },
+        },
+      }),
       singletonTab("project", "settings:project", "Настройки проекта", "Настройки проекта", {
         subtitle: "иконка, запуск и сценарии",
         command: {

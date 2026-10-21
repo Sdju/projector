@@ -11,7 +11,7 @@ import type { OpenFile } from "../open-file.ts";
 import { KeybindingsEditor } from "../../ide/index.ts";
 import { LanInfoPanel } from "../../network/index.ts";
 import { DockerPanel } from "../../docker/index.ts";
-import { AgentChat, AgentTaskTab } from "../../agent/index.ts";
+import { AgentChat, AgentJobTab, AgentTaskTab } from "../../agent/index.ts";
 import { BrowserPanel } from "../../browser/index.ts";
 import {
   CommitOverview,
@@ -84,6 +84,18 @@ export const baseTabViews: TabViews = {
       projectId: host.projectId,
       chat: tab.params?.chat,
       task: tab.params?.task,
+    }),
+  },
+  "agent-job": {
+    component: AgentJobTab,
+    keepAlive: true,
+    props: (tab, host) => ({
+      projectId: host.projectId,
+      job: tab.params?.job,
+      onOpenFile: host.openFile,
+      onTitle: (title: string) => {
+        tab.path = title;
+      },
     }),
   },
   claude: agentChat("claude-code"),

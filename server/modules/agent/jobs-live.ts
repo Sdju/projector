@@ -164,6 +164,7 @@ export function onEvent(entry: Live, event: AgentEventName, data: unknown): void
       addPending(entry, {
         id,
         kind: "permission",
+        tool: String(body.tool ?? ""),
         title: String(body.title || body.tool || "Разрешение"),
         detail: typeof body.detail === "string" ? body.detail : undefined,
         persistent: body.persistent === true,
@@ -184,7 +185,10 @@ export function onEvent(entry: Live, event: AgentEventName, data: unknown): void
           header: item.header,
           options: item.options ?? [],
           multiple: item.multiple === true,
+          custom: item.custom,
+          optional: item.optional,
         })),
+        custom: body.custom === true,
       });
       return;
     }

@@ -9,11 +9,16 @@ import UiIslandLabel from "../../common/ui/UiIslandLabel.vue";
 import UiSpinner from "../../common/ui/UiSpinner.vue";
 import { useCommandScope } from "../../common/utilities/commands.ts";
 import { useIslandMenu } from "../../common/utilities/island-menu.ts";
-import { useAgentActivity } from "../../modules/agent/index.ts";
+import {
+  requestJobTab,
+  useAgentActivity,
+  type AgentActivityItem,
+} from "../../modules/agent/index.ts";
 import { projectRoute, useProjects } from "../../modules/project/index.ts";
 import { useRunner } from "../../modules/runner/index.ts";
 import IconSquare from "~icons/lucide/square";
 import IconBot from "~icons/lucide/bot";
+import IconAlert from "~icons/lucide/circle-alert";
 
 /** The counter in the header as an island: running projects and agents at work, one click away. */
 const { projects } = useProjects();
@@ -47,8 +52,10 @@ function openProject(path: string) {
   menu.close(false);
   void router.push(projectRoute(path));
 }
-function openAgent(projectId: string) {
-  const project = projects.value.find((item) => item.id === projectId);
+function openAgent(agent: AgentActivityItem) {
+  const project = projects.value.find((item) => item.id === agent.projectId);
+  // A background job opens as its own tab of the project, not as a chat.
+  if (agent.job) requestJobTab(agent.projectId, agent.job.id);
   if (project) openProject(project.path);
   else menu.close(false);
 }
@@ -103,11 +110,13 @@ function openAgent(projectId: string) {
         :key="agent.chat"
         class="row"
         :title="agent.topic"
-        @click="openAgent(agent.projectId)"
+        @click="openAgent(agent)"
       >
         <UiSpinner v-if="agent.busy" />
+        <IconAlert v-else-if="agent.needsUser" class="alert" aria-hidden="true" />
         <IconBot v-else class="bot" aria-hidden="true" />
         <span class="name u-truncate">{{ agent.agent }} · {{ nameOf(agent.projectId) }}</span>
+        <span v-if="agent.needsUser" class="badge">ждёт вас</span>
         <span class="sub u-truncate">{{
           agent.tasks ? `в фоне: ${agent.tasks}` : agent.topic
         }}</span>
@@ -170,6 +179,14 @@ svg {
 }
 .bot {
   color: var(--faint);
+}
+.alert,
+.badge {
+  color: var(--warn, var(--err));
+}
+.badge {
+  flex-shrink: 0;
+  font-size: var(--fs-2xs);
 }
 .empty {
   margin: 0;

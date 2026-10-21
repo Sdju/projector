@@ -1,5 +1,7 @@
 export { default as AgentChat } from "./ui/AgentChat.vue";
 export { default as AgentTaskTab } from "./ui/AgentTaskTab.vue";
+export { default as AgentJobTab } from "./ui/AgentJobTab.vue";
+export { requestJobTab } from "./model/job-open.ts";
 export { projectInitPrompt } from "./lib/init-prompt.ts";
 export { useAgent } from "./model/session.ts";
 export { useAgentModes, guiPrograms } from "./model/modes.ts";

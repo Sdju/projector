@@ -12,6 +12,8 @@ export interface JobPending {
   id: string;
   kind: "permission" | "question";
   title: string;
+  /** Permission: the tool asking. */
+  tool?: string;
   detail?: string;
   /** Permission: the backend can remember the decision. */
   persistent?: boolean;
@@ -22,7 +24,11 @@ export interface JobPending {
     header?: string;
     options: { id: string; label: string; description?: string }[];
     multiple: boolean;
+    custom?: boolean;
+    optional?: boolean;
   }[];
+  /** Question: the user may write an answer of their own. */
+  custom?: boolean;
 }
 
 export interface AgentJob {
