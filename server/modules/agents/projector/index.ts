@@ -10,3 +10,4 @@ export {
 } from "./projector-web-search.ts";
 export { fetchPage } from "./projector-web.ts";
 export { listSkills, skillFolders } from "./projector-skills.ts";
+export { hooksFile, loadHooks } from "./projector-hooks.ts";

@@ -26,6 +26,7 @@ import { isRetryable, MAX_RETRIES, pause, retryDelay } from "./projector-retry.t
 import { connectMcp, mcpSection } from "./projector-mcp.ts";
 import { expandSlash, listSkills, skillsSection } from "./projector-skills.ts";
 import { memorySection } from "./projector-memory.ts";
+import { loadHooks, runStopHooks, withHooks } from "./projector-hooks.ts";
 import { projectInstructions } from "./project-instructions.ts";
 import { createBashReviewer } from "./projector-review.ts";
 import { toMessages, userMessage } from "./projector-history.ts";
@@ -114,7 +115,9 @@ async function turn(options: AgentRunOptions, open: { close: () => Promise<void>
   });
   const mcp = await connectMcp(options.cwd, guard, options.abort);
   open.close = mcp.close;
-  const tools = { ...mcp.tools, ...own };
+  const hooks = await loadHooks();
+  const started = Date.now();
+  const tools = withHooks({ ...mcp.tools, ...own }, hooks, options.cwd) as typeof own;
   const messages: ModelMessage[] = [
     ...toMessages(recent),
     await userMessage(expandSlash(options.message, skills), options.parts),
@@ -255,6 +258,7 @@ async function turn(options: AgentRunOptions, open: { close: () => Promise<void>
     added: added.map((item) => item.id),
     stopped,
   });
+  await runStopHooks(hooks, options.cwd, { seconds: (Date.now() - started) / 1000, text });
 }
 
 /** `/compact`: the answer is the summary of the whole chat, and what follows it builds on that. */
