@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import UiPanel from "../../../../../common/ui/UiPanel.vue";
 import { defineAsyncComponent, ref } from "vue";
+import UiButton from "../../../../../common/ui/UiButton.vue";
+import IconCode from "~icons/lucide/code-xml";
+import IconDocument from "~icons/lucide/file-text";
+import EditorTopbarActions from "./EditorTopbarActions.vue";
 import VisualMarkdownEditor from "./VisualMarkdownEditor.vue";
 const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
 withDefaults(
@@ -20,6 +24,7 @@ const emit = defineEmits<{
   change: [content: string];
   mode: [mode: "document" | "source"];
   save: [];
+  command: [id: string];
   open: [path: string];
 }>();
 const editorError = ref("");
@@ -38,6 +43,18 @@ function focusOut(event: FocusEvent) {
     <p v-if="editorError && mode === 'document'" class="save-error" role="alert">
       {{ editorError }} <button @click="emit('mode', 'source')">Открыть исходник</button>
     </p>
+    <EditorTopbarActions>
+      <UiButton
+        shape="icon"
+        size="sm"
+        :aria-label="mode === 'source' ? 'Показать как документ' : 'Показать исходник'"
+        :title="mode === 'source' ? 'Режим документа (WYSIWYG)' : 'Режим исходника (Markdown)'"
+        @click="emit('command', 'ide.editor.markdown.toggleSource')"
+      >
+        <IconDocument v-if="mode === 'source'" aria-hidden="true" />
+        <IconCode v-else aria-hidden="true" />
+      </UiButton>
+    </EditorTopbarActions>
     <div class="markdown-body">
       <VisualMarkdownEditor
         v-show="mode === 'document'"

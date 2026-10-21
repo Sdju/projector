@@ -15,9 +15,10 @@ import {
   MarkdownViewer,
   SvgViewer,
   provideEditorStatus,
+  provideEditorTopbar,
 } from "../modules/viewers/index.ts";
 
-/** Содержимое одной вкладки файла: хлебные крошки, ошибка сохранения и подходящий просмотрщик. */
+/** Содержимое одной вкладки файла: верхняя панель (путь и действия редактора), ошибка сохранения и подходящий просмотрщик. */
 const props = defineProps<{ file: OpenFile; projectId: string; revision: number }>();
 const emit = defineEmits<{
   change: [draft: string];
@@ -30,6 +31,11 @@ const emit = defineEmits<{
 const tabs = useWorkspaceTabs();
 const host = useTabHost();
 provideEditorStatus();
+const topbarActions = provideEditorTopbar();
+/** В шаблоне ref верхнего уровня разворачивается, поэтому значение задаётся здесь. */
+const setTopbarActions = (el: unknown) => {
+  topbarActions.value = el as HTMLElement | null;
+};
 const siteUrl = computed(() => workspaceSiteUrl(props.projectId, props.file.path));
 const view = computed(() => (props.file.virtual ? tabs.views[props.file.virtual] : undefined));
 const subtitle = computed(() =>
@@ -43,10 +49,11 @@ const hasStatusLine = computed(
 
 <template>
   <UiPanel as="div" sizing="flex" class="file-panel">
-    <div class="breadcrumb">
-      <span class="u-truncate">{{ file.path }}</span>
-      <span v-if="subtitle">{{ subtitle }}</span>
-      <span v-if="file.external || file.readonly">только просмотр</span>
+    <div class="topbar">
+      <span class="topbar-path u-truncate">{{ file.path }}</span>
+      <span v-if="subtitle" class="topbar-note">{{ subtitle }}</span>
+      <span v-if="file.external || file.readonly" class="topbar-note">только просмотр</span>
+      <div :ref="setTopbarActions" class="topbar-actions" />
     </div>
     <p v-if="file.saveError && !isMarkdown(file)" class="file-error" role="alert">
       {{ file.saveError }}
@@ -112,6 +119,7 @@ const hasStatusLine = computed(
         :column="file.column"
         @change="emit('change', $event)"
         @mode="emit('mode', $event)"
+        @command="(id) => host.run(id)"
         @save="emit('save')"
         @open="emit('open', $event)"
       />
@@ -142,19 +150,29 @@ const hasStatusLine = computed(
 </template>
 
 <style scoped>
-.breadcrumb {
+.topbar {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
   gap: 10px;
-  padding: var(--sp-2) var(--sp-3);
+  min-height: calc(var(--control-h) - 4px);
+  padding: 0 var(--sp-3);
   font: var(--fs-2xs) var(--mono);
   color: var(--muted);
   border-bottom: 1px solid var(--line);
 }
-
-.breadcrumb span:last-child {
+.topbar-path {
+  flex: 1;
+  min-width: 0;
+}
+.topbar-note {
   flex-shrink: 0;
   color: var(--faint);
+}
+.topbar-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--sp-1);
 }
 .file-error {
   margin: 0;
@@ -186,7 +204,7 @@ const hasStatusLine = computed(
   position: relative;
 }
 @media (max-width: 600px) {
-  .breadcrumb span:last-child {
+  .topbar-note {
     display: none;
   }
 }

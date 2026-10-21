@@ -11,6 +11,8 @@ export const SvgViewer = defineAsyncComponent(() => import("./ui/SvgViewer.vue")
 export const HtmlViewer = defineAsyncComponent(() => import("./ui/HtmlViewer.vue"));
 export const EditorSettings = defineAsyncComponent(() => import("./ui/EditorSettings.vue"));
 export { default as EditorStatusLine } from "./ui/EditorStatusLine.vue";
+export { default as EditorTopbarActions } from "./ui/EditorTopbarActions.vue";
+export { provideEditorTopbar } from "./lib/editor-topbar.ts";
 export {
   provideEditorStatus,
   useEditorStatusStore,
