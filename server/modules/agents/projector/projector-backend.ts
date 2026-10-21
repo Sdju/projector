@@ -171,7 +171,9 @@ async function run(options: AgentRunOptions): Promise<void> {
   } catch {
     // The indicator keeps its previous value.
   }
-  if ((await result.finishReason) === "tool-calls") {
+  const stopped =
+    (await result.finishReason) === "tool-calls" ? (budget.reason() ?? "steps") : undefined;
+  if (stopped) {
     const note = budgetNote(budget.reason());
     text += note;
     options.emit("text", { text: note });
@@ -180,6 +182,7 @@ async function run(options: AgentRunOptions): Promise<void> {
   options.emit("done", {
     text: text.trim(),
     added: added.map((item) => item.id),
+    stopped,
   });
 }
 

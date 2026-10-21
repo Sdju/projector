@@ -46,5 +46,5 @@ export function turnBudget() {
 export function budgetNote(reason: "loop" | undefined): string {
   return reason === "loop"
     ? "\n\nЯ остановился: последние вызовы повторяются с тем же результатом. Подскажите, как действовать дальше."
-    : `\n\nЯ остановился на ${MAX_STEPS} шагах. Напишите «продолжай», чтобы я пошёл дальше.`;
+    : `\n\nЯ остановился на ${MAX_STEPS} шагах.`;
 }

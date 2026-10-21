@@ -167,6 +167,7 @@ export function applyAgentEvent(
       return false;
     case "done":
       assistant.run = undefined;
+      assistant.stopped = event.data.stopped;
       // A foreground task cannot outlive the answer; a background one may and reports later,
       // unless the agent never reports (then its state is unknown once the answer is over).
       for (const task of assistant.tasks ?? [])

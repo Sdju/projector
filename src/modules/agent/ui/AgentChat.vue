@@ -417,6 +417,10 @@ async function submit() {
   await send();
   composer.value?.focus();
 }
+async function continueTurn() {
+  void toBottom();
+  await send("продолжай");
+}
 async function suggest(text: string) {
   draft.value = text;
   await nextTick();
@@ -581,6 +585,7 @@ onBeforeUnmount(() => {
           @edit="editMessage"
           @rewind="askRewind"
           @retry="retryMessage"
+          @continue="continueTurn"
           @version="showVersion"
           @open-file="(path) => openChip({ type: 'file', path })"
           @revert="(id) => askRewind(precedingUser(id), 'files')"

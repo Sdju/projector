@@ -39,6 +39,7 @@ const emit = defineEmits<{
   edit: [id: string];
   rewind: [id: string];
   retry: [id: string];
+  continue: [];
   version: [id: string, target: number];
   openFile: [path: string];
   revert: [id: string];
@@ -271,6 +272,15 @@ const waiting = computed(() => {
           @click="emit('retry', turn.id)"
         >
           <IconRefresh aria-hidden="true" />
+        </UiButton>
+        <UiButton
+          v-if="last && turn.stopped"
+          size="sm"
+          title="Ход остановлен на лимите: продолжить с того же места"
+          :disabled="busy"
+          @click="emit('continue')"
+        >
+          Продолжить
         </UiButton>
         <AgentUsageInfo v-if="turn.usage" :usage="turn.usage" class="copy-button" />
         <time
