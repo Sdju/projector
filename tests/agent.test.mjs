@@ -352,6 +352,7 @@ test("Claude Code messages become the shared chat events", async () => {
     parent_tool_use_id: null,
     message: {
       id: "m1",
+      usage: { input_tokens: 5, cache_read_input_tokens: 90, cache_creation_input_tokens: 5 },
       content: [
         { type: "text", text: "Открываю" },
         {
@@ -390,6 +391,7 @@ test("Claude Code messages become the shared chat events", async () => {
     is_error: false,
     result: "Готово",
     total_cost_usd: 0.01,
+    usage: { input_tokens: 8, output_tokens: 20, cache_read_input_tokens: 190 },
   });
   expect(mapper.sessionId).toBe("s1");
   expect(events.map(([event]) => event)).toStrictEqual([
@@ -401,8 +403,16 @@ test("Claude Code messages become the shared chat events", async () => {
     "tool-result",
     "text",
     "text",
+    "usage",
     "done",
   ]);
+  expect(events.find(([event]) => event === "usage")[1]).toStrictEqual({
+    input: 8,
+    output: 20,
+    cacheRead: 190,
+    cacheWrite: 0,
+    first: { input: 5, output: 0, cacheRead: 90, cacheWrite: 5 },
+  });
   expect(events[3][1]).toStrictEqual({ id: "t1", name: "Read", input: { file_path: "x" } });
   expect(events[4][1]).toStrictEqual({ id: "t1", name: "Read", output: "{}" });
   expect(events[5][1]).toMatchObject({ id: "t2", error: "boom" });

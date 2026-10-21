@@ -94,6 +94,19 @@ export interface AgentContext {
   cost?: { amount: number; currency: string };
 }
 
+/** Tokens an answer used, split by how the prompt cache served them. */
+export interface AgentTokens {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+}
+
+export interface AgentUsage extends AgentTokens {
+  /** The answer's first request: whether the conversation so far was found in the cache. */
+  first?: AgentTokens;
+}
+
 export interface AgentTurn {
   id: string;
   role: "user" | "assistant";
@@ -109,6 +122,8 @@ export interface AgentTurn {
   parts?: AgentPart[];
   /** Context fullness after this turn; the chat shows the latest one. */
   context?: AgentContext;
+  /** Tokens of this answer and how much of the prompt the cache served. */
+  usage?: AgentUsage;
   /** Native backend session (Claude Code) this turn belongs to; the next request resumes it. */
   session?: AgentSessionRef;
   /** The agent process still answering this turn; set until the turn ends, so it can be rejoined. */
@@ -226,6 +241,7 @@ export type AgentEvent =
   | { event: "session"; data: AgentSessionRef }
   | { event: "commands"; data: { commands: AgentCommand[] } }
   | { event: "context"; data: AgentContext }
+  | { event: "usage"; data: AgentUsage }
   | { event: "controls"; data: { controls: AgentControl[] } }
   | { event: "status"; data: { phase: string; provider?: string; model?: string } }
   | { event: "text"; data: { text: string } }

@@ -69,6 +69,9 @@ export function applyAgentEvent(
     case "context":
       assistant.context = event.data;
       return false;
+    case "usage":
+      assistant.usage = event.data;
+      return false;
     case "permission-request":
       state.permissions.push({
         id: event.data.id,

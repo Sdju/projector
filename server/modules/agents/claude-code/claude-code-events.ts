@@ -4,6 +4,23 @@ import type { AgentEmitter } from "../../agent/index.ts";
 
 export const CLAUDE_LABEL = "Claude Code";
 
+interface RawUsage {
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  cache_read_input_tokens?: number | null;
+  cache_creation_input_tokens?: number | null;
+}
+
+/** Token counts of one request or of the whole answer, as the prompt cache sees them. */
+function usageOf(raw: RawUsage | undefined) {
+  return {
+    input: raw?.input_tokens ?? 0,
+    output: raw?.output_tokens ?? 0,
+    cacheRead: raw?.cache_read_input_tokens ?? 0,
+    cacheWrite: raw?.cache_creation_input_tokens ?? 0,
+  };
+}
+
 function flattenContent(content: unknown): string {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return content == null ? "" : JSON.stringify(content);
@@ -37,6 +54,8 @@ export function createClaudeEventMapper(emit: AgentEmitter) {
   let started = false;
   let failed = false;
   let sessionId = "";
+  // The first request of the answer shows what the resumed conversation found in the cache.
+  let firstRequest: ReturnType<typeof usageOf> | undefined;
 
   const write = (chunk: string) => {
     text += chunk;
@@ -154,6 +173,8 @@ export function createClaudeEventMapper(emit: AgentEmitter) {
       }
       case "assistant": {
         started = true;
+        if (!firstRequest && !message.parent_tool_use_id)
+          firstRequest = usageOf(message.message.usage as RawUsage);
         const content = message.message.content;
         for (const block of Array.isArray(content) ? content : []) {
           if (block.type === "tool_use") {
@@ -198,6 +219,8 @@ export function createClaudeEventMapper(emit: AgentEmitter) {
         return;
       }
       case "result": {
+        if (message.usage)
+          emit("usage", { ...usageOf(message.usage as RawUsage), first: firstRequest });
         if (message.subtype === "success" && !message.is_error) {
           emit("done", {
             text: (message.result || text).trim(),

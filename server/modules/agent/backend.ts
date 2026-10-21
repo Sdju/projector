@@ -33,6 +33,7 @@ export type AgentEventName =
   | "checkpoint"
   | "command-request"
   | "context"
+  | "usage"
   | "commands"
   | "controls"
   | "permission-request"
