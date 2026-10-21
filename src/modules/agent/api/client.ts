@@ -58,6 +58,8 @@ export async function streamAgent(
   signal?: AbortSignal,
   options: {
     projectId?: string;
+    /** The chat's key, so any page can tell which chat the run belongs to. */
+    chat?: string;
     sessionId?: string;
     backend?: AgentBackendId;
     permissionMode?: AgentPermissionMode;
@@ -87,6 +89,7 @@ export async function streamAgent(
             message,
             history,
             projectId: options.projectId,
+            chat: options.chat,
             sessionId: options.sessionId,
             backend: options.backend,
             permissionMode: options.permissionMode,
@@ -371,3 +374,18 @@ export const mergeWorktree = (projectId: string, id: string) =>
 /** Deletes the isolated copy with everything the agent did in it. */
 export const discardWorktree = (projectId: string, id: string) =>
   post("/api/agent/worktree/discard", projectId, id, "Не удалось удалить копию");
+
+/** An agent process working right now, on any page. */
+export interface LiveAgentRun {
+  id: string;
+  backend: AgentBackendId;
+  projectId: string;
+  chat: string;
+  topic: string;
+}
+
+export async function fetchLiveRuns(): Promise<LiveAgentRun[]> {
+  const response = await fetch("/api/agent/runs", { cache: "no-store" });
+  if (!response.ok) return [];
+  return (await response.json()).runs ?? [];
+}

@@ -24,6 +24,40 @@ export interface AgentRunRecord {
   approvals?: boolean;
   /** The client can run Projector commands for the agent. */
   commandBridge?: boolean;
+  /** The project and chat the run belongs to, so any page can tell what works right now. */
+  projectId?: string;
+  chat?: string;
+}
+
+/** A run whose agent process is alive, for the overview of what works now. */
+export interface LiveRun {
+  id: string;
+  backend: AgentBackendId;
+  projectId: string;
+  chat: string;
+  topic: string;
+}
+
+/** Runs with a live host, whichever page started them. */
+export async function listLiveRuns(): Promise<LiveRun[]> {
+  const ids = await readdir(runsRoot()).catch(() => [] as string[]);
+  const runs = await Promise.all(
+    ids
+      .filter((id) => RUN_ID.test(id))
+      .map(async (id): Promise<LiveRun | undefined> => {
+        if ((await liveHost(id)) === undefined) return;
+        const record = await readRun(id);
+        if (!record) return;
+        return {
+          id,
+          backend: record.backend,
+          projectId: record.projectId ?? "",
+          chat: record.chat ?? "",
+          topic: record.message.trim().slice(0, 120),
+        };
+      }),
+  );
+  return runs.filter((run): run is LiveRun => !!run);
 }
 
 const RUN_ID = /^[0-9a-f]{12}$/;

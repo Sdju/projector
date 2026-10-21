@@ -50,6 +50,7 @@ export { attachHosted, startHosted } from "./hosted-process.ts";
 export {
   cancelRun,
   createRun,
+  listLiveRuns,
   pruneRuns,
   readRun,
   removeRun,
@@ -59,6 +60,7 @@ export {
   stopRun,
   trackRun,
   type AgentRunRecord,
+  type LiveRun,
 } from "./agent-runs.ts";
 export {
   completeCommandRequest,

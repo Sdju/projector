@@ -18,8 +18,17 @@ import {
   notifyQuestion,
   requestNotifications,
 } from "../lib/notify.ts";
-import { RELEASE_DELAY_MS, createState, loads, releases, sessions, viewers } from "./chat-state.ts";
+import {
+  RELEASE_DELAY_MS,
+  createState,
+  loads,
+  queued,
+  releases,
+  sessions,
+  viewers,
+} from "./chat-state.ts";
 import { INTERRUPTED, loadHistory } from "./load-history.ts";
+import { watchChat } from "./chat-sync.ts";
 import { saveChat } from "./save-chat.ts";
 import { useExternalAgent } from "./external.ts";
 import { applyAgentEvent } from "./turn-events.ts";
@@ -261,6 +270,7 @@ export function useAgent(
     await runTurn(assistant, (onEvent, signal, attach) =>
       streamAgent(message, previousHistory, onEvent, signal, {
         projectId: projectId || undefined,
+        chat: key,
         sessionId: resume,
         commands,
         backend,
@@ -297,6 +307,17 @@ export function useAgent(
     );
   }
   void resumeRun();
+
+  /** Another page saved this chat (it may have started an answer): take it and rejoin the answer. */
+  watchChat(
+    key,
+    () => state.busy || state.loading || queued.has(key),
+    async () => {
+      await ready;
+      await loadHistory(historyUrl, state, true);
+      if (!state.busy) await resumeRun();
+    },
+  );
 
   /** Stops the answer. Only this cancels an agent process; closing the page just detaches from it. */
   function stop() {

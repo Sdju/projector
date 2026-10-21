@@ -1,3 +1,4 @@
+import { announceChat } from "./chat-sync.ts";
 import { queued, saves, type ChatState } from "./chat-state.ts";
 
 /**
@@ -23,6 +24,7 @@ export function saveChat(key: string, url: string, state: ChatState) {
         );
         throw new Error(`Не удалось сохранить историю чата${detail}`);
       }
+      announceChat(key);
     });
   saves.set(key, saving);
   void saving.catch((error) => {

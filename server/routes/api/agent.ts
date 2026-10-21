@@ -25,6 +25,7 @@ import {
   completeCommandRequest,
   cancelRun,
   createRun,
+  listLiveRuns,
   pruneRuns,
   readRun,
   removeRun,
@@ -211,6 +212,10 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
     json(res, accepted ? 200 : 410, { accepted });
     return true;
   }
+  if (path === "/api/agent/runs" && method === "GET") {
+    json(res, 200, { runs: await listLiveRuns() });
+    return true;
+  }
   if (path === "/api/agent/cancel" && method === "POST") {
     const body = await readBody(req);
     await cancelRun(asString(body.runId));
@@ -230,6 +235,8 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
     // What the client can show is stored with the run: a runner that outlives this request needs it.
     const request = stored ?? {
       ...created!.request,
+      projectId: asString(body.projectId) || undefined,
+      chat: asString(body.chat) || undefined,
       approvals: body.approvals === true,
       commandBridge: body.commandBridge === true,
     };
