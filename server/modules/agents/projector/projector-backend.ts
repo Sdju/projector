@@ -12,7 +12,8 @@ import {
 } from "../../providers/index.ts";
 import { projectInstructions } from "./project-instructions.ts";
 import { createBashReviewer } from "./projector-review.ts";
-import { historyMessages, userMessage } from "./projector-history.ts";
+import { toMessages, userMessage } from "./projector-history.ts";
+import { compactHistory, summarySection } from "./projector-compaction.ts";
 
 const MAX_STEPS = 24;
 /** The window of a model that has none registered in the provider settings; the context ring is measured against it. */
@@ -55,8 +56,12 @@ async function run(options: AgentRunOptions): Promise<void> {
     },
   });
 
+  const { recent, summary } = await compactHistory(model, options.history ?? [], {
+    signal: options.abort,
+    onStart: () => options.emit("status", { phase: "compacting" }),
+  });
   const messages: ModelMessage[] = [
-    ...historyMessages(options.history ?? []),
+    ...toMessages(recent),
     await userMessage(options.message, options.parts),
   ];
 
@@ -72,7 +77,8 @@ async function run(options: AgentRunOptions): Promise<void> {
     system:
       buildSystemPrompt(widgetCatalog.guide()) +
       (options.cwd ? `\nТекущий проект: ${options.cwd}` : "") +
-      (await projectInstructions(options.cwd)),
+      (await projectInstructions(options.cwd)) +
+      summarySection(summary),
     messages,
     tools,
     stopWhen: isStepCount(MAX_STEPS),

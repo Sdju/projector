@@ -40,7 +40,9 @@ export function applyAgentEvent(
     case "status":
       state.phase = event.data.model
         ? `${event.data.provider ?? "qwen"} · ${event.data.model}`
-        : "думает";
+        : event.data.phase === "compacting"
+          ? "сжимаю историю"
+          : "думает";
       return false;
     case "run":
       assistant.run = event.data.id;

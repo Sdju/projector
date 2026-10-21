@@ -36,7 +36,12 @@ export function recentTurns(history: AgentHistoryTurn[]): AgentHistoryTurn[] {
 
 /** Earlier turns as model messages, with the calls an answer made and what they returned. */
 export function historyMessages(history: AgentHistoryTurn[]): ModelMessage[] {
-  return recentTurns(history).flatMap((turn): ModelMessage[] => {
+  return toMessages(recentTurns(history));
+}
+
+/** Turns as model messages, as they are; `historyMessages` first cuts them to the budget. */
+export function toMessages(turns: AgentHistoryTurn[]): ModelMessage[] {
+  return turns.flatMap((turn): ModelMessage[] => {
     if (turn.role === "user") return [{ role: "user", content: turn.content }];
     const tools = turn.tools ?? [];
     if (!tools.length) return [{ role: "assistant", content: turn.content }];
