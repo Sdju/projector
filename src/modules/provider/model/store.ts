@@ -110,6 +110,7 @@ export function useProviders() {
     state.providers.push({
       id,
       kind,
+      thinkingStyle: preset.thinking,
       name: kind === "custom" ? `Провайдер ${state.providers.length + 1}` : preset.name,
       url: preset.url,
       enabled: true,

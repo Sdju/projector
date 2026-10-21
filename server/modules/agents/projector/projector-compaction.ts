@@ -98,7 +98,6 @@ export async function summarize(
     ].join("\n"),
     abortSignal: signal,
     maxOutputTokens: 2_000,
-    providerOptions: { qwenOpenai: { enable_thinking: false } },
   });
   return text.trim().slice(0, SUMMARY_CHARS);
 }

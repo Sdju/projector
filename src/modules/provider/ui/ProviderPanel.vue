@@ -12,9 +12,9 @@ import UiButton from "../../../common/ui/UiButton.vue";
 import UiField from "../../../common/ui/UiField.vue";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import { useProviders } from "../model/store.ts";
-import { PROVIDER_KINDS, PROVIDER_PRESETS } from "../model/presets.ts";
+import { PROVIDER_KINDS, PROVIDER_PRESETS, THINKING_STYLES } from "../model/presets.ts";
 import { formatAmount } from "../model/format-balance.ts";
-import type { ProviderKind } from "../model/types.ts";
+import type { ProviderKind, ThinkingStyle } from "../model/types.ts";
 
 /** The provider whose page the navigation opened. Without one, the section is the overview. */
 const props = defineProps<{ providerId?: string }>();
@@ -98,6 +98,12 @@ const manual = ref("");
 
 function setContext(id: string, value: string): void {
   if (selected.value) setModelContext(selected.value.id, id, Number(value) || undefined);
+}
+
+/** A new type brings the thinking dialect that suits it; the user can pick another afterwards. */
+function changeKind(kind: ProviderKind): void {
+  if (selected.value)
+    patchProvider(selected.value.id, { kind, thinkingStyle: PROVIDER_PRESETS[kind].thinking });
 }
 
 function toggle(row: ModelRow, on: boolean): void {
@@ -232,11 +238,7 @@ function keyDraft(): string {
             v-bind="control"
             aria-label="Тип провайдера"
             :value="selected.kind"
-            @change="
-              patchProvider(selected.id, {
-                kind: ($event.target as HTMLSelectElement).value as ProviderKind,
-              })
-            "
+            @change="changeKind(($event.target as HTMLSelectElement).value as ProviderKind)"
           >
             <option v-for="kind in PROVIDER_KINDS" :key="kind" :value="kind">
               {{ PROVIDER_PRESETS[kind].label }}
@@ -244,6 +246,23 @@ function keyDraft(): string {
           </UiControl>
         </UiField>
       </UiFormGrid>
+      <UiField v-slot="{ control }" label="размышление">
+        <UiControl
+          as="select"
+          v-bind="control"
+          aria-label="Способ включать размышление модели"
+          :value="selected.thinkingStyle"
+          @change="
+            patchProvider(selected.id, {
+              thinkingStyle: ($event.target as HTMLSelectElement).value as ThinkingStyle,
+            })
+          "
+        >
+          <option v-for="item in THINKING_STYLES" :key="item.value" :value="item.value">
+            {{ item.label }}
+          </option>
+        </UiControl>
+      </UiField>
       <UiFormGrid layout="wide-end">
         <UiField v-slot="{ control }" label="url">
           <UiControl

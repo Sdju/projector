@@ -40,7 +40,6 @@ export function createBashReviewer(
         prompt: `Каталог проекта: ${cwd ?? "не задан"}\nКоманда:\n${command}`,
         abortSignal: signal,
         maxOutputTokens: 200,
-        providerOptions: { qwenOpenai: { enable_thinking: false } },
       });
       return parseVerdict(text);
     } catch {

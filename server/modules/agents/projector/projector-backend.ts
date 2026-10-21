@@ -1,5 +1,11 @@
 import type { AgentBackend, AgentRunOptions, AgentControl } from "../../agent/index.ts";
-import { streamText, type LanguageModel, type ModelMessage } from "ai";
+import {
+  defaultSettingsMiddleware,
+  streamText,
+  wrapLanguageModel,
+  type LanguageModel,
+  type ModelMessage,
+} from "ai";
 import type { Project } from "../../projects/index.ts";
 import { createAgentTools } from "./agent-tools.ts";
 import { buildSystemPrompt } from "./prompts.ts";
@@ -8,7 +14,11 @@ import {
   createQwenOpenAI,
   envFallbackFromProcess,
   loadPublicProviders,
+  quietThinkingBody,
   resolveOpenAIProvider,
+  thinkingBody,
+  thinkingLevel,
+  thinkingOptions,
 } from "../../providers/index.ts";
 import { budgetNote, turnBudget } from "./projector-budget.ts";
 import { isRetryable, MAX_RETRIES, pause, retryDelay } from "./projector-retry.ts";
@@ -43,6 +53,17 @@ async function run(options: AgentRunOptions): Promise<void> {
     openaiApiKey: resolved.apiKey,
   });
   const model = provider.chatModel(resolved.model);
+  const style = resolved.thinking === false ? "none" : resolved.thinkingStyle;
+  // The side requests (summary, command review) never think; the answer itself follows the chat's choice.
+  const quiet = quietThinkingBody(style);
+  const quietModel = quiet
+    ? wrapLanguageModel({
+        model,
+        middleware: defaultSettingsMiddleware({
+          settings: { providerOptions: { qwenOpenai: quiet } },
+        }),
+      })
+    : model;
 
   const mode = options.selection?.[TRUST] ?? options.permissionMode;
   const added: Project[] = [];
@@ -56,7 +77,8 @@ async function run(options: AgentRunOptions): Promise<void> {
       cwd: options.cwd,
       approve: options.approve,
       trusting: mode === "bypassPermissions",
-      review: mode === "auto" ? createBashReviewer(model, options.cwd, options.abort) : undefined,
+      review:
+        mode === "auto" ? createBashReviewer(quietModel, options.cwd, options.abort) : undefined,
     },
     onProject: (project) => {
       added.push(project);
@@ -66,10 +88,10 @@ async function run(options: AgentRunOptions): Promise<void> {
 
   const earlier = splitAtCompaction(options.history ?? []);
   if (options.message.trim() === COMPACT_COMMAND) {
-    await compactChat(model, earlier, options, resolved);
+    await compactChat(quietModel, earlier, options, resolved);
     return;
   }
-  const { recent, summary } = await compactHistory(model, earlier.turns, {
+  const { recent, summary } = await compactHistory(quietModel, earlier.turns, {
     signal: options.abort,
     base: earlier.summary,
     onStart: () => options.emit("status", { phase: "compacting" }),
@@ -93,6 +115,7 @@ async function run(options: AgentRunOptions): Promise<void> {
     summarySection(summary);
 
   const budget = turnBudget();
+  const thinking = thinkingBody(style, options.selection?.[THINKING]);
   let text = "";
   let result: ReturnType<typeof streamText<typeof tools>>;
   // A request that fails before the model said anything is repeated; later the turn would replay.
@@ -105,11 +128,7 @@ async function run(options: AgentRunOptions): Promise<void> {
       stopWhen: budget.stopWhen,
       abortSignal: options.abort,
       maxRetries: 0,
-      // Only a model that can think is asked to; the others get the plain request.
-      providerOptions:
-        resolved.thinking === false
-          ? undefined
-          : { qwenOpenai: { enable_thinking: options.selection?.[THINKING] !== "off" } },
+      providerOptions: thinking ? { qwenOpenai: thinking } : undefined,
     });
 
     let started = false;
@@ -259,18 +278,17 @@ async function controls(selection: Record<string, string> = {}): Promise<AgentCo
     const chosen = providers.find((item) => item.id === providerId);
     const model =
       chosen?.models.find((item) => item.alias === alias.join(":")) ?? chosen?.models[0];
-    if (model?.thinking !== false)
+    const style = model?.thinking === false || !chosen ? "none" : chosen.thinkingStyle;
+    const levels = thinkingOptions(style);
+    if (levels.length)
       list.push({
         id: THINKING,
         via: "native",
         category: "effort",
         name: "Размышление",
-        description: "Думает ли модель перед ответом; без него ответ быстрее и дешевле",
-        current: selection[THINKING] === "off" ? "off" : "on",
-        options: [
-          { value: "on", name: "Включено" },
-          { value: "off", name: "Выключено" },
-        ],
+        description: "Насколько модель думает перед ответом; без него ответ быстрее и дешевле",
+        current: thinkingLevel(style, selection[THINKING]),
+        options: levels,
       });
     list.unshift({
       id: "provider",

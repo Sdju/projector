@@ -14,4 +14,14 @@ export { inferProviderKind } from "./kinds.ts";
 export type { AgentHistoryTool, AgentHistoryTurn, ProviderModel } from "./types.ts";
 export type { OpenAIProviderWrite, ProviderBalance, ProviderKind } from "./types.ts";
 
+export {
+  defaultThinkingStyle,
+  isThinkingStyle,
+  quietThinkingBody,
+  THINKING_STYLES,
+  thinkingBody,
+  thinkingLevel,
+  thinkingOptions,
+} from "./thinking.ts";
+export type { ThinkingStyle } from "./thinking.ts";
 export { createQwenOpenAI, normalizeOpenAiBaseUrl } from "./openai-client.ts";

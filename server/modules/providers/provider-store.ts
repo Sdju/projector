@@ -5,6 +5,8 @@ import { HttpError } from "../http/index.ts";
 import { vault as systemVault } from "../secrets/index.ts";
 import { inferProviderKind, isProviderKind } from "./kinds.ts";
 import { resolveModel, sanitizeModels } from "./models.ts";
+import { defaultThinkingStyle, isThinkingStyle } from "./thinking.ts";
+import { DEFAULT_MODEL, ENV_PROVIDER_ID, envProvider, seededConfig } from "./provider-seeds.ts";
 import { DEFAULT_PROVIDERS_SECRET, revealSecret } from "./secret-obfuscation.ts";
 import type {
   EnvOpenAIFallback,
@@ -17,9 +19,6 @@ import type {
   StoredProvidersConfig,
 } from "./types.ts";
 
-const ENV_PROVIDER_ID = "env-default";
-const QWEN_PROVIDER_ID = "qwen-dashscope";
-const DEFAULT_MODEL = "qwen3.8-flash";
 let writeChain: Promise<unknown> = Promise.resolve();
 let providerVault = systemVault;
 /** Test hook: replaces the secret vault. */
@@ -57,44 +56,12 @@ function toPublic(provider: StoredOpenAIProvider, envKey = ""): OpenAIProviderPu
     id: provider.id,
     name: provider.name,
     kind: provider.kind,
+    thinkingStyle: provider.thinkingStyle,
     url: provider.url,
     enabled: provider.enabled,
     models: provider.models,
     hasApiKey: provider.vault === "keyring" || Boolean(provider.apiKey.trim()) || fromEnv,
   };
-}
-
-/** The key of the environment provider is read from the process environment, never stored. */
-function envProvider(fallback: EnvOpenAIFallback): StoredOpenAIProvider | null {
-  const url = fallback.url?.trim();
-  if (!url) return null;
-  return {
-    id: ENV_PROVIDER_ID,
-    name: "Из .env",
-    kind: inferProviderKind(url),
-    url,
-    enabled: true,
-    models: sanitizeModels(null, fallback.model?.trim() || DEFAULT_MODEL),
-    apiKey: "",
-  };
-}
-
-function qwenSeed(): StoredOpenAIProvider {
-  return {
-    id: QWEN_PROVIDER_ID,
-    name: "Qwen / DashScope",
-    kind: "qwencloud",
-    url: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
-    enabled: true,
-    models: sanitizeModels(null, DEFAULT_MODEL),
-    apiKey: "",
-  };
-}
-
-function seededConfig(fallback: EnvOpenAIFallback): StoredProvidersConfig {
-  const fromEnv = envProvider(fallback);
-  const providers = fromEnv ? [fromEnv, qwenSeed()] : [qwenSeed()];
-  return { activeProviderId: providers[0].id, providers };
 }
 
 function normalizeStoredProvider(value: unknown, index: number): StoredOpenAIProvider | null {
@@ -106,10 +73,14 @@ function normalizeStoredProvider(value: unknown, index: number): StoredOpenAIPro
         ? sanitizeProviderId(record.id)
         : `provider-${index + 1}`;
     const url = sanitizeUrl(record.url);
+    const kind = isProviderKind(record.kind) ? record.kind : inferProviderKind(url);
     return {
       id,
       name: sanitizeName(record.name, `Провайдер ${index + 1}`),
-      kind: isProviderKind(record.kind) ? record.kind : inferProviderKind(url),
+      kind,
+      thinkingStyle: isThinkingStyle(record.thinkingStyle)
+        ? record.thinkingStyle
+        : defaultThinkingStyle(kind),
       url,
       enabled: record.enabled !== false,
       models: sanitizeModels(record.models, record.model),
@@ -207,10 +178,14 @@ async function mergeProviderWrite(
       : `provider-${index + 1}`;
   const previous = existingById.get(id);
   const url = sanitizeUrl(item.url);
+  const kind = isProviderKind(item.kind) ? item.kind : (previous?.kind ?? inferProviderKind(url));
   const base = {
     id,
     name: sanitizeName(item.name, `Провайдер ${index + 1}`),
-    kind: isProviderKind(item.kind) ? item.kind : (previous?.kind ?? inferProviderKind(url)),
+    kind,
+    thinkingStyle: isThinkingStyle(item.thinkingStyle)
+      ? item.thinkingStyle
+      : (previous?.thinkingStyle ?? defaultThinkingStyle(kind)),
     url,
     enabled: item.enabled === undefined ? (previous?.enabled ?? true) : item.enabled !== false,
     models:
@@ -328,6 +303,7 @@ async function toResolved(
     id: provider.id,
     name: provider.name,
     kind: provider.kind,
+    thinkingStyle: provider.thinkingStyle,
     url: provider.url.trim(),
     ...resolveModel(provider.models, modelName, DEFAULT_MODEL),
     apiKey: await revealProviderKey(provider, secret, envKey),

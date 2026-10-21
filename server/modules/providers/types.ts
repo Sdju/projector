@@ -1,3 +1,5 @@
+import type { ThinkingStyle } from "./thinking.ts";
+
 /** Preset of a provider: decides which extras (balance, defaults) Projector offers. */
 export type ProviderKind = "custom" | "local" | "deepseek" | "qwencloud";
 
@@ -15,6 +17,8 @@ export interface OpenAIProviderPublic {
   id: string;
   name: string;
   kind: ProviderKind;
+  /** The dialect in which the provider is asked to think. */
+  thinkingStyle: ThinkingStyle;
   url: string;
   /** A disabled provider offers none of its models to the agent or the gateway. */
   enabled: boolean;
@@ -26,6 +30,7 @@ export interface OpenAIProviderWrite {
   id: string;
   name: string;
   kind?: ProviderKind;
+  thinkingStyle?: ThinkingStyle;
   url: string;
   enabled?: boolean;
   models?: Array<{ id: string; alias?: string; contextTokens?: number; thinking?: boolean }>;
@@ -48,6 +53,7 @@ export interface StoredOpenAIProvider {
   id: string;
   name: string;
   kind: ProviderKind;
+  thinkingStyle: ThinkingStyle;
   url: string;
   enabled: boolean;
   models: ProviderModel[];
@@ -73,6 +79,7 @@ export interface ResolvedOpenAIProvider {
   id: string;
   name: string;
   kind: ProviderKind;
+  thinkingStyle: ThinkingStyle;
   url: string;
   /** Upstream id of the chosen model: what goes into the request. */
   model: string;
