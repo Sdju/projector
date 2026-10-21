@@ -18,6 +18,15 @@ export function loadHistory(url: string, state: ChatState, quiet = false): Promi
       const last = state.turns.at(-1);
       if (last?.role === "assistant" && !last.run && !last.text.trim() && !last.tools.length)
         last.text = INTERRUPTED;
+      // Without a live agent process behind the chat nothing reports any more: a task still shown
+      // as running was cut off with its process (older chats kept such rows forever).
+      if (!last?.run)
+        for (const turn of state.turns)
+          for (const task of turn.tasks ?? [])
+            if (task.status === "running") {
+              task.status = "stopped";
+              task.summary ??= "Процесс агента завершился до отчёта о задаче";
+            }
       for (const turn of state.turns)
         for (const chip of turn.tools) {
           if (chip.status === "running") {

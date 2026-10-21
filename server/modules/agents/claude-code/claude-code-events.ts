@@ -62,10 +62,29 @@ export function createClaudeEventMapper(emit: AgentEmitter) {
     emit("text", { text: chunk });
   };
 
+  /** Tasks the panel shows as running; whatever is left when the process ends never reports. */
+  const running = new Set<string>();
+  /** Subagents (not shell commands) that still work: the process must stay up for them to finish. */
+  let working = 0;
+  /** The `done` of a result that came while background agents still work: sent when they are over. */
+  let pendingDone: { text: string; added: never[]; costUsd?: number } | undefined;
+
   /** Subagents and background commands: each system message patches one row of the task panel. */
   function handleTask(message: SDKMessage & { type: "system" }) {
-    const task = (patch: AgentTaskPatch) => emit("task", patch);
+    const task = (patch: AgentTaskPatch) => {
+      if (patch.status) {
+        if (patch.status === "running") running.add(patch.id);
+        else running.delete(patch.id);
+      }
+      emit("task", patch);
+    };
     switch (message.subtype) {
+      case "background_tasks_changed":
+        // A level signal: the whole set of live tasks, so a missed start or end cannot leave it stale.
+        working = message.tasks.filter(
+          (item) => !item.ambient && item.task_type !== "local_bash",
+        ).length;
+        return;
       case "task_started":
         if (message.skip_transcript || message.ambient) return;
         task({
@@ -222,12 +241,21 @@ export function createClaudeEventMapper(emit: AgentEmitter) {
         if (message.usage)
           emit("usage", { ...usageOf(message.usage as RawUsage), first: firstRequest });
         if (message.subtype === "success" && !message.is_error) {
-          emit("done", {
+          const done = {
             text: (message.result || text).trim(),
-            added: [],
+            added: [] as never[],
             costUsd: message.total_cost_usd,
-          });
+          };
+          // Background agents report in a following answer of this same run: the chat stays busy.
+          if (working > 0) {
+            pendingDone = done;
+            emit("status", { phase: "background" });
+          } else {
+            pendingDone = undefined;
+            emit("done", done);
+          }
         } else {
+          pendingDone = undefined;
           failed = true;
           const errors = "errors" in message && Array.isArray(message.errors) ? message.errors : [];
           const reason =
@@ -247,6 +275,25 @@ export function createClaudeEventMapper(emit: AgentEmitter) {
 
   return {
     handle,
+    /** Subagents still working: the agent process has to be kept alive for them. */
+    get working() {
+      return working;
+    },
+    /**
+     * The process is going away: what still ran in the panel will never report, and the answer
+     * held back for background agents is delivered.
+     */
+    finish() {
+      for (const id of running)
+        emit("task", {
+          id,
+          status: "stopped",
+          summary: "Процесс агента завершился до отчёта о задаче",
+        });
+      running.clear();
+      if (pendingDone) emit("done", pendingDone);
+      pendingDone = undefined;
+    },
     /** No assistant output yet: the request failed before the model answered. */
     get started() {
       return started;

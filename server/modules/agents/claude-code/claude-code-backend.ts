@@ -236,6 +236,7 @@ export async function runClaudeCode(options: AgentRunOptions): Promise<void> {
     try {
       for await (const message of conversation) {
         mapper.handle(message);
+        input.follow(message, mapper.working);
         if (message.type === "user" && Date.now() - contextAt > CONTEXT_REFRESH_MS) {
           contextAt = Date.now();
           void emitContext(conversation, emit);
@@ -245,6 +246,7 @@ export async function runClaudeCode(options: AgentRunOptions): Promise<void> {
           input.settled();
         } else if (message.type === "assistant" || message.type === "stream_event") input.busy();
       }
+      mapper.finish();
     } finally {
       unregister?.();
       input.close();
