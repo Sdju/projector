@@ -24,9 +24,9 @@ function render(turn: AgentHistoryTurn): string {
   return [`${who}: ${turn.content}`, ...tools].join("\n");
 }
 
-/** Hashes of every whole-turn prefix: `[k]` identifies the first `k + 1` turns. */
-function prefixKeys(turns: AgentHistoryTurn[]): string[] {
-  const hash = createHash("sha256");
+/** Hashes of every whole-turn prefix (after `base`): `[k]` identifies the first `k + 1` turns. */
+function prefixKeys(turns: AgentHistoryTurn[], base: string): string[] {
+  const hash = createHash("sha256").update(`${base}\u0000`);
   return turns.map((turn) => {
     hash.update(`${render(turn)}\u0000`);
     return hash.copy().digest("hex");
@@ -55,37 +55,24 @@ export interface CompactedHistory {
 export async function compactHistory(
   model: LanguageModel,
   history: AgentHistoryTurn[],
-  options: { signal?: AbortSignal; onStart?: () => void } = {},
+  options: { signal?: AbortSignal; onStart?: () => void; base?: string } = {},
 ): Promise<CompactedHistory> {
+  const base = options.base ?? "";
   const recent = recentTurns(history);
   const older = history.slice(0, history.length - recent.length);
-  if (!older.length) return { recent, summary: "" };
+  if (!older.length) return { recent, summary: base };
 
-  const keys = prefixKeys(older);
+  const keys = prefixKeys(older, base);
   const last = keys.length - 1;
   const cached = cache.get(keys[last]!);
   if (cached) return { recent, summary: cached };
   let covered = last;
   while (covered >= 0 && !cache.has(keys[covered]!)) covered--;
-  const previous = covered >= 0 ? cache.get(keys[covered]!)! : "";
+  const previous = covered >= 0 ? cache.get(keys[covered]!)! : base;
 
   options.onStart?.();
   try {
-    const { text } = await generateText({
-      model,
-      system: SUMMARY_PROMPT,
-      prompt: [
-        previous ? `Прежняя сводка:\n${previous}\n` : "",
-        `${previous ? "Новые сообщения" : "Разговор"}:\n${older
-          .slice(covered + 1)
-          .map(render)
-          .join("\n\n")}`,
-      ].join("\n"),
-      abortSignal: options.signal,
-      maxOutputTokens: 2_000,
-      providerOptions: { qwenOpenai: { enable_thinking: false } },
-    });
-    const summary = text.trim().slice(0, SUMMARY_CHARS);
+    const summary = await summarize(model, previous, older.slice(covered + 1), options.signal);
     if (!summary) return { recent, summary: previous };
     remember(keys[last]!, summary);
     return { recent, summary };
@@ -93,6 +80,52 @@ export async function compactHistory(
     if (options.signal?.aborted) throw error;
     return { recent, summary: previous };
   }
+}
+
+/** The summary of `turns` that continues `previous` (empty when there was none); empty if the model said nothing. */
+export async function summarize(
+  model: LanguageModel,
+  previous: string,
+  turns: AgentHistoryTurn[],
+  signal?: AbortSignal,
+): Promise<string> {
+  const { text } = await generateText({
+    model,
+    system: SUMMARY_PROMPT,
+    prompt: [
+      previous ? `Прежняя сводка:\n${previous}\n` : "",
+      `${previous ? "Новые сообщения" : "Разговор"}:\n${turns.map(render).join("\n\n")}`,
+    ].join("\n"),
+    abortSignal: signal,
+    maxOutputTokens: 2_000,
+    providerOptions: { qwenOpenai: { enable_thinking: false } },
+  });
+  return text.trim().slice(0, SUMMARY_CHARS);
+}
+
+/** The message that asks the agent to compact the chat (the chat sends it by itself on a full context). */
+export const COMPACT_COMMAND = "/compact";
+
+/**
+ * The last compaction in the history: the answer to a `/compact` message is the summary of
+ * everything before it, so only the turns after that answer still go to the model as they were.
+ */
+export function splitAtCompaction(history: AgentHistoryTurn[]): {
+  summary: string;
+  turns: AgentHistoryTurn[];
+} {
+  for (let index = history.length - 2; index >= 0; index--) {
+    const ask = history[index]!;
+    const answer = history[index + 1]!;
+    if (
+      ask.role === "user" &&
+      ask.content.trim() === COMPACT_COMMAND &&
+      answer.role === "assistant" &&
+      answer.content.trim()
+    )
+      return { summary: answer.content.trim(), turns: history.slice(index + 2) };
+  }
+  return { summary: "", turns: history };
 }
 
 /** The system prompt section with the summary of the early conversation. */

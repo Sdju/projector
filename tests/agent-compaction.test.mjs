@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vite-plus/test";
 import {
   clearCompactionCache,
   compactHistory,
+  splitAtCompaction,
   summarySection,
 } from "../server/modules/agents/projector/projector-compaction.ts";
 
@@ -75,5 +76,33 @@ describe("history compaction", () => {
   it("puts the summary into the system prompt", () => {
     expect(summarySection("")).toBe("");
     expect(summarySection("итог")).toContain("итог");
+  });
+
+  it("continues from the last /compact answer", () => {
+    const history = [
+      { role: "user", content: "старое" },
+      { role: "assistant", content: "ответ" },
+      { role: "user", content: "/compact" },
+      { role: "assistant", content: "сводка 1" },
+      { role: "user", content: "новое" },
+      { role: "assistant", content: "ответ 2" },
+    ];
+    const split = splitAtCompaction(history);
+    expect(split.summary).toBe("сводка 1");
+    expect(split.turns.map((turn) => turn.content)).toEqual(["новое", "ответ 2"]);
+    expect(splitAtCompaction(history.slice(0, 2))).toEqual({
+      summary: "",
+      turns: history.slice(0, 2),
+    });
+    expect(splitAtCompaction(history.slice(0, 3)).summary).toBe("");
+  });
+
+  it("builds on the summary of a compaction when more turns pile up", async () => {
+    const calls = [];
+    const result = await compactHistory(mock("сводка 2", calls), long(8), { base: "сводка 1" });
+    expect(result.summary).toBe("сводка 2");
+    expect(calls[0]).toContain("сводка 1");
+    const short = await compactHistory(mock("x", []), long(1), { base: "сводка 1" });
+    expect(short.summary).toBe("сводка 1");
   });
 });

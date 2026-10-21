@@ -1,5 +1,5 @@
 import type { AgentBackend, AgentRunOptions, AgentControl } from "../../agent/index.ts";
-import { isStepCount, streamText, type ModelMessage } from "ai";
+import { isStepCount, streamText, type LanguageModel, type ModelMessage } from "ai";
 import type { Project } from "../../projects/index.ts";
 import { createAgentTools } from "./agent-tools.ts";
 import { buildSystemPrompt } from "./prompts.ts";
@@ -13,7 +13,13 @@ import {
 import { projectInstructions } from "./project-instructions.ts";
 import { createBashReviewer } from "./projector-review.ts";
 import { toMessages, userMessage } from "./projector-history.ts";
-import { compactHistory, summarySection } from "./projector-compaction.ts";
+import {
+  COMPACT_COMMAND,
+  compactHistory,
+  splitAtCompaction,
+  summarize,
+  summarySection,
+} from "./projector-compaction.ts";
 
 const MAX_STEPS = 24;
 /** The window of a model that has none registered in the provider settings; the context ring is measured against it. */
@@ -56,8 +62,14 @@ async function run(options: AgentRunOptions): Promise<void> {
     },
   });
 
-  const { recent, summary } = await compactHistory(model, options.history ?? [], {
+  const earlier = splitAtCompaction(options.history ?? []);
+  if (options.message.trim() === COMPACT_COMMAND) {
+    await compactChat(model, earlier, options, resolved);
+    return;
+  }
+  const { recent, summary } = await compactHistory(model, earlier.turns, {
     signal: options.abort,
+    base: earlier.summary,
     onStart: () => options.emit("status", { phase: "compacting" }),
   });
   const messages: ModelMessage[] = [
@@ -157,6 +169,31 @@ async function run(options: AgentRunOptions): Promise<void> {
   });
 }
 
+/** `/compact`: the answer is the summary of the whole chat, and what follows it builds on that. */
+async function compactChat(
+  model: LanguageModel,
+  earlier: ReturnType<typeof splitAtCompaction>,
+  options: AgentRunOptions,
+  resolved: { model: string; contextTokens?: number },
+): Promise<void> {
+  options.emit("status", { phase: "compacting" });
+  const summary = earlier.turns.length
+    ? await summarize(model, earlier.summary, earlier.turns, options.abort)
+    : earlier.summary;
+  if (!summary) {
+    options.emit("error", { error: "Пока нечего сжимать" });
+    return;
+  }
+  options.emit("text", { text: summary });
+  // The next request measures the real size; until then the ring shows about what the summary takes.
+  options.emit("context", {
+    used: Math.ceil((summary.length + 6_000) / 3),
+    size: resolved.contextTokens ?? DEFAULT_CONTEXT_SIZE,
+    model: resolved.model,
+  });
+  options.emit("done", { text: summary, added: [] });
+}
+
 /** The providers to choose from and whether the agent asks before changing things. */
 async function controls(selection: Record<string, string> = {}): Promise<AgentControl[]> {
   const { providers, activeProviderId } = await loadPublicProviders(envFallbackFromProcess());
@@ -216,6 +253,7 @@ async function controls(selection: Record<string, string> = {}): Promise<AgentCo
 /** The Projector IDE assistant on the active OpenAI-compatible provider. */
 export const projectorBackend: AgentBackend = {
   id: "projector",
+  capabilities: { compact: { command: COMPACT_COMMAND, hintAt: 0.8, autoAt: 0.9 } },
   controls: () => controls(),
   run,
 };
