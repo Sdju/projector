@@ -20,6 +20,7 @@ import {
   thinkingLevel,
   thinkingOptions,
 } from "../../providers/index.ts";
+import { tokensOf, type Tokens } from "./projector-usage.ts";
 import { budgetNote, turnBudget } from "./projector-budget.ts";
 import { isRetryable, MAX_RETRIES, pause, retryDelay } from "./projector-retry.ts";
 import { projectInstructions } from "./project-instructions.ts";
@@ -117,6 +118,8 @@ async function run(options: AgentRunOptions): Promise<void> {
   const budget = turnBudget();
   const thinking = thinkingBody(style, options.selection?.[THINKING]);
   let text = "";
+  /** What the first request of the answer found in the provider cache. */
+  let firstRequest: Tokens | undefined;
   let result: ReturnType<typeof streamText<typeof tools>>;
   // A request that fails before the model said anything is repeated; later the turn would replay.
   for (let attempt = 0; ; attempt++) {
@@ -133,6 +136,7 @@ async function run(options: AgentRunOptions): Promise<void> {
 
     let started = false;
     let failure: unknown;
+    firstRequest = undefined;
     for await (const part of result.fullStream) {
       if (part.type === "error") {
         failure = part.error;
@@ -152,6 +156,8 @@ async function run(options: AgentRunOptions): Promise<void> {
           name: part.toolName,
           input: part.input,
         });
+      } else if (part.type === "finish-step") {
+        firstRequest ??= tokensOf(part.usage);
       } else if (part.type === "tool-result") {
         options.emit("tool-result", {
           id: part.toolCallId,
@@ -178,6 +184,14 @@ async function run(options: AgentRunOptions): Promise<void> {
     return;
   }
 
+  try {
+    // Providers that cache the prompt prefix report it; the chat shows the share served from cache.
+    const total = tokensOf(await result.totalUsage);
+    if (total.input + total.cacheRead + total.cacheWrite + total.output)
+      options.emit("usage", { ...total, first: firstRequest });
+  } catch {
+    // No usage, no tooltip.
+  }
   // The last request carried the whole conversation, so its size is how full the context is.
   try {
     const usage = await result.usage;
