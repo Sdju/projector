@@ -10,12 +10,23 @@ export type ThinkingStyle =
   | "openai"
   | "openrouter";
 
+/** What a million tokens cost, in the currency of the provider's tariff. */
+export interface ModelPrice {
+  /** Until both `input` and `output` are set the server does not keep the price. */
+  input?: number;
+  output?: number;
+  /** Tokens served from the cache; unset means the price of `input`. */
+  cacheRead?: number;
+}
+
 /** `id` goes upstream; `alias` is the name the agent and other clients see. */
 export interface ProviderModel {
   id: string;
   alias: string;
   /** Context window in tokens; the agent's context ring is measured against it. */
   contextTokens?: number;
+  /** Price of a million tokens; the chat shows what an answer and the whole chat cost. */
+  price?: ModelPrice;
   /** `false`: the model has no thinking mode; unset means it can think. */
   thinking?: boolean;
 }

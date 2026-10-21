@@ -35,6 +35,7 @@ import { activateChat, registerChat, type ChatController } from "../model/chat-r
 import { useChatWindow } from "../model/chat-window.ts";
 import { useRewindPanel } from "../model/rewind-panel.ts";
 import { useWorktreePanel } from "../model/worktree-panel.ts";
+import { chatUsageByTurn } from "../model/chat-usage.ts";
 import type { AgentBackendId, MessageChip, RewindScope } from "../model/types.ts";
 import IconSquarePen from "~icons/lucide/square-pen";
 import IconDownload from "~icons/lucide/download";
@@ -104,6 +105,7 @@ onMounted(() => {
   void loadControls();
   void loadCommands();
 });
+const chatUsage = computed(() => chatUsageByTurn(turns.value));
 const latestContext = computed(() => turns.value.findLast((turn) => turn.context)?.context);
 const activeSession = computed(
   () => turns.value.findLast((turn) => turn.role === "assistant")?.session?.id,
@@ -577,6 +579,7 @@ onBeforeUnmount(() => {
           :busy="busy"
           :last="firstShown + offset === turns.length - 1"
           :copied="copied === turn.id"
+          :chat-usage="chatUsage.get(turn.id)"
           :faded="editFrom >= 0 && firstShown + offset >= editFrom"
           :root="projectRoot"
           :can-revert="canRevert(turn.id)"

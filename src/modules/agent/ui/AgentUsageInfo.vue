@@ -2,10 +2,10 @@
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiTooltip from "../../../common/ui/UiTooltip.vue";
 import { computed } from "vue";
-import type { AgentTokens, AgentUsage } from "../model/types.ts";
+import type { AgentTokens, AgentUsage, ChatUsage } from "../model/types.ts";
 import IconInfo from "~icons/lucide/info";
 
-const props = defineProps<{ usage: AgentUsage }>();
+const props = defineProps<{ usage: AgentUsage; chat?: ChatUsage }>();
 
 const number = new Intl.NumberFormat("ru");
 const percent = (part: number, whole: number) =>
@@ -19,6 +19,9 @@ function cacheRow(label: string, tokens: AgentTokens) {
     detail: `${number.format(tokens.cacheRead)} из ${number.format(prompt)}, записано ${number.format(tokens.cacheWrite)}, без кэша ${number.format(tokens.input)}`,
   };
 }
+/** The price is in the provider's own currency, so only the figure is shown. */
+const money = (value: number) =>
+  new Intl.NumberFormat("ru", { maximumFractionDigits: value < 1 ? 4 : 2 }).format(value);
 const rows = computed(() => [
   ...(props.usage.first ? [cacheRow("Первый запрос", props.usage.first)] : []),
   cacheRow("Весь ответ", props.usage),
@@ -39,6 +42,14 @@ const rows = computed(() => [
         <span class="usage-detail">{{ row.detail }}</span>
       </span>
       <span class="usage-detail">Выведено токенов: {{ number.format(usage.output) }}</span>
+      <span v-if="usage.cost !== undefined" class="usage-detail">
+        Стоимость ответа: {{ money(usage.cost) }}
+      </span>
+      <span v-if="chat" class="usage-detail">
+        Весь чат: {{ number.format(chat.tokens) }} токенов<template v-if="chat.priced">
+          , стоимость {{ money(chat.cost) }}</template
+        >
+      </span>
     </template>
   </UiTooltip>
 </template>

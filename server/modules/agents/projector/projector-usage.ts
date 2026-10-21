@@ -29,3 +29,22 @@ export function tokensOf(usage: SdkUsage | undefined): Tokens {
     cacheWrite,
   };
 }
+
+/** What a million tokens cost; the cache prices default to the price of an ordinary input token. */
+export interface Price {
+  input: number;
+  output: number;
+  cacheRead?: number;
+  cacheWrite?: number;
+}
+
+/** The cost of the tokens at the model's price, in the currency of its tariff. */
+export function costOf(tokens: Tokens, price: Price): number {
+  return (
+    (tokens.input * price.input +
+      tokens.cacheRead * (price.cacheRead ?? price.input) +
+      tokens.cacheWrite * (price.cacheWrite ?? price.input) +
+      tokens.output * price.output) /
+    1_000_000
+  );
+}

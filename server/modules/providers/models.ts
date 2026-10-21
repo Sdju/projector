@@ -1,6 +1,6 @@
 import { HttpError } from "../http/index.ts";
 import { normalizeOpenAiBaseUrl } from "./openai-client.ts";
-import type { ProviderModel, ResolvedOpenAIProvider } from "./types.ts";
+import type { ModelPrice, ProviderModel, ResolvedOpenAIProvider } from "./types.ts";
 
 const MAX_MODELS = 500;
 const LIST_TIMEOUT_MS = 10_000;
@@ -18,6 +18,29 @@ function contextTokens(value: unknown): number | undefined {
   return number >= MIN_CONTEXT && number <= MAX_CONTEXT ? number : undefined;
 }
 
+/** The price of a million tokens; input and output are needed, a wrong figure drops the whole price. */
+export function sanitizePrice(value: unknown): ModelPrice | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  const figure = (item: unknown) => {
+    const number = typeof item === "string" && item.trim() ? Number(item) : item;
+    return typeof number === "number" && Number.isFinite(number) && number >= 0 && number < 1e6
+      ? number
+      : undefined;
+  };
+  const input = figure(record.input);
+  const output = figure(record.output);
+  if (input === undefined || output === undefined) return undefined;
+  const cacheRead = figure(record.cacheRead);
+  const cacheWrite = figure(record.cacheWrite);
+  return {
+    input,
+    output,
+    ...(cacheRead !== undefined ? { cacheRead } : {}),
+    ...(cacheWrite !== undefined ? { cacheWrite } : {}),
+  };
+}
+
 /** Registered models of one provider; the alias defaults to the id and stays unique. */
 export function sanitizeModels(value: unknown, legacyModel?: unknown): ProviderModel[] {
   const source: unknown[] = Array.isArray(value) ? value : legacyModel ? [{ id: legacyModel }] : [];
@@ -31,10 +54,12 @@ export function sanitizeModels(value: unknown, legacyModel?: unknown): ProviderM
     if (seen.has(alias)) continue;
     seen.add(alias);
     const context = contextTokens(record.contextTokens);
+    const price = sanitizePrice(record.price);
     models.push({
       id,
       alias,
       ...(context ? { contextTokens: context } : {}),
+      ...(price ? { price } : {}),
       ...(record.thinking === false ? { thinking: false } : {}),
     });
     if (models.length >= MAX_MODELS) break;
@@ -53,13 +78,14 @@ export function resolveModel(
   models: readonly ProviderModel[],
   name: string | undefined,
   fallback: string,
-): Pick<ResolvedOpenAIProvider, "model" | "modelName" | "contextTokens" | "thinking"> {
+): Pick<ResolvedOpenAIProvider, "model" | "modelName" | "contextTokens" | "thinking" | "price"> {
   const chosen = pickModel(models, name);
   return {
     model: chosen?.id ?? fallback,
     modelName: chosen?.alias ?? fallback,
     contextTokens: chosen?.contextTokens,
     thinking: chosen?.thinking,
+    price: chosen?.price,
   };
 }
 

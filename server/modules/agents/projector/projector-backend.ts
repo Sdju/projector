@@ -20,7 +20,7 @@ import {
   thinkingLevel,
   thinkingOptions,
 } from "../../providers/index.ts";
-import { tokensOf, type Tokens } from "./projector-usage.ts";
+import { costOf, tokensOf, type Price, type Tokens } from "./projector-usage.ts";
 import { budgetNote, turnBudget } from "./projector-budget.ts";
 import { isRetryable, MAX_RETRIES, pause, retryDelay } from "./projector-retry.ts";
 import { connectMcp, mcpSection } from "./projector-mcp.ts";
@@ -144,6 +144,7 @@ async function turn(options: AgentRunOptions, open: { close: () => Promise<void>
   let answering = model;
   let thinking = thinkingBody(style, wanted);
   let fallback = resolved.fallback;
+  let price: Price | undefined = resolved.price;
   let text = "";
   /** What the first request of the answer found in the provider cache. */
   let firstRequest: Tokens | undefined;
@@ -215,6 +216,7 @@ async function turn(options: AgentRunOptions, open: { close: () => Promise<void>
       });
       answering = provider.chatModel(fallback.model);
       thinking = thinkingBody(fallback.thinking === false ? "none" : style, wanted);
+      price = fallback.price;
       fallback = undefined;
       attempt = -1;
       continue;
@@ -228,7 +230,11 @@ async function turn(options: AgentRunOptions, open: { close: () => Promise<void>
     // Providers that cache the prompt prefix report it; the chat shows the share served from cache.
     const total = tokensOf(await result.totalUsage);
     if (total.input + total.cacheRead + total.cacheWrite + total.output)
-      options.emit("usage", { ...total, first: firstRequest });
+      options.emit("usage", {
+        ...total,
+        first: firstRequest,
+        ...(price ? { cost: costOf(total, price) } : {}),
+      });
   } catch {
     // No usage, no tooltip.
   }

@@ -5,7 +5,13 @@ import { computed } from "vue";
 import { chipIcon, chipLabel, chipTitle } from "../lib/composer/chips.ts";
 import { versionsOf } from "../model/branches.ts";
 import { legacyParts } from "../model/turn-events.ts";
-import type { AgentToolChip, AgentToolView, AgentTurn, MessageChip } from "../model/types.ts";
+import type {
+  AgentToolChip,
+  AgentToolView,
+  AgentTurn,
+  ChatUsage,
+  MessageChip,
+} from "../model/types.ts";
 import AgentMessage from "./AgentMessage.vue";
 import AgentActivity from "./AgentActivity.vue";
 import AgentThought from "./AgentThought.vue";
@@ -21,6 +27,8 @@ import IconNext from "~icons/lucide/chevron-right";
 
 const props = defineProps<{
   turn: AgentTurn;
+  /** Tokens and cost of the chat up to this answer. */
+  chatUsage?: ChatUsage;
   busy: boolean;
   last: boolean;
   copied: boolean;
@@ -282,7 +290,12 @@ const waiting = computed(() => {
         >
           Продолжить
         </UiButton>
-        <AgentUsageInfo v-if="turn.usage" :usage="turn.usage" class="copy-button" />
+        <AgentUsageInfo
+          v-if="turn.usage"
+          :usage="turn.usage"
+          :chat="chatUsage"
+          class="copy-button"
+        />
         <time
           v-if="stamp"
           class="turn-time footer-time"

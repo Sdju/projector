@@ -4,9 +4,20 @@ import type { ThinkingStyle } from "./thinking.ts";
 export type ProviderKind = "custom" | "local" | "deepseek" | "qwencloud";
 
 /** A model of a provider that Projector offers: `id` goes upstream, `alias` is the name clients see. */
+/** What a million tokens of the model cost, in the currency of the provider's tariff. */
+export interface ModelPrice {
+  input: number;
+  output: number;
+  /** Prompt tokens served from the cache; unset means the price of `input`. */
+  cacheRead?: number;
+  /** Prompt tokens written to the cache; unset means the price of `input`. */
+  cacheWrite?: number;
+}
+
 export interface ProviderModel {
   id: string;
   alias: string;
+  price?: ModelPrice;
   /** Context window in tokens, when the user told it; the agent measures its context against it. */
   contextTokens?: number;
   /** `false` when the model has no thinking mode, so the request must not ask for it; unset means it can. */
@@ -36,7 +47,13 @@ export interface OpenAIProviderWrite {
   fallbackModel?: string;
   url: string;
   enabled?: boolean;
-  models?: Array<{ id: string; alias?: string; contextTokens?: number; thinking?: boolean }>;
+  models?: Array<{
+    id: string;
+    alias?: string;
+    contextTokens?: number;
+    thinking?: boolean;
+    price?: ModelPrice;
+  }>;
   /** Shorthand for a single model, for callers that only know one. */
   model?: string;
   apiKey?: string;
@@ -85,7 +102,7 @@ export interface ResolvedOpenAIProvider {
   kind: ProviderKind;
   thinkingStyle: ThinkingStyle;
   /** Upstream id and thinking dialect of the fallback model, when one is set and registered. */
-  fallback?: { model: string; modelName: string; thinking?: boolean };
+  fallback?: { model: string; modelName: string; thinking?: boolean; price?: ModelPrice };
   url: string;
   /** Upstream id of the chosen model: what goes into the request. */
   model: string;
@@ -94,6 +111,7 @@ export interface ResolvedOpenAIProvider {
   /** Context window of the chosen model in tokens, when registered. */
   contextTokens?: number;
   thinking?: boolean;
+  price?: ModelPrice;
   apiKey: string;
 }
 

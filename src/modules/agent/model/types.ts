@@ -102,9 +102,19 @@ export interface AgentTokens {
   cacheWrite: number;
 }
 
+/** Running totals of a chat: tokens, and cost over the answers that had a price. */
+export interface ChatUsage {
+  tokens: number;
+  cost: number;
+  /** At least one answer had a price, so the cost means something. */
+  priced: boolean;
+}
+
 export interface AgentUsage extends AgentTokens {
   /** The answer's first request: whether the conversation so far was found in the cache. */
   first?: AgentTokens;
+  /** What the answer cost at the model's price, in the currency of its tariff; unset without a price. */
+  cost?: number;
 }
 
 export interface AgentTurn {

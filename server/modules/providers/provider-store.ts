@@ -72,7 +72,7 @@ const fallbackOf = (value: unknown) =>
 function fallbackModelOf(provider: StoredOpenAIProvider): ResolvedOpenAIProvider["fallback"] {
   const chosen = provider.models.find((item) => item.alias === provider.fallbackModel);
   return chosen
-    ? { model: chosen.id, modelName: chosen.alias, thinking: chosen.thinking }
+    ? { model: chosen.id, modelName: chosen.alias, thinking: chosen.thinking, price: chosen.price }
     : undefined;
 }
 

@@ -8,7 +8,7 @@ import {
   setActiveProvider,
 } from "../api/client.ts";
 import { PROVIDER_PRESETS } from "./presets.ts";
-import type { OpenAIProviderPublic, ProviderBalance, ProviderKind } from "./types.ts";
+import type { ModelPrice, OpenAIProviderPublic, ProviderBalance, ProviderKind } from "./types.ts";
 
 const state = reactive({
   providers: [] as OpenAIProviderPublic[],
@@ -184,6 +184,17 @@ export function useProviders() {
     if (row) row.contextTokens = tokens;
   }
 
+  /** One figure of the price; the server keeps the price only once input and output are both set. */
+  function setModelPrice(
+    providerId: string,
+    id: string,
+    field: keyof ModelPrice,
+    value: number | undefined,
+  ): void {
+    const row = state.providers.find((p) => p.id === providerId)?.models.find((m) => m.id === id);
+    if (row) row.price = { ...row.price, [field]: value };
+  }
+
   function setModelThinking(providerId: string, id: string, can: boolean): void {
     const row = state.providers.find((p) => p.id === providerId)?.models.find((m) => m.id === id);
     if (row) row.thinking = can ? undefined : false;
@@ -193,6 +204,7 @@ export function useProviders() {
     fetchModels,
     setModelThinking,
     setModelContext,
+    setModelPrice,
     registerModel,
     unregisterModel,
     renameModel,

@@ -14,7 +14,7 @@ import { commandArgs, useCommandScope } from "../../../common/utilities/commands
 import { useProviders } from "../model/store.ts";
 import { PROVIDER_KINDS, PROVIDER_PRESETS, THINKING_STYLES } from "../model/presets.ts";
 import { formatAmount } from "../model/format-balance.ts";
-import type { ProviderKind, ThinkingStyle } from "../model/types.ts";
+import type { ModelPrice, ProviderKind, ThinkingStyle } from "../model/types.ts";
 
 /** The provider whose page the navigation opened. Without one, the section is the overview. */
 const props = defineProps<{ providerId?: string }>();
@@ -40,6 +40,7 @@ const {
   unregisterModel,
   renameModel,
   setModelContext,
+  setModelPrice,
   setModelThinking,
   remoteModels,
   fetchingModels,
@@ -55,10 +56,17 @@ const preset = computed(() => PROVIDER_PRESETS[selected.value?.kind ?? "custom"]
 const balance = computed(() => (selected.value ? balances.value[selected.value.id] : undefined));
 const hasBalance = computed(() => selected.value?.kind === "deepseek");
 
+const PRICE_FIELDS = [
+  ["input", "вход"],
+  ["output", "выход"],
+  ["cacheRead", "из кэша"],
+] as const;
+
 interface ModelRow {
   id: string;
   alias: string;
   contextTokens?: number;
+  price?: ModelPrice;
   thinking?: boolean;
   on: boolean;
 }
@@ -95,6 +103,12 @@ const offered = computed(() => {
   );
 });
 const manual = ref("");
+
+function setPrice(id: string, field: keyof ModelPrice, value: string): void {
+  if (!selected.value) return;
+  const number = value.trim() === "" ? undefined : Number(value);
+  setModelPrice(selected.value.id, id, field, Number.isFinite(number) ? number : undefined);
+}
 
 function setContext(id: string, value: string): void {
   if (selected.value) setModelContext(selected.value.id, id, Number(value) || undefined);
@@ -375,6 +389,20 @@ function keyDraft(): string {
               :model-value="row.thinking !== false"
               @update:model-value="setModelThinking(selected.id, row.id, Boolean($event))"
             />
+            <span v-if="row.on" class="price">
+              <UiControl
+                v-for="[field, label] in PRICE_FIELDS"
+                :key="field"
+                mono
+                type="number"
+                min="0"
+                step="any"
+                :aria-label="`Цена ${label} ${row.id}, за 1 млн токенов`"
+                :value="row.price?.[field]"
+                :placeholder="label"
+                @input="setPrice(row.id, field, ($event.target as HTMLInputElement).value)"
+              />
+            </span>
           </label>
         </UiScrollArea>
         <UiHint v-else-if="!selected.models.length">
@@ -392,8 +420,10 @@ function keyDraft(): string {
           <UiButton :disabled="!manual.trim()" @click="addManual">+</UiButton>
         </UiInline>
         <UiHint>
-          Имя — под которым модель видна агенту и шлюзу; по умолчанию совпадает с id. Окно контекста
-          нужно кольцу заполнения в чате агента; без него берётся 128000.
+          Цена — за 1 млн токенов в валюте тарифа (вход, выход, из кэша); с ней под ответом агента
+          видна его стоимость и стоимость всего чата. Без цены стоимость не показывается. Имя — под
+          которым модель видна агенту и шлюзу; по умолчанию совпадает с id. Окно контекста нужно
+          кольцу заполнения в чате агента; без него берётся 128000.
         </UiHint>
       </UiStack>
 
@@ -516,6 +546,12 @@ function keyDraft(): string {
 .ctx,
 .think {
   grid-column: 2;
+}
+
+.price {
+  grid-column: 2 / -1;
+  display: flex;
+  gap: var(--sp-2);
 }
 
 @container (min-width: 30rem) {
