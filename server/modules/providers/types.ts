@@ -5,6 +5,8 @@ export type ProviderKind = "custom" | "local" | "deepseek" | "qwencloud";
 export interface ProviderModel {
   id: string;
   alias: string;
+  /** Context window in tokens, when the user told it; the agent measures its context against it. */
+  contextTokens?: number;
 }
 
 export interface OpenAIProviderPublic {
@@ -24,7 +26,7 @@ export interface OpenAIProviderWrite {
   kind?: ProviderKind;
   url: string;
   enabled?: boolean;
-  models?: Array<{ id: string; alias?: string }>;
+  models?: Array<{ id: string; alias?: string; contextTokens?: number }>;
   /** Shorthand for a single model, for callers that only know one. */
   model?: string;
   apiKey?: string;
@@ -74,6 +76,8 @@ export interface ResolvedOpenAIProvider {
   model: string;
   /** The registered name of the chosen model. */
   modelName: string;
+  /** Context window of the chosen model in tokens, when registered. */
+  contextTokens?: number;
   apiKey: string;
 }
 

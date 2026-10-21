@@ -4,7 +4,7 @@ import { setAsideBroken, writeFileAtomic } from "./atomic-file.ts";
 import { HttpError } from "../http/index.ts";
 import { vault as systemVault } from "../secrets/index.ts";
 import { inferProviderKind, isProviderKind } from "./kinds.ts";
-import { pickModel, sanitizeModels } from "./models.ts";
+import { resolveModel, sanitizeModels } from "./models.ts";
 import { DEFAULT_PROVIDERS_SECRET, revealSecret } from "./secret-obfuscation.ts";
 import type {
   EnvOpenAIFallback,
@@ -324,14 +324,12 @@ async function toResolved(
   envKey: string,
   modelName?: string,
 ): Promise<ResolvedOpenAIProvider> {
-  const chosen = pickModel(provider.models, modelName);
   return {
     id: provider.id,
     name: provider.name,
     kind: provider.kind,
     url: provider.url.trim(),
-    model: chosen?.id ?? DEFAULT_MODEL,
-    modelName: chosen?.alias ?? DEFAULT_MODEL,
+    ...resolveModel(provider.models, modelName, DEFAULT_MODEL),
     apiKey: await revealProviderKey(provider, secret, envKey),
   };
 }

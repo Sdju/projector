@@ -178,8 +178,14 @@ export function useProviders() {
     if (row) row.alias = alias;
   }
 
+  function setModelContext(providerId: string, id: string, tokens: number | undefined): void {
+    const row = state.providers.find((p) => p.id === providerId)?.models.find((m) => m.id === id);
+    if (row) row.contextTokens = tokens;
+  }
+
   return {
     fetchModels,
+    setModelContext,
     registerModel,
     unregisterModel,
     renameModel,

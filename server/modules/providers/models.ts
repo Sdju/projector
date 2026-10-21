@@ -1,12 +1,21 @@
 import { HttpError } from "../http/index.ts";
 import { normalizeOpenAiBaseUrl } from "./openai-client.ts";
-import type { ProviderModel } from "./types.ts";
+import type { ProviderModel, ResolvedOpenAIProvider } from "./types.ts";
 
 const MAX_MODELS = 500;
 const LIST_TIMEOUT_MS = 10_000;
+const MIN_CONTEXT = 1_000;
+const MAX_CONTEXT = 100_000_000;
 
 function clean(value: unknown): string {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, 200) : "";
+}
+
+/** A context window in tokens; anything that is not a sane whole number counts as unknown. */
+function contextTokens(value: unknown): number | undefined {
+  const number = typeof value === "string" ? Number(value) : value;
+  if (typeof number !== "number" || !Number.isInteger(number)) return undefined;
+  return number >= MIN_CONTEXT && number <= MAX_CONTEXT ? number : undefined;
 }
 
 /** Registered models of one provider; the alias defaults to the id and stays unique. */
@@ -21,7 +30,8 @@ export function sanitizeModels(value: unknown, legacyModel?: unknown): ProviderM
     const alias = clean(record.alias) || id;
     if (seen.has(alias)) continue;
     seen.add(alias);
-    models.push({ id, alias });
+    const context = contextTokens(record.contextTokens);
+    models.push(context ? { id, alias, contextTokens: context } : { id, alias });
     if (models.length >= MAX_MODELS) break;
   }
   return models;
@@ -31,6 +41,20 @@ export function sanitizeModels(value: unknown, legacyModel?: unknown): ProviderM
 export function pickModel(models: readonly ProviderModel[], name?: string): ProviderModel | null {
   const wanted = name?.trim();
   return models.find((item) => item.alias === wanted) ?? models[0] ?? null;
+}
+
+/** What a request needs of the model it names: the upstream id, the registered name and the window. */
+export function resolveModel(
+  models: readonly ProviderModel[],
+  name: string | undefined,
+  fallback: string,
+): Pick<ResolvedOpenAIProvider, "model" | "modelName" | "contextTokens"> {
+  const chosen = pickModel(models, name);
+  return {
+    model: chosen?.id ?? fallback,
+    modelName: chosen?.alias ?? fallback,
+    contextTokens: chosen?.contextTokens,
+  };
 }
 
 /** Model ids from `GET <base>/models` of an OpenAI-compatible server (also Ollama's `models`). */

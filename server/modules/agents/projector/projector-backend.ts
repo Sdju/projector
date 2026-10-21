@@ -15,8 +15,8 @@ import { createBashReviewer } from "./projector-review.ts";
 import { historyMessages, userMessage } from "./projector-history.ts";
 
 const MAX_STEPS = 24;
-/** The window of a provider's model is not reported; this is what the context ring is measured against. */
-const CONTEXT_SIZE = Number(process.env.PROJECTOR_AGENT_CONTEXT_TOKENS) || 128_000;
+/** The window of a model that has none registered in the provider settings; the context ring is measured against it. */
+const DEFAULT_CONTEXT_SIZE = Number(process.env.PROJECTOR_AGENT_CONTEXT_TOKENS) || 128_000;
 const TRUST = "permission-mode";
 const MODES = new Set(["default", "auto", "bypassPermissions"]);
 
@@ -130,7 +130,12 @@ async function run(options: AgentRunOptions): Promise<void> {
   try {
     const usage = await result.usage;
     const used = (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0);
-    if (used) options.emit("context", { used, size: CONTEXT_SIZE, model: resolved.model });
+    if (used)
+      options.emit("context", {
+        used,
+        size: resolved.contextTokens ?? DEFAULT_CONTEXT_SIZE,
+        model: resolved.model,
+      });
   } catch {
     // The indicator keeps its previous value.
   }

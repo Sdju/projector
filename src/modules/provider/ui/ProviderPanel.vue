@@ -39,6 +39,7 @@ const {
   registerModel,
   unregisterModel,
   renameModel,
+  setModelContext,
   remoteModels,
   fetchingModels,
   modelsError,
@@ -56,6 +57,7 @@ const hasBalance = computed(() => selected.value?.kind === "deepseek");
 interface ModelRow {
   id: string;
   alias: string;
+  contextTokens?: number;
   on: boolean;
 }
 const filter = ref("");
@@ -91,6 +93,10 @@ const offered = computed(() => {
   );
 });
 const manual = ref("");
+
+function setContext(id: string, value: string): void {
+  if (selected.value) setModelContext(selected.value.id, id, Number(value) || undefined);
+}
 
 function toggle(row: ModelRow, on: boolean): void {
   if (!selected.value) return;
@@ -309,6 +315,18 @@ function keyDraft(): string {
               spellcheck="false"
               @input="renameModel(selected.id, row.id, ($event.target as HTMLInputElement).value)"
             />
+            <UiControl
+              v-if="row.on"
+              class="ctx"
+              mono
+              type="number"
+              min="1000"
+              step="1000"
+              :aria-label="`Окно контекста ${row.id}, токенов`"
+              :value="row.contextTokens"
+              placeholder="окно, токенов"
+              @input="setContext(row.id, ($event.target as HTMLInputElement).value)"
+            />
           </label>
         </UiScrollArea>
         <UiHint v-else-if="!selected.models.length">
@@ -325,7 +343,10 @@ function keyDraft(): string {
           />
           <UiButton :disabled="!manual.trim()" @click="addManual">+</UiButton>
         </UiInline>
-        <UiHint>Имя — под которым модель видна агенту и шлюзу; по умолчанию совпадает с id.</UiHint>
+        <UiHint>
+          Имя — под которым модель видна агенту и шлюзу; по умолчанию совпадает с id. Окно контекста
+          нужно кольцу заполнения в чате агента; без него берётся 128000.
+        </UiHint>
       </UiStack>
 
       <UiStack v-if="hasBalance" class="balance" :gap="1">
@@ -443,16 +464,20 @@ function keyDraft(): string {
   font-size: var(--fs-xs);
 }
 
-.alias {
+.alias,
+.ctx {
   grid-column: 2;
 }
 
 @container (min-width: 30rem) {
   .row {
-    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) 9rem;
   }
   .alias {
     grid-column: 3;
+  }
+  .ctx {
+    grid-column: 4;
   }
 }
 

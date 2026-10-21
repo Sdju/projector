@@ -4,6 +4,8 @@ export type ProviderKind = "custom" | "local" | "deepseek" | "qwencloud";
 export interface ProviderModel {
   id: string;
   alias: string;
+  /** Context window in tokens; the agent's context ring is measured against it. */
+  contextTokens?: number;
 }
 
 export interface OpenAIProviderPublic {

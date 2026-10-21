@@ -38,3 +38,24 @@ describe("project instructions", () => {
     expect(text.length).toBeLessThan(13_000);
   });
 });
+
+describe("model context window", () => {
+  it("keeps a sane window and drops the rest", async () => {
+    const { sanitizeModels } = await import("../server/modules/providers/models.ts");
+    expect(
+      sanitizeModels([
+        { id: "a", contextTokens: 200000 },
+        { id: "b", contextTokens: "32000" },
+        { id: "c", contextTokens: 5 },
+        { id: "d", contextTokens: 1.5 },
+        { id: "e" },
+      ]),
+    ).toEqual([
+      { id: "a", alias: "a", contextTokens: 200000 },
+      { id: "b", alias: "b", contextTokens: 32000 },
+      { id: "c", alias: "c" },
+      { id: "d", alias: "d" },
+      { id: "e", alias: "e" },
+    ]);
+  });
+});
