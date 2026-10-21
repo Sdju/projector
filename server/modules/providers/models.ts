@@ -31,7 +31,12 @@ export function sanitizeModels(value: unknown, legacyModel?: unknown): ProviderM
     if (seen.has(alias)) continue;
     seen.add(alias);
     const context = contextTokens(record.contextTokens);
-    models.push(context ? { id, alias, contextTokens: context } : { id, alias });
+    models.push({
+      id,
+      alias,
+      ...(context ? { contextTokens: context } : {}),
+      ...(record.thinking === false ? { thinking: false } : {}),
+    });
     if (models.length >= MAX_MODELS) break;
   }
   return models;
@@ -48,12 +53,13 @@ export function resolveModel(
   models: readonly ProviderModel[],
   name: string | undefined,
   fallback: string,
-): Pick<ResolvedOpenAIProvider, "model" | "modelName" | "contextTokens"> {
+): Pick<ResolvedOpenAIProvider, "model" | "modelName" | "contextTokens" | "thinking"> {
   const chosen = pickModel(models, name);
   return {
     model: chosen?.id ?? fallback,
     modelName: chosen?.alias ?? fallback,
     contextTokens: chosen?.contextTokens,
+    thinking: chosen?.thinking,
   };
 }
 

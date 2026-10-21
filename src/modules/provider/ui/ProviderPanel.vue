@@ -40,6 +40,7 @@ const {
   unregisterModel,
   renameModel,
   setModelContext,
+  setModelThinking,
   remoteModels,
   fetchingModels,
   modelsError,
@@ -58,6 +59,7 @@ interface ModelRow {
   id: string;
   alias: string;
   contextTokens?: number;
+  thinking?: boolean;
   on: boolean;
 }
 const filter = ref("");
@@ -327,6 +329,15 @@ function keyDraft(): string {
               placeholder="окно, токенов"
               @input="setContext(row.id, ($event.target as HTMLInputElement).value)"
             />
+            <UiControl
+              v-if="row.on"
+              class="think"
+              type="checkbox"
+              title="Модель умеет размышлять: над строкой ввода агента появится переключатель"
+              :aria-label="`Размышление ${row.id}`"
+              :model-value="row.thinking !== false"
+              @update:model-value="setModelThinking(selected.id, row.id, Boolean($event))"
+            />
           </label>
         </UiScrollArea>
         <UiHint v-else-if="!selected.models.length">
@@ -465,19 +476,23 @@ function keyDraft(): string {
 }
 
 .alias,
-.ctx {
+.ctx,
+.think {
   grid-column: 2;
 }
 
 @container (min-width: 30rem) {
   .row {
-    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) 9rem;
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) 9rem auto;
   }
   .alias {
     grid-column: 3;
   }
   .ctx {
     grid-column: 4;
+  }
+  .think {
+    grid-column: 5;
   }
 }
 

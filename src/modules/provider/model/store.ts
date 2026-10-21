@@ -183,8 +183,14 @@ export function useProviders() {
     if (row) row.contextTokens = tokens;
   }
 
+  function setModelThinking(providerId: string, id: string, can: boolean): void {
+    const row = state.providers.find((p) => p.id === providerId)?.models.find((m) => m.id === id);
+    if (row) row.thinking = can ? undefined : false;
+  }
+
   return {
     fetchModels,
+    setModelThinking,
     setModelContext,
     registerModel,
     unregisterModel,

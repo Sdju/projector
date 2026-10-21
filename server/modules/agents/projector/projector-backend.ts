@@ -27,6 +27,7 @@ import {
 const DEFAULT_CONTEXT_SIZE = Number(process.env.PROJECTOR_AGENT_CONTEXT_TOKENS) || 128_000;
 const TRUST = "permission-mode";
 const MODES = new Set(["default", "auto", "bypassPermissions"]);
+const THINKING = "thinking";
 
 async function run(options: AgentRunOptions): Promise<void> {
   const [providerId, ...rest] = (options.selection?.provider || options.providerId || "").split(
@@ -104,11 +105,11 @@ async function run(options: AgentRunOptions): Promise<void> {
       stopWhen: budget.stopWhen,
       abortSignal: options.abort,
       maxRetries: 0,
-      providerOptions: {
-        qwenOpenai: {
-          enable_thinking: true,
-        },
-      },
+      // Only a model that can think is asked to; the others get the plain request.
+      providerOptions:
+        resolved.thinking === false
+          ? undefined
+          : { qwenOpenai: { enable_thinking: options.selection?.[THINKING] !== "off" } },
     });
 
     let started = false;
@@ -254,6 +255,23 @@ async function controls(selection: Record<string, string> = {}): Promise<AgentCo
       byProvider(wanted) ??
       byProvider(activeProviderId ?? "") ??
       options[0]!;
+    const [providerId, ...alias] = current.value.split(":");
+    const chosen = providers.find((item) => item.id === providerId);
+    const model =
+      chosen?.models.find((item) => item.alias === alias.join(":")) ?? chosen?.models[0];
+    if (model?.thinking !== false)
+      list.push({
+        id: THINKING,
+        via: "native",
+        category: "effort",
+        name: "Размышление",
+        description: "Думает ли модель перед ответом; без него ответ быстрее и дешевле",
+        current: selection[THINKING] === "off" ? "off" : "on",
+        options: [
+          { value: "on", name: "Включено" },
+          { value: "off", name: "Выключено" },
+        ],
+      });
     list.unshift({
       id: "provider",
       via: "native",

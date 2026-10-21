@@ -6,6 +6,8 @@ export interface ProviderModel {
   alias: string;
   /** Context window in tokens; the agent's context ring is measured against it. */
   contextTokens?: number;
+  /** `false`: the model has no thinking mode; unset means it can think. */
+  thinking?: boolean;
 }
 
 export interface OpenAIProviderPublic {

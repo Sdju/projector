@@ -34,3 +34,13 @@ test("the model list is read from an OpenAI-style /models answer", async () => {
     server.close();
   }
 });
+
+test("model thinking: only an explicit refusal is kept", () => {
+  expect(
+    sanitizeModels([{ id: "a", thinking: false }, { id: "b", thinking: true }, { id: "c" }]),
+  ).toEqual([
+    { id: "a", alias: "a", thinking: false },
+    { id: "b", alias: "b" },
+    { id: "c", alias: "c" },
+  ]);
+});

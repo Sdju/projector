@@ -7,6 +7,8 @@ export interface ProviderModel {
   alias: string;
   /** Context window in tokens, when the user told it; the agent measures its context against it. */
   contextTokens?: number;
+  /** `false` when the model has no thinking mode, so the request must not ask for it; unset means it can. */
+  thinking?: boolean;
 }
 
 export interface OpenAIProviderPublic {
@@ -26,7 +28,7 @@ export interface OpenAIProviderWrite {
   kind?: ProviderKind;
   url: string;
   enabled?: boolean;
-  models?: Array<{ id: string; alias?: string; contextTokens?: number }>;
+  models?: Array<{ id: string; alias?: string; contextTokens?: number; thinking?: boolean }>;
   /** Shorthand for a single model, for callers that only know one. */
   model?: string;
   apiKey?: string;
@@ -78,6 +80,7 @@ export interface ResolvedOpenAIProvider {
   modelName: string;
   /** Context window of the chosen model in tokens, when registered. */
   contextTokens?: number;
+  thinking?: boolean;
   apiKey: string;
 }
 
