@@ -5,20 +5,14 @@ import { computed } from "vue";
 import { chipIcon, chipLabel, chipTitle } from "../lib/composer/chips.ts";
 import { versionsOf } from "../model/branches.ts";
 import { legacyParts } from "../model/turn-events.ts";
-import type {
-  AgentToolChip,
-  AgentTokens,
-  AgentToolView,
-  AgentTurn,
-  MessageChip,
-} from "../model/types.ts";
+import type { AgentToolChip, AgentToolView, AgentTurn, MessageChip } from "../model/types.ts";
 import AgentMessage from "./AgentMessage.vue";
 import AgentActivity from "./AgentActivity.vue";
 import AgentThought from "./AgentThought.vue";
 import AgentChanges from "./AgentChanges.vue";
+import AgentUsageInfo from "./AgentUsageInfo.vue";
 import IconCopy from "~icons/lucide/copy";
 import IconCheck from "~icons/lucide/check";
-import IconInfo from "~icons/lucide/info";
 import IconPencil from "~icons/lucide/pencil";
 import IconUndo from "~icons/lucide/undo-2";
 import IconRefresh from "~icons/lucide/refresh-cw";
@@ -61,25 +55,6 @@ const stamp = computed(() =>
     minute: "2-digit",
   }),
 );
-const number = new Intl.NumberFormat("ru");
-const percent = (part: number, whole: number) =>
-  whole ? `${Math.round((part / whole) * 100)}%` : "—";
-/** Tokens read from the cache against everything the prompt held. */
-function cacheLine(label: string, tokens: AgentTokens) {
-  const prompt = tokens.input + tokens.cacheRead + tokens.cacheWrite;
-  return `${label}: из кэша ${number.format(tokens.cacheRead)} из ${number.format(prompt)} (${percent(tokens.cacheRead, prompt)}), записано в кэш ${number.format(tokens.cacheWrite)}, без кэша ${number.format(tokens.input)}`;
-}
-const usageInfo = computed(() => {
-  const usage = props.turn.usage;
-  if (!usage) return undefined;
-  return [
-    usage.first ? cacheLine("Первый запрос", usage.first) : undefined,
-    cacheLine("Весь ответ", usage),
-    `Выведено токенов: ${number.format(usage.output)}`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-});
 const stampFull = computed(() =>
   written.value?.toLocaleString("ru", { dateStyle: "long", timeStyle: "medium" }),
 );
@@ -297,15 +272,7 @@ const waiting = computed(() => {
         >
           <IconRefresh aria-hidden="true" />
         </UiButton>
-        <span
-          v-if="usageInfo"
-          class="usage-info footer-time"
-          role="img"
-          tabindex="0"
-          aria-label="Токены и кэш"
-          :title="usageInfo"
-          ><IconInfo aria-hidden="true"
-        /></span>
+        <AgentUsageInfo v-if="turn.usage" :usage="turn.usage" class="copy-button" />
         <time
           v-if="stamp"
           class="turn-time footer-time"
@@ -406,6 +373,7 @@ const waiting = computed(() => {
 }
 .assistant:hover .copy-button,
 .copy-button:focus-visible,
+.copy-button:focus-within,
 .copy-button.copied {
   opacity: 1;
 }
@@ -423,18 +391,8 @@ const waiting = computed(() => {
   opacity: 0;
   color: var(--muted);
 }
-.assistant:hover .footer-time,
-.usage-info:focus-visible {
+.assistant:hover .footer-time {
   opacity: 1;
-}
-.usage-info {
-  display: inline-flex;
-  align-self: center;
-  cursor: help;
-}
-.usage-info svg {
-  width: 14px;
-  height: 14px;
 }
 .thinking {
   font-size: var(--fs-xs);
