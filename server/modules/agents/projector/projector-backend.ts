@@ -23,6 +23,7 @@ import {
 import { tokensOf, type Tokens } from "./projector-usage.ts";
 import { budgetNote, turnBudget } from "./projector-budget.ts";
 import { isRetryable, MAX_RETRIES, pause, retryDelay } from "./projector-retry.ts";
+import { connectMcp, mcpSection } from "./projector-mcp.ts";
 import { memorySection } from "./projector-memory.ts";
 import { projectInstructions } from "./project-instructions.ts";
 import { createBashReviewer } from "./projector-review.ts";
@@ -41,7 +42,17 @@ const TRUST = "permission-mode";
 const MODES = new Set(["default", "auto", "bypassPermissions"]);
 const THINKING = "thinking";
 
+/** MCP servers live for one turn: whatever the turn started is stopped however it ends. */
 async function run(options: AgentRunOptions): Promise<void> {
+  const open = { close: async () => {} };
+  try {
+    await turn(options, open);
+  } finally {
+    await open.close();
+  }
+}
+
+async function turn(options: AgentRunOptions, open: { close: () => Promise<void> }): Promise<void> {
   const [providerId, ...rest] = (options.selection?.provider || options.providerId || "").split(
     ":",
   );
@@ -69,19 +80,20 @@ async function run(options: AgentRunOptions): Promise<void> {
 
   const mode = options.selection?.[TRUST] ?? options.permissionMode;
   const added: Project[] = [];
-  const tools = createAgentTools({
+  const guard = {
+    cwd: options.cwd,
+    approve: options.approve,
+    trusting: mode === "bypassPermissions",
+    review:
+      mode === "auto" ? createBashReviewer(quietModel, options.cwd, options.abort) : undefined,
+  };
+  const own = createAgentTools({
     cwd: options.cwd,
     commands: options.commands,
     signal: options.abort,
     ask: options.ask,
     secret: options.secret,
-    guard: {
-      cwd: options.cwd,
-      approve: options.approve,
-      trusting: mode === "bypassPermissions",
-      review:
-        mode === "auto" ? createBashReviewer(quietModel, options.cwd, options.abort) : undefined,
-    },
+    guard,
     onProject: (project) => {
       added.push(project);
       options.emit("project", project);
@@ -98,6 +110,9 @@ async function run(options: AgentRunOptions): Promise<void> {
     base: earlier.summary,
     onStart: () => options.emit("status", { phase: "compacting" }),
   });
+  const mcp = await connectMcp(options.cwd, guard, options.abort);
+  open.close = mcp.close;
+  const tools = { ...mcp.tools, ...own };
   const messages: ModelMessage[] = [
     ...toMessages(recent),
     await userMessage(options.message, options.parts),
@@ -115,6 +130,7 @@ async function run(options: AgentRunOptions): Promise<void> {
     (options.cwd ? `\nТекущий проект: ${options.cwd}` : "") +
     (await projectInstructions(options.cwd)) +
     (await memorySection(options.cwd)) +
+    mcpSection(mcp) +
     summarySection(summary);
 
   const budget = turnBudget();

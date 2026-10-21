@@ -47,6 +47,7 @@
     "@lezer/highlight": "^1.2.5",
     "@milkdown/crepe": "^7.22.2",
     "@milkdown/kit": "^7.22.2",
+    "@modelcontextprotocol/sdk": "1.32.1",
     "@tanstack/vue-virtual": "^3.13.39",
     "@vue/compiler-dom": "3.5.43",
     "@vueuse/core": "^15.0.0",

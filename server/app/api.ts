@@ -22,6 +22,7 @@ import { handleProvidersActive } from "../routes/api/providers/active.ts";
 import { handleProvidersBalance } from "../routes/api/providers/balance.ts";
 import { handleProvidersModels } from "../routes/api/providers/models.ts";
 import { handleAgent } from "../routes/api/agent.ts";
+import { handleAgentMcp } from "../routes/api/agent-mcp.ts";
 import { handleAgentMemory } from "../routes/api/agent-memory.ts";
 import { handleAgentJobs } from "../routes/api/agent-jobs.ts";
 import { handleAgentChats } from "../routes/api/agent-chats.ts";
@@ -75,6 +76,7 @@ const routes = [
   handleProvidersBalance,
   handleProvidersModels,
   handleAgentMemory,
+  handleAgentMcp,
   handleAgent,
   handleAgentJobs,
   handleAgentChats,

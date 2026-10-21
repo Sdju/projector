@@ -139,3 +139,32 @@ export async function guardMemory(
     detail: `${call.mode === "append" ? "Добавить" : "Заменить заметки на"}:\n${call.text}`,
   });
 }
+
+/** A server from the project's `.mcp.json` starts a program from the repository: the user decides. */
+export async function guardMcpServer(
+  options: GuardOptions,
+  server: { name: string } & ({ command: string; args: string[] } | { url: string }),
+): Promise<void> {
+  if (options.trusting) return;
+  const target = "command" in server ? [server.command, ...server.args].join(" ") : server.url;
+  await ask(options, {
+    tool: "mcp_server",
+    input: { name: server.name },
+    title: `Запустить MCP-сервер ${server.name} из .mcp.json проекта`,
+    detail: target,
+  });
+}
+
+/** Asks before an MCP tool runs, unless the server says the tool only reads. */
+export async function guardMcpTool(
+  options: GuardOptions,
+  call: { server: string; tool: string; input: unknown; readOnly: boolean },
+): Promise<void> {
+  if (options.trusting || call.readOnly) return;
+  await ask(options, {
+    tool: "mcp_tool",
+    input: call,
+    title: `MCP ${call.server}: ${call.tool}`,
+    detail: JSON.stringify(call.input ?? {}, null, 2),
+  });
+}
