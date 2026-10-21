@@ -21,6 +21,7 @@ using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 public delegate void HotkeyHandler();
+public delegate void ColorHandler();
 public static class ProjectorHotkey {
   [DllImport("user32.dll")] public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
   [DllImport("user32.dll")] public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
@@ -49,8 +50,13 @@ public class ProjectorCommands {
 }
 public class ProjectorTrayForm : Form {
   public HotkeyHandler Hotkey;
+  public ColorHandler Colors;
   protected override void WndProc(ref Message m) {
     if (m.Msg == 0x0312 && Hotkey != null) Hotkey();
+    if (m.Msg == 0x001A && Colors != null && m.LParam != IntPtr.Zero) {
+      var setting = Marshal.PtrToStringUni(m.LParam);
+      if (setting == "ImmersiveColorSet") Colors();
+    }
     base.WndProc(ref m);
   }
 }' -ReferencedAssemblies System.Windows.Forms
@@ -62,6 +68,7 @@ $script:form = New-Object ProjectorTrayForm
 $form.ShowInTaskbar = $false
 $form.Opacity = 0
 $form.Hotkey = { Emit "hotkey" }
+$form.Colors = { Emit "colors" }
 $notify = New-Object System.Windows.Forms.NotifyIcon
 $notify.Text = "Projector"
 try {
@@ -138,6 +145,7 @@ export interface ShellHandlers {
   onSettings: () => void;
   onRestart: () => void;
   onQuit: () => void;
+  onColorScheme?: () => void;
 }
 
 const idle: DesktopShell = {
@@ -228,6 +236,7 @@ async function launch(
       return;
     }
     if (text === "hotkey") handlers.onHotkey();
+    else if (text === "colors") handlers.onColorScheme?.();
     else if (text === "activate") handlers.onActivate();
     else if (text === "settings") handlers.onSettings();
     else if (text === "restart") handlers.onRestart();
