@@ -25,3 +25,24 @@ describe("prompt cache", () => {
     expect(tokensOf(undefined).input).toBe(0);
   });
 });
+
+describe("usage conversion", () => {
+  it("reads the cache hits of DeepSeek and of the OpenAI shape", async () => {
+    const { convertUsage } = await import("../server/modules/providers/openai-client.ts");
+    expect(
+      convertUsage({ prompt_tokens: 100, completion_tokens: 5, prompt_cache_hit_tokens: 80 })
+        .inputTokens,
+    ).toEqual({
+      total: 100,
+      noCache: 20,
+      cacheRead: 80,
+      cacheWrite: 0,
+    });
+    const openai = convertUsage({
+      prompt_tokens: 100,
+      prompt_tokens_details: { cached_tokens: 60, cache_write_tokens: 10 },
+    });
+    expect(openai.inputTokens).toMatchObject({ noCache: 30, cacheRead: 60, cacheWrite: 10 });
+    expect(convertUsage(null).inputTokens.total).toBe(0);
+  });
+});
