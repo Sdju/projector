@@ -115,7 +115,7 @@ async function turn(options: AgentRunOptions, open: { close: () => Promise<void>
   });
   const mcp = await connectMcp(options.cwd, guard, options.abort);
   open.close = mcp.close;
-  const hooks = await loadHooks();
+  const hooks = await loadHooks(options.cwd, guard);
   const started = Date.now();
   const tools = withHooks({ ...mcp.tools, ...own }, hooks, options.cwd) as typeof own;
   const messages: ModelMessage[] = [

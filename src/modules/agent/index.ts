@@ -10,6 +10,7 @@ export { default as AgentModeSettings } from "./ui/AgentModeSettings.vue";
 export { default as AgentSkillsSettings } from "./ui/AgentSkillsSettings.vue";
 export { default as AgentWebSettings } from "./ui/AgentWebSettings.vue";
 export { default as AgentMcpSettings } from "./ui/AgentMcpSettings.vue";
+export { default as AgentHooksSettings } from "./ui/AgentHooksSettings.vue";
 export { default as AgentMemorySettings } from "./ui/AgentMemorySettings.vue";
 export { registerAgentCommands } from "./model/agent-commands.ts";
 export { useAgentActivity } from "./model/activity.ts";

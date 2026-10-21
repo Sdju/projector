@@ -1,14 +1,18 @@
 import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { join } from "node:path";
 import type { ToolSet } from "ai";
 import { dataDir } from "../../../../core/modules/app-paths/index.ts";
+import { guardProjectHooks, type GuardOptions } from "./projector-guard.ts";
 
 /** When a hook runs: before a tool (it may forbid the call), after it, and when the turn is over. */
 export type HookEvent = "PreToolUse" | "PostToolUse" | "Stop";
 
 export interface Hook {
   event: HookEvent;
+  /** `project` hooks come from a repository and are asked about first. */
+  source: "user" | "project";
   command: string;
   /** Regular expression over the tool name; no matcher means every tool. Ignored for `Stop`. */
   matcher?: RegExp;
@@ -30,20 +34,18 @@ interface Entry {
   minSeconds?: unknown;
 }
 
-/**
- * The user's hooks from `<data>/agent/hooks.json`: `{ "hooks": { "Stop": [{ "command": "…" }] } }`.
- * Only the user's own file counts — a repository must not be able to run programs on every tool call.
- */
-export async function loadHooks(): Promise<Hook[]> {
+export const projectHooksFile = (cwd: string) => join(cwd, ".projector", "hooks.json");
+
+function parseHooks(text: string, source: Hook["source"]): Hook[] {
   let data: { hooks?: Record<string, Entry[]> };
   try {
-    data = JSON.parse(await readFile(hooksFile(), "utf8"));
+    data = JSON.parse(text);
   } catch {
     return [];
   }
   const hooks: Hook[] = [];
   for (const event of EVENTS) {
-    const entries = data.hooks?.[event];
+    const entries = data?.hooks?.[event];
     for (const entry of Array.isArray(entries) ? entries : []) {
       if (typeof entry?.command !== "string" || !entry.command.trim()) continue;
       let matcher: RegExp | undefined;
@@ -54,6 +56,7 @@ export async function loadHooks(): Promise<Hook[]> {
       }
       hooks.push({
         event,
+        source,
         command: entry.command,
         matcher,
         timeoutMs:
@@ -65,6 +68,76 @@ export async function loadHooks(): Promise<Hook[]> {
     }
   }
   return hooks;
+}
+
+const read = (path: string) => readFile(path, "utf8").catch(() => "");
+
+/** The hooks that apply to a project, as the settings page shows them (project ones not yet approved). */
+export async function listHooks(cwd?: string): Promise<Hook[]> {
+  return [
+    ...parseHooks(await read(hooksFile()), "user"),
+    ...(cwd ? parseHooks(await read(projectHooksFile(cwd)), "project") : []),
+  ];
+}
+
+/**
+ * The user's hooks from `<data>/agent/hooks.json` and the project's `.projector/hooks.json`:
+ * `{ "hooks": { "Stop": [{ "command": "…" }] } }`. A repository's hooks run programs on its own
+ * say-so, so the user is asked once per turn and a refusal leaves them out.
+ */
+export async function loadHooks(cwd?: string, guard?: GuardOptions): Promise<Hook[]> {
+  const all = await listHooks(cwd);
+  const project = all.filter((hook) => hook.source === "project");
+  if (!project.length || !guard) return all.filter((hook) => hook.source === "user");
+  try {
+    await guardProjectHooks(
+      guard,
+      project.map((hook) => `${hook.event}: ${hook.command}`),
+    );
+    return all;
+  } catch {
+    return all.filter((hook) => hook.source === "user");
+  }
+}
+
+/** The user's hook file as written, for the settings page; empty when there is none yet. */
+export const readUserHooks = () => read(hooksFile());
+
+/** Saves the user's hooks after checking the shape; empty text removes the file. */
+export async function writeUserHooks(text: string): Promise<void> {
+  const path = hooksFile();
+  if (!text.trim()) {
+    await rm(path, { force: true });
+    return;
+  }
+  let data: { hooks?: Record<string, unknown> } | null;
+  try {
+    data = JSON.parse(text);
+  } catch (error) {
+    throw new Error(`Не JSON: ${(error as Error).message}`);
+  }
+  const hooks = data?.hooks;
+  if (!hooks || typeof hooks !== "object" || Array.isArray(hooks))
+    throw new Error('Нужен объект вида { "hooks": { "Stop": [{ "command": "…" }] } }');
+  for (const [event, entries] of Object.entries(hooks)) {
+    if (!EVENTS.includes(event as HookEvent))
+      throw new Error(`Неизвестное событие «${event}»; есть ${EVENTS.join(", ")}`);
+    if (!Array.isArray(entries)) throw new Error(`${event}: нужен список хуков`);
+    for (const entry of entries as Entry[]) {
+      if (typeof entry?.command !== "string" || !entry.command.trim())
+        throw new Error(`${event}: у хука нет command`);
+      if (typeof entry.matcher === "string")
+        try {
+          new RegExp(entry.matcher);
+        } catch {
+          throw new Error(`${event}: matcher «${entry.matcher}» — не регулярное выражение`);
+        }
+    }
+  }
+  await mkdir(dirname(path), { recursive: true });
+  const temporary = `${path}.${process.pid}.tmp`;
+  await writeFile(temporary, text.trim() + "\n", { mode: 0o600 });
+  await rename(temporary, path);
 }
 
 interface Outcome {
@@ -106,6 +179,24 @@ function runHook(
 /** Exit code 2 of a `PreToolUse` hook forbids the call and its output tells the model why. */
 const BLOCKS = 2;
 
+/** A hook may also answer with JSON: `{ "decision": "block", "reason": "…", "additionalContext": "…" }`. */
+function answerOf(outcome: Outcome): { block?: string; context?: string } {
+  let data: { decision?: unknown; reason?: unknown; additionalContext?: unknown } | undefined;
+  try {
+    data = JSON.parse(outcome.output);
+  } catch {
+    // Plain text: only the exit code speaks.
+  }
+  const text = (value: unknown) => (typeof value === "string" && value ? value : undefined);
+  const block =
+    outcome.code === BLOCKS
+      ? outcome.output || "без объяснения"
+      : data?.decision === "block"
+        ? (text(data.reason) ?? "без объяснения")
+        : undefined;
+  return { block, context: text(data?.additionalContext) };
+}
+
 /** Gives every tool of the turn its `PreToolUse` and `PostToolUse` hooks. */
 export function withHooks(tools: ToolSet, hooks: Hook[], cwd: string | undefined): ToolSet {
   if (!hooks.some((hook) => hook.event !== "Stop")) return tools;
@@ -122,13 +213,16 @@ export function withHooks(tools: ToolSet, hooks: Hook[], cwd: string | undefined
       ...item,
       execute: async (input: unknown, context: never) => {
         for (const hook of matching("PreToolUse")) {
-          const outcome = await runHook(hook, { tool: name, input }, cwd);
-          if (outcome.code === BLOCKS)
-            throw new Error(`Хук запретил вызов: ${outcome.output || hook.command}`);
+          const { block } = answerOf(await runHook(hook, { tool: name, input }, cwd));
+          if (block) throw new Error(`Хук запретил вызов: ${block}`);
         }
         const output = await (run as (input: unknown, context: never) => unknown)(input, context);
-        for (const hook of matching("PostToolUse")) await runHook(hook, { tool: name, input }, cwd);
-        return output;
+        const notes: string[] = [];
+        for (const hook of matching("PostToolUse")) {
+          const { context } = answerOf(await runHook(hook, { tool: name, input }, cwd));
+          if (context) notes.push(context);
+        }
+        return notes.length ? { result: output, hook: notes.join("\n") } : output;
       },
     } as typeof item;
   }

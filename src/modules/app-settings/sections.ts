@@ -7,6 +7,7 @@ import { GitlabSettings } from "../gitlab/index.ts";
 import { DockerSettings } from "../docker/index.ts";
 import { ProviderPanel } from "../provider/index.ts";
 import {
+  AgentHooksSettings,
   AgentMcpSettings,
   AgentSkillsSettings,
   AgentWebSettings,
@@ -131,6 +132,14 @@ export const settingsSections: SettingsSection[] = [
     description: "Внешние серверы с инструментами для штатного агента.",
     keywords: "mcp сервер инструменты model context protocol агент Projector stdio http sse",
     component: AgentMcpSettings,
+  },
+  {
+    id: "agent-hooks",
+    title: "Хуки агента",
+    group: "Агент",
+    description: "Команды до и после инструментов агента и после его ответа.",
+    keywords: "хуки hooks уведомление PreToolUse PostToolUse Stop команда агент Projector",
+    component: AgentHooksSettings,
   },
   {
     id: "agent-web",

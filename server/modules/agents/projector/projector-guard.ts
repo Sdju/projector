@@ -155,6 +155,17 @@ export async function guardMcpServer(
   });
 }
 
+/** Hooks from the project's `.projector/hooks.json` run programs on every call: the user decides. */
+export async function guardProjectHooks(options: GuardOptions, commands: string[]): Promise<void> {
+  if (options.trusting) return;
+  await ask(options, {
+    tool: "project_hooks",
+    input: {},
+    title: "Включить хуки из .projector/hooks.json проекта",
+    detail: commands.join("\n"),
+  });
+}
+
 const knownHosts = new Set<string>();
 
 /** Asks before the agent opens a site: the address itself can carry what it has read. Remembered by host. */

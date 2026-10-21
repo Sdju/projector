@@ -6,8 +6,10 @@ import { z } from "zod";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import {
   loadHooks,
+  listHooks,
   runStopHooks,
   withHooks,
+  writeUserHooks,
 } from "../server/modules/agents/projector/projector-hooks.ts";
 
 let previous;
@@ -66,6 +68,55 @@ describe("hooks of the Projector agent", () => {
     expect(await tools.echo.execute({ text: "b" }, {})).toBe("got b");
     const seen = JSON.parse(await readFile(log, "utf8"));
     expect(seen).toMatchObject({ event: "PostToolUse", tool: "echo", input: { text: "b" } });
+  });
+
+  it("takes a JSON answer: block with a reason, or context added to the result", async () => {
+    await configure({
+      PreToolUse: [{ command: `echo '{"decision":"block","reason":"not now"}'` }],
+    });
+    let tools = withHooks({ echo }, await loadHooks(), data);
+    await expect(tools.echo.execute({ text: "a" }, {})).rejects.toThrow(/not now/);
+    await configure({ PostToolUse: [{ command: `echo '{"additionalContext":"remember"}'` }] });
+    tools = withHooks({ echo }, await loadHooks(), data);
+    expect(await tools.echo.execute({ text: "a" }, {})).toEqual({
+      result: "got a",
+      hook: "remember",
+    });
+  });
+
+  it("asks before the project's hooks and leaves them out when refused", async () => {
+    const project = await mkdtemp(join(tmpdir(), "projector-hooks-project-"));
+    await mkdir(join(project, ".projector"));
+    await writeFile(
+      join(project, ".projector", "hooks.json"),
+      JSON.stringify({ hooks: { Stop: [{ command: "echo hi" }] } }),
+    );
+    expect((await listHooks(project)).map((item) => item.source)).toEqual(["project"]);
+    const asked = [];
+    const guard = (answer) => ({
+      cwd: project,
+      trusting: false,
+      approve: async (request) => (asked.push(request), answer),
+    });
+    expect(await loadHooks(project, guard(false))).toEqual([]);
+    expect(asked).toHaveLength(1);
+    expect(await loadHooks(project, guard(true))).toHaveLength(1);
+    expect(await loadHooks(project, { cwd: project, trusting: true })).toHaveLength(1);
+    expect(await loadHooks(project)).toEqual([]);
+  });
+
+  it("checks the file before saving it", async () => {
+    await expect(writeUserHooks("{")).rejects.toThrow(/Не JSON/);
+    await expect(writeUserHooks("{}")).rejects.toThrow(/hooks/);
+    await expect(writeUserHooks('{"hooks":{"Start":[]}}')).rejects.toThrow(/Неизвестное/);
+    await expect(writeUserHooks('{"hooks":{"Stop":[{}]}}')).rejects.toThrow(/command/);
+    await expect(
+      writeUserHooks('{"hooks":{"Stop":[{"command":"x","matcher":"("}]}}'),
+    ).rejects.toThrow(/matcher/);
+    await writeUserHooks('{"hooks":{"Stop":[{"command":"x"}]}}');
+    expect(await loadHooks()).toHaveLength(1);
+    await writeUserHooks("");
+    expect(await loadHooks()).toEqual([]);
   });
 
   it("runs Stop only for turns that lasted long enough", async () => {
