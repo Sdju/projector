@@ -6,7 +6,7 @@ import { GithubSettings } from "../github/index.ts";
 import { GitlabSettings } from "../gitlab/index.ts";
 import { DockerSettings } from "../docker/index.ts";
 import { ProviderPanel } from "../provider/index.ts";
-import { AgentModeSettings } from "../agent/index.ts";
+import { AgentMemorySettings, AgentModeSettings } from "../agent/index.ts";
 import { type SettingsSection } from "../settings/index.ts";
 
 export const settingsSections: SettingsSection[] = [
@@ -109,5 +109,13 @@ export const settingsSections: SettingsSection[] = [
     description: "Терминал или графический чат для новых сессий агентов.",
     keywords: "GUI TUI терминал чат Claude Code режим вывод",
     component: AgentModeSettings,
+  },
+  {
+    id: "agent-memory",
+    title: "Память агента",
+    group: "Агент",
+    description: "Заметки, которые штатный агент помнит между разговорами.",
+    keywords: "память заметки запомни memory агент Projector инструкции предпочтения",
+    component: AgentMemorySettings,
   },
 ];

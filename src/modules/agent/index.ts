@@ -7,6 +7,7 @@ export { useAgent } from "./model/session.ts";
 export { useAgentModes, guiPrograms } from "./model/modes.ts";
 export type { AgentSessionMode } from "./model/modes.ts";
 export { default as AgentModeSettings } from "./ui/AgentModeSettings.vue";
+export { default as AgentMemorySettings } from "./ui/AgentMemorySettings.vue";
 export { registerAgentCommands } from "./model/agent-commands.ts";
 export { useAgentActivity } from "./model/activity.ts";
 export type { AgentActivityItem } from "./model/activity.ts";
