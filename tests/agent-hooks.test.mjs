@@ -101,6 +101,21 @@ describe("hooks of the Projector agent", () => {
     expect(await loadHooks(project, guard(false))).toEqual([]);
     expect(asked).toHaveLength(1);
     expect(await loadHooks(project, guard(true))).toHaveLength(1);
+    // "Always" is remembered for these commands, and a changed file asks again.
+    expect(await loadHooks(project, guard("always"))).toHaveLength(1);
+    const count = asked.length;
+    expect(await loadHooks(project, guard(false))).toHaveLength(1);
+    expect(asked).toHaveLength(count);
+    await writeFile(
+      join(project, ".projector", "hooks.json"),
+      JSON.stringify({ hooks: { Stop: [{ command: "echo changed" }] } }),
+    );
+    expect(await loadHooks(project, guard(false))).toEqual([]);
+    expect(asked).toHaveLength(count + 1);
+    await writeFile(
+      join(project, ".projector", "hooks.json"),
+      JSON.stringify({ hooks: { Stop: [{ command: "echo hi" }] } }),
+    );
     expect(await loadHooks(project, { cwd: project, trusting: true })).toHaveLength(1);
     expect(await loadHooks(project)).toEqual([]);
   });

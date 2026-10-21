@@ -155,15 +155,25 @@ export async function guardMcpServer(
   });
 }
 
-/** Hooks from the project's `.projector/hooks.json` run programs on every call: the user decides. */
+const knownHooks = new Set<string>();
+
+/**
+ * Hooks from the project's `.projector/hooks.json` run programs on every call: the user decides.
+ * "Always" is remembered until the server restarts, for exactly these commands in this project,
+ * so a changed file is asked about again.
+ */
 export async function guardProjectHooks(options: GuardOptions, commands: string[]): Promise<void> {
   if (options.trusting) return;
-  await ask(options, {
+  const key = `${options.cwd ?? ""}\n${commands.join("\n")}`;
+  if (knownHooks.has(key)) return;
+  const answer = await ask(options, {
     tool: "project_hooks",
     input: {},
     title: "Включить хуки из .projector/hooks.json проекта",
     detail: commands.join("\n"),
+    persistent: true,
   });
+  if (answer === "always") knownHooks.add(key);
 }
 
 const knownHosts = new Set<string>();

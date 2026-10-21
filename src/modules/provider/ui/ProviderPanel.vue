@@ -390,18 +390,19 @@ function keyDraft(): string {
               @update:model-value="setModelThinking(selected.id, row.id, Boolean($event))"
             />
             <span v-if="row.on" class="price">
-              <UiControl
-                v-for="[field, label] in PRICE_FIELDS"
-                :key="field"
-                mono
-                type="number"
-                min="0"
-                step="any"
-                :aria-label="`Цена ${label} ${row.id}, за 1 млн токенов`"
-                :value="row.price?.[field]"
-                :placeholder="label"
-                @input="setPrice(row.id, field, ($event.target as HTMLInputElement).value)"
-              />
+              <span v-for="[field, label] in PRICE_FIELDS" :key="field" class="price-field">
+                <span class="price-label">{{ label }}</span>
+                <UiControl
+                  mono
+                  type="number"
+                  min="0"
+                  step="any"
+                  :aria-label="`Цена ${label} ${row.id}, за 1 млн токенов`"
+                  :value="row.price?.[field]"
+                  placeholder="—"
+                  @input="setPrice(row.id, field, ($event.target as HTMLInputElement).value)"
+                />
+              </span>
             </span>
           </label>
         </UiScrollArea>
@@ -420,10 +421,10 @@ function keyDraft(): string {
           <UiButton :disabled="!manual.trim()" @click="addManual">+</UiButton>
         </UiInline>
         <UiHint>
-          Цена — за 1 млн токенов в валюте тарифа (вход, выход, из кэша); с ней под ответом агента
-          видна его стоимость и стоимость всего чата. Без цены стоимость не показывается. Имя — под
-          которым модель видна агенту и шлюзу; по умолчанию совпадает с id. Окно контекста нужно
-          кольцу заполнения в чате агента; без него берётся 128000.
+          Имя — под которым модель видна агенту и шлюзу; по умолчанию совпадает с id. Окно контекста
+          нужно кольцу заполнения в чате агента; без него берётся 128000. Цена — за 1 млн токенов в
+          валюте тарифа (вход и выход обязательны, «из кэша» по умолчанию равна входу): с ней под
+          ответом агента видна его стоимость и стоимость всего чата.
         </UiHint>
       </UiStack>
 
@@ -552,6 +553,19 @@ function keyDraft(): string {
   grid-column: 2 / -1;
   display: flex;
   gap: var(--sp-2);
+}
+
+.price-field {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.price-label {
+  color: var(--muted);
+  font-size: var(--fs-xs);
 }
 
 @container (min-width: 30rem) {

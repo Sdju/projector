@@ -47,6 +47,24 @@ const turnSchema: z.ZodType<StoredTurn> = z.lazy(() =>
         ]),
       )
       .optional(),
+    /** Tokens, cache use and cost of the answer, for the usage tooltip after a reload. */
+    usage: z
+      .object({
+        input: z.number(),
+        output: z.number(),
+        cacheRead: z.number(),
+        cacheWrite: z.number(),
+        first: z
+          .object({
+            input: z.number(),
+            output: z.number(),
+            cacheRead: z.number(),
+            cacheWrite: z.number(),
+          })
+          .optional(),
+        cost: z.number().optional(),
+      })
+      .optional(),
     context: z
       .object({
         used: z.number(),

@@ -55,6 +55,19 @@ describe("Projector agent chat history", () => {
     expect(listArchivedChats("p")).toEqual([]);
   });
 
+  it("keeps the usage of an answer, so the tooltip survives a reload", async () => {
+    const usage = {
+      input: 200,
+      output: 200,
+      cacheRead: 800,
+      cacheWrite: 0,
+      first: { input: 200, output: 0, cacheRead: 800, cacheWrite: 0 },
+      cost: 0.0022,
+    };
+    await writeAgentHistory("u", [{ ...turn("1", "assistant", "ответ"), usage }]);
+    expect((await readAgentHistory("u"))[0].usage).toEqual(usage);
+  });
+
   it("keeps when a message was written", async () => {
     await writeAgentHistory("t", [{ ...turn("1", "user", "вопрос"), at: 1760000000000 }]);
     expect((await readAgentHistory("t"))[0].at).toBe(1760000000000);

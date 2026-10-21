@@ -22,6 +22,12 @@ function cacheRow(label: string, tokens: AgentTokens) {
 /** The price is in the provider's own currency, so only the figure is shown. */
 const money = (value: number) =>
   new Intl.NumberFormat("ru", { maximumFractionDigits: value < 1 ? 4 : 2 }).format(value);
+const chatLine = computed(() => {
+  const chat = props.chat;
+  if (!chat) return "";
+  const tokens = `Весь чат: ${number.format(chat.tokens)} токенов`;
+  return chat.priced ? `${tokens}, стоимость ${money(chat.cost)}` : tokens;
+});
 const rows = computed(() => [
   ...(props.usage.first ? [cacheRow("Первый запрос", props.usage.first)] : []),
   cacheRow("Весь ответ", props.usage),
@@ -41,15 +47,13 @@ const rows = computed(() => [
         <span class="usage-value">{{ row.value }}</span>
         <span class="usage-detail">{{ row.detail }}</span>
       </span>
-      <span class="usage-detail">Выведено токенов: {{ number.format(usage.output) }}</span>
-      <span v-if="usage.cost !== undefined" class="usage-detail">
+      <span class="usage-detail usage-line"
+        >Выведено токенов: {{ number.format(usage.output) }}</span
+      >
+      <span v-if="usage.cost !== undefined" class="usage-detail usage-line">
         Стоимость ответа: {{ money(usage.cost) }}
       </span>
-      <span v-if="chat" class="usage-detail">
-        Весь чат: {{ number.format(chat.tokens) }} токенов<template v-if="chat.priced">
-          , стоимость {{ money(chat.cost) }}</template
-        >
-      </span>
+      <span v-if="chat" class="usage-detail usage-line">{{ chatLine }}</span>
     </template>
   </UiTooltip>
 </template>
@@ -64,6 +68,9 @@ const rows = computed(() => [
 .usage-label,
 .usage-detail {
   color: var(--muted);
+}
+.usage-line {
+  display: block;
 }
 .usage-detail {
   grid-column: 1 / -1;

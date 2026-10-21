@@ -36,3 +36,23 @@ describe("model prices", () => {
     ).toBe(0);
   });
 });
+
+describe("usage of a chat", () => {
+  it("adds answers up and keeps the objects of entries that did not change", async () => {
+    const { chatUsageByTurn } = await import("../src/modules/agent/model/chat-usage.ts");
+    const answer = (id, cost) => ({
+      id,
+      role: "assistant",
+      usage: { input: 100, output: 50, cacheRead: 0, cacheWrite: 0, ...(cost ? { cost } : {}) },
+    });
+    const turns = [answer("a", 0.5), { id: "u", role: "user" }, answer("b")];
+    const first = chatUsageByTurn(turns);
+    expect(first.get("a")).toEqual({ tokens: 150, cost: 0.5, priced: true });
+    expect(first.get("b")).toEqual({ tokens: 300, cost: 0.5, priced: true });
+    expect(first.has("u")).toBe(false);
+    const next = chatUsageByTurn([...turns, answer("c", 1)], first);
+    expect(next.get("a")).toBe(first.get("a"));
+    expect(next.get("b")).toBe(first.get("b"));
+    expect(next.get("c")).toEqual({ tokens: 450, cost: 1.5, priced: true });
+  });
+});
