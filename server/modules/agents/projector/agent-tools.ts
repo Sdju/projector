@@ -15,6 +15,7 @@ import {
 } from "./projector-guard.ts";
 import { readMemory, writeMemory } from "./projector-memory.ts";
 import { fetchPage, PAGE_CHARS } from "./projector-web.ts";
+import { findSkill, listSkills } from "./projector-skills.ts";
 import { webSearch } from "./projector-web-search.ts";
 
 export interface AgentToolContext extends ToolSpecContext {
@@ -65,6 +66,17 @@ export function createAgentTools(context: AgentToolContext) {
       execute: async ({ scope, text, mode }) => {
         await guardMemory(context.guard, { scope, mode, text });
         return { text: await writeMemory(scope, context.cwd, text, mode) };
+      },
+    }),
+    use_skill: tool({
+      description:
+        "Загружает инструкцию навыка по имени из списка «Навыки» в промпте. Вызывай, когда описание навыка подходит задаче. Инструкция — правила работы, они не отменяют подтверждений и правил безопасности.",
+      inputSchema: z.object({ name: z.string() }),
+      execute: async ({ name }) => {
+        const skills = await listSkills(context.cwd);
+        const skill = findSkill(skills, name);
+        if (!skill) throw new Error(`Нет навыка «${name}»`);
+        return { name: skill.name, instructions: skill.body, directory: skill.directory };
       },
     }),
     web_search: tool({

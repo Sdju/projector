@@ -24,6 +24,7 @@ import { tokensOf, type Tokens } from "./projector-usage.ts";
 import { budgetNote, turnBudget } from "./projector-budget.ts";
 import { isRetryable, MAX_RETRIES, pause, retryDelay } from "./projector-retry.ts";
 import { connectMcp, mcpSection } from "./projector-mcp.ts";
+import { expandSlash, listSkills, skillsSection } from "./projector-skills.ts";
 import { memorySection } from "./projector-memory.ts";
 import { projectInstructions } from "./project-instructions.ts";
 import { createBashReviewer } from "./projector-review.ts";
@@ -105,6 +106,7 @@ async function turn(options: AgentRunOptions, open: { close: () => Promise<void>
     await compactChat(quietModel, earlier, options, resolved);
     return;
   }
+  const skills = await listSkills(options.cwd);
   const { recent, summary } = await compactHistory(quietModel, earlier.turns, {
     signal: options.abort,
     base: earlier.summary,
@@ -115,7 +117,7 @@ async function turn(options: AgentRunOptions, open: { close: () => Promise<void>
   const tools = { ...mcp.tools, ...own };
   const messages: ModelMessage[] = [
     ...toMessages(recent),
-    await userMessage(options.message, options.parts),
+    await userMessage(expandSlash(options.message, skills), options.parts),
   ];
 
   options.emit("status", {
@@ -131,6 +133,7 @@ async function turn(options: AgentRunOptions, open: { close: () => Promise<void>
     (await projectInstructions(options.cwd)) +
     (await memorySection(options.cwd)) +
     mcpSection(mcp) +
+    skillsSection(skills) +
     summarySection(summary);
 
   const budget = turnBudget();
@@ -356,5 +359,13 @@ export const projectorBackend: AgentBackend = {
   id: "projector",
   capabilities: { compact: { command: COMPACT_COMMAND, hintAt: 0.8, autoAt: 0.9 } },
   controls: () => controls(),
+  commands: async (cwd) => [
+    { name: COMPACT_COMMAND.slice(1), description: "Сжать историю разговора в сводку" },
+    ...(await listSkills(cwd || undefined)).map((item) => ({
+      name: item.name,
+      description: item.description,
+      hint: item.hint,
+    })),
+  ],
   run,
 };

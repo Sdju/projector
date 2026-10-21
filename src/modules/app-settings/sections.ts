@@ -8,6 +8,7 @@ import { DockerSettings } from "../docker/index.ts";
 import { ProviderPanel } from "../provider/index.ts";
 import {
   AgentMcpSettings,
+  AgentSkillsSettings,
   AgentWebSettings,
   AgentMemorySettings,
   AgentModeSettings,
@@ -138,5 +139,13 @@ export const settingsSections: SettingsSection[] = [
     description: "Поисковый сервис, через который штатный агент ищет в интернете.",
     keywords: "веб поиск интернет search brave searxng агент Projector ключ",
     component: AgentWebSettings,
+  },
+  {
+    id: "agent-skills",
+    title: "Навыки и команды агента",
+    group: "Агент",
+    description: "Навыки и слэш-команды, которые находит штатный агент.",
+    keywords: "навыки skills слэш команды slash prompt SKILL.md агент Projector",
+    component: AgentSkillsSettings,
   },
 ];

@@ -34,7 +34,7 @@ export function useExternalAgent(
 ) {
   const { backend, projectId, ready, persist, key } = chat;
   const external = backend !== "projector";
-  // The Projector agent offers a model and permission choice but has no sessions or slash commands.
+  // The Projector agent offers a model and permission choice but has no sessions; its slash commands are the user's skills and prompt commands.
   const controls = computed(() => state.controls);
   const selection = computed(() => state.selection);
   const sessionList = computed(() => state.sessions);
@@ -68,7 +68,7 @@ export function useExternalAgent(
 
   /** Reads the slash commands the agent offers; without them `/` suggests nothing. */
   async function loadCommands(): Promise<void> {
-    if (!external || !projectId) return;
+    if (external && !projectId) return;
     try {
       state.commands = await fetchCommands(backend, projectId);
     } catch {

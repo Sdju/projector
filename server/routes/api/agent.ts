@@ -124,7 +124,8 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
     return true;
   }
   if (path === "/api/agent/commands" && method === "GET") {
-    const cwd = await projectPath(url.searchParams.get("projectId") ?? "");
+    const projectId = url.searchParams.get("projectId") ?? "";
+    const cwd = projectId ? await projectPath(projectId) : "";
     const backend = url.searchParams.get("backend") ?? undefined;
     json(res, 200, { commands: await agentCommands(backend, cwd) });
     return true;
