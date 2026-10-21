@@ -120,6 +120,8 @@ export interface AgentBackend {
   id: AgentBackendId;
   capabilities?: AgentCapabilities;
   run(options: AgentRunOptions): Promise<void>;
+  /** The program the agent needs is installed; absent when the backend cannot tell beforehand. */
+  available?(): boolean;
   /** What the user may tune before a turn (model, effort, mode). */
   controls?(cwd: string): Promise<AgentControl[]>;
   /** Slash commands the agent understands in this project, when it can tell before a turn. */

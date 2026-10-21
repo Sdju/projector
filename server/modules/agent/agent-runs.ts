@@ -47,7 +47,8 @@ export async function listLiveRuns(): Promise<LiveRun[]> {
       .map(async (id): Promise<LiveRun | undefined> => {
         if ((await liveHost(id)) === undefined) return;
         const record = await readRun(id);
-        if (!record) return;
+        // A background job shows up as a job, not as a second run.
+        if (!record || record.chat?.startsWith(JOB_CHAT)) return;
         return {
           id,
           backend: record.backend,
@@ -60,11 +61,15 @@ export async function listLiveRuns(): Promise<LiveRun[]> {
   return runs.filter((run): run is LiveRun => !!run);
 }
 
+/** The `chat` of a run that belongs to a background job (`job:<id>`). */
+export const JOB_CHAT = "job:";
 const RUN_ID = /^[0-9a-f]{12}$/;
 /** A host still alive after this long is stopped and its run removed. */
 const RUN_TTL_MS = 24 * 60 * 60 * 1000;
 /** A finished run nobody rejoined is kept this long, then removed. */
 const RETAIN_MS = 60 * 60 * 1000;
+/** The run of a background job waits longer: a restarted server rejoins it to collect the answer. */
+const JOB_RETAIN_MS = 24 * 60 * 60 * 1000;
 
 const runsRoot = () => join(dataDir(), "agent", "runs");
 
@@ -141,7 +146,10 @@ export async function pruneRuns(now = Date.now()): Promise<void> {
     if ((await liveHost(id)) !== undefined) {
       if (age < RUN_TTL_MS) continue;
       await stopRun(id);
-    } else if (age < RETAIN_MS) continue;
+    } else {
+      const job = (await readRun(id))?.chat?.startsWith(JOB_CHAT);
+      if (age < (job ? JOB_RETAIN_MS : RETAIN_MS)) continue;
+    }
     await removeRun(id).catch(() => {});
   }
 }

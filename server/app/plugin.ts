@@ -8,7 +8,7 @@ import { clearAgentSession, os } from "../../core/modules/os/index.ts";
 import { openLauncher, startTray } from "../modules/window/index.ts";
 import type { ServerMode } from "../../core/modules/server-mode/index.ts";
 import { attachTerminalServer } from "../modules/terminal/index.ts";
-import { pruneRuns } from "../modules/agent/index.ts";
+import { pruneRuns, recoverJobs } from "../modules/agent/index.ts";
 import { registerBuiltinAgents } from "./agents.ts";
 import { registerBuiltinWidgetDefinitions } from "./widgets.ts";
 import { reconcileOnStartup } from "../modules/environments/index.ts";
@@ -57,7 +57,11 @@ export function bindRuntime(httpServer: HttpServer | null, mode: ServerMode): vo
     const port = address && typeof address === "object" ? address.port : APP_PORT;
     void writeInstance(port);
     bindHooks();
-    void pruneRuns().catch(() => {});
+    // Jobs first: they rejoin the runs that the cleanup keeps for them.
+    void recoverJobs()
+      .catch((error) => console.error("Фоновые агенты:", error.message))
+      .then(() => pruneRuns())
+      .catch(() => {});
     void reconcileOnStartup().catch((error) =>
       console.error("Очистка контейнеров:", error.message),
     );

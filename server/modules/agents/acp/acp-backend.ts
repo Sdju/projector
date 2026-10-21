@@ -14,6 +14,7 @@ import { contentText, createAcpEventMapper } from "./acp-events.ts";
 import { initializeAcp, startAcp } from "./acp-process.ts";
 import { acpControls, acpDeleteSession, acpLoadSession, acpSessions } from "./acp-tools.ts";
 import { resolve } from "node:path";
+import { os } from "../../../../core/modules/os/index.ts";
 import { pathToFileURL } from "node:url";
 
 interface PermissionOption {
@@ -64,6 +65,9 @@ export function createAcpBackend(program: AcpProgram): AgentBackend {
     id,
     capabilities: { hosted: true },
     run: (options) => run(options, id),
+    available: () =>
+      !!(program.binary && os.tools.commandExists(program.binary)) ||
+      os.tools.commandExists(program.command),
     controls: (cwd) => acpControls(id, cwd),
     sessions: (cwd) => acpSessions(id, cwd),
     loadSession: (cwd, sessionId) => acpLoadSession(id, cwd, sessionId),

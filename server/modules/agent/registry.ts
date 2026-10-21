@@ -53,6 +53,11 @@ export function isHostedAgent(id: AgentBackendId | undefined): boolean {
   return backendFor(id).capabilities?.hosted === true;
 }
 
+/** Whether the agent can start here: its program is installed (unknown counts as yes). */
+export function isAgentAvailable(id: AgentBackendId | undefined): boolean {
+  return backendFor(id).available?.() !== false;
+}
+
 /** Method-backed operations are derived from the adapter, never its name. */
 export function agentCapabilities(id: string | undefined) {
   const backend = backendFor(id);

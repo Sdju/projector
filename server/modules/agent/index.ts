@@ -6,6 +6,7 @@ export {
   isAgentBackend,
   resolveAgentBackend,
   isHostedAgent,
+  isAgentAvailable,
 } from "./registry.ts";
 export {
   agentCapabilities,
@@ -97,3 +98,23 @@ export {
   worktreeStatus,
   type AgentWorktree,
 } from "./worktrees.ts";
+export {
+  MAX_RUNNING_JOBS,
+  answerJob,
+  assertJobSlot,
+  isFinished,
+  listJobs,
+  readJob,
+  recoverJobs,
+  removeJob,
+  startJob,
+  stopJob,
+  waitForJob,
+  type AgentJob,
+  type AgentJobStatus,
+  type JobAnswer,
+  type JobPending,
+  type JobSummary,
+  type JournalEntry,
+  type StartJobInput,
+} from "./jobs.ts";
