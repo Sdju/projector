@@ -10,6 +10,7 @@ import {
   loadPublicProviders,
   resolveOpenAIProvider,
 } from "../../providers/index.ts";
+import { projectInstructions } from "./project-instructions.ts";
 import { createBashReviewer } from "./projector-review.ts";
 import { historyMessages, userMessage } from "./projector-history.ts";
 
@@ -70,7 +71,8 @@ async function run(options: AgentRunOptions): Promise<void> {
     model,
     system:
       buildSystemPrompt(widgetCatalog.guide()) +
-      (options.cwd ? `\nТекущий проект: ${options.cwd}` : ""),
+      (options.cwd ? `\nТекущий проект: ${options.cwd}` : "") +
+      (await projectInstructions(options.cwd)),
     messages,
     tools,
     stopWhen: isStepCount(MAX_STEPS),
