@@ -43,6 +43,7 @@ import {
   claudeUpdateSession,
 } from "./claude-code-sessions.ts";
 import { askClaudeQuestions } from "./questions.ts";
+import { claudeEnv } from "./claude-code-env.ts";
 
 /** Claude Code takes the choice natively; `default` leaves the model and effort to its settings. */
 function chosen(options: AgentRunOptions) {
@@ -164,7 +165,7 @@ export async function runClaudeCode(options: AgentRunOptions): Promise<void> {
   const base: Options = {
     cwd,
     abortController,
-    env: agentEnv(),
+    env: claudeEnv(),
     includePartialMessages: true,
     // A background subagent streams no calls of its own: its progress arrives as these summaries.
     agentProgressSummaries: true,
@@ -321,7 +322,7 @@ function claudeCommands(cwd: string): Promise<AgentCommand[]> {
     })();
     const session = query({
       prompt: idle,
-      options: { cwd, env: agentEnv(), settingSources: ["user", "project", "local"] },
+      options: { cwd, env: claudeEnv(), settingSources: ["user", "project", "local"] },
     });
     try {
       return (await session.supportedCommands()).map((item) => ({

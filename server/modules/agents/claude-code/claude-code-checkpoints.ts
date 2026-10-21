@@ -1,6 +1,7 @@
 import { forkSession, getSessionMessages, query } from "@anthropic-ai/claude-agent-sdk";
 import type { SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { agentEnv } from "../../agent/index.ts";
+import { claudeEnv } from "./claude-code-env.ts";
 import type { McpServerInfo, RewindResult } from "../../agent/index.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -85,7 +86,7 @@ export function claudeMcpServers(cwd: string): Promise<McpServerInfo[]> {
   const servers = (async () => {
     const session = idleSession({
       cwd,
-      env: agentEnv(),
+      env: claudeEnv(),
       settingSources: ["user", "project", "local"],
     });
     try {
