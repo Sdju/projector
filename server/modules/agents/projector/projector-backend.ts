@@ -23,6 +23,7 @@ import {
 import { tokensOf, type Tokens } from "./projector-usage.ts";
 import { budgetNote, turnBudget } from "./projector-budget.ts";
 import { isRetryable, MAX_RETRIES, pause, retryDelay } from "./projector-retry.ts";
+import { memorySection } from "./projector-memory.ts";
 import { projectInstructions } from "./project-instructions.ts";
 import { createBashReviewer } from "./projector-review.ts";
 import { toMessages, userMessage } from "./projector-history.ts";
@@ -113,6 +114,7 @@ async function run(options: AgentRunOptions): Promise<void> {
     buildSystemPrompt(widgetCatalog.guide()) +
     (options.cwd ? `\nТекущий проект: ${options.cwd}` : "") +
     (await projectInstructions(options.cwd)) +
+    (await memorySection(options.cwd)) +
     summarySection(summary);
 
   const budget = turnBudget();

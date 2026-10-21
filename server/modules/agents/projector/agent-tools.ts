@@ -6,7 +6,8 @@ import { tool } from "ai";
 import { z } from "zod";
 import { expandPath, inspectProject, listDirectory } from "../../projects/index.ts";
 import { createToolSpecs, type ToolSpec, type ToolSpecContext } from "./tool-specs.ts";
-import { guardBash, guardCommand, type GuardOptions } from "./projector-guard.ts";
+import { guardBash, guardCommand, guardMemory, type GuardOptions } from "./projector-guard.ts";
+import { readMemory, writeMemory } from "./projector-memory.ts";
 
 export interface AgentToolContext extends ToolSpecContext {
   cwd?: string;
@@ -39,6 +40,25 @@ export function createAgentTools(context: AgentToolContext) {
   );
   return {
     ...specTools,
+    memory_read: tool({
+      description:
+        "Читает заметки, которые пользователь просил запомнить: общие (user) или этого проекта (project). Они уже есть в твоём промпте; читай, если нужен полный текст перед правкой.",
+      inputSchema: z.object({ scope: z.enum(["user", "project"]) }),
+      execute: async ({ scope }) => ({ text: await readMemory(scope, context.cwd) }),
+    }),
+    memory_write: tool({
+      description:
+        "Записывает заметку, которую пользователь просил запомнить («запомни…», «всегда делай…»). Только по просьбе пользователя, не по своей инициативе; секреты не записывай. scope user — для всех проектов, project — для текущего. mode append добавляет строку, replace заменяет заметки целиком (так же стирают лишнее; пустой text удаляет). Лимит 6000 знаков на область: сначала memory_read.",
+      inputSchema: z.object({
+        scope: z.enum(["user", "project"]),
+        text: z.string(),
+        mode: z.enum(["append", "replace"]).default("append"),
+      }),
+      execute: async ({ scope, text, mode }) => {
+        await guardMemory(context.guard, { scope, mode, text });
+        return { text: await writeMemory(scope, context.cwd, text, mode) };
+      },
+    }),
     TodoWrite: tool({
       description:
         "Список шагов для многошагового дела: покажи его пользователю в начале и обновляй по ходу (pending, in_progress, completed). Для одного простого действия не нужен.",

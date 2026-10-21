@@ -125,3 +125,17 @@ export async function guardCommand(
     remembered.set(key, (remembered.get(key) ?? new Set()).add(call.command));
   }
 }
+
+/** Asks before the agent writes to its notes: they shape every later answer. */
+export async function guardMemory(
+  options: GuardOptions,
+  call: { scope: string; mode: string; text: string },
+): Promise<void> {
+  if (options.trusting) return;
+  await ask(options, {
+    tool: "memory_write",
+    input: call,
+    title: call.scope === "user" ? "Запомнить для всех проектов" : "Запомнить для этого проекта",
+    detail: `${call.mode === "append" ? "Добавить" : "Заменить заметки на"}:\n${call.text}`,
+  });
+}
