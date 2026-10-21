@@ -42,9 +42,11 @@ export function applyAgentEvent(
         ? `${event.data.provider ?? "qwen"} · ${event.data.model}`
         : event.data.phase === "compacting"
           ? "сжимаю историю"
-          : event.data.phase === "background"
-            ? "ждёт фоновых агентов"
-            : "думает";
+          : event.data.phase === "retrying"
+            ? `провайдер не ответил, повтор ${event.data.attempt}`
+            : event.data.phase === "background"
+              ? "ждёт фоновых агентов"
+              : "думает";
       return false;
     case "run":
       assistant.run = event.data.id;

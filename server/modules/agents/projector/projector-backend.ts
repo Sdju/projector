@@ -10,6 +10,7 @@ import {
   loadPublicProviders,
   resolveOpenAIProvider,
 } from "../../providers/index.ts";
+import { isRetryable, MAX_RETRIES, pause, retryDelay } from "./projector-retry.ts";
 import { projectInstructions } from "./project-instructions.ts";
 import { createBashReviewer } from "./projector-review.ts";
 import { toMessages, userMessage } from "./projector-history.ts";
@@ -84,64 +85,76 @@ async function run(options: AgentRunOptions): Promise<void> {
   });
   options.emit("controls", { controls: await controls(options.selection ?? {}) });
 
-  const result = streamText({
-    model,
-    system:
-      buildSystemPrompt(widgetCatalog.guide()) +
-      (options.cwd ? `\nТекущий проект: ${options.cwd}` : "") +
-      (await projectInstructions(options.cwd)) +
-      summarySection(summary),
-    messages,
-    tools,
-    stopWhen: isStepCount(MAX_STEPS),
-    abortSignal: options.abort,
-    providerOptions: {
-      qwenOpenai: {
-        enable_thinking: true,
-      },
-    },
-  });
+  const system =
+    buildSystemPrompt(widgetCatalog.guide()) +
+    (options.cwd ? `\nТекущий проект: ${options.cwd}` : "") +
+    (await projectInstructions(options.cwd)) +
+    summarySection(summary);
 
   let text = "";
-  for await (const part of result.fullStream) {
-    if (part.type === "text-delta") {
-      text += part.text;
-      options.emit("text", { text: part.text });
-      continue;
+  let result: ReturnType<typeof streamText>;
+  // A request that fails before the model said anything is repeated; later the turn would replay.
+  for (let attempt = 0; ; attempt++) {
+    result = streamText({
+      model,
+      system,
+      messages,
+      tools,
+      stopWhen: isStepCount(MAX_STEPS),
+      abortSignal: options.abort,
+      maxRetries: 0,
+      providerOptions: {
+        qwenOpenai: {
+          enable_thinking: true,
+        },
+      },
+    });
+
+    let started = false;
+    let failure: unknown;
+    for await (const part of result.fullStream) {
+      if (part.type === "error") {
+        failure = part.error;
+        break;
+      }
+      if (part.type === "text-delta") {
+        started = true;
+        text += part.text;
+        options.emit("text", { text: part.text });
+      } else if (part.type === "reasoning-delta") {
+        started = true;
+        options.emit("thought", { text: part.text });
+      } else if (part.type === "tool-call") {
+        started = true;
+        options.emit("tool", {
+          id: part.toolCallId,
+          name: part.toolName,
+          input: part.input,
+        });
+      } else if (part.type === "tool-result") {
+        options.emit("tool-result", {
+          id: part.toolCallId,
+          name: part.toolName,
+          output: part.output,
+        });
+      } else if (part.type === "tool-error") {
+        options.emit("tool-result", {
+          id: part.toolCallId,
+          name: part.toolName,
+          error: part.error instanceof Error ? part.error.message : String(part.error),
+        });
+      }
     }
-    if (part.type === "reasoning-delta") {
-      options.emit("thought", { text: part.text });
-      continue;
+    if (failure === undefined) break;
+    if (!started && attempt < MAX_RETRIES && !options.abort?.aborted && isRetryable(failure)) {
+      const delay = retryDelay(attempt, failure);
+      options.emit("status", { phase: "retrying", attempt: attempt + 1, delay });
+      await pause(delay, options.abort);
+      if (!options.abort?.aborted) continue;
     }
-    if (part.type === "tool-call") {
-      options.emit("tool", {
-        id: part.toolCallId,
-        name: part.toolName,
-        input: part.input,
-      });
-      continue;
-    }
-    if (part.type === "tool-result") {
-      options.emit("tool-result", {
-        id: part.toolCallId,
-        name: part.toolName,
-        output: part.output,
-      });
-      continue;
-    }
-    if (part.type === "tool-error") {
-      options.emit("tool-result", {
-        id: part.toolCallId,
-        name: part.toolName,
-        error: part.error instanceof Error ? part.error.message : String(part.error),
-      });
-      continue;
-    }
-    if (part.type === "error") {
-      const message = part.error instanceof Error ? part.error.message : "Ошибка агента";
-      options.emit("error", { error: message });
-      return;
-    }
+    const message = failure instanceof Error ? failure.message : "Ошибка агента";
+    options.emit("error", { error: message });
+    return;
   }
 
   // The last request carried the whole conversation, so its size is how full the context is.
