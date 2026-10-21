@@ -52,3 +52,25 @@ test("only a job in the project itself continues in a chat", () => {
     false,
   );
 });
+
+test("a page hears about a job that waits for the user or ended, once", async () => {
+  const { jobNotices } = await import("../src/modules/agent/lib/job-notify.ts");
+  const known = new Map();
+  // The first look only records what is there.
+  expect(jobNotices(known, [job("a", "running"), job("old", "done")])).toEqual([]);
+  expect(jobNotices(known, [job("a", "running"), job("old", "done")])).toEqual([]);
+  const waiting = jobNotices(known, [
+    job("a", "needs-user", { pending: [{ id: "r", kind: "permission", title: "Write" }] }),
+  ]);
+  expect(waiting).toMatchObject([{ id: "a", title: "Claude Code ждёт вашего ответа" }]);
+  expect(waiting[0].body).toContain("Write");
+  expect(jobNotices(known, [job("a", "needs-user")])).toEqual([]);
+  expect(jobNotices(known, [job("a", "error", { error: "boom" })])).toMatchObject([
+    { title: expect.stringContaining("ошибкой"), body: "boom" },
+  ]);
+  // A job that started and ended between two polls is still announced.
+  expect(jobNotices(known, [job("b", "running"), job("a", "error")])).toEqual([]);
+  expect(jobNotices(known, [job("b", "done")])).toMatchObject([
+    { id: "b", title: "Claude Code закончил задание" },
+  ]);
+});

@@ -2,6 +2,7 @@ import { computed, getCurrentScope, onScopeDispose, ref } from "vue";
 import { fetchLiveRuns, type LiveAgentRun } from "../api/client.ts";
 import { fetchJobs, jobFinished, type AgentJobView } from "../api/jobs.ts";
 import { openChats } from "./chat-registry.ts";
+import { announceJobs } from "../lib/job-notify.ts";
 import { agentLabel } from "./modes.ts";
 
 /** An open chat that is answering or has subagents and background commands running. */
@@ -66,9 +67,12 @@ export function jobItems(jobs: AgentJobView[]): AgentActivityItem[] {
 /** Background jobs of all projects; the running ones and those that wait for the user are shown. */
 function useServerJobs() {
   const jobs = ref<AgentJobView[]>([]);
+  // Statuses seen so far: a change to "needs you" or "ended" notifies a page the user is not on.
+  const seen = new Map<string, AgentJobView["status"]>();
   async function refresh() {
     try {
       jobs.value = await fetchJobs();
+      announceJobs(seen, jobs.value);
     } catch {
       // The server is restarting; the next poll finds it.
     }

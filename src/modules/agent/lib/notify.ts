@@ -37,3 +37,8 @@ export function notifyQuestion(what: string): void {
 export function notifyPermission(what: string): void {
   show("Агент ждёт разрешения", what, "agent-permission");
 }
+
+/** A background job ended or waits for the user; the tag keeps one notification per job. */
+export function notifyJob(id: string, title: string, body: string): void {
+  show(title, body, `agent-job:${id}`);
+}
