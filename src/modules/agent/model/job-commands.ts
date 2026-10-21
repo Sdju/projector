@@ -68,9 +68,11 @@ function describe(job: AgentJobView) {
 export function registerJobCommands(
   register: RegisterCommand,
   projectId: string,
-  api: {
-    executeCommand(id: string, args: unknown, options: { scope: string }): Promise<unknown>;
-  } = useIdeCommands().api,
+  api:
+    | {
+        executeCommand(id: string, args: unknown, options: { scope: string }): Promise<unknown>;
+      }
+    | undefined = getCurrentInstance() ? useIdeCommands().api : undefined,
 ): void {
   // Opens the tab of a job the activity island asked for, once this workspace is up.
   if (getCurrentInstance()) useJobTabRequests(projectId);
@@ -175,7 +177,7 @@ export function registerJobCommands(
     "Открыть фоновое задание во вкладке",
     async (args) => {
       const job = text(commandArgs(args), "job");
-      await api.executeCommand(
+      await api?.executeCommand(
         "ide.workbench.agent.job.open",
         { job },
         { scope: `editor:${projectId}` },
