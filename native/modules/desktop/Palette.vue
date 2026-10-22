@@ -158,8 +158,8 @@ async function show() {
   wasActive = window.isActive();
   window.present();
   entryRef.value?.widget?.grabFocus();
+  await focusWindow();
   void model.search();
-  void focusWindow();
 }
 function hide() {
   clearTimeout(blurTimer);

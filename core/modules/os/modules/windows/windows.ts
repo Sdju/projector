@@ -1,7 +1,14 @@
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { closeWindow, findWindow, foregroundWindow, hideWindow, showWindow } from "./hwnd.ts";
+import {
+  closeWindow,
+  findWindow,
+  foregroundWindow,
+  hideWindow,
+  placeWindow,
+  showWindow,
+} from "./hwnd.ts";
 
 const BROWSERS = [
   join(
@@ -88,7 +95,7 @@ export function openWindow(url: string): void {
 export async function focusAppWindow(appClass: string): Promise<boolean> {
   const hwnd = await findWindow(appClass);
   if (!hwnd) return false;
-  await showWindow(hwnd, appClass);
+  await showWindow(hwnd);
   return true;
 }
 
@@ -115,7 +122,7 @@ export async function openOrFocusApp(
 
 export async function hidePalette(appClass: string): Promise<void> {
   const hwnd = await findWindow(appClass);
-  if (hwnd) await hideWindow(hwnd, appClass);
+  if (hwnd) await hideWindow(hwnd);
 }
 
 export async function openWebPalette(
@@ -128,7 +135,7 @@ export async function openWebPalette(
   if (hwnd) {
     const active = await foregroundWindow(appClass);
     if (toggle && active === hwnd) await hidePalette(appClass);
-    else await showWindow(hwnd, appClass);
+    else await showWindow(hwnd);
     return;
   }
   const browser = findBrowser();
@@ -147,7 +154,7 @@ export async function openWebPalette(
 
 export async function closePalette(appClass: string): Promise<void> {
   const hwnd = await findWindow(appClass);
-  if (hwnd) await closeWindow(hwnd, appClass);
+  if (hwnd) await closeWindow(hwnd);
 }
 
 export async function activateWindow(id: number | bigint): Promise<void> {
@@ -167,7 +174,7 @@ export async function activateSurface(surface: object): Promise<void> {
     const Win32Surface = (GdkWin32 as { Win32Surface?: abstract new () => object }).Win32Surface;
     if (!Win32Surface || !(surface instanceof Win32Surface)) return;
     const handle = windowHandle((surface as { getHandle(): unknown }).getHandle());
-    if (handle !== null) await activateWindow(handle);
+    if (handle !== null) await placeWindow(String(handle));
   } catch {
     /* The surface is not a Win32 window yet. */
   }

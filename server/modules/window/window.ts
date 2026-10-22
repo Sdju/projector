@@ -24,9 +24,16 @@ function desktopCommand(url: string, action: "show" | "toggle" | "tray" | "quit"
     let output = "";
     let errors = "";
     const timeout = setTimeout(() => {
+      const detail = errors.trim();
       child.kill();
-      reject(new Error("Системное окно не ответило. Проверьте GTK4 и desktop-сессию."));
-    }, 8000);
+      reject(
+        new Error(
+          detail
+            ? `Системное окно не ответило. ${detail}`
+            : "Системное окно не ответило. Проверьте GTK4 и desktop-сессию.",
+        ),
+      );
+    }, 20000);
     child.stderr.on("data", (chunk) => {
       const text = chunk.toString();
       errors = (errors + text).slice(-8000);

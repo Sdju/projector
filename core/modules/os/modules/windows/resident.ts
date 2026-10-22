@@ -1,4 +1,4 @@
-import type { DesktopAction, ResidentOptions } from "../../contract.ts";
+import type { DesktopAction, DesktopPalette, ResidentOptions } from "../../contract.ts";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { userInfo } from "node:os";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -6,6 +6,8 @@ import net from "node:net";
 import { dirname, join } from "node:path";
 import { dataHome } from "./directories.ts";
 import { processIdentity } from "./processes.ts";
+import { readWindowsColorScheme } from "./color-scheme.ts";
+import { warmWindowHelper } from "./hwnd.ts";
 import { startDesktopShell } from "./shell.ts";
 import { restrictToOwner } from "./tools.ts";
 
@@ -198,6 +200,21 @@ async function own(
   // Loaded before any window exists: only then is its surface wrapped as a Win32Surface.
   await import("gi:GdkWin32-4.0").catch(() => undefined);
   Gtk.init();
+  warmWindowHelper();
+  const applyColorScheme = async () => {
+    try {
+      const resolved = await readWindowsColorScheme();
+      if (!resolved) return;
+      const settings = Gtk.Settings.getDefault();
+      if (!settings) return;
+      const next =
+        resolved === "dark" ? Gtk.InterfaceColorScheme.DARK : Gtk.InterfaceColorScheme.LIGHT;
+      if (settings.gtkInterfaceColorScheme !== next) settings.gtkInterfaceColorScheme = next;
+    } catch (error) {
+      console.error("Тема:", error instanceof Error ? error.message : error);
+    }
+  };
+  await applyColorScheme();
   const loop = GLib.MainLoop.new(null, false);
   // Node owns the thread. Blocking in MainLoop.run does not deliver named-pipe
   // events on Windows, so GTK is pumped from a libuv timer: fast while events
@@ -215,26 +232,48 @@ async function own(
   };
   pump();
   try {
-    const palette = await options.createPalette(baseUrl);
+    // The tray host compiles C# while the palette loads. Sequential startup misses the
+    // server's READY deadline when Vite is bundling at the same time.
+    let palette: DesktopPalette | undefined;
+    const deferred: Array<(palette: DesktopPalette) => void> = [];
+    const withPalette = (run: (palette: DesktopPalette) => void) => {
+      if (palette) run(palette);
+      else deferred.push(run);
+    };
+    const shellPromise = startDesktopShell(options.dataDirectory, {
+      onActivate: () => {
+        withPalette((item) => void item.invokeSelected());
+      },
+      onHotkey: () => {
+        withPalette((item) => void item.invokeSelected(true));
+      },
+      onSettings: () => {
+        withPalette((item) => item.openPage("/settings"));
+      },
+      onRestart: () => {
+        withPalette((item) => void item.restartProjector());
+      },
+      onQuit: () => {
+        withPalette((item) => void item.quitProjector());
+      },
+      onColorScheme: () => {
+        void applyColorScheme();
+      },
+    });
+    let shell;
+    try {
+      palette = await options.createPalette(baseUrl);
+    } catch (error) {
+      shell = await shellPromise;
+      await shell.stop();
+      throw error;
+    }
+    for (const run of deferred.splice(0)) run(palette);
+    shell = await shellPromise;
     let stopping = false;
     let release = () => {};
     const untilStop = new Promise<void>((resolve) => {
       release = resolve;
-    });
-    const shell = await startDesktopShell(options.dataDirectory, {
-      onActivate: () => {
-        void palette.invokeSelected();
-      },
-      onHotkey: () => {
-        void palette.invokeSelected(true);
-      },
-      onSettings: () => palette.openPage("/settings"),
-      onRestart: () => {
-        void palette.restartProjector();
-      },
-      onQuit: () => {
-        void palette.quitProjector();
-      },
     });
     const configuredShortcut = async () => {
       try {

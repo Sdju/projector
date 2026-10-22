@@ -60,12 +60,15 @@ $link.Save()
 
 test.skipIf(!windows)("a real GTK window gets an HWND that the adapter can raise", async () => {
   const script = fileURLToPath(new URL("./fixtures/gtk-window.mjs", import.meta.url));
-  const { stdout, stderr } = await execute(process.execPath, ["--import", "vio/register", script], {
+  const { stdout } = await execute(process.execPath, ["--import", "vio/register", script], {
     timeout: 50000,
   }).catch((error) => {
     throw new Error(`${error.message}\n${error.stdout}\n${error.stderr}`);
   });
-  const result = JSON.parse(stdout.trim().split(/\r?\n/).at(-1), stderr);
+  const result = JSON.parse(stdout.trim().split(/\r?\n/).at(-1));
   expect(result.handle).toBeGreaterThan(0);
-  expect(result.window).toBe("True|Projector GTK smoke");
+  const [visible, title, dx, dy] = result.window.split("|");
+  expect(`${visible}|${title}`).toBe("True|Projector GTK smoke");
+  expect(Math.abs(Number(dx))).toBeLessThanOrEqual(8);
+  expect(Math.abs(Number(dy))).toBeLessThanOrEqual(8);
 });

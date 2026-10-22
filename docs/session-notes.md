@@ -28,7 +28,7 @@
 
 ## Native и vio
 
-GTK работает отдельным Node-процессом. На Linux resident владеет D-Bus именем `dev.projector.Launcher`, интерфейсом `dev.projector.Launcher.Control` на `/dev/projector/Launcher`; GLib MainLoop обслуживает окно, трей и хоткей. На Windows тот же процесс слушает именованный канал `dev.projector.Launcher`, а трей и хоткей держит скрытое окно Win32. На macOS команды идут по Unix-сокету `launcher.sock` в каталоге данных, а меню в строке меню и хоткей обслуживает Swift-помощник. `vp dev` и prod-сервер поднимают этот процесс при старте, без показа палитры. Сервер ждёт `READY` до восьми секунд.
+GTK работает отдельным Node-процессом. На Linux resident владеет D-Bus именем `dev.projector.Launcher`, интерфейсом `dev.projector.Launcher.Control` на `/dev/projector/Launcher`; GLib MainLoop обслуживает окно, трей и хоткей. На Windows тот же процесс слушает именованный канал `dev.projector.Launcher`, а трей и хоткей держит скрытое окно Win32. На macOS команды идут по Unix-сокету `launcher.sock` в каталоге данных, а меню в строке меню и хоткей обслуживает Swift-помощник. `vp dev` и prod-сервер поднимают этот процесс при старте, без показа палитры. Сервер ждёт `READY` до двадцати секунд.
 
 Native не имеет HMR. После изменений пересоберите `vio`, если менялся renderer, и перезапустите только native:
 
@@ -38,7 +38,7 @@ node --import vio/register native/app/entry.ts native http://localhost:4177 quit
 ./bin/projector --native
 ```
 
-`projector quit` для этого не подходит: он завершает сервер и его терминалы. При сбое запуска ошибка содержит накопленный stderr native-процесса (последние 8000 символов, `server/modules/window/window.ts`); на timeout ожидания `READY` (8 с) stderr в сообщение не попадает — запустите native вручную и выясните этап сбоя.
+`projector quit` для этого не подходит: он завершает сервер и его терминалы. При сбое запуска ошибка содержит накопленный stderr native-процесса (последние 8000 символов, `server/modules/window/window.ts`); на timeout ожидания `READY` (20 с) в сообщение попадает накопленный stderr, если процесс успел его напечатать.
 
 Прямой экспорт D-Bus callbacks через node-gtk аварийно завершает процесс; используйте `dbus-next`. GTK-типы генерируются из установленных typelibs командой `vp run gtk:types`, автоматически перед build. `usocket` необязателен, его сборка отключена.
 
