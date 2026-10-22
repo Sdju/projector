@@ -74,7 +74,8 @@ export function createToolSpecs(context: ToolSpecContext): ToolSpec[] {
     }),
     defineSpec({
       name: "execute_command",
-      description: "Вызвать ранее описанную команду Projector в явной области scope.",
+      description:
+        "Вызвать команду Projector в явной области scope. Только после describe_command для этой же пары command и scope: без него вызов отклоняется. Порядок всегда такой: list_commands, describe_command, execute_command.",
       shape: {
         command: z.string(),
         scope: z.string(),
