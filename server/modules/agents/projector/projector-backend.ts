@@ -20,7 +20,14 @@ import {
   thinkingLevel,
   thinkingOptions,
 } from "../../providers/index.ts";
-import { costOf, tokensOf, type Price, type Tokens } from "./projector-usage.ts";
+import {
+  contextOf,
+  costOf,
+  tokensOf,
+  type Price,
+  type SdkUsage,
+  type Tokens,
+} from "./projector-usage.ts";
 import { budgetNote, turnBudget } from "./projector-budget.ts";
 import { isRetryable, MAX_RETRIES, pause, retryDelay } from "./projector-retry.ts";
 import { connectMcp, mcpSection } from "./projector-mcp.ts";
@@ -148,6 +155,8 @@ async function turn(options: AgentRunOptions, open: { close: () => Promise<void>
   let text = "";
   /** What the first request of the answer found in the provider cache. */
   let firstRequest: Tokens | undefined;
+  /** One entry per model request of the successful attempt; the last one fills the context window. */
+  let requests: SdkUsage[] = [];
   let result: ReturnType<typeof streamText<typeof tools>>;
   // A request that fails before the model said anything is repeated; later the turn would replay.
   for (let attempt = 0; ; attempt++) {
@@ -165,6 +174,7 @@ async function turn(options: AgentRunOptions, open: { close: () => Promise<void>
     let started = false;
     let failure: unknown;
     firstRequest = undefined;
+    requests = [];
     for await (const part of result.fullStream) {
       if (part.type === "error") {
         failure = part.error;
@@ -186,6 +196,7 @@ async function turn(options: AgentRunOptions, open: { close: () => Promise<void>
         });
       } else if (part.type === "finish-step") {
         firstRequest ??= tokensOf(part.usage);
+        requests.push(part.usage);
       } else if (part.type === "tool-result") {
         options.emit("tool-result", {
           id: part.toolCallId,
@@ -238,19 +249,15 @@ async function turn(options: AgentRunOptions, open: { close: () => Promise<void>
   } catch {
     // No usage, no tooltip.
   }
-  // The last request carried the whole conversation, so its size is how full the context is.
-  try {
-    const usage = await result.usage;
-    const used = (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0);
-    if (used)
-      options.emit("context", {
-        used,
-        size: resolved.contextTokens ?? DEFAULT_CONTEXT_SIZE,
-        model: resolved.model,
-      });
-  } catch {
-    // The indicator keeps its previous value.
-  }
+  // `result.usage` sums every step, and each step resends the conversation, so that sum
+  // counts the same prefix again. The last request is the window.
+  const used = contextOf(requests);
+  if (used)
+    options.emit("context", {
+      used,
+      size: resolved.contextTokens ?? DEFAULT_CONTEXT_SIZE,
+      model: resolved.model,
+    });
   const stopped =
     (await result.finishReason) === "tool-calls" ? (budget.reason() ?? "steps") : undefined;
   if (stopped) {

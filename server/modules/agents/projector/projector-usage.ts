@@ -1,5 +1,5 @@
-/** Token counts of a request as the SDK reports them. */
-interface SdkUsage {
+/** Token counts of one model request as the SDK reports them. */
+export interface SdkUsage {
   inputTokens?: number;
   outputTokens?: number;
   inputTokenDetails?: {
@@ -14,6 +14,16 @@ export interface Tokens {
   output: number;
   cacheRead: number;
   cacheWrite: number;
+}
+
+/**
+ * How full the window is after a turn. Every step sends the conversation again, and cached
+ * tokens already sit inside that step's `inputTokens`, so only the last request counts:
+ * its whole prompt plus the answer it just wrote.
+ */
+export function contextOf(steps: readonly SdkUsage[]): number {
+  const last = steps.at(-1);
+  return (last?.inputTokens ?? 0) + (last?.outputTokens ?? 0);
 }
 
 /** `input` counts the prompt tokens the cache did not serve, as in the usage tooltip of the chat. */

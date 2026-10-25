@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { buildSystemPrompt } from "../server/modules/agents/projector/prompts.ts";
-import { tokensOf } from "../server/modules/agents/projector/projector-usage.ts";
+import { contextOf, tokensOf } from "../server/modules/agents/projector/projector-usage.ts";
 
 describe("prompt cache", () => {
   it("builds a byte-identical system prompt every time, so the provider can cache its prefix", () => {
@@ -23,6 +23,24 @@ describe("prompt cache", () => {
       cacheWrite: 0,
     });
     expect(tokensOf(undefined).input).toBe(0);
+  });
+
+  it("fills the window from the last request, with cached tokens counted once", () => {
+    const steps = [
+      {
+        inputTokens: 9229,
+        outputTokens: 216,
+        inputTokenDetails: { noCacheTokens: 9229, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      },
+      {
+        inputTokens: 25000,
+        outputTokens: 400,
+        inputTokenDetails: { noCacheTokens: 2000, cacheReadTokens: 23000, cacheWriteTokens: 0 },
+      },
+    ];
+    // The sum of both prompts would be 34845 and would trip autocompact on a 128k window.
+    expect(contextOf(steps)).toBe(25400);
+    expect(contextOf([])).toBe(0);
   });
 });
 
