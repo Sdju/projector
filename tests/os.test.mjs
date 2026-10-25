@@ -186,6 +186,50 @@ test(
 );
 
 test(
+  "macOS install writes a CLI command and an Applications .app for Spotlight/Raycast",
+  { skip: process.platform !== "darwin" },
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), "projector-os-install-"));
+    onTestFinished(() => rm(directory, { recursive: true, force: true }));
+    const root = join(directory, "checkout with spaces");
+    const home = join(directory, "home");
+    const previousHome = process.env.HOME;
+    process.env.HOME = home;
+    onTestFinished(() => {
+      process.env.HOME = previousHome;
+    });
+    await mkdir(join(root, "cli", "app"), { recursive: true });
+    await mkdir(home);
+    await cp(new URL("../resources/icons", import.meta.url), join(root, "resources", "icons"), {
+      recursive: true,
+    });
+    await writeFile(join(root, "package.json"), JSON.stringify({ version: "9.9.9" }));
+    await writeFile(join(root, "cli", "app", "launch.mjs"), "export {};\n");
+    const facade = new URL("../core/modules/os/index.ts", import.meta.url).href;
+    execFileSync(
+      process.execPath,
+      [
+        "--input-type=module",
+        "-e",
+        `import { os } from ${JSON.stringify(facade)};os.installDesktop(process.argv[1]);`,
+        root,
+      ],
+      { env: { ...process.env, HOME: home } },
+    );
+    const command = join(home, ".local/bin/projector");
+    const app = join(home, "Applications/Projector.app");
+    const wrapper = await readFile(command, "utf8");
+    expect(wrapper).toMatch(/checkout with spaces/);
+    expect(wrapper).toMatch(/cli\/app\/launch\.mjs/);
+    expect(await readFile(join(app, "Contents/MacOS/Projector"), "utf8")).toContain(command);
+    const plist = await readFile(join(app, "Contents/Info.plist"), "utf8");
+    expect(plist).toMatch(/dev\.projector\.app/);
+    expect(plist).toMatch(/9\.9\.9/);
+    expect(existsSync(join(app, "Contents/Resources/Projector.icns"))).toBe(true);
+  },
+);
+
+test(
   "Linux paths follow the user environment rather than a checkout or account",
   { skip: process.platform !== "linux" },
   () => {

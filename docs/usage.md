@@ -27,7 +27,7 @@
 
 Локальность определяется по адресу соединения, а не по `Host` или proxy-заголовкам. Сервер принимает `localhost` и числовые IP (защита от DNS rebinding). Перезапуск и смена режима из сети запрещены. LAN работает по HTTP.
 
-`vp run desktop` ставит команду `projector` в `~/.local/bin` и пункт меню; установка ссылается на checkout. Автозапуск не устанавливается: добавьте `projector --tray` средствами рабочего окружения.
+`vp run desktop` ставит команду `projector` в `~/.local/bin` и пункт меню (Linux: `.desktop`, Windows: ярлык в Пуск, macOS: `~/Applications/Projector.app` для Spotlight/Raycast/Launchpad); установка ссылается на checkout. Автозапуск не устанавливается: добавьте `projector --tray` средствами рабочего окружения.
 
 ## OpenAI-совместимый API
 

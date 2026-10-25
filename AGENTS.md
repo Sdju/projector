@@ -13,7 +13,7 @@ vp run build
 # либо ./bin/projector --browser
 ```
 
-Адрес: <http://localhost:4177>. Проекты открываются по пути (`/projects/<путь>`), страницы списка нет; настройки — `/settings`. `vp run desktop` устанавливает пункт меню и команду `projector`.
+Адрес: <http://localhost:4177>. Проекты открываются по пути (`/projects/<путь>`), страницы списка нет; настройки — `/settings`. `vp run desktop` устанавливает пункт меню и команду `projector` (на macOS ещё `~/Applications/Projector.app` для Spotlight/Raycast).
 
 ## Критично для разработки
 
