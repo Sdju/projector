@@ -114,8 +114,7 @@ export async function mutateProjectGit(
   if (!["stage", "unstage", "discard"].includes(action))
     throw new HttpError(400, "Неизвестное действие Git");
   const paths = [...new Set(Array.isArray(selection) ? selection : [selection])];
-  if (!paths.length || paths.length > 10000 || (action === "discard" && paths.length !== 1))
-    throw new HttpError(400, "Укажите файлы Git");
+  if (!paths.length || paths.length > 10000) throw new HttpError(400, "Укажите файлы Git");
   for (const path of paths) {
     validatePath(path);
     if (!path || path.includes("\\") || (await pathExcluded(path)))
@@ -176,8 +175,14 @@ export async function mutateProjectGit(
           ? ["restore", "--staged", "--", ...indexPaths]
           : ["rm", "--cached", "-f", "--", ...indexPaths],
       );
-    } else if (selected[0]!.index === "?") await mutateProjectEntry(base, "delete", paths[0]!);
-    else await git(base, ["restore", "--worktree", "--", paths[0]!]);
+    } else {
+      const tracked = selected
+        .filter((change) => change.index !== "?")
+        .map((change) => change.path);
+      if (tracked.length) await git(base, ["restore", "--worktree", "--", ...tracked]);
+      for (const change of selected)
+        if (change.index === "?") await mutateProjectEntry(base, "delete", change.path);
+    }
     return projectGit(base);
   });
 }

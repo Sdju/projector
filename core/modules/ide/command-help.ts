@@ -54,7 +54,7 @@ export function commandHelp(id: string): {
   if (id.startsWith("ide.git."))
     return {
       description:
-        "Действие Git в текущем проекте. stage/unstage: path файла, префикс папки или пустая строка для всей группы. discard восстанавливает рабочий файл из индекса; untracked переносит в корзину.",
+        "Действие Git в текущем проекте. stage/unstage/discard: path файла, префикс папки или пустая строка для всей группы. discard (в т.ч. для папки) восстанавливает рабочий файл из индекса; untracked переносит в корзину.",
       arguments: id.endsWith(".refresh")
         ? {}
         : {

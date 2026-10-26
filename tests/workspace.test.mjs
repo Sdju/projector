@@ -843,6 +843,13 @@ test("Git actions preserve staged content, handle deleted/literal paths and tras
         name.endsWith("-[literal].txt"),
       ),
     ).toBeTruthy();
+    await writeFile(join(base, "other.txt"), "dirty");
+    await writeFile(join(base, "fresh.txt"), "new");
+    await mutateProjectGit(base, "discard", ["other.txt", "fresh.txt"]);
+    expect(await readFile(join(base, "other.txt"), "utf8")).toBe("head");
+    await expect(readFile(join(base, "fresh.txt"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
     run("mv", "other.txt", "renamed.txt");
     await mutateProjectGit(base, "unstage", "renamed.txt");
     expect(run("diff", "--cached")).toBe("");

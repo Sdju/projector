@@ -66,7 +66,7 @@ export function registerChangeCommands(ctx: ChangeCommandContext) {
       title,
       enabled: (value) => {
         if (gitBusy.value) return false;
-        if (action === "stage" || action === "unstage") {
+        if (action === "stage" || action === "unstage" || action === "discard") {
           const selection = gitSelection(value, action === "unstage");
           return (
             !!selection.length &&
@@ -88,25 +88,25 @@ export function registerChangeCommands(ctx: ChangeCommandContext) {
         const { path, staged, confirm, pinned } = gitArgs(value);
         if (action === "openFile" || action === "openDiff")
           return ctx.open(path, action === "openDiff" ? staged : undefined, pinned);
+        const selection = gitSelection(value, action === "unstage");
+        const paths = selection.map((change) => change.path);
         if (
           action === "discard" &&
           !confirm &&
           !window.confirm(
-            gitChange(value)?.index === "?"
-              ? `Убрать новый файл ${path}? Он будет перемещён в .projector-trash.`
-              : `Откатить рабочие изменения ${path} до подготовленной версии? Несохранённый черновик тоже будет удалён.`,
+            paths.length > 1
+              ? `Откатить рабочие изменения: ${paths.length} файлов${path ? ` в ${path}` : ""}? Новые файлы будут перемещены в .projector-trash, несохранённые черновики удалены.`
+              : selection[0]?.index === "?"
+                ? `Убрать новый файл ${paths[0]}? Он будет перемещён в .projector-trash.`
+                : `Откатить рабочие изменения ${paths[0]} до подготовленной версии? Несохранённый черновик тоже будет удалён.`,
           )
         )
           return;
-        const paths =
-          action === "discard"
-            ? [path]
-            : gitSelection(value, action === "unstage").map((change) => change.path);
         gitBusy.value = true;
         try {
           await ctx.prepare(action, paths);
           ctx.invalidate();
-          await ctx.overview.mutate(action, action === "discard" ? path : paths);
+          await ctx.overview.mutate(action, paths);
           await ctx.applied(action, paths);
         } finally {
           gitBusy.value = false;

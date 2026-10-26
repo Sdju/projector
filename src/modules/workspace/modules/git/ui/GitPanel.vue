@@ -129,7 +129,7 @@ const gitMenuItems = computed<ContextMenuItem[]>(() => {
       ? [gitCommands.item("ide.git.openDiff", args), gitCommands.item("ide.git.openFile", args)]
       : []),
     gitCommands.item(args.staged ? "ide.git.unstage" : "ide.git.stage", args, { separator: true }),
-    ...(!args.staged && file ? [gitCommands.item("ide.git.discard", args, { danger: true })] : []),
+    ...(!args.staged ? [gitCommands.item("ide.git.discard", args, { danger: true })] : []),
   ];
 });
 function gitContext(event: MouseEvent | KeyboardEvent, path: string, staged: boolean) {
