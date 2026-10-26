@@ -256,12 +256,11 @@ onMounted(() => {
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.domEventHandlers({
           dragover(event) {
-            const data = event.dataTransfer;
-            if (!data) return false;
-            if (!isFileDrag(data) && !data.types.includes("application/x-projector-tree-entry"))
-              return false;
+            if (!acceptsDrag(event.dataTransfer)) return false;
             event.preventDefault();
-            data.dropEffect = "copy";
+            // The dock behind the chat would offer to open the drop as a side panel.
+            event.stopPropagation();
+            event.dataTransfer!.dropEffect = "copy";
             return true;
           },
           drop(event, target) {
@@ -270,18 +269,9 @@ onMounted(() => {
             const at =
               target.posAtCoords({ x: event.clientX, y: event.clientY }) ??
               target.state.selection.main.head;
-            const chips = droppedChips(data);
-            if (chips.length) {
-              event.preventDefault();
-              insertDropped(target, chips, at);
-              target.focus();
-              return true;
-            }
-            // The browser gave no path (a dragged image, not a file): send the image itself.
-            const images = imagesOf(data);
-            if (!images.length) return false;
+            if (!dropData(data, at)) return false;
             event.preventDefault();
-            void attachImages(images, at);
+            event.stopPropagation();
             return true;
           },
           paste(event) {
@@ -332,6 +322,26 @@ watch(draft, (value) => {
   setContent(target, value ? [{ type: "text", text: value }] : []);
 });
 
+function acceptsDrag(data: DataTransfer | null): data is DataTransfer {
+  return !!data && (isFileDrag(data) || data.types.includes("application/x-projector-tree-entry"));
+}
+/** Puts dropped files, folders and images in as chips; false when there was nothing to take. */
+function dropData(data: DataTransfer, at?: number): boolean {
+  const target = view.value;
+  if (!target) return false;
+  const position = at ?? target.state.selection.main.head;
+  const chips = droppedChips(data);
+  if (chips.length) {
+    insertDropped(target, chips, position);
+    target.focus();
+    return true;
+  }
+  // The browser gave no path (a dragged image, not a file): send the image itself.
+  const images = imagesOf(data);
+  if (!images.length) return false;
+  void attachImages(images, position);
+  return true;
+}
 function insertChips(chips: MessageChip[]) {
   const target = view.value;
   if (!target) return;
@@ -341,6 +351,8 @@ function insertChips(chips: MessageChip[]) {
 defineExpose({
   focus: () => view.value?.focus(),
   insertChips,
+  acceptsDrag,
+  dropData,
   /** Puts the cursor behind everything written. */
   end: () =>
     view.value?.dispatch({

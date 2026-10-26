@@ -5,6 +5,7 @@ import { useIdeCommands } from "../../ide/index.ts";
 import { workspaceRequest } from "../../workspace-api/index.ts";
 import { agentCommandHandler } from "../model/commands.ts";
 import { agentLabel, guiPrograms } from "../model/modes.ts";
+import { chatDropHandlers } from "../lib/chat-drop.ts";
 import { useAgent } from "../model/session.ts";
 import { readoutLines, useTabReadout } from "../../../common/utilities/tab-readout.ts";
 import UiPanel from "../../../common/ui/UiPanel.vue";
@@ -177,6 +178,7 @@ useTabReadout(() => {
 const log = ref<HTMLElement>();
 const controlsMenu = ref<InstanceType<typeof AgentControls>>();
 const composer = ref<InstanceType<typeof AgentComposer>>();
+const chatDrop = chatDropHandlers(() => composer.value);
 const panel = ref<InstanceType<typeof UiPanel>>();
 const root = computed(() => panel.value?.element);
 
@@ -505,7 +507,14 @@ onBeforeUnmount(() => {
     aria-label="Чат с агентом"
     @focusin="activateChat(controller)"
     @pointerdown.capture="activateChat(controller)"
+    @dragenter="chatDrop.dragenter"
+    @dragover="chatDrop.dragover"
+    @dragleave="chatDrop.dragleave"
+    @drop="chatDrop.drop"
   >
+    <div v-if="chatDrop.over.value" class="chat-drop-hint" aria-hidden="true">
+      Бросьте файлы или папки — добавим в сообщение
+    </div>
     <UiInline class="chat-tools" :gap="1" align="normal" justify="normal">
       <AgentSessions
         :sessions="sessions"
@@ -702,6 +711,19 @@ onBeforeUnmount(() => {
   </UiPanel>
 </template>
 <style scoped>
+.chat-drop-hint {
+  position: absolute;
+  inset: 6px;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--accent, currentColor);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  color: var(--text, inherit);
+  font-size: 14px;
+  pointer-events: none;
+}
 .agent-chat {
   --chat-width: 680px;
   min-width: 0;

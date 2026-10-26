@@ -35,7 +35,12 @@ watch(
   () => (expanded.value = false),
 );
 const input = ref<InstanceType<typeof AgentInput>>();
-defineExpose({ resize: () => {}, focus: () => input.value?.focus() });
+defineExpose({
+  resize: () => {},
+  focus: () => input.value?.focus(),
+  acceptsDrag: (data: DataTransfer | null) => !!input.value?.acceptsDrag(data),
+  dropData: (data: DataTransfer) => !!input.value?.dropData(data),
+});
 </script>
 
 <template>
