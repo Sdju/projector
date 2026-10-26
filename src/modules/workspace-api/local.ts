@@ -48,10 +48,18 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
     layout: "full",
     sidebar: [{ id: "docker", title: "Docker", command: "ide.docker.sidebar.open" }],
     tabs: [
-      singletonTab("agent", "agent:chat", "Агент", "Чат с агентом Projector", {
+      // The Projector agent: the tab without a chat id is the project's original conversation.
+      defineTab<{ chatId?: string }>({
+        id: "agent",
+        key: (params) => (params.chatId ? `agent:chat:${params.chatId}` : "agent:chat"),
+        path: () => "Агент",
+        title: () => "Чат с агентом Projector",
+        create: () => ({ chatId: newId() }),
         command: {
           id: "ide.workbench.agent.open",
           title: "Открыть чат с агентом",
+          description:
+            "Открывает новую вкладку с чатом агента Projector; вкладок можно открыть сколько нужно, у каждой свой диалог.",
           requires: "agent",
         },
       }),

@@ -75,7 +75,7 @@ export const baseTabViews: TabViews = {
   agent: {
     component: AgentChat,
     keepAlive: true,
-    props: (_, host) => ({ projectId: host.projectId }),
+    props: (tab, host) => ({ projectId: host.projectId, chatId: tab.params?.chatId }),
   },
   "agent-task": {
     component: AgentTaskTab,

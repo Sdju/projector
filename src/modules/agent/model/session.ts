@@ -52,8 +52,8 @@ export function useAgent(
   options: { backend?: AgentBackendId; chatId?: string } = {},
 ) {
   const backend = options.backend ?? "projector";
-  const key =
-    backend === "projector" ? projectId : `${backend}:${projectId}:${options.chatId ?? "main"}`;
+  const own = backend === "projector" && !options.chatId;
+  const key = own ? projectId : `${backend}:${projectId}:${options.chatId ?? "main"}`;
   clearTimeout(releases.get(key));
   releases.delete(key);
   if (!sessions.has(key)) sessions.set(key, createState());

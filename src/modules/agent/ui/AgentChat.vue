@@ -468,11 +468,16 @@ watch(
     void topUp(true);
   },
 );
+// A chat tab stays mounted while hidden: the input takes focus each time the tab is shown.
+let tabShown = false;
 onMounted(() => {
   composer.value?.resize();
   observer = new ResizeObserver(() => {
     pin();
     composer.value?.resize();
+    const nowShown = !!root.value && root.value.getClientRects().length > 0;
+    if (nowShown && !tabShown) composer.value?.focus();
+    tabShown = nowShown;
   });
   if (log.value) observer.observe(log.value);
   observeContent();
