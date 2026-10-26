@@ -64,7 +64,7 @@ export function createClaudeEventMapper(emit: AgentEmitter) {
 
   /** Tasks the panel shows as running; whatever is left when the process ends never reports. */
   const running = new Set<string>();
-  /** Subagents (not shell commands) that still work: the process must stay up for them to finish. */
+  /** Background subagents, commands and monitors that still work: the process must stay up for them to report. */
   let working = 0;
   /** The `done` of a result that came while background agents still work: sent when they are over. */
   let pendingDone: { text: string; added: never[]; costUsd?: number } | undefined;
@@ -81,9 +81,9 @@ export function createClaudeEventMapper(emit: AgentEmitter) {
     switch (message.subtype) {
       case "background_tasks_changed":
         // A level signal: the whole set of live tasks, so a missed start or end cannot leave it stale.
-        working = message.tasks.filter(
-          (item) => !item.ambient && item.task_type !== "local_bash",
-        ).length;
+        // Background commands count too: their completion report wakes the agent, and closing the
+        // input would kill the process before it can report.
+        working = message.tasks.filter((item) => !item.ambient).length;
         return;
       case "task_started":
         if (message.skip_transcript || message.ambient) return;
@@ -275,7 +275,7 @@ export function createClaudeEventMapper(emit: AgentEmitter) {
 
   return {
     handle,
-    /** Subagents still working: the agent process has to be kept alive for them. */
+    /** Background tasks still working: the agent process has to be kept alive for them. */
     get working() {
       return working;
     },
