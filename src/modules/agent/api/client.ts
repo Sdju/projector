@@ -1,3 +1,4 @@
+import { EVENTS_UNAVAILABLE, EventStreamRefused, streamViaEvents } from "./event-stream.ts";
 import type {
   AgentCommand,
   AgentBackendId,
@@ -79,37 +80,25 @@ export async function streamAgent(
     attach?: string;
   } = {},
 ): Promise<void> {
-  const response = await fetch("/api/agent", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(
-      options.attach
-        ? { attach: options.attach, approvals: true, commandBridge: !!options.commands }
-        : {
-            message,
-            history,
-            projectId: options.projectId,
-            chat: options.chat,
-            sessionId: options.sessionId,
-            backend: options.backend,
-            permissionMode: options.permissionMode,
-            selection: options.selection,
-            parts: options.parts,
-            messageId: options.messageId,
-            tail: options.tail,
-            worktree: options.worktree,
-            isolate: options.isolate,
-            approvals: true,
-            commandBridge: !!options.commands,
-          },
-    ),
-    signal,
-  });
-  if (!response.ok || !response.body) {
-    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-    const message = payload?.error || "Агент недоступен";
-    throw response.status === 404 ? new AgentRunGone(message) : new Error(message);
-  }
+  const request = options.attach
+    ? { attach: options.attach, approvals: true, commandBridge: !!options.commands }
+    : {
+        message,
+        history,
+        projectId: options.projectId,
+        chat: options.chat,
+        sessionId: options.sessionId,
+        backend: options.backend,
+        permissionMode: options.permissionMode,
+        selection: options.selection,
+        parts: options.parts,
+        messageId: options.messageId,
+        tail: options.tail,
+        worktree: options.worktree,
+        isolate: options.isolate,
+        approvals: true,
+        commandBridge: !!options.commands,
+      };
 
   async function handle(event: AgentEvent) {
     if (event.event !== "command-request") return onEvent(event);
@@ -127,6 +116,25 @@ export async function streamAgent(
       signal,
     });
     if (!reply.ok) throw new Error("Не удалось передать результат команды агенту");
+  }
+  try {
+    if ((await streamViaEvents(request, handle, signal)) !== EVENTS_UNAVAILABLE) return;
+  } catch (error) {
+    if (error instanceof EventStreamRefused)
+      throw error.status === 404 ? new AgentRunGone(error.message) : error;
+    throw error;
+  }
+  // The page has no events stream (yet): the answer comes in the body of the response.
+  const response = await fetch("/api/agent", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+    signal,
+  });
+  if (!response.ok || !response.body) {
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+    const message = payload?.error || "Агент недоступен";
+    throw response.status === 404 ? new AgentRunGone(message) : new Error(message);
   }
   const reader = response.body.getReader();
   const decoder = new TextDecoder();

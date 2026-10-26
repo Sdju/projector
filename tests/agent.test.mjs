@@ -288,6 +288,40 @@ test("HTTP agent streams discovery, description, execution, Bash and final text 
         .at(-1)
         .messages.some((m) => m.role === "tool" && m.content.includes("agent-shell-ok")),
     ).toBeTruthy();
+    // The same answer through the page's events stream: the request returns at once.
+    const { pageClientId } = await import("../src/common/utilities/page-client.ts");
+    const { get } = await import("node:http");
+    const page = new EventTarget();
+    globalThis.window = page;
+    const delivered = [];
+    const stream = await new Promise((resolve) =>
+      get(`${base}/api/events?client=${pageClientId}`, (res) => {
+        let buffer = "";
+        res.on("data", (chunk) => {
+          buffer += chunk;
+          const parts = buffer.split("\n\n");
+          buffer = parts.pop();
+          for (const part of parts) {
+            const name = /^event: (.*)$/m.exec(part)?.[1];
+            const data = /^data: (.*)$/m.exec(part)?.[1];
+            if (!name || data === undefined) continue;
+            if (name === "agent") delivered.push(JSON.parse(data));
+            page.dispatchEvent(new CustomEvent(`projector:${name}`, { detail: JSON.parse(data) }));
+          }
+        });
+        resolve(res);
+      }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    steps.length = 0;
+    requests.length = 0;
+    const viaEvents = [];
+    await streamAgent("Again", [], (event) => viaEvents.push(event), undefined, {});
+    expect(viaEvents.find((e) => e.event === "done").data.text).toBe("agent-http-ok");
+    expect(delivered.at(-1).event).toBe("end");
+    expect(delivered.some((e) => e.event === "done")).toBe(true);
+    stream.destroy();
+    delete globalThis.window;
     const rejected = await originalFetch(base + "/api/agent", {
       method: "POST",
       headers: { Origin: "https://foreign.example", "Content-Type": "application/json" },

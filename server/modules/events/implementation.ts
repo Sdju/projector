@@ -5,6 +5,8 @@ import { onProcessEvent } from "../processes/index.ts";
 interface SseClient {
   res: ServerResponse;
   id: string;
+  /** Pages served by this stream besides `id`: a shared worker keeps one stream for all of them. */
+  pages?: Set<string>;
 }
 
 type CloseListener = (clientId: string) => void;
@@ -30,7 +32,8 @@ export function bindEvents(): void {
 export function broadcastEvent(event: string, data: unknown, clientId?: string): void {
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const client of sseClients)
-    if (!clientId || client.id === clientId) client.res.write(payload);
+    if (!clientId || client.id === clientId || client.pages?.has(clientId))
+      client.res.write(payload);
 }
 
 /** Called when a page's stream closes: owners of per-page resources release them. */
@@ -49,17 +52,37 @@ export function attachSse(req: IncomingMessage, res: ServerResponse): void {
     Connection: "keep-alive",
   });
   res.write(":\n\n");
-  const client = {
+  const client: SseClient = {
     res,
     id: new URL(req.url ?? "/", "http://localhost").searchParams.get("client") ?? "",
   };
   sseClients.add(client);
   req.on("close", () => {
     sseClients.delete(client);
-    if (client.id) for (const listener of closeListeners) listener(client.id);
+    for (const id of [client.id, ...(client.pages ?? [])])
+      if (id) for (const listener of closeListeners) listener(id);
   });
+}
+
+/**
+ * Binds pages to the stream `stream` or releases them: what a page owns (file watchers) lives
+ * as long as the stream, or until the page is removed. False when the stream is gone.
+ */
+export function updateEventPages(stream: string, add: string[], remove: string[]): boolean {
+  const client = [...sseClients].find((item) => item.id === stream);
+  if (!client) return false;
+  const pages = (client.pages ??= new Set());
+  for (const id of add) if (id !== stream) pages.add(id);
+  for (const id of remove)
+    if (pages.delete(id)) for (const listener of closeListeners) listener(id);
+  return true;
 }
 
 export function notifyLauncherShow() {
   broadcastEvent("launcher-show", {});
+}
+
+/** Whether a page has an open event stream, directly or bound to a shared one. */
+export function hasEventClient(clientId: string): boolean {
+  return [...sseClients].some((item) => item.id === clientId || item.pages?.has(clientId));
 }

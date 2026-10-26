@@ -118,3 +118,5 @@ export {
   type JournalEntry,
   type StartJobInput,
 } from "./jobs.ts";
+export { trackEventStream, detachEventStream } from "./event-streams.ts";
+export { requestFrom } from "./request.ts";
