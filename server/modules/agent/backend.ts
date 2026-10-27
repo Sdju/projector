@@ -38,6 +38,7 @@ export type AgentEventName =
   | "controls"
   | "permission-request"
   | "question-request"
+  | "secret-request"
   | "run"
   | "worktree"
   | "status"

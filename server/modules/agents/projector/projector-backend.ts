@@ -1,4 +1,5 @@
-import type { AgentBackend, AgentRunOptions, AgentControl } from "../../agent/index.ts";
+import { runHostedAgent, type AgentBackend, type AgentRunOptions } from "../../agent/index.ts";
+import { fileURLToPath } from "node:url";
 import {
   defaultSettingsMiddleware,
   streamText,
@@ -13,12 +14,9 @@ import { widgetCatalog } from "./widgets.ts";
 import {
   createQwenOpenAI,
   envFallbackFromProcess,
-  loadPublicProviders,
   quietThinkingBody,
   resolveOpenAIProvider,
   thinkingBody,
-  thinkingLevel,
-  thinkingOptions,
 } from "../../providers/index.ts";
 import {
   contextOf,
@@ -36,6 +34,7 @@ import { memorySection } from "./projector-memory.ts";
 import { loadHooks, runStopHooks, withHooks } from "./projector-hooks.ts";
 import { projectInstructions } from "./project-instructions.ts";
 import { createBashReviewer } from "./projector-review.ts";
+import { controls, THINKING, TRUST } from "./projector-controls.ts";
 import { toMessages, userMessage } from "./projector-history.ts";
 import {
   COMPACT_COMMAND,
@@ -47,12 +46,24 @@ import {
 
 /** The window of a model that has none registered in the provider settings; the context ring is measured against it. */
 const DEFAULT_CONTEXT_SIZE = Number(process.env.PROJECTOR_AGENT_CONTEXT_TOKENS) || 128_000;
-const TRUST = "permission-mode";
-const MODES = new Set(["default", "auto", "bypassPermissions"]);
-const THINKING = "thinking";
+
+/** The runner process of a hosted answer (the composition root, which also registers the widgets). */
+const RUNNER = fileURLToPath(new URL("../../../app/projector-runner.ts", import.meta.url));
+
+/** The run: held by its own process when the route gave it one, otherwise in this process. */
+async function run(options: AgentRunOptions): Promise<void> {
+  if (!options.run) return runProjector(options);
+  // The runner reads the provider keys itself, so it gets the server's environment; the shell
+  // tool drops anything that looks like a secret before it starts a command.
+  await runHostedAgent(options, options.run, {
+    runner: RUNNER,
+    cwd: options.cwd || process.cwd(),
+    env: { ...process.env },
+  });
+}
 
 /** MCP servers live for one turn: whatever the turn started is stopped however it ends. */
-async function run(options: AgentRunOptions): Promise<void> {
+export async function runProjector(options: AgentRunOptions): Promise<void> {
   const open = { close: async () => {} };
   try {
     await turn(options, open);
@@ -299,82 +310,10 @@ async function compactChat(
   options.emit("done", { text: summary, added: [] });
 }
 
-/** The providers to choose from and whether the agent asks before changing things. */
-async function controls(selection: Record<string, string> = {}): Promise<AgentControl[]> {
-  const { providers, activeProviderId } = await loadPublicProviders(envFallbackFromProcess());
-  const list: AgentControl[] = [
-    {
-      id: TRUST,
-      via: "native",
-      category: "mode",
-      name: "Разрешения",
-      description: "Когда агент спрашивает перед командами оболочки и правками в Projector",
-      current: MODES.has(selection[TRUST]!) ? selection[TRUST]! : "default",
-      options: [
-        { value: "default", name: "Спрашивать", description: "Подтверждение перед изменениями" },
-        {
-          value: "auto",
-          name: "Авто",
-          description:
-            "Безопасные команды оболочки выполняются сразу — их проверяет отдельный запрос к модели, остальное подтверждается",
-        },
-        { value: "bypassPermissions", name: "Без вопросов" },
-      ],
-    },
-  ];
-  // One option per registered model of every enabled provider; `provider:alias` picks both.
-  const options = providers
-    .filter((item) => item.enabled && item.url)
-    .flatMap((item) =>
-      item.models.length
-        ? item.models.map((model) => ({
-            value: `${item.id}:${model.alias}`,
-            name: `${item.name} · ${model.alias}`,
-          }))
-        : [{ value: item.id, name: item.name }],
-    );
-  if (options.length) {
-    const wanted = selection.provider ?? "";
-    const byProvider = (id: string) => options.find((item) => item.value.split(":")[0] === id);
-    // A bare provider id (older chats) means its first model; an unknown choice, the default provider.
-    const current =
-      options.find((item) => item.value === wanted) ??
-      byProvider(wanted) ??
-      byProvider(activeProviderId ?? "") ??
-      options[0]!;
-    const [providerId, ...alias] = current.value.split(":");
-    const chosen = providers.find((item) => item.id === providerId);
-    const model =
-      chosen?.models.find((item) => item.alias === alias.join(":")) ?? chosen?.models[0];
-    const style = model?.thinking === false || !chosen ? "none" : chosen.thinkingStyle;
-    const levels = thinkingOptions(style);
-    if (levels.length)
-      list.push({
-        id: THINKING,
-        via: "native",
-        category: "effort",
-        name: "Размышление",
-        description: "Насколько модель думает перед ответом; без него ответ быстрее и дешевле",
-        current: thinkingLevel(style, selection[THINKING]),
-        options: levels,
-      });
-    list.unshift({
-      id: "provider",
-      via: "native",
-      category: "model",
-      name: "Модель",
-      description: "Провайдер и модель из настроек",
-      current: current.value,
-      options,
-    });
-  }
-  return list;
-}
-
 /** The Projector IDE assistant on the active OpenAI-compatible provider. */
 export const projectorBackend: AgentBackend = {
   id: "projector",
-  capabilities: { compact: { command: COMPACT_COMMAND, hintAt: 0.8, autoAt: 0.9 } },
+  capabilities: { hosted: true, compact: { command: COMPACT_COMMAND, hintAt: 0.8, autoAt: 0.9 } },
   controls: () => controls(),
   commands: async (cwd) => [
     { name: COMPACT_COMMAND.slice(1), description: "Сжать историю разговора в сводку" },

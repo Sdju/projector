@@ -48,6 +48,8 @@ export { createReplay } from "./replay.ts";
 export { injectMessage, registerInjector } from "./injection.ts";
 export { agentEnv, assertHostProject, attachedImages, promptWithHistory } from "./agent-host.ts";
 export { attachHosted, startHosted } from "./hosted-process.ts";
+export { runHostedAgent } from "./hosted-run.ts";
+export { runHostedRunner } from "./hosted-runner.ts";
 export {
   cancelRun,
   createRun,
