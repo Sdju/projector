@@ -1,7 +1,13 @@
 import { mkdir, realpath, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { HttpError } from "../http/index.ts";
-import { expandPath, inspectProject, loadProjects, updateProjects } from "../projects/index.ts";
+import {
+  expandPath,
+  inspectProject,
+  loadProjects,
+  sameLocalPath,
+  updateProjects,
+} from "../projects/index.ts";
 import type { Project } from "../projects/index.ts";
 import { normalizeProject } from "../project-presentation/index.ts";
 import { preferences, setFavoriteDirectory } from "../preferences/index.ts";
@@ -120,9 +126,9 @@ export async function createProjectIn(
   }
   const project = normalizeProject({ ...(await inspectProject(path, true)) });
   await updateProjects((projects) => {
-    if (!projects.some((item) => expandPath(item.path) === path)) projects.unshift(project);
+    if (!projects.some((item) => sameLocalPath(item.path, path))) projects.unshift(project);
   });
-  const stored = (await loadProjects()).find((item) => expandPath(item.path) === path) ?? project;
+  const stored = (await loadProjects()).find((item) => sameLocalPath(item.path, path)) ?? project;
   return { project: stored, route: workspaceRoute(path) };
 }
 

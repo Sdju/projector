@@ -1,5 +1,5 @@
 export { inspectProject, inspectProjectCommands } from "./inspect.ts";
-export { expandPath } from "./inspect.ts";
+export { expandPath, sameLocalPath } from "./inspect.ts";
 export { findProjects, listDirectory } from "./discovery.ts";
 
 export { loadProjects, findProject } from "./store.ts";

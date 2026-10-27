@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { dataDir } from "../../../../core/modules/app-paths/index.ts";
 
 export type MemoryScope = "user" | "project";
@@ -9,7 +9,17 @@ export type MemoryScope = "user" | "project";
 export const MEMORY_CHARS = 6_000;
 
 const root = () => join(dataDir(), "agent", "memory");
-const hash = (cwd: string) => createHash("sha256").update(cwd).digest("hex").slice(0, 16);
+/** Windows paths that differ only by case are one folder; the key must not depend on casing. */
+const hash = (cwd: string) => {
+  const path = resolve(cwd);
+  const key =
+    process.platform === "win32" && /^[a-z]:/i.test(path)
+      ? path[0]!.toUpperCase() + path.slice(1).toLowerCase()
+      : process.platform === "win32"
+        ? path.toLowerCase()
+        : path;
+  return createHash("sha256").update(key).digest("hex").slice(0, 16);
+};
 
 function fileOf(scope: MemoryScope, cwd?: string): string {
   if (scope === "user") return join(root(), "user.md");

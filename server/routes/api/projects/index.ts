@@ -3,6 +3,7 @@ import {
   loadProjects,
   updateProjects,
   expandPath,
+  sameLocalPath,
   inspectProject,
   type Project,
 } from "../../../modules/projects/index.ts";
@@ -24,24 +25,25 @@ export async function handleProjectsIndex({
     if (typeof body.path !== "string" || !body.path.trim())
       throw new HttpError(400, "Укажите путь к проекту");
     const directory = expandPath(body.path);
-    const existing = (await loadProjects()).find((item) => expandPath(item.path) === directory);
+    const existing = (await loadProjects()).find((item) => sameLocalPath(item.path, directory));
     if (existing) {
       // A saved project outlives its folder: report it so the UI can offer recovery.
       const missing = !(await stat(directory).then(
         (info) => info.isDirectory(),
         () => false,
       ));
-      json(res, 200, { project: withRuntime({ ...existing, path: directory }), missing });
+      // Keep the stored path (and thus the agent chat key); only the casing of the open may differ.
+      json(res, 200, { project: withRuntime(existing), missing });
       return true;
     }
     const draft = await inspectProject(directory, true);
-    const candidate = normalizeProject({ ...draft });
+    const candidate = normalizeProject({ ...draft, path: directory });
     let project: Project = candidate;
     let created = false;
     await updateProjects((projects) => {
       // Serialize duplicate opens so that terminals and settings share one ID.
-      const current = projects.find((item) => expandPath(item.path) === directory);
-      if (current) project = { ...current, path: directory };
+      const current = projects.find((item) => sameLocalPath(item.path, directory));
+      if (current) project = current;
       else {
         projects.unshift(candidate);
         created = true;

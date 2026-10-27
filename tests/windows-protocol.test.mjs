@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createOs } from "../core/modules/os/index.ts";
-import { expandPath } from "../server/modules/projects/index.ts";
+import { expandPath, sameLocalPath } from "../server/modules/projects/index.ts";
 import { hotkeys } from "../core/modules/os/modules/windows/shortcut.ts";
 import {
   parseAppsUseLightTheme,
@@ -146,6 +146,17 @@ test("askpass helper keeps shell metacharacters out of the script", () => {
 
 test("expandPath understands both home shortcuts", () => {
   expect(expandPath("~\\work")).toBe(expandPath("~/work"));
+});
+
+test("local paths that differ only by Windows case are the same project folder", () => {
+  if (process.platform !== "win32") return;
+  const upper = expandPath("C:\\Proj\\App");
+  const lower = expandPath("c:\\Proj\\App");
+  expect(upper).toBe(lower);
+  expect(upper.startsWith("C:\\")).toBe(true);
+  expect(sameLocalPath(upper, lower)).toBe(true);
+  expect(sameLocalPath("C:\\Proj\\App", "c:\\proj\\app")).toBe(true);
+  expect(sameLocalPath(upper, expandPath("C:\\Proj\\Other"))).toBe(false);
 });
 
 function windowFake(body) {

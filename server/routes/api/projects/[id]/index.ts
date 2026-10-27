@@ -4,6 +4,7 @@ import {
   loadProjects,
   findProject,
   expandPath,
+  sameLocalPath,
   updateProjects,
   resolveProjectIcon,
 } from "../../../../modules/projects/index.ts";
@@ -94,9 +95,9 @@ export async function handleProjectActions({
         if (existing) throw new HttpError(400, "Путь занят файлом");
         await mkdir(target, { recursive: true });
       }
-      if (mode === "relocate" && target !== expandPath(project.path)) {
+      if (mode === "relocate" && !sameLocalPath(project.path, target)) {
         const duplicate = (await loadProjects()).find(
-          (item) => item.id !== id && expandPath(item.path) === target,
+          (item) => item.id !== id && sameLocalPath(item.path, target),
         );
         if (duplicate) throw new HttpError(409, `Путь уже занят проектом «${duplicate.name}»`);
         stopProject(id);

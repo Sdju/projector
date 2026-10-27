@@ -50,12 +50,30 @@ function toCommand(name: string, prefix: string): ProjectCommand {
   return { id: randomUUID(), name, cmd: `${prefix} ${name}` };
 }
 
+/** Drive letter case follows `process.cwd()` on Windows; keep it upper so the same folder is one path. */
+function stabilize(path: string): string {
+  return process.platform === "win32" && /^[a-z]:/i.test(path)
+    ? path[0]!.toUpperCase() + path.slice(1)
+    : path;
+}
+
 export function expandPath(input: string): string {
   const trimmed = input.trim();
-  if (trimmed === "~") return os.homeDirectory();
+  if (trimmed === "~") return stabilize(os.homeDirectory());
   if (trimmed.startsWith("~/") || trimmed.startsWith("~\\"))
-    return resolve(join(os.homeDirectory(), trimmed.slice(2)));
-  return resolve(trimmed);
+    return stabilize(resolve(join(os.homeDirectory(), trimmed.slice(2))));
+  return stabilize(resolve(trimmed));
+}
+
+/**
+ * Whether two local paths name the same folder. On Windows the filesystem is case-insensitive, so
+ * `C:\Work` and `c:\work` must match; a strict `===` after `expandPath` creates a second project
+ * id and the Projector agent looks like it lost its chat history.
+ */
+export function sameLocalPath(left: string, right: string): boolean {
+  const a = expandPath(left);
+  const b = expandPath(right);
+  return process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
 }
 
 /** Read script definitions without executing them or replacing project settings. */
