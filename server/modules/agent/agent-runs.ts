@@ -27,6 +27,8 @@ export interface AgentRunRecord {
   /** The project and chat the run belongs to, so any page can tell what works right now. */
   projectId?: string;
   chat?: string;
+  /** The agent's own session of the run, once it reported it: a reopened session finds its live run by it. */
+  session?: string;
 }
 
 /** A run whose agent process is alive, for the overview of what works now. */
@@ -36,6 +38,8 @@ export interface LiveRun {
   projectId: string;
   chat: string;
   topic: string;
+  /** The agent's own session, if it reported it already. */
+  session?: string;
 }
 
 /** Runs with a live host, whichever page started them. */
@@ -55,6 +59,7 @@ export async function listLiveRuns(): Promise<LiveRun[]> {
           projectId: record.projectId ?? "",
           chat: record.chat ?? "",
           topic: record.message.trim().slice(0, 120),
+          ...(record.session ? { session: record.session } : {}),
         };
       }),
   );
@@ -93,6 +98,15 @@ export async function readRun(id: string): Promise<AgentRunRecord | null> {
   } catch {
     return null;
   }
+}
+
+/** Notes the agent's session in the stored run. */
+export async function rememberSession(id: string, session: string): Promise<void> {
+  const record = await readRun(id);
+  if (!record || record.session === session) return;
+  await writeFile(join(runDirectory(id), "run.json"), JSON.stringify({ ...record, session }), {
+    mode: 0o600,
+  });
 }
 
 export async function removeRun(id: string): Promise<void> {

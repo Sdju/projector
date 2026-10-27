@@ -26,6 +26,7 @@ import {
   listLiveRuns,
   pruneRuns,
   readRun,
+  rememberSession,
   removeRun,
   schedulePrune,
   trackRun,
@@ -283,6 +284,9 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
     const untrack = run ? trackRun(run.id, () => abort.abort()) : undefined;
     let delivered = false;
     const emit = (event: string, data: unknown) => {
+      // Noted even after the page left: the run goes on, and its session is how it is found again.
+      if (event === "session" && run && !run.attach)
+        void rememberSession(run.id, (data as { id: string }).id).catch(() => {});
       if (detached || (!viaEvents && res.writableEnded)) return;
       if (event === "done" || event === "error") delivered = true;
       if (viaEvents) broadcastEvent("agent", { stream, event, data }, client);

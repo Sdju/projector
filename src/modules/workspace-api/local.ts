@@ -29,6 +29,7 @@ function agentChatTab(program: string, label: string, description: string) {
       title: `Новая сессия ${label} (GUI)`,
       description,
       requires: "agent",
+      optional: { chatId: "Идентификатор уже открытого чата: вкладка этого чата получает фокус" },
     },
   });
 }
@@ -61,6 +62,9 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
           description:
             "Открывает новую вкладку с чатом агента Projector; вкладок можно открыть сколько нужно, у каждой свой диалог.",
           requires: "agent",
+          optional: {
+            chatId: "Идентификатор уже открытого чата: вкладка этого чата получает фокус",
+          },
         },
       }),
       // Plain coding agents behind a chat instead of the TUI; every opening is a new conversation.

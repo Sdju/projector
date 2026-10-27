@@ -264,13 +264,21 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
               if (typeof value !== "string" || !value) return;
               params[key] = value;
             }
-          } else params = create?.();
+          } else {
+            params = create?.();
+            // A given optional parameter replaces the new instance's own: it names an existing one.
+            const given = commandArgs(args);
+            for (const key of Object.keys(command.optional ?? {})) {
+              const value = given[key];
+              if (typeof value === "string" && value) params = { ...params, [key]: value };
+            }
+          }
           openTab(id, params);
           ctx.onOpenTab?.();
         },
         () => true,
         command.requires as WorkspaceCapability | undefined,
-        { description: command.description, arguments: command.arguments },
+        { description: command.description, arguments: command.arguments ?? command.optional },
       );
   function editorKeydown(event: KeyboardEvent) {
     const save = ctx.tabTypes.behaviorOf(active()?.virtual)?.save;

@@ -54,6 +54,7 @@ export {
   listLiveRuns,
   pruneRuns,
   readRun,
+  rememberSession,
   removeRun,
   rememberHost,
   runDirectory,

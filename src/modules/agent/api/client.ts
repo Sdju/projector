@@ -390,6 +390,7 @@ export interface LiveAgentRun {
   projectId: string;
   chat: string;
   topic: string;
+  session?: string;
 }
 
 export async function fetchLiveRuns(): Promise<LiveAgentRun[]> {

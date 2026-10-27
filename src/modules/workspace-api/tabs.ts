@@ -30,6 +30,8 @@ export interface TabType<P extends TabParams = TabParams> {
     requires?: string;
     /** The command takes the parameters of the tab to open as its arguments (described here). */
     arguments?: Record<string, string>;
+    /** Parameters the command may take besides what `create` gives (described here). */
+    optional?: Record<string, string>;
   };
 }
 

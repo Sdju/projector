@@ -50,7 +50,7 @@ test("the answer waits while a background subagent works", () => {
   expect(mapper.working).toBe(0);
 });
 
-test("shell commands and watchers do not hold the answer", () => {
+test("a background shell command holds the answer, an ambient watcher does not", () => {
   const { events, mapper } = mapperWithEvents();
   mapper.handle(
     system("background_tasks_changed", {
@@ -58,6 +58,23 @@ test("shell commands and watchers do not hold the answer", () => {
         { task_id: "b1", task_type: "local_bash", description: "dev" },
         { task_id: "w", task_type: "local_agent", description: "watch", ambient: true },
       ],
+    }),
+  );
+  expect(mapper.working).toBe(1);
+  mapper.handle(result);
+  expect(events.some(([type]) => type === "done")).toBe(false);
+  expect(events.at(-1)).toEqual(["status", { phase: "background" }]);
+
+  mapper.handle(system("background_tasks_changed", { tasks: [] }));
+  mapper.handle(result);
+  expect(events.at(-1)[0]).toBe("done");
+});
+
+test("an ambient watcher alone does not hold the answer", () => {
+  const { events, mapper } = mapperWithEvents();
+  mapper.handle(
+    system("background_tasks_changed", {
+      tasks: [{ task_id: "w", task_type: "local_agent", description: "watch", ambient: true }],
     }),
   );
   expect(mapper.working).toBe(0);

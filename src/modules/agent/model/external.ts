@@ -3,6 +3,7 @@ import {
   fetchCommands,
   fetchControls,
   fetchDefaults,
+  fetchLiveRuns,
   fetchSessions,
   loadSessionTurns,
   saveDefault,
@@ -10,6 +11,7 @@ import {
 import { deleteSession, updateSession } from "../api/sessions.ts";
 import { archiveChat, deleteChat, fetchChats, openChat, updateChat } from "../api/chats.ts";
 import { saves, type ChatState } from "./chat-state.ts";
+import { requestChatTab } from "./job-open.ts";
 import type { AgentBackendId, AgentControl, AgentSelection, AgentSessionInfo } from "./types.ts";
 
 /** The saved choice per agent is read once; new chats start from it. */
@@ -171,10 +173,22 @@ export function useExternalAgent(
     }
   }
 
+  /** Brings forward the chat whose agent process still works on the session; `false` when none does. */
+  async function showLiveChat(session: string): Promise<boolean> {
+    const run = (await fetchLiveRuns().catch(() => [])).find(
+      (item) => item.session === session && item.projectId === projectId && item.chat,
+    );
+    if (!run) return false;
+    return run.chat === key || requestChatTab(projectId, run.chat);
+  }
+
   /** Replaces this chat with a past session of the agent and continues it from the next message. */
   async function resumeSession(id: string): Promise<void> {
     await ready;
     if (state.busy) throw new Error("Дождитесь окончания ответа");
+    // The session still works in the background (the agent process lives on without its tab):
+    // its own chat shows it as running, a copy read from the transcript would show it as over.
+    if (external && (await showLiveChat(id))) return;
     state.error = "";
     state.loading = true;
     try {

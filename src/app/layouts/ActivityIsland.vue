@@ -10,6 +10,7 @@ import UiSpinner from "../../common/ui/UiSpinner.vue";
 import { useCommandScope } from "../../common/utilities/commands.ts";
 import { useIslandMenu } from "../../common/utilities/island-menu.ts";
 import {
+  requestChatTab,
   requestJobTab,
   useAgentActivity,
   type AgentActivityItem,
@@ -54,8 +55,10 @@ function openProject(path: string) {
 }
 function openAgent(agent: AgentActivityItem) {
   const project = projects.value.find((item) => item.id === agent.projectId);
-  // A background job opens as its own tab of the project, not as a chat.
+  // A background job opens as its own tab of the project.
   if (agent.job) requestJobTab(agent.projectId, agent.job.id);
+  // A chat opens as its tab (or gets the focus), which rejoins the answer the agent still writes.
+  else requestChatTab(agent.projectId, agent.chat);
   if (project) openProject(project.path);
   else menu.close(false);
 }
