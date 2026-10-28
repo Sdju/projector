@@ -12,8 +12,17 @@ import {
 
 describe("agent guard", () => {
   it("lets read-only shell commands through and flags the rest", () => {
-    for (const command of ["ls -la", "git status", "cat package.json | head -20", "pwd && ls"])
-      expect(isReadOnlyBash(command), command).toBe(true);
+    const cwd = "/p";
+    for (const command of [
+      "ls -la",
+      "ls src",
+      "pwd && ls",
+      "git status",
+      "git rev-parse --show-toplevel",
+      "whoami",
+    ])
+      expect(isReadOnlyBash(command, cwd), command).toBe(true);
+
     for (const command of [
       "rm -rf x",
       "echo a > b",
@@ -22,8 +31,54 @@ describe("agent guard", () => {
       "git push",
       "find . -delete",
       "sleep 1 &",
+      "cat .env",
+      "cat ~/.ssh/id_rsa",
+      "grep -r KEY ~/.local/share/projector",
+      "head -100 /proc/self/environ",
+      "find / -name id_rsa",
+      "rg --pre=./run.sh TOKEN .",
+      "git show HEAD:.env",
+      "cat /etc/passwd",
+      "tree -o output.txt",
+      "sort --compress-program=bzip2",
+      "rg --pre echo TOKEN",
+      "rg --pre-glob '*.c' pattern",
+      "git diff --textconv HEAD",
+      "date -s '2026-01-01'",
+      "date -f /etc/time.conf",
+      "file -C",
+      "grep -f ~/.ssh/id_rsa",
+      "cat package.json | head -20",
+      "rg TOKEN src",
+      "grep -rn guard server",
+      "find . -name '*.md'",
+      "git diff --no-textconv HEAD",
+      "git remote -v",
+      "ls -la ../x",
+      "ls .SSH",
+      "ls ./.ssh",
+      "git rev-parse --output=x",
+      "git remote add origin x",
+      "date --set=now",
+      "rg --pre=./x a",
+      "rg --pre-glob=* a",
+      "sort --compress-program=./x a",
+      "tree -o=out.txt",
+      "date --set=now",
+      "git rev-parse --output=x",
+      "git show HEAD:f.env",
+      "git diff HEAD -- .env",
+      "git log -p -- .env",
+      "git show HEAD -- .env",
+      "git blame .env",
+      "git remote add origin x",
+      "git remote set-url origin y",
+      "git remote remove origin",
+      "cat ./.ssh/config",
+      "cat .ENV",
+      "cat .Env.local",
     ])
-      expect(isReadOnlyBash(command), command).toBe(false);
+      expect(isReadOnlyBash(command, cwd), command).toBe(false);
   });
 
   it("asks before changing commands and only looks without asking", () => {
@@ -59,8 +114,8 @@ describe("agent guard", () => {
     });
     expect(calls).toEqual(["bash", "execute_command"]);
     await expect(guardBash({ ...options, approve: async () => false }, "rm x")).rejects.toThrow();
-    await expect(guardBash({ trusting: false }, "rm x")).rejects.toThrow();
-    await guardBash({ trusting: true }, "rm x");
+    await expect(guardBash({ cwd: "/p", trusting: false }, "rm x")).rejects.toThrow();
+    await guardBash({ cwd: "/p", trusting: true }, "rm x");
   });
 });
 
@@ -96,7 +151,10 @@ describe("auto mode review", () => {
 
     const asked = [];
     const approve = async (request) => (asked.push(request.detail), true);
-    const review = async (command) => ({ safe: command.startsWith("vp test"), reason: "причина" });
+    const review = async (command) => ({
+      safe: command.startsWith("vp test"),
+      reason: "причина",
+    });
     const options = { cwd: "/p", approve, trusting: false, review };
     await guardBash(options, "vp test run");
     expect(asked).toEqual([]);

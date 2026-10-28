@@ -1,4 +1,6 @@
 import type { ApprovalAnswer, ApprovalRequest } from "../../agent/index.ts";
+import * as path from "node:path";
+import * as os from "node:os";
 
 export interface GuardOptions {
   /** Where the project's remembered decisions are kept. */
@@ -10,56 +12,85 @@ export interface GuardOptions {
   review?: (command: string) => Promise<{ safe: boolean; reason: string }>;
 }
 
-const READ_ONLY_BINARIES = new Set([
-  "ls",
-  "cat",
-  "pwd",
-  "head",
-  "tail",
-  "wc",
-  "stat",
-  "file",
-  "du",
-  "df",
-  "which",
-  "grep",
-  "rg",
-  "sort",
-  "uniq",
-  "tree",
-  "date",
-  "uname",
-  "whoami",
-  "realpath",
-  "basename",
-  "dirname",
-]);
-const READ_ONLY_GIT = new Set([
-  "status",
-  "diff",
-  "log",
-  "show",
-  "ls-files",
-  "rev-parse",
-  "describe",
-  "blame",
-  "remote",
+/** Single-letter flags that may be combined (`-la`) and long flags; anything else is asked about. */
+interface FlagRules {
+  short: string;
+  long?: string[];
+}
+
+const GIT_RULES = new Map<string, FlagRules>([
+  ["status", { short: "sb", long: ["--short", "--branch", "--porcelain"] }],
+  ["rev-parse", { short: "", long: ["--show-toplevel", "--abbrev-ref", "--is-inside-work-tree"] }],
+  ["describe", { short: "", long: ["--tags", "--always", "--dirty"] }],
 ]);
 
-/** A command that only reads: simple words joined by `|` or `&&`, no redirects or substitution. */
-export function isReadOnlyBash(command: string): boolean {
+/** Only commands that show names, not file contents. */
+const BINARY_RULES = new Map<string, FlagRules>([
+  ["pwd", { short: "" }],
+  ["ls", { short: "alhrtRSdAFi1" }],
+  ["whoami", { short: "" }],
+  ["uname", { short: "asnrvmpio" }],
+  ["date", { short: "uR" }],
+  ["which", { short: "a" }],
+]);
+
+const SECRET_NAMES = new Set([".ssh", ".aws", ".npmrc", ".netrc", ".git-credentials"]);
+const SECRET_PATTERNS = [/(^\.|\.)env($|\.)/i, /\.(pem|key)$/i, /^id_(rsa|ed25519)/i, /\.kdbx$/i];
+
+/** True for anything outside the project or with a path segment that looks like a secret. */
+function isForbiddenPath(target: string, cwd?: string): boolean {
+  if (target.startsWith("~")) return true;
+  const base = path.resolve(cwd ?? process.cwd());
+  const full = path.resolve(base, target);
+  const relative = path.relative(base, full);
+  if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative))
+    return true;
+  if (full.startsWith(path.join(os.homedir(), ".local/share/projector"))) return true;
+  return relative
+    .split(path.sep)
+    .some(
+      (segment) =>
+        SECRET_NAMES.has(segment.toLowerCase()) ||
+        SECRET_PATTERNS.some((pattern) => pattern.test(segment)),
+    );
+}
+
+/** Quotes must wrap the whole word, and an unquoted glob could expand to a secret. */
+function wordIsSafe(word: string, cwd?: string): boolean {
+  const quoted = /^'([^']*)'$|^"([^"]*)"$/.exec(word);
+  if (!quoted && /['"*?[\]]/.test(word)) return false;
+  return !isForbiddenPath(quoted ? (quoted[1] ?? quoted[2] ?? "") : word, cwd);
+}
+
+function flagIsAllowed(word: string, rules: FlagRules): boolean {
+  if (word.startsWith("--")) return !!rules.long?.includes(word);
+  return word
+    .slice(1)
+    .split("")
+    .every((letter) => rules.short.includes(letter));
+}
+
+/** Flags must be on the allowlist; every other word is checked as a path. */
+function argsAreSafe(words: string[], rules: FlagRules, cwd?: string): boolean {
+  return words.every((word) =>
+    word.length > 1 && word.startsWith("-") ? flagIsAllowed(word, rules) : wordIsSafe(word, cwd),
+  );
+}
+
+/** A command that only shows names: simple words joined by `|` or `&&`, no redirects or substitution. */
+export function isReadOnlyBash(command: string, cwd?: string): boolean {
   if (/[<>`$(){};\n\\]|(?<!&)&(?!&)/.test(command)) return false;
   return command
     .split(/\|\||&&|\|/)
     .map((part) => part.trim().split(/\s+/))
-    .every(([binary, sub, ...rest]) => {
-      if (!binary) return false;
-      if (binary === "git") return !!sub && READ_ONLY_GIT.has(sub) && !rest.includes("--output");
-      if (binary === "find")
-        return ![sub, ...rest].some((word) =>
-          /^-(delete|exec|execdir|ok|fprint|fls)/.test(word ?? ""),
-        );
-      return READ_ONLY_BINARIES.has(binary);
+    .every(([binary = "", ...args]) => {
+      if (binary !== "git") {
+        const rules = BINARY_RULES.get(binary);
+        return !!rules && argsAreSafe(args, rules, cwd);
+      }
+      const [sub = "", ...rest] = args;
+      const rules = GIT_RULES.get(sub);
+      return !!rules && argsAreSafe(rest, rules, cwd);
     });
 }
 
@@ -93,7 +124,7 @@ async function ask(options: GuardOptions, request: ApprovalRequest): Promise<App
 
 /** Asks before a command changes the user's machine; reading is let through. */
 export async function guardBash(options: GuardOptions, command: string): Promise<void> {
-  if (options.trusting || isReadOnlyBash(command)) return;
+  if (options.trusting || isReadOnlyBash(command, options.cwd)) return;
   const verdict = await options.review?.(command);
   if (verdict?.safe) return;
   await ask(options, {
