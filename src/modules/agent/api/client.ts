@@ -339,16 +339,6 @@ export async function fetchMcpServers(
   return data.servers;
 }
 
-/** Adds a message to the answer being written; `false` when that answer has just ended. */
-export async function injectAgentMessage(messageId: string, text: string): Promise<boolean> {
-  const response = await fetch("/api/agent/inject", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messageId, text }),
-  });
-  return response.ok;
-}
-
 /** How far an isolated copy of the project has moved from the project. */
 export interface WorktreeInfo {
   id: string;

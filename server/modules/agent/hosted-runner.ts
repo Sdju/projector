@@ -71,17 +71,24 @@ async function main(answer: (options: AgentRunOptions) => Promise<void>): Promis
     setTimeout(() => process.exit(143), STOP_GRACE_MS).unref();
   });
 
-  createInterface({ input: process.stdin }).on("line", (line) => {
+  createInterface({ input: process.stdin }).on("line", async (line) => {
     if (!line.trim()) return;
     const message = JSON.parse(line) as {
       id?: string;
       result?: { output?: unknown; error?: string };
       method?: string;
-      params?: { messageId?: string; text?: string };
+      params?: { messageId?: string; text?: string; inputId?: string };
     };
     if (message.method === "inject") {
       if (message.params?.messageId && typeof message.params.text === "string")
-        injectMessage(message.params.messageId, message.params.text);
+        write({
+          id: message.id,
+          accepted: await injectMessage(
+            message.params.messageId,
+            message.params.text,
+            message.params.inputId,
+          ),
+        });
     } else if (typeof message.id === "string" && message.result) {
       completeCommandRequest(message.id, message.result);
     }

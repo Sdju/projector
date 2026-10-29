@@ -35,3 +35,17 @@ export async function deleteSession(
     "Не удалось удалить сессию",
   );
 }
+
+/** Adds a message to the answer being written; `false` when that answer has just ended. */
+export async function injectAgentMessage(
+  messageId: string,
+  text: string,
+  inputId?: string,
+): Promise<boolean> {
+  const response = await fetch("/api/agent/inject", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messageId, text, inputId }),
+  });
+  return response.ok;
+}

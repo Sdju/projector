@@ -161,7 +161,11 @@ export async function runClaudeCode(options: AgentRunOptions): Promise<void> {
     const messageId = isUuid(options.messageId) ? options.messageId : undefined;
     const input = createInput(userMessage(prompt, images, messageId));
     const unregister = messageId
-      ? registerInjector(messageId, (text) => input.push(text))
+      ? registerInjector(messageId, (text, inputId) => {
+          const accepted = input.push(text);
+          if (accepted) emit("input", { text, ...(inputId ? { inputId } : {}) });
+          return accepted;
+        })
       : undefined;
     const conversation = query({
       prompt: input.stream,

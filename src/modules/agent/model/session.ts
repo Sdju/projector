@@ -167,6 +167,7 @@ export function useAgent(
         notifyPermission(event.data.title || event.data.tool);
       if (event.event === "secret-request") notifyQuestion(event.data.label);
       if (applyAgentEvent(state, assistant, event, catalog.ingest)) persist();
+      if (["status", "controls", "tool-result"].includes(event.event)) void actions.deliverQueue();
     };
     try {
       let attach = firstAttach;
@@ -212,10 +213,7 @@ export function useAgent(
     }
   }
 
-  /**
-   * Sends the draft, or `text` (with its `chips`). While an answer is running the message waits in
-   * the queue and goes out when the answer ends.
-   */
+  /** Sends the draft or text; a busy agent receives it at the next supported model boundary. */
   async function send(text?: string, chips?: MessagePart[]): Promise<void> {
     await ready;
     const message = (text ?? state.draft).trim();
@@ -231,6 +229,7 @@ export function useAgent(
     }
     if (state.busy) {
       state.queue.push({ id: newId(), text: message, parts: content ?? [] });
+      void actions.deliverQueue();
       return;
     }
     // The edited message replaces the old one only now that it is really sent.

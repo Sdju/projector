@@ -226,7 +226,11 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
     const body = await readBody(req);
     const text = asString(body.text).trim();
     if (!text) throw new Error("Напишите сообщение агенту");
-    const accepted = injectMessage(asString(body.messageId), text);
+    const accepted = await injectMessage(
+      asString(body.messageId),
+      text,
+      asString(body.inputId) || undefined,
+    );
     json(res, accepted ? 200 : 410, { accepted });
     return true;
   }

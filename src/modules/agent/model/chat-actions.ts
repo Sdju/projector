@@ -2,13 +2,12 @@ import { computed } from "vue";
 import {
   discardWorktree,
   fetchWorktree,
-  injectAgentMessage,
   mergeWorktree,
   rewindAgentFiles,
   type RewindSummary,
   type WorktreeInfo,
 } from "../api/client.ts";
-import { legacyParts } from "./turn-events.ts";
+import { injectAgentMessage } from "../api/sessions.ts";
 import { cutAt, switchVersion } from "./branches.ts";
 import type { ChatState } from "./chat-state.ts";
 import type { AgentBackendId, AgentTurn, MessagePart } from "./types.ts";
@@ -40,8 +39,11 @@ export function useChatActions(
     if (last && (!state.capabilities.branchSession || !last.tail)) last.detached = true;
   }
 
+  let delivery: Promise<boolean> | undefined;
+
   /** Sends the next queued message once the answer is over; a stopped or failed one waits. */
-  function drainQueue(held: boolean) {
+  async function drainQueue(held: boolean) {
+    await delivery;
     if (state.busy || !state.queue.length) return;
     if (held || (state.error && !state.interrupting)) {
       state.interrupting = false;
@@ -54,7 +56,7 @@ export function useChatActions(
 
   /** Stops the answer in progress and sends this queued message instead. */
   async function sendQueuedNow(id: string): Promise<void> {
-    const index = state.queue.findIndex((item) => item.id === id);
+    const index = state.queue.findIndex((item) => item.id === id && !item.delivering);
     if (index < 0) return;
     const [item] = state.queue.splice(index, 1);
     state.queue.unshift(item!);
@@ -68,29 +70,50 @@ export function useChatActions(
    * (Claude Code reads it ahead of what it was doing). It stays in the answer as the user's own bubble.
    */
   async function injectQueued(id: string): Promise<boolean> {
+    if (delivery) return state.queue.find((item) => item.id === id)?.delivering ? delivery : false;
     const item = state.queue.find((entry) => entry.id === id);
-    if (!item || !state.busy || !state.capabilities.inject || !state.activeMessage) return false;
-    let accepted = false;
-    try {
-      accepted = await injectAgentMessage(state.activeMessage, item.text);
-    } catch {
-      accepted = false;
-    }
-    if (!accepted) {
-      state.error = "Ответ уже закончился: сообщение осталось в очереди";
+    // Text references to files are already in item.text; images need the next full request.
+    if (
+      !item ||
+      !state.busy ||
+      !state.capabilities.inject ||
+      !state.activeMessage ||
+      item.parts.some((part) => part.type === "image")
+    )
       return false;
+    const messageId = state.activeMessage;
+    item.delivering = true;
+    delivery = (async () => {
+      try {
+        const accepted = await injectAgentMessage(messageId, item.text, item.id);
+        if (accepted) {
+          state.queue = state.queue.filter((entry) => entry.id !== id);
+          persist();
+        }
+        return accepted;
+      } catch {
+        return false;
+      } finally {
+        item.delivering = false;
+      }
+    })();
+    try {
+      return await delivery;
+    } finally {
+      delivery = undefined;
     }
-    removeQueued(id);
-    const answer = state.turns.at(-1);
-    if (answer?.role === "assistant") {
-      (answer.parts ??= legacyParts(answer)).push({ type: "note", text: item.text });
-      persist();
+  }
+
+  /** FIFO delivery at a model boundary, with the end-of-answer queue as a fallback. */
+  async function deliverQueue(): Promise<void> {
+    if (delivery) return;
+    while (state.busy && state.queue.length) {
+      if (!(await injectQueued(state.queue[0]!.id))) return;
     }
-    return true;
   }
 
   function removeQueued(id: string): void {
-    state.queue = state.queue.filter((item) => item.id !== id);
+    state.queue = state.queue.filter((item) => item.id !== id || item.delivering);
   }
 
   /**
@@ -233,6 +256,7 @@ export function useChatActions(
 
   return {
     drainQueue,
+    deliverQueue,
     sendQueuedNow,
     injectQueued,
     removeQueued,

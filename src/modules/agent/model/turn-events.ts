@@ -37,6 +37,11 @@ export function applyAgentEvent(
   ingest: (project: Project) => void,
 ): boolean {
   switch (event.event) {
+    case "input":
+      if (event.data.inputId)
+        state.queue = state.queue.filter((item) => item.id !== event.data.inputId);
+      (assistant.parts ??= legacyParts(assistant)).push({ type: "note", text: event.data.text });
+      return true;
     case "status":
       state.phase =
         event.data.phase === "fallback"

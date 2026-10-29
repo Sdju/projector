@@ -43,6 +43,7 @@ export type AgentEventName =
   | "worktree"
   | "status"
   | "session"
+  | "input"
   | "text"
   | "tool"
   | "tool-result"

@@ -6,6 +6,7 @@ import {
   wrapLanguageModel,
   type LanguageModel,
   type ModelMessage,
+  type StepResult,
 } from "ai";
 import type { Project } from "../../projects/index.ts";
 import { createAgentTools } from "./agent-tools.ts";
@@ -26,6 +27,7 @@ import {
   type SdkUsage,
   type Tokens,
 } from "./projector-usage.ts";
+import { createTurnInput } from "./projector-input.ts";
 import { budgetNote, turnBudget } from "./projector-budget.ts";
 import { isRetryable, MAX_RETRIES, pause, retryDelay } from "./projector-retry.ts";
 import { connectMcp, mcpSection } from "./projector-mcp.ts";
@@ -55,24 +57,35 @@ async function run(options: AgentRunOptions): Promise<void> {
   if (!options.run) return runProjector(options);
   // The runner reads the provider keys itself, so it gets the server's environment; the shell
   // tool drops anything that looks like a secret before it starts a command.
-  await runHostedAgent(options, options.run, {
-    runner: RUNNER,
-    cwd: options.cwd || process.cwd(),
-    env: { ...process.env },
-  });
+  await runHostedAgent(
+    options,
+    options.run,
+    {
+      runner: RUNNER,
+      cwd: options.cwd || process.cwd(),
+      env: { ...process.env },
+    },
+    options.messageId,
+  );
 }
 
 /** MCP servers live for one turn: whatever the turn started is stopped however it ends. */
 export async function runProjector(options: AgentRunOptions): Promise<void> {
   const open = { close: async () => {} };
+  const input = createTurnInput(options);
   try {
-    await turn(options, open);
+    await turn(options, open, input);
   } finally {
+    input.close();
     await open.close();
   }
 }
 
-async function turn(options: AgentRunOptions, open: { close: () => Promise<void> }): Promise<void> {
+async function turn(
+  options: AgentRunOptions,
+  open: { close: () => Promise<void> },
+  input: ReturnType<typeof createTurnInput>,
+): Promise<void> {
   const [providerId, ...rest] = (options.selection?.provider || options.providerId || "").split(
     ":",
   );
@@ -167,39 +180,40 @@ async function turn(options: AgentRunOptions, open: { close: () => Promise<void>
   /** What the first request of the answer found in the provider cache. */
   let firstRequest: Tokens | undefined;
   /** One entry per model request of the successful attempt; the last one fills the context window. */
-  let requests: SdkUsage[] = [];
+  const requests: SdkUsage[] = [];
   let result: ReturnType<typeof streamText<typeof tools>>;
+  const steps: StepResult<typeof tools>[] = [];
+  let startedAnswer = false;
   // A request that fails before the model said anything is repeated; later the turn would replay.
   for (let attempt = 0; ; attempt++) {
+    messages.push(...input.take());
     result = streamText({
       model: answering,
       system,
       messages,
       tools,
-      stopWhen: budget.stopWhen,
+      // Run one model step at a time so additions also get a turn after a text-only answer.
+      stopWhen: () => true,
       abortSignal: options.abort,
       maxRetries: 0,
       providerOptions: thinking ? { qwenOpenai: thinking } : undefined,
     });
 
-    let started = false;
     let failure: unknown;
-    firstRequest = undefined;
-    requests = [];
     for await (const part of result.fullStream) {
       if (part.type === "error") {
         failure = part.error;
         break;
       }
       if (part.type === "text-delta") {
-        started = true;
+        startedAnswer = true;
         text += part.text;
         options.emit("text", { text: part.text });
       } else if (part.type === "reasoning-delta") {
-        started = true;
+        startedAnswer = true;
         options.emit("thought", { text: part.text });
       } else if (part.type === "tool-call") {
-        started = true;
+        startedAnswer = true;
         options.emit("tool", {
           id: part.toolCallId,
           name: part.toolName,
@@ -222,15 +236,31 @@ async function turn(options: AgentRunOptions, open: { close: () => Promise<void>
         });
       }
     }
-    if (failure === undefined) break;
-    if (!started && attempt < MAX_RETRIES && !options.abort?.aborted && isRetryable(failure)) {
+    if (failure === undefined) {
+      messages.push(...(await result.response).messages);
+      steps.push(...(await result.steps));
+      const continuing = (await result.finishReason) === "tool-calls" || input.pending;
+      if (options.abort?.aborted || !continuing) break;
+      const overBudget = (await Promise.all(budget.stopWhen.map((stop) => stop({ steps })))).some(
+        Boolean,
+      );
+      if (overBudget) break;
+      attempt = -1;
+      continue;
+    }
+    if (
+      !startedAnswer &&
+      attempt < MAX_RETRIES &&
+      !options.abort?.aborted &&
+      isRetryable(failure)
+    ) {
       const delay = retryDelay(attempt, failure);
       options.emit("status", { phase: "retrying", attempt: attempt + 1, delay });
       await pause(delay, options.abort);
       if (!options.abort?.aborted) continue;
     }
     // The model keeps failing: the fallback of the provider answers instead, once.
-    if (!started && fallback && !options.abort?.aborted && isRetryable(failure)) {
+    if (!startedAnswer && fallback && !options.abort?.aborted && isRetryable(failure)) {
       options.emit("status", {
         phase: "fallback",
         model: fallback.modelName,
@@ -248,9 +278,18 @@ async function turn(options: AgentRunOptions, open: { close: () => Promise<void>
     return;
   }
 
+  input.close();
   try {
     // Providers that cache the prompt prefix report it; the chat shows the share served from cache.
-    const total = tokensOf(await result.totalUsage);
+    const total = requests.map(tokensOf).reduce(
+      (sum, item) => ({
+        input: sum.input + item.input,
+        output: sum.output + item.output,
+        cacheRead: sum.cacheRead + item.cacheRead,
+        cacheWrite: sum.cacheWrite + item.cacheWrite,
+      }),
+      { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    );
     if (total.input + total.cacheRead + total.cacheWrite + total.output)
       options.emit("usage", {
         ...total,
@@ -260,7 +299,7 @@ async function turn(options: AgentRunOptions, open: { close: () => Promise<void>
   } catch {
     // No usage, no tooltip.
   }
-  // `result.usage` sums every step, and each step resends the conversation, so that sum
+  // Each step resends the conversation, so summing their input usage
   // counts the same prefix again. The last request is the window.
   const used = contextOf(requests);
   if (used)
@@ -269,8 +308,7 @@ async function turn(options: AgentRunOptions, open: { close: () => Promise<void>
       size: resolved.contextTokens ?? DEFAULT_CONTEXT_SIZE,
       model: resolved.model,
     });
-  const stopped =
-    (await result.finishReason) === "tool-calls" ? (budget.reason() ?? "steps") : undefined;
+  const stopped = budget.reason();
   if (stopped) {
     const note = budgetNote(budget.reason());
     text += note;
@@ -313,7 +351,11 @@ async function compactChat(
 /** The Projector IDE assistant on the active OpenAI-compatible provider. */
 export const projectorBackend: AgentBackend = {
   id: "projector",
-  capabilities: { hosted: true, compact: { command: COMPACT_COMMAND, hintAt: 0.8, autoAt: 0.9 } },
+  capabilities: {
+    hosted: true,
+    inject: true,
+    compact: { command: COMPACT_COMMAND, hintAt: 0.8, autoAt: 0.9 },
+  },
   controls: () => controls(),
   commands: async (cwd) => [
     { name: COMPACT_COMMAND.slice(1), description: "Сжать историю разговора в сводку" },

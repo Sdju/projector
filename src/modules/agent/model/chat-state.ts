@@ -42,7 +42,7 @@ export const createState = () =>
     isolate: false,
     /** The message that started the answer being written (what a live addition refers to). */
     activeMessage: "",
-    /** Messages written while an answer was running; each is sent when it ends. */
+    /** Messages written while an answer was running; delivered at the next model boundary when supported. */
     queue: [] as QueuedMessage[],
     /** The queued message to send right after the answer is stopped. */
     interrupting: false,
@@ -99,7 +99,32 @@ export const { releases, viewers, sessions, loads, saves, queued } = registry;
 
 /** The conversation as turns, with what the answers' tool calls returned, for an agent without a session of its own. */
 export function chatHistory(turns: AgentTurn[], withTools = false): AgentHistoryTurn[] {
-  return turns.flatMap((item): AgentHistoryTurn[] => {
+  // Live additions are user messages in context, even though the UI nests them in the answer.
+  const expanded = turns.flatMap((turn): AgentTurn[] => {
+    if (turn.role !== "assistant" || !turn.parts?.some((part) => part.type === "note"))
+      return [turn];
+    const result: AgentTurn[] = [];
+    let text = "";
+    let tools: AgentTurn["tools"] = [];
+    const flush = () => {
+      if (text || tools.length) result.push({ ...turn, text, tools });
+      text = "";
+      tools = [];
+    };
+    for (const part of turn.parts) {
+      if (part.type === "text") text += part.text;
+      else if (part.type === "tool") {
+        const tool = turn.tools.find((item) => item.id === part.id);
+        if (tool) tools.push(tool);
+      } else if (part.type === "note") {
+        flush();
+        result.push({ id: turn.id, role: "user", text: part.text, tools: [] });
+      }
+    }
+    flush();
+    return result;
+  });
+  return expanded.flatMap((item): AgentHistoryTurn[] => {
     const tools = (withTools ? item.tools : [])
       .filter((tool) => !tool.parent && tool.status !== "running")
       .map((tool) => ({

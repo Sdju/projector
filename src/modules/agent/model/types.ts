@@ -160,6 +160,7 @@ export type RewindScope = "conversation" | "files" | "both";
 
 /** A message waiting for the answer in progress to end. */
 export interface QueuedMessage {
+  delivering?: boolean;
   id: string;
   text: string;
   parts: MessagePart[];
@@ -264,6 +265,7 @@ export type AgentEvent =
       event: "status";
       data: { phase: string; provider?: string; model?: string; attempt?: number };
     }
+  | { event: "input"; data: { text: string; inputId?: string } }
   | { event: "text"; data: { text: string } }
   | { event: "tool"; data: { id: string; name: string; input: unknown; parent?: string } }
   | { event: "tool-result"; data: { id: string; name: string; output?: unknown; error?: string } }

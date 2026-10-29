@@ -1,0 +1,74 @@
+<!doctype html>
+<link rel="icon" href="data:," />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<div id="fixture"></div>
+<script type="module">
+  import "/src/app/styles.css";
+  import { createApp, h, ref } from "vue";
+  import AgentQueue from "/src/modules/agent/ui/AgentQueue.vue";
+  import { createState } from "/src/modules/agent/model/chat-state.ts";
+  import { useChatActions } from "/src/modules/agent/model/chat-actions.ts";
+  import { applyAgentEvent } from "/src/modules/agent/model/turn-events.ts";
+  const state = createState();
+  state.busy = true;
+  state.activeMessage = "running";
+  state.capabilities = { inject: true };
+  const assistant = { id: "answer", role: "assistant", text: "", tools: [] };
+  state.turns = [assistant];
+  const received = [];
+  const waiting = [];
+  const originalFetch = window.fetch;
+  window.fetch = (url, init) =>
+    url === "/api/agent/inject"
+      ? new Promise((resolve) => waiting.push({ text: JSON.parse(init.body).text, resolve }))
+      : originalFetch(url, init);
+  const actions = useChatActions(state, {
+    backend: "projector",
+    projectId: "fixture",
+    ready: Promise.resolve(),
+    persist() {},
+    async send(text) {
+      received.push(text);
+    },
+    stop() {},
+  });
+  const draft = ref("");
+  const enqueue = () => {
+    state.queue.push({ id: crypto.randomUUID(), text: draft.value, parts: [] });
+    draft.value = "";
+    void actions.deliverQueue();
+  };
+  const boundary = () => {
+    for (const { text, resolve } of waiting.splice(0)) {
+      received.push(text);
+      applyAgentEvent(state, state.turns[0], { event: "input", data: { text } }, () => {});
+      resolve(new Response(null, { status: 200 }));
+    }
+  };
+  createApp({
+    setup: () => () =>
+      h("main", { style: "padding:20px;max-width:600px" }, [
+        h("p", "Агент выполняет инструмент"),
+        h(AgentQueue, {
+          items: state.queue,
+          busy: state.busy,
+          canInject: true,
+          onRemove: actions.removeQueued,
+          onInject: actions.injectQueued,
+          onNow: actions.sendQueuedNow,
+        }),
+        h("input", {
+          "aria-label": "Уточнение",
+          value: draft.value,
+          onInput: (e) => (draft.value = e.target.value),
+          onKeydown: (e) => {
+            if (e.key === "Enter") enqueue();
+          },
+        }),
+        h("button", { onClick: enqueue }, "Отправить"),
+        h("button", { onClick: boundary }, "Следующий запрос к модели"),
+        h("output", received.join(" | ")),
+      ]),
+  }).mount("#fixture");
+  window.fixture = { ready: true, state, received };
+</script>
