@@ -29,6 +29,7 @@ export const GUI_AGENT_PROGRAMS: readonly string[] = ["claude", "codex", "openco
 export const TOGGLEABLE_AGENTS: readonly string[] = [
   "claude-code",
   "codex",
+  "kimi",
   "opencode",
   "cursor",
   "kimi",

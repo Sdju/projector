@@ -8,6 +8,7 @@ export const guiPrograms: Record<string, { title: string; command: string }> = {
   codex: { title: "Codex", command: "ide.workbench.codex.open" },
   opencode: { title: "OpenCode", command: "ide.workbench.opencode.open" },
   cursor: { title: "Cursor", command: "ide.workbench.cursor.open" },
+  kimi: { title: "Kimi", command: "ide.workbench.kimi.open" },
 };
 
 /** Chat header and welcome copy for each backend. */
@@ -17,6 +18,7 @@ const agentLabels: Record<string, string> = {
   codex: "Codex",
   opencode: "OpenCode",
   cursor: "Cursor",
+  kimi: "Kimi",
 };
 
 export function agentLabel(backend: string | undefined): string {

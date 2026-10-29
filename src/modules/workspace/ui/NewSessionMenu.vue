@@ -25,6 +25,7 @@ import IconClaude from "~icons/simple-icons/claude";
 import { guiPrograms, useAgentModes } from "../../agent/index.ts";
 import IconOpenCode from "~icons/simple-icons/opencode";
 import IconCursor from "~icons/simple-icons/cursor";
+import IconKimi from "~icons/simple-icons/kimi";
 
 /**
  * «+» с островом создания сессии: при открытии рамка охватывает кнопку, как у переключателя
@@ -53,6 +54,7 @@ const programs = [
     icon: IconOpenCode,
   },
   { program: "cursor", title: "Cursor", caption: "Запустит агента Cursor", icon: IconCursor },
+  { program: "kimi", title: "Kimi", caption: "Запустит агента Kimi Code", icon: IconKimi },
 ];
 const menu = useIslandMenu({
   anchor: "left",

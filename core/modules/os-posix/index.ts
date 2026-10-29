@@ -3,6 +3,7 @@ export { gitAskpass, publishDirectory, removeAgentHostAddress } from "./git.ts";
 export { startCodexAppServer } from "./codex.ts";
 export { readOpenCodeGoKey } from "./opencode.ts";
 export { readCursorAccessToken } from "./cursor.ts";
+export { readKimiAccessToken } from "./kimi.ts";
 export {
   agentEnv,
   agentLaunch,

@@ -2,6 +2,7 @@ import { registerAgentBackend } from "../modules/agent/index.ts";
 import { claudeCodeBackend } from "../modules/agents/claude-code/index.ts";
 import { codexBackend } from "../modules/agents/codex/index.ts";
 import { cursorBackend } from "../modules/agents/cursor/index.ts";
+import { kimiBackend } from "../modules/agents/kimi/index.ts";
 import { opencodeBackend } from "../modules/agents/opencode/index.ts";
 import { projectorBackend } from "../modules/agents/projector/index.ts";
 
@@ -14,5 +15,6 @@ export function registerBuiltinAgents(): void {
   registerAgentBackend(claudeCodeBackend);
   registerAgentBackend(codexBackend);
   registerAgentBackend(opencodeBackend);
+  registerAgentBackend(kimiBackend);
   registerAgentBackend(cursorBackend);
 }

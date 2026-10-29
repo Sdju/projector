@@ -109,7 +109,7 @@ export {
   spawnAgentProcess,
 } from "../../../os-posix/index.ts";
 export { readOpenCodeGoKey } from "../../../os-posix/index.ts";
-export { readCursorAccessToken } from "../../../os-posix/index.ts";
+export { readCursorAccessToken, readKimiAccessToken } from "../../../os-posix/index.ts";
 
 const secrets = () =>
   import(new URL("./secrets.ts", import.meta.url).href) as Promise<typeof import("./secrets.ts")>;

@@ -15,6 +15,7 @@ export const jobChatTab: Record<string, string> = {
   codex: "codex",
   opencode: "opencode",
   cursor: "cursor",
+  kimi: "kimi",
 };
 
 export function jobDuration(start: number | undefined, end: number | undefined): string {

@@ -24,6 +24,7 @@ const AGENTS: Record<string, AgentBackendId> = {
   codex: "codex",
   opencode: "opencode",
   cursor: "cursor",
+  kimi: "kimi",
 };
 
 const JOB = "Идентификатор задания из ide.agent.jobs.list или ide.agent.job.start";
@@ -82,7 +83,7 @@ export function registerJobCommands(
     async (args) => {
       const options = commandArgs(args);
       const agent = AGENTS[text(options, "agent").toLowerCase()];
-      if (!agent) throw new Error("agent: claude-code, codex, opencode или cursor");
+      if (!agent) throw new Error("agent: claude-code, codex, opencode, cursor или kimi");
       const job = await startJob({
         projectId,
         backend: agent,
@@ -96,9 +97,9 @@ export function registerJobCommands(
     undefined,
     {
       description:
-        "Запускает фонового агента (Claude Code, Codex, OpenCode или Cursor) с заданием в проекте: сервер ведёт его сам, вкладка чата не нужна, прогресс виден в острове активности. Возвращает идентификатор задания. Запросы разрешений и вопросы агента приходят как состояние needs-user и ждут ответа (ide.agent.job.answer). Одновременно работает не больше 4 заданий. С isolate: true агент работает в изолированной git-копии проекта (слияние только по просьбе пользователя). Код пишут фоновые агенты, не вы: поручайте им работу, потом проверяйте результат через ide.agent.job.result и git diff.",
+        "Запускает фонового агента (Claude Code, Codex, OpenCode, Cursor или Kimi) с заданием в проекте: сервер ведёт его сам, вкладка чата не нужна, прогресс виден в острове активности. Возвращает идентификатор задания. Запросы разрешений и вопросы агента приходят как состояние needs-user и ждут ответа (ide.agent.job.answer). Одновременно работает не больше 4 заданий. С isolate: true агент работает в изолированной git-копии проекта (слияние только по просьбе пользователя). Код пишут фоновые агенты, не вы: поручайте им работу, потом проверяйте результат через ide.agent.job.result и git diff.",
       arguments: {
-        agent: "claude-code, codex, opencode или cursor",
+        agent: "claude-code, codex, opencode, cursor или kimi",
         task: "Полное задание агенту: цель, файлы, критерии готовности",
         isolate:
           "true — работать в изолированной копии проекта (для независимых задач, которые идут параллельно)",

@@ -88,6 +88,11 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
         "Cursor",
         "Открывает вкладку с Cursor в графическом чате вместо терминала: отдельный диалог в папке проекта, запросы разрешений в чате.",
       ),
+      agentChatTab(
+        "kimi",
+        "Kimi",
+        "Открывает вкладку с Kimi Code в графическом чате вместо терминала: отдельный диалог в папке проекта, запросы разрешений в чате.",
+      ),
       // A subagent or background command of a chat, followed in its own tab (read-only).
       defineTab<{ chat: string; task: string; title?: string }>({
         id: "agent-task",

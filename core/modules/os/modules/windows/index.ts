@@ -80,6 +80,7 @@ export {
 } from "./agent-process.ts";
 export { readOpenCodeGoKey } from "./opencode.ts";
 export { readCursorAccessToken } from "./cursor.ts";
+export { readKimiAccessToken } from "./kimi.ts";
 
 const secrets = () =>
   import(new URL("./secrets.ts", import.meta.url).href) as Promise<typeof import("./secrets.ts")>;

@@ -37,7 +37,7 @@ export type AgentPart =
   /** What the agent reasoned before answering; kept apart from the answer text. */
   | { type: "thought"; text: string };
 
-export type AgentBackendId = "projector" | "claude-code" | "codex" | "opencode" | "cursor";
+export type AgentBackendId = "projector" | "claude-code" | "codex" | "opencode" | "cursor" | "kimi";
 
 export type AgentPermissionMode = "default" | "plan" | "acceptEdits" | "auto" | "bypassPermissions";
 

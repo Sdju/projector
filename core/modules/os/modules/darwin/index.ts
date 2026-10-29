@@ -49,6 +49,7 @@ export {
   startCodexAppServer,
   readOpenCodeGoKey,
   readCursorAccessToken,
+  readKimiAccessToken,
   agentEnv,
   agentLaunch,
   agentHostAddress,

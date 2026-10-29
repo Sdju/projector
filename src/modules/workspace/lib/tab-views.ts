@@ -102,6 +102,7 @@ export const baseTabViews: TabViews = {
   codex: agentChat("codex"),
   opencode: agentChat("opencode"),
   cursor: agentChat("cursor"),
+  kimi: agentChat("kimi"),
   issue: {
     component: IssueView,
     keepAlive: true,

@@ -3,6 +3,7 @@ import { CodexUsageIndicator } from "../codex/index.ts";
 import { OpenCodeUsageIndicator } from "../opencode/index.ts";
 import { ClaudeUsageIndicator } from "../claude/index.ts";
 import { CursorUsageIndicator } from "../cursor/index.ts";
+import { KimiUsageIndicator } from "../kimi/index.ts";
 import { ProviderBalanceIndicator } from "../provider/index.ts";
 import { useAgentModes } from "../../agent/index.ts";
 
@@ -15,5 +16,6 @@ const { isEnabled } = useAgentModes();
   <OpenCodeUsageIndicator v-if="isEnabled('opencode')" />
   <ClaudeUsageIndicator v-if="isEnabled('claude')" />
   <CursorUsageIndicator v-if="isEnabled('cursor')" />
+  <KimiUsageIndicator v-if="isEnabled('kimi')" />
   <ProviderBalanceIndicator />
 </template>

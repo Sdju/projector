@@ -126,6 +126,7 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
       killAgentTree: (pid: number) => backend("killAgentTree").killAgentTree(pid),
       readOpenCodeGoKey: () => backend("readOpenCodeGoKey").readOpenCodeGoKey(),
       readCursorAccessToken: () => backend("readCursorAccessToken").readCursorAccessToken(),
+      readKimiAccessToken: () => backend("readKimiAccessToken").readKimiAccessToken(),
       startCodexAppServer: () => backend("startCodexAppServer").startCodexAppServer(),
       dockerStartPlan: () => backend("dockerStartPlan").dockerStartPlan(),
       runDockerSync: (args: string[]) => backend("runDockerSync").runDockerSync(args),

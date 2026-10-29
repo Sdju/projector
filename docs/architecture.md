@@ -20,7 +20,7 @@ Projector использует FEOD для всех приложений и со
 
 Сквозной модуль — контейнер публичных адаптеров с приватным общим ядром. Он объявляется через `transitModules` в настройках конкретного корня `feod.config.mjs`. У контейнера нет собственного `index.ts` или файлов реализации: непосредственные подмодули располагаются без промежуточной папки `modules/`, каждый имеет свой `index.ts`. Внешний код и соседние адаптеры обращаются к ним через эти публичные входы. Обычная вложенность `modules/` внутри адаптеров сохраняет прежние ограничения.
 
-Интеграции Codex, Claude Code, OpenCode и Cursor находятся в `modules/agents-integration` трёх корней:
+Интеграции Codex, Claude Code, OpenCode, Cursor и Kimi Code находятся в `modules/agents-integration` трёх корней:
 
 ```text
 src/modules/agents-integration/
@@ -29,6 +29,7 @@ src/modules/agents-integration/
   claude/index.ts
   opencode/index.ts
   cursor/index.ts
+  kimi/index.ts
   status-bar/index.ts # композиция индикаторов для workspace
 
 server/modules/agents-integration/
@@ -37,6 +38,7 @@ server/modules/agents-integration/
   claude/index.ts
   opencode/index.ts
   cursor/index.ts
+  kimi/index.ts
 
 core/modules/agents-integration/
   codex/index.ts     # browser-compatible контракты
