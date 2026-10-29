@@ -25,6 +25,8 @@ export function agentLabel(backend: string | undefined): string {
 
 const state = reactive({
   modes: {} as Record<string, AgentSessionMode>,
+  /** Chat backends switched off in the settings, by backend id (`claude-code`, `codex`, …). */
+  disabled: [] as string[],
   loaded: false,
   error: "",
 });
@@ -36,10 +38,15 @@ async function request(init?: RequestInit): Promise<void> {
     headers: { "Content-Type": "application/json" },
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || "Не удалось получить режимы сессий");
+  if (!response.ok) throw new Error(data.error || "Не удалось получить настройки агентов");
   state.modes = data.modes ?? {};
+  state.disabled = Array.isArray(data.disabled) ? data.disabled : [];
   state.loaded = true;
 }
+
+/** The chat backend behind a terminal program; only Claude Code's names differ. */
+export const programBackend = (program: string): string =>
+  program === "claude" ? "claude-code" : program;
 
 /** How new agent sessions open. The default is the terminal; the choice is stored on disk. */
 export function useAgentModes() {
@@ -60,5 +67,37 @@ export function useAgentModes() {
       state.error = error instanceof Error ? error.message : "Не удалось сохранить режим";
     }
   }
-  return { modeOf, setMode, error: computed(() => state.error) };
+  /** A program without a chat of its own (Shell) is always enabled. */
+  const isEnabled = (program: string): boolean =>
+    !guiPrograms[program] || !state.disabled.includes(programBackend(program));
+  async function setEnabled(program: string, enabled: boolean): Promise<void> {
+    const backend = programBackend(program);
+    const previous = state.disabled;
+    state.disabled = enabled
+      ? previous.filter((id) => id !== backend)
+      : [...previous.filter((id) => id !== backend), backend];
+    try {
+      const response = await fetch("/api/agent/integrations", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ backend, enabled }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Не удалось сохранить интеграцию");
+      state.disabled = Array.isArray(data.disabled) ? data.disabled : state.disabled;
+      state.error = "";
+    } catch (error) {
+      state.disabled = previous;
+      state.error = error instanceof Error ? error.message : "Не удалось сохранить интеграцию";
+      throw error;
+    }
+  }
+  return {
+    modeOf,
+    setMode,
+    isEnabled,
+    setEnabled,
+    loaded: computed(() => state.loaded),
+    error: computed(() => state.error),
+  };
 }

@@ -4,4 +4,5 @@ export { interfaceMode } from "./preferences.ts";
 export { saveInterface } from "./preferences.ts";
 export { toggleFavorite, setFavoriteDirectory } from "./preferences.ts";
 export { setAgentMode, setAgentDefault, GUI_AGENT_PROGRAMS } from "./preferences.ts";
+export { setAgentEnabled, TOGGLEABLE_AGENTS } from "./preferences.ts";
 export type { AgentSessionMode } from "./preferences.ts";

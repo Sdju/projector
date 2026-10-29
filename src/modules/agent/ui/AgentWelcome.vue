@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import UiButton from "../../../common/ui/UiButton.vue";
-import { guiPrograms } from "../model/modes.ts";
+import { computed } from "vue";
+import { guiPrograms, useAgentModes } from "../model/modes.ts";
 withDefaults(defineProps<{ plain?: boolean; agentName?: string }>(), {
   plain: false,
   agentName: "Агент",
 });
 const emit = defineEmits<{ suggest: [text: string]; open: [program: string] }>();
-const coders = Object.entries(guiPrograms);
+const { isEnabled } = useAgentModes();
+const coders = computed(() => Object.entries(guiPrograms).filter(([id]) => isEnabled(id)));
 const suggestions = [
   {
     title: "Разобраться в проекте",

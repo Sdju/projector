@@ -2,6 +2,7 @@ import {
   GUI_AGENT_PROGRAMS,
   preferences,
   setAgentDefault,
+  setAgentEnabled,
   setAgentMode,
 } from "../../modules/preferences/index.ts";
 import { loadProjects } from "../../modules/projects/index.ts";
@@ -73,14 +74,31 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
     return true;
   }
   if (path === "/api/agent/modes" && method === "GET") {
-    json(res, 200, { modes: (await preferences()).agentModes, programs: GUI_AGENT_PROGRAMS });
+    const prefs = await preferences();
+    json(res, 200, {
+      modes: prefs.agentModes,
+      programs: GUI_AGENT_PROGRAMS,
+      disabled: prefs.disabledAgents,
+    });
     return true;
   }
   if (path === "/api/agent/modes" && method === "PUT") {
     const body = await readBody(req);
     if (body.mode !== "tui" && body.mode !== "gui") throw new Error("Неизвестный режим сессии");
     await setAgentMode(asString(body.program), body.mode);
-    json(res, 200, { modes: (await preferences()).agentModes, programs: GUI_AGENT_PROGRAMS });
+    const prefs = await preferences();
+    json(res, 200, {
+      modes: prefs.agentModes,
+      programs: GUI_AGENT_PROGRAMS,
+      disabled: prefs.disabledAgents,
+    });
+    return true;
+  }
+  if (path === "/api/agent/integrations" && method === "PUT") {
+    const body = await readBody(req);
+    if (typeof body.enabled !== "boolean") throw new Error("Укажите, включён ли агент");
+    await setAgentEnabled(asString(body.backend), body.enabled);
+    json(res, 200, { disabled: (await preferences()).disabledAgents });
     return true;
   }
   if (path === "/api/agent/attachments" && method === "POST") {

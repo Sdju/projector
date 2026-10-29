@@ -8,6 +8,7 @@ import { DockerSettings } from "../docker/index.ts";
 import { ProviderPanel } from "../provider/index.ts";
 import {
   AgentHooksSettings,
+  AgentIntegrationsSettings,
   AgentMcpSettings,
   AgentSkillsSettings,
   AgentWebSettings,
@@ -108,6 +109,15 @@ export const settingsSections: SettingsSection[] = [
     description: "Провайдеры OpenAI-compatible API для агента Projector.",
     keywords: "Qwen OpenAI API key ключ URL модель AI LLM",
     component: ProviderPanel,
+  },
+  {
+    id: "agent-integrations",
+    title: "Интеграции агентов",
+    group: "Агент",
+    description: "Включение и отключение адаптеров Claude Code, Codex, OpenCode, Cursor и Kimi.",
+    keywords:
+      "интеграции адаптеры claude code codex opencode cursor kimi отключить выключить агент",
+    component: AgentIntegrationsSettings,
   },
   {
     id: "agent-sessions",

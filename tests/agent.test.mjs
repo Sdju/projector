@@ -1053,3 +1053,32 @@ test("agent session modes default to the terminal and persist only a GUI choice"
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("disabled agents persist and refuse runs", async () => {
+  const { preferences, setAgentEnabled } = await import("../server/modules/preferences/index.ts");
+  const { registerAgentBackend, runAgent } = await import("../server/modules/agent/index.ts");
+  const directory = await mkdtemp(join(tmpdir(), "projector-agent-disabled-"));
+  const previous = process.env.XDG_DATA_HOME;
+  process.env.XDG_DATA_HOME = directory;
+  registerAgentBackend({ id: "codex", run: () => Promise.resolve() });
+  try {
+    expect((await preferences()).disabledAgents).toStrictEqual([]);
+    await expect(setAgentEnabled("projector", false)).rejects.toThrow(/нельзя отключить/);
+    await setAgentEnabled("codex", false);
+    expect((await preferences()).disabledAgents).toStrictEqual(["codex"]);
+    await expect(
+      runAgent({
+        backend: "codex",
+        message: "hi",
+        emit: () => {},
+        abort: new AbortController().signal,
+      }),
+    ).rejects.toThrow(/отключён в настройках/);
+    await setAgentEnabled("codex", true);
+    expect((await preferences()).disabledAgents).toStrictEqual([]);
+  } finally {
+    if (previous === undefined) delete process.env.XDG_DATA_HOME;
+    else process.env.XDG_DATA_HOME = previous;
+    await rm(directory, { recursive: true, force: true });
+  }
+});

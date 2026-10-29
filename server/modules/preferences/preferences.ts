@@ -18,11 +18,21 @@ interface Preferences {
   agentModes: Record<string, AgentSessionMode>;
   /** Last model/effort/mode choice per agent backend, by control id; new chats start from it. */
   agentDefaults: Record<string, Record<string, string>>;
+  /** Agent backends the user switched off: their runs are refused and the UI hides them. */
+  disabledAgents: string[];
 }
 
 export type AgentSessionMode = "tui" | "gui";
 /** Programs whose sessions can be shown as a chat; everything else is always a terminal. */
 export const GUI_AGENT_PROGRAMS: readonly string[] = ["claude", "codex", "opencode", "cursor"];
+/** Chat backends that can be switched off in the settings; the built-in agent always stays on. */
+export const TOGGLEABLE_AGENTS: readonly string[] = [
+  "claude-code",
+  "codex",
+  "opencode",
+  "cursor",
+  "kimi",
+];
 
 const preferencesPath = () => join(dataDir(), "launcher.json");
 let saving: Promise<unknown> = Promise.resolve();
@@ -41,6 +51,7 @@ export async function preferences(): Promise<Preferences> {
         : [],
       agentModes: agentModes(data.agentModes),
       agentDefaults: agentDefaults(data.agentDefaults),
+      disabledAgents: disabledAgents(data.disabledAgents),
     };
   } catch {
     return {
@@ -51,8 +62,15 @@ export async function preferences(): Promise<Preferences> {
       directories: [],
       agentModes: {},
       agentDefaults: {},
+      disabledAgents: [],
     };
   }
+}
+function disabledAgents(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (id): id is string => typeof id === "string" && TOGGLEABLE_AGENTS.includes(id),
+  );
 }
 function agentDefaults(value: unknown): Record<string, Record<string, string>> {
   const defaults: Record<string, Record<string, string>> = {};
@@ -122,6 +140,14 @@ export async function setAgentMode(program: string, mode: AgentSessionMode): Pro
   await updatePreferences((value) => {
     if (mode === "gui") value.agentModes[program] = "gui";
     else delete value.agentModes[program];
+  });
+}
+/** Switches an agent backend on or off; the built-in Projector agent cannot be disabled. */
+export async function setAgentEnabled(backend: string, enabled: boolean): Promise<void> {
+  if (!TOGGLEABLE_AGENTS.includes(backend)) throw new Error("Этого агента нельзя отключить");
+  await updatePreferences((value) => {
+    const rest = value.disabledAgents.filter((id) => id !== backend);
+    value.disabledAgents = enabled ? rest : [...rest, backend];
   });
 }
 /** Remembers one control choice of an agent backend as the default for new chats. */

@@ -7,7 +7,7 @@ import UiField from "../../../common/ui/UiField.vue";
 import UiHint from "../../../common/ui/UiHint.vue";
 import { guiPrograms, useAgentModes, type AgentSessionMode } from "../model/modes.ts";
 
-const { modeOf, setMode, error } = useAgentModes();
+const { modeOf, setMode, isEnabled, error } = useAgentModes();
 </script>
 
 <template>
@@ -15,6 +15,7 @@ const { modeOf, setMode, error } = useAgentModes();
     <UiField
       v-slot="{ control }"
       v-for="(program, id) in guiPrograms"
+      v-show="isEnabled(id)"
       :key="id"
       :label="program.title"
     >

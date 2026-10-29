@@ -1,4 +1,5 @@
 import type { AgentBackend, AgentBackendId, AgentRunOptions } from "./backend.ts";
+import { preferences } from "../preferences/index.ts";
 
 export type { AgentEmitter, AgentEventName, AgentRunOptions } from "./backend.ts";
 export type {
@@ -122,5 +123,9 @@ export async function loadAgentSession(id: string | undefined, cwd: string, sess
 }
 
 export async function runAgent(options: AgentRunOptions): Promise<void> {
-  await backendFor(options.backend).run(options);
+  // Backends the user switched off in the settings refuse new runs, from chats and jobs alike.
+  const backend = backendFor(options.backend);
+  if ((await preferences()).disabledAgents.includes(backend.id))
+    throw new Error("Этот агент отключён в настройках Projector");
+  await backend.run(options);
 }

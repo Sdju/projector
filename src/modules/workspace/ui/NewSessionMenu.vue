@@ -63,16 +63,18 @@ const menu = useIslandMenu({
 const { open, toggle, close, active } = menu;
 const listId = useId();
 const rows = computed(() =>
-  programs.map((entry) => {
-    const usage = agentUsageSummary[entry.program];
-    return { ...entry, usage: usage?.remaining == null ? undefined : usage };
-  }),
+  programs
+    .filter((entry) => entry.program === "shell" || isEnabled(entry.program))
+    .map((entry) => {
+      const usage = agentUsageSummary[entry.program];
+      return { ...entry, usage: usage?.remaining == null ? undefined : usage };
+    }),
 );
 
 /** The status bar is hidden on mobile, so the limits shown below are polled only while this menu is open. */
 const compact = useCompactViewport();
 
-const { modeOf, setMode } = useAgentModes();
+const { modeOf, setMode, isEnabled } = useAgentModes();
 /** The chat view needs the agent feature; without it the terminal is the only option. */
 const hasGui = (program: string) => props.agent && !!guiPrograms[program];
 const toggleMode = (program: string) => setMode(program, modeOf(program) === "gui" ? "tui" : "gui");
