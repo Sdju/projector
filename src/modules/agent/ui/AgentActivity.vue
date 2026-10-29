@@ -36,7 +36,7 @@ const title = computed(() => {
       <UiSpinner v-if="current" />
       <IconAlert v-else-if="failed" class="error-icon" aria-hidden="true" />
       <IconCheck v-else class="done-icon" aria-hidden="true" />
-      <span>{{ title }}</span>
+      <span class="activity-title u-truncate" :title="title">{{ title }}</span>
       <span v-if="current" class="tool-hint u-truncate" :title="hint">{{ hint }}</span>
       <span v-if="current || title === 'Действия'" class="count">{{ tools.length }}</span>
       <IconChevron class="group-chevron" aria-hidden="true" />
@@ -62,7 +62,11 @@ svg {
   height: 13px;
   flex-shrink: 0;
 }
+.activity-title {
+  min-width: 0;
+}
 .count {
+  flex-shrink: 0;
   color: var(--faint);
 }
 .tool-hint {

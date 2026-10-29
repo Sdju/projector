@@ -49,3 +49,71 @@ test(
     expect(browser.errors).toEqual([]);
   },
 );
+
+test(
+  "long commands fit the activity, task list and task view on narrow screens",
+  { skip: !chromium },
+  async () => {
+    const html = await readFile(new URL("./fixtures/agent-task-bar.html", import.meta.url), "utf8");
+    const fixture = await createBrowserFixture({ pages: { "/bar": html } });
+    onTestFinished(() => fixture.close());
+    const browser = await createChromium(fixture.directory);
+    onTestFinished(() => browser.close());
+    await browser.open(fixture.url("/bar"));
+    await browser.evaluate("window.fixture.longCommands()");
+    const settle = () => browser.evaluate("new Promise(resolve => requestAnimationFrame(resolve))");
+    const geometry = () =>
+      browser.evaluate(`(() => {
+    const summary = document.querySelector('.activity-summary');
+    const page = document.documentElement;
+    return { width: summary.clientWidth, height: summary.clientHeight, page: page.clientWidth, scroll: page.scrollWidth };
+  })()`);
+    for (const width of [900, 360]) {
+      await browser.viewport(width, 700);
+      await settle();
+      let box = await geometry();
+      expect(box.scroll).toBeLessThanOrEqual(box.page);
+      expect(box.height).toBeLessThan(50);
+      await browser.evaluate("window.fixture.finishCommands()");
+      await settle();
+      box = await geometry();
+      expect(box.scroll).toBeLessThanOrEqual(box.page);
+      expect(box.height).toBeLessThan(50);
+      expect(
+        await browser.evaluate('Boolean(document.querySelector(".bar-summary .error-icon"))'),
+      ).toBe(true);
+      expect(
+        await browser.evaluate('Boolean(document.querySelector(".bar-summary .done-icon"))'),
+      ).toBe(false);
+      if (!(await browser.evaluate('document.querySelector(".task-bar").open'))) {
+        await browser.click(".bar-summary");
+        await settle();
+      }
+      await browser.click(".activity-summary");
+      await browser.click(".activity-list .tool > summary");
+      await settle();
+      expect(
+        await browser.evaluate(
+          "document.documentElement.scrollWidth <= document.documentElement.clientWidth",
+        ),
+      ).toBe(true);
+      expect(
+        await browser.evaluate('document.querySelector(".activity-list .code").textContent'),
+      ).toContain("unbroken_argument_");
+      await browser.click(".activity-summary");
+      await browser.click(".task-bar .row");
+      await settle();
+      expect(
+        await browser.evaluate('document.querySelector(".task-view .code").textContent'),
+      ).toContain("unbroken_argument_");
+      expect(
+        await browser.evaluate(
+          "document.documentElement.scrollWidth <= document.documentElement.clientWidth",
+        ),
+      ).toBe(true);
+      await browser.click(".task-view .head button");
+      await browser.evaluate("window.fixture.longCommands()");
+    }
+    expect(browser.errors).toEqual([]);
+  },
+);

@@ -5,6 +5,9 @@
 <script type="module">
   import "/src/app/styles.css";
   import { createApp, h, ref } from "vue";
+  import AgentTurn from "/src/modules/agent/ui/AgentTurn.vue";
+  import AgentTaskView from "/src/modules/agent/ui/AgentTaskView.vue";
+  import { taskDetail } from "/src/modules/agent/lib/task-detail.ts";
   import AgentTaskBar from "/src/modules/agent/ui/AgentTaskBar.vue";
   const task = (n, status) => ({
     id: `t${n}`,
@@ -21,15 +24,69 @@
     task(25, "error"),
   ]);
   const views = [];
+  const turns = ref([]);
+  const viewing = ref("");
   createApp({
     setup: () => () =>
-      h("div", { style: "padding: 20px; width: 700px" }, [
-        h(AgentTaskBar, { tasks: tasks.value, onView: (id) => views.push(id) }),
+      h("div", { style: "padding:20px;width:min(700px,100%);box-sizing:border-box" }, [
+        ...turns.value.map((turn) =>
+          h(AgentTurn, { turn, busy: true, last: true, copied: false, readonly: true }),
+        ),
+        h(AgentTaskBar, {
+          tasks: tasks.value,
+          onView: (id) => {
+            views.push(id);
+            viewing.value = id;
+          },
+        }),
+        ...(viewing.value && turns.value.length
+          ? [
+              h(AgentTaskView, {
+                detail: taskDetail(turns.value, viewing.value),
+                projectId: "",
+                backend: "codex",
+                embedded: true,
+                onBack: () => (viewing.value = ""),
+              }),
+            ]
+          : []),
       ]),
   }).mount("#fixture");
   window.fixture = {
     ready: true,
     views,
+    longCommands() {
+      const command = "python3 - <<'PY'\n" + "unbroken_argument_".repeat(180) + "\nPY";
+      const tools = [
+        {
+          id: "long1",
+          name: command,
+          input: JSON.stringify({ command }),
+          detail: "failure output",
+          status: "error",
+        },
+        {
+          id: "long2",
+          name: command,
+          input: JSON.stringify({ command }),
+          detail: "ok",
+          status: "running",
+        },
+      ];
+      tasks.value = tools.map((tool) => ({
+        id: tool.id,
+        tool: tool.id,
+        kind: "shell",
+        title: command,
+        status: tool.status,
+        background: true,
+      }));
+      turns.value = [{ id: "answer", role: "assistant", text: "", tools, tasks: tasks.value }];
+    },
+    finishCommands() {
+      for (const tool of turns.value[0].tools) if (tool.status === "running") tool.status = "done";
+      for (const task of tasks.value) if (task.status === "running") task.status = "done";
+    },
     settle: () => {
       tasks.value = tasks.value.map((item) =>
         item.status === "running" ? { ...item, status: "done" } : item,

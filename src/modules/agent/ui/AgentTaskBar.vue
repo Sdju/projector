@@ -4,6 +4,7 @@ import UiDisclosureSummary from "../../../common/ui/UiDisclosureSummary.vue";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import type { AgentTask } from "../model/types.ts";
 import AgentTaskRow from "./AgentTaskRow.vue";
+import IconAlert from "~icons/lucide/circle-alert";
 import IconCheck from "~icons/lucide/check";
 import IconChevron from "~icons/lucide/chevron-right";
 
@@ -42,6 +43,7 @@ const showFinished = computed(() => !active.value.length);
   >
     <UiDisclosureSummary variant="fit" class="bar-summary">
       <UiSpinner v-if="running" />
+      <IconAlert v-else-if="failed" class="error-icon" aria-label="Есть ошибки" />
       <IconCheck v-else class="done-icon" aria-hidden="true" />
       <span>{{ title }}</span>
       <IconChevron class="chevron" aria-hidden="true" />
@@ -122,6 +124,9 @@ svg {
 }
 .finished > .list {
   margin-top: var(--sp-1);
+}
+.error-icon {
+  color: var(--err);
 }
 .done-icon {
   color: var(--run);
