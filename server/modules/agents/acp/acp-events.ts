@@ -1,9 +1,32 @@
-import { createReplay, type AgentEmitter } from "../../agent/index.ts";
+import { createReplay, type AgentCommand, type AgentEmitter } from "../../agent/index.ts";
 import { createPlainDialect, type AcpDialect, type AcpTaskPatch } from "./acp-dialect.ts";
 
 interface ContentBlock {
   type?: string;
   text?: string;
+}
+
+/**
+ * The slash commands of an `available_commands_update` (or of `session/new` in ACP v2) as the
+ * chat knows them. The list is a full snapshot, so the caller replaces whatever it had.
+ */
+export function availableCommands(list: unknown): AgentCommand[] {
+  const commands = Array.isArray(list) ? list : [];
+  return commands.flatMap((item) => {
+    const { name, description, input } = item as {
+      name?: unknown;
+      description?: unknown;
+      input?: { hint?: unknown } | null;
+    };
+    if (typeof name !== "string" || !name) return [];
+    return [
+      {
+        name,
+        ...(typeof description === "string" && description ? { description } : {}),
+        ...(typeof input?.hint === "string" ? { hint: input.hint } : {}),
+      },
+    ];
+  });
 }
 
 export function contentText(content: unknown): string {
@@ -72,24 +95,7 @@ export function createAcpEventMapper(
       return;
     }
     if (kind === "available_commands_update") {
-      const list = Array.isArray(update.availableCommands) ? update.availableCommands : [];
-      emit("commands", {
-        commands: list.flatMap((item) => {
-          const { name, description, input } = item as {
-            name?: unknown;
-            description?: unknown;
-            input?: { hint?: unknown } | null;
-          };
-          if (typeof name !== "string" || !name) return [];
-          return [
-            {
-              name,
-              ...(typeof description === "string" && description ? { description } : {}),
-              ...(typeof input?.hint === "string" ? { hint: input.hint } : {}),
-            },
-          ];
-        }),
-      });
+      emit("commands", { commands: availableCommands(update.availableCommands) });
       return;
     }
     if (kind === "usage_update") {

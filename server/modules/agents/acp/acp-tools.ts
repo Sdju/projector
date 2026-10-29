@@ -1,5 +1,6 @@
 import {
   SESSION_LIST_LIMIT,
+  type AgentCommand,
   type AgentControl,
   type AgentSessionInfo,
   type AgentSessionTurn,
@@ -7,7 +8,7 @@ import {
 import type { AgentBackendId } from "../../agent/index.ts";
 import type { AcpConnection } from "./acp-client.ts";
 import { controlsFromSession } from "./acp-controls.ts";
-import { createAcpReplayCollector } from "./acp-events.ts";
+import { availableCommands, createAcpReplayCollector } from "./acp-events.ts";
 import { initializeAcp, startAcp, type AcpInitResult } from "./acp-process.ts";
 import { acpProgram } from "./acp-programs.ts";
 
@@ -67,6 +68,77 @@ export function acpControls(id: AgentBackendId, cwd: string): Promise<AgentContr
   // A failure must not stick for the whole TTL.
   controls.catch(() => controlsCache.delete(key));
   return controls;
+}
+
+/** How long the slash commands are reused: they follow the project's files, not every call. */
+const COMMANDS_TTL_MS = 60_000;
+/** How long to wait for `available_commands_update` after `session/new`. */
+const COMMANDS_WAIT_MS = 5_000;
+const commandsCache = new Map<string, { at: number; commands: Promise<AgentCommand[]> }>();
+
+/** Resolves with an empty list after `ms`: a chat must not wait for commands forever. */
+function waitForCommands(commands: Promise<AgentCommand[]>, ms: number): Promise<AgentCommand[]> {
+  return Promise.race([
+    commands,
+    new Promise<AgentCommand[]>((resolve) => {
+      const timer = setTimeout(() => resolve([]), ms);
+      timer.unref?.();
+    }),
+  ]);
+}
+
+/**
+ * The slash commands the agent offers in `cwd`. ACP has no request for them: the agent sends
+ * `available_commands_update` after `session/new`. A throwaway session is created for that list
+ * and closed again — no prompt, no model call. The notification may arrive before the response
+ * (the protocol allows it), so it is collected from the first message.
+ */
+export function acpCommands(
+  id: AgentBackendId,
+  cwd: string,
+  waitMs = COMMANDS_WAIT_MS,
+): Promise<AgentCommand[]> {
+  const key = `${id}\n${cwd}`;
+  const cached = commandsCache.get(key);
+  if (cached && Date.now() - cached.at < COMMANDS_TTL_MS) return cached.commands;
+  let resolveAnnounced: ((commands: AgentCommand[]) => void) | undefined;
+  const announced = new Promise<AgentCommand[]>((resolve) => (resolveAnnounced = resolve));
+  let collected: AgentCommand[] | undefined;
+  let decided = false;
+  const take = (list: unknown) => {
+    collected = availableCommands(list);
+    // An empty first snapshot is not final: some agents load commands from project files.
+    if (collected.length) {
+      decided = true;
+      resolveAnnounced?.(collected);
+    }
+  };
+  const commands = withAgent(
+    id,
+    cwd,
+    async (connection, init) => {
+      const created = (await connection.request("session/new", { cwd, mcpServers: [] })) as {
+        sessionId: string;
+        /** ACP v2 returns the list in the response; v1 sends the notification instead. */
+        availableCommands?: unknown;
+      };
+      // The response is authoritative for v2 agents, even when the list is empty.
+      if (created.availableCommands !== undefined) {
+        take(created.availableCommands);
+        decided = true;
+      }
+      if (!decided) await waitForCommands(announced, waitMs);
+      await discard(connection, init, created.sessionId);
+      return collected ?? [];
+    },
+    (update) => {
+      if (update.sessionUpdate === "available_commands_update") take(update.availableCommands);
+    },
+  );
+  commandsCache.set(key, { at: Date.now(), commands });
+  // A failure must not stick for the whole TTL.
+  commands.catch(() => commandsCache.delete(key));
+  return commands;
 }
 
 const EMPTY_TITLE = /^New session - \d{4}-\d\d-\d\dT/;

@@ -12,7 +12,13 @@ import { type AcpConnection, type AcpError, NO_TIMEOUT } from "./acp-client.ts";
 import { applySelection, controlsFromSession } from "./acp-controls.ts";
 import { contentText, createAcpEventMapper } from "./acp-events.ts";
 import { initializeAcp, startAcp } from "./acp-process.ts";
-import { acpControls, acpDeleteSession, acpLoadSession, acpSessions } from "./acp-tools.ts";
+import {
+  acpCommands,
+  acpControls,
+  acpDeleteSession,
+  acpLoadSession,
+  acpSessions,
+} from "./acp-tools.ts";
 import { resolve } from "node:path";
 import { os } from "../../../../core/modules/os/index.ts";
 import { pathToFileURL } from "node:url";
@@ -69,6 +75,7 @@ export function createAcpBackend(program: AcpProgram): AgentBackend {
       !!(program.binary && os.tools.commandExists(program.binary)) ||
       os.tools.commandExists(program.command),
     controls: (cwd) => acpControls(id, cwd),
+    commands: (cwd) => acpCommands(id, cwd),
     sessions: (cwd) => acpSessions(id, cwd),
     loadSession: (cwd, sessionId) => acpLoadSession(id, cwd, sessionId),
     deleteSession: (cwd, sessionId) => acpDeleteSession(id, cwd, sessionId),
