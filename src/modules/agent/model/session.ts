@@ -64,7 +64,6 @@ export function useAgent(
   const ready = loads.get(key)!;
   const persist = () => saveChat(key, historyUrl, state);
   const catalog = useProjects();
-  const turns = computed(() => state.turns);
   const draftParts = computed({
     get: () => state.draftParts,
     set: (value) => {
@@ -347,7 +346,8 @@ export function useAgent(
     );
   }
   return {
-    turns,
+    key,
+    turns: computed(() => state.turns),
     loading,
     draft,
     draftParts,

@@ -330,8 +330,11 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
     }
     untrack?.();
     // The answer reached the page, or the user cancelled it: nothing is left to rejoin.
-    if (run && (delivered || abort.signal.aborted)) await removeRun(run.id).catch(() => {});
-    else if (run) schedulePrune();
+    if (run) {
+      const removed =
+        (delivered || abort.signal.aborted) && (await removeRun(run.id).catch(() => false));
+      if (!removed) schedulePrune();
+    }
     if (viaEvents) {
       untrackStream?.();
       if (!detached) broadcastEvent("agent", { stream, event: "end", data: {} }, client);

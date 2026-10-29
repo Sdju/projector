@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { dataDir } from "../../../core/modules/app-paths/index.ts";
 import { os } from "../../../core/modules/os/index.ts";
 import type { AgentHistoryTurn } from "../providers/index.ts";
@@ -109,12 +110,15 @@ export async function rememberSession(id: string, session: string): Promise<void
   });
 }
 
-export async function removeRun(id: string): Promise<void> {
+/** A disconnected/replaced reader must never erase a run that still has a live owner. */
+export async function removeRun(id: string): Promise<boolean> {
+  if ((await liveHost(id)) !== undefined) return false;
   const dir = runDirectory(id);
   // A deep data directory puts the socket in /tmp instead (see `agentHostAddress`).
   await os.tools.removeAgentHostAddress(dir, os.tools.agentHostAddress(dir));
   // A host that was just signalled may still write; retry instead of failing on ENOTEMPTY.
   await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  return true;
 }
 
 /** The host's process identity, so a pid reused by another program later is never signalled. */
@@ -139,7 +143,11 @@ async function liveHost(id: string): Promise<number | undefined> {
 /** Stops a run's agent and everything it started, whichever server started it. */
 export async function stopRun(id: string): Promise<void> {
   const pid = await liveHost(id);
-  if (pid) os.tools.killAgentTree(pid);
+  if (!pid) return;
+  os.tools.killAgentTree(pid);
+  // Signalling is asynchronous: keep the record until the host actually releases the run.
+  const deadline = Date.now() + 5000;
+  while ((await liveHost(id)) !== undefined && Date.now() < deadline) await sleep(25);
 }
 
 /**
@@ -173,7 +181,10 @@ export function schedulePrune(): void {
   setTimeout(() => void pruneRuns().catch(() => {}), RETAIN_MS + 1000).unref();
 }
 
-const active = new Map<string, () => void>();
+const host = globalThis as typeof globalThis & {
+  projectorAgentRuns?: Map<string, () => void>;
+};
+const active = (host.projectorAgentRuns ??= new Map<string, () => void>());
 
 /** Registers how to cancel a run this server is driving; the returned function forgets it. */
 export function trackRun(id: string, cancel: () => void): () => void {

@@ -51,6 +51,7 @@ const plain = computed(() => props.backend !== "projector");
 const agentName = computed(() => agentLabel(props.backend));
 const { api } = useIdeCommands();
 const {
+  key: chatKey,
   turns,
   loading,
   draft,
@@ -300,7 +301,6 @@ function downloadChat() {
 }
 
 // The chat publishes itself to the workspace's commands (see `registerAgentCommands`).
-const chatKey = `${props.backend}:${props.chatId ?? props.projectId}`;
 const controller: ChatController = {
   key: chatKey,
   projectId: props.projectId,

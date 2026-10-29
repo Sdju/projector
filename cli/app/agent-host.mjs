@@ -28,6 +28,26 @@ let client = null;
 let idleTimer;
 let finished = false;
 let stderrTail = "";
+const prompts = new Set();
+let turnFinished = false;
+
+// ACP servers stay alive after a turn. Once nobody is listening, a finished turn must release
+// the native session lock; its trace remains available for the next server to replay.
+function observe(message, outgoing) {
+  let rpc;
+  try {
+    rpc = JSON.parse(message);
+  } catch {
+    return;
+  }
+  if (outgoing && rpc.method === "session/prompt" && rpc.id !== undefined) {
+    prompts.add(JSON.stringify(rpc.id));
+    turnFinished = false;
+  } else if (!outgoing && !rpc.method && prompts.delete(JSON.stringify(rpc.id))) {
+    turnFinished = true;
+    if (!client || client.destroyed) child.kill("SIGTERM");
+  }
+}
 
 const record = (mark, text) => {
   try {
@@ -72,6 +92,7 @@ child.stdout.on(
   lines((line) => {
     record("<", line);
     send("<", line);
+    observe(line, false);
   }),
 );
 child.stderr.setEncoding("utf8");
@@ -112,13 +133,17 @@ const server = net.createServer((socket) => {
     "data",
     lines((line) => {
       record(">", line);
+      observe(line, true);
       if (child.stdin.writable) child.stdin.write(`${line}\n`);
     }),
   );
   socket.on("close", () => {
     if (client !== socket) return;
     client = null;
-    if (!finished) armIdle();
+    if (!finished) {
+      if (turnFinished) child.kill("SIGTERM");
+      else armIdle();
+    }
   });
 });
 server.listen(address);

@@ -104,9 +104,15 @@ export function useAgentActivity() {
       }))
       .filter((item) => item.busy || item.tasks);
     // The page's own chat knows more (background tasks) than the run on the server.
-    const known = new Set(openChats().map((chat) => chat.key));
+    // An idle/disconnected view must not hide the server's still-running agent.
+    const known = new Set(local.map((chat) => chat.chat));
     const remote = serverRuns.value
-      .filter((run) => !run.chat || !known.has(run.chat))
+      .filter((run) => {
+        const key = run.chat || run.id;
+        if (known.has(key)) return false;
+        known.add(key);
+        return true;
+      })
       .map((run) => ({
         chat: run.chat || run.id,
         projectId: run.projectId,

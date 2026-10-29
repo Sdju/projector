@@ -9,7 +9,7 @@ interface RpcMessage {
   method?: string;
   params?: unknown;
   result?: unknown;
-  error?: { code?: number; message?: string };
+  error?: { code?: number; message?: string; data?: { details?: unknown } };
 }
 
 export interface AcpConnectionHandlers {
@@ -92,7 +92,11 @@ export function createAcpConnection(child: AcpProcess, handlers: AcpConnectionHa
     if (!waiter) return;
     pending.delete(Number(message.id));
     if (message.error) {
-      const error = new Error(message.error.message || "Ошибка агента") as AcpError;
+      const summary = message.error.message || "Ошибка агента";
+      const details = message.error.data?.details;
+      const error = new Error(
+        typeof details === "string" && details.trim() ? `${summary}: ${details}` : summary,
+      ) as AcpError;
       error.code = message.error.code;
       waiter.reject(error);
     } else waiter.resolve(message.result);
