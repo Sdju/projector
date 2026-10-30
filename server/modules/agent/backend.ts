@@ -89,6 +89,8 @@ export interface AgentRunOptions {
   message: string;
   /** `message` with its chips; the text already names every file (`@path`). */
   parts?: MessagePart[];
+  /** The project the chat belongs to, when it has one; the IDE MCP server needs it. */
+  projectId?: string;
   cwd?: string;
   commands?: (request: CommandRequest) => Promise<unknown>;
   /** Asks the user before a sensitive tool runs; absent when the client cannot show a prompt. */

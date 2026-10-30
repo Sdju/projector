@@ -14,6 +14,8 @@ export interface AgentRunRecord {
   message: string;
   parts?: MessagePart[];
   history: AgentHistoryTurn[];
+  /** Feature ids chosen for the chat; absent means the user's defaults. */
+  features?: string[];
   cwd?: string;
   sessionId?: string;
   messageId?: string;

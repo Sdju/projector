@@ -107,15 +107,15 @@ commands.scope.registerCommand({
   palette: false,
   title: "Включить или выключить возможность в текущем чате",
   description:
-    "Переопределяет возможность (widgets — виджеты в ответах) для этого чата, не меняя умолчание агента в настройках. Часть агентов применяет изменение со следующего сообщения, часть — в новой сессии.",
+    "Переопределяет возможность (widgets — виджеты в ответах, ide — команды IDE через MCP) для этого чата, не меняя умолчание агента в настройках. Часть агентов применяет изменение со следующего сообщения, часть — в новой сессии.",
   arguments: {
-    feature: "string: id возможности, например widgets",
+    feature: "string: id возможности: widgets или ide",
     enabled: "boolean: включена ли возможность в этом чате",
   },
   run: (value) => {
     const args = commandArgs(value);
     if (typeof args.feature !== "string" || !args.feature)
-      throw new Error("feature: id возможности, например widgets");
+      throw new Error("feature: id возможности: widgets или ide");
     if (typeof args.enabled !== "boolean") throw new Error("enabled должен быть boolean");
     return setFeature(args.feature, args.enabled);
   },
@@ -134,7 +134,7 @@ commands.scope.registerCommand({
   id: "ide.agent.features.panel",
   title: "Открыть возможности агента",
   description:
-    "Открывает или закрывает остров возможностей в табе агента: какие необязательные возможности (виджеты в ответах) включены в этом чате и чем они отличаются от умолчаний.",
+    "Открывает или закрывает остров возможностей в табе агента: какие необязательные возможности (виджеты в ответах, команды IDE через MCP) включены в этом чате и чем они отличаются от умолчаний.",
   run: () => open(),
 });
 

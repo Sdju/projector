@@ -94,6 +94,7 @@ export async function requestFrom(body: Record<string, unknown>) {
     features: Array.isArray(body.features)
       ? body.features.filter((id): id is string => typeof id === "string").slice(0, 50)
       : undefined,
+    projectId: projectId || undefined,
     cwd: folder,
     providerId: asString(body.providerId) || undefined,
   };

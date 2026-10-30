@@ -237,6 +237,39 @@ output to 256 KiB, and stops the process group on cancellation. Environment vari
 whose names contain KEY, TOKEN, SECRET, PASSWORD or CREDENTIAL are excluded. Bash
 runs with the user's filesystem permissions; it is not an isolated sandbox. In a project with a Docker environment it runs inside the container instead (see [containers](containers-design.md)); in a trusted Dev Container project, through `devcontainer exec`.
 
+### IDE MCP server for external agents
+
+The optional `ide` feature gives Claude Code and ACP agents the same command catalog
+without one MCP tool per Projector feature. `server/modules/agents/ide-mcp/server.ts`
+is a stdio MCP server named `projector-ide` with exactly three tools:
+`list_commands`, `describe_command` and `execute_command`. The last one requires a
+prior `describe_command` for the same `command`/`scope` pair in that MCP session.
+
+The server is passed inline, never written to `.mcp.json`, Claude settings or the
+project: Claude Code gets it in `mcpServers` of every query, ACP agents in
+`session/new`/`session/load` next to the project's own servers. It is started with
+`PROJECTOR_PROJECT_ID` and `PROJECTOR_MCP_TOKEN_FILE`; the token lives in
+`agent/ide-mcp.token` in the data directory with mode `0600`.
+
+`POST /api/ide/command-request` (bearer token, loopback) broadcasts
+`ide-command-request` through `/api/events` and waits up to 60 seconds. The page
+whose scopes include the project claims the request with
+`POST /api/ide/command-request/claim` (same-origin), then answers through
+`POST /api/ide/command-request/result`. The first page to answer becomes the owner
+of that MCP process's session: later requests go to it, so discovery and execution
+see one workbench. Another tab may take over after a three-second grace period; a
+closed owner releases the session, and a request it was already running fails
+rather than running twice. Other projects' scopes are rejected.
+
+Execution uses the browser SDK and `agentCommandHandler`, the same filtering as the
+built-in agent. Read-only commands run directly; a changing command asks with
+`window.confirm` before it runs. The event carries `expiresAt`; the page checks it
+before the confirmation and before execution, and the server sends
+`ide-command-cancel` on timeout. `executeCommand` now takes an optional
+`AbortSignal`, so a command that supports cancellation stops with the request. A
+page that confirms after the deadline does not run the command: the agent has
+already received the timeout error.
+
 ### Agent backends
 
 `runAgent` (`server/modules/agent/registry.ts`) picks a backend by the request's `backend`: the agents registered in `server/app/agents.ts` (`projector` by default, `claude-code`, `codex`, `opencode`, `cursor`, `kimi`). Backends implement `AgentBackend` (`backend.ts`) and emit the shared SSE events (`AgentEventName` in `backend.ts`): `text`, `tool`, `tool-result`, `project`, `status`, `done`, `error`, plus `session` (native session ID, stored on the assistant turn and sent back as `sessionId`) and `permission-request` (a `detail` preview of the change and a `persistent` flag; answered through `POST /api/agent/tool-result` with `{ output: { allow, always? } }` — 10-minute expiry, single-use ID). A durable `always` answer is only offered when the backend can honor it. `commands` (`{ commands: [{ name, description?, hint? }] }`: slash commands an agent lists; ACP agents are read from a throwaway `session/new` before the first message — the agent sends `available_commands_update` there, no prompt is made — and later notifications replace the list; Claude Code's are read before the first message from `GET /api/agent/commands`, which starts a promptless session for `supportedCommands()`) is how `/` in the input knows what to suggest. `context` (`{ used, size, model?, compactAt?, categories?, cost? }`: how full the context window is — read from the SDK's `getContextUsage` after each Claude Code turn, from `usage_update` for ACP agents; stored on the assistant turn and drawn as a ring beside the send button) is sent when the agent reports it. Further events: `thought` (the agent's reasoning, shown in a collapsible block), `task` (subagent and background-command patches of the `core/modules/agent-task` contract, see [architecture](architecture.md)), `question-request` (an agent question, ACP elicitation, answered like a permission), `run` (the id of the hosted run, stored in the history), `checkpoint` and `worktree` (described under chat history below), and `command-request` (delegates an IDE command to the browser). `controls` (the controls with the values actually in effect, described below) is sent at the start of every turn.

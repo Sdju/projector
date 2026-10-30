@@ -8,6 +8,8 @@ export {
 } from "./catalog.ts";
 export {
   enabledFeatureText,
+  enabledFeatures,
+  featureEnabled,
   featurePrompt,
   featureSettings,
   featuresFile,

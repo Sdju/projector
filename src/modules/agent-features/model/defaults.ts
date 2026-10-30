@@ -48,7 +48,7 @@ export function useAgentFeatureDefaults() {
     id: "ide.agent.features.defaults.list",
     palette: false,
     title: "Список умолчаний возможностей агентов",
-    description: `Возвращает возможности чата (например виджеты в ответах) и для каждого агента (${agentTitles().join(", ")}) с умолчанием: включена ли она в новом чате. Это значения, которые чат может переопределить для себя; сам остров в табе агента меняет только текущий чат.`,
+    description: `Возвращает возможности чата (widgets — виджеты в ответах, ide — команды IDE через MCP) и для каждого агента (${agentTitles().join(", ")}) с умолчанием: включена ли она в новом чате. Это значения, которые чат может переопределить для себя; сам остров в табе агента меняет только текущий чат.`,
     run: () => reload(),
   });
   commands.scope.registerCommand({
@@ -56,9 +56,9 @@ export function useAgentFeatureDefaults() {
     palette: false,
     title: "Изменить умолчание возможности агента",
     description:
-      "Включает или выключает возможность (widgets — виджеты в ответах) для агента по умолчанию. Действует на новые чаты без своего переопределения; уже открытый чат меняет остров в табе агента. Отключение виджетов у Projector убирает их из его системного промпта по умолчанию.",
+      "Включает или выключает возможность (widgets — виджеты в ответах, ide — команды IDE через MCP) для агента по умолчанию. Действует на новые чаты без своего переопределения; уже открытый чат меняет остров в табе агента. У внешних агентов ide добавляет MCP-сервер projector-ide с тремя инструментами команд.",
     arguments: {
-      feature: "string: id возможности, например widgets",
+      feature: "string: id возможности: widgets или ide",
       agent: `string: id агента каталога: ${agentIds().join(", ")}`,
       enabled: "boolean: включена ли возможность по умолчанию",
     },
@@ -66,7 +66,7 @@ export function useAgentFeatureDefaults() {
     run: (value) => {
       const args = commandArgs(value);
       if (typeof args.feature !== "string" || !args.feature)
-        throw new Error("feature: id возможности, например widgets");
+        throw new Error("feature: id возможности: widgets или ide");
       if (typeof args.agent !== "string" || !args.agent)
         throw new Error(`agent: id агента каталога: ${agentIds().join(", ")}`);
       if (typeof args.enabled !== "boolean") throw new Error("enabled должен быть boolean");

@@ -8,6 +8,7 @@ import {
   type PaletteCommand,
 } from "../../../core/modules/ide/index.ts";
 import { commandHostKey } from "../../common/utilities/commands.ts";
+import { listenIdeCommands } from "./command-bridge.ts";
 import { createPageReload } from "./reload.ts";
 interface PaletteSession {
   commands: PaletteCommand[];
@@ -117,6 +118,7 @@ export function provideIdeCommands() {
     // Calling this scope explicitly preserves the originating workspace scope.
     void workbench.executeCommand(binding.command, binding.args).catch(reportError);
   }
+  const stopIdeCommands = listenIdeCommands(sdk);
   onMounted(() => {
     window.addEventListener("keydown", globalKeydown, true);
     void pageReload.refreshMode();
@@ -157,6 +159,7 @@ export function provideIdeCommands() {
     error.value = value instanceof Error ? value.message : String(value);
   });
   onBeforeUnmount(() => {
+    stopIdeCommands();
     pageReload.dispose();
     unsubscribe();
     window.removeEventListener("keydown", globalKeydown, true);

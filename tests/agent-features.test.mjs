@@ -8,6 +8,8 @@ import { registerBuiltinAgentFeatures } from "../server/app/features.ts";
 import { registerBuiltinWidgetDefinitions } from "../server/app/widgets.ts";
 import {
   enabledFeatureText,
+  enabledFeatures,
+  featureEnabled,
   featurePrompt,
   featureSettings,
   featuresFile,
@@ -52,6 +54,23 @@ describe("agent features", () => {
     expect(agentOf(settings, "projector").enabled).toBe(true);
     expect(agentOf(settings, "codex").enabled).toBe(false);
     expect(settings.file).toBe(featuresFile());
+  });
+
+  it("keeps the IDE MCP off until the user asks for it", async () => {
+    const settings = await featureSettings();
+    const ide = settings.features.find((feature) => feature.id === "ide");
+    expect(ide.title).toBe("Команды IDE через MCP");
+    expect(ide.agents.every((agent) => agent.enabled === false)).toBe(true);
+    expect(await featureEnabled("codex", "ide")).toBe(false);
+    expect(await featurePrompt("codex")).toBe("");
+
+    await setFeatureAgent("ide", "codex", true);
+    expect(await featureEnabled("codex", "ide")).toBe(true);
+    expect(await enabledFeatures("codex")).toContain("ide");
+    expect(await featurePrompt("codex")).toContain("projector-ide");
+    expect(await featurePrompt("codex", ["ide"])).toContain("execute_command");
+    // The chat's own choice can leave it out again.
+    expect(await featurePrompt("codex", [])).toBe("");
   });
 
   it("switches a feature for one agent and writes the choice", async () => {

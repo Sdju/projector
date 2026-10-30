@@ -97,6 +97,28 @@ export async function setFeatureAgent(
   return task;
 }
 
+/** The ids of the features the agent has on: the chat's choice, or the user's defaults. */
+export async function enabledFeatures(agentId: string, features?: string[]): Promise<string[]> {
+  if (features)
+    return agentFeatureCatalog
+      .list()
+      .filter((feature) => features.includes(feature.id))
+      .map((feature) => feature.id);
+  const state = await readState();
+  return agentFeatureCatalog
+    .list()
+    .filter((feature) => enabledAgents(feature, state).includes(agentId))
+    .map((feature) => feature.id);
+}
+
+export async function featureEnabled(
+  agentId: string,
+  featureId: string,
+  features?: string[],
+): Promise<boolean> {
+  return (await enabledFeatures(agentId, features)).includes(featureId);
+}
+
 /**
  * The instructions of every feature the agent has on, or an empty string. `features` is the chat's
  * own choice (an empty list means none); without it the user's defaults for the agent apply.
@@ -104,13 +126,10 @@ export async function setFeatureAgent(
  * others into the first message of a session.
  */
 export async function enabledFeatureText(agentId: string, features?: string[]): Promise<string> {
-  const wanted = features ? new Set(features) : undefined;
-  const state = wanted ? undefined : await readState();
+  const ids = new Set(await enabledFeatures(agentId, features));
   return agentFeatureCatalog
     .list()
-    .filter((feature) =>
-      wanted ? wanted.has(feature.id) : enabledAgents(feature, state!).includes(agentId),
-    )
+    .filter((feature) => ids.has(feature.id))
     .map((feature) => feature.instruction().trim())
     .filter(Boolean)
     .join("\n\n");

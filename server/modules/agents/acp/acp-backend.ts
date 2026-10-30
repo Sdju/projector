@@ -1,13 +1,19 @@
 import { acpProgram, type AcpProgram, registerAcpProgram } from "./acp-programs.ts";
 import { attachedImages, promptWithHistory } from "../../agent/index.ts";
-import { featurePrompt } from "../../agent-features/index.ts";
+import { featureEnabled, featurePrompt } from "../../agent-features/index.ts";
+import { acpIdeMcpServer, IDE_MCP_SERVER } from "../ide-mcp/index.ts";
 import type {
   AgentBackend,
   AgentBackendId,
   AgentRunOptions,
   MessagePart,
 } from "../../agent/index.ts";
-import { configuredMcpServers, projectMcpServers, type McpSupport } from "./mcp-config.ts";
+import {
+  configuredMcpServers,
+  projectMcpServers,
+  type AcpMcpServer,
+  type McpSupport,
+} from "./mcp-config.ts";
 import { elicitForm } from "./acp-elicitation.ts";
 import { type AcpConnection, type AcpError, NO_TIMEOUT } from "./acp-client.ts";
 import { applySelection, controlsFromSession } from "./acp-controls.ts";
@@ -133,6 +139,10 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
   options.emit("status", { phase: "thinking", provider: program.label, model: "" });
   try {
     const init = await initializeAcp(connection);
+    const extraMcp =
+      options.projectId && (await featureEnabled(id, "ide", options.features))
+        ? [acpIdeMcpServer(options.projectId)]
+        : [];
     const session = await openSession(
       connection,
       options,
@@ -142,6 +152,7 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
       },
       init.agentCapabilities?.loadSession === true,
       init.agentCapabilities?.mcpCapabilities,
+      extraMcp,
     );
     sessionId = session.sessionId;
     options.emit("session", { id: sessionId, backend: id });
@@ -193,6 +204,21 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
 }
 
 /**
+ * The MCP servers of a session: the project's own, plus the built-in IDE server when the feature
+ * is on. Only that addition may hide a same-named project server; with the feature off the user's
+ * `projector-ide` from `.mcp.json` is passed as it is.
+ */
+export async function sessionMcpServers(
+  cwd: string | undefined,
+  support: McpSupport,
+  extra: AcpMcpServer[],
+): Promise<AcpMcpServer[]> {
+  const project = await projectMcpServers(cwd, support);
+  if (!extra.length) return project;
+  return [...project.filter((server) => server.name !== IDE_MCP_SERVER), ...extra];
+}
+
+/**
  * Resume the native session when the agent supports it, otherwise start a fresh one. The ACP
  * `session/load` response has no `sessionId`, so the requested one is kept; an agent without the
  * `loadSession` capability, or a load that finds no such session, falls back to `session/new` with the replayed
@@ -205,7 +231,9 @@ export async function openSession(
   replay: (active: boolean) => void,
   canLoad = true,
   mcp: McpSupport = {},
+  extraMcp: AcpMcpServer[] = [],
 ): Promise<{ sessionId: string; resumed: boolean; result: unknown }> {
+  const servers = () => sessionMcpServers(options.cwd, mcp, extraMcp);
   const start = async () => {
     if (options.sessionId && canLoad) {
       replay(true);
@@ -213,7 +241,7 @@ export async function openSession(
         const loaded = await connection.request("session/load", {
           sessionId: options.sessionId,
           cwd: options.cwd,
-          mcpServers: await projectMcpServers(options.cwd, mcp),
+          mcpServers: await servers(),
         });
         return { sessionId: options.sessionId, resumed: true, result: loaded };
       } catch (error) {
@@ -226,7 +254,7 @@ export async function openSession(
     }
     const created = (await connection.request("session/new", {
       cwd: options.cwd,
-      mcpServers: await projectMcpServers(options.cwd, mcp),
+      mcpServers: await servers(),
     })) as { sessionId: string };
     return { sessionId: created.sessionId, resumed: false, result: created };
   };

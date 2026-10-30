@@ -13,6 +13,7 @@ import { pruneRuns, recoverJobs } from "../modules/agent/index.ts";
 import { registerBuiltinAgents } from "./agents.ts";
 import { registerBuiltinWidgetDefinitions } from "./widgets.ts";
 import { registerBuiltinAgentFeatures } from "./features.ts";
+import { ensureIdeMcpToken } from "../modules/ide/index.ts";
 import { reconcileOnStartup } from "../modules/environments/index.ts";
 
 import {
@@ -47,6 +48,9 @@ export function bindRuntime(httpServer: HttpServer | null, mode: ServerMode): vo
   registerBuiltinAgents();
   registerBuiltinWidgetDefinitions();
   registerBuiltinAgentFeatures();
+  void ensureIdeMcpToken().catch((error: unknown) =>
+    console.error("Ключ IDE MCP:", error instanceof Error ? error.message : error),
+  );
   // Сервер, запущенный из сессии Claude Code, иначе передаёт её метки каждому терминалу и агенту.
   os.clearSessionEnv(CLAUDE_SESSION_ENV);
   runtime.projectorRuntimeMode = mode;
@@ -68,6 +72,8 @@ export function bindRuntime(httpServer: HttpServer | null, mode: ServerMode): vo
       console.error("Очистка контейнеров:", error.message),
     );
     const url = listenAddress(address);
+    // Child agents and their MCP servers reach this exact address, even on a non-default port.
+    process.env.PROJECTOR_URL = url;
     if (process.env.PROJECTOR_WINDOW === "1") {
       void openLauncher(url).catch(console.error);
     } else if (os.capabilities.nativeDesktop) {

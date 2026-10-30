@@ -15,7 +15,8 @@ import type {
 } from "../../agent/index.ts";
 import { fileURLToPath } from "node:url";
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import { featurePrompt } from "../../agent-features/index.ts";
+import { featureEnabled, featurePrompt } from "../../agent-features/index.ts";
+import { claudeIdeMcpServer, IDE_MCP_SERVER } from "../ide-mcp/index.ts";
 import type {
   Options,
   SDKControlGetContextUsageResponse as ContextUsage,
@@ -113,10 +114,15 @@ export async function runClaudeCode(options: AgentRunOptions): Promise<void> {
   else options.abort?.addEventListener("abort", forwardAbort, { once: true });
 
   const selected = chosen(options);
+  const ideMcp =
+    options.projectId && (await featureEnabled("claude-code", "ide", options.features))
+      ? { [IDE_MCP_SERVER]: claudeIdeMcpServer(options.projectId) }
+      : undefined;
   const base: Options = {
     cwd,
     abortController,
     env: claudeEnv(),
+    ...(ideMcp ? { mcpServers: ideMcp } : {}),
     includePartialMessages: true,
     // A background subagent streams no calls of its own: its progress arrives as these summaries.
     agentProgressSummaries: true,

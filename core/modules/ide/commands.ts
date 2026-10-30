@@ -49,7 +49,7 @@ export interface CommandRegistration {
   palette?: boolean;
   id: string;
   title: string;
-  run: (args?: unknown) => unknown;
+  run: (args?: unknown, context?: { signal?: AbortSignal }) => unknown;
   enabled?: (args?: unknown) => boolean;
 }
 export interface CommandInfo {
@@ -164,7 +164,7 @@ export function createCommandService(defaults: Keybinding[] = []) {
   async function executeCommand<T = unknown>(
     id: string,
     args?: unknown,
-    options: { scope?: string } = {},
+    options: { scope?: string; signal?: AbortSignal } = {},
   ): Promise<T> {
     const scope = options.scope ?? activeScope;
     const entry = scopes.get(scope);
@@ -173,8 +173,13 @@ export function createCommandService(defaults: Keybinding[] = []) {
       throw new Error(
         `Команда ${id} не зарегистрирована в области ${scope || "(нет активной области)"}`,
       );
+    if (options.signal?.aborted) {
+      const error = new Error("Выполнение отменено");
+      error.name = "AbortError";
+      throw error;
+    }
     if (!describe(scope, id, args)?.enabled) throw new Error(`Команда ${id} сейчас недоступна`);
-    return (await command.run(args)) as T;
+    return (await command.run(args, { signal: options.signal })) as T;
   }
   function createScope(id: string, context: () => CommandContext) {
     if (scopes.has(id)) throw new Error(`Область команд ${id} уже зарегистрирована`);
@@ -199,8 +204,11 @@ export function createCommandService(defaults: Keybinding[] = []) {
         };
       },
       describe: (command: string, args?: unknown) => describe(id, command, args),
-      executeCommand: <T = unknown>(command: string, args?: unknown) =>
-        executeCommand<T>(command, args, { scope: id }),
+      executeCommand: <T = unknown>(
+        command: string,
+        args?: unknown,
+        options: { signal?: AbortSignal } = {},
+      ) => executeCommand<T>(command, args, { ...options, scope: id }),
       resolveKeybinding(event: KeyStroke, inputFocus = false) {
         if (event.isComposing || event.repeat) return;
         const contextKeys = { ...context(), inputFocus };

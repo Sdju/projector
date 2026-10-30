@@ -7,4 +7,6 @@ export const EVENT_NAMES = [
   "watch-error",
   "terminal-started",
   "agent",
+  "ide-command-request",
+  "ide-command-cancel",
 ] as const;

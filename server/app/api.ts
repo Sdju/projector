@@ -40,6 +40,7 @@ import { handleProjectSite } from "../routes/api/projects/[id]/site.ts";
 import { handleProjectTerminals } from "../routes/api/projects/[id]/terminals.ts";
 import { handleProjectActions } from "../routes/api/projects/[id]/index.ts";
 import { handleIdeKeybindings } from "../routes/api/ide/keybindings.ts";
+import { handleIdeCommands } from "../routes/api/ide/commands.ts";
 import { handleEditorSettings } from "../routes/api/ide/editor.ts";
 import { handleFilesExclude } from "../routes/api/ide/files-exclude.ts";
 import { handleDocker } from "../routes/api/docker.ts";
@@ -62,6 +63,7 @@ const routes = [
   handleFilesExclude,
   handleEditorSettings,
   handleIdeKeybindings,
+  handleIdeCommands,
   handleIntegrationsActions,
   handleDirectories,
   handleHealth,
