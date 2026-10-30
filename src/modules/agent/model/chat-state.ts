@@ -63,7 +63,19 @@ export function summarize(value: unknown): string {
   if (value == null) return "";
   if (typeof value === "string") return value.slice(0, 8000);
   try {
-    return JSON.stringify(value, null, 2).slice(0, 8000);
+    const json = JSON.stringify(value, null, 2);
+    if (json.length <= 8000) return json;
+    if (typeof value === "object" && !Array.isArray(value)) {
+      const trimmed = Object.fromEntries(
+        Object.entries(value).map(([key, item]) => [
+          key,
+          typeof item === "string" && item.length > 3500 ? `${item.slice(0, 3500)}…` : item,
+        ]),
+      );
+      const compact = JSON.stringify(trimmed, null, 2);
+      if (compact.length <= 8000) return compact;
+    }
+    return json.slice(0, 8000);
   } catch {
     return "";
   }

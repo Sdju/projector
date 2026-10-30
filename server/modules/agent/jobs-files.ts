@@ -67,7 +67,7 @@ const WRITING = new Set(["write", "edit", "multiedit", "notebookedit"]);
 export function pathsOfCall(name: string, input: unknown, root: string): string[] {
   if (!WRITING.has(name.toLowerCase()) || !input || typeof input !== "object") return [];
   const data = input as Record<string, unknown>;
-  const path = data.file_path ?? data.path ?? data.notebook_path;
+  const path = data.file_path ?? data.filePath ?? data.path ?? data.notebook_path;
   if (typeof path !== "string" || !path) return [];
   return [root && path.startsWith(`${root}/`) ? path.slice(root.length + 1) : path];
 }

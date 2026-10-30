@@ -1,5 +1,5 @@
 /** Fields the agent usually passes as a short "what" of a call, in the order they are tried. */
-const HINT_KEYS = ["command", "query", "path", "file_path", "pattern", "url"] as const;
+const HINT_KEYS = ["command", "query", "path", "file_path", "filePath", "pattern", "url"] as const;
 
 function parse(raw: string): Record<string, unknown> | undefined {
   try {
@@ -18,13 +18,11 @@ export function inputHint(raw: string): string {
   return "";
 }
 
+const asLines = (value: unknown) => (typeof value === "string" ? value.split("\n") : [""]);
+
 const diffLines = (before: unknown, after: unknown) => [
-  ...String(before ?? "")
-    .split("\n")
-    .map((line) => `- ${line}`),
-  ...String(after ?? "")
-    .split("\n")
-    .map((line) => `+ ${line}`),
+  ...asLines(before).map((line) => `- ${line}`),
+  ...asLines(after).map((line) => `+ ${line}`),
 ];
 
 /** Edit calls are shown as a diff: a path, an empty line, then `- `/`+ ` lines. */
@@ -44,18 +42,25 @@ export function formatToolInput(name: string, raw: string): string {
   if (typeof data.command === "string" && (tool === "bash" || tool === "execute")) {
     return [note && `# ${note}`, `$ ${data.command}`].filter(Boolean).join("\n");
   }
-  const path = typeof data.file_path === "string" ? data.file_path : data.path;
+  const path =
+    typeof data.file_path === "string"
+      ? data.file_path
+      : typeof data.filePath === "string"
+        ? data.filePath
+        : data.path;
   if (typeof path === "string" && typeof data.content === "string")
     return `${path}\n\n${data.content}`;
-  if (typeof path === "string" && typeof data.old_string === "string")
-    return [path, "", ...diffLines(data.old_string, data.new_string)].join("\n");
+  const oldText = data.old_string ?? data.oldString;
+  const newText = data.new_string ?? data.newString;
+  if (typeof path === "string" && typeof oldText === "string")
+    return [path, "", ...diffLines(oldText, newText)].join("\n");
   if (typeof path === "string" && Array.isArray(data.edits))
     return [
       path,
       "",
-      ...data.edits.flatMap((edit: { old_string?: unknown; new_string?: unknown }, index) => [
+      ...data.edits.flatMap((edit: Record<string, unknown>, index) => [
         ...(index ? ["@@"] : []),
-        ...diffLines(edit.old_string, edit.new_string),
+        ...diffLines(edit.old_string ?? edit.oldString, edit.new_string ?? edit.newString),
       ]),
     ].join("\n");
   // A plan the agent asks to carry out (`ExitPlanMode`) is its own text.

@@ -81,6 +81,32 @@ test("the edited files of an answer are counted per file and failed calls are sk
     { path: "a.txt", added: 5, removed: 1 },
     { path: "b.txt", added: 1, removed: 1 },
   ]);
+
+  // OpenCode passes camelCase fields (`oldString`, `newString`) with surrounding context and reports
+  // exact counts in `detail.metadata.files`.
+  const opencode = turnChanges(
+    [
+      tool("edit", {
+        path: "/p/c.ts",
+        oldString: "keep\nold\nend",
+        newString: "keep\nnew1\nnew2\nend",
+      }),
+      {
+        id: "m1",
+        name: "edit",
+        status: "done",
+        input: "{broken",
+        detail: JSON.stringify({
+          metadata: { files: [{ file: "src/d.vue", additions: 9, deletions: 5 }] },
+        }),
+      },
+    ],
+    "/p",
+  );
+  expect(opencode).toEqual([
+    { path: "c.ts", added: 2, removed: 1 },
+    { path: "src/d.vue", added: 9, removed: 5 },
+  ]);
 });
 
 test("the plan is the last TodoWrite of the answer", () => {
