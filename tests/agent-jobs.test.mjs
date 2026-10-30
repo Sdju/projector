@@ -25,6 +25,7 @@ async function until(check, timeoutMs = 8000) {
 // A scripted backend: the task text picks what it does. No real CLI is started.
 const fake = {
   id: "fake-job",
+  label: "Fake Job",
   capabilities: { hosted: true },
   async run(options) {
     attached.push({

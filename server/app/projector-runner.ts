@@ -3,12 +3,14 @@
 // continue, and the restarted server rejoins them through the host's trace.
 //
 // Usage: node projector-runner.ts <run directory>
-import { runHostedRunner } from "../modules/agent/index.ts";
-import { runProjector } from "../modules/agents/projector/index.ts";
+import { registerAgentBackend, runHostedRunner } from "../modules/agent/index.ts";
+import { projectorBackend, runProjector } from "../modules/agents/projector/index.ts";
 import { registerBuiltinWidgetDefinitions } from "./widgets.ts";
 import { registerBuiltinAgentFeatures } from "./features.ts";
 
-// The server registers these when it starts; the system prompt of the answer lists them.
+// The server registers these when it starts; the system prompt of the answer lists them. This
+// process runs one agent, so it registers that backend before the features ask for the catalog.
+registerAgentBackend(projectorBackend, { asDefault: true });
 registerBuiltinWidgetDefinitions();
 registerBuiltinAgentFeatures();
 runHostedRunner(runProjector);

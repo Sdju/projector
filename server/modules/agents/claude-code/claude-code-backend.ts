@@ -332,6 +332,8 @@ const PERMISSION_MODES = ["default", "plan", "acceptEdits", "auto", "bypassPermi
 
 export const claudeCodeBackend: AgentBackend = {
   id: "claude-code",
+  label: CLAUDE_LABEL,
+  program: "claude",
   capabilities: {
     hosted: true,
     inject: true,

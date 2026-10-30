@@ -1,4 +1,9 @@
-import type { AgentBackend, AgentBackendId, AgentRunOptions } from "./backend.ts";
+import type {
+  AgentBackend,
+  AgentBackendId,
+  AgentCapabilities,
+  AgentRunOptions,
+} from "./backend.ts";
 import { preferences } from "../preferences/index.ts";
 
 export type { AgentEmitter, AgentEventName, AgentRunOptions } from "./backend.ts";
@@ -29,6 +34,26 @@ let defaultId: AgentBackendId | undefined;
 export function registerAgentBackend(backend: AgentBackend, options: { asDefault?: boolean } = {}) {
   backends.set(backend.id, backend);
   if (options.asDefault || defaultId === undefined) defaultId = backend.id;
+}
+
+/** A registered backend as the settings, the routes and the client see it. */
+export interface AgentBackendSummary {
+  id: AgentBackendId;
+  label: string;
+  program?: string;
+  builtin?: boolean;
+  capabilities?: AgentCapabilities;
+}
+
+/** Every registered backend in registration order, without its methods. */
+export function listAgentBackends(): AgentBackendSummary[] {
+  return [...backends.values()].map(({ id, label, program, builtin, capabilities }) => ({
+    id,
+    label,
+    ...(program ? { program } : {}),
+    ...(builtin ? { builtin } : {}),
+    ...(capabilities ? { capabilities } : {}),
+  }));
 }
 
 /** Whether a request names an agent this server has registered. */

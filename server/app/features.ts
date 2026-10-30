@@ -1,15 +1,6 @@
 import { registerAgentFeature, registerFeatureAgent } from "../modules/agent-features/index.ts";
+import { listAgentBackends } from "../modules/agent/index.ts";
 import { widgetCatalog } from "../modules/agents/projector/index.ts";
-
-/** The agents a feature can be switched on for; ids match the registered chat backends. */
-const AGENTS = [
-  { id: "projector", label: "Projector" },
-  { id: "claude-code", label: "Claude Code" },
-  { id: "codex", label: "Codex" },
-  { id: "opencode", label: "OpenCode" },
-  { id: "cursor", label: "Cursor" },
-  { id: "kimi", label: "Kimi" },
-];
 
 /** What the widgets are for: the components themselves come from the catalog at call time. */
 const WIDGETS_INTRO =
@@ -21,12 +12,13 @@ const WIDGETS_INTRO =
  * instruction reads the live catalog.
  */
 export function registerBuiltinAgentFeatures(): void {
-  for (const agent of AGENTS) registerFeatureAgent(agent);
+  const backends = listAgentBackends();
+  for (const agent of backends) registerFeatureAgent({ id: agent.id, label: agent.label });
   registerAgentFeature({
     id: "widgets",
     title: "Виджеты в ответах",
     summary: "Графики, показатели, вкладки и формы прямо в markdown-ответе.",
-    defaults: ["projector"],
+    defaults: backends.filter(({ builtin }) => builtin).map(({ id }) => id),
     instruction: () => `Виджеты в ответах. ${WIDGETS_INTRO}\n\n${widgetCatalog.guide()}`,
   });
 }

@@ -351,6 +351,8 @@ async function compactChat(
 /** The Projector IDE assistant on the active OpenAI-compatible provider. */
 export const projectorBackend: AgentBackend = {
   id: "projector",
+  label: "Projector",
+  builtin: true,
   capabilities: {
     hosted: true,
     inject: true,

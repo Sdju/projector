@@ -1,5 +1,4 @@
 import {
-  GUI_AGENT_PROGRAMS,
   preferences,
   setAgentDefault,
   setAgentEnabled,
@@ -31,6 +30,7 @@ import {
   removeRun,
   schedulePrune,
   trackRun,
+  listAgentBackends,
   isHostedAgent,
   injectMessage,
   worktreeCwd,
@@ -63,6 +63,11 @@ async function agentFolder(projectId: string, worktree: string): Promise<string>
   return worktree ? worktreeCwd(projectId, worktree, path) : path;
 }
 
+/** Terminal programs of the registered chat backends, in registration order. */
+function agentPrograms(): string[] {
+  return listAgentBackends().flatMap(({ program }) => (program ? [program] : []));
+}
+
 export async function handleAgent({ req, res, url, method, path }: RouteContext): Promise<boolean> {
   const historyMatch = path.match(/^\/api\/agent\/history\/([^/]+)$/);
   if (historyMatch && (method === "GET" || method === "PUT")) {
@@ -84,11 +89,15 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
     json(res, 200, { turns, features: readChatFeatures(id) ?? null });
     return true;
   }
+  if (path === "/api/agent/backends" && method === "GET") {
+    json(res, 200, { backends: listAgentBackends() });
+    return true;
+  }
   if (path === "/api/agent/modes" && method === "GET") {
     const prefs = await preferences();
     json(res, 200, {
       modes: prefs.agentModes,
-      programs: GUI_AGENT_PROGRAMS,
+      programs: agentPrograms(),
       disabled: prefs.disabledAgents,
     });
     return true;
@@ -100,7 +109,7 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
     const prefs = await preferences();
     json(res, 200, {
       modes: prefs.agentModes,
-      programs: GUI_AGENT_PROGRAMS,
+      programs: agentPrograms(),
       disabled: prefs.disabledAgents,
     });
     return true;

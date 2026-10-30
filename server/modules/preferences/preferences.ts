@@ -23,22 +23,21 @@ interface Preferences {
 }
 
 export type AgentSessionMode = "tui" | "gui";
-/** Programs whose sessions can be shown as a chat; everything else is always a terminal. */
-export const GUI_AGENT_PROGRAMS: readonly string[] = [
-  "claude",
-  "codex",
-  "opencode",
-  "cursor",
-  "kimi",
-];
-/** Chat backends that can be switched off in the settings; the built-in agent always stays on. */
-export const TOGGLEABLE_AGENTS: readonly string[] = [
-  "claude-code",
-  "codex",
-  "opencode",
-  "cursor",
-  "kimi",
-];
+
+/** What the settings ask the live agent registry: the composition fills it after registration. */
+export interface AgentPreferencesCatalog {
+  /** Terminal programs whose sessions can be shown as a chat; everything else is a terminal. */
+  programs(): readonly string[];
+  /** Chat backends the user can switch off; the built-in agent always stays on. */
+  toggleable(): readonly string[];
+}
+
+let catalog: AgentPreferencesCatalog = { programs: () => [], toggleable: () => [] };
+
+/** Points the settings at the registry; `server/app/agents.ts` calls it after registering. */
+export function configureAgentPreferences(value: AgentPreferencesCatalog): void {
+  catalog = value;
+}
 
 const preferencesPath = () => join(dataDir(), "launcher.json");
 let saving: Promise<unknown> = Promise.resolve();
@@ -75,7 +74,7 @@ export async function preferences(): Promise<Preferences> {
 function disabledAgents(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter(
-    (id): id is string => typeof id === "string" && TOGGLEABLE_AGENTS.includes(id),
+    (id): id is string => typeof id === "string" && catalog.toggleable().includes(id),
   );
 }
 function agentDefaults(value: unknown): Record<string, Record<string, string>> {
@@ -93,7 +92,7 @@ function agentDefaults(value: unknown): Record<string, Record<string, string>> {
 function agentModes(value: unknown): Record<string, AgentSessionMode> {
   const modes: Record<string, AgentSessionMode> = {};
   if (value && typeof value === "object")
-    for (const program of GUI_AGENT_PROGRAMS)
+    for (const program of catalog.programs())
       if ((value as Record<string, unknown>)[program] === "gui") modes[program] = "gui";
   return modes;
 }
@@ -141,7 +140,7 @@ export async function setFavoriteDirectory(path: string, on?: boolean): Promise<
 }
 /** Sets how new sessions of `program` open; TUI is the default and is stored as absence. */
 export async function setAgentMode(program: string, mode: AgentSessionMode): Promise<void> {
-  if (!GUI_AGENT_PROGRAMS.includes(program))
+  if (!catalog.programs().includes(program))
     throw new Error("У этого агента нет графического режима");
   await updatePreferences((value) => {
     if (mode === "gui") value.agentModes[program] = "gui";
@@ -150,7 +149,7 @@ export async function setAgentMode(program: string, mode: AgentSessionMode): Pro
 }
 /** Switches an agent backend on or off; the built-in Projector agent cannot be disabled. */
 export async function setAgentEnabled(backend: string, enabled: boolean): Promise<void> {
-  if (!TOGGLEABLE_AGENTS.includes(backend)) throw new Error("Этого агента нельзя отключить");
+  if (!catalog.toggleable().includes(backend)) throw new Error("Этого агента нельзя отключить");
   await updatePreferences((value) => {
     const rest = value.disabledAgents.filter((id) => id !== backend);
     value.disabledAgents = enabled ? rest : [...rest, backend];

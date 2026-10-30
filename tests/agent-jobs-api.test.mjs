@@ -27,6 +27,8 @@ const { registerAgentBackend } = await import("../server/modules/agent/index.ts"
 const seen = [];
 registerAgentBackend({
   id: "fake-api",
+  label: "Fake API",
+  program: "fake-chat",
   capabilities: { hosted: true },
   async run(options) {
     seen.push({ cwd: options.cwd, selection: options.selection, mode: options.permissionMode });
@@ -43,11 +45,12 @@ registerAgentBackend({
 });
 registerAgentBackend({
   id: "fake-missing",
+  label: "Fake Missing",
   capabilities: { hosted: true },
   available: () => false,
   run: async () => {},
 });
-registerAgentBackend({ id: "fake-local", run: async () => {} });
+registerAgentBackend({ id: "fake-local", label: "Fake Local", run: async () => {} });
 
 const { handleApi } = await import("../server/app/api.ts");
 const server = createServer((req, res) => void handleApi(req, res));
@@ -73,6 +76,20 @@ const until = async (check, timeoutMs = 8000) => {
   }
   throw new Error("condition not met in time");
 };
+
+test("the agent catalog and chat programs come from the backend registry", async () => {
+  const backends = (await (await request("/api/agent/backends")).json()).backends;
+  expect(backends.find((item) => item.id === "codex")).toMatchObject({
+    label: "Codex",
+    program: "codex",
+  });
+  expect(backends.find((item) => item.id === "projector").builtin).toBe(true);
+
+  const modes = await (await request("/api/agent/modes")).json();
+  expect(modes.programs).toContain("claude");
+  expect(modes.programs).toContain("kimi");
+  expect(modes.programs).not.toContain("shell");
+});
 
 test("the jobs API validates what a client sends and runs a job to its answer", async () => {
   const start = (body, origin) => request("/api/agent/jobs", "POST", body, origin);

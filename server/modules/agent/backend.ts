@@ -125,6 +125,15 @@ export interface AgentRunOptions {
  */
 export interface AgentBackend {
   id: AgentBackendId;
+  /** Human label for the chat header, the settings and the feature switches. */
+  label: string;
+  /**
+   * Terminal program id that opens this agent, when it has one. The settings key the chat mode by
+   * program; the built-in Projector agent has no terminal and leaves this out.
+   */
+  program?: string;
+  /** The server's own agent: always on, never listed as an external integration. */
+  builtin?: true;
   capabilities?: AgentCapabilities;
   run(options: AgentRunOptions): Promise<void>;
   /** The program the agent needs is installed; absent when the backend cannot tell beforehand. */

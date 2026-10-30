@@ -70,6 +70,8 @@ export function createAcpBackend(program: AcpProgram): AgentBackend {
   const id = program.id;
   return {
     id,
+    label: program.label,
+    program: program.id,
     capabilities: { hosted: true },
     run: (options) => run(options, id),
     available: () =>

@@ -218,9 +218,9 @@ vp test run tests/agent-independence.test.mjs tests/agent.test.mjs \
 
 ## Чек-лист независимости
 
-- [ ] `tests/agent-independence.test.mjs` существует и зелёный.
-- [ ] Реестр умеет перечислять агентов; `/api/agent/backends` отдаёт каталог.
-- [ ] `features.ts` и `preferences.ts` не содержат имён агентов.
+- [x] `tests/agent-independence.test.mjs` существует и зелёный.
+- [x] Реестр умеет перечислять агентов; `/api/agent/backends` отдаёт каталог.
+- [x] `features.ts` и `preferences.ts` не содержат имён агентов.
 - [ ] Клиентский каталог в `src/modules/agents-integration/catalog.ts` заполняется из `src/app/agents.ts`.
 - [ ] Терминал, `core/modules/ide` и `core/modules/os` не содержат имён агентов.
 - [ ] В общем коде нет `backend === "<agent>"`.

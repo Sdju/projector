@@ -1068,7 +1068,12 @@ test("disabled agents persist and refuse runs", async () => {
   const directory = await mkdtemp(join(tmpdir(), "projector-agent-disabled-"));
   const previous = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = directory;
-  registerAgentBackend({ id: "codex", run: () => Promise.resolve() });
+  registerAgentBackend({
+    id: "codex",
+    label: "Codex",
+    program: "codex",
+    run: () => Promise.resolve(),
+  });
   try {
     expect((await preferences()).disabledAgents).toStrictEqual([]);
     await expect(setAgentEnabled("projector", false)).rejects.toThrow(/нельзя отключить/);

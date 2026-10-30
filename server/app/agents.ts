@@ -1,4 +1,5 @@
-import { registerAgentBackend } from "../modules/agent/index.ts";
+import { listAgentBackends, registerAgentBackend } from "../modules/agent/index.ts";
+import { configureAgentPreferences } from "../modules/preferences/index.ts";
 import { claudeCodeBackend } from "../modules/agents/claude-code/index.ts";
 import { codexBackend } from "../modules/agents/codex/index.ts";
 import { cursorBackend } from "../modules/agents/cursor/index.ts";
@@ -15,6 +16,14 @@ export function registerBuiltinAgents(): void {
   registerAgentBackend(claudeCodeBackend);
   registerAgentBackend(codexBackend);
   registerAgentBackend(opencodeBackend);
-  registerAgentBackend(kimiBackend);
   registerAgentBackend(cursorBackend);
+  registerAgentBackend(kimiBackend);
+  // The settings ask the live registry instead of keeping their own copy of the list.
+  configureAgentPreferences({
+    programs: () => listAgentBackends().flatMap(({ program }) => (program ? [program] : [])),
+    toggleable: () =>
+      listAgentBackends()
+        .filter(({ builtin }) => !builtin)
+        .map(({ id }) => id),
+  });
 }

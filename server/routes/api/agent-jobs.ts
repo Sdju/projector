@@ -6,6 +6,7 @@ import {
   isAgentAvailable,
   isAgentBackend,
   isHostedAgent,
+  listAgentBackends,
   listJobs,
   readJob,
   removeJob,
@@ -33,8 +34,15 @@ const pageOnly = (req: RouteContext["req"]) => {
 /** A new job from the body of `POST /api/agent/jobs`; everything the client sends is checked here. */
 async function startFrom(body: Record<string, unknown>) {
   const backend = asString(body.backend);
-  if (!backend || backend === "projector" || !isAgentBackend(backend))
-    throw new Error("Укажите внешнего агента: claude-code, codex, opencode или cursor");
+  const catalog = listAgentBackends();
+  const isBuiltin = catalog.some(({ id, builtin }) => id === backend && builtin);
+  if (!backend || isBuiltin || !isAgentBackend(backend)) {
+    const names = catalog
+      .filter(({ builtin }) => !builtin)
+      .map(({ label }) => label)
+      .join(", ");
+    throw new Error(`Укажите внешнего агента: ${names}`);
+  }
   if (!isHostedAgent(backend)) throw new Error("Этот агент не умеет работать в фоне");
   if (!isAgentAvailable(backend)) throw new Error("Программа этого агента не установлена");
   const task = asString(body.task).trim();
