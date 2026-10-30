@@ -35,6 +35,8 @@ export interface Live {
   snapshot?: GitSnapshot;
   touched: Set<string>;
   saveTimer?: ReturnType<typeof setTimeout>;
+  /** Set once the final status is visible; resolves after the record, journal and registry are settled. */
+  finalizing?: Promise<void>;
 }
 
 const host = globalThis as typeof globalThis & { projectorAgentJobs?: Map<string, Live> };

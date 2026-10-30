@@ -266,8 +266,14 @@ describe("background agent jobs", () => {
   it("removes only finished jobs", async () => {
     const job = await start("hang");
     await expect(jobs.removeJob(job.id)).rejects.toThrow(/работает/);
+    const running = await until(async () => {
+      const found = await jobs.readJob(job.id);
+      return found.job.status === "running" ? found.job : undefined;
+    });
+    // Remove as soon as a long poll sees the final status, while final writes may still be pending.
+    const final = jobs.waitForJob(job.id, running.rev, 30);
     await jobs.stopJob(job.id);
-    await settled(job.id);
+    expect((await final).job.status).toBe("stopped");
     await jobs.removeJob(job.id);
     expect(await jobs.readJob(job.id)).toBeNull();
     expect(await jobs.readJob("../etc")).toBeNull();

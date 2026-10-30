@@ -161,7 +161,10 @@ async function drive(entry: Live, attach: boolean): Promise<void> {
     untrack?.();
   }
   if (entry.stopping && job.runId) await stopRun(job.runId).catch(() => {});
-  await finish(entry);
+  // The final status becomes visible inside finish before its writes are done. Keep the promise
+  // so a removal that sees that status can wait instead of racing the writes or the live entry.
+  entry.finalizing = finish(entry);
+  await entry.finalizing;
 }
 
 function open(job: AgentJob, journal: JournalEntry[]): Live {
@@ -347,6 +350,13 @@ export async function answerJob(id: string, answer: JobAnswer): Promise<AgentJob
 }
 
 export async function removeJob(id: string): Promise<void> {
-  if (live.has(id)) throw new Error("Задание ещё работает: сначала остановите его");
+  const entry = live.get(id);
+  if (entry) {
+    if (!isFinished(entry.job.status))
+      throw new Error("Задание ещё работает: сначала остановите его");
+    // A finished job is still live while its final record and journal are written: let that
+    // finish, then remove the files, so nothing is deleted halfway or recreated afterwards.
+    await entry.finalizing;
+  }
   await removeJobFiles(id);
 }
