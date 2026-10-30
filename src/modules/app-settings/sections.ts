@@ -115,9 +115,8 @@ export const settingsSections: SettingsSection[] = [
     id: "agent-integrations",
     title: "Интеграции агентов",
     group: "Агент",
-    description: "Включение и отключение адаптеров Claude Code, Codex, OpenCode, Cursor и Kimi.",
-    keywords:
-      "интеграции адаптеры claude code codex opencode cursor kimi отключить выключить агент",
+    description: "Включение и отключение адаптеров кодовых агентов.",
+    keywords: "интеграции адаптеры кодовые агенты отключить выключить агент",
     component: AgentIntegrationsSettings,
   },
   {
@@ -125,7 +124,7 @@ export const settingsSections: SettingsSection[] = [
     title: "Сессии агентов",
     group: "Агент",
     description: "Терминал или графический чат для новых сессий агентов.",
-    keywords: "GUI TUI терминал чат Claude Code режим вывод",
+    keywords: "GUI TUI терминал чат режим вывод",
     component: AgentModeSettings,
   },
   {
@@ -133,8 +132,7 @@ export const settingsSections: SettingsSection[] = [
     title: "Возможности агентов",
     group: "Агент",
     description: "Умения агентов по умолчанию; в табе агента их можно переопределить для чата.",
-    keywords:
-      "возможности умения фичи виджеты widgets графики формы Claude Code Codex OpenCode Cursor Kimi агент",
+    keywords: "возможности умения фичи виджеты widgets графики формы агент",
     component: AgentFeatureDefaults,
   },
   {

@@ -27,8 +27,8 @@ const { data, error, commands } = useAgentSkillsSettings();
       <code>commands/&lt;имя&gt;.md</code>: её набирают как <code>/имя аргументы</code>, в тексте
       <code>$ARGUMENTS</code> заменяется аргументами. Папка пользователя:
       <code>{{ data.folders.find((item) => item.source === "user")?.path }}</code
-      >; в проекте — <code>.projector/</code> или <code>.claude/</code> с такими же подпапками.
-      Навык пользователя главнее одноимённого навыка проекта.
+      >; в проекте — <code>.projector/</code> с такими же подпапками; агенты со своей папкой навыков
+      читают и её. Навык пользователя главнее одноимённого навыка проекта.
     </UiHint>
     <UiMessage v-if="error" tone="danger" size="xs" flush role="alert">{{ error }}</UiMessage>
   </UiStack>

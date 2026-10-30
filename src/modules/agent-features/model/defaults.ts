@@ -1,7 +1,12 @@
 import { computed, onMounted, ref, useId } from "vue";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
+import { clientAgents } from "../../agents-integration/catalog/index.ts";
 import { writeAgentFeature } from "../api/features.ts";
 import { applyAgentFeatures, useAgentFeatureCatalog } from "./catalog.ts";
+
+/** Backend ids and labels the feature matrix covers, in catalog order. */
+const agentIds = () => clientAgents().map((agent) => agent.backend);
+const agentTitles = () => clientAgents().map((agent) => agent.title);
 
 /** Defaults of the feature matrix: what an agent gets in a chat that has no choice of its own. */
 export function useAgentFeatureDefaults() {
@@ -43,8 +48,7 @@ export function useAgentFeatureDefaults() {
     id: "ide.agent.features.defaults.list",
     palette: false,
     title: "Список умолчаний возможностей агентов",
-    description:
-      "Возвращает возможности чата (например виджеты в ответах) и для каждой агента (Projector, Claude Code, Codex, OpenCode, Cursor, Kimi) с умолчанием: включена ли она в новом чате. Это значения, которые чат может переопределить для себя; сам остров в табе агента меняет только текущий чат.",
+    description: `Возвращает возможности чата (например виджеты в ответах) и для каждого агента (${agentTitles().join(", ")}) с умолчанием: включена ли она в новом чате. Это значения, которые чат может переопределить для себя; сам остров в табе агента меняет только текущий чат.`,
     run: () => reload(),
   });
   commands.scope.registerCommand({
@@ -55,7 +59,7 @@ export function useAgentFeatureDefaults() {
       "Включает или выключает возможность (widgets — виджеты в ответах) для агента по умолчанию. Действует на новые чаты без своего переопределения; уже открытый чат меняет остров в табе агента. Отключение виджетов у Projector убирает их из его системного промпта по умолчанию.",
     arguments: {
       feature: "string: id возможности, например widgets",
-      agent: "string: projector, claude-code, codex, opencode, cursor или kimi",
+      agent: `string: id агента каталога: ${agentIds().join(", ")}`,
       enabled: "boolean: включена ли возможность по умолчанию",
     },
     enabled: () => !busy.value,
@@ -64,7 +68,7 @@ export function useAgentFeatureDefaults() {
       if (typeof args.feature !== "string" || !args.feature)
         throw new Error("feature: id возможности, например widgets");
       if (typeof args.agent !== "string" || !args.agent)
-        throw new Error("agent: projector, claude-code, codex, opencode, cursor или kimi");
+        throw new Error(`agent: id агента каталога: ${agentIds().join(", ")}`);
       if (typeof args.enabled !== "boolean") throw new Error("enabled должен быть boolean");
       return set(args.feature, args.agent, args.enabled);
     },

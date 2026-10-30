@@ -388,7 +388,7 @@ export function registerAgentCommands(register: RegisterCommand, projectId: stri
     undefined,
     {
       description:
-        "Возвращает MCP-серверы агента в проекте. У Claude Code это серверы из его настроек и .mcp.json (имя, состояние, число инструментов, ошибка); остальным агентам Projector передаёт stdio-серверы из .mcp.json проекта.",
+        "Возвращает MCP-серверы агента в проекте: серверы из его настроек и .mcp.json проекта (имя, состояние, число инструментов, ошибка).",
       arguments: { chat: CHAT },
     },
   );

@@ -37,23 +37,10 @@ const AGENT_PATTERNS = [
 ];
 
 /**
- * Known violations when the guard was introduced (2026-10-30), file → agent names.
- * Every entry is a leak from the table in docs/agent-independence.md and must disappear together
- * with the matching phase:
- *
- * - `core/modules/os*` → phase 4 (credentials and session env move into agent modules);
- * - `core/modules/terminal`, `core/modules/ide`, `server/modules/terminal` → phase 3;
- * - `src/modules/{workspace,workspace-api,agent,app-settings}` → phase 2 and phase 6;
- * - client and server text/contract leaks → phases 2 and 5.
- *
- * Remove an entry in the same change that removes the leak. Never add one: a new name in shared
- * code has to be fixed, not allowlisted. By the end of phase 6 this map is empty.
+ * No baseline: common modules must not name agents at all. Any name found in shared code is a
+ * leak that has to be fixed through the registry or the client catalog, never allowlisted.
  */
-const BASELINE = new Map([
-  ["src/modules/agent/model/agent-commands.ts", ["claude"]],
-  ["src/modules/agent/ui/AgentSkillsSettings.vue", ["claude"]],
-  ["src/modules/app-settings/sections.ts", ["claude", "codex", "kimi", "opencode"]],
-]);
+const BASELINE = new Map();
 
 const ROOT = new URL("..", import.meta.url);
 
