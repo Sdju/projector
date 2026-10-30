@@ -185,7 +185,6 @@ test("real model loop consumes additions after tool results and after a final te
 test("hosted delivery waits for the runner's boundary acknowledgement", async () => {
   const { createRun, removeRun } = await import("../server/modules/agent/agent-runs.ts");
   const { runHostedAgent } = await import("../server/modules/agent/hosted-run.ts");
-  const { fileURLToPath } = await import("node:url");
   const { writeFile } = await import("node:fs/promises");
   const directory = await mkdtemp(join(tmpdir(), "projector-queue-host-"));
   const record = { backend: "projector", message: "start", history: [], messageId: "hosted-input" };
@@ -194,7 +193,7 @@ test("hosted delivery waits for the runner's boundary acknowledgement", async ()
   let active;
   try {
     const runner = join(directory, "runner.mjs");
-    const modulePath = (path) => JSON.stringify(fileURLToPath(new URL(path, import.meta.url)));
+    const modulePath = (path) => JSON.stringify(new URL(path, import.meta.url).href);
     await writeFile(
       runner,
       `
