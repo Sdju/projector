@@ -2,15 +2,20 @@ import { expect, test } from "vite-plus/test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 
 /**
- * Guard for docs/agent-independence.md: common modules must not name concrete agents.
+ * Guard for docs/architecture.md: common modules must not name concrete agents.
  *
- * Agent-specific knowledge lives in `server/modules/agents/**`,
+ * Agent-specific knowledge lives in `server/modules/agents/<agent>/**`,
  * `server/modules/agents-integration/**` and `src/modules/agents-integration/**`, which are not
- * scanned. Everything below is shared code and has to work through the registry/catalog.
+ * scanned. The shared ACP runtime is scanned separately. Everything below is shared code and has
+ * to work through the registry/catalog.
  */
 const SCANNED_DIRS = [
   "server/modules/agent",
+  "server/modules/agent-features",
+  "server/modules/agents/acp",
+  "server/modules/preferences",
   "server/modules/terminal",
+  "core/modules/agent-features",
   "core/modules/terminal",
   "core/modules/ide",
   "core/modules/os",
@@ -18,9 +23,27 @@ const SCANNED_DIRS = [
   "src/modules/agent/model",
   "src/modules/agent/lib",
   "src/modules/agent/ui",
+  "src/modules/agent-features",
   "src/modules/workspace",
   "src/modules/workspace-api",
   "src/modules/app-settings",
+];
+
+/**
+ * Shared agent API handlers. The list is explicit because sibling routes are integration entry
+ * points that may name their agent: `claude.ts`, `codex.ts`, `cursor.ts`, `kimi.ts`, `opencode.ts`.
+ */
+const SCANNED_FILES = [
+  "server/routes/api/agent.ts",
+  "server/routes/api/agent-chats.ts",
+  "server/routes/api/agent-features.ts",
+  "server/routes/api/agent-hooks.ts",
+  "server/routes/api/agent-jobs.ts",
+  "server/routes/api/agent-mcp.ts",
+  "server/routes/api/agent-memory.ts",
+  "server/routes/api/agent-skills.ts",
+  "server/routes/api/agent-web.ts",
+  "server/routes/api/agent-worktrees.ts",
 ];
 
 /**
@@ -35,12 +58,6 @@ const AGENT_PATTERNS = [
   { name: "opencode", pattern: /(?<![a-z0-9])opencode(?![a-z0-9])/i },
   { name: "cursor", pattern: /["']cursor["']/i },
 ];
-
-/**
- * No baseline: common modules must not name agents at all. Any name found in shared code is a
- * leak that has to be fixed through the registry or the client catalog, never allowlisted.
- */
-const BASELINE = new Map();
 
 const ROOT = new URL("..", import.meta.url);
 
@@ -63,31 +80,30 @@ function stripComments(text) {
 }
 
 test("shared modules do not name concrete agents", () => {
-  const found = new Map();
+  const files = [];
   for (const dir of SCANNED_DIRS) {
     expect(existsSync(new URL(`${dir}/`, ROOT)), `missing scanned directory ${dir}`).toBe(true);
-    for (const file of sourceFiles(dir)) {
-      const source = stripComments(readFileSync(new URL(file, ROOT), "utf8"));
-      const names = AGENT_PATTERNS.filter(({ pattern }) => pattern.test(source)).map(
-        ({ name }) => name,
-      );
-      if (names.length > 0) found.set(file, names);
-    }
+    files.push(...sourceFiles(dir));
+  }
+  for (const file of SCANNED_FILES) {
+    expect(existsSync(new URL(file, ROOT)), `missing scanned file ${file}`).toBe(true);
+    files.push(file);
+  }
+
+  const found = new Map();
+  for (const file of files) {
+    const source = stripComments(readFileSync(new URL(file, ROOT), "utf8"));
+    const names = AGENT_PATTERNS.filter(({ pattern }) => pattern.test(source)).map(
+      ({ name }) => name,
+    );
+    if (names.length > 0) found.set(file, names);
   }
 
   const unexpected = [];
   for (const [file, names] of found) {
-    const allowed = BASELINE.get(file) ?? [];
-    for (const name of names) if (!allowed.includes(name)) unexpected.push(`${file}: ${name}`);
+    for (const name of names) unexpected.push(`${file}: ${name}`);
   }
   expect(unexpected, "agent names leaked into shared code; use the registry or catalog").toEqual(
     [],
   );
-
-  const stale = [];
-  for (const [file, names] of BASELINE) {
-    const current = found.get(file) ?? [];
-    for (const name of names) if (!current.includes(name)) stale.push(`${file}: ${name}`);
-  }
-  expect(stale, "baseline entries are gone; remove them from BASELINE").toEqual([]);
 });
