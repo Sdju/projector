@@ -10,6 +10,7 @@ export {
   guiCommand,
   hasGui,
   builtinAgent,
+  isBuiltinAgent,
   agentLabel,
 } from "./model/modes.ts";
 export type { AgentSessionMode } from "./model/modes.ts";

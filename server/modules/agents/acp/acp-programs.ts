@@ -1,6 +1,32 @@
 import type { AgentBackendId, AgentRunOptions, AgentTerminal } from "../../agent/index.ts";
 import type { AcpDialect } from "./acp-dialect.ts";
 
+/** A property of an ACP form schema. */
+export interface AcpFormField {
+  key: string;
+  schema: Record<string, unknown>;
+}
+
+/** A choice of a form question. */
+export interface AcpFormOption {
+  id: string;
+  label: string;
+  description?: string;
+}
+
+/**
+ * How an agent shapes the forms it asks (`elicitation/create`). The common part reads plain JSON
+ * Schema on its own; this optional dialect only covers what an agent adds on top of it.
+ */
+export interface AcpFormAdapter {
+  /** Whether this property is the free-text companion of another question. */
+  companion(field: AcpFormField, properties: Record<string, unknown>): boolean;
+  /** The question id a companion belongs to; absent falls back to stripping `_note`/`_custom`. */
+  baseOf(field: AcpFormField): string | undefined;
+  /** The option the agent reads as "none of these" when only the companion holds the answer. */
+  fallbackOption(options: AcpFormOption[]): AcpFormOption | undefined;
+}
+
 /**
  * A coding agent reached over the Agent Client Protocol. Each agent module declares its own program:
  * the command, what the agent adds to ACP, and any request methods it defines beyond ACP.
@@ -21,6 +47,8 @@ export interface AcpProgram {
   terminal?: Partial<AgentTerminal>;
   /** What the agent adds to ACP (subagents, background commands); plain when absent. */
   dialect?: () => AcpDialect;
+  /** The optional dialect of the agent's forms; the plain part works without it. */
+  forms?: AcpFormAdapter;
   /** The agent's own request methods (outside ACP), answered by the handler it names. */
   extensions?: Record<
     string,

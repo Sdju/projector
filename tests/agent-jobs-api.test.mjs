@@ -123,8 +123,9 @@ test("the jobs API validates what a client sends and runs a job to its answer", 
   });
   expect(done.job.result).toBe("ok");
   expect(done.journal.map((entry) => entry.event)).toContain("text");
-  // ACP-style agents take the mode as a selection.
-  expect(seen[0].selection).toEqual({ mode: "plan" });
+  // The mode reaches the agent both as a permission mode and as a selection, whatever its kind.
+  expect(seen[0].selection).toEqual({ mode: "plan", "permission-mode": "plan" });
+  expect(seen[0].mode).toBe("plan");
 
   const list = await (await request("/api/agent/jobs?projectId=p1")).json();
   expect(list.jobs[0]).toMatchObject({ id: created.job.id, status: "done", resultPreview: "ok" });

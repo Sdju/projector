@@ -116,7 +116,7 @@ function sorted(controls: AgentControl[]): AgentControl[] {
 
 /**
  * Applies the user's choices to a fresh session. Changing the model can change the options of
- * the others (Codex's effort levels depend on the model), so the controls are re-read from every
+ * the others (effort levels may depend on the model), so the controls are re-read from every
  * `set_config_option` answer. A refused value is skipped: the turn still runs with the agent's own.
  */
 export async function applySelection(

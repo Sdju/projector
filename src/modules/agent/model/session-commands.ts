@@ -1,10 +1,11 @@
 import { commandArgs } from "../../../common/utilities/commands.ts";
 import { chatsOf, resolveChat, type ChatController } from "./chat-registry.ts";
+import { isBuiltinAgent } from "./modes.ts";
 import type { RegisterCommand } from "./register-command.ts";
 
 const CHAT = "Ключ чата из ide.agent.chats.list; без него — чат, с которым работали последним";
 const deletable = (chat: ChatController) =>
-  chat.backend === "projector" || !!chat.capabilities().deleteSessions;
+  isBuiltinAgent(chat.backend) || !!chat.capabilities().deleteSessions;
 
 /** The command that removes a past session of an open chat's agent. */
 export function registerSessionCommands(register: RegisterCommand, projectId: string): void {

@@ -2,6 +2,7 @@ import { commandArgs } from "../../../common/utilities/commands.ts";
 import { registerBranchCommands } from "./branch-commands.ts";
 import { chatsOf, resolveChat, type ChatController } from "./chat-registry.ts";
 import { registerJobCommands } from "./job-commands.ts";
+import { isBuiltinAgent } from "./modes.ts";
 import type { RegisterCommand } from "./register-command.ts";
 import { registerSessionCommands } from "./session-commands.ts";
 import { registerTaskCommands } from "./task-commands.ts";
@@ -37,11 +38,11 @@ export function registerAgentCommands(register: RegisterCommand, projectId: stri
   registerSessionCommands(register, projectId);
   registerBranchCommands(register, projectId);
   const anyChat = () => chatsOf(projectId).length > 0;
-  const external = () => chatsOf(projectId).some((chat) => chat.backend !== "projector");
+  const external = () => chatsOf(projectId).some((chat) => !isBuiltinAgent(chat.backend));
   const idle = () => chatsOf(projectId).some((chat) => !chat.busy());
   const find = (args: unknown, accept?: (chat: ChatController) => boolean) =>
     resolveChat(projectId, commandArgs(args).chat, accept);
-  const notProjector = (chat: ChatController) => chat.backend !== "projector";
+  const notProjector = (chat: ChatController) => !isBuiltinAgent(chat.backend);
 
   register(
     "ide.agent.chats.list",

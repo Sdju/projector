@@ -1,5 +1,11 @@
 export { createAcpBackend } from "./acp-backend.ts";
-export { registerAcpProgram, type AcpProgram } from "./acp-programs.ts";
+export {
+  registerAcpProgram,
+  type AcpFormAdapter,
+  type AcpFormField,
+  type AcpFormOption,
+  type AcpProgram,
+} from "./acp-programs.ts";
 export {
   createPlainDialect,
   extendPlainDialect,

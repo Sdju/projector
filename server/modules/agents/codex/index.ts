@@ -1,5 +1,6 @@
 import { createAcpBackend } from "../acp/index.ts";
 import { createCodexDialect } from "./dialect.ts";
+import { codexForms } from "./forms.ts";
 
 /**
  * Codex through its ACP server. The adapter ships as a package rather than in the CLI, so it prefers
@@ -12,6 +13,7 @@ export const codexProgram = {
   args: ["-y", "@agentclientprotocol/codex-acp@2.1.1"],
   binary: "codex-acp",
   dialect: createCodexDialect,
+  forms: codexForms,
 };
 
 export const codexBackend = createAcpBackend(codexProgram);

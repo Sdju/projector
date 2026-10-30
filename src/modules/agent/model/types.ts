@@ -42,7 +42,7 @@ export type AgentPart =
 
 export type AgentBackendId = string;
 
-export type AgentPermissionMode = "default" | "plan" | "acceptEdits" | "auto" | "bypassPermissions";
+export type AgentPermissionMode = string;
 
 /** A knob the agent offers for a chat: model, reasoning effort, mode. */
 export interface AgentControl {

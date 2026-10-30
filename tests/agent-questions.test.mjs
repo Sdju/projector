@@ -5,6 +5,7 @@ import {
 } from "../server/modules/agent/command-bridge.ts";
 import { askClaudeQuestions } from "../server/modules/agents/claude-code/questions.ts";
 import { askCursorQuestions } from "../server/modules/agents/cursor/questions.ts";
+import { codexProgram } from "../server/modules/agents/codex/index.ts";
 
 const claudeInput = {
   questions: [
@@ -207,6 +208,7 @@ test("a Codex user-input form keeps its note field and 'none of the above' fallb
       },
     },
     params,
+    codexProgram.forms,
   );
   expect(
     asked.questions.map((item) => [item.id, item.options.length, item.custom, item.optional]),

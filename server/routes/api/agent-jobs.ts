@@ -54,6 +54,11 @@ async function startFrom(body: Record<string, unknown>) {
     throw new Error("Папка проекта не найдена");
   const mode = asString(body.mode) || asString(body.permissionMode);
   const selection = selectionFrom(body.selection);
+  // Every agent reads the mode its own way: from `permissionMode` or from the selection.
+  if (mode) {
+    selection.mode = mode;
+    selection["permission-mode"] = mode;
+  }
   assertJobSlot();
   let cwd = project.path;
   let worktree: { id: string; branch: string } | undefined;
@@ -69,10 +74,8 @@ async function startFrom(body: Record<string, unknown>) {
       projectId: project.id,
       cwd,
       worktree,
-      // Claude Code takes the permission mode itself; the ACP agents have a `mode` control.
-      ...(backend === "claude-code"
-        ? { permissionMode: mode || undefined, selection }
-        : { selection: mode ? { ...selection, mode } : selection }),
+      permissionMode: mode || undefined,
+      selection,
       unattended: body.unattended === true,
     });
   } catch (error) {

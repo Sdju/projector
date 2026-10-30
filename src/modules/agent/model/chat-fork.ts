@@ -2,6 +2,7 @@ import { newId } from "../../../common/utilities/new-id.ts";
 import { forkAt, type ForkMode } from "./branches.ts";
 import { chatKeyOf } from "./chat-key.ts";
 import { holdDraft } from "./drafts.ts";
+import { isBuiltinAgent } from "./modes.ts";
 import type { AgentBackendId, AgentTurn } from "./types.ts";
 
 export interface ForkRequest {
@@ -44,7 +45,7 @@ export async function forkChat(request: ForkRequest): Promise<ForkResult> {
   if (!slice) throw new Error("Это сообщение нельзя ответвить");
   // Without a native branch a fork must not load the same agent session: it starts a fresh one and
   // replays the copied history. Otherwise both chats would share one context that grows apart.
-  if (backend !== "projector") {
+  if (!isBuiltinAgent(backend)) {
     const last = slice.turns.findLast((turn) => turn.role === "assistant");
     if (last && (!branchSession || !last.tail)) last.detached = true;
   }

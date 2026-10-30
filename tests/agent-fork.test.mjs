@@ -7,6 +7,7 @@ import { forkAt } from "../src/modules/agent/model/branches.ts";
 import { forkChat } from "../src/modules/agent/model/chat-fork.ts";
 import { chatKeyOf } from "../src/modules/agent/model/chat-key.ts";
 import { takeDraft } from "../src/modules/agent/model/drafts.ts";
+import { registerBuiltinClientAgents } from "../src/app/agents.ts";
 import {
   archiveLiveChat,
   closeHistoryStore,
@@ -17,6 +18,7 @@ import {
 } from "../server/modules/agent/index.ts";
 
 const turn = (id, role, extra = {}) => ({ id, role, text: id, tools: [], ...extra });
+registerBuiltinClientAgents();
 const ids = (turns) => turns.map((item) => item.id).join(",");
 let directory;
 let previous;

@@ -5,7 +5,7 @@ import { useIdeCommands } from "../../ide/index.ts";
 import { workspaceRequest } from "../../workspace-api/index.ts";
 import { AgentFeaturesIsland } from "../../agent-features/index.ts";
 import { agentCommandHandler } from "../model/commands.ts";
-import { agentLabel, guiCommand } from "../model/modes.ts";
+import { agentLabel, guiCommand, isBuiltinAgent } from "../model/modes.ts";
 import { chatDropHandlers } from "../lib/chat-drop.ts";
 import { useChatBranch } from "../model/chat-branch.ts";
 import { useChatReadout } from "../model/chat-readout.ts";
@@ -48,7 +48,7 @@ const props = withDefaults(
   { backend: "projector", chatId: undefined },
 );
 /** External agents are plain coding agents: no Projector tools, their own approvals. */
-const plain = computed(() => props.backend !== "projector");
+const plain = computed(() => !isBuiltinAgent(props.backend));
 const agentName = computed(() => agentLabel(props.backend));
 const { api } = useIdeCommands();
 const {

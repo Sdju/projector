@@ -117,7 +117,8 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
       onRequest(method, params) {
         const extension = acpProgram(id).extensions?.[method];
         if (extension) return extension(options, params);
-        if (method === "elicitation/create") return elicitForm(options, params);
+        if (method === "elicitation/create")
+          return elicitForm(options, params, acpProgram(id).forms);
         if (method !== "session/request_permission")
           throw new Error(`Клиент не поддерживает ${method}`);
         return decidePermission(options, params);
@@ -238,7 +239,7 @@ export async function openSession(
   }
 }
 
-/** The agent refuses a session until the CLI is authenticated (Cursor, Codex). */
+/** The agent refuses a session until the CLI is authenticated. */
 function isAuthError(error: unknown): boolean {
   const code = (error as { code?: number } | null)?.code;
   if (code === 401) return true;

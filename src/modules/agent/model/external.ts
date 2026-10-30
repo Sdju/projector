@@ -18,6 +18,7 @@ import {
   updateChat,
 } from "../api/chats.ts";
 import { saves, type ChatState } from "./chat-state.ts";
+import { isBuiltinAgent } from "./modes.ts";
 import { requestChatTab } from "./job-open.ts";
 import type {
   AgentBackendId,
@@ -48,7 +49,7 @@ export function useExternalAgent(
   },
 ) {
   const { backend, projectId, ready, persist, key } = chat;
-  const external = backend !== "projector";
+  const external = !isBuiltinAgent(backend);
   // The Projector agent offers a model and permission choice but has no sessions; its slash commands are the user's skills and prompt commands.
   const controls = computed(() => state.controls);
   const selection = computed(() => state.selection);

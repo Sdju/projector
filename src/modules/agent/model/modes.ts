@@ -21,6 +21,10 @@ export const hasGui = (program: string): boolean => !!clientAgentOf(program);
 export const builtinAgent = (): ClientAgent | undefined =>
   clientAgents().find((agent) => agent.builtin);
 
+/** The server's own agent: it has no external session, project copy or separate chat tab. */
+export const isBuiltinAgent = (backend: string | undefined): boolean =>
+  clientAgentByBackend(backend ?? "")?.builtin === true;
+
 /** Chat header and welcome copy for a backend. */
 export function agentLabel(backend: string | undefined): string {
   return clientAgentByBackend(backend ?? "projector")?.title ?? "Агент";

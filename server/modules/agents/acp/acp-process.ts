@@ -67,7 +67,7 @@ export async function initializeAcp(connection: AcpConnection): Promise<AcpInitR
     clientCapabilities: {
       fs: { readTextFile: false, writeTextFile: false },
       terminal: false,
-      // Agents ask their questions (Codex, OpenCode) through forms; without this they answer for the user.
+      // Agents ask their questions through forms; without this they answer for the user.
       elicitation: { form: {} },
     },
     clientInfo: { name: "projector", title: "Projector", version: "1.0" },

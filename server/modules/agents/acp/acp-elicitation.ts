@@ -1,3 +1,5 @@
+import type { AcpFormAdapter, AcpFormField, AcpFormOption } from "./acp-programs.ts";
+
 type Schema = Record<string, unknown>;
 
 interface Field {
@@ -15,7 +17,7 @@ const text = (value: unknown, limit: number) =>
   typeof value === "string" ? value.slice(0, limit) : "";
 
 /** Choices of a property: `oneOf`/`anyOf` entries with `const`/`title`, or a plain `enum`. */
-function choices(schema: Schema): { id: string; label: string; description?: string }[] {
+function choices(schema: Schema): AcpFormOption[] {
   const entries = [schema.oneOf, schema.anyOf].find(Array.isArray) as unknown[] | undefined;
   if (entries)
     return entries.slice(0, 50).flatMap((entry) => {
@@ -33,13 +35,16 @@ function choices(schema: Schema): { id: string; label: string; description?: str
   return [];
 }
 
-const isCompanion = (key: string, schema: Schema, properties: Schema) => {
-  if (record(record(schema._meta).codex).role === "user_note") return true;
-  return /_(custom|note)\d*$/.test(key) && key.replace(/_(custom|note)\d*$/, "") in properties;
-};
+const strippedKey = (key: string) => key.replace(/_(custom|note)\d*$/, "");
+
+/** A companion holds the user's own words for the question its key is based on. */
+const isCompanion = (field: AcpFormField, properties: Schema, forms?: AcpFormAdapter) =>
+  forms
+    ? forms.companion(field, properties)
+    : strippedKey(field.key) !== field.key && strippedKey(field.key) in properties;
 
 /** The questions of an ACP form (`elicitation/create`, mode `form`). */
-function fieldsOf(requestedSchema: unknown): Field[] {
+function fieldsOf(requestedSchema: unknown, forms?: AcpFormAdapter): Field[] {
   const properties = record(record(requestedSchema).properties);
   const required = new Set(
     Array.isArray(record(requestedSchema).required)
@@ -48,10 +53,9 @@ function fieldsOf(requestedSchema: unknown): Field[] {
   );
   const companions = new Map<string, string>();
   for (const [key, value] of Object.entries(properties)) {
-    if (!isCompanion(key, record(value), properties)) continue;
-    const meta = record(record(record(value)._meta).codex);
-    const base =
-      typeof meta.questionId === "string" ? meta.questionId : key.replace(/_(custom|note)\d*$/, "");
+    const field = { key, schema: record(value) };
+    if (!isCompanion(field, properties, forms)) continue;
+    const base = forms?.baseOf(field) ?? strippedKey(key);
     if (base in properties) companions.set(base, key);
   }
   const companionKeys = new Set(companions.values());
@@ -74,10 +78,8 @@ function fieldsOf(requestedSchema: unknown): Field[] {
       const title = text(schema.title, 2000) || text(schema.description, 2000) || key;
       const description = text(schema.description, 300);
       const companion = companions.get(key);
-      // Codex lists a "none of these" option that goes with the companion's text.
-      const fallback = companion
-        ? options.find((option) => option.id === "None of the above")
-        : undefined;
+      // Only the agent's own dialect knows which option means "none of these".
+      const fallback = companion && forms ? forms.fallbackOption(options) : undefined;
       return [
         {
           type,
@@ -99,15 +101,16 @@ function fieldsOf(requestedSchema: unknown): Field[] {
 }
 
 /**
- * Answers a form the agent opened (`elicitation/create`): Codex's and OpenCode's question tools
- * and MCP servers' forms. Without the capability or a user, the agent is told nothing was answered.
+ * Answers a form the agent opened (`elicitation/create`): the agents' own question tools and MCP
+ * servers' forms. Without the capability or a user, the agent is told nothing was answered.
  */
 export async function elicitForm(
   options: AgentRunOptions,
   params: Record<string, unknown>,
+  forms?: AcpFormAdapter,
 ): Promise<unknown> {
   if (params.mode !== "form") return { action: "cancel" };
-  const fields = fieldsOf(params.requestedSchema);
+  const fields = fieldsOf(params.requestedSchema, forms);
   if (!options.ask || !fields.length) return { action: "cancel" };
   const message = text(params.message, 300);
   const answer = await options

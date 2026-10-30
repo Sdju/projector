@@ -31,6 +31,7 @@ import {
   viewers,
 } from "./chat-state.ts";
 import { INTERRUPTED, loadHistory } from "./load-history.ts";
+import { isBuiltinAgent } from "./modes.ts";
 import { watchChat } from "./chat-sync.ts";
 import { saveChat } from "./save-chat.ts";
 import { useExternalAgent } from "./external.ts";
@@ -55,7 +56,7 @@ export function useAgent(
   options: { backend?: AgentBackendId; chatId?: string } = {},
 ) {
   const backend = options.backend ?? "projector";
-  const own = backend === "projector" && !options.chatId;
+  const own = isBuiltinAgent(backend) && !options.chatId;
   const key = own ? projectId : chatKeyOf(backend, projectId, options.chatId ?? "main");
   clearTimeout(releases.get(key));
   releases.delete(key);
@@ -229,11 +230,11 @@ export function useAgent(
     if (text === undefined) actions.applyEdit();
     state.error = "";
     void requestNotifications();
-    const previousHistory = chatHistory(state.turns, backend === "projector");
+    const previousHistory = chatHistory(state.turns, isBuiltinAgent(backend));
     const resume = sessionId();
     const branchFrom = tail();
     const copy = worktreeId();
-    const isolate = state.isolate && !copy && !resume && backend !== "projector";
+    const isolate = state.isolate && !copy && !resume && !isBuiltinAgent(backend);
     state.isolate = false;
     const userTurn: AgentTurn = {
       id: newId(),
