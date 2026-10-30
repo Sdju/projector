@@ -557,3 +557,111 @@ test(
     expect(await browser.evaluate("document.querySelectorAll('.widget-failure').length")).toBe(0);
   },
 );
+
+test(
+  "line selects ranges directly and navigates the full minimap",
+  { skip: !chromium, timeout: 60000, retry: 1 },
+  async () => {
+    const html = await readFile(new URL("./fixtures/agent-widgets.html", import.meta.url), "utf8");
+    const fixture = await createBrowserFixture({ pages: { "/widgets": html } });
+    onTestFinished(() => fixture.close());
+    const browser = await createChromium(fixture.directory);
+    onTestFinished(() => browser.close());
+    await browser.open(fixture.url("/widgets"));
+    await browser.viewport(900, 900);
+    const labels = Array.from({ length: 101 }, (_, index) => String(index));
+    const data = Array.from({ length: 101 }, (_, index) => index);
+    const line = `<Line :labels='${JSON.stringify(labels)}' :series='[{"name":"s","data":${JSON.stringify(data)}}]' />`;
+    await browser.evaluate(`window.fixture.set(${JSON.stringify(line)}, false)`);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(
+      await browser.evaluate(
+        "[...document.querySelectorAll('.line .tool')].map((button) => button.textContent.trim())",
+      ),
+    ).toEqual(["Карта", "↺"]);
+
+    await browser.click(".line .tool");
+    const fullWidth = await browser.evaluate(
+      "+document.querySelector('.mini-viewport').getAttribute('width')",
+    );
+    const center = await browser.evaluate(`(() => {
+      const rect = document.querySelector('.line > svg').getBoundingClientRect();
+      return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    })()`);
+    for (let index = 0; index < 4; index++) {
+      await browser.call("Input.dispatchMouseEvent", {
+        type: "mouseWheel",
+        ...center,
+        deltaX: 0,
+        deltaY: -100,
+      });
+    }
+
+    const miniClick = await browser.evaluate(`(() => {
+      const svg = document.querySelector('.minimap');
+      const rect = svg.getBoundingClientRect();
+      const viewBoxX = svg.viewBox.baseVal.width * 0.7;
+      const xs = svg.querySelector('polyline').getAttribute('points').split(' ')
+        .map((point) => +point.split(',')[0]);
+      const expectedCenter = xs.reduce((closest, x) =>
+        Math.abs(x - viewBoxX) < Math.abs(closest - viewBoxX) ? x : closest
+      );
+      return {
+        x: rect.x + rect.width * 0.7,
+        y: rect.y + rect.height / 2,
+        expectedCenter,
+      };
+    })()`);
+    await browser.call("Input.dispatchMouseEvent", {
+      type: "mousePressed",
+      button: "left",
+      clickCount: 1,
+      ...miniClick,
+    });
+    await browser.call("Input.dispatchMouseEvent", {
+      type: "mouseReleased",
+      button: "left",
+      clickCount: 1,
+      ...miniClick,
+    });
+    const miniCenter = await browser.evaluate(`(() => {
+      const rect = document.querySelector('.mini-viewport');
+      return +rect.getAttribute('x') + +rect.getAttribute('width') / 2;
+    })()`);
+    expect(Math.abs(miniCenter - miniClick.expectedCenter)).toBeLessThan(1);
+
+    await browser.click(".line .tool:nth-child(2)");
+    const brush = await browser.evaluate(`(() => {
+      const rect = document.querySelector('.line > svg').getBoundingClientRect();
+      const y = rect.y + rect.height / 2;
+      return {
+        start: { x: rect.x + rect.width * 0.25, y },
+        end: { x: rect.x + rect.width * 0.7, y },
+      };
+    })()`);
+    await browser.call("Input.dispatchMouseEvent", {
+      type: "mousePressed",
+      button: "left",
+      clickCount: 1,
+      ...brush.start,
+    });
+    await browser.call("Input.dispatchMouseEvent", {
+      type: "mouseMoved",
+      button: "left",
+      buttons: 1,
+      ...brush.end,
+    });
+    await browser.call("Input.dispatchMouseEvent", {
+      type: "mouseReleased",
+      button: "left",
+      clickCount: 1,
+      ...brush.end,
+    });
+    const selectedWidth = await browser.evaluate(
+      "+document.querySelector('.mini-viewport').getAttribute('width')",
+    );
+    expect(selectedWidth).toBeGreaterThan(fullWidth * 0.35);
+    expect(selectedWidth).toBeLessThan(fullWidth * 0.55);
+    expect(await browser.evaluate("document.querySelectorAll('.widget-failure').length")).toBe(0);
+  },
+);
