@@ -71,6 +71,16 @@ export function sendLetterIcon(res: ServerResponse, name: string): void {
   res.end(letterIconSvg(name));
 }
 
+/** JSON is valid JS but not safe inside HTML: `</script>` would close the element. */
+function scriptString(value: string): string {
+  return JSON.stringify(value)
+    .replaceAll("<", "\\u003c")
+    .replaceAll(">", "\\u003e")
+    .replaceAll("&", "\\u0026")
+    .replaceAll("\u2028", "\\u2028")
+    .replaceAll("\u2029", "\\u2029");
+}
+
 export function launchHtml(project: Project, target: string): string {
   const title = escapeHtml(project.name);
   const href = `/api/projects/${encodeURIComponent(project.id)}/icon`;
@@ -86,7 +96,7 @@ export function launchHtml(project: Project, target: string): string {
 </head>
 <body>
 <p>открываю ${title}…</p>
-<script>location.replace(${JSON.stringify(target)})</script>
+<script>location.replace(${scriptString(target)})</script>
 </body>
 </html>`;
 }

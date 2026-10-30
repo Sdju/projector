@@ -2,7 +2,10 @@ import { mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vite-plus/test";
-import { parseCommands } from "../server/modules/project-presentation/implementation.ts";
+import {
+  launchHtml,
+  parseCommands,
+} from "../server/modules/project-presentation/implementation.ts";
 import { scenarioDirectory } from "../server/modules/terminal/scenario-folder.ts";
 import { commandError, settingsError } from "../src/modules/project/model/project-settings.ts";
 
@@ -36,6 +39,13 @@ test("a folder that leaves the project or an address that is not http(s) is refu
 
 test("a hidden folder is a folder name, not the project root", () => {
   expect(parseCommands([row({ cwd: ".config" })])[0].cwd).toBe(".config");
+});
+
+test("a project address cannot break out of the launch page script", () => {
+  const url = "http://localhost:5173</script><script>alert(1)</script>";
+  const html = launchHtml({ name: "demo", url }, url);
+  expect(html.includes("</script><script>")).toBe(false);
+  expect(html).toContain("http://localhost:5173\\u003c/script\\u003e");
 });
 
 test("the terminal folder must exist and stay inside the project, symlinks included", async () => {
