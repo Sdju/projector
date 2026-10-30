@@ -138,6 +138,10 @@ function startHost(): Promise<void> {
   const proc = spawnHost();
   proc.unref();
   host = proc;
+  // Importing the OS facade on Linux must not register Windows process hooks.
+  const stopOnExit = () => proc.kill();
+  process.once("exit", stopOnExit);
+  proc.once("close", () => process.off("exit", stopOnExit));
   ready = new Promise((resolve, reject) => {
     const stdin = proc.stdin;
     const stdout = proc.stdout;
@@ -235,7 +239,6 @@ export async function stopWindowHost(): Promise<void> {
   proc.stdout?.destroy();
   proc.stderr?.destroy();
 }
-process.once("exit", () => host?.kill());
 
 export function warmWindowHelper(): void {
   void startHost().catch(() => undefined);

@@ -1,4 +1,5 @@
-import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { readFileSync, unlinkSync } from "node:fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { APP_PORT, appUrl, instancePath } from "../../../core/modules/app-paths/index.ts";
 
@@ -43,13 +44,14 @@ export async function readInstance(): Promise<InstanceInfo | null> {
   }
 }
 
-export async function clearInstance(): Promise<void> {
+/** Also runs during process exit, when asynchronous filesystem work cannot complete. */
+export function clearInstance(): void {
   try {
-    const raw = await readFile(instancePath(), "utf8");
-    const info = JSON.parse(raw) as InstanceInfo;
+    const file = instancePath();
+    const info = JSON.parse(readFileSync(file, "utf8")) as InstanceInfo;
     if (info.pid && info.pid !== process.pid) return;
+    unlinkSync(file);
   } catch {
-    return;
+    // Missing, malformed or already removed by another shutdown hook.
   }
-  await unlink(instancePath()).catch(() => undefined);
 }

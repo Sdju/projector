@@ -21,10 +21,11 @@ import {
 import { authorizeHttp } from "../modules/access/index.ts";
 import { handleProxyHost, isProxyHost } from "../modules/browser/index.ts";
 
-let hooksBound = false;
-
-/** Режим текущего процесса: его сообщает /api/health. */
-const runtime = globalThis as typeof globalThis & { projectorRuntimeMode?: ServerMode };
+/** Process hooks must survive Vite's config reload without retaining old module closures. */
+const runtime = globalThis as typeof globalThis & {
+  projectorRuntimeMode?: ServerMode;
+  projectorExitHook?: () => void;
+};
 
 function listenAddress(address: string | { port: number } | null): string {
   if (address && typeof address === "object") {
@@ -34,11 +35,9 @@ function listenAddress(address: string | { port: number } | null): string {
 }
 
 function bindHooks(): void {
-  if (hooksBound) return;
-  hooksBound = true;
-  process.on("exit", () => {
-    void clearInstance();
-  });
+  if (runtime.projectorExitHook) process.off("exit", runtime.projectorExitHook);
+  runtime.projectorExitHook = clearInstance;
+  process.on("exit", runtime.projectorExitHook);
 }
 
 /** Общая часть dev, preview и standalone: режим, сокеты терминалов, запись instance, окно. */
