@@ -1,4 +1,4 @@
-import { createApp, type VioApp } from "vio";
+import { createApp, type VioApp } from "@zede/vio";
 import PaletteComponent from "./Palette.vue";
 
 /** Resident/D-Bus code sees a controller; the widget tree lives entirely in Vue. */

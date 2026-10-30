@@ -13,7 +13,7 @@ import {
   VLabel,
   VButton,
   installCss,
-} from "vio";
+} from "@zede/vio";
 import Fixture from "./Fixture.vue";
 
 Gtk.init();

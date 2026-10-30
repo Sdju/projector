@@ -34,7 +34,7 @@ Native не имеет HMR. После изменений пересоберит
 
 ```bash
 vp run vio:build
-node --import vio/register native/app/entry.ts native http://localhost:4177 quit
+node --import @zede/vio/register native/app/entry.ts native http://localhost:4177 quit
 ./bin/projector --native
 ```
 

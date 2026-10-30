@@ -26,7 +26,7 @@ import {
   type ListBoxWidget,
   type ScrolledWidget,
   type RowWidget,
-} from "vio";
+} from "@zede/vio";
 import {
   createLauncherClient,
   createLauncherModel,

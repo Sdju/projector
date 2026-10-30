@@ -1,15 +1,17 @@
 # vio
 
+Основной репозиторий библиотеки — [Sdju/vio](https://github.com/Sdju/vio), отдельный pnpm workspace. Копия в Projector временно сохраняется до первого npm-релиза `@zede/vio`; дальнейшая разработка библиотеки ведётся в отдельном репозитории.
+
 Vue custom renderer для GTK4 на Node.js. Компоненты, реактивность, `v-for`, `v-if`, slots и lifecycle выполняет Vue; дерево виджетов и сигналы обслуживает GTK. DOM, WebView и Chromium для нативного интерфейса не используются.
 
 ## Быстрый старт
 
-Нужны Node.js 24+, GTK4 и GObject Introspection. Установите `vio` и его peer dependency `node-gtk`. В этом workspace зависимости устанавливаются командой `vp install`.
+Нужны Node.js 24+, GTK4 и GObject Introspection. Установите `@zede/vio` и его peer dependency `node-gtk`. Внешний проект устанавливает пакет командой `npm install @zede/vio node-gtk`. В этом workspace зависимости устанавливаются командой `vp install`.
 
 ```vue
 <!-- Counter.vue -->
 <script setup lang="ts">
-import { ref, VWindow, VBox, VEntry, VLabel, VButton } from "vio";
+import { ref, VWindow, VBox, VEntry, VLabel, VButton } from "@zede/vio";
 const name = ref("Vue + GTK");
 const count = ref(0);
 defineProps<{ quit: () => void }>();
@@ -36,7 +38,7 @@ label {
 // main.ts
 import Gtk from "gi:Gtk-4.0";
 import GLib from "gi:GLib-2.0";
-import { createApp } from "vio";
+import { createApp } from "@zede/vio";
 import Counter from "./Counter.vue";
 
 Gtk.init();
@@ -53,10 +55,10 @@ loop.run();
 ```
 
 ```bash
-node --import vio/register main.ts
+node --import @zede/vio/register main.ts
 ```
 
-`vio/register` регистрирует и `.vue`, и `gi:` imports. SFC компилируется один раз при импорте, с inline render function для `@vue/runtime-core`. Для TS используется встроенное удаление типов Node; в Node 24 вызов этого API может печатать ExperimentalWarning. Runtime-only приложения могут использовать `h()` и загрузчик `node-gtk/register` без SFC-компилятора.
+`@zede/vio/register` регистрирует и `.vue`, и `gi:` imports. SFC компилируется один раз при импорте, с inline render function для `@vue/runtime-core`. Для TS используется встроенное удаление типов Node; в Node 24 вызов этого API может печатать ExperimentalWarning. Runtime-only приложения могут использовать `h()` и загрузчик `node-gtk/register` без SFC-компилятора.
 
 ## Компоненты и свойства
 
@@ -85,7 +87,7 @@ Enum props можно передавать строками: `orientation="verti
 Ref компонента открывает `.element` — host node и `.widget` — реальный GTK объект:
 
 ```ts
-import { ref, type WidgetHandle, type EntryWidget } from "vio";
+import { ref, type WidgetHandle, type EntryWidget } from "@zede/vio";
 const search = ref<WidgetHandle<EntryWidget>>();
 search.value?.widget?.grabFocus();
 ```
@@ -102,13 +104,13 @@ search.value?.widget?.grabFocus();
 
 ```ts
 import Adw from "gi:Adw-1";
-import { registerWidget, defineWidgetComponent } from "vio";
+import { registerWidget, defineWidgetComponent } from "@zede/vio";
 
 registerWidget("clamp", { create: () => new Adw.Clamp(), children: "single" });
 export const VClamp = defineWidgetComponent("VClamp", "clamp");
 ```
 
-`createRoot(existingGtkBox)` позволяет встроить Vue subtree в существующий GTK контейнер. `createVioRenderer(driver)` из `vio/core` отделён от GI и используется в headless-тестах; `vio/core` не импортирует GTK.
+`createRoot(existingGtkBox)` позволяет встроить Vue subtree в существующий GTK контейнер. `createVioRenderer(driver)` из `@zede/vio/core` отделён от GI и используется в headless-тестах; `@zede/vio/core` не импортирует GTK.
 
 ## Границы первой версии
 
@@ -127,4 +129,4 @@ vp run vio:gtk-test   # нужен доступ к desktop display
 
 Сам пакет можно вынести из workspace: его manifest содержит собственные зависимости, build и test scripts. Перед сборкой GTK-декларации генерируются локально в `node_modules/.node-gtk-types`; в tarball входят готовые ESM и `.d.mts` exports, README, лицензия и пример.
 
-Основой служит официальный [Vue custom renderer API](https://vuejs.org/api/custom-renderer.html). Пакет состоит из независимого reconciler (`vio/core`), GTK driver, Vue widget components и SFC compiler/Node loader. В нём нет imports или настроек Projector.
+Основой служит официальный [Vue custom renderer API](https://vuejs.org/api/custom-renderer.html). Пакет состоит из независимого reconciler (`@zede/vio/core`), GTK driver, Vue widget components и SFC compiler/Node loader. В нём нет imports или настроек Projector.

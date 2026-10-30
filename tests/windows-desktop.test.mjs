@@ -60,7 +60,7 @@ $link.Save()
 
 test.skipIf(!windows)("a real GTK window gets an HWND that the adapter can raise", async () => {
   const script = fileURLToPath(new URL("./fixtures/gtk-window.mjs", import.meta.url));
-  const { stdout } = await execute(process.execPath, ["--import", "vio/register", script], {
+  const { stdout } = await execute(process.execPath, ["--import", "@zede/vio/register", script], {
     timeout: 50000,
   }).catch((error) => {
     throw new Error(`${error.message}\n${error.stdout}\n${error.stderr}`);

@@ -335,7 +335,7 @@ test(
       process.execPath,
       [
         "--import",
-        pathToFileURL(require.resolve("vio/register")).href,
+        pathToFileURL(require.resolve("@zede/vio/register")).href,
         "--input-type=module",
         "-e",
         `import { os } from ${JSON.stringify(facade)};const catalog=await os.catalog();catalog.launchApplication("projector.desktop");`,
@@ -375,7 +375,7 @@ test(
       process.execPath,
       [
         "--import",
-        pathToFileURL(require.resolve("vio/register")).href,
+        pathToFileURL(require.resolve("@zede/vio/register")).href,
         "--input-type=module",
         "-e",
         `import { appendFileSync } from "node:fs";

@@ -6,7 +6,7 @@ const require = createRequire(import.meta.url);
 export const desktopHelper = fileURLToPath(
   new URL("../../../native/app/entry.ts", import.meta.url),
 );
-const gtkLoader = pathToFileURL(require.resolve("vio/register")).href;
+const gtkLoader = pathToFileURL(require.resolve("@zede/vio/register")).href;
 const helperArgs = (preloadGtk: boolean) =>
   preloadGtk ? ["--import", gtkLoader, desktopHelper] : [desktopHelper];
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, VWindow, VBox, VEntry, VLabel, VButton, VKeyController } from "vio";
+import { ref, VWindow, VBox, VEntry, VLabel, VButton, VKeyController } from "@zede/vio";
 const text = ref("initial");
 const count = ref(0);
 const entry = ref();

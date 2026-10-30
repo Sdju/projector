@@ -74,7 +74,10 @@ test.skipIf(!mac)(
     const env = { ...process.env, XDG_DATA_HOME: data };
     const { os } = await import("../core/modules/os/index.ts");
     const loader = os.capabilities.gtkPalette
-      ? ["--import", pathToFileURL(createRequire(import.meta.url).resolve("vio/register")).href]
+      ? [
+          "--import",
+          pathToFileURL(createRequire(import.meta.url).resolve("@zede/vio/register")).href,
+        ]
       : [];
     const run = (...args) =>
       execute(process.execPath, [...loader, entry, ...args], { env, timeout: 40_000 });
@@ -299,7 +302,7 @@ test.skipIf(!mac || !os.capabilities.gtkPalette)(
   async () => {
     const data = await realpath(await mkdtemp(join(tmpdir(), "projector-mac-hide-")));
     const script = fileURLToPath(new URL("./fixtures/gtk-hide-mac.mjs", import.meta.url));
-    const loader = pathToFileURL(createRequire(import.meta.url).resolve("vio/register")).href;
+    const loader = pathToFileURL(createRequire(import.meta.url).resolve("@zede/vio/register")).href;
     const { stdout } = await execute(process.execPath, ["--import", loader, script], {
       env: { ...process.env, XDG_DATA_HOME: data },
       timeout: 120_000,

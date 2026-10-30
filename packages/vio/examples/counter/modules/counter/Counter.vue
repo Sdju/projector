@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, VWindow, VBox, VButton, VLabel, VEntry, VSeparator } from "vio";
+import { ref, VWindow, VBox, VButton, VLabel, VEntry, VSeparator } from "@zede/vio";
 const count = ref(0);
 const name = ref("Vue + GTK");
 const props = defineProps<{ quit: () => void }>();

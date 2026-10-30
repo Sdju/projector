@@ -81,7 +81,7 @@ export default defineConfig({
     // Browser tests also start Vite and Chromium processes; leave room for the desktop.
     maxWorkers: 2,
     // GTK modules load through the vio `gi:` loader hook instead of Vite.
-    execArgv: ["--import", "vio/register"],
+    execArgv: ["--import", "@zede/vio/register"],
     server: { deps: { external: [/^gi:/] } },
     restoreMocks: true,
     testTimeout: 60_000,

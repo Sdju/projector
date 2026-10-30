@@ -1,6 +1,6 @@
 import Gtk from "gi:Gtk-4.0";
 import GLib from "gi:GLib-2.0";
-import { createApp } from "vio";
+import { createApp } from "@zede/vio";
 import { Counter } from "../modules/counter/index.ts";
 
 Gtk.init();

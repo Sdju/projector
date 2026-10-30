@@ -2,16 +2,17 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { compileSfc } from "../dist/compiler.mjs";
 
-await test("SFC compilation targets vio/core, strips TS and keeps normal Vue list/model expressions", () => {
+await test("SFC compilation targets @zede/vio, strips TS and keeps normal Vue list/model expressions", () => {
   const code = compileSfc(
     `<script setup lang="ts">
     import { ref } from "vue";
-    import { VBox, VEntry, VLabel } from "vio";
+    import { VBox, VEntry, VLabel } from "@zede/vio";
     const query = ref<string>(""); const items: string[] = ["one", "two"];
     </script><template><VBox><VEntry v-model="query"/><VLabel v-for="item in items" :key="item">{{ item }}</VLabel></VBox></template>`,
     "list.vue",
   );
-  assert.match(code, /from "vio"/);
+  assert.match(code, /from "@zede\/vio"/);
+  assert.doesNotMatch(code, /from\s*["'](?:vio|vue)["']/);
   assert.match(code, /renderList/);
   assert.match(code, /onUpdate:modelValue/);
   assert.doesNotMatch(code, /runtime-dom|ref<string>|items: string\[\]/);
@@ -28,6 +29,7 @@ await test("template-only and Options API SFCs receive a render function", () =>
     );
     assert.match(code, /__vio_component.render = __vio_render/);
     assert.match(code, /gtk-label/);
+    assert.match(code, /from "@zede\/vio"/);
   }
 });
 
@@ -37,6 +39,7 @@ await test("scoped styles use GTK classes instead of DOM attributes and have lif
     "scoped.vue",
   );
   assert.match(code, /withStyles/);
+  assert.match(code, /from '@zede\/vio'/);
   assert.match(code, /\.heading\.vio-[a-f\d]+/);
   assert.doesNotMatch(code, /\[data-v-/);
 });

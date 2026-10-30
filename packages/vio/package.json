@@ -1,5 +1,5 @@
 {
-  "name": "vio",
+  "name": "@zede/vio",
   "version": "0.7.0",
   "description": "Vue custom renderer for native GTK4 applications on Node.js",
   "license": "MIT",
@@ -25,12 +25,15 @@
     },
     "./register": "./dist/register.mjs"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "node-gtk generate-types Gtk-4.0 --no-docs && tsdown",
     "test": "vp run build && node tests/renderer.test.mjs && node tests/compiler.test.mjs",
-    "demo": "node --import vio/register examples/counter/app/entry.ts",
+    "demo": "node --import @zede/vio/register examples/counter/app/entry.ts",
     "gtk:types": "node-gtk generate-types Gtk-4.0 --no-docs",
-    "test:gtk": "node --import vio/register tests/gtk.test.mjs"
+    "test:gtk": "node --import @zede/vio/register tests/gtk.test.mjs"
   },
   "dependencies": {
     "@vue/compiler-sfc": "^3.5.43",

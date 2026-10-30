@@ -39,7 +39,7 @@ export function compileSfc(source: string, filename: string): string {
     };
   }
   const compilerOptions: CompilerOptions = {
-    runtimeModuleName: "vio",
+    runtimeModuleName: "@zede/vio",
     hoistStatic: false,
     isCustomElement: (tag) => tag.startsWith("gtk-"),
     nodeTransforms: [
@@ -83,7 +83,7 @@ export function compileSfc(source: string, filename: string): string {
       return result.code.replaceAll(`[${id}]`, `.${id}`).replaceAll(`[data-v-${id}]`, `.${id}`);
     })
     .join("\n");
-  let code = script.content.replace(/from\s*(['"])vue\1/g, 'from "vio"');
+  let code = script.content.replace(/from\s*(['"])vue\1/g, 'from "@zede/vio"');
   if (!descriptor.scriptSetup && descriptor.template) {
     const result = compileTemplate({
       source: descriptor.template.content,
@@ -96,7 +96,7 @@ export function compileSfc(source: string, filename: string): string {
     code += `\n${result.code.replace("export function render", "function __vio_render")}\n__vio_component.render = __vio_render;\n`;
   }
   if (styles)
-    code += `\nimport { withStyles as __vio_withStyles } from 'vio';\nexport default __vio_withStyles(__vio_component, ${JSON.stringify(styles)}, ${descriptor.styles.some((style) => style.scoped) ? JSON.stringify(id) : "undefined"});\n`;
+    code += `\nimport { withStyles as __vio_withStyles } from '@zede/vio';\nexport default __vio_withStyles(__vio_component, ${JSON.stringify(styles)}, ${descriptor.styles.some((style) => style.scoped) ? JSON.stringify(id) : "undefined"});\n`;
   else code += "\nexport default __vio_component;\n";
   return descriptor.script?.lang === "ts" || descriptor.scriptSetup?.lang === "ts"
     ? stripTypeScriptTypes(code)
