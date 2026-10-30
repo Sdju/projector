@@ -1,8 +1,8 @@
-import { os } from "../../../../core/modules/os/index.ts";
+import { readOpenCodeGoKey } from "./credentials.ts";
 
 /** Fixed official destination, bounded request, no upstream body in errors. */
 export async function readGoUsage(timeoutMs = 10000): Promise<unknown> {
-  const key = await os.tools.readOpenCodeGoKey();
+  const key = await readOpenCodeGoKey();
   let response: Response;
   try {
     response = await fetch("https://opencode.ai/zen/go/v1/usage", {

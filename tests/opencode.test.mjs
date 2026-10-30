@@ -2,8 +2,8 @@ import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { os } from "../core/modules/os/index.ts";
 import { readGoUsage } from "../server/modules/agents-integration/opencode/client.ts";
+import { readOpenCodeGoKey } from "../server/modules/agents-integration/opencode/credentials.ts";
 import { goWindows, openCodeUsage } from "../server/modules/agents-integration/opencode/usage.ts";
 import { handleOpenCode } from "../server/routes/api/opencode.ts";
 import { resetCountdown } from "../src/common/utilities/reset-time.ts";
@@ -89,15 +89,15 @@ describe("Go reads existing auth, bounds and sanitizes requests, shares cached A
     expect(result.message).toMatch(/Go не подключён/);
     expect(result.windows).toBe(null);
     await writeFile(authFile, "SECRET invalid JSON");
-    await expect(os.tools.readOpenCodeGoKey()).rejects.toSatisfy(
+    await expect(readOpenCodeGoKey()).rejects.toSatisfy(
       (error) => !error.message.includes("SECRET"),
     );
   });
   test("XDG file and OpenCode env override use only the Go entry", async () => {
     await writeFile(authFile, JSON.stringify({ "opencode-go": { key: "file-fixture" } }));
-    expect(await os.tools.readOpenCodeGoKey()).toBe("file-fixture");
+    expect(await readOpenCodeGoKey()).toBe("file-fixture");
     process.env.OPENCODE_AUTH_CONTENT = JSON.stringify({ "opencode-go": { key: "env-fixture" } });
-    expect(await os.tools.readOpenCodeGoKey()).toBe("env-fixture");
+    expect(await readOpenCodeGoKey()).toBe("env-fixture");
   });
   test("concurrent polls, repeated reads and HTTP route share one request", async () => {
     state.value = undefined;

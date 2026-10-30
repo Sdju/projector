@@ -45,6 +45,7 @@ export type {
   AgentProcess,
   AskpassSpec,
   AskpassScript,
+  SpawnProcessSpec,
 } from "../os-posix/index.ts";
 
 /**

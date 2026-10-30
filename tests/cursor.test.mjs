@@ -2,8 +2,8 @@ import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { os } from "../core/modules/os/index.ts";
 import { readCursorUsage } from "../server/modules/agents-integration/cursor/client.ts";
+import { readCursorAccessToken } from "../server/modules/agents-integration/cursor/credentials.ts";
 import { cursorWindows, cursorUsage } from "../server/modules/agents-integration/cursor/usage.ts";
 import { NETWORK_CONTEXT_URL } from "../server/modules/network/index.ts";
 import { handleCursor } from "../server/routes/api/cursor.ts";
@@ -84,15 +84,15 @@ describe("Cursor reads existing auth, bounds and sanitizes requests, shares cach
     expect(result.message).toMatch(/Авторизация Cursor недоступна/);
     expect(result.windows).toBe(null);
     await writeFile(authFile, "SECRET invalid JSON");
-    await expect(os.tools.readCursorAccessToken()).rejects.toSatisfy(
+    await expect(readCursorAccessToken()).rejects.toSatisfy(
       (error) => !error.message.includes("SECRET"),
     );
   });
   test("XDG file and Cursor env override use only the access token", async () => {
     await writeFile(authFile, JSON.stringify({ accessToken: "file-fixture", refreshToken: "r" }));
-    expect(await os.tools.readCursorAccessToken()).toBe("file-fixture");
+    expect(await readCursorAccessToken()).toBe("file-fixture");
     process.env.CURSOR_AUTH_CONTENT = JSON.stringify({ accessToken: "env-fixture" });
-    expect(await os.tools.readCursorAccessToken()).toBe("env-fixture");
+    expect(await readCursorAccessToken()).toBe("env-fixture");
   });
   test("concurrent polls, repeated reads and HTTP route share one request", async () => {
     state.value = undefined;

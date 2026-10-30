@@ -1,5 +1,15 @@
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 
+/** A plain child process: the caller owns the command, its arguments and its stdio. */
+export interface SpawnProcessSpec {
+  command: string;
+  args: string[];
+  cwd?: string;
+  env?: Record<string, string | undefined>;
+  stdio?: ("pipe" | "ignore" | "inherit")[];
+  shell?: boolean;
+}
+
 /** A long-lived ACP server process a coding agent runs over stdio. */
 export interface AgentProcessSpec {
   command: string;

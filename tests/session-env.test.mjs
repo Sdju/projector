@@ -1,5 +1,6 @@
 import { expect, test } from "vite-plus/test";
-import { clearAgentSession } from "../core/modules/os/index.ts";
+import { os } from "../core/modules/os/index.ts";
+import { CLAUDE_SESSION_ENV } from "../server/modules/agents/claude-code/claude-code-env.ts";
 
 test("a server started inside a Claude Code session does not pass the session on", () => {
   const env = {
@@ -11,7 +12,7 @@ test("a server started inside a Claude Code session does not pass the session on
     CLAUDE_PID: "42",
     PATH: "/usr/bin",
   };
-  expect(clearAgentSession(env).sort()).toEqual([
+  expect(os.clearSessionEnv(CLAUDE_SESSION_ENV, env).sort()).toEqual([
     "CLAUDECODE",
     "CLAUDE_CODE_CHILD_SESSION",
     "CLAUDE_CODE_MESSAGING_SOCKET",
@@ -29,7 +30,7 @@ test("user configuration of Claude Code is kept and a clean environment is untou
     CLAUDE_EFFORT: "high",
     HOME: "/home/u",
   };
-  expect(clearAgentSession(env)).toEqual([]);
+  expect(os.clearSessionEnv(CLAUDE_SESSION_ENV, env)).toEqual([]);
   expect(env).toEqual({
     CLAUDE_CODE_USE_BEDROCK: "1",
     CLAUDE_CODE_OAUTH_TOKEN: "t",
@@ -40,6 +41,6 @@ test("user configuration of Claude Code is kept and a clean environment is untou
 
 test("the real process environment is cleaned in place", () => {
   process.env.CLAUDE_CODE_CHILD_SESSION = "1";
-  clearAgentSession();
+  os.clearSessionEnv(CLAUDE_SESSION_ENV);
   expect(process.env.CLAUDE_CODE_CHILD_SESSION).toBeUndefined();
 });

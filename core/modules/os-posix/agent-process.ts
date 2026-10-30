@@ -50,7 +50,7 @@ let userPath: Promise<string | undefined> | undefined;
 
 /**
  * The PATH an interactive terminal would have. The server often starts from a desktop launcher
- * or a service manager whose PATH lacks what `.bashrc`/`.zshrc` add (`~/.local/bin`, `~/.opencode/bin`),
+ * or a service manager whose PATH lacks what `.bashrc`/`.zshrc` add (`~/.local/bin` and similar),
  * while terminal sessions run `$SHELL -i -c exec <program>`. The result is cached for the process.
  */
 function interactiveShellPath(): Promise<string | undefined> {

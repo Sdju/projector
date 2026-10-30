@@ -7,8 +7,20 @@ import { bashExecutable } from "./directories.ts";
 import { quoteForCmd } from "./agent-process.ts";
 import { killTree } from "./kill-tree.ts";
 import { runPowerShell } from "./ps.ts";
+import type { SpawnProcessSpec } from "../../../os-posix/index.ts";
 
 const execute = promisify(execFile);
+
+/** Starts a caller-defined process with the stdio it asked for; no shell unless requested. */
+export function spawnProcess(spec: SpawnProcessSpec) {
+  return spawn(spec.command, spec.args, {
+    cwd: spec.cwd,
+    env: spec.env as NodeJS.ProcessEnv | undefined,
+    stdio: spec.stdio,
+    shell: spec.shell === true,
+    windowsHide: true,
+  });
+}
 
 export function commandExists(bin: string, env?: Record<string, string | undefined>): boolean {
   if (existsSync(bin)) return true;

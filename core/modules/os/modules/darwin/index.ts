@@ -22,12 +22,20 @@ export {
   runNodeScript,
   commandExists,
   ptyCommand,
+  spawnProcess,
   isExecutableFile,
   restrictToOwner,
   restrictToOwnerSync,
 } from "./tools.ts";
 export { dockerStartPlan } from "./docker.ts";
-export { dataHome, shell, shellLaunch, desktopPaths, pickFolder } from "./directories.ts";
+export {
+  configHome,
+  dataHome,
+  shell,
+  shellLaunch,
+  desktopPaths,
+  pickFolder,
+} from "./directories.ts";
 export {
   focusAppWindow,
   openWindow,
@@ -46,10 +54,6 @@ export {
   gitAskpass,
   publishDirectory,
   removeAgentHostAddress,
-  startCodexAppServer,
-  readOpenCodeGoKey,
-  readCursorAccessToken,
-  readKimiAccessToken,
   agentEnv,
   agentLaunch,
   agentHostAddress,

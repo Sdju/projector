@@ -222,7 +222,7 @@ vp test run tests/agent-independence.test.mjs tests/agent.test.mjs \
 - [x] Реестр умеет перечислять агентов; `/api/agent/backends` отдаёт каталог.
 - [x] `features.ts` и `preferences.ts` не содержат имён агентов.
 - [x] Клиентский каталог в `src/modules/agents-integration/catalog/index.ts` заполняется из `src/app/agents.ts`.
-- [ ] Терминал, `core/modules/ide` и `core/modules/os` не содержат имён агентов.
+- [x] Терминал, `core/modules/ide` и `core/modules/os` не содержат имён агентов.
 - [ ] В общем коде нет `backend === "<agent>"`.
 - [x] Новый агент добавляется новым модулем и одной строкой регистрации на сервере и на клиенте.
 - [ ] Ошибки и промпты не перечисляют агентов вручную.

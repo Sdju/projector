@@ -1,11 +1,11 @@
-import { os } from "../../../../core/modules/os/index.ts";
 import { assertEuNetworkContext } from "../../network/index.ts";
+import { readCursorAccessToken } from "./credentials.ts";
 
 const USAGE_URL = "https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage";
 
 /** Fixed official destination, bounded request, no upstream body in errors. */
 export async function readCursorUsage(timeoutMs = 10000): Promise<unknown> {
-  const token = await os.tools.readCursorAccessToken();
+  const token = await readCursorAccessToken();
   await assertEuNetworkContext(timeoutMs);
   let response: Response;
   try {

@@ -1,8 +1,18 @@
 import { chmodSync } from "node:fs";
 import { execFile, execFileSync, spawn } from "node:child_process";
 import { promisify } from "node:util";
+import type { SpawnProcessSpec } from "./contract.ts";
 
 const execute = promisify(execFile);
+/** Starts a caller-defined process with the stdio it asked for; no shell unless requested. */
+export function spawnProcess(spec: SpawnProcessSpec) {
+  return spawn(spec.command, spec.args, {
+    cwd: spec.cwd,
+    env: spec.env as NodeJS.ProcessEnv | undefined,
+    stdio: spec.stdio,
+    shell: spec.shell === true,
+  });
+}
 export function commandExists(bin: string, env?: Record<string, string | undefined>): boolean {
   try {
     execFileSync("which", [bin], {

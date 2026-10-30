@@ -3,8 +3,7 @@ import { expect, onTestFinished, test, vi } from "vite-plus/test";
 
 vi.mock("../server/app/api.ts", () => ({ handleApi: vi.fn() }));
 vi.mock("../core/modules/os/index.ts", () => ({
-  clearAgentSession: vi.fn(),
-  os: { capabilities: { nativeDesktop: false } },
+  os: { capabilities: { nativeDesktop: false }, clearSessionEnv: vi.fn() },
 }));
 vi.mock("../server/modules/window/index.ts", () => ({}));
 vi.mock("../server/modules/terminal/index.ts", () => ({ attachTerminalServer: vi.fn() }));

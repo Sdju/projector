@@ -22,12 +22,20 @@ export {
   runNodeScript,
   commandExists,
   ptyCommand,
+  spawnProcess,
   isExecutableFile,
   restrictToOwner,
   restrictToOwnerSync,
 } from "./tools.ts";
 export { dockerStartPlan } from "./docker.ts";
-export { dataHome, shell, shellLaunch, desktopPaths, pickFolder } from "./directories.ts";
+export {
+  configHome,
+  dataHome,
+  shell,
+  shellLaunch,
+  desktopPaths,
+  pickFolder,
+} from "./directories.ts";
 export {
   focusAppWindow,
   openWindow,
@@ -99,7 +107,6 @@ export async function shortcutAvailable(shortcut: string) {
 export { gitAskpass, publishDirectory, removeAgentHostAddress } from "../../../os-posix/index.ts";
 export { installDesktop } from "./install-desktop.ts";
 
-export { startCodexAppServer } from "../../../os-posix/index.ts";
 export {
   agentEnv,
   agentLaunch,
@@ -108,8 +115,6 @@ export {
   spawnAgentHost,
   spawnAgentProcess,
 } from "../../../os-posix/index.ts";
-export { readOpenCodeGoKey } from "../../../os-posix/index.ts";
-export { readCursorAccessToken, readKimiAccessToken } from "../../../os-posix/index.ts";
 
 const secrets = () =>
   import(new URL("./secrets.ts", import.meta.url).href) as Promise<typeof import("./secrets.ts")>;

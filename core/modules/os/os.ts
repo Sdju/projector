@@ -4,6 +4,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import * as linux from "./modules/linux/index.ts";
 import * as darwin from "./modules/darwin/index.ts";
 import * as windows from "./modules/windows/index.ts";
+import { clearSessionEnv } from "./session-env.ts";
 import type {
   AgentHostSpec,
   AskpassSpec,
@@ -12,6 +13,7 @@ import type {
   ResidentOptions,
   SecretKey,
   ShellLaunch,
+  SpawnProcessSpec,
 } from "./contract.ts";
 
 export class UnsupportedPlatformError extends Error {
@@ -64,7 +66,11 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
       if (platform === "win32" && uid < 0) return { uid: 1000, gid: 1000 };
       return { uid, gid };
     },
+    configHome: () => backend("configHome").configHome(),
     dataHome: () => backend("dataHome").dataHome(),
+    /** Removes the named variables from `env` in place; returns the names that were present. */
+    clearSessionEnv: (names: readonly string[], env: NodeJS.ProcessEnv = process.env) =>
+      clearSessionEnv(names, env),
     shell: () => backend("shell").shell(),
     shellLaunch: (spec: ShellLaunch) => backend("shellLaunch").shellLaunch(spec),
     installDesktop: (root: string) => backend("installDesktop").installDesktop(root),
@@ -124,10 +130,7 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
       agentHostAddress: (dir: string) => backend("agentHostAddress").agentHostAddress(dir),
       spawnAgentHost: (spec: AgentHostSpec) => backend("spawnAgentHost").spawnAgentHost(spec),
       killAgentTree: (pid: number) => backend("killAgentTree").killAgentTree(pid),
-      readOpenCodeGoKey: () => backend("readOpenCodeGoKey").readOpenCodeGoKey(),
-      readCursorAccessToken: () => backend("readCursorAccessToken").readCursorAccessToken(),
-      readKimiAccessToken: () => backend("readKimiAccessToken").readKimiAccessToken(),
-      startCodexAppServer: () => backend("startCodexAppServer").startCodexAppServer(),
+      spawnProcess: (spec: SpawnProcessSpec) => backend("spawnProcess").spawnProcess(spec),
       dockerStartPlan: () => backend("dockerStartPlan").dockerStartPlan(),
       runDockerSync: (args: string[]) => backend("runDockerSync").runDockerSync(args),
       runDocker: (

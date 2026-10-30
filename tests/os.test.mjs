@@ -69,10 +69,14 @@ test("OS selection is automatic; unsupported systems never fall through to Linux
   }
 });
 
-test("Windows data directory follows an explicit XDG override, then LOCALAPPDATA", () => {
+test("Windows data and config directories follow an explicit XDG override, then LOCALAPPDATA/APPDATA", () => {
   const adapter = createOs("win32");
-  const previousData = process.env.XDG_DATA_HOME;
-  const previousLocal = process.env.LOCALAPPDATA;
+  const previous = {
+    XDG_DATA_HOME: process.env.XDG_DATA_HOME,
+    LOCALAPPDATA: process.env.LOCALAPPDATA,
+    XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
+    APPDATA: process.env.APPDATA,
+  };
   try {
     process.env.XDG_DATA_HOME = join("C:", "custom projector data");
     expect(adapter.dataHome()).toBe(process.env.XDG_DATA_HOME);
@@ -80,11 +84,16 @@ test("Windows data directory follows an explicit XDG override, then LOCALAPPDATA
     process.env.LOCALAPPDATA = join("D:", "Local");
     expect(adapter.dataHome()).toBe(process.env.LOCALAPPDATA);
     expect(adapter.desktopPaths().bin).toBe(join(process.env.LOCALAPPDATA, "bin"));
+    process.env.XDG_CONFIG_HOME = join("C:", "custom projector config");
+    expect(adapter.configHome()).toBe(process.env.XDG_CONFIG_HOME);
+    delete process.env.XDG_CONFIG_HOME;
+    process.env.APPDATA = join("D:", "Roaming");
+    expect(adapter.configHome()).toBe(process.env.APPDATA);
   } finally {
-    if (previousData === undefined) delete process.env.XDG_DATA_HOME;
-    else process.env.XDG_DATA_HOME = previousData;
-    if (previousLocal === undefined) delete process.env.LOCALAPPDATA;
-    else process.env.LOCALAPPDATA = previousLocal;
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   }
 });
 

@@ -50,17 +50,6 @@ const AGENT_PATTERNS = [
  * code has to be fixed, not allowlisted. By the end of phase 6 this map is empty.
  */
 const BASELINE = new Map([
-  ["core/modules/os-posix/codex.ts", ["codex"]],
-  ["core/modules/os-posix/cursor.ts", ["cursor"]],
-  ["core/modules/os-posix/index.ts", ["codex", "kimi", "opencode"]],
-  ["core/modules/os-posix/kimi.ts", ["kimi"]],
-  ["core/modules/os-posix/opencode.ts", ["opencode"]],
-  ["core/modules/os/modules/windows/codex.ts", ["codex"]],
-  ["core/modules/os/modules/windows/cursor.ts", ["cursor"]],
-  ["core/modules/os/modules/windows/index.ts", ["codex", "kimi", "opencode"]],
-  ["core/modules/os/modules/windows/kimi.ts", ["kimi"]],
-  ["core/modules/os/modules/windows/opencode.ts", ["opencode"]],
-  ["core/modules/os/session-env.ts", ["claude"]],
   ["src/modules/agent/model/agent-commands.ts", ["claude"]],
   ["src/modules/agent/ui/AgentSkillsSettings.vue", ["claude"]],
   ["src/modules/app-settings/sections.ts", ["claude", "codex", "kimi", "opencode"]],

@@ -4,7 +4,8 @@ import type { Plugin } from "vite";
 import { handleApi } from "./api.ts";
 import { clearInstance, writeInstance } from "../modules/instance/index.ts";
 import { APP_PORT, appUrl } from "../../core/modules/app-paths/index.ts";
-import { clearAgentSession, os } from "../../core/modules/os/index.ts";
+import { os } from "../../core/modules/os/index.ts";
+import { CLAUDE_SESSION_ENV } from "../modules/agents/claude-code/index.ts";
 import { openLauncher, startTray } from "../modules/window/index.ts";
 import type { ServerMode } from "../../core/modules/server-mode/index.ts";
 import { attachTerminalServer } from "../modules/terminal/index.ts";
@@ -47,7 +48,7 @@ export function bindRuntime(httpServer: HttpServer | null, mode: ServerMode): vo
   registerBuiltinWidgetDefinitions();
   registerBuiltinAgentFeatures();
   // Сервер, запущенный из сессии Claude Code, иначе передаёт её метки каждому терминалу и агенту.
-  clearAgentSession();
+  os.clearSessionEnv(CLAUDE_SESSION_ENV);
   runtime.projectorRuntimeMode = mode;
   if (!httpServer) return;
   attachTerminalServer(httpServer);

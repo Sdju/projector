@@ -9,6 +9,7 @@ export {
   runNodeScript,
   runBash,
   commandExists,
+  spawnProcess,
   isExecutableFile,
   restrictToOwner,
   restrictToOwnerSync,

@@ -4,7 +4,19 @@ import { assertEuNetworkContext } from "../../network/index.ts";
 /** One bounded JSON-RPC request over the authenticated local Codex CLI. */
 export function codexRequest(method: string, params: unknown, timeoutMs = 15000): Promise<unknown> {
   return new Promise((resolve, reject) => {
-    const child = os.tools.startCodexAppServer();
+    const child = os.tools.spawnProcess({
+      command: "codex",
+      args: ["app-server", "--stdio"],
+      env: process.env,
+      stdio: ["pipe", "pipe", "ignore"],
+      shell: os.platform === "win32" && os.tools.commandExists("codex"),
+    });
+    if (!child.stdin || !child.stdout) {
+      child.kill();
+      reject(new Error("Codex CLI недоступен"));
+      return;
+    }
+    const { stdin, stdout } = child;
     let buffer = "";
     let settled = false;
     let requested = false;
@@ -12,7 +24,7 @@ export function codexRequest(method: string, params: unknown, timeoutMs = 15000)
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      child.stdin.end();
+      stdin.end();
       child.kill();
       const killTimer = setTimeout(() => child.kill("SIGKILL"), 1000);
       killTimer.unref();
@@ -21,11 +33,11 @@ export function codexRequest(method: string, params: unknown, timeoutMs = 15000)
       else resolve(value);
     };
     const timer = setTimeout(() => finish(new Error("Codex CLI не ответил вовремя")), timeoutMs);
-    const send = (message: unknown) => child.stdin.write(JSON.stringify(message) + "\n");
+    const send = (message: unknown) => stdin.write(JSON.stringify(message) + "\n");
     child.on("error", () => finish(new Error("Codex CLI недоступен")));
-    child.stdin.on("error", () => finish(new Error("Соединение с Codex CLI закрыто")));
+    stdin.on("error", () => finish(new Error("Соединение с Codex CLI закрыто")));
     child.once("close", () => finish(new Error("Codex CLI завершился до ответа")));
-    child.stdout.on("data", (chunk: string) => {
+    stdout.on("data", (chunk: string) => {
       buffer += chunk;
       if (buffer.length > 1024 * 1024) return finish(new Error("Ответ Codex CLI слишком большой"));
       let end;
@@ -49,7 +61,7 @@ export function codexRequest(method: string, params: unknown, timeoutMs = 15000)
         } else if (message.id === 2 && requested) finish(undefined, message.result);
       }
     });
-    child.stdout.setEncoding("utf8");
+    stdout.setEncoding("utf8");
     send({
       id: 1,
       method: "initialize",

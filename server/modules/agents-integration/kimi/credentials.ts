@@ -1,9 +1,12 @@
 import { readdir, readFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { join } from "node:path";
+import { os } from "../../../../core/modules/os/index.ts";
 
 /** Seconds before the stated expiry at which a token counts as expired. */
 const EXPIRY_BUFFER = 300;
+
+const UNAVAILABLE = "Авторизация Kimi Code недоступна; выполните kimi login";
+const EXPIRED = "Авторизация Kimi Code недоступна или истекла; выполните kimi login";
 
 /** A token from one credential file, or null when that file has no usable token. */
 function tokenOf(content: string): string | null {
@@ -31,21 +34,20 @@ export async function readKimiAccessToken(): Promise<string> {
   if (override !== undefined) {
     const token = tokenOf(override);
     if (token) return token;
-    throw new Error("Авторизация Kimi Code недоступна; выполните kimi login");
+    throw new Error(UNAVAILABLE);
   }
+  const directory = join(os.homeDirectory(), ".kimi-code", "credentials");
   let files: string[];
   try {
-    files = (await readdir(join(homedir(), ".kimi-code", "credentials"))).filter((name) =>
-      name.endsWith(".json"),
-    );
+    files = (await readdir(directory)).filter((name) => name.endsWith(".json"));
   } catch {
-    throw new Error("Авторизация Kimi Code недоступна; выполните kimi login");
+    throw new Error(UNAVAILABLE);
   }
   for (const name of files) {
-    const token = await readFile(join(homedir(), ".kimi-code", "credentials", name), "utf8")
+    const token = await readFile(join(directory, name), "utf8")
       .then(tokenOf)
       .catch(() => null);
     if (token) return token;
   }
-  throw new Error("Авторизация Kimi Code недоступна или истекла; выполните kimi login");
+  throw new Error(EXPIRED);
 }

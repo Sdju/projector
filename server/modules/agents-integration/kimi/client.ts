@@ -1,10 +1,10 @@
-import { os } from "../../../../core/modules/os/index.ts";
+import { readKimiAccessToken } from "./credentials.ts";
 
 const USAGE_URL = "https://api.kimi.com/coding/v1/usages";
 
 /** Fixed official destination, bounded request, no upstream body in errors. */
 export async function readKimiUsage(timeoutMs = 10000): Promise<unknown> {
-  const token = await os.tools.readKimiAccessToken();
+  const token = await readKimiAccessToken();
   let response: Response;
   try {
     response = await fetch(USAGE_URL, {
