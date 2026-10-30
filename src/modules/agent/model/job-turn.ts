@@ -7,6 +7,7 @@ const FOLDED = new Set([
   "text",
   "thought",
   "tool",
+  "tool-output",
   "tool-result",
   "task",
   "session",

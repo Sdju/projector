@@ -27,12 +27,36 @@ test("command output streamed as terminal deltas becomes the tool result", () =>
   });
   mapper.handleUpdate("s", delta("one\n"));
   mapper.handleUpdate("s", delta("two\n"));
+  expect(
+    events.filter(([type]) => type === "tool-output").map(([, data]) => data.chunk),
+  ).toStrictEqual(["one\n", "two\n"]);
   mapper.handleUpdate("s", {
     sessionUpdate: "tool_call_update",
     toolCallId: "t1",
     status: "completed",
   });
   expect(events.at(-1)).toEqual(["tool-result", { id: "t1", name: "ls", output: "one\ntwo\n" }]);
+});
+
+test("what the agent says to display wins over rawOutput metadata", () => {
+  const events = [];
+  const mapper = createAcpEventMapper((type, data) => events.push([type, data]), "OpenCode");
+  mapper.handleUpdate("s", {
+    sessionUpdate: "tool_call",
+    toolCallId: "t1",
+    title: "shell",
+    kind: "execute",
+    status: "pending",
+    rawInput: { command: "ls" },
+  });
+  mapper.handleUpdate("s", {
+    sessionUpdate: "tool_call_update",
+    toolCallId: "t1",
+    status: "completed",
+    content: [{ type: "content", content: { type: "text", text: "file.txt\n" } }],
+    rawOutput: { metadata: { status: "completed", truncated: false, exit: 0 } },
+  });
+  expect(events.at(-1)).toEqual(["tool-result", { id: "t1", name: "shell", output: "file.txt\n" }]);
 });
 
 test("a failed command keeps its streamed output as the error", () => {

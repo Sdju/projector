@@ -13,6 +13,7 @@ import { createAgentTools } from "../server/modules/agents/projector/agent-tools
 import { createCommandService } from "../core/modules/ide/index.ts";
 import { agentCommandHandler } from "../src/modules/agent/model/commands.ts";
 import { os } from "../core/modules/os/index.ts";
+import { runStreamingProcess } from "../core/modules/os-posix/index.ts";
 
 test("command bridge routes concurrent replies once, expires and cancels requests", async () => {
   const requests = [];
@@ -133,6 +134,13 @@ test("Bash uses cwd, returns failure status, bounds output and aborts subprocess
     expect(printed.toLowerCase()).toBe(cwd.toLowerCase());
     expect(result.stderr).toBe("failure");
     expect(result.exitCode).toBe(7);
+    const streamed = [];
+    const live = await os.tools.runBash("printf one; printf two", {
+      cwd,
+      onOutput: (chunk) => streamed.push(chunk),
+    });
+    expect(streamed.join("")).toBe("onetwo");
+    expect(live.stdout).toBe("onetwo");
     const bounded = await os.tools.runBash("yes agent", { cwd });
     expect(bounded.terminated).toBe(true);
     expect(Buffer.byteLength(bounded.stdout) <= 256 * 1024).toBeTruthy();
@@ -143,6 +151,24 @@ test("Bash uses cwd, returns failure status, bounds output and aborts subprocess
   } finally {
     await rm(cwd, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
+});
+
+test("a streamed process reports output as it comes and keeps the execFile result shape", async () => {
+  const chunks = [];
+  const result = await runStreamingProcess(
+    process.execPath,
+    ["-e", "process.stdout.write('one'); setTimeout(() => process.stdout.write('two'), 20)"],
+    { onOutput: (chunk, stream) => chunks.push([stream, chunk]) },
+  );
+  expect(result.stdout).toBe("onetwo");
+  expect(chunks.map(([, chunk]) => chunk).join("")).toBe("onetwo");
+  expect(chunks.every(([stream]) => stream === "stdout")).toBe(true);
+  await expect(
+    runStreamingProcess(process.execPath, [
+      "-e",
+      "process.stdout.write('part'); process.stderr.write('boom'); process.exit(3)",
+    ]),
+  ).rejects.toMatchObject({ code: 3, stdout: "part", stderr: "boom" });
 });
 
 test("chat history persists on disk, validates data and separates project IDs", async () => {
@@ -525,6 +551,7 @@ test("ACP session updates become the shared chat events", async () => {
     id: "t1",
     name: "Read file",
     input: { path: "x" },
+    kind: "read",
   });
   expect(events[4][1]).toStrictEqual({ id: "t1", name: "Read file", output: "ok" });
   expect(events[6][1]).toMatchObject({ id: "t2", error: "boom" });

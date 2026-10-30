@@ -21,6 +21,10 @@ export interface AgentToolChip {
   input?: string;
   /** The result once it arrives (the input while the tool is still running). */
   detail: string;
+  /** The kind of action the agent named (ACP: read, edit, execute, search, fetch…). */
+  kind?: string;
+  /** Output the call has streamed so far, while it is still running. */
+  output?: string;
   /** The call of a subagent (`Task`) this call was made inside of. */
   parent?: string;
   /** When the call started and ended (ms since the epoch), for showing how long it took. */
@@ -279,7 +283,11 @@ export type AgentEvent =
     }
   | { event: "input"; data: { text: string; inputId?: string } }
   | { event: "text"; data: { text: string } }
-  | { event: "tool"; data: { id: string; name: string; input: unknown; parent?: string } }
+  | {
+      event: "tool";
+      data: { id: string; name: string; input: unknown; kind?: string; parent?: string };
+    }
+  | { event: "tool-output"; data: { id: string; chunk: string } }
   | { event: "tool-result"; data: { id: string; name: string; output?: unknown; error?: string } }
   | { event: "task"; data: AgentTaskPatch }
   | { event: "thought"; data: { text: string } }

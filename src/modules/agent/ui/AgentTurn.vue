@@ -238,7 +238,12 @@ const waiting = computed(() => {
           :text="segment.text"
           :streaming="busy && last && segment === segments.at(-1)"
         />
-        <AgentActivity v-else :tools="segment.tools" />
+        <AgentActivity
+          v-else
+          :tools="segment.tools"
+          :root="root"
+          @open="(path) => emit('openFile', path)"
+        />
       </template>
       <UiInline
         v-if="busy && last && waiting"

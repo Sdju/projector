@@ -195,6 +195,7 @@ export function useAgent(
         if (chip.status === "running") {
           chip.status = "error";
           Object.assign(chip, { detail: "Выполнение прервано", endedAt: Date.now() });
+          delete chip.output;
         }
       state.busy = false;
       state.phase = "";

@@ -127,6 +127,7 @@ async function turn(
     ask: options.ask,
     secret: options.secret,
     guard,
+    onOutput: (id, chunk) => options.emit("tool-output", { id, chunk }),
     onProject: (project) => {
       added.push(project);
       options.emit("project", project);

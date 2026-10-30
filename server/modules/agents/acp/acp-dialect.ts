@@ -24,6 +24,8 @@ export interface AcpDialect {
   call(update: AcpUpdate, id: string): AcpTaskPatch[];
   /** Command output the agent streamed outside of the final update; read once per call. */
   output(id: string): string;
+  /** A piece of output carried by this update, for showing the command while it still runs. */
+  outputChunk(update: AcpUpdate): string;
   /** A tool call ended with `output`. */
   end(update: AcpUpdate, id: string, output: string): AcpTaskPatch[];
   /** The agent started writing the answer: work it left open runs on without it. */
@@ -52,6 +54,7 @@ export function createPlainDialect(): AcpDialect {
     chunk: () => undefined,
     call: () => [],
     output: () => "",
+    outputChunk: () => "",
     end: () => [],
     speak: () => [],
     finish: () => [],

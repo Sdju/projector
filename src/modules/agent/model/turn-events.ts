@@ -52,6 +52,9 @@ export function appendThought(turn: AgentTurn, text: string) {
   else parts.push({ type: "thought", text });
 }
 
+/** How much streamed output a running call keeps in the chat; the final result is kept apart. */
+const LIVE_OUTPUT_CHARS = 64_000;
+
 /**
  * Folds one stream event into the chat and the answer being written. Returns `true` when the
  * history should be saved now: a new session or run is what lets a reload resume the turn.
@@ -143,6 +146,7 @@ export function applyAgentEvent(
       if (again) {
         if (again.status === "running") again.detail = summarize(event.data.input);
         again.input = summarize(event.data.input);
+        if (event.data.kind) again.kind = event.data.kind;
         return false;
       }
       if (assistant.text.trim() && !assistant.text.endsWith("\n\n")) assistant.text += "\n\n";
@@ -156,6 +160,7 @@ export function applyAgentEvent(
         status: "running" as const,
         input: summarize(event.data.input),
         detail: summarize(event.data.input),
+        ...(event.data.kind ? { kind: event.data.kind } : {}),
         startedAt: known?.startedAt ?? at,
         ...(known?.endedAt !== undefined ? { endedAt: known.endedAt } : {}),
         ...(event.data.parent ? { parent: event.data.parent } : {}),
@@ -164,6 +169,14 @@ export function applyAgentEvent(
       timed.set(chip.id, { startedAt: chip.startedAt, endedAt: chip.endedAt });
       parts.push({ type: "tool", id: event.data.id });
       return false;
+    case "tool-output": {
+      const chip = assistant.tools.find((item) => item.id === event.data.id);
+      if (chip && chip.status === "running") {
+        const output = `${chip.output ?? ""}${event.data.chunk}`;
+        chip.output = output.length > LIVE_OUTPUT_CHARS ? output.slice(-LIVE_OUTPUT_CHARS) : output;
+      }
+      return false;
+    }
     case "tool-result": {
       const chip = assistant.tools.find((item) => item.id === event.data.id);
       if (chip) {
@@ -172,6 +185,8 @@ export function applyAgentEvent(
         chip.status = event.data.error ? "error" : "done";
         chip.detail = event.data.error || summarize(event.data.output);
         chip.endedAt = known?.endedAt ?? at;
+        // The final result replaces the streamed pieces: they were only for the run.
+        chip.output = undefined;
         timed.set(chip.id, { startedAt: chip.startedAt, endedAt: chip.endedAt });
       }
       return false;

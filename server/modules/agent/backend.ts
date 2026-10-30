@@ -46,6 +46,7 @@ export type AgentEventName =
   | "input"
   | "text"
   | "tool"
+  | "tool-output"
   | "tool-result"
   | "task"
   | "thought"

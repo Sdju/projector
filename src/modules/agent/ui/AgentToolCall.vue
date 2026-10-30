@@ -1,22 +1,30 @@
 <script setup lang="ts">
 import UiDisclosureSummary from "../../../common/ui/UiDisclosureSummary.vue";
-import { computed } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import AgentCodeBlock from "./AgentCodeBlock.vue";
 import { formatElapsed, useElapsedClock } from "../lib/elapsed.ts";
-import { formatToolInput, inputHint, isEditTool } from "../lib/tool-input.ts";
+import {
+  formatToolInput,
+  inputHint,
+  isEditTool,
+  parseToolInput,
+  toolFilePath,
+} from "../lib/tool-input.ts";
 import { toolLabel } from "../lib/tool-labels.ts";
+import { lineCount, relativePath, toolVisual } from "../lib/tool-visual.ts";
 import type { AgentToolChip, AgentToolView } from "../model/types.ts";
 import IconChevron from "~icons/lucide/chevron-right";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import IconAlert from "~icons/lucide/circle-alert";
 import IconTerminal from "~icons/lucide/terminal";
 import IconSearch from "~icons/lucide/search";
-import IconInfo from "~icons/lucide/info";
-import IconPlay from "~icons/lucide/play";
 import IconFolder from "~icons/lucide/folder";
 import IconFile from "~icons/lucide/file-text";
+import IconGlobe from "~icons/lucide/globe";
+import IconBot from "~icons/lucide/bot";
 
-const props = defineProps<{ tool: AgentToolView }>();
+const props = defineProps<{ tool: AgentToolView; root?: string }>();
+const emit = defineEmits<{ open: [path: string] }>();
 
 /** The result as shown: the tools Projector knows get a readable summary instead of raw JSON. */
 function output(tool: AgentToolChip): {
@@ -59,30 +67,93 @@ function output(tool: AgentToolChip): {
   }
 }
 
+const visual = computed(() => toolVisual(props.tool.name, props.tool.kind));
+const data = computed(() => parseToolInput(props.tool.input ?? ""));
+const path = computed(() => toolFilePath(props.tool.input ?? ""));
+const shownPath = computed(() => relativePath(path.value, props.root));
+const command = computed(() => (typeof data.value?.command === "string" ? data.value.command : ""));
+const written = computed(() => (typeof data.value?.content === "string" ? data.value.content : ""));
+
 const view = computed(() => {
   const tool = props.tool;
   const result = output(tool);
   const raw = tool.input ?? (tool.status === "running" ? tool.detail : "");
+  const kind = visual.value;
+  const running = tool.status === "running";
   return {
     label: toolLabel(tool.name),
-    hint: inputHint(raw) || result.hint,
+    hint: path.value ? shownPath.value : command.value || inputHint(raw) || result.hint,
+    path: path.value ? shownPath.value : "",
     status: result.status ?? tool.status,
-    result: result.text,
+    result: running ? "" : result.text,
+    resultHint: running ? "" : result.hint,
+    live: running ? (tool.output ?? "") : "",
     input: raw ? formatToolInput(tool.name, raw) : "",
-    // While running, the input is all there is to show.
     diff: isEditTool(tool.name),
-    showInput: Boolean(raw) && tool.status !== "running",
+    running,
+    // A read has no input worth showing: the content is the result.
+    showInput: Boolean(raw) && kind !== "read",
+    body: kind === "write" ? written.value : "",
+    badge: running
+      ? ""
+      : kind === "write"
+        ? `+${lineCount(written.value)}`
+        : kind === "read"
+          ? `${lineCount(result.text)} стр.`
+          : kind === "bash"
+            ? result.hint
+            : "",
   };
 });
-const kind = computed(() => {
-  const name = props.tool.name.toLowerCase();
-  if (name === "bash") return IconTerminal;
-  if (name === "list_commands") return IconSearch;
-  if (name === "describe_command") return IconInfo;
-  if (name === "execute_command") return IconPlay;
-  if (["read", "write", "edit", "multiedit"].includes(name)) return IconFile;
-  return IconFolder;
+const icon = computed(() => {
+  switch (visual.value) {
+    case "bash":
+      return IconTerminal;
+    case "search":
+      return IconSearch;
+    case "web":
+      return IconGlobe;
+    case "task":
+      return IconBot;
+    case "read":
+    case "write":
+    case "edit":
+      return IconFile;
+    default:
+      return IconFolder;
+  }
 });
+
+// A command opens as it runs so its output is read live; a failure and a short read open too.
+const opened = ref(visual.value === "bash" && props.tool.status === "running");
+watch(
+  () => props.tool.status,
+  (status) => {
+    if (status === "running" && visual.value === "bash") opened.value = true;
+    else if (status === "error") opened.value = true;
+    else if (status === "done" && visual.value === "read" && lineCount(view.value.result) <= 80)
+      opened.value = true;
+    // A finished command keeps its row tidy; the output stays one click away.
+    else if (status === "done" && visual.value === "bash" && view.value.status !== "error")
+      opened.value = false;
+  },
+);
+const toggle = (event: Event) => {
+  opened.value = (event.target as HTMLDetailsElement).open;
+};
+
+// Live output keeps the newest line in view, like a terminal.
+const body = ref<HTMLElement>();
+watch(
+  () => props.tool.output,
+  async () => {
+    await nextTick();
+    const blocks = body.value?.querySelectorAll("pre");
+    const pre = blocks?.[blocks.length - 1];
+    if (pre) pre.scrollTop = pre.scrollHeight;
+  },
+);
+
 // A call that runs shows the time so far, a finished one how long it took.
 const now = useElapsedClock();
 const time = computed(() => {
@@ -98,11 +169,19 @@ const timeTitle = computed(() =>
 </script>
 
 <template>
-  <details class="tool" :class="view.status">
+  <details
+    class="tool"
+    :class="[view.status, { streaming: view.running && view.live }]"
+    :open="opened"
+    @toggle="toggle"
+  >
     <UiDisclosureSummary variant="padded">
-      <component :is="kind" class="tool-icon" aria-hidden="true" />
+      <component :is="icon" class="tool-icon" aria-hidden="true" />
       <span class="tool-name u-truncate" :title="view.label">{{ view.label }}</span>
       <span class="tool-hint u-truncate" :title="view.hint">{{ view.hint }}</span>
+      <span v-if="view.badge" class="tool-badge" :class="{ failed: view.status === 'error' }">{{
+        view.badge
+      }}</span>
       <span v-if="time" class="tool-time" :title="timeTitle">{{ time }}</span>
       <UiSpinner v-if="tool.status === 'running'" class="state-icon" label="Выполняется" />
       <IconAlert
@@ -112,15 +191,79 @@ const timeTitle = computed(() =>
       />
       <IconChevron class="row-chevron" aria-hidden="true" />
     </UiDisclosureSummary>
-    <div v-if="view.showInput" class="io-label">Вход</div>
-    <AgentCodeBlock v-if="view.showInput" :text="view.input" :diff="view.diff" />
-    <div v-if="view.showInput" class="io-label">Результат</div>
-    <AgentCodeBlock
-      :text="view.result || (tool.status === 'running' ? 'Ожидание результата…' : 'Без вывода')"
-    />
+
+    <div ref="body" class="tool-body">
+      <template v-if="visual === 'read'">
+        <div v-if="view.path" class="file-row">
+          <span class="io-label">Файл</span>
+          <button
+            type="button"
+            class="file u-truncate"
+            :title="`Открыть ${view.path}`"
+            @click="emit('open', view.path)"
+          >
+            {{ view.path }}
+          </button>
+        </div>
+        <div class="io-label">{{ view.status === "error" ? "Ошибка" : "Содержимое" }}</div>
+        <AgentCodeBlock
+          :text="
+            view.result ||
+            (view.running ? 'Ожидание результата…' : 'Файл пуст или ничего не вернул')
+          "
+        />
+      </template>
+
+      <template v-else-if="visual === 'write'">
+        <div v-if="view.path" class="file-row">
+          <span class="io-label">Куда</span>
+          <button
+            type="button"
+            class="file u-truncate"
+            :title="`Открыть ${view.path}`"
+            @click="emit('open', view.path)"
+          >
+            {{ view.path }}
+          </button>
+        </div>
+        <div class="io-label">Содержимое</div>
+        <AgentCodeBlock :text="view.body || 'Пустой файл'" />
+        <template v-if="view.result">
+          <div class="io-label">Результат</div>
+          <AgentCodeBlock :text="view.result" />
+        </template>
+      </template>
+
+      <template v-else-if="visual === 'bash'">
+        <div class="io-label">Команда</div>
+        <AgentCodeBlock :text="view.input || '…'" />
+        <div class="io-label">{{ view.running ? "Вывод" : "Результат" }}</div>
+        <AgentCodeBlock
+          :text="view.live || view.result || (view.running ? 'Ожидание вывода…' : 'Без вывода')"
+        />
+      </template>
+
+      <template v-else>
+        <template v-if="view.showInput">
+          <div class="io-label">Вход</div>
+          <AgentCodeBlock :text="view.input" :diff="view.diff" />
+        </template>
+        <div class="io-label">Результат</div>
+        <AgentCodeBlock
+          :text="view.result || (view.running ? 'Ожидание результата…' : 'Без вывода')"
+        />
+      </template>
+    </div>
+
     <div v-if="tool.children?.length" class="nested">
       <div class="io-label">Вызовы субагента: {{ tool.children.length }}</div>
-      <AgentToolCall v-for="child in tool.children" :key="child.id" :tool="child" />
+      <AgentToolCall
+        v-for="child in tool.children"
+        :key="child.id"
+        :tool="child"
+        :root="root"
+        @open="emit('open', $event)"
+      />
     </div>
   </details>
 </template>
@@ -145,6 +288,15 @@ svg {
   flex: 1;
   color: var(--faint);
 }
+.tool-badge {
+  flex-shrink: 0;
+  color: var(--faint);
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+.tool-badge.failed {
+  color: var(--err);
+}
 .tool-time {
   flex-shrink: 0;
   color: var(--faint);
@@ -168,6 +320,28 @@ svg {
 .io-label {
   margin-top: var(--sp-1);
   color: var(--faint);
+}
+.file-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.file-row .io-label {
+  flex-shrink: 0;
+  margin-top: 0;
+}
+.file {
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  text-align: left;
+  font: var(--fs-2xs) var(--mono);
+  color: var(--text-2);
+}
+.file:hover {
+  color: var(--text);
+  text-decoration: underline;
 }
 .nested {
   margin: var(--sp-1) 0 0 var(--sp-2);

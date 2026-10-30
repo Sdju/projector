@@ -135,15 +135,31 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
       runDockerSync: (args: string[]) => backend("runDockerSync").runDockerSync(args),
       runDocker: (
         args: string[],
-        options?: { cwd?: string; timeout?: number; signal?: AbortSignal },
+        options?: {
+          cwd?: string;
+          timeout?: number;
+          signal?: AbortSignal;
+          onOutput?: (chunk: string, stream: "stdout" | "stderr") => void;
+        },
       ) => backend("runDocker").runDocker(args, options),
       runNodeScript: (
         script: string,
         args: string[],
-        options?: { cwd?: string; timeout?: number; signal?: AbortSignal },
+        options?: {
+          cwd?: string;
+          timeout?: number;
+          signal?: AbortSignal;
+          onOutput?: (chunk: string, stream: "stdout" | "stderr") => void;
+        },
       ) => backend("runNodeScript").runNodeScript(script, args, options),
-      runBash: (command: string, options: { cwd: string; signal?: AbortSignal }) =>
-        backend("runBash").runBash(command, options),
+      runBash: (
+        command: string,
+        options: {
+          cwd: string;
+          signal?: AbortSignal;
+          onOutput?: (chunk: string, stream: "stdout" | "stderr") => void;
+        },
+      ) => backend("runBash").runBash(command, options),
       /** 0600 on POSIX; on Windows only the current user stays in the file's ACL. */
       restrictToOwner: (path: string) => backend("restrictToOwner").restrictToOwner(path),
       restrictToOwnerSync: (path: string) =>

@@ -1,5 +1,5 @@
 import { createReplay, type AgentCommand, type AgentEmitter } from "../../agent/index.ts";
-import { createPlainDialect, type AcpDialect, type AcpTaskPatch } from "./acp-dialect.ts";
+import { createPlainDialect, isOver, type AcpDialect, type AcpTaskPatch } from "./acp-dialect.ts";
 
 interface ContentBlock {
   type?: string;
@@ -41,18 +41,37 @@ export function contentText(content: unknown): string {
 }
 
 function toolOutput(update: Record<string, unknown>): string {
-  if (typeof update.rawOutput === "string") return update.rawOutput;
-  if (update.rawOutput != null) return JSON.stringify(update.rawOutput, null, 2);
+  // `content` is what the protocol asks clients to display; `rawOutput` is often only metadata
+  // (a status, an exit code), so it is used when the update carries no readable content.
   const content = Array.isArray(update.content) ? update.content : [];
-  return content
+  const text = content
     .map((item) => {
-      const block = item as { type?: string; content?: unknown; path?: unknown };
+      const block = item as {
+        type?: string;
+        content?: unknown;
+        path?: unknown;
+        oldText?: unknown;
+        newText?: unknown;
+      };
       if (block.type === "content") return contentText(block.content);
-      if (block.type === "diff") return `diff: ${String(block.path ?? "")}`;
+      if (block.type === "diff")
+        return [
+          String(block.path ?? ""),
+          ...(typeof block.oldText === "string"
+            ? block.oldText.split("\n").map((line) => `- ${line}`)
+            : []),
+          ...(typeof block.newText === "string"
+            ? block.newText.split("\n").map((line) => `+ ${line}`)
+            : []),
+        ].join("\n");
       return "";
     })
     .filter(Boolean)
     .join("\n");
+  if (text) return text;
+  if (typeof update.rawOutput === "string") return update.rawOutput;
+  if (update.rawOutput != null) return JSON.stringify(update.rawOutput, null, 2);
+  return "";
 }
 
 /**
@@ -76,6 +95,13 @@ export function createAcpEventMapper(
     if (update.status === "failed")
       emit("tool-result", { id, name, error: output || "Ошибка инструмента" });
     else emit("tool-result", { id, name, output });
+  }
+
+  /** Output that arrives while the call still runs: the chat shows it as it comes. */
+  function streamOutput(update: Record<string, unknown>, id: string): void {
+    if (isOver(update)) return;
+    const chunk = dialect.outputChunk(update);
+    if (chunk) emit("tool-output", { id, chunk });
   }
 
   function handleUpdate(_sessionId: string, update: Record<string, unknown>): void {
@@ -131,9 +157,11 @@ export function createAcpEventMapper(
           update.rawInput && Object.keys(update.rawInput).length
             ? update.rawInput
             : { title: update.title, kind: update.kind },
+        ...(typeof update.kind === "string" ? { kind: update.kind } : {}),
         ...(parent ? { parent } : {}),
       });
       emitTasks(dialect.call(update, id));
+      streamOutput(update, id);
       if (update.status === "completed" || update.status === "failed") finishTool(update, id, name);
       return;
     }
@@ -144,9 +172,16 @@ export function createAcpEventMapper(
       const input = update.rawInput;
       if (input && typeof input === "object" && Object.keys(input).length) {
         const { parent } = dialect.tool(update);
-        emit("tool", { id, name, input, ...(parent ? { parent } : {}) });
+        emit("tool", {
+          id,
+          name,
+          input,
+          ...(typeof update.kind === "string" ? { kind: update.kind } : {}),
+          ...(parent ? { parent } : {}),
+        });
       }
       emitTasks(dialect.call(update, id));
+      streamOutput(update, id);
       if (update.status === "completed" || update.status === "failed") finishTool(update, id, name);
     }
   }

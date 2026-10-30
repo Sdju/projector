@@ -111,12 +111,13 @@ export async function runEnvironmentCommand(
   timeout = 30_000,
   signal?: AbortSignal,
   credentialFile?: string,
+  onOutput?: (chunk: string, stream: "stdout" | "stderr") => void,
 ) {
   const launch = environmentLaunch(project, command, false, false);
   if (credentialFile)
     launch.args.splice(launch.args.indexOf("--entrypoint"), 0, "--env-file", credentialFile);
   try {
-    return await os.tools.runDocker(launch.args, { timeout, signal });
+    return await os.tools.runDocker(launch.args, { timeout, signal, onOutput });
   } finally {
     await stopEnvironmentContainer(launch.docker.context, launch.docker.containerId);
   }

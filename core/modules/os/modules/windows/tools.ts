@@ -7,7 +7,7 @@ import { bashExecutable } from "./directories.ts";
 import { quoteForCmd } from "./agent-process.ts";
 import { killTree } from "./kill-tree.ts";
 import { runPowerShell } from "./ps.ts";
-import type { SpawnProcessSpec } from "../../../os-posix/index.ts";
+import { runStreamingProcess, type SpawnProcessSpec } from "../../../os-posix/index.ts";
 
 const execute = promisify(execFile);
 
@@ -45,8 +45,22 @@ function dockerEnv() {
 
 export function runDocker(
   args: string[],
-  options: { cwd?: string; timeout?: number; signal?: AbortSignal } = {},
+  options: {
+    cwd?: string;
+    timeout?: number;
+    signal?: AbortSignal;
+    onOutput?: (chunk: string, stream: "stdout" | "stderr") => void;
+  } = {},
 ) {
+  if (options.onOutput)
+    return runStreamingProcess("docker", args, {
+      cwd: options.cwd,
+      timeout: options.timeout ?? 15000,
+      signal: options.signal,
+      env: dockerEnv(),
+      onOutput: options.onOutput,
+      maxBuffer: 4 * 1024 * 1024,
+    });
   return execute("docker", args, {
     cwd: options.cwd,
     timeout: options.timeout ?? 15000,
@@ -60,7 +74,12 @@ export function runDocker(
 export function runNodeScript(
   script: string,
   args: string[],
-  options: { cwd?: string; timeout?: number; signal?: AbortSignal } = {},
+  options: {
+    cwd?: string;
+    timeout?: number;
+    signal?: AbortSignal;
+    onOutput?: (chunk: string, stream: "stdout" | "stderr") => void;
+  } = {},
 ) {
   const env = Object.fromEntries(
     Object.entries(process.env).filter(
@@ -69,6 +88,15 @@ export function runNodeScript(
         !/^DOCKER_(HOST|CONTEXT|TLS_VERIFY|CERT_PATH|API_VERSION)$/.test(key),
     ),
   );
+  if (options.onOutput)
+    return runStreamingProcess(process.execPath, [script, ...args], {
+      cwd: options.cwd,
+      timeout: options.timeout ?? 30000,
+      signal: options.signal,
+      env,
+      onOutput: options.onOutput,
+      maxBuffer: 4 * 1024 * 1024,
+    });
   return execute(process.execPath, [script, ...args], {
     cwd: options.cwd,
     timeout: options.timeout ?? 30000,
@@ -88,7 +116,14 @@ export function runDockerSync(args: string[]) {
   });
 }
 
-export function runBash(command: string, options: { cwd: string; signal?: AbortSignal }) {
+export function runBash(
+  command: string,
+  options: {
+    cwd: string;
+    signal?: AbortSignal;
+    onOutput?: (chunk: string, stream: "stdout" | "stderr") => void;
+  },
+) {
   const bash = bashExecutable();
   if (!bash)
     return Promise.reject(new Error("Не найден Bash. Установите Git Bash или задайте SHELL"));
@@ -130,8 +165,14 @@ export function runBash(command: string, options: { cwd: string; signal?: AbortS
       bytes += chunk.length;
       if (bytes > 256 * 1024) kill();
     };
-    child.stdout.on("data", (chunk: Buffer) => capture(stdout, chunk));
-    child.stderr.on("data", (chunk: Buffer) => capture(stderr, chunk));
+    child.stdout.on("data", (chunk: Buffer) => {
+      capture(stdout, chunk);
+      options.onOutput?.(chunk.toString("utf8"), "stdout");
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      capture(stderr, chunk);
+      options.onOutput?.(chunk.toString("utf8"), "stderr");
+    });
     const timer = setTimeout(kill, 30000);
     options.signal?.addEventListener("abort", kill, { once: true });
     const cleanup = () => {

@@ -10,6 +10,20 @@ function parse(raw: string): Record<string, unknown> | undefined {
   }
 }
 
+/** The arguments of a call as an object, when they are JSON the chat can read. */
+export function parseToolInput(raw: string): Record<string, unknown> | undefined {
+  return parse(raw);
+}
+
+/** The file a call works on: `file_path`, `filePath` or `path`, as agents name it. */
+export function toolFilePath(raw: string): string {
+  const data = parse(raw);
+  if (!data) return "";
+  for (const key of ["file_path", "filePath", "path"] as const)
+    if (typeof data[key] === "string" && data[key]) return data[key];
+  return "";
+}
+
 /** One line telling what a call works on: the command, the path, the query. */
 export function inputHint(raw: string): string {
   const data = parse(raw);
@@ -39,9 +53,13 @@ export function formatToolInput(name: string, raw: string): string {
   if (!data) return raw;
   const tool = name.toLowerCase();
   const note = typeof data.description === "string" ? data.description : "";
-  if (typeof data.command === "string" && (tool === "bash" || tool === "execute")) {
+  if (
+    typeof data.command === "string" &&
+    tool !== "execute_command" &&
+    tool !== "describe_command" &&
+    tool !== "list_commands"
+  )
     return [note && `# ${note}`, `$ ${data.command}`].filter(Boolean).join("\n");
-  }
   const path =
     typeof data.file_path === "string"
       ? data.file_path

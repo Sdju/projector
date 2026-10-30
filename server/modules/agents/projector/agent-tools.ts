@@ -24,6 +24,35 @@ export interface AgentToolContext extends ToolSpecContext {
   guard: GuardOptions;
   /** Puts questions to the user; absent when the client cannot show them. */
   ask?: (request: QuestionRequest) => Promise<QuestionAnswer>;
+  /** Sends a piece of a running command's output to the chat, while the call is still open. */
+  onOutput?: (id: string, chunk: string) => void;
+}
+
+/** A chatty command would otherwise become thousands of events; output is sent in small bursts. */
+const OUTPUT_FLUSH_MS = 80;
+const OUTPUT_BURST_CHARS = 8_000;
+
+function liveOutput(emit: (chunk: string) => void) {
+  let buffer = "";
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const flush = () => {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      timer = undefined;
+    }
+    if (!buffer) return;
+    const chunk = buffer;
+    buffer = "";
+    emit(chunk);
+  };
+  return {
+    push(chunk: string) {
+      buffer += chunk;
+      if (buffer.length >= OUTPUT_BURST_CHARS) flush();
+      else timer ??= setTimeout(flush, OUTPUT_FLUSH_MS);
+    },
+    flush,
+  };
 }
 
 function specTool(spec: ToolSpec, guard: GuardOptions) {
@@ -168,53 +197,68 @@ export function createAgentTools(context: AgentToolContext) {
       description:
         "Выполнить Bash в окружении проекта: Dev Container для доверенного проекта, Docker для изолированного, иначе машина пользователя. Возвращает stdout, stderr, exitCode; лимит 30 секунд. cwd по умолчанию — открытый проект.",
       inputSchema: z.object({ command: z.string().min(1), cwd: z.string().optional() }),
-      execute: async ({ command, cwd }) => {
+      execute: async ({ command, cwd }, { toolCallId }) => {
         await guardBash(context.guard, command);
-        const target = expandPath(cwd || context.cwd || os.homeDirectory());
-        // A trusted Dev Container takes precedence over the restricted Docker environment.
-        const trusted =
-          (context.cwd ? await devcontainerForPath(context.cwd) : undefined) ??
-          (await devcontainerForPath(target));
-        const restricted = trusted
-          ? undefined
-          : ((context.cwd ? await environmentForPath(context.cwd) : undefined) ??
-            (await environmentForPath(target)));
-        const environment = trusted ?? restricted;
-        if (environment) {
-          if (target !== environment.path)
-            throw new Error("Bash окружения выполняется только в корне проекта с окружением");
-          if (context.signal?.aborted) throw new Error("Запрос остановлен");
-          try {
-            const result = trusted
-              ? await runDevcontainerCommand(
-                  trusted,
-                  ["/bin/bash", "-c", command],
-                  30_000,
-                  context.signal,
-                )
-              : await runEnvironmentCommand(
-                  environment,
-                  ["/bin/bash", "--noprofile", "--norc", "-c", command],
-                  30_000,
-                  context.signal,
-                );
-            return {
-              stdout: result.stdout.slice(0, 256 * 1024),
-              stderr: result.stderr.slice(0, 256 * 1024),
-              exitCode: 0,
-            };
-          } catch (error) {
+        const live = context.onOutput
+          ? liveOutput((chunk) => context.onOutput!(toolCallId, chunk))
+          : undefined;
+        const onOutput = (chunk: string) => live?.push(chunk);
+        try {
+          const target = expandPath(cwd || context.cwd || os.homeDirectory());
+          // A trusted Dev Container takes precedence over the restricted Docker environment.
+          const trusted =
+            (context.cwd ? await devcontainerForPath(context.cwd) : undefined) ??
+            (await devcontainerForPath(target));
+          const restricted = trusted
+            ? undefined
+            : ((context.cwd ? await environmentForPath(context.cwd) : undefined) ??
+              (await environmentForPath(target)));
+          const environment = trusted ?? restricted;
+          if (environment) {
+            if (target !== environment.path)
+              throw new Error("Bash окружения выполняется только в корне проекта с окружением");
             if (context.signal?.aborted) throw new Error("Запрос остановлен");
-            const failure = error as { code?: number; stdout?: string; stderr?: string };
-            if (typeof failure.code !== "number") throw error;
-            return {
-              stdout: (failure.stdout || "").slice(0, 256 * 1024),
-              stderr: (failure.stderr || "").slice(0, 256 * 1024),
-              exitCode: failure.code,
-            };
+            try {
+              const result = trusted
+                ? await runDevcontainerCommand(
+                    trusted,
+                    ["/bin/bash", "-c", command],
+                    30_000,
+                    context.signal,
+                    onOutput,
+                  )
+                : await runEnvironmentCommand(
+                    environment,
+                    ["/bin/bash", "--noprofile", "--norc", "-c", command],
+                    30_000,
+                    context.signal,
+                    undefined,
+                    onOutput,
+                  );
+              return {
+                stdout: result.stdout.slice(0, 256 * 1024),
+                stderr: result.stderr.slice(0, 256 * 1024),
+                exitCode: 0,
+              };
+            } catch (error) {
+              if (context.signal?.aborted) throw new Error("Запрос остановлен");
+              const failure = error as { code?: number; stdout?: string; stderr?: string };
+              if (typeof failure.code !== "number") throw error;
+              return {
+                stdout: (failure.stdout || "").slice(0, 256 * 1024),
+                stderr: (failure.stderr || "").slice(0, 256 * 1024),
+                exitCode: failure.code,
+              };
+            }
           }
+          return await os.tools.runBash(command, {
+            cwd: target,
+            signal: context.signal,
+            onOutput,
+          });
+        } finally {
+          live?.flush();
         }
-        return os.tools.runBash(command, { cwd: target, signal: context.signal });
       },
     }),
     list_directory: tool({

@@ -97,6 +97,7 @@ export function createCodexDialect(): AcpDialect {
       streamed.delete(id);
       return output;
     },
+    outputChunk: (update) => deltaOf(update),
     end(update, id) {
       running.delete(id);
       return detached.delete(id)

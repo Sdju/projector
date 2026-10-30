@@ -2,7 +2,11 @@ export const toolLabels: Record<string, string> = {
   list_commands: "Поиск команд",
   describe_command: "Описание команды",
   execute_command: "Вызов команды",
-  bash: "Bash",
+  bash: "Команда",
+  shell: "Команда",
+  terminal: "Терминал",
+  run: "Команда",
+  run_command: "Команда",
   ask_user: "Вопрос пользователю",
   find_projects: "Поиск проектов",
   inspect_path: "Обзор проекта",
@@ -12,15 +16,39 @@ export const toolLabels: Record<string, string> = {
   list_projects: "Список проектов",
   // Claude Code built-in tools
   Read: "Чтение файла",
+  read: "Чтение файла",
+  read_file: "Чтение файла",
   Edit: "Правка файла",
+  edit: "Правка файла",
+  edit_file: "Правка файла",
   MultiEdit: "Правка файла",
+  multiedit: "Правка файла",
+  apply_patch: "Правка файла",
   Write: "Запись файла",
+  write: "Запись файла",
+  write_file: "Запись файла",
   Grep: "Поиск в файлах",
+  grep: "Поиск в файлах",
   Glob: "Поиск файлов",
+  glob: "Поиск файлов",
   WebFetch: "Загрузка страницы",
+  webfetch: "Загрузка страницы",
+  web_fetch: "Загрузка страницы",
   WebSearch: "Поиск в сети",
+  websearch: "Поиск в сети",
+  web_search: "Поиск в сети",
   Task: "Субагент",
+  task: "Субагент",
+  agent: "Субагент",
+  subagent: "Субагент",
   TodoWrite: "План задач",
+  todowrite: "План задач",
 };
 
-export const toolLabel = (name: string) => toolLabels[name] || name;
+/** Labels are written for the agents that name a tool in CamelCase or snake_case alike. */
+const lowerLabels = Object.fromEntries(
+  Object.entries(toolLabels).map(([name, label]) => [name.toLowerCase(), label]),
+);
+
+export const toolLabel = (name: string) =>
+  toolLabels[name] || lowerLabels[name.toLowerCase()] || name;

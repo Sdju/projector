@@ -5,14 +5,25 @@ import { formatElapsed, useElapsedClock } from "../lib/elapsed.ts";
 import { inputHint } from "../lib/tool-input.ts";
 import { toolLabel } from "../lib/tool-labels.ts";
 import type { AgentToolView } from "../model/types.ts";
+import AgentCodeBlock from "./AgentCodeBlock.vue";
 import AgentToolCall from "./AgentToolCall.vue";
 import IconChevron from "~icons/lucide/chevron-right";
 import IconCheck from "~icons/lucide/check";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import IconAlert from "~icons/lucide/circle-alert";
 
-const props = defineProps<{ tools: AgentToolView[] }>();
+const props = defineProps<{ tools: AgentToolView[]; root?: string }>();
+const emit = defineEmits<{ open: [path: string] }>();
 const current = computed(() => props.tools.findLast((tool) => tool.status === "running"));
+const live = computed(() => current.value?.output ?? "");
+// The group stays a single row, so a running command shows just the newest lines of its output.
+const tail = computed(() =>
+  live.value
+    .split("\n")
+    .slice(-6)
+    .filter((line, index, lines) => line || index < lines.length - 1)
+    .join("\n"),
+);
 const failed = computed(() => props.tools.some((tool) => tool.status === "error"));
 const hint = computed(() => {
   const tool = current.value;
@@ -36,7 +47,7 @@ const title = computed(() => {
 
 <template>
   <div v-if="tools.length === 1" class="activity single">
-    <AgentToolCall :tool="tools[0]!" />
+    <AgentToolCall :tool="tools[0]!" :root="root" @open="emit('open', $event)" />
   </div>
   <details v-else class="activity" :class="{ working: current, failed }">
     <UiDisclosureSummary variant="fit" class="activity-summary">
@@ -51,8 +62,15 @@ const title = computed(() => {
       <span v-if="current || title === 'Действия'" class="count">{{ tools.length }}</span>
       <IconChevron class="group-chevron" aria-hidden="true" />
     </UiDisclosureSummary>
+    <AgentCodeBlock v-if="tail" :text="tail" />
     <div class="activity-list">
-      <AgentToolCall v-for="tool in tools" :key="tool.id" :tool="tool" />
+      <AgentToolCall
+        v-for="tool in tools"
+        :key="tool.id"
+        :tool="tool"
+        :root="root"
+        @open="emit('open', $event)"
+      />
     </div>
   </details>
 </template>

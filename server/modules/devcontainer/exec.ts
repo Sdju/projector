@@ -42,6 +42,7 @@ export async function runDevcontainerCommand(
   command: string[],
   timeout = 30_000,
   signal?: AbortSignal,
+  onOutput?: (chunk: string, stream: "stdout" | "stderr") => void,
 ) {
   const resolved = target(project);
   if (!resolved) throw new Error("Проект не использует доверенный Dev Container");
@@ -50,6 +51,7 @@ export async function runDevcontainerCommand(
     return await os.tools.runNodeScript(cliPath(), ["exec", ...resolved.flags, ...command], {
       timeout,
       signal,
+      onOutput,
     });
   } catch (error) {
     // A container removed behind our back: forget it so the next call rebuilds.
