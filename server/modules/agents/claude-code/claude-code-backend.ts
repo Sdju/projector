@@ -15,6 +15,7 @@ import type {
 } from "../../agent/index.ts";
 import { fileURLToPath } from "node:url";
 import { query } from "@anthropic-ai/claude-agent-sdk";
+import { featurePrompt } from "../../agent-features/index.ts";
 import type {
   Options,
   SDKControlGetContextUsageResponse as ContextUsage,
@@ -57,10 +58,10 @@ function chosen(options: AgentRunOptions) {
   };
 }
 
-/** The runner process of a hosted answer (see `claude-runner.ts`). */
-const RUNNER = fileURLToPath(new URL("./claude-runner.ts", import.meta.url));
+/** The runner process of a hosted answer (see `server/app/claude-runner.ts`). */
+const RUNNER = fileURLToPath(new URL("../../../app/claude-runner.ts", import.meta.url));
 
-/** The answer of a hosted run: followed through its runner (see `claude-runner.ts`). */
+/** The answer of a hosted run: followed through its runner (see `server/app/claude-runner.ts`). */
 async function runHosted(options: AgentRunOptions, handle: AgentRunHandle): Promise<void> {
   if (!options.cwd) throw new Error("Claude Code работает внутри проекта: откройте чат в проекте");
   await assertHostProject(options.cwd, CLAUDE_LABEL);
@@ -78,10 +79,24 @@ async function run(options: AgentRunOptions): Promise<void> {
   return runClaudeCode(options);
 }
 
+/** The prompt of a Claude Code session: its own preset plus the abilities switched on for the agent. */
+export async function claudeSystemPrompt(): Promise<Options["systemPrompt"]> {
+  const features = await featurePrompt("claude-code");
+  return {
+    type: "preset",
+    preset: "claude_code",
+    ...(features ? { append: features } : {}),
+    // The host changes the append when the user flips a feature: render the prompt fresh on every
+    // request, otherwise a resumed session keeps the prompt recorded at its first request.
+    snapshot: false,
+  };
+}
+
 /**
  * Plain Claude Code behind a chat UI instead of the TUI: its own prompt, tools, login, `CLAUDE.md`
- * and settings. Nothing about Projector is added to the model's context. Runs in the runner process
- * (`claude-runner.ts`) for a hosted answer, and in the server process otherwise.
+ * and settings. Nothing about Projector is added to the model's context except the abilities the
+ * user switched on. Runs in the runner process (`server/app/claude-runner.ts`) for a hosted answer,
+ * and in the server process otherwise.
  */
 export async function runClaudeCode(options: AgentRunOptions): Promise<void> {
   if (!options.cwd) throw new Error("Claude Code работает внутри проекта: откройте чат в проекте");
@@ -106,7 +121,7 @@ export async function runClaudeCode(options: AgentRunOptions): Promise<void> {
     // A background subagent streams no calls of its own: its progress arrives as these summaries.
     agentProgressSummaries: true,
     settingSources: ["user", "project", "local"],
-    systemPrompt: { type: "preset", preset: "claude_code" },
+    systemPrompt: await claudeSystemPrompt(),
     permissionMode: mode,
     // Files are backed up before the agent changes them, so a step can be taken back later.
     enableFileCheckpointing: true,

@@ -1,5 +1,6 @@
 import { acpProgram, type AcpProgram, registerAcpProgram } from "./acp-programs.ts";
 import { attachedImages, promptWithHistory } from "../../agent/index.ts";
+import { featurePrompt } from "../../agent-features/index.ts";
 import type {
   AgentBackend,
   AgentBackendId,
@@ -141,9 +142,10 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
       options.emit("controls", { controls: applied });
     }
     // A resumed session already holds the history; a fresh one starts from the replayed chat.
+    // Abilities the user switched on for this agent go before the new message, once per session.
     const prompt = session.resumed
       ? options.message
-      : promptWithHistory(options.message, options.history ?? []);
+      : promptWithHistory(options.message, options.history ?? [], await featurePrompt(id));
     const result = (await connection.request(
       "session/prompt",
       {

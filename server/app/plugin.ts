@@ -11,6 +11,7 @@ import { attachTerminalServer } from "../modules/terminal/index.ts";
 import { pruneRuns, recoverJobs } from "../modules/agent/index.ts";
 import { registerBuiltinAgents } from "./agents.ts";
 import { registerBuiltinWidgetDefinitions } from "./widgets.ts";
+import { registerBuiltinAgentFeatures } from "./features.ts";
 import { reconcileOnStartup } from "../modules/environments/index.ts";
 
 import {
@@ -45,6 +46,7 @@ export function bindRuntime(httpServer: HttpServer | null, mode: ServerMode): vo
   // Регистрация при вызове, а не при импорте: импорт конфига Vite не должен трогать агентов.
   registerBuiltinAgents();
   registerBuiltinWidgetDefinitions();
+  registerBuiltinAgentFeatures();
   // Сервер, запущенный из сессии Claude Code, иначе передаёт её метки каждому терминалу и агенту.
   clearAgentSession();
   runtime.projectorRuntimeMode = mode;

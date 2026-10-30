@@ -11,7 +11,7 @@ import {
 import type { Project } from "../../projects/index.ts";
 import { createAgentTools } from "./agent-tools.ts";
 import { buildSystemPrompt } from "./prompts.ts";
-import { widgetCatalog } from "./widgets.ts";
+import { enabledFeatureText } from "../../agent-features/index.ts";
 import {
   createQwenOpenAI,
   envFallbackFromProcess,
@@ -162,7 +162,7 @@ async function turn(
   options.emit("controls", { controls: await controls(options.selection ?? {}) });
 
   const system =
-    buildSystemPrompt(widgetCatalog.guide()) +
+    buildSystemPrompt(await enabledFeatureText("projector")) +
     (options.cwd ? `\nТекущий проект: ${options.cwd}` : "") +
     (await projectInstructions(options.cwd)) +
     (await memorySection(options.cwd)) +

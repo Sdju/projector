@@ -32,13 +32,20 @@ export async function attachedImages(parts: MessagePart[] | undefined) {
   return images;
 }
 
-export function promptWithHistory(message: string, history: AgentHistoryTurn[]): string {
-  if (!history.length) return message;
+export function promptWithHistory(
+  message: string,
+  history: AgentHistoryTurn[],
+  context = "",
+): string {
   const transcript = history
     .slice(-10)
     .map((turn) => `${turn.role === "user" ? "Пользователь" : "Ассистент"}: ${turn.content}`)
     .join("\n\n");
-  return `Предыдущая переписка в этом чате:\n\n${transcript}\n\nНовое сообщение пользователя:\n${message}`;
+  return [
+    ...(history.length ? [`Предыдущая переписка в этом чате:\n\n${transcript}`] : []),
+    ...(context.trim() ? [context.trim()] : []),
+    ...(history.length ? [`Новое сообщение пользователя:\n${message}`] : [message]),
+  ].join("\n\n");
 }
 
 /** An external agent's tools run on the host, so isolating environments are refused. */

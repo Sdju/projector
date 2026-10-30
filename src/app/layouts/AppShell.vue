@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ActivityIsland from "./ActivityIsland.vue";
+import { AgentFeaturesIsland } from "../../modules/agent-features/index.ts";
 import { useCommandScope, commandArgs } from "../../common/utilities/commands.ts";
 import { computed, ref } from "vue";
 import { githubProjectRoute } from "../../../core/modules/github/index.ts";
@@ -119,6 +120,7 @@ const navigatePath = (path: string) =>
       </router-link>
       <nav class="nav">
         <router-link v-if="!currentProject" to="/settings">настройки</router-link>
+        <AgentFeaturesIsland />
         <ActivityIsland />
       </nav>
     </header>

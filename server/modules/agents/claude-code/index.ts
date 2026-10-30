@@ -1,1 +1,1 @@
-export { claudeCodeBackend } from "./claude-code-backend.ts";
+export { claudeCodeBackend, runClaudeCode } from "./claude-code-backend.ts";

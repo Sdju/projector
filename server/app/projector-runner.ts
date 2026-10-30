@@ -6,7 +6,9 @@
 import { runHostedRunner } from "../modules/agent/index.ts";
 import { runProjector } from "../modules/agents/projector/index.ts";
 import { registerBuiltinWidgetDefinitions } from "./widgets.ts";
+import { registerBuiltinAgentFeatures } from "./features.ts";
 
 // The server registers these when it starts; the system prompt of the answer lists them.
 registerBuiltinWidgetDefinitions();
+registerBuiltinAgentFeatures();
 runHostedRunner(runProjector);
