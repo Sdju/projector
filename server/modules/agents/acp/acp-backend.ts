@@ -68,16 +68,17 @@ function promptBlocks(
 export function createAcpBackend(program: AcpProgram): AgentBackend {
   registerAcpProgram(program);
   const id = program.id;
+  const terminal = {
+    program: id,
+    executable: id,
+    title: program.label,
+    ...program.terminal,
+  };
   return {
     id,
     label: program.label,
-    program: program.id,
-    terminal: {
-      program: id,
-      executable: id,
-      title: program.label,
-      ...program.terminal,
-    },
+    program: terminal.program,
+    terminal,
     capabilities: { hosted: true },
     run: (options) => run(options, id),
     available: () =>

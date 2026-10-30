@@ -645,6 +645,24 @@ test("ACP permission prefers one-time options and previews the change", async ()
   expect(detail).toContain("контекст");
 });
 
+test("ACP backend keeps the terminal program and executable its overrides resolve to", async () => {
+  const { createAcpBackend } = await import("../server/modules/agents/acp/index.ts");
+
+  // The terminal may be a different program than the backend; the chat mode follows the terminal.
+  const overridden = createAcpBackend({
+    id: "acp-terminal-backend",
+    label: "Overridden",
+    command: "acp-server",
+    args: ["acp"],
+    terminal: { program: "acp-terminal-program", executable: "acp-terminal-binary" },
+  });
+  expect(overridden.program).toBe("acp-terminal-program");
+  expect(overridden.terminal).toMatchObject({
+    program: "acp-terminal-program",
+    executable: "acp-terminal-binary",
+  });
+});
+
 test("approval bridge turns an always answer into a durable choice", async () => {
   const { createApprovalBridge } = await import("../server/modules/agent/index.ts");
   const requests = [];
