@@ -10,9 +10,11 @@ import UiSpinner from "../../common/ui/UiSpinner.vue";
 import { useCommandScope } from "../../common/utilities/commands.ts";
 import { useIslandMenu } from "../../common/utilities/island-menu.ts";
 import {
+  formatElapsed,
   requestChatTab,
   requestJobTab,
   useAgentActivity,
+  useElapsedClock,
   type AgentActivityItem,
 } from "../../modules/agent/index.ts";
 import { projectRoute, useProjects } from "../../modules/project/index.ts";
@@ -33,6 +35,17 @@ const summary = computed(
   () => `Запущено проектов: ${running.value.length}, агентов за работой: ${agents.value.length}`,
 );
 const nameOf = (id: string) => projects.value.find((item) => item.id === id)?.name ?? id;
+
+// The time each working agent has already spent: one shared clock for the whole island.
+const now = useElapsedClock();
+function agentSub(agent: AgentActivityItem) {
+  const time =
+    agent.busy && agent.startedAt !== undefined
+      ? `работает ${formatElapsed(now.value - agent.startedAt)}`
+      : "";
+  const what = agent.tasks ? `в фоне: ${agent.tasks}` : agent.topic;
+  return [time, what].filter(Boolean).join(" · ");
+}
 
 const menu = useIslandMenu({
   anchor: "right",
@@ -120,9 +133,7 @@ function openAgent(agent: AgentActivityItem) {
         <IconBot v-else class="bot" aria-hidden="true" />
         <span class="name u-truncate">{{ agent.agent }} · {{ nameOf(agent.projectId) }}</span>
         <span v-if="agent.needsUser" class="badge">ждёт вас</span>
-        <span class="sub u-truncate">{{
-          agent.tasks ? `в фоне: ${agent.tasks}` : agent.topic
-        }}</span>
+        <span class="sub u-truncate">{{ agentSub(agent) }}</span>
       </UiActionRow>
     </template>
   </UiIsland>

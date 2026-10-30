@@ -384,6 +384,8 @@ export interface LiveAgentRun {
   chat: string;
   topic: string;
   session?: string;
+  /** When the run started (ms since the epoch), for the elapsed time in the island. */
+  startedAt?: number;
 }
 
 export async function fetchLiveRuns(): Promise<LiveAgentRun[]> {

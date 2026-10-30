@@ -2,7 +2,8 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
-import { taskDuration, taskStatusLabel, type AgentTaskDetail } from "../lib/task-detail.ts";
+import { taskElapsed, taskStatusLabel, type AgentTaskDetail } from "../lib/task-detail.ts";
+import { useElapsedClock } from "../lib/elapsed.ts";
 import { loadSessionTurns } from "../api/client.ts";
 import type { AgentBackendId, AgentTurn as Turn } from "../model/types.ts";
 import AgentTurn from "./AgentTurn.vue";
@@ -23,13 +24,14 @@ const props = defineProps<{
 const emit = defineEmits<{ back: []; tab: [] }>();
 
 const task = computed(() => props.detail.task);
+const now = useElapsedClock();
 const meta = computed(() =>
   [
     taskStatusLabel[task.value.status],
     task.value.subagent,
     task.value.background ? "в фоне" : "",
     task.value.tools ? `вызовов: ${task.value.tools}` : "",
-    taskDuration(task.value.durationMs),
+    taskElapsed(task.value, now.value),
   ]
     .filter(Boolean)
     .join(" · "),

@@ -34,7 +34,7 @@ import { INTERRUPTED, loadHistory } from "./load-history.ts";
 import { watchChat } from "./chat-sync.ts";
 import { saveChat } from "./save-chat.ts";
 import { useExternalAgent } from "./external.ts";
-import { applyAgentEvent } from "./turn-events.ts";
+import { applyAgentEvent, resetAnswer } from "./turn-events.ts";
 import { hasChips, messageText, normalizeParts } from "../lib/message-parts.ts";
 import type {
   AgentBackendId,
@@ -168,9 +168,7 @@ export function useAgent(
       let attach = firstAttach;
       for (let attempt = 0; ; attempt++) {
         if (attach) {
-          assistant.text = "";
-          assistant.tools.splice(0);
-          assistant.parts = [];
+          resetAnswer(assistant);
         }
         try {
           await start(onEvent, signal, attach);
@@ -195,7 +193,7 @@ export function useAgent(
       for (const chip of assistant.tools)
         if (chip.status === "running") {
           chip.status = "error";
-          chip.detail = "Выполнение прервано";
+          Object.assign(chip, { detail: "Выполнение прервано", endedAt: Date.now() });
         }
       state.busy = false;
       state.phase = "";

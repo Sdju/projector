@@ -1,4 +1,5 @@
 import type { AgentJobStatus } from "../api/jobs.ts";
+import { formatElapsed } from "./elapsed.ts";
 
 export const jobStatusLabel: Record<AgentJobStatus, string> = {
   queued: "Запускается",
@@ -18,12 +19,11 @@ export const jobChatTab: Record<string, string> = {
   kimi: "kimi",
 };
 
-export function jobDuration(start: number | undefined, end: number | undefined): string {
+export function jobDuration(
+  start: number | undefined,
+  end: number | undefined,
+  now = Date.now(),
+): string {
   if (!start) return "";
-  const seconds = Math.max(0, Math.round(((end ?? Date.now()) - start) / 1000));
-  if (seconds < 60) return `${seconds} с`;
-  const minutes = Math.floor(seconds / 60);
-  return minutes < 60
-    ? `${minutes} мин ${seconds % 60} с`
-    : `${Math.floor(minutes / 60)} ч ${minutes % 60} мин`;
+  return formatElapsed((end ?? now) - start);
 }

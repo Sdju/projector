@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 import type { MessageChip, MessagePart } from "../model/types.ts";
 import AgentInput from "./AgentInput.vue";
+import AgentWorkClock from "./AgentWorkClock.vue";
 import IconArrowUp from "~icons/lucide/arrow-up";
 import IconArrowDown from "~icons/lucide/arrow-down";
 import IconSquare from "~icons/lucide/square";
@@ -13,6 +14,8 @@ const draft = defineModel<string>({ required: true });
 const parts = defineModel<MessagePart[]>("parts", { default: () => [] });
 const props = defineProps<{
   busy: boolean;
+  /** When the answer in progress began, for the clock beside the input. */
+  startedAt?: number;
   away: boolean;
   error: string;
   copied: boolean;
@@ -80,6 +83,7 @@ defineExpose({
       <UiInline class="composer-footer" justify="normal">
         <slot name="controls" />
         <UiInline class="footer-end" justify="normal">
+          <AgentWorkClock v-if="busy && startedAt" :started-at="startedAt" />
           <slot name="status" />
           <button
             v-if="busy"

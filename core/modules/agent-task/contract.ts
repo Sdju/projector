@@ -27,6 +27,9 @@ export const agentTaskSchema = z.object({
   tools: z.number().optional(),
   tokens: z.number().optional(),
   durationMs: z.number().optional(),
+  /** When the task started and ended (ms since the epoch); the chat fills them in as it sees them. */
+  startedAt: z.number().optional(),
+  endedAt: z.number().optional(),
   /** What it reported while working, oldest first; the chat collects it from the patches. */
   log: z.array(z.string()).optional(),
 });

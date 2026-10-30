@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
-import { taskDuration } from "../lib/task-detail.ts";
+import { useElapsedClock } from "../lib/elapsed.ts";
+import { taskElapsed } from "../lib/task-detail.ts";
 import { toolLabel } from "../lib/tool-labels.ts";
 import type { AgentTask } from "../model/types.ts";
 import IconAlert from "~icons/lucide/circle-alert";
@@ -14,13 +16,15 @@ import IconTab from "~icons/lucide/square-arrow-out-up-right";
 /** One subagent or background command in the task list: open it to read, or in a tab. */
 const props = defineProps<{ task: AgentTask; current?: boolean }>();
 const emit = defineEmits<{ view: [id: string]; tab: [id: string] }>();
+const now = useElapsedClock();
+const duration = computed(() => taskElapsed(props.task, now.value));
 
 function note() {
   const task = props.task;
   const parts = [
     task.subagent,
     task.tools ? `вызовов: ${task.tools}` : "",
-    taskDuration(task.durationMs),
+    duration.value,
     task.status === "running" && task.lastTool ? toolLabel(task.lastTool) : task.summary,
   ];
   return parts.filter(Boolean).join(" · ");

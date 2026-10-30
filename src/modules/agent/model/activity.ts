@@ -15,6 +15,8 @@ export interface AgentActivityItem {
   busy: boolean;
   /** Subagents and background commands still running. */
   tasks: number;
+  /** When the agent started the work shown, for the elapsed time in the island. */
+  startedAt?: number;
   /** A background job: its id (the tab opens by it) and what it waits for. */
   job?: { id: string; status: AgentJobView["status"] };
   /** The agent waits for the user's answer. */
@@ -59,6 +61,7 @@ export function jobItems(jobs: AgentJobView[]): AgentActivityItem[] {
       topic: job.task.trim().slice(0, 120),
       busy: job.status !== "needs-user",
       tasks: 0,
+      startedAt: job.startedAt,
       job: { id: job.id, status: job.status },
       needsUser: job.status === "needs-user",
     }));
@@ -101,6 +104,7 @@ export function useAgentActivity() {
             .slice(0, 120) ?? "",
         busy: chat.busy(),
         tasks: chat.tasks().filter((task) => task.status === "running").length,
+        startedAt: chat.turns().findLast((turn) => turn.role === "assistant")?.at,
       }))
       .filter((item) => item.busy || item.tasks);
     // The page's own chat knows more (background tasks) than the run on the server.
@@ -120,6 +124,7 @@ export function useAgentActivity() {
         topic: run.topic,
         busy: true,
         tasks: 0,
+        startedAt: run.startedAt,
       }));
     const jobs = jobItems(serverJobs.value);
     return [...local, ...remote, ...jobs];

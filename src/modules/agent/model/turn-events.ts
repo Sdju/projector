@@ -12,6 +12,32 @@ export function legacyParts(turn: AgentTurn): AgentPart[] {
   ];
 }
 
+type ToolTimes = { startedAt?: number; endedAt?: number };
+/**
+ * Times of the calls of each answer. A rejoin replays the answer into a cleared turn, and the
+ * replay must not restart the clock of a call that was already timed before it.
+ */
+const toolTimes = new WeakMap<AgentTurn, Map<string, ToolTimes>>();
+
+function timesOf(assistant: AgentTurn): Map<string, ToolTimes> {
+  const known = toolTimes.get(assistant);
+  if (known) return known;
+  const times = new Map<string, ToolTimes>();
+  toolTimes.set(assistant, times);
+  return times;
+}
+
+/** Keeps the times of the calls already seen, then empties the answer for its replay. */
+export function resetAnswer(assistant: AgentTurn) {
+  const times = timesOf(assistant);
+  for (const tool of assistant.tools)
+    if (tool.startedAt !== undefined || tool.endedAt !== undefined)
+      times.set(tool.id, { startedAt: tool.startedAt, endedAt: tool.endedAt });
+  assistant.text = "";
+  assistant.tools.splice(0);
+  assistant.parts = [];
+}
+
 export function appendText(turn: AgentTurn, text: string) {
   const parts = (turn.parts ??= legacyParts({ ...turn, text: turn.text.slice(0, -text.length) }));
   const last = parts.at(-1);
@@ -35,6 +61,7 @@ export function applyAgentEvent(
   assistant: AgentTurn,
   event: AgentEvent,
   ingest: (project: Project) => void,
+  at = Date.now(),
 ): boolean {
   switch (event.event) {
     case "input":
@@ -121,21 +148,31 @@ export function applyAgentEvent(
       if (assistant.text.trim() && !assistant.text.endsWith("\n\n")) assistant.text += "\n\n";
       // Taken before the call is added: a turn without parts yet derives them from its tools.
       const parts = (assistant.parts ??= legacyParts(assistant));
-      assistant.tools.push({
+      const timed = timesOf(assistant);
+      const known = timed.get(event.data.id);
+      const chip = {
         id: event.data.id,
         name: event.data.name,
-        status: "running",
+        status: "running" as const,
         input: summarize(event.data.input),
         detail: summarize(event.data.input),
+        startedAt: known?.startedAt ?? at,
+        ...(known?.endedAt !== undefined ? { endedAt: known.endedAt } : {}),
         ...(event.data.parent ? { parent: event.data.parent } : {}),
-      });
+      };
+      assistant.tools.push(chip);
+      timed.set(chip.id, { startedAt: chip.startedAt, endedAt: chip.endedAt });
       parts.push({ type: "tool", id: event.data.id });
       return false;
     case "tool-result": {
       const chip = assistant.tools.find((item) => item.id === event.data.id);
       if (chip) {
+        const timed = timesOf(assistant);
+        const known = timed.get(chip.id);
         chip.status = event.data.error ? "error" : "done";
         chip.detail = event.data.error || summarize(event.data.output);
+        chip.endedAt = known?.endedAt ?? at;
+        timed.set(chip.id, { startedAt: chip.startedAt, endedAt: chip.endedAt });
       }
       return false;
     }
@@ -164,6 +201,11 @@ export function applyAgentEvent(
       // What the task reports along the way becomes its progress log (no repeats, bounded).
       const line = event.data.summary || (event.data.lastTool && toolLabel(event.data.lastTool));
       if (line && task.log?.at(-1) !== line) task.log = [...(task.log ?? []), line].slice(-100);
+      // The chat times the task itself: an adapter may report a duration, but not for every task.
+      if (task.status === "running") {
+        task.startedAt ??= at;
+        task.endedAt = undefined;
+      } else if (task.startedAt !== undefined && task.endedAt === undefined) task.endedAt = at;
       return false;
     }
     case "project":
@@ -181,6 +223,7 @@ export function applyAgentEvent(
       for (const task of assistant.tasks ?? [])
         if (task.status === "running" && (!task.background || task.untracked)) {
           task.status = "stopped";
+          task.endedAt = at;
           if (task.untracked) task.summary ??= "Состояние после ответа неизвестно";
         }
       return false;

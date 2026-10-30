@@ -1,4 +1,5 @@
 import type { AgentTask, AgentToolChip, AgentTurn } from "../model/types.ts";
+import { formatElapsed } from "./elapsed.ts";
 
 /** A task with what the chat knows about it: the call that started it and the calls it made. */
 export interface AgentTaskDetail {
@@ -36,10 +37,20 @@ export function taskDetail(turns: AgentTurn[], id: string): AgentTaskDetail | un
   };
 }
 
-export function taskDuration(ms?: number) {
-  if (!ms) return "";
-  const seconds = Math.round(ms / 1000);
-  return seconds < 60 ? `${seconds} с` : `${Math.floor(seconds / 60)} мин ${seconds % 60} с`;
+/**
+ * How long a task took, or has been taking: the adapter's duration if it reports one, otherwise
+ * the time since the chat first saw it run.
+ */
+export function taskElapsed(task: AgentTask, now: number): string {
+  const reported = task.durationMs ?? 0;
+  if (task.status === "running") {
+    const live = task.startedAt ? Math.max(reported, now - task.startedAt) : reported;
+    return live ? formatElapsed(live) : "";
+  }
+  if (reported) return formatElapsed(reported);
+  if (task.startedAt !== undefined && task.endedAt !== undefined)
+    return formatElapsed(task.endedAt - task.startedAt);
+  return "";
 }
 
 export const taskStatusLabel = {

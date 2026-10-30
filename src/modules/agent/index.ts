@@ -16,3 +16,4 @@ export { default as AgentMemorySettings } from "./ui/AgentMemorySettings.vue";
 export { registerAgentCommands } from "./model/agent-commands.ts";
 export { useAgentActivity } from "./model/activity.ts";
 export type { AgentActivityItem } from "./model/activity.ts";
+export { formatElapsed, useElapsedClock } from "./lib/elapsed.ts";

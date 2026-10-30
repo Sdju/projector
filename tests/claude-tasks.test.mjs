@@ -61,6 +61,15 @@ test("task events are merged into one row of the answer", () => {
   apply({ id: "a1", tools: 2 });
   apply({ id: "a1", status: "done" });
   expect(turn.tasks).toEqual([
-    { id: "a1", kind: "agent", title: "Поиск", status: "done", background: true, tools: 2 },
+    {
+      id: "a1",
+      kind: "agent",
+      title: "Поиск",
+      status: "done",
+      background: true,
+      tools: 2,
+      startedAt: expect.any(Number),
+      endedAt: expect.any(Number),
+    },
   ]);
 });

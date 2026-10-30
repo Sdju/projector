@@ -30,6 +30,8 @@ export interface AgentRunRecord {
   chat?: string;
   /** The agent's own session of the run, once it reported it: a reopened session finds its live run by it. */
   session?: string;
+  /** When the run started (ms since the epoch), for the elapsed time in the overview. */
+  startedAt?: number;
 }
 
 /** A run whose agent process is alive, for the overview of what works now. */
@@ -41,6 +43,8 @@ export interface LiveRun {
   topic: string;
   /** The agent's own session, if it reported it already. */
   session?: string;
+  /** When the run started (ms since the epoch). */
+  startedAt?: number;
 }
 
 /** Runs with a live host, whichever page started them. */
@@ -54,6 +58,10 @@ export async function listLiveRuns(): Promise<LiveRun[]> {
         const record = await readRun(id);
         // A background job shows up as a job, not as a second run.
         if (!record || record.chat?.startsWith(JOB_CHAT)) return;
+        // A run started before its record carried the time: the file's own time is close enough.
+        const startedAt =
+          record.startedAt ??
+          (await stat(join(runDirectory(id), "run.json")).catch(() => null))?.mtimeMs;
         return {
           id,
           backend: record.backend,
@@ -61,6 +69,7 @@ export async function listLiveRuns(): Promise<LiveRun[]> {
           chat: record.chat ?? "",
           topic: record.message.trim().slice(0, 120),
           ...(record.session ? { session: record.session } : {}),
+          ...(startedAt !== undefined ? { startedAt } : {}),
         };
       }),
   );
@@ -89,7 +98,9 @@ export async function createRun(record: AgentRunRecord): Promise<string> {
   const id = randomBytes(6).toString("hex");
   const dir = runDirectory(id);
   await mkdir(dir, { recursive: true, mode: 0o700 });
-  await writeFile(join(dir, "run.json"), JSON.stringify(record), { mode: 0o600 });
+  await writeFile(join(dir, "run.json"), JSON.stringify({ ...record, startedAt: Date.now() }), {
+    mode: 0o600,
+  });
   return id;
 }
 

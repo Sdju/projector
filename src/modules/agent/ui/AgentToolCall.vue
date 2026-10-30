@@ -2,6 +2,7 @@
 import UiDisclosureSummary from "../../../common/ui/UiDisclosureSummary.vue";
 import { computed } from "vue";
 import AgentCodeBlock from "./AgentCodeBlock.vue";
+import { formatElapsed, useElapsedClock } from "../lib/elapsed.ts";
 import { formatToolInput, inputHint, isEditTool } from "../lib/tool-input.ts";
 import { toolLabel } from "../lib/tool-labels.ts";
 import type { AgentToolChip, AgentToolView } from "../model/types.ts";
@@ -82,6 +83,18 @@ const kind = computed(() => {
   if (["read", "write", "edit", "multiedit"].includes(name)) return IconFile;
   return IconFolder;
 });
+// A call that runs shows the time so far, a finished one how long it took.
+const now = useElapsedClock();
+const time = computed(() => {
+  const tool = props.tool;
+  if (tool.startedAt === undefined) return "";
+  if (tool.status === "running") return formatElapsed(now.value - tool.startedAt);
+  if (tool.endedAt === undefined) return "";
+  return formatElapsed(tool.endedAt - tool.startedAt);
+});
+const timeTitle = computed(() =>
+  props.tool.status === "running" ? `Выполняется ${time.value}` : `Длительность: ${time.value}`,
+);
 </script>
 
 <template>
@@ -90,6 +103,7 @@ const kind = computed(() => {
       <component :is="kind" class="tool-icon" aria-hidden="true" />
       <span class="tool-name u-truncate" :title="view.label">{{ view.label }}</span>
       <span class="tool-hint u-truncate" :title="view.hint">{{ view.hint }}</span>
+      <span v-if="time" class="tool-time" :title="timeTitle">{{ time }}</span>
       <UiSpinner v-if="tool.status === 'running'" class="state-icon" label="Выполняется" />
       <IconAlert
         v-else-if="view.status === 'error'"
@@ -130,6 +144,12 @@ svg {
   min-width: 0;
   flex: 1;
   color: var(--faint);
+}
+.tool-time {
+  flex-shrink: 0;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .row-chevron {
   width: 11px;

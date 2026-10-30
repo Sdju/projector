@@ -13,6 +13,7 @@ import {
   type AgentJobView,
 } from "../api/jobs.ts";
 import { jobDuration, jobStatusLabel } from "../lib/job-labels.ts";
+import { useElapsedClock } from "../lib/elapsed.ts";
 import { agentLabel } from "../model/modes.ts";
 import { canContinueInChat, continueJobInChat } from "../model/job-continue.ts";
 import { jobTurn } from "../model/job-turn.ts";
@@ -67,13 +68,14 @@ const outcome = computed(() => {
   const result = job.value?.result?.trim() ?? "";
   return finished.value && result && result !== turn.value.text.trim() ? result : "";
 });
+const now = useElapsedClock();
 const meta = computed(() =>
   [
     job.value ? jobStatusLabel[job.value.status] : "",
     job.value ? agentLabel(job.value.backend) : "",
     job.value?.unattended ? "без вопросов" : "",
     job.value?.worktree ? `копия ${job.value.worktree.branch}` : "",
-    jobDuration(job.value?.startedAt ?? job.value?.createdAt, job.value?.endedAt),
+    jobDuration(job.value?.startedAt ?? job.value?.createdAt, job.value?.endedAt, now.value),
   ]
     .filter(Boolean)
     .join(" · "),

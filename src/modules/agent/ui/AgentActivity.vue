@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import UiDisclosureSummary from "../../../common/ui/UiDisclosureSummary.vue";
 import { computed } from "vue";
+import { formatElapsed, useElapsedClock } from "../lib/elapsed.ts";
 import { inputHint } from "../lib/tool-input.ts";
 import { toolLabel } from "../lib/tool-labels.ts";
 import type { AgentToolView } from "../model/types.ts";
@@ -16,6 +17,12 @@ const failed = computed(() => props.tools.some((tool) => tool.status === "error"
 const hint = computed(() => {
   const tool = current.value;
   return tool ? inputHint(tool.input ?? tool.detail) : "";
+});
+const now = useElapsedClock();
+const currentTime = computed(() => {
+  const tool = current.value;
+  if (!tool || tool.startedAt === undefined) return "";
+  return formatElapsed(now.value - tool.startedAt);
 });
 // A finished group of one kind of call reads as "Запись файла ×2"; a mixed one, as a count.
 const title = computed(() => {
@@ -38,6 +45,9 @@ const title = computed(() => {
       <IconCheck v-else class="done-icon" aria-hidden="true" />
       <span class="activity-title u-truncate" :title="title">{{ title }}</span>
       <span v-if="current" class="tool-hint u-truncate" :title="hint">{{ hint }}</span>
+      <span v-if="currentTime" class="tool-time" :title="`Выполняется ${currentTime}`">{{
+        currentTime
+      }}</span>
       <span v-if="current || title === 'Действия'" class="count">{{ tools.length }}</span>
       <IconChevron class="group-chevron" aria-hidden="true" />
     </UiDisclosureSummary>
@@ -68,6 +78,12 @@ svg {
 .count {
   flex-shrink: 0;
   color: var(--faint);
+}
+.tool-time {
+  flex-shrink: 0;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .tool-hint {
   min-width: 0;

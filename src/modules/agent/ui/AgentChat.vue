@@ -696,6 +696,7 @@ onBeforeUnmount(() => {
       :project-id="projectId"
       :commands="slashCommands"
       :busy="busy"
+      :started-at="turns.findLast((turn) => turn.role === 'assistant')?.at"
       :away="away"
       :error="error || copyError"
       :copied="!!copied"

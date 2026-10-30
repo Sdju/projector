@@ -29,6 +29,7 @@ export function jobTurn(journal: AgentJobEntry[], id: string, at: number): Agent
         turn,
         { event: entry.event, data: entry.data } as AgentEvent,
         () => {},
+        entry.at,
       );
     else if (entry.event === "answer") {
       const data = entry.data as { auto?: boolean; summary?: string; title?: string };

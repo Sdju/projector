@@ -23,6 +23,9 @@ export interface AgentToolChip {
   detail: string;
   /** The call of a subagent (`Task`) this call was made inside of. */
   parent?: string;
+  /** When the call started and ended (ms since the epoch), for showing how long it took. */
+  startedAt?: number;
+  endedAt?: number;
 }
 
 /** A call with the calls a subagent made inside of it, for showing. */
