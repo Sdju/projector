@@ -47,11 +47,14 @@ describe("Kimi reads CLI credentials, bounds and sanitizes requests, shares cach
     previousFetch = globalThis.fetch;
     previousEnv = {
       HOME: process.env.HOME,
+      USERPROFILE: process.env.USERPROFILE,
       KIMI_AUTH_CONTENT: process.env.KIMI_AUTH_CONTENT,
     };
     state = globalThis.projectorKimiUsage;
     calls = 0;
+    // `os.homedir()` reads HOME on POSIX and USERPROFILE on Windows.
     process.env.HOME = directory;
+    process.env.USERPROFILE = directory;
     delete process.env.KIMI_AUTH_CONTENT;
     await mkdir(join(directory, ".kimi-code", "credentials"), { recursive: true });
   });

@@ -260,7 +260,7 @@ async function own(
         void applyColorScheme();
       },
     });
-    let shell;
+    let shell: Awaited<ReturnType<typeof startDesktopShell>>;
     try {
       palette = await options.createPalette(baseUrl);
     } catch (error) {
@@ -293,7 +293,7 @@ async function own(
       stopping = true;
       clearTimeout(pulse);
       await shell.stop();
-      palette.dispose();
+      palette?.dispose();
       server.close();
       await rm(pidPath, { force: true });
       await rm(launcherTokenPath(options.dataDirectory), { force: true });

@@ -221,6 +221,7 @@ test("shared channels preserve PTY, ACK, resize, reconnect, control isolation an
     for (const ws of sockets) ws.terminate();
     closeProjectTerminals(project.id);
     await new Promise((resolve) => server.close(resolve));
-    await rm(root, { recursive: true, force: true });
+    // Windows releases PTY and socket handles asynchronously.
+    await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 200 });
   }
 });

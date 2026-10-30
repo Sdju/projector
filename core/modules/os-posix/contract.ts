@@ -16,6 +16,8 @@ export interface AgentProcessSpec {
   args: string[];
   cwd?: string;
   env?: Record<string, string | undefined>;
+  /** Windows routes `.cmd` shims through a shell by default; an absolute executable can opt out. */
+  shell?: boolean;
 }
 
 /** An agent command as the OS needs it started: quoted and routed through a shell where required. */

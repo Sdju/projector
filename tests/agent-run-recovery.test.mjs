@@ -69,7 +69,7 @@ async function withHost(work) {
     if (id) await stopRun(id);
     if (previous === undefined) delete process.env.XDG_DATA_HOME;
     else process.env.XDG_DATA_HOME = previous;
-    await rm(directory, { recursive: true, force: true });
+    await rm(directory, { recursive: true, force: true, maxRetries: 20, retryDelay: 200 });
   }
 }
 

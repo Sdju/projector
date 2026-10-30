@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  closeHistoryStore,
   createCommandBridge,
   completeCommandRequest,
   readAgentHistory,
@@ -157,9 +158,10 @@ test("chat history persists on disk, validates data and separates project IDs", 
     await writeAgentHistory("a/../../b", []);
     expect(await readAgentHistory("a/../../b")).toStrictEqual([]);
   } finally {
+    closeHistoryStore();
     if (previous === undefined) delete process.env.XDG_DATA_HOME;
     else process.env.XDG_DATA_HOME = previous;
-    await rm(directory, { recursive: true, force: true });
+    await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 });
 
@@ -1045,9 +1047,10 @@ test("chat history keeps the native session of a turn", async () => {
     await writeAgentHistory("p", turns);
     expect(await readAgentHistory("p")).toStrictEqual(turns);
   } finally {
+    closeHistoryStore();
     if (previous === undefined) delete process.env.XDG_DATA_HOME;
     else process.env.XDG_DATA_HOME = previous;
-    await rm(directory, { recursive: true, force: true });
+    await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 });
 

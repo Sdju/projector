@@ -37,7 +37,9 @@ test("a secret is written to the chosen .env, other lines and the file mode are 
   expect(await readFile(join(cwd, ".env"), "utf8")).toBe(
     "# keep\nOTHER=1\nOPENAI_API_KEY=sk-live-123\n",
   );
-  expect((await stat(join(cwd, ".env"))).mode & 0o777).toBe(0o640);
+  // Windows does not expose POSIX permission bits; the content check above is the real assertion.
+  if (process.platform !== "win32")
+    expect((await stat(join(cwd, ".env"))).mode & 0o777).toBe(0o640);
 });
 
 test("a new .env is private and values that need it are quoted", async () => {
@@ -46,7 +48,8 @@ test("a new .env is private and values that need it are quoted", async () => {
   expect(target.replaces).toBe(false);
   await writeEnvSecret(target, "pa ss'word\nline");
   expect(await readFile(join(cwd, "prod.env"), "utf8")).toBe('DB_PASSWORD="pa ss\'word\\nline"\n');
-  expect((await stat(join(cwd, "prod.env"))).mode & 0o777).toBe(0o600);
+  if (process.platform !== "win32")
+    expect((await stat(join(cwd, "prod.env"))).mode & 0o777).toBe(0o600);
 });
 
 test("the destination must be a .env file of the project, reached without links out of it", async () => {

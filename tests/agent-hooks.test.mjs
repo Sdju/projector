@@ -34,6 +34,9 @@ const echo = tool({
   execute: async ({ text }) => `got ${text}`,
 });
 
+/** Hooks run through the platform shell; a Node one-liner avoids POSIX-only commands. */
+const nodeCommand = (script) => `"${process.execPath}" -e "${script}"`;
+
 describe("hooks of the Projector agent", () => {
   it("reads only well-formed hooks from the user's file", async () => {
     expect(await loadHooks()).toEqual([]);
@@ -51,7 +54,12 @@ describe("hooks of the Projector agent", () => {
 
   it("lets exit code 2 of PreToolUse forbid the call, with the reason", async () => {
     await configure({
-      PreToolUse: [{ matcher: "^echo$", command: "echo nope >&2; exit 2" }],
+      PreToolUse: [
+        {
+          matcher: "^echo$",
+          command: nodeCommand("process.stderr.write('nope');process.exit(2)"),
+        },
+      ],
     });
     const tools = withHooks({ echo, other: echo }, await loadHooks(), data);
     await expect(tools.echo.execute({ text: "a" }, {})).rejects.toThrow(/Хук запретил.*nope/);
@@ -60,23 +68,48 @@ describe("hooks of the Projector agent", () => {
 
   it("runs PostToolUse with the call on its input, and an ordinary failure forbids nothing", async () => {
     const log = join(data, "post.log");
-    await configure({
-      PreToolUse: [{ command: "exit 1" }],
-      PostToolUse: [{ command: `cat > ${JSON.stringify(log)}` }],
-    });
-    const tools = withHooks({ echo }, await loadHooks(), data);
-    expect(await tools.echo.execute({ text: "b" }, {})).toBe("got b");
-    const seen = JSON.parse(await readFile(log, "utf8"));
-    expect(seen).toMatchObject({ event: "PostToolUse", tool: "echo", input: { text: "b" } });
+    process.env.PROJECTOR_HOOK_LOG = log;
+    try {
+      await configure({
+        PreToolUse: [{ command: "exit 1" }],
+        PostToolUse: [
+          {
+            command: nodeCommand(
+              "const fs=require('fs');let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>fs.writeFileSync(process.env.PROJECTOR_HOOK_LOG,s));",
+            ),
+          },
+        ],
+      });
+      const tools = withHooks({ echo }, await loadHooks(), data);
+      expect(await tools.echo.execute({ text: "b" }, {})).toBe("got b");
+      const seen = JSON.parse(await readFile(log, "utf8"));
+      expect(seen).toMatchObject({ event: "PostToolUse", tool: "echo", input: { text: "b" } });
+    } finally {
+      delete process.env.PROJECTOR_HOOK_LOG;
+    }
   });
 
   it("takes a JSON answer: block with a reason, or context added to the result", async () => {
     await configure({
-      PreToolUse: [{ command: `echo '{"decision":"block","reason":"not now"}'` }],
+      PreToolUse: [
+        {
+          command: nodeCommand(
+            "process.stdout.write(JSON.stringify({decision:'block',reason:'not now'}))",
+          ),
+        },
+      ],
     });
     let tools = withHooks({ echo }, await loadHooks(), data);
     await expect(tools.echo.execute({ text: "a" }, {})).rejects.toThrow(/not now/);
-    await configure({ PostToolUse: [{ command: `echo '{"additionalContext":"remember"}'` }] });
+    await configure({
+      PostToolUse: [
+        {
+          command: nodeCommand(
+            "process.stdout.write(JSON.stringify({additionalContext:'remember'}))",
+          ),
+        },
+      ],
+    });
     tools = withHooks({ echo }, await loadHooks(), data);
     expect(await tools.echo.execute({ text: "a" }, {})).toEqual({
       result: "got a",

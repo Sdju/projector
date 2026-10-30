@@ -39,7 +39,8 @@ describe("IDE MCP bridge", () => {
     const token = await ensureIdeMcpToken();
     expect(token).toMatch(/^[0-9a-f]{64}$/);
     expect((await readFile(ideMcpTokenFile(), "utf8")).trim()).toBe(token);
-    expect((await stat(ideMcpTokenFile())).mode & 0o777).toBe(0o600);
+    if (process.platform !== "win32")
+      expect((await stat(ideMcpTokenFile())).mode & 0o777).toBe(0o600);
     expect(await ideMcpTokenMatches(token)).toBe(true);
     expect(await ideMcpTokenMatches("wrong")).toBe(false);
     expect(await ideMcpTokenMatches(null)).toBe(false);

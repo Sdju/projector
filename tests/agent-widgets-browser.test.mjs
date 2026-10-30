@@ -188,9 +188,10 @@ test(
     await browser.evaluate(
       `(() => { const i = document.querySelector("#typed input, input#typed") ?? document.querySelector("[role=tabpanel] input"); i.value = "осталось"; i.dispatchEvent(new Event("input", { bubbles: true })); })()`,
     );
-    await browser.click("[role=tab]:nth-of-type(2)");
+    // Click by index: several tab groups share the page, and `:nth-of-type` is ambiguous.
+    await browser.evaluate("[...document.querySelectorAll('[role=tab]')][1].click()");
     await wait("[...document.querySelectorAll('[role=tabpanel]')][0].style.display === 'none'");
-    await browser.click("[role=tab]");
+    await browser.evaluate("[...document.querySelectorAll('[role=tab]')][0].click()");
     await wait("[...document.querySelectorAll('[role=tabpanel]')][0].style.display !== 'none'");
     expect(await browser.evaluate("document.querySelector('[role=tabpanel] input').value")).toBe(
       "осталось",

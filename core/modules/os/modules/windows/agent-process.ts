@@ -11,7 +11,10 @@ export function quoteForCmd(value: string): string {
 
 /** A separate stdio process per chat turn: Projector never touches the user's own sessions. */
 /** `.cmd` shims are not executable without a shell on Windows, and a shell joins argv unquoted. */
-export function agentLaunch(spec: Pick<AgentProcessSpec, "command" | "args">): AgentLaunch {
+export function agentLaunch(
+  spec: Pick<AgentProcessSpec, "command" | "args" | "shell">,
+): AgentLaunch {
+  if (spec.shell === false) return { command: spec.command, args: spec.args, shell: false };
   return { command: quoteForCmd(spec.command), args: spec.args.map(quoteForCmd), shell: true };
 }
 

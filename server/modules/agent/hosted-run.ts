@@ -26,6 +26,8 @@ export async function runHostedAgent(
         args: [launch.runner, runDirectory(handle.id)],
         cwd: launch.cwd,
         env: launch.env,
+        // A Node script with an absolute path needs no cmd.exe; its args may contain spaces.
+        shell: false,
       });
   const relayedIds: string[] = [];
   const injections = new Map<string, (accepted: boolean) => void>();

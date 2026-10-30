@@ -19,6 +19,8 @@ async function project(name) {
   git(dir, "init", "-q", "-b", "main");
   git(dir, "config", "user.email", "t@t");
   git(dir, "config", "user.name", "t");
+  // The test compares file contents byte for byte; Windows must not rewrite LF to CRLF.
+  git(dir, "config", "core.autocrlf", "false");
   await writeFile(join(dir, "app", "a.txt"), "one\n");
   git(dir, "add", "-A");
   git(dir, "commit", "-qm", "init");
@@ -29,7 +31,7 @@ test("an agent works in its own copy, which is merged into the project on reques
   const main = await project("merge");
   const folder = join(main, "app");
   const copy = await createWorktree("p1", folder);
-  expect(copy.cwd.endsWith("/app")).toBe(true);
+  expect(copy.cwd.replaceAll("\\", "/").endsWith("/app")).toBe(true);
   expect(await worktreeCwd("p1", copy.id, folder)).toBe(copy.cwd);
 
   await writeFile(join(copy.cwd, "a.txt"), "two\n");

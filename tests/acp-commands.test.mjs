@@ -1,76 +1,13 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, expect, test } from "vite-plus/test";
 import { registerAcpProgram } from "../server/modules/agents/acp/acp-programs.ts";
 import { acpCommands } from "../server/modules/agents/acp/acp-tools.ts";
 
-const SCRIPT = `
-  const fs = require("node:fs");
-  const readline = require("node:readline");
-  const mode = process.argv[1];
-  if (process.env.PROBE_MARK) fs.appendFileSync(process.env.PROBE_MARK, "start\\n");
-  const send = (message) => process.stdout.write(JSON.stringify(message) + "\\n");
-  const commands = [
-    { name: "review", description: "Review changes", input: { hint: "<branch>" } },
-    { name: "compact" },
-  ];
-  const announce = () =>
-    send({
-      jsonrpc: "2.0",
-      method: "session/update",
-      params: {
-        sessionId: "s1",
-        update: { sessionUpdate: "available_commands_update", availableCommands: commands },
-      },
-    });
-  const rl = readline.createInterface({ input: process.stdin });
-  rl.on("line", (line) => {
-    const message = JSON.parse(line);
-    if (message.method === "initialize")
-      send({
-        jsonrpc: "2.0",
-        id: message.id,
-        result: {
-          protocolVersion: 1,
-          agentCapabilities: { sessionCapabilities: { delete: {} } },
-        },
-      });
-    else if (message.method === "session/new") {
-      if (mode === "before") {
-        announce();
-        send({ jsonrpc: "2.0", id: message.id, result: { sessionId: "s1" } });
-      } else if (mode === "after") {
-        send({ jsonrpc: "2.0", id: message.id, result: { sessionId: "s1" } });
-        setTimeout(announce, 20);
-      } else if (mode === "empty-then") {
-        send({ jsonrpc: "2.0", id: message.id, result: { sessionId: "s1" } });
-        send({
-          jsonrpc: "2.0",
-          method: "session/update",
-          params: {
-            sessionId: "s1",
-            update: { sessionUpdate: "available_commands_update", availableCommands: [] },
-          },
-        });
-        setTimeout(announce, 30);
-      } else if (mode === "response") {
-        send({
-          jsonrpc: "2.0",
-          id: message.id,
-          result: { sessionId: "s1", availableCommands: commands },
-        });
-      } else send({ jsonrpc: "2.0", id: message.id, result: { sessionId: "s1" } });
-    } else if (message.method === "session/delete" || message.method === "session/close")
-      send({ jsonrpc: "2.0", id: message.id, result: {} });
-    else
-      send({
-        jsonrpc: "2.0",
-        id: message.id,
-        error: { code: -32601, message: "Method not found" },
-      });
-  });
-`;
+/** A file, not an `-e` argument: Windows shell quoting would mangle the multi-line script. */
+const SCRIPT = fileURLToPath(new URL("./fixtures/acp-commands-probe.mjs", import.meta.url));
 
 const dirs = [];
 afterEach(async () => {
@@ -85,7 +22,7 @@ function probe(mode) {
     id,
     label: "Probe",
     command: process.execPath,
-    args: ["-e", SCRIPT, mode],
+    args: [SCRIPT, mode],
   });
   return id;
 }

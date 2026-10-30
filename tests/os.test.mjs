@@ -366,7 +366,8 @@ test(
 
 test(
   "Windows palette resident accepts a second command and quits",
-  { skip: process.platform !== "win32" },
+  // The CI runner has no GTK4 installation; a developer's Windows machine runs it.
+  { skip: process.platform !== "win32" || process.env.CI === "true" },
   async () => {
     const root = await mkdtemp(join(tmpdir(), "projector-win-palette-"));
     const dataDirectory = join(root, "projector");
