@@ -207,9 +207,17 @@ async function own(
       if (!resolved) return;
       const settings = Gtk.Settings.getDefault();
       if (!settings) return;
-      const next =
-        resolved === "dark" ? Gtk.InterfaceColorScheme.DARK : Gtk.InterfaceColorScheme.LIGHT;
-      if (settings.gtkInterfaceColorScheme !== next) settings.gtkInterfaceColorScheme = next;
+      // GtkInterfaceColorScheme exists in newer GTK; older Windows bundles only follow the
+      // system theme themselves, so there is nothing to set.
+      const schemes = (
+        Gtk as unknown as {
+          InterfaceColorScheme?: { DARK: unknown; LIGHT: unknown };
+        }
+      ).InterfaceColorScheme;
+      if (!schemes) return;
+      const next = resolved === "dark" ? schemes.DARK : schemes.LIGHT;
+      const target = settings as unknown as { gtkInterfaceColorScheme?: unknown };
+      if (target.gtkInterfaceColorScheme !== next) target.gtkInterfaceColorScheme = next;
     } catch (error) {
       console.error("Тема:", error instanceof Error ? error.message : error);
     }

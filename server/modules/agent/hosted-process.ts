@@ -70,7 +70,11 @@ export async function startHosted(runId: string, spec: AgentProcessSpec): Promis
     } catch (error) {
       if (Date.now() > deadline || (await os.processes.identity(pid)) === null) {
         const tail = (await readFile(join(dir, "host.log"), "utf8").catch(() => "")).trim();
-        throw new Error(tail ? `Не удалось запустить агента: ${tail.slice(-500)}` : String(error));
+        const trace = (await readFile(join(dir, "trace.log"), "utf8").catch(() => "")).trim();
+        const detail = tail || trace;
+        throw new Error(
+          detail ? `Не удалось запустить агента: ${detail.slice(-800)}` : String(error),
+        );
       }
       await sleep(40);
     }
