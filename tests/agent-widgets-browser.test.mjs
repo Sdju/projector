@@ -206,6 +206,53 @@ test(
     });
     await browser.evaluate("window.fixture.replies.length = 0");
 
+    // Data widgets: images, inline icons, chips and the on-demand GitInfo layout.
+    await set(
+      `<Card>
+  <Chips :items="['TypeScript','Vue','Node.js']" mono />
+  <Chips :items="[{label:'готово',tone:'success',icon:'circle-check'},{label:'риск',tone:'warning'}]" />
+  <Image src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="Пиксель" caption="Проверка" :height="120" />
+  <p><InlineIcon name="git-branch" label="Ветка" /> main <InlineIcon name="missing" /></p>
+  <GitInfo branch="main" upstream="origin/main" :ahead="2" :staged="3" :unstaged="1" :untracked="2" :additions="48" :deletions="12" :commits="[{hash:'a1b2c3d4',subject:'Добавить GitInfo',author:'Ада',when:'2 ч назад'}]" :files="[{path:'core/modules/agent-widgets/git-info/index.ts',status:'A',additions:48,deletions:0}]" />
+</Card>`,
+      false,
+    );
+    await wait("document.querySelector('.git-info') !== null");
+    expect(
+      await browser.evaluate(
+        "[...document.querySelectorAll('.chips')][0].querySelectorAll('.chip').length",
+      ),
+    ).toBe(3);
+    expect(
+      await browser.evaluate(
+        "[...document.querySelectorAll('.chips')][0].querySelector('.chip').className",
+      ),
+    ).toContain("info");
+    expect(
+      await browser.evaluate(
+        "[...document.querySelectorAll('.chips')][1].querySelector('.success svg') !== null",
+      ),
+    ).toBe(true);
+    expect(
+      await browser.evaluate(
+        "[...document.querySelectorAll('.chips')][1].querySelector('.warning .dot') !== null",
+      ),
+    ).toBe(true);
+    expect(
+      await browser.evaluate("document.querySelector('.image img').getBoundingClientRect().height"),
+    ).toBe(120);
+    expect(await browser.evaluate("document.querySelectorAll('.inline-icon svg').length")).toBe(1);
+    expect(
+      await browser.evaluate("document.querySelector('.inline-icon.missing').textContent"),
+    ).toBe("•");
+    const gitText = await browser.evaluate("document.querySelector('.git-info').innerText");
+    expect(gitText).toContain("main");
+    expect(gitText).toContain("origin/main");
+    expect(gitText).toContain("+48");
+    expect(gitText).toContain("a1b2c3d");
+    expect(gitText).toContain("Добавить GitInfo");
+    expect(gitText).toContain("core/modules/agent-widgets/git-info/index.ts");
+
     // A form needs no script: named controls, preset / reset / submit buttons.
     await set(
       `<Card>

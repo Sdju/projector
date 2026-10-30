@@ -17,6 +17,7 @@ import { readMemory, writeMemory } from "./projector-memory.ts";
 import { fetchPage, PAGE_CHARS } from "./projector-web.ts";
 import { findSkill, listSkills } from "./projector-skills.ts";
 import { webSearch } from "./projector-web-search.ts";
+import { widgetCatalog } from "./widgets.ts";
 
 export interface AgentToolContext extends ToolSpecContext {
   cwd?: string;
@@ -96,6 +97,12 @@ export function createAgentTools(context: AgentToolContext) {
         await guardMemory(context.guard, { scope, mode, text });
         return { text: await writeMemory(scope, context.cwd, text, mode) };
       },
+    }),
+    describe_widget: tool({
+      description:
+        "Полное описание специального виджета из раздела «Специальные виджеты»: свойства, ограничения и пример. Вызывай перед первым использованием такого виджета. Для обычных виджетов не нужен — их описание уже в промпте.",
+      inputSchema: z.object({ name: z.string().describe("Имя специального виджета") }),
+      execute: async ({ name }) => ({ description: widgetCatalog.describeSpecial(name) }),
     }),
     use_skill: tool({
       description:

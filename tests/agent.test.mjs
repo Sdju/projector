@@ -53,6 +53,12 @@ test("agent discovers live commands, requires description, checks args and exclu
   const commands = agentCommandHandler(sdk, "a");
   const tools = createAgentTools({ onProject: () => {}, commands, guard: { trusting: true } });
   const call = (name, input) => tools[name].execute(input, { toolCallId: "test", messages: [] });
+  expect((await call("describe_widget", { name: "GitInfo" })).description).toContain(
+    "branch: string",
+  );
+  await expect(async () => call("describe_widget", { name: "Card" })).rejects.toThrow(
+    /не специальный/,
+  );
   expect((await call("list_commands", {})).commands.map((c) => c.id)).toStrictEqual([
     "ide.fileTree.file.rename",
   ]);

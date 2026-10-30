@@ -1,7 +1,8 @@
 import { acpProgram, type AcpProgram, registerAcpProgram } from "./acp-programs.ts";
 import { attachedImages, promptWithHistory } from "../../agent/index.ts";
 import { featureEnabled, featurePrompt } from "../../agent-features/index.ts";
-import { acpIdeMcpServer, IDE_MCP_SERVER } from "../ide-mcp/index.ts";
+import { acpIdeMcpServer } from "../ide-mcp/index.ts";
+import { acpWidgetsMcpServer } from "../widgets-mcp/index.ts";
 import type {
   AgentBackend,
   AgentBackendId,
@@ -139,10 +140,14 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
   options.emit("status", { phase: "thinking", provider: program.label, model: "" });
   try {
     const init = await initializeAcp(connection);
-    const extraMcp =
-      options.projectId && (await featureEnabled(id, "ide", options.features))
-        ? [acpIdeMcpServer(options.projectId)]
-        : [];
+    const [ideEnabled, widgetsEnabled] = await Promise.all([
+      featureEnabled(id, "ide", options.features),
+      featureEnabled(id, "widgets", options.features),
+    ]);
+    const extraMcp = [
+      ...(options.projectId && ideEnabled ? [acpIdeMcpServer(options.projectId)] : []),
+      ...(widgetsEnabled ? [acpWidgetsMcpServer()] : []),
+    ];
     const session = await openSession(
       connection,
       options,
@@ -204,9 +209,9 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
 }
 
 /**
- * The MCP servers of a session: the project's own, plus the built-in IDE server when the feature
- * is on. Only that addition may hide a same-named project server; with the feature off the user's
- * `projector-ide` from `.mcp.json` is passed as it is.
+ * The MCP servers of a session: the project's own, plus the built-in IDE and widget servers when
+ * their features are on. Only those additions may hide a same-named project server; with the
+ * feature off the user's `projector-ide` or `projector-widgets` from `.mcp.json` is passed as is.
  */
 export async function sessionMcpServers(
   cwd: string | undefined,
@@ -215,7 +220,8 @@ export async function sessionMcpServers(
 ): Promise<AcpMcpServer[]> {
   const project = await projectMcpServers(cwd, support);
   if (!extra.length) return project;
-  return [...project.filter((server) => server.name !== IDE_MCP_SERVER), ...extra];
+  const names = new Set(extra.map((server) => server.name));
+  return [...project.filter((server) => !names.has(server.name)), ...extra];
 }
 
 /**

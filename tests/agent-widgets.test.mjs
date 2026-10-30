@@ -140,6 +140,48 @@ test("the catalog's guide is made from the definitions and covers every register
   expect(catalog.describe("Nope")).toContain("Нет компонента");
 });
 
+test("special widgets stay in the guide as a name and use case, with details on demand", async () => {
+  const { createWidgetCatalog, defineWidget } =
+    await import("../core/modules/widget-catalog/index.ts");
+  const catalog = createWidgetCatalog();
+  catalog.register(
+    defineWidget({
+      name: "Trace",
+      group: "data",
+      summary: "редкая трассировка — используй для разбора запроса",
+      props: { id: { type: "string", description: "идентификатор", required: true } },
+      special: true,
+      example: '<Trace id="abc" />',
+    }),
+  );
+  catalog.register(
+    defineWidget({
+      name: "Stat",
+      group: "data",
+      summary: "показатель",
+      props: { label: { type: "string", description: "подпись", required: true } },
+      example: '<Stat label="A" />',
+    }),
+  );
+  const guide = catalog.guide();
+  expect(guide).toContain("Trace — редкая трассировка");
+  expect(guide).toContain("describe_widget");
+  expect(guide).not.toContain("<Trace");
+  expect(guide).not.toContain("id: string; обязательное");
+  expect(guide).toContain("Stat — показатель");
+  expect(guide).toContain("<Stat");
+  expect(catalog.describeSpecial("Trace")).toContain("id: string; обязательное");
+  expect(catalog.describeSpecial("Trace")).toContain('<Trace id="abc" />');
+  expect(() => catalog.describeSpecial("Stat")).toThrow("не специальный");
+  expect(() => catalog.describeSpecial("Nope")).toThrow("Нет компонента");
+});
+
+test("InlineIcon offers exactly the names its prompt documents", async () => {
+  const { INLINE_ICON_NAMES } = await import("../core/modules/agent-widgets/inline-icon/index.ts");
+  const { icons } = await import("../src/modules/agent-widgets/_/index.ts");
+  expect(Object.keys(icons).sort()).toEqual([...INLINE_ICON_NAMES].sort());
+});
+
 test("the definitions, the client components and both composition lists stay one set", async () => {
   const { readdirSync, readFileSync } = await import("node:fs");
   const { widgetCatalog } = await import("../server/modules/agents/projector/index.ts");
@@ -148,12 +190,13 @@ test("the definitions, the client components and both composition lists stay one
   const server = readFileSync(new URL("../server/app/widgets.ts", import.meta.url), "utf8");
   const client = readFileSync(new URL("../src/app/widgets.ts", import.meta.url), "utf8");
   for (const name of names) {
-    const entry = (await import(`../src/modules/agent-widgets/${name}/index.ts`))[name];
+    const id = name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+    const entry = (await import(`../src/modules/agent-widgets/${name}/index.ts`))[id];
     const definition = (await import(`../core/modules/agent-widgets/${name}/index.ts`))[
-      `${name}Widget`
+      `${id}Widget`
     ];
     expect(entry.definition, name).toBe(definition);
-    expect(server, name).toContain(`${name}Widget`);
+    expect(server, name).toContain(`${id}Widget`);
     expect(client, name).toContain(`modules/agent-widgets/${name}/index.ts`);
     // What the agent is told has to be what the component accepts.
     const accepted = Object.keys(entry.component.props ?? {})

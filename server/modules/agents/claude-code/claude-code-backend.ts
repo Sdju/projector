@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { featureEnabled, featurePrompt } from "../../agent-features/index.ts";
 import { claudeIdeMcpServer, IDE_MCP_SERVER } from "../ide-mcp/index.ts";
+import { claudeWidgetsMcpServer, WIDGETS_MCP_SERVER } from "../widgets-mcp/index.ts";
 import type {
   Options,
   SDKControlGetContextUsageResponse as ContextUsage,
@@ -114,20 +115,27 @@ export async function runClaudeCode(options: AgentRunOptions): Promise<void> {
   else options.abort?.addEventListener("abort", forwardAbort, { once: true });
 
   const selected = chosen(options);
-  const ideMcp =
-    options.projectId && (await featureEnabled("claude-code", "ide", options.features))
+  const [ideEnabled, widgetsEnabled] = await Promise.all([
+    featureEnabled("claude-code", "ide", options.features),
+    featureEnabled("claude-code", "widgets", options.features),
+  ]);
+  const extraMcp = {
+    ...(options.projectId && ideEnabled
       ? { [IDE_MCP_SERVER]: claudeIdeMcpServer(options.projectId) }
-      : undefined;
+      : {}),
+    ...(widgetsEnabled ? { [WIDGETS_MCP_SERVER]: claudeWidgetsMcpServer() } : {}),
+  };
   const base: Options = {
     cwd,
     abortController,
     env: claudeEnv(),
-    ...(ideMcp ? { mcpServers: ideMcp } : {}),
+    ...(Object.keys(extraMcp).length ? { mcpServers: extraMcp } : {}),
     includePartialMessages: true,
     // A background subagent streams no calls of its own: its progress arrives as these summaries.
     agentProgressSummaries: true,
     settingSources: ["user", "project", "local"],
     systemPrompt: await claudeSystemPrompt(options.features),
+    ...(widgetsEnabled ? { allowedTools: [`mcp__${WIDGETS_MCP_SERVER}__describe_widget`] } : {}),
     permissionMode: mode,
     // Files are backed up before the agent changes them, so a step can be taken back later.
     enableFileCheckpointing: true,

@@ -3,9 +3,13 @@ import { bars } from "../modules/agent-widgets/bars/index.ts";
 import { button } from "../modules/agent-widgets/button/index.ts";
 import { card } from "../modules/agent-widgets/card/index.ts";
 import { checks } from "../modules/agent-widgets/checks/index.ts";
+import { chips } from "../modules/agent-widgets/chips/index.ts";
 import { columns } from "../modules/agent-widgets/columns/index.ts";
 import { donut } from "../modules/agent-widgets/donut/index.ts";
 import { form } from "../modules/agent-widgets/form/index.ts";
+import { gitInfo } from "../modules/agent-widgets/git-info/index.ts";
+import { image } from "../modules/agent-widgets/image/index.ts";
+import { inlineIcon } from "../modules/agent-widgets/inline-icon/index.ts";
 import { input } from "../modules/agent-widgets/input/index.ts";
 import { line } from "../modules/agent-widgets/line/index.ts";
 import { row } from "../modules/agent-widgets/row/index.ts";
@@ -25,9 +29,13 @@ export function registerBuiltinWidgets(): void {
     button,
     card,
     checks,
+    chips,
     columns,
     donut,
     form,
+    gitInfo,
+    image,
+    inlineIcon,
     input,
     line,
     row,

@@ -24,6 +24,11 @@ export interface WidgetDefinition {
   slot?: string;
   /** Extra rules worth the agent's tokens (behaviour that is not obvious from the props). */
   notes?: string[];
+  /**
+   * Rare components stay in the guide as a name and a use case only. Their properties and example
+   * come from the `describe_widget` tool on demand, so a large catalogue does not tax every answer.
+   */
+  special?: boolean;
   /** A minimal working use, included in the guide and detailed description. */
   example: string;
 }
@@ -78,6 +83,8 @@ export interface WidgetCatalog {
   guide(): string;
   /** Everything about one component: props with types, notes and an example. */
   describe(name: string): string;
+  /** The same, but only for a special component; normal ones are already in the guide. */
+  describeSpecial(name: string): string;
 }
 
 export function createWidgetCatalog(): WidgetCatalog {
@@ -92,16 +99,31 @@ export function createWidgetCatalog(): WidgetCatalog {
       const sections = (Object.keys(GROUPS) as WidgetDefinition["group"][])
         .map((group) => {
           const lines = list()
-            .filter((definition) => definition.group === group)
+            .filter((definition) => definition.group === group && !definition.special)
             .flatMap((definition) => [...describeDefinition(definition), ""]);
           return lines.length ? `${GROUPS[group]}:\n${lines.join("\n")}` : "";
         })
         .filter(Boolean);
-      return [WIDGET_SYNTAX.join("\n"), ...sections].join("\n");
+      const special = list().filter((definition) => definition.special);
+      const onDemand = special.length
+        ? [
+            "Специальные виджеты:",
+            "Их свойства и примеры не загружены. Когда специальный виджет уместен, сначала вызови describe_widget с его именем; не угадывай свойства.",
+            ...special.map((definition) => `${definition.name} — ${definition.summary}`),
+          ].join("\n")
+        : "";
+      return [WIDGET_SYNTAX.join("\n"), ...sections, onDemand].filter(Boolean).join("\n");
     },
     describe(name) {
       const definition = items.get(name);
       if (!definition) return `Нет компонента ${name}`;
+      return describeDefinition(definition).join("\n");
+    },
+    describeSpecial(name) {
+      const definition = items.get(name);
+      if (!definition) throw new Error(`Нет компонента ${name}`);
+      if (!definition.special)
+        throw new Error(`Компонент ${name} не специальный: его описание уже есть в промпте`);
       return describeDefinition(definition).join("\n");
     },
   };
