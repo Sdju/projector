@@ -24,12 +24,17 @@ interface Preferences {
 
 export type AgentSessionMode = "tui" | "gui";
 /** Programs whose sessions can be shown as a chat; everything else is always a terminal. */
-export const GUI_AGENT_PROGRAMS: readonly string[] = ["claude", "codex", "opencode", "cursor"];
+export const GUI_AGENT_PROGRAMS: readonly string[] = [
+  "claude",
+  "codex",
+  "opencode",
+  "cursor",
+  "kimi",
+];
 /** Chat backends that can be switched off in the settings; the built-in agent always stays on. */
 export const TOGGLEABLE_AGENTS: readonly string[] = [
   "claude-code",
   "codex",
-  "kimi",
   "opencode",
   "cursor",
   "kimi",

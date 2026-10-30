@@ -1044,8 +1044,16 @@ test("agent session modes default to the terminal and persist only a GUI choice"
     expect((await preferences()).agentModes).toStrictEqual({ claude: "gui" });
     await setAgentMode("codex", "gui");
     expect((await preferences()).agentModes).toStrictEqual({ claude: "gui", codex: "gui" });
+    await setAgentMode("kimi", "gui");
+    expect((await preferences()).agentModes).toStrictEqual({
+      claude: "gui",
+      codex: "gui",
+      kimi: "gui",
+    });
     await expect(setAgentMode("shell", "gui")).rejects.toThrow(/графическ/);
     await setAgentMode("claude", "tui");
+    expect((await preferences()).agentModes).toStrictEqual({ codex: "gui", kimi: "gui" });
+    await setAgentMode("kimi", "tui");
     expect((await preferences()).agentModes).toStrictEqual({ codex: "gui" });
   } finally {
     if (previous === undefined) delete process.env.XDG_DATA_HOME;
