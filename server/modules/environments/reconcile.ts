@@ -39,8 +39,7 @@ export async function reconcileEnvironmentContainers(
       for (const line of stdout.split("\n")) {
         const [id, owner = ""] = line.trim().split(" ");
         if (!/^[a-f0-9]{12,64}$/.test(id ?? "")) continue;
-        if (owner === "")
-          orphans.push(id!); // created before owners were recorded
+        if (owner === "") orphans.push(id!); // created before owners were recorded
         else if ((await ownerAlive(owner)) === false) orphans.push(id!);
       }
       if (orphans.length) await run(["--context", context, "rm", "--force", ...orphans]);

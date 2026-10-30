@@ -80,7 +80,6 @@
     "@types/ws": "^8.18.2",
     "@vitejs/plugin-vue": "^6.0.9",
     "node-gyp": "^13.0.2",
-    "oxlint": "^1.86.0",
     "typescript": "~6.0.2",
     "unplugin-icons": "^24.0.0",
     "vite": "catalog:",
@@ -95,6 +94,6 @@
     }
   },
   "engines": {
-    "node": ">=24.0.0 <25"
+    "node": ">=24.11.0 <25"
   }
 }

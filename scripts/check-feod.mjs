@@ -1,5 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,12 +8,10 @@ import { createConfig } from "@o-feod/oxlint-structure-plugin/configs";
 import feodConfig from "../feod.config.mjs";
 
 const projectRoot = fileURLToPath(new URL("..", import.meta.url));
+// Run the Oxlint that Vite+ bundles, so the checker and `vp lint` never disagree on rules.
+const vitePlusRequire = createRequire(import.meta.resolve("vite-plus/package.json"));
 // The `.bin` shim is a shell script. Windows `spawn` reports ENOENT for it, so run the JS entry.
-const oxlintBin = join(
-  dirname(fileURLToPath(import.meta.resolve("oxlint/package.json"))),
-  "bin",
-  "oxlint",
-);
+const oxlintBin = join(dirname(vitePlusRequire.resolve("oxlint/package.json")), "bin", "oxlint");
 const plugin = fileURLToPath(import.meta.resolve("@o-feod/oxlint-structure-plugin"));
 
 /** Run only the FEOD rules over the configured roots; policy lives in feod.config.mjs. */
