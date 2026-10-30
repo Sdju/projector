@@ -10,6 +10,9 @@ import {
 } from "../src/modules/workspace-api/index.ts";
 import { useDirectoryWatch } from "../src/modules/workspace/modules/tree/lib/directory-watch.ts";
 import { useFileSync } from "../src/modules/workspace/lib/file-sync.ts";
+import { registerBuiltinClientAgents } from "../src/app/agents.ts";
+
+registerBuiltinClientAgents();
 
 function setup(profile) {
   vi.useFakeTimers();

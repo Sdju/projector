@@ -16,6 +16,9 @@ import {
   mutateWorkspaceBranch,
 } from "../src/modules/workspace-api/index.ts";
 import { isEditable, isMarkdown } from "../src/modules/workspace/open-file.ts";
+import { registerBuiltinClientAgents } from "../src/app/agents.ts";
+
+registerBuiltinClientAgents();
 
 test("GitHub authentication opens an empty workspace without local or remote data access", async () => {
   const projectId = "gh:/vuejs/core";

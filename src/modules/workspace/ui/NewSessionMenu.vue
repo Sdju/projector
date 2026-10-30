@@ -17,15 +17,9 @@ import {
 } from "../../agents-integration/status-bar/index.ts";
 import { useCompactViewport } from "../../../common/utilities/compact-viewport.ts";
 import IconPlus from "~icons/lucide/plus";
-import IconBot from "~icons/lucide/bot";
 import IconMessage from "~icons/lucide/message-square";
 import IconTerminal from "~icons/lucide/terminal";
-import IconCodex from "~icons/simple-icons/openai";
-import IconClaude from "~icons/simple-icons/claude";
-import { guiPrograms, useAgentModes } from "../../agent/index.ts";
-import IconOpenCode from "~icons/simple-icons/opencode";
-import IconCursor from "~icons/simple-icons/cursor";
-import IconKimi from "~icons/simple-icons/kimi";
+import { builtinAgent, guiAgents, guiCommand, hasGui, useAgentModes } from "../../agent/index.ts";
 
 /**
  * «+» с островом создания сессии: при открытии рамка охватывает кнопку, как у переключателя
@@ -33,29 +27,22 @@ import IconKimi from "~icons/simple-icons/kimi";
  */
 const props = defineProps<{ busy: boolean; agent?: boolean }>();
 const emit = defineEmits<{ command: [id: string, args?: unknown] }>();
-const programs = [
+const { modeOf, setMode, isEnabled } = useAgentModes();
+const programs = computed(() => [
   {
     program: "shell",
     title: "Shell",
     caption: "Пустой терминал в папке проекта",
     icon: IconTerminal,
   },
-  { program: "codex", title: "Codex", caption: "Запустит агента OpenAI Codex", icon: IconCodex },
-  {
-    program: "claude",
-    title: "Claude Code",
-    caption: "Запустит агента Anthropic",
-    icon: IconClaude,
-  },
-  {
-    program: "opencode",
-    title: "OpenCode",
-    caption: "Запустит агента OpenCode",
-    icon: IconOpenCode,
-  },
-  { program: "cursor", title: "Cursor", caption: "Запустит агента Cursor", icon: IconCursor },
-  { program: "kimi", title: "Kimi", caption: "Запустит агента Kimi Code", icon: IconKimi },
-];
+  ...guiAgents().map((agent) => ({
+    program: agent.program,
+    title: agent.title,
+    caption: agent.caption,
+    icon: agent.icon,
+  })),
+]);
+const builtin = builtinAgent();
 const menu = useIslandMenu({
   anchor: "left",
   initialFocus: ".row:not(:disabled)",
@@ -65,7 +52,7 @@ const menu = useIslandMenu({
 const { open, toggle, close, active } = menu;
 const listId = useId();
 const rows = computed(() =>
-  programs
+  programs.value
     .filter((entry) => entry.program === "shell" || isEnabled(entry.program))
     .map((entry) => {
       const usage = agentUsageSummary[entry.program];
@@ -76,9 +63,8 @@ const rows = computed(() =>
 /** The status bar is hidden on mobile, so the limits shown below are polled only while this menu is open. */
 const compact = useCompactViewport();
 
-const { modeOf, setMode, isEnabled } = useAgentModes();
 /** The chat view needs the agent feature; without it the terminal is the only option. */
-const hasGui = (program: string) => props.agent && !!guiPrograms[program];
+const canOpenChat = (program: string) => props.agent && hasGui(program);
 const toggleMode = (program: string) => setMode(program, modeOf(program) === "gui" ? "tui" : "gui");
 function openChat() {
   close();
@@ -87,7 +73,7 @@ function openChat() {
 function pick(program: string) {
   if (props.busy) return;
   close();
-  if (hasGui(program) && modeOf(program) === "gui") emit("command", guiPrograms[program]!.command);
+  if (canOpenChat(program) && modeOf(program) === "gui") emit("command", guiCommand(program));
   else emit("command", "ide.workbench.terminal.new", { program });
 }
 function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) {
@@ -102,7 +88,7 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
 </script>
 
 <template>
-  <span v-if="compact && open" hidden><AgentUsageIndicators /></span>
+  <span v-if="compact && open" hidden><AgentUsageIndicators :enabled="isEnabled" /></span>
   <span :ref="menu.trigger" class="new-session">
     <UiButton
       shape="icon"
@@ -129,8 +115,8 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
           :disabled="busy"
           :tabindex="index === active ? 0 : -1"
           :data-command="
-            hasGui(row.program) && modeOf(row.program) === 'gui'
-              ? guiPrograms[row.program]!.command
+            canOpenChat(row.program) && modeOf(row.program) === 'gui'
+              ? guiCommand(row.program)
               : 'ide.workbench.terminal.new'
           "
           @mousemove="active = index"
@@ -140,7 +126,7 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
           <UiActionCopy
             :title="row.title"
             :description="
-              hasGui(row.program) && modeOf(row.program) === 'gui'
+              canOpenChat(row.program) && modeOf(row.program) === 'gui'
                 ? 'Графический чат вместо терминала'
                 : row.caption
             "
@@ -150,7 +136,7 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
           >
         </UiActionRow>
         <button
-          v-if="hasGui(row.program)"
+          v-if="canOpenChat(row.program)"
           type="button"
           class="mode"
           :aria-pressed="modeOf(row.program) === 'gui'"
@@ -167,21 +153,18 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
         </button>
       </div>
     </UiStack>
-    <template v-if="agent">
-      <UiIslandLabel divided>Projector</UiIslandLabel>
+    <template v-if="agent && builtin">
+      <UiIslandLabel divided>{{ builtin.title }}</UiIslandLabel>
       <UiActionRow
         class="row"
         role="menuitem"
         data-command="ide.workbench.agent.open"
-        :tabindex="active === programs.length ? 0 : -1"
-        @mousemove="active = programs.length"
+        :tabindex="active === rows.length ? 0 : -1"
+        @mousemove="active = rows.length"
         @click="openChat"
       >
-        <IconBot class="row-icon" aria-hidden="true" />
-        <UiActionCopy
-          title="Чат с агентом"
-          description="Встроенный агент Projector, история разговоров"
-        />
+        <component :is="builtin.icon" class="row-icon" aria-hidden="true" />
+        <UiActionCopy :title="builtin.title" :description="builtin.caption" />
         <UiBadge
           v-if="providerBalanceSummary.text"
           class="hint"

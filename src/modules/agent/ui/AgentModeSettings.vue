@@ -5,7 +5,7 @@ import UiStack from "../../../common/ui/UiStack.vue";
 
 import UiField from "../../../common/ui/UiField.vue";
 import UiHint from "../../../common/ui/UiHint.vue";
-import { guiPrograms, useAgentModes, type AgentSessionMode } from "../model/modes.ts";
+import { guiAgents, useAgentModes, type AgentSessionMode } from "../model/modes.ts";
 
 const { modeOf, setMode, isEnabled, error } = useAgentModes();
 </script>
@@ -14,17 +14,19 @@ const { modeOf, setMode, isEnabled, error } = useAgentModes();
   <UiStack as="section" :gap="4">
     <UiField
       v-slot="{ control }"
-      v-for="(program, id) in guiPrograms"
-      v-show="isEnabled(id)"
-      :key="id"
-      :label="program.title"
+      v-for="agent in guiAgents()"
+      v-show="isEnabled(agent.program)"
+      :key="agent.program"
+      :label="agent.title"
     >
       <UiControl
         as="select"
         v-bind="control"
-        :aria-label="`Режим сессий ${program.title}`"
-        :value="modeOf(id)"
-        @change="setMode(id, ($event.target as HTMLSelectElement).value as AgentSessionMode)"
+        :aria-label="`Режим сессий ${agent.title}`"
+        :value="modeOf(agent.program)"
+        @change="
+          setMode(agent.program, ($event.target as HTMLSelectElement).value as AgentSessionMode)
+        "
       >
         <option value="tui">Терминал (TUI)</option>
         <option value="gui">Графический чат (GUI)</option>

@@ -12,6 +12,7 @@ import { KeybindingsEditor } from "../../ide/index.ts";
 import { LanInfoPanel } from "../../network/index.ts";
 import { DockerPanel } from "../../docker/index.ts";
 import { AgentChat, AgentJobTab, AgentTaskTab } from "../../agent/index.ts";
+import { clientAgents } from "../../agents-integration/catalog/index.ts";
 import { BrowserPanel } from "../../browser/index.ts";
 import {
   CommitOverview,
@@ -55,93 +56,96 @@ export interface TabHost {
   run(command: string, args?: unknown): void;
 }
 
-export const baseTabViews: TabViews = {
-  keybindings: { component: KeybindingsEditor, ownKeys: true, keepAlive: true },
-  network: { component: LanInfoPanel, ownKeys: true, keepAlive: true },
-  docker: { component: DockerPanel, keepAlive: true },
-  browser: {
-    component: BrowserPanel,
-    keepAlive: true,
-    ownKeys: true,
-    props: (tab, host) => ({
-      projectId: host.projectId,
-      url: tab.params?.url,
-      onNavigate: (url: string, title: string) => {
-        tab.params = { ...tab.params, url, title };
-        if (title) tab.path = title;
-      },
-    }),
-  },
-  agent: {
-    component: AgentChat,
-    keepAlive: true,
-    props: (tab, host) => ({ projectId: host.projectId, chatId: tab.params?.chatId }),
-  },
-  "agent-task": {
-    component: AgentTaskTab,
-    keepAlive: true,
-    props: (tab, host) => ({
-      projectId: host.projectId,
-      chat: tab.params?.chat,
-      task: tab.params?.task,
-    }),
-  },
-  "agent-job": {
-    component: AgentJobTab,
-    keepAlive: true,
-    props: (tab, host) => ({
-      projectId: host.projectId,
-      job: tab.params?.job,
-      onOpenFile: host.openFile,
-      onTitle: (title: string) => {
-        tab.path = title;
-      },
-    }),
-  },
-  claude: agentChat("claude-code"),
-  codex: agentChat("codex"),
-  opencode: agentChat("opencode"),
-  cursor: agentChat("cursor"),
-  kimi: agentChat("kimi"),
-  issue: {
-    component: IssueView,
-    keepAlive: true,
-    props: (tab, host) => ({
-      projectId: host.projectId,
-      number: tab.params?.number,
-      onOpen: host.openFile,
-    }),
-  },
-  pull: {
-    component: PullRequestView,
-    keepAlive: true,
-    props: (tab, host) => ({
-      projectId: host.projectId,
-      number: tab.params?.number,
-      onOpen: host.openFile,
-    }),
-  },
-  discussion: {
-    component: DiscussionView,
-    keepAlive: true,
-    props: (tab, host) => ({
-      projectId: host.projectId,
-      number: tab.params?.number,
-      onOpen: host.openFile,
-    }),
-  },
-  commit: {
-    component: CommitOverview,
-    keepAlive: true,
-    props: (tab, host) => ({
-      projectId: host.projectId,
-      hash: tab.params?.hash,
-      onOpenCommit: (hash: string) => host.openTab("commit", { hash }),
-      onOpenDiff: host.openCommitDiff,
-      onSubject: (text: string) => (tab.content = text),
-    }),
-  },
-};
+/** Base views of a workspace; agent chats come from the catalog registered before mounting. */
+export function baseTabViews(): TabViews {
+  return {
+    keybindings: { component: KeybindingsEditor, ownKeys: true, keepAlive: true },
+    network: { component: LanInfoPanel, ownKeys: true, keepAlive: true },
+    docker: { component: DockerPanel, keepAlive: true },
+    browser: {
+      component: BrowserPanel,
+      keepAlive: true,
+      ownKeys: true,
+      props: (tab, host) => ({
+        projectId: host.projectId,
+        url: tab.params?.url,
+        onNavigate: (url: string, title: string) => {
+          tab.params = { ...tab.params, url, title };
+          if (title) tab.path = title;
+        },
+      }),
+    },
+    agent: {
+      component: AgentChat,
+      keepAlive: true,
+      props: (tab, host) => ({ projectId: host.projectId, chatId: tab.params?.chatId }),
+    },
+    "agent-task": {
+      component: AgentTaskTab,
+      keepAlive: true,
+      props: (tab, host) => ({
+        projectId: host.projectId,
+        chat: tab.params?.chat,
+        task: tab.params?.task,
+      }),
+    },
+    "agent-job": {
+      component: AgentJobTab,
+      keepAlive: true,
+      props: (tab, host) => ({
+        projectId: host.projectId,
+        job: tab.params?.job,
+        onOpenFile: host.openFile,
+        onTitle: (title: string) => {
+          tab.path = title;
+        },
+      }),
+    },
+    ...Object.fromEntries(
+      clientAgents()
+        .filter((agent) => !agent.builtin)
+        .map((agent) => [agent.program, agentChat(agent.backend)]),
+    ),
+    issue: {
+      component: IssueView,
+      keepAlive: true,
+      props: (tab, host) => ({
+        projectId: host.projectId,
+        number: tab.params?.number,
+        onOpen: host.openFile,
+      }),
+    },
+    pull: {
+      component: PullRequestView,
+      keepAlive: true,
+      props: (tab, host) => ({
+        projectId: host.projectId,
+        number: tab.params?.number,
+        onOpen: host.openFile,
+      }),
+    },
+    discussion: {
+      component: DiscussionView,
+      keepAlive: true,
+      props: (tab, host) => ({
+        projectId: host.projectId,
+        number: tab.params?.number,
+        onOpen: host.openFile,
+      }),
+    },
+    commit: {
+      component: CommitOverview,
+      keepAlive: true,
+      props: (tab, host) => ({
+        projectId: host.projectId,
+        hash: tab.params?.hash,
+        onOpenCommit: (hash: string) => host.openTab("commit", { hash }),
+        onOpenDiff: host.openCommitDiff,
+        onSubject: (text: string) => (tab.content = text),
+      }),
+    },
+  };
+}
 
 interface WorkspaceTabs {
   types: TabRegistry;
@@ -158,7 +162,7 @@ export function useWorkspaceTabTypes(
   behaviors: Record<string, TabBehavior> = {},
 ) {
   const types = createTabRegistry(baseTabTypes, profile.tabs);
-  provide(workspaceTabsKey, { types, views: { ...baseTabViews, ...views } });
+  provide(workspaceTabsKey, { types, views: { ...baseTabViews(), ...views } });
   const detach = Object.entries(behaviors).map(([id, behavior]) => types.behave(id, behavior));
   onBeforeUnmount(() => detach.forEach((fn) => fn()));
   return types;

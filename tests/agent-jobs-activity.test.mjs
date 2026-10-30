@@ -2,6 +2,9 @@ import { expect, test } from "vite-plus/test";
 import { jobItems } from "../src/modules/agent/model/activity.ts";
 import { jobTurn } from "../src/modules/agent/model/job-turn.ts";
 import { canContinueInChat } from "../src/modules/agent/model/job-continue.ts";
+import { registerBuiltinClientAgents } from "../src/app/agents.ts";
+
+registerBuiltinClientAgents();
 
 const job = (id, status, extra = {}) => ({
   id,

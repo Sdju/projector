@@ -61,20 +61,9 @@ const BASELINE = new Map([
   ["core/modules/os/modules/windows/kimi.ts", ["kimi"]],
   ["core/modules/os/modules/windows/opencode.ts", ["opencode"]],
   ["core/modules/os/session-env.ts", ["claude"]],
-  ["src/modules/agent/lib/job-labels.ts", ["claude", "codex", "kimi", "opencode", "cursor"]],
   ["src/modules/agent/model/agent-commands.ts", ["claude"]],
-  ["src/modules/agent/model/job-commands.ts", ["claude", "codex", "kimi", "opencode", "cursor"]],
-  ["src/modules/agent/model/modes.ts", ["claude", "codex", "kimi", "opencode", "cursor"]],
-  ["src/modules/agent/model/types.ts", ["claude", "codex", "kimi", "opencode", "cursor"]],
-  ["src/modules/agent/ui/AgentIntegrationsSettings.vue", ["claude", "codex", "kimi", "opencode"]],
   ["src/modules/agent/ui/AgentSkillsSettings.vue", ["claude"]],
   ["src/modules/app-settings/sections.ts", ["claude", "codex", "kimi", "opencode"]],
-  ["src/modules/workspace-api/local.ts", ["claude", "codex", "kimi", "opencode", "cursor"]],
-  ["src/modules/workspace/lib/tab-views.ts", ["claude", "codex", "kimi", "opencode", "cursor"]],
-  [
-    "src/modules/workspace/ui/NewSessionMenu.vue",
-    ["claude", "codex", "kimi", "opencode", "cursor"],
-  ],
 ]);
 
 const ROOT = new URL("..", import.meta.url);

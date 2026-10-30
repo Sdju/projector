@@ -6,11 +6,13 @@ import UiInline from "../../../common/ui/UiInline.vue";
 import UiField from "../../../common/ui/UiField.vue";
 import UiHint from "../../../common/ui/UiHint.vue";
 import { ref } from "vue";
-import { guiPrograms, programBackend, useAgentModes } from "../model/modes.ts";
+import { guiAgents, hasGui, useAgentModes } from "../model/modes.ts";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 
 const { isEnabled, setEnabled, error } = useAgentModes();
 const busy = ref("");
+const programs = () => guiAgents().map((agent) => agent.program);
+const titles = () => guiAgents().map((agent) => agent.title);
 const commands = useCommandScope("agentIntegrations:settings", () => ({
   surface: "agentIntegrationsSettings",
   busy: busy.value,
@@ -19,30 +21,28 @@ commands.scope.registerCommand({
   id: "ide.agent.integrations.list",
   palette: false,
   title: "Список интеграций агентов",
-  description:
-    "Возвращает адаптеры агентов (Claude Code, Codex, OpenCode, Cursor, Kimi) с состоянием «включён/выключен».",
+  description: `Возвращает адаптеры агентов (${titles().join(", ")}) с состоянием «включён/выключен».`,
   run: () =>
-    Object.entries(guiPrograms).map(([program, item]) => ({
-      program,
-      backend: programBackend(program),
-      title: item.title,
-      enabled: isEnabled(program),
+    guiAgents().map((agent) => ({
+      program: agent.program,
+      backend: agent.backend,
+      title: agent.title,
+      enabled: isEnabled(agent.program),
     })),
 });
 commands.scope.registerCommand({
   id: "ide.agent.integrations.set",
   title: "Включить или выключить интеграцию агента",
-  description:
-    "Включает или выключает адаптер агента: claude, codex, opencode, cursor или kimi. Отключённый агент скрывается из меню сессий и статусной строки, а его запуск отклоняется.",
+  description: `Включает или выключает адаптер агента: ${programs().join(", ")}. Отключённый агент скрывается из меню сессий и статусной строки, а его запуск отклоняется.`,
   arguments: {
-    program: "string: claude, codex, opencode, cursor или kimi",
+    program: `string: ${programs().join(", ")}`,
     enabled: "boolean: включён ли агент",
   },
   enabled: () => !busy.value,
   run: async (value) => {
     const { program, enabled } = commandArgs(value);
-    if (typeof program !== "string" || !guiPrograms[program])
-      throw new Error("program: claude, codex, opencode, cursor или kimi");
+    if (typeof program !== "string" || !hasGui(program))
+      throw new Error(`program: ${programs().join(", ")}`);
     if (typeof enabled !== "boolean") throw new Error("enabled должен быть boolean");
     busy.value = program;
     try {
@@ -63,14 +63,14 @@ function toggle(program: string, event: Event) {
 
 <template>
   <UiStack as="section" :gap="4" @pointerdown="commands.scope.activate()">
-    <UiField v-for="(program, id) in guiPrograms" :key="id" :label="program.title">
+    <UiField v-for="agent in guiAgents()" :key="agent.program" :label="agent.title">
       <UiInline as="label" justify="normal">
         <UiControl
           type="checkbox"
-          :checked="isEnabled(id)"
-          :disabled="busy === id"
-          :aria-label="`Интеграция ${program.title}`"
-          @change="toggle(id, $event)"
+          :checked="isEnabled(agent.program)"
+          :disabled="busy === agent.program"
+          :aria-label="`Интеграция ${agent.title}`"
+          @change="toggle(agent.program, $event)"
         />
         включён
       </UiInline>

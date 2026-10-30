@@ -1,4 +1,5 @@
 import type { AgentJobStatus } from "../api/jobs.ts";
+import { clientAgentByBackend } from "../../agents-integration/catalog/index.ts";
 import { formatElapsed } from "./elapsed.ts";
 
 export const jobStatusLabel: Record<AgentJobStatus, string> = {
@@ -10,14 +11,11 @@ export const jobStatusLabel: Record<AgentJobStatus, string> = {
   stopped: "Остановлено",
 };
 
-/** The name of the chat tab (`ide.workbench.<name>.open`) of each external agent. */
-export const jobChatTab: Record<string, string> = {
-  "claude-code": "claude",
-  codex: "codex",
-  opencode: "opencode",
-  cursor: "cursor",
-  kimi: "kimi",
-};
+/** The terminal program whose chat tab (`ide.workbench.<program>.open`) holds this backend. */
+export function jobChatTab(backend: string): string | undefined {
+  const agent = clientAgentByBackend(backend);
+  return agent && !agent.builtin ? agent.program : undefined;
+}
 
 export function jobDuration(
   start: number | undefined,

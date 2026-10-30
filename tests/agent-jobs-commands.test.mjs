@@ -1,5 +1,8 @@
 import { afterEach, expect, test, vi } from "vite-plus/test";
+import { registerBuiltinClientAgents } from "../src/app/agents.ts";
 import { registerJobCommands } from "../src/modules/agent/model/job-commands.ts";
+
+registerBuiltinClientAgents();
 
 const commands = new Map();
 const opened = [];

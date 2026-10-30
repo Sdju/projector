@@ -1,33 +1,34 @@
 import { computed, reactive } from "vue";
+import {
+  clientAgentByBackend,
+  clientAgentOf,
+  clientAgents,
+  type ClientAgent,
+} from "../../agents-integration/catalog/index.ts";
 
 export type AgentSessionMode = "tui" | "gui";
 
-/** Terminal programs with a graphical chat and the IDE command that opens it. */
-export const guiPrograms: Record<string, { title: string; command: string }> = {
-  claude: { title: "Claude Code", command: "ide.workbench.claude.open" },
-  codex: { title: "Codex", command: "ide.workbench.codex.open" },
-  opencode: { title: "OpenCode", command: "ide.workbench.opencode.open" },
-  cursor: { title: "Cursor", command: "ide.workbench.cursor.open" },
-  kimi: { title: "Kimi", command: "ide.workbench.kimi.open" },
-};
+/** External agents that have a graphical chat, in catalog order. */
+export const guiAgents = (): ClientAgent[] => clientAgents().filter((agent) => !agent.builtin);
 
-/** Chat header and welcome copy for each backend. */
-const agentLabels: Record<string, string> = {
-  projector: "Projector",
-  "claude-code": "Claude Code",
-  codex: "Codex",
-  opencode: "OpenCode",
-  cursor: "Cursor",
-  kimi: "Kimi",
-};
+/** The IDE command that opens the graphical chat of a terminal program. */
+export const guiCommand = (program: string): string => `ide.workbench.${program}.open`;
 
+/** Whether a terminal program has a graphical chat of its own. */
+export const hasGui = (program: string): boolean => !!clientAgentOf(program);
+
+/** The built-in Projector agent, if it is registered. */
+export const builtinAgent = (): ClientAgent | undefined =>
+  clientAgents().find((agent) => agent.builtin);
+
+/** Chat header and welcome copy for a backend. */
 export function agentLabel(backend: string | undefined): string {
-  return agentLabels[backend ?? "projector"] ?? "Агент";
+  return clientAgentByBackend(backend ?? "projector")?.title ?? "Агент";
 }
 
 const state = reactive({
   modes: {} as Record<string, AgentSessionMode>,
-  /** Chat backends switched off in the settings, by backend id (`claude-code`, `codex`, …). */
+  /** Chat backends switched off in the settings, by backend id. */
   disabled: [] as string[],
   loaded: false,
   error: "",
@@ -46,10 +47,6 @@ async function request(init?: RequestInit): Promise<void> {
   state.loaded = true;
 }
 
-/** The chat backend behind a terminal program; only Claude Code's names differ. */
-export const programBackend = (program: string): string =>
-  program === "claude" ? "claude-code" : program;
-
 /** How new agent sessions open. The default is the terminal; the choice is stored on disk. */
 export function useAgentModes() {
   loading ??= request().catch((error) => {
@@ -57,7 +54,7 @@ export function useAgentModes() {
     loading = undefined;
   });
   const modeOf = (program: string): AgentSessionMode =>
-    guiPrograms[program] && state.modes[program] === "gui" ? "gui" : "tui";
+    hasGui(program) && state.modes[program] === "gui" ? "gui" : "tui";
   async function setMode(program: string, mode: AgentSessionMode): Promise<void> {
     const previous = state.modes[program];
     state.modes = { ...state.modes, [program]: mode };
@@ -70,10 +67,12 @@ export function useAgentModes() {
     }
   }
   /** A program without a chat of its own (Shell) is always enabled. */
-  const isEnabled = (program: string): boolean =>
-    !guiPrograms[program] || !state.disabled.includes(programBackend(program));
+  const isEnabled = (program: string): boolean => {
+    const backend = clientAgentOf(program)?.backend;
+    return !backend || !state.disabled.includes(backend);
+  };
   async function setEnabled(program: string, enabled: boolean): Promise<void> {
-    const backend = programBackend(program);
+    const backend = clientAgentOf(program)?.backend ?? program;
     const previous = state.disabled;
     state.disabled = enabled
       ? previous.filter((id) => id !== backend)

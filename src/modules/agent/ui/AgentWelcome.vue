@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import UiButton from "../../../common/ui/UiButton.vue";
 import { computed } from "vue";
-import { guiPrograms, useAgentModes } from "../model/modes.ts";
+import { guiAgents, useAgentModes } from "../model/modes.ts";
 withDefaults(defineProps<{ plain?: boolean; agentName?: string }>(), {
   plain: false,
   agentName: "Агент",
 });
 const emit = defineEmits<{ suggest: [text: string]; open: [program: string] }>();
 const { isEnabled } = useAgentModes();
-const coders = computed(() => Object.entries(guiPrograms).filter(([id]) => isEnabled(id)));
+const coders = computed(() => guiAgents().filter((agent) => isEnabled(agent.program)));
 const suggestions = [
   {
     title: "Разобраться в проекте",
@@ -51,12 +51,12 @@ const suggestions = [
           appearance="outline"
           tone="muted"
           shape="pill"
-          v-for="[id, program] in coders"
-          :key="id"
+          v-for="agent in coders"
+          :key="agent.program"
           type="button"
-          @click="emit('open', id)"
+          @click="emit('open', agent.program)"
         >
-          {{ program.title }}
+          {{ agent.title }}
         </UiButton>
       </div>
     </div>

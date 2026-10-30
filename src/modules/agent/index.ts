@@ -4,7 +4,14 @@ export { default as AgentJobTab } from "./ui/AgentJobTab.vue";
 export { requestChatTab, requestJobTab } from "./model/job-open.ts";
 export { projectInitPrompt } from "./lib/init-prompt.ts";
 export { useAgent } from "./model/session.ts";
-export { useAgentModes, guiPrograms } from "./model/modes.ts";
+export {
+  useAgentModes,
+  guiAgents,
+  guiCommand,
+  hasGui,
+  builtinAgent,
+  agentLabel,
+} from "./model/modes.ts";
 export type { AgentSessionMode } from "./model/modes.ts";
 export { default as AgentModeSettings } from "./ui/AgentModeSettings.vue";
 export { default as AgentIntegrationsSettings } from "./ui/AgentIntegrationsSettings.vue";

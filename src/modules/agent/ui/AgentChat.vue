@@ -5,7 +5,7 @@ import { useIdeCommands } from "../../ide/index.ts";
 import { workspaceRequest } from "../../workspace-api/index.ts";
 import { AgentFeaturesIsland } from "../../agent-features/index.ts";
 import { agentCommandHandler } from "../model/commands.ts";
-import { agentLabel, guiPrograms } from "../model/modes.ts";
+import { agentLabel, guiCommand } from "../model/modes.ts";
 import { chatDropHandlers } from "../lib/chat-drop.ts";
 import { useChatBranch } from "../model/chat-branch.ts";
 import { useChatReadout } from "../model/chat-readout.ts";
@@ -139,9 +139,9 @@ const {
   },
 });
 // Opening a chat is a workspace command, not one of this chat's own.
-function openCoder(program: string) {
+function openAgent(program: string) {
   void api
-    .executeCommand(guiPrograms[program]!.command, undefined, {
+    .executeCommand(guiCommand(program), undefined, {
       scope: `editor:${props.projectId}`,
     })
     .catch((cause) => {
@@ -586,7 +586,7 @@ onBeforeUnmount(() => {
         :plain="plain"
         :agent-name="agentName"
         @suggest="suggest"
-        @open="openCoder"
+        @open="openAgent"
       />
       <div
         v-else

@@ -1,4 +1,6 @@
 import { newId } from "../../common/utilities/new-id.ts";
+import type { ClientAgent } from "../agents-integration/catalog/index.ts";
+import { clientAgents } from "../agents-integration/catalog/index.ts";
 import type { FileWrite, GitWrite, WorkspaceProfile } from "./profile.ts";
 import { defineTab, singletonTab } from "./tabs.ts";
 import { localWorkspaceWatch } from "./local-watch.ts";
@@ -17,7 +19,8 @@ async function send(url: string, method: string, body: unknown, failure: string)
 }
 
 /** A plain coding agent behind a chat instead of the TUI; every opening is a new conversation. */
-function agentChatTab(program: string, label: string, description: string) {
+function agentChatTab(agent: ClientAgent) {
+  const { program, title: label } = agent;
   return defineTab<{ chatId?: string; title?: string }>({
     id: program,
     key: (params) => `${program}:${params.chatId ?? "main"}`,
@@ -27,7 +30,7 @@ function agentChatTab(program: string, label: string, description: string) {
     command: {
       id: `ide.workbench.${program}.open`,
       title: `Новая сессия ${label} (GUI)`,
-      description,
+      description: `Открывает вкладку с ${label} в графическом чате вместо терминала: отдельный диалог в папке проекта, запросы разрешений в чате.`,
       requires: "agent",
       optional: {
         chatId: "Идентификатор уже открытого чата: вкладка этого чата получает фокус",
@@ -72,31 +75,9 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
         },
       }),
       // Plain coding agents behind a chat instead of the TUI; every opening is a new conversation.
-      agentChatTab(
-        "claude",
-        "Claude Code",
-        "Открывает вкладку с Claude Code в графическом чате вместо терминала: отдельный диалог в папке проекта, запросы разрешений в чате.",
-      ),
-      agentChatTab(
-        "codex",
-        "Codex",
-        "Открывает вкладку с Codex в графическом чате вместо терминала: отдельный диалог в папке проекта, запросы разрешений в чате.",
-      ),
-      agentChatTab(
-        "opencode",
-        "OpenCode",
-        "Открывает вкладку с OpenCode в графическом чате вместо терминала: отдельный диалог в папке проекта, запросы разрешений в чате.",
-      ),
-      agentChatTab(
-        "cursor",
-        "Cursor",
-        "Открывает вкладку с Cursor в графическом чате вместо терминала: отдельный диалог в папке проекта, запросы разрешений в чате.",
-      ),
-      agentChatTab(
-        "kimi",
-        "Kimi",
-        "Открывает вкладку с Kimi Code в графическом чате вместо терминала: отдельный диалог в папке проекта, запросы разрешений в чате.",
-      ),
+      ...clientAgents()
+        .filter((agent) => !agent.builtin)
+        .map(agentChatTab),
       // A subagent or background command of a chat, followed in its own tab (read-only).
       defineTab<{ chat: string; task: string; title?: string }>({
         id: "agent-task",

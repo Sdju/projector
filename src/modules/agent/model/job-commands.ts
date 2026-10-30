@@ -10,22 +10,28 @@ import {
   type AgentJobView,
 } from "../api/jobs.ts";
 import { useIdeCommands } from "../../ide/index.ts";
+import {
+  clientAgentByBackend,
+  clientAgentOf,
+  clientAgents,
+} from "../../agents-integration/catalog/index.ts";
 import { useJobTabRequests } from "./job-open.ts";
 import type { RegisterCommand } from "./register-command.ts";
-import type { AgentBackendId } from "./types.ts";
 
 /** What a command returns of the answer: enough to judge it, the rest is in the job's tab. */
 const RESULT_CHARS = 8000;
 const WAIT_LIMIT = 45;
 
-const AGENTS: Record<string, AgentBackendId> = {
-  claude: "claude-code",
-  "claude-code": "claude-code",
-  codex: "codex",
-  opencode: "opencode",
-  cursor: "cursor",
-  kimi: "kimi",
-};
+/** External agents the catalog knows: only they can run as background jobs. */
+const externalAgents = () => clientAgents().filter((agent) => !agent.builtin);
+const agentTitles = () =>
+  externalAgents()
+    .map((agent) => agent.title)
+    .join(", ");
+const agentIds = () =>
+  externalAgents()
+    .map((agent) => agent.backend)
+    .join(", ");
 
 const JOB = "Идентификатор задания из ide.agent.jobs.list или ide.agent.job.start";
 
@@ -82,11 +88,12 @@ export function registerJobCommands(
     "Запустить фонового агента",
     async (args) => {
       const options = commandArgs(args);
-      const agent = AGENTS[text(options, "agent").toLowerCase()];
-      if (!agent) throw new Error("agent: claude-code, codex, opencode, cursor или kimi");
+      const name = text(options, "agent").toLowerCase();
+      const agent = clientAgentByBackend(name) ?? clientAgentOf(name);
+      if (!agent || agent.builtin) throw new Error(`agent: ${agentIds()}`);
       const job = await startJob({
         projectId,
-        backend: agent,
+        backend: agent.backend,
         task: text(options, "task"),
         isolate: options.isolate === true,
         mode: typeof options.mode === "string" ? options.mode : undefined,
@@ -96,10 +103,9 @@ export function registerJobCommands(
     () => true,
     undefined,
     {
-      description:
-        "Запускает фонового агента (Claude Code, Codex, OpenCode, Cursor или Kimi) с заданием в проекте: сервер ведёт его сам, вкладка чата не нужна, прогресс виден в острове активности. Возвращает идентификатор задания. Запросы разрешений и вопросы агента приходят как состояние needs-user и ждут ответа (ide.agent.job.answer). Одновременно работает не больше 4 заданий. С isolate: true агент работает в изолированной git-копии проекта (слияние только по просьбе пользователя). Код пишут фоновые агенты, не вы: поручайте им работу, потом проверяйте результат через ide.agent.job.result и git diff.",
+      description: `Запускает фонового агента (${agentTitles()}) с заданием в проекте: сервер ведёт его сам, вкладка чата не нужна, прогресс виден в острове активности. Возвращает идентификатор задания. Запросы разрешений и вопросы агента приходят как состояние needs-user и ждут ответа (ide.agent.job.answer). Одновременно работает не больше 4 заданий. С isolate: true агент работает в изолированной git-копии проекта (слияние только по просьбе пользователя). Код пишут фоновые агенты, не вы: поручайте им работу, потом проверяйте результат через ide.agent.job.result и git diff.`,
       arguments: {
-        agent: "claude-code, codex, opencode, cursor или kimi",
+        agent: agentIds(),
         task: "Полное задание агенту: цель, файлы, критерии готовности",
         isolate:
           "true — работать в изолированной копии проекта (для независимых задач, которые идут параллельно)",

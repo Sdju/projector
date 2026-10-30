@@ -9,7 +9,7 @@ interface Commands {
 /** A job can continue in a chat when it kept a session and worked in the project itself. */
 export function canContinueInChat(job: AgentJobView): boolean {
   // A session of an isolated copy belongs to the copy's folder, which the chat does not search.
-  return !!job.sessionId && !job.worktree && job.backend in jobChatTab;
+  return !!job.sessionId && !job.worktree && !!jobChatTab(job.backend);
 }
 
 /**
@@ -18,8 +18,10 @@ export function canContinueInChat(job: AgentJobView): boolean {
  */
 export async function continueJobInChat(api: Commands, job: AgentJobView): Promise<void> {
   if (!canContinueInChat(job)) throw new Error("Это задание нельзя продолжить в чате");
+  const tab = jobChatTab(job.backend);
+  if (!tab) throw new Error("Это задание нельзя продолжить в чате");
   const known = new Set(chatsOf(job.projectId).map((chat) => chat.key));
-  await api.executeCommand(`ide.workbench.${jobChatTab[job.backend]}.open`, undefined, {
+  await api.executeCommand(`ide.workbench.${tab}.open`, undefined, {
     scope: `editor:${job.projectId}`,
   });
   const deadline = Date.now() + 5000;

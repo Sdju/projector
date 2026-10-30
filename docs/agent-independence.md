@@ -83,7 +83,7 @@
 
 **Делаем.**
 
-1. Новый модуль `src/modules/agents-integration/catalog.ts`:
+1. Новый модуль `src/modules/agents-integration/catalog/index.ts` (публичный вход подмодуля, как требует FEOD):
 
    ```ts
    export interface ClientAgent {
@@ -221,8 +221,8 @@ vp test run tests/agent-independence.test.mjs tests/agent.test.mjs \
 - [x] `tests/agent-independence.test.mjs` существует и зелёный.
 - [x] Реестр умеет перечислять агентов; `/api/agent/backends` отдаёт каталог.
 - [x] `features.ts` и `preferences.ts` не содержат имён агентов.
-- [ ] Клиентский каталог в `src/modules/agents-integration/catalog.ts` заполняется из `src/app/agents.ts`.
+- [x] Клиентский каталог в `src/modules/agents-integration/catalog/index.ts` заполняется из `src/app/agents.ts`.
 - [ ] Терминал, `core/modules/ide` и `core/modules/os` не содержат имён агентов.
 - [ ] В общем коде нет `backend === "<agent>"`.
-- [ ] Новый агент добавляется новым модулем и одной строкой регистрации на сервере и на клиенте.
+- [x] Новый агент добавляется новым модулем и одной строкой регистрации на сервере и на клиенте.
 - [ ] Ошибки и промпты не перечисляют агентов вручную.

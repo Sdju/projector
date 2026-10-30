@@ -1,21 +1,21 @@
 <script setup lang="ts">
-import { CodexUsageIndicator } from "../codex/index.ts";
-import { OpenCodeUsageIndicator } from "../opencode/index.ts";
-import { ClaudeUsageIndicator } from "../claude/index.ts";
-import { CursorUsageIndicator } from "../cursor/index.ts";
-import { KimiUsageIndicator } from "../kimi/index.ts";
+import { computed } from "vue";
 import { ProviderBalanceIndicator } from "../provider/index.ts";
-import { useAgentModes } from "../../agent/index.ts";
+import { clientAgents } from "../catalog/index.ts";
 
-// Агенты, отключённые в настройках, не показывают лимиты и не опрашивают сервисы.
-const { isEnabled } = useAgentModes();
+// Агенты, отключённые в настройках, не показывают лимиты и не опрашивают сервисы: владелец
+// статусной строки передаёт проверку, чтобы композиция интеграций не зависела от модуля чата.
+const props = defineProps<{ enabled?: (program: string) => boolean }>();
+const agents = computed(() =>
+  clientAgents().flatMap((agent) =>
+    agent.usage && (props.enabled?.(agent.program) ?? true)
+      ? [{ ...agent, usage: agent.usage }]
+      : [],
+  ),
+);
 </script>
 
 <template>
-  <CodexUsageIndicator v-if="isEnabled('codex')" />
-  <OpenCodeUsageIndicator v-if="isEnabled('opencode')" />
-  <ClaudeUsageIndicator v-if="isEnabled('claude')" />
-  <CursorUsageIndicator v-if="isEnabled('cursor')" />
-  <KimiUsageIndicator v-if="isEnabled('kimi')" />
+  <component v-for="agent in agents" :key="agent.backend" :is="agent.usage" />
   <ProviderBalanceIndicator />
 </template>

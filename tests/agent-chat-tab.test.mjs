@@ -1,5 +1,8 @@
 import { expect, test } from "vite-plus/test";
+import { registerBuiltinClientAgents } from "../src/app/agents.ts";
 import { chatTabCommand } from "../src/modules/agent/lib/chat-tab.ts";
+
+registerBuiltinClientAgents();
 
 test("a chat key names the tab command and chat of an external agent", () => {
   expect(chatTabCommand("p1", "claude-code:p1:abc-1")).toEqual({

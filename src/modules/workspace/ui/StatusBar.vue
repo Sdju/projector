@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { AgentUsageIndicators } from "../../agents-integration/status-bar/index.ts";
+import { useAgentModes } from "../../agent/index.ts";
+
+const { isEnabled } = useAgentModes();
 </script>
 
 <template>
   <footer class="status-bar">
     <span class="status-spacer" />
-    <AgentUsageIndicators />
+    <AgentUsageIndicators :enabled="isEnabled" />
   </footer>
 </template>
 
