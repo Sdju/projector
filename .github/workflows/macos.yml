@@ -31,11 +31,8 @@ jobs:
         run: vp install --frozen-lockfile
       - name: Architecture
         run: vp run architecture
-      - name: Build vio
-        working-directory: packages/vio
-        run: vp exec tsdown
       - name: Tests
         timeout-minutes: 15
         run: vp test run
       - name: Real GTK widgets
-        run: vp run vio:gtk-test
+        run: vp run test:gtk

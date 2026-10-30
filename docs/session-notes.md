@@ -13,7 +13,6 @@
 | `native/app/entry.ts`, `native/modules/desktop`                                                                                   | Запуск desktop через OS-адаптер, Vue/GTK-палитра и контроллер                                                                                                                              |
 | `core/modules/os`, закрытые `modules/linux`, `modules/windows`, `modules/darwin`; `core/modules/os-posix`                         | Выбор ОС, каталоги, процессы, утилиты; Linux: X11, GIO, D-Bus, трей; Windows: Win32, меню Пуск, трей, хоткей; macOS: `ps`/`lsof`, Keychain, Swift-помощник                                 |
 | `core/modules/launcher`                                                                                                           | Общие контракты, HTTP-клиент и модель поведения DOM/GTK-палитры                                                                                                                            |
-| `packages/vio`                                                                                                                    | Независимый Vue renderer для GTK4, SFC loader, стили и demo                                                                                                                                |
 | `server/modules/processes`, `server/modules/terminal`, `server/modules/terminal-control`                                          | Процессы проектов, PTY, WebSocket экрана и управления сессиями                                                                                                                             |
 | `src/modules/terminal`                                                                                                            | Список сессий (`useTerminalSessions`), `TerminalView` — один xterm на видимую вкладку, транспорт через SharedWorker (`lib/shared.worker.ts`, `lib/socket.ts`), клавиатура, IME             |
 | `src/modules/dock`                                                                                                                | Раскладка блоков: чистая модель дерева (`model/layout.ts`), разделители, группы вкладок, drag-and-drop                                                                                     |
@@ -24,16 +23,15 @@
 | `server/modules/access`, `server/modules/network`                                                                                 | LAN-режим, пароль, сессии и ограничения локального доступа; проверка региона для лимитов агентов                                                                                           |
 | `core/modules/ide`, `src/modules/ide`                                                                                             | Реестр IDE-команд и привязок клавиш: ядро и браузерный хост                                                                                                                                |
 
-Обычный запуск поднимает `vp dev`; `projector mode prod` переключает на собственный Node-сервер по `dist` (`server/app/standalone.ts`; выбор режима — `core/modules/server-mode`, переключение — `cli/app/launch.mjs`). Сборка проверяет типы и собирает фронтенд и `vio`, но не упаковывает desktop-продукт. Projector имеет собственный Git-корень; перед коммитом проверяйте текущий diff, поскольку другие сессии могут работать в том же checkout.
+Обычный запуск поднимает `vp dev`; `projector mode prod` переключает на собственный Node-сервер по `dist` (`server/app/standalone.ts`; выбор режима — `core/modules/server-mode`, переключение — `cli/app/launch.mjs`). Сборка проверяет типы и собирает фронтенд, но не упаковывает desktop-продукт. Renderer `@zede/vio` устанавливается готовым из npm. Projector имеет собственный Git-корень; перед коммитом проверяйте текущий diff, поскольку другие сессии могут работать в том же checkout.
 
 ## Native и vio
 
 GTK работает отдельным Node-процессом. На Linux resident владеет D-Bus именем `dev.projector.Launcher`, интерфейсом `dev.projector.Launcher.Control` на `/dev/projector/Launcher`; GLib MainLoop обслуживает окно, трей и хоткей. На Windows тот же процесс слушает именованный канал `dev.projector.Launcher`, а трей и хоткей держит скрытое окно Win32. На macOS команды идут по Unix-сокету `launcher.sock` в каталоге данных, а меню в строке меню и хоткей обслуживает Swift-помощник. `vp dev` и prod-сервер поднимают этот процесс при старте, без показа палитры. Сервер ждёт `READY` до двадцати секунд.
 
-Native не имеет HMR. После изменений пересоберите `vio`, если менялся renderer, и перезапустите только native:
+Native не имеет HMR. После изменений палитры или обновления зависимости `@zede/vio` перезапустите только native:
 
 ```bash
-vp run vio:build
 node --import @zede/vio/register native/app/entry.ts native http://localhost:4177 quit
 ./bin/projector --native
 ```
@@ -83,7 +81,7 @@ node --import @zede/vio/register native/app/entry.ts native http://localhost:417
 
 Не меняйте текущий профиль браузера ради тестов. Для изоляции используйте временный XDG-каталог в `/tmp`.
 
-`vp run check` включает архитектуру, тесты, типы и сборку. Vitest по умолчанию использует два worker-процесса: браузерные тесты дополнительно запускают Vite и Chromium. Для точечной проверки достаточно `vp test run tests/<имя>.test.mjs`; `--maxWorkers=1` оставляет один worker. Браузерные фикстуры ждут явный результат `PASS`/`FAIL` через CDP и не запускают проверку FEOD всего репозитория. `vp run vio:gtk-test` отдельно проверяет настоящие GTK-виджеты. Для затронутой области запускайте соответствующие тесты из `tests/`; они не заменяют проверку реального фокуса, трея, хоткея и событий мыши.
+`vp run check` включает архитектуру, тесты, типы и сборку. Vitest по умолчанию использует два worker-процесса: браузерные тесты дополнительно запускают Vite и Chromium. Для точечной проверки достаточно `vp test run tests/<имя>.test.mjs`; `--maxWorkers=1` оставляет один worker. Браузерные фикстуры ждут явный результат `PASS`/`FAIL` через CDP и не запускают проверку FEOD всего репозитория. `vp run test:gtk` отдельно проверяет палитру Projector с настоящими GTK-виджетами и внешним `@zede/vio`. Тесты renderer/compiler находятся в [репозитории vio](https://github.com/Sdju/vio). Для затронутой области запускайте соответствующие тесты из `tests/`; они не заменяют проверку реального фокуса, трея, хоткея и событий мыши.
 
 Перед GUI-проверкой проверяйте `/api/health` и `/api/status`, затем состояние терминалов на странице проекта. В браузерных инструментах обязательны актуальный `pageId` и свежий snapshot после навигации/HMR. API/PTY-тесты требуют локальных сокетов, GTK — display; `EPERM` сначала отличайте от дефекта приложения.
 

@@ -145,5 +145,5 @@ projector quit       # завершить Projector и запущенные им
 
 [Правила участия](CONTRIBUTING.md), [UI-кит](docs/ui-kit.md), [изменения в выпусках](CHANGELOG.md).
 Projector распространяется по лицензии [MIT](LICENSE). Лицензии включённых
-иконок приведены в [NOTICE](public/file-icons/NOTICE.md); пакет `vio` содержит
-свой [LICENSE](packages/vio/LICENSE).
+иконок приведены в [NOTICE](public/file-icons/NOTICE.md); внешний пакет `@zede/vio` распространяется
+по собственной [лицензии MIT](https://github.com/Sdju/vio/blob/main/packages/vio/LICENSE).

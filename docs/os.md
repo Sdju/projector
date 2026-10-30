@@ -73,7 +73,7 @@ node cli/app/import-companion-key.mjs /path/to/providers.json
 - **Данные** — `~/Library/Application Support` (с приоритетом `XDG_DATA_HOME`); `moveNoReplace` — атомарное «занять и переименовать» вместо GNU `mv`.
 - **Окна** — `open -na <Chromium-браузер> --args --app=…`; фокус окна по классу недоступен. Выбор папки — `osascript`.
 - **Ввод в CI:** хоткей и меню проверяются настоящими HID-событиями (`CGEvent`): нажатие `Ctrl+Alt+Space`, клик по значку, реальный указатель наводится на каждую из четырёх строк меню и кликает по ней (проверяются подсветка и событие строки). Окно GTK-палитры проверяется по `CGWindowListCopyWindowInfo`: показ, скрытие `toggle` (с учётом автоскрытия при потере фокуса) и повторный показ. Тест лаунчера работает с `.app`: скрытыми считаются бандлы с `LSUIElement`/`LSBackgroundOnly`, а запуск подтверждается скриптом внутри бандла.
-- **Проверка** — `.github/workflows/macos.yml` (`macos-15`, Homebrew GTK4): архитектура, `vp test run` (включая `tests/macos-adapter.test.mjs`: каталог, процессы, резидент с GTK-палитрой, меню/хоткей помощника, окно Chromium) и `vio:gtk-test`.
+- **Проверка** — `.github/workflows/macos.yml` (`macos-15`, Homebrew GTK4): архитектура, `vp test run` (включая `tests/macos-adapter.test.mjs`: каталог, процессы, резидент с GTK-палитрой, меню/хоткей помощника, окно Chromium) и `test:gtk`.
 
 ## Windows: как устроено и что не поддерживается
 

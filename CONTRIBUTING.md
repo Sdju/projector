@@ -7,7 +7,7 @@
 ```bash
 vp install --frozen-lockfile
 vp run check
-vp run vio:gtk-test
+vp run test:gtk
 ```
 
 Последняя команда требует доступного display. В CI она запускается через Xvfb.

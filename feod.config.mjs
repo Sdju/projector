@@ -50,8 +50,6 @@ export default {
       "public/**",
       "resources/**",
       "dist/**",
-      "packages/vio/tests/**",
-      "packages/vio/dist/**",
       "**/*.config.*",
       "feod.config.mjs",
     ],
@@ -94,7 +92,5 @@ export default {
       extra: { confine: [...nodeOnly, ...adapters] },
     },
     cli: { layers: libraryLayers, dependencies: ["core"] },
-    "packages/vio/src": { layers: libraryLayers },
-    "packages/vio/examples/counter": {},
   },
 };

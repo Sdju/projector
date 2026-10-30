@@ -101,7 +101,6 @@ export default defineConfig({
       "vite-plus/prefer-vite-plus-imports": "error",
       ...(feodLint.rules as Record<string, "error" | "warn" | "off" | [string, object]>),
     },
-    ignorePatterns: ["packages/vio/examples/**"],
     options: { typeAware: true, typeCheck: true },
   },
 });

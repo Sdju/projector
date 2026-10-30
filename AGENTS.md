@@ -30,7 +30,7 @@ vp run build
 
 ```bash
 vp run check         # архитектура, тесты, типы и сборка
-vp run vio:gtk-test  # реальные GTK-виджеты; нужен display
+vp run test:gtk  # реальные GTK-виджеты; нужен display
 ```
 
 ## Документация
@@ -46,4 +46,4 @@ vp run vio:gtk-test  # реальные GTK-виджеты; нужен display
 - [Возможности агентов](docs/agent-features.md): остров в табе агента, умолчания в настройках, выдача виджетов Claude Code, Codex, OpenCode, Cursor и Kimi.
 - [Независимость от агентов](docs/architecture.md#агенты-чата-и-их-особенности): реестр и клиентский каталог вместо перечислений в терминале, настройках, OS-адаптере и клиенте; инварианты и страж `tests/agent-independence.test.mjs`.
 - [Форки чатов](docs/chat-forks.md): ветка от сообщения в новую вкладку, индекс недавних чатов и возврат закрытых вкладок.
-- [SDK команд IDE](docs/ide-commands.md), [темы иконок](docs/file-icons.md), [renderer vio](packages/vio/README.md).
+- [SDK команд IDE](docs/ide-commands.md), [темы иконок](docs/file-icons.md), [renderer vio](https://github.com/Sdju/vio/blob/main/packages/vio/README.md).

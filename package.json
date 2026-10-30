@@ -15,14 +15,10 @@
   "type": "module",
   "scripts": {
     "dev": "vp dev",
-    "build": "vp run architecture && vp run gtk:types && vp run vio:build && vue-tsc --noEmit && vp build",
+    "build": "vp run architecture && vp run gtk:types && vue-tsc --noEmit && vp build",
     "preview": "node server/app/standalone.ts",
     "gtk:types": "node scripts/gtk-types.mjs",
-    "test": "vp run architecture && vp run vio:test && vp test run",
-    "vio:build": "vp run --filter @zede/vio build",
-    "vio:test": "vp run --filter @zede/vio test",
-    "vio:demo": "vp run --filter @zede/vio demo",
-    "vio:gtk-test": "vp run --filter @zede/vio test:gtk",
+    "test": "vp run architecture && vp test run",
     "architecture": "node scripts/check-feod.mjs",
     "test:docker": "vp test run tests/docker.test.mjs",
     "test:file-icons": "vp test run tests/file-icons.test.mjs",
@@ -30,7 +26,8 @@
     "test:tree": "vp test run tests/tree-page.test.mjs tests/tree-pagination.test.mjs",
     "test:live": "PROJECTOR_TEST_DOCKER=1 PROJECTOR_TEST_DEVCONTAINER=1 vp test run --no-file-parallelism tests/environment-live.test.mjs tests/reconcile.test.mjs tests/devcontainer-live.test.mjs tests/sigkill-live.test.mjs",
     "check": "vp run test && vp run build",
-    "prepare": "vp hooks enable"
+    "prepare": "vp hooks enable",
+    "test:gtk": "node --import @zede/vio/register tests/native-palette.gtk.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.54",
@@ -56,7 +53,7 @@
     "@xterm/addon-web-links": "^0.12.0",
     "@xterm/headless": "^6.0.0",
     "@xterm/xterm": "^6.0.0",
-    "@zede/vio": "workspace:*",
+    "@zede/vio": "0.7.1",
     "ai": "^7.0.112",
     "dbus-next": "0.10.2",
     "dompurify": "^3.4.16",

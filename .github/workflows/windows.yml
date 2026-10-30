@@ -31,9 +31,6 @@ jobs:
         run: vp install --frozen-lockfile
       - name: Architecture
         run: vp run architecture
-      - name: Build vio
-        working-directory: packages/vio
-        run: vp exec tsdown
       - name: Tests
         timeout-minutes: 15
         run: vp test run
