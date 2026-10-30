@@ -11,6 +11,9 @@ import {
 } from "../api/client.ts";
 import { addVersion } from "./branches.ts";
 import { chatHistory } from "./chat-state.ts";
+import { chatKeyOf } from "./chat-key.ts";
+import { useChatView } from "./chat-view.ts";
+import { takeDraft } from "./drafts.ts";
 import { useChatActions } from "./chat-actions.ts";
 import {
   notifyAnswer,
@@ -53,41 +56,29 @@ export function useAgent(
 ) {
   const backend = options.backend ?? "projector";
   const own = backend === "projector" && !options.chatId;
-  const key = own ? projectId : `${backend}:${projectId}:${options.chatId ?? "main"}`;
+  const key = own ? projectId : chatKeyOf(backend, projectId, options.chatId ?? "main");
   clearTimeout(releases.get(key));
   releases.delete(key);
-  if (!sessions.has(key)) sessions.set(key, createState());
+  if (!sessions.has(key)) {
+    sessions.set(key, createState());
+    // A forked chat starts with the question its branch replaced; it was parked before the tab opened.
+    const draft = takeDraft(key);
+    const created = sessions.get(key)!;
+    if (draft) {
+      created.draft = draft.text;
+      created.draftParts = draft.parts;
+    }
+  }
   const state = sessions.get(key)!;
 
   const historyUrl = `/api/agent/history/${encodeURIComponent(key || "catalog")}`;
   if (!loads.has(key)) loads.set(key, loadHistory(historyUrl, state));
   const ready = loads.get(key)!;
-  const persist = () => saveChat(key, historyUrl, state);
+  const persist = () =>
+    saveChat(key, historyUrl, state, projectId ? { project: projectId, backend } : undefined);
   const catalog = useProjects();
-  const draftParts = computed({
-    get: () => state.draftParts,
-    set: (value) => {
-      state.draftParts = value;
-    },
-  });
-  const draft = computed({
-    get: () => state.draft,
-    set: (value: string) => {
-      state.draft = value;
-    },
-  });
-  const busy = computed(() => state.busy);
-  const loading = computed(() => state.loading);
-  const error = computed({
-    get: () => state.error,
-    set: (value: string) => {
-      state.error = value;
-    },
-  });
-  const phase = computed(() => state.phase);
-  const permissions = computed(() => state.permissions);
-  const questions = computed(() => state.questions);
-  const secrets = computed(() => state.secrets);
+  const { draftParts, draft, busy, loading, error, phase, permissions, questions, secrets } =
+    useChatView(state);
 
   const {
     controls,
@@ -97,6 +88,10 @@ export function useAgent(
     loadCommands,
     setControl,
     loadSessions,
+    loadRecent,
+    recent,
+    recentLoading,
+    recentError,
     changeSession,
     resumeSession,
     removeSession,
@@ -363,11 +358,15 @@ export function useAgent(
     sessions: sessionList,
     sessionsLoading: computed(() => state.sessionsLoading),
     sessionsError: computed(() => state.sessionsError),
+    recent,
+    recentLoading,
+    recentError,
     loadControls,
     loadCommands,
     commands: computed(() => state.commands),
     setControl,
     loadSessions,
+    loadRecent,
     changeSession,
     resumeSession,
     removeSession,

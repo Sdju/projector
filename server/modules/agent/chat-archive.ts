@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 import {
+  chatMetaOf,
+  chatTitle,
   deleteHistory,
   historyDatabase,
   loadHistory,
   saveHistory,
-  type HistoryTurn,
 } from "./history-store.ts";
 import { readAgentHistory, writeAgentHistory } from "./history.ts";
 
@@ -27,15 +28,6 @@ interface Row {
   pinned: number;
 }
 
-/** The first thing the user said: what the chat was about. */
-function titleOf(turns: HistoryTurn[]): string {
-  const first = turns.find((turn) => (turn as { role?: string }).role === "user") as
-    | { text?: string }
-    | undefined;
-  const text = (first?.text ?? "").replace(/\s+/g, " ").trim();
-  return text.length > 80 ? `${text.slice(0, 79)}…` : text || "Без названия";
-}
-
 export function listArchivedChats(scope: string): ArchivedChat[] {
   const rows = historyDatabase()
     .prepare(
@@ -56,12 +48,17 @@ export async function archiveLiveChat(scope: string): Promise<string | undefined
   if (!turns.length) return undefined;
   const id = randomUUID();
   const db = historyDatabase();
+  const meta = chatMetaOf(scope);
   saveHistory(archiveKey(id), turns);
-  db.prepare("INSERT INTO archives (id, scope, title, updated, pinned) VALUES (?, ?, ?, ?, 0)").run(
+  db.prepare(
+    "INSERT INTO archives (id, scope, title, updated, pinned, project, backend) VALUES (?, ?, ?, ?, 0, ?, ?)",
+  ).run(
     id,
     scope,
-    titleOf(turns),
+    meta?.title || chatTitle(turns),
     new Date().toISOString(),
+    meta?.project ?? "",
+    meta?.backend ?? "",
   );
   const extra = db
     .prepare(
@@ -69,20 +66,25 @@ export async function archiveLiveChat(scope: string): Promise<string | undefined
     )
     .all(scope, KEEP) as unknown as { id: string }[];
   for (const row of extra) removeArchivedChat(row.id);
-  await writeAgentHistory(scope, []);
+  // The live chat is empty now: it should not linger in the project's list of chats.
+  await writeAgentHistory(scope, [], meta);
   return id;
 }
 
 /** Makes an archived chat the live one (the one that was live is put aside) and returns it. */
 export async function openArchivedChat(scope: string, id: string) {
   const row = historyDatabase()
-    .prepare("SELECT id FROM archives WHERE id = ? AND scope = ?")
-    .get(id, scope);
+    .prepare("SELECT id, title, project, backend FROM archives WHERE id = ? AND scope = ?")
+    .get(id, scope) as { id: string; title: string; project: string; backend: string } | undefined;
   const turns = row ? loadHistory(archiveKey(id)) : undefined;
-  if (!turns) throw new Error("Чат не найден");
+  if (!row || !turns) throw new Error("Чат не найден");
   await archiveLiveChat(scope);
   removeArchivedChat(id);
-  return writeAgentHistory(scope, turns);
+  const index =
+    row.project && row.backend
+      ? { project: row.project, backend: row.backend, title: row.title }
+      : undefined;
+  return writeAgentHistory(scope, turns, index);
 }
 
 export function renameArchivedChat(id: string, change: { title?: string; pinned?: boolean }) {

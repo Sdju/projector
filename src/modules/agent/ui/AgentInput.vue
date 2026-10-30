@@ -214,6 +214,11 @@ function commit(state: EditorState) {
   parts.value = next;
 }
 
+function draftContent(text: string): readonly MessagePart[] {
+  if (parts.value.length && messageText(parts.value).trim() === text.trim()) return parts.value;
+  return text ? [{ type: "text", text }] : [];
+}
+
 onMounted(() => {
   void loadRoot();
   const submit = () => {
@@ -305,9 +310,7 @@ onMounted(() => {
   });
   view.value = editor;
   // A chat shown again keeps the unsent message: with chips if they are still known.
-  if (parts.value.length && messageText(parts.value) === draft.value)
-    setContent(editor, parts.value);
-  else if (draft.value) setContent(editor, [{ type: "text", text: draft.value }]);
+  if (draft.value || parts.value.length) setContent(editor, draftContent(draft.value));
 });
 onBeforeUnmount(() => {
   search?.abort();
@@ -318,8 +321,9 @@ onBeforeUnmount(() => {
 // The chat sets the draft too (a suggestion, an emptied field after sending): that text wins.
 watch(draft, (value) => {
   const target = view.value;
-  if (!target || value === messageText(contentOf(target.state))) return;
-  setContent(target, value ? [{ type: "text", text: value }] : []);
+  const current = target ? messageText(contentOf(target.state)) : "";
+  if (!target || value === current || (value && value === current.trim())) return;
+  setContent(target, draftContent(value));
 });
 
 function acceptsDrag(data: DataTransfer | null): data is DataTransfer {

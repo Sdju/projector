@@ -66,10 +66,19 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
   const historyMatch = path.match(/^\/api\/agent\/history\/([^/]+)$/);
   if (historyMatch && (method === "GET" || method === "PUT")) {
     const id = decodeURIComponent(historyMatch[1]!);
-    const turns =
-      method === "GET"
-        ? await readAgentHistory(id)
-        : await writeAgentHistory(id, (await readBody(req)).turns);
+    let turns;
+    if (method === "GET") turns = await readAgentHistory(id);
+    else {
+      const body = await readBody(req);
+      const project = asString(body.projectId);
+      const backend = asString(body.backend);
+      const title = asString(body.title);
+      turns = await writeAgentHistory(
+        id,
+        body.turns,
+        project && backend ? { project, backend, ...(title ? { title } : {}) } : undefined,
+      );
+    }
     json(res, 200, { turns });
     return true;
   }

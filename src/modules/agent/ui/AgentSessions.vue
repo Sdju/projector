@@ -5,7 +5,7 @@ import UiInline from "../../../common/ui/UiInline.vue";
 import UiControl, { type UiControlHandle } from "../../../common/ui/UiControl.vue";
 import { computed, nextTick, ref, watch } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
-import type { AgentSessionInfo } from "../model/types.ts";
+import type { AgentRecentChat, AgentSessionInfo } from "../model/types.ts";
 import IconHistory from "~icons/lucide/history";
 import IconPin from "~icons/lucide/pin";
 import IconPencil from "~icons/lucide/pencil";
@@ -24,12 +24,17 @@ const props = defineProps<{
   deletable?: boolean;
   /** What the list is called: past sessions of an agent, or the chat history. */
   label?: string;
+  /** Chats of the project kept on disk, including closed tabs. */
+  recent?: AgentRecentChat[];
+  recentLoading?: boolean;
+  recentError?: string;
 }>();
 const emit = defineEmits<{
   open: [];
   pick: [id: string];
   change: [id: string, change: { title?: string; pinned?: boolean }];
   remove: [id: string];
+  openRecent: [chat: string, title: string];
 }>();
 const menu = useIslandMenu({
   anchor: "right",
@@ -47,6 +52,12 @@ const visible = computed(() => {
   return needle
     ? props.sessions.filter((item) => item.title.toLocaleLowerCase().includes(needle))
     : props.sessions;
+});
+/** The project's chats the search leaves; the current one is filtered out by the chat itself. */
+const recentVisible = computed(() => {
+  const list = props.recent ?? [];
+  const needle = search.value.trim().toLocaleLowerCase();
+  return needle ? list.filter((item) => item.title.toLocaleLowerCase().includes(needle)) : list;
 });
 let renameRow: HTMLElement | undefined;
 function startRename(session: AgentSessionInfo, event: MouseEvent) {
@@ -86,6 +97,11 @@ function remove(id: string) {
 function pick(id: string) {
   menu.close();
   emit("pick", id);
+}
+/** A chat of the project opens in its tab; one already open gets the focus. */
+function pickRecent(chat: string, title: string) {
+  menu.close();
+  emit("openRecent", chat, title);
 }
 watch(shown, (open) => {
   if (open) {
@@ -135,7 +151,7 @@ function age(value?: string): string {
     </UiButton>
     <UiIsland :menu="menu" :label="label ?? 'Прошлые сессии'" :width="320">
       <UiControl
-        v-if="sessions.length > 4"
+        v-if="sessions.length + (recent?.length ?? 0) > 4"
         ref="searchInput"
         v-model="search"
         class="search"
@@ -145,10 +161,12 @@ function age(value?: string): string {
       />
       <p v-if="loading" class="note">Загружаю…</p>
       <p v-else-if="error" class="note error" role="alert">{{ error }}</p>
-      <p v-else-if="!sessions.length" class="note">
+      <p v-else-if="!sessions.length && !recent?.length && !recentLoading" class="note">
         {{ label ? "Прошлых чатов пока нет" : "В этой папке пока нет сессий" }}
       </p>
-      <p v-else-if="!visible.length" class="note">Ничего не найдено</p>
+      <p v-else-if="!visible.length && !recentVisible.length && !recentLoading" class="note">
+        Ничего не найдено
+      </p>
       <UiInline
         v-for="session in visible"
         :key="session.id"
@@ -222,6 +240,29 @@ function age(value?: string): string {
           </button>
         </UiInline>
       </UiInline>
+      <p v-if="recentLoading" class="note">Загружаю недавние чаты…</p>
+      <p v-else-if="recentError" class="note error" role="alert">{{ recentError }}</p>
+      <template v-if="recentVisible.length">
+        <p class="group">Недавние чаты</p>
+        <UiInline
+          v-for="chat in recentVisible"
+          :key="chat.chat"
+          class="row"
+          :gap="0.5"
+          justify="normal"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            class="item"
+            :title="chat.title"
+            @click="pickRecent(chat.chat, chat.title)"
+          >
+            <span class="title u-truncate">{{ chat.title }}</span>
+            <span class="age">{{ age(chat.updatedAt) }}</span>
+          </button>
+        </UiInline>
+      </template>
     </UiIsland>
   </div>
 </template>
@@ -238,6 +279,13 @@ function age(value?: string): string {
 }
 .note.error {
   color: var(--warn);
+}
+.group {
+  margin: 4px 0 0;
+  padding: 6px 10px 2px;
+  border-top: 1px solid var(--line);
+  color: var(--faint);
+  font-size: var(--fs-2xs);
 }
 .item {
   display: flex;

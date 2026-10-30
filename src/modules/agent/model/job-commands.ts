@@ -11,7 +11,7 @@ import {
 } from "../api/jobs.ts";
 import { useIdeCommands } from "../../ide/index.ts";
 import { useJobTabRequests } from "./job-open.ts";
-import type { RegisterCommand } from "./agent-commands.ts";
+import type { RegisterCommand } from "./register-command.ts";
 import type { AgentBackendId } from "./types.ts";
 
 /** What a command returns of the answer: enough to judge it, the rest is in the job's tab. */

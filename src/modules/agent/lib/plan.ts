@@ -33,3 +33,19 @@ export function latestPlan(turn: AgentTurn | undefined): PlanItem[] {
     return [];
   }
 }
+
+/**
+ * The plan the chat pins: the last answer's list while it has unfinished items, or the latest one
+ * that still does; a finished plan shows only for the answer that finished it.
+ */
+export function shownPlan(turns: AgentTurn[]): PlanItem[] {
+  const answers = turns.filter((turn) => turn.role === "assistant");
+  for (const turn of answers.toReversed()) {
+    const items = latestPlan(turn);
+    if (!items.length) continue;
+    return turn === answers.at(-1) || items.some((item) => item.status !== "completed")
+      ? items
+      : [];
+  }
+  return [];
+}

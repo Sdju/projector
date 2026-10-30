@@ -1,4 +1,4 @@
-import type { AgentTurn } from "./types.ts";
+import type { AgentTurn, MessagePart } from "./types.ts";
 
 /** The most other versions of a conversation a message keeps. */
 const MAX_VARIANTS = 20;
@@ -50,4 +50,54 @@ export function switchVersion(turns: AgentTurn[], index: number, target: number)
   chosen[0]!.slot = target;
   turns.push(...chosen);
   return true;
+}
+
+/** Where a fork starts: before a question, or after the answer it got. */
+export type ForkMode = "before" | "after";
+
+export interface ForkSlice {
+  /** The turns the new chat starts with, cloned so nothing is shared with the original. */
+  turns: AgentTurn[];
+  /** What the new chat's input starts with: the question a «before» fork replaces. */
+  draft?: { text: string; parts: MessagePart[] };
+}
+
+/** A plain copy: chat state is reactive, and a proxy cannot be cloned by `structuredClone`. */
+function copy<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+/**
+ * The part of the conversation a new chat starts with. «Before» a user message copies everything
+ * earlier and gives the message back as a draft; «after» an answer (or the answer to a question)
+ * copies it too, so the next message continues the branch.
+ */
+export function forkAt(turns: AgentTurn[], id: string, mode: ForkMode): ForkSlice | undefined {
+  const index = turns.findIndex((turn) => turn.id === id);
+  if (index < 0) return undefined;
+  const head = turns[index]!;
+  let end = index;
+  if (mode === "before") {
+    if (head.role !== "user") return undefined;
+    end = index - 1;
+  } else if (head.role === "user") {
+    // «After a question» means after its answer; a question still waiting has nothing to continue.
+    if (turns[index + 1]?.role !== "assistant") return undefined;
+    end = index + 1;
+  }
+  const copied = copy(turns.slice(0, end + 1));
+  for (const turn of copied) {
+    // A fork is a new line: live processes and the versions of the original do not carry over.
+    turn.run = undefined;
+    turn.variants = undefined;
+    turn.slot = undefined;
+    for (const task of turn.tasks ?? [])
+      if (task.status === "running") {
+        task.status = "stopped";
+        task.summary ??= "Ветка отделена: задача осталась в исходном чате";
+      }
+  }
+  const draft =
+    mode === "before" ? { text: head.text, parts: copy(head.content ?? []) } : undefined;
+  return { turns: copied, draft };
 }

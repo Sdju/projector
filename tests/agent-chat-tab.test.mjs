@@ -10,6 +10,10 @@ test("a chat key names the tab command and chat of an external agent", () => {
     command: "ide.workbench.agent.open",
     args: { chatId: "xyz" },
   });
+  expect(chatTabCommand("p1", "projector:p1:xyz", "Ветка · тест")).toEqual({
+    command: "ide.workbench.agent.open",
+    args: { chatId: "xyz", title: "Ветка · тест" },
+  });
 });
 
 test("the project's own conversation and foreign keys have no tab to show", () => {

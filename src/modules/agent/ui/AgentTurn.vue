@@ -3,7 +3,7 @@ import UiInline from "../../../common/ui/UiInline.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { computed } from "vue";
 import { chipIcon, chipLabel, chipTitle } from "../lib/composer/chips.ts";
-import { versionsOf } from "../model/branches.ts";
+import { versionsOf, type ForkMode } from "../model/branches.ts";
 import { legacyParts } from "../model/turn-events.ts";
 import type {
   AgentToolChip,
@@ -22,6 +22,7 @@ import IconCheck from "~icons/lucide/check";
 import IconPencil from "~icons/lucide/pencil";
 import IconUndo from "~icons/lucide/undo-2";
 import IconRefresh from "~icons/lucide/refresh-cw";
+import IconGitFork from "~icons/lucide/git-fork";
 import IconPrev from "~icons/lucide/chevron-left";
 import IconNext from "~icons/lucide/chevron-right";
 
@@ -47,6 +48,8 @@ const emit = defineEmits<{
   edit: [id: string];
   rewind: [id: string];
   retry: [id: string];
+  /** A new chat from this point: before a question (with it in the input) or after an answer. */
+  fork: [id: string, mode: ForkMode];
   continue: [];
   version: [id: string, target: number];
   openFile: [path: string];
@@ -186,6 +189,17 @@ const waiting = computed(() => {
         >
           <IconUndo aria-hidden="true" />
         </UiButton>
+        <UiButton
+          shape="icon"
+          size="sm"
+          class="turn-action"
+          title="Ответвить в новый чат: копия разговора до этого сообщения, текст останется в поле ввода"
+          aria-label="Ответвить в новый чат"
+          :disabled="busy"
+          @click="emit('fork', turn.id, 'before')"
+        >
+          <IconGitFork aria-hidden="true" />
+        </UiButton>
       </UiInline>
       <p class="user-message">
         <template v-if="turn.content?.length">
@@ -258,6 +272,17 @@ const waiting = computed(() => {
         justify="normal"
         class="turn-footer"
       >
+        <UiButton
+          shape="icon"
+          size="sm"
+          class="copy-button"
+          title="Продолжить в новом чате: копия разговора до этого ответа"
+          aria-label="Продолжить в новом чате"
+          :disabled="busy"
+          @click="emit('fork', turn.id, 'after')"
+        >
+          <IconGitFork aria-hidden="true" />
+        </UiButton>
         <UiButton
           shape="icon"
           size="sm"

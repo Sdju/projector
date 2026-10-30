@@ -3,9 +3,15 @@ import { queued, saves, type ChatState } from "./chat-state.ts";
 
 /**
  * Saves the chat to the server. Events arrive far faster than a save takes: saves queued behind
- * the running one collapse into a single request carrying the newest state.
+ * the running one collapse into a single request carrying the newest state. The project and agent
+ * name the chat in the project's list of chats.
  */
-export function saveChat(key: string, url: string, state: ChatState) {
+export function saveChat(
+  key: string,
+  url: string,
+  state: ChatState,
+  index?: { project: string; backend: string },
+) {
   if (queued.has(key)) return;
   queued.add(key);
   const saving = (saves.get(key) ?? Promise.resolve())
@@ -15,7 +21,10 @@ export function saveChat(key: string, url: string, state: ChatState) {
       const response = await fetch(url, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ turns: state.turns }),
+        body: JSON.stringify({
+          turns: state.turns,
+          ...(index ? { projectId: index.project, backend: index.backend } : {}),
+        }),
       });
       if (!response.ok) {
         const detail = await response.json().then(

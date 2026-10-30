@@ -2,6 +2,7 @@ import {
   archiveLiveChat,
   listArchivedChats,
   openArchivedChat,
+  readRecentChats,
   removeArchivedChat,
   renameArchivedChat,
 } from "../../modules/agent/index.ts";
@@ -14,6 +15,12 @@ import type { RouteContext } from "../../modules/transport/index.ts";
 export async function handleAgentChats({ req, res, url, method, path }: RouteContext) {
   if (path === "/api/agent/chats" && method === "GET") {
     json(res, 200, { chats: listArchivedChats(url.searchParams.get("key") ?? "") });
+    return true;
+  }
+  if (path === "/api/agent/chats/recent" && method === "GET") {
+    const project = url.searchParams.get("projectId") ?? "";
+    const backend = url.searchParams.get("backend") || undefined;
+    json(res, 200, { chats: readRecentChats(project, backend) });
     return true;
   }
   if (!path.startsWith("/api/agent/chats/") || method !== "POST") return false;

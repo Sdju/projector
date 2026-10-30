@@ -1,6 +1,6 @@
 import { commandArgs } from "../../../common/utilities/commands.ts";
 import { chatsOf, resolveChat } from "./chat-registry.ts";
-import type { RegisterCommand } from "./agent-commands.ts";
+import type { RegisterCommand } from "./register-command.ts";
 
 /** The commands for subagents and background commands of the open chats of a project. */
 export function registerTaskCommands(register: RegisterCommand, projectId: string): void {

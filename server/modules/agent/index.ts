@@ -85,7 +85,14 @@ export {
 } from "./command-bridge.ts";
 export { readAttachment, saveAttachment } from "./attachments.ts";
 export { readAgentHistory, writeAgentHistory } from "./history.ts";
-export { closeHistoryStore } from "./history-store.ts";
+export {
+  chatMetaOf,
+  chatTitle,
+  closeHistoryStore,
+  readRecentChats,
+  type ChatIndex,
+  type RecentChat,
+} from "./history-store.ts";
 export {
   archiveLiveChat,
   listArchivedChats,

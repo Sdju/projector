@@ -9,10 +9,23 @@ import {
   saveDefault,
 } from "../api/client.ts";
 import { deleteSession, updateSession } from "../api/sessions.ts";
-import { archiveChat, deleteChat, fetchChats, openChat, updateChat } from "../api/chats.ts";
+import {
+  archiveChat,
+  deleteChat,
+  fetchChats,
+  fetchRecentChats,
+  openChat,
+  updateChat,
+} from "../api/chats.ts";
 import { saves, type ChatState } from "./chat-state.ts";
 import { requestChatTab } from "./job-open.ts";
-import type { AgentBackendId, AgentControl, AgentSelection, AgentSessionInfo } from "./types.ts";
+import type {
+  AgentBackendId,
+  AgentControl,
+  AgentRecentChat,
+  AgentSelection,
+  AgentSessionInfo,
+} from "./types.ts";
 
 /** The saved choice per agent is read once; new chats start from it. */
 let defaultsLoad: Promise<Record<string, AgentSelection>> | undefined;
@@ -108,6 +121,24 @@ export function useExternalAgent(
       state.sessionsLoading = false;
     }
     return state.sessions;
+  }
+
+  /** Chats of the project kept on disk (including closed tabs), newest first. */
+  async function loadRecent(): Promise<AgentRecentChat[]> {
+    if (!projectId) {
+      state.recent = [];
+      return [];
+    }
+    state.recentLoading = true;
+    try {
+      state.recent = await fetchRecentChats(projectId, backend);
+      state.recentError = "";
+    } catch (err) {
+      state.recentError = err instanceof Error ? err.message : "Не удалось получить недавние чаты";
+    } finally {
+      state.recentLoading = false;
+    }
+    return state.recent;
   }
 
   /** Renames a past session or pins it; the list is read again to show the result. */
@@ -216,6 +247,10 @@ export function useExternalAgent(
     loadCommands,
     setControl,
     loadSessions,
+    loadRecent,
+    recent: computed(() => state.recent),
+    recentLoading: computed(() => state.recentLoading),
+    recentError: computed(() => state.recentError),
     changeSession,
     resumeSession,
     removeSession,

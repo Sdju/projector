@@ -100,7 +100,7 @@ const CHANGING = new Set(
   ),
 );
 const LOOKING = new Set(
-  "read result list get info search refresh describe status find more filter open toggle focus show copy".split(
+  "read result list get info search refresh describe status find more filter open toggle focus show copy recent".split(
     " ",
   ),
 );

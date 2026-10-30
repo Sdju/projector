@@ -12,6 +12,21 @@ export interface HistoryTurn {
   slot?: number;
 }
 
+/** Where a live chat belongs: what its index entry is grouped by. */
+export interface ChatIndex {
+  project: string;
+  backend: string;
+  title?: string;
+}
+
+/** A chat of the project, open in a tab or closed but still on disk. */
+export interface RecentChat {
+  chat: string;
+  backend: string;
+  title: string;
+  updatedAt: string;
+}
+
 const ROOT = "";
 
 /**
@@ -36,15 +51,32 @@ const SCHEMA = `
     PRIMARY KEY (chat, id)
   );
   CREATE INDEX IF NOT EXISTS turns_parent ON turns (chat, parent, ord);
+  CREATE TABLE IF NOT EXISTS chat_index (
+    chat TEXT PRIMARY KEY,
+    scope TEXT NOT NULL,
+    backend TEXT NOT NULL,
+    title TEXT NOT NULL,
+    updated TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS chat_index_scope ON chat_index (scope, backend, updated);
   CREATE TABLE IF NOT EXISTS archives (
     id TEXT PRIMARY KEY,
     scope TEXT NOT NULL,
     title TEXT NOT NULL,
     updated TEXT NOT NULL,
-    pinned INTEGER NOT NULL DEFAULT 0
+    pinned INTEGER NOT NULL DEFAULT 0,
+    project TEXT NOT NULL DEFAULT '',
+    backend TEXT NOT NULL DEFAULT ''
   );
   CREATE INDEX IF NOT EXISTS archives_scope ON archives (scope, pinned, updated);
 `;
+
+/** A column added after the table was first created; SQLite has no `ADD COLUMN IF NOT EXISTS`. */
+function ensureColumn(db: DatabaseSync, table: string, column: string, declaration: string) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as unknown as { name: string }[];
+  if (!columns.some((item) => item.name === column))
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${declaration}`);
+}
 
 const databases = new Map<string, DatabaseSync>();
 
@@ -57,6 +89,8 @@ export function historyDatabase(): DatabaseSync {
   const db = new DatabaseSync(file);
   db.exec("PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000; PRAGMA synchronous = NORMAL;");
   db.exec(SCHEMA);
+  ensureColumn(db, "archives", "project", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, "archives", "backend", "TEXT NOT NULL DEFAULT ''");
   void chmod(file, 0o600).catch(() => {});
   databases.set(file, db);
   return db;
@@ -78,6 +112,74 @@ interface Row {
 }
 
 const hashOf = (text: string) => createHash("sha1").update(text).digest("base64");
+
+/** The first thing the user said: what the chat is about. */
+export function chatTitle(turns: HistoryTurn[]): string {
+  const first = turns.find((turn) => (turn as { role?: string }).role === "user") as
+    | { text?: string }
+    | undefined;
+  const text = (first?.text ?? "").replace(/\s+/g, " ").trim();
+  return text.length > 80 ? `${text.slice(0, 79)}…` : text || "Без названия";
+}
+
+/** Remembers the chat in the project's list; an empty chat is not worth listing. */
+function saveIndex(db: DatabaseSync, chat: string, turns: HistoryTurn[], index: ChatIndex) {
+  if (!index.project) return;
+  if (!turns.length) {
+    db.prepare("DELETE FROM chat_index WHERE chat = ?").run(chat);
+    return;
+  }
+  const title = index.title || chatTitle(turns);
+  db.prepare(
+    `INSERT INTO chat_index (chat, scope, backend, title, updated) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT (chat) DO UPDATE SET
+       scope = excluded.scope, backend = excluded.backend,
+       title = CASE
+         WHEN ? IS NOT NULL THEN excluded.title
+         WHEN chat_index.title LIKE 'Ветка%' THEN chat_index.title
+         ELSE excluded.title
+       END,
+       updated = excluded.updated`,
+  ).run(chat, index.project, index.backend, title, new Date().toISOString(), index.title || null);
+}
+
+/** Where a saved chat belongs, if it is in the project's list. */
+export function chatMetaOf(chat: string): ChatIndex | undefined {
+  const row = historyDatabase()
+    .prepare("SELECT scope, backend, title FROM chat_index WHERE chat = ?")
+    .get(chat) as { scope: string; backend: string; title: string } | undefined;
+  return row ? { project: row.scope, backend: row.backend, title: row.title } : undefined;
+}
+
+/** Chats of a project, newest first: open in a tab or closed with their history still on disk. */
+export function readRecentChats(project: string, backend?: string, limit = 50): RecentChat[] {
+  if (!project) return [];
+  const db = historyDatabase();
+  // The project's own conversation (key = project) has no tab command to reopen it; it is opened
+  // by the workspace itself and is left out of the list.
+  const rows = (backend
+    ? db
+        .prepare(
+          "SELECT chat, backend, title, updated FROM chat_index WHERE scope = ? AND chat <> scope AND backend = ? ORDER BY updated DESC LIMIT ?",
+        )
+        .all(project, backend, limit)
+    : db
+        .prepare(
+          "SELECT chat, backend, title, updated FROM chat_index WHERE scope = ? AND chat <> scope ORDER BY updated DESC LIMIT ?",
+        )
+        .all(project, limit)) as unknown as {
+    chat: string;
+    backend: string;
+    title: string;
+    updated: string;
+  }[];
+  return rows.map((row) => ({
+    chat: row.chat,
+    backend: row.backend,
+    title: row.title,
+    updatedAt: row.updated,
+  }));
+}
 
 /** Splits a version of the chat into rows; forks found along the way become sibling rows. */
 function flatten(
@@ -117,7 +219,7 @@ function rowOf(turn: HistoryTurn, parent: string, ord: number): Row {
 }
 
 /** Replaces the saved chat with `turns`, rewriting only the rows that changed. */
-export function saveHistory(chat: string, turns: HistoryTurn[]): void {
+export function saveHistory(chat: string, turns: HistoryTurn[], index?: ChatIndex): void {
   const rows: Row[] = [];
   const pick = new Map<string, string>();
   flatten(turns, ROOT, rows, pick);
@@ -153,6 +255,7 @@ export function saveHistory(chat: string, turns: HistoryTurn[]): void {
       `INSERT INTO chats (id, pick, revision) VALUES (?, ?, 1)
        ON CONFLICT (id) DO UPDATE SET pick = excluded.pick, revision = revision + 1`,
     ).run(chat, pick.get(ROOT) ?? null);
+    if (index) saveIndex(db, chat, turns, index);
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");
@@ -234,6 +337,7 @@ export function deleteHistory(chat: string): void {
   const db = historyDatabase();
   db.prepare("DELETE FROM turns WHERE chat = ?").run(chat);
   db.prepare("DELETE FROM chats WHERE id = ?").run(chat);
+  db.prepare("DELETE FROM chat_index WHERE chat = ?").run(chat);
 }
 
 /** The JSON file an earlier version kept a chat in. */

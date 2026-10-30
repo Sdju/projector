@@ -1,19 +1,13 @@
 import { commandArgs } from "../../../common/utilities/commands.ts";
+import { registerBranchCommands } from "./branch-commands.ts";
 import { chatsOf, resolveChat, type ChatController } from "./chat-registry.ts";
 import { registerJobCommands } from "./job-commands.ts";
+import type { RegisterCommand } from "./register-command.ts";
 import { registerSessionCommands } from "./session-commands.ts";
 import { registerTaskCommands } from "./task-commands.ts";
 import type { RewindScope } from "./types.ts";
 
-/** How the workspace registers one of its commands (the same call as for its own). */
-export type RegisterCommand = (
-  id: string,
-  title: string,
-  run: (args?: unknown) => unknown,
-  enabled: (args?: unknown) => boolean,
-  requires?: undefined,
-  meta?: { description?: string; arguments?: Record<string, string> },
-) => unknown;
+export type { RegisterCommand };
 
 const CHAT = "Ключ чата из ide.agent.chats.list; без него — чат, с которым работали последним";
 const SCOPES: RewindScope[] = ["conversation", "files", "both"];
@@ -41,6 +35,7 @@ export function registerAgentCommands(register: RegisterCommand, projectId: stri
   registerTaskCommands(register, projectId);
   registerJobCommands(register, projectId);
   registerSessionCommands(register, projectId);
+  registerBranchCommands(register, projectId);
   const anyChat = () => chatsOf(projectId).length > 0;
   const external = () => chatsOf(projectId).some((chat) => chat.backend !== "projector");
   const idle = () => chatsOf(projectId).some((chat) => !chat.busy());

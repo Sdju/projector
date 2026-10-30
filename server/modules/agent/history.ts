@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { agentTaskSchema } from "../../../core/modules/agent-task/index.ts";
 import { importLegacyHistory, loadHistory, saveHistory } from "./history-store.ts";
+import type { ChatIndex } from "./history-store.ts";
 interface StoredTurn {
   id: string;
   variants?: StoredTurn[][];
@@ -102,8 +103,8 @@ export async function readAgentHistory(id: string) {
   const saved = loadHistory(id) ?? (await importLegacyHistory(id, (value) => schema.parse(value)));
   return schema.parse(saved ?? []);
 }
-export async function writeAgentHistory(id: string, value: unknown) {
+export async function writeAgentHistory(id: string, value: unknown, index?: ChatIndex) {
   const turns = schema.parse(value);
-  saveHistory(id, turns);
+  saveHistory(id, turns, index);
   return turns;
 }

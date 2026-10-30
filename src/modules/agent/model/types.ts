@@ -62,6 +62,15 @@ export interface AgentSessionInfo {
   pinned?: boolean;
 }
 
+/** A chat of the project kept on disk: open in a tab, or closed with its history still saved. */
+export interface AgentRecentChat {
+  /** The chat key, which names its tab (`ide.workbench.<agent>.open`). */
+  chat: string;
+  backend: string;
+  title: string;
+  updatedAt: string;
+}
+
 export interface AgentSessionRef {
   backend: string;
   id: string;

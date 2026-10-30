@@ -7,6 +7,7 @@ import type {
   AgentPermission,
   AgentPermissionMode,
   AgentQuestionRequest,
+  AgentRecentChat,
   AgentSecretRequest,
   AgentSelection,
   AgentSessionInfo,
@@ -37,6 +38,10 @@ export const createState = () =>
     sessions: [] as AgentSessionInfo[],
     sessionsLoading: false,
     sessionsError: "",
+    /** Chats of the project kept on disk, newest first: a closed tab can be opened again. */
+    recent: [] as AgentRecentChat[],
+    recentLoading: false,
+    recentError: "",
     abort: undefined as AbortController | undefined,
     /** The next message starts the chat in an isolated copy of the project. */
     isolate: false,

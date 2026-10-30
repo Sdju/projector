@@ -1,5 +1,6 @@
 import { shallowReactive } from "vue";
 import type { McpServer, WorktreeInfo } from "../api/client.ts";
+import type { ForkMode } from "./branches.ts";
 import type {
   AgentBackendId,
   AgentCapabilities,
@@ -41,6 +42,8 @@ export interface ChatController {
   stop(): void;
   edit(turnId: string): void;
   retry(turnId: string): Promise<void>;
+  /** Starts a new chat from the turns before (or up to) a message; the original is untouched. */
+  fork(turnId: string, mode?: ForkMode): Promise<{ chat: string }>;
   rewind(turnId: string, scope: RewindScope): Promise<unknown>;
   showVersion(turnId: string, version: number): void;
   removeQueued(id: string): void;

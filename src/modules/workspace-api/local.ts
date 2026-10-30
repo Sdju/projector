@@ -18,18 +18,21 @@ async function send(url: string, method: string, body: unknown, failure: string)
 
 /** A plain coding agent behind a chat instead of the TUI; every opening is a new conversation. */
 function agentChatTab(program: string, label: string, description: string) {
-  return defineTab<{ chatId?: string }>({
+  return defineTab<{ chatId?: string; title?: string }>({
     id: program,
     key: (params) => `${program}:${params.chatId ?? "main"}`,
-    path: () => label,
-    title: () => `${label} в графическом чате`,
+    path: (params) => params.title ?? label,
+    title: (params) => params.title ?? `${label} в графическом чате`,
     create: () => ({ chatId: newId() }),
     command: {
       id: `ide.workbench.${program}.open`,
       title: `Новая сессия ${label} (GUI)`,
       description,
       requires: "agent",
-      optional: { chatId: "Идентификатор уже открытого чата: вкладка этого чата получает фокус" },
+      optional: {
+        chatId: "Идентификатор уже открытого чата: вкладка этого чата получает фокус",
+        title: "Заголовок вкладки; по умолчанию — название агента",
+      },
     },
   });
 }
@@ -50,11 +53,11 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
     sidebar: [{ id: "docker", title: "Docker", command: "ide.docker.sidebar.open" }],
     tabs: [
       // The Projector agent: the tab without a chat id is the project's original conversation.
-      defineTab<{ chatId?: string }>({
+      defineTab<{ chatId?: string; title?: string }>({
         id: "agent",
         key: (params) => (params.chatId ? `agent:chat:${params.chatId}` : "agent:chat"),
-        path: () => "Агент",
-        title: () => "Чат с агентом Projector",
+        path: (params) => params.title ?? "Агент",
+        title: (params) => params.title ?? "Чат с агентом Projector",
         create: () => ({ chatId: newId() }),
         command: {
           id: "ide.workbench.agent.open",
@@ -64,6 +67,7 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
           requires: "agent",
           optional: {
             chatId: "Идентификатор уже открытого чата: вкладка этого чата получает фокус",
+            title: "Заголовок вкладки; по умолчанию — «Агент»",
           },
         },
       }),

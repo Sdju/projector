@@ -4,11 +4,15 @@ import { jobChatTab } from "./job-labels.ts";
 export function chatTabCommand(
   projectId: string,
   chat: string,
-): { command: string; args: { chatId: string } } | undefined {
+  title?: string,
+): { command: string; args: { chatId: string; title?: string } } | undefined {
   for (const [backend, tab] of Object.entries({ projector: "agent", ...jobChatTab })) {
     const prefix = `${backend}:${projectId}:`;
     if (chat.startsWith(prefix) && chat.length > prefix.length)
-      return { command: `ide.workbench.${tab}.open`, args: { chatId: chat.slice(prefix.length) } };
+      return {
+        command: `ide.workbench.${tab}.open`,
+        args: { chatId: chat.slice(prefix.length), ...(title ? { title } : {}) },
+      };
   }
   // The project's own conversation (key = project) is the tab without a chat id.
   return undefined;

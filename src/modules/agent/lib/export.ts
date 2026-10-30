@@ -33,3 +33,13 @@ export function chatMarkdown(turns: AgentTurn[], title: string): string {
   }
   return `${out.join("\n\n")}\n`;
 }
+
+/** Saves the chat as a Markdown file through the browser. */
+export function downloadChatMarkdown(turns: AgentTurn[], title: string, name: string): void {
+  const url = URL.createObjectURL(
+    new Blob([chatMarkdown(turns, title)], { type: "text/markdown;charset=utf-8" }),
+  );
+  const link = Object.assign(document.createElement("a"), { href: url, download: name });
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

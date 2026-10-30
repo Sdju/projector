@@ -84,6 +84,8 @@ describe("agent guard", () => {
   it("asks before changing commands and only looks without asking", () => {
     expect(commandIsSafe("ide.workbench.tab.read")).toBe(true);
     expect(commandIsSafe("ide.agent.jobs.list")).toBe(true);
+    expect(commandIsSafe("ide.agent.chats.recent")).toBe(true);
+    expect(commandIsSafe("ide.agent.chat.fork")).toBe(false);
     expect(commandIsSafe("ide.agent.job.result")).toBe(true);
     expect(commandIsSafe("ide.agent.job.open")).toBe(true);
     expect(commandIsSafe("ide.agent.job.start")).toBe(false);

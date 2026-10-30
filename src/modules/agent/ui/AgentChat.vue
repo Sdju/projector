@@ -6,8 +6,9 @@ import { workspaceRequest } from "../../workspace-api/index.ts";
 import { agentCommandHandler } from "../model/commands.ts";
 import { agentLabel, guiPrograms } from "../model/modes.ts";
 import { chatDropHandlers } from "../lib/chat-drop.ts";
+import { useChatBranch } from "../model/chat-branch.ts";
+import { useChatReadout } from "../model/chat-readout.ts";
 import { useAgent } from "../model/session.ts";
-import { readoutLines, useTabReadout } from "../../../common/utilities/tab-readout.ts";
 import UiPanel from "../../../common/ui/UiPanel.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
@@ -29,8 +30,8 @@ import AgentTaskView from "./AgentTaskView.vue";
 import { barTasks, chatTasks, taskDetail } from "../lib/task-detail.ts";
 import AgentRewind from "./AgentRewind.vue";
 import AgentWorktree from "./AgentWorktree.vue";
-import { chatMarkdown } from "../lib/export.ts";
-import { latestPlan } from "../lib/plan.ts";
+import { chatMarkdown, downloadChatMarkdown } from "../lib/export.ts";
+import { shownPlan } from "../lib/plan.ts";
 import { fetchMcpServers, type McpServer } from "../api/client.ts";
 import { activateChat, registerChat, type ChatController } from "../model/chat-registry.ts";
 import { useChatWindow } from "../model/chat-window.ts";
@@ -67,11 +68,15 @@ const {
   sessions,
   sessionsLoading,
   sessionsError,
+  recent,
+  recentLoading,
+  recentError,
   loadControls,
   loadCommands,
   commands: slashCommands,
   setControl,
   loadSessions,
+  loadRecent,
   changeSession,
   resumeSession,
   removeSession,
@@ -113,6 +118,24 @@ const latestContext = computed(() => turns.value.findLast((turn) => turn.context
 const activeSession = computed(
   () => turns.value.findLast((turn) => turn.role === "assistant")?.session?.id,
 );
+// Branching and the project's chat list sit beside the chat: see `useChatBranch`.
+const {
+  fork,
+  forkMessage,
+  recentChats,
+  openRecent: openRecentChat,
+} = useChatBranch({
+  backend: props.backend,
+  projectId: props.projectId,
+  key: chatKey,
+  turns: () => turns.value,
+  capabilities: () => capabilities.value,
+  recent: () => recent.value,
+  api,
+  fail: (message) => {
+    error.value = message;
+  },
+});
 // Opening a chat is a workspace command, not one of this chat's own.
 function openCoder(program: string) {
   void api
@@ -153,28 +176,14 @@ function taskInTab(id: string) {
     });
 }
 // Что штатный агент видит в чате: статус, последний ответ и чипы инструментов.
-useTabReadout(() => {
-  const last = turns.value.at(-1);
-  const answer = turns.value
-    .findLast((turn) => turn.role === "assistant")
-    ?.text.trim()
-    .slice(0, 2000);
-  const chips = last?.tools.map((tool) => `${tool.name} — ${tool.status}`).join("; ");
-  return {
-    note: `Чат агента ${agentName.value}`,
-    text: readoutLines(
-      `Бэкенд: ${props.backend ?? "projector"}`,
-      busy.value ? `Состояние: Работает (${phase.value})` : "Состояние: Готов",
-      error.value ? `Ошибка: ${error.value}` : "",
-      ...controls.value.map(
-        (control) =>
-          `${control.name}: ${control.options.find((item) => item.value === control.current)?.name ?? control.current}`,
-      ),
-      `Сообщений: ${turns.value.length}`,
-      answer ? `Последний ответ:\n${answer}` : "",
-      chips ? `Инструменты: ${chips}` : "",
-    ),
-  };
+useChatReadout({
+  backend: props.backend,
+  agent: agentName.value,
+  busy,
+  phase,
+  error,
+  controls,
+  turns,
 });
 const log = ref<HTMLElement>();
 const controlsMenu = ref<InstanceType<typeof AgentControls>>();
@@ -213,19 +222,8 @@ const editFrom = computed(() =>
   editing.value ? turns.value.findIndex((turn) => turn.id === editing.value) : -1,
 );
 
-// The plan stays pinned while it has unfinished items, even after later messages; a finished one
-// only shows for the answer that finished it.
-const plan = computed(() => {
-  const answers = turns.value.filter((turn) => turn.role === "assistant");
-  for (const turn of answers.toReversed()) {
-    const items = latestPlan(turn);
-    if (!items.length) continue;
-    return turn === answers.at(-1) || items.some((item) => item.status !== "completed")
-      ? items
-      : [];
-  }
-  return [];
-});
+// The plan stays pinned while it has unfinished items, even after later messages.
+const plan = computed(() => shownPlan(turns.value));
 const contextShare = computed(() =>
   latestContext.value ? latestContext.value.used / Math.max(1, latestContext.value.size) : 0,
 );
@@ -260,6 +258,10 @@ async function retryMessage(id: string) {
   void toBottom();
   await retry(id);
 }
+/** The list of the chat's own history and the project's chats is read when the panel opens. */
+async function openHistory() {
+  await Promise.all([loadSessions(), loadRecent()]);
+}
 
 // A full context is compacted once the answer is over, unless the last message already was that.
 watch(busy, (working) => {
@@ -289,15 +291,11 @@ function exportMarkdown() {
   return chatMarkdown(turns.value, `${agentName.value} · ${new Date().toLocaleString("ru")}`);
 }
 function downloadChat() {
-  const url = URL.createObjectURL(
-    new Blob([exportMarkdown()], { type: "text/markdown;charset=utf-8" }),
+  downloadChatMarkdown(
+    turns.value,
+    `${agentName.value} · ${new Date().toLocaleString("ru")}`,
+    `${props.backend}-chat.md`,
   );
-  const link = Object.assign(document.createElement("a"), {
-    href: url,
-    download: `${props.backend}-chat.md`,
-  });
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // The chat publishes itself to the workspace's commands (see `registerAgentCommands`).
@@ -328,6 +326,7 @@ const controller: ChatController = {
   stop,
   edit,
   retry,
+  fork,
   rewind: async (id, scope) => {
     const result = await rewindTo(id, scope);
     return result ?? { ok: true, files: [] };
@@ -525,10 +524,14 @@ onBeforeUnmount(() => {
         :editable="!plain || capabilities.editSessions"
         :deletable="!plain || capabilities.deleteSessions"
         :label="plain ? undefined : 'История чатов'"
-        @open="loadSessions"
+        :recent="recentChats"
+        :recent-loading="recentLoading"
+        :recent-error="recentError"
+        @open="openHistory"
         @change="changeSession"
         @remove="(id) => void removeSession(id).catch(() => {})"
         @pick="(id) => void resumeSession(id).catch(() => {})"
+        @open-recent="openRecentChat"
       />
       <UiButton
         v-if="plain && !turns.length"
@@ -603,6 +606,7 @@ onBeforeUnmount(() => {
           @edit="editMessage"
           @rewind="askRewind"
           @retry="retryMessage"
+          @fork="forkMessage"
           @continue="continueTurn"
           @version="showVersion"
           @open-file="(path) => openChip({ type: 'file', path })"

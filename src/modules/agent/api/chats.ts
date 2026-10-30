@@ -1,4 +1,4 @@
-import type { AgentSessionInfo, AgentTurn } from "../model/types.ts";
+import type { AgentRecentChat, AgentSessionInfo, AgentTurn } from "../model/types.ts";
 
 async function post<T>(path: string, body: object, failure: string): Promise<T> {
   const response = await fetch(`/api/agent/chats/${path}`, {
@@ -19,6 +19,22 @@ export async function fetchChats(key: string): Promise<AgentSessionInfo[]> {
     error?: string;
   };
   if (!response.ok) throw new Error(data.error || "Не удалось получить историю чатов");
+  return data.chats ?? [];
+}
+
+/** Chats of the project kept on disk, newest first: open in a tab or closed. */
+export async function fetchRecentChats(
+  projectId: string,
+  backend?: string,
+): Promise<AgentRecentChat[]> {
+  const query = new URLSearchParams({ projectId });
+  if (backend) query.set("backend", backend);
+  const response = await fetch(`/api/agent/chats/recent?${query}`);
+  const data = (await response.json().catch(() => ({}))) as {
+    chats?: AgentRecentChat[];
+    error?: string;
+  };
+  if (!response.ok) throw new Error(data.error || "Не удалось получить недавние чаты");
   return data.chats ?? [];
 }
 
