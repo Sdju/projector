@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { agentTaskSchema } from "../../../core/modules/agent-task/index.ts";
-import { importLegacyHistory, loadHistory, saveHistory } from "./history-store.ts";
+import {
+  importLegacyHistory,
+  loadHistory,
+  saveChatFeatures,
+  saveHistory,
+} from "./history-store.ts";
 import type { ChatIndex } from "./history-store.ts";
 interface StoredTurn {
   id: string;
@@ -99,12 +104,21 @@ const turnSchema: z.ZodType<StoredTurn> = z.lazy(() =>
   }),
 );
 const schema = z.array(turnSchema);
+const featuresSchema = z.array(z.string().min(1).max(64)).max(50);
 export async function readAgentHistory(id: string) {
   const saved = loadHistory(id) ?? (await importLegacyHistory(id, (value) => schema.parse(value)));
   return schema.parse(saved ?? []);
 }
-export async function writeAgentHistory(id: string, value: unknown, index?: ChatIndex) {
+export async function writeAgentHistory(
+  id: string,
+  value: unknown,
+  index?: ChatIndex,
+  features?: unknown,
+) {
   const turns = schema.parse(value);
   saveHistory(id, turns, index);
+  // `undefined` keeps the chat's choice; `null` clears it back to the user's defaults.
+  if (features !== undefined)
+    saveChatFeatures(id, features === null ? null : featuresSchema.parse(features));
   return turns;
 }

@@ -91,6 +91,9 @@ export async function requestFrom(body: Record<string, unknown>) {
     sessionId: asString(body.sessionId) || undefined,
     messageId: asString(body.messageId) || undefined,
     tail: asString(body.tail) || undefined,
+    features: Array.isArray(body.features)
+      ? body.features.filter((id): id is string => typeof id === "string").slice(0, 50)
+      : undefined,
     cwd: folder,
     providerId: asString(body.providerId) || undefined,
   };

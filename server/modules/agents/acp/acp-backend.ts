@@ -145,7 +145,11 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
     // Abilities the user switched on for this agent go before the new message, once per session.
     const prompt = session.resumed
       ? options.message
-      : promptWithHistory(options.message, options.history ?? [], await featurePrompt(id));
+      : promptWithHistory(
+          options.message,
+          options.history ?? [],
+          await featurePrompt(id, options.features),
+        );
     const result = (await connection.request(
       "session/prompt",
       {

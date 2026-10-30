@@ -98,23 +98,27 @@ export async function setFeatureAgent(
 }
 
 /**
- * The instructions of every feature the agent has on, or an empty string. Backends combine this
- * text with their own prompt: Projector reads it into the system prompt, others into the first
- * message of a session.
+ * The instructions of every feature the agent has on, or an empty string. `features` is the chat's
+ * own choice (an empty list means none); without it the user's defaults for the agent apply.
+ * Backends combine this text with their own prompt: Projector reads it into the system prompt,
+ * others into the first message of a session.
  */
-export async function enabledFeatureText(agentId: string): Promise<string> {
-  const state = await readState();
+export async function enabledFeatureText(agentId: string, features?: string[]): Promise<string> {
+  const wanted = features ? new Set(features) : undefined;
+  const state = wanted ? undefined : await readState();
   return agentFeatureCatalog
     .list()
-    .filter((feature) => enabledAgents(feature, state).includes(agentId))
+    .filter((feature) =>
+      wanted ? wanted.has(feature.id) : enabledAgents(feature, state!).includes(agentId),
+    )
     .map((feature) => feature.instruction().trim())
     .filter(Boolean)
     .join("\n\n");
 }
 
 /** The feature text framed for an agent that has no Projector prompt of its own. */
-export async function featurePrompt(agentId: string): Promise<string> {
-  const text = await enabledFeatureText(agentId);
+export async function featurePrompt(agentId: string, features?: string[]): Promise<string> {
+  const text = await enabledFeatureText(agentId, features);
   if (!text) return "";
   return `[Projector] В этом чате включены дополнительные возможности Projector. Пользуйся ими, когда это уместно; обычные вопросы не загромождай.\n\n${text}`;
 }

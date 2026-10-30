@@ -162,7 +162,7 @@ async function turn(
   options.emit("controls", { controls: await controls(options.selection ?? {}) });
 
   const system =
-    buildSystemPrompt(await enabledFeatureText("projector")) +
+    buildSystemPrompt(await enabledFeatureText("projector", options.features)) +
     (options.cwd ? `\nТекущий проект: ${options.cwd}` : "") +
     (await projectInstructions(options.cwd)) +
     (await memorySection(options.cwd)) +

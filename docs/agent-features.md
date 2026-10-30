@@ -1,18 +1,20 @@
 # Возможности агентов
 
-Необязательные умения, которые Projector добавляет агенту в промпт: сейчас это виджеты в ответах — графики, показатели, вкладки и формы прямо в markdown. Виджеты включены у штатного агента Projector и могут быть включены у Claude Code, Codex, OpenCode, Cursor и Kimi. Остров **возможности** в шапке рядом с островом активности показывает матрицу «возможность × агент».
+Необязательные умения, которые Projector добавляет агенту в промпт: сейчас это виджеты в ответах — графики, показатели, вкладки и формы прямо в markdown. Умолчания задаются в настройках «Возможности агентов» для каждого агента, а остров **возможности** в табе агента переопределяет их только для текущего чата.
 
-## Файл и умолчания
+## Умолчания и переопределение
 
-Выбор хранится в `$XDG_DATA_HOME/projector/agent/features.json`:
+- **Умолчания** лежат в `$XDG_DATA_HOME/projector/agent/features.json`:
 
-```json
-{ "features": { "widgets": ["projector", "codex"] } }
-```
+  ```json
+  { "features": { "widgets": ["projector", "codex"] } }
+  ```
 
-- Возможность, которой нет в файле, использует свои умолчания; у виджетов это `projector`. Пустой список — «выключено у всех».
-- Запись атомарная, через временный файл. Повреждённый JSON читается как «всё по умолчанию» и не мешает чату.
-- Настройка общая для всех проектов; отдельного проектного выбора нет.
+  Возможность, которой нет в файле, использует свои умолчания; у виджетов это `projector`. Пустой список — «выключено у всех». Запись атомарная, через временный файл; повреждённый JSON читается как «всё по умолчанию».
+
+- **Выбор чата** — список id возможностей, сохранённый вместе с чатом (`chats.features` в `agent/history.sqlite`). Пока его нет, действуют умолчания; пустой список — «в этом чате всё выключено». Кнопка «Как по умолчанию» удаляет выбор чата.
+- Переопределение передаётся серверу вместе с каждым ходом (`features` в `POST /api/agent`), поэтому применяется и после перезагрузки страницы.
+- Остров в табе агента показывает только возможности этого чата; матрица всех агентов — в настройках. Изменение умолчания в настройках сразу видно в открытых чатах без собственного выбора.
 
 ## Как возможность попадает в модель
 
@@ -34,37 +36,39 @@ Hosted-ход — отдельный процесс со своей композ
 
 ## Где что лежит
 
-| Место                                 | Что                                                                                    |
-| ------------------------------------- | -------------------------------------------------------------------------------------- |
-| `core/modules/agent-features`         | Контракт `AgentFeature` (id, название, описание, умолчания, `instruction()`) и каталог |
-| `server/modules/agent-features`       | Реестр агентов, хранилище `features.json`, `enabledFeatureText` и `featurePrompt`      |
-| `server/app/features.ts`              | Единственное место, где возможности названы: сейчас `widgets`                          |
-| `server/app/plugin.ts`                | Регистрация при старте сервера                                                         |
-| `server/app/projector-runner.ts`      | Регистрация в процессе ответа Projector                                                |
-| `server/app/claude-runner.ts`         | Регистрация в процессе ответа Claude Code                                              |
-| `src/modules/agent-features`          | Запросы `/api/agent/features`, модель острова и сам остров                             |
-| `server/routes/api/agent-features.ts` | `GET` состояния и `PUT` одного переключателя                                           |
+| Место                                  | Что                                                                                    |
+| -------------------------------------- | -------------------------------------------------------------------------------------- |
+| `core/modules/agent-features`          | Контракт `AgentFeature` (id, название, описание, умолчания, `instruction()`) и каталог |
+| `server/modules/agent-features`        | Реестр агентов, хранилище умолчаний, `enabledFeatureText` и `featurePrompt`            |
+| `server/app/features.ts`               | Единственное место, где возможности названы: сейчас `widgets`                          |
+| `server/app/plugin.ts`                 | Регистрация при старте сервера                                                         |
+| `server/app/projector-runner.ts`       | Регистрация в процессе ответа Projector                                                |
+| `server/app/claude-runner.ts`          | Регистрация в процессе ответа Claude Code                                              |
+| `server/routes/api/agent-features.ts`  | `GET` умолчаний и `PUT` одного переключателя                                           |
+| `src/modules/agent-features`           | Общий каталог, модель умолчаний, остров чата и раздел настроек                         |
+| `src/modules/agent/ui/AgentChat.vue`   | Место острова: панель инструментов таба агента                                         |
+| `src/modules/app-settings/sections.ts` | Раздел настроек `agent-features`                                                       |
 
 ### Как добавить возможность
 
 1. `server/app/features.ts`: `registerAgentFeature({ id, title, summary, defaults, instruction: () => "…" })`. `instruction` вызывается при каждом ходе, поэтому может читать актуальный каталог.
 2. Если возможность умеет только часть агентов, ограничьте `defaults` и проверяйте id в своём бэкенде.
-3. Добавьте доставку в бэкенды, где она нужна: Projector — в `buildSystemPrompt`, Claude Code — в `claudeSystemPrompt` (`systemPrompt.append`), ACP — в `featurePrompt` первого сообщения. `featurePrompt` уже фильтрует по включённым агентам.
+3. Добавьте доставку в бэкенды, где она нужна: Projector — в `buildSystemPrompt`, Claude Code — в `claudeSystemPrompt` (`systemPrompt.append`), ACP — в `featurePrompt` первого сообщения. `featurePrompt` фильтрует по включённым возможностям и принимает выбор чата.
 4. Для нового hosted-раннера вызовите `registerBuiltinWidgetDefinitions()` и `registerBuiltinAgentFeatures()` до `runHostedRunner`, как в `projector-runner.ts` и `claude-runner.ts`.
 5. `vp test run tests/agent-features.test.mjs`.
 
 ## API и команды
 
-- `GET /api/agent/features` — `{ features: [{ id, title, summary, agents: [{ id, label, enabled }] }], file }`.
-- `PUT /api/agent/features` — `{ feature, agent, enabled }`; отвечает тем же состоянием.
-- `ide.agent.features.list` (scope `surface: agentFeatures`) — то же, что GET.
-- `ide.agent.features.set` `{ feature, agent, enabled }` — переключатель; доступен штатному агенту.
-- `ide.agent.features.panel` — открывает или закрывает остров.
-
-Штатный агент видит команды через общий реестр; отдельного инструмента у него нет.
+- `GET /api/agent/features` — `{ features: [{ id, title, summary, agents: [{ id, label, enabled }] }], file }`; `enabled` — умолчание.
+- `PUT /api/agent/features` — `{ feature, agent, enabled }`; меняет умолчание и отвечает тем же состоянием.
+- `POST /api/agent` принимает `features: string[]` — выбор чата; пустой список выключает всё, отсутствие поля означает умолчания.
+- `GET/PUT /api/agent/history/:chat` возвращает и сохраняет `features` рядом с `turns`; `null` — вернуть умолчания.
+- В табе агента (scope `surface: agentFeatures`): `ide.agent.features.chat.list`, `ide.agent.features.chat.set` `{ feature, enabled }`, `ide.agent.features.chat.reset`, `ide.agent.features.panel`.
+- В настройках (scope `surface: agentFeatureDefaults`): `ide.agent.features.defaults.list`, `ide.agent.features.defaults.set` `{ feature, agent, enabled }`.
 
 ## Ограничения
 
 - Возможности живут в промпте, а не в файлах агента: нативные `SKILL.md`, правила Cursor и `AGENTS.md` не создаются.
 - Терминальные сессии (TUI) возможностей не получают: их ведёт сам CLI, Projector в его контекст не вмешивается.
-- Проектные исключения, разные наборы для разных моделей и отложенное включение с середины ACP-сессии не поддерживаются.
+- Выбор чата не копируется в ветку или форк: новая ветка начинает с умолчаний.
+- Разные наборы для разных моделей одного агента не поддерживаются.

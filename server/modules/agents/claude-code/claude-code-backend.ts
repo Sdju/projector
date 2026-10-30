@@ -79,13 +79,13 @@ async function run(options: AgentRunOptions): Promise<void> {
   return runClaudeCode(options);
 }
 
-/** The prompt of a Claude Code session: its own preset plus the abilities switched on for the agent. */
-export async function claudeSystemPrompt(): Promise<Options["systemPrompt"]> {
-  const features = await featurePrompt("claude-code");
+/** The prompt of a Claude Code session: its own preset plus the abilities switched on for the chat. */
+export async function claudeSystemPrompt(features?: string[]): Promise<Options["systemPrompt"]> {
+  const text = await featurePrompt("claude-code", features);
   return {
     type: "preset",
     preset: "claude_code",
-    ...(features ? { append: features } : {}),
+    ...(text ? { append: text } : {}),
     // The host changes the append when the user flips a feature: render the prompt fresh on every
     // request, otherwise a resumed session keeps the prompt recorded at its first request.
     snapshot: false,
@@ -121,7 +121,7 @@ export async function runClaudeCode(options: AgentRunOptions): Promise<void> {
     // A background subagent streams no calls of its own: its progress arrives as these summaries.
     agentProgressSummaries: true,
     settingSources: ["user", "project", "local"],
-    systemPrompt: await claudeSystemPrompt(),
+    systemPrompt: await claudeSystemPrompt(options.features),
     permissionMode: mode,
     // Files are backed up before the agent changes them, so a step can be taken back later.
     enableFileCheckpointing: true,

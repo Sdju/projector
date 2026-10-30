@@ -89,6 +89,7 @@ export {
   chatMetaOf,
   chatTitle,
   closeHistoryStore,
+  readChatFeatures,
   readRecentChats,
   type ChatIndex,
   type RecentChat,

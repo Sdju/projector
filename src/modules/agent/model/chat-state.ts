@@ -45,6 +45,8 @@ export const createState = () =>
     abort: undefined as AbortController | undefined,
     /** The next message starts the chat in an isolated copy of the project. */
     isolate: false,
+    /** Feature ids enabled for this chat only; undefined means the user's defaults. */
+    featureOverrides: undefined as string[] | undefined,
     /** The message that started the answer being written (what a live addition refers to). */
     activeMessage: "",
     /** Messages written while an answer was running; delivered at the next model boundary when supported. */

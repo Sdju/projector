@@ -91,6 +91,8 @@ export function historyDatabase(): DatabaseSync {
   db.exec(SCHEMA);
   ensureColumn(db, "archives", "project", "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, "archives", "backend", "TEXT NOT NULL DEFAULT ''");
+  // Feature overrides of a chat, as JSON; NULL means the user's defaults apply.
+  ensureColumn(db, "chats", "features", "TEXT");
   void chmod(file, 0o600).catch(() => {});
   databases.set(file, db);
   return db;
@@ -261,6 +263,32 @@ export function saveHistory(chat: string, turns: HistoryTurn[], index?: ChatInde
     db.exec("ROLLBACK");
     throw error;
   }
+}
+
+/** The feature ids this chat chose for itself; absent means the user's defaults apply. */
+export function readChatFeatures(chat: string): string[] | undefined {
+  const db = historyDatabase();
+  const row = db.prepare("SELECT features FROM chats WHERE id = ?").get(chat) as
+    | { features: string | null }
+    | undefined;
+  if (!row?.features) return undefined;
+  try {
+    const value = JSON.parse(row.features) as unknown;
+    return Array.isArray(value)
+      ? value.filter((id): id is string => typeof id === "string")
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Replaces the chat's feature overrides; `null` returns it to the user's defaults. */
+export function saveChatFeatures(chat: string, features: string[] | null): void {
+  const db = historyDatabase();
+  db.prepare(
+    `INSERT INTO chats (id, features) VALUES (?, ?)
+     ON CONFLICT (id) DO UPDATE SET features = excluded.features`,
+  ).run(chat, features ? JSON.stringify(features) : null);
 }
 
 /** The chat as it is shown: the picked version, the others nested under the turn that forks them. */

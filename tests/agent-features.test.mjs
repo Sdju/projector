@@ -13,6 +13,7 @@ import {
   featuresFile,
   setFeatureAgent,
 } from "../server/modules/agent-features/index.ts";
+import { readChatFeatures, writeAgentHistory } from "../server/modules/agent/index.ts";
 import { promptWithHistory } from "../server/modules/agent/agent-host.ts";
 import { claudeSystemPrompt } from "../server/modules/agents/claude-code/claude-code-backend.ts";
 import { buildSystemPrompt } from "../server/modules/agents/projector/prompts.ts";
@@ -92,6 +93,40 @@ describe("agent features", () => {
     expect(agentOf(settings, "projector").enabled).toBe(true);
   });
 
+  it("honours the chat's own feature choice over the defaults", async () => {
+    await setFeatureAgent("widgets", "codex", true);
+    expect(await featurePrompt("codex")).toContain("Bars —");
+    // The chat chose no features: its choice wins even though the default is on.
+    expect(await featurePrompt("codex", [])).toBe("");
+    // The chat chose widgets although the default is off.
+    expect(await enabledFeatureText("projector", ["widgets"])).toContain("Bars —");
+    expect(await featurePrompt("projector", [])).toBe("");
+    // An unknown id adds nothing: only registered features are rendered.
+    expect(await enabledFeatureText("projector", ["unknown"])).toBe("");
+  });
+
+  it("carries the chat's feature choice in the saved history", async () => {
+    await writeAgentHistory("chat-features", [], undefined, ["widgets"]);
+    expect(readChatFeatures("chat-features")).toEqual(["widgets"]);
+    await writeAgentHistory("chat-features", [], undefined, []);
+    expect(readChatFeatures("chat-features")).toEqual([]);
+    await writeAgentHistory("chat-features", [], undefined, null);
+    expect(readChatFeatures("chat-features")).toBeUndefined();
+    // A write without the field keeps the saved choice for older clients.
+    await writeAgentHistory("chat-features", [], undefined, ["widgets"]);
+    await writeAgentHistory("chat-features", []);
+    expect(readChatFeatures("chat-features")).toEqual(["widgets"]);
+  });
+
+  it("passes the chat's feature choice to the agent request", async () => {
+    const { requestFrom } = await import("../server/modules/agent/index.ts");
+    expect(
+      (await requestFrom({ message: "привет", features: ["widgets"] })).request.features,
+    ).toEqual(["widgets"]);
+    expect((await requestFrom({ message: "привет", features: [] })).request.features).toEqual([]);
+    expect((await requestFrom({ message: "привет" })).request.features).toBeUndefined();
+  });
+
   it("puts the feature text before the new message but after the replayed history", () => {
     const text = promptWithHistory("Новое", [{ role: "user", content: "Старое" }], "КОНТЕКСТ");
     expect(text.indexOf("Старое")).toBeLessThan(text.indexOf("КОНТЕКСТ"));
@@ -130,6 +165,10 @@ describe("agent features", () => {
     const on = await claudeSystemPrompt();
     expect(on.snapshot).toBe(false);
     expect(on.append).toContain("Bars —");
+
+    // The chat's own choice wins over the default in both directions.
+    expect((await claudeSystemPrompt([])).append).toBeUndefined();
+    expect((await claudeSystemPrompt(["widgets"])).append).toContain("Bars —");
   });
 
   it("the system prompt names the feature section only when the feature is on", () => {

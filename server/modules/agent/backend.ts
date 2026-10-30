@@ -100,6 +100,11 @@ export interface AgentRunOptions {
   history?: AgentHistoryTurn[];
   /** Native conversation of the backend (Claude Code session ID) to continue instead of `history`. */
   sessionId?: string;
+  /**
+   * Feature ids enabled for this chat, overriding the user's defaults; an empty list means none.
+   * Absent means the defaults from `agent/features.json`.
+   */
+  features?: string[];
   /** The message's own ID (a UUID): the transcript keeps it, so files can be rewound to it later. */
   messageId?: string;
   /**

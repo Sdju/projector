@@ -71,6 +71,8 @@ export async function streamAgent(
     messageId?: string;
     /** Where the kept conversation ends in the agent's transcript. */
     tail?: string;
+    /** Feature ids enabled for this chat, overriding the defaults; an empty list means none. */
+    features?: string[];
     /** The isolated copy of the project the chat works in. */
     worktree?: string;
     /** Start the chat in a new isolated copy of the project. */
@@ -94,6 +96,7 @@ export async function streamAgent(
         parts: options.parts,
         messageId: options.messageId,
         tail: options.tail,
+        features: options.features,
         worktree: options.worktree,
         isolate: options.isolate,
         approvals: true,

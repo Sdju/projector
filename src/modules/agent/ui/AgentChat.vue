@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } f
 import { widgetReplyKey } from "../../widget-runtime/index.ts";
 import { useIdeCommands } from "../../ide/index.ts";
 import { workspaceRequest } from "../../workspace-api/index.ts";
+import { AgentFeaturesIsland } from "../../agent-features/index.ts";
 import { agentCommandHandler } from "../model/commands.ts";
 import { agentLabel, guiPrograms } from "../model/modes.ts";
 import { chatDropHandlers } from "../lib/chat-drop.ts";
@@ -42,7 +43,6 @@ import type { AgentBackendId, ChatUsage, MessageChip, RewindScope } from "../mod
 import IconSquarePen from "~icons/lucide/square-pen";
 import IconDownload from "~icons/lucide/download";
 import IconBranch from "~icons/lucide/git-branch";
-
 const props = withDefaults(
   defineProps<{ projectId: string; backend?: AgentBackendId; chatId?: string }>(),
   { backend: "projector", chatId: undefined },
@@ -93,6 +93,8 @@ const {
   canRewindFiles,
   rewindFiles,
   isolate,
+  featureOverrides,
+  setFeatureOverrides,
   worktreeId,
   worktreeInfo,
   mergeCopy,
@@ -532,6 +534,13 @@ onBeforeUnmount(() => {
         @remove="(id) => void removeSession(id).catch(() => {})"
         @pick="(id) => void resumeSession(id).catch(() => {})"
         @open-recent="openRecentChat"
+      />
+      <AgentFeaturesIsland
+        :backend="backend"
+        :chat="chatKey"
+        :overrides="featureOverrides"
+        :disabled="loading"
+        @update:overrides="setFeatureOverrides"
       />
       <UiButton
         v-if="plain && !turns.length"

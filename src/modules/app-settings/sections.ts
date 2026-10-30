@@ -15,6 +15,7 @@ import {
   AgentMemorySettings,
   AgentModeSettings,
 } from "../agent/index.ts";
+import { AgentFeatureDefaults } from "../agent-features/index.ts";
 import { type SettingsSection } from "../settings/index.ts";
 
 export const settingsSections: SettingsSection[] = [
@@ -126,6 +127,15 @@ export const settingsSections: SettingsSection[] = [
     description: "Терминал или графический чат для новых сессий агентов.",
     keywords: "GUI TUI терминал чат Claude Code режим вывод",
     component: AgentModeSettings,
+  },
+  {
+    id: "agent-features",
+    title: "Возможности агентов",
+    group: "Агент",
+    description: "Умения агентов по умолчанию; в табе агента их можно переопределить для чата.",
+    keywords:
+      "возможности умения фичи виджеты widgets графики формы Claude Code Codex OpenCode Cursor Kimi агент",
+    component: AgentFeatureDefaults,
   },
   {
     id: "agent-memory",

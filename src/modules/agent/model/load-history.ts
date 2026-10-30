@@ -10,9 +10,16 @@ export function loadHistory(url: string, state: ChatState, quiet = false): Promi
     .then(async (response) => {
       if (!response.ok) throw new Error("Не удалось загрузить историю чата");
       const data = await response.json();
+      const features = Array.isArray(data.features) ? data.features : undefined;
       // A refresh of an unchanged chat must not re-render it.
-      if (quiet && JSON.stringify(data.turns) === JSON.stringify(state.turns)) return;
+      if (
+        quiet &&
+        JSON.stringify(data.turns) === JSON.stringify(state.turns) &&
+        JSON.stringify(features ?? null) === JSON.stringify(state.featureOverrides ?? null)
+      )
+        return;
       state.turns = data.turns;
+      state.featureOverrides = features;
       // A turn saved at its start but never finished: the page or server went away mid-answer.
       // One with a live agent process behind it is rejoined instead (`resumeRun`).
       const last = state.turns.at(-1);

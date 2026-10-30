@@ -23,6 +23,7 @@ export function saveChat(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           turns: state.turns,
+          features: state.featureOverrides ?? null,
           ...(index ? { projectId: index.project, backend: index.backend } : {}),
         }),
       });

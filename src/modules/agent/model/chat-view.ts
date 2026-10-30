@@ -30,3 +30,14 @@ export function useChatView(state: ChatState) {
     secrets: computed(() => state.secrets),
   };
 }
+
+/** The chat's own feature choice: reactive for the island, saved with the chat when it changes. */
+export function featureChoice(state: ChatState, persist: () => void) {
+  return {
+    featureOverrides: computed(() => state.featureOverrides),
+    setFeatureOverrides(value: string[] | undefined) {
+      state.featureOverrides = value;
+      persist();
+    },
+  };
+}

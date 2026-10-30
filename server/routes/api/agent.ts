@@ -35,6 +35,7 @@ import {
   injectMessage,
   worktreeCwd,
   readAgentHistory,
+  readChatFeatures,
   readAttachment,
   saveAttachment,
   writeAgentHistory,
@@ -77,9 +78,10 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
         id,
         body.turns,
         project && backend ? { project, backend, ...(title ? { title } : {}) } : undefined,
+        body.features,
       );
     }
-    json(res, 200, { turns });
+    json(res, 200, { turns, features: readChatFeatures(id) ?? null });
     return true;
   }
   if (path === "/api/agent/modes" && method === "GET") {

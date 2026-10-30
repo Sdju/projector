@@ -12,7 +12,7 @@ import {
 import { addVersion } from "./branches.ts";
 import { chatHistory } from "./chat-state.ts";
 import { chatKeyOf } from "./chat-key.ts";
-import { useChatView } from "./chat-view.ts";
+import { featureChoice, useChatView } from "./chat-view.ts";
 import { takeDraft } from "./drafts.ts";
 import { useChatActions } from "./chat-actions.ts";
 import {
@@ -272,6 +272,7 @@ export function useAgent(
         parts: content,
         messageId: userTurn.id,
         tail: branchFrom,
+        features: state.featureOverrides,
         worktree: copy,
         isolate,
         attach,
@@ -383,6 +384,7 @@ export function useAgent(
     canRewindFiles: actions.canRewindFiles,
     rewindFiles: actions.rewindFiles,
     isolate: actions.isolate,
+    ...featureChoice(state, () => void ready.then(persist)),
     worktreeId,
     worktreeInfo: actions.worktreeInfo,
     mergeCopy: actions.mergeCopy,
