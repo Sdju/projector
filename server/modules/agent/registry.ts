@@ -3,6 +3,7 @@ import type {
   AgentBackendId,
   AgentCapabilities,
   AgentRunOptions,
+  AgentTerminal,
 } from "./backend.ts";
 import { preferences } from "../preferences/index.ts";
 
@@ -12,6 +13,7 @@ export type {
   AgentBackendId,
   AgentCommand,
   AgentPermissionMode,
+  AgentTerminal,
   McpServerInfo,
   MessagePart,
   RewindResult,
@@ -41,16 +43,18 @@ export interface AgentBackendSummary {
   id: AgentBackendId;
   label: string;
   program?: string;
+  terminal?: AgentTerminal;
   builtin?: boolean;
   capabilities?: AgentCapabilities;
 }
 
 /** Every registered backend in registration order, without its methods. */
 export function listAgentBackends(): AgentBackendSummary[] {
-  return [...backends.values()].map(({ id, label, program, builtin, capabilities }) => ({
+  return [...backends.values()].map(({ id, label, program, terminal, builtin, capabilities }) => ({
     id,
     label,
     ...(program ? { program } : {}),
+    ...(terminal ? { terminal } : {}),
     ...(builtin ? { builtin } : {}),
     ...(capabilities ? { capabilities } : {}),
   }));

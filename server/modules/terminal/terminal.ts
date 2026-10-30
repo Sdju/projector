@@ -184,6 +184,32 @@ export function closeProjectTerminals(projectId: string): void {
     closeTerminalSession(projectId, session.id);
 }
 
+/** What a terminal needs from an agent's descriptor: the executable to run and the tab title. */
+export interface TerminalProgramDescriptor {
+  executable: string;
+  title: string;
+}
+
+/**
+ * Programs come from the agent registry through this lookup, which composition sets at startup:
+ * importing the registry here would close a module cycle through events and processes.
+ */
+let findProgram: (program: string) => TerminalProgramDescriptor | undefined = () => undefined;
+
+/** Wires terminal programs to the agent registry; called by the composition, not by modules. */
+export function configureTerminalPrograms(
+  lookup: (program: string) => TerminalProgramDescriptor | undefined,
+): void {
+  findProgram = lookup;
+}
+
+/** The descriptor of a registered agent's terminal; looked up per call, as the registry fills late. */
+function agentTerminal(program: string): TerminalProgramDescriptor {
+  const terminal = findProgram(program);
+  if (!terminal) throw new Error("Неизвестная программа");
+  return terminal;
+}
+
 export function createTerminalSession(
   project: Project,
   input: Record<string, unknown>,
@@ -204,8 +230,8 @@ export function createTerminalSession(
   if (!previous && state.sessions.size >= MAX_SESSIONS)
     throw new Error("Лимит терминалов: закройте ненужные сессии");
   const program = (input.program ?? "shell") as TerminalProgram;
-  if (!["shell", "codex", "claude", "opencode", "cursor", "kimi"].includes(program))
-    throw new Error("Неизвестная программа");
+  // `shell` is built in; every other program comes from the agent registry, which fills at startup.
+  const terminal = program === "shell" ? undefined : agentTerminal(program);
   const command =
     input.commandId === undefined
       ? undefined
@@ -234,13 +260,12 @@ export function createTerminalSession(
   }
   env.TERM = "xterm-256color";
   env.COLORTERM = "truecolor";
-  // Cursor Agent CLI installs as `agent` / `cursor-agent`, not `cursor`.
-  const executable = program === "cursor" ? "agent" : program;
+  // An agent's CLI may install under another name than its program; its descriptor says which.
   const shell: ShellLaunch = command
     ? { kind: "command", command: command.cmd }
     : program === "shell"
       ? { kind: "interactive" }
-      : { kind: "program", executable };
+      : { kind: "program", executable: terminal!.executable };
   // A config the user trusted in its current form replaces the restricted environment.
   const trusted = launch ? undefined : devcontainerLaunch(project, shell);
   if (trusted) launch = trusted;
@@ -283,17 +308,7 @@ export function createTerminalSession(
       devcontainer: launch?.workspace ? { workspace: launch.workspace } : undefined,
       commandId: command?.id,
       customTitle: previous?.info.customTitle,
-      title:
-        launch?.title ??
-        command?.name ??
-        {
-          shell: "Shell",
-          codex: "Codex",
-          claude: "Claude Code",
-          opencode: "OpenCode",
-          cursor: "Cursor",
-          kimi: "Kimi",
-        }[program],
+      title: launch?.title ?? command?.name ?? (program === "shell" ? "Shell" : terminal!.title),
       pid: child.pid,
       ...dimensions,
       status: "running",

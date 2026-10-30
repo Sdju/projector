@@ -1,5 +1,6 @@
 import { listAgentBackends, registerAgentBackend } from "../modules/agent/index.ts";
 import { configureAgentPreferences } from "../modules/preferences/index.ts";
+import { configureTerminalPrograms } from "../modules/terminal/index.ts";
 import { claudeCodeBackend } from "../modules/agents/claude-code/index.ts";
 import { codexBackend } from "../modules/agents/codex/index.ts";
 import { cursorBackend } from "../modules/agents/cursor/index.ts";
@@ -26,4 +27,9 @@ export function registerBuiltinAgents(): void {
         .filter(({ builtin }) => !builtin)
         .map(({ id }) => id),
   });
+  // Terminal programs come from the same registry; no list of agents lives in the terminal.
+  configureTerminalPrograms(
+    (program) =>
+      listAgentBackends().find((backend) => backend.terminal?.program === program)?.terminal,
+  );
 }

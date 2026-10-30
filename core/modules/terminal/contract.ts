@@ -1,4 +1,5 @@
-export type TerminalProgram = "shell" | "codex" | "claude" | "opencode" | "cursor" | "kimi";
+/** A program a terminal can run: `shell` or the terminal program id of an agent in the catalog. */
+export type TerminalProgram = string;
 
 export interface TerminalActivity {
   state: "idle" | "busy" | "unknown";

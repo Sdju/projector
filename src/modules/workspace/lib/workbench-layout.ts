@@ -345,12 +345,20 @@ export function useWorkbenchLayout(ctx: WorkbenchLayoutContext) {
     "Новый терминал",
     async (value) => {
       const { program = "shell" } = commandArgs(value);
-      if (!["shell", "codex", "claude", "opencode", "cursor", "kimi"].includes(program as string))
-        throw new Error("program: shell, codex, claude, opencode или cursor");
-      await createTerminal(program as TerminalProgram);
+      if (typeof program !== "string" || !program.trim())
+        throw new Error("program: непустая строка");
+      // The server owns the catalog: an unknown program is refused there.
+      await createTerminal(program);
     },
     () => !terminals.busy.value,
     "terminals",
+    {
+      description: "Создаёт терминальную сессию в проекте и показывает её вкладку.",
+      arguments: {
+        program:
+          "string (необязательно): shell или id терминальной программы агента; по умолчанию shell",
+      },
+    },
   );
   registerTabReader({
     layout: () => layout.value,

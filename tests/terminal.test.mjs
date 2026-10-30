@@ -364,6 +364,11 @@ test("OpenCode uses project cwd and an interactive PTY, reconnects and restarts"
     process.env.PATH = previousPath;
   }
 });
+test("an unknown terminal program is refused before any PTY starts", async () => {
+  const refused = await request("", "POST", { program: "nope" });
+  expect(refused.status).toBe(400);
+  expect((await refused.json()).error).toBe("Неизвестная программа");
+});
 test("Cursor launches agent CLI in project cwd with an interactive PTY", async () => {
   const bin = join(root, "bin");
   await mkdir(bin, { recursive: true });

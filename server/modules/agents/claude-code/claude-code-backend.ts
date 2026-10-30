@@ -334,6 +334,7 @@ export const claudeCodeBackend: AgentBackend = {
   id: "claude-code",
   label: CLAUDE_LABEL,
   program: "claude",
+  terminal: { program: "claude", executable: "claude", title: CLAUDE_LABEL },
   capabilities: {
     hosted: true,
     inject: true,

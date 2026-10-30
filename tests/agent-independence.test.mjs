@@ -50,7 +50,6 @@ const AGENT_PATTERNS = [
  * code has to be fixed, not allowlisted. By the end of phase 6 this map is empty.
  */
 const BASELINE = new Map([
-  ["core/modules/ide/command-help.ts", ["claude", "codex", "kimi", "opencode"]],
   ["core/modules/os-posix/codex.ts", ["codex"]],
   ["core/modules/os-posix/cursor.ts", ["cursor"]],
   ["core/modules/os-posix/index.ts", ["codex", "kimi", "opencode"]],
@@ -62,8 +61,6 @@ const BASELINE = new Map([
   ["core/modules/os/modules/windows/kimi.ts", ["kimi"]],
   ["core/modules/os/modules/windows/opencode.ts", ["opencode"]],
   ["core/modules/os/session-env.ts", ["claude"]],
-  ["core/modules/terminal/contract.ts", ["claude", "codex", "kimi", "opencode", "cursor"]],
-  ["server/modules/terminal/terminal.ts", ["claude", "codex", "kimi", "opencode", "cursor"]],
   ["src/modules/agent/lib/job-labels.ts", ["claude", "codex", "kimi", "opencode", "cursor"]],
   ["src/modules/agent/model/agent-commands.ts", ["claude"]],
   ["src/modules/agent/model/job-commands.ts", ["claude", "codex", "kimi", "opencode", "cursor"]],
@@ -74,10 +71,6 @@ const BASELINE = new Map([
   ["src/modules/app-settings/sections.ts", ["claude", "codex", "kimi", "opencode"]],
   ["src/modules/workspace-api/local.ts", ["claude", "codex", "kimi", "opencode", "cursor"]],
   ["src/modules/workspace/lib/tab-views.ts", ["claude", "codex", "kimi", "opencode", "cursor"]],
-  [
-    "src/modules/workspace/lib/workbench-layout.ts",
-    ["claude", "codex", "kimi", "opencode", "cursor"],
-  ],
   [
     "src/modules/workspace/ui/NewSessionMenu.vue",
     ["claude", "codex", "kimi", "opencode", "cursor"],

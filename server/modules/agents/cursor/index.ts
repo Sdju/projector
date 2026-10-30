@@ -7,6 +7,7 @@ export const cursorProgram = {
   label: "Cursor",
   command: "agent",
   args: ["acp"],
+  terminal: { executable: "agent" },
   extensions: { "cursor/ask_question": askCursorQuestions },
 };
 

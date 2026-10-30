@@ -118,6 +118,19 @@ export interface AgentRunOptions {
 }
 
 /**
+ * A terminal program that opens an agent: the program id the client and the session use, the
+ * executable the PTY runs, and the title of the tab.
+ */
+export interface AgentTerminal {
+  /** Program id of the terminal, shared by the client and the session. */
+  program: string;
+  /** Executable the PTY starts; it may differ from the program id. */
+  executable: string;
+  /** Title of the terminal tab. */
+  title: string;
+}
+
+/**
  * One way of running the chat agent. A backend streams the shared SSE events (`text`, `tool`,
  * `tool-result`, ...) so the client stays agent-agnostic. To add an agent, extend `AgentBackendId`,
  * implement a backend in its own module under `server/modules/agents/` and register it in
@@ -132,6 +145,8 @@ export interface AgentBackend {
    * program; the built-in Projector agent has no terminal and leaves this out.
    */
   program?: string;
+  /** How the agent opens as a terminal; the built-in Projector agent has no terminal. */
+  terminal?: AgentTerminal;
   /** The server's own agent: always on, never listed as an external integration. */
   builtin?: true;
   capabilities?: AgentCapabilities;

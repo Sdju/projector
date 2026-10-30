@@ -19,14 +19,6 @@ export function commandHelp(id: string): {
             : { id: "string (необязательно): идентификатор вкладки" },
     };
   }
-  if (id === "ide.workbench.terminal.new")
-    return {
-      description: "Создаёт терминальную сессию в проекте и показывает её вкладку.",
-      arguments: {
-        program:
-          "string (необязательно): shell, codex, claude, opencode, cursor или kimi; по умолчанию shell",
-      },
-    };
   if (id.startsWith("ide.workbench.panel."))
     return {
       description:

@@ -32,6 +32,7 @@ export type {
   AgentPermissionMode,
   AgentRunHandle,
   AgentRunOptions,
+  AgentTerminal,
   McpServerInfo,
   MessagePart,
   RewindResult,

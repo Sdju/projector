@@ -72,6 +72,12 @@ export function createAcpBackend(program: AcpProgram): AgentBackend {
     id,
     label: program.label,
     program: program.id,
+    terminal: {
+      program: id,
+      executable: id,
+      title: program.label,
+      ...program.terminal,
+    },
     capabilities: { hosted: true },
     run: (options) => run(options, id),
     available: () =>

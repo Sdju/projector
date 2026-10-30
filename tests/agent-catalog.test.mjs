@@ -25,6 +25,25 @@ test("the registry lists every backend in registration order with its label and 
   expect(backends.filter((backend) => backend.builtin).map(({ id }) => id)).toEqual(["projector"]);
 });
 
+test("every agent declares how its terminal opens, with the program id as the default executable", () => {
+  const byId = Object.fromEntries(listAgentBackends().map((backend) => [backend.id, backend]));
+  expect(byId.projector.terminal).toBeUndefined();
+  expect(byId["claude-code"].terminal).toEqual({
+    program: "claude",
+    executable: "claude",
+    title: "Claude Code",
+  });
+  // The Cursor Agent CLI installs as `agent`, while the program stays `cursor`.
+  expect(byId.cursor.terminal).toEqual({ program: "cursor", executable: "agent", title: "Cursor" });
+  for (const id of ["codex", "opencode", "kimi"]) {
+    expect(byId[id].terminal.program).toBe(id);
+    expect(byId[id].terminal.executable).toBe(id);
+    expect(byId[id].terminal.title).toBe(byId[id].label);
+  }
+  for (const backend of Object.values(byId))
+    if (backend.program) expect(backend.terminal?.program).toBe(backend.program);
+});
+
 test("a new backend reaches the feature switches, the on/off setting and the chat mode", async () => {
   registerAgentBackend({
     id: "fake-agent",

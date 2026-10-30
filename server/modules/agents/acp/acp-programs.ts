@@ -1,4 +1,4 @@
-import type { AgentBackendId, AgentRunOptions } from "../../agent/index.ts";
+import type { AgentBackendId, AgentRunOptions, AgentTerminal } from "../../agent/index.ts";
 import type { AcpDialect } from "./acp-dialect.ts";
 
 /**
@@ -14,6 +14,11 @@ export interface AcpProgram {
   args: string[];
   /** A globally installed binary that replaces `command` when present (avoids `npx`). */
   binary?: string;
+  /**
+   * Overrides of the terminal that opens the agent: the program id defaults to `id`, the
+   * executable to `id` and the tab title to `label`.
+   */
+  terminal?: Partial<AgentTerminal>;
   /** What the agent adds to ACP (subagents, background commands); plain when absent. */
   dialect?: () => AcpDialect;
   /** The agent's own request methods (outside ACP), answered by the handler it names. */

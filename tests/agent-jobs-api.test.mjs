@@ -82,6 +82,7 @@ test("the agent catalog and chat programs come from the backend registry", async
   expect(backends.find((item) => item.id === "codex")).toMatchObject({
     label: "Codex",
     program: "codex",
+    terminal: { program: "codex", executable: "codex", title: "Codex" },
   });
   expect(backends.find((item) => item.id === "projector").builtin).toBe(true);
 
