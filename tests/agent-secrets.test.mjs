@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -65,24 +66,49 @@ test("the destination must be a .env file of the project, reached without links 
 
 test("the bridge hands the typed value only to the caller and reports a decline as null", async () => {
   const events = [];
+  const destination = {
+    kind: "env_file",
+    file: ".env",
+    key: "OPENAI_API_KEY",
+    replaces: false,
+  };
   const controller = new AbortController();
   const ask = createSecretBridge((event, data) => events.push({ event, data }), controller.signal);
-  const pending = ask({
-    label: "Ключ OpenAI",
-    destination: { kind: "env_file", file: ".env", key: "OPENAI_API_KEY", replaces: false },
-  });
+  const pending = ask({ label: "Ключ OpenAI", destination });
   const sent = events.at(-1);
   expect(sent.event).toBe("secret-request");
-  expect(JSON.stringify(sent.data)).not.toContain("sk-");
-  completeCommandRequest(sent.data.id, { output: { value: "sk-typed" } });
+  expect(sent.data).toMatchObject({ label: "Ключ OpenAI", destination });
+  expect(completeCommandRequest(sent.data.id, { output: { value: "sk-typed" } })).toBe(true);
   await expect(pending).resolves.toBe("sk-typed");
+  // The caller receives the value; nothing sent to the browser does, before or after typing.
+  expect(JSON.stringify(events)).not.toContain("sk-typed");
 
-  const declined = ask({
-    label: "Ключ",
-    destination: { kind: "env_file", file: ".env", key: "K", replaces: false },
-  });
+  const declined = ask({ label: "Ключ", destination });
   completeCommandRequest(events.at(-1).data.id, { output: {} });
   await expect(declined).resolves.toBeNull();
+
+  const blank = ask({ label: "Ключ", destination });
+  completeCommandRequest(events.at(-1).data.id, { output: { value: "" } });
+  await expect(blank).resolves.toBeNull();
+
+  // Abort and timeout reject, so a missing secret is never mistaken for a typed one.
+  const stopping = new AbortController();
+  const stoppingAsk = createSecretBridge(
+    (event, data) => events.push({ event, data }),
+    stopping.signal,
+  );
+  const aborted = stoppingAsk({ label: "Ключ", destination });
+  stopping.abort();
+  await expect(aborted).rejects.toThrow(/остановлен/);
+
+  const slow = createSecretBridge(
+    (event, data) => events.push({ event, data }),
+    new AbortController().signal,
+    5,
+  );
+  await expect(slow({ label: "Ключ", destination })).rejects.toThrow(/не получен вовремя/);
+
+  expect(JSON.stringify(events)).not.toContain("sk-typed");
 });
 
 test("request_secret returns only the fact of storing, never the value", async () => {
@@ -104,11 +130,39 @@ test("request_secret returns only the fact of storing, never the value", async (
     stored: false,
     declined: true,
   });
+
+  // Without a client that can show the prompt, the tool is not constructed at all.
+  expect(createToolSpecs({ onProject: () => {} }).map((item) => item.name)).not.toContain(
+    "request_secret",
+  );
 });
 
-test("the secret tool is absent when the client cannot show the prompt", () => {
-  const names = createToolSpecs({ onProject: () => {} }).map((item) => item.name);
-  expect(names).not.toContain("request_secret");
+test("gitIgnored says whether the project's rules keep the written .env out of commits", async () => {
+  const cwd = await project();
+  execFileSync("git", ["init", "-q", cwd]);
+  const store = createToolSpecs({
+    cwd,
+    onProject: () => {},
+    secret: async () => "sk-ignored",
+  }).find((item) => item.name === "request_secret");
+  const storeIn = async () => (await store.run({ kind: "env", key: "TOKEN" })).gitIgnored;
+
+  // Nothing ignores the new file yet: it would be committed.
+  expect(await storeIn()).toBe(false);
+  await writeFile(join(cwd, ".gitignore"), ".env\n");
+  expect(await storeIn()).toBe(true);
+  // A tracked file is no longer ignored even when a rule matches it.
+  execFileSync("git", ["-C", cwd, "add", "-f", ".env"]);
+  expect(await storeIn()).toBe(false);
+
+  // Outside a repository the answer is unknown, not a promise that the secret stays out.
+  const plain = await project();
+  const outside = createToolSpecs({
+    cwd: plain,
+    onProject: () => {},
+    secret: async () => "sk-plain",
+  }).find((item) => item.name === "request_secret");
+  expect((await outside.run({ kind: "env", key: "TOKEN" })).gitIgnored).toBeUndefined();
 });
 
 function fakeKeyring({ available = true } = {}) {

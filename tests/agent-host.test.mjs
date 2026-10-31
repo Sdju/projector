@@ -47,8 +47,8 @@ async function until(check, timeoutMs = 8000) {
   throw new Error("condition not met in time");
 }
 
-test("an agent run survives its server and is rejoined with the whole answer replayed", async () => {
-  if (process.platform === "win32") return;
+// oxfmt-ignore
+test.skipIf(process.platform === "win32")("an agent run survives its server and is rejoined with the whole answer replayed", async () => {
   const directory = await mkdtemp(join(tmpdir(), "projector-host-"));
   const previous = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = directory;
@@ -127,6 +127,7 @@ test("an agent run survives its server and is rejoined with the whole answer rep
       .split("\n")
       .map((line) => JSON.parse(line))
       .map((message) => message.method ?? `answer:${message.id}`);
+    expect(methods.filter((method) => method === "answer:100")).toHaveLength(1);
     expect(methods).toStrictEqual(["initialize", "session/new", "session/prompt", "answer:100"]);
     await second.close();
     await until(async () => (await os.processes.identity(pid)) === null);
@@ -148,6 +149,9 @@ test("an agent run survives its server and is rejoined with the whole answer rep
         NO_TIMEOUT,
       ),
     ).toStrictEqual({ stopReason: "end_turn" });
+    expect(replayed.join(""), "the whole prior answer is replayed, not only its last line").toBe(
+      "onetwo",
+    );
     expect(replayed).toStrictEqual(["one", "two"]);
     expect(asking).toStrictEqual([]);
     await third.close();
@@ -158,8 +162,8 @@ test("an agent run survives its server and is rejoined with the whole answer rep
   }
 }, 30000);
 
-test("stopping a hosted run kills the agent and everything it started", async () => {
-  if (process.platform === "win32") return;
+// oxfmt-ignore
+test.skipIf(process.platform === "win32")("stopping a hosted run kills the agent and everything it started", async () => {
   const directory = await mkdtemp(join(tmpdir(), "projector-host-"));
   const previous = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = directory;
@@ -194,8 +198,8 @@ test("stopping a hosted run kills the agent and everything it started", async ()
   }
 }, 30000);
 
-test("a run started by an earlier server is stopped from its identity, never by a reused pid", async () => {
-  if (process.platform === "win32") return;
+// oxfmt-ignore
+test.skipIf(process.platform === "win32")("a run started by an earlier server is stopped from its identity, never by a reused pid", async () => {
   const directory = await mkdtemp(join(tmpdir(), "projector-host-"));
   const previous = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = directory;

@@ -1,17 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
-import { buildSystemPrompt } from "../server/modules/agents/projector/prompts.ts";
 import { contextOf, tokensOf } from "../server/modules/agents/projector/projector-usage.ts";
 
 describe("prompt cache", () => {
-  it("builds a byte-identical system prompt every time, so the provider can cache its prefix", () => {
-    expect(buildSystemPrompt("гайд")).toBe(buildSystemPrompt("гайд"));
-    expect(buildSystemPrompt("гайд")).not.toMatch(/\b20\d\d-\d\d-\d\d\b|Date|\d{2}:\d{2}:\d{2}/);
-  });
-
-  it("names no concrete external agent, so the prompt does not drift from the registry", () => {
-    expect(buildSystemPrompt("")).not.toMatch(/\b(claude|codex|cursor|kimi|opencode)\b/i);
-  });
-
   it("splits the prompt into cached and fresh tokens", () => {
     expect(
       tokensOf({

@@ -5,7 +5,7 @@ import { applyAgentEvent } from "../src/modules/agent/model/turn-events.ts";
 import { injectMessage } from "../server/modules/agent/injection.ts";
 import { createTurnInput } from "../server/modules/agents/projector/projector-input.ts";
 import { projectorBackend } from "../server/modules/agents/projector/index.ts";
-import { scriptedModel } from "./evals/harness.mjs";
+import { scriptedModel } from "./helpers/scripted-model.mjs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -193,18 +193,22 @@ test("hosted delivery waits for the runner's boundary acknowledgement", async ()
   let active;
   try {
     const runner = join(directory, "runner.mjs");
+    const release = join(directory, "release");
     const modulePath = (path) => JSON.stringify(new URL(path, import.meta.url).href);
     await writeFile(
       runner,
       `
+      import { existsSync } from "node:fs";
       import { runHostedRunner } from ${modulePath("../server/modules/agent/hosted-runner.ts")};
       import { createTurnInput } from ${modulePath("../server/modules/agents/projector/projector-input.ts")};
+      const release = ${JSON.stringify(release)};
       runHostedRunner(async (options) => {
         const input = createTurnInput(options);
         options.emit("text", { text: "ready" });
         try {
           while (!input.pending && !options.abort.aborted) await new Promise(r => setTimeout(r, 10));
-          await new Promise(r => setTimeout(r, 100));
+          options.emit("text", { text: "received" });
+          while (!existsSync(release) && !options.abort.aborted) await new Promise(r => setTimeout(r, 10));
           input.take();
           options.emit("done", { text: "done" });
         } finally { input.close(); }
@@ -228,12 +232,26 @@ test("hosted delivery waits for the runner's boundary acknowledgement", async ()
       record.messageId,
     );
     await started;
-    let accepted = false;
-    const delivered = Promise.resolve(injectMessage(record.messageId, "follow-up")).then(
-      (value) => (accepted = value),
+    let accepted;
+    let settled = false;
+    const delivered = (async () => {
+      const value = await injectMessage(record.messageId, "follow-up");
+      accepted = value;
+      settled = true;
+      return value;
+    })();
+    // The runner has the input queued but has not taken it: delivery must still be unacknowledged.
+    await vi.waitFor(
+      () =>
+        expect(events.some((item) => item.event === "text" && item.data.text === "received")).toBe(
+          true,
+        ),
+      5000,
     );
-    expect(accepted).toBe(false);
-    await delivered;
+    expect(settled, "delivery stays pending until the runner acknowledges").toBe(false);
+    expect(accepted).toBeUndefined();
+    await writeFile(release, "");
+    expect(await delivered).toBe(true);
     expect(accepted).toBe(true);
     await active;
     expect(events.filter((item) => item.event === "input")).toEqual([
@@ -334,4 +352,19 @@ test("a replayed input confirms delivery even when the HTTP acknowledgement was 
   );
   expect(state.queue.map((item) => item.id)).toEqual(["next"]);
   expect(state.turns[0].parts).toEqual([{ type: "note", text: "confirmed" }]);
+});
+
+test("a replayed input event shows its note in the answer only once", () => {
+  const { state } = setup();
+  state.queue = [message("replayed")];
+  const event = { event: "input", data: { text: "replayed", inputId: "replayed" } };
+  const first = applyAgentEvent(state, state.turns[0], event, () => {});
+  const replay = applyAgentEvent(state, state.turns[0], event, () => {});
+
+  expect(state.queue).toEqual([]);
+  expect(state.turns[0].parts).toEqual([{ type: "note", text: "replayed" }]);
+  // The notes become user messages in context, so a duplicate would repeat the instruction.
+  expect(chatHistory(state.turns, true)).toEqual([{ role: "user", content: "replayed" }]);
+  expect(first).toBe(true);
+  expect(replay).toBe(false);
 });

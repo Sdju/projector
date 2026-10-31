@@ -1,8 +1,8 @@
-import { expect, onTestFinished, test } from "vite-plus/test";
+import { expect, onTestFinished, test, vi } from "vite-plus/test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { createServer } from "node:http";
+import { createServer, request } from "node:http";
 import { once } from "node:events";
 import { handleApi } from "../server/app/api.ts";
 import { setGatewayEnabled } from "../server/modules/openai-gateway/index.ts";
@@ -18,11 +18,11 @@ async function listen(server) {
   return server.address().port;
 }
 
-async function setup() {
+async function setup(network = "local", { respond, providerApiKey = "" } = {}) {
   const dir = await mkdtemp(join(tmpdir(), "projector-openai-gateway-"));
   const previous = { data: process.env.XDG_DATA_HOME, network: process.env.PROJECTOR_NETWORK };
   process.env.XDG_DATA_HOME = dir;
-  process.env.PROJECTOR_NETWORK = "local";
+  process.env.PROJECTOR_NETWORK = network;
   onTestFinished(async () => {
     for (const [key, value] of [
       ["XDG_DATA_HOME", previous.data],
@@ -43,6 +43,7 @@ async function setup() {
       auth: req.headers.authorization,
       body: Buffer.concat(chunks).toString(),
     });
+    if (respond) return respond(req, res);
     res.writeHead(200, { "Content-Type": "text/event-stream" });
     res.write("data: one\n\n");
     res.end("data: [DONE]\n\n");
@@ -60,21 +61,21 @@ async function setup() {
           name: "A",
           url: `http://127.0.0.1:${upstreamPort}`,
           model: "model-a",
-          apiKey: "",
+          apiKey: providerApiKey,
         },
         {
           id: "b",
           name: "B",
           url: `http://127.0.0.1:${upstreamPort}/x/v2`,
           model: "model-b",
-          apiKey: "",
+          apiKey: providerApiKey,
         },
       ],
     }),
   );
   const gateway = createServer((req, res) => void handleApi(req, res));
   const port = await listen(gateway);
-  return { seen, base: `http://127.0.0.1:${port}` };
+  return { seen, base: `http://127.0.0.1:${port}`, upstreamPort };
 }
 
 test("gateway is off until enabled and reports OpenAI-shaped errors", async () => {
@@ -168,7 +169,9 @@ test("a whitelisted origin gets its own origin echoed, others stay refused", asy
 });
 
 test("an access key is required once set and is never a session for the rest of the API", async () => {
-  const { base } = await setup();
+  const { base } = await setup("lan");
+  const { authorizeHttp, setLanPassword } = await import("../server/modules/access/index.ts");
+  setLanPassword("lan-password");
   const set = await fetch(`${base}/api/openai`, {
     method: "PUT",
     body: JSON.stringify({ enabled: true, apiKey: "sk-test-key" }),
@@ -185,7 +188,38 @@ test("an access key is required once set and is never a session for the rest of 
     headers: { Authorization: "Bearer sk-test-key" },
   });
   expect(ok.status).toBe(200);
-  expect(ok.headers.get("set-cookie")).toBeNull();
+
+  // A LAN client authenticating the gateway with its key gets no session cookie, although the
+  // very same client path issues one for the LAN password.
+  const request = (url, authorization) => ({
+    url,
+    method: "GET",
+    headers: { host: "192.0.2.1:4177", authorization },
+    socket: { remoteAddress: "192.0.2.10" },
+  });
+  const response = () => {
+    const headers = {};
+    return {
+      headers,
+      setHeader: (name, value) => (headers[name.toLowerCase()] = value),
+      hasHeader: (name) => name.toLowerCase() in headers,
+      writeHead() {
+        return this;
+      },
+      end() {},
+    };
+  };
+  const attempt = (url, authorization) => {
+    const res = response();
+    return { allowed: authorizeHttp(request(url, authorization), res), res };
+  };
+  const key = attempt("/api/openai/v1/models", "Bearer sk-test-key");
+  expect(key.allowed).toBe(true);
+  expect(key.res.headers["set-cookie"], "no session from a gateway key").toBeUndefined();
+  expect(attempt("/api/projects", "Bearer sk-test-key").allowed).toBe(false);
+  const password = attempt("/api/projects", "Bearer lan-password");
+  expect(password.allowed).toBe(true);
+  expect(password.res.headers["set-cookie"]).toMatch(/projector_lan=/);
 
   const cleared = await fetch(`${base}/api/openai`, {
     method: "PUT",
@@ -273,4 +307,170 @@ test("origin templates cover this machine and the local network on any port", as
     "http://192.168.1.1.evil.com",
   ])
     expect(await status(origin), origin).toBe(403);
+});
+
+test("gateway refuses an oversized body with an OpenAI 413 and never calls the upstream", async () => {
+  const { base, seen } = await setup();
+  setGatewayEnabled(true);
+  const port = new URL(base).port;
+  // Matches MAX_BODY in server/modules/openai-gateway/gateway.ts: 32 * 1024 * 1024.
+  const limit = 32 * 1024 * 1024;
+  const head = Buffer.from('{"model":"model-a","stream":true,"pad":"');
+  const tail = Buffer.from('"}');
+  const chunk = Buffer.alloc(1024 * 1024, "a");
+
+  // The body is streamed in 1 MiB chunks: neither a 32 MiB string nor 32 MiB of
+  // response are built up front. The gateway answers 413 before the upload ends,
+  // so late writes may hit the socket it has already closed.
+  const post = async (total) => {
+    const req = request({
+      port,
+      method: "POST",
+      path: "/api/openai/v1/chat/completions",
+      headers: { "content-type": "application/json" },
+    });
+    req.on("error", () => {});
+    let left = total - head.length - tail.length;
+    req.write(head);
+    while (left > 0) {
+      const size = Math.min(left, chunk.length);
+      if (!req.write(size === chunk.length ? chunk : chunk.subarray(0, size)))
+        await once(req, "drain");
+      left -= size;
+    }
+    req.end(tail);
+    const [response] = await once(req, "response");
+    const parts = [];
+    for await (const part of response) parts.push(part);
+    return { status: response.statusCode, body: Buffer.concat(parts).toString() };
+  };
+
+  const oversized = await post(limit + 1);
+  expect(oversized.status).toBe(413);
+  expect(JSON.parse(oversized.body).error).toMatchObject({
+    type: "invalid_request_error",
+    code: null,
+  });
+  expect(seen, "an oversized body is not forwarded").toHaveLength(0);
+
+  const atLimit = await post(limit - 1);
+  expect(atLimit.status).toBe(200);
+  expect(atLimit.body).toContain("[DONE]");
+  expect(seen).toHaveLength(1);
+  expect(seen[0].body.startsWith('{"model":"model-a"')).toBe(true);
+});
+
+test("gateway turns an upstream failure into a sanitized 502", async () => {
+  const upstreamSecret = "UPSTREAM-SECRET-BODY";
+  const providerKey = "sk-upstream-provider-secret";
+  const clientKey = "sk-client-gateway-secret";
+  const { base, seen, upstreamPort } = await setup("local", {
+    providerApiKey: providerKey,
+    respond: (_req, res) => {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: { message: upstreamSecret, key: providerKey } }));
+    },
+  });
+  setGatewayEnabled(true);
+  await fetch(`${base}/api/openai`, {
+    method: "PUT",
+    body: JSON.stringify({ apiKey: clientKey }),
+  });
+
+  const response = await fetch(`${base}/api/openai/v1/chat/completions`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${clientKey}` },
+    body: JSON.stringify({ model: "model-a", messages: [] }),
+  });
+  const text = await response.text();
+  expect(response.status).toBe(502);
+  expect(JSON.parse(text).error.type).toBe("api_error");
+  expect(text).not.toContain(upstreamSecret);
+  expect(text).not.toContain(`127.0.0.1:${upstreamPort}`);
+  expect(text).not.toContain(clientKey);
+  expect(text).not.toContain(providerKey);
+  expect(seen, "the upstream is called exactly once").toHaveLength(1);
+});
+
+test("gateway keeps a valid upstream 4xx but drops unknown fields", async () => {
+  const { base, seen } = await setup("local", {
+    respond: (_req, res) => {
+      res.writeHead(400, {
+        "Content-Type": "application/json",
+        "X-Upstream-Secret": "UPSTREAM-HEADER-SECRET",
+      });
+      res.end(
+        JSON.stringify({
+          error: {
+            message: "model does not exist",
+            type: "invalid_request_error",
+            param: "model",
+            code: "model_not_found",
+            secret: "UPSTREAM-EXTRA-FIELD",
+          },
+          request_id: "UPSTREAM-REQUEST-ID",
+        }),
+      );
+    },
+  });
+  setGatewayEnabled(true);
+
+  const response = await fetch(`${base}/api/openai/v1/chat/completions`, {
+    method: "POST",
+    body: JSON.stringify({ model: "model-a", messages: [] }),
+  });
+  const body = await response.json();
+  expect(response.status).toBe(400);
+  expect(body.error).toEqual({
+    message: "model does not exist",
+    type: "invalid_request_error",
+    param: "model",
+    code: "model_not_found",
+  });
+  expect(JSON.stringify(body)).not.toContain("UPSTREAM-EXTRA-FIELD");
+  expect(JSON.stringify(body)).not.toContain("UPSTREAM-REQUEST-ID");
+  expect(response.headers.get("x-upstream-secret")).toBeNull();
+  expect(seen).toHaveLength(1);
+});
+
+test("gateway does not end a broken stream as a successful answer", async () => {
+  const providerKey = "sk-broken-stream-provider-secret";
+  const { base, seen } = await setup("local", {
+    providerApiKey: providerKey,
+    respond: (_req, res) => {
+      res.writeHead(200, { "Content-Type": "text/event-stream" });
+      res.write("data: partial\n\n", () => res.socket.destroy());
+    },
+  });
+  setGatewayEnabled(true);
+  const port = new URL(base).port;
+  const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+  onTestFinished(() => logged.mockRestore());
+
+  const result = await new Promise((resolve) => {
+    const req = request(
+      {
+        port,
+        method: "POST",
+        path: "/api/openai/v1/chat/completions",
+        headers: { "content-type": "application/json" },
+      },
+      (response) => {
+        let body = "";
+        response.on("data", (chunk) => (body += chunk));
+        response.on("close", () =>
+          resolve({ status: response.statusCode, complete: response.complete, body }),
+        );
+      },
+    );
+    req.on("error", () => resolve({ status: 0, complete: false, body: "" }));
+    req.end(JSON.stringify({ model: "model-a", stream: true }));
+  });
+
+  expect(result.status).toBe(200);
+  expect(result.complete, "the client sees a truncated response, not a finished one").toBe(false);
+  expect(result.body).not.toContain("[DONE]");
+  expect(seen).toHaveLength(1);
+  expect(logged, "the gateway logs the broken stream").toHaveBeenCalled();
+  expect(logged.mock.calls.flat().join("\n")).not.toContain(providerKey);
 });

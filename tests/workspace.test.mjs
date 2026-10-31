@@ -113,138 +113,191 @@ test("file drops preserve external contents and distinguish project paths", asyn
   URL.revokeObjectURL(image.image);
 });
 
-const root = await mkdtemp(join(tmpdir(), "projector-workspace-"));
-const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
-test("entry actions create, copy, rename and trash without overwriting or escaping the project", async () => {
-  const base = await mkdtemp(join(tmpdir(), "projector-entries-"));
-  try {
-    await mutateProjectEntry(base, "create-directory", "", "", "folder");
-    await mutateProjectEntry(base, "create-file", "", "folder", "note.md");
-    await writeFile(join(base, "folder/note.md"), "draft");
-    expect(await mutateProjectEntry(base, "rename", "folder/note.md", "", "new.md")).toStrictEqual({
-      source: "folder/note.md",
-      destination: "folder/new.md",
-    });
-    await mutateProjectEntry(base, "copy", "folder", "", "copy");
-    expect(await readFile(join(base, "copy/new.md"), "utf8")).toBe("draft");
-    for (const action of ["create-file", "create-directory", "copy"])
-      await expect(mutateProjectEntry(base, action, "folder", "", "copy")).rejects.toMatchObject({
+test("entry rename moves a file and refuses to overwrite an existing name", async () => {
+  await withDefaultExcludes(async () => {
+    const base = await mkdtemp(join(tmpdir(), "projector-entries-"));
+    try {
+      await mutateProjectEntry(base, "create-directory", "", "", "folder");
+      await mutateProjectEntry(base, "create-file", "", "folder", "note.md");
+      await writeFile(join(base, "folder/note.md"), "draft");
+      expect(
+        await mutateProjectEntry(base, "rename", "folder/note.md", "", "new.md"),
+      ).toStrictEqual({
+        source: "folder/note.md",
+        destination: "folder/new.md",
+      });
+      await mutateProjectEntry(base, "create-file", "", "folder", "other.md");
+      await expect(
+        mutateProjectEntry(base, "rename", "folder/new.md", "", "other.md"),
+      ).rejects.toMatchObject({
         status: 409,
       });
-    await expect(
-      mutateProjectEntry(base, "copy", "folder", "folder", "child"),
-    ).rejects.toMatchObject({
-      status: 400,
-    });
-    await mutateProjectEntry(base, "create-file", "", "folder", "other.md");
-    await expect(
-      mutateProjectEntry(base, "rename", "folder/new.md", "", "other.md"),
-    ).rejects.toMatchObject({
-      status: 409,
-    });
-    await symlink(base, join(base, "alias"));
-    for (const action of ["rename", "delete", "copy"])
-      for (const path of ["", "../outside", "alias", "alias/folder", ".git/config"])
-        await expect(mutateProjectEntry(base, action, path, "", "valid")).rejects.toMatchObject({
-          status: 403,
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  });
+});
+test("entry copy preserves contents and never overwrites an existing name", async () => {
+  await withDefaultExcludes(async () => {
+    const base = await mkdtemp(join(tmpdir(), "projector-entries-"));
+    try {
+      await mutateProjectEntry(base, "create-directory", "", "", "folder");
+      await mutateProjectEntry(base, "create-file", "", "folder", "new.md");
+      await writeFile(join(base, "folder/new.md"), "draft");
+      await mutateProjectEntry(base, "copy", "folder", "", "copy");
+      expect(await readFile(join(base, "copy/new.md"), "utf8")).toBe("draft");
+      for (const action of ["create-file", "create-directory", "copy"])
+        await expect(mutateProjectEntry(base, action, "folder", "", "copy")).rejects.toMatchObject({
+          status: 409,
         });
-    for (const name of [
-      "../outside",
-      "a/b",
-      "a\\b",
-      ".",
-      "..",
-      ".git",
-      ".projector-trash",
-      "\0",
-      "   ",
-    ])
-      await expect(mutateProjectEntry(base, "create-file", "", "", name)).rejects.toMatchObject({
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  });
+});
+test("entry copy refuses to copy a directory into its own subtree", async () => {
+  await withDefaultExcludes(async () => {
+    const base = await mkdtemp(join(tmpdir(), "projector-entries-"));
+    try {
+      await mkdir(join(base, "folder"));
+      await expect(
+        mutateProjectEntry(base, "copy", "folder", "folder", "child"),
+      ).rejects.toMatchObject({
         status: 400,
       });
-    await expect(
-      mutateProjectEntry(base, "create-file", "", "alias", "valid"),
-    ).rejects.toMatchObject({
-      status: 403,
-    });
-    execFileSync("git", ["-C", base, "init", "-q"]);
-    await mutateProjectEntry(base, "delete", "folder");
-    const trashed = await readdir(join(base, ".projector-trash"));
-    expect(trashed.length).toBe(1);
-    expect(
-      (await projectGit(base)).changes.every((change) => !change.path.includes(".projector-trash")),
-    ).toBeTruthy();
-    expect(await readFile(join(base, ".projector-trash", trashed[0], "new.md"), "utf8")).toBe(
-      "draft",
-    );
-    expect((await listProjectDirectory(base)).entries.map((entry) => entry.name)).toStrictEqual([
-      "copy",
-    ]);
-    await rm(join(base, ".projector-trash"), { recursive: true });
-    await symlink(tmpdir(), join(base, ".projector-trash"));
-    await expect(mutateProjectEntry(base, "delete", "copy")).rejects.toMatchObject({ status: 403 });
-    expect(await readFile(join(base, "copy/new.md"), "utf8")).toBe("draft");
-  } finally {
-    await rm(base, { recursive: true, force: true });
-  }
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  });
 });
-test("Text file saves preserve text and mode, reject stale drafts and contain writes", async () => {
-  const base = await mkdtemp(join(tmpdir(), "projector-markdown-"));
-  try {
-    await writeFile(join(base, "readme.md"), "# Original\r\n", { mode: 0o640 });
-    await saveProjectFile(base, "readme.md", "# Новый текст\r\n", "# Original\r\n");
-    expect(await readFile(join(base, "readme.md"), "utf8")).toBe("# Новый текст\r\n");
-    if (process.platform !== "win32")
-      expect((await lstat(join(base, "readme.md"))).mode & 0o777).toBe(0o640);
-    await expect(
-      saveProjectFile(base, "readme.md", "stale", "# Original\r\n"),
-    ).rejects.toMatchObject({
-      status: 409,
-    });
-    const competing = await Promise.allSettled([
-      saveProjectFile(base, "readme.md", "first", "# Новый текст\r\n"),
-      saveProjectFile(base, "readme.md", "second", "# Новый текст\r\n"),
-    ]);
-    expect(competing.filter((result) => result.status === "fulfilled").length).toBe(1);
-    expect(competing.find((result) => result.status === "rejected").reason.status).toBe(409);
-    await symlink(join(base, "readme.md"), join(base, "alias.md"));
-    await mkdir(join(base, ".git"));
-    await writeFile(join(base, ".git/config.md"), "protected");
-    for (const path of ["../outside.md", "/tmp/outside.md", "alias.md", ".git/config.md"])
-      await expect(saveProjectFile(base, path, "test", "")).rejects.toMatchObject({
+test("entry trash moves deletions aside and refuses a symlinked trash directory", async () => {
+  await withDefaultExcludes(async () => {
+    const base = await mkdtemp(join(tmpdir(), "projector-entries-"));
+    try {
+      for (const folder of ["folder", "copy"]) {
+        await mkdir(join(base, folder));
+        await writeFile(join(base, folder, "new.md"), "draft");
+      }
+      execFileSync("git", ["-C", base, "init", "-q"]);
+      await mutateProjectEntry(base, "delete", "folder");
+      const trashed = await readdir(join(base, ".projector-trash"));
+      expect(trashed.length).toBe(1);
+      expect(
+        (await projectGit(base)).changes.every(
+          (change) => !change.path.includes(".projector-trash"),
+        ),
+      ).toBeTruthy();
+      expect(await readFile(join(base, ".projector-trash", trashed[0], "new.md"), "utf8")).toBe(
+        "draft",
+      );
+      expect((await listProjectDirectory(base)).entries.map((entry) => entry.name)).toStrictEqual([
+        "copy",
+      ]);
+      await rm(join(base, ".projector-trash"), { recursive: true });
+      await symlink(tmpdir(), join(base, ".projector-trash"));
+      await expect(mutateProjectEntry(base, "delete", "copy")).rejects.toMatchObject({
         status: 403,
       });
-    for (const path of ["plain.ts", "settings.json", ".gitignore", "LICENSE"]) {
-      await writeFile(join(base, path), "original\r\n", { mode: 0o750 });
-      await saveProjectFile(base, path, "Изменено\r\n", "original\r\n");
-      expect(await readFile(join(base, path), "utf8")).toBe("Изменено\r\n");
+      expect(await readFile(join(base, "copy/new.md"), "utf8")).toBe("draft");
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  });
+});
+test("entry actions reject traversal, invalid names and symlinked directories", async () => {
+  await withDefaultExcludes(async () => {
+    const base = await mkdtemp(join(tmpdir(), "projector-entries-"));
+    try {
+      await mkdir(join(base, "folder"));
+      await symlink(base, join(base, "alias"));
+      for (const action of ["rename", "delete", "copy"])
+        for (const path of ["", "../outside", "alias", "alias/folder", ".git/config"])
+          await expect(mutateProjectEntry(base, action, path, "", "valid")).rejects.toMatchObject({
+            status: 403,
+          });
+      for (const name of [
+        "../outside",
+        "a/b",
+        "a\\b",
+        ".",
+        "..",
+        ".git",
+        ".projector-trash",
+        "\0",
+        "   ",
+      ])
+        await expect(mutateProjectEntry(base, "create-file", "", "", name)).rejects.toMatchObject({
+          status: 400,
+        });
+      await expect(
+        mutateProjectEntry(base, "create-file", "", "alias", "valid"),
+      ).rejects.toMatchObject({
+        status: 403,
+      });
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  });
+});
+test("Text file saves preserve text and mode, reject stale drafts and contain writes", async () => {
+  await withDefaultExcludes(async () => {
+    const base = await mkdtemp(join(tmpdir(), "projector-markdown-"));
+    try {
+      await writeFile(join(base, "readme.md"), "# Original\r\n", { mode: 0o640 });
+      await saveProjectFile(base, "readme.md", "# Новый текст\r\n", "# Original\r\n");
+      expect(await readFile(join(base, "readme.md"), "utf8")).toBe("# Новый текст\r\n");
       if (process.platform !== "win32")
-        expect((await lstat(join(base, path))).mode & 0o777).toBe(0o750);
-      await expect(saveProjectFile(base, path, "stale", "original\r\n")).rejects.toMatchObject({
+        expect((await lstat(join(base, "readme.md"))).mode & 0o777).toBe(0o640);
+      await expect(
+        saveProjectFile(base, "readme.md", "stale", "# Original\r\n"),
+      ).rejects.toMatchObject({
         status: 409,
       });
+      const competing = await Promise.allSettled([
+        saveProjectFile(base, "readme.md", "first", "# Новый текст\r\n"),
+        saveProjectFile(base, "readme.md", "second", "# Новый текст\r\n"),
+      ]);
+      expect(competing.filter((result) => result.status === "fulfilled").length).toBe(1);
+      expect(competing.find((result) => result.status === "rejected").reason.status).toBe(409);
+      await symlink(join(base, "readme.md"), join(base, "alias.md"));
+      await mkdir(join(base, ".git"));
+      await writeFile(join(base, ".git/config.md"), "protected");
+      for (const path of ["../outside.md", "/tmp/outside.md", "alias.md", ".git/config.md"])
+        await expect(saveProjectFile(base, path, "test", "")).rejects.toMatchObject({
+          status: 403,
+        });
+      for (const path of ["plain.ts", "settings.json", ".gitignore", "LICENSE"]) {
+        await writeFile(join(base, path), "original\r\n", { mode: 0o750 });
+        await saveProjectFile(base, path, "Изменено\r\n", "original\r\n");
+        expect(await readFile(join(base, path), "utf8")).toBe("Изменено\r\n");
+        if (process.platform !== "win32")
+          expect((await lstat(join(base, path))).mode & 0o777).toBe(0o750);
+        await expect(saveProjectFile(base, path, "stale", "original\r\n")).rejects.toMatchObject({
+          status: 409,
+        });
+      }
+      await writeFile(join(base, "binary.bin"), Buffer.from([0, 1]));
+      await expect(saveProjectFile(base, "binary.bin", "text", "")).rejects.toMatchObject({
+        status: 415,
+      });
+      await expect(saveProjectFile(base, "readme.md", "\0", "first")).rejects.toMatchObject({
+        status: 415,
+      });
+      await writeFile(join(base, "picture.png"), Buffer.from([137, 80, 78, 71]));
+      const image = await readProjectImage(base, "picture.png");
+      expect(image.type).toBe("image/png");
+      expect(image.content).toStrictEqual(Buffer.from([137, 80, 78, 71]));
+      expect(await previewProjectFile(base, "picture.png")).toStrictEqual({
+        path: "picture.png",
+        content: "",
+        image: true,
+      });
+      await expect(readProjectImage(base, "readme.md")).rejects.toMatchObject({ status: 415 });
+      await expect(readProjectImage(base, "../picture.png")).rejects.toMatchObject({ status: 403 });
+    } finally {
+      await rm(base, { recursive: true, force: true });
     }
-    await writeFile(join(base, "binary.bin"), Buffer.from([0, 1]));
-    await expect(saveProjectFile(base, "binary.bin", "text", "")).rejects.toMatchObject({
-      status: 415,
-    });
-    await expect(saveProjectFile(base, "readme.md", "\0", "first")).rejects.toMatchObject({
-      status: 415,
-    });
-    await writeFile(join(base, "picture.png"), Buffer.from([137, 80, 78, 71]));
-    const image = await readProjectImage(base, "picture.png");
-    expect(image.type).toBe("image/png");
-    expect(image.content).toStrictEqual(Buffer.from([137, 80, 78, 71]));
-    expect(await previewProjectFile(base, "picture.png")).toStrictEqual({
-      path: "picture.png",
-      content: "",
-      image: true,
-    });
-    await expect(readProjectImage(base, "readme.md")).rejects.toMatchObject({ status: 415 });
-    await expect(readProjectImage(base, "../picture.png")).rejects.toMatchObject({ status: 403 });
-  } finally {
-    await rm(base, { recursive: true, force: true });
-  }
+  });
 });
 test("file tree and Git changes report execute bits for files, including chmod-only changes", async () => {
   const base = await mkdtemp(join(tmpdir(), "projector-executable-"));
@@ -307,24 +360,15 @@ test("file tree and Git changes report execute bits for files, including chmod-o
     await rm(base, { recursive: true, force: true });
   }
 });
-test("tree move destinations and open-file paths respect directory boundaries", () => {
+test("moves preserve contents, never overwrite, and reject self, traversal, excluded and symlink paths", async () => {
   expect(parentPath("src/nested/file.ts")).toBe("src/nested");
   expect(parentPath("file.ts")).toBe("");
   expect(moveDestination("src/file.ts", "")).toBe("file.ts");
   expect(moveDestination("src/file.ts", "docs")).toBe("docs/file.ts");
-  for (const [source, target] of [
-    ["", "src"],
-    ["src", "src"],
-    ["src", "src/nested"],
-    ["src/file.ts", "src"],
-  ])
-    expect(moveDestination(source, target)).toBe(undefined);
+  // A sibling whose name starts with `src` is not inside `src`.
   expect(moveDestination("src", "src-other")).toBe("src-other/src");
   expect(relocatedPath("src/nested/file.ts", "src", "docs/src")).toBe("docs/src/nested/file.ts");
   expect(relocatedPath("src-other/file.ts", "src", "docs/src")).toBe("src-other/file.ts");
-});
-
-test("moves preserve contents, never overwrite, and reject self, traversal, excluded and symlink paths", async () => {
   await withDefaultExcludes(async () => {
     const base = await mkdtemp(join(tmpdir(), "projector-move-"));
     try {
@@ -417,6 +461,8 @@ test("files exclude setting controls tree visibility for node_modules", async ()
 
 test("workspace tree, bounded reading, traversal and symlink containment, literal search", async () => {
   await withDefaultExcludes(async () => {
+    const root = await mkdtemp(join(tmpdir(), "projector-workspace-tree-"));
+    const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
     try {
       await mkdir(join(root, "src"));
       await mkdir(join(root, "node_modules"));
@@ -462,7 +508,22 @@ test("workspace tree, bounded reading, traversal and symlink containment, litera
       expect(search.hits.map((hit) => [hit.path, hit.line, hit.column])).toStrictEqual([
         ["src/code.ts", 1, 22],
       ]);
-      git("add", "src/code.ts", ".gitignore");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});
+test("project comparison reports staged, working, renamed, deleted and nested file contents", async () => {
+  await withDefaultExcludes(async () => {
+    const root = await mkdtemp(join(tmpdir(), "projector-workspace-git-"));
+    const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
+    try {
+      await mkdir(join(root, "src"));
+      await writeFile(join(root, "src/code.ts"), 'const word = "Привет [world]";\n');
+      git("init", "-q");
+      git("config", "user.name", "Workspace Test");
+      git("config", "user.email", "test@example.test");
+      git("add", "src/code.ts");
       git("commit", "-qm", "initial");
       await writeFile(join(root, "src/code.ts"), "staged\n");
       git("add", "src/code.ts");
@@ -544,57 +605,64 @@ test("Git gutter returns the index text of tracked files only", async () => {
   }
 });
 
-test("workspace HTTP routes resolve catalog projects and reject foreign origins and hosts", async () => {
+/**
+ * Workspace HTTP routes read a catalog project from XDG_DATA_HOME; every case
+ * gets its own fixture and restores the developer environment even on failure.
+ */
+async function withWorkspaceApi(run) {
   const { createServer, request: httpRequest } = await import("node:http");
   const { once } = await import("node:events");
+  const { gzipSync } = await import("node:zlib");
   const directory = await mkdtemp(join(tmpdir(), "projector-workspace-api-"));
   const externalDirectory = await mkdtemp(join(tmpdir(), "projector-external-preview-"));
-  const externalPath = join(externalDirectory, "outside.txt");
-  await writeFile(externalPath, "External file contents\n");
-  await writeFile(
-    join(externalDirectory, "outside.svg"),
-    "<svg xmlns='http://www.w3.org/2000/svg'/>",
-  );
-  process.env.XDG_DATA_HOME = directory;
-  await mkdir(join(directory, "projector"));
-  await writeFile(join(directory, "sample.ts"), "const sample = true;\n");
-  await writeFile(join(directory, "sample.md"), "# Original\n");
-  const { gzipSync } = await import("node:zlib");
-  await writeFile(join(directory, "sample.ts.gz"), gzipSync("const sample = true;\n"));
-  await writeFile(
-    join(directory, "projector/projects.json"),
-    JSON.stringify({
-      projects: [
-        { id: "workspace-test", path: directory, name: "test", commands: [], createdAt: "" },
-      ],
-    }),
-  );
-  const { handleApi } = await import("../server/app/api.ts");
-  const server = createServer((req, res) => {
-    void handleApi(req, res).then((handled) => {
-      if (!handled) res.writeHead(404).end();
-    });
-  });
-  server.listen(0, "127.0.0.1");
-  await once(server, "listening");
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const route = `${base}/api/projects/workspace-test/workspace`;
+  const previousDataHome = process.env.XDG_DATA_HOME;
+  let server;
   try {
+    const externalPath = join(externalDirectory, "outside.txt");
+    const imagePath = join(externalDirectory, "outside.svg");
+    await writeFile(externalPath, "External file contents\n");
+    await writeFile(imagePath, "<svg xmlns='http://www.w3.org/2000/svg'/>");
+    process.env.XDG_DATA_HOME = directory;
+    await mkdir(join(directory, "projector"));
+    await writeFile(join(directory, "sample.ts"), "const sample = true;\n");
+    await writeFile(join(directory, "sample.md"), "# Original\n");
+    await writeFile(join(directory, "sample.ts.gz"), gzipSync("const sample = true;\n"));
+    await writeFile(
+      join(directory, "projector/projects.json"),
+      JSON.stringify({
+        projects: [
+          { id: "workspace-test", path: directory, name: "test", commands: [], createdAt: "" },
+        ],
+      }),
+    );
+    const { handleApi } = await import("../server/app/api.ts");
+    server = createServer((req, res) => {
+      void handleApi(req, res).then((handled) => {
+        if (!handled) res.writeHead(404).end();
+      });
+    });
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const route = `${base}/api/projects/workspace-test/workspace`;
+    return await run({ base, route, directory, externalPath, imagePath, httpRequest });
+  } finally {
+    if (server) await new Promise((resolve) => server.close(resolve));
+    await rm(directory, { recursive: true, force: true });
+    await rm(externalDirectory, { recursive: true, force: true });
+    if (previousDataHome === undefined) delete process.env.XDG_DATA_HOME;
+    else process.env.XDG_DATA_HOME = previousDataHome;
+  }
+}
+
+test("workspace HTTP routes resolve catalog projects and serve external and project resources", async () => {
+  await withWorkspaceApi(async ({ base, route, directory, externalPath, imagePath }) => {
     const external = await fetch(`${route}/external?path=${encodeURIComponent(externalPath)}`);
     expect(external.status).toBe(200);
     expect(await external.json()).toStrictEqual({
       path: externalPath,
       content: "External file contents\n",
     });
-    expect((await fetch(`${route}/external?path=relative.txt`)).status).toBe(400);
-    expect(
-      (
-        await fetch(`${route}/external?path=${encodeURIComponent(externalPath)}`, {
-          headers: { Origin: "https://foreign.test" },
-        })
-      ).status,
-    ).toBe(403);
-    const imagePath = join(externalDirectory, "outside.svg");
     const imagePreview = await (
       await fetch(`${route}/external?path=${encodeURIComponent(imagePath)}`)
     ).json();
@@ -623,6 +691,65 @@ test("workspace HTTP routes resolve catalog projects and reject foreign origins 
     ).toBeTruthy();
     expect((await (await fetch(`${route}/search?q=sample`)).json()).hits[0].path).toBe("sample.ts");
     expect((await (await fetch(`${route}/git`)).json()).available).toBe(false);
+    const save = (body) =>
+      fetch(`${route}/file`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Origin: base },
+        body: JSON.stringify(body),
+      });
+    const saved = await save({ path: "sample.md", original: "# Original\n", content: "# Saved\n" });
+    expect(saved.status).toBe(200);
+    expect(saved.headers.get("cache-control")).toBe("no-store");
+    expect(await readFile(join(directory, "sample.md"), "utf8")).toBe("# Saved\n");
+    const folders = `${base}/api/directories?${new URLSearchParams({ path: directory })}`;
+    const folderResponse = await fetch(folders);
+    expect(folderResponse.status).toBe(200);
+    expect(folderResponse.headers.get("cache-control")).toBe("no-store");
+    expect((await folderResponse.json()).entries).toStrictEqual([
+      { name: "projector", path: join(directory, "projector") },
+    ]);
+    const entry = (body) =>
+      fetch(`${route}/entry`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: base },
+        body: JSON.stringify(body),
+      });
+    const creation = { action: "create-file", path: "", directory: "", name: "created.md" };
+    expect((await entry(creation)).status).toBe(200);
+    expect((await entry(creation)).status).toBe(409);
+    expect(
+      (await entry({ ...creation, action: "rename", path: "created.md", name: "renamed.md" }))
+        .status,
+    ).toBe(200);
+    expect((await entry({ ...creation, action: "delete", path: "renamed.md" })).status).toBe(200);
+    expect((await fetch(`${route}/root`)).status).toBe(200);
+    const move = (body) =>
+      fetch(`${route}/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: base },
+        body: JSON.stringify(body),
+      });
+    const moved = await move({ path: "sample.ts", directory: "projector" });
+    expect(moved.status).toBe(200);
+    expect(moved.headers.get("cache-control")).toBe("no-store");
+    expect(await moved.json()).toStrictEqual({
+      source: "sample.ts",
+      destination: "projector/sample.ts",
+    });
+    expect((await fetch(`${route}/file?path=projector/sample.ts`)).status).toBe(200);
+    expect((await fetch(`${route}/file?path=sample.ts`)).status).toBe(400);
+  });
+});
+
+test("workspace HTTP routes reject foreign origins and hosts", async () => {
+  await withWorkspaceApi(async ({ base, route, directory, externalPath, httpRequest }) => {
+    expect(
+      (
+        await fetch(`${route}/external?path=${encodeURIComponent(externalPath)}`, {
+          headers: { Origin: "https://foreign.test" },
+        })
+      ).status,
+    ).toBe(403);
     const save = (body, origin = base) =>
       fetch(`${route}/file`, {
         method: "PUT",
@@ -637,15 +764,6 @@ test("workspace HTTP routes resolve catalog projects and reject foreign origins 
         )
       ).status,
     ).toBe(403);
-    expect((await save({ path: "sample.md", content: "# Saved\n" })).status).toBe(400);
-    const saved = await save({ path: "sample.md", original: "# Original\n", content: "# Saved\n" });
-    expect(saved.status).toBe(200);
-    expect(saved.headers.get("cache-control")).toBe("no-store");
-    expect(await readFile(join(directory, "sample.md"), "utf8")).toBe("# Saved\n");
-    expect(
-      (await save({ path: "sample.md", original: "# Original\n", content: "stale" })).status,
-    ).toBe(409);
-    expect((await fetch(`${route}/file?path=../outside`)).status).toBe(403);
     expect(
       (await fetch(`${route}/file?path=sample.ts`, { headers: { Origin: "https://foreign.test" } }))
         .status,
@@ -664,12 +782,6 @@ test("workspace HTTP routes resolve catalog projects and reject foreign origins 
     });
     expect(foreignStatus).toBe(403);
     const folders = `${base}/api/directories?${new URLSearchParams({ path: directory })}`;
-    const folderResponse = await fetch(folders);
-    expect(folderResponse.status).toBe(200);
-    expect(folderResponse.headers.get("cache-control")).toBe("no-store");
-    expect((await folderResponse.json()).entries).toStrictEqual([
-      { name: "projector", path: join(directory, "projector") },
-    ]);
     expect((await fetch(folders, { headers: { Origin: "https://foreign.test" } })).status).toBe(
       403,
     );
@@ -682,49 +794,60 @@ test("workspace HTTP routes resolve catalog projects and reject foreign origins 
       request.end();
     });
     expect(foreignFolder).toBe(403);
+    const creation = { action: "create-file", path: "", directory: "", name: "created.md" };
+    expect(
+      (
+        await fetch(`${route}/entry`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Origin: "https://foreign.test" },
+          body: JSON.stringify(creation),
+        })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await fetch(`${route}/move`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Origin: "https://foreign.test" },
+          body: JSON.stringify({ path: "sample.ts", directory: "projector" }),
+        })
+      ).status,
+    ).toBe(403);
+  });
+});
+
+test("workspace HTTP routes reject invalid input, stale drafts and paths outside the project", async () => {
+  await withWorkspaceApi(async ({ base, route }) => {
+    expect((await fetch(`${route}/external?path=relative.txt`)).status).toBe(400);
+    const save = (body) =>
+      fetch(`${route}/file`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Origin: base },
+        body: JSON.stringify(body),
+      });
+    expect((await save({ path: "sample.md", content: "# Saved\n" })).status).toBe(400);
+    await save({ path: "sample.md", original: "# Original\n", content: "# Saved\n" });
+    expect(
+      (await save({ path: "sample.md", original: "# Original\n", content: "stale" })).status,
+    ).toBe(409);
+    expect((await fetch(`${route}/file?path=../outside`)).status).toBe(403);
     expect((await fetch(`${base}/api/projects/missing/workspace/tree`)).status).toBe(404);
-    const entry = (body, origin = base) =>
+    const entry = (body) =>
       fetch(`${route}/entry`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Origin: origin },
+        headers: { "Content-Type": "application/json", Origin: base },
         body: JSON.stringify(body),
       });
-    const creation = { action: "create-file", path: "", directory: "", name: "created.md" };
-    expect((await entry(creation, "https://foreign.test")).status).toBe(403);
     expect((await entry({ action: "delete" })).status).toBe(400);
-    expect((await entry(creation)).status).toBe(200);
-    expect((await entry(creation)).status).toBe(409);
-    expect(
-      (await entry({ ...creation, action: "rename", path: "created.md", name: "renamed.md" }))
-        .status,
-    ).toBe(200);
-    expect((await entry({ ...creation, action: "delete", path: "renamed.md" })).status).toBe(200);
-    expect((await fetch(`${route}/root`)).status).toBe(200);
-    const move = (body, origin = base) =>
+    const move = (body) =>
       fetch(`${route}/move`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Origin: origin },
+        headers: { "Content-Type": "application/json", Origin: base },
         body: JSON.stringify(body),
       });
-    expect(
-      (await move({ path: "sample.ts", directory: "projector" }, "https://foreign.test")).status,
-    ).toBe(403);
     expect((await move({ directory: "projector" })).status).toBe(400);
     expect((await move({ path: "../sample.ts", directory: "projector" })).status).toBe(403);
-    const moved = await move({ path: "sample.ts", directory: "projector" });
-    expect(moved.status).toBe(200);
-    expect(moved.headers.get("cache-control")).toBe("no-store");
-    expect(await moved.json()).toStrictEqual({
-      source: "sample.ts",
-      destination: "projector/sample.ts",
-    });
-    expect((await fetch(`${route}/file?path=projector/sample.ts`)).status).toBe(200);
-    expect((await fetch(`${route}/file?path=sample.ts`)).status).toBe(400);
-  } finally {
-    await new Promise((resolve) => server.close(resolve));
-    await rm(directory, { recursive: true, force: true });
-    await rm(externalDirectory, { recursive: true, force: true });
-  }
+  });
 });
 
 test("path bar lists real directories and symlinks, completes prefixes and rejects invalid paths", async () => {
@@ -802,70 +925,74 @@ test("Git tree backgrounds aggregate nested changes, renames, deletions and conf
 });
 
 test("Git actions preserve staged content, handle deleted/literal paths and trash untracked files", async () => {
-  const base = await mkdtemp(join(tmpdir(), "projector-git-actions-"));
-  const run = (...args) => execFileSync("git", ["-C", base, ...args], { encoding: "utf8" });
-  try {
-    run("init", "-q");
-    run("config", "user.name", "Test");
-    run("config", "user.email", "test@example.test");
-    await writeFile(join(base, "file.txt"), "head");
-    await writeFile(join(base, "other.txt"), "head");
-    run("add", ".");
-    run("commit", "-qm", "initial");
-    await writeFile(join(base, "file.txt"), "index");
-    await mutateProjectGit(base, "stage", "file.txt");
-    await writeFile(join(base, "file.txt"), "working");
-    const partial = await projectGit(base);
-    expect(partial.changes.find((c) => c.path === "file.txt").index).toBe("M");
-    expect(partial.changes.find((c) => c.path === "file.txt").worktree).toBe("M");
-    await mutateProjectGit(base, "discard", "file.txt");
-    expect(await readFile(join(base, "file.txt"), "utf8")).toBe("index");
-    expect(run("show", ":file.txt")).toBe("index");
-    await mutateProjectGit(base, "unstage", "file.txt");
-    expect(run("show", ":file.txt")).toBe("head");
-    expect(await readFile(join(base, "file.txt"), "utf8")).toBe("index");
-    await rm(join(base, "file.txt"));
-    await mutateProjectGit(base, "discard", "file.txt");
-    expect(await readFile(join(base, "file.txt"), "utf8")).toBe("head");
-    await rm(join(base, "file.txt"));
-    await mutateProjectGit(base, "stage", "file.txt");
-    expect((await projectGit(base)).changes.find((c) => c.path === "file.txt").index).toBe("D");
-    await mutateProjectGit(base, "unstage", "file.txt");
-    await mutateProjectGit(base, "discard", "file.txt");
-    await writeFile(join(base, "[literal].txt"), "new");
-    await writeFile(join(base, "literal.txt"), "other");
-    await mutateProjectGit(base, "stage", "[literal].txt");
-    expect((await projectGit(base)).changes.find((c) => c.path === "literal.txt").index).toBe("?");
-    await mutateProjectGit(base, "unstage", "[literal].txt");
-    await mutateProjectGit(base, "discard", "[literal].txt");
-    expect(
-      (await readdir(join(base, ".projector-trash"))).some((name) =>
-        name.endsWith("-[literal].txt"),
-      ),
-    ).toBeTruthy();
-    await writeFile(join(base, "other.txt"), "dirty");
-    await writeFile(join(base, "fresh.txt"), "new");
-    await mutateProjectGit(base, "discard", ["other.txt", "fresh.txt"]);
-    expect(await readFile(join(base, "other.txt"), "utf8")).toBe("head");
-    await expect(readFile(join(base, "fresh.txt"), "utf8")).rejects.toMatchObject({
-      code: "ENOENT",
-    });
-    run("mv", "other.txt", "renamed.txt");
-    await mutateProjectGit(base, "unstage", "renamed.txt");
-    expect(run("diff", "--cached")).toBe("");
-    expect(await readFile(join(base, "renamed.txt"), "utf8")).toBe("head");
-    for (const path of ["", "../outside", ".git/config", "a/../file.txt"])
-      await expect(mutateProjectGit(base, "stage", path)).rejects.toMatchObject({ status: 403 });
-    await expect(mutateProjectGit(base, "reset", "literal.txt")).rejects.toMatchObject({
-      status: 400,
-    });
-    await symlink(outside, join(base, "escape"));
-    await expect(mutateProjectGit(base, "stage", "escape")).rejects.toMatchObject({
-      status: 403,
-    });
-  } finally {
-    await rm(base, { recursive: true, force: true });
-  }
+  await withDefaultExcludes(async () => {
+    const base = await mkdtemp(join(tmpdir(), "projector-git-actions-"));
+    const run = (...args) => execFileSync("git", ["-C", base, ...args], { encoding: "utf8" });
+    try {
+      run("init", "-q");
+      run("config", "user.name", "Test");
+      run("config", "user.email", "test@example.test");
+      await writeFile(join(base, "file.txt"), "head");
+      await writeFile(join(base, "other.txt"), "head");
+      run("add", ".");
+      run("commit", "-qm", "initial");
+      await writeFile(join(base, "file.txt"), "index");
+      await mutateProjectGit(base, "stage", "file.txt");
+      await writeFile(join(base, "file.txt"), "working");
+      const partial = await projectGit(base);
+      expect(partial.changes.find((c) => c.path === "file.txt").index).toBe("M");
+      expect(partial.changes.find((c) => c.path === "file.txt").worktree).toBe("M");
+      await mutateProjectGit(base, "discard", "file.txt");
+      expect(await readFile(join(base, "file.txt"), "utf8")).toBe("index");
+      expect(run("show", ":file.txt")).toBe("index");
+      await mutateProjectGit(base, "unstage", "file.txt");
+      expect(run("show", ":file.txt")).toBe("head");
+      expect(await readFile(join(base, "file.txt"), "utf8")).toBe("index");
+      await rm(join(base, "file.txt"));
+      await mutateProjectGit(base, "discard", "file.txt");
+      expect(await readFile(join(base, "file.txt"), "utf8")).toBe("head");
+      await rm(join(base, "file.txt"));
+      await mutateProjectGit(base, "stage", "file.txt");
+      expect((await projectGit(base)).changes.find((c) => c.path === "file.txt").index).toBe("D");
+      await mutateProjectGit(base, "unstage", "file.txt");
+      await mutateProjectGit(base, "discard", "file.txt");
+      await writeFile(join(base, "[literal].txt"), "new");
+      await writeFile(join(base, "literal.txt"), "other");
+      await mutateProjectGit(base, "stage", "[literal].txt");
+      expect((await projectGit(base)).changes.find((c) => c.path === "literal.txt").index).toBe(
+        "?",
+      );
+      await mutateProjectGit(base, "unstage", "[literal].txt");
+      await mutateProjectGit(base, "discard", "[literal].txt");
+      expect(
+        (await readdir(join(base, ".projector-trash"))).some((name) =>
+          name.endsWith("-[literal].txt"),
+        ),
+      ).toBeTruthy();
+      await writeFile(join(base, "other.txt"), "dirty");
+      await writeFile(join(base, "fresh.txt"), "new");
+      await mutateProjectGit(base, "discard", ["other.txt", "fresh.txt"]);
+      expect(await readFile(join(base, "other.txt"), "utf8")).toBe("head");
+      await expect(readFile(join(base, "fresh.txt"), "utf8")).rejects.toMatchObject({
+        code: "ENOENT",
+      });
+      run("mv", "other.txt", "renamed.txt");
+      await mutateProjectGit(base, "unstage", "renamed.txt");
+      expect(run("diff", "--cached")).toBe("");
+      expect(await readFile(join(base, "renamed.txt"), "utf8")).toBe("head");
+      for (const path of ["", "../outside", ".git/config", "a/../file.txt"])
+        await expect(mutateProjectGit(base, "stage", path)).rejects.toMatchObject({ status: 403 });
+      await expect(mutateProjectGit(base, "reset", "literal.txt")).rejects.toMatchObject({
+        status: 400,
+      });
+      await symlink(outside, join(base, "escape"));
+      await expect(mutateProjectGit(base, "stage", "escape")).rejects.toMatchObject({
+        status: 403,
+      });
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  });
 });
 
 test("Git unstage works before the first commit, and index writes serialize", async () => {

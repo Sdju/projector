@@ -44,6 +44,7 @@ export default {
     // Only the configured roots are architecture; tooling, tests and docs are not.
     ignore: [
       "tests/**",
+      "evals/**",
       "scripts/**",
       "bin/**",
       "docs/**",

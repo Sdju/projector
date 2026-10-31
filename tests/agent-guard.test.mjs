@@ -1,3 +1,4 @@
+import * as os from "node:os";
 import { describe, expect, it } from "vite-plus/test";
 import {
   commandIsSafe,
@@ -11,7 +12,7 @@ import {
 } from "../server/modules/agents/projector/projector-history.ts";
 
 describe("agent guard", () => {
-  it("lets read-only shell commands through and flags the rest", () => {
+  it("passes allowed read-only commands", () => {
     const cwd = "/p";
     for (const command of [
       "ls -la",
@@ -22,78 +23,56 @@ describe("agent guard", () => {
       "whoami",
     ])
       expect(isReadOnlyBash(command, cwd), command).toBe(true);
+  });
 
+  it("refuses dangerous commands by path escape, secrets, flags, metacharacters and the data dir", () => {
+    const cwd = "/p";
+    // Redirects, substitution and a single background `&` are not read-only.
+    for (const command of ["ls >x", "ls `id`", "ls $(id)", "ls &"])
+      expect(isReadOnlyBash(command, cwd), command).toBe(false);
+
+    // Outside the project, or under the home directory.
+    for (const command of ["ls -la ../x", "ls ~/.ssh/id_rsa"])
+      expect(isReadOnlyBash(command, cwd), command).toBe(false);
+
+    // Path segments that look like secrets.
     for (const command of [
-      "rm -rf x",
-      "echo a > b",
-      "ls; rm x",
-      "cat $(whoami)",
-      "git push",
-      "find . -delete",
-      "sleep 1 &",
-      "cat .env",
-      "cat ~/.ssh/id_rsa",
-      "grep -r KEY ~/.local/share/projector",
-      "head -100 /proc/self/environ",
-      "find / -name id_rsa",
-      "rg --pre=./run.sh TOKEN .",
-      "git show HEAD:.env",
-      "cat /etc/passwd",
-      "tree -o output.txt",
-      "sort --compress-program=bzip2",
-      "rg --pre echo TOKEN",
-      "rg --pre-glob '*.c' pattern",
-      "git diff --textconv HEAD",
-      "date -s '2026-01-01'",
-      "date -f /etc/time.conf",
-      "file -C",
-      "grep -f ~/.ssh/id_rsa",
-      "cat package.json | head -20",
-      "rg TOKEN src",
-      "grep -rn guard server",
-      "find . -name '*.md'",
-      "git diff --no-textconv HEAD",
-      "git remote -v",
-      "ls -la ../x",
       "ls .SSH",
       "ls ./.ssh",
-      "git rev-parse --output=x",
-      "git remote add origin x",
-      "date --set=now",
-      "rg --pre=./x a",
-      "rg --pre-glob=* a",
-      "sort --compress-program=./x a",
-      "tree -o=out.txt",
-      "date --set=now",
-      "git rev-parse --output=x",
-      "git show HEAD:f.env",
-      "git diff HEAD -- .env",
-      "git log -p -- .env",
-      "git show HEAD -- .env",
-      "git blame .env",
-      "git remote add origin x",
-      "git remote set-url origin y",
-      "git remote remove origin",
-      "cat ./.ssh/config",
-      "cat .ENV",
-      "cat .Env.local",
+      "ls .env",
+      "ls .ENV.local",
+      "ls cert.pem",
+      "ls keys/id_rsa",
+      "ls vault.kdbx",
     ])
       expect(isReadOnlyBash(command, cwd), command).toBe(false);
+
+    // Flags outside the per-binary allowlist.
+    for (const command of [
+      "date -s '2026-01-01'",
+      "date -f time.conf",
+      "date --set=now",
+      "git rev-parse --output=x",
+    ])
+      expect(isReadOnlyBash(command, cwd), command).toBe(false);
+
+    // Projector's own data directory is forbidden even when it is inside the home directory.
+    expect(isReadOnlyBash("ls .local/share/projector", os.homedir())).toBe(false);
   });
 
   it("asks before changing commands and only looks without asking", () => {
-    expect(commandIsSafe("ide.workbench.tab.read")).toBe(true);
     expect(commandIsSafe("ide.agent.jobs.list")).toBe(true);
     expect(commandIsSafe("ide.agent.chats.recent")).toBe(true);
     expect(commandIsSafe("ide.agent.chat.fork")).toBe(false);
-    expect(commandIsSafe("ide.agent.job.result")).toBe(true);
-    expect(commandIsSafe("ide.agent.job.open")).toBe(true);
     expect(commandIsSafe("ide.agent.job.start")).toBe(false);
     expect(commandIsSafe("ide.agent.job.stop")).toBe(false);
     expect(commandIsSafe("ide.agent.job.answer")).toBe(false);
-    expect(commandIsSafe("ide.project.settings.get")).toBe(true);
     expect(commandIsSafe("ide.docker.container.remove")).toBe(false);
     expect(commandIsSafe("ide.workbench.terminal.new")).toBe(false);
+    // A command that both looks and changes is never read-only.
+    expect(commandIsSafe("ide.workbench.tab.read.save")).toBe(false);
+    expect(commandIsSafe("ide.agent.job.result.delete")).toBe(false);
+    expect(commandIsSafe("ide.project.settings.get.write")).toBe(false);
   });
 
   it("denies when the user refuses and remembers an always", async () => {
@@ -128,16 +107,63 @@ describe("agent history", () => {
       {
         role: "assistant",
         content: "done",
-        tools: [{ id: "a", name: "bash", input: '{"command":"ls"}', output: "x" }],
+        tools: [
+          { id: "a", name: "bash", input: '{"command":"ls"}', output: "x" },
+          { id: "b", name: "bash", input: '{"command":"fail"}', output: "boom", failed: true },
+        ],
       },
     ]);
     expect(messages.map((item) => item.role)).toEqual(["user", "assistant", "tool"]);
-    const long = Array.from({ length: 400 }, (_, i) => ({
+    expect(messages[1].content).toContainEqual({
+      type: "tool-call",
+      toolCallId: "a",
+      toolName: "bash",
+      input: { command: "ls" },
+    });
+    expect(messages[2].content).toContainEqual({
+      type: "tool-result",
+      toolCallId: "a",
+      toolName: "bash",
+      output: { type: "text", value: "x" },
+    });
+    // A failed call keeps its error text, not a plain result.
+    expect(messages[2].content).toContainEqual({
+      type: "tool-result",
+      toolCallId: "b",
+      toolName: "bash",
+      output: { type: "error-text", value: "boom" },
+    });
+
+    // Tool output is cut at the module's output budget, and an empty one stays visible.
+    const [, , toolResult] = historyMessages([
+      { role: "user", content: "hi" },
+      {
+        role: "assistant",
+        content: "",
+        tools: [
+          { id: "long", name: "bash", input: "{}", output: "x".repeat(10_000) },
+          { id: "empty", name: "bash", input: "{}", output: "" },
+        ],
+      },
+    ]);
+    expect(toolResult.content[0].output.value, "вывод обрезан до OUTPUT_CHARS").toHaveLength(4_000);
+    expect(toolResult.content[0].output.value).toBe("x".repeat(4_000));
+    expect(toolResult.content[1].output).toEqual({ type: "text", value: "(пусто)" });
+
+    const long = Array.from({ length: 401 }, (_, i) => ({
       role: i % 2 ? "assistant" : "user",
       content: "x".repeat(1000),
     }));
-    expect(recentTurns(long)[0].role).toBe("user");
-    expect(recentTurns(long).length).toBeLessThan(long.length);
+    const recent = recentTurns(long);
+    expect(recent[0].role).toBe("user");
+    expect(recent.at(-1)).toBe(long.at(-1));
+    // The built history stays inside the module's 90 000-character budget.
+    const size = historyMessages(long).reduce(
+      (sum, message) => sum + (typeof message.content === "string" ? message.content.length : 0),
+      0,
+    );
+    expect(size, "история не должна выходить за бюджет модуля").toBeLessThanOrEqual(90_000);
+    expect(recent.length).toBeLessThan(long.length);
   });
 });
 

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
-  budgetNote,
   isLooping,
   tokensSpent,
   turnBudget,
@@ -33,7 +32,6 @@ describe("time and token limits", () => {
     expect(tokensSpent(steps)).toBe(100);
     expect(budget.stopWhen.some((stop) => stop({ steps }))).toBe(true);
     expect(budget.reason()).toBe("tokens");
-    expect(budgetNote("tokens")).toContain("токенов");
   });
 
   it("stops on time and lets limits of 0 pass", () => {

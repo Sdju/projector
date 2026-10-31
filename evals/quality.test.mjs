@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it } from "vite-plus/test";
-import { judge, runScenario, scriptedModel } from "./evals/harness.mjs";
-import { scenarios } from "./evals/scenarios.mjs";
+import { judge, runScenario } from "./harness.mjs";
+import { scenarios } from "./scenarios.mjs";
+import { scriptedModel } from "../tests/helpers/scripted-model.mjs";
 
 const byId = (id) => scenarios.find((item) => item.id === id);
 
@@ -87,7 +88,7 @@ describe("evals harness, against a scripted model", () => {
   });
 
   it("refuses shell commands that write, and lets reading ones through", async () => {
-    const { bashWrites } = await import("./evals/harness.mjs");
+    const { bashWrites } = await import("./harness.mjs");
     for (const command of [
       "mkdir src && touch src/a.ts",
       "echo x > file.txt",

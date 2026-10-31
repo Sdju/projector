@@ -1,14 +1,5 @@
 import { expect, test } from "vite-plus/test";
 import { applyAgentEvent, resetAnswer } from "../src/modules/agent/model/turn-events.ts";
-import { formatElapsed } from "../src/modules/agent/lib/elapsed.ts";
-
-test("durations read as a short clock", () => {
-  expect(formatElapsed(0)).toBe("0 с");
-  expect(formatElapsed(4_400)).toBe("4 с");
-  expect(formatElapsed(65_000)).toBe("1:05");
-  expect(formatElapsed(3_725_000)).toBe("1:02:05");
-  expect(formatElapsed(-500)).toBe("0 с");
-});
 
 test("the chat times a tool call from the event and keeps it across a replay", () => {
   const state = { permissions: [], questions: [], secrets: [], turns: [] };

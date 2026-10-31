@@ -271,8 +271,7 @@ Windows HWND-адаптер регистрировал обработчик пр
 Для определения основного удерживающего объекта нужен снимок кучи во время
 роста памяти. Поднимать лимит Node вместо такой диагностики оснований нет.
 
-Регрессионные проверки: `vp test run tests/config-lifecycle.test.mjs
-tests/runtime-lifecycle.test.mjs tests/instance-exit.test.mjs
-tests/window-host-lifecycle.test.mjs tests/windows-protocol.test.mjs tests/restart.test.mjs`
-(одна команда). Они проверяют импорт настоящего конфига, замену обработчика при
-перезагрузке, завершение дочернего Node и жизненный цикл Windows-помощника.
+Регрессионные проверки: `vp test run tests/runtime-lifecycle.test.mjs
+tests/instance-exit.test.mjs tests/window-host-lifecycle.test.mjs
+tests/windows-protocol.test.mjs tests/restart.test.mjs`
+(одна команда). Они проверяют замену обработчика при перезагрузке, завершение дочернего Node и жизненный цикл Windows-помощника.

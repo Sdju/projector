@@ -20,6 +20,7 @@
     "gtk:types": "node scripts/gtk-types.mjs",
     "test": "vp run architecture && vp test run",
     "architecture": "node scripts/check-feod.mjs",
+    "test:evals": "vp test run --config vite.evals.config.ts",
     "test:docker": "vp test run tests/docker.test.mjs",
     "test:file-icons": "vp test run tests/file-icons.test.mjs",
     "test:virtual-list": "vp test run tests/virtual-list.test.mjs",

@@ -3,7 +3,7 @@ const used = (name) => (run) => run.tools.some((item) => item.name === name);
 /**
  * What the Projector agent must and must not do. Each scenario is one user message and the
  * behaviour that is checked afterwards (see `judge` in harness.mjs); run them against a real
- * model with `PROJECTOR_EVAL=1 OPENAI_URL=… OPENAI_API_KEY=… OPENAI_MODEL=… vp test run tests/agent-evals.test.mjs`.
+ * model with `PROJECTOR_EVAL=1 OPENAI_URL=… OPENAI_API_KEY=… OPENAI_MODEL=… vp run test:evals`.
  */
 export const scenarios = [
   {

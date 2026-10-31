@@ -57,9 +57,58 @@ function send(server, hostname, path, headers = {}) {
   });
 }
 
+const WAIT_MS = 5_000;
+
+/** Turns a stalled wait into a failing assertion instead of a minute-long hang. */
+function within(promise, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`Timed out after ${WAIT_MS} ms waiting for ${label}`)),
+      WAIT_MS,
+    );
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+function lanAddress() {
+  return Object.values(networkInterfaces())
+    .flat()
+    .find((entry) => entry?.family === "IPv4" && !entry.internal)?.address;
+}
+
+/** Vite dev middlewares behind the same LAN gate the desktop server uses. */
+async function viteServer(dir) {
+  const { createServer: createVite } = await import("vite-plus");
+  const vite = await createVite({
+    configFile: join(process.cwd(), "vite.config.ts"),
+    cacheDir: join(dir, "vite-cache"),
+    server: { middlewareMode: true, hmr: false, ws: false },
+    logLevel: "error",
+    optimizeDeps: { noDiscovery: true, include: [] },
+  });
+  onTestFinished(() => vite.close());
+  return listen(createServer(vite.middlewares));
+}
+
+function rawUpgrade(server, requestLine) {
+  return new Promise((resolve, reject) => {
+    const socket = connect(server.address().port, "127.0.0.1", () => socket.write(requestLine));
+    let raw = "";
+    socket.setTimeout(WAIT_MS, () =>
+      socket.destroy(new Error(`Timed out after ${WAIT_MS} ms waiting for a raw HTTP answer`)),
+    );
+    socket.on("data", (chunk) => {
+      raw += chunk;
+    });
+    socket.on("end", () => resolve(raw));
+    socket.on("error", reject);
+  });
+}
+
 async function listen(server) {
   server.listen(0, "0.0.0.0");
-  await once(server, "listening");
+  await within(once(server, "listening"), "the test HTTP server to listen");
   onTestFinished(async () => {
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
@@ -89,16 +138,23 @@ test("LAN cannot turn attacker-controlled Host/Origin into local authority", asy
 
 test("corrupt credentials fail closed, and replacing a password restores file permissions", async () => {
   await isolatedLan();
-  const req = fakeRequest("192.0.2.1:4177", "192.0.2.10", { authorization: "Bearer arbitrary" });
+  const lan = fakeRequest("192.0.2.1:4177", "192.0.2.10", { authorization: "Bearer arbitrary" });
   for (const data of ["", "corrupt", "ab:zz", "a".repeat(32) + ":" + "a".repeat(2)]) {
     await writeFile(lanPasswordPath(), data);
     expect(hasLanPassword).toThrow(/Повреждён/);
-    expect(accessAllowed(req, false)).toBe(false);
-    expect(accessAllowed(fakeRequest(), false)).toBe(false);
+    expect(accessAllowed(lan, false), data).toBe(false);
   }
+  // A loopback client never consults the damaged file, so the refusal above is the LAN rule.
+  expect(
+    accessAllowed(
+      fakeRequest("127.0.0.1:4177", "127.0.0.1", { authorization: "Bearer arbitrary" }),
+      false,
+    ),
+    "loopback bypass is not what denies the LAN client",
+  ).toBe(true);
   await rm(lanPasswordPath());
   await mkdir(lanPasswordPath());
-  expect(accessAllowed(fakeRequest(), false), "unreadable credential path").toBe(false);
+  expect(accessAllowed(lan, false), "unreadable credential path").toBe(false);
   await rm(lanPasswordPath(), { recursive: true });
   setLanPassword("test-only-password");
   await chmod(lanPasswordPath(), 0o644);
@@ -168,30 +224,17 @@ test("fetch isolates LAN credentials and prompts only on an explicit LAN challen
   auth.clearLanPassword();
 });
 
-test("Vite resources require LAN authentication; session cookies survive resource loads and expire on password replacement", async (t) => {
+test("Vite and static resources require LAN authentication, and the session cookie works for assets and the WebSocket", async (t) => {
   const dir = await isolatedLan();
-  const address = Object.values(networkInterfaces())
-    .flat()
-    .find((entry) => entry?.family === "IPv4" && !entry.internal)?.address;
+  const address = lanAddress();
   if (!address) return t.skip("No non-loopback IPv4 interface available");
-  const { createServer: createVite } = await import("vite-plus");
-  const vite = await createVite({
-    configFile: join(process.cwd(), "vite.config.ts"),
-    cacheDir: join(dir, "vite-cache"),
-    server: { middlewareMode: true, hmr: false, ws: false },
-    logLevel: "error",
-    optimizeDeps: { noDiscovery: true, include: [] },
-  });
-  onTestFinished(() => vite.close());
-  const server = await listen(createServer(vite.middlewares));
+  const server = await viteServer(dir);
   const headers = { Host: "localhost:4177" };
   const unauthorized = await send(server, address, "/api/app/network", headers);
   expect(unauthorized.status).toBe(401);
   expect(unauthorized.headers["www-authenticate"]).toBe('Bearer realm="Projector LAN"');
-  for (const path of [
-    "/package.json",
-    `/@fs${process.cwd()}/server/modules/access/access.ts?raw`,
-  ]) {
+  const resources = ["/package.json", `/@fs${process.cwd()}/server/modules/access/access.ts?raw`];
+  for (const path of resources) {
     expect((await send(server, address, path, headers)).status, path).toBe(401);
   }
   const login = await send(server, address, "/projects", { ...headers, Accept: "text/html" });
@@ -206,9 +249,11 @@ test("Vite resources require LAN authentication; session cookies survive resourc
   expect(setCookie).toMatch(/HttpOnly; SameSite=Strict/);
   expect(setCookie).not.toMatch(/test-only-password/);
   const cookie = setCookie.split(";")[0];
-  expect(
-    (await send(server, address, "/package.json", { ...headers, Cookie: cookie })).status,
-  ).toBe(200);
+  for (const path of resources) {
+    expect((await send(server, address, path, { ...headers, Cookie: cookie })).status, path).toBe(
+      200,
+    );
+  }
   expect(
     accessAllowed(
       fakeRequest("localhost:4177", address, { cookie, origin: "http://localhost:4177" }),
@@ -216,11 +261,31 @@ test("Vite resources require LAN authentication; session cookies survive resourc
     ),
     "WebSocket cookie",
   ).toBe(true);
+});
+
+test("replacing the LAN password closes the WebSocket session, and a foreign Origin is refused", async (t) => {
+  await isolatedLan();
+  const address = lanAddress();
+  if (!address) return t.skip("No non-loopback IPv4 interface available");
+  const server = await listen(
+    createServer((req, res) => {
+      if (!authorizeHttp(req, res)) return;
+      void handleApi(req, res);
+    }),
+  );
+  const headers = { Host: "localhost:4177" };
+  const accepted = await send(server, address, "/api/app/network", {
+    ...headers,
+    Authorization: "Bearer test-only-password",
+  });
+  expect(accepted.status).toBe(200);
+  const cookie = accepted.headers["set-cookie"][0].split(";")[0];
   expect(
     accessAllowed(
       fakeRequest("localhost:4177", address, { cookie, origin: "http://attacker.invalid" }),
       true,
     ),
+    "foreign Origin",
   ).toBe(false);
   await updateProjects((projects) =>
     projects.push({
@@ -244,19 +309,22 @@ test("Vite resources require LAN authentication; session cookies survive resourc
     },
   );
   onTestFinished(() => client.terminate());
-  const snapshot = once(client, "message");
-  await once(client, "open");
+  const snapshot = within(once(client, "message"), "the terminal control snapshot");
+  await within(once(client, "open"), "the terminal control WebSocket to open");
   expect(JSON.parse(String((await snapshot)[0])).type).toBe("sessions");
-  const closed = once(client, "close");
-  setLanPassword("test-only-password");
+  const closed = within(
+    once(client, "close"),
+    "the terminal control WebSocket to close after the password change",
+  );
+  setLanPassword("replacement");
   await closed;
   expect(
-    (await send(server, address, "/package.json", { ...headers, Cookie: cookie })).status,
+    (await send(server, address, "/api/app/network", { ...headers, Cookie: cookie })).status,
   ).toBe(401);
 });
 
-test("malformed requests cannot crash HTTP or either WebSocket upgrade handler", async () => {
-  const dir = await isolatedLan();
+test("a malformed WebSocket upgrade answers 400 and leaves HTTP and both upgrade handlers alive", async () => {
+  await isolatedLan();
   const server = await listen(
     createServer((req, res) => {
       if (!authorizeHttp(req, res)) return;
@@ -265,23 +333,37 @@ test("malformed requests cannot crash HTTP or either WebSocket upgrade handler",
   );
   attachTerminalServer(server);
   attachTerminalControlServer(server);
-  const response = await new Promise((resolve, reject) => {
-    const socket = connect(server.address().port, "127.0.0.1", () => {
-      socket.write(
-        "GET //[ HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n",
-      );
-    });
-    let raw = "";
-    socket.on("data", (chunk) => {
-      raw += chunk;
-    });
-    socket.on("end", () => resolve(raw));
-    socket.on("error", reject);
-  });
+  const response = await rawUpgrade(
+    server,
+    "GET //[ HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n",
+  );
   expect(response).toMatch(/^HTTP\/1.1 400/);
-  expect((await send(server, "127.0.0.1", "/api/app/network", { Host: "[" })).status).toBe(403);
+  expect(
+    await rawUpgrade(
+      server,
+      "GET /api/terminal/socket?session=missing HTTP/1.1\r\nHost: localhost:4177\r\nOrigin: http://localhost:4177\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n",
+    ),
+    "terminal upgrade handler remains alive",
+  ).toMatch(/^HTTP\/1.1 404/);
+  expect(
+    await rawUpgrade(
+      server,
+      "GET /api/terminal/control?project=missing HTTP/1.1\r\nHost: localhost:4177\r\nOrigin: http://localhost:4177\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n",
+    ),
+    "terminal control upgrade handler remains alive",
+  ).toMatch(/^HTTP\/1.1 404/);
   expect((await send(server, "127.0.0.1", "/api/app/network")).status, "server remains alive").toBe(
     200,
+  );
+});
+
+test("a project SVG icon is served with a sandboxing policy and nosniff", async () => {
+  const dir = await isolatedLan();
+  const server = await listen(
+    createServer((req, res) => {
+      if (!authorizeHttp(req, res)) return;
+      void handleApi(req, res);
+    }),
   );
   const project = join(dir, "svg");
   await mkdir(project);

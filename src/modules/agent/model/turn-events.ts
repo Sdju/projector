@@ -27,9 +27,22 @@ function timesOf(assistant: AgentTurn): Map<string, ToolTimes> {
   return times;
 }
 
+/** Instructions already shown in each answer: a replayed event must not add its note twice. */
+const shownInputs = new WeakMap<AgentTurn, Set<string>>();
+
+function inputsOf(assistant: AgentTurn): Set<string> {
+  const known = shownInputs.get(assistant);
+  if (known) return known;
+  const ids = new Set<string>();
+  shownInputs.set(assistant, ids);
+  return ids;
+}
+
 /** Keeps the times of the calls already seen, then empties the answer for its replay. */
 export function resetAnswer(assistant: AgentTurn) {
   const times = timesOf(assistant);
+  // The answer is replayed from scratch, so its notes have to be added again.
+  shownInputs.delete(assistant);
   for (const tool of assistant.tools)
     if (tool.startedAt !== undefined || tool.endedAt !== undefined)
       times.set(tool.id, { startedAt: tool.startedAt, endedAt: tool.endedAt });
@@ -67,11 +80,16 @@ export function applyAgentEvent(
   at = Date.now(),
 ): boolean {
   switch (event.event) {
-    case "input":
-      if (event.data.inputId)
-        state.queue = state.queue.filter((item) => item.id !== event.data.inputId);
+    case "input": {
+      const shown = inputsOf(assistant);
+      const inputId = event.data.inputId;
+      if (inputId) state.queue = state.queue.filter((item) => item.id !== inputId);
+      // A replayed event removes the same queued message again but shows nothing new.
+      if (inputId && shown.has(inputId)) return false;
+      if (inputId) shown.add(inputId);
       (assistant.parts ??= legacyParts(assistant)).push({ type: "note", text: event.data.text });
       return true;
+    }
     case "status":
       state.phase =
         event.data.phase === "fallback"

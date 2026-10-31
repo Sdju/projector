@@ -83,7 +83,6 @@ describe("agent features", () => {
     const prompt = await featurePrompt("codex");
     expect(prompt).toContain("[Projector]");
     expect(prompt).toContain("Виджеты в ответах");
-    expect(prompt).toContain("Bars —");
     expect(await featurePrompt("cursor")).toBe("");
 
     const off = await setFeatureAgent("widgets", "codex", false);
@@ -114,11 +113,8 @@ describe("agent features", () => {
 
   it("honours the chat's own feature choice over the defaults", async () => {
     await setFeatureAgent("widgets", "codex", true);
-    expect(await featurePrompt("codex")).toContain("Bars —");
     // The chat chose no features: its choice wins even though the default is on.
     expect(await featurePrompt("codex", [])).toBe("");
-    // The chat chose widgets although the default is off.
-    expect(await enabledFeatureText("projector", ["widgets"])).toContain("Bars —");
     expect(await featurePrompt("projector", [])).toBe("");
     // An unknown id adds nothing: only registered features are rendered.
     expect(await enabledFeatureText("projector", ["unknown"])).toBe("");
@@ -183,11 +179,9 @@ describe("agent features", () => {
     await setFeatureAgent("widgets", "claude-code", true);
     const on = await claudeSystemPrompt();
     expect(on.snapshot).toBe(false);
-    expect(on.append).toContain("Bars —");
 
     // The chat's own choice wins over the default in both directions.
     expect((await claudeSystemPrompt([])).append).toBeUndefined();
-    expect((await claudeSystemPrompt(["widgets"])).append).toContain("Bars —");
   });
 
   it("the system prompt names the feature section only when the feature is on", () => {

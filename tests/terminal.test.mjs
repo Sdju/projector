@@ -8,6 +8,7 @@ import { WebSocket } from "ws";
 import headless from "@xterm/headless";
 import serialization from "@xterm/addon-serialize";
 import { trackMouseEncoding } from "../server/modules/terminal/index.ts";
+import { listAgentBackends } from "../server/modules/agent/index.ts";
 
 test("mouse encoding survives snapshots, fragmented modes, disable, RIS and retained sessions", async () => {
   const screen = new headless.Terminal({ allowProposedApi: true });
@@ -192,19 +193,33 @@ test("WS project control: push, cross-client mutations, process protection and r
     "foreground process",
   );
   const rejected = await first.rpc("DELETE", session.id);
-  expect(rejected.error).toBe("Подтвердите прерывание процессов");
+  // The guard protects a live session: it stays listed and running instead of being closed.
+  expect(
+    listTerminalSessions(project.id).some(
+      (item) => item.id === session.id && item.status === "running",
+    ),
+  ).toBe(true);
   expect(rejected.session.id).toBe(session.id);
+  // A reconnected client is greeted with the live session and its output, not an empty list.
+  second.client.close();
+  await once(second.client, "close");
+  const restored = await control();
+  expect(restored.latest().map((item) => item.id)).toStrictEqual(
+    listTerminalSessions(project.id).map((item) => item.id),
+  );
+  expect(restored.latest().some((item) => item.id === session.id)).toBe(true);
+  expect(screen.output().trim(), "reconnected session keeps its prior output").not.toBe("");
   await first.rpc("POST", session.id, { action: "stop" });
   await until(
-    () => second.latest().some((item) => item.id === session.id && item.status === "exited"),
+    () => restored.latest().some((item) => item.id === session.id && item.status === "exited"),
     "exit pushed",
   );
   const restarted = await first.rpc("POST", session.id, { action: "restart" });
   expect(restarted.session.id).not.toBe(session.id);
   await until(
     () =>
-      second.latest().some((item) => item.id === restarted.session.id) &&
-      !second.latest().some((item) => item.id === session.id),
+      restored.latest().some((item) => item.id === restarted.session.id) &&
+      !restored.latest().some((item) => item.id === session.id),
     "replacement pushed",
   );
   const current = await first.rpc("GET", restarted.session.id);
@@ -216,14 +231,8 @@ test("WS project control: push, cross-client mutations, process protection and r
     ).ok,
   ).toBe(true);
   await until(
-    () => !second.latest().some((item) => item.id === restarted.session.id),
+    () => !restored.latest().some((item) => item.id === restarted.session.id),
     "deletion pushed",
-  );
-  second.client.close();
-  await once(second.client, "close");
-  const restored = await control();
-  expect(restored.latest().map((item) => item.id)).toStrictEqual(
-    listTerminalSessions(project.id).map((item) => item.id),
   );
   // HTTP compatibility changes also publish to every WS subscriber.
   const created = await request("", "POST", { program: "shell" });
@@ -237,6 +246,9 @@ test("WS project control: push, cross-client mutations, process protection and r
     () => !restored.latest().some((item) => item.id === external.id),
     "HTTP deletion pushed",
   );
+  // Nothing leaked: the reconnected subscriber sees every session gone.
+  expect(restored.latest()).toStrictEqual([]);
+  expect(listTerminalSessions(project.id)).toStrictEqual([]);
   for (const subscriber of [first, restored]) subscriber.client.close();
 });
 test("session model preserves restart placement and reconnects its WS subscription", async () => {
@@ -318,48 +330,55 @@ test("session model preserves restart placement and reconnects its WS subscripti
     }
   }
 });
-test("OpenCode uses project cwd and an interactive PTY, reconnects and restarts", async () => {
+test("agent terminals run their registry program in the project cwd through an interactive PTY, reconnect and restart", async () => {
   const bin = join(root, "bin");
-  await mkdir(bin);
-  await writeFile(
-    join(bin, "opencode"),
-    '#!/bin/sh\ntest -t 0 && test -t 1 || exit 1\nprintf "OPENCODE_READY:%s\\n" "$(pwd -W 2>/dev/null || pwd)"\nread value\nprintf "OPENCODE_INPUT:%s\\n" "$value"\n',
-    { mode: 0o700 },
-  );
+  await mkdir(bin, { recursive: true });
   const previousPath = process.env.PATH;
   process.env.PATH = `${bin}${delimiter}${previousPath}`;
   try {
-    const created = await request("", "POST", { program: "opencode" });
-    expect(created.status, await created.clone().text()).toBe(201);
-    const { session } = await created.json();
-    expect(session.program).toBe("opencode");
-    expect(session.title).toBe("OpenCode");
-    const first = await connect(session.id);
-    await until(
-      () => first.output().includes(`OPENCODE_READY:${shellRoot}`),
-      "OpenCode PTY and cwd",
-    );
-    first.client.close();
-    await once(first.client, "close");
-    const reconnected = await connect(session.id);
-    expect(reconnected.output().includes(`OPENCODE_READY:${shellRoot}`)).toBeTruthy();
-    reconnected.send({ type: "input", data: "привет OpenCode\r" });
-    await until(
-      () => reconnected.output().includes("OPENCODE_INPUT:привет OpenCode"),
-      "OpenCode input",
-    );
-    await until(
-      () => listTerminalSessions(project.id).find((item) => item.id === session.id)?.exitCode === 0,
-      "OpenCode exit",
-    );
-    const restarted = await request(`/${session.id}`, "POST", { action: "restart" });
-    expect(restarted.status, await restarted.clone().text()).toBe(201);
-    const fresh = (await restarted.json()).session;
-    expect(fresh.program).toBe("opencode");
-    expect(fresh.title).toBe("OpenCode");
-    const output = await connect(fresh.id);
-    await until(() => output.output().includes(`OPENCODE_READY:${shellRoot}`), "OpenCode restart");
-    expect((await request(`/${fresh.id}`, "DELETE")).status).toBe(200);
+    for (const id of ["opencode", "cursor"]) {
+      const { terminal } = listAgentBackends().find((backend) => backend.id === id);
+      const { program, executable, title } = terminal;
+      // Both programs come from the registry: the shim proves the PTY runs it in the project.
+      const marker = program.toUpperCase();
+      await writeFile(
+        join(bin, executable),
+        `#!/bin/sh\ntest -t 0 && test -t 1 || exit 1\nprintf "${marker}_READY:%s\\n" "$(pwd -W 2>/dev/null || pwd)"\nread value\nprintf "${marker}_INPUT:%s\\n" "$value"\n`,
+        { mode: 0o700 },
+      );
+      const created = await request("", "POST", { program });
+      expect(created.status, await created.clone().text()).toBe(201);
+      const { session } = await created.json();
+      expect(session.program).toBe(program);
+      expect(session.title).toBe(title);
+      const first = await connect(session.id);
+      await until(
+        () => first.output().includes(`${marker}_READY:${shellRoot}`),
+        `${id} PTY and cwd`,
+      );
+      first.client.close();
+      await once(first.client, "close");
+      const reconnected = await connect(session.id);
+      expect(reconnected.output().includes(`${marker}_READY:${shellRoot}`)).toBeTruthy();
+      reconnected.send({ type: "input", data: `привет ${title}\r` });
+      await until(
+        () => reconnected.output().includes(`${marker}_INPUT:привет ${title}`),
+        `${id} input`,
+      );
+      await until(
+        () =>
+          listTerminalSessions(project.id).find((item) => item.id === session.id)?.exitCode === 0,
+        `${id} exit`,
+      );
+      const restarted = await request(`/${session.id}`, "POST", { action: "restart" });
+      expect(restarted.status, await restarted.clone().text()).toBe(201);
+      const fresh = (await restarted.json()).session;
+      expect(fresh.program).toBe(program);
+      expect(fresh.title).toBe(title);
+      const output = await connect(fresh.id);
+      await until(() => output.output().includes(`${marker}_READY:${shellRoot}`), `${id} restart`);
+      expect((await request(`/${fresh.id}`, "DELETE")).status).toBe(200);
+    }
   } finally {
     process.env.PATH = previousPath;
   }
@@ -369,35 +388,18 @@ test("an unknown terminal program is refused before any PTY starts", async () =>
   expect(refused.status).toBe(400);
   expect((await refused.json()).error).toBe("Неизвестная программа");
 });
-test("Cursor launches agent CLI in project cwd with an interactive PTY", async () => {
-  const bin = join(root, "bin");
-  await mkdir(bin, { recursive: true });
-  await writeFile(
-    join(bin, "agent"),
-    '#!/bin/sh\ntest -t 0 && test -t 1 || exit 1\nprintf "CURSOR_READY:%s\\n" "$(pwd -W 2>/dev/null || pwd)"\nsleep 1\n',
-    { mode: 0o700 },
-  );
-  const previousPath = process.env.PATH;
-  process.env.PATH = `${bin}${delimiter}${previousPath}`;
-  try {
-    const created = await request("", "POST", { program: "cursor" });
-    expect(created.status, await created.clone().text()).toBe(201);
-    const { session } = await created.json();
-    expect(session.program).toBe("cursor");
-    expect(session.title).toBe("Cursor");
-    const first = await connect(session.id);
-    await until(
-      () => first.output().includes(`CURSOR_READY:${shellRoot}`),
-      "Cursor agent PTY and cwd",
-    );
-    expect((await request(`/${session.id}`, "DELETE")).status).toBe(200);
-  } finally {
-    process.env.PATH = previousPath;
-  }
-});
 
-test("real PTY: input, Unicode, resize, interrupt, reconnect, alternate screen, isolation, exit and cleanup", async () => {
-  const droppedSession = (await (await request("", "POST", { program: "shell" })).json()).session;
+/** Starts a shell session for one case; status assertions stay in the case that owns them. */
+async function openShell(overrides = {}) {
+  return (await (await request("", "POST", { program: "shell", ...overrides })).json()).session;
+}
+/** Closes a session the case created; cleanup never asserts, so leaks surface in the teardown. */
+async function closeShell(id) {
+  await request(`/${id}`, "DELETE");
+}
+
+test("real PTY: uploads check the file name, origin and bytes and vanish with their session", async () => {
+  const droppedSession = await openShell();
   const uploadUrl = `${base}/api/projects/${project.id}/terminals/${droppedSession.id}`;
   const content = Buffer.from([0, 255, 10, 13, 65]);
   const upload = (name, extra = {}) =>
@@ -414,6 +416,9 @@ test("real PTY: input, Unicode, resize, interrupt, reconnect, alternate screen, 
   expect(await readFile(uploadedPath)).toStrictEqual(content);
   await request(`/${droppedSession.id}`, "DELETE");
   await expect(readFile(uploadedPath)).rejects.toMatchObject({ code: "ENOENT" });
+});
+
+test("real PTY: raw input carries SGR mouse and UTF-8 bytes while unknown encodings are refused", async () => {
   const create = await request("", "POST", { program: "shell", cols: 90, rows: 30 });
   expect(create.status, await create.clone().text()).toBe(201);
   const { session } = await create.json();
@@ -481,6 +486,12 @@ process.stdin.on('data', (chunk) => {
       first.output().includes(shellRoot),
     "interactive input and cwd",
   );
+  await closeShell(session.id);
+});
+
+test("real PTY: file links resolve against the live shell cwd", async () => {
+  const session = await openShell({ cols: 90, rows: 30 });
+  const first = await connect(session.id);
   await mkdir(join(root, "nested"));
   await writeFile(join(root, "nested/local.ts"), "const local = true;\n");
   await writeFile(join(root, "root.md"), "# Root\n");
@@ -518,6 +529,12 @@ process.stdin.on('data', (chunk) => {
   expect((await request("/missing-session?link=local.ts")).status).toBe(404);
   first.send({ type: "input", data: "cd ..; printf 'LINK_BACK_%s\\n' READY\r" });
   await until(() => first.output().includes("LINK_BACK_READY"), "restore shell cwd after links");
+  await closeShell(session.id);
+});
+
+test("real PTY: resize, partial output, Ctrl+C and alternate screen survive reconnect; bad sizes are refused", async () => {
+  const session = await openShell({ cols: 90, rows: 30 });
+  const first = await connect(session.id);
   first.send({ type: "resize", cols: 112, rows: 35 });
   await until(
     () =>
@@ -564,6 +581,11 @@ process.stdin.on('data', (chunk) => {
     () => second.messages.some((message) => message.type === "error"),
     "invalid resize rejected",
   );
+  await closeShell(session.id);
+});
+
+test("real PTY: sessions are isolated and flow control bounds the output queue until acknowledged", async () => {
+  const session = await openShell();
   const other = await (await request("", "POST", { program: "shell" })).json();
   expect(other.session.pid).not.toBe(session.pid);
   const reloaded = await import("../server/modules/terminal/terminal.ts?reload-test");
@@ -585,19 +607,12 @@ process.stdin.on('data', (chunk) => {
   flood.send({ type: "ack", length: pending() });
   await until(() => flood.output().includes("FLOOD_DONE"), "render acknowledgements resume output");
   expect((await request(`/${floodSession.session.id}`, "DELETE")).status).toBe(200);
-  second.send({ type: "input", data: "exit 7\r" });
-  await until(
-    () =>
-      second.messages.some(
-        (message) =>
-          message.type === "status" &&
-          message.session.status === "exited" &&
-          message.session.exitCode === 7,
-      ),
-    "exit status",
-  );
-  expect((await request(`/${session.id}`, "DELETE")).status).toBe(200);
-  expect((await request(`/${session.id}`, "DELETE")).status).toBe(400);
+  await closeShell(other.session.id);
+  await closeShell(session.id);
+});
+
+test("real PTY: deleting a busy session needs a fresh confirmation and kills TERM-ignoring children", async () => {
+  const other = await (await request("", "POST", { program: "shell" })).json();
   const running = await connect(other.session.id);
   running.send({
     type: "input",
@@ -624,6 +639,73 @@ process.stdin.on('data', (chunk) => {
     async () => (await os.processes.identity(childPid)) === null,
     "background child terminated",
   );
+  const shell = (
+    await (await request("", "POST", { program: "shell", cols: 100, rows: 30 })).json()
+  ).session;
+  const shellOutput = await connect(shell.id);
+  await until(
+    async () => (await (await request(`/${shell.id}`)).json()).session.activity.state === "idle",
+    "Bash prompt is idle",
+  );
+  shellOutput.send({ type: "input", data: "sleep 60\r" });
+  await until(
+    async () =>
+      (await (await request(`/${shell.id}`)).json()).session.activity.processes.some(
+        (item) => item.name === "sleep",
+      ),
+    "foreground process is busy",
+  ).catch(async (error) => {
+    const { os } = await import("../core/modules/os/index.ts");
+    const session = (await (await request(`/${shell.id}`)).json()).session;
+    const rows = (await os.processes.list()) ?? [];
+    const family = new Set([session.pid]);
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const row of rows)
+        if (family.has(row.parent) && !family.has(row.pid)) grew = !!family.add(row.pid);
+    }
+    throw new Error(
+      `${error.message}\n${JSON.stringify(session.activity)}\n${JSON.stringify(rows.filter((row) => family.has(row.pid)))}\n${shellOutput.output().slice(-500)}`,
+    );
+  });
+  expect((await request(`/${shell.id}`, "DELETE", {})).status).toBe(409);
+  shellOutput.send({ type: "input", data: "\u0003" });
+  await until(
+    async () => (await (await request(`/${shell.id}`)).json()).session.activity.state === "idle",
+    "shell idles after foreground job stops",
+  );
+  shellOutput.send({ type: "input", data: "sleep 60 &\r" });
+  await until(
+    async () =>
+      (await (await request(`/${shell.id}`)).json()).session.activity.processes.some(
+        (item) => item.name === "sleep",
+      ),
+    "background process is busy even at a prompt",
+  );
+  const blockedWork = await request(`/${shell.id}`, "DELETE", {});
+  expect(blockedWork.status).toBe(409);
+  const oldConfirmation = (await blockedWork.json()).session.activity.confirmation;
+  expect((await request(`/${shell.id}`, "DELETE", { confirmation: "invalid" })).status).toBe(409);
+  shellOutput.send({ type: "input", data: "sleep 60 &\r" });
+  await until(
+    async () =>
+      (await (await request(`/${shell.id}`)).json()).session.activity.processes.filter(
+        (item) => item.name === "sleep",
+      ).length === 2,
+    "a new process invalidates approval",
+  );
+  expect((await request(`/${shell.id}`, "DELETE", { confirmation: oldConfirmation })).status).toBe(
+    409,
+  );
+  shellOutput.send({ type: "input", data: "kill $(jobs -p)\r" });
+  await until(
+    async () => (await (await request(`/${shell.id}`)).json()).session.activity.state === "idle",
+    "shell idles after background jobs stop",
+  );
+  await closeShell(shell.id);
+});
+
+test("real PTY: project commands start, reconnect, restart, stop and keep the project status", async () => {
   // Project commands use the same interactive PTY and reconnectable screen as shells.
   const { getSnapshot } = await import("../server/modules/processes/index.ts");
   const run = (action, body) =>
@@ -694,70 +776,26 @@ process.stdin.on('data', (chunk) => {
   );
   expect((await request(`/${waitSession.id}`, "DELETE")).status).toBe(200);
   expect((await request("", "POST", { commandId: "missing" })).status).toBe(400);
-  const shell = (
-    await (await request("", "POST", { program: "shell", cols: 100, rows: 30 })).json()
-  ).session;
-  const shellOutput = await connect(shell.id);
-  await until(
-    async () => (await (await request(`/${shell.id}`)).json()).session.activity.state === "idle",
-    "Bash prompt is idle",
-  );
-  shellOutput.send({ type: "input", data: "sleep 60\r" });
-  await until(
-    async () =>
-      (await (await request(`/${shell.id}`)).json()).session.activity.processes.some(
-        (item) => item.name === "sleep",
-      ),
-    "foreground process is busy",
-  ).catch(async (error) => {
-    const { os } = await import("../core/modules/os/index.ts");
-    const session = (await (await request(`/${shell.id}`)).json()).session;
-    const rows = (await os.processes.list()) ?? [];
-    const family = new Set([session.pid]);
-    for (let grew = true; grew;) {
-      grew = false;
-      for (const row of rows)
-        if (family.has(row.parent) && !family.has(row.pid)) grew = !!family.add(row.pid);
-    }
-    throw new Error(
-      `${error.message}\n${JSON.stringify(session.activity)}\n${JSON.stringify(rows.filter((row) => family.has(row.pid)))}\n${shellOutput.output().slice(-500)}`,
-    );
-  });
-  expect((await request(`/${shell.id}`, "DELETE", {})).status).toBe(409);
-  shellOutput.send({ type: "input", data: "\u0003" });
-  await until(
-    async () => (await (await request(`/${shell.id}`)).json()).session.activity.state === "idle",
-    "shell idles after foreground job stops",
-  );
-  shellOutput.send({ type: "input", data: "sleep 60 &\r" });
-  await until(
-    async () =>
-      (await (await request(`/${shell.id}`)).json()).session.activity.processes.some(
-        (item) => item.name === "sleep",
-      ),
-    "background process is busy even at a prompt",
-  );
-  const blockedWork = await request(`/${shell.id}`, "DELETE", {});
-  expect(blockedWork.status).toBe(409);
-  const oldConfirmation = (await blockedWork.json()).session.activity.confirmation;
-  expect((await request(`/${shell.id}`, "DELETE", { confirmation: "invalid" })).status).toBe(409);
-  shellOutput.send({ type: "input", data: "sleep 60 &\r" });
-  await until(
-    async () =>
-      (await (await request(`/${shell.id}`)).json()).session.activity.processes.filter(
-        (item) => item.name === "sleep",
-      ).length === 2,
-    "a new process invalidates approval",
-  );
-  expect((await request(`/${shell.id}`, "DELETE", { confirmation: oldConfirmation })).status).toBe(
-    409,
-  );
-  shellOutput.send({ type: "input", data: "kill $(jobs -p)\r" });
-  await until(
-    async () => (await (await request(`/${shell.id}`)).json()).session.activity.state === "idle",
-    "shell idles after background jobs stop",
-  );
+});
 
+test("real PTY: exit codes, deletion, stop, rename and restart keep the session contract", async () => {
+  const exited = await openShell({ cols: 90, rows: 30 });
+  const second = await connect(exited.id);
+  second.send({ type: "input", data: "exit 7\r" });
+  await until(
+    () =>
+      second.messages.some(
+        (message) =>
+          message.type === "status" &&
+          message.session.status === "exited" &&
+          message.session.exitCode === 7,
+      ),
+    "exit status",
+  );
+  expect((await request(`/${exited.id}`, "DELETE")).status).toBe(200);
+  expect((await request(`/${exited.id}`, "DELETE")).status).toBe(400);
+  const shell = await openShell({ cols: 100, rows: 30 });
+  const shellOutput = await connect(shell.id);
   shellOutput.send({ type: "input", data: "printf 'KEPT_OUTPUT\\n'\r" });
   await until(() => shellOutput.output().includes("KEPT_OUTPUT"), "shell stop probe output");
   expect((await request(`/${shell.id}`, "POST", { action: "stop" })).status).toBe(200);

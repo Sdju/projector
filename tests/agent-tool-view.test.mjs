@@ -1,7 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import { applyAgentEvent } from "../src/modules/agent/model/turn-events.ts";
 import { toolVisual } from "../src/modules/agent/lib/tool-visual.ts";
-import { toolLabel } from "../src/modules/agent/lib/tool-labels.ts";
 import { codeLanguage } from "../src/modules/agent/lib/code-language.ts";
 
 test("a call is shaped by what it does, not only by its name", () => {
@@ -25,14 +24,6 @@ test("a file body is highlighted by the language of its name", () => {
   expect(codeLanguage("C:\\project\\src\\app.mjs")).toBe("mjs");
   expect(codeLanguage("README.")).toBe("");
   expect(codeLanguage("")).toBe("");
-});
-
-test("labels read the same for CamelCase and snake_case tool names", () => {
-  expect(toolLabel("Read")).toBe("Чтение файла");
-  expect(toolLabel("read")).toBe("Чтение файла");
-  expect(toolLabel("read_file")).toBe("Чтение файла");
-  expect(toolLabel("shell")).toBe("Команда");
-  expect(toolLabel("Неизвестный")).toBe("Неизвестный");
 });
 
 test("streamed output lives while the call runs and gives way to its result", () => {
