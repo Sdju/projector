@@ -24,6 +24,8 @@ export async function streamViaEvents(
   body: Record<string, unknown>,
   handle: (event: AgentEvent) => Promise<void>,
   signal?: AbortSignal,
+  /** The run the server started: kept before events arrive, so a broken stream can be rejoined. */
+  onRun?: (id: string) => void,
 ): Promise<typeof EVENTS_UNAVAILABLE | undefined> {
   if (typeof window === "undefined") return EVENTS_UNAVAILABLE;
   const stream = newId();
@@ -69,6 +71,9 @@ export async function streamViaEvents(
       const payload = (await response.json().catch(() => null)) as { error?: string } | null;
       throw new EventStreamRefused(payload?.error || "Агент недоступен", response.status);
     }
+    // The id comes before the first event: a page whose stream dies at once still knows the run.
+    const started = (await response.json().catch(() => null)) as { run?: string } | null;
+    if (started?.run) onRun?.(started.run);
     await ended;
     await chain;
   } finally {

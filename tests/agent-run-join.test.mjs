@@ -17,8 +17,9 @@ test("a page opening a chat being answered here joins the run instead of attachi
     const res = {
       writableEnded: false,
       ended: false,
-      writeHead(status) {
+      writeHead(status, headers) {
         this.status = status;
+        this.headers = headers ?? {};
       },
       write(chunk) {
         chunks.push(String(chunk));
@@ -49,6 +50,8 @@ test("a page opening a chat being answered here joins the run instead of attachi
     expect(body).toContain('"text":"two"');
     expect(body).toContain("event: done");
     expect(res.ended).toBe(true);
+    // The page learns the run from the response, before the first event is replayed.
+    expect(res.headers["X-Agent-Run"]).toBe(runId);
   } finally {
     if (previous === undefined) delete process.env.XDG_DATA_HOME;
     else process.env.XDG_DATA_HOME = previous;

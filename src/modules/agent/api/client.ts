@@ -61,6 +61,8 @@ export async function streamAgent(
     commands?: (request: AgentCommandRequest) => Promise<unknown>;
     /** Rejoin the answer an agent process is still producing instead of asking again. */
     attach?: string;
+    /** The run the server started: kept before events arrive, so a broken stream can be rejoined. */
+    onRun?: (id: string) => void;
   } = {},
 ): Promise<void> {
   const request = options.attach
@@ -89,7 +91,8 @@ export async function streamAgent(
     await answerCommand(event.data.id, event.data, options.commands, signal);
   }
   try {
-    if ((await streamViaEvents(request, handle, signal)) !== EVENTS_UNAVAILABLE) return;
+    if ((await streamViaEvents(request, handle, signal, options.onRun)) !== EVENTS_UNAVAILABLE)
+      return;
   } catch (error) {
     if (error instanceof EventStreamRefused)
       throw error.status === 404 ? new AgentRunGone(error.message) : error;
@@ -107,6 +110,8 @@ export async function streamAgent(
     const message = payload?.error || "Агент недоступен";
     throw response.status === 404 ? new AgentRunGone(message) : new Error(message);
   }
+  const started = response.headers.get("X-Agent-Run");
+  if (started) options.onRun?.(started);
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";

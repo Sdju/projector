@@ -66,12 +66,14 @@ export async function handleAgentRun({
       json(res, 409, { error: "Поток событий страницы не открыт" });
       return;
     }
-    json(res, 202, { accepted: true });
+    json(res, 202, { accepted: true, ...(run ? { run: run.id } : {}) });
   } else
     res.writeHead(200, {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
+      // The page keeps the id even if the stream breaks before its first event.
+      ...(run ? { "X-Agent-Run": run.id } : {}),
     });
   // The newcomer gets the answer so far and then the live events, like the first page sees them.
   if (run && attachId && isRunDriven(attachId)) {

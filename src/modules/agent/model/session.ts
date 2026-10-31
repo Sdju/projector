@@ -273,6 +273,11 @@ export function useAgent(
         worktree: copy,
         isolate,
         attach,
+        // Kept before any event: a stream that dies at once still leaves a run to rejoin.
+        onRun: (id) => {
+          assistant.run = id;
+          persist();
+        },
       }),
     );
   }
@@ -293,6 +298,10 @@ export function useAgent(
           commands,
           backend,
           attach,
+          onRun: (id) => {
+            assistant.run = id;
+            persist();
+          },
         }),
       assistant.run,
     );
