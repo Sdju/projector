@@ -6,6 +6,7 @@ import type {
   AgentTerminal,
 } from "./backend.ts";
 import { preferences } from "../preferences/index.ts";
+import { removeChatsWithSession } from "./recent-chats.ts";
 
 export type { AgentEmitter, AgentEventName, AgentRunOptions } from "./backend.ts";
 export type {
@@ -131,10 +132,18 @@ export async function updateAgentSession(
   await backend.updateSession(cwd, sessionId, change);
 }
 
-export async function deleteAgentSession(id: string | undefined, cwd: string, sessionId: string) {
+export async function deleteAgentSession(
+  id: string | undefined,
+  cwd: string,
+  sessionId: string,
+  history?: { project: string; keep?: string },
+) {
   const backend = backendFor(id);
   if (!backend.deleteSession) throw new Error("Этот агент не умеет удалять сессии");
   await backend.deleteSession(cwd, sessionId);
+  // The chats that continued the session are the same conversation: remove their copies too.
+  if (history?.project)
+    removeChatsWithSession(history.project, backend.id, sessionId, history.keep);
 }
 
 export async function agentMcpServers(id: string | undefined, cwd: string) {

@@ -1,4 +1,4 @@
-import { currentSession, historyDatabase, loadHistory } from "./history-store.ts";
+import { currentSession, deleteHistory, historyDatabase, loadHistory } from "./history-store.ts";
 
 /** A chat of the project, open in a tab or closed but still on disk. */
 export interface RecentChat {
@@ -52,4 +52,25 @@ export function readRecentChats(project: string, backend?: string, limit = 50): 
       ...(session ? { session } : {}),
     };
   });
+}
+
+/**
+ * Forgets the chats that continued a native session which was just deleted: otherwise each of
+ * them would come back as a separate, undeletable copy of the removed conversation.
+ * `keep` is the chat asking for the deletion: its own tab stays as it is.
+ */
+export function removeChatsWithSession(
+  project: string,
+  backend: string,
+  session: string,
+  keep = "",
+): string[] {
+  if (!project) return [];
+  const rows = historyDatabase()
+    .prepare(
+      "SELECT chat FROM chat_index WHERE scope = ? AND backend = ? AND session = ? AND chat <> ?",
+    )
+    .all(project, backend, session, keep) as unknown as { chat: string }[];
+  for (const row of rows) deleteHistory(row.chat);
+  return rows.map((row) => row.chat);
 }

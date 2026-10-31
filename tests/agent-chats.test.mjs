@@ -10,6 +10,7 @@ import {
   readAgentHistory,
   readRecentChats,
   removeArchivedChat,
+  removeChatsWithSession,
   renameArchivedChat,
   writeAgentHistory,
 } from "../server/modules/agent/index.ts";
@@ -101,5 +102,42 @@ describe("Projector agent chat history", () => {
       index,
     );
     expect(readRecentChats("sessions-project", "opencode")[0].session).toBeUndefined();
+  });
+
+  it("deleting a session forgets the chats that continued it", async () => {
+    const project = "deleted-project";
+    const backend = "opencode";
+    const index = { project, backend };
+    const chat = (name) => `${backend}:${project}:${name}`;
+    const answer = (id, session) => ({
+      ...turn(id, "assistant", "ответ"),
+      session: { backend, id: session },
+    });
+    await writeAgentHistory(
+      chat("first"),
+      [turn("1", "user", "q"), answer("2", "ses_gone")],
+      index,
+    );
+    await writeAgentHistory(
+      chat("second"),
+      [turn("3", "user", "q"), answer("4", "ses_gone")],
+      index,
+    );
+    await writeAgentHistory(chat("keep"), [turn("5", "user", "q"), answer("6", "ses_gone")], index);
+    await writeAgentHistory(
+      chat("other"),
+      [turn("7", "user", "q"), answer("8", "ses_other")],
+      index,
+    );
+
+    const removed = removeChatsWithSession(project, backend, "ses_gone", chat("keep"));
+    expect(removed.sort()).toEqual([chat("first"), chat("second")].sort());
+    expect(
+      readRecentChats(project, backend)
+        .map((item) => item.chat)
+        .sort(),
+    ).toEqual([chat("keep"), chat("other")].sort());
+    expect(await readAgentHistory(chat("first"))).toEqual([]);
+    expect(await readAgentHistory(chat("keep")).then((turns) => turns.length)).toBe(2);
   });
 });

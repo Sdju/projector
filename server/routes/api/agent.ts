@@ -219,7 +219,10 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
     const cwd = await projectPath(asString(body.projectId));
     const sessionId = asString(body.sessionId);
     if (!sessionId) throw new Error("Укажите сессию");
-    await deleteAgentSession(asString(body.backend) || undefined, cwd, sessionId);
+    await deleteAgentSession(asString(body.backend) || undefined, cwd, sessionId, {
+      project: asString(body.projectId),
+      ...(asString(body.chat) ? { keep: asString(body.chat) } : {}),
+    });
     json(res, 200, { ok: true });
     return true;
   }

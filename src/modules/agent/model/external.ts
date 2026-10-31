@@ -209,14 +209,18 @@ export function useExternalAgent(
     // The row leaves the list at once: reloading it first would make the menu jump while the
     // "loading" note takes its place.
     const previous = state.sessions;
+    const previousRecent = state.recent;
     if (previous.some((item) => item.id === id))
       state.sessions = previous.filter((item) => item.id !== id);
+    // A chat that continued this session is the same conversation: its copy goes with it.
+    if (external) state.recent = previousRecent.filter((item) => item.session !== id);
     try {
-      if (external) await deleteSession(backend, projectId, id);
+      if (external) await deleteSession(backend, projectId, id, key);
       else await deleteChat(id);
-      await loadSessions(true);
+      await Promise.all([loadSessions(true), external ? loadRecent() : undefined]);
     } catch (err) {
       state.sessions = previous;
+      state.recent = previousRecent;
       state.sessionsError = err instanceof Error ? err.message : "Не удалось удалить чат";
       throw err;
     }

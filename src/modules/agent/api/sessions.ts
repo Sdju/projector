@@ -19,18 +19,19 @@ export async function updateSession(
   );
 }
 
-/** Removes a past session of the agent for good. */
+/** Removes a past session of the agent for good; chats that continued it are forgotten too. */
 export async function deleteSession(
   backend: AgentBackendId,
   projectId: string,
   sessionId: string,
+  chat?: string,
 ): Promise<void> {
   await getJson(
     "/api/agent/sessions/delete",
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ backend, projectId, sessionId }),
+      body: JSON.stringify({ backend, projectId, sessionId, ...(chat ? { chat } : {}) }),
     },
     "Не удалось удалить сессию",
   );
