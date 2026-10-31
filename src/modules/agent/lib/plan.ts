@@ -1,48 +1,38 @@
+import {
+  clientAgentByBackend,
+  type AgentPlanItem,
+} from "../../agents-integration/catalog/index.ts";
 import type { AgentTurn } from "../model/types.ts";
 
-export interface PlanItem {
-  content: string;
-  status: "pending" | "in_progress" | "completed";
-  /** What the agent says while the item is being done. */
-  active?: string;
+export type PlanItem = AgentPlanItem;
+
+/** The list the agent kept in this answer: its reader finds the latest plan call, `[]` for a clear. */
+function planOf(turn: AgentTurn | undefined, backend: string): PlanItem[] | undefined {
+  if (turn?.role !== "assistant") return undefined;
+  const read = clientAgentByBackend(backend)?.plan;
+  if (!read) return undefined;
+  for (const tool of turn.tools.toReversed()) {
+    if (!tool.input) continue;
+    const items = read({ name: tool.name, input: tool.input });
+    if (items) return items;
+  }
+  return undefined;
 }
 
-const STATUSES = new Set(["pending", "in_progress", "completed"]);
-
-/** The task list the agent kept in its last answer (the latest `TodoWrite` call), if any. */
-export function latestPlan(turn: AgentTurn | undefined): PlanItem[] {
-  if (turn?.role !== "assistant") return [];
-  const call = turn.tools.findLast((tool) => tool.name === "TodoWrite" && tool.input);
-  if (!call?.input) return [];
-  try {
-    const todos = (JSON.parse(call.input) as { todos?: unknown }).todos;
-    if (!Array.isArray(todos)) return [];
-    return todos.flatMap((item): PlanItem[] => {
-      const todo = item as { content?: unknown; status?: unknown; activeForm?: unknown };
-      if (typeof todo.content !== "string" || typeof todo.status !== "string") return [];
-      if (!STATUSES.has(todo.status)) return [];
-      return [
-        {
-          content: todo.content,
-          status: todo.status as PlanItem["status"],
-          ...(typeof todo.activeForm === "string" ? { active: todo.activeForm } : {}),
-        },
-      ];
-    });
-  } catch {
-    return [];
-  }
+/** The task list the agent kept in its last answer, if any. */
+export function latestPlan(turn: AgentTurn | undefined, backend: string): PlanItem[] {
+  return planOf(turn, backend) ?? [];
 }
 
 /**
  * The plan the chat pins: the last answer's list while it has unfinished items, or the latest one
  * that still does; a finished plan shows only for the answer that finished it.
  */
-export function shownPlan(turns: AgentTurn[]): PlanItem[] {
+export function shownPlan(turns: AgentTurn[], backend: string): PlanItem[] {
   const answers = turns.filter((turn) => turn.role === "assistant");
   for (const turn of answers.toReversed()) {
-    const items = latestPlan(turn);
-    if (!items.length) continue;
+    const items = planOf(turn, backend);
+    if (!items) continue;
     return turn === answers.at(-1) || items.some((item) => item.status !== "completed")
       ? items
       : [];

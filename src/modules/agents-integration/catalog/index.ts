@@ -1,5 +1,25 @@
 import type { Component } from "vue";
 
+/** One item of the agent's own task list, as the chat pins and shows it. */
+export interface AgentPlanItem {
+  content: string;
+  status: "pending" | "in_progress" | "completed";
+  /** What the agent says while the item is being done. */
+  active?: string;
+}
+
+/** A tool call a plan reader may recognize. */
+export interface AgentPlanCall {
+  name: string;
+  input?: string;
+}
+
+/**
+ * Reads one tool call as a task list: `undefined` when the call does not carry one, `[]` when the
+ * agent cleared the list. The schema belongs to the agent, so the shared chat only asks this reader.
+ */
+export type AgentPlanReader = (call: AgentPlanCall) => AgentPlanItem[] | undefined;
+
 /**
  * What the client knows about an agent: the backend that answers in the chat, the terminal
  * program it stands for and how it is shown in menus and settings. Agents register themselves;
@@ -17,6 +37,8 @@ export interface ClientAgent {
   builtin?: boolean;
   /** The limits indicator of the agent, if it has one. */
   usage?: Component;
+  /** How the agent keeps its task list, if it has one. */
+  plan?: AgentPlanReader;
 }
 
 const agents = new Map<string, ClientAgent>();

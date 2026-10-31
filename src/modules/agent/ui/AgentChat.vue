@@ -243,7 +243,7 @@ const editFrom = computed(() =>
 );
 
 // The plan stays pinned while it has unfinished items, even after later messages.
-const plan = computed(() => shownPlan(turns.value));
+const plan = computed(() => shownPlan(turns.value, props.backend));
 const contextShare = computed(() =>
   latestContext.value ? latestContext.value.used / Math.max(1, latestContext.value.size) : 0,
 );

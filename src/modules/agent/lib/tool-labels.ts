@@ -43,6 +43,7 @@ export const toolLabels: Record<string, string> = {
   subagent: "Субагент",
   TodoWrite: "План задач",
   todowrite: "План задач",
+  TodoList: "План задач",
 };
 
 /** Labels are written for the agents that name a tool in CamelCase or snake_case alike. */

@@ -10,9 +10,12 @@ import {
 } from "../src/modules/agent/model/branches.ts";
 import { turnChanges } from "../src/modules/agent/lib/turn-changes.ts";
 import { applyAgentEvent } from "../src/modules/agent/model/turn-events.ts";
-import { latestPlan } from "../src/modules/agent/lib/plan.ts";
+import { latestPlan, shownPlan } from "../src/modules/agent/lib/plan.ts";
 import { chatMarkdown } from "../src/modules/agent/lib/export.ts";
 import { readAgentHistory, writeAgentHistory } from "../server/modules/agent/index.ts";
+import { registerBuiltinClientAgents } from "../src/app/agents.ts";
+
+registerBuiltinClientAgents();
 
 const turn = (id, role, text = id) => ({ id, role, text, tools: [] });
 const ids = (turns) => turns.map((item) => item.id).join(",");
@@ -109,7 +112,7 @@ test("the edited files of an answer are counted per file and failed calls are sk
   ]);
 });
 
-test("the plan is the last TodoWrite of the answer", () => {
+test("the plan is the last plan call of the answer", () => {
   const answer = {
     ...turn("a", "assistant"),
     tools: [
@@ -135,11 +138,66 @@ test("the plan is the last TodoWrite of the answer", () => {
       },
     ],
   };
-  expect(latestPlan(answer).map((item) => `${item.content}:${item.status}`)).toEqual([
-    "one:completed",
-    "two:in_progress",
+  expect(latestPlan(answer, "claude-code").map((item) => `${item.content}:${item.status}`)).toEqual(
+    ["one:completed", "two:in_progress"],
+  );
+  expect(latestPlan(turn("u", "user"), "claude-code")).toEqual([]);
+});
+
+test("Kimi's TodoList carries the plan too", () => {
+  const answer = {
+    ...turn("a", "assistant"),
+    tools: [
+      {
+        id: "1",
+        name: "TodoList",
+        status: "done",
+        detail: "",
+        input: JSON.stringify({
+          todos: [
+            { title: "one", status: "in_progress" },
+            { title: "two", status: "done" },
+          ],
+        }),
+      },
+      // Kimi reads the list by calling without `todos`: that call must not erase the plan.
+      { id: "2", name: "TodoList", status: "done", detail: "", input: "{}" },
+    ],
+  };
+  expect(latestPlan(answer, "kimi").map((item) => `${item.content}:${item.status}`)).toEqual([
+    "one:in_progress",
+    "two:completed",
   ]);
-  expect(latestPlan(turn("u", "user"))).toEqual([]);
+  // Another agent's reader does not know Kimi's tool, so the list stays with Kimi.
+  expect(latestPlan(answer, "claude-code")).toEqual([]);
+});
+
+test("a cleared plan does not fall back to an earlier answer", () => {
+  const open = {
+    ...turn("a1", "assistant"),
+    tools: [
+      {
+        id: "1",
+        name: "TodoList",
+        status: "done",
+        detail: "",
+        input: JSON.stringify({ todos: [{ title: "one", status: "pending" }] }),
+      },
+    ],
+  };
+  const cleared = {
+    ...turn("a2", "assistant"),
+    tools: [
+      {
+        id: "2",
+        name: "TodoList",
+        status: "done",
+        detail: "",
+        input: JSON.stringify({ todos: [] }),
+      },
+    ],
+  };
+  expect(shownPlan([turn("u1", "user"), open, turn("u2", "user"), cleared], "kimi")).toEqual([]);
 });
 
 test("the chat exports as markdown", () => {

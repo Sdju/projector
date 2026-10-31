@@ -238,7 +238,7 @@ export function useSideQuestion(options: SideQuestionOptions) {
           selection: options.backend === "projector" ? options.selection.value : {},
           thread: state.exchanges.slice(-20),
           running: checksOf(options.turns.value),
-          plan: shownPlan(options.turns.value).map((item) => ({
+          plan: shownPlan(options.turns.value, options.backend).map((item) => ({
             content: item.content,
             status: item.status,
           })),

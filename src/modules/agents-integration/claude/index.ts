@@ -1,5 +1,6 @@
 import IconClaude from "~icons/simple-icons/claude";
 import type { ClientAgent } from "../catalog/index.ts";
+import { readClaudePlan } from "./plan.ts";
 import ClaudeUsageIndicator from "./ui/ClaudeUsageIndicator.vue";
 
 export { ClaudeUsageIndicator };
@@ -11,4 +12,5 @@ export const claudeAgent: ClientAgent = {
   caption: "Запустит агента Anthropic",
   icon: IconClaude,
   usage: ClaudeUsageIndicator,
+  plan: readClaudePlan,
 };

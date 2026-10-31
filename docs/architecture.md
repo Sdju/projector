@@ -105,7 +105,9 @@ Workspace не знает конкретных видов служебных в�
 - `claude-code/` — Claude Code через Agent SDK; раннер hosted-хода — `server/app/claude-runner.ts` (композиция регистрирует виджеты и возможности, как и `projector-runner.ts`);
 - `projector/` — встроенный ассистент Projector с инструментами и `secrets/`; его ход живёт в раннере `server/app/projector-runner.ts` (композиция: раннер регистрирует виджеты, как сервер).
 
-На клиенте тот же каталог живёт в `src/modules/agents-integration/catalog/index.ts`: дескриптор `ClientAgent` (`backend`, `program`, `title`, `caption`, `icon`, `builtin`, `usage`) заполняет `src/app/agents.ts` до монтирования приложения. Меню «+», вкладки чатов, режимы, интеграции и команды фоновых заданий читают его, а не перечисляют агентов.
+На клиенте тот же каталог живёт в `src/modules/agents-integration/catalog/index.ts`: дескриптор `ClientAgent` (`backend`, `program`, `title`, `caption`, `icon`, `builtin`, `usage`, `plan`) заполняет `src/app/agents.ts` до монтирования приложения. Меню «+», вкладки чатов, режимы, интеграции и команды фоновых заданий читают его, а не перечисляют агентов.
+
+План задач агента тоже остаётся в его модуле: `ClientAgent.plan` читает один вызов (Projector и Claude Code — `TodoWrite`, Kimi — `TodoList`), а `lib/plan.ts` только перебирает вызовы ответа и выбирает последний список. Имена инструментов и статусы конкретного агента общий чат не знает.
 
 Подключаются агенты в двух местах: на сервере — `server/app/agents.ts` (`registerBuiltinAgents`), на клиенте — `src/app/agents.ts` (`registerBuiltinClientAgents`, вызов в `entry.ts`). Чтобы добавить агента, создайте подмодуль с `index.ts` (бэкенд и `terminal`-дескриптор), дескриптор `ClientAgent` в клиентском модуле и по одной строке в каждой композиции. Агент сам объявляет `label`, `program`, `terminal`, `capabilities.hosted` (если его ход живёт в отдельном процессе `agent-host`), свои режимы разрешений, формы и расширения протокола. `backend.program` совпадает с `terminal.program`, даже если id бэкенда и терминальной программы различаются.
 
