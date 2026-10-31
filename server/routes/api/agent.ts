@@ -15,23 +15,10 @@ import {
   updateAgentSession,
   deleteAgentSession,
   loadAgentSession,
-  runAgent,
-  createCommandBridge,
-  createApprovalBridge,
-  createQuestionBridge,
-  createSecretBridge,
   completeCommandRequest,
   cancelRun,
-  createRun,
   listLiveRuns,
-  pruneRuns,
-  readRun,
-  rememberSession,
-  removeRun,
-  schedulePrune,
-  trackRun,
   listAgentBackends,
-  isHostedAgent,
   injectMessage,
   worktreeCwd,
   readAgentHistory,
@@ -39,12 +26,10 @@ import {
   readAttachment,
   saveAttachment,
   writeAgentHistory,
-  trackEventStream,
-  requestFrom,
   detachEventStream,
+  handleAgentRun,
 } from "../../modules/agent/index.ts";
 
-import { broadcastEvent, hasEventClient } from "../../modules/events/index.ts";
 import { accessAllowed } from "../../modules/access/index.ts";
 import { HttpError } from "../../modules/http/index.ts";
 import { readBody, asString, json } from "../../modules/transport/index.ts";
@@ -275,97 +260,7 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
   }
   if (path === "/api/agent" && method === "POST") {
     const body = await readBody(req);
-    const attachId = asString(body.attach);
-    // A rejoined run repeats the request an earlier server stored; a new one reads it from the body.
-    const stored = attachId ? await readRun(attachId) : null;
-    if (attachId && !stored) {
-      json(res, 404, { error: "Ход агента не найден" });
-      return true;
-    }
-    const created = stored ? undefined : await requestFrom(body);
-    // What the client can show is stored with the run: a runner that outlives this request needs it.
-    const request = stored ?? {
-      ...created!.request,
-      projectId: asString(body.projectId) || undefined,
-      chat: asString(body.chat) || undefined,
-      approvals: body.approvals === true,
-      commandBridge: body.commandBridge === true,
-    };
-    const backend = request.backend;
-    const hosted = isHostedAgent(backend);
-    const run = hosted
-      ? { id: attachId || (await createRun(request)), attach: !!attachId }
-      : undefined;
-    if (hosted && !attachId) void pruneRuns().catch(() => {});
-
-    // A page with its own events stream asks for the answer there: the request returns at once and
-    // holds no connection (a browser allows few per origin for all its tabs). Others get an SSE body.
-    const client = asString(body.client);
-    const stream = asString(body.stream);
-    const viaEvents = !!client && !!stream;
-    if (viaEvents) {
-      if (!hasEventClient(client)) {
-        json(res, 409, { error: "Поток событий страницы не открыт" });
-        return true;
-      }
-      json(res, 202, { accepted: true });
-    } else
-      res.writeHead(200, {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache, no-transform",
-        Connection: "keep-alive",
-      });
-    // A closed page only detaches from a hosted run, which keeps going and can be rejoined;
-    // other agents stop with their request. Stopping a hosted run is the explicit cancel.
-    const abort = new AbortController();
-    let detached = false;
-    const detach = () => {
-      if (detached) return;
-      detached = true;
-      if (!hosted) abort.abort();
-    };
-    const untrackStream = viaEvents ? trackEventStream(stream, client, detach) : undefined;
-    if (!viaEvents) res.on("close", detach);
-    const untrack = run ? trackRun(run.id, () => abort.abort()) : undefined;
-    let delivered = false;
-    const emit = (event: string, data: unknown) => {
-      // Noted even after the page left: the run goes on, and its session is how it is found again.
-      if (event === "session" && run && !run.attach)
-        void rememberSession(run.id, (data as { id: string }).id).catch(() => {});
-      if (detached || (!viaEvents && res.writableEnded)) return;
-      if (event === "done" || event === "error") delivered = true;
-      if (viaEvents) broadcastEvent("agent", { stream, event, data }, client);
-      else res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-    };
-    if (run) emit("run", { id: run.id });
-    if (created?.worktree) emit("worktree", created.worktree);
-    try {
-      await runAgent({
-        ...request,
-        backend,
-        run,
-        commands: body.commandBridge === true ? createCommandBridge(emit, abort.signal) : undefined,
-        approve: body.approvals === true ? createApprovalBridge(emit, abort.signal) : undefined,
-        ask: body.approvals === true ? createQuestionBridge(emit, abort.signal) : undefined,
-        secret: body.approvals === true ? createSecretBridge(emit, abort.signal) : undefined,
-        abort: abort.signal,
-        emit,
-      });
-    } catch (error) {
-      const text = error instanceof Error ? error.message : "Ошибка агента";
-      emit("error", { error: text });
-    }
-    untrack?.();
-    // The answer reached the page, or the user cancelled it: nothing is left to rejoin.
-    if (run) {
-      const removed =
-        (delivered || abort.signal.aborted) && (await removeRun(run.id).catch(() => false));
-      if (!removed) schedulePrune();
-    }
-    if (viaEvents) {
-      untrackStream?.();
-      if (!detached) broadcastEvent("agent", { stream, event: "end", data: {} }, client);
-    } else if (!res.writableEnded) res.end();
+    await handleAgentRun({ res, body });
     return true;
   }
   return false;

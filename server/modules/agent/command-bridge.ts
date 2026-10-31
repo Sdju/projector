@@ -79,7 +79,11 @@ export interface SecretRequest {
 }
 
 type BridgeResult = { output?: unknown; error?: string };
-const pending = new Map<string, (result: BridgeResult) => void>();
+const host = globalThis as typeof globalThis & {
+  projectorCommandPending?: Map<string, (result: BridgeResult) => void>;
+  projectorCommandRelayed?: Map<string, (result: BridgeResult) => void>;
+};
+const pending = (host.projectorCommandPending ??= new Map());
 
 /** Each request has a single-use capability, delivered only to its originating SSE client. */
 function bridgeRequest(
@@ -193,7 +197,10 @@ export function createSecretBridge(
  * Requests asked by a run held outside this server (its own process): the answer goes back to that
  * process, which keeps the request open. Registered by whichever server is attached to the run.
  */
-const relayed = new Map<string, (result: BridgeResult) => void>();
+const relayed = (host.projectorCommandRelayed ??= new Map<
+  string,
+  (result: BridgeResult) => void
+>());
 
 export function relayRequest(id: string, deliver: (result: BridgeResult) => void): void {
   relayed.set(id, deliver);
@@ -201,6 +208,11 @@ export function relayRequest(id: string, deliver: (result: BridgeResult) => void
 
 export function unrelayRequests(ids: Iterable<string>): void {
   for (const id of ids) relayed.delete(id);
+}
+
+/** Whether the request still waits for its user: a page that joins later may show it. */
+export function isBridgeRequestPending(id: string): boolean {
+  return pending.has(id) || relayed.has(id);
 }
 
 export function completeCommandRequest(id: string, result: BridgeResult): boolean {
