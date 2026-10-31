@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { openTerminalSocket, type TerminalSocket } from "../lib/socket.ts";
 import UiPanel from "../../../common/ui/UiPanel.vue";
+import UiButton from "../../../common/ui/UiButton.vue";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { Terminal, type IDisposable } from "@xterm/xterm";
@@ -9,6 +10,7 @@ import "@xterm/xterm/css/xterm.css";
 import { openExternalLink } from "../../../common/utilities/open-external-link.ts";
 import { lanPassword } from "../../../common/utilities/lan-auth.ts";
 import { deferTerminalText } from "../lib/keyboard.ts";
+import { readTerminalClipboard, type TerminalClipboardFailure } from "../lib/clipboard.ts";
 import { bindTerminalInput } from "../lib/input.ts";
 import { bindTerminalTouchScroll, terminalScroller } from "../lib/touch-scroll.ts";
 import { bindTerminalLinks, type TerminalLink } from "../lib/links.ts";
@@ -92,6 +94,34 @@ let resizeFrame = 0;
 let rendering = Promise.resolve();
 
 const running = () => ready && props.session.status === "running" && !props.session.stopRequested;
+const clipboardFailure = ref<TerminalClipboardFailure>();
+const clipboardBusy = ref(false);
+const clipboardErrorText = computed(() => {
+  if (clipboardFailure.value === "denied")
+    return "Доступ к буферу обмена запрещён. Разрешите «Буфер обмена» в настройках сайта, затем повторите вставку. Также работает Shift+Insert.";
+  if (clipboardFailure.value === "unsupported")
+    return "Браузер не поддерживает чтение буфера обмена. Вставьте текст через меню браузера или Shift+Insert.";
+  return "Браузер не разрешил чтение буфера обмена. Нажмите «Разрешить вставку» и подтвердите доступ. Если диалог не появился, разрешите «Буфер обмена» в настройках сайта. Также работает Shift+Insert.";
+});
+
+async function pasteFromClipboard(): Promise<void> {
+  if (clipboardBusy.value) return;
+  clipboardBusy.value = true;
+  try {
+    const result = await readTerminalClipboard(navigator.clipboard, navigator.permissions);
+    if (result.status === "success") {
+      clipboardFailure.value = undefined;
+      if (running()) {
+        terminal?.paste(result.text);
+        terminal?.focus();
+      }
+      return;
+    }
+    clipboardFailure.value = result.status;
+  } finally {
+    clipboardBusy.value = false;
+  }
+}
 
 async function openTerminalLink(link: TerminalLink) {
   if (link.web) {
@@ -211,6 +241,7 @@ function connect(): void {
   disconnect();
   if (!terminal) return;
   error.value = "";
+  clipboardFailure.value = undefined;
   terminal.reset();
   connection.value = "connecting";
   const currentGeneration = generation;
@@ -339,14 +370,7 @@ onMounted(() => {
     if (event.type === "keydown" && event.ctrlKey && event.shiftKey && event.code === "KeyV") {
       // Returning false does not cancel the browser's own paste event: without this the text lands twice.
       event.preventDefault();
-      void navigator.clipboard
-        .readText()
-        .then((text) => {
-          if (ready && props.session.status === "running") terminal?.paste(text);
-        })
-        .catch(() => {
-          error.value = "Вставьте текст через меню браузера или Shift+Insert";
-        });
+      void pasteFromClipboard();
       return false;
     }
     // Fcitx virtual layouts can translate a US keydown only in keypress.
@@ -388,6 +412,17 @@ onBeforeUnmount(() => {
     </div>
     <p v-if="statusText" class="status" role="status">{{ statusText }}</p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <div v-if="clipboardFailure" class="error clipboard-error" role="alert">
+      <span>{{ clipboardErrorText }}</span>
+      <UiButton
+        v-if="clipboardFailure !== 'unsupported'"
+        size="sm"
+        :busy="clipboardBusy"
+        @click="pasteFromClipboard"
+      >
+        {{ clipboardFailure === "denied" ? "Повторить вставку" : "Разрешить вставку" }}
+      </UiButton>
+    </div>
     <div
       class="screen-wrap"
       data-terminal-drop
@@ -427,6 +462,12 @@ onBeforeUnmount(() => {
   padding: 10px 12px;
   color: var(--err);
   font-size: var(--fs-xs);
+}
+.clipboard-error {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
 }
 .screen-wrap {
   position: relative;
