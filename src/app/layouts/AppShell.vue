@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import ActivityIsland from "./ActivityIsland.vue";
+import { ActivityIsland } from "../../modules/agent/index.ts";
 import { useCommandScope, commandArgs } from "../../common/utilities/commands.ts";
+import { useCompactViewport } from "../../common/utilities/compact-viewport.ts";
 import { computed, ref } from "vue";
 import { githubProjectRoute } from "../../../core/modules/github/index.ts";
 import { useRoute, useRouter } from "vue-router";
@@ -12,6 +13,8 @@ defineProps<{ currentProject?: ProjectLocation }>();
 const { openPath } = useProjects();
 const route = useRoute();
 const router = useRouter();
+/** On a phone the project header is hidden; the island moves into the terminal header there. */
+const compact = useCompactViewport();
 
 const commands = useCommandScope("project:path", () => ({ surface: "project-path" }));
 commands.scope.registerCommand({
@@ -119,7 +122,7 @@ const navigatePath = (path: string) =>
       </router-link>
       <nav class="nav">
         <router-link v-if="!currentProject" to="/settings">настройки</router-link>
-        <ActivityIsland />
+        <ActivityIsland v-if="!currentProject || !compact" />
       </nav>
     </header>
     <p v-if="dropError" class="drop-error" role="alert">{{ dropError }}</p>

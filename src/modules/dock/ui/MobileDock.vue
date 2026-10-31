@@ -97,6 +97,9 @@ const handlers = {
             :render="dock.slots.actions"
             :args="{ activeId: surface.active }"
           />
+          <div v-if="surface.side === 'terminal' && dock.slots.trailing" class="trailing">
+            <DockSlot :render="dock.slots.trailing" :args="{ group: { role: surface.side } }" />
+          </div>
         </header>
         <div class="body">
           <div
@@ -157,6 +160,12 @@ const handlers = {
   flex: 1;
   min-width: 0;
   height: 36px;
+}
+.trailing {
+  display: flex;
+  align-items: center;
+  flex: none;
+  padding-inline-end: var(--sp-1);
 }
 .body {
   position: relative;

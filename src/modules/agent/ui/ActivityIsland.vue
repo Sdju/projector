@@ -1,29 +1,28 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRouter } from "vue-router";
-import UiActionRow from "../../common/ui/UiActionRow.vue";
-import UiButton from "../../common/ui/UiButton.vue";
-import UiInline from "../../common/ui/UiInline.vue";
-import UiIsland from "../../common/ui/UiIsland.vue";
-import UiIslandLabel from "../../common/ui/UiIslandLabel.vue";
-import UiSpinner from "../../common/ui/UiSpinner.vue";
-import { useCommandScope } from "../../common/utilities/commands.ts";
-import { useIslandMenu } from "../../common/utilities/island-menu.ts";
-import {
-  formatElapsed,
-  requestChatTab,
-  requestJobTab,
-  useAgentActivity,
-  useElapsedClock,
-  type AgentActivityItem,
-} from "../../modules/agent/index.ts";
-import { projectRoute, useProjects } from "../../modules/project/index.ts";
-import { useRunner } from "../../modules/runner/index.ts";
+import UiActionRow from "../../../common/ui/UiActionRow.vue";
+import UiButton from "../../../common/ui/UiButton.vue";
+import UiInline from "../../../common/ui/UiInline.vue";
+import UiIsland from "../../../common/ui/UiIsland.vue";
+import UiIslandLabel from "../../../common/ui/UiIslandLabel.vue";
+import UiSpinner from "../../../common/ui/UiSpinner.vue";
+import { useCommandScope } from "../../../common/utilities/commands.ts";
+import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
+import { useAgentActivity, type AgentActivityItem } from "../model/activity.ts";
+import { requestChatTab, requestJobTab } from "../model/job-open.ts";
+import { formatElapsed, useElapsedClock } from "../lib/elapsed.ts";
+import { projectRoute, useProjects } from "../../project/index.ts";
+import { useRunner } from "../../runner/index.ts";
 import IconSquare from "~icons/lucide/square";
 import IconBot from "~icons/lucide/bot";
 import IconAlert from "~icons/lucide/circle-alert";
 
-/** The counter in the header as an island: running projects and agents at work, one click away. */
+/**
+ * The counter in the header as an island: running projects and agents at work, one click away.
+ * `scope` distinguishes copies of the trigger on one page (header and the mobile terminal header).
+ */
+const props = withDefaults(defineProps<{ scopeId?: string }>(), { scopeId: "activity" });
 const { projects } = useProjects();
 const runner = useRunner();
 const router = useRouter();
@@ -53,12 +52,12 @@ const menu = useIslandMenu({
   returnFocus: ".trigger",
 });
 
-const commands = useCommandScope("activity", () => ({ surface: "activity" }));
+const commands = useCommandScope(props.scopeId, () => ({ surface: "activity" }));
 commands.scope.registerCommand({
   id: "ide.activity.toggle",
   title: "Показать запущенные проекты и агентов",
   description:
-    "Открывает или закрывает остров в правом верхнем углу: запущенные проекты (с остановкой) и агенты, которые сейчас работают.",
+    "Открывает или закрывает остров активности: запущенные проекты (с остановкой) и агенты, которые сейчас работают.",
   run: () => menu.toggle(),
 });
 
@@ -206,5 +205,12 @@ svg {
   margin: 0;
   padding: var(--sp-2);
   color: var(--faint);
+}
+/* The terminal header on a phone is 36px high: keep the tap target usable there. */
+@media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {
+  .trigger {
+    min-height: 32px;
+    padding-inline: var(--sp-2);
+  }
 }
 </style>

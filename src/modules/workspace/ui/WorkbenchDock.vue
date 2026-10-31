@@ -8,6 +8,7 @@ import IconFinishFlag from "../../../common/ui/IconFinishFlag.vue";
 import { DockView } from "../../dock/index.ts";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import { TerminalView } from "../../terminal/index.ts";
+import { ActivityIsland } from "../../agent/index.ts";
 import type { useOpenFiles } from "../lib/open-files.ts";
 import type { useWorkbenchLayout } from "../lib/workbench-layout.ts";
 import type { createPanelHosts } from "../panel-hosts.ts";
@@ -146,6 +147,9 @@ const hostOf = (key: string) => props.panelHosts.hosts[key] ?? null;
           <IconRestart aria-hidden="true" />
         </UiButton>
       </template>
+    </template>
+    <template #trailing>
+      <ActivityIsland scope-id="activity:mobile" />
     </template>
     <template #empty="{ group }">
       <UiEmpty v-if="group.role === 'editor'">
