@@ -3,7 +3,7 @@ import { fetchRecentChats } from "../api/chats.ts";
 import { chatTabCommand } from "../lib/chat-tab.ts";
 import type { RegisterCommand } from "./register-command.ts";
 import type { ForkMode } from "./branches.ts";
-import { chatsOf, resolveChat, type ChatController } from "./chat-registry.ts";
+import { chatsOf, resolveChat } from "./chat-registry.ts";
 
 const CHAT = "Ключ чата из ide.agent.chats.list; без него — чат, с которым работали последним";
 
@@ -15,9 +15,8 @@ function text(args: Record<string, unknown>, key: string): string {
 
 /** Branches of a chat and the list of chats a closed tab can be brought back from. */
 export function registerBranchCommands(register: RegisterCommand, projectId: string): void {
-  const idle = () => chatsOf(projectId).some((chat) => !chat.busy());
-  const find = (args: unknown, accept?: (chat: ChatController) => boolean) =>
-    resolveChat(projectId, commandArgs(args).chat, accept);
+  const anyChat = () => chatsOf(projectId).length > 0;
+  const find = (args: unknown) => resolveChat(projectId, commandArgs(args).chat);
 
   register(
     "ide.agent.chats.recent",
@@ -41,7 +40,7 @@ export function registerBranchCommands(register: RegisterCommand, projectId: str
     "Ответвить чат в новый",
     async (args) => {
       const options = commandArgs(args);
-      const chat = find(args, (item) => !item.busy());
+      const chat = find(args);
       const turnId = text(options, "turnId");
       const asked = options.mode;
       if (asked !== undefined && asked !== "before" && asked !== "after")
@@ -50,7 +49,7 @@ export function registerBranchCommands(register: RegisterCommand, projectId: str
       const mode: ForkMode = asked ?? (role === "assistant" ? "after" : "before");
       return chat.fork(turnId, mode);
     },
-    idle,
+    anyChat,
     undefined,
     {
       description:

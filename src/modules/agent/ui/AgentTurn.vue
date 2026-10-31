@@ -195,7 +195,6 @@ const waiting = computed(() => {
           class="turn-action"
           title="Ответвить в новый чат: копия разговора до этого сообщения, текст останется в поле ввода"
           aria-label="Ответвить в новый чат"
-          :disabled="busy"
           @click="emit('fork', turn.id, 'before')"
         >
           <IconGitFork aria-hidden="true" />
@@ -283,7 +282,6 @@ const waiting = computed(() => {
           class="copy-button"
           title="Продолжить в новом чате: копия разговора до этого ответа"
           aria-label="Продолжить в новом чате"
-          :disabled="busy"
           @click="emit('fork', turn.id, 'after')"
         >
           <IconGitFork aria-hidden="true" />

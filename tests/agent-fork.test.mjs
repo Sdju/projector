@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { reactive } from "vue";
 import { forkAt } from "../src/modules/agent/model/branches.ts";
+import { registerBranchCommands } from "../src/modules/agent/model/branch-commands.ts";
 import { forkChat } from "../src/modules/agent/model/chat-fork.ts";
+import { registerChat } from "../src/modules/agent/model/chat-registry.ts";
 import { chatKeyOf } from "../src/modules/agent/model/chat-key.ts";
 import { takeDraft } from "../src/modules/agent/model/drafts.ts";
 import { registerBuiltinClientAgents } from "../src/app/agents.ts";
@@ -97,6 +99,33 @@ test("a fork of the reactive chat state is a plain copy", () => {
   expect(slice.turns.map((item) => item.id)).toEqual(["u1", "a1"]);
   slice.turns[0].text = "changed";
   expect(turns[0].text).toBe("u1");
+});
+
+test("a chat can be forked while its answer is still being written", async () => {
+  const commands = new Map();
+  const register = (id, _title, run, enabled) => commands.set(id, { run, enabled });
+  registerBranchCommands(register, "busy-project");
+  const chat = {
+    key: "projector:busy-project:live",
+    projectId: "busy-project",
+    backend: "projector",
+    busy: () => true,
+    visible: () => true,
+    turns: () => [turn("u1", "user"), turn("a1", "assistant")],
+    fork: async (turnId, mode) => ({ chat: `${turnId}:${mode}` }),
+  };
+  const unregister = registerChat(chat);
+  try {
+    expect(commands.get("ide.agent.chat.fork").enabled()).toBe(true);
+    expect(await commands.get("ide.agent.chat.fork").run({ turnId: "a1" })).toEqual({
+      chat: "a1:after",
+    });
+    expect(await commands.get("ide.agent.chat.fork").run({ turnId: "u1" })).toEqual({
+      chat: "u1:before",
+    });
+  } finally {
+    unregister();
+  }
 });
 
 test("forking writes the copy under a new chat key and parks its draft", async () => {
