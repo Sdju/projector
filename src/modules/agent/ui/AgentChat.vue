@@ -20,6 +20,7 @@ import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import AgentWelcome from "./AgentWelcome.vue";
 import AgentTurn from "./AgentTurn.vue";
 import AgentComposer from "./AgentComposer.vue";
+import AgentJobDock from "./AgentJobDock.vue";
 import AgentQuestions from "./AgentQuestions.vue";
 import AgentSecrets from "./AgentSecrets.vue";
 import AgentPermissions from "./AgentPermissions.vue";
@@ -38,7 +39,8 @@ import AgentRewind from "./AgentRewind.vue";
 import AgentWorktree from "./AgentWorktree.vue";
 import { chatMarkdown, downloadChatMarkdown } from "../lib/export.ts";
 import { shownPlan } from "../lib/plan.ts";
-import { fetchMcpServers, type McpServer } from "../api/client.ts";
+import { fetchMcpServers } from "../api/client.ts";
+import { useMcpServers } from "../model/mcp-panel.ts";
 import { activateChat, registerChat, type ChatController } from "../model/chat-registry.ts";
 import { useChatWindow } from "../model/chat-window.ts";
 import { useRewindPanel } from "../model/rewind-panel.ts";
@@ -213,6 +215,7 @@ const composer = ref<InstanceType<typeof AgentComposer>>();
 const chatDrop = chatDropHandlers(() => composer.value);
 const panel = ref<InstanceType<typeof UiPanel>>();
 const root = computed(() => panel.value?.element);
+
 // The project folder: edited files and dropped paths are shown relative to it.
 const projectRoot = ref("");
 void workspaceRequest<{ root: string }>(props.projectId, "root")
@@ -221,15 +224,8 @@ void workspaceRequest<{ root: string }>(props.projectId, "root")
   })
   .catch(() => {});
 // MCP servers shown in the parameters island; read when it opens, as that starts a probe process.
-const mcp = ref<McpServer[]>([]);
-async function loadMcp() {
-  if (!plain.value) return;
-  try {
-    mcp.value = await fetchMcpServers(props.backend, props.projectId);
-  } catch {
-    mcp.value = [];
-  }
-}
+const { mcp, load: loadMcpServers } = useMcpServers(() => props.backend, props.projectId);
+const loadMcp = () => (plain.value ? loadMcpServers() : Promise.resolve());
 
 const { copy, copyInfo, copyWorking, copyNote, endCopy } = useWorktreePanel(turns, busy, {
   worktreeInfo,
@@ -648,6 +644,13 @@ onBeforeUnmount(() => {
         версией.
         <button type="button" @click="cancelEdit">Отмена</button>
       </p>
+      <AgentJobDock
+        v-if="!plain"
+        :project-id="projectId"
+        :chat="chatKey"
+        :enabled="!plain"
+        :send="(text, options) => send(text, undefined, options)"
+      />
       <AgentPermissions :permissions="permissions" @decide="decide" />
       <AgentQuestions :requests="questions" @answer="answer" />
       <AgentSecrets :requests="secrets" @answer="answerSecret" />

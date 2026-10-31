@@ -119,9 +119,7 @@ export {
   type AgentWorktree,
 } from "./worktrees.ts";
 export {
-  MAX_RUNNING_JOBS,
   answerJob,
-  assertJobSlot,
   isFinished,
   listJobs,
   readJob,
@@ -138,6 +136,8 @@ export {
   type JournalEntry,
   type StartJobInput,
 } from "./jobs.ts";
+export { clearJobWorktree, retryJob } from "./jobs-worktree.ts";
+export { jobDiff, PATCH_LIMIT, type JobDiff } from "./jobs-diff.ts";
 export { trackEventStream, detachEventStream } from "./event-streams.ts";
 export { requestFrom } from "./request.ts";
 export { sideRequestFrom, type SideRequest, type SideExchange } from "./side-request.ts";

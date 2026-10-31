@@ -24,7 +24,7 @@ export function useChatActions(
     projectId: string;
     ready: Promise<void>;
     persist: () => void;
-    send: (text?: string, chips?: MessagePart[]) => Promise<void>;
+    send: (text?: string, chips?: MessagePart[], options?: { auto?: string }) => Promise<void>;
     stop: () => void;
   },
 ) {
@@ -51,7 +51,8 @@ export function useChatActions(
     }
     state.interrupting = false;
     const next = state.queue.shift()!;
-    void send(next.text, next.parts);
+    if (next.auto) void send(next.text, next.parts, { auto: next.auto });
+    else void send(next.text, next.parts);
   }
 
   /** Stops the answer in progress and sends this queued message instead. */

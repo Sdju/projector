@@ -14,8 +14,6 @@ import {
 const CLIP = 4000;
 const SAVE_DELAY_MS = 400;
 
-/** How many jobs may work at the same time. */
-export const MAX_RUNNING_JOBS = 4;
 /** The full answer kept with a job. */
 export const RESULT_LIMIT = 100_000;
 

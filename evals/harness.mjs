@@ -60,6 +60,34 @@ export const CATALOG = [
     description: "Поручает задачу Codex, Claude Code, OpenCode или Cursor",
     arguments: { agent: "claude | codex | opencode | cursor", task: "Задача", isolate: "bool" },
   },
+  {
+    command: "ide.agent.job.result",
+    scope: "workbench",
+    title: "Результат фонового задания",
+    description: "Состояние, итог, изменённые файлы и запросы задания",
+    arguments: { job: "Идентификатор задания", wait: "Секунды ожидания" },
+  },
+  {
+    command: "ide.agent.job.diff",
+    scope: "workbench",
+    title: "Изменения фонового задания",
+    description: "Файлы, git --stat и patch того, что сделало задание",
+    arguments: { job: "Идентификатор задания", limit: "Предел длины patch" },
+  },
+  {
+    command: "ide.agent.job.log",
+    scope: "workbench",
+    title: "Вызовы инструментов задания",
+    description: "Последние команды задания и их вывод",
+    arguments: { job: "Идентификатор задания", tail: "Сколько вызовов" },
+  },
+  {
+    command: "ide.agent.job.answer",
+    scope: "workbench",
+    title: "Ответить на вопрос задания",
+    description: "Передаёт ответ на вопрос фонового агента; разрешения подтверждает пользователь",
+    arguments: { job: "Идентификатор задания", answers: "Ответы по id", answer: "Текст" },
+  },
 ];
 
 /**

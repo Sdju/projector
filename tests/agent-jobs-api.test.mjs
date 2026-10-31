@@ -114,9 +114,20 @@ test("the jobs API validates what a client sends and runs a job to its answer", 
   ).toBe(403);
 
   const created = await (
-    await start({ projectId: "p1", backend: "fake-api", task: "do it", mode: "plan" })
+    await start({
+      projectId: "p1",
+      backend: "fake-api",
+      task: "do it",
+      mode: "plan",
+      origin: "projector:chat",
+    })
   ).json();
-  expect(created.job).toMatchObject({ backend: "fake-api", projectId: "p1", cwd: work });
+  expect(created.job).toMatchObject({
+    backend: "fake-api",
+    projectId: "p1",
+    cwd: work,
+    origin: "projector:chat",
+  });
   const done = await until(async () => {
     const body = await (await request(`/api/agent/jobs/${created.job.id}`)).json();
     return body.job.status === "done" ? body : undefined;
@@ -147,7 +158,41 @@ test("the jobs API validates what a client sends and runs a job to its answer", 
   expect((await request(`/api/agent/jobs/${created.job.id}`)).status).toBe(404);
 });
 
-test("a job in an isolated copy works there, can be stopped, and the limit is reported", async () => {
+test("a job reports an unsupported follow-up and can be retried in place", async () => {
+  const start = async (task) =>
+    (
+      await (
+        await request("/api/agent/jobs", "POST", { projectId: "p1", backend: "fake-api", task })
+      ).json()
+    ).job;
+  const job = await start("hang");
+  await until(
+    async () =>
+      (await (await request(`/api/agent/jobs/${job.id}`)).json()).job.status === "running",
+  );
+  const sent = await request(`/api/agent/jobs/${job.id}/send`, "POST", { text: "ещё" });
+  expect(sent.status).toBe(200);
+  expect((await sent.json()).accepted).toBe(false);
+  await request(`/api/agent/jobs/${job.id}/stop`, "POST", {});
+  await until(
+    async () =>
+      (await (await request(`/api/agent/jobs/${job.id}`)).json()).job.status === "stopped",
+  );
+  const retried = await request(`/api/agent/jobs/${job.id}/retry`, "POST", {
+    task: "продолжай",
+  });
+  expect(retried.status).toBe(201);
+  const next = (await retried.json()).job;
+  expect(next).toMatchObject({ task: "продолжай", projectId: "p1", backend: "fake-api" });
+  expect(next.id).not.toBe(job.id);
+  await request(`/api/agent/jobs/${next.id}/stop`, "POST", {});
+  await until(
+    async () =>
+      (await (await request(`/api/agent/jobs/${next.id}`)).json()).job.status === "stopped",
+  );
+});
+
+test("a job in an isolated copy works there and can be stopped", async () => {
   const start = async (task, extra = {}) =>
     request("/api/agent/jobs", "POST", { projectId: "p1", backend: "fake-api", task, ...extra });
   const job = (await (await start("hang", { isolate: true })).json()).job;
@@ -158,12 +203,6 @@ test("a job in an isolated copy works there, can be stopped, and the limit is re
       (await (await request(`/api/agent/jobs/${job.id}`)).json()).job.status === "running",
   );
 
-  const more = [];
-  for (let index = 0; index < 3; index++) more.push((await (await start("hang")).json()).job);
-  const over = await start("hang");
-  expect(over.status).toBe(400);
-  expect((await over.json()).error).toMatch(/Уже работает 4/);
-
   // A long poll returns at once when the status moves.
   const poll = request(`/api/agent/jobs/${job.id}?wait=30&rev=${job.rev + 100}`);
   const stopped = await request(`/api/agent/jobs/${job.id}/stop`, "POST", {});
@@ -173,7 +212,34 @@ test("a job in an isolated copy works there, can be stopped, and the limit is re
     async () =>
       (await (await request(`/api/agent/jobs/${job.id}`)).json()).job.status === "stopped",
   );
-  for (const item of more) await request(`/api/agent/jobs/${item.id}/stop`, "POST", {});
+
+  // The copy is visible; a retry takes it over, so the old record loses it and cannot merge it.
+  const copy = await (await request(`/api/agent/jobs/${job.id}/worktree`)).json();
+  expect(copy.worktree).toMatchObject({ branch: job.worktree.branch });
+  const retried = await request(`/api/agent/jobs/${job.id}/retry`, "POST", { task: "hang" });
+  expect(retried.status).toBe(201);
+  const next = (await retried.json()).job;
+  expect(next).toMatchObject({ cwd: job.cwd, worktree: { branch: job.worktree.branch } });
+  expect(next.id).not.toBe(job.id);
+  expect((await (await request(`/api/agent/jobs/${job.id}`)).json()).job.worktree).toBeUndefined();
+  expect((await request(`/api/agent/jobs/${job.id}/worktree/merge`, "POST", {})).status).toBe(400);
+  await until(
+    async () =>
+      (await (await request(`/api/agent/jobs/${next.id}`)).json()).job.status === "running",
+  );
+  await request(`/api/agent/jobs/${next.id}/stop`, "POST", {});
+  await until(
+    async () =>
+      (await (await request(`/api/agent/jobs/${next.id}`)).json()).job.status === "stopped",
+  );
+  const nextCopy = await (await request(`/api/agent/jobs/${next.id}/worktree`)).json();
+  expect(nextCopy.worktree).toMatchObject({ branch: job.worktree.branch });
+  const merged = await (
+    await request(`/api/agent/jobs/${next.id}/worktree/merge`, "POST", {})
+  ).json();
+  expect(merged.merged).toBe(false);
+  expect((await (await request(`/api/agent/jobs/${next.id}`)).json()).job.worktree).toBeUndefined();
+  expect((await (await request(`/api/agent/jobs/${next.id}/worktree`)).json()).worktree).toBeNull();
   await until(async () =>
     (await (await request("/api/agent/jobs")).json()).jobs.every(
       (item) => item.status !== "running" && item.status !== "queued",

@@ -39,6 +39,8 @@ import type {
   MessagePart,
 } from "./types.ts";
 
+type SendOptions = { auto?: string };
+
 /** A restarting server answers again within seconds; this much patience covers a slow restart. */
 const REJOIN_DELAY_MS = 1000;
 const REJOIN_ATTEMPTS = 60;
@@ -206,7 +208,7 @@ export function useAgent(
   }
 
   /** Sends the draft or text; a busy agent receives it at the next supported model boundary. */
-  async function send(text?: string, chips?: MessagePart[]): Promise<void> {
+  async function send(text?: string, chips?: MessagePart[], options?: SendOptions): Promise<void> {
     await ready;
     const message = (text ?? state.draft).trim();
     if (!message) return;
@@ -220,7 +222,12 @@ export function useAgent(
       state.draftParts = [];
     }
     if (state.busy) {
-      state.queue.push({ id: newId(), text: message, parts: content ?? [] });
+      state.queue.push({
+        id: newId(),
+        text: message,
+        parts: content ?? [],
+        ...(options?.auto ? { auto: options.auto } : {}),
+      });
       void actions.deliverQueue();
       return;
     }
@@ -240,6 +247,7 @@ export function useAgent(
       text: message,
       at: Date.now(),
       ...(content ? { content } : {}),
+      ...(options?.auto ? { auto: options.auto } : {}),
       tools: [],
     };
     // The message replaces others that were cut off: they stay as versions of this point.

@@ -212,8 +212,8 @@ useTabReadout(() => ({
       <p v-if="actionError" class="note error" role="alert">{{ actionError }}</p>
       <p v-if="job?.error" class="note error" role="alert">{{ job.error }}</p>
       <p v-if="job?.worktree && finished" class="note">
-        Работа шла в изолированной копии ({{ job.worktree.branch }}): слить её в проект можно в чате
-        по просьбе, командой ide.agent.worktree.merge.
+        Работа шла в изолированной копии ({{ job.worktree.branch }}): слить её в проект можно
+        командой ide.agent.job.merge по просьбе пользователя.
       </p>
       <AgentPermissions :permissions="permissions" @decide="decide" />
       <AgentQuestions :requests="questions" @answer="answer" />

@@ -67,6 +67,11 @@ describe("agent guard", () => {
     expect(commandIsSafe("ide.agent.job.start")).toBe(false);
     expect(commandIsSafe("ide.agent.job.stop")).toBe(false);
     expect(commandIsSafe("ide.agent.job.answer")).toBe(false);
+    expect(commandIsSafe("ide.agent.job.diff")).toBe(true);
+    expect(commandIsSafe("ide.agent.job.log")).toBe(true);
+    expect(commandIsSafe("ide.agent.job.worktree")).toBe(true);
+    expect(commandIsSafe("ide.agent.job.merge")).toBe(false);
+    expect(commandIsSafe("ide.agent.job.discard")).toBe(false);
     expect(commandIsSafe("ide.docker.container.remove")).toBe(false);
     expect(commandIsSafe("ide.workbench.terminal.new")).toBe(false);
     // A command that both looks and changes is never read-only.

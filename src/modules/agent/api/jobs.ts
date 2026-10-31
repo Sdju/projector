@@ -30,6 +30,8 @@ export interface AgentJobView {
   projectId: string;
   cwd: string;
   worktree?: { id: string; branch: string };
+  /** The Projector chat that started the job, when it did. */
+  origin?: string;
   unattended: boolean;
   status: AgentJobStatus;
   rev: number;
@@ -90,6 +92,8 @@ export interface StartJobOptions {
   isolate?: boolean;
   mode?: string;
   unattended?: boolean;
+  /** The Projector chat that starts the job; its completion continues that conversation. */
+  origin?: string;
 }
 
 export async function startJob(options: StartJobOptions): Promise<AgentJobView> {
@@ -108,8 +112,88 @@ export interface JobAnswerBody {
   answers?: Record<string, string[]> | null;
 }
 
+export interface AgentJobDiff {
+  files: string[];
+  stat: string;
+  patch: string;
+  truncated: boolean;
+}
+
+/** What a job changed in its folder: changed paths, `--stat` and a unified patch. */
+export async function fetchJobDiff(id: string, limit = 0): Promise<AgentJobDiff> {
+  const query = limit ? `?limit=${encodeURIComponent(limit)}` : "";
+  return (
+    await call<{ diff: AgentJobDiff }>(
+      `/api/agent/jobs/${id}/diff${query}`,
+      undefined,
+      "Не удалось прочитать изменения задания",
+    )
+  ).diff;
+}
+
 export async function answerJob(id: string, body: JobAnswerBody): Promise<AgentJobView> {
   return (await post(`/api/agent/jobs/${id}/answer`, body, "Не удалось передать ответ")).job;
+}
+
+export interface JobWorktreeStatus {
+  id: string;
+  branch: string;
+  changed: number;
+}
+
+/** The isolated copy of a job and how many files differ; null when the job works in the project. */
+export async function fetchJobWorktree(id: string): Promise<JobWorktreeStatus | null> {
+  return (
+    await call<{ worktree: JobWorktreeStatus | null }>(
+      `/api/agent/jobs/${id}/worktree`,
+      undefined,
+      "Не удалось прочитать копию задания",
+    )
+  ).worktree;
+}
+
+export interface JobWorktreeResult {
+  merged?: boolean;
+  message?: string;
+  discarded?: boolean;
+  job?: AgentJobView;
+}
+
+export async function mergeJobWorktree(id: string): Promise<JobWorktreeResult> {
+  return call<JobWorktreeResult>(
+    `/api/agent/jobs/${id}/worktree/merge`,
+    { method: "POST" },
+    "Не удалось влить копию задания",
+  );
+}
+
+export async function discardJobWorktree(id: string): Promise<JobWorktreeResult> {
+  return call<JobWorktreeResult>(
+    `/api/agent/jobs/${id}/worktree/discard`,
+    { method: "POST" },
+    "Не удалось удалить копию задания",
+  );
+}
+
+export async function retryJob(id: string, task?: string, append = false): Promise<AgentJobView> {
+  return (
+    await call<{ job: AgentJobView }>(
+      `/api/agent/jobs/${id}/retry`,
+      { method: "POST", body: JSON.stringify({ task, append }) },
+      "Не удалось повторить задание",
+    )
+  ).job;
+}
+
+/** Adds a follow-up to a running job; false when its agent cannot take one mid-run. */
+export async function sendJobMessage(id: string, text: string): Promise<boolean> {
+  return (
+    await call<{ accepted: boolean }>(
+      `/api/agent/jobs/${id}/send`,
+      { method: "POST", body: JSON.stringify({ text }) },
+      "Не удалось отправить уточнение заданию",
+    )
+  ).accepted;
 }
 
 export async function removeJob(id: string): Promise<void> {

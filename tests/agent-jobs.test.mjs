@@ -48,6 +48,30 @@ const fake = {
       emit("error", { error: "boom" });
       return;
     }
+    if (task === "multi") {
+      const answers = await options.ask({
+        questions: [
+          {
+            id: "q1",
+            question: "Which?",
+            options: [
+              { id: "a", label: "A" },
+              { id: "b", label: "B" },
+            ],
+            multiple: true,
+          },
+          {
+            id: "q2",
+            question: "Why?",
+            options: [{ id: "c", label: "C" }],
+            multiple: false,
+            custom: true,
+          },
+        ],
+      });
+      emit("done", { text: `answers=${JSON.stringify(answers)}` });
+      return;
+    }
     if (task === "ask") {
       const allowed = await options.approve({
         tool: "bash",
@@ -148,7 +172,9 @@ describe("background agent jobs", () => {
       });
     const permission = await waiting("permission");
     expect(permission.pending[0]).toMatchObject({ title: "Run ls" });
-    const after = await jobs.answerJob(job.id, { text: "да" });
+    await expect(jobs.answerJob(job.id, { text: "да" })).rejects.toThrow(/карточкой/);
+    await expect(jobs.answerJob(job.id, { answers: null })).rejects.toThrow(/карточкой/);
+    const after = await jobs.answerJob(job.id, { allow: true });
     expect(after.pending).toEqual([]);
     const question = await waiting("question");
     expect(question.pending[0].questions[0].id).toBe("q1");
@@ -157,6 +183,19 @@ describe("background agent jobs", () => {
     expect(done.result).toBe('allowed=true answers={"q1":["A"]}');
     expect(journal.filter((entry) => entry.event === "answer")).toHaveLength(2);
     await expect(jobs.answerJob(job.id, { text: "да" })).rejects.toThrow();
+  });
+
+  it("answers several questions by option ids", async () => {
+    const job = await start("multi");
+    const waiting = await until(async () => {
+      const { job: now } = await jobs.readJob(job.id);
+      return now.status === "needs-user" ? now : undefined;
+    });
+    expect(waiting.pending[0].questions.map((item) => item.id)).toEqual(["q1", "q2"]);
+    await jobs.answerJob(job.id, { answers: { q1: ["a", "b"], q2: ["c"] } });
+    const { job: done, journal } = await settled(job.id);
+    expect(done.result).toBe('answers={"q1":["a","b"],"q2":["c"]}');
+    expect(journal.filter((entry) => entry.event === "answer")).toHaveLength(1);
   });
 
   it("refuses a permission when the answer is no, and skips it when unattended it allows", async () => {
@@ -185,16 +224,6 @@ describe("background agent jobs", () => {
     const { job: done } = await settled(job.id);
     expect(done.status).toBe("error");
     expect(done.error).toBe("boom");
-  });
-
-  it("limits the jobs working at once", async () => {
-    const started = [];
-    for (let index = 0; index < jobs.MAX_RUNNING_JOBS; index++) started.push(await start("hang"));
-    expect(() => jobs.assertJobSlot()).toThrow(/Уже работает/);
-    await expect(start("hang")).rejects.toThrow(/Уже работает/);
-    for (const job of started) await jobs.stopJob(job.id);
-    for (const job of started) await settled(job.id);
-    expect(() => jobs.assertJobSlot()).not.toThrow();
   });
 
   it("wakes a long poll when the status changes", async () => {

@@ -186,6 +186,8 @@ export interface AgentTurn {
   parts?: AgentPart[];
   /** The turn ended on its budget, not on an answer: the chat offers to continue it. */
   stopped?: "steps" | "loop" | "tokens" | "time";
+  /** The IDE wrote this message, not the user: the id of the job that triggered it. */
+  auto?: string;
   /** Context fullness after this turn; the chat shows the latest one. */
   context?: AgentContext;
   /** Tokens of this answer and how much of the prompt the cache served. */
@@ -218,6 +220,8 @@ export interface QueuedMessage {
   id: string;
   text: string;
   parts: MessagePart[];
+  /** The IDE wrote this message after a job: it is shown as a continuation note. */
+  auto?: string;
 }
 
 /** A sensitive tool call waiting for the user's decision. */

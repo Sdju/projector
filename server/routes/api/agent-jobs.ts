@@ -1,20 +1,26 @@
 import { stat } from "node:fs/promises";
 import {
   answerJob,
-  assertJobSlot,
+  clearJobWorktree,
   createWorktree,
+  injectMessage,
   isAgentAvailable,
   isAgentBackend,
+  isFinished,
   isHostedAgent,
+  jobDiff,
   listAgentBackends,
   listJobs,
+  mergeWorktree,
   readJob,
   removeJob,
   removeWorktree,
+  retryJob,
   selectionFrom,
   startJob,
   stopJob,
   waitForJob,
+  worktreeStatus,
 } from "../../modules/agent/index.ts";
 import { accessAllowed } from "../../modules/access/index.ts";
 import { HttpError } from "../../modules/http/index.ts";
@@ -59,7 +65,6 @@ async function startFrom(body: Record<string, unknown>) {
     selection.mode = mode;
     selection["permission-mode"] = mode;
   }
-  assertJobSlot();
   let cwd = project.path;
   let worktree: { id: string; branch: string } | undefined;
   if (body.isolate === true) {
@@ -74,6 +79,7 @@ async function startFrom(body: Record<string, unknown>) {
       projectId: project.id,
       cwd,
       worktree,
+      origin: asString(body.origin) || undefined,
       permissionMode: mode || undefined,
       selection,
       unattended: body.unattended === true,
@@ -101,10 +107,84 @@ export async function handleAgentJobs({
     json(res, 201, { job: await startFrom(await readBody(req)) });
     return true;
   }
-  const match = path.match(/^\/api\/agent\/jobs\/([0-9a-f]{12})(?:\/(stop|answer))?$/);
+  const match = path.match(
+    /^\/api\/agent\/jobs\/([0-9a-f]{12})(?:\/(stop|answer|diff|send|retry|worktree(?:\/(?:merge|discard))?))?$/,
+  );
   if (!match) return false;
   const id = match[1]!;
   const action = match[2];
+  if (action === "diff" && method === "GET") {
+    const found = await readJob(id);
+    if (!found) throw new HttpError(404, "Задание не найдено");
+    const limit = Number(url.searchParams.get("limit"));
+    json(res, 200, {
+      diff: await jobDiff(found.job.cwd, limit || undefined, found.job.base, found.job.dirty),
+    });
+    return true;
+  }
+  if (action === "send" && method === "POST") {
+    pageOnly(req);
+    const found = await readJob(id);
+    if (!found) throw new HttpError(404, "Задание не найдено");
+    if (isFinished(found.job.status)) throw new HttpError(409, "Задание уже завершилось");
+    const text = asString((await readBody(req)).text).trim();
+    if (!text) throw new HttpError(400, "Напишите уточнение агенту");
+    const accepted = await injectMessage(found.job.messageId, text);
+    json(res, 200, { accepted });
+    return true;
+  }
+  if (action === "retry" && method === "POST") {
+    pageOnly(req);
+    const body = await readBody(req);
+    const task = asString(body.task).trim() || undefined;
+    if (task && task.length > TASK_LIMIT) throw new Error(`Задание длиннее ${TASK_LIMIT} символов`);
+    const found = await readJob(id);
+    if (!found) throw new HttpError(404, "Задание не найдено");
+    if (!isHostedAgent(found.job.backend) || !isAgentAvailable(found.job.backend))
+      throw new Error("Агент этого задания больше не может работать в фоне");
+    let job;
+    try {
+      job = await retryJob(id, task, body.append === true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (/ещё работает|уже занята/.test(message)) throw new HttpError(409, message);
+      throw error;
+    }
+    json(res, 201, { job });
+    return true;
+  }
+  if (action === "worktree" && method === "GET") {
+    const found = await readJob(id);
+    if (!found) throw new HttpError(404, "Задание не найдено");
+    if (!found.job.worktree) {
+      json(res, 200, { worktree: null });
+      return true;
+    }
+    const project = (await loadProjects()).find((item) => item.id === found.job.projectId);
+    if (!project) throw new HttpError(404, "Проект не найден");
+    json(res, 200, {
+      worktree: await worktreeStatus(project.id, found.job.worktree.id, project.path),
+    });
+    return true;
+  }
+  if ((action === "worktree/merge" || action === "worktree/discard") && method === "POST") {
+    pageOnly(req);
+    const found = await readJob(id);
+    if (!found) throw new HttpError(404, "Задание не найдено");
+    if (!found.job.worktree) throw new HttpError(400, "Задание работает без копии");
+    if (!isFinished(found.job.status)) throw new HttpError(409, "Дождитесь завершения задания");
+    const project = (await loadProjects()).find((item) => item.id === found.job.projectId);
+    if (!project) throw new HttpError(404, "Проект не найден");
+    const result = action.endsWith("/merge")
+      ? await mergeWorktree(project.id, found.job.worktree.id, project.path)
+      : (await removeWorktree(project.id, found.job.worktree.id, project.path),
+        { discarded: true });
+    json(res, 200, {
+      ...result,
+      job: await clearJobWorktree(id, project.path),
+    });
+    return true;
+  }
   if (!action && method === "GET") {
     const wait = Math.min(Math.max(Number(url.searchParams.get("wait")) || 0, 0), WAIT_LIMIT);
     const rev = Number(url.searchParams.get("rev"));

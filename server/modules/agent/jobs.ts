@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   createApprovalBridge,
   createQuestionBridge,
@@ -9,7 +10,6 @@ import type { AgentBackendId, AgentEventName, AgentPermissionMode } from "./back
 import type { AgentSelection } from "./controls.ts";
 import { changedSince, snapshotGit } from "./jobs-files.ts";
 import {
-  MAX_RUNNING_JOBS,
   RESULT_LIMIT,
   change,
   dropPending,
@@ -36,7 +36,7 @@ import {
 } from "./jobs-store.ts";
 import { runAgent } from "./registry.ts";
 
-export { MAX_RUNNING_JOBS, isFinished } from "./jobs-live.ts";
+export { isFinished } from "./jobs-live.ts";
 export type { AgentJob, AgentJobStatus, JobPending, JournalEntry } from "./jobs-store.ts";
 
 /** A request nobody answered is refused after this long. */
@@ -48,17 +48,13 @@ export interface StartJobInput {
   projectId: string;
   cwd: string;
   worktree?: { id: string; branch: string };
+  /** The Projector chat that started the job; only that chat continues on completion. */
+  origin?: string;
+  /** A native session to resume: a retry goes on in the same conversation. */
+  sessionId?: string;
   selection?: AgentSelection;
   permissionMode?: AgentPermissionMode;
   unattended?: boolean;
-}
-
-/** Throws when the limit of working jobs is reached; asked before an isolated copy is made. */
-export function assertJobSlot(): void {
-  if (live.size >= MAX_RUNNING_JOBS)
-    throw new Error(
-      `Уже работает ${MAX_RUNNING_JOBS} фоновых задания: дождитесь или остановите одно`,
-    );
 }
 
 const clip = (text: string) => (text.length > RESULT_LIMIT ? text.slice(0, RESULT_LIMIT) : text);
@@ -99,10 +95,17 @@ async function drive(entry: Live, attach: boolean): Promise<void> {
         approvals: true,
         projectId: job.projectId,
         chat: `job:${job.id}`,
+        messageId: job.messageId,
+        ...(job.sessionId ? { sessionId: job.sessionId } : {}),
       };
       job.runId = await createRun(run);
       job.startedAt = Date.now();
       entry.snapshot = await snapshotGit(job.cwd);
+      if (entry.snapshot) {
+        if (entry.snapshot.head) job.base = entry.snapshot.head;
+        job.dirty = [...entry.snapshot.dirty.keys()];
+      }
+      await persist(entry);
     }
     untrack = trackRun(job.runId!, () => entry.abort.abort());
     change(entry, "running");
@@ -183,7 +186,6 @@ function open(job: AgentJob, journal: JournalEntry[]): Live {
 
 /** Creates a job and starts its agent without waiting for the answer. */
 export async function startJob(input: StartJobInput): Promise<AgentJob> {
-  assertJobSlot();
   const job: AgentJob = {
     id: newJobId(),
     backend: input.backend,
@@ -191,6 +193,9 @@ export async function startJob(input: StartJobInput): Promise<AgentJob> {
     projectId: input.projectId,
     cwd: input.cwd,
     ...(input.worktree ? { worktree: input.worktree } : {}),
+    ...(input.origin ? { origin: input.origin } : {}),
+    messageId: randomUUID(),
+    ...(input.sessionId ? { sessionId: input.sessionId } : {}),
     ...(input.selection ? { selection: input.selection } : {}),
     ...(input.permissionMode ? { permissionMode: input.permissionMode } : {}),
     unattended: input.unattended === true,
@@ -305,14 +310,16 @@ export async function stopJob(id: string): Promise<AgentJob | null> {
 export interface JobAnswer {
   /** The request to answer; the first waiting one by default. */
   request?: string;
+  /**
+   * Permissions only: the user's explicit choice. A job permission is never granted by text or by
+   * an agent command — the page shows the card and sends this boolean.
+   */
   allow?: boolean;
   always?: boolean;
-  /** Free words: "да"/"нет" for a permission, the answer for the first question. */
+  /** Questions: the answer in the user's own words. */
   text?: string;
   answers?: Record<string, string[]> | null;
 }
-
-const YES = /^(да|yes|y|allow|разреш|ok|ок|одобр|always)/i;
 
 /** Sends the user's answer to the request the agent waits on; the run goes on. */
 export async function answerJob(id: string, answer: JobAnswer): Promise<AgentJob> {
@@ -325,9 +332,10 @@ export async function answerJob(id: string, answer: JobAnswer): Promise<AgentJob
   let output: unknown;
   let summary: string;
   if (card.kind === "permission") {
-    const text = answer.text?.trim() ?? "";
-    const allow = answer.allow ?? (text ? YES.test(text) : false);
-    const always = answer.always ?? /^(always|всегда)/i.test(text);
+    if (typeof answer.allow !== "boolean")
+      throw new Error("Разрешение подтверждает пользователь карточкой в чате Projector");
+    const allow = answer.allow;
+    const always = answer.always === true;
     output = { allow, always: allow && always };
     summary = allow ? (always ? "разрешено всегда" : "разрешено") : "отклонено";
   } else {

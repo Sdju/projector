@@ -200,7 +200,10 @@ const waiting = computed(() => {
           <IconGitFork aria-hidden="true" />
         </UiButton>
       </UiInline>
-      <p class="user-message">
+      <p v-if="turn.auto" class="user-message auto">
+        Продолжение после задания <code>{{ turn.auto }}</code>
+      </p>
+      <p v-else class="user-message">
         <template v-if="turn.content?.length">
           <template v-for="(part, index) in turn.content" :key="index">
             <template v-if="part.type === 'text'">{{ part.text }}</template>
@@ -384,6 +387,15 @@ const waiting = computed(() => {
 }
 .note {
   margin: 0 0 var(--sp-3) auto;
+}
+.user-message.auto {
+  padding: var(--sp-1) 0;
+  background: none;
+  color: var(--muted);
+  font-size: var(--fs-2xs);
+}
+.user-message.auto code {
+  font-family: var(--mono);
 }
 .chip {
   display: inline-flex;

@@ -39,8 +39,15 @@ export interface AgentJob {
   /** The folder the agent works in: the project or its isolated copy. */
   cwd: string;
   worktree?: { id: string; branch: string };
+  /** HEAD when the job started and the paths already dirty: what `job.diff` compares against. */
+  base?: string;
+  dirty?: string[];
+  /** The Projector chat that started the job: its completion continues that conversation. */
+  origin?: string;
   selection?: AgentSelection;
   permissionMode?: AgentPermissionMode;
+  /** The message id the backend keeps for this job; a follow-up written mid-run is delivered to it. */
+  messageId: string;
   /** The user explicitly chose no questions: permissions are granted and questions skipped. */
   unattended: boolean;
   status: AgentJobStatus;
