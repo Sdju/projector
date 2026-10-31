@@ -48,7 +48,13 @@ export function tokensSpent(steps: UsedStep[]): number {
 }
 
 /** Stop conditions of a turn; `reason()` says which one ended it. */
-export function turnBudget(limits = { seconds: MAX_SECONDS, tokens: MAX_TOKENS }, now = Date.now) {
+export function turnBudget(
+  limits: { seconds?: number; tokens?: number; steps?: number } = {},
+  now = Date.now,
+) {
+  const seconds = limits.seconds ?? MAX_SECONDS;
+  const tokens = limits.tokens ?? MAX_TOKENS;
+  const steps = limits.steps ?? MAX_STEPS;
   const started = now();
   let stopped: StopReason | undefined;
   const stopBy =
@@ -60,25 +66,31 @@ export function turnBudget(limits = { seconds: MAX_SECONDS, tokens: MAX_TOKENS }
     };
   return {
     stopWhen: [
-      stopBy("steps", (steps) => steps.length >= MAX_STEPS),
+      stopBy("steps", (used) => used.length >= steps),
       stopBy("loop", (steps) => isLooping(steps)),
-      stopBy("time", () => limits.seconds > 0 && now() - started >= limits.seconds * 1000),
-      stopBy("tokens", (steps) => limits.tokens > 0 && tokensSpent(steps) >= limits.tokens),
+      stopBy("time", () => seconds > 0 && now() - started >= seconds * 1000),
+      stopBy("tokens", (used) => tokens > 0 && tokensSpent(used) >= tokens),
     ],
     reason: () => stopped,
   };
 }
 
 /** The line that tells the user why the turn ended on tool calls. */
-export function budgetNote(reason: StopReason | undefined): string {
+export function budgetNote(
+  reason: StopReason | undefined,
+  limits: { seconds?: number; tokens?: number; steps?: number } = {},
+): string {
+  const seconds = limits.seconds ?? MAX_SECONDS;
+  const tokens = limits.tokens ?? MAX_TOKENS;
+  const steps = limits.steps ?? MAX_STEPS;
   switch (reason) {
     case "loop":
       return "\n\nЯ остановился: последние вызовы повторяются с тем же результатом. Подскажите, как действовать дальше.";
     case "time":
-      return `\n\nЯ остановился: ход идёт дольше ${MAX_SECONDS} с.`;
+      return `\n\nЯ остановился: ход идёт дольше ${seconds} с.`;
     case "tokens":
-      return `\n\nЯ остановился: ход израсходовал ${MAX_TOKENS} токенов.`;
+      return `\n\nЯ остановился: ход израсходовал ${tokens} токенов.`;
     default:
-      return `\n\nЯ остановился на ${MAX_STEPS} шагах.`;
+      return `\n\nЯ остановился на ${steps} шагах.`;
   }
 }

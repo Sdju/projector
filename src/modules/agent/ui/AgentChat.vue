@@ -10,6 +10,9 @@ import { chatDropHandlers } from "../lib/chat-drop.ts";
 import { useChatBranch } from "../model/chat-branch.ts";
 import { useChatReadout } from "../model/chat-readout.ts";
 import { useAgent } from "../model/session.ts";
+import { useSideQuestion } from "../model/side-question.ts";
+import { useAutoCompact } from "../model/use-auto-compact.ts";
+import { useChatInputActions } from "../model/use-chat-input-actions.ts";
 import UiPanel from "../../../common/ui/UiPanel.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
@@ -26,9 +29,11 @@ import AgentControls from "./AgentControls.vue";
 import AgentSessions from "./AgentSessions.vue";
 import AgentPlan from "./AgentPlan.vue";
 import AgentQueue from "./AgentQueue.vue";
+import AgentSideQuestion from "./AgentSideQuestion.vue";
 import AgentTaskBar from "./AgentTaskBar.vue";
 import AgentTaskView from "./AgentTaskView.vue";
-import { barTasks, chatTasks, taskDetail } from "../lib/task-detail.ts";
+import { chatTasks } from "../lib/task-detail.ts";
+import { useChatTaskView } from "../model/use-chat-task-view.ts";
 import AgentRewind from "./AgentRewind.vue";
 import AgentWorktree from "./AgentWorktree.vue";
 import { chatMarkdown, downloadChatMarkdown } from "../lib/export.ts";
@@ -43,6 +48,7 @@ import type { AgentBackendId, ChatUsage, MessageChip, RewindScope } from "../mod
 import IconSquarePen from "~icons/lucide/square-pen";
 import IconDownload from "~icons/lucide/download";
 import IconBranch from "~icons/lucide/git-branch";
+import IconMessageCircleQuestion from "~icons/lucide/message-circle-question";
 const props = withDefaults(
   defineProps<{ projectId: string; backend?: AgentBackendId; chatId?: string }>(),
   { backend: "projector", chatId: undefined },
@@ -60,10 +66,12 @@ const {
   busy,
   error,
   phase,
+  lastEventAt,
   permissions,
   questions,
   secrets,
   controls,
+  selection,
   capabilities,
   sessions,
   sessionsLoading,
@@ -73,7 +81,7 @@ const {
   recentError,
   loadControls,
   loadCommands,
-  commands: slashCommands,
+  commands: agentCommands,
   setControl,
   loadSessions,
   loadRecent,
@@ -120,6 +128,25 @@ const latestContext = computed(() => turns.value.findLast((turn) => turn.context
 const activeSession = computed(
   () => turns.value.findLast((turn) => turn.role === "assistant")?.session?.id,
 );
+const side = useSideQuestion({
+  chat: chatKey,
+  projectId: props.projectId,
+  backend: props.backend,
+  turns,
+  busy,
+  phase,
+  lastEventAt,
+  permissions,
+  questions,
+  secrets,
+  queue,
+  selection,
+  commands: agentCommandHandler(api, props.projectId),
+});
+const slashCommands = computed(() => [
+  { name: "btw", description: "Вопрос в сторону, не прерывая агента" },
+  ...agentCommands.value,
+]);
 // Branching and the project's chat list sit beside the chat: see `useChatBranch`.
 const {
   fork,
@@ -150,33 +177,26 @@ function openAgent(program: string) {
 }
 attach();
 // Subagents and background commands sit above the input; one can be read here or in a tab.
-const tasks = computed(() => barTasks(turns.value));
-const viewingTask = ref("");
-const viewed = computed(() =>
-  viewingTask.value ? taskDetail(turns.value, viewingTask.value) : undefined,
-);
-// The task left the chat (rewind, a new session): there is nothing to show any more.
-watch(
-  () => !!viewingTask.value && !viewed.value,
-  (gone) => {
-    if (gone) viewingTask.value = "";
+const {
+  tasks,
+  viewing: viewingTask,
+  viewed,
+  view: viewTask,
+  open: taskInTab,
+} = useChatTaskView({
+  turns,
+  openTab: (task, id) => {
+    void api
+      .executeCommand(
+        "ide.workbench.agent.task.open",
+        { chat: chatKey, task: task?.id ?? id, title: task?.title },
+        { scope: `editor:${props.projectId}` },
+      )
+      .catch((cause) => {
+        error.value = cause instanceof Error ? cause.message : "Не удалось открыть задачу";
+      });
   },
-);
-function viewTask(id: string) {
-  viewingTask.value = viewingTask.value === id ? "" : id;
-}
-function taskInTab(id: string) {
-  const task = chatTasks(turns.value).find((item) => item.id === id);
-  void api
-    .executeCommand(
-      "ide.workbench.agent.task.open",
-      { chat: chatKey, task: id, title: task?.title },
-      { scope: `editor:${props.projectId}` },
-    )
-    .catch((cause) => {
-      error.value = cause instanceof Error ? cause.message : "Не удалось открыть задачу";
-    });
-}
+});
 // Что штатный агент видит в чате: статус, последний ответ и чипы инструментов.
 useChatReadout({
   backend: props.backend,
@@ -193,7 +213,6 @@ const composer = ref<InstanceType<typeof AgentComposer>>();
 const chatDrop = chatDropHandlers(() => composer.value);
 const panel = ref<InstanceType<typeof UiPanel>>();
 const root = computed(() => panel.value?.element);
-
 // The project folder: edited files and dropped paths are shown relative to it.
 const projectRoot = ref("");
 void workspaceRequest<{ root: string }>(props.projectId, "root")
@@ -201,7 +220,6 @@ void workspaceRequest<{ root: string }>(props.projectId, "root")
     projectRoot.value = data.root;
   })
   .catch(() => {});
-
 // MCP servers shown in the parameters island; read when it opens, as that starts a probe process.
 const mcp = ref<McpServer[]>([]);
 async function loadMcp() {
@@ -265,30 +283,16 @@ async function openHistory() {
   await Promise.all([loadSessions(), loadRecent()]);
 }
 
-// A full context is compacted once the answer is over, unless the last message already was that.
-watch(busy, (working) => {
-  if (
-    working ||
-    !capabilities.value.compact ||
-    contextShare.value < capabilities.value.compact.autoAt ||
-    queue.value.length
-  )
-    return;
-  if (
-    turns.value.findLast((turn) => turn.role === "user")?.text ===
-    capabilities.value.compact.command
-  )
-    return;
-  if (error.value) return;
-  void compact();
+const { compact } = useAutoCompact({
+  busy,
+  capabilities,
+  contextShare,
+  queue,
+  turns,
+  error,
+  send,
+  toBottom,
 });
-
-async function compact() {
-  void toBottom();
-  const policy = capabilities.value.compact;
-  if (!policy) throw new Error("Агент не поддерживает сжатие разговора");
-  await send(policy.command);
-}
 function exportMarkdown() {
   return chatMarkdown(turns.value, `${agentName.value} · ${new Date().toLocaleString("ru")}`);
 }
@@ -337,6 +341,10 @@ const controller: ChatController = {
   removeQueued,
   exportMarkdown,
   compact,
+  status: () => side.status(),
+  openSide: () => side.openPanel(),
+  askSide: (text) => side.ask(text),
+  clearSide: () => side.clear(),
   mcpServers: () => fetchMcpServers(props.backend, props.projectId),
   worktree: async () => (worktreeId() ? worktreeInfo() : undefined),
   mergeWorktree: mergeCopy,
@@ -417,27 +425,19 @@ provide(widgetReplyKey, (text) => {
   void toBottom();
   void send(text);
 });
-async function submit() {
-  if (!draft.value.trim()) return;
-  void toBottom();
-  await send();
-  composer.value?.focus();
-}
-async function continueTurn() {
-  void toBottom();
-  await send("продолжай");
-}
-async function suggest(text: string) {
-  draft.value = text;
-  await nextTick();
-  composer.value?.resize();
-  composer.value?.focus();
-}
-async function newChat() {
-  await clear();
-  away.value = false;
-  composer.value?.focus();
-}
+const { submit, continueTurn, suggest, newChat } = useChatInputActions({
+  draft,
+  draftParts,
+  send,
+  side,
+  clear,
+  toBottom,
+  resetAway: () => {
+    away.value = false;
+  },
+  resize: () => composer.value?.resize(),
+  focus: () => composer.value?.focus(),
+});
 async function copyMessage(id: string, text: string) {
   try {
     await navigator.clipboard.writeText(text);
@@ -554,6 +554,17 @@ onBeforeUnmount(() => {
         <IconBranch aria-hidden="true" />
       </UiButton>
       <UiButton
+        shape="icon"
+        size="sm"
+        :class="{ on: side.state.open }"
+        :aria-pressed="side.state.open"
+        title="Вопрос в сторону: не прерывает агента и не попадает в чат"
+        aria-label="Вопрос в сторону"
+        @click="side.toggle()"
+      >
+        <IconMessageCircleQuestion aria-hidden="true" />
+      </UiButton>
+      <UiButton
         v-if="turns.length"
         shape="icon"
         size="sm"
@@ -663,6 +674,7 @@ onBeforeUnmount(() => {
         @merge="endCopy(mergeCopy)"
         @discard="endCopy(discardCopy)"
       />
+      <AgentSideQuestion v-if="side.state.open" :side="side" />
       <AgentPlan :items="plan" :busy="busy" />
       <p
         v-if="capabilities.compact && contextShare >= capabilities.compact.hintAt && !busy"

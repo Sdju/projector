@@ -46,4 +46,5 @@ vp run test:gtk  # реальные GTK-виджеты; нужен display
 - [Возможности агентов](docs/agent-features.md): остров в табе агента, умолчания в настройках, выдача виджетов Claude Code, Codex, OpenCode, Cursor и Kimi.
 - [Независимость от агентов](docs/architecture.md#агенты-чата-и-их-особенности): реестр и клиентский каталог вместо перечислений в терминале, настройках, OS-адаптере и клиенте; паритет реестров проверяет `tests/agent-catalog.test.mjs`.
 - [Форки чатов](docs/chat-forks.md): ветка от сообщения в новую вкладку, индекс недавних чатов и возврат закрытых вкладок.
+- [Вопросы в сторону](docs/agent-side.md): `/btw` без прерывания агента, read-only состояние чата и отсутствие записи в историю.
 - [SDK команд IDE](docs/ide-commands.md), [темы иконок](docs/file-icons.md), [renderer vio](https://github.com/Sdju/vio/blob/main/packages/vio/README.md).

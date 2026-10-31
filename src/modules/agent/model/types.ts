@@ -116,6 +116,38 @@ export interface AgentContext {
   cost?: { amount: number; currency: string };
 }
 
+/** A read-only snapshot of a chat, for `ide.agent.chat.status` and side diagnostics. */
+export interface AgentChatStatus {
+  chat: string;
+  backend: string;
+  busy: boolean;
+  phase: string;
+  startedAt?: number;
+  elapsedMs?: number;
+  lastEventAt?: number;
+  sinceLastEventMs?: number;
+  currentTools: { name: string; input?: string; startedAt?: number; elapsedMs?: number }[];
+  pending: {
+    permissions: { tool: string; title: string }[];
+    questions: { title?: string; count: number }[];
+    secrets: { label: string }[];
+  };
+  queue: { count: number; texts: string[] };
+  /** `checked: false` means the live-run list could not be read, not that no process exists. */
+  live: { found: boolean; checked?: boolean; run?: string; startedAt?: number };
+  health:
+    | "idle"
+    | "active"
+    | "quiet"
+    | "running-tool"
+    | "waiting-user"
+    | "waiting-background"
+    | "broken";
+  lastAssistantText?: string;
+  session?: string;
+  context?: AgentContext;
+}
+
 /** Tokens an answer used, split by how the prompt cache served them. */
 export interface AgentTokens {
   input: number;
@@ -250,6 +282,42 @@ export interface AgentHistoryTurn {
   /** What the answer's tool calls returned, for an agent that only gets the replayed chat. */
   tools?: { id: string; name: string; input?: string; output: string; failed?: boolean }[];
 }
+
+/** One earlier question asked in the side panel; it never enters the chat history. */
+export interface AgentSideExchange {
+  question: string;
+  answer: string;
+}
+
+/** A tool call still running when the side question was asked. */
+export interface AgentSideRunningTool {
+  name: string;
+  input?: string;
+  startedAt?: number;
+}
+
+/** One step of the chat's current plan. */
+export interface AgentSidePlanItem {
+  content: string;
+  status: string;
+}
+
+/** Who answers a side question: the built-in Projector agent, by default on the active provider. */
+export interface AgentSideMeta {
+  mode: "projector";
+  chat?: string;
+  provider?: string;
+  model?: string;
+  readOnly?: boolean;
+}
+
+/** A side answer also says who answers it; the rest is the ordinary chat event stream. */
+export type AgentSideEvent =
+  | AgentEvent
+  | {
+      event: "meta";
+      data: AgentSideMeta;
+    };
 
 export interface AgentCommandRequest {
   id: string;

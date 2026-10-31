@@ -5,6 +5,7 @@ import { registerJobCommands } from "./job-commands.ts";
 import { isBuiltinAgent } from "./modes.ts";
 import type { RegisterCommand } from "./register-command.ts";
 import { registerSessionCommands } from "./session-commands.ts";
+import { registerSideCommands } from "./side-commands.ts";
 import { registerTaskCommands } from "./task-commands.ts";
 import type { RewindScope } from "./types.ts";
 
@@ -37,6 +38,7 @@ export function registerAgentCommands(register: RegisterCommand, projectId: stri
   registerJobCommands(register, projectId);
   registerSessionCommands(register, projectId);
   registerBranchCommands(register, projectId);
+  registerSideCommands(register, projectId);
   const anyChat = () => chatsOf(projectId).length > 0;
   const external = () => chatsOf(projectId).some((chat) => !isBuiltinAgent(chat.backend));
   const idle = () => chatsOf(projectId).some((chat) => !chat.busy());

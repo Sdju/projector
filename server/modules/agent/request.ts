@@ -8,7 +8,7 @@ import type { MessagePart } from "./index.ts";
 import type { AgentHistoryTool, AgentHistoryTurn } from "../providers/index.ts";
 
 /** Calls an earlier answer made; malformed ones are dropped, sizes bounded. */
-function historyTools(value: unknown): AgentHistoryTool[] {
+export function historyTools(value: unknown): AgentHistoryTool[] {
   if (!Array.isArray(value)) return [];
   return value.slice(0, 100).flatMap((item): AgentHistoryTool[] => {
     if (!item || typeof item !== "object") return [];

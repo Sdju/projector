@@ -1,4 +1,6 @@
+import { answerCommand } from "./commands.ts";
 import { EVENTS_UNAVAILABLE, EventStreamRefused, streamViaEvents } from "./event-stream.ts";
+import { parseSse } from "./sse.ts";
 import type {
   AgentCommand,
   AgentBackendId,
@@ -13,27 +15,6 @@ import type {
   AgentCommandRequest,
   AgentPermissionMode,
 } from "../model/types.ts";
-
-function parseSse(buffer: string): { events: AgentEvent[]; rest: string } {
-  const events: AgentEvent[] = [];
-  const parts = buffer.split("\n\n");
-  const rest = parts.pop() ?? "";
-  for (const chunk of parts) {
-    let name = "";
-    const dataLines: string[] = [];
-    for (const line of chunk.split("\n")) {
-      if (line.startsWith("event:")) name = line.slice(6).trim();
-      if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
-    }
-    if (!name) continue;
-    try {
-      events.push({ event: name, data: JSON.parse(dataLines.join("\n") || "{}") } as AgentEvent);
-    } catch {
-      events.push({ event: "error", data: { error: "Некорректный поток" } });
-    }
-  }
-  return { events, rest };
-}
 
 /** Stores a pasted or dropped image on the server; messages refer to it by the returned id. */
 export async function uploadAttachment(
@@ -105,20 +86,7 @@ export async function streamAgent(
 
   async function handle(event: AgentEvent) {
     if (event.event !== "command-request") return onEvent(event);
-    let result: { output?: unknown; error?: string };
-    try {
-      if (!options.commands) throw new Error("Команды недоступны в этом чате");
-      result = { output: await options.commands(event.data) };
-    } catch (error) {
-      result = { error: error instanceof Error ? error.message : String(error) };
-    }
-    const reply = await fetch("/api/agent/tool-result", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: event.data.id, ...result }),
-      signal,
-    });
-    if (!reply.ok) throw new Error("Не удалось передать результат команды агенту");
+    await answerCommand(event.data.id, event.data, options.commands, signal);
   }
   try {
     if ((await streamViaEvents(request, handle, signal)) !== EVENTS_UNAVAILABLE) return;
@@ -390,6 +358,6 @@ export interface LiveAgentRun {
 
 export async function fetchLiveRuns(): Promise<LiveAgentRun[]> {
   const response = await fetch("/api/agent/runs", { cache: "no-store" });
-  if (!response.ok) return [];
+  if (!response.ok) throw new Error("Не удалось получить работающие процессы агентов");
   return (await response.json()).runs ?? [];
 }

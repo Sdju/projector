@@ -10,6 +10,7 @@ import {
 } from "ai";
 import type { Project } from "../../projects/index.ts";
 import { createAgentTools } from "./agent-tools.ts";
+import { createSideTools, SIDE_LIMITS, sideAbort, sideSystem } from "./projector-side.ts";
 import { buildSystemPrompt } from "./prompts.ts";
 import { enabledFeatureText } from "../../agent-features/index.ts";
 import {
@@ -30,7 +31,7 @@ import {
 import { createTurnInput } from "./projector-input.ts";
 import { budgetNote, turnBudget } from "./projector-budget.ts";
 import { isRetryable, MAX_RETRIES, pause, retryDelay } from "./projector-retry.ts";
-import { connectMcp, mcpSection } from "./projector-mcp.ts";
+import { connectMcp, mcpSection, type McpConnection } from "./projector-mcp.ts";
 import { expandSlash, listSkills, skillsSection } from "./projector-skills.ts";
 import { memorySection } from "./projector-memory.ts";
 import { loadHooks, runStopHooks, withHooks } from "./projector-hooks.ts";
@@ -71,21 +72,22 @@ async function run(options: AgentRunOptions): Promise<void> {
 
 /** MCP servers live for one turn: whatever the turn started is stopped however it ends. */
 export async function runProjector(options: AgentRunOptions): Promise<void> {
+  const effective = options.side ? { ...options, abort: sideAbort(options.abort) } : options;
   const open = { close: async () => {} };
-  const input = createTurnInput(options);
+  const input = createTurnInput(effective);
   try {
-    await turn(options, open, input);
+    await turn(effective, open, input);
   } finally {
     input.close();
     await open.close();
   }
 }
-
 async function turn(
   options: AgentRunOptions,
   open: { close: () => Promise<void> },
   input: ReturnType<typeof createTurnInput>,
 ): Promise<void> {
+  const side = options.side === true;
   const [providerId, ...rest] = (options.selection?.provider || options.providerId || "").split(
     ":",
   );
@@ -120,58 +122,83 @@ async function turn(
     review:
       mode === "auto" ? createBashReviewer(quietModel, options.cwd, options.abort) : undefined,
   };
-  const own = createAgentTools({
-    cwd: options.cwd,
-    commands: options.commands,
-    signal: options.abort,
-    ask: options.ask,
-    secret: options.secret,
-    guard,
-    onOutput: (id, chunk) => options.emit("tool-output", { id, chunk }),
-    onProject: (project) => {
-      added.push(project);
-      options.emit("project", project);
-    },
-  });
+  const own = side
+    ? createSideTools({
+        commands: options.commands,
+        chat: options.chat,
+        scope: options.scope,
+      })
+    : createAgentTools({
+        cwd: options.cwd,
+        commands: options.commands,
+        signal: options.abort,
+        ask: options.ask,
+        secret: options.secret,
+        guard,
+        onOutput: (id, chunk) => options.emit("tool-output", { id, chunk }),
+        onProject: (project) => {
+          added.push(project);
+          options.emit("project", project);
+        },
+      });
 
   const earlier = splitAtCompaction(options.history ?? []);
-  if (options.message.trim() === COMPACT_COMMAND) {
+  if (!side && options.message.trim() === COMPACT_COMMAND) {
     await compactChat(quietModel, earlier, options, resolved);
     return;
   }
-  const skills = await listSkills(options.cwd);
-  const { recent, summary } = await compactHistory(quietModel, earlier.turns, {
-    signal: options.abort,
-    base: earlier.summary,
-    onStart: () => options.emit("status", { phase: "compacting" }),
-  });
-  const mcp = await connectMcp(options.cwd, guard, options.abort);
+  const skills = side ? [] : await listSkills(options.cwd);
+  const { recent, summary } = side
+    ? { recent: earlier.turns, summary: earlier.summary }
+    : await compactHistory(quietModel, earlier.turns, {
+        signal: options.abort,
+        base: earlier.summary,
+        onStart: () => options.emit("status", { phase: "compacting" }),
+      });
+  const mcp: McpConnection = side
+    ? { tools: {}, problems: [], servers: [], close: async () => {} }
+    : await connectMcp(options.cwd, guard, options.abort);
   open.close = mcp.close;
-  const hooks = await loadHooks(options.cwd, guard);
+  const hooks = side ? [] : await loadHooks(options.cwd, guard);
   const started = Date.now();
-  const tools = withHooks({ ...mcp.tools, ...own }, hooks, options.cwd) as typeof own;
-  const messages: ModelMessage[] = [
-    ...toMessages(recent),
-    await userMessage(expandSlash(options.message, skills), options.parts),
-  ];
+  const tools = side
+    ? own
+    : (withHooks({ ...mcp.tools, ...own }, hooks, options.cwd) as typeof own);
+  const messages: ModelMessage[] = toMessages(recent);
+  const sideMessage = await userMessage(
+    side ? options.message : expandSlash(options.message, skills),
+    options.parts,
+  );
+  const previous = messages.at(-1);
+  if (
+    side &&
+    previous?.role === "user" &&
+    typeof previous.content === "string" &&
+    typeof sideMessage.content === "string"
+  ) {
+    messages[messages.length - 1] = {
+      role: "user",
+      content: `${previous.content}\n\n[Отдельный вопрос в сторону, не часть основного задания]\n${sideMessage.content}`,
+    };
+  } else messages.push(sideMessage);
 
   options.emit("status", {
     phase: "thinking",
     provider: resolved.name,
     model: resolved.model,
   });
-  options.emit("controls", { controls: await controls(options.selection ?? {}) });
+  if (!side) options.emit("controls", { controls: await controls(options.selection ?? {}) });
 
-  const system =
-    buildSystemPrompt(await enabledFeatureText("projector", options.features)) +
-    (options.cwd ? `\nТекущий проект: ${options.cwd}` : "") +
-    (await projectInstructions(options.cwd)) +
-    (await memorySection(options.cwd)) +
-    mcpSection(mcp) +
-    skillsSection(skills) +
-    summarySection(summary);
-
-  const budget = turnBudget();
+  const system = side
+    ? sideSystem(options.cwd, summary)
+    : buildSystemPrompt(await enabledFeatureText("projector", options.features)) +
+      (options.cwd ? `\nТекущий проект: ${options.cwd}` : "") +
+      (await projectInstructions(options.cwd)) +
+      (await memorySection(options.cwd)) +
+      mcpSection(mcp) +
+      skillsSection(skills) +
+      summarySection(summary);
+  const budget = turnBudget(side ? SIDE_LIMITS : undefined);
   const wanted = options.selection?.[THINKING];
   let answering = model;
   let thinking = thinkingBody(style, wanted);
@@ -241,11 +268,11 @@ async function turn(
       messages.push(...(await result.response).messages);
       steps.push(...(await result.steps));
       const continuing = (await result.finishReason) === "tool-calls" || input.pending;
-      if (options.abort?.aborted || !continuing) break;
-      const overBudget = (await Promise.all(budget.stopWhen.map((stop) => stop({ steps })))).some(
-        Boolean,
-      );
-      if (overBudget) break;
+      const aborted = options.abort?.aborted === true;
+      const overBudget =
+        (continuing || aborted) &&
+        (await Promise.all(budget.stopWhen.map((stop) => stop({ steps })))).some(Boolean);
+      if (overBudget || aborted || !continuing) break;
       attempt = -1;
       continue;
     }
@@ -311,7 +338,7 @@ async function turn(
     });
   const stopped = budget.reason();
   if (stopped) {
-    const note = budgetNote(budget.reason());
+    const note = budgetNote(budget.reason(), side ? SIDE_LIMITS : undefined);
     text += note;
     options.emit("text", { text: note });
   }
@@ -321,7 +348,8 @@ async function turn(
     added: added.map((item) => item.id),
     stopped,
   });
-  await runStopHooks(hooks, options.cwd, { seconds: (Date.now() - started) / 1000, text });
+  if (!side)
+    await runStopHooks(hooks, options.cwd, { seconds: (Date.now() - started) / 1000, text });
 }
 
 /** `/compact`: the answer is the summary of the whole chat, and what follows it builds on that. */

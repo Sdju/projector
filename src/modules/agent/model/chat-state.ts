@@ -26,6 +26,8 @@ export const createState = () =>
     busy: false,
     error: "",
     phase: "",
+    /** When the last event of the answer arrived (ms since the epoch), for stall diagnosis. */
+    lastEventAt: 0,
     permissions: [] as AgentPermission[],
     questions: [] as AgentQuestionRequest[],
     secrets: [] as AgentSecretRequest[],

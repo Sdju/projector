@@ -140,3 +140,4 @@ export {
 } from "./jobs.ts";
 export { trackEventStream, detachEventStream } from "./event-streams.ts";
 export { requestFrom } from "./request.ts";
+export { sideRequestFrom, type SideRequest, type SideExchange } from "./side-request.ts";

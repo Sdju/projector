@@ -79,6 +79,7 @@ export function applyAgentEvent(
   ingest: (project: Project) => void,
   at = Date.now(),
 ): boolean {
+  state.lastEventAt = at;
   switch (event.event) {
     case "input": {
       const shown = inputsOf(assistant);

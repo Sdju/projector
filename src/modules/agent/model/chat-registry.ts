@@ -4,6 +4,7 @@ import type { ForkMode } from "./branches.ts";
 import type {
   AgentBackendId,
   AgentCapabilities,
+  AgentChatStatus,
   AgentControl,
   AgentSessionInfo,
   AgentTask,
@@ -49,6 +50,14 @@ export interface ChatController {
   removeQueued(id: string): void;
   exportMarkdown(): string;
   compact(): Promise<void>;
+  /** A read-only snapshot of the chat, for `ide.agent.chat.status`. */
+  status(): Promise<AgentChatStatus>;
+  /** Opens the side-question panel of this chat. */
+  openSide(): void;
+  /** Asks a side question and resolves with its answer; it is not added to the chat. */
+  askSide(text: string): Promise<string>;
+  /** Clears the in-memory side thread of this chat. */
+  clearSide(): void;
   mcpServers(): Promise<McpServer[]>;
   /** The isolated copy of the project the chat works in, if any. */
   worktree(): Promise<WorktreeInfo | undefined>;

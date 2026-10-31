@@ -92,6 +92,15 @@ export interface AgentRunOptions {
   parts?: MessagePart[];
   /** The project the chat belongs to, when it has one; the IDE MCP server needs it. */
   projectId?: string;
+  /** The chat key a side question belongs to; absent for normal turns. */
+  chat?: string;
+  /** The live command scope of that chat (`editor:<projectId>`), used by side-question tools. */
+  scope?: string;
+  /**
+   * A side question: a read-only answer that is not a chat turn. The backend must not write
+   * history, start a run record or ask the user; it may only read the current state.
+   */
+  side?: boolean;
   cwd?: string;
   commands?: (request: CommandRequest) => Promise<unknown>;
   /** Asks the user before a sensitive tool runs; absent when the client cannot show a prompt. */

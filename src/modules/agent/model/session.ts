@@ -331,6 +331,7 @@ export function useAgent(
     busy,
     error,
     phase,
+    lastEventAt: computed(() => state.lastEventAt),
     permissions,
     questions,
     secrets,
