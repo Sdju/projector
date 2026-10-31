@@ -71,6 +71,38 @@ test("nothing is restored without the agent's own session", () => {
   expect(turns[1].text).toBe("");
 });
 
+test("an answer split by harness reminders and many messages comes back whole", () => {
+  const turns = [user("исправь систему пермишенов"), answer(INTERRUPTED)];
+  const native = [
+    user("исправь систему пермишенов\n<system-reminder>план принят</system-reminder>"),
+    answer("Сначала посмотрю код.", {
+      tools: [{ id: "1:tool_a", name: "Read", status: "done", detail: "ok" }],
+    }),
+    user("<system-reminder>\nTodo list:\n  [done] Прочитать код\n</system-reminder>"),
+    answer("Правлю обработку разрешения.", {
+      tools: [{ id: "2:tool_b", name: "Edit", status: "done", detail: "ok" }],
+    }),
+    // A real follow-up question: everything after it belongs to another answer.
+    user("а теперь тесты"),
+    answer("Тесты добавил."),
+  ];
+  expect(restoreLostAnswer(turns, native)).toBe(true);
+  expect(turns[1].text).toBe("Сначала посмотрю код.\n\nПравлю обработку разрешения.");
+  expect(turns[1].tools.map((tool) => tool.id)).toEqual(["1:tool_a", "2:tool_b"]);
+  expect(turns[1].parts?.map((part) => part.type)).toEqual(["text", "tool", "text", "tool"]);
+});
+
+test("tool calls without any text still restore the progress of a lost answer", () => {
+  const turns = [user("почини"), answer("")];
+  const native = [
+    user("почини\n<system-reminder>напоминание</system-reminder>"),
+    answer("", { tools: [{ id: "1:tool_a", name: "Bash", status: "done", detail: "ok" }] }),
+  ];
+  expect(restoreLostAnswer(turns, native)).toBe(true);
+  expect(turns[1].text).toBe("");
+  expect(turns[1].tools.map((tool) => tool.id)).toEqual(["1:tool_a"]);
+});
+
 test("a recovered answer is saved, so it is not fetched again", async () => {
   const turns = [user("почини"), answer(INTERRUPTED)];
   let saved = 0;
