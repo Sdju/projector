@@ -207,6 +207,7 @@ const timeTitle = computed(() =>
         </div>
         <div class="io-label">{{ view.status === "error" ? "Ошибка" : "Содержимое" }}</div>
         <AgentCodeBlock
+          :path="path"
           :text="
             view.result ||
             (view.running ? 'Ожидание результата…' : 'Файл пуст или ничего не вернул')

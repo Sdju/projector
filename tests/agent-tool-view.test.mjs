@@ -2,6 +2,7 @@ import { expect, test } from "vite-plus/test";
 import { applyAgentEvent } from "../src/modules/agent/model/turn-events.ts";
 import { toolVisual } from "../src/modules/agent/lib/tool-visual.ts";
 import { toolLabel } from "../src/modules/agent/lib/tool-labels.ts";
+import { codeLanguage } from "../src/modules/agent/lib/code-language.ts";
 
 test("a call is shaped by what it does, not only by its name", () => {
   expect(toolVisual("Read")).toBe("read");
@@ -16,6 +17,14 @@ test("a call is shaped by what it does, not only by its name", () => {
   expect(toolVisual("cat src/app.ts", "read")).toBe("read");
   expect(toolVisual("Собрать проект", "edit")).toBe("edit");
   expect(toolVisual("mcp__server__tool")).toBe("other");
+});
+
+test("a file body is highlighted by the language of its name", () => {
+  expect(codeLanguage("src/app.ts")).toBe("ts");
+  expect(codeLanguage("src/App.vue")).toBe("xml");
+  expect(codeLanguage("C:\\project\\src\\app.mjs")).toBe("mjs");
+  expect(codeLanguage("README.")).toBe("");
+  expect(codeLanguage("")).toBe("");
 });
 
 test("labels read the same for CamelCase and snake_case tool names", () => {

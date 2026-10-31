@@ -1,7 +1,19 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import hljs from "highlight.js/lib/common";
+import { codeLanguage } from "../lib/code-language.ts";
 
-const props = defineProps<{ text: string; diff?: boolean }>();
+const props = defineProps<{ text: string; diff?: boolean; path?: string }>();
+/** The body of a file is highlighted by its name; a diff keeps its own add/remove colors. */
+const highlighted = computed(() => {
+  const language = codeLanguage(props.path);
+  if (props.diff || !language) return "";
+  try {
+    return hljs.highlight(props.text, { language, ignoreIllegals: true }).value;
+  } catch {
+    return "";
+  }
+});
 // In a diff the first line is the file path; `- ` and `+ ` lines are removed and added code.
 const lines = computed(() =>
   props.text
@@ -20,7 +32,8 @@ const lines = computed(() =>
 </script>
 
 <template>
-  <pre class="code" :class="{ diff }"><span
+  <pre v-if="highlighted" class="code highlighted"><code v-html="highlighted" /></pre>
+  <pre v-else class="code" :class="{ diff }"><span
     v-for="(row, index) in lines"
     :key="index"
     class="row"
@@ -44,6 +57,31 @@ const lines = computed(() =>
   padding: 0 var(--sp-3);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.highlighted code {
+  display: block;
+  padding: 0 var(--sp-3);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.highlighted :deep(.hljs-keyword),
+.highlighted :deep(.hljs-selector-tag) {
+  color: var(--warn);
+}
+.highlighted :deep(.hljs-string),
+.highlighted :deep(.hljs-attr) {
+  color: var(--run);
+}
+.highlighted :deep(.hljs-number),
+.highlighted :deep(.hljs-literal) {
+  color: var(--err);
+}
+.highlighted :deep(.hljs-comment) {
+  color: var(--faint);
+}
+.highlighted :deep(.hljs-title),
+.highlighted :deep(.hljs-built_in) {
+  color: var(--info);
 }
 .diff .row.add,
 .diff .row.del {
