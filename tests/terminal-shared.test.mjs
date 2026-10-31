@@ -33,7 +33,7 @@ const { state } = await import("../server/modules/terminal/session-state.ts");
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function until(predicate) {
   for (let i = 0; i < 400; i++) {
-    if (predicate()) return;
+    if (await predicate()) return;
     await wait(25);
   }
   expect.fail("Timed out waiting for terminal transport");
@@ -94,13 +94,22 @@ test("shared channels preserve PTY, ACK, resize, reconnect, control isolation an
     await until(() => state.sessions.get(a.id).pending.size === 2);
     const pendingA = state.sessions.get(a.id).pending;
     expect([...pendingA.values()].every((length) => length > 0)).toBe(true);
-    for (const channel of ["a", "a-second-view"]) {
-      const length = payloads(data, channel)
-        .filter((item) => item.type === "output")
-        .reduce((sum, item) => sum + item.data.length, 0);
-      send(channel, { type: "ack", length });
-    }
-    await until(() => [...pendingA.values()].every((length) => length === 0));
+    // Output may still be arriving while an ack is in flight: confirm only what has arrived since
+    // the previous ack, so a late chunk cannot leave the queue waiting forever.
+    const received = { a: 0, "a-second-view": 0 };
+    await until(async () => {
+      for (const channel of Object.keys(received)) {
+        const length = payloads(data, channel)
+          .filter((item) => item.type === "output")
+          .reduce((sum, item) => sum + (item.data ?? "").length, 0);
+        if (length > received[channel]) {
+          send(channel, { type: "ack", length: length - received[channel] });
+          received[channel] = length;
+        }
+      }
+      await wait(25);
+      return [...pendingA.values()].every((length) => length === 0);
+    });
     send("b", { type: "resize", cols: 91, rows: 29 });
     await until(() =>
       payloads(data, "b").some((item) => item.type === "status" && item.session.cols === 91),

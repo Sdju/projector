@@ -128,8 +128,13 @@ describe("background agent jobs", () => {
     // The command bridge of Projector is never offered; the run record is collected.
     expect(attached.at(-1)).toMatchObject({ attach: false, approvals: true, bridge: false });
     expect(await runs.readRun(done.runId)).toBeNull();
-    // It is on disk, so it outlives the server.
-    expect((await store.loadJob(job.id)).status).toBe("done");
+    // It is on disk, so it outlives the server. The final record is written after its status
+    // becomes visible, so wait for the file instead of racing the write.
+    const saved = await until(async () => {
+      const found = await store.loadJob(job.id);
+      return found?.status === "done" ? found : undefined;
+    });
+    expect(saved.result).toBe("final answer");
     expect((await jobs.listJobs("p1")).map((item) => item.id)).toContain(job.id);
     expect(await jobs.listJobs("other")).toEqual([]);
   });
