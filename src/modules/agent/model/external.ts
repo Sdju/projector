@@ -50,6 +50,10 @@ export function useExternalAgent(
 ) {
   const { backend, projectId, ready, persist, key } = chat;
   const external = !isBuiltinAgent(backend);
+  // The lists are read again every time the menu opens; the loading state belongs to the first
+  // load only, so a refresh never hides or shifts what is already on screen.
+  let sessionsLoaded = false;
+  let recentLoaded = false;
   // The Projector agent offers a model and permission choice but has no sessions; its slash commands are the user's skills and prompt commands.
   const controls = computed(() => state.controls);
   const selection = computed(() => state.selection);
@@ -109,17 +113,22 @@ export function useExternalAgent(
     }
   }
 
-  /** Past sessions of this agent in the project, newest first. */
-  async function loadSessions(): Promise<AgentSessionInfo[]> {
+  /**
+   * Past sessions of this agent in the project, newest first. A refresh with `quiet` keeps the
+   * list already shown and does not put the menu back into its loading state.
+   */
+  async function loadSessions(quiet = false): Promise<AgentSessionInfo[]> {
     if (external && !projectId) return [];
-    state.sessionsLoading = true;
+    const wait = !quiet && !sessionsLoaded;
+    if (wait) state.sessionsLoading = true;
     try {
       state.sessions = external ? await fetchSessions(backend, projectId) : await fetchChats(key);
       state.sessionsError = "";
     } catch (err) {
       state.sessionsError = err instanceof Error ? err.message : "Не удалось получить сессии";
     } finally {
-      state.sessionsLoading = false;
+      sessionsLoaded = true;
+      if (wait) state.sessionsLoading = false;
     }
     return state.sessions;
   }
@@ -130,14 +139,16 @@ export function useExternalAgent(
       state.recent = [];
       return [];
     }
-    state.recentLoading = true;
+    const wait = !recentLoaded;
+    if (wait) state.recentLoading = true;
     try {
       state.recent = await fetchRecentChats(projectId, backend);
       state.recentError = "";
     } catch (err) {
       state.recentError = err instanceof Error ? err.message : "Не удалось получить недавние чаты";
     } finally {
-      state.recentLoading = false;
+      recentLoaded = true;
+      if (wait) state.recentLoading = false;
     }
     return state.recent;
   }
@@ -150,7 +161,7 @@ export function useExternalAgent(
     try {
       if (external) await updateSession(backend, projectId, id, change);
       else await updateChat(id, change);
-      await loadSessions();
+      await loadSessions(true);
     } catch (err) {
       state.sessionsError = err instanceof Error ? err.message : "Не удалось изменить сессию";
     }
@@ -195,11 +206,17 @@ export function useExternalAgent(
   }
 
   async function removeSession(id: string): Promise<void> {
+    // The row leaves the list at once: reloading it first would make the menu jump while the
+    // "loading" note takes its place.
+    const previous = state.sessions;
+    if (previous.some((item) => item.id === id))
+      state.sessions = previous.filter((item) => item.id !== id);
     try {
       if (external) await deleteSession(backend, projectId, id);
       else await deleteChat(id);
-      await loadSessions();
+      await loadSessions(true);
     } catch (err) {
+      state.sessions = previous;
       state.sessionsError = err instanceof Error ? err.message : "Не удалось удалить чат";
       throw err;
     }

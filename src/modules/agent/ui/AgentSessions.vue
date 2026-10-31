@@ -93,6 +93,11 @@ function remove(id: string) {
   }
   confirming.value = "";
   emit("remove", id);
+  // The row disappears with the focused button: the list keeps the keyboard reachable.
+  void nextTick(() => {
+    if (!shown.value || menu.island.value?.contains(document.activeElement)) return;
+    menu.island.value?.querySelector<HTMLElement>("input[type=search], button.item")?.focus();
+  });
 }
 function pick(id: string) {
   menu.close();
@@ -159,7 +164,7 @@ function age(value?: string): string {
         placeholder="Найти сессию"
         aria-label="Найти сессию"
       />
-      <p v-if="loading" class="note">Загружаю…</p>
+      <p v-if="loading && !sessions.length && !recent?.length" class="note">Загружаю…</p>
       <p v-else-if="error" class="note error" role="alert">{{ error }}</p>
       <p v-else-if="!sessions.length && !recent?.length && !recentLoading" class="note">
         {{ label ? "Прошлых чатов пока нет" : "В этой папке пока нет сессий" }}
@@ -240,7 +245,7 @@ function age(value?: string): string {
           </button>
         </UiInline>
       </UiInline>
-      <p v-if="recentLoading" class="note">Загружаю недавние чаты…</p>
+      <p v-if="recentLoading && !recentVisible.length" class="note">Загружаю недавние чаты…</p>
       <p v-else-if="recentError" class="note error" role="alert">{{ recentError }}</p>
       <template v-if="recentVisible.length">
         <p class="group">Недавние чаты</p>
