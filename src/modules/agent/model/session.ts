@@ -7,6 +7,7 @@ import {
   answerQuestion,
   answerSecret,
   cancelAgentRun,
+  loadSessionTurns,
   streamAgent,
 } from "../api/client.ts";
 import { addVersion } from "./branches.ts";
@@ -21,16 +22,9 @@ import {
   notifyQuestion,
   requestNotifications,
 } from "../lib/notify.ts";
-import {
-  RELEASE_DELAY_MS,
-  createState,
-  loads,
-  queued,
-  releases,
-  sessions,
-  viewers,
-} from "./chat-state.ts";
+import { chatPresence, createState, loads, queued, releases, sessions } from "./chat-state.ts";
 import { INTERRUPTED, loadHistory } from "./load-history.ts";
+import { recoverTurn } from "./lost-answer.ts";
 import { isBuiltinAgent } from "./modes.ts";
 import { watchChat } from "./chat-sync.ts";
 import { saveChat } from "./save-chat.ts";
@@ -77,6 +71,9 @@ export function useAgent(
   const ready = loads.get(key)!;
   const persist = () =>
     saveChat(key, historyUrl, state, projectId ? { project: projectId, backend } : undefined);
+  /** The agent's own transcript still has an answer the page never received. */
+  const recover = (turn: AgentTurn | undefined) =>
+    recoverTurn(state.turns, turn, (id) => loadSessionTurns(backend, projectId, id), persist);
   const catalog = useProjects();
   const { draftParts, draft, busy, loading, error, phase, permissions, questions, secrets } =
     useChatView(state);
@@ -185,7 +182,7 @@ export function useAgent(
     } catch (err) {
       if (err instanceof AgentRunGone) {
         assistant.run = undefined;
-        if (!assistant.text.trim()) assistant.text = INTERRUPTED;
+        if (!(await recover(assistant)) && !assistant.text.trim()) assistant.text = INTERRUPTED;
       } else if (!signal.aborted)
         state.error = err instanceof Error ? err.message : "Агент не ответил";
     } finally {
@@ -300,7 +297,7 @@ export function useAgent(
       assistant.run,
     );
   }
-  void resumeRun();
+  void resumeRun().then(() => recover(state.turns.at(-1)));
 
   /** Another page saved this chat (it may have started an answer): take it and rejoin the answer. */
   watchChat(
@@ -310,6 +307,7 @@ export function useAgent(
       await ready;
       await loadHistory(historyUrl, state, true);
       if (!state.busy) await resumeRun();
+      if (!state.busy) await recover(state.turns.at(-1));
     },
   );
 
@@ -323,23 +321,7 @@ export function useAgent(
     }
     state.abort?.abort();
   }
-  /** A chat view starts showing this chat; pair it with `release`. */
-  function attach() {
-    viewers.set(key, (viewers.get(key) ?? 0) + 1);
-  }
-  /** The chat view went away: stop its request unless the same chat is shown again shortly. */
-  function release() {
-    viewers.set(key, Math.max(0, (viewers.get(key) ?? 1) - 1));
-    if (viewers.get(key)) return;
-    clearTimeout(releases.get(key));
-    releases.set(
-      key,
-      setTimeout(() => {
-        releases.delete(key);
-        if (!viewers.get(key)) state.abort?.abort();
-      }, RELEASE_DELAY_MS),
-    );
-  }
+  const { attach, release } = chatPresence(key, () => state.abort?.abort());
   return {
     key,
     turns: computed(() => state.turns),

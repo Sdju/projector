@@ -116,6 +116,27 @@ registry.queued ??= new Set();
 for (const state of registry.sessions.values()) state.capabilities ??= {};
 export const { releases, viewers, sessions, loads, saves, queued } = registry;
 
+/** A chat view starts showing this chat, and stops when it goes away (see `RELEASE_DELAY_MS`). */
+export function chatPresence(key: string, abort: () => void) {
+  return {
+    attach() {
+      viewers.set(key, (viewers.get(key) ?? 0) + 1);
+    },
+    release() {
+      viewers.set(key, Math.max(0, (viewers.get(key) ?? 1) - 1));
+      if (viewers.get(key)) return;
+      clearTimeout(releases.get(key));
+      releases.set(
+        key,
+        setTimeout(() => {
+          releases.delete(key);
+          if (!viewers.get(key)) abort();
+        }, RELEASE_DELAY_MS),
+      );
+    },
+  };
+}
+
 /** The conversation as turns, with what the answers' tool calls returned, for an agent without a session of its own. */
 export function chatHistory(turns: AgentTurn[], withTools = false): AgentHistoryTurn[] {
   // Live additions are user messages in context, even though the UI nests them in the answer.
