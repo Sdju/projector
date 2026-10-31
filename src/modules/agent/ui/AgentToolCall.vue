@@ -235,6 +235,15 @@ const timeTitle = computed(() =>
         </template>
       </template>
 
+      <template v-else-if="visual === 'edit' && view.diff && view.showInput">
+        <div class="io-label">Изменения</div>
+        <AgentCodeBlock :path="path" :text="view.input" :diff="true" />
+        <template v-if="view.status === 'error'">
+          <div class="io-label">Ошибка</div>
+          <AgentCodeBlock :text="view.result || 'Ошибка инструмента'" />
+        </template>
+      </template>
+
       <template v-else-if="visual === 'bash'">
         <div class="io-label">Команда</div>
         <AgentCodeBlock :text="view.input || '…'" />

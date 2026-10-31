@@ -4,12 +4,20 @@ import hljs from "highlight.js/lib/common";
 import { codeLanguage } from "../lib/code-language.ts";
 
 const props = defineProps<{ text: string; diff?: boolean; path?: string }>();
-/** The body of a file is highlighted by its name; a diff keeps its own add/remove colors. */
-const highlighted = computed(() => {
-  const language = codeLanguage(props.path);
-  if (props.diff || !language) return "";
+const language = computed(() => codeLanguage(props.path));
+function highlightLine(line: string): string {
+  if (!language.value) return "";
   try {
-    return hljs.highlight(props.text, { language, ignoreIllegals: true }).value;
+    return hljs.highlight(line, { language: language.value, ignoreIllegals: true }).value;
+  } catch {
+    return "";
+  }
+}
+/** The file body and diff lines are highlighted by its name; a diff keeps its add/remove colors. */
+const highlighted = computed(() => {
+  if (props.diff || !language.value) return "";
+  try {
+    return hljs.highlight(props.text, { language: language.value, ignoreIllegals: true }).value;
   } catch {
     return "";
   }
@@ -21,12 +29,18 @@ const lines = computed(() =>
     // The empty line after the path only separates it in plain text; the path row has its own gap.
     .filter((line, index) => !(props.diff && index === 1 && !line))
     .map((line, index) => {
-      if (!props.diff) return { line, kind: "" };
-      if (index === 0) return { line, kind: "path" };
-      if (line.startsWith("- ")) return { line: line.slice(2), kind: "del" };
-      if (line.startsWith("+ ")) return { line: line.slice(2), kind: "add" };
-      if (line === "@@") return { line: "⋯", kind: "gap" };
-      return { line, kind: "" };
+      if (!props.diff) return { line, kind: "", html: "" };
+      if (index === 0) return { line, kind: "path", html: "" };
+      if (line.startsWith("- ")) {
+        const text = line.slice(2);
+        return { line: text, kind: "del", html: highlightLine(text) };
+      }
+      if (line.startsWith("+ ")) {
+        const text = line.slice(2);
+        return { line: text, kind: "add", html: highlightLine(text) };
+      }
+      if (line === "@@") return { line: "⋯", kind: "gap", html: "" };
+      return { line, kind: "", html: highlightLine(line) };
     }),
 );
 </script>
@@ -38,7 +52,8 @@ const lines = computed(() =>
     :key="index"
     class="row"
     :class="row.kind"
-    >{{ row.line || " " }}</span></pre>
+    ><span v-if="row.html" v-html="row.html" /><template v-else>{{ row.line || " " }}</template></span
+  ></pre>
 </template>
 
 <style scoped>
@@ -64,23 +79,23 @@ const lines = computed(() =>
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.highlighted :deep(.hljs-keyword),
-.highlighted :deep(.hljs-selector-tag) {
+.code :deep(.hljs-keyword),
+.code :deep(.hljs-selector-tag) {
   color: var(--warn);
 }
-.highlighted :deep(.hljs-string),
-.highlighted :deep(.hljs-attr) {
+.code :deep(.hljs-string),
+.code :deep(.hljs-attr) {
   color: var(--run);
 }
-.highlighted :deep(.hljs-number),
-.highlighted :deep(.hljs-literal) {
+.code :deep(.hljs-number),
+.code :deep(.hljs-literal) {
   color: var(--err);
 }
-.highlighted :deep(.hljs-comment) {
+.code :deep(.hljs-comment) {
   color: var(--faint);
 }
-.highlighted :deep(.hljs-title),
-.highlighted :deep(.hljs-built_in) {
+.code :deep(.hljs-title),
+.code :deep(.hljs-built_in) {
   color: var(--info);
 }
 .diff .row.add,
