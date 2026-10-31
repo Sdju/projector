@@ -34,7 +34,7 @@ export async function fetchRecentChats(
     chats?: AgentRecentChat[];
     error?: string;
   };
-  if (!response.ok) throw new Error(data.error || "Не удалось получить недавние чаты");
+  if (!response.ok) throw new Error(data.error || "Не удалось получить историю");
   return data.chats ?? [];
 }
 

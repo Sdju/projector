@@ -36,10 +36,10 @@ test(
     for (const width of [1200, 390]) {
       await browser.viewport(width);
       await settle();
-      await act(() => browser.click('[aria-label="Прошлые сессии"]'));
+      await act(() => browser.click('[aria-label="История"]'));
       await eventually('document.activeElement.classList.contains("item")', true);
-      await act(() => browser.click('[aria-label="Переименовать сессию"]'));
-      await eventually('document.activeElement.getAttribute("aria-label")', "Название сессии");
+      await act(() => browser.click('[aria-label="Переименовать чат"]'));
+      await eventually('document.activeElement.getAttribute("aria-label")', "Название чата");
       await browser.call("Input.insertText", { text: "Changed" });
       await act(() => browser.key("Escape"));
       expect(await browser.evaluate('Boolean(document.querySelector("[role=dialog]"))')).toBe(true);
@@ -48,20 +48,77 @@ test(
       expect(await browser.evaluate('Boolean(document.querySelector("[role=dialog]"))')).toBe(
         false,
       );
-      await eventually('document.activeElement.getAttribute("aria-label")', "Прошлые сессии");
+      await eventually('document.activeElement.getAttribute("aria-label")', "История");
     }
     await browser.evaluate("window.fixture.empty()");
-    await act(() => browser.click('[aria-label="Прошлые сессии"]'));
+    await act(() => browser.click('[aria-label="История"]'));
     await browser.evaluate("window.fixture.loaded()");
     await settle();
     await eventually('document.activeElement.classList.contains("item")', true);
     await act(() => browser.key("Escape"));
     await browser.evaluate("window.fixture.many()");
-    await act(() => browser.click('[aria-label="Прошлые сессии"]'));
-    await eventually('document.activeElement.getAttribute("aria-label")', "Найти сессию");
+    await act(() => browser.click('[aria-label="История"]'));
+    await eventually('document.activeElement.getAttribute("aria-label")', "Найти чат");
     await act(() => browser.click("#outside"));
     expect(await browser.evaluate('Boolean(document.querySelector("[role=dialog]"))')).toBe(false);
     expect(await browser.evaluate("document.activeElement.id")).toBe("outside");
+    expect(browser.errors).toEqual([]);
+  },
+);
+test(
+  "a chat and its native session are one row, not two",
+  {
+    skip: !chromium,
+    timeout: 60000,
+  },
+  async () => {
+    const html = await readFile(new URL("./fixtures/agent-sessions.html", import.meta.url), "utf8");
+    const fixture = await createBrowserFixture({ pages: { "/sessions": html } });
+    onTestFinished(() => fixture.close());
+    const browser = await createChromium(fixture.directory);
+    onTestFinished(() => browser.close());
+    await browser.open(fixture.url("/sessions"));
+    const settle = () =>
+      browser.evaluate(
+        "new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))",
+      );
+    await browser.evaluate("window.fixture.linked()");
+    await settle();
+    await browser.click('[aria-label="История"]');
+    await settle();
+    const titles = await browser.evaluate(
+      "[...document.querySelectorAll('.item')].map(item => item.textContent.trim())",
+    );
+    // The session with a tab is shown once, under the session's title; the two others keep their rows.
+    expect(titles.length).toBe(3);
+    expect(titles[0]).toContain("Main session");
+    expect(titles.some((title) => title.includes("Main tab"))).toBe(false);
+    expect(titles.some((title) => title.includes("Tab without a session"))).toBe(true);
+    expect(titles.some((title) => title.includes("Other session"))).toBe(true);
+
+    // The merged row opens its tab; a tab-only row does too; a session-only row continues the chat.
+    await browser.evaluate("document.querySelectorAll('.item')[0].click()");
+    await settle();
+    expect(await browser.evaluate("window.fixture.opened")).toEqual([
+      { chat: "chat-main", title: "Main session" },
+    ]);
+    await browser.click('[aria-label="История"]');
+    await settle();
+    await browser.evaluate(
+      "[...document.querySelectorAll('.item')].find(item => item.textContent.includes('Tab without a session')).click()",
+    );
+    await settle();
+    expect(await browser.evaluate("window.fixture.opened[1]")).toEqual({
+      chat: "chat-only",
+      title: "Tab without a session",
+    });
+    await browser.click('[aria-label="История"]');
+    await settle();
+    await browser.evaluate(
+      "[...document.querySelectorAll('.item')].find(item => item.textContent.includes('Other session')).click()",
+    );
+    await settle();
+    expect(await browser.evaluate("window.fixture.picks")).toEqual(["session-other"]);
     expect(browser.errors).toEqual([]);
   },
 );
@@ -84,7 +141,7 @@ test(
       );
     await browser.evaluate("window.fixture.branches()");
     await settle();
-    await browser.click('[aria-label="Прошлые сессии"]');
+    await browser.click('[aria-label="История"]');
     await settle();
     expect(await browser.evaluate("document.querySelectorAll('.item').length")).toBe(3);
     expect(await browser.evaluate("Boolean(document.querySelector('.item.branch'))")).toBe(false);

@@ -11,14 +11,17 @@
     { id: "two", title: "Second session" },
   ]);
   const loading = ref(false);
+  const recent = ref([]);
   let loadOnOpen = false;
   const changes = [],
-    picks = [];
+    picks = [],
+    opened = [];
   createApp({
     setup: () => () =>
       h("div", { style: "padding: 30px" }, [
         h(AgentSessions, {
           sessions: sessions.value,
+          recent: recent.value,
           loading: loading.value,
           onOpen: () => {
             if (loadOnOpen) loading.value = true;
@@ -28,6 +31,7 @@
           editable: true,
           onChange: (id, change) => changes.push({ id, change }),
           onPick: (id) => picks.push(id),
+          onOpenRecent: (chat, title) => opened.push({ chat, title }),
         }),
         h("button", { id: "outside", style: "margin-top: 200px" }, "Outside"),
       ]),
@@ -36,6 +40,7 @@
     ready: true,
     changes,
     picks,
+    opened,
     empty: () => {
       sessions.value = [];
       loadOnOpen = true;
@@ -58,6 +63,27 @@
         { id: "main-three", title: "Main chat three" },
         { id: "branch-one", title: "Explore sidebar", parent: "main-one", agent: "explore" },
         { id: "branch-two", title: "Audit tests", parent: "main-two", agent: "general" },
+      ];
+    },
+    linked: () => {
+      sessions.value = [
+        { id: "session-main", title: "Main session" },
+        { id: "session-other", title: "Other session" },
+      ];
+      recent.value = [
+        {
+          chat: "chat-main",
+          backend: "opencode",
+          title: "Main tab",
+          updatedAt: "2026-10-31T12:00:00.000Z",
+          session: "session-main",
+        },
+        {
+          chat: "chat-only",
+          backend: "opencode",
+          title: "Tab without a session",
+          updatedAt: "2026-10-30T12:00:00.000Z",
+        },
       ];
     },
   };

@@ -525,7 +525,6 @@ onBeforeUnmount(() => {
         :active="activeSession"
         :editable="!plain || capabilities.editSessions"
         :deletable="!plain || capabilities.deleteSessions"
-        :label="plain ? undefined : 'История чатов'"
         :recent="recentChats"
         :recent-loading="recentLoading"
         :recent-error="recentError"

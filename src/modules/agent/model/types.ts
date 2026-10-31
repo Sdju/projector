@@ -80,6 +80,8 @@ export interface AgentRecentChat {
   backend: string;
   title: string;
   updatedAt: string;
+  /** Native session this chat continues: its session row and this chat are one entry. */
+  session?: string;
 }
 
 export interface AgentSessionRef {

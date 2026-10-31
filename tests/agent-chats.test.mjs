@@ -8,10 +8,12 @@ import {
   listArchivedChats,
   openArchivedChat,
   readAgentHistory,
+  readRecentChats,
   removeArchivedChat,
   renameArchivedChat,
   writeAgentHistory,
 } from "../server/modules/agent/index.ts";
+import { historyDatabase } from "../server/modules/agent/history-store.ts";
 
 const turn = (id, role, text) => ({ id, role, text, tools: [] });
 let directory;
@@ -71,5 +73,33 @@ describe("Projector agent chat history", () => {
   it("keeps when a message was written", async () => {
     await writeAgentHistory("t", [{ ...turn("1", "user", "вопрос"), at: 1760000000000 }]);
     expect((await readAgentHistory("t"))[0].at).toBe(1760000000000);
+  });
+
+  it("remembers the native session a chat continues, including rows written earlier", async () => {
+    const index = { project: "sessions-project", backend: "opencode", title: "Чат" };
+    const chat = "opencode:sessions-project:chat";
+    const answer = {
+      ...turn("2", "assistant", "ответ"),
+      session: { backend: "opencode", id: "ses_one" },
+    };
+    await writeAgentHistory(chat, [turn("1", "user", "вопрос"), answer], index);
+    expect(readRecentChats("sessions-project", "opencode")).toMatchObject([
+      { chat, title: "Чат", session: "ses_one" },
+    ]);
+
+    // A row from before the index kept sessions gets it from the saved turns, once.
+    historyDatabase().prepare("UPDATE chat_index SET session = NULL WHERE chat = ?").run(chat);
+    expect(readRecentChats("sessions-project", "opencode")[0].session).toBe("ses_one");
+    expect(
+      historyDatabase().prepare("SELECT session FROM chat_index WHERE chat = ?").get(chat).session,
+    ).toBe("ses_one");
+
+    // A detached answer is a chat that no longer continues the session.
+    await writeAgentHistory(
+      chat,
+      [turn("1", "user", "вопрос"), { ...answer, detached: true }],
+      index,
+    );
+    expect(readRecentChats("sessions-project", "opencode")[0].session).toBeUndefined();
   });
 });

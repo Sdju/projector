@@ -145,7 +145,7 @@ export function useExternalAgent(
       state.recent = await fetchRecentChats(projectId, backend);
       state.recentError = "";
     } catch (err) {
-      state.recentError = err instanceof Error ? err.message : "Не удалось получить недавние чаты";
+      state.recentError = err instanceof Error ? err.message : "Не удалось получить историю";
     } finally {
       recentLoaded = true;
       if (wait) state.recentLoading = false;

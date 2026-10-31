@@ -10,6 +10,11 @@ export interface HistoryTurn {
   id: string;
   variants?: HistoryTurn[][];
   slot?: number;
+  /** An answer keeps the native session it was written in; the next message continues it. */
+  role?: "user" | "assistant";
+  session?: { backend: string; id: string };
+  /** The chat was cut back: the native session cannot be continued from this answer. */
+  detached?: boolean;
 }
 
 /** Where a live chat belongs: what its index entry is grouped by. */
@@ -17,14 +22,6 @@ export interface ChatIndex {
   project: string;
   backend: string;
   title?: string;
-}
-
-/** A chat of the project, open in a tab or closed but still on disk. */
-export interface RecentChat {
-  chat: string;
-  backend: string;
-  title: string;
-  updatedAt: string;
 }
 
 const ROOT = "";
@@ -56,7 +53,8 @@ const SCHEMA = `
     scope TEXT NOT NULL,
     backend TEXT NOT NULL,
     title TEXT NOT NULL,
-    updated TEXT NOT NULL
+    updated TEXT NOT NULL,
+    session TEXT
   );
   CREATE INDEX IF NOT EXISTS chat_index_scope ON chat_index (scope, backend, updated);
   CREATE TABLE IF NOT EXISTS archives (
@@ -91,6 +89,8 @@ export function historyDatabase(): DatabaseSync {
   db.exec(SCHEMA);
   ensureColumn(db, "archives", "project", "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, "archives", "backend", "TEXT NOT NULL DEFAULT ''");
+  // The native session a chat continues; older rows get it from their history on first read.
+  ensureColumn(db, "chat_index", "session", "TEXT");
   // Feature overrides of a chat, as JSON; NULL means the user's defaults apply.
   ensureColumn(db, "chats", "features", "TEXT");
   void chmod(file, 0o600).catch(() => {});
@@ -124,6 +124,16 @@ export function chatTitle(turns: HistoryTurn[]): string {
   return text.length > 80 ? `${text.slice(0, 79)}…` : text || "Без названия";
 }
 
+/** The native session a chat continues: the last answer's, unless the chat was cut back. */
+export function currentSession(turns: HistoryTurn[]): string | undefined {
+  for (let index = turns.length - 1; index >= 0; index--) {
+    const turn = turns[index]!;
+    if (turn.role !== "assistant") continue;
+    return turn.detached ? undefined : turn.session?.id;
+  }
+  return undefined;
+}
+
 /** Remembers the chat in the project's list; an empty chat is not worth listing. */
 function saveIndex(db: DatabaseSync, chat: string, turns: HistoryTurn[], index: ChatIndex) {
   if (!index.project) return;
@@ -133,7 +143,7 @@ function saveIndex(db: DatabaseSync, chat: string, turns: HistoryTurn[], index: 
   }
   const title = index.title || chatTitle(turns);
   db.prepare(
-    `INSERT INTO chat_index (chat, scope, backend, title, updated) VALUES (?, ?, ?, ?, ?)
+    `INSERT INTO chat_index (chat, scope, backend, title, updated, session) VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT (chat) DO UPDATE SET
        scope = excluded.scope, backend = excluded.backend,
        title = CASE
@@ -141,8 +151,17 @@ function saveIndex(db: DatabaseSync, chat: string, turns: HistoryTurn[], index: 
          WHEN chat_index.title LIKE 'Ветка%' THEN chat_index.title
          ELSE excluded.title
        END,
-       updated = excluded.updated`,
-  ).run(chat, index.project, index.backend, title, new Date().toISOString(), index.title || null);
+       updated = excluded.updated,
+       session = excluded.session`,
+  ).run(
+    chat,
+    index.project,
+    index.backend,
+    title,
+    new Date().toISOString(),
+    currentSession(turns) ?? null,
+    index.title || null,
+  );
 }
 
 /** Where a saved chat belongs, if it is in the project's list. */
@@ -151,36 +170,6 @@ export function chatMetaOf(chat: string): ChatIndex | undefined {
     .prepare("SELECT scope, backend, title FROM chat_index WHERE chat = ?")
     .get(chat) as { scope: string; backend: string; title: string } | undefined;
   return row ? { project: row.scope, backend: row.backend, title: row.title } : undefined;
-}
-
-/** Chats of a project, newest first: open in a tab or closed with their history still on disk. */
-export function readRecentChats(project: string, backend?: string, limit = 50): RecentChat[] {
-  if (!project) return [];
-  const db = historyDatabase();
-  // The project's own conversation (key = project) has no tab command to reopen it; it is opened
-  // by the workspace itself and is left out of the list.
-  const rows = (backend
-    ? db
-        .prepare(
-          "SELECT chat, backend, title, updated FROM chat_index WHERE scope = ? AND chat <> scope AND backend = ? ORDER BY updated DESC LIMIT ?",
-        )
-        .all(project, backend, limit)
-    : db
-        .prepare(
-          "SELECT chat, backend, title, updated FROM chat_index WHERE scope = ? AND chat <> scope ORDER BY updated DESC LIMIT ?",
-        )
-        .all(project, limit)) as unknown as {
-    chat: string;
-    backend: string;
-    title: string;
-    updated: string;
-  }[];
-  return rows.map((row) => ({
-    chat: row.chat,
-    backend: row.backend,
-    title: row.title,
-    updatedAt: row.updated,
-  }));
 }
 
 /** Splits a version of the chat into rows; forks found along the way become sibling rows. */

@@ -23,8 +23,6 @@ const props = defineProps<{
   editable?: boolean;
   /** A session can be removed from the list for good. */
   deletable?: boolean;
-  /** What the list is called: past sessions of an agent, or the chat history. */
-  label?: string;
   /** Chats of the project kept on disk, including closed tabs. */
   recent?: AgentRecentChat[];
   recentLoading?: boolean;
@@ -48,29 +46,72 @@ const renaming = ref("");
 const draft = ref("");
 const confirming = ref("");
 const searchInput = ref<UiControlHandle>();
+/**
+ * One entry of the history: a native session of the agent, a chat tab of the project, or both of
+ * them when the chat continues that session. The menu never shows the two as different things.
+ */
+interface HistoryEntry extends AgentSessionInfo {
+  /** The tab to open or focus, when the conversation has one. */
+  chat?: string;
+  /** A native session or archived chat is behind the row, so rename/pin/delete apply to it. */
+  native?: boolean;
+}
+const history = computed<HistoryEntry[]>(() => {
+  const entries = props.sessions.map((session): HistoryEntry => ({ ...session, native: true }));
+  const bySession = new Map(entries.map((entry) => [entry.id, entry]));
+  const seen = new Set<string>();
+  for (const chat of props.recent ?? []) {
+    if (chat.session) {
+      const known = bySession.get(chat.session);
+      // The same conversation: keep one row, openable as its tab.
+      if (known) {
+        // Two tabs continued one session: the newest one stands for both.
+        if (known.chat) continue;
+        known.chat = chat.chat;
+        if (chat.updatedAt > (known.updatedAt ?? "")) known.updatedAt = chat.updatedAt;
+        continue;
+      }
+      // Two tabs continued one session: the newest one stands for both.
+      if (seen.has(chat.session)) continue;
+      seen.add(chat.session);
+    }
+    entries.push({
+      id: chat.chat,
+      title: chat.title,
+      updatedAt: chat.updatedAt,
+      chat: chat.chat,
+      native: false,
+    });
+  }
+  return entries.sort(
+    (a, b) =>
+      Number(b.pinned === true) - Number(a.pinned === true) ||
+      (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""),
+  );
+});
 /** Branches of subagents clutter history, so they are folded under their chats until asked for. */
 const showBranches = ref(false);
-const branchCount = computed(() => props.sessions.filter((item) => item.parent).length);
+const branchCount = computed(() => history.value.filter((item) => item.parent).length);
 const searchActive = computed(() => search.value.trim().length > 0);
 const branchesShown = computed(() => showBranches.value || searchActive.value);
 const visible = computed(() => {
   const needle = search.value.trim().toLocaleLowerCase();
   return needle
-    ? props.sessions.filter((item) => item.title.toLocaleLowerCase().includes(needle))
-    : props.sessions;
+    ? history.value.filter((item) => item.title.toLocaleLowerCase().includes(needle))
+    : history.value;
 });
 /** Rows in display order: a branch follows the chat it was started from, indented by its depth. */
-const rows = computed<{ session: AgentSessionInfo; depth: number }[]>(() => {
+const rows = computed<{ session: HistoryEntry; depth: number }[]>(() => {
   const mains = visible.value.filter((item) => !item.parent);
   if (!branchesShown.value) return mains.map((session) => ({ session, depth: 0 }));
-  const children = new Map<string, AgentSessionInfo[]>();
+  const children = new Map<string, HistoryEntry[]>();
   for (const session of visible.value) {
     if (!session.parent) continue;
     children.set(session.parent, [...(children.get(session.parent) ?? []), session]);
   }
-  const result: { session: AgentSessionInfo; depth: number }[] = [];
+  const result: { session: HistoryEntry; depth: number }[] = [];
   const seen = new Set<string>();
-  const append = (session: AgentSessionInfo, depth: number) => {
+  const append = (session: HistoryEntry, depth: number) => {
     if (seen.has(session.id)) return;
     seen.add(session.id);
     result.push({ session, depth });
@@ -85,19 +126,13 @@ function titleOf(session: AgentSessionInfo): string {
   if (!session.parent) return session.title;
   return `${session.title} · ветка субагента${session.agent ? ` (${session.agent})` : ""}`;
 }
-/** The project's chats the search leaves; the current one is filtered out by the chat itself. */
-const recentVisible = computed(() => {
-  const list = props.recent ?? [];
-  const needle = search.value.trim().toLocaleLowerCase();
-  return needle ? list.filter((item) => item.title.toLocaleLowerCase().includes(needle)) : list;
-});
 let renameRow: HTMLElement | undefined;
 function startRename(session: AgentSessionInfo, event: MouseEvent) {
   renameRow = (event.currentTarget as HTMLElement).closest<HTMLElement>(".row") ?? undefined;
   renaming.value = session.id;
   draft.value = session.title;
   void nextTick(() =>
-    menu.island.value?.querySelector<HTMLElement>('[aria-label="Название сессии"]')?.focus(),
+    menu.island.value?.querySelector<HTMLElement>('[aria-label="Название чата"]')?.focus(),
   );
 }
 function finishRename(save: boolean, restoreFocus = false) {
@@ -112,7 +147,7 @@ function finishRename(save: boolean, restoreFocus = false) {
     void nextTick(() => {
       if (!shown.value) return;
       const target = row?.isConnected
-        ? row.querySelector<HTMLButtonElement>('.mini[aria-label="Переименовать сессию"]')
+        ? row.querySelector<HTMLButtonElement>('.mini[aria-label="Переименовать чат"]')
         : searchInput.value;
       target?.focus();
     });
@@ -131,14 +166,12 @@ function remove(id: string) {
     menu.island.value?.querySelector<HTMLElement>("input[type=search], button.item")?.focus();
   });
 }
-function pick(id: string) {
+function pick(entry: HistoryEntry) {
   menu.close();
-  emit("pick", id);
-}
-/** A chat of the project opens in its tab; one already open gets the focus. */
-function pickRecent(chat: string, title: string) {
-  menu.close();
-  emit("openRecent", chat, title);
+  // A conversation that already has a tab is opened there; one known only by its session goes on
+  // in this chat. The menu does not ask the user to tell these apart.
+  if (entry.chat) emit("openRecent", entry.chat, entry.title);
+  else emit("pick", entry.id);
 }
 watch(shown, (open) => {
   if (open) {
@@ -178,38 +211,29 @@ function age(value?: string): string {
     <UiButton
       shape="icon"
       size="sm"
-      :title="label ?? 'Прошлые сессии'"
-      :aria-label="label ?? 'Прошлые сессии'"
+      title="История"
+      aria-label="История"
       :aria-expanded="shown"
       :disabled="disabled"
       @click="menu.toggle()"
     >
       <IconHistory aria-hidden="true" />
     </UiButton>
-    <UiIsland :menu="menu" :label="label ?? 'Прошлые сессии'" :width="320">
+    <UiIsland :menu="menu" label="История" :width="320">
       <UiControl
-        v-if="sessions.length + (recent?.length ?? 0) > 4"
+        v-if="history.length > 4"
         ref="searchInput"
         v-model="search"
         class="search"
         type="search"
-        placeholder="Найти сессию"
-        aria-label="Найти сессию"
+        placeholder="Найти чат"
+        aria-label="Найти чат"
       />
-      <p v-if="loading && !sessions.length && !recent?.length" class="note">Загружаю…</p>
+      <p v-if="loading && !history.length" class="note">Загружаю…</p>
       <p v-else-if="error" class="note error" role="alert">{{ error }}</p>
-      <p v-else-if="!sessions.length && !recent?.length && !recentLoading" class="note">
-        {{ label ? "Прошлых чатов пока нет" : "В этой папке пока нет сессий" }}
-      </p>
-      <p v-else-if="!visible.length && !recentVisible.length && !recentLoading" class="note">
-        Ничего не найдено
-      </p>
-      <p
-        v-else-if="
-          !rows.length && !recentVisible.length && !recentLoading && branchCount && !branchesShown
-        "
-        class="note"
-      >
+      <p v-else-if="!history.length && !recentLoading" class="note">В истории пока пусто</p>
+      <p v-else-if="!visible.length && !recentLoading" class="note">Ничего не найдено</p>
+      <p v-else-if="!rows.length && !recentLoading && branchCount && !branchesShown" class="note">
         Основных чатов нет — только ветки субагентов
       </p>
       <UiInline v-for="row in rows" :key="row.session.id" class="row" :gap="0.5" justify="normal">
@@ -217,7 +241,7 @@ function age(value?: string): string {
           v-if="renaming === row.session.id"
           v-model="draft"
           class="rename"
-          aria-label="Название сессии"
+          aria-label="Название чата"
           @keydown.enter.prevent="finishRename(true, true)"
           @keydown.esc.stop.prevent="finishRename(false, true)"
           @blur="finishRename(true)"
@@ -230,7 +254,7 @@ function age(value?: string): string {
           :class="{ active: row.session.id === active, branch: row.depth > 0 }"
           :style="row.depth ? { paddingLeft: `${10 + row.depth * 14}px` } : undefined"
           :title="titleOf(row.session)"
-          @click="pick(row.session.id)"
+          @click="pick(row.session)"
         >
           <IconBranch v-if="row.session.parent" class="branch-mark" aria-hidden="true" />
           <IconPin v-if="row.session.pinned" class="pinned" aria-hidden="true" />
@@ -240,7 +264,7 @@ function age(value?: string): string {
         </button>
         <UiInline
           as="span"
-          v-if="(editable || deletable) && renaming !== row.session.id"
+          v-if="(editable || deletable) && row.session.native && renaming !== row.session.id"
           class="row-actions"
           :gap="0.5"
           align="normal"
@@ -251,7 +275,7 @@ function age(value?: string): string {
             type="button"
             class="mini"
             :title="row.session.pinned ? 'Открепить' : 'Закрепить сверху'"
-            :aria-label="row.session.pinned ? 'Открепить сессию' : 'Закрепить сессию'"
+            :aria-label="row.session.pinned ? 'Открепить чат' : 'Закрепить чат'"
             @click="emit('change', row.session.id, { pinned: !row.session.pinned })"
           >
             <IconPin aria-hidden="true" />
@@ -261,7 +285,7 @@ function age(value?: string): string {
             type="button"
             class="mini"
             title="Переименовать"
-            aria-label="Переименовать сессию"
+            aria-label="Переименовать чат"
             @click="startRename(row.session, $event)"
           >
             <IconPencil aria-hidden="true" />
@@ -274,7 +298,7 @@ function age(value?: string): string {
             :title="
               confirming === row.session.id ? 'Нажмите ещё раз, чтобы удалить навсегда' : 'Удалить'
             "
-            :aria-label="confirming === row.session.id ? 'Подтвердить удаление' : 'Удалить сессию'"
+            :aria-label="confirming === row.session.id ? 'Подтвердить удаление' : 'Удалить чат'"
             @click="remove(row.session.id)"
             @blur="confirming = ''"
           >
@@ -302,29 +326,8 @@ function age(value?: string): string {
         <span v-else-if="branchesShown">Скрыть ветки субагентов</span>
         <span v-else>Показать ветки субагентов · {{ branchCount }}</span>
       </button>
-      <p v-if="recentLoading && !recentVisible.length" class="note">Загружаю недавние чаты…</p>
+      <p v-if="recentLoading && !history.length && !loading" class="note">Загружаю историю…</p>
       <p v-else-if="recentError" class="note error" role="alert">{{ recentError }}</p>
-      <template v-if="recentVisible.length">
-        <p class="group">Недавние чаты</p>
-        <UiInline
-          v-for="chat in recentVisible"
-          :key="chat.chat"
-          class="row"
-          :gap="0.5"
-          justify="normal"
-        >
-          <button
-            type="button"
-            role="menuitem"
-            class="item"
-            :title="chat.title"
-            @click="pickRecent(chat.chat, chat.title)"
-          >
-            <span class="title u-truncate">{{ chat.title }}</span>
-            <span class="age">{{ age(chat.updatedAt) }}</span>
-          </button>
-        </UiInline>
-      </template>
     </UiIsland>
   </div>
 </template>
@@ -341,13 +344,6 @@ function age(value?: string): string {
 }
 .note.error {
   color: var(--warn);
-}
-.group {
-  margin: 4px 0 0;
-  padding: 6px 10px 2px;
-  border-top: 1px solid var(--line);
-  color: var(--faint);
-  font-size: var(--fs-2xs);
 }
 .item {
   display: flex;

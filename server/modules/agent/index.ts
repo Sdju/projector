@@ -93,10 +93,9 @@ export {
   chatTitle,
   closeHistoryStore,
   readChatFeatures,
-  readRecentChats,
   type ChatIndex,
-  type RecentChat,
 } from "./history-store.ts";
+export { readRecentChats, type RecentChat } from "./recent-chats.ts";
 export {
   archiveLiveChat,
   listArchivedChats,
