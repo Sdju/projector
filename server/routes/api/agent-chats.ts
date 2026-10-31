@@ -1,5 +1,6 @@
 import {
   archiveLiveChat,
+  forgetChat,
   listArchivedChats,
   openArchivedChat,
   readRecentChats,
@@ -47,6 +48,10 @@ export async function handleAgentChats({ req, res, url, method, path }: RouteCon
   if (action === "delete") {
     removeArchivedChat(asString(body.id));
     json(res, 200, { ok: true });
+    return true;
+  }
+  if (action === "forget") {
+    json(res, 200, { ok: forgetChat(asString(body.projectId), asString(body.chat)) });
     return true;
   }
   return false;

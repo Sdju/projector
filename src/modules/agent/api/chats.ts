@@ -50,3 +50,7 @@ export const updateChat = (id: string, change: { title?: string; pinned?: boolea
   post("update", { id, ...change }, "Не удалось изменить чат");
 
 export const deleteChat = (id: string) => post("delete", { id }, "Не удалось удалить чат");
+
+/** Removes a chat of the project with its saved turns; an open tab keeps its screen. */
+export const forgetChat = (projectId: string, chat: string) =>
+  post<{ ok: boolean }>("forget", { projectId, chat }, "Не удалось удалить чат");

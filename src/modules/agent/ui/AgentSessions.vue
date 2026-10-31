@@ -32,7 +32,7 @@ const emit = defineEmits<{
   open: [];
   pick: [id: string];
   change: [id: string, change: { title?: string; pinned?: boolean }];
-  remove: [id: string];
+  remove: [target: string | { chat: string }];
   openRecent: [chat: string, title: string];
 }>();
 const menu = useIslandMenu({
@@ -153,13 +153,14 @@ function finishRename(save: boolean, restoreFocus = false) {
     });
 }
 /** A removal cannot be undone: the first click arms the button, the second one deletes. */
-function remove(id: string) {
-  if (confirming.value !== id) {
-    confirming.value = id;
+function remove(entry: HistoryEntry) {
+  if (confirming.value !== entry.id) {
+    confirming.value = entry.id;
     return;
   }
   confirming.value = "";
-  emit("remove", id);
+  if (entry.native) emit("remove", entry.id);
+  else if (entry.chat) emit("remove", { chat: entry.chat });
   // The row disappears with the focused button: the list keeps the keyboard reachable.
   void nextTick(() => {
     if (!shown.value || menu.island.value?.contains(document.activeElement)) return;
@@ -264,14 +265,17 @@ function age(value?: string): string {
         </button>
         <UiInline
           as="span"
-          v-if="(editable || deletable) && row.session.native && renaming !== row.session.id"
+          v-if="
+            renaming !== row.session.id &&
+            (row.session.native ? editable || deletable : Boolean(row.session.chat))
+          "
           class="row-actions"
           :gap="0.5"
           align="normal"
           justify="normal"
         >
           <button
-            v-if="editable"
+            v-if="editable && row.session.native"
             type="button"
             class="mini"
             :title="row.session.pinned ? 'Открепить' : 'Закрепить сверху'"
@@ -281,7 +285,7 @@ function age(value?: string): string {
             <IconPin aria-hidden="true" />
           </button>
           <button
-            v-if="editable"
+            v-if="editable && row.session.native"
             type="button"
             class="mini"
             title="Переименовать"
@@ -291,7 +295,7 @@ function age(value?: string): string {
             <IconPencil aria-hidden="true" />
           </button>
           <button
-            v-if="deletable"
+            v-if="row.session.native ? deletable : true"
             type="button"
             class="mini"
             :class="{ danger: confirming === row.session.id }"
@@ -299,7 +303,7 @@ function age(value?: string): string {
               confirming === row.session.id ? 'Нажмите ещё раз, чтобы удалить навсегда' : 'Удалить'
             "
             :aria-label="confirming === row.session.id ? 'Подтвердить удаление' : 'Удалить чат'"
-            @click="remove(row.session.id)"
+            @click="remove(row.session)"
             @blur="confirming = ''"
           >
             <IconTrash aria-hidden="true" />

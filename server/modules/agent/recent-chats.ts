@@ -74,3 +74,14 @@ export function removeChatsWithSession(
   for (const row of rows) deleteHistory(row.chat);
   return rows.map((row) => row.chat);
 }
+
+/** Removes a chat of this project with its saved turns; a tab that is open keeps its screen. */
+export function forgetChat(project: string, chat: string): boolean {
+  if (!project || !chat) return false;
+  const row = historyDatabase().prepare("SELECT scope FROM chat_index WHERE chat = ?").get(chat) as
+    | { scope: string }
+    | undefined;
+  if (!row || row.scope !== project) return false;
+  deleteHistory(chat);
+  return true;
+}

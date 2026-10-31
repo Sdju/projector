@@ -112,8 +112,16 @@ test(
       chat: "chat-only",
       title: "Tab without a session",
     });
+    // A row that is only a tab is deleted locally, without asking the agent to delete a session.
     await browser.click('[aria-label="История"]');
     await settle();
+    const chatOnlyDelete =
+      "[...document.querySelectorAll('.row')].find(row => row.textContent.includes('Tab without a session')).querySelector('.mini')";
+    await browser.evaluate(`${chatOnlyDelete}.click()`);
+    await settle();
+    await browser.evaluate(`${chatOnlyDelete}.click()`);
+    await settle();
+    expect(await browser.evaluate("window.fixture.removedRecent")).toEqual(["chat-only"]);
     await browser.evaluate(
       "[...document.querySelectorAll('.item')].find(item => item.textContent.includes('Other session')).click()",
     );

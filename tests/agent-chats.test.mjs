@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   archiveLiveChat,
   closeHistoryStore,
+  forgetChat,
   listArchivedChats,
   openArchivedChat,
   readAgentHistory,
@@ -139,5 +140,20 @@ describe("Projector agent chat history", () => {
     ).toEqual([chat("keep"), chat("other")].sort());
     expect(await readAgentHistory(chat("first"))).toEqual([]);
     expect(await readAgentHistory(chat("keep")).then((turns) => turns.length)).toBe(2);
+  });
+
+  it("forgets a chat only in its own project", async () => {
+    const project = "forget-project";
+    const chat = `projector:${project}:tab`;
+    await writeAgentHistory(chat, [turn("1", "user", "q"), turn("2", "assistant", "a")], {
+      project,
+      backend: "projector",
+    });
+    expect(forgetChat("other-project", chat)).toBe(false);
+    expect(readRecentChats("forget-project").some((item) => item.chat === chat)).toBe(true);
+    expect(forgetChat(project, chat)).toBe(true);
+    expect(readRecentChats("forget-project").some((item) => item.chat === chat)).toBe(false);
+    expect(await readAgentHistory(chat)).toEqual([]);
+    expect(forgetChat(project, chat)).toBe(false);
   });
 });

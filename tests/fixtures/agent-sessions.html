@@ -15,7 +15,8 @@
   let loadOnOpen = false;
   const changes = [],
     picks = [],
-    opened = [];
+    opened = [],
+    removedRecent = [];
   createApp({
     setup: () => () =>
       h("div", { style: "padding: 30px" }, [
@@ -32,6 +33,11 @@
           onChange: (id, change) => changes.push({ id, change }),
           onPick: (id) => picks.push(id),
           onOpenRecent: (chat, title) => opened.push({ chat, title }),
+          onRemove: (target) => {
+            if (typeof target === "string") return;
+            removedRecent.push(target.chat);
+            recent.value = recent.value.filter((item) => item.chat !== target.chat);
+          },
         }),
         h("button", { id: "outside", style: "margin-top: 200px" }, "Outside"),
       ]),
@@ -41,6 +47,7 @@
     changes,
     picks,
     opened,
+    removedRecent,
     empty: () => {
       sessions.value = [];
       loadOnOpen = true;

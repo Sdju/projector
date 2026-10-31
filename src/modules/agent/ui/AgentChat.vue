@@ -530,7 +530,7 @@ onBeforeUnmount(() => {
         :recent-error="recentError"
         @open="openHistory"
         @change="changeSession"
-        @remove="(id) => void removeSession(id).catch(() => {})"
+        @remove="(target) => void removeSession(target).catch(() => {})"
         @pick="(id) => void resumeSession(id).catch(() => {})"
         @open-recent="openRecentChat"
       />

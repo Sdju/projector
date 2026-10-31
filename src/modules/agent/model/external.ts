@@ -14,6 +14,7 @@ import {
   deleteChat,
   fetchChats,
   fetchRecentChats,
+  forgetChat,
   openChat,
   updateChat,
 } from "../api/chats.ts";
@@ -205,7 +206,24 @@ export function useExternalAgent(
     persist();
   }
 
-  async function removeSession(id: string): Promise<void> {
+  /**
+   * Removes a session (`id`), or a chat that has no session behind it (`{ chat }`): a row of the
+   * history is always the same conversation, so the copies that continued the session go too.
+   */
+  async function removeSession(target: string | { chat: string }): Promise<void> {
+    if (typeof target !== "string") {
+      const previous = state.recent;
+      state.recent = previous.filter((item) => item.chat !== target.chat);
+      try {
+        await forgetChat(projectId, target.chat);
+      } catch (err) {
+        state.recent = previous;
+        state.recentError = err instanceof Error ? err.message : "Не удалось удалить чат";
+        throw err;
+      }
+      return;
+    }
+    const id = target;
     // The row leaves the list at once: reloading it first would make the menu jump while the
     // "loading" note takes its place.
     const previous = state.sessions;
