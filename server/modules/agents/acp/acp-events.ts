@@ -92,9 +92,10 @@ export function createAcpEventMapper(
   function finishTool(update: Record<string, unknown>, id: string, name: string): void {
     const output = dialect.output(id) || toolOutput(update);
     emitTasks(dialect.end(update, id, output));
+    const shown = dialect.result(update, id, output);
     if (update.status === "failed")
-      emit("tool-result", { id, name, error: output || "Ошибка инструмента" });
-    else emit("tool-result", { id, name, output });
+      emit("tool-result", { id, name, error: shown || "Ошибка инструмента" });
+    else emit("tool-result", { id, name, output: shown });
   }
 
   /** Output that arrives while the call still runs: the chat shows it as it comes. */
@@ -244,7 +245,7 @@ export function createAcpReplayCollector(
     const chip = replay.findTool(id);
     if (!chip) return;
     chip.status = update.status === "failed" ? "error" : "done";
-    const output = dialect.output(id) || toolOutput(update);
+    const output = dialect.result(update, id, dialect.output(id) || toolOutput(update));
     if (output) chip.detail = output.slice(0, 8000);
   }
 

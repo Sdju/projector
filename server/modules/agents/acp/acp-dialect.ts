@@ -26,6 +26,11 @@ export interface AcpDialect {
   output(id: string): string;
   /** A piece of output carried by this update, for showing the command while it still runs. */
   outputChunk(update: AcpUpdate): string;
+  /**
+   * The result as the chat shows it. An agent may strip its own framing here: the shared chat
+   * renders the returned text without knowing which agent wrote it.
+   */
+  result(update: AcpUpdate, id: string, output: string): string;
   /** A tool call ended with `output`. */
   end(update: AcpUpdate, id: string, output: string): AcpTaskPatch[];
   /** The agent started writing the answer: work it left open runs on without it. */
@@ -55,6 +60,7 @@ export function createPlainDialect(): AcpDialect {
     call: () => [],
     output: () => "",
     outputChunk: () => "",
+    result: (_update, _id, output) => output,
     end: () => [],
     speak: () => [],
     finish: () => [],

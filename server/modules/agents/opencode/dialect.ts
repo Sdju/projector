@@ -6,6 +6,7 @@ import {
   type AcpTaskPatch,
   type AcpUpdate,
 } from "../acp/index.ts";
+import { cleanReadOutput } from "./read.ts";
 
 /**
  * OpenCode runs a subagent as a `subagent` tool call and marks everything the subagent does
@@ -59,6 +60,10 @@ function backgroundOf(update: AcpUpdate) {
   return background === true && typeof command === "string" ? command : undefined;
 }
 
+/** A call that reads a file: its result is a framed file body, not raw tool text. */
+const readsFile = (update: AcpUpdate) =>
+  update.kind === "read" || String(update.title ?? "").toLowerCase() === "read";
+
 export function createOpencodeDialect(): AcpDialect {
   /** Subagent calls still open, with the description their child session is titled by. */
   const open: { call: string; description: string }[] = [];
@@ -67,6 +72,8 @@ export function createOpencodeDialect(): AcpDialect {
   const counts = new Map<string, number>();
   /** What each subagent has said so far: chunks arrive a few tokens at a time. */
   const said = new Map<string, string>();
+  /** File reads whose result is a framed body: only those get the frame removed. */
+  const reads = new Set<string>();
 
   /** The call a child session works for; the session is told apart only by its title. */
   function parentOf(child: ChildSession) {
@@ -114,6 +121,7 @@ export function createOpencodeDialect(): AcpDialect {
     },
     call(update, id) {
       const patches: AcpTaskPatch[] = [];
+      if (readsFile(update)) reads.add(id);
       const child = childOf(update);
       const parent = child && parentOf(child);
       patches.push(...flush());
@@ -151,6 +159,9 @@ export function createOpencodeDialect(): AcpDialect {
         });
       }
       return patches;
+    },
+    result(_update, id, output) {
+      return reads.has(id) ? cleanReadOutput(output) : output;
     },
     end(update, id, output) {
       const index = open.findIndex((item) => item.call === id);

@@ -175,6 +175,108 @@ test("opencode subagent calls nest under its call and report as a task", () => {
   expect(tasks.at(-1)).toEqual({ id: "sub", status: "done", summary: "found 3 files", tools: 1 });
 });
 
+const readResult = (id, text) => ({
+  sessionUpdate: "tool_call_update",
+  toolCallId: id,
+  status: "completed",
+  content: [{ type: "content", content: { type: "text", text } }],
+});
+
+test("opencode read result loses its frame and line numbers", () => {
+  const events = [];
+  const mapper = createAcpEventMapper(
+    (type, data) => events.push([type, data]),
+    "OpenCode",
+    createOpencodeDialect(),
+  );
+  mapper.handleUpdate("s", {
+    sessionUpdate: "tool_call",
+    toolCallId: "r1",
+    title: "read",
+    kind: "read",
+    status: "pending",
+    rawInput: {},
+  });
+  mapper.handleUpdate("s", {
+    sessionUpdate: "tool_call_update",
+    toolCallId: "r1",
+    status: "in_progress",
+    rawInput: { path: "/p/a.ts" },
+  });
+  mapper.handleUpdate(
+    "s",
+    readResult("r1", "Read file /p/a.ts, lines 3-5\n3: const a = 1;\n4: \n5: const b = 2;"),
+  );
+  expect(events.at(-1)).toEqual([
+    "tool-result",
+    { id: "r1", name: "read", output: "const a = 1;\n\nconst b = 2;" },
+  ]);
+});
+
+test("opencode read handles an empty file and a truncated tail", () => {
+  const events = [];
+  const mapper = createAcpEventMapper(
+    (type, data) => events.push([type, data]),
+    "OpenCode",
+    createOpencodeDialect(),
+  );
+  const read = (id, text) => {
+    mapper.handleUpdate("s", {
+      sessionUpdate: "tool_call",
+      toolCallId: id,
+      title: "read",
+      kind: "read",
+      status: "pending",
+      rawInput: {},
+    });
+    mapper.handleUpdate("s", readResult(id, text));
+    return events.at(-1)[1].output;
+  };
+  expect(read("empty", "Read file /p/empty.ts, 0 lines")).toBe("");
+  expect(
+    read(
+      "tail",
+      "Read file /p/a.ts, lines 1-2\n1: a\n2: b\n[Output truncated. Continue reading with offset: 3]",
+    ),
+  ).toBe("a\nb\n[Output truncated. Continue reading with offset: 3]");
+});
+
+test("opencode leaves the result of a non-read call untouched", () => {
+  const events = [];
+  const mapper = createAcpEventMapper(
+    (type, data) => events.push([type, data]),
+    "OpenCode",
+    createOpencodeDialect(),
+  );
+  mapper.handleUpdate("s", {
+    sessionUpdate: "tool_call",
+    toolCallId: "sh",
+    title: "shell",
+    kind: "execute",
+    status: "pending",
+    rawInput: { command: "cat a.ts" },
+  });
+  mapper.handleUpdate("s", readResult("sh", "Read file /p/a.ts, lines 1-1\n1: a"));
+  expect(events.at(-1)).toEqual([
+    "tool-result",
+    { id: "sh", name: "shell", output: "Read file /p/a.ts, lines 1-1\n1: a" },
+  ]);
+});
+
+test("opencode replay stores the cleaned read result", () => {
+  const collector = createAcpReplayCollector("opencode", "s", createOpencodeDialect());
+  collector.handleUpdate({
+    sessionUpdate: "tool_call",
+    toolCallId: "r1",
+    title: "read",
+    kind: "read",
+    status: "pending",
+    rawInput: {},
+  });
+  collector.handleUpdate(readResult("r1", "Read file /p/a.ts, lines 1-1\n1: const a = 1;"));
+  expect(collector.turns[0].tools[0]).toMatchObject({ status: "done", detail: "const a = 1;" });
+});
+
 test("opencode background command is a task that its call does not end", () => {
   const events = [];
   const mapper = createAcpEventMapper(
