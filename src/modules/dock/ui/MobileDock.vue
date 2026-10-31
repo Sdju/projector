@@ -144,6 +144,9 @@ const handlers = {
   flex-direction: column;
   background: var(--bg);
   min-height: 0;
+  /* Поверхности накрывают друг друга по z-index, поэтому z-index внутри панели не должен
+     всплывать над соседней поверхностью: иначе тулбар агента виден поверх терминалов и файлов. */
+  isolation: isolate;
 }
 .terminal {
   z-index: 2;
