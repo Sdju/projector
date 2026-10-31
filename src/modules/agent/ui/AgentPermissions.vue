@@ -27,7 +27,7 @@ const emit = defineEmits<{ decide: [id: string, allow: boolean, always?: boolean
     >
       <UiInline as="header" align="center" justify="normal">
         <IconShield aria-hidden="true" />
-        <span class="title">{{ item.title }}</span>
+        <span class="title" :title="item.title">{{ item.title }}</span>
         <code class="tool">{{ item.tool }}</code>
       </UiInline>
       <AgentCodeBlock v-if="item.detail" :text="item.detail" :diff="isEditTool(item.tool)" />
@@ -54,6 +54,11 @@ const emit = defineEmits<{ decide: [id: string, allow: boolean, always?: boolean
   display: grid;
   gap: 8px;
   margin: 0 0 10px;
+  /* A backend may describe a call by its whole command line: the dock scrolls instead of pushing
+     the composer and the buttons out of the window. */
+  max-height: min(50vh, 420px);
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 header {
   min-width: 0;
@@ -64,12 +69,17 @@ header svg {
   flex-shrink: 0;
   color: var(--warn);
 }
+/* The title repeats the detail for a command: one line with a full text on hover, not a tall
+   column that turns the card into half the screen. */
 .title {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--text);
 }
 .tool {
+  flex-shrink: 0;
   margin-left: auto;
   color: var(--muted);
   font-family: var(--mono);
