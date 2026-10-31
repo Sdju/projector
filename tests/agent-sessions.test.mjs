@@ -65,3 +65,51 @@ test(
     expect(browser.errors).toEqual([]);
   },
 );
+test(
+  "subagent branches stay folded under their chats and are found by search",
+  {
+    skip: !chromium,
+    timeout: 60000,
+  },
+  async () => {
+    const html = await readFile(new URL("./fixtures/agent-sessions.html", import.meta.url), "utf8");
+    const fixture = await createBrowserFixture({ pages: { "/sessions": html } });
+    onTestFinished(() => fixture.close());
+    const browser = await createChromium(fixture.directory);
+    onTestFinished(() => browser.close());
+    await browser.open(fixture.url("/sessions"));
+    const settle = () =>
+      browser.evaluate(
+        "new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))",
+      );
+    await browser.evaluate("window.fixture.branches()");
+    await settle();
+    await browser.click('[aria-label="Прошлые сессии"]');
+    await settle();
+    expect(await browser.evaluate("document.querySelectorAll('.item').length")).toBe(3);
+    expect(await browser.evaluate("Boolean(document.querySelector('.item.branch'))")).toBe(false);
+    expect(
+      await browser.evaluate("document.querySelector('.toggle').textContent.trim()"),
+    ).toContain("Показать ветки субагентов · 2");
+    await browser.click(".toggle");
+    await settle();
+    expect(await browser.evaluate("document.querySelectorAll('.item').length")).toBe(5);
+    expect(await browser.evaluate("document.querySelectorAll('.item.branch').length")).toBe(2);
+    expect(await browser.evaluate("document.querySelector('.item.branch').title")).toContain(
+      "ветка субагента",
+    );
+    expect(await browser.evaluate("document.querySelector('.toggle').ariaExpanded")).toBe("true");
+    // A branch past the folded list is still reachable through search, which opens the branches.
+    await browser.click(".toggle");
+    await settle();
+    await browser.click("input[type=search]");
+    await browser.call("Input.insertText", { text: "Audit" });
+    await settle();
+    expect(await browser.evaluate("document.querySelectorAll('.item').length")).toBe(1);
+    expect(
+      await browser.evaluate("document.querySelector('.item').classList.contains('branch')"),
+    ).toBe(true);
+    expect(await browser.evaluate("document.querySelector('.toggle').disabled")).toBe(true);
+    expect(browser.errors).toEqual([]);
+  },
+);

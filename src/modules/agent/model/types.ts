@@ -67,6 +67,10 @@ export interface AgentSessionInfo {
   title: string;
   updatedAt?: string;
   pinned?: boolean;
+  /** The chat a subagent branch was started from; a branch, not a chat of its own. */
+  parent?: string;
+  /** The agent a branch runs as (`general`, `explore`, ...), when known. */
+  agent?: string;
 }
 
 /** A chat of the project kept on disk: open in a tab, or closed with its history still saved. */

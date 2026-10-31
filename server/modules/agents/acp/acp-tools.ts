@@ -147,30 +147,93 @@ interface RawSession {
   sessionId?: string;
   title?: string | null;
   updatedAt?: string | null;
+  /** Parent session: agents that expose subagent branches use their own field name. */
+  parentId?: unknown;
+  parentSessionId?: unknown;
+  agent?: unknown;
+  _meta?: Record<string, unknown> | null;
+}
+
+/** The session a raw one was started from, as far as the agent tells it. */
+function parentOf(session: RawSession): string | undefined {
+  const meta = session._meta ?? {};
+  for (const value of [
+    session.parentId,
+    session.parentSessionId,
+    meta.parentId,
+    meta.parentSessionId,
+    meta["opencode/parent-session"],
+  ])
+    if (typeof value === "string" && value.trim()) return value;
+  return undefined;
+}
+
+/** The agent a branch runs as, when the listing names it. */
+function agentOf(session: RawSession): string | undefined {
+  const meta = session._meta ?? {};
+  for (const value of [session.agent, meta.agent, meta["opencode/agent"]])
+    if (typeof value === "string" && value.trim()) return value;
+  return undefined;
+}
+
+/** Fills in what the ACP listing leaves out (OpenCode keeps parents only in its own storage). */
+export type SessionDecorator = (sessions: AgentSessionInfo[]) => Promise<AgentSessionInfo[]>;
+
+const newestFirst = (a: AgentSessionInfo, b: AgentSessionInfo) =>
+  (b.updatedAt ?? "").localeCompare(a.updatedAt ?? "");
+
+/**
+ * Branches of subagents are not chats of their own: they must not push real chats out of the
+ * limited list. Their parents are kept in full, and branches follow those that remain.
+ */
+function capSessions(list: AgentSessionInfo[]): AgentSessionInfo[] {
+  const mains = list.filter((session) => !session.parent);
+  if (!mains.length) return list.sort(newestFirst).slice(0, SESSION_LIST_LIMIT);
+  const children = new Map<string, AgentSessionInfo[]>();
+  for (const session of list)
+    if (session.parent)
+      children.set(session.parent, [...(children.get(session.parent) ?? []), session]);
+  const kept = new Set(mains.slice(0, SESSION_LIST_LIMIT).map((session) => session.id));
+  const include = (id: string) => {
+    for (const child of children.get(id) ?? [])
+      if (!kept.has(child.id)) {
+        kept.add(child.id);
+        include(child.id);
+      }
+  };
+  for (const id of [...kept]) include(id);
+  return list.filter((session) => kept.has(session.id)).sort(newestFirst);
 }
 
 /** The agent's own past sessions in `cwd`, newest first; empty when it cannot list them. */
-export function acpSessions(id: AgentBackendId, cwd: string): Promise<AgentSessionInfo[]> {
+export function acpSessions(
+  id: AgentBackendId,
+  cwd: string,
+  decorate?: SessionDecorator,
+): Promise<AgentSessionInfo[]> {
   return withAgent(id, cwd, async (connection, init) => {
     if (!init.agentCapabilities?.sessionCapabilities?.list) return [];
     const answer = (await connection.request("session/list", { cwd })) as {
       sessions?: RawSession[];
     };
-    return (answer.sessions ?? [])
-      .flatMap((session): AgentSessionInfo[] => {
-        const title = session.title?.trim();
-        // An untitled session never received a prompt (OpenCode names it by its creation time).
-        if (!session.sessionId || !title || EMPTY_TITLE.test(title)) return [];
-        return [
-          {
-            id: session.sessionId,
-            title,
-            ...(session.updatedAt ? { updatedAt: session.updatedAt } : {}),
-          },
-        ];
-      })
-      .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""))
-      .slice(0, SESSION_LIST_LIMIT);
+    const list = (answer.sessions ?? []).flatMap((session): AgentSessionInfo[] => {
+      const title = session.title?.trim();
+      // An untitled session never received a prompt (OpenCode names it by its creation time).
+      if (!session.sessionId || !title || EMPTY_TITLE.test(title)) return [];
+      const parent = parentOf(session);
+      // Only a branch is named by its agent: the same field on a chat is the mode it runs in.
+      const agent = parent ? agentOf(session) : undefined;
+      return [
+        {
+          id: session.sessionId,
+          title,
+          ...(session.updatedAt ? { updatedAt: session.updatedAt } : {}),
+          ...(parent ? { parent } : {}),
+          ...(agent ? { agent } : {}),
+        },
+      ];
+    });
+    return capSessions(decorate ? await decorate(list) : list);
   });
 }
 

@@ -1,4 +1,5 @@
 export { createAcpBackend } from "./acp-backend.ts";
+export { acpSessions, type SessionDecorator } from "./acp-tools.ts";
 export {
   registerAcpProgram,
   type AcpFormAdapter,

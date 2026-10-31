@@ -51,5 +51,14 @@
         title: `Session ${i}`,
       }));
     },
+    branches: () => {
+      sessions.value = [
+        { id: "main-one", title: "Main chat one" },
+        { id: "main-two", title: "Main chat two" },
+        { id: "main-three", title: "Main chat three" },
+        { id: "branch-one", title: "Explore sidebar", parent: "main-one", agent: "explore" },
+        { id: "branch-two", title: "Audit tests", parent: "main-two", agent: "general" },
+      ];
+    },
   };
 </script>

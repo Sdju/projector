@@ -34,6 +34,13 @@ export interface AgentSessionInfo {
   updatedAt?: string;
   /** Kept at the top of the list by the user. */
   pinned?: boolean;
+  /**
+   * The session this one was started from. A subagent works in its own native session, and the
+   * agent lists it next to real chats: the id lets history keep it apart from them.
+   */
+  parent?: string;
+  /** The agent a branch runs as (`general`, `explore`, ...), when the agent names it. */
+  agent?: string;
 }
 
 /** One replayed message of a past session, in the shape the chat stores. */
