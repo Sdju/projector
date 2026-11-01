@@ -247,12 +247,12 @@ const { copy, copyInfo, copyWorking, copyNote, endCopy } = useWorktreePanel(turn
 const editFrom = computed(() =>
   editing.value ? turns.value.findIndex((turn) => turn.id === editing.value) : -1,
 );
-// A finished answer may end with a form: it becomes the next message's input.
-const { pendingForm, submitComposerForm, submitTurnForm } = useAnswerForm({
+const { pendingForm, originalForm, submitComposerForm, submitTurnForm } = useAnswerForm({
   turns,
   busy,
   draft,
   draftParts,
+  selection,
   send,
   edit,
 });
@@ -621,7 +621,7 @@ onBeforeUnmount(() => {
           :root="projectRoot"
           :can-revert="canRevert(turn.id)"
           :promoted-form="
-            turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? pendingForm : undefined
+            turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? originalForm : undefined
           "
           @copy="copyMessage"
           @open="openChip"

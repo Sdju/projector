@@ -38,6 +38,16 @@ readonly-снимке, где композера нет. Внутрь кладу
 - `form` хранится в `AgentTurn`, очереди сообщений и Zod-схеме истории, поэтому снимок переживает
   перезагрузку и сохранение чата.
 
+## Form Doctor
+
+Перед показом формы `useAnswerForm` проверяет её через Vue-компилятор. Эвристики
+(`heuristicFormRepair`) убирают повторяющиеся атрибуты и закрывают незавершённые теги; если
+ошибка осталась, клиент до трёх раз зовёт `POST /api/agent/form-repair`. Серверный Projector
+получает историю, исходную форму и текст ошибки, возвращает только исправленный блок. Каждый
+ответ снова проверяется компилятором; после успеха в композер попадает исправленный исходник, а в
+ответе остаётся исходный блок. Если все попытки неудачны, форма не открывается и пользователь
+может ответить текстом.
+
 ## Что проверено
 
 - Реальный Chromium, чат Codex «Рентген вкладки»: последняя `<Card><Form>` появилась в композере;
@@ -48,7 +58,8 @@ readonly-снимке, где композера нет. Внутрь кладу
 - Перезагрузка страницы: снимки двух ответов остались readonly с выбранными значениями; карандаш
   снова включает поля, «Отмена» возвращает readonly.
 - `tests/agent-widgets.test.mjs`: выбор последнего блока, отказ при тексте после формы, вложенная
-  форма в `<Card>`, незакрытая форма, распознавание `<IntelligentForm>`.
+  форма в `<Card>`, незакрытая форма, распознавание `<IntelligentForm>`, эвристики и валидация Form
+  Doctor.
 - `tests/agent-widgets-browser.test.mjs`: встроенная кнопка отправляет именованные поля, а
   promoted `<IntelligentForm>` не оставляет копии в ответе; в режиме композера кнопки формы нет, и
   отправку выполняет общая кнопка.
@@ -74,6 +85,9 @@ readonly-снимке, где композера нет. Внутрь кладу
 - `core/modules/agent-widgets/intelligent-form/index.ts` — определение формы ответа.
 - `src/modules/agent-widgets/intelligent-form/` — поля, блокировка и кнопка для сообщения/снимка.
 - `src/modules/widget-runtime/answer.ts` — выбор блока-ответа.
+- `src/modules/widget-runtime/repair.ts` — эвристики, проверка компилятором и разбор ответа доктора.
+- `server/modules/agents/projector/form-doctor.ts` — Projector-запрос на переписывание формы.
+- `server/routes/api/agent-form-repair.ts` — `POST /api/agent/form-repair`.
 - `src/modules/widget-runtime/form.ts` — `formPresetKey` (readonly + значения).
 - `src/modules/agent/model/answer-form.ts` — `pendingForm`, отправка снимка.
 - `src/modules/agent/ui/AgentFormPanel.vue` — блок в композере или снимке.

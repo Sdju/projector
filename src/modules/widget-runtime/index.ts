@@ -6,3 +6,4 @@ export { useWidgetReply, widgetReplyKey, formatWidgetReply, type WidgetReply } f
 export { formPresetKey, formChromeKey, type FormPreset, type FormChrome } from "./form.ts";
 export { useMessageScope, messageScopeKey, type MessageScope } from "./scope.ts";
 export { autoClose, parseWidgetSource } from "./autoclose.ts";
+export { dedupeAttributes, doctorFormSource, formProblem, heuristicFormRepair } from "./repair.ts";

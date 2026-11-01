@@ -1,4 +1,5 @@
 export { projectorBackend, runProjector } from "./projector-backend.ts";
+export { repairForm, type FormDoctorRequest } from "./form-doctor.ts";
 export { registerWidgetDefinition, widgetCatalog } from "./widgets.ts";
 export { projectMemories, readMemory, writeMemory } from "./projector-memory.ts";
 export { mcpServerConfigs, readUserMcp, writeUserMcp } from "./projector-mcp-config.ts";

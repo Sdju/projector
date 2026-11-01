@@ -162,6 +162,27 @@ test("a form can be the next answer only as the last block of a finished message
   expect(answerFormSource("<Ask>не закрыта")).toBeUndefined();
 });
 
+test("Form Doctor heuristics fix duplicate attributes and validate the result", async () => {
+  const { registerBuiltinWidgets } = await import("../src/app/widgets.ts");
+  registerBuiltinWidgets();
+  const { dedupeAttributes, doctorFormSource, formProblem, heuristicFormRepair } =
+    await import("../src/modules/widget-runtime/repair.ts");
+  const broken =
+    '<IntelligentForm><Checks name="next" single name="next" :options="[{value:\'release\'}]" /><Button submit>Продолжить</Button></IntelligentForm>';
+  expect(await formProblem(broken)).toMatch(/Duplicate attribute/);
+  const repaired = heuristicFormRepair(broken);
+  expect(repaired.match(/\bname="next"/g)).toHaveLength(1);
+  expect(await formProblem(repaired)).toBeUndefined();
+  expect(await formProblem("<Form><Unknown /></Form>")).toContain("Неизвестный компонент");
+  expect(await formProblem('<Form><Input name="a" /></Form>')).toBeUndefined();
+  expect(await formProblem('<Form><Input name="a"')).toMatch(/Unexpected EOF|missing end tag/);
+  expect(dedupeAttributes('<Card title="a > b" title="c" />')).toBe('<Card title="a > b" />');
+
+  const answer = `<IntelligentForm><Input name="next" /></IntelligentForm>`;
+  expect(doctorFormSource(`Вот исправление:\n\n\`\`\`vue\n${answer}\n\`\`\``)).toBe(answer);
+  expect(doctorFormSource("<IntelligentForm>не закрыта")).toBeUndefined();
+});
+
 test("the catalog's guide is made from the definitions and covers every registered component", async () => {
   const { createWidgetCatalog, defineWidget } =
     await import("../core/modules/widget-catalog/index.ts");
