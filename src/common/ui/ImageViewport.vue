@@ -211,7 +211,12 @@ defineExpose({ reset });
 </script>
 
 <template>
-  <UiPanel class="image-viewport" :class="{ floating }" aria-label="Просмотр изображения">
+  <UiPanel
+    class="image-viewport"
+    :class="{ floating }"
+    aria-label="Просмотр изображения"
+    data-swipe-ignore
+  >
     <div
       ref="canvas"
       class="image-canvas"

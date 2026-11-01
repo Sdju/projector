@@ -3,6 +3,8 @@ import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useIdeCommands } from "../../ide/index.ts";
 import { useCommandScope, commandArgs } from "../../../common/utilities/commands.ts";
+import { useCompactViewport } from "../../../common/utilities/compact-viewport.ts";
+import { useSheetDismiss } from "../../../common/utilities/sheet-dismiss.ts";
 import {
   useProjects,
   projectRoute,
@@ -20,6 +22,13 @@ const router = useRouter();
 const { api } = useIdeCommands();
 const { projects } = useProjects();
 const open = ref(false);
+const compact = useCompactViewport();
+const sheetElement = ref<HTMLElement>();
+useSheetDismiss({
+  element: sheetElement,
+  enabled: compact,
+  close: () => (open.value = false),
+});
 const choices = computed(() => [
   props.project,
   ...projects.value.filter((item) => item.id !== props.project.id),
@@ -91,9 +100,11 @@ const navigate = (path: string) =>
     />
     <div
       v-if="open"
+      ref="sheetElement"
       class="sheet mobile-sheet"
       @keydown.esc.stop="commands.run('ide.project.picker.toggle')"
     >
+      <span v-if="compact" class="sheet-grabber" aria-hidden="true" />
       <div class="sheet-heading">
         <span>Выбор проекта</span>
         <button
@@ -170,6 +181,15 @@ svg {
   background: var(--bg-2);
   border: 1px solid var(--line-strong);
   padding: var(--sp-2);
+}
+.sheet-grabber {
+  display: block;
+  width: 36px;
+  height: 4px;
+  margin: 0 auto var(--sp-2);
+  border-radius: var(--r-full);
+  background: var(--line-strong);
+  opacity: 0.9;
 }
 .sheet-heading {
   display: flex;

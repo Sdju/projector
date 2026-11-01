@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import UiPopupSurface from "./UiPopupSurface.vue";
-import type { ComponentPublicInstance } from "vue";
+import { computed, type ComponentPublicInstance } from "vue";
+import { useSheetDismiss } from "../utilities/sheet-dismiss.ts";
 import type { useIslandMenu } from "../utilities/island-menu.ts";
 
 const props = defineProps<{
@@ -14,6 +15,11 @@ const props = defineProps<{
 function bindIsland(surface: Element | ComponentPublicInstance | null) {
   props.menu.island.value = (surface as InstanceType<typeof UiPopupSurface> | null)?.element;
 }
+const sheet = useSheetDismiss({
+  element: props.menu.island,
+  enabled: computed(() => props.menu.compact.value && !props.passive),
+  close: () => props.menu.close(),
+});
 </script>
 
 <template>
@@ -29,7 +35,11 @@ function bindIsland(surface: Element | ComponentPublicInstance | null) {
       class="island"
       role="dialog"
       :aria-label="label"
-      :class="{ 'mobile-sheet': menu.compact.value, passive }"
+      :class="{
+        'mobile-sheet': menu.compact.value,
+        'sheet-dragging': sheet.dragging.value,
+        passive,
+      }"
       :style="{
         ...menu.style.value,
         '--island-width': `${width ?? 340}px`,
@@ -38,6 +48,7 @@ function bindIsland(surface: Element | ComponentPublicInstance | null) {
       @keydown="menu.keydown"
       @focusin="menu.trackFocus"
     >
+      <span v-if="menu.compact.value && !passive" class="sheet-grabber" aria-hidden="true" />
       <slot />
     </UiPopupSurface>
   </Teleport>
@@ -61,5 +72,18 @@ function bindIsland(surface: Element | ComponentPublicInstance | null) {
 .mobile-sheet {
   --ui-island-chevron-transform: none;
   --ui-island-footer-display: none;
+}
+.sheet-grabber {
+  flex: none;
+  align-self: center;
+  width: 36px;
+  height: 4px;
+  margin: 2px 0 4px;
+  border-radius: var(--r-full);
+  background: var(--line-strong);
+  opacity: 0.9;
+}
+.sheet-dragging .sheet-grabber {
+  background: var(--muted);
 }
 </style>

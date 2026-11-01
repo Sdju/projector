@@ -30,6 +30,7 @@ import { sidebarSections } from "../lib/sidebar-views.ts";
 import { provideTabHost, useWorkspaceTabTypes, type TabViews } from "../lib/tab-views.ts";
 import { useWorkspaceRefresh } from "../lib/workspace-refresh.ts";
 import { useMobileSurfaces, registerMobileCommands } from "../lib/mobile-surfaces.ts";
+import { useSurfaceSwipe } from "../lib/surface-swipe.ts";
 const props = defineProps<{
   projectId: string;
   projectSettingsDirty?: boolean;
@@ -56,6 +57,13 @@ const editorCommands = useCommandScope(`editor:${props.projectId}`, () => ({
   surface: "editor",
   projectId: props.projectId,
 }));
+useSurfaceSwipe({
+  workspace: workspaceElement,
+  mobile,
+  surface: mobileSurface,
+  terminals: () => capabilities.terminals,
+  show: (surface) => editorCommands.run("ide.workbench.mobile.surface.show", { surface }),
+});
 const registerEditor = (
   id: string,
   title: string,

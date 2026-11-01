@@ -66,6 +66,10 @@ node --import @zede/vio/register native/app/entry.ts native http://localhost:417
 
 Текст из `onData` передаётся в UTF-8, legacy mouse reports из `onBinary` — как исходные байты. При восстановлении экрана сохраняйте кодировку мыши SGR/pixel вместе с режимом tracking; сериализации xterm недостаточно. Проверяйте переключение вкладок и переподключение, а не только новую сессию.
 
+## Жесты на телефоне
+
+Общий распознаватель — `src/common/utilities/swipe-gesture.ts`. Он фиксирует одну ось после 8 px, не вызывает `preventDefault` до этого, отдаёт жест длинному нажатию и прокручиваемому предку, который ещё может двигаться в сторону свайпа. `src/modules/workspace/lib/surface-swipe.ts` двигает активную поверхность и передаёт смену штатным переходам, `src/common/utilities/sheet-dismiss.ts` двигает нижнюю шторку и гасит scrim через `--sheet-scrim`. Не добавляйте вторые touch-обработчики: области с собственным панорамированием помечайте `data-swipe-ignore`.
+
 ## Данные и проверки
 
 Данные находятся в `$XDG_DATA_HOME/projector`, по умолчанию `~/.local/share/projector`:

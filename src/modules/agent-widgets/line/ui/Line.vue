@@ -260,7 +260,7 @@ const tooltipStyle = computed(() => {
 </script>
 
 <template>
-  <figure ref="host" class="line">
+  <figure ref="host" class="line" data-swipe-ignore>
     <div class="toolbar">
       <button
         type="button"

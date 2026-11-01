@@ -254,7 +254,7 @@ body .mobile-sheet.mobile-sheet {
   overscroll-behavior: contain;
   border-radius: calc(var(--r-lg) + 4px);
   box-shadow:
-    0 0 0 100vmax var(--overlay),
+    0 0 0 100vmax var(--sheet-scrim, var(--overlay)),
     var(--shadow-popover);
   animation: sheet-up var(--t-base);
 }
