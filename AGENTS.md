@@ -36,16 +36,19 @@ vp run test:gtk  # реальные GTK-виджеты; нужен display
 ## Документация
 
 - [Разработка и диагностика](docs/session-notes.md): карта кода, HMR, native, ввод и данные.
-- [Производительность](docs/performance.md): базовый замер памяти и скорости, методология.
+- [Рабочие материалы](docs/in-process/README.md): дорожные карты, открытые вопросы и варианты решений; удаляются после завершения.
+- [Производительность](docs/performance.md): пределы памяти и скорости, методология замера.
 - [Реестр больших файлов](docs/large-files.md): потолки размеров и планы разбиения; проверка (`extra.largeFiles` в `feod.config.mjs`) включена в `vp run architecture`.
 - [Использование](docs/usage.md): режимы, хоткей, трей, файлы и терминалы.
 - [Интеграции](docs/integrations.md): GitHub, авторизация и импорт.
 - [Архитектура](docs/architecture.md), [адаптер ОС](docs/os.md), [транспорт терминалов](docs/terminal-transport.md), [Docker](docs/docker.md) и [решения по контейнерам](docs/containers-design.md).
-- [UI-кит](docs/ui-kit.md), [виртуализация списков](docs/virtualization.md), [аудит дублей компонентов](docs/component-reuse-audit.md).
+- [UI-кит](docs/ui-kit.md), [виртуализация списков](docs/virtualization.md).
 - [Компоненты в ответах агента](docs/agent-widgets.md): каталог виджетов, прогрессивный рендер, формы и `reply`.
 - [Возможности агентов](docs/agent-features.md): остров в табе агента, умолчания в настройках, выдача виджетов Claude Code, Codex, OpenCode, Cursor и Kimi.
-- [Делегирование](docs/agent-delegation.md): фоновые задания кодовых агентов, разрешения в чате Projector, автопродолжение, копии и очередь; что уже работает и что дальше.
+- [Делегирование](docs/agent-delegation.md): фоновые задания кодовых агентов, разрешения в чате Projector, автопродолжение, копии и границы.
 - [Независимость от агентов](docs/architecture.md#агенты-чата-и-их-особенности): реестр и клиентский каталог вместо перечислений в терминале, настройках, OS-адаптере и клиенте; паритет реестров проверяет `tests/agent-catalog.test.mjs`.
 - [Форки чатов](docs/chat-forks.md): ветка от сообщения в новую вкладку, индекс недавних чатов и возврат закрытых вкладок.
 - [Вопросы в сторону](docs/agent-side.md): `/btw` без прерывания агента, read-only состояние чата и отсутствие записи в историю.
 - [SDK команд IDE](docs/ide-commands.md), [темы иконок](docs/file-icons.md), [renderer vio](https://github.com/Sdju/vio/blob/main/packages/vio/README.md).
+
+Документация в `docs/` описывает текущее устройство, контракты и ограничения. Рабочие материалы — дорожные карты, открытые вопросы, варианты решений и статусы — держите в [`docs/in-process/`](docs/in-process/README.md) и удаляйте после завершения. История изменений — в `CHANGELOG.md`, задачи — в issue/PR.
