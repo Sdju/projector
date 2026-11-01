@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import UiButton from "../../../common/ui/UiButton.vue";
-import UiDialog from "../../../common/ui/UiDialog.vue";
-import ImageViewport from "../../../common/ui/ImageViewport.vue";
+import UiButton from "./UiButton.vue";
+import UiDialog from "./UiDialog.vue";
+import ImageViewport from "./ImageViewport.vue";
 import IconX from "~icons/lucide/x";
 
 const props = defineProps<{ src: string; alt: string }>();

@@ -6,6 +6,7 @@
   import "/src/app/styles.css";
   import { createApp, h, ref } from "vue";
   import AgentMessage from "/src/modules/agent/ui/AgentMessage.vue";
+  import { chatProjectKey } from "/src/modules/chat-images/index.ts";
   import { widgetReplyKey } from "/src/modules/widget-runtime/index.ts";
   import { registerBuiltinWidgets } from "/src/app/widgets.ts";
   registerBuiltinWidgets();
@@ -24,6 +25,7 @@
       ]),
   });
   app.provide(widgetReplyKey, (message) => replies.push(message));
+  app.provide(chatProjectKey, "p");
   app.mount("#fixture");
   window.fixture = {
     ready: true,

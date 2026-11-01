@@ -2,9 +2,8 @@
 import { inject, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import { createMarkdownStream } from "../lib/markdown-stream.ts";
 import { renderChatMarkdown } from "../lib/markdown.ts";
-import { chatImageSource } from "../lib/markdown-images.ts";
-import { chatProjectKey } from "./chat-project.ts";
-import AgentImageModal from "./AgentImageModal.vue";
+import { chatImageSource, chatProjectKey } from "../../chat-images/index.ts";
+import ImageModal from "../../../common/ui/ImageModal.vue";
 
 /**
  * A markdown text that grows: closed blocks stay as they were, only the last one is redone. While
@@ -68,12 +67,7 @@ function replaceBrokenImage(event: Event) {
   <div class="md" @click="openImage" @error.capture="replaceBrokenImage">
     <div v-for="block in blocks" :key="block.key" class="md-block" v-html="block.html" />
   </div>
-  <AgentImageModal
-    v-if="preview"
-    :src="preview.src"
-    :alt="preview.alt"
-    @close="preview = undefined"
-  />
+  <ImageModal v-if="preview" :src="preview.src" :alt="preview.alt" @close="preview = undefined" />
 </template>
 
 <style scoped>

@@ -98,7 +98,16 @@ test(
   { skip: !chromium, timeout: 90000, retry: 1 },
   async () => {
     const html = await readFile(new URL("./fixtures/agent-widgets.html", import.meta.url), "utf8");
-    const fixture = await createBrowserFixture({ pages: { "/widgets": html } });
+    const fixture = await createBrowserFixture({
+      pages: { "/widgets": html },
+      responses: [
+        {
+          startsWith: "/api/projects/p/workspace/external-asset",
+          type: "image/svg+xml",
+          body: "<svg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/>",
+        },
+      ],
+    });
     onTestFinished(() => fixture.close());
     const browser = await createChromium(fixture.directory);
     onTestFinished(() => browser.close());
@@ -247,6 +256,7 @@ test(
   <Chips :items="['TypeScript','Vue','Node.js']" mono />
   <Chips :items="[{label:'готово',tone:'success',icon:'circle-check'},{label:'риск',tone:'warning'}]" />
   <Image src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="Пиксель" caption="Проверка" :height="120" />
+  <Image src="/tmp/widget-shot.png" alt="Снимок с диска" :height="120" />
   <p><InlineIcon name="git-branch" label="Ветка" /> main <InlineIcon name="missing" /></p>
   <GitInfo branch="main" upstream="origin/main" :ahead="2" :staged="3" :unstaged="1" :untracked="2" :additions="48" :deletions="12" :commits="[{hash:'a1b2c3d4',subject:'Добавить GitInfo',author:'Ада',when:'2 ч назад'}]" :files="[{path:'core/modules/agent-widgets/git-info/index.ts',status:'A',additions:48,deletions:0}]" />
 </Card>`,
@@ -276,6 +286,25 @@ test(
     expect(
       await browser.evaluate("document.querySelector('.image img').getBoundingClientRect().height"),
     ).toBe(120);
+    // A file on disk resolves like a markdown picture: the widget and the chat agree on the path.
+    const imageSources = await browser.evaluate(
+      "[...document.querySelectorAll('.image img')].map((image) => image.getAttribute('src'))",
+    );
+    expect(imageSources[0]).toContain("data:image/gif;base64,");
+    expect(imageSources[1]).toBe(
+      "/api/projects/p/workspace/external-asset?path=%2Ftmp%2Fwidget-shot.png",
+    );
+    // A click opens the same zoomable viewer as a markdown picture.
+    await browser.evaluate("document.querySelectorAll('.image img')[1].click()");
+    await wait('!!document.querySelector("dialog[open]")');
+    expect(
+      await browser.evaluate('document.querySelector("dialog[open] .modal-title").textContent'),
+    ).toBe("Снимок с диска");
+    expect(await browser.evaluate('!!document.querySelector("dialog[open] .view-controls")')).toBe(
+      true,
+    );
+    await browser.click(".image-modal-close");
+    await wait('!document.querySelector("dialog[open]")');
     expect(await browser.evaluate("document.querySelectorAll('.inline-icon svg').length")).toBe(1);
     expect(
       await browser.evaluate("document.querySelector('.inline-icon.missing').textContent"),

@@ -1,5 +1,5 @@
-import { markdownPath } from "../../../common/utilities/markdown-path.ts";
-import { workspaceAssetUrl } from "../../workspace-api/index.ts";
+import { markdownPath } from "../../common/utilities/markdown-path.ts";
+import { workspaceAssetUrl } from "../workspace-api/index.ts";
 
 /** Static routes of the app itself: they are served as they are, not as project files. */
 const APP_ASSET = /^\/(?:api|assets|file-icons)(?:\/|$)/i;
@@ -36,9 +36,11 @@ function localPath(src: string): string | undefined {
 }
 
 /**
- * Where a markdown image in a chat answer is loaded from: a project file goes through the
- * workspace `asset` endpoint, a file on disk through `external-asset`, and web, `data:` and `blob:`
+ * Where an image in a chat answer is loaded from: a project file goes through the workspace
+ * `asset` endpoint, a file on disk through `external-asset`, and web, `data:` and `blob:`
  * sources stay as they are. Anything unsafe or unresolvable gives `undefined`.
+ *
+ * Markdown pictures and the `Image` widget share this, so a path means the same in both.
  */
 export function chatImageSource(src: string, projectId: string): string | undefined {
   const value = src.trim();

@@ -10,7 +10,7 @@ const html = `<!doctype html>
   import "/src/app/styles.css";
   import { createApp, h, ref } from "vue";
   import AgentMessage from "/src/modules/agent/ui/AgentMessage.vue";
-  import { chatProjectKey } from "/src/modules/agent/ui/chat-project.ts";
+  import { chatProjectKey } from "/src/modules/chat-images/index.ts";
   const text = ref("");
   const app = createApp({
     setup: () => () => h(AgentMessage, { text: text.value, streaming: false }),
