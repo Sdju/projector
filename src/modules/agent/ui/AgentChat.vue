@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from "vue";
 import { widgetReplyKey } from "../../widget-runtime/index.ts";
+import { chatProjectKey } from "./chat-project.ts";
 import { useIdeCommands } from "../../ide/index.ts";
 import { workspaceRequest } from "../../workspace-api/index.ts";
 import { AgentFeaturesIsland } from "../../agent-features/index.ts";
@@ -224,7 +225,6 @@ const composer = ref<InstanceType<typeof AgentComposer>>();
 const chatDrop = chatDropHandlers(() => composer.value);
 const panel = ref<InstanceType<typeof UiPanel>>();
 const root = computed(() => panel.value?.element);
-
 // The project folder: edited files and dropped paths are shown relative to it.
 const projectRoot = ref("");
 void workspaceRequest<{ root: string }>(props.projectId, "root")
@@ -235,7 +235,6 @@ void workspaceRequest<{ root: string }>(props.projectId, "root")
 // MCP servers shown in the parameters island; read when it opens, as that starts a probe process.
 const { mcp, load: loadMcpServers } = useMcpServers(() => props.backend, props.projectId);
 const loadMcp = () => (plain.value ? loadMcpServers() : Promise.resolve());
-
 const { copy, copyInfo, copyWorking, copyNote, endCopy } = useWorktreePanel(turns, busy, {
   worktreeInfo,
   mergeCopy,
@@ -425,6 +424,7 @@ provide(widgetReplyKey, (text) => {
   void toBottom();
   void send(text);
 });
+provide(chatProjectKey, props.projectId);
 const { submit, continueTurn, suggest, newChat } = useChatInputActions({
   draft,
   draftParts,

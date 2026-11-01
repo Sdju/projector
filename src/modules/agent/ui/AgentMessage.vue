@@ -99,6 +99,25 @@ useMessageScope(
 .agent-message :deep(.md a:hover) {
   color: var(--text);
 }
+.agent-message :deep(.md img) {
+  max-width: 100%;
+  height: auto;
+  max-height: min(70vh, 720px);
+  object-fit: contain;
+  box-sizing: border-box;
+  vertical-align: middle;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  padding: var(--sp-1);
+  cursor: zoom-in;
+}
+.agent-message :deep(.md p > img:only-child) {
+  display: block;
+}
+.agent-message :deep(.md .md-image-text) {
+  color: var(--muted);
+}
 .agent-message :deep(.md code) {
   font: var(--fs-2xs)/1.6 var(--mono);
   background: var(--bg-3);

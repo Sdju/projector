@@ -1,20 +1,11 @@
 import { workspaceAssetUrl } from "../../../../workspace-api/index.ts";
+import { markdownPath } from "../../../../../common/utilities/markdown-path.ts";
 import MarkdownIt from "markdown-it";
 import taskLists from "markdown-it-task-lists";
 import hljs from "highlight.js/lib/common";
 import DOMPurify from "dompurify";
 
-export function markdownPath(href: string, path: string): string | undefined {
-  if (!href || href.startsWith("#") || /^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(href)) return;
-  try {
-    const url = new URL(href, `https://projector.invalid/${path}`);
-    const result = decodeURIComponent(url.pathname.slice(1));
-    if (result.split("/").includes("..") || result.includes("\0") || result.includes("\\")) return;
-    return result;
-  } catch {
-    return;
-  }
-}
+export { markdownPath };
 
 export function renderMarkdown(content: string, path: string, projectId: string) {
   const md = new MarkdownIt({
