@@ -31,6 +31,22 @@ const emit = defineEmits<{
 }>();
 const collapsed = ref(new Set<string>());
 const { resolver } = useFileIconTheme();
+type GitTint = "added" | "deleted";
+const tintLabels: Record<GitTint, string> = {
+  added: "новый файл",
+  deleted: "удалён",
+};
+/** Фон строки: зелёный для новых записей, красный для удалённых, без цвета для остальных. */
+function entryTint(changes: Change[]): GitTint | undefined {
+  const status = (change: Change) => (props.staged ? change.index : change.worktree);
+  if (changes.every((change) => ["A", "?"].includes(status(change)))) return "added";
+  if (changes.every((change) => status(change) === "D")) return "deleted";
+  return undefined;
+}
+function rowTitle(path: string, originalPath: string | undefined, tint: GitTint | undefined) {
+  const label = originalPath ? `${originalPath} → ${path}` : path;
+  return tint ? `${label} · ${tintLabels[tint]}` : label;
+}
 const rows = computed(() => {
   const entries = new Map<
     string,
@@ -77,6 +93,7 @@ const rows = computed(() => {
         !collapsed.value.has(entry.path),
       ),
       change: entry.changes[0]!,
+      tint: entryTint(entry.changes),
     }));
 });
 function toggle(path: string) {
@@ -94,6 +111,7 @@ function toggle(path: string) {
       <div
         class="git-row"
         :class="{ selected: !entry.directory && selected === entry.path }"
+        :data-git-status="entry.tint"
         @contextmenu="emit('context', $event, entry.path)"
         @keydown.shift.f10.prevent="emit('context', $event, entry.path)"
       >
@@ -110,9 +128,11 @@ function toggle(path: string) {
           :style="{ paddingLeft: `${12 + depth * 14}px` }"
           :data-path="entry.path"
           :title="
-            !entry.directory && entry.change.originalPath
-              ? `${entry.change.originalPath} → ${entry.path}`
-              : entry.path
+            rowTitle(
+              entry.path,
+              entry.directory ? undefined : entry.change.originalPath,
+              entry.tint,
+            )
           "
           :aria-expanded="entry.directory ? !collapsed.has(entry.path) : undefined"
           :aria-current="!entry.directory && selected === entry.path ? 'true' : undefined"
@@ -129,8 +149,8 @@ function toggle(path: string) {
           </span>
           <FileIcon :icon="entry.icon" />
           <span class="name u-truncate">{{ entry.name }}</span>
+          <span v-if="entry.tint" class="u-sr-only">, {{ tintLabels[entry.tint] }}</span>
           <span v-if="entry.directory" class="count">{{ entry.changes.length }}</span>
-          <b v-else class="status">{{ staged ? entry.change.index : entry.change.worktree }}</b>
         </UiActionRow>
         <button
           v-if="!readonly"
@@ -183,6 +203,18 @@ function toggle(path: string) {
 }
 .git-row.selected {
   background: var(--active);
+}
+.git-row[data-git-status="added"] {
+  --git-tint: var(--run);
+}
+.git-row[data-git-status="deleted"] {
+  --git-tint: var(--err);
+}
+.git-row[data-git-status] {
+  box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--git-tint) 11%, transparent);
+}
+.git-row[data-git-status].selected {
+  box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--git-tint) 18%, transparent);
 }
 .entry {
   flex: 1;
@@ -238,15 +270,9 @@ function toggle(path: string) {
   flex: 1;
   min-width: 0;
 }
-.count,
-.status {
+.count {
   flex-shrink: 0;
   font: var(--fs-2xs) var(--mono);
-}
-.count {
   color: var(--faint);
-}
-.status {
-  color: var(--run);
 }
 </style>
