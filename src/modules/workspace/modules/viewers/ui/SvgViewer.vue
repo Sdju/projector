@@ -8,7 +8,7 @@ import UiIsland from "../../../../../common/ui/UiIsland.vue";
 import { useIslandMenu } from "../../../../../common/utilities/island-menu.ts";
 import { commandArgs, useCommandScope } from "../../../../../common/utilities/commands.ts";
 import { useCompactViewport } from "../../../../../common/utilities/compact-viewport.ts";
-import ImageViewport from "./ImageViewport.vue";
+import ImageViewport from "../../../../../common/ui/ImageViewport.vue";
 import SplitPanes from "./SplitPanes.vue";
 import SvgParameters from "./SvgParameters.vue";
 import IconSliders from "~icons/lucide/sliders-horizontal";

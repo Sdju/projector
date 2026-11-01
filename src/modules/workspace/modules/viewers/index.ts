@@ -1,7 +1,7 @@
 import { defineAsyncComponent } from "vue";
 export { default as ArchiveViewer } from "./ui/ArchiveViewer.vue";
 export { default as CommitOverview } from "./ui/CommitOverview.vue";
-export { default as ImageViewport } from "./ui/ImageViewport.vue";
+export { default as ImageViewport } from "../../../../common/ui/ImageViewport.vue";
 export const IssueView = defineAsyncComponent(() => import("./ui/IssueView.vue"));
 export const PullRequestView = defineAsyncComponent(() => import("./ui/PullRequestView.vue"));
 export const DiscussionView = defineAsyncComponent(() => import("./ui/DiscussionView.vue"));

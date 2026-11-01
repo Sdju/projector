@@ -38,10 +38,7 @@ import {
   relocatedPath,
 } from "../core/modules/workspace/index.ts";
 import { githubRepositoryFromRemote } from "../core/modules/github/index.ts";
-import {
-  fitImage,
-  zoomImageAt,
-} from "../src/modules/workspace/modules/viewers/lib/image-viewport.ts";
+import { fitImage, zoomImageAt } from "../src/common/utilities/image-viewport.ts";
 
 /** Workspace excludes are global settings; isolate them from the developer machine. */
 function withDefaultExcludes(run) {

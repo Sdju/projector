@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import UiPanel from "../../../../../common/ui/UiPanel.vue";
-import UiControl from "../../../../../common/ui/UiControl.vue";
-import UiInline from "../../../../../common/ui/UiInline.vue";
+import UiPanel from "./UiPanel.vue";
+import UiControl from "./UiControl.vue";
+import UiInline from "./UiInline.vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { fitImage, zoomImageAt, type ImageTransform } from "../lib/image-viewport.ts";
-import UiButton from "../../../../../common/ui/UiButton.vue";
+import { fitImage, zoomImageAt, type ImageTransform } from "../utilities/image-viewport.ts";
+import UiButton from "./UiButton.vue";
 import IconRatio from "~icons/lucide/ratio";
 import IconMaximize from "~icons/lucide/maximize";
 const props = withDefaults(
@@ -273,6 +273,7 @@ defineExpose({ reset });
         <UiControl as="select" v-model="localBackground" aria-label="Фон изображения">
           <option value="light">Светлый</option>
           <option value="dark">Тёмный</option>
+          <option value="transparent">Прозрачный</option>
           <option value="checker">Шашечки</option>
           <option value="gradient">Градиент</option>
           <option value="color-gradient">Цветной градиент</option>
@@ -356,6 +357,10 @@ defineExpose({ reset });
 }
 .dark {
   background: var(--preview-dark);
+}
+.transparent {
+  background: transparent;
+  background-color: transparent;
 }
 .checker {
   background-color: var(--preview-checker-a);
