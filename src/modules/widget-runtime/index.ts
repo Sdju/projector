@@ -3,6 +3,6 @@ export { splitMessage, type MessagePart } from "./split.ts";
 export { answerFormSource } from "./answer.ts";
 export { registerWidget, isWidgetName, widgetCatalog, type WidgetEntry } from "./registry.ts";
 export { useWidgetReply, widgetReplyKey, formatWidgetReply, type WidgetReply } from "./bridge.ts";
-export { formPresetKey, type FormPreset } from "./form.ts";
+export { formPresetKey, formChromeKey, type FormPreset, type FormChrome } from "./form.ts";
 export { useMessageScope, messageScopeKey, type MessageScope } from "./scope.ts";
 export { autoClose, parseWidgetSource } from "./autoclose.ts";

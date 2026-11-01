@@ -1,0 +1,35 @@
+<!doctype html>
+<link rel="icon" href="data:," />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<div id="fixture"></div>
+<script type="module">
+  import "/src/app/styles.css";
+  import { createApp, h } from "vue";
+  import AgentFormPanel from "/src/modules/agent/ui/AgentFormPanel.vue";
+  import { registerBuiltinWidgets } from "/src/app/widgets.ts";
+  registerBuiltinWidgets();
+
+  const source =
+    '<IntelligentForm summary="Composer form"><Input name="note" initial="ok" /></IntelligentForm>';
+  const replies = [];
+  window.fixture = { ready: true, replies, submittable: false };
+  let panel;
+  const app = createApp({
+    setup: () => () =>
+      h("div", { style: "padding: 24px; max-width: 600px" }, [
+        h(AgentFormPanel, {
+          ref: (value) => {
+            panel = value;
+          },
+          composer: true,
+          source,
+          onSubmit: (text, data, summary) => replies.push({ text, data, summary }),
+          onSubmittable: (value) => {
+            window.fixture.submittable = value;
+          },
+        }),
+        h("button", { id: "send", type: "button", onClick: () => panel?.submit() }, "send"),
+      ]),
+  });
+  app.mount("#fixture");
+</script>

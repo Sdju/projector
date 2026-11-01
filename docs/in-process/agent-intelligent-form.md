@@ -10,10 +10,11 @@
 показывает ту же форму с выбранными значениями. Карандаш снимает readonly и позволяет выбрать другой
 ответ; отправка создаёт новую версию разговора.
 
-Основной виджет — `<IntelligentForm>`: он сам создаёт форму, блокирует поля после отправки и
-добавляет кнопку. Внутрь кладутся только поля `<Checks>`, `<Input>`, `<Slider>` и `<Tabs>` с
-`name`; обёртки `<Card>`/`<Form>` и `<Button submit>` не нужны. Старая разметка `<Form>` с
-`<Button submit>` продолжает работать как совместимый вариант.
+Основной виджет — `<IntelligentForm>`: он создаёт форму и блокирует поля после отправки. В
+композере отправляет общая кнопка поля ввода; отдельная кнопка формы остаётся только в сообщении и
+readonly-снимке, где композера нет. Внутрь кладутся только поля `<Checks>`, `<Input>`, `<Slider>` и
+`<Tabs>` с `name`; обёртки `<Card>`/`<Form>` и `<Button submit>` не нужны. Старая разметка `<Form>`
+с `<Button submit>` продолжает работать как совместимый вариант.
 
 ## Как это работает
 
@@ -49,7 +50,8 @@
 - `tests/agent-widgets.test.mjs`: выбор последнего блока, отказ при тексте после формы, вложенная
   форма в `<Card>`, незакрытая форма, распознавание `<IntelligentForm>`.
 - `tests/agent-widgets-browser.test.mjs`: встроенная кнопка отправляет именованные поля, а
-  promoted `<IntelligentForm>` не оставляет копии в ответе.
+  promoted `<IntelligentForm>` не оставляет копии в ответе; в режиме композера кнопки формы нет, и
+  отправку выполняет общая кнопка.
 - `tests/agent-chats.test.mjs`: `form` с исходником и значениями переживает запись и чтение истории.
 - Реальные eval на `deepseek-flash` (по 3 прогона): project/release/docker — 9/9 ответов с
   `<IntelligentForm>`. До правила «два параметра и больше — форма» модель выбирала `ask_user`.
@@ -70,7 +72,7 @@
 ## Файлы
 
 - `core/modules/agent-widgets/intelligent-form/index.ts` — определение формы ответа.
-- `src/modules/agent-widgets/intelligent-form/` — поля, блокировка и встроенная кнопка отправки.
+- `src/modules/agent-widgets/intelligent-form/` — поля, блокировка и кнопка для сообщения/снимка.
 - `src/modules/widget-runtime/answer.ts` — выбор блока-ответа.
 - `src/modules/widget-runtime/form.ts` — `formPresetKey` (readonly + значения).
 - `src/modules/agent/model/answer-form.ts` — `pendingForm`, отправка снимка.

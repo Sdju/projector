@@ -12,3 +12,10 @@ export interface FormPreset {
 }
 
 export const formPresetKey: InjectionKey<FormPreset> = Symbol("agent-widget-form-preset");
+
+/** The surrounding panel can own submission: the composer's send button is the only visible one. */
+export interface FormChrome {
+  composer?: boolean;
+  registerSubmit?: (submit: () => boolean | void) => () => void;
+}
+export const formChromeKey: InjectionKey<FormChrome> = Symbol("agent-widget-form-chrome");

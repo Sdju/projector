@@ -75,6 +75,22 @@ function submitForm(text: string, data: unknown, summary?: string) {
   emit("formSubmit", text, data, summary, source);
 }
 const input = ref<InstanceType<typeof AgentInput>>();
+const formPanel = ref<InstanceType<typeof AgentFormPanel>>();
+const formSubmittable = ref(false);
+watch(
+  () => formOpen.value,
+  (open) => {
+    if (!open) formSubmittable.value = false;
+  },
+);
+watch(activeForm, () => (formSubmittable.value = false));
+function submitActive() {
+  if (formOpen.value) {
+    formPanel.value?.submit();
+    return;
+  }
+  emit("submit");
+}
 defineExpose({
   resize: () => {},
   focus: () => {
@@ -110,10 +126,16 @@ defineExpose({
     <form
       class="composer"
       :class="{ working: busy, 'form-mode': formOpen }"
-      @submit.prevent="formOpen ? undefined : emit('submit')"
+      @submit.prevent="submitActive"
     >
       <div v-if="activeForm" class="composer-form">
-        <AgentFormPanel :source="activeForm" @submit="submitForm" />
+        <AgentFormPanel
+          ref="formPanel"
+          composer
+          :source="activeForm"
+          @submit="submitForm"
+          @submittable="formSubmittable = $event"
+        />
       </div>
       <AgentInput
         v-show="!formOpen"
@@ -160,19 +182,23 @@ defineExpose({
             class="send-button"
             :title="
               formOpen
-                ? 'Сначала отправьте форму'
+                ? formSubmittable
+                  ? 'Отправить форму'
+                  : 'Сначала отправьте форму'
                 : busy
                   ? 'В очередь: уйдёт, когда агент закончит (Enter)'
                   : 'Отправить (Enter)'
             "
             :aria-label="
               formOpen
-                ? 'Отправка недоступна, пока открыта форма'
+                ? formSubmittable
+                  ? 'Отправить форму'
+                  : 'Отправка недоступна, пока открыта форма'
                 : busy
                   ? 'Поставить сообщение в очередь'
                   : 'Отправить сообщение'
             "
-            :disabled="formOpen || !draft.trim()"
+            :disabled="formOpen ? !formSubmittable : !draft.trim()"
           >
             <IconArrowUp aria-hidden="true" />
           </button>

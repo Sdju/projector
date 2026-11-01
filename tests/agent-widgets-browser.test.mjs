@@ -59,6 +59,41 @@ const message = `## Квартал в цифрах
 Готово.`;
 
 test(
+  "the composer owns the submit button of an IntelligentForm",
+  { skip: !chromium, timeout: 30000, retry: 1 },
+  async () => {
+    const html = await readFile(
+      new URL("./fixtures/agent-form-composer.html", import.meta.url),
+      "utf8",
+    );
+    const fixture = await createBrowserFixture({ pages: { "/composer": html } });
+    onTestFinished(() => fixture.close());
+    const browser = await createChromium(fixture.directory);
+    onTestFinished(() => browser.close());
+    await browser.open(fixture.url("/composer"));
+    await browser.viewport(600, 500);
+    const wait = async (expression, ms = 8000) => {
+      for (let waited = 0; waited < ms; waited += 50) {
+        if (await browser.evaluate(expression)) return;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      expect(await browser.evaluate(expression)).toBeTruthy();
+    };
+
+    await wait("window.fixture.submittable === true");
+    expect(
+      await browser.evaluate('document.querySelectorAll(".intelligent-form .btn").length'),
+    ).toBe(0);
+    await browser.click("#send");
+    await wait("window.fixture.replies.length === 1");
+    const [reply] = await browser.evaluate("window.fixture.replies");
+    expect(reply.data).toEqual({ note: "ok" });
+    expect(reply.summary).toBe("Composer form");
+    expect(reply.text.startsWith("Composer form\n\n```json")).toBe(true);
+  },
+);
+
+test(
   "widgets stream without remounting, stay interactive and render charts",
   { skip: !chromium, timeout: 90000, retry: 1 },
   async () => {

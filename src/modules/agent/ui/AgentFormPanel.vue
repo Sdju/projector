@@ -2,6 +2,7 @@
 import { computed, provide } from "vue";
 import {
   AgentWidget,
+  formChromeKey,
   formPresetKey,
   widgetReplyKey,
   type WidgetReply,
@@ -17,10 +18,32 @@ const props = defineProps<{
   /** The answer already sent; `<Form>` fields show these values instead of their initials. */
   values?: unknown;
   readonly?: boolean;
+  /** The composer owns the single send button; the form does not draw its own. */
+  composer?: boolean;
 }>();
-const emit = defineEmits<{ submit: [text: string, data: unknown, summary?: string] }>();
+const emit = defineEmits<{
+  submit: [text: string, data: unknown, summary?: string];
+  submittable: [value: boolean];
+}>();
 
 const readonly = computed(() => props.readonly === true);
+const submitters = new Set<() => boolean | void>();
+provide(formChromeKey, {
+  composer: props.composer === true,
+  registerSubmit(submit) {
+    submitters.add(submit);
+    emit("submittable", true);
+    return () => {
+      submitters.delete(submit);
+      emit("submittable", submitters.size > 0);
+    };
+  },
+});
+function submit() {
+  for (const handler of submitters) if (handler() === true) return true;
+  return false;
+}
+defineExpose({ submit });
 const seeded = computed<Record<string, unknown>>(() =>
   props.values && typeof props.values === "object" ? (props.values as Record<string, unknown>) : {},
 );
