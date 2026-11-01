@@ -44,3 +44,20 @@ describe("time and token limits", () => {
     expect(budget.reason()).toBe("time");
   });
 });
+
+describe("step limit", () => {
+  const done = (usage) => ({ ...step("a", Math.random(), 1), usage });
+
+  it("does not stop on steps when the limit is off", () => {
+    const budget = turnBudget({ steps: 0 });
+    const steps = Array.from({ length: 100 }, () => done({}));
+    expect(budget.stopWhen.some((stop) => stop({ steps }))).toBe(false);
+  });
+
+  it("stops at a custom step limit", () => {
+    const budget = turnBudget({ steps: 2 });
+    const steps = [done({}), done({})];
+    expect(budget.stopWhen.some((stop) => stop({ steps }))).toBe(true);
+    expect(budget.reason()).toBe("steps");
+  });
+});

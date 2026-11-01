@@ -1,7 +1,7 @@
 import type { StopCondition } from "ai";
 
-/** Steps one turn may take; `PROJECTOR_AGENT_MAX_STEPS` raises or lowers it. */
-export const MAX_STEPS = Number(process.env.PROJECTOR_AGENT_MAX_STEPS) || 24;
+/** Steps one turn may take; `PROJECTOR_AGENT_MAX_STEPS` raises it, 0 is no limit. */
+export const MAX_STEPS = Number(process.env.PROJECTOR_AGENT_MAX_STEPS) || 0;
 /** The same call with the same result this many times in a row is a loop, not progress. */
 export const LOOP_REPEATS = 3;
 
@@ -66,7 +66,7 @@ export function turnBudget(
     };
   return {
     stopWhen: [
-      stopBy("steps", (used) => used.length >= steps),
+      stopBy("steps", (used) => steps > 0 && used.length >= steps),
       stopBy("loop", (steps) => isLooping(steps)),
       stopBy("time", () => seconds > 0 && now() - started >= seconds * 1000),
       stopBy("tokens", (used) => tokens > 0 && tokensSpent(used) >= tokens),
@@ -91,6 +91,6 @@ export function budgetNote(
     case "tokens":
       return `\n\nЯ остановился: ход израсходовал ${tokens} токенов.`;
     default:
-      return `\n\nЯ остановился на ${steps} шагах.`;
+      return steps > 0 ? `\n\nЯ остановился на ${steps} шагах.` : "";
   }
 }
