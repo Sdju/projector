@@ -51,13 +51,17 @@ export function shouldContinue(
 export function useJobChat(projectId: string, options: Options) {
   const api = useIdeCommands().api;
   const since = Date.now();
-  const { jobs, refresh } = useProjectJobs(projectId, (job, before) => {
-    if (!options.enabled() || !shouldContinue(job, before, options.chat, since)) return;
-    if (continued.has(job.id) || marked(job.id)) return;
-    continued.add(job.id);
-    mark(job.id);
-    void continueAfter(job);
-  });
+  const { jobs, refresh } = useProjectJobs(
+    projectId,
+    (job, before) => {
+      if (!options.enabled() || !shouldContinue(job, before, options.chat, since)) return;
+      if (continued.has(job.id) || marked(job.id)) return;
+      continued.add(job.id);
+      mark(job.id);
+      void continueAfter(job);
+    },
+    options.enabled,
+  );
 
   async function continueAfter(job: AgentJobView): Promise<void> {
     try {

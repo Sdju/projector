@@ -10,6 +10,7 @@ import { chatDropHandlers } from "../lib/chat-drop.ts";
 import { useChatBranch } from "../model/chat-branch.ts";
 import { useChatReadout } from "../model/chat-readout.ts";
 import { useAgent } from "../model/session.ts";
+import { useChatJobs } from "../model/chat-jobs.ts";
 import { useSideQuestion } from "../model/side-question.ts";
 import { useAutoCompact } from "../model/use-auto-compact.ts";
 import { useChatInputActions } from "../model/use-chat-input-actions.ts";
@@ -20,7 +21,8 @@ import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import AgentWelcome from "./AgentWelcome.vue";
 import AgentTurn from "./AgentTurn.vue";
 import AgentComposer from "./AgentComposer.vue";
-import AgentJobDock from "./AgentJobDock.vue";
+import AgentActivityDock from "./AgentActivityDock.vue";
+import AgentJobRequests from "./AgentJobRequests.vue";
 import AgentQuestions from "./AgentQuestions.vue";
 import AgentSecrets from "./AgentSecrets.vue";
 import AgentPermissions from "./AgentPermissions.vue";
@@ -28,10 +30,7 @@ import AgentContextMeter from "./AgentContextMeter.vue";
 import AgentChipPreview from "./AgentChipPreview.vue";
 import AgentControls from "./AgentControls.vue";
 import AgentSessions from "./AgentSessions.vue";
-import AgentPlan from "./AgentPlan.vue";
-import AgentQueue from "./AgentQueue.vue";
 import AgentSideQuestion from "./AgentSideQuestion.vue";
-import AgentTaskBar from "./AgentTaskBar.vue";
 import AgentTaskView from "./AgentTaskView.vue";
 import { chatTasks } from "../lib/task-detail.ts";
 import { useChatTaskView } from "../model/use-chat-task-view.ts";
@@ -47,6 +46,7 @@ import { useRewindPanel } from "../model/rewind-panel.ts";
 import { useWorktreePanel } from "../model/worktree-panel.ts";
 import { chatUsageByTurn } from "../model/chat-usage.ts";
 import type { AgentBackendId, ChatUsage, MessageChip, RewindScope } from "../model/types.ts";
+import IconArrowDown from "~icons/lucide/arrow-down";
 import IconSquarePen from "~icons/lucide/square-pen";
 import IconDownload from "~icons/lucide/download";
 import IconBranch from "~icons/lucide/git-branch";
@@ -119,6 +119,15 @@ const {
 } = useAgent(props.projectId, plain.value ? undefined : agentCommandHandler(api, props.projectId), {
   backend: props.backend,
   chatId: props.chatId,
+});
+const jobsState = useChatJobs({
+  projectId: props.projectId,
+  chat: chatKey,
+  enabled: () => !plain.value,
+  send: (text, options) => send(text, undefined, options),
+  permissions,
+  questions,
+  secrets,
 });
 onMounted(() => {
   void loadControls();
@@ -232,18 +241,15 @@ const { copy, copyInfo, copyWorking, copyNote, endCopy } = useWorktreePanel(turn
   mergeCopy,
   discardCopy,
 });
-
 // While a message is being edited, the turns its replacement will cut off are shown faded.
 const editFrom = computed(() =>
   editing.value ? turns.value.findIndex((turn) => turn.id === editing.value) : -1,
 );
-
 // The plan stays pinned while it has unfinished items, even after later messages.
 const plan = computed(() => shownPlan(turns.value, props.backend));
 const contextShare = computed(() =>
   latestContext.value ? latestContext.value.used / Math.max(1, latestContext.value.size) : 0,
 );
-
 // Rolling back to a message: the panel asks what to undo, shows what the files would change, then does it.
 const {
   rewinding,
@@ -278,7 +284,6 @@ async function retryMessage(id: string) {
 async function openHistory() {
   await Promise.all([loadSessions(), loadRecent()]);
 }
-
 const { compact } = useAutoCompact({
   busy,
   capabilities,
@@ -299,7 +304,6 @@ function downloadChat() {
     `${props.backend}-chat.md`,
   );
 }
-
 // The chat publishes itself to the workspace's commands (see `registerAgentCommands`).
 const controller: ChatController = {
   key: chatKey,
@@ -644,16 +648,15 @@ onBeforeUnmount(() => {
         версией.
         <button type="button" @click="cancelEdit">Отмена</button>
       </p>
-      <AgentJobDock
-        v-if="!plain"
-        :project-id="projectId"
-        :chat="chatKey"
-        :enabled="!plain"
-        :send="(text, options) => send(text, undefined, options)"
-      />
-      <AgentPermissions :permissions="permissions" @decide="decide" />
-      <AgentQuestions :requests="questions" @answer="answer" />
-      <AgentSecrets :requests="secrets" @answer="answerSecret" />
+      <button v-if="away" type="button" class="latest-button" @click="toBottom">
+        <IconArrowDown aria-hidden="true" />К последнему сообщению
+      </button>
+      <div v-if="jobsState.hasRequests" class="requests">
+        <AgentPermissions :permissions="permissions" @decide="decide" />
+        <AgentQuestions :requests="questions" @answer="answer" />
+        <AgentSecrets :requests="secrets" @answer="answerSecret" />
+        <AgentJobRequests v-if="!plain" :jobs="jobsState.jobs" @answered="jobsState.refresh" />
+      </div>
       <AgentRewind
         v-if="rewinding"
         :key="rewinding.id"
@@ -678,7 +681,6 @@ onBeforeUnmount(() => {
         @discard="endCopy(discardCopy)"
       />
       <AgentSideQuestion v-if="side.state.open" :side="side" />
-      <AgentPlan :items="plan" :busy="busy" />
       <p
         v-if="capabilities.compact && contextShare >= capabilities.compact.hintAt && !busy"
         class="compact-hint"
@@ -692,11 +694,17 @@ onBeforeUnmount(() => {
         <template v-else>Контекст заполнен на {{ Math.round(contextShare * 100) }}%.</template>
         <button type="button" @click="compact">Сжать сейчас</button>
       </p>
-      <AgentTaskBar :tasks="tasks" :viewing="viewingTask" @view="viewTask" @tab="taskInTab" />
-      <AgentQueue
-        :items="queue"
+      <AgentActivityDock
+        :jobs="jobsState.jobs"
+        :tasks="tasks"
+        :plan="plan"
+        :queue="queue"
         :busy="busy"
         :can-inject="!!capabilities.inject"
+        :viewing-task="viewingTask"
+        @open="jobsState.open"
+        @view="viewTask"
+        @tab="taskInTab"
         @now="sendQueuedNow"
         @inject="injectQueued"
         @remove="removeQueued"
@@ -711,7 +719,6 @@ onBeforeUnmount(() => {
       :commands="slashCommands"
       :busy="busy"
       :started-at="turns.findLast((turn) => turn.role === 'assistant')?.at"
-      :away="away"
       :error="error || copyError"
       :copied="!!copied"
       @submit="submit"
@@ -719,7 +726,6 @@ onBeforeUnmount(() => {
       @fail="(message) => (error = message)"
       @dismiss="dismissError"
       @stop="stop"
-      @latest="toBottom"
     >
       <template v-if="latestContext" #status>
         <AgentContextMeter :context="latestContext" />
@@ -780,11 +786,23 @@ onBeforeUnmount(() => {
 }
 .dock {
   position: relative;
+  display: grid;
+  gap: var(--sp-2);
   width: 100%;
   max-width: calc(var(--chat-width) + 56px);
   margin: 0 auto;
   padding: 0 var(--sp-5);
   flex-shrink: 0;
+}
+.dock > * {
+  margin-bottom: 0;
+}
+.requests {
+  display: grid;
+  gap: var(--sp-2);
+  max-height: min(45vh, 420px);
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 .compact-hint {
   margin: 0 0 var(--sp-2);
@@ -793,6 +811,26 @@ onBeforeUnmount(() => {
 }
 .compact-hint.urgent {
   color: var(--err);
+}
+.latest-button {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + var(--sp-2));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px var(--sp-3);
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  color: var(--text-2);
+  font-size: var(--fs-2xs);
+  white-space: nowrap;
+}
+.latest-button svg {
+  width: 12px;
+  height: 12px;
 }
 .edit-hint {
   margin: 0 0 var(--sp-2);

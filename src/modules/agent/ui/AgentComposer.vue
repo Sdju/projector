@@ -5,7 +5,6 @@ import type { MessageChip, MessagePart } from "../model/types.ts";
 import AgentInput from "./AgentInput.vue";
 import AgentWorkClock from "./AgentWorkClock.vue";
 import IconArrowUp from "~icons/lucide/arrow-up";
-import IconArrowDown from "~icons/lucide/arrow-down";
 import IconSquare from "~icons/lucide/square";
 import IconAlert from "~icons/lucide/circle-alert";
 import IconX from "~icons/lucide/x";
@@ -16,7 +15,6 @@ const props = defineProps<{
   busy: boolean;
   /** When the answer in progress began, for the clock beside the input. */
   startedAt?: number;
-  away: boolean;
   error: string;
   copied: boolean;
   projectId?: string;
@@ -25,7 +23,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   submit: [];
   stop: [];
-  latest: [];
   open: [chip: MessageChip];
   fail: [message: string];
   dismiss: [];
@@ -48,9 +45,6 @@ defineExpose({
 
 <template>
   <div class="composer-area">
-    <button v-if="away" type="button" class="latest-button" @click="emit('latest')">
-      <IconArrowDown aria-hidden="true" />К последнему сообщению
-    </button>
     <div v-if="error" class="chat-error" role="alert">
       <IconAlert aria-hidden="true" />
       <p class="chat-error-text" :class="{ clamped: long && !expanded, open: expanded }">
@@ -172,26 +166,6 @@ defineExpose({
   width: 10px;
   height: 10px;
   fill: currentColor;
-}
-.latest-button {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 2px);
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px var(--sp-3);
-  border-radius: var(--r-full);
-  border: 1px solid var(--line);
-  background: var(--bg-2);
-  color: var(--text-2);
-  font-size: var(--fs-2xs);
-  white-space: nowrap;
-}
-.latest-button svg {
-  width: 12px;
-  height: 12px;
 }
 .chat-error {
   display: flex;

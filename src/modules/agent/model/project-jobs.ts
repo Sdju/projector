@@ -29,6 +29,7 @@ export function continuationPrompt(job: AgentJobView): string {
 export function useProjectJobs(
   projectId: string,
   onChange?: (job: AgentJobView, before?: AgentJobView) => void,
+  enabled: () => boolean = () => true,
 ) {
   const jobs = ref<AgentJobView[]>([]);
   const error = ref("");
@@ -37,7 +38,7 @@ export function useProjectJobs(
   let timer: ReturnType<typeof setInterval> | undefined;
 
   async function refresh(): Promise<void> {
-    if (disposed) return;
+    if (disposed || !enabled()) return;
     // A hidden page has nobody to answer or continue: resume polling when it is shown again.
     if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
     try {
@@ -56,8 +57,10 @@ export function useProjectJobs(
     }
   }
 
-  timer = setInterval(() => void refresh(), POLL_MS);
-  void refresh();
+  if (enabled()) {
+    timer = setInterval(() => void refresh(), POLL_MS);
+    void refresh();
+  }
   onScopeDispose(() => {
     disposed = true;
     if (timer) clearInterval(timer);

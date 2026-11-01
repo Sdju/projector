@@ -44,6 +44,17 @@ test("the watcher reports status changes and stops with its scope", async () => 
   scope.stop();
 });
 
+test("a disabled watcher leaves external agent chats alone", async () => {
+  const fetchMock = vi.fn(async () => reply({ jobs: [job()] }));
+  vi.stubGlobal("fetch", fetchMock);
+  const scope = effectScope();
+  const watcher = scope.run(() => useProjectJobs("p1", undefined, () => false));
+  await watcher.refresh();
+  expect(fetchMock).not.toHaveBeenCalled();
+  expect(watcher.jobs.value).toEqual([]);
+  scope.stop();
+});
+
 test("a failed poll keeps the last known jobs and reports the reason", async () => {
   vi.stubGlobal(
     "fetch",

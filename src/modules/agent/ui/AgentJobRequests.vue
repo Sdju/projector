@@ -67,15 +67,6 @@ async function answer(id: string, answers: Record<string, string[]> | null): Pro
 </script>
 
 <template>
-  <div v-if="permissions.length || questions.length" class="job-requests">
-    <AgentPermissions :permissions="permissions" @decide="decide" />
-    <AgentQuestions :requests="questions" @answer="answer" />
-  </div>
+  <AgentPermissions :permissions="permissions" @decide="decide" />
+  <AgentQuestions :requests="questions" @answer="answer" />
 </template>
-
-<style scoped>
-.job-requests {
-  display: grid;
-  gap: 8px;
-}
-</style>

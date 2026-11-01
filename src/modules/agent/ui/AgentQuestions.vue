@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { reactive } from "vue";
+import UiCard from "../../../common/ui/UiCard.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import type { AgentQuestionRequest } from "../model/types.ts";
@@ -45,7 +46,14 @@ function submit(request: AgentQuestionRequest) {
 
 <template>
   <div v-if="requests.length" class="questions" role="dialog" aria-label="Вопрос агента">
-    <section v-for="request in requests" :key="request.id" class="question">
+    <UiCard
+      v-for="request in requests"
+      :key="request.id"
+      as="section"
+      tone="warning"
+      density="notice"
+      class="question"
+    >
       <UiInline as="header" align="center" justify="normal">
         <IconHelp aria-hidden="true" />
         <span class="title">{{ request.title || "Агент спрашивает" }}</span>
@@ -83,32 +91,17 @@ function submit(request: AgentQuestionRequest) {
         </UiButton>
         <UiButton @click="emit('answer', request.id, null)"> Пропустить </UiButton>
       </UiInline>
-    </section>
+    </UiCard>
   </div>
 </template>
 
 <style scoped>
-/* Над полем ввода поверх переписки: появление вопроса не сдвигает сообщения. */
 .questions {
-  position: absolute;
-  inset-inline: var(--sp-5);
-  bottom: calc(100% + var(--sp-2));
-  z-index: var(--z-expanded);
   display: grid;
   gap: var(--sp-2);
-  max-height: min(70vh, 560px);
-  overflow: auto;
-  scrollbar-width: thin;
 }
-.question {
-  display: grid;
+.question.ui-card {
   gap: var(--sp-3);
-  padding: var(--sp-4);
-  border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--line-strong));
-  border-radius: var(--r-lg);
-  background: color-mix(in srgb, var(--warn) 6%, var(--bg-2));
-  box-shadow: var(--shadow-popover);
-  color: var(--text);
   font-size: var(--fs-md);
   line-height: 1.5;
 }

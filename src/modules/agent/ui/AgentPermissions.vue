@@ -53,12 +53,6 @@ const emit = defineEmits<{ decide: [id: string, allow: boolean, always?: boolean
 .permissions {
   display: grid;
   gap: 8px;
-  margin: 0 0 10px;
-  /* A backend may describe a call by its whole command line: the dock scrolls instead of pushing
-     the composer and the buttons out of the window. */
-  max-height: min(50vh, 420px);
-  overflow-y: auto;
-  scrollbar-width: thin;
 }
 header {
   min-width: 0;

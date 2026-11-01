@@ -40,8 +40,8 @@ const state = (job: AgentJobView) =>
 <style scoped>
 .jobs {
   display: grid;
-  gap: 4px;
-  margin: 0 0 8px;
+  gap: 2px;
+  margin: 0;
 }
 .job {
   display: flex;
@@ -49,20 +49,20 @@ const state = (job: AgentJobView) =>
   gap: 8px;
   width: 100%;
   min-width: 0;
-  padding: 6px 8px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
+  padding: 4px 6px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: none;
   color: var(--text);
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
 .job:hover {
-  background: var(--surface-hover, var(--surface));
+  background: var(--hover);
 }
 .job.needs-user {
-  border-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
 }
 .mark {
   width: 14px;
