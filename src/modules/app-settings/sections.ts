@@ -6,6 +6,7 @@ import { GithubSettings } from "../github/index.ts";
 import { GitlabSettings } from "../gitlab/index.ts";
 import { DockerSettings } from "../docker/index.ts";
 import { ProviderPanel } from "../provider/index.ts";
+import { PwaSettings } from "../pwa/index.ts";
 import {
   AgentHooksSettings,
   AgentIntegrationsSettings,
@@ -26,6 +27,15 @@ export const settingsSections: SettingsSection[] = [
     description: "Режим запуска и системная горячая клавиша.",
     keywords: "окно браузер GTK трей хоткей shortcut запуск",
     component: InterfaceSettings,
+  },
+  {
+    id: "pwa",
+    title: "Приложение",
+    group: "Среда",
+    description: "Установка на домашний экран, отдельное окно и полноэкранный режим.",
+    keywords:
+      "pwa установка приложение иконка домашний экран ярлык fullscreen полный экран standalone service worker кеш офлайн",
+    component: PwaSettings,
   },
   {
     id: "folders",

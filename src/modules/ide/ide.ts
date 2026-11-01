@@ -8,6 +8,7 @@ import {
   type PaletteCommand,
 } from "../../../core/modules/ide/index.ts";
 import { commandHostKey } from "../../common/utilities/commands.ts";
+import { fullscreenAvailable, installApp, toggleFullscreen, usePwa } from "../pwa/index.ts";
 import { listenIdeCommands } from "./command-bridge.ts";
 import { createPageReload } from "./reload.ts";
 interface PaletteSession {
@@ -40,7 +41,24 @@ export function provideIdeCommands() {
     error.value = value instanceof Error ? value.message : "Не удалось выполнить команду";
   };
   const workbench = sdk.createScope("workbench", () => ({ surface: "workbench" }));
+  const { canInstall } = usePwa();
   const pageReload = createPageReload(reportError, () => revision.value++);
+  workbench.registerCommand({
+    id: "ide.workbench.pwa.install",
+    title: "Установить Projector как приложение",
+    description:
+      "Открывает системное предложение установки: иконка в меню приложений и отдельное окно без адресной строки. Доступно, когда браузер предложил установку; в dev service worker и офлайн-кеш не включаются.",
+    enabled: () => canInstall.value,
+    run: () => installApp(),
+  });
+  workbench.registerCommand({
+    id: "ide.workbench.fullscreen.toggle",
+    title: "Полноэкранный режим",
+    description:
+      "Скрывает интерфейс браузера и освобождает весь экран под рабочую область; на телефоне это заменяет установленное приложение. Выход — повторный вызов или Esc.",
+    enabled: () => fullscreenAvailable(),
+    run: () => toggleFullscreen(),
+  });
   workbench.registerCommand({
     id: "ide.workbench.pages.reload",
     title: "Перезагрузить открытые страницы Projector",

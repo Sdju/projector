@@ -1,6 +1,7 @@
 import { computed, ref, watch, type Ref } from "vue";
 import { useCompactViewport } from "../../../common/utilities/compact-viewport.ts";
 import { commandArgs, type useCommandScope } from "../../../common/utilities/commands.ts";
+import { fullscreenAvailable, toggleFullscreen } from "../../pwa/index.ts";
 import type { WorkspaceCapabilities } from "../../workspace-api/index.ts";
 
 export type MobileSurface = "editor" | "files" | "terminal";
@@ -58,6 +59,14 @@ export function registerMobileCommands(options: {
         throw new Error("surface: editor, files или terminal");
       surface.value = target;
     },
+  });
+  editorCommands.scope.registerCommand({
+    id: "ide.workbench.fullscreen.toggle",
+    title: "Полноэкранный режим",
+    description:
+      "Скрывает интерфейс браузера и освобождает весь экран под рабочую область; на телефоне это заменяет установленное приложение. Выход — повторный вызов или Esc.",
+    enabled: () => fullscreenAvailable(),
+    run: () => toggleFullscreen(),
   });
   watch(options.activeKey, (key) => {
     if (key) surface.value = "editor";

@@ -118,7 +118,7 @@ The terminal read is the `{ action: "read", lines }` POST on the terminal contro
 
 ## Reload and server mode
 
-Global `workbench` scope: `ide.workbench.pages.reload` reloads all same-origin pages (BroadcastChannel). `ide.workbench.server.restart` confirms, calls `POST /api/app/restart`, waits for a new PID in `/api/health` (60 s timeout), then reloads; `ide.workbench.server.mode.dev|prod` call `POST /api/app/mode` with `{ mode }` (detached `projector mode <mode>`, see [usage](usage.md)). All of them end terminals and child processes.
+Global `workbench` scope: `ide.workbench.pages.reload` reloads all same-origin pages (BroadcastChannel). `ide.workbench.server.restart` confirms, calls `POST /api/app/restart`, waits for a new PID in `/api/health` (60 s timeout), then reloads; `ide.workbench.server.mode.dev|prod` call `POST /api/app/mode` with `{ mode }` (detached `projector mode <mode>`, see [usage](usage.md)). All of them end terminals and child processes. `ide.workbench.pwa.install` opens the saved browser install prompt, `ide.workbench.fullscreen.toggle` uses the Fullscreen API (also in the mobile surface pill and the scope of every project workspace).
 
 ## Git commands
 

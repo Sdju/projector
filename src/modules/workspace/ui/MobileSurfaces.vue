@@ -3,10 +3,15 @@ import { computed } from "vue";
 import IconFiles from "~icons/lucide/folder-tree";
 import IconEditor from "~icons/lucide/file-code";
 import IconTerminal from "~icons/lucide/terminal";
+import IconMaximize from "~icons/lucide/maximize";
+import IconMinimize from "~icons/lucide/minimize";
+import { fullscreenAvailable, usePwa } from "../../pwa/index.ts";
 
 /** Навигация по поверхностям проекта на узком экране: файлы, редактор, терминалы. */
 const props = defineProps<{ terminals: boolean; surface: string }>();
 defineEmits<{ command: [id: string, args?: unknown] }>();
+const canFullscreen = fullscreenAvailable();
+const { fullscreen } = usePwa();
 const entries = computed(() => [
   { id: "files", title: "Файлы", icon: IconFiles },
   { id: "editor", title: "Редактор", icon: IconEditor },
@@ -28,6 +33,19 @@ const entries = computed(() => [
     >
       <component :is="entry.icon" aria-hidden="true" />
       <span>{{ entry.title }}</span>
+    </button>
+    <span v-if="canFullscreen" class="pill-divider" aria-hidden="true"></span>
+    <button
+      v-if="canFullscreen"
+      class="surface-tab action"
+      :class="{ active: fullscreen }"
+      :aria-pressed="fullscreen"
+      :aria-label="fullscreen ? 'Выйти из полного экрана' : 'На весь экран'"
+      title="Полноэкранный режим"
+      data-command="ide.workbench.fullscreen.toggle"
+      @click="$emit('command', 'ide.workbench.fullscreen.toggle')"
+    >
+      <component :is="fullscreen ? IconMinimize : IconMaximize" aria-hidden="true" />
     </button>
   </nav>
 </template>
@@ -78,5 +96,21 @@ const entries = computed(() => [
 }
 .surface-tab.active span {
   display: inline;
+}
+.surface-tab.action {
+  inline-size: 40px;
+  padding-inline: 0;
+  color: var(--text-2);
+}
+.surface-tab.action.active {
+  inline-size: 40px;
+  padding-inline: 0;
+}
+.pill-divider {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  margin-inline: 1px 0;
+  background: var(--line);
 }
 </style>
