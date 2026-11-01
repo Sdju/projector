@@ -38,7 +38,11 @@ for (const scenario of scenarios.filter((item) => !only.length || only.includes(
     for (const command of run.bashWrites)
       console.log(`     bash отклонён: ${command.slice(0, 200)}`);
     if (run.failed.length)
-      console.log(`     ошибки инструментов: ${run.failed.map((item) => item.name).join(", ")}`);
+      console.log(
+        `     ошибки инструментов: ${run.failed
+          .map((item) => `${item.name}: ${String(item.error).replace(/\s+/g, " ").slice(0, 160)}`)
+          .join("; ")}`,
+      );
     console.log(`     ответ: ${run.answer.replace(/\s+/g, " ").slice(0, 300)}`);
     for (const item of failures) console.log(`     ✗ ${item}`);
   }

@@ -26,9 +26,12 @@ useMessageScope(
   <div class="agent-message">
     <template v-for="(part, index) in parts" :key="index">
       <AgentMarkdown v-if="part.type === 'markdown'" :text="part.text" :streaming="streaming" />
-      <p v-else-if="part.type === 'widget' && part.source === promoted" class="promoted-form">
-        <span aria-hidden="true">↓</span> Форма доступна в поле ввода.
-      </p>
+      <template v-else-if="part.type === 'widget' && part.source === promoted">
+        <!-- The dedicated answer form lives only in the composer: no second copy in the answer. -->
+        <p v-if="part.name !== 'IntelligentForm'" class="promoted-form">
+          <span aria-hidden="true">↓</span> Форма доступна в поле ввода.
+        </p>
+      </template>
       <AgentWidget
         v-else-if="part.type === 'widget'"
         :source="part.source"

@@ -6,7 +6,7 @@ import { describe, expect, it } from "vite-plus/test";
 const entry = fileURLToPath(new URL("../server/app/widgets-mcp.ts", import.meta.url));
 
 describe("widgets MCP", () => {
-  it("describes special widgets and refuses ordinary ones", async () => {
+  it("describes special and ordinary widgets", async () => {
     const transport = new StdioClientTransport({
       command: process.execPath,
       args: [entry],
@@ -31,8 +31,8 @@ describe("widgets MCP", () => {
         name: "describe_widget",
         arguments: { name: "Card" },
       });
-      expect(ordinary.isError).toBe(true);
-      expect(ordinary.content[0].text).toContain("не специальный");
+      expect(ordinary.isError).not.toBe(true);
+      expect(ordinary.content[0].text).toContain("Card — рамка");
     } finally {
       await client.close();
     }

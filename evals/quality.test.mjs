@@ -140,6 +140,33 @@ describe("evals harness, against a scripted model", () => {
     ]);
   });
 
+  it("checks the dedicated answer form and the number of its fields", () => {
+    const scenario = byId("intelligent-form-project");
+    const run = (answer) => ({
+      tools: [],
+      executed: [],
+      approvals: [],
+      failed: [],
+      secrets: [],
+      events: [],
+      answer,
+    });
+    expect(
+      judge(
+        scenario,
+        run(
+          '<IntelligentForm><Checks name="mode" /><Input name="port" /><Checks name="start" /></IntelligentForm>',
+        ),
+      ),
+    ).toEqual([]);
+    expect(judge(scenario, run('<Form><Input name="name" /></Form>'))).toContain(
+      "в ответе есть /<Form\\b/",
+    );
+    expect(
+      judge(scenario, run('<IntelligentForm><Input name="name" /></IntelligentForm>')),
+    ).toContain("в форме 1 полей, нужно 3");
+  });
+
   it("catches a secret that leaks into the conversation", async () => {
     const scenario = byId("secret-by-form");
     const run = {

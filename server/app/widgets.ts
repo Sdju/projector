@@ -11,6 +11,7 @@ import { gitInfoWidget } from "../../core/modules/agent-widgets/git-info/index.t
 import { imageWidget } from "../../core/modules/agent-widgets/image/index.ts";
 import { inlineIconWidget } from "../../core/modules/agent-widgets/inline-icon/index.ts";
 import { inputWidget } from "../../core/modules/agent-widgets/input/index.ts";
+import { intelligentFormWidget } from "../../core/modules/agent-widgets/intelligent-form/index.ts";
 import { lineWidget } from "../../core/modules/agent-widgets/line/index.ts";
 import { rowWidget } from "../../core/modules/agent-widgets/row/index.ts";
 import { sliderWidget } from "../../core/modules/agent-widgets/slider/index.ts";
@@ -37,6 +38,7 @@ export function registerBuiltinWidgetDefinitions(): void {
     imageWidget,
     inlineIconWidget,
     inputWidget,
+    intelligentFormWidget,
     lineWidget,
     rowWidget,
     sliderWidget,

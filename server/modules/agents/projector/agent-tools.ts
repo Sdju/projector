@@ -100,9 +100,9 @@ export function createAgentTools(context: AgentToolContext) {
     }),
     describe_widget: tool({
       description:
-        "Полное описание специального виджета из раздела «Специальные виджеты»: свойства, ограничения и пример. Вызывай перед первым использованием такого виджета. Для обычных виджетов не нужен — их описание уже в промпте.",
-      inputSchema: z.object({ name: z.string().describe("Имя специального виджета") }),
-      execute: async ({ name }) => ({ description: widgetCatalog.describeSpecial(name) }),
+        "Полное описание виджета: свойства, ограничения и пример. Для специальных виджетов обязательно вызывай перед первым использованием; для обычных описание уже есть в промпте.",
+      inputSchema: z.object({ name: z.string().describe("Имя виджета") }),
+      execute: async ({ name }) => ({ description: widgetCatalog.describe(name) }),
     }),
     use_skill: tool({
       description:

@@ -12,7 +12,7 @@ const server = new McpServer(
   { name: "projector-widgets", version: "1" },
   {
     instructions:
-      "Полные описания специальных виджетов Projector. Перед первым использованием виджета из раздела «Специальные виджеты» вызови describe_widget с его именем.",
+      "Полные описания виджетов Projector. Для виджета из раздела «Специальные виджеты» вызови describe_widget перед первым использованием; обычные уже описаны в промпте.",
   },
 );
 
@@ -20,12 +20,12 @@ server.registerTool(
   "describe_widget",
   {
     description:
-      "Полное описание специального виджета: свойства, ограничения и пример. Вызывай перед первым использованием такого виджета. Для обычных виджетов не нужен — их описание уже в промпте.",
-    inputSchema: { name: z.string().describe("Имя специального виджета") },
+      "Полное описание виджета: свойства, ограничения и пример. Для специального виджета вызывай перед первым использованием; для обычного не обязательно — описание уже в промпте.",
+    inputSchema: { name: z.string().describe("Имя виджета") },
   },
   async ({ name }) => {
     try {
-      return { content: [{ type: "text" as const, text: widgetCatalog.describeSpecial(name) }] };
+      return { content: [{ type: "text" as const, text: widgetCatalog.describe(name) }] };
     } catch (error) {
       return {
         isError: true,

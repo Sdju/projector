@@ -324,6 +324,38 @@ test(
     expect(await browser.evaluate("window.fixture.replies.length")).toBe(1);
     await browser.evaluate("window.fixture.replies.length = 0");
 
+    // The dedicated answer form brings its own submit button and sends its named fields.
+    await set(
+      `<IntelligentForm summary="Настройки" submit="Применить">
+  <Input name="note" label="Комментарий" initial="без заметок" />
+  <Checks name="scripts" :initial="['lint']" :options="['start','test','lint']" />
+</IntelligentForm>`,
+      false,
+    );
+    await wait('document.querySelector(".intelligent-form .btn") !== null');
+    await browser.click(".intelligent-form .btn");
+    await wait(
+      'document.querySelector(".intelligent-form .btn").textContent.includes("Отправлено")',
+    );
+    const dedicated = await browser.evaluate("window.fixture.replies.at(-1)");
+    expect(dedicated.startsWith("Настройки\n\n```json")).toBe(true);
+    expect(JSON.parse(dedicated.split("```json\n")[1].split("\n```")[0])).toEqual({
+      note: "без заметок",
+      scripts: ["lint"],
+    });
+    expect(await browser.evaluate('document.querySelector(".intelligent-form").disabled')).toBe(
+      true,
+    );
+    await browser.evaluate("window.fixture.replies.length = 0");
+
+    // A promoted IntelligentForm lives only in the composer: the answer has no second copy or hint.
+    const promoted = `<IntelligentForm summary="Настройки"><Input name="note" initial="x" /></IntelligentForm>`;
+    await set(promoted, false);
+    await browser.evaluate(`window.fixture.promote(${JSON.stringify(promoted)})`);
+    await wait('document.querySelector(".intelligent-form") === null');
+    expect(await browser.evaluate('document.querySelector(".promoted-form")')).toBe(null);
+    await browser.evaluate("window.fixture.promote('')");
+
     // Stream in 40-character chunks; mark the first Card's DOM node once it is rendered.
     let marked = false;
     let mountsSeen = 0;

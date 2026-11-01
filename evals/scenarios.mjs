@@ -76,4 +76,38 @@ export const scenarios = [
     message: "Сохрани мой токен GitHub",
     expect: { called: ["request_secret"], secretStaysOut: true },
   },
+  {
+    id: "intelligent-form-project",
+    title: "Сложные настройки запуска собирает в IntelligentForm",
+    message:
+      "Подготовь проект к запуску: уточни у меня режим (server или window), порт и нужно ли запускать при старте. Ничего не меняй без моего ответа.",
+    expect: {
+      notExecuted: ["ide.project.settings.set"],
+      answer: /<IntelligentForm\b/,
+      notInAnswer: /<Form\b/,
+      formFields: 3,
+    },
+  },
+  {
+    id: "intelligent-form-release",
+    title: "Параметры релиза собирает одной формой",
+    message:
+      "Собери релиз: уточни ветку, версию, обновлять ли CHANGELOG и публиковать ли тег. Покажи все варианты одной формой.",
+    expect: {
+      answer: /<IntelligentForm\b/,
+      notInAnswer: /<Form\b/,
+      formFields: 4,
+    },
+  },
+  {
+    id: "intelligent-form-docker",
+    title: "Настройки Docker уточняет формой, а не текстом",
+    message:
+      "Настрой Docker для проекта: выбери сеть none или bridge, порт, лимит памяти и нужно ли поднимать контейнер после создания. Сначала уточни параметры.",
+    expect: {
+      answer: /<IntelligentForm\b/,
+      notInAnswer: /<Form\b/,
+      formFields: 4,
+    },
+  },
 ];

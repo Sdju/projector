@@ -230,6 +230,11 @@ export function judge(scenario, run) {
     failures.push(`ответ не подходит под ${expect.answer}`);
   if (expect.notInAnswer && expect.notInAnswer.test(run.answer))
     failures.push(`в ответе есть ${expect.notInAnswer}`);
+  if (expect.formFields) {
+    const fields = new Set([...String(run.answer).matchAll(/\bname="([^"]+)"/g)].map((m) => m[1]));
+    if (fields.size < expect.formFields)
+      failures.push(`в форме ${fields.size} полей, нужно ${expect.formFields}`);
+  }
   if (expect.either && !expect.either.some((rule) => rule(run)))
     failures.push("не выполнено ни одно из допустимых поведений");
   if (expect.secretStaysOut)

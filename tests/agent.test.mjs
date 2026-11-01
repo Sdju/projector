@@ -56,9 +56,7 @@ test("agent discovers live commands, requires description, checks args and exclu
   expect((await call("describe_widget", { name: "GitInfo" })).description).toContain(
     "branch: string",
   );
-  await expect(async () => call("describe_widget", { name: "Card" })).rejects.toThrow(
-    /не специальный/,
-  );
+  expect((await call("describe_widget", { name: "Card" })).description).toContain("Card — рамка");
   expect((await call("list_commands", {})).commands.map((c) => c.id)).toStrictEqual([
     "ide.fileTree.file.rename",
   ]);
