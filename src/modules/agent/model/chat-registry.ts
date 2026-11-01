@@ -64,6 +64,15 @@ export interface ChatController {
   askSide(text: string): Promise<string>;
   /** Clears the in-memory side thread of this chat. */
   clearSide(): void;
+  /** Whether the Lens caption is shown in the work block. */
+  lensOpen(): boolean;
+  /** Turns Lens on and resolves with the first caption. */
+  openLens(): Promise<string>;
+  closeLens(): void;
+  /** Asks for a new caption; the text is returned as well as shown. */
+  refreshLens(): Promise<string>;
+  /** Whether Lens asks again by itself while the agent works. */
+  setLensAuto(on: boolean): void;
   mcpServers(): Promise<McpServer[]>;
   /** The isolated copy of the project the chat works in, if any. */
   worktree(): Promise<WorktreeInfo | undefined>;

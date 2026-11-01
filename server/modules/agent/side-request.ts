@@ -58,7 +58,8 @@ function exchanges(value: unknown): SideExchange[] {
   });
 }
 
-function runningTools(value: unknown): SideRunningTool[] {
+/** Running tools a request reports; malformed rows are dropped and sizes bounded. */
+export function runningToolsFrom(value: unknown): SideRunningTool[] {
   if (!Array.isArray(value)) return [];
   return value.slice(0, RUNNING_TOOLS).flatMap((item): SideRunningTool[] => {
     if (!item || typeof item !== "object") return [];
@@ -77,7 +78,8 @@ function runningTools(value: unknown): SideRunningTool[] {
   });
 }
 
-function planItems(value: unknown): SidePlanItem[] {
+/** Plan items a request reports; malformed rows are dropped and sizes bounded. */
+export function planItemsFrom(value: unknown): SidePlanItem[] {
   if (!Array.isArray(value)) return [];
   return value.slice(0, PLAN_ITEMS).flatMap((item): SidePlanItem[] => {
     if (!item || typeof item !== "object") return [];
@@ -107,7 +109,8 @@ function fitHistory(turns: AgentHistoryTurn[]): AgentHistoryTurn[] {
   return turns.slice(start);
 }
 
-function history(value: unknown): AgentHistoryTurn[] {
+/** The visible conversation a request reports, cut to what a read-only answer needs. */
+export function historyFrom(value: unknown): AgentHistoryTurn[] {
   if (!Array.isArray(value)) return [];
   return fitHistory(
     value.slice(-HISTORY_TURNS).flatMap((item): AgentHistoryTurn[] => {
@@ -159,12 +162,12 @@ export function sideRequestFrom(body: Record<string, unknown>): SideRequest {
   const question = text(body.question, QUESTION_CHARS);
   if (!question) throw new Error("Напишите вопрос в сторону");
   const thread = exchanges(body.thread);
-  const running = runningTools(body.running);
-  const plan = planItems(body.plan);
+  const running = runningToolsFrom(body.running);
+  const plan = planItemsFrom(body.plan);
   return {
     question,
     message: sideMessage(question, thread, running, plan),
-    history: history(body.history),
+    history: historyFrom(body.history),
     thread,
     running,
     plan,

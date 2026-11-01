@@ -5,10 +5,13 @@ import { computed, ref } from "vue";
 import { chipIcon, chipLabel, chipTitle } from "../lib/composer/chips.ts";
 import { versionsOf, type ForkMode } from "../model/branches.ts";
 import { legacyParts } from "../model/turn-events.ts";
+import type { AgentLens } from "../model/lens.ts";
 import type { AgentToolChip, AgentTurn, ChatUsage, MessageChip } from "../model/types.ts";
 import AgentMessage from "./AgentMessage.vue";
 import AgentFormAnswer from "./AgentFormAnswer.vue";
-import AgentWork, { type AgentWorkItem } from "./AgentWork.vue";
+import AgentLensView from "./AgentLens.vue";
+import type { AgentWorkItem } from "../lib/work-items.ts";
+import AgentWork from "./AgentWork.vue";
 import AgentChanges from "./AgentChanges.vue";
 import AgentUsageInfo from "./AgentUsageInfo.vue";
 import IconCopy from "~icons/lucide/copy";
@@ -37,6 +40,8 @@ const props = defineProps<{
   readonly?: boolean;
   /** The form the chat is waiting for: its copy in this answer is shown as a read-only panel. */
   promotedForm?: string;
+  /** The chat's Lens: only the last work group of the last answer shows it. */
+  lens?: AgentLens;
 }>();
 const emit = defineEmits<{
   copy: [id: string, text: string];
@@ -144,6 +149,10 @@ const currentWork = computed(() => {
   }
   return "";
 });
+// The Lens panel belongs to one block: the last work group of the answer.
+const lastWork = computed(
+  () => segments.value.findLast((segment) => segment.type === "work")?.key ?? "",
+);
 </script>
 
 <template>
@@ -280,9 +289,16 @@ const currentWork = computed(() => {
           :current="segment.key === currentWork"
           :any-running="anyRunning"
           :root="root"
+          :lens="segment.key === lastWork ? lens : undefined"
           @open="(path) => emit('openFile', path)"
         />
       </template>
+      <!-- Until the first thought or call there is no work block: Lens sits by the thinking dots. -->
+      <AgentLensView
+        v-if="waiting && busy && last && lens && lens.state.open"
+        :lens="lens"
+        class="early"
+      />
       <UiInline
         v-if="busy && last && waiting"
         :gap="2"

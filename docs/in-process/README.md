@@ -14,3 +14,4 @@
 
 - [agent-roadmap.md](agent-roadmap.md) — открытые пункты штатного агента Projector.
 - [agent-intelligent-form.md](agent-intelligent-form.md) — прототип формы вместо поля ввода и снимка ответа.
+- [agent-lens.md](agent-lens.md) — прототип Lens: живая подпись о текущей работе в блоке «Работа».

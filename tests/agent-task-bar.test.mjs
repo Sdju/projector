@@ -62,9 +62,23 @@ test(
     await browser.open(fixture.url("/bar"));
     await browser.evaluate("window.fixture.longCommands()");
     const settle = () => browser.evaluate("new Promise(resolve => requestAnimationFrame(resolve))");
+    const wait = async (expression, ms = 4000) => {
+      for (let waited = 0; waited < ms; waited += 50) {
+        if (await browser.evaluate(expression)) return;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      expect(await browser.evaluate(expression)).toBeTruthy();
+    };
+    // On a phone the work block is a sheet: wait for that mode instead of racing the media query.
     const openWork = async () => {
-      if (!(await browser.evaluate('document.querySelector(".work")?.open')))
+      if (await browser.evaluate('Boolean(document.querySelector(".work[data-compact]"))')) {
+        if (!(await browser.evaluate('Boolean(document.querySelector(".island"))')))
+          await browser.click(".work-summary");
+        await wait('Boolean(document.querySelector(".island"))');
+      } else if (!(await browser.evaluate('document.querySelector(".work")?.open'))) {
         await browser.click(".work-summary");
+        await wait('Boolean(document.querySelector(".work[open]"))');
+      }
       await settle();
     };
     const geometry = () =>
@@ -108,6 +122,11 @@ test(
         await browser.evaluate('document.querySelector(".activity-list .code").textContent'),
       ).toContain("unbroken_argument_");
       await browser.click(".activity-summary");
+      // The sheet covers the dock: close it before reaching the task list behind it.
+      if (await browser.evaluate('Boolean(document.querySelector(".island"))')) {
+        await browser.click(".work-sheet-title");
+        await wait('!document.querySelector(".island")');
+      }
       await browser.click(".task-bar .row");
       await settle();
       expect(

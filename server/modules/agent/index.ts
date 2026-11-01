@@ -143,3 +143,4 @@ export { jobDiff, PATCH_LIMIT, type JobDiff } from "./jobs-diff.ts";
 export { trackEventStream, detachEventStream, bindAgentEventStreams } from "./event-streams.ts";
 export { requestFrom } from "./request.ts";
 export { sideRequestFrom, type SideRequest, type SideExchange } from "./side-request.ts";
+export { lensRequestFrom, type LensRequest } from "./lens-request.ts";

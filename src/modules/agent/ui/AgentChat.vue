@@ -12,6 +12,7 @@ import { useChatBranch } from "../model/chat-branch.ts";
 import { useChatReadout } from "../model/chat-readout.ts";
 import { useAgent } from "../model/session.ts";
 import { useChatJobs } from "../model/chat-jobs.ts";
+import { lensActions, useAgentLens } from "../model/lens.ts";
 import { useSideQuestion } from "../model/side-question.ts";
 import { useAutoCompact } from "../model/use-auto-compact.ts";
 import { useChatInputActions } from "../model/use-chat-input-actions.ts";
@@ -42,6 +43,7 @@ import { openChatChip } from "./open-chip.ts";
 import { exportChat, downloadChat as saveChatMarkdown } from "../lib/export.ts";
 import { copyText } from "../lib/clipboard.ts";
 import { shownPlan } from "../lib/plan.ts";
+import { previousUser } from "../lib/previous-user.ts";
 import { fetchMcpServers } from "../api/client.ts";
 import { useMcpServers } from "../model/mcp-panel.ts";
 import { activateChat, registerChat, type ChatController } from "../model/chat-registry.ts";
@@ -55,6 +57,7 @@ import IconSquarePen from "~icons/lucide/square-pen";
 import IconDownload from "~icons/lucide/download";
 import IconBranch from "~icons/lucide/git-branch";
 import IconMessageCircleQuestion from "~icons/lucide/message-circle-question";
+import IconScanEye from "~icons/lucide/scan-eye";
 const props = withDefaults(
   defineProps<{ projectId: string; backend?: AgentBackendId; chatId?: string }>(),
   { backend: "projector", chatId: undefined },
@@ -261,6 +264,7 @@ const plan = computed(() => shownPlan(turns.value, props.backend));
 const contextShare = computed(() =>
   latestContext.value ? latestContext.value.used / Math.max(1, latestContext.value.size) : 0,
 );
+const lens = useAgentLens({ turns, busy, phase, queue, plan, selection });
 // Rolling back to a message: the panel asks what to undo, shows what the files would change, then does it.
 const {
   rewinding,
@@ -274,14 +278,8 @@ const {
   confirmRewind,
   closeRewind,
 } = useRewindPanel({ rewindFiles, edit, focus: () => composer.value?.focus() });
-// A request's own answers belong to the user message before them.
-function precedingUser(id: string): string {
-  const index = turns.value.findIndex((turn) => turn.id === id);
-  return turns.value.slice(0, index + 1).findLast((turn) => turn.role === "user")?.id ?? "";
-}
-function canRevert(id: string): boolean {
-  return canRewindFiles(precedingUser(id));
-}
+const precedingUser = (id: string) => previousUser(turns.value, id);
+const canRevert = (id: string) => canRewindFiles(precedingUser(id));
 async function editMessage(id: string) {
   edit(id);
   await nextTick();
@@ -349,6 +347,7 @@ const controller: ChatController = {
   openSide: () => side.openPanel(),
   askSide: (text) => side.ask(text),
   clearSide: () => side.clear(),
+  ...lensActions(lens),
   mcpServers: () => fetchMcpServers(props.backend, props.projectId),
   worktree: async () => (worktreeId() ? worktreeInfo() : undefined),
   mergeWorktree: mergeCopy,
@@ -568,6 +567,18 @@ onBeforeUnmount(() => {
         v-if="turns.length"
         shape="icon"
         size="sm"
+        :class="{ on: lens.state.open }"
+        :aria-pressed="lens.state.open"
+        title="Lens: чем агент занят сейчас — короткая сводка прямо в блоке работы"
+        aria-label="Lens: чем агент занят сейчас"
+        @click="lens.toggle()"
+      >
+        <IconScanEye aria-hidden="true" />
+      </UiButton>
+      <UiButton
+        v-if="turns.length"
+        shape="icon"
+        size="sm"
         title="Сохранить чат в Markdown"
         aria-label="Сохранить чат в Markdown"
         @click="saveChatMarkdown(turns, agentName, backend)"
@@ -623,6 +634,7 @@ onBeforeUnmount(() => {
           :promoted-form="
             turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? originalForm : undefined
           "
+          :lens="turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? lens : undefined"
           @copy="copyMessage"
           @open="openChip"
           @edit="editMessage"

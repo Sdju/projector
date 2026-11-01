@@ -1,10 +1,5 @@
-import { defaultSettingsMiddleware, generateText, wrapLanguageModel } from "ai";
-import {
-  createQwenOpenAI,
-  envFallbackFromProcess,
-  quietThinkingBody,
-  resolveOpenAIProvider,
-} from "../../providers/index.ts";
+import { generateText } from "ai";
+import { quietChatModel } from "./quiet-model.ts";
 
 /** The doctor gets only the conversation and the broken block; it must not call tools or change files. */
 const SYSTEM = `Ты Form Doctor — ремонтируешь Vue-разметку формы Projector. На вход приходят история чата, ошибочная форма и сообщение компилятора.
@@ -23,26 +18,7 @@ export interface FormDoctorRequest {
 
 /** Repairs one form with the same provider/model as the chat; no tools, history or side effects. */
 export async function repairForm(request: FormDoctorRequest): Promise<string> {
-  const [providerId, ...rest] = (request.selection?.provider || "").split(":");
-  const resolved = await resolveOpenAIProvider({
-    providerId,
-    model: rest.join(":"),
-    fallback: envFallbackFromProcess(),
-  });
-  const provider = createQwenOpenAI({
-    openaiUrl: resolved.url,
-    openaiApiKey: resolved.apiKey,
-  });
-  const style = resolved.thinking === false ? "none" : resolved.thinkingStyle;
-  const quiet = quietThinkingBody(style);
-  const model = quiet
-    ? wrapLanguageModel({
-        model: provider.chatModel(resolved.model),
-        middleware: defaultSettingsMiddleware({
-          settings: { providerOptions: { qwenOpenai: quiet } },
-        }),
-      })
-    : provider.chatModel(resolved.model);
+  const { model } = await quietChatModel(request.selection);
   const history = (request.history ?? "").slice(-20_000);
   const form = request.form.slice(0, 30_000);
   const error = request.error.slice(0, 2_000);

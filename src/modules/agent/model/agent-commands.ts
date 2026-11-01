@@ -1,4 +1,5 @@
 import { commandArgs } from "../../../common/utilities/commands.ts";
+import { text, turnArg } from "../lib/command-args.ts";
 import { registerBranchCommands } from "./branch-commands.ts";
 import { chatsOf, resolveChat, type ChatController } from "./chat-registry.ts";
 import { registerJobCommands } from "./job-commands.ts";
@@ -6,6 +7,7 @@ import { isBuiltinAgent } from "./modes.ts";
 import type { RegisterCommand } from "./register-command.ts";
 import { registerSessionCommands } from "./session-commands.ts";
 import { registerSideCommands } from "./side-commands.ts";
+import { registerLensCommands } from "./lens-commands.ts";
 import { registerFormCommands } from "./form-commands.ts";
 import { registerTaskCommands } from "./task-commands.ts";
 import type { RewindScope } from "./types.ts";
@@ -14,20 +16,6 @@ export type { RegisterCommand };
 
 const CHAT = "Ключ чата из ide.agent.chats.list; без него — чат, с которым работали последним";
 const SCOPES: RewindScope[] = ["conversation", "files", "both"];
-
-function text(args: Record<string, unknown>, key: string): string {
-  const value = args[key];
-  if (typeof value !== "string" || !value) throw new Error(`Укажите ${key}`);
-  return value;
-}
-
-/** The newest message of the user, which `edit`, `retry` and `rewind` take when no turn is named. */
-function turnArg(chat: ChatController, args: Record<string, unknown>, role: "user" | "assistant") {
-  if (typeof args.turnId === "string" && args.turnId) return args.turnId;
-  const turn = chat.turns().findLast((item) => item.role === role);
-  if (!turn) throw new Error("В чате ещё нет сообщений");
-  return turn.id;
-}
 
 /**
  * The commands of agent chats, for the workspace of a project. They live here and not in the chat
@@ -40,6 +28,7 @@ export function registerAgentCommands(register: RegisterCommand, projectId: stri
   registerSessionCommands(register, projectId);
   registerBranchCommands(register, projectId);
   registerSideCommands(register, projectId);
+  registerLensCommands(register, projectId);
   registerFormCommands(register, projectId);
   const anyChat = () => chatsOf(projectId).length > 0;
   const external = () => chatsOf(projectId).some((chat) => !isBuiltinAgent(chat.backend));
