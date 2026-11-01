@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { dataDir } from "../../../core/modules/app-paths/index.ts";
 import type { AgentBackendId, AgentPermissionMode } from "./backend.ts";
 import type { AgentSelection } from "./controls.ts";
+import type { AgentHistoryTurn } from "../providers/index.ts";
 
 export type AgentJobStatus = "queued" | "running" | "needs-user" | "done" | "error" | "stopped";
 
@@ -39,9 +40,13 @@ export interface AgentJob {
   /** The folder the agent works in: the project or its isolated copy. */
   cwd: string;
   worktree?: { id: string; branch: string };
+  /** The old copy is gone or belongs to a retry: this record cannot use its folder any more. */
+  worktreeCleared?: boolean;
   /** HEAD when the job started and the paths already dirty: what `job.diff` compares against. */
   base?: string;
   dirty?: string[];
+  /** Completed turns plus the user message of an active run, for agents without a native session. */
+  history?: AgentHistoryTurn[];
   /** The Projector chat that started the job: its completion continues that conversation. */
   origin?: string;
   selection?: AgentSelection;
@@ -62,6 +67,13 @@ export interface AgentJob {
   error?: string;
   files: string[];
   pending: JobPending[];
+}
+
+/** The replay history is server-only: API polls carry the current result instead. */
+export function publicJob(job: AgentJob): AgentJob {
+  const copy = structuredClone(job);
+  delete copy.history;
+  return copy;
 }
 
 /** One event of the job as the chat stream carried it (`text`, `tool`, ...), plus `answer`/`status`. */

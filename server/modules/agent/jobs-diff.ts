@@ -6,6 +6,16 @@ const run = promisify(execFile);
 const MAX_BUFFER = 16 * 1024 * 1024;
 /** The patch the agent reads: enough for a review, small enough for a model answer. */
 export const PATCH_LIMIT = 60_000;
+const SECRET_NAMES = new Set([".ssh", ".aws", ".npmrc", ".netrc", ".git-credentials"]);
+const SECRET_PATTERNS = [/(^\.|\.)env($|\.)/i, /\.(pem|key)$/i, /^id_(rsa|ed25519)/i, /\.kdbx$/i];
+const secretPath = (path: string) =>
+  path
+    .split("/")
+    .some(
+      (segment) =>
+        SECRET_NAMES.has(segment.toLowerCase()) ||
+        SECRET_PATTERNS.some((pattern) => pattern.test(segment)),
+    );
 
 async function git(cwd: string, args: string[]): Promise<string> {
   return (await run("git", args, { cwd, maxBuffer: MAX_BUFFER })).stdout;
@@ -27,7 +37,7 @@ async function noIndex(cwd: string, path: string): Promise<string> {
 }
 
 export interface JobDiff {
-  /** Every changed path: tracked, staged and untracked. */
+  /** Every changed non-secret path: tracked, staged and untracked. */
   files: string[];
   /** The `--stat` summary of tracked changes. */
   stat: string;
@@ -58,10 +68,39 @@ export async function jobDiff(
   let summary = "";
   let patch = "";
   try {
-    summary = (await git(cwd, ["--no-pager", "diff", from, "--stat", "--", ...paths])).trim();
-    const names = await git(cwd, ["--no-pager", "diff", from, "--name-only", "-z", "--", ...paths]);
-    for (const path of names.split("\0").filter(Boolean)) files.add(path);
-    patch = await git(cwd, ["--no-pager", "diff", from, "--", ...paths]);
+    const output = await git(cwd, [
+      "--no-pager",
+      "diff",
+      from,
+      "--name-status",
+      "-z",
+      "--",
+      ...paths,
+    ]);
+    const parts = output.split("\0").filter(Boolean);
+    const changed: string[] = [];
+    const secrets = new Set<string>();
+    for (let index = 0; index < parts.length; index++) {
+      const status = parts[index]!;
+      if (status.startsWith("R") || status.startsWith("C")) {
+        const before = parts[++index];
+        const after = parts[++index];
+        if (!before || !after) continue;
+        if (secretPath(before) || secretPath(after)) {
+          secrets.add(before);
+          secrets.add(after);
+        } else changed.push(after);
+      } else {
+        const path = parts[++index];
+        if (!path) continue;
+        if (secretPath(path)) secrets.add(path);
+        else changed.push(path);
+      }
+    }
+    const visible = [...paths, ...[...secrets].map((path) => `:(exclude,literal)${path}`)];
+    for (const path of changed) files.add(path);
+    summary = (await git(cwd, ["--no-pager", "diff", from, "--stat", "--", ...visible])).trim();
+    patch = await git(cwd, ["--no-pager", "diff", from, "--", ...visible]);
   } catch {
     // Not a git repository or no commits yet: the files still come from the working tree.
   }
@@ -69,7 +108,7 @@ export async function jobDiff(
   try {
     untracked = (await git(cwd, ["ls-files", "--others", "--exclude-standard", "-z"]))
       .split("\0")
-      .filter((path) => path && !dirtySet.has(path));
+      .filter((path) => path && !dirtySet.has(path) && !secretPath(path));
   } catch {
     untracked = [];
   }

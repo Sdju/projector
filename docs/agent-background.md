@@ -6,7 +6,7 @@
 
 Хранилище: `$XDG_DATA_HOME/projector/agent/jobs/<id>/` (`id` — 12 hex-символов, форма проверяется).
 
-- `job.json` — запись `AgentJob`: `id`, `backend`, `task` (текст задания), `projectId`, `cwd` (папка агента), `worktree` (`{ id, branch }`, если работа идёт в изолированной копии), `selection` и `permissionMode`, `unattended` (явное «без вопросов»), `status`, `rev` (растёт при каждой смене состояния), `createdAt`/`startedAt`/`endedAt`, `runId` (ход в `agent/runs`), `sessionId`, `result` (итоговый ответ, до 100 000 символов), `error`, `files` (изменённые файлы), `pending` (карточки, ждущие пользователя).
+- `job.json` — запись `AgentJob`: `id`, `backend`, `task` (текст задания), `projectId`, `cwd` (папка агента), `worktree` (`{ id, branch }`, если работа идёт в изолированной копии), `worktreeCleared` (копия удалена или передана повтору), служебная `history` для агентов без нативной сессии (в API не отдаётся), `selection` и `permissionMode`, `unattended` (явное «без вопросов»), `status`, `rev` (растёт при каждой смене состояния), `createdAt`/`startedAt`/`endedAt`, `runId` (ход в `agent/runs`), `sessionId`, `result` (итоговый ответ, до 100 000 символов), `error`, `files` (изменённые файлы), `pending` (карточки, ждущие пользователя).
 - `journal.json` — журнал событий в формате SSE-событий чата (`text`, `tool`, `tool-result`, `task`, `thought`, `permission-request`, `question-request`, плюс `answer` и `status`). Соседние `text` склеиваются, большие входы и выходы инструментов обрезаются, хранится не больше 1500 записей. Формат совпадает с событиями чата, поэтому вкладка задания свёртывает журнал в обычный ход агента (`applyAgentEvent`) и рисует тем же `AgentTurn`.
 
 Состояния: `queued` (создано, ход ещё не запущен), `running`, `needs-user` (есть неотвеченные запрос разрешения или вопрос), `done`, `error`, `stopped`. Завершённые задания хранятся 14 дней.
@@ -30,8 +30,8 @@
 - `POST /api/agent/jobs` — `{ projectId, backend, task, isolate?, selection?, mode?, unattended?, origin? }` (`mode` — режим разрешений Claude Code или элемент `mode` у ACP-агентов; `origin` — ключ чата Projector, который запустил задание).
 - `GET /api/agent/jobs` — список (без журнала); `?projectId=` фильтрует.
 - `GET /api/agent/jobs/:id` — задание с журналом. `?wait=<сек ≤45>&rev=<N>` ждёт, пока `rev` станет больше `N`.
-- `GET /api/agent/jobs/:id/diff` — файлы, `--stat` и patch; `?limit=` ограничивает длину.
-- `GET /api/agent/jobs/:id/worktree`, `POST /api/agent/jobs/:id/worktree/merge|discard` — копия задания.
+- `GET /api/agent/jobs/:id/diff` — файлы, `--stat` и patch без секретных путей; `?limit=` ограничивает длину. После удаления или передачи копии возвращает `409`, а не diff чужой папки.
+- `GET /api/agent/jobs/:id/worktree`, `POST /api/agent/jobs/:id/worktree/merge|discard` — копия задания. Операции над копией взаимоисключающие; слияние и удаление отклоняются, если её использует другое активное задание.
 - `POST /api/agent/jobs/:id/stop`, `POST /api/agent/jobs/:id/answer` — `{ request?, allow?, always?, text?, answers? }`.
 - `POST /api/agent/jobs/:id/send` — `{ text }`: уточнение идущему ходу (`accepted: false`, если агент не умеет), а завершённому — новый ход в той же записи и сессии (`continued: true` и `job`).
 - `POST /api/agent/jobs/:id/retry` — новый ход с той же задачей, папкой, копией и сессией.

@@ -11,6 +11,7 @@ let jobs;
 let runs;
 let store;
 let attached;
+let replayed;
 
 async function until(check, timeoutMs = 8000) {
   const deadline = Date.now() + timeoutMs;
@@ -101,6 +102,16 @@ const fake = {
   },
 };
 
+const replay = {
+  id: "fake-replay",
+  label: "Fake Replay",
+  capabilities: { hosted: true },
+  async run(options) {
+    replayed.push({ message: options.message, history: options.history });
+    options.emit("done", { text: `answer to ${options.message}` });
+  },
+};
+
 beforeAll(async () => {
   directory = await realpath(await mkdtemp(join(tmpdir(), "projector-jobs-")));
   previous = process.env.XDG_DATA_HOME;
@@ -115,10 +126,12 @@ beforeAll(async () => {
   execFileSync("git", ["commit", "-qm", "init"], { cwd: folder });
   const agent = await import("../server/modules/agent/index.ts");
   agent.registerAgentBackend(fake);
+  agent.registerAgentBackend(replay);
   jobs = agent;
   runs = agent;
   store = await import("../server/modules/agent/jobs-store.ts");
   attached = [];
+  replayed = [];
 });
 afterAll(async () => {
   process.env.XDG_DATA_HOME = previous;
@@ -161,6 +174,27 @@ describe("background agent jobs", () => {
     expect(saved.result).toBe("final answer");
     expect((await jobs.listJobs("p1")).map((item) => item.id)).toContain(job.id);
     expect(await jobs.listJobs("other")).toEqual([]);
+  });
+
+  it("replays every earlier follow-up when the agent has no native session", async () => {
+    const job = await start("original", { backend: "fake-replay" });
+    expect(job.history).toBeUndefined();
+    await settled(job.id);
+    await jobs.followUpJob(job.id, "second");
+    await settled(job.id);
+    await jobs.followUpJob(job.id, "third");
+    await settled(job.id);
+    expect(replayed.map((call) => call.message)).toEqual(["original", "second", "third"]);
+    expect(replayed[2].history).toEqual([
+      { role: "user", content: "original" },
+      { role: "assistant", content: "answer to original" },
+      { role: "user", content: "second" },
+      { role: "assistant", content: "answer to second" },
+    ]);
+    const saved = await store.loadJob(job.id);
+    expect(saved.history).toHaveLength(6);
+    expect((await jobs.readJob(job.id)).job.history).toBeUndefined();
+    expect((await jobs.listJobs("p1")).find((item) => item.id === job.id).history).toBeUndefined();
   });
 
   it("turns a permission and a question into needs-user and goes on after the answers", async () => {

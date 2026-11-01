@@ -137,7 +137,7 @@ export {
   type JournalEntry,
   type StartJobInput,
 } from "./jobs.ts";
-export { clearJobWorktree, forkJob, retryJob } from "./jobs-worktree.ts";
+export { forkJob, retryJob, settleJobWorktree } from "./jobs-worktree.ts";
 export { followUpJob } from "./jobs-followup.ts";
 export { jobDiff, PATCH_LIMIT, type JobDiff } from "./jobs-diff.ts";
 export { trackEventStream, detachEventStream, bindAgentEventStreams } from "./event-streams.ts";

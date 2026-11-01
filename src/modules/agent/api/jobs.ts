@@ -30,6 +30,8 @@ export interface AgentJobView {
   projectId: string;
   cwd: string;
   worktree?: { id: string; branch: string };
+  /** The isolated copy was merged, discarded or transferred to a retry. */
+  worktreeCleared?: boolean;
   /** The Projector chat that started the job, when it did. */
   origin?: string;
   unattended: boolean;

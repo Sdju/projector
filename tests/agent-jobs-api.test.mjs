@@ -267,12 +267,27 @@ test("a job in an isolated copy works there and can be stopped", async () => {
   const next = (await retried.json()).job;
   expect(next).toMatchObject({ cwd: job.cwd, worktree: { branch: job.worktree.branch } });
   expect(next.id).not.toBe(job.id);
-  expect((await (await request(`/api/agent/jobs/${job.id}`)).json()).job.worktree).toBeUndefined();
+  const previous = (await (await request(`/api/agent/jobs/${job.id}`)).json()).job;
+  expect(previous).toMatchObject({ worktreeCleared: true, cwd: job.cwd });
+  expect(previous.worktree).toBeUndefined();
   expect((await request(`/api/agent/jobs/${job.id}/worktree/merge`, "POST", {})).status).toBe(400);
+  expect((await request(`/api/agent/jobs/${job.id}/diff`)).status).toBe(409);
+  expect((await request(`/api/agent/jobs/${job.id}/send`, "POST", { text: "old" })).status).toBe(
+    400,
+  );
   await until(
     async () =>
       (await (await request(`/api/agent/jobs/${next.id}`)).json()).job.status === "running",
   );
+  // This is the state visible during a retry/merge race: the old record still names the copy,
+  // but the active retry owns it. Merge must refuse rather than delete the retry's folder.
+  const storage = await import("../server/modules/agent/jobs-store.ts");
+  const contended = await storage.loadJob(job.id);
+  contended.worktree = job.worktree;
+  delete contended.worktreeCleared;
+  await storage.saveJob(contended);
+  expect((await request(`/api/agent/jobs/${job.id}/worktree/merge`, "POST", {})).status).toBe(409);
+  expect(await readFile(join(next.cwd, "a.txt"), "utf8")).toBe("1\n");
   await request(`/api/agent/jobs/${next.id}/stop`, "POST", {});
   await until(
     async () =>

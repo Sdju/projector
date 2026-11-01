@@ -1,7 +1,6 @@
 import { stat } from "node:fs/promises";
 import {
   answerJob,
-  clearJobWorktree,
   createWorktree,
   injectMessage,
   isAgentAvailable,
@@ -13,12 +12,12 @@ import {
   forkJob,
   listAgentBackends,
   listJobs,
-  mergeWorktree,
   readJob,
   removeJob,
   removeWorktree,
   retryJob,
   selectionFrom,
+  settleJobWorktree,
   startJob,
   stopJob,
   waitForJob,
@@ -118,6 +117,8 @@ export async function handleAgentJobs({
   if (action === "diff" && method === "GET") {
     const found = await readJob(id);
     if (!found) throw new HttpError(404, "Задание не найдено");
+    if (found.job.worktreeCleared)
+      throw new HttpError(409, "Изолированная копия удалена или передана другому заданию");
     const limit = Number(url.searchParams.get("limit"));
     json(res, 200, {
       diff: await jobDiff(found.job.cwd, limit || undefined, found.job.base, found.job.dirty),
@@ -138,7 +139,7 @@ export async function handleAgentJobs({
         json(res, 200, { accepted: true, continued: true, job });
       } catch (error) {
         const message = error instanceof Error ? error.message : "";
-        if (/ещё работает/.test(message)) throw new HttpError(409, message);
+        if (/ещё работает|уже занята/.test(message)) throw new HttpError(409, message);
         throw error;
       }
       return true;
@@ -171,9 +172,15 @@ export async function handleAgentJobs({
     pageOnly(req);
     const task = asString((await readBody(req)).task).trim() || undefined;
     if (task && task.length > TASK_LIMIT) throw new Error(`Задание длиннее ${TASK_LIMIT} символов`);
-    const job = await forkJob(id, task);
-    if (!job) throw new HttpError(404, "Задание не найдено");
-    json(res, 201, { job });
+    try {
+      const job = await forkJob(id, task);
+      if (!job) throw new HttpError(404, "Задание не найдено");
+      json(res, 201, { job });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (/Дождитесь|уже занята/.test(message)) throw new HttpError(409, message);
+      throw error;
+    }
     return true;
   }
   if (action === "worktree" && method === "GET") {
@@ -192,20 +199,16 @@ export async function handleAgentJobs({
   }
   if ((action === "worktree/merge" || action === "worktree/discard") && method === "POST") {
     pageOnly(req);
-    const found = await readJob(id);
-    if (!found) throw new HttpError(404, "Задание не найдено");
-    if (!found.job.worktree) throw new HttpError(400, "Задание работает без копии");
-    if (!isFinished(found.job.status)) throw new HttpError(409, "Дождитесь завершения задания");
-    const project = (await loadProjects()).find((item) => item.id === found.job.projectId);
-    if (!project) throw new HttpError(404, "Проект не найден");
-    const result = action.endsWith("/merge")
-      ? await mergeWorktree(project.id, found.job.worktree.id, project.path)
-      : (await removeWorktree(project.id, found.job.worktree.id, project.path),
-        { discarded: true });
-    json(res, 200, {
-      ...result,
-      job: await clearJobWorktree(id, project.path),
-    });
+    try {
+      const result = await settleJobWorktree(id, action.endsWith("/merge") ? "merge" : "discard");
+      if (!result) throw new HttpError(404, "Задание не найдено");
+      json(res, 200, result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (/Дождитесь|уже занята/.test(message)) throw new HttpError(409, message);
+      if (/Проект не найден/.test(message)) throw new HttpError(404, message);
+      throw error;
+    }
     return true;
   }
   if (!action && method === "GET") {

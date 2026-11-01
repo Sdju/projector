@@ -29,6 +29,7 @@ import {
   loadJob,
   loadJournal,
   newJobId,
+  publicJob,
   removeJobFiles,
   saveJob,
   type AgentJob,
@@ -64,6 +65,8 @@ async function finish(entry: Live): Promise<void> {
   const { job } = entry;
   const status: AgentJobStatus = entry.stopping ? "stopped" : entry.failure ? "error" : "done";
   job.result = clip((entry.final ?? entry.collected).trim());
+  if (job.history?.at(-1)?.role === "user")
+    job.history.push({ role: "assistant", content: job.result.slice(0, 20_000) });
   if (entry.failure && !entry.stopping) job.error = entry.failure;
   job.pending = [];
   const changed = await changedSince(job.cwd, entry.snapshot);
@@ -199,6 +202,7 @@ export async function startJob(input: StartJobInput): Promise<AgentJob> {
     projectId: input.projectId,
     cwd: input.cwd,
     ...(input.worktree ? { worktree: input.worktree } : {}),
+    history: [{ role: "user", content: input.task }],
     ...(input.origin ? { origin: input.origin } : {}),
     messageId: randomUUID(),
     ...(input.sessionId ? { sessionId: input.sessionId } : {}),
@@ -215,7 +219,7 @@ export async function startJob(input: StartJobInput): Promise<AgentJob> {
   const entry = open(job, []);
   await persist(entry);
   void drive(entry, false);
-  return structuredClone(job);
+  return publicJob(job);
 }
 
 /** Rejoins the jobs an earlier server left running; each one is taken over only once. */
@@ -245,12 +249,12 @@ async function collect(): Promise<void> {
   }
 }
 
-export interface JobSummary extends Omit<AgentJob, "result"> {
+export interface JobSummary extends Omit<AgentJob, "result" | "history"> {
   resultPreview: string;
 }
 
 const summarize = (job: AgentJob): JobSummary => {
-  const { result, ...rest } = job;
+  const { result, history: _history, ...rest } = job;
   return { ...rest, resultPreview: result.slice(0, 300) };
 };
 
@@ -269,9 +273,9 @@ export async function readJob(
   id: string,
 ): Promise<{ job: AgentJob; journal: JournalEntry[] } | null> {
   const entry = live.get(id);
-  if (entry) return { job: structuredClone(entry.job), journal: structuredClone(entry.journal) };
+  if (entry) return { job: publicJob(entry.job), journal: structuredClone(entry.journal) };
   const job = await loadJob(id);
-  return job ? { job, journal: await loadJournal(id) } : null;
+  return job ? { job: publicJob(job), journal: await loadJournal(id) } : null;
 }
 
 /** Resolves when the job's `rev` passes `rev`, or after `seconds` (at most 45). */
@@ -306,11 +310,11 @@ export async function stopJob(id: string): Promise<AgentJob | null> {
       }
       await saveJob(job);
     }
-    return job;
+    return job ? publicJob(job) : null;
   }
   entry.stopping = true;
   entry.abort.abort();
-  return structuredClone(entry.job);
+  return publicJob(entry.job);
 }
 
 export interface JobAnswer {
@@ -360,7 +364,7 @@ export async function answerJob(id: string, answer: JobAnswer): Promise<AgentJob
   }
   record(entry, "answer", { id: card.id, kind: card.kind, summary });
   dropPending(entry, card.id);
-  return structuredClone(entry.job);
+  return publicJob(entry.job);
 }
 
 export async function removeJob(id: string): Promise<void> {

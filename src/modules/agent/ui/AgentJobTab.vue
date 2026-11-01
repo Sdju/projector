@@ -239,7 +239,12 @@ useTabReadout(() => ({
         </div>
         <ul class="files">
           <li v-for="file in job.files" :key="file">
-            <button v-if="!job.worktree" type="button" class="file" @click="emit('openFile', file)">
+            <button
+              v-if="!job.worktree && !job.worktreeCleared"
+              type="button"
+              class="file"
+              @click="emit('openFile', file)"
+            >
               {{ file }}
             </button>
             <span v-else>{{ file }}</span>
