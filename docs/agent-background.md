@@ -33,13 +33,14 @@
 - `GET /api/agent/jobs/:id/diff` — файлы, `--stat` и patch; `?limit=` ограничивает длину.
 - `GET /api/agent/jobs/:id/worktree`, `POST /api/agent/jobs/:id/worktree/merge|discard` — копия задания.
 - `POST /api/agent/jobs/:id/stop`, `POST /api/agent/jobs/:id/answer` — `{ request?, allow?, always?, text?, answers? }`.
-- `POST /api/agent/jobs/:id/send` — `{ text }`: уточнение идущему ходу, `accepted: false` если агент не умеет.
+- `POST /api/agent/jobs/:id/send` — `{ text }`: уточнение идущему ходу (`accepted: false`, если агент не умеет), а завершённому — новый ход в той же записи и сессии (`continued: true` и `job`).
 - `POST /api/agent/jobs/:id/retry` — новый ход с той же задачей, папкой, копией и сессией.
+- `POST /api/agent/jobs/:id/fork` — `{ task? }`: новая копия из текущего состояния копии задания; исходное задание не меняется.
 - `DELETE /api/agent/jobs/:id` — убрать завершённое задание.
 
 ## IDE-команды
 
-Регистрируются в scope проекта вместе с командами чатов (`agent-commands.ts`): `ide.agent.job.start` `{ agent, task, isolate?, mode? }`, `ide.agent.jobs.list`, `ide.agent.job.result` `{ job, wait? }`, `ide.agent.job.diff` `{ job, limit? }`, `ide.agent.job.log` `{ job, tail? }`, `ide.agent.job.stop`, `ide.agent.job.answer` `{ job, answer?, answers?, request? }`, `ide.agent.job.send` `{ job, text }`, `ide.agent.job.retry` `{ job, task? }`, `ide.agent.job.continue` `{ job, text }`, `ide.agent.job.worktree`, `ide.agent.job.merge`, `ide.agent.job.discard`, `ide.agent.job.open`. Вкладка задания — `agent-job` (`ide.workbench.agent.job.open`).
+Регистрируются в scope проекта вместе с командами чатов (`agent-commands.ts`): `ide.agent.job.start` `{ agent, task, isolate? }`, `ide.agent.jobs.list`, `ide.agent.job.result` `{ job, wait? }`, `ide.agent.job.diff` `{ job, limit? }`, `ide.agent.job.log` `{ job, tail? }`, `ide.agent.job.stop`, `ide.agent.job.answer` `{ job, answer?, answers?, request? }`, `ide.agent.job.send` `{ job, text }`, `ide.agent.job.retry` `{ job, task? }`, `ide.agent.job.continue` `{ job, text }`, `ide.agent.job.fork` `{ job, task? }`, `ide.agent.job.worktree`, `ide.agent.job.merge`, `ide.agent.job.discard`, `ide.agent.job.open`. Вкладка задания — `agent-job` (`ide.workbench.agent.job.open`).
 
 ## Остров, чат и вкладка
 
@@ -51,7 +52,7 @@
 
 ## Ограничения и что не делаем
 
-- «Продолжить в чате» открывает обычный GUI-чат агента и возобновляет `sessionId` (механика `resumeSession`). Для заданий в изолированной копии это пока недоступно: сессия привязана к папке копии, а чат ищет сессии в папке проекта; продолжить можно командой `ide.agent.job.continue` — новым ходом в той же копии и сессии.
+- «Продолжить в чате» открывает обычный GUI-чат агента и возобновляет `sessionId` (механика `resumeSession`). Для заданий в изолированной копии это пока недоступно: сессия привязана к папке копии, а чат ищет сессии в папке проекта; продолжить можно `ide.agent.job.send` или `ide.agent.job.continue` — новым ходом в той же записи, копии и сессии.
 - Слияние копии задания — только по явной просьбе пользователя (`ide.agent.job.worktree`, `ide.agent.job.merge`, `ide.agent.job.discard`); автослияния нет.
 - Потолка одновременных заданий нет: задания стартуют сразу. Расписания, очереди по ресурсам и автоповтора по таймеру нет; повтор после ошибки — явная команда. Нет TUI. Задание дольше 24 часов останавливает очистка ходов.
 - Остановка ждёт хост: после `stop` задание получает `stopped`, даже если агент ещё завершается.

@@ -9,6 +9,8 @@ import {
   isFinished,
   isHostedAgent,
   jobDiff,
+  followUpJob,
+  forkJob,
   listAgentBackends,
   listJobs,
   mergeWorktree,
@@ -108,7 +110,7 @@ export async function handleAgentJobs({
     return true;
   }
   const match = path.match(
-    /^\/api\/agent\/jobs\/([0-9a-f]{12})(?:\/(stop|answer|diff|send|retry|worktree(?:\/(?:merge|discard))?))?$/,
+    /^\/api\/agent\/jobs\/([0-9a-f]{12})(?:\/(stop|answer|diff|send|retry|fork|worktree(?:\/(?:merge|discard))?))?$/,
   );
   if (!match) return false;
   const id = match[1]!;
@@ -126,11 +128,23 @@ export async function handleAgentJobs({
     pageOnly(req);
     const found = await readJob(id);
     if (!found) throw new HttpError(404, "Задание не найдено");
-    if (isFinished(found.job.status)) throw new HttpError(409, "Задание уже завершилось");
     const text = asString((await readBody(req)).text).trim();
     if (!text) throw new HttpError(400, "Напишите уточнение агенту");
+    if (isFinished(found.job.status)) {
+      // A finished job takes a follow-up as a new run in the same record, copy and session.
+      try {
+        const job = await followUpJob(id, text);
+        if (!job) throw new HttpError(404, "Задание не найдено");
+        json(res, 200, { accepted: true, continued: true, job });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (/ещё работает/.test(message)) throw new HttpError(409, message);
+        throw error;
+      }
+      return true;
+    }
     const accepted = await injectMessage(found.job.messageId, text);
-    json(res, 200, { accepted });
+    json(res, 200, { accepted, continued: false });
     return true;
   }
   if (action === "retry" && method === "POST") {
@@ -150,6 +164,15 @@ export async function handleAgentJobs({
       if (/ещё работает|уже занята/.test(message)) throw new HttpError(409, message);
       throw error;
     }
+    json(res, 201, { job });
+    return true;
+  }
+  if (action === "fork" && method === "POST") {
+    pageOnly(req);
+    const task = asString((await readBody(req)).task).trim() || undefined;
+    if (task && task.length > TASK_LIMIT) throw new Error(`Задание длиннее ${TASK_LIMIT} символов`);
+    const job = await forkJob(id, task);
+    if (!job) throw new HttpError(404, "Задание не найдено");
     json(res, 201, { job });
     return true;
   }

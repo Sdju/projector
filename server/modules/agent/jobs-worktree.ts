@@ -2,6 +2,7 @@ import { isFinished, live, persist, wake } from "./jobs-live.ts";
 import { jobIds, loadJob, saveJob, type AgentJob } from "./jobs-store.ts";
 import { readJob, startJob } from "./jobs.ts";
 import { loadProjects } from "../projects/index.ts";
+import { forkWorktree } from "./worktrees.ts";
 
 /** A copy is being transferred right now: two retries must not start in the same worktree. */
 const host = globalThis as typeof globalThis & { projectorJobCopies?: Set<string> };
@@ -34,6 +35,29 @@ export async function clearJobWorktree(id: string, projectPath?: string): Promis
   settled(job);
   await saveJob(job);
   return job;
+}
+
+/** Starts a second job in a new copy that begins from what this job's copy has now. */
+export async function forkJob(id: string, task?: string): Promise<AgentJob | null> {
+  const found = await readJob(id);
+  if (!found) return null;
+  const { job } = found;
+  if (!isFinished(job.status)) throw new Error("Дождитесь завершения задания");
+  if (!job.worktree) throw new Error("Форк доступен только заданию в изолированной копии");
+  const project = (await loadProjects()).find((item) => item.id === job.projectId);
+  if (!project) throw new Error("Проект не найден");
+  const copy = await forkWorktree(project.id, project.path, job.cwd);
+  return startJob({
+    backend: job.backend,
+    task: task?.trim() || job.task,
+    projectId: job.projectId,
+    cwd: copy.cwd,
+    worktree: { id: copy.id, branch: copy.branch },
+    origin: job.origin,
+    selection: job.selection,
+    permissionMode: job.permissionMode,
+    unattended: job.unattended,
+  });
 }
 
 /** Starts the same task again after a failure: the same folder, copy and native session. */

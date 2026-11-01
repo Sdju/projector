@@ -7,6 +7,7 @@ import {
   fetchJobDiff,
   fetchJobWorktree,
   fetchJobs,
+  forkJob,
   jobFinished,
   mergeJobWorktree,
   retryJob,
@@ -14,7 +15,16 @@ import {
   startJob,
   stopJob,
 } from "../api/jobs.ts";
-import { JOB, LOG_LIMIT, WAIT_LIMIT, answerBody, describe, text, toolCalls } from "./job-view.ts";
+import {
+  JOB,
+  LOG_LIMIT,
+  WAIT_LIMIT,
+  answerBody,
+  describe,
+  followUps,
+  text,
+  toolCalls,
+} from "./job-view.ts";
 import { useIdeCommands } from "../../ide/index.ts";
 import {
   clientAgentByBackend,
@@ -137,7 +147,12 @@ export function registerJobCommands(
       const id = text(options, "job");
       const tail = Math.min(Math.max(Math.trunc(Number(options.tail)) || 20, 1), LOG_LIMIT);
       const found = await fetchJob(id);
-      return { job: id, status: found.job.status, ...toolCalls(found.journal, tail) };
+      return {
+        job: id,
+        status: found.job.status,
+        ...toolCalls(found.journal, tail),
+        ...followUps(found.journal),
+      };
     },
     () => true,
     undefined,
@@ -203,18 +218,18 @@ export function registerJobCommands(
     async (args) => {
       const options = commandArgs(args);
       const id = text(options, "job");
-      const sent = await sendJobMessage(id, text(options, "text"));
-      if (!sent) throw new Error("Этот агент не принимает уточнения на ходу");
-      return { job: id, sent: true };
+      const result = await sendJobMessage(id, text(options, "text"));
+      if (!result.accepted) throw new Error("Этот агент не принимает уточнения на ходу");
+      return result.job ? describe(result.job) : { job: id, sent: true };
     },
     () => true,
     undefined,
     {
       description:
-        "Добавляет уточнение в ответ, который задание пишет сейчас: агент учтёт его, не останавливаясь. Если агент не поддерживает уточнения на ходу, команда сообщает об этом — задание можно только остановить. Для вопросов, которые ждут ответа, используйте ide.agent.job.answer.",
+        "Досылает уточнение заданию. Идущему — в текущий ход, если агент это умеет. Завершённому — новый ход в той же записи, копии и нативной сессии: то же задание продолжается, без создания нового. Для вопросов, которые ждут ответа, используйте ide.agent.job.answer.",
       arguments: {
         job: JOB,
-        text: "Уточнение агенту: что поменять или на что обратить внимание",
+        text: "Уточнение агенту: что поправить, добавить или проверить",
       },
     },
   );
@@ -242,14 +257,37 @@ export function registerJobCommands(
     "Продолжить фоновое задание",
     async (args) => {
       const options = commandArgs(args);
-      return describe(await retryJob(text(options, "job"), text(options, "text"), true));
+      const id = text(options, "job");
+      const result = await sendJobMessage(id, text(options, "text"));
+      if (!result.accepted || !result.job)
+        throw new Error("Задание не удалось продолжить: возможно, оно ещё работает");
+      return describe(result.job);
     },
     () => true,
     undefined,
     {
       description:
-        "Продолжает завершённое задание новым ходом в той же папке, изолированной копии и нативной сессии: новый текст дописывается как задача. Так изолированное задание продолжается без потери контекста, хотя обычный чат к копии не подключится.",
+        "Продолжает завершённое задание новым ходом в той же записи, копии и нативной сессии: исходная задача и результат остаются в контексте. Для идущего задания это то же, что ide.agent.job.send. Новую запись создаёт только ide.agent.job.retry.",
       arguments: { job: JOB, text: "Что сделать дальше" },
+    },
+  );
+  register(
+    "ide.agent.job.fork",
+    "Ответвить фоновое задание",
+    async (args) => {
+      const options = commandArgs(args);
+      const task = typeof options.task === "string" ? options.task.trim() : undefined;
+      return describe(await forkJob(text(options, "job"), task || undefined));
+    },
+    () => true,
+    undefined,
+    {
+      description:
+        "Создаёт новое задание в отдельной изолированной копии, которая начинается с текущего состояния копии исходного задания: незакоммиченная работа фиксируется на ветке исходной копии, исходное задание не меняется. Подходит, чтобы попробовать другой вариант, не мешая исходному. Работает только для задания в изолированной копии.",
+      arguments: {
+        job: JOB,
+        task: "Задание форку вместо исходного (необязательно)",
+      },
     },
   );
   register(

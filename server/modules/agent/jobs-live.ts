@@ -155,6 +155,9 @@ export function onEvent(entry: Live, event: AgentEventName, data: unknown): void
     case "tool-result":
       record(entry, event, { ...body, output: shrink(body.output) });
       return;
+    case "input":
+      record(entry, event, body);
+      return;
     case "task":
       record(entry, event, body);
       return;

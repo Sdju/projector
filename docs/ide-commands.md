@@ -288,7 +288,7 @@ already received the timeout error.
 - `ide.agent.jobs.list` — задания проекта: состояние, запросы, файлы, начало итога.
 - `ide.agent.job.result` `{ job, wait? }` — полный итог; `wait` (до 45 с) держит ответ, пока состояние не сменится. Итог сверяют с `ide.agent.job.diff`.
 - `ide.agent.job.diff` `{ job, limit? }` и `ide.agent.job.log` `{ job, tail? }` — файлы, `--stat`, patch и последние вызовы инструментов: проверка вместо доверия итогу.
-- `ide.agent.job.stop` `{ job }`, `ide.agent.job.answer` `{ job, answers?, answer?, request? }` (только вопросы, по идентификаторам вариантов; разрешения выдаёт пользователь карточкой в чате), `ide.agent.job.send` `{ job, text }`, `ide.agent.job.retry` `{ job, task? }`, `ide.agent.job.continue` `{ job, text }`, `ide.agent.job.open` `{ job }` (вкладка `agent-job`, `ide.workbench.agent.job.open`).
+- `ide.agent.job.stop` `{ job }`, `ide.agent.job.answer` `{ job, answers?, answer?, request? }` (только вопросы, по идентификаторам вариантов; разрешения выдаёт пользователь карточкой в чате), `ide.agent.job.send` `{ job, text }` (идущему — в текущий ход, завершённому — новый ход в той же записи), `ide.agent.job.retry` `{ job, task? }`, `ide.agent.job.continue` `{ job, text }`, `ide.agent.job.fork` `{ job, task? }`, `ide.agent.job.open` `{ job }` (вкладка `agent-job`, `ide.workbench.agent.job.open`).
 - `ide.agent.job.worktree`, `ide.agent.job.merge`, `ide.agent.job.discard` — копия задания; слияние и удаление только по просьбе пользователя.
 
 Штатный агент поручает код фоновым агентам, не пишет его сам; независимые задачи отдаёт разным заданиям с `isolate: true`. `projector-guard` считает безопасными `result`, `list`, `open`, `diff`, `log` и `worktree`, остальные команды заданий спрашивают подтверждение.

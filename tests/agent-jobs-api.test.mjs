@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { once } from "node:events";
 import { createServer } from "node:http";
-import { mkdir, mkdtemp, realpath, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, expect, test } from "vite-plus/test";
@@ -40,6 +40,8 @@ registerAgentBackend({
         );
       return;
     }
+    if (options.message === "write")
+      await writeFile(join(options.cwd, "fork.txt"), "made by the job\n");
     options.emit("done", { text: "ok" });
   },
 });
@@ -178,6 +180,20 @@ test("a job reports an unsupported follow-up and can be retried in place", async
     async () =>
       (await (await request(`/api/agent/jobs/${job.id}`)).json()).job.status === "stopped",
   );
+  // A finished job takes a follow-up as a new run in the same record and session.
+  const again = await request(`/api/agent/jobs/${job.id}/send`, "POST", { text: "ещё раз" });
+  expect(again.status).toBe(200);
+  const followUp = await again.json();
+  expect(followUp).toMatchObject({ accepted: true, continued: true });
+  expect(followUp.job.id).toBe(job.id);
+  const followed = await until(async () => {
+    const body = await (await request(`/api/agent/jobs/${job.id}`)).json();
+    return body.job.status === "done" ? body : undefined;
+  });
+  expect(followed.job.result).toBe("ok");
+  expect(
+    followed.journal.filter((entry) => entry.event === "input").map((entry) => entry.data.text),
+  ).toContain("ещё раз");
   const retried = await request(`/api/agent/jobs/${job.id}/retry`, "POST", {
     task: "продолжай",
   });
@@ -189,6 +205,36 @@ test("a job reports an unsupported follow-up and can be retried in place", async
   await until(
     async () =>
       (await (await request(`/api/agent/jobs/${next.id}`)).json()).job.status === "stopped",
+  );
+});
+
+test("a fork starts a second copy from the job's current state", async () => {
+  const started = await (
+    await request("/api/agent/jobs", "POST", {
+      projectId: "p1",
+      backend: "fake-api",
+      task: "write",
+      isolate: true,
+    })
+  ).json();
+  const job = started.job;
+  await until(async () => {
+    const body = await (await request(`/api/agent/jobs/${job.id}`)).json();
+    return body.job.status === "done" ? body : undefined;
+  });
+  const forked = await (await request(`/api/agent/jobs/${job.id}/fork`, "POST", {})).json();
+  const copy = forked.job;
+  expect(copy.id).not.toBe(job.id);
+  expect(copy.cwd).not.toBe(job.cwd);
+  expect(copy.worktree.branch).not.toBe(job.worktree.branch);
+  expect(copy.worktree.branch).toMatch(/^projector\//);
+  await until(
+    async () => (await (await request(`/api/agent/jobs/${copy.id}`)).json()).job.status === "done",
+  );
+  expect(await readFile(join(copy.cwd, "fork.txt"), "utf8")).toBe("made by the job\n");
+  // The original copy stays where it was.
+  expect((await (await request(`/api/agent/jobs/${job.id}`)).json()).job.worktree.branch).toBe(
+    job.worktree.branch,
   );
 });
 

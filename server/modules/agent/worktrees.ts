@@ -136,6 +136,34 @@ export async function mergeWorktree(
   return { merged: true, message: "Изменения влиты в проект, копия удалена" };
 }
 
+/**
+ * A second copy that starts from what a running job's copy has right now: its dirty work is
+ * committed on the copy's own branch and the fork branches off it. The source copy stays as is.
+ */
+export async function forkWorktree(
+  projectId: string,
+  projectPath: string,
+  sourceCwd: string,
+): Promise<AgentWorktree & { cwd: string }> {
+  const source = (await layout(sourceCwd)).root;
+  const { root: main, inside } = await layout(projectPath);
+  const branch = (await git(source, ["rev-parse", "--abbrev-ref", "HEAD"])).trim();
+  if (!branch.startsWith("projector/"))
+    throw new Error("Форк доступен только изолированной копии Projector");
+  await git(source, ["add", "-A"]);
+  if ((await git(source, ["status", "--porcelain"])) !== "")
+    await git(source, ["commit", "-m", "Состояние перед форком"], IDENTITY);
+  const id = randomBytes(4).toString("hex");
+  const folder = folderOf(projectId, id);
+  await mkdir(join(dataDir(), "worktrees"), { recursive: true, mode: 0o700 });
+  try {
+    await git(main, ["worktree", "add", "-b", branchOf(id), folder, branch]);
+  } catch (error) {
+    throw new Error(`Не удалось создать форк копии: ${gitFailure(error)}`);
+  }
+  return { id, branch: branchOf(id), cwd: join(folder, inside) };
+}
+
 /** Deletes the copy and its branch together with everything the agent did in it. */
 export async function removeWorktree(
   projectId: string,

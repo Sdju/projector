@@ -165,9 +165,14 @@ test("worktree commands report, merge and discard the copy", async () => {
   expect(discarded).toMatchObject({ job: "aaaaaaaaaaaa", discarded: true });
 });
 
-test("send and retry go to the API", async () => {
+test("send continues the same job, retry starts a new one", async () => {
   const fetchMock = vi.fn(async (url) => {
-    if (url.endsWith("/send")) return reply({ accepted: true });
+    if (url.endsWith("/send"))
+      return reply({
+        accepted: true,
+        continued: true,
+        job: job({ status: "running" }),
+      });
     if (url.endsWith("/retry"))
       return reply({ job: job({ id: "bbbbbbbbbbbb", status: "queued" }) });
     return reply({ accepted: false });
@@ -176,15 +181,29 @@ test("send and retry go to the API", async () => {
   const sent = await commands
     .get("ide.agent.job.send")
     .run({ job: "aaaaaaaaaaaa", text: "проверь тесты" });
-  expect(sent).toEqual({ job: "aaaaaaaaaaaa", sent: true });
+  expect(sent).toMatchObject({ job: "aaaaaaaaaaaa", status: "running" });
   expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ text: "проверь тесты" });
   const retried = await commands.get("ide.agent.job.retry").run({ job: "aaaaaaaaaaaa" });
   expect(retried).toMatchObject({ job: "bbbbbbbbbbbb", status: "queued" });
-  await commands.get("ide.agent.job.continue").run({ job: "aaaaaaaaaaaa", text: "добавь тест" });
-  expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({
-    task: "добавь тест",
-    append: true,
-  });
+  const continued = await commands
+    .get("ide.agent.job.continue")
+    .run({ job: "aaaaaaaaaaaa", text: "добавь тест" });
+  expect(continued).toMatchObject({ job: "aaaaaaaaaaaa", status: "running" });
+  expect(fetchMock.mock.calls[2][0]).toBe("/api/agent/jobs/aaaaaaaaaaaa/send");
+  expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({ text: "добавь тест" });
+});
+
+test("fork starts another copy with an optional new task", async () => {
+  const fetchMock = vi.fn(async () =>
+    reply({ job: job({ id: "cccccccccccc", status: "queued" }) }),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  const result = await commands
+    .get("ide.agent.job.fork")
+    .run({ job: "aaaaaaaaaaaa", task: "другой вариант" });
+  expect(result).toMatchObject({ job: "cccccccccccc", status: "queued" });
+  expect(fetchMock.mock.calls[0][0]).toBe("/api/agent/jobs/aaaaaaaaaaaa/fork");
+  expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ task: "другой вариант" });
 });
 
 test("result exposes request, question and option ids", async () => {

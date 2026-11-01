@@ -126,3 +126,19 @@ export function toolCalls(journal: AgentJobEntry[], tail: number) {
   });
   return { calls: items, cut };
 }
+
+/** Follow-ups the job was given: what it was asked to do after the first answer. */
+export function followUps(journal: AgentJobEntry[], tail = 10) {
+  const items = journal
+    .filter((entry) => entry.event === "input")
+    .map((entry) => {
+      const data = entry.data as { text?: unknown; followUp?: unknown } | undefined;
+      return {
+        at: entry.at,
+        text: typeof data?.text === "string" ? data.text.slice(0, 2000) : "",
+        ...(data?.followUp === true ? { followUp: true } : {}),
+      };
+    })
+    .filter((item) => item.text);
+  return { followUps: items.slice(-tail), followUpsCut: items.length > tail };
+}

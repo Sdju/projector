@@ -185,15 +185,27 @@ export async function retryJob(id: string, task?: string, append = false): Promi
   ).job;
 }
 
-/** Adds a follow-up to a running job; false when its agent cannot take one mid-run. */
-export async function sendJobMessage(id: string, text: string): Promise<boolean> {
+/** Adds a follow-up to a running job; a finished one starts a new run in the same record. */
+export async function sendJobMessage(
+  id: string,
+  text: string,
+): Promise<{ accepted: boolean; continued: boolean; job?: AgentJobView }> {
+  return call<{ accepted: boolean; continued: boolean; job?: AgentJobView }>(
+    `/api/agent/jobs/${id}/send`,
+    { method: "POST", body: JSON.stringify({ text }) },
+    "Не удалось отправить уточнение заданию",
+  );
+}
+
+/** Starts a new job in a copy that begins from the finished job's current state. */
+export async function forkJob(id: string, task?: string): Promise<AgentJobView> {
   return (
-    await call<{ accepted: boolean }>(
-      `/api/agent/jobs/${id}/send`,
-      { method: "POST", body: JSON.stringify({ text }) },
-      "Не удалось отправить уточнение заданию",
+    await call<{ job: AgentJobView }>(
+      `/api/agent/jobs/${id}/fork`,
+      { method: "POST", body: JSON.stringify({ task }) },
+      "Не удалось создать форк задания",
     )
-  ).accepted;
+  ).job;
 }
 
 export async function removeJob(id: string): Promise<void> {

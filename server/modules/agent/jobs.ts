@@ -7,6 +7,7 @@ import {
 import { createRun, readRun, removeRun, stopRun, trackRun } from "./agent-runs.ts";
 import type { AgentRunRecord } from "./agent-runs.ts";
 import type { AgentBackendId, AgentEventName, AgentPermissionMode } from "./backend.ts";
+import type { AgentHistoryTurn } from "../providers/index.ts";
 import type { AgentSelection } from "./controls.ts";
 import { changedSince, snapshotGit } from "./jobs-files.ts";
 import {
@@ -66,7 +67,7 @@ async function finish(entry: Live): Promise<void> {
   if (entry.failure && !entry.stopping) job.error = entry.failure;
   job.pending = [];
   const changed = await changedSince(job.cwd, entry.snapshot);
-  job.files = [...new Set([...changed, ...entry.touched])].sort().slice(0, 500);
+  job.files = [...new Set([...job.files, ...changed, ...entry.touched])].sort().slice(0, 500);
   job.endedAt = Date.now();
   if (job.runId) await removeRun(job.runId).catch(() => {});
   change(entry, status);
@@ -76,7 +77,12 @@ async function finish(entry: Live): Promise<void> {
   wake(entry);
 }
 
-async function drive(entry: Live, attach: boolean): Promise<void> {
+export async function drive(
+  entry: Live,
+  attach: boolean,
+  message = entry.job.task,
+  history: AgentHistoryTurn[] = [],
+): Promise<void> {
   const { job } = entry;
   let untrack: (() => void) | undefined;
   try {
@@ -87,8 +93,8 @@ async function drive(entry: Live, attach: boolean): Promise<void> {
     } else {
       run = {
         backend: job.backend,
-        message: job.task,
-        history: [],
+        message,
+        history,
         cwd: job.cwd,
         selection: job.selection,
         permissionMode: job.permissionMode,
@@ -170,7 +176,7 @@ async function drive(entry: Live, attach: boolean): Promise<void> {
   await entry.finalizing;
 }
 
-function open(job: AgentJob, journal: JournalEntry[]): Live {
+export function open(job: AgentJob, journal: JournalEntry[]): Live {
   const entry: Live = {
     job,
     journal,
