@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, useId } from "vue";
+import { computed, onMounted, ref, useId, type ComponentPublicInstance } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiControl from "../../../common/ui/UiControl.vue";
 import UiIsland from "../../../common/ui/UiIsland.vue";
@@ -21,6 +21,10 @@ const props = defineProps<{
   overrides?: string[];
   /** The chat is still loading: its saved choice would replace a toggle made now. */
   disabled?: boolean;
+  /** Another control opens the island: keep the header button out of the layout. */
+  showTrigger?: boolean;
+  /** The island opens next to this element when the header no longer has its own trigger. */
+  anchor?: () => HTMLElement | undefined;
 }>();
 const emit = defineEmits<{ "update:overrides": [value: string[] | undefined] }>();
 
@@ -43,8 +47,12 @@ const menu = useIslandMenu({
   anchor: "right",
   initialFocus: ["input:not(:disabled)", "button:not(:disabled)"],
   items: "input, button",
-  returnFocus: ".trigger",
+  returnFocus: ".trigger, button",
 });
+const ownTrigger = ref<HTMLElement>();
+function bindTrigger(element: Element | ComponentPublicInstance | null) {
+  ownTrigger.value = element instanceof HTMLElement ? element : undefined;
+}
 const commands = useCommandScope(`agent-features:${useId()}`, () => ({
   surface: "agentFeatures",
   backend: props.backend,
@@ -138,11 +146,16 @@ commands.scope.registerCommand({
   run: () => open(),
 });
 
-function open() {
+function openAt(anchor?: HTMLElement) {
+  menu.trigger.value = anchor ?? props.anchor?.() ?? ownTrigger.value;
   if (!menu.open.value) void reload();
   commands.scope.activate();
-  menu.toggle();
+  menu.toggle(true);
 }
+function open() {
+  openAt();
+}
+defineExpose({ openAt });
 function change(featureId: string, event: Event) {
   const enabled = (event.target as HTMLInputElement).checked;
   void setFeature(featureId, enabled).catch(() => undefined);
@@ -151,8 +164,9 @@ onMounted(() => void loadAgentFeatures().catch(() => undefined));
 </script>
 
 <template>
-  <div :ref="(element) => (menu.trigger.value = element as HTMLElement)" class="features">
+  <div :ref="bindTrigger" class="features" :class="{ hidden: showTrigger === false }">
     <button
+      v-if="showTrigger !== false"
       type="button"
       class="trigger"
       :class="{ changed: overridden }"
@@ -193,6 +207,9 @@ onMounted(() => void loadAgentFeatures().catch(() => undefined));
 <style scoped>
 .features {
   display: inline-flex;
+}
+.features.hidden {
+  display: none;
 }
 .trigger {
   position: relative;

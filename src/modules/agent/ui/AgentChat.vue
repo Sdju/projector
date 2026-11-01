@@ -35,6 +35,7 @@ import AgentControls from "./AgentControls.vue";
 import AgentSessions from "./AgentSessions.vue";
 import AgentSideQuestion from "./AgentSideQuestion.vue";
 import AgentTaskView from "./AgentTaskView.vue";
+import AgentChatMenu from "./AgentChatMenu.vue";
 import { chatTasks } from "../lib/task-detail.ts";
 import { useChatTaskView } from "../model/use-chat-task-view.ts";
 import AgentRewind from "./AgentRewind.vue";
@@ -54,10 +55,6 @@ import { chatUsageByTurn } from "../model/chat-usage.ts";
 import type { AgentBackendId, ChatUsage, MessageChip, RewindScope } from "../model/types.ts";
 import IconArrowDown from "~icons/lucide/arrow-down";
 import IconSquarePen from "~icons/lucide/square-pen";
-import IconDownload from "~icons/lucide/download";
-import IconBranch from "~icons/lucide/git-branch";
-import IconMessageCircleQuestion from "~icons/lucide/message-circle-question";
-import IconScanEye from "~icons/lucide/scan-eye";
 const props = withDefaults(
   defineProps<{ projectId: string; backend?: AgentBackendId; chatId?: string }>(),
   { backend: "projector", chatId: undefined },
@@ -66,6 +63,9 @@ const props = withDefaults(
 const plain = computed(() => !isBuiltinAgent(props.backend));
 const agentName = computed(() => agentLabel(props.backend));
 const { api } = useIdeCommands();
+const chatMenu = ref<InstanceType<typeof AgentChatMenu>>();
+const featuresIsland = ref<InstanceType<typeof AgentFeaturesIsland>>();
+const featuresAnchor = () => chatMenu.value?.anchor();
 const {
   key: chatKey,
   turns,
@@ -515,7 +515,7 @@ onBeforeUnmount(() => {
     <div v-if="chatDrop.over.value" class="chat-drop-hint" aria-hidden="true">
       Бросьте файлы или папки — добавим в сообщение
     </div>
-    <UiInline class="chat-tools" :gap="1" align="normal" justify="normal">
+    <UiInline class="chat-tools" :gap="1" align="normal" justify="end">
       <AgentSessions
         :sessions="sessions"
         :loading="sessionsLoading"
@@ -533,58 +533,6 @@ onBeforeUnmount(() => {
         @pick="(id) => void resumeSession(id).catch(() => {})"
         @open-recent="openRecentChat"
       />
-      <AgentFeaturesIsland
-        :backend="backend"
-        :chat="chatKey"
-        :overrides="featureOverrides"
-        :disabled="loading"
-        @update:overrides="setFeatureOverrides"
-      />
-      <UiButton
-        v-if="plain && !turns.length"
-        shape="icon"
-        size="sm"
-        :class="{ on: isolate }"
-        :aria-pressed="isolate"
-        title="Работать в изолированной копии проекта (git worktree): изменения агента не затронут файлы, пока вы их не влёте"
-        aria-label="Работать в изолированной копии проекта"
-        @click="isolate = !isolate"
-      >
-        <IconBranch aria-hidden="true" />
-      </UiButton>
-      <UiButton
-        shape="icon"
-        size="sm"
-        :class="{ on: side.state.open }"
-        :aria-pressed="side.state.open"
-        title="Вопрос в сторону: не прерывает агента и не попадает в чат"
-        aria-label="Вопрос в сторону"
-        @click="side.toggle()"
-      >
-        <IconMessageCircleQuestion aria-hidden="true" />
-      </UiButton>
-      <UiButton
-        v-if="turns.length"
-        shape="icon"
-        size="sm"
-        :class="{ on: lens.state.open }"
-        :aria-pressed="lens.state.open"
-        title="Lens: чем агент занят сейчас — короткая сводка прямо в блоке работы"
-        aria-label="Lens: чем агент занят сейчас"
-        @click="lens.toggle()"
-      >
-        <IconScanEye aria-hidden="true" />
-      </UiButton>
-      <UiButton
-        v-if="turns.length"
-        shape="icon"
-        size="sm"
-        title="Сохранить чат в Markdown"
-        aria-label="Сохранить чат в Markdown"
-        @click="saveChatMarkdown(turns, agentName, backend)"
-      >
-        <IconDownload aria-hidden="true" />
-      </UiButton>
       <UiButton
         v-if="turns.length"
         shape="icon"
@@ -596,7 +544,31 @@ onBeforeUnmount(() => {
       >
         <IconSquarePen aria-hidden="true" />
       </UiButton>
+      <AgentChatMenu
+        ref="chatMenu"
+        :lens="lens.state.open"
+        :side="side.state.open"
+        :can-download="turns.length > 0"
+        :can-isolate="plain && !turns.length"
+        :isolate="isolate"
+        :features-changed="featureOverrides !== undefined"
+        @features="featuresIsland?.openAt(featuresAnchor())"
+        @lens="lens.toggle()"
+        @side="side.toggle()"
+        @download="saveChatMarkdown(turns, agentName, backend)"
+        @isolate="isolate = !isolate"
+      />
     </UiInline>
+    <AgentFeaturesIsland
+      ref="featuresIsland"
+      :show-trigger="false"
+      :anchor="featuresAnchor"
+      :backend="backend"
+      :chat="chatKey"
+      :overrides="featureOverrides"
+      :disabled="loading"
+      @update:overrides="setFeatureOverrides"
+    />
     <div v-show="!viewed" ref="log" class="chat-log" @scroll.passive="trackScroll">
       <div v-if="loading" class="chat-loading" role="status">
         <UiSpinner />
@@ -785,14 +757,11 @@ onBeforeUnmount(() => {
   position: relative;
 }
 .chat-tools {
-  position: absolute;
-  top: var(--sp-2);
-  right: var(--sp-3);
-  z-index: var(--z-sticky);
-}
-.chat-tools .on {
-  color: var(--text);
-  background: var(--bg-4);
+  flex: none;
+  width: 100%;
+  max-width: calc(var(--chat-width) + 56px);
+  margin: 0 auto;
+  padding: var(--sp-2) var(--sp-5) 0;
 }
 .chat-log {
   flex: 1;
