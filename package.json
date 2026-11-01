@@ -28,7 +28,8 @@
     "test:live": "PROJECTOR_TEST_DOCKER=1 PROJECTOR_TEST_DEVCONTAINER=1 vp test run --no-file-parallelism tests/environment-live.test.mjs tests/reconcile.test.mjs tests/devcontainer-live.test.mjs tests/sigkill-live.test.mjs",
     "check": "vp run test && vp run build",
     "prepare": "vp hooks enable",
-    "test:gtk": "node --import @zede/vio/register tests/native-palette.gtk.mjs"
+    "test:gtk": "node --import @zede/vio/register tests/native-palette.gtk.mjs",
+    "bench:chat": "node scripts/bench-chat/run.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.54",

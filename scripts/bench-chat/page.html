@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="data:," />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Chat performance bench</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: var(--bg, #101014);
+      }
+      #fixture {
+        width: 900px;
+      }
+      .chat-log {
+        height: 900px;
+        overflow: auto;
+        overflow-anchor: none;
+        padding: var(--sp-6, 24px) var(--sp-5, 20px);
+        box-sizing: border-box;
+      }
+      .conversation {
+        width: 100%;
+        max-width: 680px;
+        margin: auto;
+        container-type: inline-size;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="fixture"></div>
+    <script type="module">
+      import "/src/app/styles.css";
+      import { createApp, defineComponent, h, nextTick, reactive, ref, computed } from "vue";
+      import AgentTurn from "/src/modules/agent/ui/AgentTurn.vue";
+      import AgentMessage from "/src/modules/agent/ui/AgentMessage.vue";
+      import { useChatWindow } from "/src/modules/agent/model/chat-window.ts";
+      import { registerBuiltinWidgets } from "/src/app/widgets.ts";
+      import { widgetReplyKey } from "/src/modules/widget-runtime/index.ts";
+
+      registerBuiltinWidgets();
+
+      const container = document.getElementById("fixture");
+      let app;
+      let state = reactive({ turns: [], busy: false });
+      let frames = [];
+      let frameLoop = 0;
+      let longTasks = [];
+      let longTaskObserver;
+
+      const SENT =
+        "Проверка показала, что сборка проходит, тесты зелёные, а память остаётся в пределах нормы.";
+      const rnd = (() => {
+        let seed = 42;
+        return () => {
+          seed = (seed * 1664525 + 1013904223) % 4294967296;
+          return seed / 4294967296;
+        };
+      })();
+
+      function prose(chars, tables = true) {
+        let out = "## Итоги\n\n";
+        let section = 0;
+        while (out.length < chars) {
+          out += `Абзац ${section}: ${SENT} ${SENT}\n\n`;
+          if (section % 3 === 0)
+            out += `- первый пункт ${section}\n- второй пункт с \`кодом\`\n- третий пункт\n\n`;
+          if (tables && section % 5 === 0)
+            out += `| Шаг | Время |\n| --- | --- |\n| Сборка | ${section} мс |\n| Тесты | ${section + 1} мс |\n\n`;
+          section++;
+        }
+        return out.slice(0, chars);
+      }
+
+      function codeSource(chars, open = false) {
+        let body = "";
+        let line = 0;
+        while (body.length < chars) {
+          body += `  const value${line} = compute(${line}, "${SENT}");\n`;
+          line++;
+        }
+        return `\`\`\`ts\n${body.slice(0, chars)}${open ? "" : "\n```"}`;
+      }
+
+      function tableSource(chars) {
+        let out = "| Файл | Строки | Время |\n| --- | --- | --- |\n";
+        let row = 0;
+        while (out.length < chars) {
+          out += `| src/modules/agent/file-${row}.ts | ${row * 7 + 10} | ${row} мс |\n`;
+          row++;
+        }
+        return out.slice(0, chars);
+      }
+
+      function widgetsSource(count) {
+        return Array.from(
+          { length: count },
+          (_, index) =>
+            `<Card title="Блок ${index}" hint="группа ${index}">\n  <Row><Stat label="A" value="${index * 10}" :delta="${index}" /><Stat label="B" value="${index * 20}" /></Row>\n</Card>`,
+        ).join("\n\n");
+      }
+
+      function workParts(turnIndex, count, thoughts = 0) {
+        const tools = Array.from({ length: count }, (_, index) => ({
+          id: `t${turnIndex}-${index}`,
+          name: index % 3 === 0 ? "bash" : index % 3 === 1 ? "read_file" : "grep",
+          status: "done",
+          detail: index % 3 === 0 ? `{"stdout":"ok ${index}","exitCode":0}` : `Результат ${index}`,
+          input: index % 3 === 0 ? `{"command":"vp run test"}` : `{"path":"src/file-${index}.ts"}`,
+          kind: index % 3 === 0 ? "execute" : "read",
+          startedAt: Date.now() - 1000,
+          endedAt: Date.now(),
+        }));
+        const parts = [];
+        for (let index = 0; index < thoughts; index++)
+          parts.push({ type: "thought", text: `Шаг ${index}: ${SENT} ${SENT}` });
+        parts.push(...tools.map((tool) => ({ type: "tool", id: tool.id })));
+        return { tools, parts };
+      }
+
+      function assistantTurn(index, config) {
+        const { chars = 1200, kind = "prose", tools = 0, widgets = 0, thoughts = 0 } = config;
+        if (tools || thoughts) {
+          const built = workParts(index, tools, thoughts);
+          const answer = prose(600);
+          return {
+            id: `a${index}`,
+            role: "assistant",
+            text: answer,
+            tools: built.tools,
+            parts: [...built.parts, { type: "text", text: answer }],
+            at: Date.now(),
+          };
+        }
+        let text;
+        if (widgets) text = `${widgetsSource(widgets)}\n\n${prose(chars)}`;
+        else if (kind === "code") text = codeSource(chars);
+        else if (kind === "table") text = tableSource(chars);
+        else text = prose(chars);
+        return { id: `a${index}`, role: "assistant", text, tools: [], at: Date.now() };
+      }
+
+      function buildChat(requests, config) {
+        const turns = [];
+        for (let index = 0; index < requests; index++) {
+          turns.push({
+            id: `u${index}`,
+            role: "user",
+            text: `Запрос ${index}: что изменилось в сборке и тестах?`,
+            tools: [],
+            at: Date.now(),
+          });
+          turns.push(assistantTurn(index, config));
+        }
+        return turns;
+      }
+
+      function turnProps(turn, index, total) {
+        return {
+          turn,
+          busy: state.busy,
+          last: index === total - 1,
+          copied: false,
+          root: "",
+          canRevert: false,
+          readonly: false,
+        };
+      }
+
+      const ListView = defineComponent({
+        setup() {
+          return () => {
+            const turns = state.turns;
+            return h(
+              "div",
+              { class: "chat-log" },
+              h(
+                "div",
+                { class: "conversation" },
+                turns.map((turn, index) => h(AgentTurn, turnProps(turn, index, turns.length))),
+              ),
+            );
+          };
+        },
+      });
+
+      const WindowView = defineComponent({
+        setup() {
+          const log = ref();
+          const waiting = ref(false);
+          const windowed = useChatWindow(
+            computed(() => state.turns),
+            log,
+            () => {},
+            waiting,
+          );
+          return () => {
+            const shown = windowed.shown.value;
+            const offset = windowed.firstShown.value;
+            const total = state.turns.length;
+            return h(
+              "div",
+              { class: "chat-log", ref: log },
+              h(
+                "div",
+                { class: "conversation" },
+                shown.map((turn, index) => h(AgentTurn, turnProps(turn, offset + index, total))),
+              ),
+            );
+          };
+        },
+      });
+
+      function reset() {
+        if (app) {
+          app.unmount();
+          app = null;
+        }
+        container.innerHTML = "";
+        state = reactive({ turns: [], busy: false });
+        frames = [];
+        longTasks = [];
+        longTaskObserver?.disconnect();
+        longTaskObserver = undefined;
+        cancelAnimationFrame(frameLoop);
+        frameLoop = 0;
+      }
+
+      function mount(view) {
+        app = createApp(view);
+        app.provide(widgetReplyKey, () => {});
+        app.mount(container);
+      }
+
+      function chatLog() {
+        return container.querySelector(".chat-log");
+      }
+
+      function nodes() {
+        return container.querySelectorAll("*").length;
+      }
+
+      function startFrames() {
+        frames = [];
+        let last = performance.now();
+        const step = (now) => {
+          frames.push(now - last);
+          last = now;
+          frameLoop = requestAnimationFrame(step);
+        };
+        frameLoop = requestAnimationFrame(step);
+      }
+
+      function stopFrames() {
+        cancelAnimationFrame(frameLoop);
+        frameLoop = 0;
+        return frames;
+      }
+
+      function startLongTasks() {
+        longTasks = [];
+        try {
+          longTaskObserver = new PerformanceObserver((list) => {
+            for (const entry of list.getEntries()) longTasks.push(entry.duration);
+          });
+          longTaskObserver.observe({ type: "longtask", buffered: false });
+        } catch {
+          longTaskObserver = undefined;
+        }
+      }
+
+      function stopLongTasks() {
+        longTaskObserver?.disconnect();
+        longTaskObserver = undefined;
+        return longTasks;
+      }
+
+      /** The rendered text of the answer being streamed, not of the whole chat. */
+      function lastMarkdownText() {
+        const all = container.querySelectorAll(".md");
+        return all.length ? all[all.length - 1].textContent : "";
+      }
+
+      /** A chunk renders now or after the markdown throttle; its marker tells which. */
+      function waitMarker(marker, limit = 5000) {
+        return new Promise((resolve) => {
+          const started = performance.now();
+          const check = () => {
+            if (lastMarkdownText().includes(marker)) return resolve(performance.now() - started);
+            if (performance.now() - started > limit) return resolve(-1);
+            setTimeout(check, 0);
+          };
+          check();
+        });
+      }
+
+      function splitEvery(text, size) {
+        const chunks = [];
+        for (let at = 0; at < text.length; at += size) chunks.push(text.slice(at, at + size));
+        return chunks;
+      }
+
+      function makeSource(kind, chars, open) {
+        if (kind === "code")
+          return { prefix: "", source: codeSource(chars, open), close: open ? "\n```" : "" };
+        if (kind === "table") return { prefix: "", source: tableSource(chars), close: "" };
+        return { prefix: "", source: prose(chars, false), close: "" };
+      }
+
+      /** Opens every collapsed work box: the body mounts now, so its cost is visible. */
+      async function openWork() {
+        const boxes = [...container.querySelectorAll(".work")];
+        const started = performance.now();
+        for (const box of boxes) {
+          box.open = true;
+          box.dispatchEvent(new Event("toggle"));
+        }
+        await nextTick();
+        void document.body.offsetHeight;
+        return {
+          openMs: performance.now() - started,
+          opened: boxes.length,
+          openNodes: nodes(),
+          openHeight: chatLog().scrollHeight,
+        };
+      }
+
+      async function mountList(config, repeats = 3) {
+        const runs = [];
+        for (let run = 0; run < repeats; run++) {
+          reset();
+          const data = buildChat(config.requests, config);
+          state.turns = data;
+          const t0 = performance.now();
+          mount(ListView);
+          const t1 = performance.now();
+          const count = nodes();
+          const height = chatLog().scrollHeight;
+          void document.body.offsetHeight;
+          const t2 = performance.now();
+          const opened = config.openWork ? await openWork() : undefined;
+          runs.push({
+            patch: t1 - t0,
+            layout: t2 - t1,
+            total: t2 - t0,
+            nodes: count,
+            height,
+            ...opened,
+          });
+          await nextTick();
+        }
+        return runs;
+      }
+
+      async function mountWindowed(config, repeats = 3) {
+        const runs = [];
+        for (let run = 0; run < repeats; run++) {
+          reset();
+          state.turns = buildChat(config.requests, config);
+          const t0 = performance.now();
+          mount(WindowView);
+          const t1 = performance.now();
+          const count = nodes();
+          const height = chatLog().scrollHeight;
+          void document.body.offsetHeight;
+          const t2 = performance.now();
+          runs.push({
+            patch: t1 - t0,
+            layout: t2 - t1,
+            total: t2 - t0,
+            nodes: count,
+            height,
+            mounted: container.querySelectorAll(".turn").length,
+          });
+          await nextTick();
+        }
+        return runs;
+      }
+
+      async function append(config, repeats = 3) {
+        const runs = [];
+        for (let run = 0; run < repeats; run++) {
+          reset();
+          state.turns = buildChat(config.requests, config);
+          mount(config.window ? WindowView : ListView);
+          await nextTick();
+          void document.body.offsetHeight;
+          const t0 = performance.now();
+          state.turns.push(
+            {
+              id: `u${config.requests}`,
+              role: "user",
+              text: "Новый запрос: что дальше?",
+              tools: [],
+              at: Date.now(),
+            },
+            assistantTurn(config.requests, config),
+          );
+          await nextTick();
+          const t1 = performance.now();
+          void document.body.offsetHeight;
+          const t2 = performance.now();
+          runs.push({ patch: t1 - t0, layout: t2 - t1, total: t2 - t0, nodes: nodes() });
+        }
+        return runs;
+      }
+
+      async function streamInTurn(config) {
+        reset();
+        state.turns = buildChat(config.requests, config);
+        mount(config.window ? WindowView : ListView);
+        await nextTick();
+        void document.body.offsetHeight;
+
+        const built =
+          config.streamTools || config.streamThoughts
+            ? workParts(config.requests, config.streamTools ?? 0, config.streamThoughts ?? 0)
+            : undefined;
+        const assistant = built
+          ? {
+              id: `a${config.requests}`,
+              role: "assistant",
+              text: "",
+              tools: built.tools,
+              parts: [...built.parts, { type: "text", text: "" }],
+              at: Date.now(),
+            }
+          : { id: `a${config.requests}`, role: "assistant", text: "", tools: [], at: Date.now() };
+        const t0 = performance.now();
+        state.turns.push(
+          {
+            id: `u${config.requests}`,
+            role: "user",
+            text: "Новый запрос: покажи изменения.",
+            tools: [],
+            at: Date.now(),
+          },
+          assistant,
+        );
+        state.busy = true;
+        await nextTick();
+        void document.body.offsetHeight;
+        const appendMs = performance.now() - t0;
+        const opened = config.openWork ? await openWork() : undefined;
+
+        // The chat pins itself to the bottom while an answer streams: scrollHeight is read and
+        // scrollTop written on every frame, exactly like AgentChat's `pin`.
+        let pinLoop = 0;
+        if (config.pin) {
+          const pin = () => {
+            const log = chatLog();
+            if (log) log.scrollTop = log.scrollHeight;
+            pinLoop = requestAnimationFrame(pin);
+          };
+          pinLoop = requestAnimationFrame(pin);
+        }
+
+        const turn = state.turns.at(-1);
+        const textPart = turn.parts?.at(-1);
+        const source = makeSource(config.kind ?? "prose", config.chars, true);
+        const chunks = splitEvery(source.source, config.chunk ?? 64);
+        const updates = [];
+        let deferred = 0;
+        let stalled = 0;
+        let accumulated = source.prefix;
+        startFrames();
+        startLongTasks();
+        const started = performance.now();
+        for (let index = 0; index < chunks.length; index++) {
+          const marker = `ZQ${index}ZQ`;
+          accumulated += `${chunks[index]} ${marker}`;
+          const at = performance.now();
+          if (textPart) textPart.text = accumulated;
+          else turn.text = accumulated;
+          await nextTick();
+          const patch = performance.now() - at;
+          let latency = patch;
+          if (!lastMarkdownText().includes(marker)) {
+            deferred++;
+            const waited = await waitMarker(marker);
+            latency = performance.now() - at;
+            if (waited < 0) stalled++;
+          }
+          updates.push({ patch, latency, chars: accumulated.length });
+        }
+        const wall = performance.now() - started;
+        if (source.close) {
+          if (textPart) textPart.text = accumulated + source.close;
+          else turn.text = accumulated + source.close;
+          await nextTick();
+        }
+        cancelAnimationFrame(pinLoop);
+        const frameStats = stopFrames();
+        const tasks = stopLongTasks();
+        state.busy = false;
+        await nextTick();
+        return {
+          appendMs,
+          wall,
+          chunks: chunks.length,
+          chars: accumulated.length,
+          deferred,
+          stalled,
+          updates,
+          frames: frameStats,
+          longTasks: tasks,
+          nodes: nodes(),
+          ...opened,
+          openNodes: opened?.openNodes ?? nodes(),
+        };
+      }
+
+      async function streamMessage(config) {
+        reset();
+        const source = makeSource(config.kind ?? "prose", config.chars, true);
+        const chunks = splitEvery(source.source, config.chunk ?? 64);
+        const streaming = config.streaming !== false;
+        const text = ref("");
+        const MessageView = defineComponent({
+          setup() {
+            return () =>
+              h(
+                "div",
+                { class: "chat-log" },
+                h(
+                  "div",
+                  { class: "conversation" },
+                  h(AgentMessage, { text: text.value, streaming }),
+                ),
+              );
+          },
+        });
+        state.turns = [{ id: "a0", role: "assistant", text: "", tools: [] }];
+        mount(MessageView);
+        await nextTick();
+        void document.body.offsetHeight;
+
+        const updates = [];
+        let deferred = 0;
+        let stalled = 0;
+        let accumulated = source.prefix;
+        startFrames();
+        startLongTasks();
+        const started = performance.now();
+        for (let index = 0; index < chunks.length; index++) {
+          const marker = `ZQ${index}ZQ`;
+          accumulated += `${chunks[index]} ${marker}`;
+          const at = performance.now();
+          text.value = accumulated;
+          await nextTick();
+          const patch = performance.now() - at;
+          let latency = patch;
+          if (!lastMarkdownText().includes(marker)) {
+            deferred++;
+            const waited = await waitMarker(marker);
+            latency = performance.now() - at;
+            if (waited < 0) stalled++;
+          }
+          updates.push({ patch, latency, chars: accumulated.length });
+        }
+        const wall = performance.now() - started;
+        if (source.close) {
+          text.value = accumulated + source.close;
+          await nextTick();
+        }
+        const frameStats = stopFrames();
+        const tasks = stopLongTasks();
+        return {
+          wall,
+          chunks: chunks.length,
+          chars: accumulated.length,
+          deferred,
+          stalled,
+          updates,
+          frames: frameStats,
+          longTasks: tasks,
+          nodes: nodes(),
+        };
+      }
+
+      async function scroll(config) {
+        reset();
+        state.turns = buildChat(config.requests, config);
+        mount(ListView);
+        await nextTick();
+        const log = chatLog();
+        const max = log.scrollHeight - log.clientHeight;
+        log.scrollTop = max;
+        void document.body.offsetHeight;
+
+        const steps = [];
+        for (let index = 0; index <= 60; index++) {
+          const at = performance.now();
+          log.scrollTop = max * (1 - index / 60);
+          void log.getBoundingClientRect();
+          steps.push(performance.now() - at);
+        }
+
+        log.scrollTop = max;
+        const rafFrames = [];
+        let last = performance.now();
+        const start = last;
+        await new Promise((resolve) => {
+          const step = (now) => {
+            rafFrames.push(now - last);
+            last = now;
+            const progress = Math.min(1, (now - start) / 1500);
+            log.scrollTop = max * (1 - progress);
+            if (progress < 1) requestAnimationFrame(step);
+            else resolve();
+          };
+          requestAnimationFrame(step);
+        });
+        return { steps, frames: rafFrames, height: log.scrollHeight, nodes: nodes() };
+      }
+
+      async function switchChat(config, repeats = 3) {
+        const runs = [];
+        for (let run = 0; run < repeats; run++) {
+          reset();
+          state.turns = buildChat(config.requests, config);
+          mount(config.window ? WindowView : ListView);
+          await nextTick();
+          void document.body.offsetHeight;
+          const next = buildChat(config.requests, config).map((turn) => ({
+            ...turn,
+            id: `next-${turn.id}`,
+          }));
+          const t0 = performance.now();
+          state.turns = next;
+          await nextTick();
+          const t1 = performance.now();
+          void document.body.offsetHeight;
+          const t2 = performance.now();
+          runs.push({ patch: t1 - t0, layout: t2 - t1, total: t2 - t0, nodes: nodes() });
+        }
+        return runs;
+      }
+
+      async function mountPersist(config) {
+        reset();
+        state.turns = buildChat(config.requests, config);
+        mount(ListView);
+        await nextTick();
+        void document.body.offsetHeight;
+        return { nodes: nodes(), height: chatLog().scrollHeight };
+      }
+
+      window.fixture = {
+        ready: true,
+        mountList,
+        mountWindowed,
+        append,
+        streamInTurn,
+        streamMessage,
+        scroll,
+        switchChat,
+        mountPersist,
+        clear() {
+          reset();
+          return true;
+        },
+        info() {
+          return { ua: navigator.userAgent, memory: performance.memory ?? null };
+        },
+      };
+    </script>
+  </body>
+</html>

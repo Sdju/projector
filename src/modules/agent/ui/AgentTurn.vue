@@ -5,16 +5,9 @@ import { computed } from "vue";
 import { chipIcon, chipLabel, chipTitle } from "../lib/composer/chips.ts";
 import { versionsOf, type ForkMode } from "../model/branches.ts";
 import { legacyParts } from "../model/turn-events.ts";
-import type {
-  AgentToolChip,
-  AgentToolView,
-  AgentTurn,
-  ChatUsage,
-  MessageChip,
-} from "../model/types.ts";
+import type { AgentToolChip, AgentTurn, ChatUsage, MessageChip } from "../model/types.ts";
 import AgentMessage from "./AgentMessage.vue";
-import AgentActivity from "./AgentActivity.vue";
-import AgentThought from "./AgentThought.vue";
+import AgentWork, { type AgentWorkItem } from "./AgentWork.vue";
 import AgentChanges from "./AgentChanges.vue";
 import AgentUsageInfo from "./AgentUsageInfo.vue";
 import IconCopy from "~icons/lucide/copy";
@@ -74,10 +67,10 @@ const stampFull = computed(() =>
 type Segment =
   | { key: string; type: "text"; text: string }
   | { key: string; type: "note"; text: string }
-  | { key: string; type: "thought"; text: string }
-  | { key: string; type: "tools"; tools: AgentToolView[] };
+  | { key: string; type: "work"; items: AgentWorkItem[] };
 
-// Text and tool calls in the order they happened; neighbouring calls form one group.
+// Text, notes and work in the order they happened; thoughts and calls between texts form one
+// collapsed "Работа" group, with neighbouring calls shown as one row inside it.
 const segments = computed(() => {
   const result: Segment[] = [];
   // Calls a subagent made are shown inside its own call, not among the main ones.
@@ -91,6 +84,11 @@ const segments = computed(() => {
       .filter((tool) => !tool.parent || !known.has(tool.parent))
       .map((tool) => [tool.id, { ...tool, children: children.get(tool.id) }]),
   );
+  const addWork = (index: number, item: AgentWorkItem) => {
+    const last = result.at(-1);
+    if (last?.type === "work") last.items.push(item);
+    else result.push({ key: `w${index}`, type: "work", items: [item] });
+  };
   for (const [index, part] of (props.turn.parts ?? legacyParts(props.turn)).entries()) {
     if (part.type === "text") {
       if (part.text.trim()) result.push({ key: `t${index}`, type: "text", text: part.text });
@@ -101,21 +99,35 @@ const segments = computed(() => {
       continue;
     }
     if (part.type === "thought") {
-      if (part.text.trim()) result.push({ key: `r${index}`, type: "thought", text: part.text });
+      if (part.text.trim()) addWork(index, { key: `r${index}`, type: "thought", text: part.text });
       continue;
     }
     const tool = byId.get(part.id);
     if (!tool) continue;
     const last = result.at(-1);
-    if (last?.type === "tools") last.tools.push(tool);
-    else result.push({ key: `a${index}`, type: "tools", tools: [tool] });
+    if (last?.type === "work") {
+      const item = last.items.at(-1);
+      if (item?.type === "tools") {
+        item.tools.push(tool);
+        continue;
+      }
+    }
+    addWork(index, { key: `a${index}`, type: "tools", tools: [tool] });
   }
   return result;
 });
-// A reasoning block shows its own progress, so the dots are only for the gaps between steps.
-const waiting = computed(() => {
-  const type = segments.value.at(-1)?.type;
-  return type !== "text" && type !== "thought";
+// The "Работа" block shows its own current step; dots only fill an answer with nothing yet.
+const waiting = computed(() => segments.value.length === 0);
+const anyRunning = computed(() => props.turn.tools.some((tool) => tool.status === "running"));
+// A note after the work does not finish it: the last work group is still the one being worked on
+// until a text block follows.
+const currentWork = computed(() => {
+  for (let index = segments.value.length - 1; index >= 0; index--) {
+    const segment = segments.value[index]!;
+    if (segment.type === "text") return "";
+    if (segment.type === "work") return segment.key;
+  }
+  return "";
 });
 </script>
 
@@ -235,14 +247,13 @@ const waiting = computed(() => {
           :streaming="busy && last && segment === segments.at(-1)"
         />
         <p v-else-if="segment.type === 'note'" class="user-message note">{{ segment.text }}</p>
-        <AgentThought
-          v-else-if="segment.type === 'thought'"
-          :text="segment.text"
-          :streaming="busy && last && segment === segments.at(-1)"
-        />
-        <AgentActivity
+        <AgentWork
           v-else
-          :tools="segment.tools"
+          :items="segment.items"
+          :busy="busy"
+          :last="last"
+          :current="segment.key === currentWork"
+          :any-running="anyRunning"
           :root="root"
           @open="(path) => emit('openFile', path)"
         />
