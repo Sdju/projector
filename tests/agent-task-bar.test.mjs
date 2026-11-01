@@ -62,15 +62,21 @@ test(
     await browser.open(fixture.url("/bar"));
     await browser.evaluate("window.fixture.longCommands()");
     const settle = () => browser.evaluate("new Promise(resolve => requestAnimationFrame(resolve))");
+    const openWork = async () => {
+      if (!(await browser.evaluate('document.querySelector(".work")?.open')))
+        await browser.click(".work-summary");
+      await settle();
+    };
     const geometry = () =>
       browser.evaluate(`(() => {
-    const summary = document.querySelector('.activity-summary');
+    const summary = document.querySelector('.work-summary');
     const page = document.documentElement;
     return { width: summary.clientWidth, height: summary.clientHeight, page: page.clientWidth, scroll: page.scrollWidth };
   })()`);
     for (const width of [900, 360]) {
       await browser.viewport(width, 700);
       await settle();
+      await openWork();
       let box = await geometry();
       expect(box.scroll).toBeLessThanOrEqual(box.page);
       expect(box.height).toBeLessThan(50);
@@ -89,6 +95,7 @@ test(
         await browser.click(".bar-summary");
         await settle();
       }
+      await openWork();
       await browser.click(".activity-summary");
       await browser.click(".activity-list .tool > summary");
       await settle();

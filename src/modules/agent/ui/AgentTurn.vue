@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import UiInline from "../../../common/ui/UiInline.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { chipIcon, chipLabel, chipTitle } from "../lib/composer/chips.ts";
 import { versionsOf, type ForkMode } from "../model/branches.ts";
 import { legacyParts } from "../model/turn-events.ts";
 import type { AgentToolChip, AgentTurn, ChatUsage, MessageChip } from "../model/types.ts";
 import AgentMessage from "./AgentMessage.vue";
+import AgentFormAnswer from "./AgentFormAnswer.vue";
 import AgentWork, { type AgentWorkItem } from "./AgentWork.vue";
 import AgentChanges from "./AgentChanges.vue";
 import AgentUsageInfo from "./AgentUsageInfo.vue";
@@ -34,11 +35,14 @@ const props = defineProps<{
   canRevert?: boolean;
   /** A conversation only to read (a subagent's): no editing, retrying or rolling back. */
   readonly?: boolean;
+  /** The form the chat is waiting for: its copy in this answer is shown as a read-only panel. */
+  promotedForm?: string;
 }>();
 const emit = defineEmits<{
   copy: [id: string, text: string];
   open: [chip: MessageChip];
   edit: [id: string];
+  formSubmit: [id: string, text: string, data: unknown, summary?: string];
   rewind: [id: string];
   retry: [id: string];
   /** A new chat from this point: before a question (with it in the input) or after an answer. */
@@ -50,6 +54,17 @@ const emit = defineEmits<{
 }>();
 
 const versions = computed(() => versionsOf(props.turn));
+const formAnswer = ref<InstanceType<typeof AgentFormAnswer>>();
+const editTitle = computed(() =>
+  props.turn.form ? "Изменить ответ в форме" : "Править и отправить заново",
+);
+function editMessage() {
+  if (props.turn.form) formAnswer.value?.start();
+  else emit("edit", props.turn.id);
+}
+function submitForm(text: string, data: unknown, summary?: string) {
+  emit("formSubmit", props.turn.id, text, data, summary);
+}
 
 const written = computed(() => (props.turn.at ? new Date(props.turn.at) : undefined));
 const stamp = computed(() =>
@@ -183,10 +198,10 @@ const currentWork = computed(() => {
           shape="icon"
           size="sm"
           class="turn-action"
-          title="Править и отправить заново"
+          :title="editTitle"
           aria-label="Править сообщение"
           :disabled="busy"
-          @click="emit('edit', turn.id)"
+          @click="editMessage"
         >
           <IconPencil aria-hidden="true" />
         </UiButton>
@@ -212,7 +227,16 @@ const currentWork = computed(() => {
           <IconGitFork aria-hidden="true" />
         </UiButton>
       </UiInline>
-      <p v-if="turn.auto" class="user-message auto">
+      <div v-if="turn.form" class="user-form">
+        <AgentFormAnswer
+          ref="formAnswer"
+          :source="turn.form.source"
+          :values="turn.form.values"
+          :busy="busy"
+          @submit="submitForm"
+        />
+      </div>
+      <p v-else-if="turn.auto" class="user-message auto">
         Продолжение после задания <code>{{ turn.auto }}</code>
       </p>
       <p v-else class="user-message">
@@ -245,6 +269,7 @@ const currentWork = computed(() => {
           v-if="segment.type === 'text'"
           :text="segment.text"
           :streaming="busy && last && segment === segments.at(-1)"
+          :promoted="promotedForm"
         />
         <p v-else-if="segment.type === 'note'" class="user-message note">{{ segment.text }}</p>
         <AgentWork
@@ -396,6 +421,13 @@ const currentWork = computed(() => {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.user-form {
+  width: min(90%, 640px);
+  min-width: 0;
+}
+.user-form :deep(.ui-card) {
+  background: var(--bg-3);
+}
 .note {
   margin: 0 0 var(--sp-3) auto;
 }
@@ -501,6 +533,9 @@ const currentWork = computed(() => {
   }
   .user-message {
     max-width: 96%;
+  }
+  .user-form {
+    width: 100%;
   }
 }
 @media (prefers-reduced-motion: reduce) {

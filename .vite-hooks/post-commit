@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+# Vite can keep a stale transform when a formatter or Git hook rewrites a file and the watcher
+# event races the final write. Touch committed source files so the dev server sees a fresh mtime
+# and reloads the actual module.
+git diff-tree --no-commit-id --name-only -r HEAD |
+  while IFS= read -r file; do
+    case "$file" in
+      src/*|core/*|server/*) [ -f "$file" ] && touch "$file" ;;
+    esac
+  done

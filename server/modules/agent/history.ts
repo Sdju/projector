@@ -56,6 +56,14 @@ const turnSchema: z.ZodType<StoredTurn> = z.lazy(() =>
         ]),
       )
       .optional(),
+    /** A form answer: the block the user filled and the values that were sent. */
+    form: z
+      .object({
+        source: z.string(),
+        values: z.unknown(),
+        summary: z.string().optional(),
+      })
+      .optional(),
     /** Tokens, cache use and cost of the answer, for the usage tooltip after a reload. */
     usage: z
       .object({

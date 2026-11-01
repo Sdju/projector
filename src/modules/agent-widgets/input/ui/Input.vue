@@ -15,8 +15,8 @@ useField(props.name, model, props.initial ?? "");
 <template>
   <label class="field">
     <span v-if="label">{{ label }}</span>
-    <textarea v-if="multiline" v-model="model" rows="3" :placeholder="placeholder" />
-    <input v-else v-model="model" type="text" :placeholder="placeholder" />
+    <textarea v-if="multiline" v-model="model" rows="3" :name="name" :placeholder="placeholder" />
+    <input v-else v-model="model" type="text" :name="name" :placeholder="placeholder" />
   </label>
 </template>
 

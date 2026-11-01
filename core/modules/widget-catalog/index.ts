@@ -29,6 +29,11 @@ export interface WidgetDefinition {
    * come from the `describe_widget` tool on demand, so a large catalogue does not tax every answer.
    */
   special?: boolean;
+  /**
+   * The block can be the chat's next answer: when an answer ends with it, the composer shows it in
+   * place of the text field, and the user's message keeps the same block as a read-only snapshot.
+   */
+  answer?: boolean;
   /** A minimal working use, included in the guide and detailed description. */
   example: string;
 }

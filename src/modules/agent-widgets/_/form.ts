@@ -1,4 +1,5 @@
 import { inject, onBeforeUnmount, ref, type InjectionKey, type Ref } from "vue";
+import type { FormPreset } from "../../widget-runtime/index.ts";
 
 /**
  * A form is a set of named controls that need no script: each control registers its value here,
@@ -16,12 +17,15 @@ export const formKey: InjectionKey<FormContext> = Symbol("agent-widget-form");
 
 const clone = <T>(value: T): T => (value === undefined ? value : JSON.parse(JSON.stringify(value)));
 
-export function createForm(): FormContext {
+export function createForm(preset?: FormPreset | null): FormContext {
   const fields = new Map<string, { value: Ref<unknown>; initial: unknown }>();
   return {
     sent: ref(false),
     register(name, value, initial) {
       const field = { value, initial: clone(initial) };
+      // A snapshot shows the answer that was actually sent, not the defaults the agent wrote.
+      const submitted = preset?.values?.[name];
+      if (submitted !== undefined) value.value = clone(submitted);
       fields.set(name, field);
       return () => {
         if (fields.get(name) === field) fields.delete(name);

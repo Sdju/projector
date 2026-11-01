@@ -28,6 +28,7 @@ function toggle(value: string, single?: boolean) {
       <label>
         <input
           :type="single ? 'radio' : 'checkbox'"
+          :name="name"
           :checked="chosen.includes(option.value)"
           @change="toggle(option.value, single)"
         />

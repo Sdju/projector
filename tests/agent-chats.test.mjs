@@ -77,6 +77,16 @@ describe("Projector agent chat history", () => {
     expect((await readAgentHistory("t"))[0].at).toBe(1760000000000);
   });
 
+  it("keeps the form a user answered, with the values that were sent", async () => {
+    const form = {
+      source: "<Form><Checks name=\"next\" :options=\"['a','b']\" /></Form>",
+      values: { next: ["b"] },
+      summary: "Продолжить",
+    };
+    await writeAgentHistory("f", [{ ...turn("1", "user", "Продолжить"), form }]);
+    expect((await readAgentHistory("f"))[0].form).toEqual(form);
+  });
+
   it("remembers the native session a chat continues, including rows written earlier", async () => {
     const index = { project: "sessions-project", backend: "opencode", title: "Чат" };
     const chat = "opencode:sessions-project:chat";

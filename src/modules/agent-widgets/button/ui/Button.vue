@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, inject, ref } from "vue";
+import { computed, inject, ref, unref } from "vue";
 import UiButton from "../../../../common/ui/UiButton.vue";
-import { useWidgetReply } from "../../../widget-runtime/index.ts";
+import { formPresetKey, useWidgetReply } from "../../../widget-runtime/index.ts";
 import { formKey } from "../../_/form.ts";
 
 const props = defineProps<{
@@ -18,13 +18,16 @@ const props = defineProps<{
   sentLabel?: string;
 }>();
 const form = inject(formKey, null);
+const preset = inject(formPresetKey, null);
 const reply = useWidgetReply();
 const sentAlone = ref(false);
 const sent = computed(() => (props.submit ? !!form?.sent.value : sentAlone.value));
-const locked = computed(() => sent.value || !!form?.sent.value);
+const presetReadonly = computed(() => unref(preset?.readonly) === true);
+const locked = computed(() => sent.value || !!form?.sent.value || presetReadonly.value);
 
 // Only the click on this button sends: reply() refuses without a fresh user gesture.
 function click() {
+  if (locked.value) return;
   if (props.reset) form?.reset();
   if (props.preset) form?.set(props.preset);
   if (props.submit && form && reply(form.values(), props.summary)) form.sent.value = true;

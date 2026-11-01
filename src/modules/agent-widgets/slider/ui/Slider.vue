@@ -23,6 +23,7 @@ useField(props.name, model, props.initial ?? props.min ?? 0);
     <input
       v-model.number="model"
       type="range"
+      :name="name"
       :min="min ?? 0"
       :max="max ?? 100"
       :step="step ?? 1"

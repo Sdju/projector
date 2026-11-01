@@ -8,7 +8,7 @@ import {
   useMessageScope,
 } from "../../widget-runtime/index.ts";
 
-const props = defineProps<{ text: string; streaming?: boolean }>();
+const props = defineProps<{ text: string; streaming?: boolean; promoted?: string }>();
 // Text only grows, so earlier parts keep their position and source: Vue patches only the tail.
 const parts = computed(() =>
   splitMessage(props.text, { known: isWidgetName, streaming: props.streaming }),
@@ -26,6 +26,9 @@ useMessageScope(
   <div class="agent-message">
     <template v-for="(part, index) in parts" :key="index">
       <AgentMarkdown v-if="part.type === 'markdown'" :text="part.text" :streaming="streaming" />
+      <p v-else-if="part.type === 'widget' && part.source === promoted" class="promoted-form">
+        <span aria-hidden="true">↓</span> Форма доступна в поле ввода.
+      </p>
       <AgentWidget
         v-else-if="part.type === 'widget'"
         :source="part.source"
@@ -40,6 +43,20 @@ useMessageScope(
 .script-error {
   color: var(--err);
   font-size: var(--fs-xs);
+}
+.promoted-form {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 12px 0;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-md);
+  color: var(--muted);
+  font-size: var(--fs-2xs);
+}
+.promoted-form span {
+  color: var(--text-2);
 }
 .agent-message {
   color: var(--text);

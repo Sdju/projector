@@ -114,6 +114,40 @@ test("autoClose turns a half-written component into one that compiles", async ()
   });
 });
 
+test("a form can be the next answer only as the last block of a finished message", async () => {
+  const { defineWidget } = await import("../core/modules/widget-catalog/index.ts");
+  const { formWidget } = await import("../core/modules/agent-widgets/form/index.ts");
+  expect(formWidget.answer).toBe(true);
+  const { registerWidget } = await import("../src/modules/widget-runtime/registry.ts");
+  const { answerFormSource } = await import("../src/modules/widget-runtime/answer.ts");
+  registerWidget({
+    definition: defineWidget({
+      name: "Ask",
+      group: "form",
+      summary: "вопрос формой",
+      answer: true,
+      example: "<Ask />",
+    }),
+    component: { render: () => null },
+  });
+  registerWidget({
+    definition: defineWidget({
+      name: "Card",
+      group: "layout",
+      summary: "рамка",
+      example: "<Card />",
+    }),
+    component: { render: () => null },
+  });
+  const ask = "<Ask>выбор</Ask>";
+  expect(answerFormSource(`Вот варианты:\n\n${ask}`)).toBe(ask);
+  expect(answerFormSource(`Вот варианты:\n\n<Card>${ask}</Card>`)).toBe(`<Card>${ask}</Card>`);
+  expect(answerFormSource(`${ask}\n\nПосле формы`)).toBeUndefined();
+  expect(answerFormSource(`<Card>${ask}</Card>\n\nтекст`)).toBeUndefined();
+  expect(answerFormSource("<Card>без формы</Card>")).toBeUndefined();
+  expect(answerFormSource("<Ask>не закрыта")).toBeUndefined();
+});
+
 test("the catalog's guide is made from the definitions and covers every registered component", async () => {
   const { createWidgetCatalog, defineWidget } =
     await import("../core/modules/widget-catalog/index.ts");

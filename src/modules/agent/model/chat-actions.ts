@@ -10,7 +10,7 @@ import {
 import { injectAgentMessage } from "../api/sessions.ts";
 import { cutAt, switchVersion } from "./branches.ts";
 import type { ChatState } from "./chat-state.ts";
-import type { AgentBackendId, AgentTurn, MessagePart } from "./types.ts";
+import type { AgentBackendId, AgentFormAnswer, AgentTurn, MessagePart } from "./types.ts";
 
 /**
  * What the user does with a chat beyond writing the next message: queue messages while the agent
@@ -24,7 +24,11 @@ export function useChatActions(
     projectId: string;
     ready: Promise<void>;
     persist: () => void;
-    send: (text?: string, chips?: MessagePart[], options?: { auto?: string }) => Promise<void>;
+    send: (
+      text?: string,
+      chips?: MessagePart[],
+      options?: { auto?: string; form?: AgentFormAnswer },
+    ) => Promise<void>;
     stop: () => void;
   },
 ) {
@@ -51,7 +55,11 @@ export function useChatActions(
     }
     state.interrupting = false;
     const next = state.queue.shift()!;
-    if (next.auto) void send(next.text, next.parts, { auto: next.auto });
+    const options = {
+      ...(next.auto ? { auto: next.auto } : {}),
+      ...(next.form ? { form: next.form } : {}),
+    };
+    if (Object.keys(options).length) void send(next.text, next.parts, options);
     else void send(next.text, next.parts);
   }
 
@@ -171,7 +179,7 @@ export function useChatActions(
     const user = state.turns.slice(0, index + 1).findLast((turn) => turn.role === "user");
     if (!user || state.busy) return;
     const cut = cutBack(user.id);
-    if (cut) await send(cut.text, cut.content ?? []);
+    if (cut) await send(cut.text, cut.content ?? [], cut.form ? { form: cut.form } : undefined);
   }
 
   /** Shows another version of the chat from this message on. */

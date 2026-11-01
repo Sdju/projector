@@ -38,6 +38,12 @@ export interface ChatController {
   removeSession(id: string): Promise<void>;
   toggleControlsMenu(): void;
   send(text: string): Promise<void>;
+  /** The block the last answer ended with, if the chat waits for it: a form instead of the field. */
+  pendingForm(): string | undefined;
+  /** Shows that form in the composer again. */
+  showForm(): void;
+  /** Hides the form and returns the ordinary text field. */
+  hideForm(): void;
   /** Adds a message to the answer being written; `false` when it could not be added. */
   inject(text: string): Promise<boolean>;
   stop(): void;

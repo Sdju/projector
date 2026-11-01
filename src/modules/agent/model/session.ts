@@ -31,15 +31,17 @@ import { saveChat } from "./save-chat.ts";
 import { useExternalAgent } from "./external.ts";
 import { applyAgentEvent, resetAnswer } from "./turn-events.ts";
 import { hasChips, messageText, normalizeParts } from "../lib/message-parts.ts";
+import { userTurnOf } from "./user-turn.ts";
 import type {
   AgentBackendId,
   AgentEvent,
+  AgentFormAnswer,
   AgentTurn,
   AgentCommandRequest,
   MessagePart,
 } from "./types.ts";
 
-type SendOptions = { auto?: string };
+type SendOptions = { auto?: string; form?: AgentFormAnswer };
 
 /** A restarting server answers again within seconds; this much patience covers a slow restart. */
 const REJOIN_DELAY_MS = 1000;
@@ -226,6 +228,7 @@ export function useAgent(
         id: newId(),
         text: message,
         parts: content ?? [],
+        ...(options?.form ? { form: options.form } : {}),
         ...(options?.auto ? { auto: options.auto } : {}),
       });
       void actions.deliverQueue();
@@ -241,15 +244,7 @@ export function useAgent(
     const copy = worktreeId();
     const isolate = state.isolate && !copy && !resume && !isBuiltinAgent(backend);
     state.isolate = false;
-    const userTurn: AgentTurn = {
-      id: newId(),
-      role: "user",
-      text: message,
-      at: Date.now(),
-      ...(content ? { content } : {}),
-      ...(options?.auto ? { auto: options.auto } : {}),
-      tools: [],
-    };
+    const userTurn = userTurnOf(message, content, options);
     // The message replaces others that were cut off: they stay as versions of this point.
     if (state.stash?.index === state.turns.length) addVersion(userTurn, state.stash.versions);
     state.stash = undefined;

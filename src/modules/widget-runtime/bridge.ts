@@ -1,7 +1,7 @@
 import { inject, type InjectionKey } from "vue";
 
 /** How a component talks back to the agent: it sends a message into the chat the component is in. */
-export type WidgetReply = (text: string) => void;
+export type WidgetReply = (text: string, data?: unknown, summary?: string) => boolean | void;
 export const widgetReplyKey: InjectionKey<WidgetReply> = Symbol("agent-widget-reply");
 
 /** The user message a component's `reply(data, summary)` becomes: a short line and the data as JSON. */
@@ -24,7 +24,8 @@ export function useWidgetReply(): (data: unknown, summary?: string) => boolean {
   const send = inject(widgetReplyKey, undefined);
   return (data, summary) => {
     if (!send || !userIsActive()) return false;
-    send(formatWidgetReply(data, summary));
+    // The text is what the agent sees; the raw data lets the chat keep a form answer as values.
+    send(formatWidgetReply(data, summary), data, summary);
     return true;
   };
 }

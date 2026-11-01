@@ -171,6 +171,16 @@ export interface AgentUsage extends AgentTokens {
   cost?: number;
 }
 
+/** A form the agent offered and the user answered: its markup and the values that were sent. */
+export interface AgentFormAnswer {
+  /** The form or panel block exactly as the agent wrote it. */
+  source: string;
+  /** The values the user submitted; the form's controls show them again. */
+  values: unknown;
+  /** The line the submit button put before the values. */
+  summary?: string;
+}
+
 export interface AgentTurn {
   id: string;
   role: "user" | "assistant";
@@ -182,6 +192,8 @@ export interface AgentTurn {
   tasks?: AgentTask[];
   /** What the user wrote, with chips; `text` holds the same message as plain text. */
   content?: MessagePart[];
+  /** On a user turn: the form that was filled instead of typing, shown in place of the text. */
+  form?: AgentFormAnswer;
   /** Order of text and tool calls; absent in turns saved before it existed. */
   parts?: AgentPart[];
   /** The turn ended on its budget, not on an answer: the chat offers to continue it. */
@@ -220,6 +232,8 @@ export interface QueuedMessage {
   id: string;
   text: string;
   parts: MessagePart[];
+  /** A form answer keeps the block it came from, so the user's message can show it again. */
+  form?: AgentFormAnswer;
   /** The IDE wrote this message after a job: it is shown as a continuation note. */
   auto?: string;
 }

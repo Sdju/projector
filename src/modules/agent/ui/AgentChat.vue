@@ -15,6 +15,7 @@ import { useChatJobs } from "../model/chat-jobs.ts";
 import { useSideQuestion } from "../model/side-question.ts";
 import { useAutoCompact } from "../model/use-auto-compact.ts";
 import { useChatInputActions } from "../model/use-chat-input-actions.ts";
+import { useAnswerForm } from "../model/answer-form.ts";
 import UiPanel from "../../../common/ui/UiPanel.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
@@ -37,7 +38,9 @@ import { chatTasks } from "../lib/task-detail.ts";
 import { useChatTaskView } from "../model/use-chat-task-view.ts";
 import AgentRewind from "./AgentRewind.vue";
 import AgentWorktree from "./AgentWorktree.vue";
-import { chatMarkdown, downloadChatMarkdown } from "../lib/export.ts";
+import { openChatChip } from "./open-chip.ts";
+import { exportChat, downloadChat as saveChatMarkdown } from "../lib/export.ts";
+import { copyText } from "../lib/clipboard.ts";
 import { shownPlan } from "../lib/plan.ts";
 import { fetchMcpServers } from "../api/client.ts";
 import { useMcpServers } from "../model/mcp-panel.ts";
@@ -244,6 +247,15 @@ const { copy, copyInfo, copyWorking, copyNote, endCopy } = useWorktreePanel(turn
 const editFrom = computed(() =>
   editing.value ? turns.value.findIndex((turn) => turn.id === editing.value) : -1,
 );
+// A finished answer may end with a form: it becomes the next message's input.
+const { pendingForm, submitComposerForm, submitTurnForm } = useAnswerForm({
+  turns,
+  busy,
+  draft,
+  draftParts,
+  send,
+  edit,
+});
 // The plan stays pinned while it has unfinished items, even after later messages.
 const plan = computed(() => shownPlan(turns.value, props.backend));
 const contextShare = computed(() =>
@@ -293,16 +305,6 @@ const { compact } = useAutoCompact({
   send,
   toBottom,
 });
-function exportMarkdown() {
-  return chatMarkdown(turns.value, `${agentName.value} · ${new Date().toLocaleString("ru")}`);
-}
-function downloadChat() {
-  downloadChatMarkdown(
-    turns.value,
-    `${agentName.value} · ${new Date().toLocaleString("ru")}`,
-    `${props.backend}-chat.md`,
-  );
-}
 // The chat publishes itself to the workspace's commands (see `registerAgentCommands`).
 const controller: ChatController = {
   key: chatKey,
@@ -322,6 +324,9 @@ const controller: ChatController = {
   removeSession,
   toggleControlsMenu: () => controlsMenu.value?.toggle(),
   send: (text) => send(text),
+  pendingForm: () => pendingForm.value,
+  showForm: () => composer.value?.showForm(),
+  hideForm: () => composer.value?.hideForm(),
   inject: async (text) => {
     await send(text);
     const item = queue.value.findLast((entry) => entry.text === text.trim());
@@ -338,7 +343,7 @@ const controller: ChatController = {
   },
   showVersion,
   removeQueued,
-  exportMarkdown,
+  exportMarkdown: () => exportChat(turns.value, agentName.value),
   compact,
   status: () => side.status(),
   openSide: () => side.openPanel(),
@@ -355,20 +360,16 @@ const controller: ChatController = {
 const unregisterChat = registerChat(controller);
 onBeforeUnmount(unregisterChat);
 // A file chip opens its file in the editor; an image chip opens the picture itself.
-function openChip(chip: MessageChip) {
-  if (chip.type === "image")
-    window.open(`/api/agent/attachments/${encodeURIComponent(chip.id)}`, "_blank", "noopener");
-  else if (chip.type === "file")
-    void api
-      .executeCommand(
+const openChip = (chip: MessageChip) =>
+  openChatChip(chip, {
+    openFile: (path, directory) =>
+      api.executeCommand(
         "ide.editor.path.open",
-        { path: chip.path, directory: chip.directory === true },
+        { path, directory },
         { scope: `editor:${props.projectId}` },
-      )
-      .catch((cause) => {
-        error.value = cause instanceof Error ? cause.message : "Не удалось открыть файл";
-      });
-}
+      ),
+    fail: (message) => (error.value = message),
+  });
 const away = ref(false);
 const { PRELOAD_PX, firstShown, shown, hidden, loadEarlier, topUp } = useChatWindow(
   turns,
@@ -439,17 +440,16 @@ const { submit, continueTurn, suggest, newChat } = useChatInputActions({
   focus: () => composer.value?.focus(),
 });
 async function copyMessage(id: string, text: string) {
-  try {
-    await navigator.clipboard.writeText(text);
-    copied.value = id;
-    copyError.value = "";
-    clearTimeout(copyTimer);
-    copyTimer = setTimeout(() => {
-      copied.value = "";
-    }, 2000);
-  } catch {
+  if (!(await copyText(text))) {
     copyError.value = "Не удалось скопировать ответ";
+    return;
   }
+  copied.value = id;
+  copyError.value = "";
+  clearTimeout(copyTimer);
+  copyTimer = setTimeout(() => {
+    copied.value = "";
+  }, 2000);
 }
 watch(
   () => [
@@ -570,7 +570,7 @@ onBeforeUnmount(() => {
         size="sm"
         title="Сохранить чат в Markdown"
         aria-label="Сохранить чат в Markdown"
-        @click="downloadChat"
+        @click="saveChatMarkdown(turns, agentName, backend)"
       >
         <IconDownload aria-hidden="true" />
       </UiButton>
@@ -620,9 +620,13 @@ onBeforeUnmount(() => {
           :faded="editFrom >= 0 && firstShown + offset >= editFrom"
           :root="projectRoot"
           :can-revert="canRevert(turn.id)"
+          :promoted-form="
+            turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? pendingForm : undefined
+          "
           @copy="copyMessage"
           @open="openChip"
           @edit="editMessage"
+          @form-submit="submitTurnForm"
           @rewind="askRewind"
           @retry="retryMessage"
           @fork="forkMessage"
@@ -721,7 +725,10 @@ onBeforeUnmount(() => {
       :started-at="turns.findLast((turn) => turn.role === 'assistant')?.at"
       :error="error || copyError"
       :copied="!!copied"
+      :form="pendingForm"
+      :editing="!!editing"
       @submit="submit"
+      @form-submit="submitComposerForm"
       @open="openChip"
       @fail="(message) => (error = message)"
       @dismiss="dismissError"

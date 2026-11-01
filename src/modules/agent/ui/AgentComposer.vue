@@ -3,10 +3,14 @@ import { computed, ref, watch } from "vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 import type { MessageChip, MessagePart } from "../model/types.ts";
 import AgentInput from "./AgentInput.vue";
+import AgentFormPanel from "./AgentFormPanel.vue";
 import AgentWorkClock from "./AgentWorkClock.vue";
+import UiButton from "../../../common/ui/UiButton.vue";
 import IconArrowUp from "~icons/lucide/arrow-up";
 import IconSquare from "~icons/lucide/square";
 import IconAlert from "~icons/lucide/circle-alert";
+import IconType from "~icons/lucide/type";
+import IconListChecks from "~icons/lucide/list-checks";
 import IconX from "~icons/lucide/x";
 
 const draft = defineModel<string>({ required: true });
@@ -19,6 +23,10 @@ const props = defineProps<{
   copied: boolean;
   projectId?: string;
   commands?: { name: string; description?: string }[];
+  /** The form the last answer ended with: it takes the place of the text field. */
+  form?: string;
+  /** A message is being edited: the text field wins over the pending form. */
+  editing?: boolean;
 }>();
 const emit = defineEmits<{
   submit: [];
@@ -26,6 +34,7 @@ const emit = defineEmits<{
   open: [chip: MessageChip];
   fail: [message: string];
   dismiss: [];
+  formSubmit: [text: string, data: unknown, summary: string | undefined, source: string];
 }>();
 // A long error (a validation dump, a stack) stays a short strip until asked to open.
 const expanded = ref(false);
@@ -34,12 +43,47 @@ watch(
   () => props.error,
   () => (expanded.value = false),
 );
+// The answer form is the composer until the user asks for the text field; a new form opens again.
+const dismissed = ref("");
+watch(
+  () => props.form,
+  (source, previous) => {
+    if (source && source !== previous) dismissed.value = "";
+  },
+);
+// A new answer always offers its form, even when it is the same markup as the previous one.
+watch(
+  () => props.busy,
+  (busy, was) => {
+    if (was && !busy) dismissed.value = "";
+  },
+);
+const formOpen = computed(
+  () => !!props.form && !props.busy && !props.editing && dismissed.value !== props.form,
+);
+const activeForm = computed(() => (formOpen.value ? props.form : undefined));
+function dismissForm() {
+  dismissed.value = props.form ?? "";
+}
+function restoreForm() {
+  if (props.form) dismissed.value = "";
+}
+function submitForm(text: string, data: unknown, summary?: string) {
+  const source = props.form;
+  if (!source) return;
+  dismissed.value = source;
+  emit("formSubmit", text, data, summary, source);
+}
 const input = ref<InstanceType<typeof AgentInput>>();
 defineExpose({
   resize: () => {},
-  focus: () => input.value?.focus(),
+  focus: () => {
+    if (!formOpen.value) input.value?.focus();
+  },
   acceptsDrag: (data: DataTransfer | null) => !!input.value?.acceptsDrag(data),
   dropData: (data: DataTransfer) => !!input.value?.dropData(data),
+  showForm: restoreForm,
+  hideForm: dismissForm,
 });
 </script>
 
@@ -63,8 +107,16 @@ defineExpose({
         <IconX aria-hidden="true" />
       </button>
     </div>
-    <form class="composer" :class="{ working: busy }" @submit.prevent="emit('submit')">
+    <form
+      class="composer"
+      :class="{ working: busy, 'form-mode': formOpen }"
+      @submit.prevent="formOpen ? undefined : emit('submit')"
+    >
+      <div v-if="activeForm" class="composer-form">
+        <AgentFormPanel :source="activeForm" @submit="submitForm" />
+      </div>
       <AgentInput
+        v-show="!formOpen"
         ref="input"
         v-model="draft"
         v-model:parts="parts"
@@ -77,6 +129,19 @@ defineExpose({
       <UiInline class="composer-footer" justify="normal">
         <slot name="controls" />
         <UiInline class="footer-end" justify="normal">
+          <UiButton
+            v-if="form && !editing"
+            shape="icon"
+            size="sm"
+            class="form-toggle"
+            :title="formOpen ? 'Переключиться на текст' : 'Открыть форму ответа'"
+            :aria-label="formOpen ? 'Переключиться на текст' : 'Открыть форму ответа'"
+            :aria-pressed="formOpen"
+            @click="formOpen ? dismissForm() : restoreForm()"
+          >
+            <IconType v-if="formOpen" aria-hidden="true" />
+            <IconListChecks v-else aria-hidden="true" />
+          </UiButton>
           <AgentWorkClock v-if="busy && startedAt" :started-at="startedAt" />
           <slot name="status" />
           <button
@@ -93,9 +158,21 @@ defineExpose({
             v-if="!busy || draft.trim()"
             type="submit"
             class="send-button"
-            :title="busy ? 'В очередь: уйдёт, когда агент закончит (Enter)' : 'Отправить (Enter)'"
-            :aria-label="busy ? 'Поставить сообщение в очередь' : 'Отправить сообщение'"
-            :disabled="!draft.trim()"
+            :title="
+              formOpen
+                ? 'Сначала отправьте форму'
+                : busy
+                  ? 'В очередь: уйдёт, когда агент закончит (Enter)'
+                  : 'Отправить (Enter)'
+            "
+            :aria-label="
+              formOpen
+                ? 'Отправка недоступна, пока открыта форма'
+                : busy
+                  ? 'Поставить сообщение в очередь'
+                  : 'Отправить сообщение'
+            "
+            :disabled="formOpen || !draft.trim()"
           >
             <IconArrowUp aria-hidden="true" />
           </button>
@@ -126,6 +203,39 @@ defineExpose({
 }
 .composer:focus-within {
   border-color: var(--focus);
+}
+.composer.form-mode {
+  padding: 2px var(--sp-2) var(--sp-1);
+}
+.composer-form {
+  display: grid;
+  gap: var(--sp-1);
+  min-width: 0;
+  max-height: min(46vh, 460px);
+  overflow: auto;
+  padding: var(--sp-3) 0 var(--sp-2);
+  border-bottom: 1px solid var(--line);
+  scrollbar-width: thin;
+}
+.composer-form :deep(.widget > .ui-card) {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.composer-form :deep(.widget) {
+  margin: 0;
+}
+/* Form mode has a wider composer padding, so the footer only compensates its left inset.
+   The vertical padding stays zero: the footer box and its buttons must not move between modes. */
+.composer.form-mode .composer-footer {
+  padding: 0 0 0 var(--sp-2);
+}
+.form-toggle {
+  color: var(--muted);
+}
+.form-toggle:hover:not(:disabled) {
+  color: var(--text);
 }
 .composer-footer {
   padding: 0 var(--sp-1) 0 var(--sp-3);

@@ -43,3 +43,16 @@ export function downloadChatMarkdown(turns: AgentTurn[], title: string, name: st
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/** The chat as text with the current time in its title; the same for a download. */
+export function exportChat(turns: AgentTurn[], agent: string): string {
+  return chatMarkdown(turns, `${agent} · ${new Date().toLocaleString("ru")}`);
+}
+
+export function downloadChat(turns: AgentTurn[], agent: string, backend: string): void {
+  downloadChatMarkdown(
+    turns,
+    `${agent} · ${new Date().toLocaleString("ru")}`,
+    `${backend}-chat.md`,
+  );
+}
