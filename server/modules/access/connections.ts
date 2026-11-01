@@ -5,9 +5,13 @@ import { onLanPasswordChanged } from "./password.ts";
 
 /** Revoke live LAN sockets as well as HTTP sessions when the password changes. */
 export function protectLanSockets(
-  server: { once(event: "close", listener: () => void): unknown },
+  server: {
+    once(event: "close", listener: () => void): unknown;
+    off?(event: "close", listener: () => void): unknown;
+  },
   sockets: WebSocketServer,
-): void {
+  allowed: typeof accessAllowed = accessAllowed,
+): () => void {
   const requests = new Map<WebSocket, IncomingMessage>();
   sockets.on("connection", (client, req) => {
     if (isLocalRequest(req)) return;
@@ -21,13 +25,19 @@ export function protectLanSockets(
     for (const [client, req] of requests) {
       const token =
         new URL(req.url ?? "/", "http://localhost").searchParams.get("token") ?? undefined;
-      if (!accessAllowed(req, true, token)) client.terminate();
+      if (!allowed(req, true, token)) client.terminate();
     }
   }, 30000);
   timer.unref();
-  server.once("close", () => {
+  let disposed = false;
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
     clearInterval(timer);
     unsubscribe();
     requests.clear();
-  });
+    server.off?.("close", dispose);
+  };
+  server.once("close", dispose);
+  return dispose;
 }

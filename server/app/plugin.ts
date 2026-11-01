@@ -1,6 +1,7 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
-import type { HttpServer, PreviewServer, ViteDevServer } from "vite";
-import type { Plugin } from "vite";
+import { findProject, loadProjects } from "../modules/projects/index.ts";
+import { bindWorkspaceEvents } from "../modules/workspace/index.ts";
+import type { RuntimeHandlers } from "./runtime-contract.ts";
+import type { HttpServer } from "vite-plus";
 import { handleApi } from "./api.ts";
 import { clearInstance, writeInstance } from "../modules/instance/index.ts";
 import { APP_PORT, appUrl } from "../../core/modules/app-paths/index.ts";
@@ -8,19 +9,20 @@ import { os } from "../../core/modules/os/index.ts";
 import { CLAUDE_SESSION_ENV } from "../modules/agents/claude-code/index.ts";
 import { openLauncher, startTray } from "../modules/window/index.ts";
 import type { ServerMode } from "../../core/modules/server-mode/index.ts";
-import { attachTerminalServer } from "../modules/terminal/index.ts";
-import { pruneRuns, recoverJobs } from "../modules/agent/index.ts";
+import { attachTerminalServer, listTerminalSessions } from "../modules/terminal/index.ts";
+import { pruneRuns, recoverJobs, bindAgentEventStreams } from "../modules/agent/index.ts";
 import { registerBuiltinAgents } from "./agents.ts";
 import { registerBuiltinWidgetDefinitions } from "./widgets.ts";
 import { registerBuiltinAgentFeatures } from "./features.ts";
-import { ensureIdeMcpToken } from "../modules/ide/index.ts";
+import { ensureIdeMcpToken, bindIdeCommandEvents } from "../modules/ide/index.ts";
 import { reconcileOnStartup } from "../modules/environments/index.ts";
 
 import {
   attachSharedTerminalServer,
   attachTerminalControlServer,
+  terminalControl,
 } from "../modules/terminal-control/index.ts";
-import { authorizeHttp } from "../modules/access/index.ts";
+import { authorizeHttp, accessAllowed } from "../modules/access/index.ts";
 import { handleProxyHost, isProxyHost } from "../modules/browser/index.ts";
 
 /** Process hooks must survive Vite's config reload without retaining old module closures. */
@@ -43,7 +45,11 @@ function bindHooks(): void {
 }
 
 /** Общая часть dev, preview и standalone: режим, сокеты терминалов, запись instance, окно. */
-export function bindRuntime(httpServer: HttpServer | null, mode: ServerMode): void {
+export function bindRuntime(
+  httpServer: HttpServer | null,
+  mode: ServerMode,
+  handlers: () => RuntimeHandlers = getRuntimeHandlers,
+): () => void {
   // Регистрация при вызове, а не при импорте: импорт конфига Vite не должен трогать агентов.
   registerBuiltinAgents();
   registerBuiltinWidgetDefinitions();
@@ -54,11 +60,26 @@ export function bindRuntime(httpServer: HttpServer | null, mode: ServerMode): vo
   // Сервер, запущенный из сессии Claude Code, иначе передаёт её метки каждому терминалу и агенту.
   os.clearSessionEnv(CLAUDE_SESSION_ENV);
   runtime.projectorRuntimeMode = mode;
-  if (!httpServer) return;
-  attachTerminalServer(httpServer);
-  attachTerminalControlServer(httpServer);
-  attachSharedTerminalServer(httpServer);
-  httpServer.once("listening", () => {
+  const subscriptions = [bindAgentEventStreams(), bindIdeCommandEvents(), bindWorkspaceEvents()];
+  const deactivate = () => subscriptions.forEach((off) => off());
+  if (!httpServer) return deactivate;
+  const allowed: typeof accessAllowed = (...args) => handlers().accessAllowed(...args);
+  const operations = {
+    allowed,
+    control: (...args: Parameters<typeof terminalControl>) => handlers().terminalControl(...args),
+    sessions: (...args: Parameters<typeof listTerminalSessions>) =>
+      handlers().terminalSessions(...args),
+    project: (...args: Parameters<typeof findProject>) => handlers().findProject(...args),
+  };
+  const transports = [
+    attachTerminalServer(httpServer, {
+      allowed,
+      projects: (...args) => handlers().loadProjects(...args),
+    }),
+    attachTerminalControlServer(httpServer, operations),
+    attachSharedTerminalServer(httpServer, operations),
+  ];
+  const listening = () => {
     const address = httpServer.address();
     const port = address && typeof address === "object" ? address.port : APP_PORT;
     void writeInstance(port);
@@ -82,37 +103,31 @@ export function bindRuntime(httpServer: HttpServer | null, mode: ServerMode): vo
         console.warn("Трей недоступен:", error instanceof Error ? error.message : error),
       );
     }
-  });
+  };
+  if (httpServer.listening) bindHooks();
+  else httpServer.once("listening", listening);
+  return () => {
+    httpServer.off("listening", listening);
+    for (const dispose of transports) dispose?.();
+    deactivate();
+  };
 }
 
-function attach(server: ViteDevServer | PreviewServer, mode: ServerMode): void {
-  bindRuntime(server.httpServer, mode);
-  server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
-    // Origin прокси псевдобраузера имеет собственную проверку и не проходит общую по Host.
-    if (isProxyHost(req)) {
-      void handleProxyHost(req, res);
-      return;
-    }
-    if (!authorizeHttp(req, res, true)) return;
-    void handleApi(req, res)
-      .then((handled) => {
-        if (!handled) next();
-      })
-      .catch(() => {
-        if (!res.headersSent) res.writeHead(400);
-        res.end();
-      });
-  });
-}
-
-export function projectorPlugin(): Plugin {
+/** A complete request/operation generation; no resource is recreated while constructing it. */
+export function getRuntimeHandlers(): RuntimeHandlers {
   return {
-    name: "projector-api",
-    configureServer(server) {
-      attach(server, "dev");
+    async handleHttp(req, res, next) {
+      if (isProxyHost(req)) {
+        await handleProxyHost(req, res);
+        return;
+      }
+      if (!authorizeHttp(req, res, true)) return;
+      if (!(await handleApi(req, res))) next();
     },
-    configurePreviewServer(server) {
-      attach(server, "prod");
-    },
+    terminalControl,
+    terminalSessions: listTerminalSessions,
+    accessAllowed,
+    findProject,
+    loadProjects,
   };
 }

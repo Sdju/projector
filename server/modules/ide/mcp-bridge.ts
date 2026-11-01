@@ -81,22 +81,29 @@ function broadcast(entry: Pending): void {
  * A page that goes away releases its sessions. A request it had not claimed is offered to the
  * other tabs of the project; a request it was already running fails instead of running twice.
  */
-state.off?.();
-state.off = onEventClientClose((page) => {
-  for (const [session, owner] of [...state.owners]) {
-    if (owner !== page) continue;
-    state.owners.delete(session);
-    for (const entry of [...state.pending.values()]) {
-      if (entry.session !== session) continue;
-      if (entry.claimedBy) entry.finish({ error: "Страница Projector закрыта" });
-      else {
-        entry.owner = undefined;
-        entry.claimedBy = undefined;
-        broadcast(entry);
+export function bindIdeCommandEvents(): () => void {
+  state.off?.();
+  const off = onEventClientClose((page) => {
+    for (const [session, owner] of [...state.owners]) {
+      if (owner !== page) continue;
+      state.owners.delete(session);
+      for (const entry of [...state.pending.values()]) {
+        if (entry.session !== session) continue;
+        if (entry.claimedBy) entry.finish({ error: "Страница Projector закрыта" });
+        else {
+          entry.owner = undefined;
+          entry.claimedBy = undefined;
+          broadcast(entry);
+        }
       }
     }
-  }
-});
+  });
+  state.off = off;
+  return () => {
+    off();
+    if (state.off === off) state.off = undefined;
+  };
+}
 
 /**
  * Asks the page that owns the MCP session for a command. The first answer binds the session to
@@ -109,6 +116,7 @@ export function requestIdeCommand(
   request: AgentCommandCall,
   timeoutMs = 60_000,
 ): Promise<unknown> {
+  if (!state.off) bindIdeCommandEvents();
   const id = randomUUID();
   const now = Date.now();
   const owner = state.owners.get(session);

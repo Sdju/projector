@@ -140,6 +140,6 @@ export {
 export { clearJobWorktree, forkJob, retryJob } from "./jobs-worktree.ts";
 export { followUpJob } from "./jobs-followup.ts";
 export { jobDiff, PATCH_LIMIT, type JobDiff } from "./jobs-diff.ts";
-export { trackEventStream, detachEventStream } from "./event-streams.ts";
+export { trackEventStream, detachEventStream, bindAgentEventStreams } from "./event-streams.ts";
 export { requestFrom } from "./request.ts";
 export { sideRequestFrom, type SideRequest, type SideExchange } from "./side-request.ts";

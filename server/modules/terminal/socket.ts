@@ -15,7 +15,10 @@ import {
 } from "./session-state.ts";
 import { accessAllowed, protectLanSockets } from "../access/index.ts";
 
-export function attachTerminalServer(server: Server | HttpServer): void {
+export function attachTerminalServer(
+  server: Server | HttpServer,
+  handlers = { allowed: accessAllowed, projects: loadProjects },
+): (() => void) | undefined {
   if (state.servers.has(server)) return;
   state.servers.add(server);
   const sockets = new WebSocketServer({
@@ -24,7 +27,7 @@ export function attachTerminalServer(server: Server | HttpServer): void {
     perMessageDeflate: false,
   });
   const alive = new WeakSet<WebSocket>();
-  protectLanSockets(server, sockets);
+  const unprotect = protectLanSockets(server, sockets, handlers.allowed);
   const heartbeat = setInterval(() => {
     for (const client of sockets.clients) {
       if (!alive.has(client)) {
@@ -36,12 +39,19 @@ export function attachTerminalServer(server: Server | HttpServer): void {
     }
   }, 30000);
   heartbeat.unref();
-  server.once("close", () => {
+  let disposed = false;
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
     clearInterval(heartbeat);
+    unprotect();
     for (const client of sockets.clients) client.terminate();
     sockets.close();
-  });
-  server.on("upgrade", (req: IncomingMessage, socket: Duplex, head: Buffer) => {
+    state.servers.delete(server);
+    server.off("close", dispose);
+    server.off("upgrade", upgrade);
+  };
+  const upgrade = (req: IncomingMessage, socket: Duplex, head: Buffer) => {
     if (socket.writableEnded || socket.destroyed) return;
     let url: URL;
     try {
@@ -51,7 +61,7 @@ export function attachTerminalServer(server: Server | HttpServer): void {
       return;
     }
     if (url.pathname !== "/api/terminal/socket") return; // Leave Vite HMR alone.
-    if (!accessAllowed(req, true, url.searchParams.get("token") ?? undefined)) {
+    if (!handlers.allowed(req, true, url.searchParams.get("token") ?? undefined)) {
       socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
       return;
     }
@@ -60,7 +70,8 @@ export function attachTerminalServer(server: Server | HttpServer): void {
       socket.end("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
       return;
     }
-    void loadProjects()
+    void handlers
+      .projects()
       .then((projects) => {
         if (
           !projects.some((project) => project.id === session.info.projectId) ||
@@ -78,7 +89,10 @@ export function attachTerminalServer(server: Server | HttpServer): void {
         });
       })
       .catch(() => socket.destroy());
-  });
+  };
+  server.on("upgrade", upgrade);
+  server.once("close", dispose);
+  return dispose;
 }
 
 function screenSnapshot(session: Session, client: TerminalPeer): void {

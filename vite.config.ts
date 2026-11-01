@@ -7,7 +7,8 @@ import feod from "./feod.config.mjs";
 import { checkFeod, checkFeodAsync } from "./scripts/check-feod.mjs";
 import { APP_PORT, readNetworkMode } from "./core/modules/app-paths/index.ts";
 import { networkHost } from "./core/modules/network-mode/index.ts";
-import { projectorPlugin } from "./server/app/plugin.ts";
+import { projectorPlugin } from "./server/app/dev-plugin.ts";
+import manifest from "./package.json" with { type: "json" };
 
 function architecturePlugin(): Plugin {
   const describe = (errors: ReturnType<typeof checkFeod>) =>
@@ -42,6 +43,7 @@ function architecturePlugin(): Plugin {
 const feodLint = createFeodConfig(feod, { rootDir: fileURLToPath(new URL(".", import.meta.url)) });
 
 export default defineConfig({
+  ssr: { external: Object.keys(manifest.dependencies) },
   plugins: [architecturePlugin(), vue(), Icons({ compiler: "vue3" }), projectorPlugin()],
   resolve: {
     alias: {

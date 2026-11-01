@@ -5,6 +5,11 @@ vi.mock("../server/app/api.ts", () => ({ handleApi: vi.fn() }));
 vi.mock("../core/modules/os/index.ts", () => ({
   os: { capabilities: { nativeDesktop: false }, clearSessionEnv: vi.fn() },
 }));
+vi.mock("../server/modules/ide/index.ts", () => ({
+  ensureIdeMcpToken: vi.fn().mockResolvedValue(undefined),
+  bindIdeCommandEvents: () => () => {},
+}));
+vi.mock("../server/modules/workspace/index.ts", () => ({ bindWorkspaceEvents: () => () => {} }));
 vi.mock("../server/modules/window/index.ts", () => ({}));
 vi.mock("../server/modules/terminal/index.ts", () => ({ attachTerminalServer: vi.fn() }));
 vi.mock("../server/modules/terminal-control/index.ts", () => ({
@@ -14,6 +19,7 @@ vi.mock("../server/modules/terminal-control/index.ts", () => ({
 vi.mock("../server/modules/agent/index.ts", () => ({
   recoverJobs: vi.fn().mockResolvedValue(undefined),
   pruneRuns: vi.fn().mockResolvedValue(undefined),
+  bindAgentEventStreams: () => () => {},
 }));
 vi.mock("../server/modules/environments/index.ts", () => ({
   reconcileOnStartup: vi.fn().mockResolvedValue(undefined),

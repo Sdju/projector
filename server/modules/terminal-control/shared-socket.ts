@@ -2,15 +2,13 @@ import type { Server } from "node:http";
 import type { HttpServer } from "vite";
 import { EventEmitter } from "node:events";
 import { WebSocket, WebSocketServer } from "ws";
-import { accessAllowed, protectLanSockets } from "../access/index.ts";
-import { findProject } from "../projects/index.ts";
+import { protectLanSockets } from "../access/index.ts";
 import {
-  listTerminalSessions,
   onTerminalSessionsChanged,
   subscribeTerminalPeer,
   type TerminalPeer,
 } from "../terminal/index.ts";
-import { terminalControl } from "./control.ts";
+import { defaultTerminalControlHandlers, type TerminalControlHandlers } from "./handlers.ts";
 
 /** Each browser consumer has independent ACK accounting, even on a shared physical socket. */
 class Channel extends EventEmitter implements TerminalPeer {
@@ -63,7 +61,10 @@ const host = globalThis as typeof globalThis & {
   projectorSharedServers?: WeakSet<Server | HttpServer>;
 };
 const servers = (host.projectorSharedServers ??= new WeakSet());
-export function attachSharedTerminalServer(server: Server | HttpServer): void {
+export function attachSharedTerminalServer(
+  server: Server | HttpServer,
+  handlers: TerminalControlHandlers = defaultTerminalControlHandlers,
+): (() => void) | undefined {
   if (servers.has(server)) return;
   servers.add(server);
   const wss = new WebSocketServer({
@@ -71,7 +72,7 @@ export function attachSharedTerminalServer(server: Server | HttpServer): void {
     maxPayload: 128 * 1024,
     perMessageDeflate: false,
   });
-  protectLanSockets(server, wss);
+  const unprotect = protectLanSockets(server, wss, handlers.allowed);
   const alive = new WeakSet<WebSocket>();
   const heartbeat = setInterval(() => {
     for (const socket of wss.clients) {
@@ -83,12 +84,23 @@ export function attachSharedTerminalServer(server: Server | HttpServer): void {
     }
   }, 30000);
   heartbeat.unref();
-  server.once("close", () => {
+  let disposed = false;
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
     clearInterval(heartbeat);
+    unprotect();
+    servers.delete(server);
+    server.off("close", dispose);
+    server.off("upgrade", upgrade);
     for (const socket of wss.clients) socket.terminate();
     wss.close();
-  });
-  server.on("upgrade", (req, socket, head) => {
+  };
+  const upgrade: (
+    req: import("node:http").IncomingMessage,
+    socket: import("node:stream").Duplex,
+    head: Buffer,
+  ) => void = (req, socket, head) => {
     if (socket.destroyed || socket.writableEnded) return;
     let url: URL;
     try {
@@ -98,7 +110,7 @@ export function attachSharedTerminalServer(server: Server | HttpServer): void {
     }
     if (url.pathname !== "/api/terminal/shared") return;
     const kind = url.searchParams.get("kind");
-    if (!accessAllowed(req, true, url.searchParams.get("token") ?? undefined)) {
+    if (!handlers.allowed(req, true, url.searchParams.get("token") ?? undefined)) {
       socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
       return;
     }
@@ -111,12 +123,15 @@ export function attachSharedTerminalServer(server: Server | HttpServer): void {
       alive.add(client);
       client.on("pong", () => alive.add(client));
       client.on("error", () => client.terminate());
-      bind(client, kind);
+      bind(client, kind, handlers);
     });
-  });
+  };
+  server.on("upgrade", upgrade);
+  server.once("close", dispose);
+  return dispose;
 }
 
-function bind(socket: WebSocket, kind: "control" | "data") {
+function bind(socket: WebSocket, kind: "control" | "data", handlers: TerminalControlHandlers) {
   const channels = new Map<string, Channel>();
   const opening = new Map<string, object>();
   let pumping: ReturnType<typeof setTimeout> | undefined;
@@ -145,7 +160,7 @@ function bind(socket: WebSocket, kind: "control" | "data") {
       pumping = setTimeout(pump, socket.bufferedAmount > 256 * 1024 ? 10 : 1);
   };
   const snapshot = (peer: Channel) =>
-    peer.send(JSON.stringify({ type: "sessions", sessions: listTerminalSessions(peer.projectId) }));
+    peer.send(JSON.stringify({ type: "sessions", sessions: handlers.sessions(peer.projectId) }));
   const dirty = new Set<string>();
   const unsubscribe =
     kind === "control"
@@ -159,7 +174,7 @@ function bind(socket: WebSocket, kind: "control" | "data") {
             if (!peers.length) return;
             const data = JSON.stringify({
               type: "sessions",
-              sessions: listTerminalSessions(projectId),
+              sessions: handlers.sessions(projectId),
             });
             for (const peer of peers) peer.send(data);
           });
@@ -193,7 +208,8 @@ function bind(socket: WebSocket, kind: "control" | "data") {
           throw new Error("Некорректная подписка");
         const attempt = {};
         opening.set(id, attempt);
-        void findProject(message.projectId)
+        void handlers
+          .project(message.projectId)
           .then((project) => {
             if (opening.get(id) !== attempt || socket.readyState !== WebSocket.OPEN) return;
             opening.delete(id);
@@ -251,7 +267,7 @@ function bind(socket: WebSocket, kind: "control" | "data") {
                           Array.isArray(request.body)))
                     )
                       throw new Error("Некорректный запрос терминала");
-                    const result = await terminalControl(
+                    const result = await handlers.control(
                       project.id,
                       request.method,
                       request.sessionId,

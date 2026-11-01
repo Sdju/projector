@@ -1,17 +1,19 @@
 import type { Server } from "node:http";
 import type { HttpServer } from "vite";
 import { WebSocket, WebSocketServer } from "ws";
-import { accessAllowed, protectLanSockets } from "../access/index.ts";
-import { findProject } from "../projects/index.ts";
-import { listTerminalSessions, onTerminalSessionsChanged } from "../terminal/index.ts";
-import { terminalControl } from "./control.ts";
+import { protectLanSockets } from "../access/index.ts";
+import { onTerminalSessionsChanged } from "../terminal/index.ts";
+import { defaultTerminalControlHandlers, type TerminalControlHandlers } from "./handlers.ts";
 
 const host = globalThis as typeof globalThis & {
   projectorTerminalControlServers?: WeakSet<Server | HttpServer>;
 };
 const servers = (host.projectorTerminalControlServers ??= new WeakSet());
 
-export function attachTerminalControlServer(server: Server | HttpServer): void {
+export function attachTerminalControlServer(
+  server: Server | HttpServer,
+  handlers: TerminalControlHandlers = defaultTerminalControlHandlers,
+): (() => void) | undefined {
   if (servers.has(server)) return;
   servers.add(server);
   const sockets = new WebSocketServer({
@@ -20,7 +22,7 @@ export function attachTerminalControlServer(server: Server | HttpServer): void {
     perMessageDeflate: false,
   });
   const projects = new Map<WebSocket, string>();
-  protectLanSockets(server, sockets);
+  const unprotect = protectLanSockets(server, sockets, handlers.allowed);
   const alive = new WeakSet<WebSocket>();
   const send = (client: WebSocket, message: unknown) => {
     if (client.readyState !== WebSocket.OPEN) return;
@@ -31,7 +33,7 @@ export function attachTerminalControlServer(server: Server | HttpServer): void {
     client.send(JSON.stringify(message));
   };
   const snapshot = (client: WebSocket, projectId: string) =>
-    send(client, { type: "sessions", sessions: listTerminalSessions(projectId) });
+    send(client, { type: "sessions", sessions: handlers.sessions(projectId) });
   const dirty = new Set<string>();
   const unsubscribe = onTerminalSessionsChanged((projectId) => {
     if (dirty.has(projectId)) return;
@@ -52,13 +54,24 @@ export function attachTerminalControlServer(server: Server | HttpServer): void {
     }
   }, 30000);
   heartbeat.unref();
-  server.once("close", () => {
+  let disposed = false;
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
     unsubscribe();
     clearInterval(heartbeat);
+    unprotect();
+    servers.delete(server);
+    server.off("close", dispose);
+    server.off("upgrade", upgrade);
     for (const client of sockets.clients) client.terminate();
     sockets.close();
-  });
-  server.on("upgrade", (req, socket, head) => {
+  };
+  const upgrade: (
+    req: import("node:http").IncomingMessage,
+    socket: import("node:stream").Duplex,
+    head: Buffer,
+  ) => void = (req, socket, head) => {
     if (socket.writableEnded || socket.destroyed) return;
     let url: URL;
     try {
@@ -68,12 +81,13 @@ export function attachTerminalControlServer(server: Server | HttpServer): void {
       return;
     }
     if (url.pathname !== "/api/terminal/control") return;
-    if (!accessAllowed(req, true, url.searchParams.get("token") ?? undefined)) {
+    if (!handlers.allowed(req, true, url.searchParams.get("token") ?? undefined)) {
       socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
       return;
     }
     const projectId = url.searchParams.get("project") ?? "";
-    void findProject(projectId)
+    void handlers
+      .project(projectId)
       .then((project) => {
         if (!project) {
           socket.end("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
@@ -114,7 +128,7 @@ export function attachTerminalControlServer(server: Server | HttpServer): void {
                       Array.isArray(message.body)))
                 )
                   throw new Error("Некорректный запрос терминала");
-                const data = await terminalControl(
+                const data = await handlers.control(
                   projectId,
                   message.method,
                   message.sessionId,
@@ -134,5 +148,8 @@ export function attachTerminalControlServer(server: Server | HttpServer): void {
         });
       })
       .catch(() => socket.destroy());
-  });
+  };
+  server.on("upgrade", upgrade);
+  server.once("close", dispose);
+  return dispose;
 }

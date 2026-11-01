@@ -15,15 +15,23 @@ const state: NonNullable<typeof host.projectorAgentStreams> = (host.projectorAge
   detach: new Map(),
   owners: new Map(),
 });
-// A page that goes away detaches from its answers like a closed request does.
-state.off?.();
-state.off = onEventClientClose((client) => {
-  for (const [stream, owner] of [...state.owners])
-    if (owner === client) state.detach.get(stream)?.();
-});
+/** Replace the page-close subscription only when this generation is activated. */
+export function bindAgentEventStreams(): () => void {
+  state.off?.();
+  const off = onEventClientClose((client) => {
+    for (const [stream, owner] of [...state.owners])
+      if (owner === client) state.detach.get(stream)?.();
+  });
+  state.off = off;
+  return () => {
+    off();
+    if (state.off === off) state.off = undefined;
+  };
+}
 
 /** Registers an answer of `client`; the returned function forgets it. */
 export function trackEventStream(stream: string, client: string, detach: () => void): () => void {
+  if (!state.off) bindAgentEventStreams();
   state.detach.set(stream, detach);
   state.owners.set(stream, client);
   return () => {

@@ -28,15 +28,31 @@ interface Registry {
   clients: Map<string, Map<string, Subscription>>;
   directories: Map<string, Directory>;
   bound: boolean;
+  off?: () => void;
 }
 
 // Vite reloads the API modules without closing watchers: keep them across reloads.
 const host = globalThis as typeof globalThis & { projectorFileWatch?: Registry };
-const registry = (host.projectorFileWatch ??= {
+const registry: Registry = (host.projectorFileWatch ??= {
   clients: new Map(),
   directories: new Map(),
   bound: false,
 });
+/** The watcher registry survives HMR; its page-close callback has an explicit owner. */
+export function bindWorkspaceEvents(): () => void {
+  registry.off?.();
+  const off = onEventClientClose((id) => {
+    registry.clients.delete(id);
+    void reconcile();
+  });
+  registry.off = off;
+  registry.bound = true;
+  return () => {
+    off();
+    if (registry.off === off) registry.off = undefined;
+  };
+}
+
 const DEBOUNCE_MS = 60;
 const LISTING_DEBOUNCE_MS = 150;
 const MAX_FILES = 200;
@@ -178,13 +194,7 @@ export async function watchProject(
   root: string,
   patch: { paths?: unknown[]; directories?: unknown[] },
 ) {
-  if (!registry.bound) {
-    registry.bound = true;
-    onEventClientClose((id) => {
-      registry.clients.delete(id);
-      void reconcile();
-    });
-  }
+  if (!registry.off) bindWorkspaceEvents();
   const projects = registry.clients.get(clientId) ?? new Map<string, Subscription>();
   const current = projects.get(projectId) ?? {
     root,
