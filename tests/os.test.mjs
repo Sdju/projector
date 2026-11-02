@@ -492,21 +492,28 @@ $stream.Dispose()
         );
     }
     expect(await os.desktopPid("dev.projector.Launcher")).toBe(child.pid);
+    const identityPath = join(dataDirectory, "launcher.identity.json");
+    const identity = JSON.parse(await readFile(identityPath, "utf8"));
+    expect(identity).toMatchObject({ pid: child.pid, started: expect.any(String) });
+    expect(identity.started).not.toBe("");
     await os.runDesktop("http://127.0.0.1:9", "toggle", {
       dataDirectory,
       createPalette: async () => {
         throw new Error("вторая палитра не создаётся");
       },
     });
+    // Quit replies READY before the resident process exits — arm the waiter first.
+    const exited = once(child, "exit");
     await os.runDesktop("http://127.0.0.1:9", "quit", {
       dataDirectory,
       createPalette: async () => {
         throw new Error("палитра не создаётся");
       },
     });
-    const [code] = await once(child, "exit");
+    const [code] = await exited;
     expect(code).toBe(0);
     expect(await readFile(marker, "utf8")).toBe("create\nshow\ntoggle\ndispose\n");
     expect(await os.desktopPid("dev.projector.Launcher")).toBeUndefined();
+    expect(existsSync(identityPath)).toBe(false);
   },
 );

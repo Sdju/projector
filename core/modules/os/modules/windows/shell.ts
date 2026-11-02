@@ -296,7 +296,11 @@ async function launch(
       if (stopped) return;
       stopped = true;
       failPending();
-      input.write("quit\n");
+      try {
+        input.write("quit\n");
+      } catch {
+        /* stdin already closed */
+      }
       await new Promise<void>((resolve) => {
         const timer = setTimeout(() => {
           child.kill();

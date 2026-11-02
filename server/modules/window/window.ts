@@ -33,7 +33,7 @@ function desktopCommand(url: string, action: "show" | "toggle" | "tray" | "quit"
             : "Системное окно не ответило. Проверьте GTK4 и desktop-сессию.",
         ),
       );
-    }, 20000);
+    }, 45000);
     child.stderr.on("data", (chunk) => {
       const text = chunk.toString();
       errors = (errors + text).slice(-8000);

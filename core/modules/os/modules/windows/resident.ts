@@ -1,43 +1,35 @@
 import type { DesktopAction, DesktopPalette, ResidentOptions } from "../../contract.ts";
-import { randomBytes, timingSafeEqual } from "node:crypto";
-import { userInfo } from "node:os";
+import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import net from "node:net";
 import { dirname, join } from "node:path";
-import { dataHome } from "./directories.ts";
 import { processIdentity } from "./processes.ts";
 import { readWindowsColorScheme } from "./color-scheme.ts";
-import { warmWindowHelper } from "./hwnd.ts";
+import { stopWindowHost, warmWindowHelper } from "./hwnd.ts";
+import {
+  bindPipe,
+  forward,
+  isDesktopAction,
+  launcherPidPath,
+  launcherIdentityPath,
+  launcherTokenPath,
+  pipeTaken,
+  reclaim,
+  waitForForward,
+} from "./resident-pipe.ts";
 import { startDesktopShell } from "./shell.ts";
 import { restrictToOwner } from "./tools.ts";
 
 const service = "dev.projector.Launcher";
-const actions: DesktopAction[] = ["show", "toggle", "tray", "quit"];
-/** Same directory as `dataDir()` without importing app-paths back into the OS adapter. */
-const appDirectory = "projector";
 
-/** One pipe per Windows user: a fixed name would let a second account's session collide with it. */
-function pipeName(): string {
-  const user = userInfo().username.replace(/[^\w.-]/g, "_");
-  return process.env.PROJECTOR_LAUNCHER_PIPE || `\\\\.\\pipe\\${service}.${user}`;
-}
-
-/** The pipe has the default DACL, so every command must prove it can read the user's profile. */
-function sameToken(given: string, token: string): boolean {
-  const a = Buffer.from(given);
-  const b = Buffer.from(token);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
-
-export function launcherPidPath(dataDirectory = join(dataHome(), appDirectory)): string {
-  return join(dataDirectory, "launcher.pid");
-}
+export { launcherPidPath, launcherTokenPath } from "./resident-pipe.ts";
 
 export async function desktopPid(name: string): Promise<number | undefined> {
   if (name !== service) return;
   try {
     const pid = Number((await readFile(launcherPidPath(), "utf8")).trim());
-    if (!processIdentity(pid)) {
+    // Windows processIdentity is async; a bare call always yields a truthy Promise.
+    if (!(await processIdentity(pid))) {
       await rm(launcherPidPath(), { force: true });
       return;
     }
@@ -47,114 +39,40 @@ export async function desktopPid(name: string): Promise<number | undefined> {
   }
 }
 
-export function launcherTokenPath(dataDirectory = join(dataHome(), appDirectory)): string {
-  return join(dataDirectory, "launcher.token");
-}
-
-/** Named pipes carry no per-user ACL here, so commands must quote the secret kept in the profile. */
-async function readToken(dataDirectory: string): Promise<string> {
-  try {
-    return (await readFile(launcherTokenPath(dataDirectory), "utf8")).trim();
-  } catch {
-    return "";
-  }
-}
-
-function isAction(value: string): value is DesktopAction {
-  return actions.includes(value as DesktopAction);
-}
-
-async function forward(action: DesktopAction, dataDirectory: string): Promise<boolean> {
-  const token = await readToken(dataDirectory);
-  if (!token) return false;
-  return new Promise((resolve) => {
-    const socket = net.connect(pipeName());
-    let buffer = "";
-    let settled = false;
-    const finish = (accepted: boolean) => {
-      if (settled) return;
-      settled = true;
-      socket.destroy();
-      resolve(accepted);
-    };
-    socket.setTimeout(1500, () => finish(false));
-    socket.on("error", () => finish(false));
-    socket.on("data", (chunk: Buffer) => {
-      buffer += chunk.toString();
-      if (buffer.includes("READY")) finish(true);
-    });
-    socket.on("connect", () => {
-      socket.write(`${token} ${action}\n`);
-    });
-  });
-}
-
-function taken(error: unknown): boolean {
-  const code = (error as NodeJS.ErrnoException).code;
-  return code === "EADDRINUSE" || code === "EACCES";
-}
-
-function bind(
-  token: string,
-  dispatch: (action: DesktopAction) => Promise<void>,
-): Promise<net.Server> {
-  const server = net.createServer((socket) => {
-    let buffer = "";
-    let handled = false;
-    socket.on("data", (chunk: Buffer) => {
-      if (handled) return;
-      buffer += chunk.toString();
-      const newline = buffer.indexOf("\n");
-      if (newline < 0) return;
-      handled = true;
-      const [given, requested = ""] = buffer.slice(0, newline).trim().split(" ");
-      if (!sameToken(given ?? "", token) || !isAction(requested)) {
-        socket.destroy();
-        return;
-      }
-      void dispatch(requested)
-        .then(() => socket.end("READY\n"))
-        .catch((error: unknown) => {
-          console.error(error instanceof Error ? error.message : error);
-          socket.destroy();
-        });
-    });
-  });
-  return new Promise((resolve, reject) => {
-    const fail = (error: Error) => {
-      server.close();
-      reject(error);
-    };
-    server.once("error", fail);
-    server.listen(pipeName(), () => {
-      server.off("error", fail);
-      resolve(server);
-    });
-  });
-}
-
 /** Owns the palette process. A second launch only forwards show, toggle, tray or quit. */
 export async function runResident(
   baseUrl: string,
   action: DesktopAction,
   options: ResidentOptions,
 ) {
-  if (!isAction(action)) throw new Error("Неизвестная команда");
-  if (await forward(action, options.dataDirectory)) {
+  if (!isDesktopAction(action)) throw new Error("Неизвестная команда");
+  const requestId = randomUUID();
+  if (action === "quit") {
+    if (
+      (await forward(action, options.dataDirectory, requestId)) ||
+      (await waitForForward(action, options.dataDirectory, 3, requestId))
+    ) {
+      console.log("READY");
+      return;
+    }
+    await reclaim(options.dataDirectory).catch(() => undefined);
     console.log("READY");
     return;
   }
-  if (action === "quit") {
+  // Same idea as macOS: never start a second resident while the first still answers.
+  if (await waitForForward(action, options.dataDirectory, 8, requestId)) {
     console.log("READY");
     return;
   }
 
+  // CIM can be slow. Resolve identity before binding so another launcher cannot
+  // mistake a pipe waiting for its token to be published for a hung resident.
+  const started = await processIdentity(process.pid);
   const token = randomBytes(24).toString("hex");
   const queued: Array<() => Promise<void>> = [];
   let live: ((action: DesktopAction) => Promise<void>) | undefined;
-  let server: net.Server;
-  try {
-    server = await bind(token, async (requested) => {
+  const attach = async () =>
+    bindPipe(token, async (requested) => {
       if (live) {
         await live(requested);
         return;
@@ -163,18 +81,42 @@ export async function runResident(
         queued.push(() => live!(requested).then(resolve, reject));
       });
     });
+
+  let server: net.Server;
+  try {
+    server = await attach();
   } catch (error) {
-    if (!taken(error) || !(await forward(action, options.dataDirectory))) throw error;
-    console.log("READY");
-    return;
+    if (!pipeTaken(error)) throw error;
+    // Holder appeared between the forward loop and listen, or is hung with a stale token.
+    if (await waitForForward(action, options.dataDirectory, 5, requestId)) {
+      console.log("READY");
+      return;
+    }
+    await reclaim(options.dataDirectory);
+    try {
+      server = await attach();
+    } catch (retryError) {
+      if (
+        !pipeTaken(retryError) ||
+        !(await waitForForward(action, options.dataDirectory, 5, requestId))
+      )
+        throw retryError;
+      console.log("READY");
+      return;
+    }
   }
 
   const pidPath = launcherPidPath(options.dataDirectory);
-  await mkdir(dirname(pidPath), { recursive: true });
-  await writeFile(pidPath, `${process.pid}\n`);
-  await writeFile(launcherTokenPath(options.dataDirectory), `${token}\n`, { mode: 0o600 });
-  await restrictToOwner(launcherTokenPath(options.dataDirectory)).catch(() => undefined);
   try {
+    await mkdir(dirname(pidPath), { recursive: true });
+    // Publish identity before GTK init so a racing second launch can forward instead of reclaiming.
+    await writeFile(pidPath, `${process.pid}\n`);
+    await writeFile(
+      launcherIdentityPath(options.dataDirectory),
+      JSON.stringify({ pid: process.pid, started }),
+    );
+    await writeFile(launcherTokenPath(options.dataDirectory), `${token}\n`, { mode: 0o600 });
+    await restrictToOwner(launcherTokenPath(options.dataDirectory)).catch(() => undefined);
     await own(baseUrl, action, options, server, pidPath, (next) => {
       live = next;
       return queued.splice(0);
@@ -182,6 +124,7 @@ export async function runResident(
   } catch (error) {
     server.close();
     await rm(pidPath, { force: true });
+    await rm(launcherIdentityPath(options.dataDirectory), { force: true });
     await rm(launcherTokenPath(options.dataDirectory), { force: true });
     throw error;
   }
@@ -300,17 +243,34 @@ async function own(
       if (stopping) return;
       stopping = true;
       clearTimeout(pulse);
-      await shell.stop();
-      palette?.dispose();
+      try {
+        await shell.stop();
+      } catch (error) {
+        console.error("Трей stop:", error instanceof Error ? error.message : error);
+      }
+      try {
+        await stopWindowHost();
+      } catch (error) {
+        console.error("Окно stop:", error instanceof Error ? error.message : error);
+      }
+      try {
+        palette?.dispose();
+      } catch (error) {
+        console.error("Палитра:", error instanceof Error ? error.message : error);
+      }
       server.close();
       await rm(pidPath, { force: true });
+      await rm(launcherIdentityPath(options.dataDirectory), { force: true });
       await rm(launcherTokenPath(options.dataDirectory), { force: true });
       release();
     }
     const dispatch = async (requested: DesktopAction) => {
       if (requested === "quit") {
         setTimeout(() => {
-          void stop();
+          void stop().catch((error: unknown) => {
+            console.error("Остановка:", error instanceof Error ? error.message : error);
+            release();
+          });
         }, 50);
         return;
       }

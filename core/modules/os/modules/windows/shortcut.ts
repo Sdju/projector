@@ -44,7 +44,7 @@ async function residentAlive(): Promise<boolean> {
     const pid = Number(
       (await readFile(join(dataHome(), appDirectory, "launcher.pid"), "utf8")).trim(),
     );
-    return processIdentity(pid) !== null;
+    return (await processIdentity(pid)) !== null;
   } catch {
     return false;
   }
