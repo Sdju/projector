@@ -20,6 +20,7 @@ export { findProjectPaths } from "./find-paths.ts";
 export {
   projectGit,
   projectGithubRepository,
+  projectGitlabRepository,
   projectComparison,
   projectGutter,
   mutateProjectGit,

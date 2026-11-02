@@ -18,7 +18,10 @@ import {
 } from "../../../../modules/devcontainer/index.ts";
 import { openBrowser, openWindow } from "../../../../modules/window/index.ts";
 import { closeProjectTerminals } from "../../../../modules/terminal/index.ts";
-import { projectGithubRepository } from "../../../../modules/workspace/index.ts";
+import {
+  projectGithubRepository,
+  projectGitlabRepository,
+} from "../../../../modules/workspace/index.ts";
 import { json, readBody, asString } from "../../../../modules/transport/index.ts";
 import {
   parseMode,
@@ -143,6 +146,14 @@ export async function handleProjectActions({
       res.setHeader("Cache-Control", "no-store");
       json(res, 200, {
         repository: project.environment ? null : await projectGithubRepository(project.path),
+      });
+      return true;
+    }
+
+    if (action === "gitlab" && method === "GET") {
+      res.setHeader("Cache-Control", "no-store");
+      json(res, 200, {
+        repository: project.environment ? null : await projectGitlabRepository(project.path),
       });
       return true;
     }

@@ -1,5 +1,10 @@
+import { GITLAB_PREFIX } from "../gitlab/index.ts";
+
 /** Where a project lives. The only place that knows how a reference is spelled as text. */
-export type ProjectRef = { kind: "local"; path: string } | { kind: "github"; repository: string };
+export type ProjectRef =
+  | { kind: "local"; path: string }
+  | { kind: "github"; repository: string }
+  | { kind: "gitlab"; instance: string; path: string };
 
 const GITHUB_PREFIX = "gh:/";
 const REPOSITORY = /^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9_.-]+$/;
@@ -17,6 +22,17 @@ export function normalizeGithubRepository(value: string): string {
 }
 
 export function parseProjectRef(path: string): ProjectRef {
+  if (path.startsWith(GITLAB_PREFIX)) {
+    const rest = path.slice(GITLAB_PREFIX.length);
+    const slash = rest.indexOf("/");
+    return slash < 0
+      ? { kind: "gitlab", instance: rest, path: "" }
+      : {
+          kind: "gitlab",
+          instance: rest.slice(0, slash),
+          path: rest.slice(slash + 1),
+        };
+  }
   if (path.startsWith(GITHUB_PREFIX))
     return { kind: "github", repository: path.slice(GITHUB_PREFIX.length) };
   return { kind: "local", path };
@@ -24,7 +40,9 @@ export function parseProjectRef(path: string): ProjectRef {
 
 /** Stable text form: also the project id inside the workspace. */
 export function formatProjectRef(ref: ProjectRef): string {
-  return ref.kind === "github" ? `${GITHUB_PREFIX}${ref.repository}` : ref.path;
+  if (ref.kind === "github") return `${GITHUB_PREFIX}${ref.repository}`;
+  if (ref.kind === "gitlab") return `${GITLAB_PREFIX}${ref.instance}/${ref.path}`;
+  return ref.path;
 }
 
 const DRIVE = /^[A-Za-z]:$/;
@@ -96,6 +114,18 @@ function localPathSegments(filePath: string) {
 }
 
 export function projectRefSegments(ref: ProjectRef) {
+  if (ref.kind === "gitlab") {
+    const parts = ref.path.split("/").filter(Boolean);
+    const authority = `${GITLAB_PREFIX}${ref.instance}`;
+    return [
+      { name: GITLAB_PREFIX, path: GITLAB_PREFIX },
+      ...(ref.instance ? [{ name: ref.instance, path: authority }] : []),
+      ...parts.map((name, i) => ({
+        name,
+        path: `${authority}/${parts.slice(0, i + 1).join("/")}`,
+      })),
+    ];
+  }
   if (ref.kind === "github") {
     const parts = ref.repository.split("/").filter(Boolean);
     return [

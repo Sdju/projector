@@ -24,9 +24,10 @@ import {
   setFavoriteDirectory,
 } from "./folders.ts";
 import { searchGithubRepositories } from "../github/index.ts";
-import { searchGitlabProjects, importGitlabProject } from "../gitlab/index.ts";
+import { searchGitlabProjects, importGitlabProject, gitlabCloneTarget } from "../gitlab/index.ts";
 import { appUrl, projectAppUrl } from "../../../core/modules/app-paths/index.ts";
 import { githubProjectRoute } from "../../../core/modules/github/index.ts";
+import { gitlabProjectRoute } from "../../../core/modules/gitlab/index.ts";
 export {
   shortcuts,
   type LaunchItem,
@@ -126,6 +127,8 @@ interface HostedHit {
   fullName: string;
   description: string;
   private: boolean;
+  /** GitLab instance of the hit; GitHub results have no instance and keep `gh:<fullName>`. */
+  instance?: string;
 }
 /** Search results of a code host (`gh:` / `gl:`); every host differs only in id prefix and wording. */
 async function searchHosted(
@@ -136,7 +139,7 @@ async function searchHosted(
     const hits = await find();
     return {
       items: hits.map((repo): LaunchItem => ({
-        id: `${host.prefix}:${repo.fullName}`,
+        id: `${host.prefix}:${repo.instance ? `${repo.instance}/` : ""}${repo.fullName}`,
         name: repo.fullName,
         kind: host.kind,
         description: `${repo.private ? "приватный · " : ""}${repo.description || host.noun}`,
@@ -159,7 +162,7 @@ const GITLAB = {
   prefix: "gl",
   kind: "gitlab",
   noun: "проект GitLab",
-  action: { id: "import", title: "Клонировать и открыть" },
+  action: { id: "open", title: "Открыть проект GitLab" },
 } as const;
 
 export async function searchLauncher(
@@ -296,10 +299,14 @@ export async function launchItem(
     return result;
   }
   if (id.startsWith("gl:")) {
-    if (action && action !== "import")
-      throw new Error("Для проекта GitLab доступно только клонирование");
-    const { project } = await importGitlabProject({ repository: id.slice(3) });
-    result.route = workspaceRoute(project.path);
+    const repository = id.slice(3);
+    if (action === "import") {
+      const { project } = await importGitlabProject({ repository });
+      result.route = workspaceRoute(project.path);
+    } else if (!action || action === "open") {
+      const target = await gitlabCloneTarget(repository);
+      result.route = gitlabProjectRoute(target.instance, target.path);
+    } else throw new Error("Для проекта GitLab доступны открытие и клонирование");
     if (!inline) await openRoute(result.route);
   } else if (id.startsWith("gh:")) {
     if (action && action !== "open") throw new Error("Для репозитория доступно только открытие");

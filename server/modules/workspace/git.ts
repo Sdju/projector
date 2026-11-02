@@ -3,6 +3,14 @@ import { environmentForPath, runEnvironmentCommand } from "../environments/index
 import { lstat, realpath } from "node:fs/promises";
 import { HttpError } from "../http/index.ts";
 import { githubRepositoryFromRemote } from "../../../core/modules/github/index.ts";
+import {
+  GITLAB_DEFAULT_INSTANCE,
+  gitlabRepositoryFromRemote,
+  normalizeGitlabInstance,
+  normalizeGitlabProjectPath,
+} from "../../../core/modules/gitlab/index.ts";
+import { integrationConfig } from "../integration-store/index.ts";
+import { gitlabBaseUrl } from "../gitlab/index.ts";
 import { MAX_BYTES, decode, exec, location, pathExcluded, validatePath } from "./paths.ts";
 import { isExcludedPath } from "../../../core/modules/workspace/index.ts";
 import { excludePatterns } from "./files-exclude.ts";
@@ -45,6 +53,50 @@ export async function git(root: string, args: string[], maxBuffer = 4 * MAX_BYTE
 export async function projectGithubRepository(root: string): Promise<string | null> {
   const remote = await git(root, ["remote", "get-url", "origin"]).catch(() => "");
   return githubRepositoryFromRemote(remote);
+}
+/**
+ * GitLab instance and project path when the project's `origin` points at GitLab, otherwise null.
+ * A self-hosted remote is accepted only for the configured instance; the install prefix of that
+ * instance is removed from the path, and credentials of the remote never leave this function.
+ */
+export async function projectGitlabRepository(
+  root: string,
+): Promise<{ instance: string; path: string } | null> {
+  const remote = await git(root, ["remote", "get-url", "origin"]).catch(() => "");
+  const repository = gitlabRepositoryFromRemote(remote);
+  if (!repository) return null;
+  let configured = GITLAB_DEFAULT_INSTANCE;
+  let configuredHost = GITLAB_DEFAULT_INSTANCE;
+  let prefix = "";
+  try {
+    const base = new URL(gitlabBaseUrl((await integrationConfig("gitlab")).settings.url));
+    configured = normalizeGitlabInstance(base.origin);
+    // SSH and scp remotes carry no web port, so the host alone identifies the same instance.
+    configuredHost = normalizeGitlabInstance(base.hostname);
+    prefix = base.pathname.replace(/^\/+|\/+$/g, "");
+  } catch {
+    // An unusable setting must not break local projects: only gitlab.com stays reachable.
+  }
+  if (
+    repository.instance !== configured &&
+    repository.instance !== configuredHost &&
+    repository.instance !== GITLAB_DEFAULT_INSTANCE
+  )
+    return null;
+  // SSH remotes name the host without the web port; canonical links use the configured instance.
+  const instance = repository.instance === configuredHost ? configured : repository.instance;
+  let path = repository.path;
+  if (
+    prefix &&
+    (repository.instance === configured || repository.instance === configuredHost) &&
+    path.startsWith(`${prefix}/`)
+  )
+    path = path.slice(prefix.length + 1);
+  try {
+    return { instance, path: normalizeGitlabProjectPath(path) };
+  } catch {
+    return null;
+  }
 }
 export async function projectGit(root: string): Promise<GitOverview> {
   try {

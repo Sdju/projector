@@ -33,9 +33,24 @@ import {
   connectGitlab,
   disconnectGitlab,
   revealGitlabToken,
+  beginGitlabLogin,
+  pollGitlabLogin,
   gitlabRepositories,
   gitlabStatus,
   importGitlabProject,
+  cloneGitlabProject,
+  browseGitlabRepository,
+  browseGitlabDirectories,
+  browseGitlabTree,
+  browseGitlabFile,
+  browseGitlabAsset,
+  browseGitlabLog,
+  browseGitlabCommit,
+  browseGitlabComparison,
+  browseGitlabIssues,
+  browseGitlabIssue,
+  browseGitlabMergeRequests,
+  browseGitlabMergeRequest,
 } from "../../../modules/gitlab/index.ts";
 
 import { isLocalRequest } from "../../../modules/access/index.ts";
@@ -136,6 +151,64 @@ export async function handleIntegrationsActions({
       else return false;
       return true;
     }
+    // GitLab browsing is checked before hostMatch so `/browse/...` never falls through.
+    if (path.startsWith("/api/integrations/gitlab/browse/") && method === "GET") {
+      const repository = url.searchParams.get("repository") || "";
+      const sha = url.searchParams.get("sha") || "";
+      if (path === "/api/integrations/gitlab/browse/directories")
+        json(
+          res,
+          200,
+          await browseGitlabDirectories(
+            url.searchParams.get("path") || "",
+            url.searchParams.get("complete") === "true",
+          ),
+        );
+      else if (path === "/api/integrations/gitlab/browse/asset") {
+        const asset = await browseGitlabAsset(repository, sha, url.searchParams.get("path") || "");
+        res.setHeader("Content-Type", asset.mime);
+        res.setHeader("X-Content-Type-Options", "nosniff");
+        res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
+        res.end(asset.bytes);
+      } else if (path === "/api/integrations/gitlab/browse/repository")
+        json(res, 200, await browseGitlabRepository(repository, url.searchParams.get("ref") || ""));
+      else if (path === "/api/integrations/gitlab/browse/tree")
+        json(res, 200, await browseGitlabTree(repository, sha, url.searchParams.get("path") || ""));
+      else if (path === "/api/integrations/gitlab/browse/file")
+        json(res, 200, await browseGitlabFile(repository, sha, url.searchParams.get("path") || ""));
+      else if (path === "/api/integrations/gitlab/browse/log")
+        json(res, 200, await browseGitlabLog(repository, Object.fromEntries(url.searchParams)));
+      else if (path === "/api/integrations/gitlab/browse/commit")
+        json(res, 200, await browseGitlabCommit(repository, url.searchParams.get("hash") || ""));
+      else if (path === "/api/integrations/gitlab/browse/commit-diff")
+        json(
+          res,
+          200,
+          await browseGitlabComparison(
+            repository,
+            url.searchParams.get("hash") || "",
+            url.searchParams.get("path") || "",
+          ),
+        );
+      else if (path === "/api/integrations/gitlab/browse/issues")
+        json(res, 200, await browseGitlabIssues(repository, Object.fromEntries(url.searchParams)));
+      else if (path === "/api/integrations/gitlab/browse/issue")
+        json(res, 200, await browseGitlabIssue(repository, Number(url.searchParams.get("number"))));
+      else if (path === "/api/integrations/gitlab/browse/merge-requests")
+        json(
+          res,
+          200,
+          await browseGitlabMergeRequests(repository, Object.fromEntries(url.searchParams)),
+        );
+      else if (path === "/api/integrations/gitlab/browse/merge-request")
+        json(
+          res,
+          200,
+          await browseGitlabMergeRequest(repository, Number(url.searchParams.get("number"))),
+        );
+      else return false;
+      return true;
+    }
     if (path === "/api/integrations" && method === "GET") {
       json(res, 200, await listIntegrations([githubStatus, gitlabStatus, dockerIntegrationStatus]));
       return true;
@@ -179,9 +252,36 @@ export async function handleIntegrationsActions({
       json(res, 200, await pollGithubLogin(await readBody(req)));
       return true;
     }
+    if (path === "/api/integrations/gitlab/device" && method === "POST") {
+      json(res, 200, await beginGitlabLogin());
+      return true;
+    }
+    if (path === "/api/integrations/gitlab/device/poll" && method === "POST") {
+      json(res, 200, await pollGitlabLogin(await readBody(req)));
+      return true;
+    }
     if (path === "/api/integrations/gitlab/import" && method === "POST") {
       const result = await importGitlabProject(await readBody(req));
       json(res, 201, { project: withRuntime(result.project) });
+      return true;
+    }
+    if (path === "/api/integrations/gitlab/clone" && method === "POST") {
+      const result = await cloneGitlabProject(await readBody(req));
+      json(res, 201, { project: withRuntime(result.project) });
+      return true;
+    }
+    if (path === "/api/integrations/gitlab/clone-jobs" && method === "POST") {
+      json(res, 202, { job: startCloneJob(await readBody(req), cloneGitlabProject) });
+      return true;
+    }
+    const gitlabJobMatch = path.match(/^\/api\/integrations\/gitlab\/clone-jobs\/([0-9a-f-]{36})$/);
+    if (gitlabJobMatch && method === "GET") {
+      const job = cloneJob(gitlabJobMatch[1]);
+      json(res, 200, { job: job.project ? { ...job, project: withRuntime(job.project) } : job });
+      return true;
+    }
+    if (gitlabJobMatch && method === "DELETE") {
+      json(res, 200, { job: cancelCloneJob(gitlabJobMatch[1]) });
       return true;
     }
     if (path === "/api/integrations/github/clone-jobs" && method === "POST") {
