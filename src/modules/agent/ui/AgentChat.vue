@@ -32,6 +32,7 @@ import AgentSecrets from "./AgentSecrets.vue";
 import AgentPermissions from "./AgentPermissions.vue";
 import AgentContextMeter from "./AgentContextMeter.vue";
 import AgentChipPreview from "./AgentChipPreview.vue";
+import ImageModal from "../../../common/ui/ImageModal.vue";
 import AgentControls from "./AgentControls.vue";
 import AgentSessions from "./AgentSessions.vue";
 import AgentSideQuestion from "./AgentSideQuestion.vue";
@@ -39,9 +40,9 @@ import AgentTaskView from "./AgentTaskView.vue";
 import AgentChatMenu from "./AgentChatMenu.vue";
 import { chatTasks } from "../lib/task-detail.ts";
 import { useChatTaskView } from "../model/use-chat-task-view.ts";
+import { useChipActions } from "../model/use-chip-actions.ts";
 import AgentRewind from "./AgentRewind.vue";
 import AgentWorktree from "./AgentWorktree.vue";
-import { openChatChip } from "./open-chip.ts";
 import { exportChat, downloadChat as saveChatMarkdown } from "../lib/export.ts";
 import { copyText } from "../lib/clipboard.ts";
 import { shownPlan } from "../lib/plan.ts";
@@ -53,7 +54,7 @@ import { useChatWindow } from "../model/chat-window.ts";
 import { useRewindPanel } from "../model/rewind-panel.ts";
 import { useWorktreePanel } from "../model/worktree-panel.ts";
 import { chatUsageByTurn } from "../model/chat-usage.ts";
-import type { AgentBackendId, ChatUsage, MessageChip, RewindScope } from "../model/types.ts";
+import type { AgentBackendId, ChatUsage, RewindScope } from "../model/types.ts";
 import IconArrowDown from "~icons/lucide/arrow-down";
 import IconSquarePen from "~icons/lucide/square-pen";
 const props = withDefaults(
@@ -362,17 +363,10 @@ const controller: ChatController = {
 };
 const unregisterChat = registerChat(controller);
 onBeforeUnmount(unregisterChat);
-// A file chip opens its file in the editor; an image chip opens the picture itself.
-const openChip = (chip: MessageChip) =>
-  openChatChip(chip, {
-    openFile: (path, directory) =>
-      api.executeCommand(
-        "ide.editor.path.open",
-        { path, directory },
-        { scope: `editor:${props.projectId}` },
-      ),
-    fail: (message) => (error.value = message),
-  });
+// A file chip opens its file in the editor; an image chip opens the picture in the chat viewer.
+const { open: openChip, image: chipPreview } = useChipActions(props.projectId, api, (message) => {
+  error.value = message;
+});
 const away = ref(false);
 const { PRELOAD_PX, firstShown, shown, hidden, loadEarlier, topUp } = useChatWindow(
   turns,
@@ -751,6 +745,12 @@ onBeforeUnmount(() => {
       </template>
     </AgentComposer>
     <AgentChipPreview :project-id="projectId" :scope="root" />
+    <ImageModal
+      v-if="chipPreview"
+      :src="chipPreview.src"
+      :alt="chipPreview.alt"
+      @close="chipPreview = undefined"
+    />
   </UiPanel>
 </template>
 <style scoped>
