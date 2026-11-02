@@ -61,14 +61,22 @@ GitHub использует общий `ProjectWorkspace`, дерево файл
 Раздел **GitLab** в настройках работает с gitlab.com и self-hosted GitLab. Реализация: `server/modules/gitlab`; настройки и токен хранятся так же, как у GitHub (`integrations.json`, системное хранилище секретов).
 
 1. Укажите адрес GitLab (по умолчанию `https://gitlab.com`) и папку для импорта, сохраните настройки. Смена адреса сбрасывает токен: он принадлежит одному серверу.
-2. Создайте Personal Access Token со scope `read_api` и `read_repository` и подключите его; Projector проверяет токен через `/api/v4/user`. Токен отправляется только на настроенный адрес, перенаправления запрещены, браузеру он не возвращается (просмотр — «глазок» для токена из хранилища, только локально и не как IDE-команда).
-3. В палитре введите `gl/` (недавно активные проекты аккаунта) или `gl/часть-названия`; Enter клонирует проект. Тот же импорт есть в настройках: поле «Клонировать проект» принимает `group/project` или ссылку на сервер GitLab, включая вложенные группы.
+2. Авторизуйтесь одним из способов:
+   - **Через браузер (Device Flow, GitLab 17.1+):** создайте OAuth Application на своём инстансе (`https://gitlab.com/-/user_settings/applications` или тот же путь на self-hosted), включите Device Flow и права `read_api`, `read_repository`, `read_user`, внесите **Client ID** в настройки Projector. Нажмите «войти через GitLab», откройте показанную ссылку и введите код. Client secret не нужен; callback не используется. Projector сам опрашивает `/oauth/token`, учитывает `authorization_pending`, `slow_down`, `expired_token` и `access_denied`.
+   - **Personal Access Token (запасной вариант):** создайте токен со scope `read_api` и `read_repository` и подключите его; Projector проверяет токен через `/api/v4/user`.
+3. В палитре введите `gl/` (недавно активные проекты аккаунта), `gl/часть-названия`, полную ссылку на проект или путь группы (`gl/gitlab-org/`); Enter открывает проект в readonly-клиенте, а для группы показывает её проекты. Клонирование осталось отдельным действием в карточке результата и в строке пути. Тот же импорт есть в настройках: поле «Клонировать проект» принимает `group/project` или ссылку на сервер GitLab, включая вложенные группы.
 
-Клонирование идёт по HTTPS в `<папка импорта>/<группа>/<подгруппа>/<проект>` (`git` с `core.hooksPath=/dev/null`, токен через временный `GIT_ASKPASS`), проект регистрируется в `projects.json`; зависимости не устанавливаются, код не запускается, существующие папки не перезаписываются. Команды агента: `ide.gitlab.integration.save`, `.connect`, `.disconnect` и `ide.gitlab.repository.import`.
+OAuth-токен хранится в системном хранилище секретов вместе с refresh-токеном и временем истечения. За 60 секунд до истечения Projector обновляет access token одним запросом на инстанс (параллельные вкладки делят один refresh), а после `401` делает ровно один refresh и повтор. Если refresh не удался, настройки просят войти снова; временная сетевая ошибка не стирает сохранённые учётные данные. Для PAT обновления и повтора нет. Токен уходит только на настроенный адрес: при self-hosted инстансе `gitlab.com` читается анонимно, перенаправления запрещены, браузеру токен не возвращается (просмотр — «глазок» для access/PAT из хранилища, только локально и не как IDE-команда).
 
-Пока не реализованы: Device Flow/OAuth, просмотр репозитория без клонирования (`gl:/…`), issues и история Git через API, клонирование в Docker.
+Клонирование идёт по HTTPS в `<папка импорта>/<группа>/<подгруппа>/<проект>` (`git` с `core.hooksPath=/dev/null`, токен через временный `GIT_ASKPASS`), проект регистрируется в `projects.json`; зависимости не устанавливаются, код не запускается, существующие папки не перезаписываются. Команды агента: `ide.gitlab.repository.open`, `ide.gitlab.repository.refresh`, `ide.gitlab.repository.info`, `ide.gitlab.repository.clone`, `.clone.dialog`, `.clone.directory`, `.clone.cancel`, `.clone.abort`, `ide.gitlab.integration.save`, `.connect`, `.disconnect`, `ide.gitlab.integration.device.start`, `.device.cancel` и `ide.gitlab.repository.import`. Issues доступны через общие `ide.issues.*`, merge requests — через `ide.mergeRequests.*`, история — через `ide.git.*`.
 
-Проверка без настоящего GitLab: `vp test run tests/gitlab.test.mjs`.
+`/gl/projects/<instance>/<group>/<project>` открывает readonly-workspace: дерево, файлы, Markdown и изображения, карточку проекта, Issues, Merge requests, историю Git, коммиты и diff. Снимок фиксируется на коммите; `?ref=ветка` выбирает ref, `?path=...` открывает файл, без `path` показывается README. Запись файлов, Git-мутации, терминалы и агент недоступны.
+
+Если `origin` локального проекта указывает на GitLab, к обычному локальному workspace добавляются Issues, Merge requests и вкладка «О проекте»; файлы, Git и терминалы остаются локальными. Поддерживаются HTTPS, SSH и scp-подобные remote; self-hosted принимается только для настроенного инстанса. Проекты в Docker-окружении не получают панели GitLab.
+
+В текущий паритет не входят Pipelines, Snippets, Wiki и несколько инстансов одновременно (P4).
+
+Проверка без настоящего GitLab: `vp test run tests/gitlab-oauth.test.mjs tests/gitlab.test.mjs tests/gitlab-browser.test.mjs tests/gitlab-clone.test.mjs tests/gitlab-trackers.test.mjs tests/gitlab-navigation.test.mjs tests/gitlab-workspace.test.mjs tests/gitlab-local.test.mjs`.
 
 ## Лимиты агентов в статусной строке
 
