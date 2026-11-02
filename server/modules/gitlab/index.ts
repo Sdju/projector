@@ -38,5 +38,6 @@ export type { GitlabSearchHit } from "./search.ts";
 export { browseGitlabLog, browseGitlabCommit, browseGitlabComparison } from "./history.ts";
 export { browseGitlabIssues, browseGitlabIssue } from "./issues.ts";
 export { browseGitlabMergeRequests, browseGitlabMergeRequest } from "./merge-requests.ts";
+export { browseGitlabPipelines, browseGitlabPipeline, browseGitlabJob } from "./pipelines.ts";
 export { cloneGitlabProject, importGitlabProject } from "./clone.ts";
 export { cloneGitlabContainer } from "./container.ts";

@@ -4,7 +4,14 @@ import UiButton from "../../common/ui/UiButton.vue";
 import { onBeforeUnmount, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import type { GitlabRepository } from "../../../core/modules/gitlab/index.ts";
-import { ProjectWorkspace, IssueView, PullRequestView, type TabViews } from "../workspace/index.ts";
+import {
+  ProjectWorkspace,
+  IssueView,
+  PullRequestView,
+  PipelineView,
+  JobView,
+  type TabViews,
+} from "../workspace/index.ts";
 import { settingsTabViews } from "../app-settings/index.ts";
 import { registerWorkspaceProfile, workspaceRequest } from "../workspace-api/index.ts";
 import { useCommandScope } from "../../common/utilities/commands.ts";
@@ -97,6 +104,26 @@ const tabViews: TabViews = {
       short: "MR",
       noun: "merge request",
       onOpen: host.openFile,
+    }),
+  },
+  pipeline: {
+    component: PipelineView,
+    keepAlive: true,
+    props: (tab, host) => ({
+      projectId: host.projectId,
+      id: tab.params?.id,
+      host: "GitLab",
+      onOpenJob: (job: { id: number; title: string }, pinned?: boolean) =>
+        host.openTab("job", job, { preview: !pinned }),
+    }),
+  },
+  job: {
+    component: JobView,
+    keepAlive: true,
+    props: (tab, host) => ({
+      projectId: host.projectId,
+      id: tab.params?.id,
+      host: "GitLab",
     }),
   },
 };

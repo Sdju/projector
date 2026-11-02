@@ -7,7 +7,10 @@ import {
 import {
   GitlabRequestError,
   readIssues,
+  readJob,
   readMergeRequest,
+  readPipeline,
+  readPipelines,
 } from "../src/modules/gitlab-workspace/client.ts";
 import {
   moveWorkspaceEntry,
@@ -123,6 +126,15 @@ test("the readonly GitLab source reads tree, files, history, issues and merge re
       async readMergeRequest(repository, number) {
         return { action: "merge-request", repository, number };
       },
+      async readPipelines(repository, params) {
+        return { action: "pipelines", repository, params };
+      },
+      async readPipeline(repository, id) {
+        return { action: "pipeline", repository, id };
+      },
+      async readJob(repository, id) {
+        return { action: "job", repository, id };
+      },
     },
   );
   const projectId = "gitlab-workspace-test";
@@ -133,12 +145,15 @@ test("the readonly GitLab source reads tree, files, history, issues and merge re
     expect(profile.sidebar.map((section) => section.id)).toStrictEqual([
       "issues",
       "merge-requests",
+      "pipelines",
     ]);
     expect(profile.tabs.map((tab) => tab.id)).toStrictEqual([
       "gitlab-integration",
       "repository",
       "issue",
       "pull",
+      "pipeline",
+      "job",
     ]);
     expect(profile.features).toStrictEqual({
       terminals: false,
@@ -257,6 +272,25 @@ test("the readonly GitLab source reads tree, files, history, issues and merge re
       number: 9,
     });
     await expect(workspaceRequest(projectId, "pull", { number: "0" })).rejects.toThrow();
+    expect(
+      await workspaceRequest(projectId, "pipelines", { status: "failed", page: "1" }),
+    ).toStrictEqual({
+      action: "pipelines",
+      repository: REPOSITORY,
+      params: { status: "failed", page: "1" },
+    });
+    expect(await workspaceRequest(projectId, "pipeline", { id: "42" })).toStrictEqual({
+      action: "pipeline",
+      repository: REPOSITORY,
+      id: 42,
+    });
+    expect(await workspaceRequest(projectId, "job", { id: "7" })).toStrictEqual({
+      action: "job",
+      repository: REPOSITORY,
+      id: 7,
+    });
+    await expect(workspaceRequest(projectId, "pipeline", { id: "0" })).rejects.toThrow();
+    await expect(workspaceRequest(projectId, "job", { id: "nope" })).rejects.toThrow();
 
     const capabilities = workspaceCapabilities(projectId);
     expect(capabilities.write).toBe(false);
@@ -265,6 +299,7 @@ test("the readonly GitLab source reads tree, files, history, issues and merge re
     expect(capabilities.issues).toBe(true);
     expect(capabilities.pulls).toBe(true);
     expect(capabilities.discussions).toBe(false);
+    expect(capabilities.pipelines).toBe(true);
     expect(capabilities.terminals).toBe(false);
     expect(capabilities.persist).toBe(false);
     expect(capabilities.externalFiles).toBe(false);
@@ -297,7 +332,10 @@ test("a local project with a GitLab origin keeps local providers and adds tracke
   expect(profile.features.terminals).toBe(true);
   expect(profile.providers.files.write).toBeTruthy();
   expect(profile.sidebar.some((section) => section.id === "merge-requests")).toBe(true);
+  expect(profile.sidebar.some((section) => section.id === "pipelines")).toBe(true);
   expect(profile.tabs.some((tab) => tab.id === "pull")).toBe(true);
+  expect(profile.tabs.some((tab) => tab.id === "pipeline")).toBe(true);
+  expect(profile.tabs.some((tab) => tab.id === "job")).toBe(true);
   expect(profile.tabs.some((tab) => tab.id === "repository")).toBe(true);
 });
 
@@ -307,7 +345,9 @@ test("the GitLab resolver claims gl:/ projects instead of falling back to local 
 });
 
 test("the GitLab client targets browse actions and reports the HTTP status", async () => {
-  const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ ok: true }));
+  const fetch = vi
+    .spyOn(globalThis, "fetch")
+    .mockImplementation(async () => Response.json({ ok: true }));
   try {
     expect(await readIssues(REPOSITORY, { state: "open" })).toStrictEqual({ ok: true });
     expect(fetch.mock.calls[0][0]).toBe(
@@ -325,6 +365,27 @@ test("the GitLab client targets browse actions and reports the HTTP status", asy
       `/api/integrations/gitlab/browse/merge-request?${new URLSearchParams({
         repository: REPOSITORY,
         number: "3",
+      })}`,
+    );
+    expect(await readPipelines(REPOSITORY, { status: "failed" })).toStrictEqual({ ok: true });
+    expect(String(fetch.mock.calls[2][0])).toBe(
+      `/api/integrations/gitlab/browse/pipelines?${new URLSearchParams({
+        repository: REPOSITORY,
+        status: "failed",
+      })}`,
+    );
+    expect(await readPipeline(REPOSITORY, 42)).toStrictEqual({ ok: true });
+    expect(String(fetch.mock.calls[3][0])).toBe(
+      `/api/integrations/gitlab/browse/pipeline?${new URLSearchParams({
+        repository: REPOSITORY,
+        id: "42",
+      })}`,
+    );
+    expect(await readJob(REPOSITORY, 7)).toStrictEqual({ ok: true });
+    expect(String(fetch.mock.calls[4][0])).toBe(
+      `/api/integrations/gitlab/browse/job?${new URLSearchParams({
+        repository: REPOSITORY,
+        id: "7",
       })}`,
     );
   } finally {

@@ -70,13 +70,15 @@ OAuth-токен хранится в системном хранилище се�
 
 Клонирование идёт по HTTPS в `<папка импорта>/<группа>/<подгруппа>/<проект>` (`git` с `core.hooksPath=/dev/null`, токен через временный `GIT_ASKPASS`), проект регистрируется в `projects.json`; зависимости не устанавливаются, код не запускается, существующие папки не перезаписываются. Команды агента: `ide.gitlab.repository.open`, `ide.gitlab.repository.refresh`, `ide.gitlab.repository.info`, `ide.gitlab.repository.clone`, `.clone.dialog`, `.clone.directory`, `.clone.cancel`, `.clone.abort`, `ide.gitlab.integration.save`, `.connect`, `.disconnect`, `ide.gitlab.integration.device.start`, `.device.cancel` и `ide.gitlab.repository.import`. Issues доступны через общие `ide.issues.*`, merge requests — через `ide.mergeRequests.*`, история — через `ide.git.*`.
 
-`/gl/projects/<instance>/<group>/<project>` открывает readonly-workspace: дерево, файлы, Markdown и изображения, карточку проекта, Issues, Merge requests, историю Git, коммиты и diff. Снимок фиксируется на коммите; `?ref=ветка` выбирает ref, `?path=...` открывает файл, без `path` показывается README. Запись файлов, Git-мутации, терминалы и агент недоступны.
+`/gl/projects/<instance>/<group>/<project>` открывает readonly-workspace: дерево, файлы, Markdown и изображения, карточку проекта, Issues, Merge requests, Pipelines с джобами и логами, историю Git, коммиты и diff. Снимок фиксируется на коммите; `?ref=ветка` выбирает ref, `?path=...` открывает файл, без `path` показывается README. Запись файлов, Git-мутации, терминалы и агент недоступны.
 
-Если `origin` локального проекта указывает на GitLab, к обычному локальному workspace добавляются Issues, Merge requests и вкладка «О проекте»; файлы, Git и терминалы остаются локальными. Поддерживаются HTTPS, SSH и scp-подобные remote; self-hosted принимается только для настроенного инстанса. Проекты в Docker-окружении не получают панели GitLab.
+Раздел **Pipelines** показывает историю запусков с фильтром по статусу (все, идущие, ошибки, успешные). Вкладка pipeline содержит ветку, коммит, длительность и джобы по стадиям; вкладка джоба показывает статус, причину падения и readonly-лог до 2 MiB. Лог читается тем же токеном, что и остальной GitLab, ANSI-последовательности удаляются. Команды: `ide.pipelines.block.toggle`, `ide.pipelines.filter`, `ide.pipelines.refresh`, `ide.pipelines.more`, `ide.pipelines.open` (scope `pipelines:<projectId>`), `ide.pipeline.refresh` и `ide.pipeline.job.open` (scope `pipeline:<projectId>:<pipelineId>`), `ide.job.refresh` (scope `job:<projectId>:<jobId>`). Провайдер общий для GitHub и GitLab: `pipelines` отдаёт список, `pipeline` — запуск с джобами, `job` — джоб с логом; GitHub-реализация подключится тем же контрактом.
 
-В текущий паритет не входят Pipelines, Snippets, Wiki и несколько инстансов одновременно (P4).
+Если `origin` локального проекта указывает на GitLab, к обычному локальному workspace добавляются Issues, Merge requests, Pipelines и вкладка «О проекте»; файлы, Git и терминалы остаются локальными. Поддерживаются HTTPS, SSH и scp-подобные remote; self-hosted принимается только для настроенного инстанса. Проекты в Docker-окружении не получают панели GitLab.
 
-Проверка без настоящего GitLab: `vp test run tests/gitlab-oauth.test.mjs tests/gitlab.test.mjs tests/gitlab-browser.test.mjs tests/gitlab-clone.test.mjs tests/gitlab-trackers.test.mjs tests/gitlab-navigation.test.mjs tests/gitlab-workspace.test.mjs tests/gitlab-local.test.mjs`.
+В текущий паритет не входят Snippets, Wiki и несколько инстансов одновременно (P4).
+
+Проверка без настоящего GitLab: `vp test run tests/gitlab-oauth.test.mjs tests/gitlab.test.mjs tests/gitlab-browser.test.mjs tests/gitlab-clone.test.mjs tests/gitlab-trackers.test.mjs tests/gitlab-pipelines.test.mjs tests/gitlab-navigation.test.mjs tests/gitlab-workspace.test.mjs tests/gitlab-local.test.mjs`.
 
 ## Лимиты агентов в статусной строке
 

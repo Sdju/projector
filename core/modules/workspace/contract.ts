@@ -264,6 +264,66 @@ export interface PullRequestDetail {
   filesTruncated: boolean;
 }
 
+/** Host-neutral CI status: GitLab statuses and GitHub conclusions map into this set. */
+export type PipelineStatus =
+  | "queued"
+  | "running"
+  | "success"
+  | "failed"
+  | "canceled"
+  | "skipped"
+  | "manual"
+  | "unknown";
+export interface Pipeline {
+  id: number;
+  /** Display name of a workflow; empty when the host names runs only by id. */
+  name: string;
+  status: PipelineStatus;
+  /** What started the run: a GitLab source (`push`, `web`, …) or a GitHub event. */
+  source: string;
+  ref: string;
+  sha: string;
+  author: IssueUser;
+  webUrl: string;
+  createdAt: string;
+  updatedAt: string;
+  /** Seconds reported by the host, or null while it has not finished. */
+  duration: number | null;
+}
+export interface PipelineJob {
+  id: number;
+  pipelineId: number;
+  name: string;
+  stage: string;
+  status: PipelineStatus;
+  ref: string;
+  webUrl: string;
+  createdAt: string;
+  startedAt: string;
+  finishedAt: string;
+  /** Seconds reported by the host, or null while it has not finished. */
+  duration: number | null;
+  allowFailure: boolean;
+  failureReason: string;
+}
+export interface PipelineList {
+  pipelines: Pipeline[];
+  /** Page number of the next page, or null when the list is complete. */
+  next: number | null;
+}
+export interface PipelineDetail {
+  pipeline: Pipeline;
+  jobs: PipelineJob[];
+  /** The host returned more jobs than the reader loads at once. */
+  jobsTruncated: boolean;
+}
+export interface PipelineJobDetail {
+  job: PipelineJob;
+  log: string;
+  /** The trace is longer than the reader loads or was not available. */
+  logTruncated: boolean;
+}
+
 export interface Discussion {
   number: number;
   title: string;

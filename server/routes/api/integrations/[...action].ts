@@ -51,6 +51,9 @@ import {
   browseGitlabIssue,
   browseGitlabMergeRequests,
   browseGitlabMergeRequest,
+  browseGitlabPipelines,
+  browseGitlabPipeline,
+  browseGitlabJob,
 } from "../../../modules/gitlab/index.ts";
 
 import { isLocalRequest } from "../../../modules/access/index.ts";
@@ -206,6 +209,16 @@ export async function handleIntegrationsActions({
           200,
           await browseGitlabMergeRequest(repository, Number(url.searchParams.get("number"))),
         );
+      else if (path === "/api/integrations/gitlab/browse/pipelines")
+        json(
+          res,
+          200,
+          await browseGitlabPipelines(repository, Object.fromEntries(url.searchParams)),
+        );
+      else if (path === "/api/integrations/gitlab/browse/pipeline")
+        json(res, 200, await browseGitlabPipeline(repository, url.searchParams.get("id") || ""));
+      else if (path === "/api/integrations/gitlab/browse/job")
+        json(res, 200, await browseGitlabJob(repository, url.searchParams.get("id") || ""));
       else return false;
       return true;
     }

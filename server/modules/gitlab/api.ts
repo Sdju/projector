@@ -252,6 +252,8 @@ export interface GitlabReader {
   target: GitlabTarget;
   request<T>(path: string, init?: GitlabRequestInit): Promise<GitlabPage<T>>;
   get<T>(path: string, init?: GitlabRequestInit): Promise<T>;
+  /** Low-level response for endpoints that are not JSON, with the same OAuth recovery. */
+  fetch(path: string, init?: GitlabRequestInit): Promise<Response>;
 }
 
 /**
@@ -265,20 +267,27 @@ export async function gitlabReader(repository: unknown): Promise<GitlabReader> {
       ...init,
       tokenType: target.tokenType,
     });
-  const request = async <T>(path: string, init: GitlabRequestInit = {}) => {
+  const recover = async <T>(run: () => Promise<T>) => {
     try {
-      return await send<T>(path, init);
+      return await run();
     } catch (error) {
       if (!(error instanceof HttpError) || error.status !== 401 || target.tokenType !== "oauth")
         throw error;
       target.token = await refreshGitlabToken(target.base, true);
-      return send<T>(path, init);
+      return run();
     }
   };
+  const request = <T>(path: string, init: GitlabRequestInit = {}) =>
+    recover(() => send<T>(path, init));
+  const raw = (path: string, init: GitlabRequestInit = {}) =>
+    recover(() =>
+      gitlabFetch(target.base, path, target.token, { ...init, tokenType: target.tokenType }),
+    );
   return {
     target,
     request,
     get: async <T>(path: string, init?: GitlabRequestInit) => (await request<T>(path, init)).data,
+    fetch: raw,
   };
 }
 

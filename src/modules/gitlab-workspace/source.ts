@@ -13,8 +13,11 @@ import {
   readGit,
   readIssue,
   readIssues,
+  readJob,
   readMergeRequest,
   readMergeRequests,
+  readPipeline,
+  readPipelines,
   readRepository,
   readTree,
 } from "./client.ts";
@@ -68,6 +71,18 @@ const numberedTab = (id: string, label: string) =>
 const issueTab = numberedTab("issue", "Issue");
 const pullTab = numberedTab("pull", "MR");
 
+const idTab = (kind: string, label: string) =>
+  defineTab<{ id: number; title?: string }>({
+    id: kind,
+    key: ({ id }) => `${kind}:${id}`,
+    path: ({ id }) => `${label} #${id}`,
+    title: ({ id, title }) => `${title ? `${title} · ` : ""}${label} #${id}`,
+    hint: ({ title }) => title ?? "",
+    preview: true,
+  });
+const pipelineTab = idTab("pipeline", "Pipeline");
+const jobTab = idTab("job", "Job");
+
 const repositoryTab = singletonTab(
   "repository",
   "gitlab:repository",
@@ -110,6 +125,9 @@ export interface GitlabWorkspaceApi {
   readIssue?: typeof readIssue;
   readMergeRequests?: typeof readMergeRequests;
   readMergeRequest?: typeof readMergeRequest;
+  readPipelines?: typeof readPipelines;
+  readPipeline?: typeof readPipeline;
+  readJob?: typeof readJob;
 }
 
 const defaultApi: GitlabWorkspaceApi = {
@@ -121,11 +139,34 @@ const defaultApi: GitlabWorkspaceApi = {
   readIssue,
   readMergeRequests,
   readMergeRequest,
+  readPipelines,
+  readPipeline,
+  readJob,
 };
+
+/** Pipelines, a pipeline with its jobs, and one job with its trace. */
+function pipelineProvider(
+  repository: string,
+  api: GitlabWorkspaceApi = defaultApi,
+): {
+  read(action: string, params: Record<string, string>, signal?: AbortSignal): Promise<unknown>;
+} {
+  return {
+    read(action, params, signal) {
+      if (action === "pipelines")
+        return (api.readPipelines ?? readPipelines)(repository, params, signal);
+      if (action !== "pipeline" && action !== "job") throw new Error(UNAVAILABLE);
+      const id = Number(params.id);
+      if (!Number.isSafeInteger(id) || id <= 0) throw new Error("Укажите номер записи CI");
+      if (action === "pipeline") return (api.readPipeline ?? readPipeline)(repository, id, signal);
+      return (api.readJob ?? readJob)(repository, id, signal);
+    },
+  };
+}
 
 /**
  * Local project whose `origin` points at GitLab: files, Git and search stay local; GitLab adds
- * issues, merge requests and the project info tab.
+ * issues, merge requests, pipelines and the project info tab.
  */
 export function createGitlabEnabledLocalProfile(
   projectId: string,
@@ -150,9 +191,10 @@ export function createGitlabEnabledLocalProfile(
       ...(local.sidebar ?? []),
       { id: "issues", title: "Issues" },
       { id: "merge-requests", title: "Merge requests" },
+      { id: "pipelines", title: "Pipelines", requires: "pipelines" },
     ],
-    tabs: [...(local.tabs ?? []), repositoryTab, issueTab, pullTab],
-    providers: { ...local.providers, issues, pulls },
+    tabs: [...(local.tabs ?? []), repositoryTab, issueTab, pullTab, pipelineTab, jobTab],
+    providers: { ...local.providers, issues, pulls, pipelines: pipelineProvider(repository) },
   };
 }
 
@@ -285,8 +327,9 @@ export function createGitlabWorkspaceProfile(
     sidebar: [
       { id: "issues", title: "Issues" },
       { id: "merge-requests", title: "Merge requests" },
+      { id: "pipelines", title: "Pipelines", requires: "pipelines" },
     ],
-    tabs: [integrationTab, repositoryTab, issueTab, pullTab],
+    tabs: [integrationTab, repositoryTab, issueTab, pullTab, pipelineTab, jobTab],
     features: {
       terminals: false,
       docker: false,
@@ -295,6 +338,12 @@ export function createGitlabWorkspaceProfile(
       persist: false,
       externalFiles: false,
     },
-    providers: { files, git, issues, pulls },
+    providers: {
+      files,
+      git,
+      issues,
+      pulls,
+      pipelines: pipelineProvider(repository, api),
+    },
   };
 }

@@ -8,6 +8,7 @@ export type WorkspaceCapability =
   | "issues"
   | "pulls"
   | "discussions"
+  | "pipelines"
   | "terminals"
   | "docker"
   | "agent"
@@ -79,6 +80,7 @@ export interface WorkspaceProfile {
     issues?: ReadProvider;
     pulls?: ReadProvider;
     discussions?: ReadProvider;
+    pipelines?: ReadProvider;
   };
   features: Readonly<WorkspaceFeatures>;
   /** Service tab kinds this workspace adds to the base set. */
@@ -101,6 +103,7 @@ export function profileCapabilities(profile: WorkspaceProfile): Readonly<Workspa
       issues: !!profile.providers.issues,
       pulls: !!profile.providers.pulls,
       discussions: !!profile.providers.discussions,
+      pipelines: !!profile.providers.pipelines,
     });
     capabilityCache.set(profile, capabilities);
   }
@@ -108,27 +111,32 @@ export function profileCapabilities(profile: WorkspaceProfile): Readonly<Workspa
 }
 
 /** Which provider serves a read action; the table is the only place that knows the split. */
-const READ_DOMAIN: Record<string, "files" | "git" | "search" | "issues" | "pulls" | "discussions"> =
-  {
-    tree: "files",
-    file: "files",
-    root: "files",
-    git: "git",
-    branches: "git",
-    log: "git",
-    commit: "git",
-    "commit-diff": "git",
-    diff: "git",
-    gutter: "git",
-    search: "search",
-    paths: "files",
-    issues: "issues",
-    issue: "issues",
-    pulls: "pulls",
-    pull: "pulls",
-    discussions: "discussions",
-    discussion: "discussions",
-  };
+const READ_DOMAIN: Record<
+  string,
+  "files" | "git" | "search" | "issues" | "pulls" | "discussions" | "pipelines"
+> = {
+  tree: "files",
+  file: "files",
+  root: "files",
+  git: "git",
+  branches: "git",
+  log: "git",
+  commit: "git",
+  "commit-diff": "git",
+  diff: "git",
+  gutter: "git",
+  search: "search",
+  paths: "files",
+  issues: "issues",
+  issue: "issues",
+  pulls: "pulls",
+  pull: "pulls",
+  discussions: "discussions",
+  discussion: "discussions",
+  pipelines: "pipelines",
+  pipeline: "pipelines",
+  job: "pipelines",
+};
 export function readProviderFor(profile: WorkspaceProfile, action: string): ReadProvider {
   const domain = READ_DOMAIN[action];
   if (!domain) throw new Error(`Неизвестное действие workspace: ${action}`);

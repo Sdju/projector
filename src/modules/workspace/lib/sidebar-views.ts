@@ -8,6 +8,7 @@ import {
 import type { GitBranchesState, GitHistoryState, GitOverviewState } from "../modules/git/index.ts";
 import { GitPanel } from "../modules/git/index.ts";
 import { DiscussionsPanel, IssuesPanel, PullsPanel } from "../modules/issues/index.ts";
+import { PipelinesPanel } from "../modules/pipelines/index.ts";
 import { DockerSidebar } from "../../docker/index.ts";
 import SearchPanel from "../ui/SearchPanel.vue";
 import FilesSection from "../ui/FilesSection.vue";
@@ -22,6 +23,7 @@ import IconIssues from "~icons/lucide/circle-dot";
 import IconPulls from "~icons/lucide/git-pull-request";
 import IconMerge from "~icons/lucide/git-merge";
 import IconDiscussions from "~icons/lucide/messages-square";
+import IconPipelines from "~icons/lucide/workflow";
 
 /** Sections every workspace has; profiles add their own through `profile.sidebar`. */
 export const baseSidebarTypes: SidebarType[] = [
@@ -158,6 +160,17 @@ export const baseSidebarViews: SidebarViews = {
       kind: "mergeRequests",
       host: "GitLab",
       action: "pulls",
+    }),
+    refresh: (_, panel) => panel?.refresh?.(),
+  },
+  pipelines: {
+    icon: IconPipelines,
+    component: PipelinesPanel,
+    props: (host, selected) => ({
+      projectId: host.projectId,
+      active: selected,
+      onOpen: (pipeline: { id: number; title?: string }, pinned?: boolean) =>
+        host.openTab("pipeline", pipeline, { preview: !pinned }),
     }),
     refresh: (_, panel) => panel?.refresh?.(),
   },

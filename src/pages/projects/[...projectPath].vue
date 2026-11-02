@@ -18,7 +18,12 @@ import {
 } from "../../modules/catalog/index.ts";
 import { RunMenu, useRunner } from "../../modules/runner/index.ts";
 import { DevcontainerTrust } from "../../modules/devcontainer/index.ts";
-import { ProjectWorkspace, type TabViews } from "../../modules/workspace/index.ts";
+import {
+  ProjectWorkspace,
+  PipelineView,
+  JobView,
+  type TabViews,
+} from "../../modules/workspace/index.ts";
 import { registerWorkspaceProfile } from "../../modules/workspace-api/index.ts";
 import {
   createGithubEnabledLocalProfile,
@@ -56,6 +61,30 @@ const tabViews = computed<TabViews>(() => {
   const github = githubRepository.value;
   return {
     ...settingsTabViews,
+    ...(gitlab
+      ? {
+          pipeline: {
+            component: PipelineView,
+            keepAlive: true,
+            props: (tab, host) => ({
+              projectId: host.projectId,
+              id: tab.params?.id,
+              host: "GitLab",
+              onOpenJob: (job: { id: number; title: string }, pinned?: boolean) =>
+                host.openTab("job", job, { preview: !pinned }),
+            }),
+          },
+          job: {
+            component: JobView,
+            keepAlive: true,
+            props: (tab, host) => ({
+              projectId: host.projectId,
+              id: tab.params?.id,
+              host: "GitLab",
+            }),
+          },
+        }
+      : {}),
     repository: gitlab
       ? {
           component: GitlabRepositoryInfoLoader,

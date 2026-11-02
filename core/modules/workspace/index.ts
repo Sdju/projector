@@ -40,6 +40,12 @@ export type {
   PullRequestList,
   PullRequestReview,
   PullRequestState,
+  Pipeline,
+  PipelineDetail,
+  PipelineJob,
+  PipelineJobDetail,
+  PipelineList,
+  PipelineStatus,
 } from "./contract.ts";
 export type { FilesExcludeMap } from "./files-exclude.ts";
 export {
