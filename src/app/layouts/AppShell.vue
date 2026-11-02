@@ -119,7 +119,10 @@ const navigatePath = (path: string) =>
   <div
     class="shell"
     :class="{
-      workspace: route.name === 'project' || route.name === 'github-project',
+      workspace:
+        route.name === 'project' ||
+        route.name === 'github-project' ||
+        route.name === 'gitlab-project',
       settings: route.name === 'settings',
     }"
     @dragenter="dragEnter"
