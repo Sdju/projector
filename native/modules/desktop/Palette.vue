@@ -119,6 +119,8 @@ watch(detailIndex, async () => {
 const icons = new Map<string, object | null>();
 let wasActive = false;
 let blurTimer: ReturnType<typeof setTimeout> | undefined;
+/** Start Menu / Spotlight steal focus right after launch; postpone hiding briefly after show(). */
+let suppressBlurUntil = 0;
 let opening = false;
 
 function appIcon(item: LaunchItem) {
@@ -151,6 +153,7 @@ function rowHint(item: LaunchItem) {
 }
 async function show() {
   clearTimeout(blurTimer);
+  suppressBlurUntil = Date.now() + 2000;
   model.live(true);
   model.setQuery("");
   await nextTick();
@@ -159,6 +162,11 @@ async function show() {
   window.present();
   entryRef.value?.widget?.grabFocus();
   await focusWindow();
+  // present() may lose to the Start Menu; raise again after the shell dismisses.
+  setTimeout(() => {
+    if (!windowRef.value?.widget?.getVisible()) return;
+    void focusWindow();
+  }, 300);
   void model.search();
 }
 function hide() {
@@ -176,9 +184,12 @@ function activeChanged() {
   const window = windowRef.value?.widget;
   if (window?.isActive()) wasActive = true;
   else if (wasActive && window?.getVisible())
-    blurTimer = setTimeout(() => {
-      if (window.getVisible() && !window.isActive()) hide();
-    }, 100);
+    blurTimer = setTimeout(
+      () => {
+        if (window.getVisible() && !window.isActive()) hide();
+      },
+      Math.max(100, suppressBlurUntil - Date.now()),
+    );
 }
 async function focusWindow() {
   const surface = windowRef.value?.widget?.getSurface();

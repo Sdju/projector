@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import Gtk from "gi:Gtk-4.0";
+import GLib from "gi:GLib-2.0";
 import { createApp, nextTick } from "@zede/vio";
 import Palette from "../native/modules/desktop/Palette.vue";
+import { os } from "../core/modules/os/index.ts";
+
+if (process.platform === "win32") await import("gi:GdkWin32-4.0");
 
 Gtk.init();
 
@@ -63,4 +67,55 @@ await test("Projector palette uses the published renderer for native entry, sear
   }
   assert.equal(app.root.children.length, 0);
   assert.equal(windows.getNItems(), before, "unmount destroys the palette window");
+});
+
+await test("palette hides after losing real window focus during the startup grace period", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => Response.json({ items: [] });
+  const context = GLib.MainContext.default();
+  const pump = setInterval(() => {
+    for (let step = 0; step < 64 && context.iteration(false); step++);
+  }, 10);
+  const app = createApp(Palette, { baseUrl: "http://palette.test", applicationIcon: () => null });
+  const other = new Gtk.Window({ title: "Projector focus regression test" });
+  const errors = [];
+  app.config.errorHandler = (error) => errors.push(error);
+  const waitFor = async (condition, message, timeout = 3000) => {
+    const deadline = Date.now() + timeout;
+    while (!condition() && Date.now() < deadline)
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.ok(condition(), message);
+  };
+  try {
+    const controller = app.mount();
+    const window = descendants(app.root).find((node) => node.type === "window").widget;
+    // Warm the OS helper before measuring the two-second grace period.
+    await controller.show();
+    await waitFor(() => window.isActive(), "palette acquires real focus");
+    controller.hide();
+    const shownAt = Date.now();
+    await controller.show();
+    await waitFor(() => window.isActive(), "reopened palette is active");
+    // Let show()'s 300ms raise finish before deliberately focusing another window.
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    other.present();
+    await os.windows.activateSurface(other.getSurface());
+    await waitFor(
+      () => other.isActive() && !window.isActive(),
+      "focus moves to another GTK window",
+    );
+    assert.ok(Date.now() - shownAt < 2000, "focus was lost inside the grace period");
+    assert.ok(window.getVisible(), "grace period postpones hiding");
+    await waitFor(() => !window.getVisible(), "palette hides when the grace period expires");
+    assert.deepEqual(errors, []);
+  } finally {
+    clearInterval(pump);
+    app.unmount();
+    other.destroy();
+    globalThis.fetch = originalFetch;
+    if (process.platform === "win32") {
+      const { stopWindowHost } = await import("../core/modules/os/modules/windows/hwnd.ts");
+      await stopWindowHost();
+    }
+  }
 });
