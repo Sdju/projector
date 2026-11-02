@@ -17,9 +17,9 @@ import {
 } from "./mcp-config.ts";
 import { elicitForm } from "./acp-elicitation.ts";
 import { type AcpConnection, type AcpError, NO_TIMEOUT } from "./acp-client.ts";
-import { applySelection, controlsFromSession } from "./acp-controls.ts";
+import { applySelection, controlsFromSession, shownModel } from "./acp-controls.ts";
 import { contentText, createAcpEventMapper } from "./acp-events.ts";
-import { initializeAcp, startAcp } from "./acp-process.ts";
+import { acpAdvertisedDelete, initializeAcp, startAcp } from "./acp-process.ts";
 import {
   acpCommands,
   acpControls,
@@ -86,7 +86,12 @@ export function createAcpBackend(program: AcpProgram): AgentBackend {
     label: program.label,
     program: terminal.program,
     terminal,
-    capabilities: { hosted: true },
+    capabilities: {
+      hosted: true,
+      get deleteSessions() {
+        return acpAdvertisedDelete(id);
+      },
+    },
     run: (options) => run(options, id),
     available: () =>
       !!(program.binary && os.tools.commandExists(program.binary)) ||
@@ -116,11 +121,15 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
     options.cwd,
     {
       onNotification(method, params) {
-        if (method !== "session/update" || replaying) return;
-        mapper.handleUpdate(
-          String(params.sessionId ?? ""),
-          (params.update ?? {}) as Record<string, unknown>,
-        );
+        if (replaying) return;
+        if (method === "session/update") {
+          mapper.handleUpdate(
+            String(params.sessionId ?? ""),
+            (params.update ?? {}) as Record<string, unknown>,
+          );
+          return;
+        }
+        acpProgram(id).notifications?.[method]?.(options, params);
       },
       onRequest(method, params) {
         const extension = acpProgram(id).extensions?.[method];
@@ -139,7 +148,7 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
 
   options.emit("status", { phase: "thinking", provider: program.label, model: "" });
   try {
-    const init = await initializeAcp(connection);
+    const init = await initializeAcp(connection, id);
     const [ideEnabled, widgetsEnabled] = await Promise.all([
       featureEnabled(id, "ide", options.features),
       featureEnabled(id, "widgets", options.features),
@@ -164,8 +173,16 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
     // What the agent offers for this session, with the user's choices applied before the prompt.
     const offered = controlsFromSession(session.result);
     if (offered.length) {
-      const applied = await applySelection(connection, sessionId, offered, options.selection ?? {});
+      const chosen =
+        program.normalizeSelection?.(options.selection ?? {}, offered) ?? options.selection ?? {};
+      const applied = await applySelection(connection, sessionId, offered, chosen);
+      mapper.setModel(shownModel(applied));
       options.emit("controls", { controls: applied });
+      options.emit("status", {
+        phase: "thinking",
+        provider: program.label,
+        model: shownModel(applied),
+      });
     }
     // A resumed session already holds the history; a fresh one starts from the replayed chat.
     // Abilities the user switched on for this agent go before the new message, once per session.
@@ -226,9 +243,10 @@ export async function sessionMcpServers(
 
 /**
  * Resume the native session when the agent supports it, otherwise start a fresh one. The ACP
- * `session/load` response has no `sessionId`, so the requested one is kept; an agent without the
- * `loadSession` capability, or a load that finds no such session, falls back to `session/new` with the replayed
- * history. If the agent refuses until authenticated, the first advertised method is used once.
+ * `session/load` response has no `sessionId`, so the requested one is kept; an agent without
+ * `loadSession`, or a load that finds no such session, falls back to `session/new` with the
+ * replayed history. Any other load error is reported as is. If the agent refuses until
+ * authenticated, the first advertised method is used once.
  */
 export async function openSession(
   connection: AcpConnection,
@@ -253,7 +271,8 @@ export async function openSession(
       } catch (error) {
         // A dead connection or a missing login must surface as is; only a session that is gone
         // (moved project, pruned transcript) falls back to a fresh one.
-        if ((error as AcpError).fatal || isAuthError(error)) throw error;
+        if ((error as AcpError).fatal || isAuthError(error) || !isMissingSession(error))
+          throw error;
       } finally {
         replay(false);
       }
@@ -272,6 +291,14 @@ export async function openSession(
     await connection.request("authenticate", { methodId });
     return await start();
   }
+}
+
+/** The requested native session is gone; a fresh one is the only way to continue. */
+function isMissingSession(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return /no such session|unknown session|session .*not found|failed to load session/i.test(
+    message,
+  );
 }
 
 /** The agent refuses a session until the CLI is authenticated. */

@@ -759,6 +759,16 @@ test("ACP resume keeps the requested session, replays history only on a fresh on
   expect(
     await openSession(failed, { sessionId: "old-1", cwd: "/tmp" }, [], () => {}),
   ).toMatchObject({ sessionId: "new-2", resumed: false });
+
+  const refused = {
+    request: async (method) => {
+      if (method === "session/load") throw new Error("internal error");
+      return { sessionId: "new-3" };
+    },
+  };
+  await expect(
+    openSession(refused, { sessionId: "old-1", cwd: "/tmp" }, [], () => {}),
+  ).rejects.toThrow(/internal error/);
 });
 
 test("ACP session open does not mask real failures as a missing session", async () => {
@@ -920,14 +930,21 @@ test("ACP controls: model, effort, mode first; config options win over the legac
   expect(controls.map((control) => [control.id, control.category])).toStrictEqual([
     ["model", "model"],
     ["reasoning_effort", "effort"],
+    ["fast", "flag"],
     ["mode", "mode"],
     ["collab", "other"],
   ]);
-  // Grouped options are flattened, and the unsupported boolean option is skipped.
+  // Grouped options are flattened; a boolean becomes a flag with on/off values.
   expect(controls[0].options.map((option) => option.value)).toStrictEqual([
     "gpt-6.1-sol",
     "gpt-6-luna",
   ]);
+  expect(controls[0].options[1]).toMatchObject({ value: "gpt-6-luna", group: "older" });
+  expect(controls.find((control) => control.id === "fast")).toMatchObject({
+    category: "flag",
+    current: "false",
+    boolean: true,
+  });
   expect(controls.every((control) => control.via === "config")).toBe(true);
 
   // An agent that only reports the legacy lists still gets a model and a mode control.
@@ -993,6 +1010,21 @@ test("ACP selection is applied in order, re-reads dependent options and skips re
   expect(legacyCalls).toStrictEqual([
     ["session/set_mode", { sessionId: "s1", modeId: "read-only" }],
   ]);
+
+  // A boolean config option is sent as a JSON boolean, not the string "true".
+  const flags = [];
+  await applySelection(
+    {
+      request: async (method, params) => {
+        flags.push([method, params.configId, params.value]);
+        return {};
+      },
+    },
+    "s1",
+    controls,
+    { fast: "true" },
+  );
+  expect(flags).toStrictEqual([["session/set_config_option", "fast", true]]);
 });
 
 test("ACP replay rebuilds the chat from a loaded session", async () => {

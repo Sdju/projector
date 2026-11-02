@@ -12,6 +12,7 @@
 
 ## Сейчас
 
+- [cursor-acp.md](cursor-acp.md) — проблемы ACP Cursor (пикер Fast/effort, дубли истории, расширения) и этапы доработки.
 - [agent-roadmap.md](agent-roadmap.md) — открытые пункты штатного агента Projector.
 - [gitlab-client-roadmap.md](gitlab-client-roadmap.md) — что осталось у GitLab после паритета с GitHub: Pipelines, Wiki, несколько инстансов и проверки.
 - [opencode-background-subagents.md](opencode-background-subagents.md) — фоновый `subagent` OpenCode не виден как живая задача, поэтому Lens не читает его рассуждения.

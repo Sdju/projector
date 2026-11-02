@@ -83,11 +83,21 @@ const history = computed<HistoryEntry[]>(() => {
       native: false,
     });
   }
-  return entries.sort(
-    (a, b) =>
-      Number(b.pinned === true) - Number(a.pinned === true) ||
-      (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""),
+  const boundTitles = new Set(
+    entries.filter((entry) => entry.native && entry.chat).map((entry) => entry.title),
   );
+  return entries
+    .filter((entry) => {
+      // An unbound native row with the same title as a chat-bound session is the leftover of a
+      // resumed conversation, not a second chat.
+      if (!entry.native || entry.chat || entry.parent) return true;
+      return !boundTitles.has(entry.title);
+    })
+    .sort(
+      (a, b) =>
+        Number(b.pinned === true) - Number(a.pinned === true) ||
+        (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""),
+    );
 });
 /** Branches of subagents clutter history, so they are folded under their chats until asked for. */
 const showBranches = ref(false);

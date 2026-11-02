@@ -35,21 +35,22 @@ async function withAgent<T>(
     },
   });
   try {
-    return await work(connection, await initializeAcp(connection));
+    return await work(connection, await initializeAcp(connection, id));
   } finally {
     await connection.close();
   }
 }
 
 /** Drops the throwaway session so probing does not fill the agent's own history. */
-async function discard(connection: AcpConnection, init: AcpInitResult, sessionId: string) {
-  const capabilities = init.agentCapabilities?.sessionCapabilities ?? {};
-  const method = capabilities.delete
-    ? "session/delete"
-    : capabilities.close
-      ? "session/close"
-      : undefined;
-  if (method) await connection.request(method, { sessionId }, 10_000).catch(() => {});
+async function discard(connection: AcpConnection, sessionId: string) {
+  for (const method of ["session/delete", "session/close"] as const) {
+    try {
+      await connection.request(method, { sessionId }, 10_000);
+      return;
+    } catch {
+      /* The agent may not implement this method; try the next one. */
+    }
+  }
 }
 
 /** Models, effort levels and modes the agent offers in `cwd`, cached for a few minutes. */
@@ -57,11 +58,11 @@ export function acpControls(id: AgentBackendId, cwd: string): Promise<AgentContr
   const key = `${id}\n${cwd}`;
   const cached = controlsCache.get(key);
   if (cached && Date.now() - cached.at < CONTROLS_TTL_MS) return cached.controls;
-  const controls = withAgent(id, cwd, async (connection, init) => {
+  const controls = withAgent(id, cwd, async (connection) => {
     const created = (await connection.request("session/new", { cwd, mcpServers: [] })) as {
       sessionId: string;
     };
-    await discard(connection, init, created.sessionId);
+    await discard(connection, created.sessionId);
     return controlsFromSession(created);
   });
   controlsCache.set(key, { at: Date.now(), controls });
@@ -116,7 +117,7 @@ export function acpCommands(
   const commands = withAgent(
     id,
     cwd,
-    async (connection, init) => {
+    async (connection) => {
       const created = (await connection.request("session/new", { cwd, mcpServers: [] })) as {
         sessionId: string;
         /** ACP v2 returns the list in the response; v1 sends the notification instead. */
@@ -128,7 +129,7 @@ export function acpCommands(
         decided = true;
       }
       if (!decided) await waitForCommands(announced, waitMs);
-      await discard(connection, init, created.sessionId);
+      await discard(connection, created.sessionId);
       return collected ?? [];
     },
     (update) => {
@@ -141,7 +142,7 @@ export function acpCommands(
   return commands;
 }
 
-const EMPTY_TITLE = /^New session - \d{4}-\d\d-\d\dT/;
+const EMPTY_TITLE = /^(New session - \d{4}-\d\d-\d\dT|untitled|new session)$/i;
 
 interface RawSession {
   sessionId?: string;
@@ -218,7 +219,7 @@ export function acpSessions(
     };
     const list = (answer.sessions ?? []).flatMap((session): AgentSessionInfo[] => {
       const title = session.title?.trim();
-      // An untitled session never received a prompt (OpenCode names it by its creation time).
+      // A session that never received a prompt has no title (or a placeholder like OpenCode's).
       if (!session.sessionId || !title || EMPTY_TITLE.test(title)) return [];
       const parent = parentOf(session);
       // Only a branch is named by its agent: the same field on a chat is the mode it runs in.

@@ -84,6 +84,7 @@ export function createAcpEventMapper(
   dialect: AcpDialect = createPlainDialect(),
 ) {
   let text = "";
+  let model = "";
   const toolNames = new Map<string, string>();
   const emitTasks = (patches: AcpTaskPatch[]) => {
     for (const patch of patches) emit("task", patch);
@@ -139,8 +140,12 @@ export function createAcpEventMapper(
       }
       return;
     }
+    if (kind === "session_info_update" || kind === "current_mode_update") {
+      // Native title/mode live on the agent's session list; the chat keeps its own first-message title.
+      return;
+    }
     if (kind === "agent_thought_chunk") {
-      emit("status", { phase: "thinking", provider: label, model: "" });
+      emit("status", { phase: "thinking", provider: label, model });
       // A subagent's reasoning is not the answer's.
       const thought = contentText(update.content);
       if (thought && !dialect.inner(update)) emit("thought", { text: thought });
@@ -191,6 +196,9 @@ export function createAcpEventMapper(
     handleUpdate,
     /** The answer ended: commands still running will outlive it. */
     finish: () => emitTasks(dialect.finish()),
+    setModel(name: string) {
+      model = name;
+    },
     get text() {
       return text;
     },

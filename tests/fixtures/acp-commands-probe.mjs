@@ -20,13 +20,20 @@ const announce = () =>
 const rl = readline.createInterface({ input: process.stdin });
 rl.on("line", (line) => {
   const message = JSON.parse(line);
+  if (
+    process.env.PROBE_DISCARD &&
+    (message.method === "session/delete" || message.method === "session/close")
+  )
+    fs.appendFileSync(process.env.PROBE_DISCARD, `${message.method}\n`);
   if (message.method === "initialize")
     send({
       jsonrpc: "2.0",
       id: message.id,
       result: {
         protocolVersion: 1,
-        agentCapabilities: { sessionCapabilities: { delete: {} } },
+        agentCapabilities: {
+          sessionCapabilities: mode === "no-delete" ? { list: {} } : { delete: {} },
+        },
       },
     });
   else if (message.method === "session/new") {

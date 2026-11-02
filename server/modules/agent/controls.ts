@@ -5,12 +5,14 @@ import type { AgentTask } from "../../../core/modules/agent-task/index.ts";
  * (Codex: model, reasoning effort, approval preset; Cursor: model, mode; OpenCode: model, effort,
  * agent), so they travel as data and the UI renders whatever it receives.
  */
-export type AgentControlCategory = "model" | "effort" | "mode" | "other";
+export type AgentControlCategory = "model" | "effort" | "mode" | "flag" | "other";
 
 export interface AgentControlOption {
   value: string;
   name: string;
   description?: string;
+  /** Select group this value belongs to, when the agent sent grouped options. */
+  group?: string;
 }
 
 export interface AgentControl {
@@ -22,6 +24,8 @@ export interface AgentControl {
   options: AgentControlOption[];
   /** How the value is applied over ACP; Claude Code uses `native`. */
   via: "config" | "model" | "mode" | "native";
+  /** ACP `boolean` option: the value is sent as a JSON boolean, not a string. */
+  boolean?: true;
 }
 
 /** Values chosen by the user, by control id. */

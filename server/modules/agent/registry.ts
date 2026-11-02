@@ -96,7 +96,7 @@ export function agentCapabilities(id: string | undefined) {
     ...backend.capabilities,
     rewindFiles: !!backend.rewindFiles,
     editSessions: !!backend.updateSession,
-    deleteSessions: !!backend.deleteSession,
+    deleteSessions: backend.capabilities?.deleteSessions ?? !!backend.deleteSession,
   };
 }
 

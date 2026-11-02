@@ -16,6 +16,7 @@ import IconCheck from "~icons/lucide/check";
 import IconModel from "~icons/lucide/cpu";
 import IconEffort from "~icons/lucide/brain";
 import IconMode from "~icons/lucide/shield-check";
+import IconFlag from "~icons/lucide/zap";
 import IconOther from "~icons/lucide/sliders-horizontal";
 
 const props = defineProps<{
@@ -39,6 +40,7 @@ const icons: Record<AgentControl["category"], Component> = {
   model: IconModel,
   effort: IconEffort,
   mode: IconMode,
+  flag: IconFlag,
   other: IconOther,
 };
 function currentName(control: AgentControl): string {
@@ -57,6 +59,17 @@ const summary = computed(() =>
 /** Каскад: корень острова — список параметров, выбор параметра открывает его варианты. */
 const view = ref<string>();
 const selected = computed(() => props.controls.find((control) => control.id === view.value));
+/** Consecutive options that share a `group` stay under one heading. */
+const optionGroups = computed(() => {
+  const options = selected.value?.options ?? [];
+  const groups: { name?: string; options: AgentControl["options"] }[] = [];
+  for (const option of options) {
+    const last = groups.at(-1);
+    if (last && last.name === option.group) last.options.push(option);
+    else groups.push({ name: option.group, options: [option] });
+  }
+  return groups;
+});
 watch(open, (value) => {
   if (!value) view.value = undefined;
   else emit("opened");
@@ -177,24 +190,27 @@ defineExpose({ toggle: () => menu.toggle() });
         />
       </UiActionRow>
       <UiStack flow="flex" gap="none" class="list">
-        <UiActionRow
-          v-for="option in selected.options"
-          :key="option.value"
-          type="button"
-          class="option"
-          :class="{ current: option.value === selected.current }"
-          role="menuitemradio"
-          :aria-checked="option.value === selected.current"
-          @click="pick(selected, option.value)"
-        >
-          <UiActionCopy
-            :title="option.name"
-            :description="option.description"
-            description-mode="wrap"
-            :emphasized="option.value === selected.current"
-          />
-          <IconCheck v-if="option.value === selected.current" class="check" aria-hidden="true" />
-        </UiActionRow>
+        <template v-for="(group, index) in optionGroups" :key="group.name ?? index">
+          <span v-if="group.name" class="group">{{ group.name }}</span>
+          <UiActionRow
+            v-for="option in group.options"
+            :key="option.value"
+            type="button"
+            class="option"
+            :class="{ current: option.value === selected.current }"
+            role="menuitemradio"
+            :aria-checked="option.value === selected.current"
+            @click="pick(selected, option.value)"
+          >
+            <UiActionCopy
+              :title="option.name"
+              :description="option.description"
+              description-mode="wrap"
+              :emphasized="option.value === selected.current"
+            />
+            <IconCheck v-if="option.value === selected.current" class="check" aria-hidden="true" />
+          </UiActionRow>
+        </template>
       </UiStack>
     </UiStack>
   </UiIsland>
@@ -239,8 +255,14 @@ defineExpose({ toggle: () => menu.toggle() });
 .value {
   max-width: 150px;
 }
-.chip[data-category="mode"] {
+.chip[data-category="mode"],
+.chip[data-category="flag"] {
   color: var(--faint);
+}
+.group {
+  padding: var(--sp-2) var(--sp-3) var(--sp-1);
+  color: var(--faint);
+  font-size: var(--fs-2xs);
 }
 .mcp {
   display: grid;

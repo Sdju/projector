@@ -57,11 +57,11 @@ export type AgentPermissionMode = string;
 /** A knob the agent offers for a chat: model, reasoning effort, mode. */
 export interface AgentControl {
   id: string;
-  category: "model" | "effort" | "mode" | "other";
+  category: "model" | "effort" | "mode" | "flag" | "other";
   name: string;
   description?: string;
   current: string;
-  options: { value: string; name: string; description?: string }[];
+  options: { value: string; name: string; description?: string; group?: string }[];
 }
 
 /** Choices by control id. */

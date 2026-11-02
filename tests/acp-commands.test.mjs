@@ -3,8 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, expect, test } from "vite-plus/test";
+import { acpAdvertisedDelete } from "../server/modules/agents/acp/acp-process.ts";
 import { registerAcpProgram } from "../server/modules/agents/acp/acp-programs.ts";
-import { acpCommands } from "../server/modules/agents/acp/acp-tools.ts";
+import { acpCommands, acpControls } from "../server/modules/agents/acp/acp-tools.ts";
 
 /** A file, not an `-e` argument: Windows shell quoting would mangle the multi-line script. */
 const SCRIPT = fileURLToPath(new URL("./fixtures/acp-commands-probe.mjs", import.meta.url));
@@ -13,6 +14,7 @@ const dirs = [];
 afterEach(async () => {
   while (dirs.length) await rm(dirs.pop(), { recursive: true, force: true });
   delete process.env.PROBE_MARK;
+  delete process.env.PROBE_DISCARD;
 });
 
 let nextId = 1;
@@ -71,4 +73,23 @@ test("the command list is cached, so opening another chat does not spawn the age
   await acpCommands(id, cwd, 1000);
   await acpCommands(id, cwd, 1000);
   expect((await readFile(mark, "utf8")).trim().split("\n")).toStrictEqual(["start"]);
+});
+
+test("a probe session is deleted even when the agent did not advertise session/delete", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "projector-acp-discard-"));
+  dirs.push(cwd);
+  const mark = join(cwd, "discard");
+  process.env.PROBE_DISCARD = mark;
+  const id = probe("no-delete");
+  await acpControls(id, cwd);
+  expect((await readFile(mark, "utf8")).trim().split("\n")).toStrictEqual(["session/delete"]);
+  expect(acpAdvertisedDelete(id)).toBe(false);
+});
+
+test("deleteSessions follows the advertised session/delete capability", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "projector-acp-delete-cap-"));
+  dirs.push(cwd);
+  const id = probe("before");
+  await acpCommands(id, cwd, 1000);
+  expect(acpAdvertisedDelete(id)).toBe(true);
 });

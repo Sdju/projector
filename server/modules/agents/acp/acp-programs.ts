@@ -1,4 +1,10 @@
-import type { AgentBackendId, AgentRunOptions, AgentTerminal } from "../../agent/index.ts";
+import type {
+  AgentBackendId,
+  AgentControl,
+  AgentRunOptions,
+  AgentSelection,
+  AgentTerminal,
+} from "../../agent/index.ts";
 import type { AcpDialect } from "./acp-dialect.ts";
 
 /** A property of an ACP form schema. */
@@ -49,10 +55,26 @@ export interface AcpProgram {
   dialect?: () => AcpDialect;
   /** The optional dialect of the agent's forms; the plain part works without it. */
   forms?: AcpFormAdapter;
+  /**
+   * Extra `initialize.clientCapabilities` this agent needs beyond the shared ACP ones. Nested
+   * objects are merged one level (`_meta` of the program is added, `fs` is not replaced).
+   */
+  clientCapabilities?: Record<string, unknown>;
+  /**
+   * Rewrites stored choices before they are applied: an older combined value may become several
+   * knobs once the agent offers them separately. The program owns the rewrite; the shared client
+   * only calls it.
+   */
+  normalizeSelection?: (selection: AgentSelection, controls: AgentControl[]) => AgentSelection;
   /** The agent's own request methods (outside ACP), answered by the handler it names. */
   extensions?: Record<
     string,
     (options: AgentRunOptions, params: Record<string, unknown>) => Promise<unknown>
+  >;
+  /** Notifications the agent sends outside `session/update`; fire-and-forget. */
+  notifications?: Record<
+    string,
+    (options: AgentRunOptions, params: Record<string, unknown>) => void
   >;
 }
 

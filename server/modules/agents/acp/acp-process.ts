@@ -61,15 +61,54 @@ export async function startAcp(
   return createAcpConnection(child, { ...handlers, label: program.label });
 }
 
-export async function initializeAcp(connection: AcpConnection): Promise<AcpInitResult> {
-  return (await connection.request("initialize", {
+/** What the last handshake said about `session/delete`, so the UI does not offer a dead action. */
+const advertisedDelete = new Map<AgentBackendId, boolean>();
+
+export function acpAdvertisedDelete(id: AgentBackendId): boolean {
+  return advertisedDelete.get(id) === true;
+}
+
+/** Nested objects of `clientCapabilities` are merged one level; scalars replace. */
+export function mergeClientCapabilities(
+  base: Record<string, unknown>,
+  extra: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  if (!extra) return base;
+  const out: Record<string, unknown> = { ...base };
+  for (const [key, value] of Object.entries(extra)) {
+    const prev = out[key];
+    if (
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      prev &&
+      typeof prev === "object" &&
+      !Array.isArray(prev)
+    )
+      out[key] = { ...(prev as Record<string, unknown>), ...(value as Record<string, unknown>) };
+    else out[key] = value;
+  }
+  return out;
+}
+
+export async function initializeAcp(
+  connection: AcpConnection,
+  id?: AgentBackendId,
+): Promise<AcpInitResult> {
+  const extra = id ? acpProgram(id).clientCapabilities : undefined;
+  const init = (await connection.request("initialize", {
     protocolVersion: PROTOCOL_VERSION,
-    clientCapabilities: {
-      fs: { readTextFile: false, writeTextFile: false },
-      terminal: false,
-      // Agents ask their questions through forms; without this they answer for the user.
-      elicitation: { form: {} },
-    },
+    clientCapabilities: mergeClientCapabilities(
+      {
+        fs: { readTextFile: false, writeTextFile: false },
+        terminal: false,
+        // Agents ask their questions through forms; without this they answer for the user.
+        elicitation: { form: {} },
+      },
+      extra,
+    ),
     clientInfo: { name: "projector", title: "Projector", version: "1.0" },
   })) as AcpInitResult;
+  if (id) advertisedDelete.set(id, !!init.agentCapabilities?.sessionCapabilities?.delete);
+  return init;
 }

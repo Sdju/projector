@@ -144,6 +144,38 @@ test("the plan is the last plan call of the answer", () => {
   expect(latestPlan(turn("u", "user"), "claude-code")).toEqual([]);
 });
 
+test("Cursor's create_plan and update_todos carry the plan too", () => {
+  const answer = {
+    ...turn("a", "assistant"),
+    tools: [
+      {
+        id: "1",
+        name: "create_plan",
+        status: "done",
+        detail: "",
+        input: JSON.stringify({ todos: [{ content: "old", status: "pending" }] }),
+      },
+      {
+        id: "2",
+        name: "update_todos",
+        status: "done",
+        detail: "",
+        input: JSON.stringify({
+          todos: [
+            { content: "one", status: "completed" },
+            { content: "two", status: "in_progress" },
+          ],
+        }),
+      },
+    ],
+  };
+  expect(latestPlan(answer, "cursor").map((item) => `${item.content}:${item.status}`)).toEqual([
+    "one:completed",
+    "two:in_progress",
+  ]);
+  expect(latestPlan(answer, "claude-code")).toEqual([]);
+});
+
 test("Kimi's TodoList carries the plan too", () => {
   const answer = {
     ...turn("a", "assistant"),

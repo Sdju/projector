@@ -12,16 +12,27 @@ const CATEGORIES: Record<string, AgentControlCategory> = {
   model: "model",
   thought_level: "effort",
   mode: "mode",
+  model_config: "flag",
 };
 
 const asText = (value: unknown) => (typeof value === "string" ? value : "");
 
+function currentOf(row: Raw): string {
+  const value = row.currentValue;
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "number") return String(value);
+  return asText(value);
+}
+
 /** ACP select options are flat or grouped (`{ group, name, options }`). */
-function flattenOptions(options: unknown): AgentControlOption[] {
+function flattenOptions(options: unknown, group?: string): AgentControlOption[] {
   if (!Array.isArray(options)) return [];
   return options.flatMap((item): AgentControlOption[] => {
     const row = (item ?? {}) as Raw;
-    if (Array.isArray(row.options)) return flattenOptions(row.options);
+    if (Array.isArray(row.options)) {
+      const name = asText(row.group) || asText(row.name) || group;
+      return flattenOptions(row.options, name || undefined);
+    }
     const value = asText(row.value);
     if (!value) return [];
     return [
@@ -29,27 +40,44 @@ function flattenOptions(options: unknown): AgentControlOption[] {
         value,
         name: asText(row.name) || value,
         ...(asText(row.description) ? { description: asText(row.description) } : {}),
+        ...(group ? { group } : {}),
       },
     ];
   });
+}
+
+function booleanOptions(row: Raw): AgentControlOption[] {
+  const on = asText(row.name) || "Да";
+  return [
+    { value: "true", name: on },
+    { value: "false", name: "Выкл" },
+  ];
 }
 
 function fromConfigOptions(list: unknown): AgentControl[] {
   if (!Array.isArray(list)) return [];
   return list.flatMap((item): AgentControl[] => {
     const row = (item ?? {}) as Raw;
-    const options = flattenOptions(row.options);
     const id = asText(row.id);
-    if (row.type !== "select" || !id || !options.length) return [];
+    if (!id) return [];
+    const type = asText(row.type);
+    const boolean = type === "boolean";
+    const options = boolean
+      ? booleanOptions(row)
+      : type === "select"
+        ? flattenOptions(row.options)
+        : [];
+    if (!options.length) return [];
     return [
       {
         id,
-        category: CATEGORIES[asText(row.category)] ?? "other",
+        category: CATEGORIES[asText(row.category)] ?? (boolean ? "flag" : "other"),
         name: asText(row.name) || id,
         ...(asText(row.description) ? { description: asText(row.description) } : {}),
-        current: asText(row.currentValue),
+        current: currentOf(row),
         options,
         via: "config",
+        ...(boolean ? { boolean: true as const } : {}),
       },
     ];
   });
@@ -101,7 +129,7 @@ function legacyControls(result: Raw, known: AgentControl[]): AgentControl[] {
   return controls.filter((control) => control.options.length);
 }
 
-const ORDER: AgentControlCategory[] = ["model", "effort", "mode", "other"];
+const ORDER: AgentControlCategory[] = ["model", "effort", "flag", "mode", "other"];
 
 /** The controls of a `session/new` or `session/load` response, model first, then effort. */
 export function controlsFromSession(result: unknown): AgentControl[] {
@@ -112,6 +140,12 @@ export function controlsFromSession(result: unknown): AgentControl[] {
 
 function sorted(controls: AgentControl[]): AgentControl[] {
   return ORDER.flatMap((category) => controls.filter((control) => control.category === category));
+}
+
+export function shownModel(controls: AgentControl[]): string {
+  const model = controls.find((control) => control.category === "model");
+  if (!model) return "";
+  return model.options.find((option) => option.value === model.current)?.name ?? model.current;
 }
 
 /**
@@ -137,7 +171,7 @@ export async function applySelection(
           const answer = (await connection.request("session/set_config_option", {
             sessionId,
             configId: live.id,
-            value: wanted,
+            value: live.boolean ? wanted === "true" : wanted,
           })) as Raw | undefined;
           const updated = fromConfigOptions(answer?.configOptions);
           if (updated.length)
