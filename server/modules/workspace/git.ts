@@ -34,6 +34,7 @@ export async function git(root: string, args: string[], maxBuffer = 4 * MAX_BYTE
     ).stdout;
   return (
     await exec("git", ["--literal-pathspecs", "-C", root, ...args], {
+      windowsHide: true,
       maxBuffer,
       timeout: 10000,
       env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },

@@ -34,6 +34,14 @@ export {
 } from "../../../core/modules/launcher/index.ts";
 
 const execute = promisify(execFile);
+
+/** Desktop queries are background work; their Node console must never appear over the UI. */
+function runDesktop(args: string[], options: { timeout?: number; maxBuffer?: number } = {}) {
+  return execute(process.execPath, [...desktopArgs(), ...args], {
+    ...options,
+    windowsHide: true,
+  });
+}
 import { preferences, toggleFavorite, updatePreferences } from "../preferences/index.ts";
 export { preferences, interfaceMode, saveInterface } from "../preferences/index.ts";
 export async function shortcutStatus(): Promise<{
@@ -42,7 +50,7 @@ export async function shortcutStatus(): Promise<{
   shortcut: string;
 }> {
   try {
-    const { stdout } = await execute(process.execPath, [...desktopArgs(), "shortcut-status"], {
+    const { stdout } = await runDesktop(["shortcut-status"], {
       timeout: 8000,
     });
     return JSON.parse(stdout);
@@ -54,11 +62,7 @@ export async function shortcutStatus(): Promise<{
 export async function checkShortcut(shortcut: string): Promise<void> {
   if (!shortcut) return;
   try {
-    const { stdout } = await execute(
-      process.execPath,
-      [...desktopArgs(), "shortcut-check", shortcut],
-      { timeout: 8000 },
-    );
+    const { stdout } = await runDesktop(["shortcut-check", shortcut], { timeout: 8000 });
     const result = JSON.parse(stdout);
     if (result.supported && !result.available)
       throw new Error(`Сочетание ${shortcut} уже занято другим приложением`);
@@ -72,7 +76,7 @@ let catalogLoading: Promise<LaunchItem[]> | undefined;
 async function applications(): Promise<LaunchItem[]> {
   if (catalog && Date.now() - catalog.at < 15000) return catalog.items;
   if (catalogLoading) return catalogLoading;
-  catalogLoading = execute(process.execPath, [...desktopArgs(), "list"], {
+  catalogLoading = runDesktop(["list"], {
     timeout: 10000,
     maxBuffer: 4 * 1024 * 1024,
   })
@@ -305,7 +309,7 @@ export async function launchItem(
     if (action && action !== "launch") throw new Error("Для приложения доступен только запуск");
     const app = (await applications()).find((item) => item.id === id);
     if (!app) throw new Error("Приложение больше не доступно");
-    await execute(process.execPath, [...desktopArgs(), "launch", id.slice(4)], { timeout: 10000 });
+    await runDesktop(["launch", id.slice(4)], { timeout: 10000 });
   } else if (id.startsWith("project:")) {
     const project = (await loadProjects()).find((p) => `project:${p.id}` === id);
     if (!project) throw new Error("Проект не найден");
@@ -351,7 +355,7 @@ export async function launchItem(
 }
 
 export async function applicationIcon(id: string): Promise<string | null> {
-  const { stdout } = await execute(process.execPath, [...desktopArgs(), "icon", id], {
+  const { stdout } = await runDesktop(["icon", id], {
     timeout: 5000,
   });
   return stdout.trim() || null;

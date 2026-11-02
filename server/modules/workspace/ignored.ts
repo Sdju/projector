@@ -5,6 +5,7 @@ export function ignoredPaths(dir: string, names: string[]): Promise<Set<string>>
   if (!names.length) return Promise.resolve(new Set());
   return new Promise((done) => {
     const child = spawn("git", ["-C", dir, "check-ignore", "-z", "--stdin"], {
+      windowsHide: true,
       stdio: ["pipe", "pipe", "ignore"],
       env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
     });
