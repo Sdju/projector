@@ -339,13 +339,24 @@ export async function decidePermission(
   const allowAlways = list.find((item) => item.kind === "allow_always");
   const allow = allowOnce ?? allowAlways;
   if (!options.approve || !allow) return { outcome: { outcome: "cancelled" } };
-  const tool = String(toolCall.title || toolCall.kind || "tool");
+  const kind = String(toolCall.kind ?? "").toLowerCase();
+  // The ACP title of a shell call is the command itself. Using it as the tool name repeats the
+  // same line three times in the card (title, tool label and preview), so keep the kind instead.
+  const tool = kind === "execute" ? "bash" : kind === "edit" ? "edit" : kind || "tool";
+  const input = (toolCall.rawInput ?? {}) as Record<string, unknown>;
+  const command = typeof input.command === "string" ? input.command : "";
+  const title =
+    kind === "execute"
+      ? "Выполнить команду в оболочке"
+      : typeof toolCall.title === "string"
+        ? toolCall.title
+        : undefined;
   const answer = await options
     .approve({
       tool,
-      input: toolCall.rawInput ?? {},
-      title: typeof toolCall.title === "string" ? toolCall.title : undefined,
-      detail: toolCallDetail(toolCall),
+      input,
+      ...(title ? { title } : {}),
+      detail: toolCallDetail(toolCall) ?? (command ? `$ ${command}` : undefined),
       persistent: !!allowAlways,
     })
     .catch(() => false);

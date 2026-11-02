@@ -11,6 +11,11 @@ import {
   judgeFallback,
   parseJudgeVerdict,
 } from "../server/modules/judge/index.ts";
+import {
+  canRememberPermission,
+  permissionRiskClass,
+  permissionTone,
+} from "../src/modules/agent/lib/permission-risk.ts";
 
 const verdict = (score, confidence = "high") => ({
   score,
@@ -92,6 +97,20 @@ test("Judge shows the score in the card and never automates a failure", async ()
     expect.objectContaining({ judge: expect.objectContaining({ score: 4, confidence: "low" }) }),
   );
   expect(emit).not.toHaveBeenCalled();
+});
+
+test("The card tone follows the score and never remembers a high-risk permission", () => {
+  expect(permissionTone()).toBe("warning");
+  expect(permissionTone(verdict(1))).toBe("neutral");
+  expect(permissionTone(verdict(3))).toBe("warning");
+  expect(permissionTone(verdict(4))).toBe("danger");
+  expect(permissionTone(verdict(5))).toBe("danger");
+  expect(permissionRiskClass()).toBe("risk-0");
+  expect(permissionRiskClass(verdict(3))).toBe("risk-3");
+  expect(canRememberPermission({ persistent: true })).toBe(true);
+  expect(canRememberPermission({ persistent: false, judge: verdict(1) })).toBe(false);
+  expect(canRememberPermission({ persistent: true, judge: verdict(3) })).toBe(true);
+  expect(canRememberPermission({ persistent: true, judge: verdict(4) })).toBe(false);
 });
 
 test("Judge does not spend a request when both display and automation are off", async () => {

@@ -3,7 +3,7 @@
 defineProps<{
   as?: "section" | "div" | "article" | "li";
   appearance?: "card" | "frame";
-  tone?: "neutral" | "warning";
+  tone?: "neutral" | "warning" | "danger";
   density?: "regular" | "compact" | "notice";
 }>();
 </script>
@@ -46,5 +46,9 @@ defineProps<{
 .warning {
   border-color: color-mix(in srgb, var(--warn) 40%, var(--bg-2));
   background: color-mix(in srgb, var(--warn) 8%, var(--bg-2));
+}
+.danger {
+  border-color: color-mix(in srgb, var(--err) 48%, var(--bg-2));
+  background: color-mix(in srgb, var(--err) 8%, var(--bg-2));
 }
 </style>

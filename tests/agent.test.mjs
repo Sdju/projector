@@ -670,6 +670,22 @@ test("ACP permission prefers one-time options and previews the change", async ()
     outcome: { outcome: "selected", optionId: "r-once" },
   });
 
+  const shell = capture(true);
+  await decidePermission(shell.options, {
+    toolCall: {
+      kind: "execute",
+      title: "cd /tmp && pwd",
+      rawInput: { command: "cd /tmp && pwd" },
+    },
+    options,
+  });
+  // A shell title is the command itself; the card gets one label, a bash badge and one preview.
+  expect(shell.state.request).toMatchObject({
+    tool: "bash",
+    title: "Выполнить команду в оболочке",
+    detail: "$ cd /tmp && pwd",
+  });
+
   const detail = toolCallDetail({
     content: [
       { type: "diff", path: "src/a.ts", oldText: "old", newText: "new" },

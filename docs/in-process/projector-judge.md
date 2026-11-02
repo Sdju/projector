@@ -47,6 +47,14 @@ interface JudgeVerdict {
 
 `confidence` нужен для автоматического решения: при `low` автоматическое разрешение запрещено. Ошибка, таймаут или неразборчивый JSON дают `score: 4`, `confidence: "low"` и `reason: "оценка недоступна"`, но карточка всё равно показывается.
 
+## Карточка
+
+- Рамка и иконка следуют риску: 1–2 нейтрально, 3 предупреждение, 4–5 опасность.
+- Заголовок — короткое действие, рядом бейдж инструмента (`bash`, `edit`, MCP-имя). Для shell заголовок не повторяет команду: она показана один раз в превью `$ …`.
+- Оценка отделена от объяснения: «Почему» и «Что изменится» — две строки, если эффект известен.
+- «Всегда разрешать» скрыта для риска 4–5: опасное правило нельзя сохранить навсегда.
+- Второго подтверждения для 4–5 нет: пользователь видит риск, но решает одним действием.
+
 ## Поток
 
 1. Агент (встроенный Projector или внешний Claude Code/ACP) доходит до `approve(request)`.
@@ -93,7 +101,8 @@ judge?: { show?: boolean; auto?: boolean; maxRisk?: number };
 - `src/modules/agent/model/permissions.ts`, `types.ts`, `turn-events.ts` — вердикт в карточке и событие `judge` в работе.
 - `src/modules/agent/model/chat-state.ts`, `save-chat.ts`, `load-history.ts`, `session.ts`, `api/client.ts` — переопределение чата в истории и в запросе.
 - `src/modules/agent/model/judge-settings.ts`, `api/judge.ts`, `ui/AgentJudgeSettings.vue`, `ui/AgentJudgeIsland.vue`, `ui/AgentJudgeFields.vue` — настройки.
-- `src/modules/agent/ui/AgentPermissions.vue`, `AgentJudgeNote.vue`, `AgentWorkBody.vue`, `AgentTurn.vue`, `AgentChatMenu.vue`, `AgentChat.vue` — карточка, строка автоматического решения и меню «Ещё».
+- `src/modules/agent/ui/AgentPermissions.vue`, `lib/permission-risk.ts`, `AgentJudgeNote.vue`, `AgentWorkBody.vue`, `AgentTurn.vue`, `AgentChatMenu.vue`, `AgentChat.vue` — карточка, тон по риску, строка автоматического решения и меню «Ещё».
+- `server/modules/agents/acp/acp-backend.ts` — карточка ACP больше не повторяет команду трижды: инструмент берётся из `kind` (`bash`), заголовок — короткий, команда — один раз в превью.
 - `src/modules/app-settings/sections.ts` — секция «Судья Projector».
 - `src/modules/agent/lib/export.ts` — решение Судьи попадает в Markdown.
 
@@ -102,7 +111,7 @@ judge?: { show?: boolean; auto?: boolean; maxRisk?: number };
 - По умолчанию включено с `maxRisk: 1` и `confidence: "high-medium"`; чат может выключить автоматизацию или изменить порог.
 - Максимальный порог — 3; 4 и 5 не автоматизируются.
 - `high-medium` разрешает автоматическое решение при высокой и средней уверенности; `high` — только при высокой.
-- Автоматическое разрешение не запоминает «Всегда разрешать».
+- Автоматическое разрешение не запоминает «Всегда разрешать»; для риска 4–5 эта кнопка скрыта и при ручном решении.
 - При ошибке Judge, таймауте, пустом ответе или неразборчивом JSON — карточка без автоматизации.
 - Автоматизация действует для всех агентов, включая Claude Code, ACP и фоновые задания.
 - Действия с риском 4–5 можно дополнительно помечать как «требует второго подтверждения» (отдельная настройка), но это не входит в первую версию.
