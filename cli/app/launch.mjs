@@ -1,5 +1,5 @@
-import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, openSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, openSync, readdirSync } from "node:fs";
 import { open, readFile, unlink } from "node:fs/promises";
 import { os } from "../../core/modules/os/index.ts";
 import { SERVER_MODES, isServerMode, serverCommand } from "../../core/modules/server-mode/index.ts";
@@ -201,6 +201,59 @@ async function switchMode(target) {
   console.log(`сервер работает в режиме ${target}`);
 }
 
+function vitePlusCliPresent() {
+  const files = [
+    join(ROOT, "node_modules", "@voidzero-dev", "vite-plus-core", "dist", "vite", "bin", "vite.js"),
+    join(ROOT, "node_modules", "vite", "dist", "vite", "bin", "vite.js"),
+  ];
+  if (files.some((file) => existsSync(file))) return true;
+  const store = join(ROOT, "node_modules", ".pnpm");
+  if (!existsSync(store)) return false;
+  for (const name of readdirSync(store)) {
+    if (!name.startsWith("@voidzero-dev+vite-plus-cor")) continue;
+    if (
+      existsSync(
+        join(
+          store,
+          name,
+          "node_modules",
+          "@voidzero-dev",
+          "vite-plus-core",
+          "dist",
+          "vite",
+          "bin",
+          "vite.js",
+        ),
+      )
+    )
+      return true;
+  }
+  return false;
+}
+
+function assertDevToolchain(vp) {
+  if (readServerMode() !== "dev") return;
+  if (!existsSync(vp) && vp === "vp")
+    throw new Error(`Не найден vp. Выполните pnpm install в ${ROOT}`);
+  // vite-plus requires bin/vite.js even when node/cli.js is still present.
+  if (vitePlusCliPresent()) return;
+  const repair = join(ROOT, "scripts", "ensure-vite-plus-core.mjs");
+  if (existsSync(repair)) {
+    const result = spawnSync(process.execPath, [repair], {
+      cwd: ROOT,
+      encoding: "utf8",
+      windowsHide: true,
+      timeout: 120000,
+    });
+    if (result.stdout) console.error(result.stdout.trim());
+    if (result.stderr) console.error(result.stderr.trim());
+    if (vitePlusCliPresent()) return;
+  }
+  throw new Error(
+    `Повреждён node_modules (нет vite-plus-core/cli.js). В ${ROOT} выполните: pnpm install`,
+  );
+}
+
 async function main() {
   const release = await acquireLock();
   try {
@@ -219,6 +272,7 @@ async function main() {
 
     const vp = findVp();
     if (quit) return;
+    assertDevToolchain(vp);
     await ensureBuilt(vp, readServerMode());
     if (serverOnly) {
       await release();
