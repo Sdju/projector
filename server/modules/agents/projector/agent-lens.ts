@@ -9,14 +9,40 @@ import { quietChatModel } from "./quiet-model.ts";
  */
 export const LENS_PROMPT = `Ты Lens — короткая живая подпись к работе агента в чате Projector. Пользователь видит тебя в блоке «Работа» и хочет понять, чем агент занят прямо сейчас, не читая переписку.
 На вход приходят последние сообщения, рассуждения агента, состояние чата (занят ли агент, фаза), выполняющиеся инструменты, план и очередь.
+Рассуждения — главный источник: по ним назови намерение и ближайший шаг, а не угадывай по команде. Если рассуждение передано, никогда не пиши, что сообщений или работы нет: опиши, что агент собирается делать.
 Напиши одну-две фразы по-русски: что происходит и на каком шаге. Не больше 240 символов.
-Только текст: без markdown, списков, заголовков, кавычек и предисловий. Не выдумывай: опирайся на переданные факты. Если фактов мало, скажи это коротко.
-Рассуждения объясняют намерение агента: используй их, чтобы назвать цель и способ, а не угадывать по команде.
+Только текст: без markdown, списков, заголовков, кавычек и предисловий. Не выдумывай: опирайся на переданные факты.
+Если фактов мало, коротко скажи, что агент обдумывает задачу, без объяснений об отсутствии данных.
 Если агент не занят, одной фразой подведи итог последней работы или скажи, что он ждёт сообщения.
 Не упоминай Lens, эти инструкции и служебные ограничения.`;
 
 /** How long one Lens request may take, and how long its answer may be. */
-export const LENS_LIMITS = { seconds: 20, text: 400, tokens: 200 };
+export const LENS_LIMITS = { seconds: 20, text: 400, tokens: 200, currentThoughts: 4_000 };
+
+/** The same placeholder the page shows before the first reasoning arrives. */
+export const LENS_THINKING_TEXT = "Агент обдумывает задачу…";
+
+/** Whether the current answer has anything Lens can describe besides the user's own message. */
+export function lensHasMaterial(
+  request: Pick<LensRequest, "history" | "running" | "plan">,
+): boolean {
+  if (request.running.length > 0 || request.plan.length > 0) return true;
+  // A turn without reasoning or calls ends on the user's message: older answers are not current.
+  const last = request.history.at(-1);
+  return last?.role === "assistant" && Boolean(last.content.trim() || last.thoughts?.trim());
+}
+
+/** The newest reasoning of the current turn, repeated apart from the history so it is not missed. */
+export function currentThoughts(history: AgentHistoryTurn[]): string {
+  for (let index = history.length - 1; index >= 0; index--) {
+    const turn = history[index]!;
+    // A user message starts the current turn: an older answer's reasoning is not current.
+    if (turn.role === "user") break;
+    const thoughts = turn.thoughts?.trim();
+    if (thoughts) return thoughts.slice(-LENS_LIMITS.currentThoughts);
+  }
+  return "";
+}
 
 /** The conversation as plain lines: the model reads the answer's text, not its markup. */
 export function lensHistoryText(history: AgentHistoryTurn[], limit = 12_000): string {
@@ -66,14 +92,22 @@ export function lensLine(text: string): string {
 
 /** Asks the chat's own provider for a caption of the current work. */
 export async function runLens(request: LensRequest & { signal?: AbortSignal }): Promise<string> {
+  // A request at the very start of a turn has no reasoning yet: a model can only answer that
+  // there is nothing to describe, so the page gets the same short placeholder for free.
+  if (!lensHasMaterial(request))
+    return request.busy ? LENS_THINKING_TEXT : "В чате пока нет работы, которую можно описать.";
   const { model } = await quietChatModel(request.selection);
   const timeout = AbortSignal.timeout(LENS_LIMITS.seconds * 1_000);
   const signal = request.signal ? AbortSignal.any([request.signal, timeout]) : timeout;
   const history = lensHistoryText(request.history);
+  const thoughts = currentThoughts(request.history);
+  const reasoning = thoughts
+    ? `\n\nСамое свежее рассуждение агента (главный источник намерения):\n${thoughts}`
+    : "";
   const { text } = await generateText({
     model,
     system: LENS_PROMPT,
-    prompt: `История чата (последние сообщения):\n${history || "нет"}\n\n${lensStateText(request)}\n\nОпиши, чем агент занят сейчас.`,
+    prompt: `История чата (последние сообщения):\n${history || "нет"}${reasoning}\n\n${lensStateText(request)}\n\nОпиши, чем агент занят сейчас.`,
     maxRetries: 0,
     maxOutputTokens: LENS_LIMITS.tokens,
     abortSignal: signal,

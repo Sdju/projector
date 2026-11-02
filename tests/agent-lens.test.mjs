@@ -1,10 +1,11 @@
 import { expect, test, vi } from "vite-plus/test";
-import { effectScope, ref } from "vue";
+import { effectScope, nextTick, ref } from "vue";
 
 vi.mock("../src/modules/agent/api/lens.ts", () => ({ fetchLens: vi.fn() }));
 
 const { fetchLens } = await import("../src/modules/agent/api/lens.ts");
-const { lensHistory, lensState, useAgentLens } = await import("../src/modules/agent/model/lens.ts");
+const { LENS_THINKING_TEXT, lensHistory, lensState, lensStep, useAgentLens } =
+  await import("../src/modules/agent/model/lens.ts");
 
 function conversation() {
   return [
@@ -73,6 +74,19 @@ test("Lens state reports running calls, the plan and the queue", () => {
   });
 });
 
+test("Lens does not treat a change of call as a new step", () => {
+  const answer = (id) => [
+    {
+      id: "a1",
+      role: "assistant",
+      text: "",
+      tools: [{ id, name: "Bash", status: "running", detail: "" }],
+      parts: [],
+    },
+  ];
+  expect(lensStep(answer("t1"), "думает", [])).toBe(lensStep(answer("t2"), "думает", []));
+});
+
 test("Lens asks for a caption with the chat and the live state, and keeps it", async () => {
   fetchLens.mockReset();
   fetchLens.mockResolvedValue({ text: "Собирает проект после правки.", at: 1_000 });
@@ -128,6 +142,38 @@ test("Lens refreshes on its own only while the agent is busy", async () => {
     await vi.advanceTimersByTimeAsync(3_000);
     expect(fetchLens).toHaveBeenCalledTimes(2);
     expect(lens.state.auto).toBe(false);
+  } finally {
+    scope.stop();
+    vi.useRealTimers();
+  }
+});
+
+test("Lens shows the placeholder until reasoning arrives, then names the intent", async () => {
+  vi.useFakeTimers();
+  fetchLens.mockReset();
+  fetchLens.mockResolvedValue({ text: "Проверяет падение сборки.", at: 2_000 });
+  const turns = ref([
+    { id: "u1", role: "user", text: "почини сборку", tools: [] },
+    { id: "a1", role: "assistant", text: "", tools: [] },
+  ]);
+  const scope = effectScope();
+  const lens = scope.run(() => useAgentLens(options({ turns, plan: ref([]), intervalMs: 60_000 })));
+  try {
+    const text = await lens.open();
+    // A turn that has not reasoned or called anything yet gets no paid request.
+    expect(text).toBe(LENS_THINKING_TEXT);
+    expect(fetchLens).not.toHaveBeenCalled();
+    turns.value[1].parts = [{ type: "thought", text: "Сначала проверю, почему падает сборка" }];
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(fetchLens).toHaveBeenCalledTimes(1);
+    expect(lens.state.text).toBe("Проверяет падение сборки.");
+    expect(fetchLens.mock.calls[0][0].history.at(-1).thoughts).toContain("проверю");
+    // The thought goes on, but it is still the same step: no request per token.
+    turns.value[1].parts[0].text += " и запущу тесты";
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(fetchLens).toHaveBeenCalledTimes(1);
   } finally {
     scope.stop();
     vi.useRealTimers();

@@ -9,6 +9,12 @@ export const LENS_INTERVAL_MS = 20_000;
 const LENS_TURNS = 20;
 const LENS_TOOL_INPUT = 300;
 const LENS_RUNNING_TOOLS = 8;
+/** Shown without a request until the answer has reasoning, text or a running call to read. */
+export const LENS_THINKING_TEXT = "Агент обдумывает задачу…";
+/** Wait for the first reasoning to accumulate before asking the model for a caption. */
+const LENS_FIRST_DELAY_MS = 1_500;
+/** A step change that arrives during a request is asked about right after it. */
+const LENS_RETRY_MS = 500;
 
 export interface AgentLensOptions {
   turns: Ref<AgentTurn[]>;
@@ -31,6 +37,39 @@ export function lensHistory(turns: AgentTurn[]): AgentHistoryTurn[] {
   let start = 0;
   while (start < history.length && history[start]!.role !== "user") start++;
   return history.slice(start);
+}
+
+/**
+ * Whether the answer being written has something to describe. The start of a turn is just a
+ * placeholder: asking the model then produces "there are no messages yet" instead of a caption.
+ */
+export function lensHasMaterial(turns: AgentTurn[], plan: PlanItem[] = []): boolean {
+  // A plan names the current step even before the model has reasoned about it.
+  if (plan.some((item) => item.status !== "completed")) return true;
+  const last = turns.at(-1);
+  if (last?.role !== "assistant") return false;
+  if (last.text.trim()) return true;
+  if (last.tools.some((tool) => tool.status === "running" && !tool.parent)) return true;
+  return (last.parts ?? []).some((part) => part.type === "thought" && part.text.trim());
+}
+
+/**
+ * A coarse change of the current step: reasoning appeared, text started, a call changed or the
+ * plan moved. Unlike the full signature, it ignores the growing text of a thought.
+ */
+export function lensStep(turns: AgentTurn[], phase: string, plan: PlanItem[]): string {
+  const last = turns.at(-1);
+  if (last?.role !== "assistant") return "";
+  const thought = (last.parts ?? []).some((part) => part.type === "thought" && part.text.trim());
+  // Only whether something runs, not which call: a tool change must not cost a request.
+  const running = last.tools.some((tool) => tool.status === "running" && !tool.parent);
+  return [
+    thought ? "thought" : "",
+    last.text.trim() ? "text" : "",
+    running ? "running" : "",
+    phase.trim(),
+    plan.map((item) => item.status).join(","),
+  ].join("|");
 }
 
 /** The live facts the model gets besides the conversation. */
@@ -98,13 +137,19 @@ export function useAgentLens(options: AgentLensOptions) {
   let generation = 0;
   let controller: AbortController | undefined;
   let timer: ReturnType<typeof setInterval> | undefined;
+  let stepTimer: ReturnType<typeof setTimeout> | undefined;
   /** The signature of the last successful request: an unchanged timer tick asks nothing. */
   let asked = "";
+  /** A step change waits for the current request to finish instead of being lost. */
+  let stepPending = false;
 
   function arm() {
     if (timer !== undefined) clearInterval(timer);
     timer = undefined;
-    if (!state.open || !state.auto) return;
+    if (!state.open || !state.auto) {
+      clearStep();
+      return;
+    }
     timer = setInterval(() => {
       if (!options.busy.value) return;
       if (typeof document !== "undefined" && document.hidden) return;
@@ -115,11 +160,53 @@ export function useAgentLens(options: AgentLensOptions) {
   function disarm() {
     if (timer !== undefined) clearInterval(timer);
     timer = undefined;
+    clearStep();
+  }
+
+  function clearStep() {
+    stepPending = false;
+    if (stepTimer !== undefined) clearTimeout(stepTimer);
+    stepTimer = undefined;
+  }
+
+  function scheduleStep(delay = LENS_FIRST_DELAY_MS) {
+    if (!state.open || !state.auto) return;
+    stepPending = true;
+    if (stepTimer !== undefined) clearTimeout(stepTimer);
+    stepTimer = setTimeout(() => {
+      stepTimer = undefined;
+      void runStep();
+    }, delay);
+  }
+
+  async function runStep() {
+    if (!stepPending) return;
+    if (!state.open || !state.auto || !options.busy.value) {
+      stepPending = false;
+      return;
+    }
+    if (state.busy) {
+      stepTimer = setTimeout(() => {
+        stepTimer = undefined;
+        void runStep();
+      }, LENS_RETRY_MS);
+      return;
+    }
+    stepPending = false;
+    await refresh(false);
   }
 
   /** Asks for a new caption; an in-flight request is replaced, and its answer dropped. */
   async function refresh(force = true): Promise<string> {
     if (!state.open || state.busy) return state.text;
+    // The first seconds of a turn have no reasoning yet: a request here only earns "nothing
+    // to describe". Keep the placeholder locally and wait for the first thought or call.
+    if (options.busy.value && !lensHasMaterial(options.turns.value, options.plan.value)) {
+      state.error = "";
+      state.text = LENS_THINKING_TEXT;
+      state.at = 0;
+      return state.text;
+    }
     const signature = lensSignature(
       options.turns.value,
       options.busy.value,
@@ -216,8 +303,22 @@ export function useAgentLens(options: AgentLensOptions) {
   // The first caption appears when the work starts, the last one sums the answer up.
   watch(options.busy, (busy) => {
     if (!state.open || !state.auto) return;
-    if (busy || Date.now() - state.at > 1_000) void refresh();
+    if (busy) {
+      clearStep();
+      void refresh();
+    } else if (Date.now() - state.at > 1_000) {
+      clearStep();
+      void refresh();
+    }
   });
+  // Reasoning, the first text or a new call is exactly when there is something to name. The
+  // coarse step ignores the growing thought so Lens does not pay for a request per token.
+  watch(
+    () => lensStep(options.turns.value, options.phase.value, options.plan.value),
+    () => {
+      if (state.open && state.auto && options.busy.value) scheduleStep();
+    },
+  );
   // A cleared chat has no work to describe: the old caption cannot belong to it.
   watch(
     () => options.turns.value.length === 0,

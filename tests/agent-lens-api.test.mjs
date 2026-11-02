@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vite-plus/test";
 import { handleApi } from "../server/app/api.ts";
-import { lensLine } from "../server/modules/agents/projector/index.ts";
+import { LENS_THINKING_TEXT, lensLine, runLens } from "../server/modules/agents/projector/index.ts";
 import { scriptedModel } from "./helpers/scripted-model.mjs";
 
 test("Lens cleans its caption into one line", () => {
@@ -12,6 +12,29 @@ test("Lens cleans its caption into one line", () => {
   expect(lensLine("```vue\nЧто-то\n```\nПишет тесты.")).toBe("Пишет тесты.");
   expect(lensLine("x".repeat(500)).length).toBe(400);
   expect(lensLine("   ")).toBe("");
+});
+
+test("Lens does not call the model before the first reasoning or call", async () => {
+  const text = await runLens({
+    history: [{ role: "user", content: "почини сборку" }],
+    busy: true,
+    phase: "думает",
+    running: [],
+    plan: [],
+    queue: 0,
+    selection: { provider: "env:test" },
+  });
+  expect(text).toBe(LENS_THINKING_TEXT);
+  const idle = await runLens({
+    history: [{ role: "user", content: "почини сборку" }],
+    busy: false,
+    phase: "",
+    running: [],
+    plan: [],
+    queue: 0,
+    selection: { provider: "env:test" },
+  });
+  expect(idle).toContain("нет работы");
 });
 
 test("POST /api/agent/lens captions the current work from the visible chat", async () => {
@@ -80,6 +103,7 @@ test("POST /api/agent/lens captions the current work from the visible chat", asy
     expect(prompt).toContain("Пользователь: почини сборку");
     expect(prompt).toContain("Ассистент: запускаю сборку");
     expect(prompt).toContain("Рассуждение: Сначала проверю, почему падает сборка");
+    expect(prompt).toContain("Самое свежее рассуждение агента");
     expect(prompt).toContain("Сейчас выполняются");
     expect(prompt).toContain("vp build");
     expect(prompt).toContain("Собрать проект");
