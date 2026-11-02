@@ -253,7 +253,7 @@ const { copy, copyInfo, copyWorking, copyNote, endCopy } = useWorktreePanel(turn
 const editFrom = computed(() =>
   editing.value ? turns.value.findIndex((turn) => turn.id === editing.value) : -1,
 );
-const { pendingForm, originalForm, submitComposerForm, submitTurnForm } = useAnswerForm({
+const { pendingForm, answerFormFor, submitComposerForm, submitTurnForm } = useAnswerForm({
   turns,
   busy,
   draft,
@@ -618,9 +618,8 @@ onBeforeUnmount(() => {
           :faded="editFrom >= 0 && firstShown + offset >= editFrom"
           :root="projectRoot"
           :can-revert="canRevert(turn.id)"
-          :promoted-form="
-            turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? originalForm : undefined
-          "
+          :promoted-form="answerFormFor(turn).promotedForm"
+          :form-answered="answerFormFor(turn).formAnswered"
           :lens="turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? lens : undefined"
           @copy="copyMessage"
           @open="openChip"

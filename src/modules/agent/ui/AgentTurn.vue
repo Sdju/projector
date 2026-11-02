@@ -38,8 +38,10 @@ const props = defineProps<{
   canRevert?: boolean;
   /** A conversation only to read (a subagent's): no editing, retrying or rolling back. */
   readonly?: boolean;
-  /** The form the chat is waiting for: its copy in this answer is shown as a read-only panel. */
+  /** The form block the chat owns: the composer shows the active one, the user's snapshot the sent one. */
   promotedForm?: string;
+  /** The form was already sent: the user's snapshot shows it, so this copy is hidden. */
+  formAnswered?: boolean;
   /** The chat's Lens: only the last work group of the last answer shows it. */
   lens?: AgentLens;
 }>();
@@ -289,6 +291,7 @@ const lastWork = computed(
           :text="segment.text"
           :streaming="busy && last && segment === segments.at(-1)"
           :promoted="promotedForm"
+          :answered="formAnswered"
         />
         <p v-else-if="segment.type === 'note'" class="user-message note">{{ segment.text }}</p>
         <AgentWork
@@ -450,6 +453,9 @@ const lastWork = computed(
 .user-form {
   width: min(90%, 640px);
   min-width: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-lg);
+  background: var(--bg-3);
 }
 .user-form :deep(.ui-card) {
   background: var(--bg-3);

@@ -8,7 +8,13 @@ import {
   useMessageScope,
 } from "../../widget-runtime/index.ts";
 
-const props = defineProps<{ text: string; streaming?: boolean; promoted?: string }>();
+const props = defineProps<{
+  text: string;
+  streaming?: boolean;
+  promoted?: string;
+  /** The promoted form was already sent: the user's snapshot below shows it. */
+  answered?: boolean;
+}>();
 // Text only grows, so earlier parts keep their position and source: Vue patches only the tail.
 const parts = computed(() =>
   splitMessage(props.text, { known: isWidgetName, streaming: props.streaming }),
@@ -27,8 +33,11 @@ useMessageScope(
     <template v-for="(part, index) in parts" :key="index">
       <AgentMarkdown v-if="part.type === 'markdown'" :text="part.text" :streaming="streaming" />
       <template v-else-if="part.type === 'widget' && part.source === promoted">
-        <!-- The dedicated answer form lives only in the composer: no second copy in the answer. -->
-        <p v-if="part.name !== 'IntelligentForm'" class="promoted-form">
+        <!-- A sent form lives in the user's snapshot; the active one lives in the composer. -->
+        <p v-if="answered && part.name !== 'IntelligentForm'" class="promoted-form">
+          <span aria-hidden="true">✓</span> Ответ отправлен в форме.
+        </p>
+        <p v-else-if="!answered && part.name !== 'IntelligentForm'" class="promoted-form">
           <span aria-hidden="true">↓</span> Форма доступна в поле ввода.
         </p>
       </template>

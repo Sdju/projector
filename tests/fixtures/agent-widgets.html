@@ -13,6 +13,7 @@
   const text = ref("");
   const streaming = ref(true);
   const promoted = ref("");
+  const answered = ref(false);
   const replies = [];
   const app = createApp({
     setup: () => () =>
@@ -21,6 +22,7 @@
           text: text.value,
           streaming: streaming.value,
           promoted: promoted.value,
+          answered: answered.value,
         }),
       ]),
   });
@@ -36,6 +38,9 @@
     },
     promote(value) {
       promoted.value = value;
+    },
+    answer(value) {
+      answered.value = value;
     },
   };
 </script>

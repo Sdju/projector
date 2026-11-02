@@ -418,6 +418,21 @@ test(
     await browser.evaluate(`window.fixture.promote(${JSON.stringify(promoted)})`);
     await wait('document.querySelector(".intelligent-form") === null');
     expect(await browser.evaluate('document.querySelector(".promoted-form")')).toBe(null);
+
+    // An answered form is represented by the user's snapshot: the answer hides its copy.
+    const answeredForm = `<Form><Input name="note" initial="x" /></Form>`;
+    await set(answeredForm, false);
+    await browser.evaluate(`window.fixture.promote(${JSON.stringify(answeredForm)})`);
+    await wait('document.querySelector(".promoted-form") !== null');
+    expect(
+      await browser.evaluate('document.querySelector(".promoted-form").textContent'),
+    ).toContain("Форма доступна в поле ввода");
+    await browser.evaluate("window.fixture.answer(true)");
+    await wait(
+      'document.querySelector(".promoted-form").textContent.includes("Ответ отправлен в форме")',
+    );
+    expect(await browser.evaluate('document.querySelector("fieldset.form")')).toBe(null);
+    await browser.evaluate("window.fixture.answer(false)");
     await browser.evaluate("window.fixture.promote('')");
 
     // Stream in 40-character chunks; mark the first Card's DOM node once it is rendered.

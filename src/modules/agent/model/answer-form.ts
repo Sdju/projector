@@ -20,6 +20,22 @@ function formHistory(turns: AgentTurn[]): string {
 }
 
 /**
+ * Forms already answered: a user turn with a snapshot always follows the answer it came from.
+ * Pairing the neighbouring turns survives reloads, retries and edits of the snapshot.
+ */
+export function answeredFormSources(turns: AgentTurn[]): Map<string, string> {
+  const result = new Map<string, string>();
+  for (let index = 0; index < turns.length - 1; index++) {
+    const turn = turns[index];
+    const next = turns[index + 1];
+    if (turn.role !== "assistant" || next.role !== "user" || !next.form) continue;
+    const source = answerFormSource(turn.text);
+    if (source) result.set(turn.id, source);
+  }
+  return result;
+}
+
+/**
  * The form that replaces the composer: the last block of the last finished answer. Sending it
  * stores the block and the values on the user's message, so the chat can show the same form again.
  *
@@ -47,6 +63,16 @@ export function useAnswerForm(options: {
   const pendingForm = shallowRef<string>();
   /** What the answer actually contains: the message hides this block while the composer shows a form. */
   const originalForm = shallowRef<string>();
+  /** A sent form is shown by the user's snapshot only: the answer must not offer it again. */
+  const answeredForms = computed(() => answeredFormSources(options.turns.value));
+  /** What this answer must hide: the composer owns the active form, the snapshot owns the sent one. */
+  function answerFormFor(turn: AgentTurn): { promotedForm?: string; formAnswered?: boolean } {
+    if (turn.role !== "assistant") return {};
+    if (turn.id === options.turns.value.at(-1)?.id)
+      return originalForm.value ? { promotedForm: originalForm.value } : {};
+    const source = answeredForms.value.get(turn.id);
+    return source ? { promotedForm: source, formAnswered: true } : {};
+  }
   const repairing = shallowRef(false);
   const repairError = shallowRef("");
   let generation = 0;
@@ -139,6 +165,8 @@ export function useAnswerForm(options: {
   return {
     pendingForm,
     originalForm,
+    answeredForms,
+    answerFormFor,
     repairing,
     repairError,
     submitComposerForm,
