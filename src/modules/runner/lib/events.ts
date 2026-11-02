@@ -2,6 +2,14 @@ import { EVENT_NAMES } from "./event-names.ts";
 
 export type EventHandler = (name: string, data: string) => void;
 
+// HMR can recreate the runner while its worker port (or EventSource) is still alive.
+// Keep the transport for the page's lifetime and replace only its consumer.
+const CONNECTION = Symbol.for("projector.page-events");
+interface PageConnection {
+  handler: EventHandler;
+}
+const page = globalThis as typeof globalThis & { [CONNECTION]?: PageConnection };
+
 function direct(clientId: string, handler: EventHandler): void {
   const source = new EventSource(`/api/events?client=${clientId}`);
   for (const name of EVENT_NAMES)
@@ -20,6 +28,16 @@ const shared =
  * SharedWorker; without one, or when it fails to start, the page opens its own stream.
  */
 export function connectEvents(clientId: string, handler: EventHandler): void {
+  const existing = page[CONNECTION];
+  if (existing) {
+    existing.handler = handler;
+    return;
+  }
+  const connection = (page[CONNECTION] = { handler });
+  openEvents(clientId, (name, data) => connection.handler(name, data));
+}
+
+function openEvents(clientId: string, handler: EventHandler): void {
   if (!shared) return direct(clientId, handler);
   let ready = false;
   let fallback = false;
