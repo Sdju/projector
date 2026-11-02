@@ -151,7 +151,7 @@ interface WorkspaceTabs {
   types: TabRegistry;
   views: TabViews;
 }
-const workspaceTabsKey: InjectionKey<WorkspaceTabs> = Symbol("workspace-tabs");
+const workspaceTabsKey: InjectionKey<WorkspaceTabs> = Symbol.for("projector.workspace-tabs");
 /**
  * Composes the tab kinds of a workspace: base kinds, kinds of the profile, views of the
  * embedding page and host behavior. Descendants read them through `useWorkspaceTabs`.
@@ -173,7 +173,7 @@ export function useWorkspaceTabs() {
   return tabs;
 }
 
-const tabHostKey: InjectionKey<TabHost> = Symbol("tab-host");
+const tabHostKey: InjectionKey<TabHost> = Symbol.for("projector.tab-host");
 export const provideTabHost = (host: TabHost) => provide(tabHostKey, host);
 export function useTabHost() {
   const host = inject(tabHostKey);
