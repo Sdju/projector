@@ -27,7 +27,7 @@
 
 Локальность определяется по адресу соединения, а не по `Host` или proxy-заголовкам. Сервер принимает `localhost` и числовые IP (защита от DNS rebinding). Перезапуск и смена режима из сети запрещены. LAN работает по HTTP.
 
-`vp run desktop` ставит команду `projector` в `~/.local/bin` и пункт меню (Linux: `.desktop`, Windows: ярлык в Пуск, macOS: `~/Applications/Projector.app` для Spotlight/Raycast/Launchpad); установка ссылается на checkout. Автозапуск не устанавливается: добавьте `projector --tray` средствами рабочего окружения.
+`vp run desktop` ставит команду `projector` в `~/.local/bin` (на Windows — `%LOCALAPPDATA%\bin`, плюс запись в User PATH) и пункт меню (Linux: `.desktop`, Windows: ярлык в Пуск без окна консоли, macOS: `~/Applications/Projector.app` для Spotlight/Raycast/Launchpad); установка ссылается на checkout. Автозапуск не устанавливается: добавьте `projector --tray` средствами рабочего окружения.
 
 ## Установка как приложение (PWA)
 
@@ -65,7 +65,7 @@ Service worker (`public/sw.js`) включается только когда с�
 - Системное окно: Node.js 24 и GTK4. На Linux процесс вызывается через D-Bus и требует GObject Introspection с GioUnix. На Windows GTK4 берётся из поставки `node-gtk`, второй запуск передаёт команду уже живущему процессу.
 - Отдельное веб-окно: Chromium-совместимый браузер с отдельным профилем Projector; фокус и скрытие через `xdotool` и `xprop` (X11).
 - macOS: GTK-палитра (нужны `brew install gtk4 gobject-introspection pkg-config`; без GTK4 нативный режим недоступен), окно Chromium, значок в строке меню и хоткей через Swift-помощник (нужны Xcode Command Line Tools), данные в `~/Library/Application Support` (с приоритетом `XDG_DATA_HOME`). Подробности — [os](os.md).
-- Windows: браузер, окно Chromium и GTK-палитра; запуск `bin\projector.cmd` или `vp dev`, данные в `%LOCALAPPDATA%\projector`. Вместе с сервером резидент палитры ставит иконку в область уведомлений и глобальный хоткей; палитра открывается по хоткею или клику по иконке.
+- Windows: браузер, окно Chromium и GTK-палитра; запуск из меню Пуск (`vp run desktop`), `bin\projector.cmd` или `vp dev`, данные в `%LOCALAPPDATA%\projector`. Вместе с сервером резидент палитры ставит иконку в область уведомлений и глобальный хоткей; палитра открывается по хоткею или клику по иконке.
 - Поиск приложений на Linux использует GIO через `node-gtk`. Трей и хоткей на Linux — `dbus-next`; на Windows это NotifyIcon и `RegisterHotKey`. Биндинг `usocket` отключён.
 
 ## Проекты

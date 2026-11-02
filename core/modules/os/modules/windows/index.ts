@@ -77,6 +77,7 @@ export async function shortcutAvailable(shortcut: string) {
 
 export { gitAskpass, publishDirectory, removeAgentHostAddress } from "./git.ts";
 export { installDesktop } from "./install-desktop.ts";
+export { alertHiddenFailure } from "./alert.ts";
 export {
   agentEnv,
   agentLaunch,

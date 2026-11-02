@@ -150,7 +150,7 @@ test(
 );
 
 test(
-  "Windows install writes a Start menu shortcut and a command for a path with spaces",
+  "Windows install writes a silent Start menu shortcut and a command for a path with spaces",
   { skip: process.platform !== "win32" },
   async () => {
     const directory = await mkdtemp(join(tmpdir(), "projector-os-install-"));
@@ -172,25 +172,42 @@ test(
     });
     await mkdir(join(root, "resources", "icons"), { recursive: true });
     await cp(
-      new URL("../resources/icons/projector.svg", import.meta.url),
-      join(root, "resources", "icons", "projector.svg"),
+      new URL("../resources/icons/256.png", import.meta.url),
+      join(root, "resources", "icons", "256.png"),
     );
     os.installDesktop(root);
     const command = join(directory, "local", "bin", "projector.cmd");
+    const silent = join(directory, "local", "bin", "projector.vbs");
     expect(await readFile(command, "utf8")).toMatch(/checkout with spaces/);
-    expect(
-      existsSync(
-        join(
-          directory,
-          "roaming",
-          "Microsoft",
-          "Windows",
-          "Start Menu",
-          "Programs",
-          "Projector.lnk",
-        ),
-      ),
-    ).toBe(true);
+    const vbs = await readFile(silent, "utf8");
+    expect(vbs).toMatch(/checkout with spaces/);
+    expect(vbs).toMatch(/,\s*0,\s*False/);
+    expect(existsSync(join(directory, "local", "icons", "projector.ico"))).toBe(true);
+    const shortcut = join(
+      directory,
+      "roaming",
+      "Microsoft",
+      "Windows",
+      "Start Menu",
+      "Programs",
+      "Projector.lnk",
+    );
+    expect(existsSync(shortcut)).toBe(true);
+    const probe = execFileSync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-Command",
+        `$s = (New-Object -ComObject WScript.Shell).CreateShortcut($env:LINK); Write-Output $s.TargetPath; Write-Output $s.Arguments`,
+      ],
+      {
+        encoding: "utf8",
+        windowsHide: true,
+        env: { ...process.env, LINK: shortcut },
+      },
+    );
+    expect(probe).toMatch(/wscript\.exe/i);
+    expect(probe).toMatch(/projector\.vbs/i);
   },
 );
 

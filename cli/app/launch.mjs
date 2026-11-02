@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, openSync, readdirSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, openSync, readdirSync, writeSync } from "node:fs";
 import { open, readFile, unlink } from "node:fs/promises";
 import { os } from "../../core/modules/os/index.ts";
 import { SERVER_MODES, isServerMode, serverCommand } from "../../core/modules/server-mode/index.ts";
@@ -36,10 +36,14 @@ function isPidAlive(pid) {
 }
 
 function findVp() {
+  // Start Menu / wscript launches with a minimal PATH: prefer the checkout's
+  // vite-plus CLI (spawned via node) over a bare `vp` that only works in a prepared shell.
+  const shims = process.platform === "win32" ? ["vp.cmd", "vp"] : ["vp", "vp.cmd"];
+  const dirs = [os.toolchainBin(), join(ROOT, "node_modules", ".bin")];
   const candidates = [
     process.env.VP,
-    join(os.toolchainBin(), "vp"),
-    join(os.toolchainBin(), "vp.cmd"),
+    join(ROOT, "node_modules", "vite-plus", "bin", "vp"),
+    ...dirs.flatMap((dir) => shims.map((name) => join(dir, name))),
     "vp",
   ].filter(Boolean);
   for (const bin of candidates) {
@@ -99,20 +103,39 @@ async function acquireLock() {
   throw new Error("Запуск уже выполняется");
 }
 
-async function waitUntilReady(timeoutMs = 30000) {
+async function waitUntilReady(timeoutMs = 30000, daemonPid) {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
     if (await health()) return;
+    if (daemonPid && !isPidAlive(daemonPid)) {
+      const logPath = join(DATA_DIR, "server.log");
+      throw new Error(`Сервер сразу завершился. См. лог: ${logPath}`);
+    }
     await sleep(200);
   }
-  throw new Error("Сервер не поднялся");
+  throw new Error(
+    `Сервер не поднялся за ${Math.round(timeoutMs / 1000)} с. См. ${join(DATA_DIR, "server.log")}`,
+  );
+}
+
+/** Start Menu uses a hidden console — surface failures with a MessageBox on Windows. */
+function alertFailure(message) {
+  const text = String(message);
+  console.error(text);
+  try {
+    mkdirSync(DATA_DIR, { recursive: true });
+    appendFileSync(join(DATA_DIR, "launch-err.log"), `${new Date().toISOString()} ${text}\n`);
+  } catch {
+    /* log best-effort */
+  }
+  os.alertHiddenFailure(text);
 }
 
 function childEnv() {
-  const vpBin = os.toolchainBin();
+  const pathDirs = [os.toolchainBin(), join(ROOT, "node_modules", ".bin")];
   const env = {
     ...process.env,
-    PATH: [vpBin, process.env.PATH].filter(Boolean).join(delimiter),
+    PATH: [...pathDirs, process.env.PATH].filter(Boolean).join(delimiter),
   };
   // Одноразовый режим доступа: не сохраняется на диск и не влияет на следующие запуски.
   if (lan) env.PROJECTOR_NETWORK = "lan";
@@ -120,9 +143,31 @@ function childEnv() {
   return env;
 }
 
+/** Spawn `vp` whether it is a .cmd shim, a Unix binary, or the vite-plus JS CLI. */
+function spawnVp(vp, vpArgs, options) {
+  const win = process.platform === "win32";
+  const hide = options.windowsHide ?? win;
+  if (/[\\/]vite-plus[\\/]bin[\\/]vp$/i.test(vp)) {
+    return spawn(process.execPath, [vp, ...vpArgs], {
+      ...options,
+      windowsHide: hide,
+    });
+  }
+  return spawn(vp, vpArgs, {
+    ...options,
+    shell: win && /\.(cmd|bat)$/i.test(vp),
+    windowsHide: hide,
+  });
+}
+
 function run(vp, commandArgs) {
   return new Promise((resolve, reject) => {
-    const child = spawn(vp, commandArgs, { cwd: ROOT, stdio: "inherit", env: childEnv() });
+    const child = spawnVp(vp, commandArgs, {
+      cwd: ROOT,
+      stdio: "inherit",
+      env: childEnv(),
+      windowsHide: false,
+    });
     child.once("error", reject);
     child.once("exit", (code) =>
       code === 0
@@ -146,12 +191,42 @@ function serverPaths(vp) {
   return { vp, node: process.execPath, root: ROOT };
 }
 
+/** `vp` is a wrapper: it spawns `vite.js` without CREATE_NO_WINDOW. A detached wrapper on Windows therefore leaves an empty `node.exe` console. */
+function windowsViteCli() {
+  return [
+    join(ROOT, "node_modules", "vite", "dist", "vite", "bin", "vite.js"),
+    join(ROOT, "node_modules", "@voidzero-dev", "vite-plus-core", "dist", "vite", "bin", "vite.js"),
+  ].find((file) => existsSync(file));
+}
+
+function daemonCommand(vp) {
+  const planned = serverCommand(readServerMode(), serverPaths(vp));
+  if (process.platform !== "win32" || planned.args[0] !== "dev") return planned;
+  const viteJs = windowsViteCli();
+  if (!viteJs) return planned;
+  return { command: process.execPath, args: [viteJs, ...planned.args] };
+}
+
+function daemonEnv() {
+  return {
+    ...childEnv(),
+    NODE_PACKAGE_MANAGER: "vite-plus",
+    JS_RUNTIME_NAME: process.release.name,
+    JS_RUNTIME_VERSION: process.versions.node,
+  };
+}
+
 function startForeground(vp) {
   const { command, args } = serverCommand(readServerMode(), serverPaths(vp));
-  const child = spawn(command, args, {
+  const child = spawnVp(command, args, {
     cwd: ROOT,
     stdio: "inherit",
     env: childEnv(),
+    windowsHide: false,
+  });
+  child.once("error", (error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
   });
   child.on("exit", (code) => {
     process.exit(code ?? 0);
@@ -161,14 +236,28 @@ function startForeground(vp) {
 function startDaemon(vp) {
   mkdirSync(DATA_DIR, { recursive: true });
   const logFd = openSync(join(DATA_DIR, "server.log"), "a");
-  const { command, args } = serverCommand(readServerMode(), serverPaths(vp));
-  const child = spawn(command, args, {
+  const { command, args } = daemonCommand(vp);
+  // Hidden console: Start Menu uses wscript, but a detached console-subsystem
+  // child still gets a window unless CREATE_NO_WINDOW is set on that process.
+  const child = spawnVp(command, args, {
     cwd: ROOT,
     detached: true,
     stdio: ["ignore", logFd, logFd],
-    env: childEnv(),
+    env: daemonEnv(),
+    windowsHide: true,
+  });
+  // Without a listener, spawn ENOENT becomes an uncaught exception and aborts launch.mjs
+  // after the Start Menu already hid the console — looks like a silent crash.
+  child.once("error", (error) => {
+    try {
+      const message = error instanceof Error ? `${error.stack || error.message}\n` : `${error}\n`;
+      writeSync(logFd, message);
+    } catch {
+      /* log best-effort */
+    }
   });
   child.unref();
+  return child.pid;
 }
 
 /** Меняет режим на диске и, если сервер работает в другом режиме, перезапускает его. */
@@ -195,8 +284,8 @@ async function switchMode(target) {
   console.log(`перезапуск в режиме ${target}: терминалы и их процессы будут завершены`);
   await openApp({}, "quit");
   await os.processes.waitForExit(info.pid, 15000);
-  startDaemon(vp);
-  await waitUntilReady();
+  const daemonPid = startDaemon(vp);
+  await waitUntilReady(30000, daemonPid);
   await openApp({ tray: true });
   console.log(`сервер работает в режиме ${target}`);
 }
@@ -280,8 +369,8 @@ async function main() {
       return;
     }
 
-    startDaemon(vp);
-    await waitUntilReady();
+    const daemonPid = startDaemon(vp);
+    await waitUntilReady(30000, daemonPid);
     await openApp();
   } finally {
     await release();
@@ -289,6 +378,7 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
+  const message = error instanceof Error ? error.message : String(error);
+  alertFailure(message);
   process.exit(1);
 });

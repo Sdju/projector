@@ -74,6 +74,9 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
     shell: () => backend("shell").shell(),
     shellLaunch: (spec: ShellLaunch) => backend("shellLaunch").shellLaunch(spec),
     installDesktop: (root: string) => backend("installDesktop").installDesktop(root),
+    alertHiddenFailure: (message: string) => {
+      if (platform === "win32") windows.alertHiddenFailure(message);
+    },
     desktopPaths: () => backend("desktopPaths").desktopPaths(),
     requireSupported: (operation: string) => {
       if (!supported || (operation === "native desktop" && !nativeDesktop))

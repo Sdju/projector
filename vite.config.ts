@@ -73,7 +73,7 @@ export default defineConfig({
       toggle: { command: "./bin/projector toggle", cache: false },
       tray: { command: "./bin/projector --tray", cache: false },
       launch: { command: "./bin/projector", cache: false },
-      desktop: { command: "./bin/install-desktop", cache: false },
+      desktop: { command: "node cli/app/install-desktop.mjs", cache: false },
     },
   },
   test: {

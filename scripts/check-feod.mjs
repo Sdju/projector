@@ -23,6 +23,7 @@ export function checkFeod({ rootDir = projectRoot, config = feodConfig } = {}) {
       cwd: rootDir,
       encoding: "utf8",
       maxBuffer: 64 * 1024 * 1024,
+      windowsHide: true,
     });
     if (result.error) throw result.error;
     return diagnosticsOf(result.status, result.stdout, result.stderr, result.signal);
@@ -46,6 +47,7 @@ export function checkFeodAsync({
     const child = spawn(process.execPath, [oxlintBin, ...run.args], {
       cwd: rootDir,
       stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
     });
     let stdout = "";
     let stderr = "";

@@ -94,8 +94,7 @@ vp run build
 ./bin/projector --browser
 ```
 
-На Windows запускайте `bin\projector.cmd`: палитра тоже открывается в GTK-окне.
-Веб-интерфейс в браузере:
+На Windows после `vp run desktop` можно запускать Projector из меню Пуск без терминала; из checkout — `bin\projector.cmd`. Палитра открывается в GTK-окне. Веб-интерфейс в браузере:
 
 ```bat
 bin\projector.cmd --browser
@@ -109,7 +108,7 @@ bin\projector.cmd --browser
 vp run desktop
 ```
 
-Команда устанавливается в `~/.local/bin`; эта папка должна быть в `PATH`. На Linux — пункт `.desktop`, на Windows — ярлык в меню Пуск, на macOS — ещё и `~/Applications/Projector.app` (его находят Spotlight, Raycast и Launchpad; одного CLI недостаточно). Сохраняйте папку с исходниками на прежнем месте: установка ссылается на неё. После переноса повторите `vp run desktop`.
+Команда устанавливается в `~/.local/bin` (Windows: `%LOCALAPPDATA%\bin`, каталог добавляется в User PATH). На Linux — пункт `.desktop`, на Windows — ярлык в меню Пуск без окна консоли, на macOS — ещё и `~/Applications/Projector.app` (его находят Spotlight, Raycast и Launchpad; одного CLI недостаточно). Сохраняйте папку с исходниками на прежнем месте: установка ссылается на неё. После переноса повторите `vp run desktop`.
 
 ## Первые шаги
 

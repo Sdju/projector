@@ -29,7 +29,7 @@ export async function handleAppMode({ req, res, method, path }: RouteContext): P
     const child = spawn(
       process.execPath,
       [fileURLToPath(new URL("../../../../cli/app/launch.mjs", import.meta.url)), "mode", mode],
-      { detached: true, stdio: ["ignore", log, log] },
+      { detached: true, stdio: ["ignore", log, log], windowsHide: true },
     );
     child.once("exit", (code) => {
       // Успешное переключение останавливает этот процесс; флаг нужен только при отказе.
