@@ -17,6 +17,7 @@ export {
   fetchDirectories,
   fetchPathSuggestions,
   fetchProjectGithub,
+  fetchProjectGitlab,
   inspectCommands,
   inspectPath,
   pickFolder,
@@ -28,6 +29,8 @@ export {
   projectRoute,
   projectPathFromParams,
   githubRepositoryFromParams,
+  gitlabProjectFromParams,
+  gitlabOpenRoute,
 } from "./project-route.ts";
 export {
   parseProjectRef,
@@ -36,5 +39,18 @@ export {
   isAbsoluteLocalPath,
 } from "../../../core/modules/project/index.ts";
 export type { ProjectRef } from "../../../core/modules/project/index.ts";
+export {
+  GITLAB_DEFAULT_INSTANCE,
+  GITLAB_PREFIX,
+  normalizeGitlabInstance,
+  normalizeGitlabProjectPath,
+  gitlabProjectRoute,
+  gitlabProjectKey,
+} from "../../../core/modules/gitlab/index.ts";
+export type {
+  GitlabRepository,
+  GitlabEntry,
+  GitlabFile,
+} from "../../../core/modules/gitlab/index.ts";
 export type { ProjectLocation } from "./model/types.ts";
 export { default as ProjectOpening } from "./ui/ProjectOpening.vue";

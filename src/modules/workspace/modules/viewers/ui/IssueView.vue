@@ -8,7 +8,9 @@ import TrackerComments from "./TrackerComments.vue";
 import TrackerDetail from "./TrackerDetail.vue";
 
 /** Вкладка обсуждения issue: метаданные, Markdown-тело и комментарии. */
-const props = defineProps<{ projectId: string; number: number }>();
+const props = withDefaults(defineProps<{ projectId: string; number: number; host?: string }>(), {
+  host: "GitHub",
+});
 const emit = defineEmits<{ open: [path: string] }>();
 const { detail, loading, error } = useTrackerDetail<IssueDetail>(
   () => props.projectId,
@@ -62,6 +64,7 @@ useTabReadout(() => {
     :labels="detail?.issue.labels ?? []"
     :body="detail?.issue.body ?? ''"
     :reactions="detail?.issue.reactions ?? []"
+    :host="host"
     @open="emit('open', $event)"
   >
     <template #meta>
@@ -81,7 +84,7 @@ useTabReadout(() => {
       v-if="detail?.commentsTruncated"
       class="note"
     >
-      Показаны первые 500 комментариев. Откройте issue на GitHub, чтобы увидеть все.
+      Показаны первые 500 комментариев. Откройте issue на {{ host }}, чтобы увидеть все.
     </UiHint>
   </TrackerDetail>
 </template>

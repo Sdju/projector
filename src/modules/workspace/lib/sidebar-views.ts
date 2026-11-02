@@ -20,6 +20,7 @@ import IconGit from "~icons/devicon/git";
 import IconDocker from "~icons/lucide/container";
 import IconIssues from "~icons/lucide/circle-dot";
 import IconPulls from "~icons/lucide/git-pull-request";
+import IconMerge from "~icons/lucide/git-merge";
 import IconDiscussions from "~icons/lucide/messages-square";
 
 /** Sections every workspace has; profiles add their own through `profile.sidebar`. */
@@ -140,6 +141,23 @@ export const baseSidebarViews: SidebarViews = {
       active: selected,
       onOpen: (pull: { number: number; title: string }, pinned?: boolean) =>
         host.openTab("pull", pull, { preview: !pinned }),
+    }),
+    refresh: (_, panel) => panel?.refresh?.(),
+  },
+  "merge-requests": {
+    icon: IconMerge,
+    component: PullsPanel,
+    props: (host, selected) => ({
+      projectId: host.projectId,
+      active: selected,
+      onOpen: (pull: { number: number; title: string }, pinned?: boolean) =>
+        host.openTab("pull", pull, { preview: !pinned }),
+      title: "Merge requests",
+      noun: "merge requests",
+      singular: "merge request",
+      kind: "mergeRequests",
+      host: "GitLab",
+      action: "pulls",
     }),
     refresh: (_, panel) => panel?.refresh?.(),
   },

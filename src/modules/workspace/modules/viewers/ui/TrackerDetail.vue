@@ -18,24 +18,29 @@ import IconExternal from "~icons/lucide/external-link";
  * Каркас вкладки issue / pull request: состояние, заголовок, автор, метки и Markdown-тело;
  * разделы вкладки (ревью, файлы, комментарии) приходят слотом.
  */
-defineProps<{
-  projectId: string;
-  loading: boolean;
-  error: string;
-  /** Загрузка идёт, данных ещё нет. */
-  ready: boolean;
-  noun: string;
-  state: string;
-  stateLabel: string;
-  title: string;
-  number: number;
-  author: IssueUser;
-  createdAt: string;
-  htmlUrl: string;
-  labels: IssueLabel[];
-  body: string;
-  reactions: Reaction[];
-}>();
+withDefaults(
+  defineProps<{
+    projectId: string;
+    loading: boolean;
+    error: string;
+    /** Загрузка идёт, данных ещё нет. */
+    ready: boolean;
+    noun: string;
+    state: string;
+    stateLabel: string;
+    title: string;
+    number: number;
+    author: IssueUser;
+    createdAt: string;
+    htmlUrl: string;
+    labels: IssueLabel[];
+    body: string;
+    reactions: Reaction[];
+    /** Хост в ссылке «на …»: «GitHub» или «GitLab». */
+    host?: string;
+  }>(),
+  { host: "GitHub" },
+);
 const emit = defineEmits<{ open: [path: string] }>();
 </script>
 
@@ -75,7 +80,7 @@ const emit = defineEmits<{ open: [path: string] }>();
           target="_blank"
           rel="noopener noreferrer"
         >
-          <IconExternal aria-hidden="true" />на GitHub
+          <IconExternal aria-hidden="true" />на {{ host }}
         </UiInline>
       </UiInline>
       <slot name="stats" />

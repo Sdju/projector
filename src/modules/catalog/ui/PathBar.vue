@@ -23,8 +23,11 @@ const listId = useId();
 const { entries, selected, loading, error, truncated, invalidate, load, schedule } =
   useDirectoryListing();
 let disposed = false;
+const project = computed(() => parseProjectRef(props.path));
 const remoteInput = computed(() => parseProjectRef(value.value).kind !== "local");
-const remoteProject = computed(() => parseProjectRef(props.path).kind !== "local");
+const remoteProject = computed(() => project.value.kind !== "local");
+const remoteKind = computed(() => parseProjectRef(value.value).kind);
+const projectKind = computed(() => project.value.kind);
 const open = computed(() => editing.value || menuPath.value !== null);
 const commands = useCommandScope(`path-bar:${listId}`, () => ({
   surface: "path-bar",
@@ -46,24 +49,31 @@ commands.scope.registerCommand({
 // Диалог клонирования живёт на уровне страницы репозитория, поэтому команда стабильна.
 const { api, reportError } = useIdeCommands();
 function openClone() {
-  void api
-    .executeCommand("ide.github.repository.clone.dialog", undefined, {
-      scope: `github-clone:${props.path}`,
-    })
-    .catch(reportError);
+  const project = parseProjectRef(props.path);
+  const command =
+    project.kind === "gitlab"
+      ? "ide.gitlab.repository.clone.dialog"
+      : "ide.github.repository.clone.dialog";
+  const scope =
+    project.kind === "gitlab" ? `gitlab-clone:${props.path}` : `github-clone:${props.path}`;
+  void api.executeCommand(command, undefined, { scope }).catch(reportError);
 }
 const githubOwnerPath = computed(() => {
   const project = parseProjectRef(props.path);
   return project.kind === "github" ? `gh:/${project.repository.split("/")[0]}` : "";
 });
-const listingRemote = computed(
-  () => parseProjectRef(menuPath.value ?? value.value).kind === "github",
-);
+const listingRemote = computed(() => {
+  const kind = parseProjectRef(menuPath.value ?? value.value).kind;
+  return kind === "github" || kind === "gitlab";
+});
 const segments = computed(() => projectRefSegments(parseProjectRef(props.path)));
 const candidate = computed(() => entries.value[selected.value < 0 ? 0 : selected.value]);
 const completion = computed(() => {
   if (!editing.value || !caretAtEnd.value || !candidate.value) return "";
-  const name = candidate.value.name;
+  // Remote hints complete the last path segment, which is not always the display name.
+  const name = remoteInput.value
+    ? (candidate.value.path.split("/").pop() ?? candidate.value.name)
+    : candidate.value.name;
   const slash = Math.max(value.value.lastIndexOf("/"), value.value.lastIndexOf("\\"));
   const prefix = value.value.slice(slash + 1);
   const separator = value.value.includes("\\") ? "\\" : "/";
@@ -239,12 +249,14 @@ onBeforeUnmount(() => {
           <IconDownload aria-hidden="true" />
         </button>
         <button
-          v-else
+          v-else-if="segment.path !== 'gl:/'"
           class="segment-arrow"
           :aria-label="
-            remoteProject
+            projectKind === 'github'
               ? `Репозитории ${githubOwnerPath.slice(4)} (${segment.name})`
-              : `Папки в ${segment.path}`
+              : projectKind === 'gitlab'
+                ? `Проект GitLab ${segment.path}`
+                : `Папки в ${segment.path}`
           "
           :aria-expanded="menuPath === segment.path"
           aria-haspopup="listbox"
@@ -268,7 +280,13 @@ onBeforeUnmount(() => {
         ref="inputControl"
         v-model="value"
         role="combobox"
-        :aria-label="remoteInput ? 'Репозиторий GitHub' : 'Путь к папке'"
+        :aria-label="
+          remoteKind === 'gitlab'
+            ? 'Проект GitLab'
+            : remoteInput
+              ? 'Репозиторий GitHub'
+              : 'Путь к папке'
+        "
         aria-autocomplete="both"
         :aria-expanded="open"
         :aria-controls="listId"
@@ -291,11 +309,15 @@ onBeforeUnmount(() => {
       :heading="
         editing
           ? remoteInput
-            ? 'Открыть репозиторий'
+            ? remoteKind === 'gitlab'
+              ? 'Открыть проект GitLab'
+              : 'Открыть репозиторий'
             : 'Перейти в папку'
-          : remoteProject
+          : projectKind === 'github'
             ? `Репозитории ${githubOwnerPath.slice(4)}`
-            : (menuPath ?? '')
+            : projectKind === 'gitlab'
+              ? 'Проект GitLab'
+              : (menuPath ?? '')
       "
       :editing="editing"
       :remote="listingRemote"

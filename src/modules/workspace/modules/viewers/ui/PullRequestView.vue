@@ -13,13 +13,24 @@ import TrackerComments from "./TrackerComments.vue";
 import TrackerDetail from "./TrackerDetail.vue";
 
 /** Вкладка pull request: метаданные, Markdown-описание, ревью, обсуждение и изменённые файлы. */
-const props = defineProps<{ projectId: string; number: number }>();
+const props = withDefaults(
+  defineProps<{
+    projectId: string;
+    number: number;
+    /** Хост в ссылке «на …» и подсказках: «GitHub» или «GitLab». */
+    host?: string;
+    /** Короткая подпись в readout: «PR» у GitHub, «MR» у GitLab. */
+    short?: string;
+    noun?: string;
+  }>(),
+  { host: "GitHub", short: "PR", noun: "pull request" },
+);
 const emit = defineEmits<{ open: [path: string] }>();
 const { detail, loading, error } = useTrackerDetail<PullRequestDetail>(
   () => props.projectId,
   () => props.number,
   "pull",
-  "Не удалось открыть pull request",
+  `Не удалось открыть ${props.noun}`,
 );
 
 const STATE_LABEL = { open: "открыт", closed: "закрыт", merged: "влит" } as const;
@@ -59,7 +70,7 @@ const stateLabel = computed(() => {
 
 // Что штатный агент видит во вкладке pull request: состояние, ветки, статистика, ревью и файлы.
 useTabReadout(() => {
-  const note = `PR #${detail.value?.pull.number ?? props.number}`;
+  const note = `${props.short} #${detail.value?.pull.number ?? props.number}`;
   if (error.value) return { note, text: `Ошибка: ${error.value}` };
   const data = detail.value;
   if (!data) return { note, text: "Загрузка…" };
@@ -104,7 +115,7 @@ useTabReadout(() => {
     :loading="loading"
     :error="error"
     :ready="!!detail"
-    noun="pull request"
+    :noun="noun"
     :state="detail?.pull.state ?? ''"
     :state-label="stateLabel"
     :title="detail?.pull.title ?? ''"
@@ -115,6 +126,7 @@ useTabReadout(() => {
     :labels="detail?.pull.labels ?? []"
     :body="detail?.pull.body ?? ''"
     :reactions="detail?.pull.reactions ?? []"
+    :host="host"
     @open="emit('open', $event)"
   >
     <template #meta>
@@ -160,7 +172,7 @@ useTabReadout(() => {
         class="note"
       >
         Показано {{ detail.files.length }} из {{ detail.changedFiles }} файлов. Остальные — на
-        GitHub.
+        {{ host }}.
       </UiHint>
     </template>
     <TrackerComments
@@ -177,7 +189,7 @@ useTabReadout(() => {
       v-if="detail?.commentsTruncated"
       class="note"
     >
-      Показаны первые 500 комментариев. Откройте pull request на GitHub, чтобы увидеть все.
+      Показаны первые 500 комментариев. Откройте {{ noun }} на {{ host }}, чтобы увидеть все.
     </UiHint>
   </TrackerDetail>
 </template>

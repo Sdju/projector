@@ -5,6 +5,7 @@ export interface Integration {
   enabled: boolean;
   settings: { clientId: string; directory: string; url?: string };
   connected: boolean;
+  auth?: "pat" | "oauth" | null;
   account: string | null;
 }
 export interface DeviceLogin {

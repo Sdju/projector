@@ -9,27 +9,53 @@ import IconDraft from "~icons/lucide/git-pull-request-draft";
 import IconClosed from "~icons/lucide/git-pull-request-closed";
 import IconMerged from "~icons/lucide/git-merge";
 
-/** Сайдбар-блок pull requests: состояние, список и подгрузка следующих страниц. */
-const props = defineProps<{ projectId: string; active: boolean }>();
+/** Сайдбар-блок трекера (pull requests, merge requests): состояние, список и подгрузка страниц. */
+const props = withDefaults(
+  defineProps<{
+    projectId: string;
+    active: boolean;
+    /** Заголовок блока и подпись пустого списка. */
+    title?: string;
+    noun?: string;
+    singular?: string;
+    /** Вид команд: `pulls` → `ide.pulls.*`, `mergeRequests` → `ide.mergeRequests.*`. */
+    kind?: string;
+    /** Хост в описаниях команд. */
+    host?: string;
+    /** Действие провайдера, отдающее список. */
+    action?: string;
+  }>(),
+  {
+    title: "Pull requests",
+    noun: "pull requests",
+    singular: "pull request",
+    kind: "pulls",
+    host: "GitHub",
+    action: "pulls",
+  },
+);
 const emit = defineEmits<{
   open: [pull: { number: number; title: string }, pinned?: boolean];
 }>();
 const list = usePagedList<PullRequest>(
   () => props.projectId,
+  props.action,
   "pulls",
-  "pulls",
-  "Не удалось прочитать pull requests",
+  `Не удалось прочитать ${props.noun}`,
 );
 const { commands, open } = useTrackerPanel({
-  kind: "pulls",
-  plural: "pull requests",
-  singular: "pull request",
+  kind: props.kind,
+  plural: props.noun,
+  singular: props.singular,
+  host: props.host,
   opens: "описание, ревью, обсуждение и изменённые файлы",
   projectId: () => props.projectId,
   active: () => props.active,
   list,
   open: (pull, pinned) => emit("open", pull, pinned),
 });
+/** Все действия блока идут через `ide.<kind>.*`: у GitLab это `ide.mergeRequests.*`. */
+const run = (action: string, args?: unknown) => commands.run(`ide.${props.kind}.${action}`, args);
 const stateIcon = (pull: PullRequest) =>
   pull.state === "merged"
     ? IconMerged
@@ -45,9 +71,9 @@ defineExpose({ refresh: () => list.load() });
 
 <template>
   <TrackerPanel
-    title="Pull requests"
-    noun="pull requests"
-    prefix="ide.pulls"
+    :title="title"
+    :noun="noun"
+    :prefix="`ide.${kind}`"
     :open="open"
     :count="list.items.value.length"
     :state="list.state.value"
@@ -55,9 +81,9 @@ defineExpose({ refresh: () => list.load() });
     :loading-more="list.loadingMore.value"
     :error="list.error.value"
     :has-more="list.next.value !== null"
-    @toggle="commands.run('ide.pulls.block.toggle')"
-    @filter="commands.run('ide.pulls.filter', { state: $event })"
-    @more="commands.run('ide.pulls.more')"
+    @toggle="run('block.toggle')"
+    @filter="run('filter', { state: $event })"
+    @more="run('more')"
   >
     <li v-for="pull in list.items.value" :key="pull.number">
       <TrackerRow
@@ -65,10 +91,8 @@ defineExpose({ refresh: () => list.load() });
         :title="pull.title"
         :labels="pull.labels"
         :author="pull.author"
-        @click="commands.run('ide.pulls.open', { number: pull.number, title: pull.title })"
-        @dblclick="
-          commands.run('ide.pulls.open', { number: pull.number, title: pull.title, pinned: true })
-        "
+        @click="run('open', { number: pull.number, title: pull.title })"
+        @dblclick="run('open', { number: pull.number, title: pull.title, pinned: true })"
       >
         <template #icon>
           <component

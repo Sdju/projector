@@ -6,7 +6,7 @@ import UiField from "../../common/ui/UiField.vue";
 import UiInline from "../../common/ui/UiInline.vue";
 import UiStack from "../../common/ui/UiStack.vue";
 
-import { onMounted, ref } from "vue";
+import { computed, onMounted, onBeforeUnmount, ref } from "vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import { commandArgs, useCommandScope } from "../../common/utilities/commands.ts";
 import {
@@ -15,21 +15,31 @@ import {
   TokenReveal,
   useIntegrationOperation,
 } from "../integration-api/index.ts";
-import type { Integration, SecretStorage } from "../integration-api/index.ts";
+import type { DeviceLogin, Integration, SecretStorage } from "../integration-api/index.ts";
 
 const gitlab = ref<Integration | null>(null);
 const secretStorage = ref<SecretStorage>({ backend: "file", reason: "unavailable" });
 const enabled = ref(false);
+const clientId = ref("");
 const url = ref("");
 const directory = ref("");
 const token = ref("");
+const hasClientId = computed(() => (clientId.value ?? "").trim().length > 0);
 const repository = ref("");
 const { error, message, busy, action } = useIntegrationOperation();
+const device = ref<DeviceLogin | null>(null);
+let timer: ReturnType<typeof setTimeout> | undefined;
+let disposed = false;
 const tokenView = ref<InstanceType<typeof TokenReveal> | null>(null);
+function cancelDevice() {
+  clearTimeout(timer);
+  device.value = null;
+}
 function apply(value: Integration) {
   gitlab.value = value;
   if (!value.connected) tokenView.value?.hide();
   enabled.value = value.enabled;
+  clientId.value = value.settings.clientId ?? "";
   url.value = value.settings.url ?? "";
   directory.value = value.settings.directory;
 }
@@ -43,15 +53,72 @@ onMounted(() =>
     /* Initial load failures are shown by the form. */
   }),
 );
+onBeforeUnmount(() => {
+  disposed = true;
+  cancelDevice();
+});
 
 async function save(enable = enabled.value) {
+  cancelDevice();
   apply(
     await integrationRequest<Integration>("/gitlab", "PUT", {
       enabled: enable,
+      clientId: clientId.value,
       url: url.value,
       directory: directory.value,
     }),
   );
+}
+async function poll(login: DeviceLogin) {
+  if (disposed || device.value?.id !== login.id) return;
+  try {
+    const result = await integrationRequest<{
+      pending: boolean;
+      interval?: number;
+      integration?: Integration;
+    }>("/gitlab/device/poll", "POST", { id: login.id });
+    if (disposed || device.value?.id !== login.id) return;
+    if (result.pending) timer = setTimeout(() => void poll(login), (result.interval || 5) * 1000);
+    else {
+      if (result.integration) apply(result.integration);
+      cancelDevice();
+      message.value = "GitLab подключён";
+    }
+  } catch (err) {
+    if (!disposed && device.value?.id === login.id) {
+      cancelDevice();
+      error.value = err instanceof Error ? err.message : "Ошибка входа";
+    }
+  }
+}
+function login() {
+  return action(async () => {
+    await save();
+    const data = await integrationRequest<DeviceLogin>("/gitlab/device", "POST");
+    device.value = data;
+    timer = setTimeout(() => void poll(data), data.interval * 1000);
+  });
+}
+function connectToken() {
+  if (busy.value || !token.value.trim()) return;
+  return action(async () => {
+    cancelDevice();
+    await save(true);
+    apply(
+      await integrationRequest<Integration>("/gitlab/auth", "POST", {
+        token: token.value.trim(),
+      }),
+    );
+    token.value = "";
+    message.value = "GitLab подключён";
+  });
+}
+function disconnect() {
+  return action(async () => {
+    cancelDevice();
+    apply(await integrationRequest<Integration>("/gitlab/auth", "DELETE"));
+    message.value = "GitLab отключён";
+  });
 }
 
 const commands = useCommandScope("gitlab-settings", () => ({
@@ -61,7 +128,8 @@ const commands = useCommandScope("gitlab-settings", () => ({
 commands.scope.registerCommand({
   id: "ide.gitlab.integration.save",
   title: "Сохранить настройки GitLab",
-  description: "Сохраняет адрес GitLab, папку импорта и состояние интеграции.",
+  description:
+    "Сохраняет адрес GitLab, Client ID OAuth-приложения, папку импорта и состояние интеграции.",
   enabled: () => !busy.value && !!gitlab.value,
   run: () =>
     action(async () => {
@@ -75,28 +143,29 @@ commands.scope.registerCommand({
   description:
     "Подключает GitLab по Personal Access Token (scope read_api и read_repository), введённому в форме.",
   enabled: () => !busy.value && !!token.value.trim(),
-  run: () =>
-    action(async () => {
-      await save(true);
-      apply(
-        await integrationRequest<Integration>("/gitlab/auth", "POST", {
-          token: token.value.trim(),
-        }),
-      );
-      token.value = "";
-      message.value = "GitLab подключён";
-    }),
+  run: connectToken,
 });
 commands.scope.registerCommand({
   id: "ide.gitlab.integration.disconnect",
   title: "Отключить GitLab",
   description: "Удаляет сохранённый токен GitLab из Projector.",
   enabled: () => !busy.value && !!gitlab.value?.connected,
-  run: () =>
-    action(async () => {
-      apply(await integrationRequest<Integration>("/gitlab/auth", "DELETE"));
-      message.value = "GitLab отключён";
-    }),
+  run: disconnect,
+});
+commands.scope.registerCommand({
+  id: "ide.gitlab.integration.device.start",
+  title: "Войти в GitLab через браузер",
+  description:
+    "Сохраняет настройки и получает код GitLab Device Flow для подтверждения в браузере (GitLab 17.1+).",
+  enabled: () => !busy.value && enabled.value && hasClientId.value && !device.value,
+  run: login,
+});
+commands.scope.registerCommand({
+  id: "ide.gitlab.integration.device.cancel",
+  title: "Отменить вход в GitLab",
+  description: "Прекращает ожидание подтверждения текущего входа GitLab Device Flow.",
+  enabled: () => !!device.value,
+  run: cancelDevice,
 });
 commands.scope.registerCommand({
   id: "ide.gitlab.repository.import",
@@ -126,7 +195,9 @@ commands.scope.registerCommand({
       <UiInline as="header" :gap="3" justify="between" wrap>
         <UiHeading as="h3" :space-after="0">Подключение</UiHeading>
         <span class="status">{{
-          gitlab.connected ? `подключён · ${gitlab.account}` : "не подключён"
+          gitlab.connected
+            ? `подключён${gitlab.auth === "oauth" ? " · OAuth" : " · PAT"} · ${gitlab.account}`
+            : "не подключён"
         }}</span>
       </UiInline>
       <UiStack
@@ -147,6 +218,14 @@ commands.scope.registerCommand({
             autocomplete="off"
             required
         /></UiField>
+        <UiField v-slot="{ control }" layout="plain" label="Client ID для входа через браузер">
+          <UiControl
+            v-bind="control"
+            v-model="clientId"
+            :disabled="busy"
+            placeholder="Client ID OAuth-приложения GitLab"
+            autocomplete="off"
+        /></UiField>
         <UiField v-slot="{ control }" layout="plain" label="Папка для импорта">
           <UiControl
             v-bind="control"
@@ -157,6 +236,16 @@ commands.scope.registerCommand({
         /></UiField>
         <p class="muted help">
           Для self-hosted укажите адрес вашего сервера. Смена адреса сбрасывает сохранённый токен.
+          Для входа через браузер создайте
+          <a
+            :href="`${url || 'https://gitlab.com'}/-/user_settings/applications`"
+            target="_blank"
+            rel="noopener noreferrer"
+            >OAuth Application</a
+          >
+          на своём инстансе, включите Device Flow (GitLab 17.1+) и права
+          <code>read_api</code>, <code>read_repository</code>, <code>read_user</code>. Client secret
+          не нужен. Можно также подключиться токеном ниже.
         </p>
         <UiButton type="submit" data-command="ide.gitlab.integration.save" :disabled="busy"
           >сохранить настройки</UiButton
@@ -170,6 +259,28 @@ commands.scope.registerCommand({
         :disabled="busy"
         @error="error = $event"
       />
+      <UiInline class="actions" :gap="3" wrap>
+        <UiButton
+          :disabled="busy || !enabled || !hasClientId || !!device"
+          data-command="ide.gitlab.integration.device.start"
+          @click="commands.run('ide.gitlab.integration.device.start')"
+          >войти через GitLab</UiButton
+        >
+      </UiInline>
+      <div v-if="device" class="device" role="status">
+        <p>
+          Введите код <strong>{{ device.userCode }}</strong> на странице GitLab.
+        </p>
+        <a :href="device.verificationUri" target="_blank" rel="noopener noreferrer"
+          >открыть GitLab для входа ↗</a
+        >
+        <p class="muted">Ожидаем подтверждения…</p>
+        <UiButton
+          data-command="ide.gitlab.integration.device.cancel"
+          @click="commands.run('ide.gitlab.integration.device.cancel')"
+          >отменить</UiButton
+        >
+      </div>
       <UiStack
         as="form"
         align="start"
@@ -268,5 +379,19 @@ label {
 
 .help {
   margin: 0;
+}
+.actions,
+.device {
+  margin-top: var(--sp-4);
+}
+a {
+  text-decoration: underline;
+}
+.device {
+  padding: var(--sp-3);
+  background: var(--bg-2);
+}
+.device strong {
+  font-family: var(--mono);
 }
 </style>

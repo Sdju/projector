@@ -7,7 +7,9 @@ import TrackerPanel from "./TrackerPanel.vue";
 import TrackerRow from "./TrackerRow.vue";
 
 /** Сайдбар-блок issues: состояние, список и подгрузка следующих страниц. */
-const props = defineProps<{ projectId: string; active: boolean }>();
+const props = withDefaults(defineProps<{ projectId: string; active: boolean; host?: string }>(), {
+  host: "GitHub",
+});
 const emit = defineEmits<{
   open: [issue: { number: number; title: string }, pinned?: boolean];
 }>();
@@ -16,6 +18,7 @@ const { commands, open } = useTrackerPanel({
   kind: "issues",
   plural: "issues",
   singular: "issue",
+  host: props.host,
   opens: "обсуждение",
   projectId: () => props.projectId,
   active: () => props.active,

@@ -7,6 +7,7 @@ import {
   projectPathFromParams,
   projectRoute,
   fetchProjectGithub,
+  fetchProjectGitlab,
   ProjectOpening,
 } from "../../modules/project/index.ts";
 import type { Project } from "../../modules/project/index.ts";
@@ -23,10 +24,15 @@ import {
   createGithubEnabledLocalProfile,
   GithubRepositoryInfoLoader,
 } from "../../modules/github-workspace/index.ts";
+import {
+  createGitlabEnabledLocalProfile,
+  GitlabRepositoryInfoLoader,
+} from "../../modules/gitlab-workspace/index.ts";
 import { useCommandScope } from "../../common/utilities/commands.ts";
 import { useIdeCommands } from "../../modules/ide/index.ts";
 import UiButton from "../../common/ui/UiButton.vue";
 import IconGithub from "~icons/simple-icons/github";
+import IconGitlab from "~icons/simple-icons/gitlab";
 import IconProjectSettings from "~icons/lucide/sliders-horizontal";
 import { projectInitPrompt, useAgent } from "../../modules/agent/index.ts";
 import { settingsTabViews } from "../../modules/app-settings/index.ts";
@@ -40,30 +46,41 @@ const { api } = useIdeCommands();
 const settings = ref<InstanceType<typeof ProjectSettings>>();
 const settingsDirty = ref(false);
 
-// Set when the local project's `origin` points at GitHub; adds issues and the info tab.
-const repository = ref<string | null>(null);
+// Set when the local project's `origin` points at a code host; adds issues and the info tab.
+const githubRepository = ref<string | null>(null);
+const gitlabRepository = ref<{ instance: string; path: string } | null>(null);
 
 // The settings form keeps unsaved edits, so its tab stays mounted while it moves between docks.
-const tabViews: TabViews = {
-  ...settingsTabViews,
-  repository: {
-    component: GithubRepositoryInfoLoader,
-    keepAlive: true,
-    props: () => ({ repository: repository.value ?? "" }),
-  },
-  project: {
-    keepAlive: true,
-    ownKeys: true,
-    component: () =>
-      project.value &&
-      h(ProjectSettings, {
-        ref: settings,
-        project: project.value,
-        onDirty: (value: boolean) => (settingsDirty.value = value),
-        afterRemove: () => router.push("/"),
-      }),
-  },
-};
+const tabViews = computed<TabViews>(() => {
+  const gitlab = gitlabRepository.value;
+  const github = githubRepository.value;
+  return {
+    ...settingsTabViews,
+    repository: gitlab
+      ? {
+          component: GitlabRepositoryInfoLoader,
+          keepAlive: true,
+          props: () => ({ instance: gitlab.instance, path: gitlab.path }),
+        }
+      : {
+          component: GithubRepositoryInfoLoader,
+          keepAlive: true,
+          props: () => ({ repository: github ?? "" }),
+        },
+    project: {
+      keepAlive: true,
+      ownKeys: true,
+      component: () =>
+        project.value &&
+        h(ProjectSettings, {
+          ref: settings,
+          project: project.value,
+          onDirty: (value: boolean) => (settingsDirty.value = value),
+          afterRemove: () => router.push("/"),
+        }),
+    },
+  };
+});
 
 const projectId = ref("");
 const workspace = ref<InstanceType<typeof ProjectWorkspace>>();
@@ -71,14 +88,28 @@ const workspace = ref<InstanceType<typeof ProjectWorkspace>>();
 const githubCommands = useCommandScope("project:github", () => ({
   surface: "project",
   projectId: projectId.value || null,
-  repository: repository.value ?? null,
+  repository: githubRepository.value ?? null,
 }));
 githubCommands.scope.registerCommand({
   id: "ide.github.repository.info",
   title: "Информация о репозитории GitHub",
   description:
     "Открывает вкладку с описанием, статистикой и метаданными репозитория GitHub проекта.",
-  enabled: () => !!repository.value && !!workspace.value,
+  enabled: () => !!githubRepository.value && !!workspace.value,
+  run: () => workspace.value?.openTab("repository"),
+});
+const gitlabCommands = useCommandScope("project:gitlab", () => ({
+  surface: "project",
+  projectId: projectId.value || null,
+  instance: gitlabRepository.value?.instance ?? null,
+  path: gitlabRepository.value?.path ?? null,
+}));
+gitlabCommands.scope.registerCommand({
+  id: "ide.gitlab.repository.info",
+  title: "Информация о проекте GitLab",
+  description:
+    "Открывает вкладку с описанием, статистикой и метаданными проекта GitLab локального проекта.",
+  enabled: () => !!gitlabRepository.value && !!workspace.value,
   run: () => workspace.value?.openTab("repository"),
 });
 // A project created by this visit gets an agent tab with a suggested initialization request.
@@ -117,25 +148,38 @@ watch(
       dispose?.();
     });
     projectId.value = "";
-    repository.value = null;
+    githubRepository.value = null;
+    gitlabRepository.value = null;
     missing.value = false;
     openError.value = "";
     opening.value = true;
     try {
       const { project: item, missing: gone, created } = await openPath(path);
-      // Detect `origin` before the workspace mounts so it opens with the local+GitHub profile.
-      const github =
+      // Detect `origin` before the workspace mounts so it opens with the matching local profile.
+      const [github, gitlab] =
         gone || item.environment
-          ? null
-          : await fetchProjectGithub(item.id).then(
-              (data) => data.repository,
-              () => null,
-            );
+          ? [null, null]
+          : await Promise.all([
+              fetchProjectGithub(item.id).then(
+                (data) => data.repository,
+                () => null,
+              ),
+              fetchProjectGitlab(item.id).then(
+                (data) => data.repository,
+                () => null,
+              ),
+            ]);
       if (active) {
-        repository.value = github;
-        dispose = github
-          ? registerWorkspaceProfile(item.id, createGithubEnabledLocalProfile(item.id, github))
-          : undefined;
+        githubRepository.value = github;
+        gitlabRepository.value = gitlab;
+        dispose = gitlab
+          ? registerWorkspaceProfile(
+              item.id,
+              createGitlabEnabledLocalProfile(item.id, gitlab.instance, gitlab.path),
+            )
+          : github
+            ? registerWorkspaceProfile(item.id, createGithubEnabledLocalProfile(item.id, github))
+            : undefined;
         projectId.value = item.id;
         initProjectId = created && !gone ? item.id : "";
         missing.value = gone;
@@ -190,7 +234,18 @@ watch(
           <IconProjectSettings aria-hidden="true" />
         </UiButton>
         <UiButton
-          v-if="repository"
+          v-if="gitlabRepository"
+          shape="icon"
+          size="sm"
+          title="Информация о проекте GitLab"
+          aria-label="Информация о проекте GitLab"
+          data-command="ide.gitlab.repository.info"
+          @click="gitlabCommands.run('ide.gitlab.repository.info')"
+        >
+          <IconGitlab aria-hidden="true" />
+        </UiButton>
+        <UiButton
+          v-else-if="githubRepository"
           shape="icon"
           size="sm"
           title="Информация о репозитории"

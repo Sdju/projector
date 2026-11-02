@@ -5,7 +5,13 @@ import { useCompactViewport } from "../../common/utilities/compact-viewport.ts";
 import { computed, ref } from "vue";
 import { githubProjectRoute } from "../../../core/modules/github/index.ts";
 import { useRoute, useRouter } from "vue-router";
-import { useProjects, projectRoute, type ProjectLocation } from "../../modules/project/index.ts";
+import {
+  useProjects,
+  projectRoute,
+  gitlabOpenRoute,
+  type ProjectLocation,
+} from "../../modules/project/index.ts";
+import { fetchIntegrations } from "../../modules/integration-api/index.ts";
 import { ProjectSwitcher, MobileProjectPicker } from "../../modules/catalog/index.ts";
 import { isFileDrag, pathsFromDataTransfer } from "../../modules/path-drop/index.ts";
 
@@ -20,8 +26,11 @@ const commands = useCommandScope("project:path", () => ({ surface: "project-path
 commands.scope.registerCommand({
   id: "ide.project.path.open",
   title: "Открыть проект по пути",
-  description: "Открывает локальную папку либо gh:/owner/repository в readonly без клонирования.",
-  arguments: { path: "string: абсолютный путь или gh:/owner/repository" },
+  description:
+    "Открывает локальную папку, gh:/owner/repository или gl:/<instance>/<group>/<project> в readonly без клонирования.",
+  arguments: {
+    path: "string: абсолютный путь, gh:/owner/repository или gl:/<instance>/<group>/<project>",
+  },
   run: async (value) => {
     const { path } = commandArgs(value);
     if (typeof path !== "string") throw new Error("Укажите path");
@@ -38,6 +47,23 @@ commands.scope.registerCommand({
     const { repository } = commandArgs(value);
     if (typeof repository !== "string") throw new Error("Укажите repository");
     await router.push(githubProjectRoute(repository));
+  },
+});
+commands.scope.registerCommand({
+  id: "ide.gitlab.repository.open",
+  title: "Открыть проект GitLab",
+  description:
+    "Открывает проект GitLab в readonly без клонирования: ссылку, gl:/<instance>/<group>/<project> или group/project настроенного инстанса. Публичные проекты gitlab.com доступны без входа.",
+  arguments: {
+    repository:
+      "string: group/project, <instance>/group/project, gl:/<instance>/group/project или ссылка GitLab",
+  },
+  run: async (value) => {
+    const { repository } = commandArgs(value);
+    if (typeof repository !== "string") throw new Error("Укажите repository");
+    const data = await fetchIntegrations();
+    const integration = data.integrations.find((item) => item.id === "gitlab");
+    await router.push(gitlabOpenRoute(repository, integration?.settings.url));
   },
 });
 commands.scope.registerCommand({

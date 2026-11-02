@@ -8,6 +8,9 @@ import {
   projectIconUrl,
   formatProjectRef,
   githubRepositoryFromParams,
+  gitlabProjectFromParams,
+  normalizeGitlabInstance,
+  normalizeGitlabProjectPath,
   type ProjectLocation,
 } from "../modules/project/index.ts";
 import { useRunner } from "../modules/runner/index.ts";
@@ -21,20 +24,42 @@ const { load, projects } = useProjects();
 const { connect } = useRunner();
 const route = useRoute();
 const router = useRouter();
+const gitlabProject = computed(() => {
+  if (route.name !== "gitlab-project") return;
+  try {
+    const raw = gitlabProjectFromParams(route.params.gitlabPath);
+    const instance = normalizeGitlabInstance(raw.instance);
+    return { instance, path: normalizeGitlabProjectPath(raw.path, instance) };
+  } catch {
+    return undefined;
+  }
+});
 const currentProject = computed<ProjectLocation | undefined>(() => {
   if (route.name === "project")
     return projects.value.find(
       (project) => project.path === projectPathFromParams(route.params.projectPath),
     );
-  if (route.name !== "github-project") return;
-  const repository = githubRepositoryFromParams(route.params.githubPath);
-  const path = formatProjectRef({ kind: "github", repository });
-  return {
-    id: path,
-    path,
-    name: repository.split("/").at(-1) || "GitHub",
-    iconUrl: "/github.svg",
-  };
+  if (route.name === "github-project") {
+    const repository = githubRepositoryFromParams(route.params.githubPath);
+    const path = formatProjectRef({ kind: "github", repository });
+    return {
+      id: path,
+      path,
+      name: repository.split("/").at(-1) || "GitHub",
+      iconUrl: "/github.svg",
+    };
+  }
+  if (route.name === "gitlab-project") {
+    const repository = gitlabProject.value;
+    if (!repository) return;
+    const path = formatProjectRef({ kind: "gitlab", ...repository });
+    return {
+      id: path,
+      path,
+      name: repository.path.split("/").at(-1) || "GitLab",
+      iconUrl: "/gitlab.svg",
+    };
+  }
 });
 watchEffect(() => {
   const project = currentProject.value;
@@ -46,9 +71,13 @@ watchEffect(() => {
             kind: "github",
             repository: githubRepositoryFromParams(route.params.githubPath),
           })
-        : route.name === "settings"
-          ? "настройки"
-          : "проект";
+        : route.name === "gitlab-project"
+          ? gitlabProject.value
+            ? formatProjectRef({ kind: "gitlab", ...gitlabProject.value })
+            : "проект"
+          : route.name === "settings"
+            ? "настройки"
+            : "проект";
   document.title = project ? `${project.name} — Projector` : `Projector — ${page}`;
   const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
   if (favicon) {

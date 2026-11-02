@@ -15,6 +15,8 @@ export interface TrackerPanelOptions {
   singular: string;
   /** Что открывает вкладка. */
   opens: string;
+  /** Хост трекера в описаниях команд: «GitHub», «GitLab». */
+  host?: string;
   projectId: () => string;
   active: () => boolean;
   list: ReturnType<typeof usePagedList>;
@@ -24,6 +26,7 @@ export interface TrackerPanelOptions {
 /** Команды `ide.<kind>.*`, раскрытие блока и ленивая загрузка списка для сайдбар-панели. */
 export function useTrackerPanel(options: TrackerPanelOptions) {
   const { kind, plural, singular, list } = options;
+  const host = options.host ?? "GitHub";
   const open = ref(true);
   const commands = useCommandScope(`${kind}:${options.projectId()}`, () => ({
     surface: kind,
@@ -41,7 +44,7 @@ export function useTrackerPanel(options: TrackerPanelOptions) {
   register(
     `ide.${kind}.refresh`,
     `Обновить список ${plural}`,
-    `Перечитывает первую страницу ${plural} GitHub с текущим фильтром состояния.`,
+    `Перечитывает первую страницу ${plural} ${host} с текущим фильтром состояния.`,
     () => list.load(),
   );
   register(
