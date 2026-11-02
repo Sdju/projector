@@ -92,6 +92,7 @@ export function planItemsFrom(value: unknown): SidePlanItem[] {
 
 const weight = (turn: AgentHistoryTurn) =>
   turn.content.length +
+  (turn.thoughts?.length ?? 0) +
   (turn.tools ?? []).reduce((sum, tool) => sum + (tool.input?.length ?? 0) + tool.output.length, 0);
 
 /** Oldest whole exchanges go first: the side question is about now, not the start of the chat. */
@@ -119,8 +120,16 @@ export function historyFrom(value: unknown): AgentHistoryTurn[] {
       const role = row.role === "assistant" ? "assistant" : row.role === "user" ? "user" : null;
       const content = asString(row.content).slice(0, TURN_CHARS);
       const tools = historyTools(row.tools);
-      if (!role || (!content.trim() && !tools.length)) return [];
-      return [{ role, content, ...(tools.length ? { tools } : {}) }];
+      const thoughts = role === "assistant" ? asString(row.thoughts).slice(0, TURN_CHARS) : "";
+      if (!role || (!content.trim() && !thoughts && !tools.length)) return [];
+      return [
+        {
+          role,
+          content,
+          ...(thoughts ? { thoughts } : {}),
+          ...(tools.length ? { tools } : {}),
+        },
+      ];
     }),
   );
 }

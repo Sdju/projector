@@ -2,14 +2,20 @@
 import { computed, ref } from "vue";
 import UiDisclosureSummary from "../../../common/ui/UiDisclosureSummary.vue";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
-import type { AgentTask } from "../model/types.ts";
+import type { AgentBackendId, AgentSelection, AgentTask } from "../model/types.ts";
 import AgentTaskRow from "./AgentTaskRow.vue";
 import IconAlert from "~icons/lucide/circle-alert";
 import IconCheck from "~icons/lucide/check";
 import IconChevron from "~icons/lucide/chevron-right";
 
 /** Subagents and background commands as a strip above the input: open one to read, or in a tab. */
-const props = defineProps<{ tasks: AgentTask[]; viewing?: string }>();
+const props = defineProps<{
+  tasks: AgentTask[];
+  viewing?: string;
+  projectId?: string;
+  backend?: AgentBackendId;
+  selection?: AgentSelection;
+}>();
 const emit = defineEmits<{ view: [id: string]; tab: [id: string] }>();
 
 // What needs attention stays in sight; the finished ones fold into their own group.
@@ -55,6 +61,9 @@ const showFinished = computed(() => !active.value.length);
           :key="task.id"
           :task="task"
           :current="viewing === task.id"
+          :project-id="projectId"
+          :backend="backend"
+          :selection="selection"
           @view="emit('view', $event)"
           @tab="emit('tab', $event)"
         />
@@ -70,6 +79,9 @@ const showFinished = computed(() => !active.value.length);
             :key="task.id"
             :task="task"
             :current="viewing === task.id"
+            :project-id="projectId"
+            :backend="backend"
+            :selection="selection"
             @view="emit('view', $event)"
             @tab="emit('tab', $event)"
           />

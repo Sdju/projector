@@ -3,7 +3,7 @@ import { computed, ref } from "vue";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import type { AgentJobView } from "../api/jobs.ts";
 import type { PlanItem } from "../lib/plan.ts";
-import type { AgentTask, QueuedMessage } from "../model/types.ts";
+import type { AgentBackendId, AgentSelection, AgentTask, QueuedMessage } from "../model/types.ts";
 import AgentJobBar from "./AgentJobBar.vue";
 import AgentPlan from "./AgentPlan.vue";
 import AgentQueue from "./AgentQueue.vue";
@@ -21,6 +21,9 @@ const props = defineProps<{
   busy: boolean;
   canInject?: boolean;
   viewingTask?: string;
+  projectId?: string;
+  backend?: AgentBackendId;
+  selection?: AgentSelection;
 }>();
 const emit = defineEmits<{
   open: [id: string];
@@ -91,6 +94,9 @@ const summary = computed(() => {
       <AgentTaskBar
         :tasks="tasks"
         :viewing="viewingTask"
+        :project-id="projectId"
+        :backend="backend"
+        :selection="selection"
         @view="emit('view', $event)"
         @tab="emit('tab', $event)"
       />

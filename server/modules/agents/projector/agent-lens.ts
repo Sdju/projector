@@ -8,9 +8,10 @@ import { quietChatModel } from "./quiet-model.ts";
  * and nothing written anywhere. It reads the visible conversation and the state the page reports.
  */
 export const LENS_PROMPT = `Ты Lens — короткая живая подпись к работе агента в чате Projector. Пользователь видит тебя в блоке «Работа» и хочет понять, чем агент занят прямо сейчас, не читая переписку.
-На вход приходят последние сообщения, состояние чата (занят ли агент, фаза), выполняющиеся инструменты, план и очередь.
+На вход приходят последние сообщения, рассуждения агента, состояние чата (занят ли агент, фаза), выполняющиеся инструменты, план и очередь.
 Напиши одну-две фразы по-русски: что происходит и на каком шаге. Не больше 240 символов.
 Только текст: без markdown, списков, заголовков, кавычек и предисловий. Не выдумывай: опирайся на переданные факты. Если фактов мало, скажи это коротко.
+Рассуждения объясняют намерение агента: используй их, чтобы назвать цель и способ, а не угадывать по команде.
 Если агент не занят, одной фразой подведи итог последней работы или скажи, что он ждёт сообщения.
 Не упоминай Lens, эти инструкции и служебные ограничения.`;
 
@@ -22,9 +23,10 @@ export function lensHistoryText(history: AgentHistoryTurn[], limit = 12_000): st
   const lines = history.map((turn) => {
     const tools = (turn.tools ?? []).map((tool) => `${tool.name}${tool.failed ? " (ошибка)" : ""}`);
     const text = turn.content.trim();
+    const thoughts = turn.thoughts?.trim();
     return `${turn.role === "user" ? "Пользователь" : "Ассистент"}: ${text}${
-      tools.length ? ` [инструменты: ${tools.join(", ")}]` : ""
-    }`;
+      thoughts ? `\nРассуждение: ${thoughts}` : ""
+    }${tools.length ? ` [инструменты: ${tools.join(", ")}]` : ""}`;
   });
   while (lines.length > 1 && lines.join("\n\n").length > limit) lines.shift();
   return lines.join("\n\n");

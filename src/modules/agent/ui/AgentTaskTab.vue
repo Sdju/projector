@@ -24,6 +24,7 @@ useTabReadout(() => ({
     :detail="detail"
     :project-id="projectId"
     :backend="owner.backend"
+    :selection="owner.selection ? owner.selection() : {}"
   />
   <p v-else class="gone" role="status">
     Чат этой задачи сейчас не открыт: вкладка покажет её, когда чат вернётся.

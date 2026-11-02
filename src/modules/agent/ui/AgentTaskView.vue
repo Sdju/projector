@@ -1,16 +1,21 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
-import { taskElapsed, taskStatusLabel, type AgentTaskDetail } from "../lib/task-detail.ts";
 import { useElapsedClock } from "../lib/elapsed.ts";
-import { loadSessionTurns } from "../api/client.ts";
-import type { AgentBackendId, AgentTurn as Turn } from "../model/types.ts";
+import type { PlanItem } from "../lib/plan.ts";
+import { taskElapsed, taskStatusLabel, type AgentTaskDetail } from "../lib/task-detail.ts";
+import { toolLabel } from "../lib/tool-labels.ts";
+import { useAgentLens } from "../model/lens.ts";
+import { useTaskTurns } from "../model/task-turns.ts";
+import type { AgentBackendId, AgentSelection, QueuedMessage } from "../model/types.ts";
+import AgentLensPanel from "./AgentLens.vue";
 import AgentTurn from "./AgentTurn.vue";
 import AgentCodeBlock from "./AgentCodeBlock.vue";
 import AgentToolCall from "./AgentToolCall.vue";
 import IconBack from "~icons/lucide/arrow-left";
 import IconBot from "~icons/lucide/bot";
+import IconScanEye from "~icons/lucide/scan-eye";
 import IconTerminal from "~icons/lucide/terminal";
 import IconTab from "~icons/lucide/square-arrow-out-up-right";
 
@@ -20,6 +25,7 @@ const props = defineProps<{
   embedded?: boolean;
   projectId: string;
   backend: AgentBackendId;
+  selection?: AgentSelection;
 }>();
 const emit = defineEmits<{ back: []; tab: [] }>();
 
@@ -42,46 +48,45 @@ const assignment = computed(() => {
   const input = props.detail.call?.input?.trim() ?? "";
   return input && input !== "{}" ? input : "";
 });
-// A background task's own call only reports that it started: its result is not the outcome.
-// The conversation of the subagent's own session, read from the agent; refreshed while it works.
-const turns = ref<Turn[]>([]);
-const loadError = ref("");
-let timer: ReturnType<typeof setTimeout> | undefined;
-let generation = 0;
 // Tasks saved before the session was recorded: the launch result of the call names it.
 const sessionId = computed(
   () =>
     task.value.session ?? /"sessionID"\s*:\s*"([^"]+)"/.exec(props.detail.call?.detail ?? "")?.[1],
 );
-async function load() {
-  const session = sessionId.value;
-  if (!session) return;
-  const current = ++generation;
-  try {
-    const loaded = await loadSessionTurns(props.backend, props.projectId, session);
-    if (current !== generation) return;
-    turns.value = loaded;
-    loadError.value = "";
-  } catch (cause) {
-    if (current === generation)
-      loadError.value = cause instanceof Error ? cause.message : "Не удалось прочитать сессию";
-  }
-  if (current === generation && task.value.status === "running")
-    timer = setTimeout(() => void load(), 3000);
-}
-watch(
-  () => [sessionId.value, task.value.status],
-  () => {
-    clearTimeout(timer);
-    void load();
-  },
-  { immediate: true },
-);
-onBeforeUnmount(() => {
-  generation++;
-  clearTimeout(timer);
+// The conversation of the subagent's own session, read from the agent; refreshed while it works.
+const {
+  turns,
+  error: loadError,
+  load,
+} = useTaskTurns({
+  backend: () => props.backend,
+  projectId: () => props.projectId,
+  session: () => sessionId.value,
+  running: () => task.value.status === "running",
+  auto: true,
 });
+const phase = computed(() => {
+  if (task.value.status !== "running") return "";
+  return task.value.lastTool ? `выполняет ${toolLabel(task.value.lastTool)}` : "";
+});
+const lens = useAgentLens({
+  turns,
+  busy: computed(() => task.value.status === "running"),
+  phase,
+  queue: ref<QueuedMessage[]>([]),
+  plan: ref<PlanItem[]>([]),
+  selection: computed(() => props.selection ?? {}),
+});
+async function toggleLens() {
+  if (lens.state.open) {
+    lens.close();
+    return;
+  }
+  if (!turns.value.length) await load();
+  await lens.open();
+}
 
+// A background task's own call only reports that it started: its result is not the outcome.
 const outcome = computed(() => {
   const { call } = props.detail;
   if (task.value.status === "running") return "";
@@ -116,6 +121,18 @@ const outcome = computed(() => {
         </div>
       </div>
       <UiButton
+        v-if="task.kind === 'agent'"
+        shape="icon"
+        size="sm"
+        :active="lens.state.open"
+        :aria-pressed="lens.state.open"
+        :title="lens.state.open ? 'Скрыть Lens' : 'Lens: чем занимается сабагент'"
+        :aria-label="lens.state.open ? 'Скрыть Lens' : 'Показать Lens'"
+        @click="toggleLens"
+      >
+        <IconScanEye aria-hidden="true" />
+      </UiButton>
+      <UiButton
         v-if="embedded"
         shape="icon"
         size="sm"
@@ -126,6 +143,9 @@ const outcome = computed(() => {
         <IconTab aria-hidden="true" />
       </UiButton>
     </header>
+    <div v-if="lens.state.open" class="task-lens">
+      <AgentLensPanel :lens="lens" />
+    </div>
     <div v-if="turns.length" class="body conversation" role="log" aria-label="Чат сабагента">
       <AgentTurn
         v-for="(turn, index) in turns"
@@ -203,6 +223,10 @@ svg {
   gap: var(--sp-1);
   align-items: center;
   color: var(--faint);
+}
+.task-lens {
+  padding: var(--sp-1) var(--sp-3);
+  border-bottom: 1px solid var(--line);
 }
 .body {
   display: grid;

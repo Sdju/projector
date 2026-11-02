@@ -1,20 +1,37 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import { useElapsedClock } from "../lib/elapsed.ts";
+import type { PlanItem } from "../lib/plan.ts";
 import { taskElapsed } from "../lib/task-detail.ts";
 import { toolLabel } from "../lib/tool-labels.ts";
-import type { AgentTask } from "../model/types.ts";
+import { useAgentLens } from "../model/lens.ts";
+import { useTaskTurns } from "../model/task-turns.ts";
+import type {
+  AgentBackendId,
+  AgentSelection,
+  AgentTask,
+  AgentTurn,
+  QueuedMessage,
+} from "../model/types.ts";
 import IconAlert from "~icons/lucide/circle-alert";
 import IconBot from "~icons/lucide/bot";
 import IconCheck from "~icons/lucide/check";
+import IconRefresh from "~icons/lucide/refresh-cw";
+import IconScanEye from "~icons/lucide/scan-eye";
 import IconSquare from "~icons/lucide/square";
 import IconTerminal from "~icons/lucide/terminal";
 import IconTab from "~icons/lucide/square-arrow-out-up-right";
 
 /** One subagent or background command in the task list: open it to read, or in a tab. */
-const props = defineProps<{ task: AgentTask; current?: boolean }>();
+const props = defineProps<{
+  task: AgentTask;
+  current?: boolean;
+  projectId?: string;
+  backend?: AgentBackendId;
+  selection?: AgentSelection;
+}>();
 const emit = defineEmits<{ view: [id: string]; tab: [id: string] }>();
 const now = useElapsedClock();
 const duration = computed(() => taskElapsed(props.task, now.value));
@@ -28,6 +45,43 @@ function note() {
     task.status === "running" && task.lastTool ? toolLabel(task.lastTool) : task.summary,
   ];
   return parts.filter(Boolean).join(" · ");
+}
+
+// Lens of one subagent: the row stays closed until asked, then reads the task's own session.
+const transcript = useTaskTurns({
+  backend: () => props.backend,
+  projectId: () => props.projectId,
+  session: () => props.task.session,
+  running: () => props.task.status === "running",
+});
+const turns = computed((): AgentTurn[] => {
+  if (transcript.turns.value.length) return transcript.turns.value;
+  const prompt = props.task.prompt?.trim();
+  return prompt ? [{ id: props.task.id, role: "user", text: prompt, tools: [] }] : [];
+});
+const phase = computed(() => {
+  if (props.task.status !== "running") return "";
+  return props.task.lastTool ? `выполняет ${toolLabel(props.task.lastTool)}` : "";
+});
+const lens = useAgentLens({
+  turns,
+  busy: computed(() => props.task.status === "running"),
+  phase,
+  queue: ref<QueuedMessage[]>([]),
+  plan: ref<PlanItem[]>([]),
+  selection: computed(() => props.selection ?? {}),
+});
+const lensNote = computed(
+  () => lens.state.error || lens.state.text || (lens.state.busy ? "Смотрю, чем занят…" : ""),
+);
+async function toggleLens() {
+  if (lens.state.open) {
+    lens.close();
+    transcript.stop();
+    return;
+  }
+  await transcript.start();
+  await lens.open();
 }
 </script>
 
@@ -50,8 +104,41 @@ function note() {
         aria-hidden="true"
       />
       <span class="name u-truncate">{{ task.title || "Задача" }}</span>
-      <span class="note u-truncate">{{ note() }}</span>
+      <span
+        v-if="lens.state.open"
+        class="note u-truncate"
+        :class="{ error: lens.state.error }"
+        :title="lensNote"
+      >
+        <span class="lens-label">Lens</span>
+        {{ lensNote }}
+      </span>
+      <span v-else class="note u-truncate">{{ note() }}</span>
     </button>
+    <template v-if="task.kind === 'agent'">
+      <UiButton
+        shape="icon"
+        size="sm"
+        :active="lens.state.open"
+        :aria-pressed="lens.state.open"
+        :title="lens.state.open ? 'Скрыть Lens' : 'Lens: чем занимается сабагент'"
+        :aria-label="lens.state.open ? 'Скрыть Lens' : 'Показать Lens'"
+        @click="toggleLens"
+      >
+        <IconScanEye aria-hidden="true" />
+      </UiButton>
+      <UiButton
+        v-if="lens.state.open"
+        shape="icon"
+        size="sm"
+        :disabled="lens.state.busy"
+        title="Обновить Lens"
+        aria-label="Обновить Lens"
+        @click="lens.refresh()"
+      >
+        <IconRefresh aria-hidden="true" />
+      </UiButton>
+    </template>
     <UiButton
       shape="icon"
       size="sm"
@@ -105,6 +192,16 @@ li.current {
   min-width: 0;
   flex: 1;
   color: var(--faint);
+}
+.note.error {
+  color: var(--err);
+}
+.lens-label {
+  margin-right: 2px;
+  color: var(--faint);
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 .done-icon {
   color: var(--run);

@@ -6,6 +6,7 @@ import type {
   AgentCapabilities,
   AgentChatStatus,
   AgentControl,
+  AgentSelection,
   AgentSessionInfo,
   AgentTask,
   AgentTurn,
@@ -31,6 +32,8 @@ export interface ChatController {
   tasks(): AgentTask[];
   queue(): QueuedMessage[];
   controls(): AgentControl[];
+  /** The current model, effort and mode choices; Lens uses the provider one. */
+  selection(): AgentSelection;
   capabilities(): AgentCapabilities;
   setControl(id: string, value: string): Promise<void>;
   loadSessions(): Promise<AgentSessionInfo[]>;

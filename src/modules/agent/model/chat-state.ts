@@ -139,28 +139,62 @@ export function chatPresence(key: string, abort: () => void) {
   };
 }
 
-/** The conversation as turns, with what the answers' tool calls returned, for an agent without a session of its own. */
-export function chatHistory(turns: AgentTurn[], withTools = false): AgentHistoryTurn[] {
+/** The reasoning of an answer, in the order it was shown. */
+function thoughtsOf(turn: AgentTurn): string {
+  if (turn.role !== "assistant") return "";
+  return (turn.parts ?? [])
+    .filter((part) => part.type === "thought")
+    .map((part) => part.text.trim())
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+/**
+ * The conversation as turns, with what the answers' tool calls returned, for an agent without a
+ * session of its own. `withThoughts` is for Lens: it names the intent behind the calls.
+ */
+export function chatHistory(
+  turns: AgentTurn[],
+  withTools = false,
+  withThoughts = false,
+): AgentHistoryTurn[] {
+  type Expanded = {
+    role: "user" | "assistant";
+    text: string;
+    thoughts: string;
+    tools: AgentTurn["tools"];
+  };
   // Live additions are user messages in context, even though the UI nests them in the answer.
-  const expanded = turns.flatMap((turn): AgentTurn[] => {
+  const expanded = turns.flatMap((turn): Expanded[] => {
+    const plain = (): Expanded => ({
+      role: turn.role,
+      text: turn.text,
+      thoughts: withThoughts ? thoughtsOf(turn) : "",
+      tools: turn.tools,
+    });
     if (turn.role !== "assistant" || !turn.parts?.some((part) => part.type === "note"))
-      return [turn];
-    const result: AgentTurn[] = [];
+      return [plain()];
+    const result: Expanded[] = [];
     let text = "";
+    let thoughts = "";
     let tools: AgentTurn["tools"] = [];
     const flush = () => {
-      if (text || tools.length) result.push({ ...turn, text, tools });
+      if (text || thoughts || tools.length)
+        result.push({ role: "assistant", text, thoughts, tools });
       text = "";
+      thoughts = "";
       tools = [];
     };
     for (const part of turn.parts) {
       if (part.type === "text") text += part.text;
+      else if (part.type === "thought" && withThoughts)
+        thoughts += `${thoughts ? "\n\n" : ""}${part.text}`;
       else if (part.type === "tool") {
         const tool = turn.tools.find((item) => item.id === part.id);
         if (tool) tools.push(tool);
       } else if (part.type === "note") {
         flush();
-        result.push({ id: turn.id, role: "user", text: part.text, tools: [] });
+        result.push({ role: "user", text: part.text, thoughts: "", tools: [] });
       }
     }
     flush();
@@ -176,7 +210,15 @@ export function chatHistory(turns: AgentTurn[], withTools = false): AgentHistory
         output: tool.detail,
         ...(tool.status === "error" ? { failed: true } : {}),
       }));
-    if (!item.text.trim() && !tools.length) return [];
-    return [{ role: item.role, content: item.text, ...(tools.length ? { tools } : {}) }];
+    const thoughts = item.thoughts.trim();
+    if (!item.text.trim() && !thoughts && !tools.length) return [];
+    return [
+      {
+        role: item.role,
+        content: item.text,
+        ...(thoughts ? { thoughts } : {}),
+        ...(tools.length ? { tools } : {}),
+      },
+    ];
   });
 }

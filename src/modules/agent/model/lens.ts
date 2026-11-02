@@ -27,7 +27,7 @@ export interface AgentLensOptions {
  * separately in the state, so they are not repeated here.
  */
 export function lensHistory(turns: AgentTurn[]): AgentHistoryTurn[] {
-  const history = chatHistory(turns, true).slice(-LENS_TURNS);
+  const history = chatHistory(turns, true, true).slice(-LENS_TURNS);
   let start = 0;
   while (start < history.length && history[start]!.role !== "user") start++;
   return history.slice(start);
@@ -63,6 +63,23 @@ export function lensState(
 }
 
 /**
+ * What Lens would send right now: the timer asks only when this changes. The signature includes
+ * the reasoning, text, calls and plan, so a repeated caption cannot describe the same step twice.
+ */
+export function lensSignature(
+  turns: AgentTurn[],
+  busy: boolean,
+  phase: string,
+  queue: QueuedMessage[],
+  plan: PlanItem[],
+): string {
+  return JSON.stringify({
+    history: lensHistory(turns),
+    state: lensState(turns, busy, phase, queue, plan),
+  });
+}
+
+/**
  * Lens of one chat: off until the user asks for it, then a short caption of the current work,
  * refreshed on a timer while the agent is busy and on demand. It is a read-only view: no chat
  * history, no run record, no session. Lives in memory only.
@@ -81,6 +98,8 @@ export function useAgentLens(options: AgentLensOptions) {
   let generation = 0;
   let controller: AbortController | undefined;
   let timer: ReturnType<typeof setInterval> | undefined;
+  /** The signature of the last successful request: an unchanged timer tick asks nothing. */
+  let asked = "";
 
   function arm() {
     if (timer !== undefined) clearInterval(timer);
@@ -89,7 +108,7 @@ export function useAgentLens(options: AgentLensOptions) {
     timer = setInterval(() => {
       if (!options.busy.value) return;
       if (typeof document !== "undefined" && document.hidden) return;
-      void refresh();
+      void refresh(false);
     }, interval);
   }
 
@@ -99,8 +118,16 @@ export function useAgentLens(options: AgentLensOptions) {
   }
 
   /** Asks for a new caption; an in-flight request is replaced, and its answer dropped. */
-  async function refresh(): Promise<string> {
+  async function refresh(force = true): Promise<string> {
     if (!state.open || state.busy) return state.text;
+    const signature = lensSignature(
+      options.turns.value,
+      options.busy.value,
+      options.phase.value,
+      options.queue.value,
+      options.plan.value,
+    );
+    if (!force && signature === asked) return state.text;
     const run = ++generation;
     controller?.abort();
     const next = new AbortController();
@@ -125,6 +152,7 @@ export function useAgentLens(options: AgentLensOptions) {
       if (run !== generation) return state.text;
       state.text = answer.text;
       state.at = answer.at;
+      asked = signature;
       return answer.text;
     } catch (error) {
       if (run === generation && !next.signal.aborted)
@@ -171,6 +199,7 @@ export function useAgentLens(options: AgentLensOptions) {
     state.text = "";
     state.at = 0;
     state.error = "";
+    asked = "";
   }
 
   /** The feature is off, and the chat starts over. */

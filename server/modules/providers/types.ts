@@ -128,6 +128,8 @@ export interface AgentHistoryTool {
 export interface AgentHistoryTurn {
   role: "user" | "assistant";
   content: string;
+  /** The assistant's reasoning, read by Lens to name the intent behind its calls. */
+  thoughts?: string;
   tools?: AgentHistoryTool[];
 }
 

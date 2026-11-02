@@ -24,6 +24,11 @@ function conversation() {
         },
         { id: "t2", name: "Read", status: "done", detail: "ok", input: '{"path":"src/main.ts"}' },
       ],
+      parts: [
+        { type: "text", text: "запускаю сборку" },
+        { type: "thought", text: "Сначала проверю, почему падает сборка" },
+        { type: "tool", id: "t2" },
+      ],
     },
   ];
 }
@@ -45,7 +50,8 @@ test("Lens reads the visible chat including the answer still being written", () 
   const history = lensHistory(conversation());
   expect(history[0]).toMatchObject({ role: "user", content: "почини сборку" });
   expect(JSON.stringify(history)).toContain("запускаю сборку");
-  // Finished calls travel with the history; the running one is reported as live state.
+  // Reasoning names the intent; finished calls travel with the history, the running one as state.
+  expect(JSON.stringify(history)).toContain("Сначала проверю");
   expect(JSON.stringify(history)).toContain("Read");
   expect(JSON.stringify(history)).not.toContain("vp build");
 });
@@ -97,13 +103,21 @@ test("Lens asks for a caption with the chat and the live state, and keeps it", a
 test("Lens refreshes on its own only while the agent is busy", async () => {
   vi.useFakeTimers();
   fetchLens.mockReset();
-  fetchLens.mockResolvedValue({ text: "Собирает проект.", at: Date.now() });
+  fetchLens.mockImplementation(async () => ({ text: "Собирает проект.", at: Date.now() }));
   const lensOptions = options();
   const scope = effectScope();
   const lens = scope.run(() => useAgentLens(lensOptions));
   try {
     await lens.open();
     expect(fetchLens).toHaveBeenCalledTimes(1);
+    // The same steps: the timer must not ask for the same caption again.
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(fetchLens).toHaveBeenCalledTimes(1);
+    // The plan moved on: this is a new step, so the timer asks again.
+    lensOptions.plan.value = [
+      { content: "Собрать проект", status: "completed" },
+      { content: "Проверить тесты", status: "in_progress" },
+    ];
     await vi.advanceTimersByTimeAsync(1_000);
     expect(fetchLens).toHaveBeenCalledTimes(2);
     lensOptions.busy.value = false;

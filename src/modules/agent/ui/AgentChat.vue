@@ -315,6 +315,7 @@ const controller: ChatController = {
   tasks: () => chatTasks(turns.value),
   queue: () => queue.value,
   controls: () => controls.value,
+  selection: () => selection.value,
   capabilities: () => capabilities.value,
   setControl,
   loadSessions,
@@ -626,6 +627,7 @@ onBeforeUnmount(() => {
       :detail="viewed"
       :project-id="projectId"
       :backend="backend"
+      :selection="selection"
       embedded
       @back="viewingTask = ''"
       @tab="taskInTab(viewed.task.id)"
@@ -690,6 +692,9 @@ onBeforeUnmount(() => {
         :busy="busy"
         :can-inject="!!capabilities.inject"
         :viewing-task="viewingTask"
+        :project-id="projectId"
+        :backend="backend"
+        :selection="selection"
         @open="jobsState.open"
         @view="viewTask"
         @tab="taskInTab"

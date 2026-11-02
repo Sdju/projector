@@ -46,7 +46,11 @@ test("POST /api/agent/lens captions the current work from the visible chat", asy
   const body = {
     history: [
       { role: "user", content: "почини сборку" },
-      { role: "assistant", content: "запускаю сборку" },
+      {
+        role: "assistant",
+        content: "запускаю сборку",
+        thoughts: "Сначала проверю, почему падает сборка",
+      },
     ],
     state: {
       busy: true,
@@ -75,6 +79,7 @@ test("POST /api/agent/lens captions the current work from the visible chat", asy
     const prompt = messages.at(-1).content;
     expect(prompt).toContain("Пользователь: почини сборку");
     expect(prompt).toContain("Ассистент: запускаю сборку");
+    expect(prompt).toContain("Рассуждение: Сначала проверю, почему падает сборка");
     expect(prompt).toContain("Сейчас выполняются");
     expect(prompt).toContain("vp build");
     expect(prompt).toContain("Собрать проект");
