@@ -160,17 +160,18 @@ export async function handleAgentRun({
   if (run) emit("run", { id: run.id });
   if (created?.worktree) emit("worktree", created.worktree);
   const approval = body.approvals === true ? createApprovalBridge(emit, abort.signal) : undefined;
-  const approve =
-    approval && !hosted
-      ? createJudgedApproval({
-          approve: approval,
-          emit: (event, data) => emit(event, data),
-          settings: resolveJudgeSettings(await readJudgeSettings(), request.judge),
-          cwd: request.cwd,
-          backend,
-          signal: abort.signal,
-        })
-      : approval;
+  // ACP asks through this server even when its agent process is hosted; Projector and Claude Code
+  // ask inside their own runner, where `hosted-runner.ts` wraps the same approval.
+  const approve = approval
+    ? createJudgedApproval({
+        approve: approval,
+        emit: (event, data) => emit(event, data),
+        settings: resolveJudgeSettings(await readJudgeSettings(), request.judge),
+        cwd: request.cwd,
+        backend,
+        signal: abort.signal,
+      })
+    : approval;
   try {
     await runAgent({
       ...request,
