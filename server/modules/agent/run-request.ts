@@ -20,6 +20,8 @@ import { isHostedAgent, runAgent } from "./registry.ts";
 import { driveRun, isRunDriven, joinRun, type RunViewer } from "./run-hub.ts";
 import { broadcastEvent, hasEventClient } from "../events/index.ts";
 import { asString, json } from "../transport/index.ts";
+import { resolveJudgeSettings } from "../../../core/modules/agent-judge/index.ts";
+import { createJudgedApproval, readJudgeSettings } from "../judge/index.ts";
 
 /**
  * Starts an answer, or rejoins one that a hosted process is still producing. A page that opens
@@ -157,13 +159,25 @@ export async function handleAgentRun({
   };
   if (run) emit("run", { id: run.id });
   if (created?.worktree) emit("worktree", created.worktree);
+  const approval = body.approvals === true ? createApprovalBridge(emit, abort.signal) : undefined;
+  const approve =
+    approval && !hosted
+      ? createJudgedApproval({
+          approve: approval,
+          emit: (event, data) => emit(event, data),
+          settings: resolveJudgeSettings(await readJudgeSettings(), request.judge),
+          cwd: request.cwd,
+          backend,
+          signal: abort.signal,
+        })
+      : approval;
   try {
     await runAgent({
       ...request,
       backend,
       run,
       commands: body.commandBridge === true ? createCommandBridge(emit, abort.signal) : undefined,
-      approve: body.approvals === true ? createApprovalBridge(emit, abort.signal) : undefined,
+      approve,
       ask: body.approvals === true ? createQuestionBridge(emit, abort.signal) : undefined,
       secret: body.approvals === true ? createSecretBridge(emit, abort.signal) : undefined,
       abort: abort.signal,

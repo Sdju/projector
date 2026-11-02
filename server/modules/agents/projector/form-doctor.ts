@@ -1,5 +1,5 @@
 import { generateText } from "ai";
-import { quietChatModel } from "./quiet-model.ts";
+import { quietChatModel } from "../../providers/index.ts";
 
 /** The doctor gets only the conversation and the broken block; it must not call tools or change files. */
 const SYSTEM = `Ты Form Doctor — ремонтируешь Vue-разметку формы Projector. На вход приходят история чата, ошибочная форма и сообщение компилятора.

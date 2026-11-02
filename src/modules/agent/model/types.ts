@@ -9,7 +9,11 @@ export interface AgentCapabilities {
 }
 
 import type { AgentTask, AgentTaskPatch } from "../../../../core/modules/agent-task/index.ts";
+import type { JudgeVerdict } from "../../../../core/modules/agent-judge/index.ts";
 import type { Project } from "../../project/index.ts";
+import type { JudgeNote } from "./judge-note.ts";
+
+export type { AgentPermission } from "./permissions.ts";
 
 export type { AgentTask };
 
@@ -42,7 +46,9 @@ export type AgentPart =
   /** A message the user added while the answer was being written. */
   | { type: "note"; text: string }
   /** What the agent reasoned before answering; kept apart from the answer text. */
-  | { type: "thought"; text: string };
+  | { type: "thought"; text: string }
+  /** An action the judge allowed without asking; shown in the work block. */
+  | ({ type: "judge" } & JudgeNote);
 
 export type AgentBackendId = string;
 
@@ -238,16 +244,6 @@ export interface QueuedMessage {
   auto?: string;
 }
 
-/** A sensitive tool call waiting for the user's decision. */
-export interface AgentPermission {
-  id: string;
-  tool: string;
-  title: string;
-  detail: string;
-  /** The backend offers a durable "always" choice for this tool. */
-  persistent: boolean;
-}
-
 /**
  * The agent asks for a secret. Only what it will be stored as is known here: the value is typed
  * into the form and sent straight to the server, never kept in the chat state.
@@ -362,8 +358,10 @@ export type AgentEvent =
         title?: string;
         detail?: string;
         persistent?: boolean;
+        judge?: JudgeVerdict;
       };
     }
+  | { event: "judge"; data: JudgeNote }
   | { event: "question-request"; data: AgentQuestionRequest }
   | { event: "secret-request"; data: AgentSecretRequest }
   | { event: "run"; data: { id: string } }

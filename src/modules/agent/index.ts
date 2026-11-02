@@ -22,6 +22,7 @@ export { default as AgentWebSettings } from "./ui/AgentWebSettings.vue";
 export { default as AgentMcpSettings } from "./ui/AgentMcpSettings.vue";
 export { default as AgentHooksSettings } from "./ui/AgentHooksSettings.vue";
 export { default as AgentMemorySettings } from "./ui/AgentMemorySettings.vue";
+export { default as AgentJudgeSettings } from "./ui/AgentJudgeSettings.vue";
 export { registerAgentCommands } from "./model/agent-commands.ts";
 export { useAgentActivity } from "./model/activity.ts";
 export type { AgentActivityItem } from "./model/activity.ts";

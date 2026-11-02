@@ -218,6 +218,10 @@ test("HTTP agent streams discovery, description, execution, Bash and final text 
   const directory = await mkdtemp(join(tmpdir(), "projector-agent-http-"));
   const previousData = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = directory;
+  // This mock provider answers by request number; the judge's extra request would shift the
+  // scripted steps, so the test runs with the optional review turned off.
+  const { writeJudgeSettings } = await import("../server/modules/judge/index.ts");
+  await writeJudgeSettings({ show: false, auto: false, maxRisk: 1, confidence: "high-medium" });
   const requests = [];
   const steps = [
     ["list_commands", { query: "test.command" }],

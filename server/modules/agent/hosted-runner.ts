@@ -21,6 +21,8 @@ import {
   createSecretBridge,
 } from "./command-bridge.ts";
 import { injectMessage } from "./injection.ts";
+import { resolveJudgeSettings } from "../../../core/modules/agent-judge/index.ts";
+import { createJudgedApproval, readJudgeSettings } from "../judge/index.ts";
 
 const REQUESTS = new Set([
   "permission-request",
@@ -94,6 +96,19 @@ async function main(answer: (options: AgentRunOptions) => Promise<void>): Promis
     }
   });
 
+  const approval = record.approvals
+    ? createApprovalBridge((event, data) => emit(event, data), signal)
+    : undefined;
+  const approve = approval
+    ? createJudgedApproval({
+        approve: approval,
+        emit: (event, data) => emit(event, data),
+        settings: resolveJudgeSettings(await readJudgeSettings(), record.judge),
+        cwd: record.cwd,
+        backend: record.backend,
+        signal,
+      })
+    : undefined;
   const options: AgentRunOptions = {
     backend: record.backend,
     permissionMode: record.permissionMode,
@@ -104,6 +119,7 @@ async function main(answer: (options: AgentRunOptions) => Promise<void>): Promis
     cwd: record.cwd,
     history: record.history,
     features: record.features,
+    judge: record.judge,
     sessionId: record.sessionId,
     messageId: record.messageId,
     tail: record.tail,
@@ -112,7 +128,7 @@ async function main(answer: (options: AgentRunOptions) => Promise<void>): Promis
     emit,
     ...(record.approvals
       ? {
-          approve: createApprovalBridge((event, data) => emit(event, data), signal),
+          approve,
           ask: createQuestionBridge((event, data) => emit(event, data), signal),
           secret: createSecretBridge((event, data) => emit(event, data), signal),
         }

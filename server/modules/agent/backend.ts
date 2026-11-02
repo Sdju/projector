@@ -13,6 +13,7 @@ export interface AgentCapabilities {
   compact?: { command: string; hintAt: number; autoAt: number };
 }
 
+import type { JudgeOverride } from "../../../core/modules/agent-judge/index.ts";
 import type { AgentHistoryTurn } from "../providers/index.ts";
 import type {
   AgentControl,
@@ -37,6 +38,7 @@ export type AgentEventName =
   | "commands"
   | "controls"
   | "permission-request"
+  | "judge"
   | "question-request"
   | "secret-request"
   | "run"
@@ -117,6 +119,8 @@ export interface AgentRunOptions {
    * Absent means the defaults from `agent/features.json`.
    */
   features?: string[];
+  /** The chat's own Judge settings; absent means the global ones. */
+  judge?: JudgeOverride;
   /** The message's own ID (a UUID): the transcript keeps it, so files can be rewound to it later. */
   messageId?: string;
   /**

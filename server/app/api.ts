@@ -27,6 +27,7 @@ import { handleAgentLens } from "../routes/api/agent-lens.ts";
 import { handleAgentSide } from "../routes/api/agent-side.ts";
 import { handleAgentSkills } from "../routes/api/agent-skills.ts";
 import { handleAgentFeatures } from "../routes/api/agent-features.ts";
+import { handleAgentJudge } from "../routes/api/agent-judge.ts";
 import { handleAgentWeb } from "../routes/api/agent-web.ts";
 import { handleAgentMcp } from "../routes/api/agent-mcp.ts";
 import { handleAgentHooks } from "../routes/api/agent-hooks.ts";
@@ -92,6 +93,7 @@ const routes = [
   handleAgentWeb,
   handleAgentSkills,
   handleAgentFeatures,
+  handleAgentJudge,
   handleAgent,
   handleAgentFormRepair,
   handleAgentLens,

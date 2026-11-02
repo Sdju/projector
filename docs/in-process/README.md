@@ -14,3 +14,4 @@
 
 - [agent-roadmap.md](agent-roadmap.md) — открытые пункты штатного агента Projector.
 - [opencode-background-subagents.md](opencode-background-subagents.md) — фоновый `subagent` OpenCode не виден как живая задача, поэтому Lens не читает его рассуждения.
+- [projector-judge.md](projector-judge.md) — оценка риска действия 1–5 в карточке подтверждения, настройки и автоматическое разрешение низкого риска.

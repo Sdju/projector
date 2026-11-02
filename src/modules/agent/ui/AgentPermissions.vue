@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import UiBadge from "../../../common/ui/UiBadge.vue";
 import UiCard from "../../../common/ui/UiCard.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
+import { judgeScoreTone } from "../../../../core/modules/agent-judge/index.ts";
 import { isEditTool } from "../lib/tool-input.ts";
 import AgentCodeBlock from "./AgentCodeBlock.vue";
 import type { AgentPermission } from "../model/types.ts";
@@ -30,6 +32,15 @@ const emit = defineEmits<{ decide: [id: string, allow: boolean, always?: boolean
         <span class="title" :title="item.title">{{ item.title }}</span>
         <code class="tool">{{ item.tool }}</code>
       </UiInline>
+      <div v-if="item.judge" class="judge" role="note">
+        <UiBadge :tone="judgeScoreTone(item.judge.score)">
+          риск {{ item.judge.score }}/5 · {{ item.judge.label }}
+        </UiBadge>
+        <span class="judge-reason">
+          {{ item.judge.reason
+          }}<template v-if="item.judge.effect">. {{ item.judge.effect }}</template>
+        </span>
+      </div>
       <AgentCodeBlock v-if="item.detail" :text="item.detail" :diff="isEditTool(item.tool)" />
       <UiInline align="stretch">
         <UiButton appearance="solid" size="sm" @click="emit('decide', item.id, true)">
@@ -77,5 +88,18 @@ header svg {
   margin-left: auto;
   color: var(--muted);
   font-family: var(--mono);
+}
+.judge {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-1);
+  margin-bottom: var(--sp-2);
+  color: var(--muted);
+  font-size: var(--fs-2xs);
+  line-height: 1.5;
+}
+.judge-reason {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 </style>

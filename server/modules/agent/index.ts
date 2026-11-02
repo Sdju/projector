@@ -97,6 +97,7 @@ export {
   readChatFeatures,
   type ChatIndex,
 } from "./history-store.ts";
+export { readChatJudge } from "./judge-store.ts";
 export {
   forgetChat,
   readRecentChats,

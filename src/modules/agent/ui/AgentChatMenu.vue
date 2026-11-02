@@ -9,6 +9,7 @@ import IconDownload from "~icons/lucide/download";
 import IconEllipsis from "~icons/lucide/ellipsis";
 import IconMessageCircleQuestion from "~icons/lucide/message-circle-question";
 import IconScanEye from "~icons/lucide/scan-eye";
+import IconScale from "~icons/lucide/scale";
 import IconSparkles from "~icons/lucide/sparkles";
 
 /** Secondary chat actions, kept out of the header so it stays a short row of durable controls. */
@@ -22,11 +23,14 @@ const props = defineProps<{
   isolate: boolean;
   /** The chat overrides the agent's feature defaults, so the menu marks it. */
   featuresChanged: boolean;
+  /** The chat overrides the global Judge settings. */
+  judgeChanged: boolean;
 }>();
 const emit = defineEmits<{
   lens: [];
   side: [];
   features: [];
+  judge: [];
   download: [];
   isolate: [];
 }>();
@@ -37,7 +41,7 @@ const menu = useIslandMenu({
   returnFocus: "button",
 });
 defineExpose({ anchor: () => menu.trigger.value });
-function run(action: "lens" | "side" | "features" | "download" | "isolate") {
+function run(action: "lens" | "side" | "features" | "judge" | "download" | "isolate") {
   menu.close();
   switch (action) {
     case "lens":
@@ -48,6 +52,9 @@ function run(action: "lens" | "side" | "features" | "download" | "isolate") {
       break;
     case "features":
       emit("features");
+      break;
+    case "judge":
+      emit("judge");
       break;
     case "download":
       emit("download");
@@ -66,7 +73,7 @@ function run(action: "lens" | "side" | "features" | "download" | "isolate") {
       size="sm"
       title="Ещё"
       aria-label="Ещё"
-      :active="lens || side || isolate || featuresChanged"
+      :active="lens || side || isolate || featuresChanged || judgeChanged"
       :aria-expanded="menu.open.value"
       @click="menu.toggle()"
     >
@@ -81,6 +88,14 @@ function run(action: "lens" | "side" | "features" | "download" | "isolate") {
           <span class="hint">Виджеты и команды IDE в этом чате</span>
         </span>
         <span v-if="featuresChanged" class="dot" aria-hidden="true" />
+      </button>
+      <button type="button" class="item" @click="run('judge')">
+        <IconScale aria-hidden="true" />
+        <span class="text">
+          <span class="title">Судья</span>
+          <span class="hint">Риск действия и автоматическое разрешение</span>
+        </span>
+        <span v-if="judgeChanged" class="dot" aria-hidden="true" />
       </button>
       <button type="button" class="item" :aria-pressed="lens" @click="run('lens')">
         <IconScanEye aria-hidden="true" />

@@ -3,6 +3,7 @@ import { resolveAgentBackend } from "./registry.ts";
 import { selectionFrom } from "./controls.ts";
 import { worktreeCwd, createWorktree } from "./worktrees.ts";
 import { asString } from "../transport/index.ts";
+import { normalizeJudgeOverride } from "../../../core/modules/agent-judge/index.ts";
 
 import type { MessagePart } from "./index.ts";
 import type { AgentHistoryTool, AgentHistoryTurn } from "../providers/index.ts";
@@ -94,6 +95,7 @@ export async function requestFrom(body: Record<string, unknown>) {
     features: Array.isArray(body.features)
       ? body.features.filter((id): id is string => typeof id === "string").slice(0, 50)
       : undefined,
+    judge: normalizeJudgeOverride(body.judge),
     projectId: projectId || undefined,
     cwd: folder,
     providerId: asString(body.providerId) || undefined,

@@ -10,6 +10,9 @@ import type { AgentBackendId, AgentEventName, AgentPermissionMode } from "./back
 import type { AgentHistoryTurn } from "../providers/index.ts";
 import type { AgentSelection } from "./controls.ts";
 import { changedSince, snapshotGit } from "./jobs-files.ts";
+import { resolveJudgeSettings } from "../../../core/modules/agent-judge/index.ts";
+import { createJudgedApproval, readJudgeSettings } from "../judge/index.ts";
+import { readChatJudge } from "./judge-store.ts";
 import {
   RESULT_LIMIT,
   change,
@@ -137,8 +140,19 @@ export async function drive(
           entry.abort.signal,
           ANSWER_TIMEOUT_MS,
         );
+        const approve = createJudgedApproval({
+          approve: bridge,
+          emit: (event, data) => emit(event, data),
+          settings: resolveJudgeSettings(
+            await readJudgeSettings(),
+            job.origin ? readChatJudge(job.origin) : undefined,
+          ),
+          cwd: job.cwd,
+          backend: job.backend,
+          signal: entry.abort.signal,
+        });
         try {
-          return await bridge(request);
+          return await approve(request);
         } catch {
           return false;
         } finally {

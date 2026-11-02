@@ -1,4 +1,5 @@
 import { reactive } from "vue";
+import type { JudgeOverride } from "../../../../core/modules/agent-judge/index.ts";
 import type {
   AgentCapabilities,
   AgentCommand,
@@ -49,6 +50,8 @@ export const createState = () =>
     isolate: false,
     /** Feature ids enabled for this chat only; undefined means the user's defaults. */
     featureOverrides: undefined as string[] | undefined,
+    /** Judge settings for this chat only; undefined means the global ones. */
+    judgeOverride: undefined as JudgeOverride | undefined,
     /** The message that started the answer being written (what a live addition refers to). */
     activeMessage: "",
     /** Messages written while an answer was running; delivered at the next model boundary when supported. */

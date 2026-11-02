@@ -15,6 +15,7 @@ import {
   AgentWebSettings,
   AgentMemorySettings,
   AgentModeSettings,
+  AgentJudgeSettings,
 } from "../agent/index.ts";
 import { AgentFeatureDefaults } from "../agent-features/index.ts";
 import { type SettingsSection } from "../settings/index.ts";
@@ -144,6 +145,14 @@ export const settingsSections: SettingsSection[] = [
     description: "Умения агентов по умолчанию; в табе агента их можно переопределить для чата.",
     keywords: "возможности умения фичи виджеты widgets графики формы агент",
     component: AgentFeatureDefaults,
+  },
+  {
+    id: "agent-judge",
+    title: "Судья Projector",
+    group: "Агент",
+    description: "Оценка риска действий и автоматическое разрешение безопасных запросов.",
+    keywords: "судья judge риск безопасность подтверждение разрешение авто threshold",
+    component: AgentJudgeSettings,
   },
   {
     id: "agent-memory",

@@ -5,6 +5,7 @@ import { chatProjectKey } from "../../chat-images/index.ts";
 import { useIdeCommands } from "../../ide/index.ts";
 import { workspaceRequest } from "../../workspace-api/index.ts";
 import { AgentFeaturesIsland } from "../../agent-features/index.ts";
+import AgentJudgeIsland from "./AgentJudgeIsland.vue";
 import { agentCommandHandler } from "../model/commands.ts";
 import { agentLabel, guiCommand, isBuiltinAgent } from "../model/modes.ts";
 import { chatDropHandlers } from "../lib/chat-drop.ts";
@@ -65,7 +66,7 @@ const agentName = computed(() => agentLabel(props.backend));
 const { api } = useIdeCommands();
 const chatMenu = ref<InstanceType<typeof AgentChatMenu>>();
 const featuresIsland = ref<InstanceType<typeof AgentFeaturesIsland>>();
-const featuresAnchor = () => chatMenu.value?.anchor();
+const judgeIsland = ref<InstanceType<typeof AgentJudgeIsland>>();
 const {
   key: chatKey,
   turns,
@@ -112,6 +113,8 @@ const {
   isolate,
   featureOverrides,
   setFeatureOverrides,
+  judgeOverride,
+  setJudgeOverride,
   worktreeId,
   worktreeInfo,
   mergeCopy,
@@ -553,7 +556,9 @@ onBeforeUnmount(() => {
         :can-isolate="plain && !turns.length"
         :isolate="isolate"
         :features-changed="featureOverrides !== undefined"
-        @features="featuresIsland?.openAt(featuresAnchor())"
+        :judge-changed="judgeOverride !== undefined"
+        @features="featuresIsland?.openAt(chatMenu?.anchor())"
+        @judge="judgeIsland?.openAt(chatMenu?.anchor())"
         @lens="lens.toggle()"
         @side="side.toggle()"
         @download="saveChatMarkdown(turns, agentName, backend)"
@@ -563,12 +568,21 @@ onBeforeUnmount(() => {
     <AgentFeaturesIsland
       ref="featuresIsland"
       :show-trigger="false"
-      :anchor="featuresAnchor"
+      :anchor="() => chatMenu?.anchor()"
       :backend="backend"
       :chat="chatKey"
       :overrides="featureOverrides"
       :disabled="loading"
       @update:overrides="setFeatureOverrides"
+    />
+    <AgentJudgeIsland
+      ref="judgeIsland"
+      :show-trigger="false"
+      :anchor="() => chatMenu?.anchor()"
+      :chat="chatKey"
+      :override="judgeOverride"
+      :disabled="loading"
+      @update:override="setJudgeOverride"
     />
     <div v-show="!viewed" ref="log" class="chat-log" @scroll.passive="trackScroll">
       <div v-if="loading" class="chat-loading" role="status">

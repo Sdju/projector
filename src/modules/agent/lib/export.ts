@@ -24,6 +24,12 @@ export function chatMarkdown(turns: AgentTurn[], title: string): string {
         body.push(`**Вы добавили:** ${part.text.trim()}`);
         continue;
       }
+      if (part.type === "judge") {
+        body.push(
+          `> Судья: риск ${part.verdict.score}/5 · ${part.verdict.label} — ${part.verdict.reason}`,
+        );
+        continue;
+      }
       const tool = byId.get(part.id);
       if (!tool) continue;
       const hint = inputHint(tool.input ?? "");

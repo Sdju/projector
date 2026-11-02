@@ -6,6 +6,8 @@ import {
   saveChatFeatures,
   saveHistory,
 } from "./history-store.ts";
+import { saveChatJudge } from "./judge-store.ts";
+import { normalizeJudgeOverride } from "../../../core/modules/agent-judge/index.ts";
 import type { ChatIndex } from "./history-store.ts";
 interface StoredTurn {
   id: string;
@@ -99,6 +101,26 @@ const turnSchema: z.ZodType<StoredTurn> = z.lazy(() =>
           z.object({ type: z.literal("tool"), id: z.string() }),
           z.object({ type: z.literal("note"), text: z.string() }),
           z.object({ type: z.literal("thought"), text: z.string() }),
+          z.object({
+            type: z.literal("judge"),
+            tool: z.string(),
+            title: z.string().optional(),
+            verdict: z.object({
+              score: z.union([
+                z.literal(1),
+                z.literal(2),
+                z.literal(3),
+                z.literal(4),
+                z.literal(5),
+              ]),
+              label: z.string(),
+              reason: z.string(),
+              confidence: z.enum(["high", "medium", "low"]),
+              effect: z.string().optional(),
+            }),
+            decision: z.literal("auto"),
+            at: z.number(),
+          }),
         ]),
       )
       .optional(),
@@ -125,11 +147,14 @@ export async function writeAgentHistory(
   value: unknown,
   index?: ChatIndex,
   features?: unknown,
+  judge?: unknown,
 ) {
   const turns = schema.parse(value);
   saveHistory(id, turns, index);
   // `undefined` keeps the chat's choice; `null` clears it back to the user's defaults.
   if (features !== undefined)
     saveChatFeatures(id, features === null ? null : featuresSchema.parse(features));
+  if (judge !== undefined)
+    saveChatJudge(id, judge === null ? null : (normalizeJudgeOverride(judge) ?? null));
   return turns;
 }

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { dataDir } from "../../../core/modules/app-paths/index.ts";
 import { os } from "../../../core/modules/os/index.ts";
+import type { JudgeOverride } from "../../../core/modules/agent-judge/index.ts";
 import type { AgentHistoryTurn } from "../providers/index.ts";
 import type { AgentBackendId, AgentPermissionMode, MessagePart } from "./backend.ts";
 import type { AgentSelection } from "./controls.ts";
@@ -16,6 +17,8 @@ export interface AgentRunRecord {
   history: AgentHistoryTurn[];
   /** Feature ids chosen for the chat; absent means the user's defaults. */
   features?: string[];
+  /** The chat's own Judge settings; absent means the global ones. */
+  judge?: JudgeOverride;
   cwd?: string;
   sessionId?: string;
   messageId?: string;

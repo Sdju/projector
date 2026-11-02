@@ -122,6 +122,16 @@ const segments = computed(() => {
       if (part.text.trim()) addWork(index, { key: `r${index}`, type: "thought", text: part.text });
       continue;
     }
+    if (part.type === "judge") {
+      addWork(index, {
+        key: `j${index}`,
+        type: "judge",
+        tool: part.tool,
+        ...(part.title ? { title: part.title } : {}),
+        verdict: part.verdict,
+      });
+      continue;
+    }
     const tool = byId.get(part.id);
     if (!tool) continue;
     const last = result.at(-1);

@@ -71,7 +71,15 @@ export default {
     },
     inventory: { uncovered: true },
     extra: {
-      largeFiles: { thresholds: { default: 400, ".vue": 500 }, files: {} },
+      largeFiles: {
+        thresholds: { default: 400, ".vue": 500 },
+        files: {
+          "src/modules/agent/ui/AgentChat.vue": {
+            ceiling: 503,
+            plan: "Вынести меню «Ещё» и острова возможностей/Судьи в AgentChatHeader",
+          },
+        },
+      },
       confine: adapters,
     },
   },

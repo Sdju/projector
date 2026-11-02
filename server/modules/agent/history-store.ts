@@ -93,6 +93,8 @@ export function historyDatabase(): DatabaseSync {
   ensureColumn(db, "chat_index", "session", "TEXT");
   // Feature overrides of a chat, as JSON; NULL means the user's defaults apply.
   ensureColumn(db, "chats", "features", "TEXT");
+  // Judge settings of a chat, as JSON; NULL means the global settings apply.
+  ensureColumn(db, "chats", "judge", "TEXT");
   void chmod(file, 0o600).catch(() => {});
   databases.set(file, db);
   return db;

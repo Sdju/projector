@@ -51,6 +51,30 @@ test("Claude Code thinking is streamed once, not again with the whole message", 
   expect(thoughts(events)).toEqual(["шаг 1", "без стрима"]);
 });
 
+test("Judge adds one note per automatic decision and its verdict reaches the card", () => {
+  const state = { permissions: [], questions: [], secrets: [] };
+  const turn = { id: "t", role: "assistant", text: "", tools: [] };
+  const apply = (event, data) => applyAgentEvent(state, turn, { event, data }, () => {});
+  const verdict = {
+    score: 2,
+    label: "низкий",
+    reason: "Правка внутри проекта",
+    confidence: "high",
+  };
+  apply("judge", { tool: "bash", title: "Правка", verdict, decision: "auto", at: 1 });
+  apply("judge", { tool: "bash", title: "Правка", verdict, decision: "auto", at: 1 });
+  expect(turn.parts).toEqual([
+    { type: "judge", tool: "bash", title: "Правка", verdict, decision: "auto", at: 1 },
+  ]);
+  apply("permission-request", {
+    id: "p",
+    tool: "bash",
+    input: { command: "rm -rf /" },
+    judge: { ...verdict, score: 4, label: "высокий" },
+  });
+  expect(state.permissions[0].judge).toMatchObject({ score: 4, label: "высокий" });
+});
+
 test("thoughts join into one part and stay out of the answer text", () => {
   const state = { permissions: [], questions: [] };
   const turn = { id: "t", role: "assistant", text: "", tools: [] };

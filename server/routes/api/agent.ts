@@ -23,6 +23,7 @@ import {
   worktreeCwd,
   readAgentHistory,
   readChatFeatures,
+  readChatJudge,
   readAttachment,
   saveAttachment,
   writeAgentHistory,
@@ -69,9 +70,14 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
         body.turns,
         project && backend ? { project, backend, ...(title ? { title } : {}) } : undefined,
         body.features,
+        body.judge,
       );
     }
-    json(res, 200, { turns, features: readChatFeatures(id) ?? null });
+    json(res, 200, {
+      turns,
+      features: readChatFeatures(id) ?? null,
+      judge: readChatJudge(id) ?? null,
+    });
     return true;
   }
   if (path === "/api/agent/backends" && method === "GET") {

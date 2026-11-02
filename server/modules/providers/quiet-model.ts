@@ -1,11 +1,8 @@
 import { defaultSettingsMiddleware, wrapLanguageModel } from "ai";
 import type { LanguageModel } from "ai";
-import {
-  createQwenOpenAI,
-  envFallbackFromProcess,
-  quietThinkingBody,
-  resolveOpenAIProvider,
-} from "../../providers/index.ts";
+import { createQwenOpenAI } from "./openai-client.ts";
+import { envFallbackFromProcess, resolveOpenAIProvider } from "./provider-store.ts";
+import { quietThinkingBody } from "./thinking.ts";
 
 /**
  * The chat's provider and model with thinking turned down: one cheap request, no tools and no

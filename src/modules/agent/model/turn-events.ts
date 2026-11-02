@@ -144,8 +144,18 @@ export function applyAgentEvent(
           event.data.detail?.trim() ||
           formatToolInput(event.data.tool, summarize(event.data.input)),
         persistent: event.data.persistent === true,
+        ...(event.data.judge ? { judge: event.data.judge } : {}),
       });
       return false;
+    case "judge": {
+      const parts = (assistant.parts ??= legacyParts(assistant));
+      const known = parts.some(
+        (part) =>
+          part.type === "judge" && part.tool === event.data.tool && part.at === event.data.at,
+      );
+      if (!known) parts.push({ type: "judge", ...event.data });
+      return false;
+    }
     case "question-request":
       state.questions.push(event.data);
       return false;

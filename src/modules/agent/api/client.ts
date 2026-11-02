@@ -1,3 +1,4 @@
+import type { JudgeOverride } from "../../../../core/modules/agent-judge/index.ts";
 import { answerCommand } from "./commands.ts";
 import { EVENTS_UNAVAILABLE, EventStreamRefused, streamViaEvents } from "./event-stream.ts";
 import { parseSse } from "./sse.ts";
@@ -54,6 +55,8 @@ export async function streamAgent(
     tail?: string;
     /** Feature ids enabled for this chat, overriding the defaults; an empty list means none. */
     features?: string[];
+    /** The chat's own Judge settings; absent means the global ones. */
+    judge?: JudgeOverride;
     /** The isolated copy of the project the chat works in. */
     worktree?: string;
     /** Start the chat in a new isolated copy of the project. */
@@ -80,6 +83,7 @@ export async function streamAgent(
         messageId: options.messageId,
         tail: options.tail,
         features: options.features,
+        judge: options.judge,
         worktree: options.worktree,
         isolate: options.isolate,
         approvals: true,

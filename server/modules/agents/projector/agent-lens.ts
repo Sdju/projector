@@ -1,7 +1,6 @@
 import { generateText } from "ai";
-import type { AgentHistoryTurn } from "../../providers/index.ts";
+import { quietChatModel, type AgentHistoryTurn } from "../../providers/index.ts";
 import type { LensRequest } from "../../agent/index.ts";
-import { quietChatModel } from "./quiet-model.ts";
 
 /**
  * Lens is a short live caption of the chat, not a second agent: no tools, no history of its own

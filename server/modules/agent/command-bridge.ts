@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { JudgeVerdict } from "../../../core/modules/agent-judge/index.ts";
 
 export interface CommandRequest {
   operation: "list" | "describe" | "execute";
@@ -18,6 +19,8 @@ export interface ApprovalRequest {
   detail?: string;
   /** The backend can remember the decision, so the prompt offers a separate "always" choice. */
   persistent?: boolean;
+  /** Projector Judge's verdict, filled before the card reaches the user. */
+  judge?: JudgeVerdict;
 }
 
 /** `true` allows this call once, `"always"` also remembers it; `false` denies. */

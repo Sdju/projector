@@ -24,6 +24,7 @@ export function saveChat(
         body: JSON.stringify({
           turns: state.turns,
           features: state.featureOverrides ?? null,
+          judge: state.judgeOverride ?? null,
           ...(index ? { projectId: index.project, backend: index.backend } : {}),
         }),
       });

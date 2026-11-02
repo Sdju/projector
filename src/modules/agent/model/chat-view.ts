@@ -41,3 +41,14 @@ export function featureChoice(state: ChatState, persist: () => void) {
     },
   };
 }
+
+/** The chat's Judge override: reactive for the island, saved with the chat when it changes. */
+export function judgeChoice(state: ChatState, persist: () => void) {
+  return {
+    judgeOverride: computed(() => state.judgeOverride),
+    setJudgeOverride(value: ChatState["judgeOverride"]) {
+      state.judgeOverride = value;
+      persist();
+    },
+  };
+}
