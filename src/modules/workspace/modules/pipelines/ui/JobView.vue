@@ -6,7 +6,11 @@ import { relativeTime } from "../../../../../common/utilities/commit-format.ts";
 import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab-readout.ts";
 import { useCommandRegistrar, useCommandScope } from "../../../../../common/utilities/commands.ts";
 import { useJobDetail } from "../lib/detail.ts";
-import { durationLabel, PIPELINE_STATUS_LABEL } from "../lib/status.ts";
+import {
+  durationLabel,
+  PIPELINE_STATUS_LABEL,
+  refLabel,
+} from "../../../../../../core/modules/workspace/index.ts";
 import IconExternal from "~icons/lucide/external-link";
 
 /** Job tab: status, stage and the readonly trace of one CI job. */
@@ -70,7 +74,7 @@ useTabReadout(() => {
       </UiInline>
       <UiInline as="p" class="meta" wrap>
         <span v-if="detail.job.stage">{{ detail.job.stage }}</span>
-        <span v-if="detail.job.ref" class="mono">{{ detail.job.ref }}</span>
+        <span v-if="detail.job.ref" class="mono">{{ refLabel(detail.job.ref) }}</span>
         <span v-if="detail.job.createdAt" :title="detail.job.createdAt"
           >создан {{ relativeTime(detail.job.createdAt) }}</span
         >

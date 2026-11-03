@@ -84,6 +84,7 @@ const emit = defineEmits<{ open: [path: string] }>();
         </UiInline>
       </UiInline>
       <slot name="stats" />
+      <slot name="summary" />
       <ul v-if="labels.length" class="labels">
         <li
           v-for="label in labels"

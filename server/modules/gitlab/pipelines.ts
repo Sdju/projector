@@ -16,8 +16,10 @@ const JOB_PAGE = 100;
 const JOB_LIMIT = 300;
 const TRACE_LIMIT = 2 * 1024 * 1024;
 const ANSI = /\u001b\[[0-9;?]*[ -/]*[@-~]/g;
-const SECTION_START = /^section_start:\d+:([^\r\n]*)\r?\n?/gm;
-const SECTION_END = /^section_end:\d+:[^\r\n]*\r?\n?/gm;
+/** GitLab prefixes every trace line with an ISO time and a stream marker (`00O`, `00E`, `00O+`). */
+const TRACE_PREFIX = /^\uFEFF?\d{4}-\d{2}-\d{2}T\S+ \d\d[OE][+-]? ?/;
+const SECTION_START = /section_start:\d+:([^\r\n]*?)\r?$/;
+const SECTION_END = /section_end:\d+:[^\r\n]*\r?$/;
 
 /** GitLab pipeline states that the list endpoint accepts as a filter. */
 const FILTER_STATUSES = new Set([
@@ -49,7 +51,7 @@ const STATUS: Record<string, PipelineStatus> = {
   manual: "manual",
 };
 
-interface ApiPipeline {
+export interface ApiPipeline {
   id: number;
   status?: string;
   source?: string;
@@ -83,7 +85,7 @@ function pipelineStatus(value?: string): PipelineStatus {
   return STATUS[value || ""] ?? "unknown";
 }
 
-function pipeline(raw: ApiPipeline): Pipeline {
+export function pipeline(raw: ApiPipeline): Pipeline {
   return {
     id: raw.id,
     name: raw.name || "",
@@ -202,11 +204,21 @@ export async function browseGitlabPipeline(
 }
 
 function cleanTrace(value: string) {
-  // GitLab wraps groups of lines in section markers; show the name as a plain heading.
-  return value
-    .replace(ANSI, "")
-    .replace(SECTION_START, (_, name: string) => `▶ ${name}\n`)
-    .replace(SECTION_END, "");
+  // GitLab prefixes lines with a timestamp and stream marker, and wraps groups of lines in
+  // section markers; show the section name as a plain heading.
+  const lines = value.replace(ANSI, "").split("\n");
+  const clean: string[] = [];
+  for (const raw of lines) {
+    const line = raw.replace(TRACE_PREFIX, "").replace(/\r$/, "");
+    const start = SECTION_START.exec(line);
+    if (start) {
+      clean.push(`▶ ${start[1]}`);
+      continue;
+    }
+    if (SECTION_END.test(line)) continue;
+    clean.push(line);
+  }
+  return clean.join("\n");
 }
 
 async function traceText(response: Response): Promise<{ log: string; truncated: boolean }> {

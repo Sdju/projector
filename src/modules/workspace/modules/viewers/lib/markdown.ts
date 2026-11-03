@@ -1,5 +1,6 @@
 import { workspaceAssetUrl } from "../../../../workspace-api/index.ts";
 import { markdownPath } from "../../../../../common/utilities/markdown-path.ts";
+import { splitEmoji, type EmojiMap } from "../../../../../common/utilities/github-emoji.ts";
 import MarkdownIt from "markdown-it";
 import taskLists from "markdown-it-task-lists";
 import hljs from "highlight.js/lib/common";
@@ -7,7 +8,49 @@ import DOMPurify from "dompurify";
 
 export { markdownPath };
 
-export function renderMarkdown(content: string, path: string, projectId: string) {
+/** GitLab writes image dimensions after the image: `![](url){width=12}`. */
+const IMAGE_ATTRIBUTES = /(!\[[^\]]*\]\([^)]*\))\{(?:width|height)=\d+\}/g;
+/** Read-only cards do not resize images: drop the attribute text that Markdown keeps. */
+export function stripImageAttributes(content: string) {
+  return content.replace(IMAGE_ATTRIBUTES, "$1");
+}
+
+function decorateEmoji(root: HTMLElement, emojis: EmojiMap) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes: Text[] = [];
+  while (walker.nextNode()) {
+    const node = walker.currentNode as Text;
+    if (!node.nodeValue?.includes(":")) continue;
+    if (node.parentElement?.closest("code, pre")) continue;
+    nodes.push(node);
+  }
+  for (const node of nodes) {
+    const parts = splitEmoji(node.nodeValue ?? "", emojis);
+    if (parts.every((part) => typeof part === "string")) continue;
+    const fragment = document.createDocumentFragment();
+    for (const part of parts) {
+      if (typeof part === "string") {
+        fragment.append(part);
+        continue;
+      }
+      const image = document.createElement("img");
+      image.className = "github-emoji";
+      image.src = part.url;
+      image.alt = `:${part.name}:`;
+      image.title = `:${part.name}:`;
+      image.loading = "lazy";
+      fragment.append(image);
+    }
+    node.replaceWith(fragment);
+  }
+}
+
+export function renderMarkdown(
+  content: string,
+  path: string,
+  projectId: string,
+  emojis: EmojiMap = {},
+) {
   const md = new MarkdownIt({
     html: true,
     linkify: true,
@@ -56,5 +99,6 @@ export function renderMarkdown(content: string, path: string, projectId: string)
     if (target) image.setAttribute("src", workspaceAssetUrl(projectId, target));
     image.setAttribute("loading", "lazy");
   }
+  decorateEmoji(document, emojis);
   return document.innerHTML;
 }

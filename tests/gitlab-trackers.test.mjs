@@ -442,6 +442,70 @@ test("GitLab merge request falls back to /changes and tolerates missing approval
   expect(empty.filesTruncated).toBe(false);
 });
 
+test("GitLab merge request exposes its latest pipeline, reviewers and approval quota", async () => {
+  await setup();
+  mockFetch((address) => {
+    const url = new URL(address);
+    const path = url.pathname;
+    if (path === `/api/v4/projects/${id}/merge_requests/11`)
+      return Response.json(
+        mergeRequestRow({
+          iid: 11,
+          reviewers: [
+            { username: "rev", avatar_url: "" },
+            { username: "duo", avatar_url: "" },
+          ],
+          head_pipeline: {
+            id: 99,
+            status: "running",
+            source: "merge_request_event",
+            ref: "refs/merge-requests/11/merge",
+            sha: "b".repeat(40),
+            web_url: "https://gitlab.com/group/project/-/pipelines/99",
+            created_at: "2024-01-01T00:00:00Z",
+            updated_at: "2024-01-01T00:01:00Z",
+            duration: null,
+            user: { username: "tanuki", avatar_url: "" },
+          },
+        }),
+      );
+    if (path === `/api/v4/projects/${id}/merge_requests/11/award_emoji`) return Response.json([]);
+    if (path === `/api/v4/projects/${id}/merge_requests/11/approvals`)
+      return Response.json({
+        approved_by: [{ user: { id: 5, username: "rev" } }],
+        approvals_required: 2,
+        approvals_left: 1,
+      });
+    if (path === `/api/v4/projects/${id}/merge_requests/11/notes`) return Response.json([]);
+    if (path === `/api/v4/projects/${id}/merge_requests/11/diffs`) return Response.json([]);
+    return Response.json({}, { status: 404 });
+  });
+  const { browseGitlabMergeRequest } = await import("../server/modules/gitlab/index.ts");
+  const detail = await browseGitlabMergeRequest(repository, 11);
+  expect(detail.pipeline).toStrictEqual({
+    id: 99,
+    name: "",
+    status: "running",
+    source: "merge_request_event",
+    ref: "refs/merge-requests/11/merge",
+    sha: "b".repeat(40),
+    author: { login: "tanuki", avatarUrl: "" },
+    webUrl: "https://gitlab.com/group/project/-/pipelines/99",
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:01:00Z",
+    duration: null,
+  });
+  expect(detail.reviewers).toStrictEqual([
+    { login: "rev", avatarUrl: "" },
+    { login: "duo", avatarUrl: "" },
+  ]);
+  expect(detail.approvals).toStrictEqual({
+    approvedBy: [{ login: "rev", avatarUrl: "" }],
+    required: 2,
+    left: 1,
+  });
+});
+
 test("GitLab merge request files stop at 300 and report truncation", async () => {
   await setup();
   const pages = [];

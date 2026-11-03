@@ -122,6 +122,8 @@ export function baseTabViews(): TabViews {
         projectId: host.projectId,
         number: tab.params?.number,
         onOpen: host.openFile,
+        onOpenPipeline: (pipeline: { id: number; title?: string }) =>
+          host.openTab("pipeline", pipeline, { preview: false }),
       }),
     },
     discussion: {

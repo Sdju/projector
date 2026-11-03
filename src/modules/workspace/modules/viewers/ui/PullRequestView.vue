@@ -1,13 +1,21 @@
 <script setup lang="ts">
 import UiHint from "../../../../../common/ui/UiHint.vue";
 import UiHeading from "../../../../../common/ui/UiHeading.vue";
+import UiStatusDot from "../../../../../common/ui/UiStatusDot.vue";
 import { computed } from "vue";
 import type {
   PullRequestDetail,
   PullRequestFile,
   PullRequestReview,
 } from "../../../../../../core/modules/workspace/index.ts";
+import { countRu } from "../../../../../common/utilities/plural.ts";
+import { relativeTime } from "../../../../../common/utilities/commit-format.ts";
 import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab-readout.ts";
+import {
+  durationLabel,
+  PIPELINE_STATUS_LABEL,
+  PIPELINE_STATUS_TONE,
+} from "../../../../../../core/modules/workspace/index.ts";
 import { useTrackerDetail } from "../lib/tracker-detail.ts";
 import TrackerComments from "./TrackerComments.vue";
 import TrackerDetail from "./TrackerDetail.vue";
@@ -25,7 +33,10 @@ const props = withDefaults(
   }>(),
   { host: "GitHub", short: "PR", noun: "pull request" },
 );
-const emit = defineEmits<{ open: [path: string] }>();
+const emit = defineEmits<{
+  open: [path: string];
+  openPipeline: [pipeline: { id: number; title?: string }];
+}>();
 const { detail, loading, error } = useTrackerDetail<PullRequestDetail>(
   () => props.projectId,
   () => props.number,
@@ -67,6 +78,27 @@ const stateLabel = computed(() => {
   const pull = detail.value?.pull;
   return pull?.draft && pull.state === "open" ? "черновик" : STATE_LABEL[pull?.state ?? "open"];
 });
+const pipeline = computed(() => detail.value?.pipeline ?? null);
+const approvedLogins = computed(
+  () => new Set((detail.value?.reviews ?? []).map((review) => review.author.login)),
+);
+/** Reviewers with the state the approvals endpoint exposes; approvers missing from the list are added. */
+const reviewers = computed(() => {
+  const seen = new Set<string>();
+  const rows = (detail.value?.reviewers ?? []).map((author) => {
+    seen.add(author.login);
+    return { author, approved: approvedLogins.value.has(author.login) };
+  });
+  for (const author of detail.value?.approvals?.approvedBy ?? []) {
+    if (seen.has(author.login)) continue;
+    seen.add(author.login);
+    rows.push({ author, approved: true });
+  }
+  return rows.sort((left, right) => Number(right.approved) - Number(left.approved));
+});
+const openPipeline = () => {
+  if (pipeline.value) emit("openPipeline", { id: pipeline.value.id, title: pipeline.value.name });
+};
 
 // Что штатный агент видит во вкладке pull request: состояние, ветки, статистика, ревью и файлы.
 useTabReadout(() => {
@@ -89,6 +121,14 @@ useTabReadout(() => {
       `Автор: ${pull.author.login}, создано ${pull.createdAt}`,
       `Ветки: ${pull.head} → ${pull.base}`,
       `Коммитов: ${data.commits}, файлов: ${data.changedFiles}, +${data.additions} −${data.deletions}`,
+      data.pipeline
+        ? `Pipeline: #${data.pipeline.id} ${PIPELINE_STATUS_LABEL[data.pipeline.status]}`
+        : "",
+      reviewers.value.length
+        ? `Ревьюеры: ${reviewers.value
+            .map((reviewer) => `${reviewer.author.login}${reviewer.approved ? " (одобрил)" : ""}`)
+            .join(", ")}`
+        : "",
       pull.labels.length
         ? `Метки: ${pull.labels.map((label) => label.name).join(", ")}`
         : "Метки: нет",
@@ -132,10 +172,47 @@ useTabReadout(() => {
     <template #meta>
       <span class="branches">{{ detail?.pull.head }} → {{ detail?.pull.base }}</span>
     </template>
+    <template #summary>
+      <div v-if="pipeline" class="pipeline-bar">
+        <button
+          type="button"
+          class="pipeline-open"
+          :title="`Открыть pipeline #${pipeline.id}`"
+          @click="openPipeline"
+        >
+          <UiStatusDot :tone="PIPELINE_STATUS_TONE[pipeline.status]" shrink />
+          <span class="pipeline-title">Pipeline #{{ pipeline.id }}</span>
+          <span class="pipeline-state">{{ PIPELINE_STATUS_LABEL[pipeline.status] }}</span>
+          <span v-if="durationLabel(pipeline.duration)" class="pipeline-meta"
+            >за {{ durationLabel(pipeline.duration) }}</span
+          >
+          <span v-if="pipeline.createdAt" class="pipeline-meta" :title="pipeline.createdAt"
+            >создан {{ relativeTime(pipeline.createdAt) }}</span
+          >
+        </button>
+        <a
+          v-if="pipeline.webUrl"
+          class="pipeline-external"
+          :href="pipeline.webUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          >на {{ host }}</a
+        >
+      </div>
+      <p v-if="reviewers.length" class="review-line">
+        <span class="approvals">Ревьюеры</span>
+        <span v-for="reviewer in reviewers" :key="reviewer.author.login" class="reviewer">
+          <span :class="{ approved: reviewer.approved }">{{ reviewer.author.login }}</span>
+          <span class="reviewer-mark" :class="{ approved: reviewer.approved }">{{
+            reviewer.approved ? "✓" : "○"
+          }}</span>
+        </span>
+      </p>
+    </template>
     <template #stats>
       <p v-if="detail" class="stats">
-        <span>{{ detail.commits }} коммитов</span>
-        <span>{{ detail.changedFiles }} файлов</span>
+        <span>{{ countRu(detail.commits, "коммит", "коммита", "коммитов") }}</span>
+        <span>{{ countRu(detail.changedFiles, "файл", "файла", "файлов") }}</span>
         <span class="add">+{{ detail.additions }}</span>
         <span class="del">−{{ detail.deletions }}</span>
       </p>
@@ -205,6 +282,72 @@ useTabReadout(() => {
   margin: var(--sp-2) 0 0;
   color: var(--muted);
   font-size: var(--fs-xs);
+}
+.pipeline-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  font-size: var(--fs-xs);
+}
+.pipeline-open {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+  color: var(--text-2);
+}
+.pipeline-open:hover {
+  color: var(--text);
+}
+.pipeline-title {
+  font-family: var(--mono);
+}
+.pipeline-state {
+  color: var(--muted);
+}
+.pipeline-meta {
+  color: var(--faint);
+  font-size: var(--fs-2xs);
+  white-space: nowrap;
+}
+.pipeline-external {
+  color: var(--muted);
+  font-size: var(--fs-2xs);
+  text-decoration: underline;
+  white-space: nowrap;
+}
+.review-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: var(--sp-2) 0 0;
+  color: var(--muted);
+  font-size: var(--fs-2xs);
+}
+.approvals {
+  color: var(--text-2);
+}
+.reviewer {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-family: var(--mono);
+}
+.reviewer .approved {
+  color: var(--run);
+}
+.reviewer-mark {
+  color: var(--faint);
+}
+.reviewer-mark.approved {
+  color: var(--run);
 }
 .add {
   color: var(--run);

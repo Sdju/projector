@@ -104,6 +104,8 @@ const tabViews: TabViews = {
       short: "MR",
       noun: "merge request",
       onOpen: host.openFile,
+      onOpenPipeline: (pipeline: { id: number; title?: string }) =>
+        host.openTab("pipeline", pipeline, { preview: false }),
     }),
   },
   pipeline: {
@@ -113,8 +115,8 @@ const tabViews: TabViews = {
       projectId: host.projectId,
       id: tab.params?.id,
       host: "GitLab",
-      onOpenJob: (job: { id: number; title: string }, pinned?: boolean) =>
-        host.openTab("job", job, { preview: !pinned }),
+      onOpenJob: (job: { id: number; title: string }) =>
+        host.openTab("job", job, { preview: false }),
     }),
   },
   job: {

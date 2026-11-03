@@ -1,6 +1,7 @@
 import { HttpError } from "../http/index.ts";
 import type {
   PullRequest,
+  PullRequestApprovals,
   PullRequestDetail,
   PullRequestFile,
   PullRequestList,
@@ -17,6 +18,7 @@ import {
   projectId,
   type ApiDiff,
 } from "./browser.ts";
+import { pipeline, type ApiPipeline } from "./pipelines.ts";
 import {
   awardReactions,
   gitlabLabels,
@@ -57,6 +59,7 @@ interface ApiMergeRequest {
   work_in_progress?: boolean;
   merged_at?: string | null;
   author?: GitlabUser;
+  reviewers?: GitlabUser[];
   labels?: Array<GitlabLabel | string>;
   description?: string | null;
   web_url?: string;
@@ -66,9 +69,13 @@ interface ApiMergeRequest {
   target_branch?: string;
   changes_count?: string | number;
   commits_count?: number;
+  head_pipeline?: ApiPipeline | null;
+  pipeline?: ApiPipeline | null;
 }
 interface ApiApprovals {
   approved_by?: Array<{ user?: GitlabUser }>;
+  approvals_required?: number;
+  approvals_left?: number;
 }
 
 function pullState(raw: ApiMergeRequest): PullRequestState {
@@ -103,6 +110,19 @@ function mergeRequestFile(raw: ApiDiff): PullRequestFile {
     status: FILE_STATUS[diffStatus(raw)] ?? "modified",
     additions: counts.additions,
     deletions: counts.deletions,
+  };
+}
+
+function approvalsOf(raw: ApiApprovals): PullRequestApprovals {
+  const approvedBy = (raw.approved_by ?? []).flatMap((entry) =>
+    entry.user ? [gitlabUser(entry.user)] : [],
+  );
+  const required = Number(raw.approvals_required);
+  const left = Number(raw.approvals_left);
+  return {
+    approvedBy,
+    required: Number.isFinite(required) && required > 0 ? required : 0,
+    left: Number.isFinite(left) && left >= 0 ? left : 0,
   };
 }
 
@@ -225,6 +245,13 @@ export async function browseGitlabMergeRequest(
     changedFiles,
     comments,
     reviews: approvedBy(approvals),
+    reviewers: (raw.reviewers ?? []).map(gitlabUser),
+    approvals: approvalsOf(approvals),
+    pipeline: raw.head_pipeline
+      ? pipeline(raw.head_pipeline)
+      : raw.pipeline
+        ? pipeline(raw.pipeline)
+        : null,
     files,
     commentsTruncated: truncated,
     // `changes_count` counts every file of the MR; the diff pages may stop earlier.

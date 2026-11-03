@@ -17,9 +17,10 @@ import {
   splitFrontmatter,
   type Frontmatter,
 } from "../lib/frontmatter.ts";
-import { markdownPath, renderMarkdown } from "../lib/markdown.ts";
+import { markdownPath, renderMarkdown, stripImageAttributes } from "../lib/markdown.ts";
 import { githubEmojiDecorations } from "../lib/markdown-emoji.ts";
 import { createCrepe, normalizeImageAttributes } from "../lib/crepe-options.ts";
+import type { EmojiMap } from "../../../../../common/utilities/github-emoji.ts";
 import { useMarkdownInteractions } from "../lib/markdown-links.ts";
 import "@milkdown/crepe/theme/common/style.css";
 import "@milkdown/crepe/theme/classic-dark.css";
@@ -53,6 +54,7 @@ const frontmatter = ref<Frontmatter | undefined>(initial.frontmatter);
 let currentContent = props.content;
 let baselineContent = initial.body;
 let currentBody = initial.body;
+let emojiMap: EmojiMap = {};
 const newKey = ref<string>();
 const vFocus = { mounted: (element: HTMLElement) => element.focus() };
 let baselineDocument: Node | undefined;
@@ -65,7 +67,8 @@ const { linkMouseDown, followLink } = useMarkdownInteractions({
 });
 
 function split(content: string) {
-  return props.compact ? { body: content } : splitFrontmatter(content);
+  const parts = props.compact ? { body: content } : splitFrontmatter(content);
+  return props.editable === false ? { ...parts, body: stripImageAttributes(parts.body) } : parts;
 }
 function applyFrontmatter(raw: string | undefined) {
   if (raw === undefined || !frontmatter.value || raw === frontmatter.value.raw) return false;
@@ -124,7 +127,10 @@ onMounted(async () => {
   crepe = editor;
   editor.editor.use(normalizeImageAttributes);
   // Only a readonly document (issue, comment) shows emoji images; an edited file stays as typed.
-  if (props.editable === false) editor.editor.use(githubEmojiDecorations(await loadGithubEmojis()));
+  if (props.editable === false) {
+    emojiMap = await loadGithubEmojis();
+    editor.editor.use(githubEmojiDecorations(emojiMap));
+  }
   editor.editor
     .use(
       $prose(
@@ -146,7 +152,12 @@ onMounted(async () => {
         const dom = document.createElement("span");
         dom.className = "markdown-html";
         dom.contentEditable = "false";
-        dom.innerHTML = renderMarkdown(String(node.attrs.value), props.path, props.projectId);
+        dom.innerHTML = renderMarkdown(
+          String(node.attrs.value),
+          props.path,
+          props.projectId,
+          emojiMap,
+        );
         return { dom, ignoreMutation: () => true };
       }),
     );
@@ -220,7 +231,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     class="visual-markdown"
-    :class="{ compact }"
+    :class="{ compact, readonly: !editable }"
     @mousedown.capture="linkMouseDown"
     @click.capture="followLink"
   >
@@ -521,6 +532,20 @@ onBeforeUnmount(() => {
 .visual-markdown :deep(.markdown-html p) {
   margin: 0;
 }
+.visual-markdown :deep(.markdown-html table) {
+  table-layout: auto;
+  width: 100%;
+}
+.visual-markdown :deep(.markdown-html th),
+.visual-markdown :deep(.markdown-html td) {
+  padding: 2px var(--sp-2);
+  vertical-align: top;
+}
+.visual-markdown :deep(img.github-emoji) {
+  width: 1.1em;
+  height: 1.1em;
+  vertical-align: -0.15em;
+}
 .visual-markdown :deep(input[type="checkbox"]) {
   width: auto;
   accent-color: var(--run);
@@ -607,6 +632,17 @@ onBeforeUnmount(() => {
 .visual-markdown :deep(.milkdown-code-block .cm-content) {
   font: var(--fs-sm) var(--mono);
 }
+/* Read-only documents keep the code, not the editing chrome: no language picker or line numbers. */
+.visual-markdown.readonly :deep(.milkdown-code-block .tools .language-button),
+.visual-markdown.readonly :deep(.milkdown-code-block .cm-gutters) {
+  display: none;
+}
+.visual-markdown.compact.readonly :deep(.milkdown-code-block .tools) {
+  display: none;
+}
+.visual-markdown.readonly :deep(.milkdown-code-block .cm-content) {
+  padding-left: var(--sp-3);
+}
 .visual-markdown :deep(.milkdown-code-block .cm-gutters) {
   color: var(--faint);
   font: var(--fs-2xs) var(--mono);
@@ -623,6 +659,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
   background: var(--bg-2);
+  color: var(--text);
   font: 0.9em var(--mono);
 }
 /* Встроенный readonly-блок: без полей документа, высота по содержимому. */

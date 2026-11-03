@@ -249,6 +249,13 @@ export interface PullRequestReview {
   htmlUrl: string;
   submittedAt: string;
 }
+/** Approval state of a merge request; hosts without an approvals API leave it empty. */
+export interface PullRequestApprovals {
+  approvedBy: IssueUser[];
+  /** Number of approvals the host requires; 0 when it does not report a quota. */
+  required: number;
+  left: number;
+}
 export interface PullRequestDetail {
   pull: PullRequest;
   commits: number;
@@ -259,6 +266,12 @@ export interface PullRequestDetail {
   comments: IssueComment[];
   reviews: PullRequestReview[];
   files: PullRequestFile[];
+  /** Reviewers invited to the review, with their current state in `reviews`. */
+  reviewers?: IssueUser[];
+  /** Host-specific approval quota of a merge request. */
+  approvals?: PullRequestApprovals;
+  /** Latest pipeline of the source branch, when the host exposes one. */
+  pipeline?: Pipeline | null;
   /** The host returned more comments or files than the reader loads at once. */
   commentsTruncated: boolean;
   filesTruncated: boolean;

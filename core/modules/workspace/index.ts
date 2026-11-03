@@ -21,6 +21,13 @@ export type {
 export { layoutGraph } from "./git-graph.ts";
 export type { GraphRow } from "./git-graph.ts";
 export type { GitBranch, GitBranches } from "./contract.ts";
+export {
+  durationLabel,
+  PIPELINE_STATUS_LABEL,
+  PIPELINE_STATUS_TONE,
+  refLabel,
+  sourceLabel,
+} from "./pipeline-status.ts";
 export type {
   Discussion,
   DiscussionComment,
@@ -35,6 +42,7 @@ export type {
   Reaction,
   ReactionKind,
   PullRequest,
+  PullRequestApprovals,
   PullRequestDetail,
   PullRequestFile,
   PullRequestList,

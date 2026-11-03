@@ -176,7 +176,7 @@ test("GitLab job detail reads a trace, strips ANSI and survives a missing trace"
     if (url.pathname === `/api/v4/projects/${id}/jobs/7`) return Response.json(jobRow());
     if (url.pathname === `/api/v4/projects/${id}/jobs/7/trace`)
       return new Response(
-        "\u001b[31mred\u001b[0m\nsection_start:1:build\r\nok\nsection_end:2:build\r\n",
+        "\u001b[31mred\u001b[0m\n2026-11-02T22:01:46.918777Z 00O section_start:1:build\r\n2026-11-02T22:01:47.000000Z 00O+ok\n2026-11-02T22:01:48.000000Z 00O section_end:2:build\r\n",
         { headers: { "Content-Type": "text/plain" } },
       );
     return Response.json({}, { status: 404 });
