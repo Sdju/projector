@@ -21,7 +21,7 @@ const emit = defineEmits<{
   openDiff: [hash: string, path: string];
   subject: [text: string];
 }>();
-const canOpenTree = computed(() => workspaceCapabilities(props.projectId).historyTree);
+const canOpenTree = computed(() => workspaceCapabilities(props.projectId).snapshots);
 const detail = ref<GitCommitDetail>();
 const error = ref("");
 const loading = ref(false);

@@ -172,6 +172,17 @@ export function createGithubWorkspaceProfile(
 ): WorkspaceProfile {
   let metadata = initial;
   const directories = new Map<string, Promise<GithubEntry[]>>();
+  const snapshots = new Map<string, Promise<GithubRepository>>();
+  /** A commit is immutable, so its tree is resolved once and kept even when the live ref moves. */
+  function snapshotAt(rev: string) {
+    let pending = snapshots.get(rev);
+    if (!pending) {
+      pending = api.readRepository(repository, rev);
+      snapshots.set(rev, pending);
+      pending.catch(() => snapshots.delete(rev));
+    }
+    return pending;
+  }
   async function directory(
     snapshot: GithubRepository,
     path: string,
@@ -221,6 +232,7 @@ export function createGithubWorkspaceProfile(
     },
   };
   const files: WorkspaceProfile["providers"]["files"] = {
+    snapshots: true,
     async refresh() {
       const next = await api.readRepository(repository, ref);
       directories.clear();
@@ -231,7 +243,7 @@ export function createGithubWorkspaceProfile(
       return `/api/integrations/github/browse/asset?${new URLSearchParams({ repository, sha: metadata.tree, path })}`;
     },
     async read(action, params, signal) {
-      const snapshot = metadata;
+      const snapshot = params.rev ? await snapshotAt(params.rev) : metadata;
       const path = params.path || "";
       if (action === "root")
         return { root: formatProjectRef({ kind: "github", repository: snapshot.fullName }) };

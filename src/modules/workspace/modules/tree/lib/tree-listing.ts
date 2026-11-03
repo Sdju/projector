@@ -1,11 +1,13 @@
 import { commandArgs, type CommandScope } from "../../../../../common/utilities/commands.ts";
 import { ref, watch, onBeforeUnmount, nextTick, type Ref, type InjectionKey } from "vue";
 import { useDirectoryWatch } from "./directory-watch.ts";
-import { workspaceRequest } from "../../../../workspace-api/index.ts";
+import { workspaceScopeRequest } from "../../../../workspace-api/index.ts";
 import {
   TREE_PAGE_SIZE,
+  fileScopeKey,
   type TreePage,
   type FileEntry,
+  type FileScope,
 } from "../../../../../../core/modules/workspace/index.ts";
 
 export function createTreePaging() {
@@ -20,7 +22,7 @@ export const treePagingKey: InjectionKey<ReturnType<typeof createTreePaging>> =
   Symbol("tree-paging");
 
 export function useTreeListing(
-  props: { projectId: string; path: string; revision: number; rev?: string },
+  props: { projectId: string; path: string; revision: number; scope: FileScope },
   paging: ReturnType<typeof createTreePaging>,
   removed: (path: string) => void,
 ) {
@@ -46,7 +48,7 @@ export function useTreeListing(
     controller = new AbortController();
     loading.value = true;
     error.value = "";
-    const nextIdentity = `${props.projectId}\0${props.rev ?? ""}\0${props.path}`;
+    const nextIdentity = `${props.projectId}\0${fileScopeKey(props.scope)}\0${props.path}`;
     if (identity !== nextIdentity) {
       entries.value = [];
       total.value = 0;
@@ -58,15 +60,15 @@ export function useTreeListing(
     const count = append ? TREE_PAGE_SIZE : Math.max(TREE_PAGE_SIZE, previous.length);
     const reveal = !append ? revealChild() || previous.at(-1)?.path || "" : "";
     try {
-      const data = await workspaceRequest<TreePage>(
+      const data = await workspaceScopeRequest<TreePage>(
         props.projectId,
+        props.scope,
         "tree",
         {
           path: props.path,
           offset: String(offset),
           limit: String(Math.min(count, 1000)),
           ...(reveal ? { reveal } : {}),
-          ...(props.rev ? { rev: props.rev } : {}),
         },
         controller.signal,
       );
@@ -100,7 +102,7 @@ export function useTreeListing(
     { immediate: true },
   );
   watch(
-    () => [props.projectId, props.rev, props.path, props.revision, revealChild()],
+    () => [props.projectId, fileScopeKey(props.scope), props.path, props.revision, revealChild()],
     () => void load(),
     { immediate: true },
   );

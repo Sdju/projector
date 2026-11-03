@@ -10,6 +10,25 @@ export { LARGE_FILE_BYTES, MAX_TEXT_BYTES, largeFileQuestion } from "./file-size
 export { parentPath, moveDestination, relocatedPath } from "./paths.ts";
 export { gitTreeDecorations } from "./git-decorations.ts";
 export type { GitDecoration } from "./git-decorations.ts";
+export {
+  commitChangeKind,
+  commitFilesToFileChanges,
+  fileChangeDecorations,
+  gitChangeKind,
+  gitChangesToFileChanges,
+  pullRequestChangeKind,
+  pullRequestFilesToFileChanges,
+} from "./changes.ts";
+export type { FileChange, FileChangeKind, FileDecoration } from "./changes.ts";
+export {
+  fileScopeKey,
+  fileScopeNote,
+  fileScopeQuery,
+  fileScopeTitle,
+  isLiveScope,
+  shortRevision,
+} from "./scope.ts";
+export type { FileScope } from "./scope.ts";
 export type {
   GitRef,
   GitCommit,

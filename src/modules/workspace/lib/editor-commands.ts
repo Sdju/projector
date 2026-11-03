@@ -4,6 +4,7 @@ import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import { commandArgs, type useCommandScope } from "../../../common/utilities/commands.ts";
 import { copyWithNotice } from "../../../common/utilities/notice.ts";
 import type { TabRegistry, WorkspaceCapability } from "../../workspace-api/index.ts";
+import type { FileScope } from "../../../../core/modules/workspace/index.ts";
 import { workspaceSiteUrl } from "../../workspace-api/index.ts";
 import { normalizeBrowserInput } from "../../../../core/modules/browser/index.ts";
 import { isEditable, isHtml, isMarkdown, type OpenFile } from "../open-file.ts";
@@ -33,8 +34,8 @@ export interface EditorCommandContext {
   selectTab: (key: string) => void;
   onOpenTab?: () => void;
   toggleMarkdownSource: () => void;
-  /** Показывает файл в дереве: открывает сайдбар и раздел «Файлы». */
-  revealInTree: (path: string, rev?: string) => void;
+  /** Показывает файл в дереве: открывает сайдбар и раздел этого снимка. */
+  revealInTree: (path: string, scope?: FileScope) => void;
   tabTypes: TabRegistry;
 }
 
@@ -110,7 +111,7 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
     "ide.editor.file.reveal",
     "Показать в дереве файлов",
     (args) => {
-      ctx.revealInTree(commandFile(args)!.path, commandFile(args)!.rev);
+      ctx.revealInTree(commandFile(args)!.path, commandFile(args)!.scope);
     },
     (args) => !!commandFile(args) && !commandFile(args)!.external,
   );

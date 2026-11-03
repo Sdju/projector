@@ -4,7 +4,7 @@ import UiToolbar from "../../../common/ui/UiToolbar.vue";
 import { computed } from "vue";
 import { workspaceSiteUrl } from "../../workspace-api/index.ts";
 import { useTabHost, useWorkspaceTabs } from "../lib/tab-views.ts";
-import { isEditable, isHtml, isMarkdown, type OpenFile } from "../open-file.ts";
+import { isEditable, isHtml, isLiveFile, isMarkdown, type OpenFile } from "../open-file.ts";
 import TabReadoutScope from "../../../common/ui/TabReadoutScope.vue";
 import {
   ArchiveViewer,
@@ -83,7 +83,7 @@ const hasStatusLine = computed(
       <ImageViewport v-else-if="file.image" :src="file.image" :alt="file.path" />
       <ArchiveViewer v-else-if="file.archive" :archive="file.archive" />
       <SvgViewer
-        v-else-if="/\.svg$/i.test(file.path) && file.original === undefined && !file.rev"
+        v-else-if="/\.svg$/i.test(file.path) && file.original === undefined && isLiveFile(file)"
         :path="file.path"
         :content="file.draft ?? file.content"
         :editable="isEditable(file)"
@@ -126,7 +126,7 @@ const hasStatusLine = computed(
       <CodeViewer
         v-else-if="!file.virtual"
         :path="file.path"
-        :project-id="file.rev ? '' : projectId"
+        :project-id="isLiveFile(file) ? projectId : ''"
         :revision="revision"
         :content="file.draft ?? file.content"
         :editable="isEditable(file)"

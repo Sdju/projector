@@ -25,6 +25,13 @@ import WorkbenchDock from "./WorkbenchDock.vue";
 import StatusBar from "./StatusBar.vue";
 import type { DockTarget } from "../../dock/index.ts";
 import { type OpenFile } from "../open-file.ts";
+import {
+  fileScopeKey,
+  fileScopeNote,
+  fileScopeTitle,
+  isLiveScope,
+  type FileScope,
+} from "../../../../core/modules/workspace/index.ts";
 import { createPanelHosts } from "../panel-hosts.ts";
 import { TerminalCloseDialog } from "../../terminal/index.ts";
 import { useDocker } from "../../docker/index.ts";
@@ -93,7 +100,7 @@ function entryDeleted(path: string) {
     (tab) =>
       tab.virtual ||
       tab.commit ||
-      tab.rev ||
+      (tab.scope && !isLiveScope(tab.scope)) ||
       (tab.path !== path && !tab.path.startsWith(path + "/")),
   );
   revision.value++;
@@ -110,22 +117,24 @@ const extraSections = ref<SidebarType[]>([]);
 const sections = computed(() =>
   extendSidebarRegistry(sidebarSections(profile, capabilities), () => extraSections.value),
 );
-function openCommitTree(hash: string) {
-  if (!capabilities.git || !capabilities.historyTree)
-    throw new Error("Источник не умеет показывать файлы коммита");
-  const id = `commit-tree:${hash}`;
+function openTree(scope: FileScope) {
+  if (!capabilities.snapshots) throw new Error("Источник не умеет показывать файлы снимка");
+  const id = `tree:${fileScopeKey(scope)}`;
   if (!extraSections.value.some((type) => type.id === id))
     extraSections.value.push({
       id,
-      title: `Файлы коммита @${hash.slice(0, 7)}`,
-      source: `Только чтение · коммит ${hash.slice(0, 7)}`,
-      group: "git",
-      kind: "commit-tree",
-      params: { hash },
+      title: fileScopeTitle(scope),
+      source: fileScopeNote(scope),
+      group: capabilities.git ? "git" : undefined,
+      kind: "tree",
+      params: { scope },
       closable: true,
     });
   section.value = id;
   showSidebar();
+}
+function openCommitTree(hash: string) {
+  openTree({ kind: "commit", rev: hash });
 }
 function closeSection(id: string) {
   const index = extraSections.value.findIndex((type) => type.id === id);
@@ -226,9 +235,9 @@ const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
   selectTab: (key) => revealPanel(key),
   onOpenTab: () => (mobileSidebarOpen.value = false),
   toggleMarkdownSource,
-  revealInTree: (path, rev) => {
-    if (rev) {
-      const id = `commit-tree:${rev}`;
+  revealInTree: (path, scope) => {
+    if (scope && !isLiveScope(scope)) {
+      const id = `tree:${fileScopeKey(scope)}`;
       if (sections.value.has(id)) {
         section.value = id;
         showSidebar();

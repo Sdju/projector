@@ -10,6 +10,7 @@ import {
   workspaceCapabilities,
   type ImportConflict,
 } from "../../../../workspace-api/index.ts";
+import { isLiveScope } from "../../../../../../core/modules/workspace/index.ts";
 import { baseName, topLevelName, type DropSource } from "./drop-entries.ts";
 import { treeDragType } from "./tree-drag.ts";
 import type { TreeContext } from "./tree-operations.ts";
@@ -51,13 +52,13 @@ export function useTreeImport(
   },
 ) {
   const { busy, expanded, error: failure, message } = drag;
+  const canWrite = () => workspaceCapabilities(props.projectId).write && isLiveScope(props.scope);
 
   /** Дерево принимает внешний drag, если проект записываемый и умеет получать файлы с диска. */
   function accepts(data: DataTransfer | null) {
     const capabilities = workspaceCapabilities(props.projectId);
     return (
-      !props.readonly &&
-      capabilities.write &&
+      canWrite() &&
       capabilities.externalFiles &&
       isFileDrag(data) &&
       !data?.types.includes(treeDragType)
@@ -219,12 +220,11 @@ export function useTreeImport(
     },
     enabled: () => {
       const capabilities = workspaceCapabilities(props.projectId);
-      return (
-        !props.readonly && capabilities.write && capabilities.externalFiles && !drag.busy.value
-      );
+      return canWrite() && capabilities.externalFiles && !drag.busy.value;
     },
     run: async (value?: unknown) => {
-      if (props.readonly) throw new Error("Историческое дерево доступно только для чтения");
+      if (!isLiveScope(props.scope))
+        throw new Error("Историческое дерево доступно только для чтения");
       const args = commandArgs(value);
       if (
         !Array.isArray(args.paths) ||

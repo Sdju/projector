@@ -1,4 +1,9 @@
-import type { FileContent } from "../../../core/modules/workspace/index.ts";
+import {
+  fileScopeKey,
+  isLiveScope,
+  type FileContent,
+  type FileScope,
+} from "../../../core/modules/workspace/index.ts";
 import type { TabParams } from "../workspace-api/index.ts";
 
 export interface OpenFile extends FileContent {
@@ -12,8 +17,8 @@ export interface OpenFile extends FileContent {
   parent?: string;
   /** Номер merge request, к которому относится diff-вкладка. */
   pull?: number;
-  /** Снимок файла на этом коммите: вкладка только для чтения. */
-  rev?: string;
+  /** Снимок, из которого прочитан файл; отсутствует у рабочей копии. */
+  scope?: FileScope;
   external?: boolean;
   image?: string;
   localFile?: File;
@@ -39,14 +44,30 @@ export interface OpenFileOptions {
   reload?: boolean;
   external?: boolean;
   preview?: boolean;
-  /** Read the file from a commit instead of the working copy. */
-  rev?: string;
+  /** Read the file from a snapshot instead of the working copy. */
+  scope?: FileScope;
+}
+
+/** A file of the working copy; absent scope is the same as an explicit live one. */
+export const isLiveFile = (file: OpenFile) => !file.scope || isLiveScope(file.scope);
+
+/** Key of a file tab; live keys keep their historical shape so saved sessions still open. */
+export function fileTabKey(
+  path: string,
+  options: { external?: boolean; staged?: boolean; scope?: FileScope } = {},
+) {
+  const scope = options.scope;
+  if (scope && !isLiveScope(scope)) {
+    const part = scope.kind === "commit" ? `rev:${scope.rev}` : fileScopeKey(scope);
+    return `${path}:${part}`;
+  }
+  return `${options.external ? "external:" : ""}${path}:${options.staged === undefined ? "file" : options.staged ? "index" : "working"}`;
 }
 
 /** Diff against the Git index shows the real file on the right, so it can be edited in place. */
 export const isEditable = (file: OpenFile) =>
   !file.readonly &&
-  !file.rev &&
+  isLiveFile(file) &&
   !file.binary &&
   !file.virtual &&
   !file.external &&
@@ -54,14 +75,14 @@ export const isEditable = (file: OpenFile) =>
   !file.archive &&
   (file.original === undefined || file.staged === false);
 export const isMarkdown = (file: OpenFile) =>
-  !file.rev &&
+  isLiveFile(file) &&
   !file.virtual &&
   !file.binary &&
   !file.image &&
   file.original === undefined &&
   /\.(?:md|markdown)$/i.test(file.path);
 export const isHtml = (file: OpenFile) =>
-  !file.rev &&
+  isLiveFile(file) &&
   !file.virtual &&
   !file.binary &&
   !file.image &&

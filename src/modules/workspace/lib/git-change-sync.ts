@@ -1,6 +1,6 @@
 import type { Ref } from "vue";
 import { workspaceRequest } from "../../workspace-api/index.ts";
-import type { OpenFile } from "../open-file.ts";
+import { isLiveFile, type OpenFile } from "../open-file.ts";
 import type { FileContent } from "../../../../core/modules/workspace/index.ts";
 import type { useOpenFiles } from "./open-files.ts";
 
@@ -18,7 +18,7 @@ export function useGitChangeSync(ctx: GitChangeSyncContext) {
   /** Смена HEAD затрагивает любые файлы: сохраняются все открытые. */
   const openTabs = () =>
     ctx.tabs.value.filter(
-      (tab) => !tab.virtual && !tab.commit && !tab.rev && !tab.external && !tab.localFile,
+      (tab) => !tab.virtual && !tab.commit && isLiveFile(tab) && !tab.external && !tab.localFile,
     );
   async function prepare(action: string, paths: string[]) {
     if (action === "checkout") {
@@ -61,7 +61,7 @@ export function useGitChangeSync(ctx: GitChangeSyncContext) {
     ctx.tabs.value = ctx.tabs.value.filter(
       (tab) =>
         tab.commit ||
-        tab.rev ||
+        !isLiveFile(tab) ||
         !paths.includes(tab.path) ||
         (tab.original === undefined && action !== "discard"),
     );

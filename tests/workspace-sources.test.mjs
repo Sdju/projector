@@ -8,6 +8,7 @@ import {
   registerWorkspaceProfile,
   workspaceCapabilities,
   workspaceRequest,
+  workspaceScopeRequest,
   workspaceAssetUrl,
   saveWorkspaceFile,
   moveWorkspaceEntry,
@@ -201,6 +202,68 @@ test("the shared workspace uses a readonly source for tree, files, assets and re
     unregister();
   }
   expect(workspaceCapabilities("local-test").write).toBe(true);
+});
+
+test("a remote profile reads a tree and its files at a pinned commit", async () => {
+  const live = {
+    fullName: "octocat/repo",
+    branch: "main",
+    commit: "1".repeat(40),
+    tree: "2".repeat(40),
+    empty: false,
+    private: false,
+    description: "",
+  };
+  const pinned = {
+    ...live,
+    commit: "3".repeat(40),
+    tree: "4".repeat(40),
+  };
+  const calls = [];
+  const profile = createGithubWorkspaceProfile("octocat/repo", live, "", () => {}, {
+    async readRepository(repository, ref) {
+      calls.push({ repository, ref });
+      return ref === pinned.commit ? pinned : live;
+    },
+    async readTree(repository, sha) {
+      calls.push({ repository, sha });
+      return {
+        truncated: false,
+        entries: [
+          {
+            name: sha === pinned.tree ? "pinned.ts" : "live.ts",
+            type: "blob",
+            sha: sha === pinned.tree ? "5".repeat(40) : "6".repeat(40),
+            mode: "100644",
+            size: 3,
+          },
+        ],
+      };
+    },
+    async readFile(repository, sha) {
+      return { content: sha.slice(0, 3), binary: false, image: null, size: 3 };
+    },
+    async readGit() {
+      throw new Error("unexpected history read");
+    },
+  });
+  const unregister = registerWorkspaceProfile("pinned-remote-test", profile);
+  try {
+    const scope = { kind: "commit", rev: pinned.commit };
+    const tree = await workspaceScopeRequest("pinned-remote-test", scope, "tree");
+    expect(tree.entries.map((entry) => entry.name)).toStrictEqual(["pinned.ts"]);
+    const file = await workspaceScopeRequest("pinned-remote-test", scope, "file", {
+      path: "pinned.ts",
+    });
+    expect(file.content).toBe("555");
+    expect(calls.filter((call) => call.ref === pinned.commit).length).toBe(1);
+    expect(calls.some((call) => call.sha === pinned.tree)).toBe(true);
+    expect(workspaceCapabilities("pinned-remote-test").snapshots).toBe(true);
+    const liveTree = await workspaceRequest("pinned-remote-test", "tree");
+    expect(liveTree.entries.map((entry) => entry.name)).toStrictEqual(["live.ts"]);
+  } finally {
+    unregister();
+  }
 });
 
 test("a local project with a GitHub origin keeps local providers and adds issues", async () => {

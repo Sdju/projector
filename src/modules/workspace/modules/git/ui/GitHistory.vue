@@ -22,7 +22,7 @@ import IconRefresh from "~icons/lucide/refresh-cw";
 const props = defineProps<{
   history: GitHistoryState;
   allBranches?: boolean;
-  historyTree?: boolean;
+  snapshots?: boolean;
   commands: ReturnType<typeof useCommandScope>;
   /** Растёт при каждом обновлении Git: открытая история перечитывается следом. */
   revision: number;
@@ -136,7 +136,7 @@ register(
   "Показывает дерево файлов на момент коммита в боковой панели рядом с Git.",
   (value) => emit("openTree", hashArg(value)),
   hashHelp,
-  () => !!props.historyTree,
+  () => !!props.snapshots,
 );
 register(
   "ide.git.commit.openDiff",
@@ -167,12 +167,12 @@ const menuItems = computed<ContextMenuItem[]>(() => {
     ? [
         item("ide.git.commit.openDiff", args),
         item("ide.git.commit.openFile", args),
-        ...(props.historyTree ? [item("ide.git.commit.openTree", args)] : []),
+        ...(props.snapshots ? [item("ide.git.commit.openTree", args)] : []),
       ]
     : [
         item("ide.git.commit.toggle", args),
         item("ide.git.commit.open", args),
-        ...(props.historyTree ? [item("ide.git.commit.openTree", args)] : []),
+        ...(props.snapshots ? [item("ide.git.commit.openTree", args)] : []),
         item("ide.git.commit.copyHash", args, { separator: true }),
       ];
 });

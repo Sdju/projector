@@ -4,11 +4,12 @@ import { readDrop } from "./drop-entries.ts";
 import type { useTreeImport } from "./tree-import.ts";
 import { topLevelTreePaths } from "./tree-selection.ts";
 import {
+  isLiveScope,
   moveDestination,
   parentPath,
   relocatedPath,
+  type FileEntry,
 } from "../../../../../../core/modules/workspace/index.ts";
-import type { FileEntry } from "../../../../../../core/modules/workspace/index.ts";
 import type { TreeContext } from "./tree-operations.ts";
 
 /** Перетаскивание записей дерева: выбор цели, подсветка и перенос. */
@@ -17,7 +18,7 @@ export function useTreeDragDrop(
   importer: Pick<ReturnType<typeof useTreeImport>, "accepts" | "importInto">,
 ) {
   const { source, busy, expanded, error: moveError, message } = drag;
-  const canWrite = () => workspaceCapabilities(props.projectId).write && !props.readonly;
+  const canWrite = () => workspaceCapabilities(props.projectId).write && isLiveScope(props.scope);
   function startDrag(event: DragEvent, entry: FileEntry) {
     if (busy.value || !canWrite() || !event.dataTransfer) {
       event.preventDefault();

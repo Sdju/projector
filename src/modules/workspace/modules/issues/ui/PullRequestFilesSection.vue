@@ -4,9 +4,11 @@ import UiHint from "../../../../../common/ui/UiHint.vue";
 import UiActionRow from "../../../../../common/ui/UiActionRow.vue";
 import MiddleTruncate from "../../../../../common/ui/MiddleTruncate.vue";
 import { computed, ref, watch } from "vue";
-import type {
-  PullRequestChanges,
-  PullRequestFile,
+import {
+  pullRequestFilesToFileChanges,
+  type FileChange,
+  type FileChangeKind,
+  type PullRequestChanges,
 } from "../../../../../../core/modules/workspace/index.ts";
 import { workspaceRequest } from "../../../../workspace-api/index.ts";
 import { FileIcon, useFileIconTheme } from "../../../../file-icons/index.ts";
@@ -28,7 +30,7 @@ interface DirNode {
   name: string;
   path: string;
   directories: DirNode[];
-  files: PullRequestFile[];
+  files: FileChange[];
 }
 interface Row {
   kind: "directory" | "file";
@@ -38,7 +40,7 @@ interface Row {
   files?: number;
   additions?: number;
   deletions?: number;
-  file?: PullRequestFile;
+  file?: FileChange;
 }
 
 const loaded = ref<PullRequestChanges>();
@@ -51,17 +53,18 @@ const selected = ref("");
 const { resolver } = useFileIconTheme();
 let generation = 0;
 
-const MARK: Record<PullRequestFile["status"], string> = {
+const MARK: Record<FileChangeKind, string> = {
   added: "A",
-  removed: "D",
+  deleted: "D",
   modified: "M",
   renamed: "R",
   copied: "C",
-  changed: "M",
-  unchanged: "·",
+  conflict: "U",
 };
 
-function build(files: PullRequestFile[]) {
+const files = computed(() => pullRequestFilesToFileChanges(changes.value?.files ?? []));
+
+function build(files: FileChange[]) {
   const root: DirNode = { name: "", path: "", directories: [], files: [] };
   const directories = new Map<string, DirNode>([["", root]]);
   const bucket = (path: string) => {
@@ -104,7 +107,7 @@ function fold(node: DirNode, rootLevel: boolean) {
   return { name, path, node: target };
 }
 
-function fileRow(file: PullRequestFile, depth: number): Row {
+function fileRow(file: FileChange, depth: number): Row {
   const name = file.path.split("/").pop() || file.path;
   return {
     kind: "file",
@@ -151,8 +154,8 @@ function directoryStats(directory: DirNode): {
   const walk = (node: DirNode) => {
     for (const file of node.files) {
       files++;
-      additions += file.additions;
-      deletions += file.deletions;
+      additions += file.additions ?? 0;
+      deletions += file.deletions ?? 0;
     }
     for (const child of node.directories) walk(child);
   };
@@ -162,18 +165,19 @@ function directoryStats(directory: DirNode): {
 
 const filtered = computed(() => {
   const needle = query.value.trim().toLowerCase();
-  const files = changes.value?.files ?? [];
-  return needle ? files.filter((file) => file.path.toLowerCase().includes(needle)) : files;
+  return needle
+    ? files.value.filter((file) => file.path.toLowerCase().includes(needle))
+    : files.value;
 });
 const searching = computed(() => query.value.trim().length > 0);
 const rows = computed(() => flatten(build(filtered.value), 0, true, searching.value));
 const head = computed(() => changes.value?.diffRefs?.headSha ?? props.head ?? "");
 const totals = computed(() => {
-  const files = changes.value?.files ?? [];
+  const source = changes.value?.files ?? [];
   return {
-    files: changes.value?.changedFiles ?? files.length,
-    additions: files.reduce((sum, file) => sum + file.additions, 0),
-    deletions: files.reduce((sum, file) => sum + file.deletions, 0),
+    files: changes.value?.changedFiles ?? source.length,
+    additions: source.reduce((sum, file) => sum + file.additions, 0),
+    deletions: source.reduce((sum, file) => sum + file.deletions, 0),
     capped: changes.value?.changedFilesCapped === true,
     truncated: changes.value?.filesTruncated === true,
   };
@@ -183,7 +187,7 @@ function toggle(path: string) {
   if (expanded.value.has(path)) expanded.value.delete(path);
   else expanded.value.add(path);
 }
-function directoryPaths(files: PullRequestFile[]) {
+function directoryPaths(files: FileChange[]) {
   const next = new Set<string>();
   const walk = (node: DirNode, rootLevel: boolean) => {
     for (const directory of node.directories) {
@@ -217,7 +221,7 @@ function reveal(path: string) {
   for (let index = 1; index < parts.length; index++) next.add(parts.slice(0, index).join("/"));
   expanded.value = next;
 }
-function expandDirectories(files: PullRequestFile[]) {
+function expandDirectories(files: FileChange[]) {
   expanded.value = directoryPaths(files);
 }
 async function load() {
@@ -230,7 +234,7 @@ async function load() {
     });
     if (current !== generation) return;
     loaded.value = data;
-    expandDirectories(data.files);
+    expandDirectories(pullRequestFilesToFileChanges(data.files));
   } catch (err) {
     if (current === generation)
       error.value = err instanceof Error ? err.message : "Не удалось прочитать изменения";
@@ -244,7 +248,7 @@ watch(
   () => {
     loaded.value = undefined;
     if (props.snapshot) {
-      expandDirectories(props.snapshot.files);
+      expandDirectories(pullRequestFilesToFileChanges(props.snapshot.files));
       return;
     }
     void load();
@@ -255,7 +259,7 @@ watch(
   () => props.snapshot,
   (snapshot) => {
     loaded.value = undefined;
-    if (snapshot) expandDirectories(snapshot.files);
+    if (snapshot) expandDirectories(pullRequestFilesToFileChanges(snapshot.files));
   },
 );
 defineExpose({ reveal, refresh: load });
@@ -362,11 +366,11 @@ defineExpose({ reveal, refresh: load });
               >!</span
             >
             <span
-              v-if="row.file?.status && row.file.status !== 'modified'"
+              v-if="row.file?.kind && row.file.kind !== 'modified'"
               class="mark"
-              :class="row.file.status"
-              :title="row.file.status"
-              >{{ MARK[row.file.status] }}</span
+              :class="row.file.kind"
+              :title="row.file.kind"
+              >{{ MARK[row.file.kind] }}</span
             >
             <span class="add">+{{ row.file?.additions ?? 0 }}</span>
             <span class="del">−{{ row.file?.deletions ?? 0 }}</span>
@@ -506,7 +510,8 @@ defineExpose({ reveal, refresh: load });
 .mark.added {
   color: var(--run);
 }
-.mark.removed {
+.mark.removed,
+.mark.deleted {
   color: var(--err);
 }
 .mark.renamed,

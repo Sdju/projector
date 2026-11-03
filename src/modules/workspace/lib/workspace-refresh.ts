@@ -4,7 +4,7 @@ import { relocatedPath } from "../../../../core/modules/workspace/index.ts";
 import { replacePanel, type DockLayout } from "../../dock/index.ts";
 import { refreshWorkspace, type WorkspaceCapabilities } from "../../workspace-api/index.ts";
 import { filesExcludeRevision } from "../modules/tree/index.ts";
-import type { OpenFile } from "../open-file.ts";
+import { isLiveFile, type OpenFile } from "../open-file.ts";
 import type { useOpenFiles } from "./open-files.ts";
 
 export interface WorkspaceRefreshContext {
@@ -36,7 +36,7 @@ export function useWorkspaceRefresh(ctx: WorkspaceRefreshContext) {
     if (!ctx.capabilities.write) {
       const selected = ctx.activeKey();
       for (const tab of [...tabs.value])
-        if (!tab.virtual && !tab.commit && !tab.rev && !tab.localFile)
+        if (!tab.virtual && !tab.commit && isLiveFile(tab) && !tab.localFile)
           await openFile(tab.path, tab.line, tab.column, undefined, {
             reload: true,
             preview: !!tab.preview,
@@ -45,7 +45,7 @@ export function useWorkspaceRefresh(ctx: WorkspaceRefreshContext) {
       return;
     }
     const current = ctx.active();
-    if (!current || current.virtual || current.commit || current.rev) return;
+    if (!current || current.virtual || current.commit || !isLiveFile(current)) return;
     if (current.localFile) void openBrowserFile(current.localFile, true);
     else
       void openFile(current.path, current.line, current.column, current.staged, {
@@ -56,7 +56,7 @@ export function useWorkspaceRefresh(ctx: WorkspaceRefreshContext) {
   function entryMoved(source: string, destination: string) {
     files.invalidate();
     for (const tab of [...tabs.value]) {
-      if (tab.virtual || tab.commit || tab.rev) continue;
+      if (tab.virtual || tab.commit || !isLiveFile(tab)) continue;
       const path = relocatedPath(tab.path, source, destination);
       if (path === tab.path) continue;
       if (tab.staged !== undefined) {

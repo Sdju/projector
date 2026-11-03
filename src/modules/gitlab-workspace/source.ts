@@ -238,18 +238,18 @@ export function createGitlabWorkspaceProfile(
   let metadata = initial;
   const directories = new Map<string, Promise<GitlabEntry[]>>();
   async function directory(
-    snapshot: GitlabRepository,
+    commit: string,
     folder: string,
     signal?: AbortSignal,
   ): Promise<GitlabEntry[]> {
-    if (snapshot.empty) return [];
+    if (!commit) return [];
     if (folder && folder.split("/").some((part) => !part || part === "." || part === ".."))
       throw new Error("Неверный путь папки");
-    const key = `${snapshot.commit}:${folder}`;
+    const key = `${commit}:${folder}`;
     const cached = directories.get(key);
     if (cached) return cached;
     const pending = (async () => {
-      const data = await api.readTree(repository, snapshot.commit, folder, signal);
+      const data = await api.readTree(repository, commit, folder, signal);
       if (data.truncated) throw new Error("GitLab вернул неполный список этой папки");
       return data.entries;
     })();
@@ -276,6 +276,7 @@ export function createGitlabWorkspaceProfile(
     },
   };
   const files: WorkspaceProfile["providers"]["files"] = {
+    snapshots: true,
     async refresh() {
       const next = await api.readRepository(repository, ref);
       directories.clear();
@@ -291,10 +292,11 @@ export function createGitlabWorkspaceProfile(
     },
     async read(action, params, signal) {
       const snapshot = metadata;
+      const commit = params.rev || snapshot.commit;
       const folder = params.path || "";
       if (action === "root") return { root: formatProjectRef({ kind: "gitlab", instance, path }) };
       if (action === "tree") {
-        const entries: FileEntry[] = (await directory(snapshot, folder, signal)).map((entry) => ({
+        const entries: FileEntry[] = (await directory(commit, folder, signal)).map((entry) => ({
           name: entry.name,
           path: folder ? `${folder}/${entry.name}` : entry.name,
           directory: entry.type === "tree",
@@ -317,7 +319,7 @@ export function createGitlabWorkspaceProfile(
         folder.split("/").some((part) => !part || part === "." || part === "..")
       )
         throw new Error("Неверный путь файла");
-      const file = await api.readFile(repository, snapshot.commit, folder, signal);
+      const file = await api.readFile(repository, commit, folder, signal);
       const content: FileContent & { image: boolean } = {
         path: folder,
         content: file.content,

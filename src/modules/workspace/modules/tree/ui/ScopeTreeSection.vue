@@ -3,15 +3,18 @@ import UiScrollArea from "../../../../../common/ui/UiScrollArea.vue";
 import { computed, ref, watch } from "vue";
 import FileTree from "./FileTree.vue";
 import { workspaceRequest } from "../../../../workspace-api/index.ts";
-import type {
-  GitCommitDetail,
-  GitOverview,
+import {
+  commitFilesToFileChanges,
+  fileChangeDecorations,
+  fileScopeKey,
+  type FileScope,
+  type GitCommitDetail,
 } from "../../../../../../core/modules/workspace/index.ts";
 
-/** Файлы коммита в боковой панели: то же дерево, но только для чтения. */
+/** Файлы снимка в боковой панели: то же дерево, но только для чтения. */
 const props = defineProps<{
   projectId: string;
-  rev: string;
+  scope: FileScope;
   revision?: number;
   selected?: string;
   onOpen?: (path: string, pinned?: boolean) => void;
@@ -21,42 +24,42 @@ const tree = ref<InstanceType<typeof FileTree>>();
 const error = ref("");
 let generation = 0;
 async function load() {
+  if (props.scope.kind !== "commit") {
+    detail.value = undefined;
+    error.value = "Этот источник пока не умеет показывать файлы";
+    return;
+  }
   const current = ++generation;
   error.value = "";
   try {
     const data = await workspaceRequest<GitCommitDetail>(props.projectId, "commit", {
-      hash: props.rev,
+      hash: props.scope.rev,
     });
     if (current === generation) detail.value = data;
   } catch (err) {
     if (current === generation) error.value = err instanceof Error ? err.message : "Ошибка Git";
   }
 }
-watch(() => [props.projectId, props.rev, props.revision], load, { immediate: true });
-const gitChanges = computed<GitOverview["changes"]>(
-  () =>
-    detail.value?.files.map((file) => ({
-      path: file.path,
-      originalPath: file.originalPath,
-      index: file.status,
-      worktree: " ",
-    })) ?? [],
+watch(() => [props.projectId, fileScopeKey(props.scope), props.revision], load, {
+  immediate: true,
+});
+const decorations = computed(() =>
+  fileChangeDecorations(commitFilesToFileChanges(detail.value?.files ?? [])),
 );
 defineExpose({ reveal: (path: string) => tree.value?.reveal(path) });
 </script>
 
 <template>
-  <div class="commit-tree">
+  <div class="scope-tree">
     <p v-if="error" class="note" role="alert">{{ error }}</p>
-    <UiScrollArea v-if="rev" class="side-content">
+    <UiScrollArea v-if="!error" class="side-content">
       <FileTree
         ref="tree"
         :project-id="projectId"
-        :rev="rev"
-        readonly
+        :scope="scope"
         :selected="selected ?? ''"
         :revision="revision ?? 0"
-        :git-changes="gitChanges"
+        :decorations="decorations"
         @open="(path, pinned) => onOpen?.(path, pinned)"
       />
     </UiScrollArea>
@@ -64,7 +67,7 @@ defineExpose({ reveal: (path: string) => tree.value?.reveal(path) });
 </template>
 
 <style scoped>
-.commit-tree {
+.scope-tree {
   display: flex;
   flex: 1;
   flex-direction: column;

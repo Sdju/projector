@@ -7,6 +7,7 @@ import {
   type WorkspaceWatchPatch,
   type WorkspaceWatchHandlers,
 } from "./profile.ts";
+import { fileScopeQuery, type FileScope } from "../../../core/modules/workspace/index.ts";
 import { createLocalWorkspaceProfile } from "./local.ts";
 export {
   createWorkspaceProfiles,
@@ -97,6 +98,20 @@ export async function workspaceRequest<T>(
 ): Promise<T> {
   const provider = readProviderFor(workspaceProfile(projectId), action);
   return (await provider.read(action, params, signal)) as T;
+}
+
+/**
+ * Reads a workspace action from a file scope. The action keeps its name (`tree`, `file`, `diff`);
+ * the scope contributes only its parameters, so call sites never spell out `rev` or `from/to`.
+ */
+export function workspaceScopeRequest<T>(
+  projectId: string,
+  scope: FileScope,
+  action: string,
+  params: Record<string, string> = {},
+  signal?: AbortSignal,
+): Promise<T> {
+  return workspaceRequest<T>(projectId, action, { ...params, ...fileScopeQuery(scope) }, signal);
 }
 
 export function searchWorkspace(

@@ -10,7 +10,14 @@ import {
   type TabRegistry,
 } from "../../workspace-api/index.ts";
 import { projectRelativePath, previewBrowserFile } from "../file-drop.ts";
-import { isEditable, isMarkdown, type OpenFile, type OpenFileOptions } from "../open-file.ts";
+import { isLiveScope } from "../../../../core/modules/workspace/index.ts";
+import {
+  fileTabKey,
+  isEditable,
+  isMarkdown,
+  type OpenFile,
+  type OpenFileOptions,
+} from "../open-file.ts";
 import { dropPreviewExcept as dropPreviewTabs, opensAsPreview } from "./preview-tabs.ts";
 import { createDiffOpeners } from "./open-diff-files.ts";
 import { ensureTab } from "./service-tabs.ts";
@@ -53,13 +60,11 @@ export function useOpenFiles(ctx: OpenFilesContext) {
     line?: number,
     column?: number,
     staged?: boolean,
-    { reload = false, external = false, preview = true, rev }: OpenFileOptions = {},
+    { reload = false, external = false, preview = true, scope }: OpenFileOptions = {},
   ) {
     if (external && !workspaceCapabilities(ctx.projectId()).externalFiles)
       throw new Error("Внешние файлы недоступны для этого источника");
-    const key = rev
-      ? `${path}:rev:${rev}`
-      : `${external ? "external:" : ""}${path}:${staged === undefined ? "file" : staged ? "index" : "working"}`;
+    const key = fileTabKey(path, { external, staged, scope });
     const existing = tabs.value.find((tab) => tab.key === key);
     const asPreview = opensAsPreview(preview, existing);
     if (existing && (!reload || ctx.isDirty(existing) || existing.saving)) {
@@ -78,7 +83,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
       const data = await readOpenData(ctx.projectId(), path, {
         external,
         staged,
-        rev,
+        scope,
         ask: !existing,
         wanted: () => generation === fileGeneration,
       });
@@ -86,10 +91,10 @@ export function useOpenFiles(ctx: OpenFilesContext) {
       if (asPreview) dropPreviewExcept(key);
       const file: OpenFile = {
         ...data,
-        readonly: !!rev || !workspaceCapabilities(ctx.projectId()).write,
+        readonly: (!!scope && !isLiveScope(scope)) || !workspaceCapabilities(ctx.projectId()).write,
         external,
         image:
-          !rev && "image" in data && data.image
+          (!scope || isLiveScope(scope)) && "image" in data && data.image
             ? workspaceAssetUrl(ctx.projectId(), path, external)
             : undefined,
         path,
@@ -97,7 +102,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
         archive: "archive" in data ? data.archive : undefined,
         original: "original" in data ? data.original : undefined,
         staged,
-        rev,
+        scope,
         line,
         column,
         key,

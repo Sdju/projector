@@ -1,5 +1,12 @@
-import { LARGE_FILE_BYTES, largeFileQuestion } from "../../../../core/modules/workspace/index.ts";
-import type { FileComparison, FileContent } from "../../../../core/modules/workspace/index.ts";
+import {
+  LARGE_FILE_BYTES,
+  fileScopeQuery,
+  isLiveScope,
+  largeFileQuestion,
+  type FileComparison,
+  type FileContent,
+  type FileScope,
+} from "../../../../core/modules/workspace/index.ts";
 import { workspaceRequest } from "../../workspace-api/index.ts";
 
 /**
@@ -12,13 +19,13 @@ export async function readFileConfirmed(
   external: boolean,
   ask: boolean,
   wanted: () => boolean,
-  rev?: string,
+  scope?: FileScope,
 ): Promise<(FileContent & { image?: boolean }) | undefined> {
   const read = (announce: boolean) =>
     workspaceRequest<FileContent & { image?: boolean }>(projectId, external ? "external" : "file", {
       path,
       ...(announce ? { ask: "1" } : {}),
-      ...(rev ? { rev } : {}),
+      ...(scope ? fileScopeQuery(scope) : {}),
     });
   const file = await read(ask);
   if (file.large === undefined) return file;
@@ -33,13 +40,13 @@ export async function readOpenData(
   options: {
     external: boolean;
     staged?: boolean;
-    rev?: string;
+    scope?: FileScope;
     ask: boolean;
     wanted: () => boolean;
   },
 ): Promise<(FileContent & { image?: boolean }) | FileComparison | undefined> {
-  if (options.rev)
-    return readFileConfirmed(projectId, path, false, options.ask, options.wanted, options.rev);
+  if (options.scope && !isLiveScope(options.scope))
+    return readFileConfirmed(projectId, path, false, options.ask, options.wanted, options.scope);
   if (options.staged === undefined)
     return readFileConfirmed(projectId, path, options.external, options.ask, options.wanted);
   return workspaceRequest<FileComparison>(projectId, "diff", {

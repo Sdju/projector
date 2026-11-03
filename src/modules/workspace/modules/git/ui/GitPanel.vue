@@ -48,7 +48,7 @@ const gitMenu = ref<InstanceType<typeof ContextMenu>>();
 const gitTarget = ref({ path: "", staged: false });
 const gitProvider = workspaceProfile(props.projectId).providers.git;
 const writable = !!gitProvider?.write;
-const historyTree = workspaceCapabilities(props.projectId).historyTree;
+const snapshots = workspaceCapabilities(props.projectId).snapshots;
 const historyOpen = ref(!writable);
 /** Высота истории, подогнанная перетаскиванием; без неё история занимает место по содержимому. */
 const historyHeight = ref<number>();
@@ -262,7 +262,7 @@ defineExpose({
           v-model:target="commitTarget"
           :history="history"
           :all-branches="gitProvider?.allBranches !== false"
-          :history-tree="historyTree"
+          :snapshots="snapshots"
           :commands="gitCommands"
           :revision="overview.gutterRevision.value"
           @open-commit="emit('openCommit', $event)"

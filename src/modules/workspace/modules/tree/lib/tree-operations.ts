@@ -10,8 +10,14 @@ import {
 } from "../../../../workspace-api/index.ts";
 import type { createTreeDrag } from "./tree-drag.ts";
 import { topLevelTreePaths, type createTreeSelection } from "./tree-selection.ts";
-import { parentPath, relocatedPath } from "../../../../../../core/modules/workspace/index.ts";
-import type { FileEntry } from "../../../../../../core/modules/workspace/index.ts";
+import {
+  fileScopeKey,
+  isLiveScope,
+  parentPath,
+  relocatedPath,
+  type FileEntry,
+  type FileScope,
+} from "../../../../../../core/modules/workspace/index.ts";
 import { ref } from "vue";
 import { registerTreePagingCommand, type createTreePaging } from "./tree-listing.ts";
 
@@ -39,8 +45,7 @@ export interface TreeContext {
   props: {
     projectId: string;
     path: string;
-    rev?: string;
-    readonly?: boolean;
+    scope: FileScope;
     beforeChange?: (path: string) => Promise<boolean>;
   };
   emit: TreeEmit;
@@ -78,6 +83,7 @@ export function useTreeOperations({
   const treeCommands = useCommandScope(`fileTree:${useId()}`, () => ({
     surface: "fileTree",
     projectId: props.projectId,
+    scope: fileScopeKey(props.scope),
     entryKind: contextEntry.value ? (contextEntry.value.directory ? "directory" : "file") : "root",
     busy: drag.busy.value,
     clipboard: !!clipboard.value,
@@ -273,7 +279,7 @@ export function useTreeOperations({
     }
   }
   const capabilities = workspaceCapabilities(props.projectId);
-  const writable = capabilities.write && !props.readonly;
+  const canWrite = () => capabilities.write && isLiveScope(props.scope);
   const requirements = new Map<string, WorkspaceCapability>();
   /** `requires` is the profile capability a command needs; commands never inspect the project. */
   const register = (
@@ -289,7 +295,7 @@ export function useTreeOperations({
       title,
       run,
       enabled: (args) =>
-        (!requires || (requires === "write" ? writable : capabilities[requires])) &&
+        (!requires || (requires === "write" ? canWrite() : capabilities[requires])) &&
         !drag.busy.value &&
         enabled(args),
     });
@@ -378,7 +384,7 @@ export function useTreeOperations({
       item: (id, options) => treeCommands.item(`ide.fileTree.${id}`, undefined, options),
       allowed: (id) => {
         const requires = requirements.get(id);
-        return !requires || (requires === "write" ? writable : capabilities[requires]);
+        return !requires || (requires === "write" ? canWrite() : capabilities[requires]);
       },
     }),
   );

@@ -1,7 +1,7 @@
 import { nextTick, onBeforeUnmount, watch, type Ref } from "vue";
 import { parseDockLayout, serializeDockLayout, type DockLayout } from "../../dock/index.ts";
 import type { SidebarRegistry, TabParams } from "../../workspace-api/index.ts";
-import type { OpenFile, OpenFileOptions } from "../open-file.ts";
+import { isLiveFile, type OpenFile, type OpenFileOptions } from "../open-file.ts";
 import { useSessionSnapshot } from "../../../common/utilities/session-snapshot.ts";
 import { workspaceSessionSchema, type WorkspaceSession } from "../session.ts";
 import type { MobileSurface } from "./mobile-surfaces.ts";
@@ -53,7 +53,7 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
     (): WorkspaceSession => ({
       tabs: ctx.tabs.value
         // A historical snapshot is tied to its temporary sidebar section, which is not restored.
-        .filter((tab) => !tab.localFile && !tab.rev)
+        .filter((tab) => !tab.localFile && isLiveFile(tab))
         .map((tab) => ({
           key: tab.key,
           path: tab.path,
@@ -61,7 +61,7 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
           params: tab.params,
           commit: tab.commit,
           pull: tab.pull,
-          rev: tab.rev,
+          scope: tab.scope,
           external: tab.external,
           staged: tab.staged,
           markdownMode: tab.markdownMode,
@@ -93,7 +93,7 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
             ? await ctx.openCommitFile(tab.commit, tab.path, false)
             : await ctx.openFile(tab.path, undefined, undefined, tab.staged, {
                 external: tab.external,
-                rev: tab.rev,
+                scope: tab.scope ?? (tab.rev ? { kind: "commit", rev: tab.rev } : undefined),
                 preview: false,
               });
         // A project switch or a user opening another file takes precedence over restoration.

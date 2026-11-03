@@ -5,6 +5,7 @@ import {
   watchWorkspace,
   workspaceWatchable,
 } from "../../../../workspace-api/index.ts";
+import { isLiveScope, type FileScope } from "../../../../../../core/modules/workspace/index.ts";
 
 /** Раскрытые папки всех деревьев страницы: сколько списков показывает каждую. */
 const shown = new Map<string, Map<string, number>>();
@@ -43,7 +44,7 @@ const MIN_FOCUS_GAP_MS = 5000;
  * и переподключение потока событий.
  */
 export function useDirectoryWatch(
-  props: { projectId: string; path: string; rev?: string },
+  props: { projectId: string; path: string; scope?: FileScope },
   reload: () => void,
 ) {
   let release: (() => void) | undefined;
@@ -67,7 +68,7 @@ export function useDirectoryWatch(
     notify(null, message, "error", 10000);
   }
   onMounted(() => {
-    if (props.rev) return;
+    if (props.scope && !isLiveScope(props.scope)) return;
     if (workspaceWatchable(props.projectId)) {
       release = track(props.projectId, props.path);
       unsubscribe = subscribeWorkspace(props.projectId, {

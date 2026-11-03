@@ -6,7 +6,7 @@ import {
   workspaceWatchable,
 } from "../../workspace-api/index.ts";
 import type { FileContent } from "../../../../core/modules/workspace/index.ts";
-import type { OpenFile } from "../open-file.ts";
+import { isLiveFile, type OpenFile } from "../open-file.ts";
 
 export interface FileSyncContext {
   projectId: () => string;
@@ -21,7 +21,7 @@ const synced = (file: OpenFile) =>
   !file.virtual &&
   !file.external &&
   !file.commit &&
-  !file.rev &&
+  isLiveFile(file) &&
   !file.localFile &&
   !file.binary &&
   !file.image &&

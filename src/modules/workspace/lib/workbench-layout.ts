@@ -6,6 +6,7 @@ import type {
 } from "../../workspace-api/index.ts";
 import { computed, ref, watch, type Ref } from "vue";
 import { commandArgs } from "../../../common/utilities/commands.ts";
+import { isLiveScope } from "../../../../core/modules/workspace/index.ts";
 import {
   activatePanel,
   addPanel,
@@ -177,8 +178,10 @@ export function useWorkbenchLayout(ctx: WorkbenchLayoutContext) {
             ? `${file.path} · ${file.saveError}`
             : file.commit
               ? `${file.path} · ${file.parent || "∅"} → ${file.commit.slice(0, 7)}`
-              : file.rev
-                ? `${file.path} · @${file.rev.slice(0, 7)}`
+              : file.scope && !isLiveScope(file.scope)
+                ? file.scope.kind === "commit"
+                  ? `${file.path} · @${file.scope.rev.slice(0, 7)}`
+                  : `${file.path} · ${file.scope.from.slice(0, 7)} → ${file.scope.to.slice(0, 7)}`
                 : `${file.path}${file.original !== undefined ? (file.staged ? " · HEAD → index" : " · index → рабочий файл") : ""}`,
         dirty: ctx.isDirty(file),
         saving: !!file.saving,

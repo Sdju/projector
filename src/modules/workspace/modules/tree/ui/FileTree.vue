@@ -14,7 +14,13 @@ import {
 } from "vue";
 import { useSessionSnapshot } from "../../../../../common/utilities/session-snapshot.ts";
 import { createTreePaging, treePagingKey, useTreeListing } from "../lib/tree-listing.ts";
-import { TREE_PAGE_SIZE } from "../../../../../../core/modules/workspace/index.ts";
+import {
+  TREE_PAGE_SIZE,
+  fileScopeKey,
+  isLiveScope,
+  type FileDecoration,
+  type FileScope,
+} from "../../../../../../core/modules/workspace/index.ts";
 import { treeSessionSchema } from "../lib/tree-session.ts";
 import { useTreeOperations } from "../lib/tree-operations.ts";
 import { useTreeKeyboard } from "../lib/tree-keyboard.ts";
@@ -29,11 +35,6 @@ import { useFileIconTheme } from "../../../../file-icons/index.ts";
 import { workspaceCapabilities } from "../../../../workspace-api/index.ts";
 import { createTreeDrag, treeDragKey } from "../lib/tree-drag.ts";
 import { createTreeSelection, treeSelectionKey } from "../lib/tree-selection.ts";
-import {
-  gitTreeDecorations,
-  type GitDecoration,
-  type GitOverview,
-} from "../../../../../../core/modules/workspace/index.ts";
 import type { FileEntry } from "../../../../../../core/modules/workspace/index.ts";
 const props = withDefaults(
   defineProps<{
@@ -42,12 +43,11 @@ const props = withDefaults(
     selected: string;
     depth?: number;
     revision: number;
-    rev?: string;
-    readonly?: boolean;
-    gitChanges?: GitOverview["changes"];
+    scope?: FileScope;
+    decorations?: ReadonlyMap<string, FileDecoration>;
     beforeChange?: (path: string) => Promise<boolean>;
   }>(),
-  { path: "", depth: 0 },
+  { path: "", depth: 0, scope: () => ({ kind: "live" }), decorations: () => new Map() },
 );
 const emit = defineEmits<{
   open: [path: string, pinned?: boolean];
@@ -57,12 +57,12 @@ const emit = defineEmits<{
 }>();
 const paging = props.depth === 0 ? createTreePaging() : inject(treePagingKey)!;
 if (props.depth === 0) provide(treePagingKey, paging);
-const gitDecorations =
+const decorations =
   props.depth === 0
-    ? computed(() => gitTreeDecorations(props.gitChanges ?? []))
-    : inject<ComputedRef<Map<string, GitDecoration>>>("workspace-tree-git")!;
-if (props.depth === 0) provide("workspace-tree-git", gitDecorations);
-const gitLabels: Record<GitDecoration, string> = {
+    ? computed(() => props.decorations ?? new Map<string, FileDecoration>())
+    : inject<ComputedRef<ReadonlyMap<string, FileDecoration>>>("workspace-tree-decorations")!;
+if (props.depth === 0) provide("workspace-tree-decorations", decorations);
+const decorationLabels: Record<FileDecoration, string> = {
   added: "Новые записи Git",
   modified: "Есть изменения Git",
   deleted: "Удалённые записи Git",
@@ -134,16 +134,14 @@ if (props.depth === 0) {
 }
 const { source, target, busy, expanded, error: moveError, message, hint, progress } = drag;
 if (props.depth === 0) {
+  const sessionKey = () =>
+    `projector:tree:v1:${props.projectId}${isLiveScope(props.scope) ? "" : `:${fileScopeKey(props.scope)}`}`;
   const session = workspaceCapabilities(props.projectId).persist
-    ? useSessionSnapshot(
-        () => `projector:tree:v1:${props.projectId}${props.rev ? `:rev:${props.rev}` : ""}`,
-        () => [...expanded.value],
-        treeSessionSchema,
-      )
+    ? useSessionSnapshot(sessionKey, () => [...expanded.value], treeSessionSchema)
     : { read: () => undefined };
   expanded.value = new Set(session.read() ?? []);
   watch(
-    () => props.projectId,
+    () => [props.projectId, isLiveScope(props.scope) ? "live" : fileScopeKey(props.scope)],
     () => {
       menu.value?.close(false);
       dialog.value?.close();
@@ -176,7 +174,7 @@ toastErrors(() => (props.depth === 0 ? themeError.value : ""));
 const rows = computed(() =>
   entries.value.map((entry) => ({
     entry,
-    decoration: gitDecorations.value.get(entry.path),
+    decoration: decorations.value.get(entry.path),
     icon: resolver.value.resolve(entry, expanded.value.has(entry.path)),
   })),
 );
@@ -297,7 +295,7 @@ defineExpose({ reveal });
         :data-path="entry.path"
         :data-git-status="decoration"
         :style="{ paddingLeft: `${12 + depth * 14}px` }"
-        :title="decoration ? `${entry.path} · ${gitLabels[decoration]}` : entry.path"
+        :title="decoration ? `${entry.path} · ${decorationLabels[decoration]}` : entry.path"
         :aria-selected="selection.paths.value.has(entry.path)"
         role="treeitem"
         :aria-level="depth + 1"
@@ -327,8 +325,8 @@ defineExpose({ reveal });
         :selected="selected"
         :depth="depth + 1"
         :revision="revision"
-        :rev="rev"
-        :readonly="readonly"
+        :scope="scope"
+        :decorations="decorations"
         :before-change="beforeChange"
         @changed="emit('changed')"
         @deleted="emit('deleted', $event)"

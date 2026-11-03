@@ -6,7 +6,13 @@ import {
   type WorkspaceProfile,
 } from "../../workspace-api/index.ts";
 import type { GitBranchesState, GitHistoryState, GitOverviewState } from "../modules/git/index.ts";
-import type { PullRequestChanges } from "../../../../core/modules/workspace/index.ts";
+import {
+  fileChangeDecorations,
+  fileScopeKey,
+  gitChangesToFileChanges,
+  type FileScope,
+  type PullRequestChanges,
+} from "../../../../core/modules/workspace/index.ts";
 import { GitPanel } from "../modules/git/index.ts";
 import {
   DiscussionsPanel,
@@ -18,7 +24,7 @@ import { PipelinesPanel } from "../modules/pipelines/index.ts";
 import { DockerSidebar } from "../../docker/index.ts";
 import SearchPanel from "../ui/SearchPanel.vue";
 import FilesSection from "../ui/FilesSection.vue";
-import { CommitTreeSection } from "../modules/tree/index.ts";
+import { ScopeTreeSection } from "../modules/tree/index.ts";
 import type { OpenFile, OpenFileOptions } from "../open-file.ts";
 import type { useGitChangeSync } from "./git-change-sync.ts";
 import type { useOpenFiles } from "./open-files.ts";
@@ -98,7 +104,7 @@ export const baseSidebarViews: SidebarViews = {
       beforeChange: host.files.prepareEntryChange,
       selected: host.active?.path ?? "",
       revision: host.revision,
-      gitChanges: host.overview.git.value.changes,
+      decorations: fileChangeDecorations(gitChangesToFileChanges(host.overview.git.value.changes)),
       onChanged: host.changed,
       onDeleted: host.deleted,
       onOpen: (path: string, pinned?: boolean) =>
@@ -134,19 +140,23 @@ export const baseSidebarViews: SidebarViews = {
     activate: (host) => void host.overview.load(),
     refresh: (_, panel) => panel?.refresh?.(),
   },
-  "commit-tree": {
+  tree: {
     icon: IconFiles,
-    component: CommitTreeSection,
+    component: ScopeTreeSection,
     props: (host, _selected, type) => {
-      const hash = typeof type?.params?.hash === "string" ? type.params.hash : "";
+      const scope = type?.params?.scope as FileScope | undefined;
+      if (!scope) throw new Error("У раздела дерева нет источника");
       return {
         projectId: host.projectId,
-        rev: hash,
+        scope,
         revision: host.revision,
-        selected: host.active?.rev === hash ? host.active.path : "",
+        selected:
+          host.active?.scope && fileScopeKey(host.active.scope) === fileScopeKey(scope)
+            ? host.active.path
+            : "",
         onOpen: (path: string, pinned?: boolean) =>
           host.openFile(path, undefined, undefined, undefined, {
-            rev: hash,
+            scope,
             preview: !pinned,
           }),
       };
