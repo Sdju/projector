@@ -28,6 +28,7 @@ export {
   refLabel,
   sourceLabel,
 } from "./pipeline-status.ts";
+export { mergeStatusLabel, mergeStatusTone } from "./pull-status.ts";
 export type {
   Discussion,
   DiscussionComment,
@@ -41,13 +42,6 @@ export type {
   IssueUser,
   Reaction,
   ReactionKind,
-  PullRequest,
-  PullRequestApprovals,
-  PullRequestDetail,
-  PullRequestFile,
-  PullRequestList,
-  PullRequestReview,
-  PullRequestState,
   Pipeline,
   PipelineDetail,
   PipelineJob,
@@ -55,6 +49,18 @@ export type {
   PipelineList,
   PipelineStatus,
 } from "./contract.ts";
+export type {
+  PullRequest,
+  PullRequestApprovals,
+  PullRequestChanges,
+  PullRequestComparison,
+  PullRequestDetail,
+  PullRequestDiffRefs,
+  PullRequestFile,
+  PullRequestList,
+  PullRequestReview,
+  PullRequestState,
+} from "./pull-requests.ts";
 export type { FilesExcludeMap } from "./files-exclude.ts";
 export {
   ALWAYS_FILES_EXCLUDE,

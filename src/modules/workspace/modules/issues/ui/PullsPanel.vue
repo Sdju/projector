@@ -1,5 +1,11 @@
 <script setup lang="ts">
 import type { PullRequest } from "../../../../../../core/modules/workspace/index.ts";
+import {
+  PIPELINE_STATUS_LABEL,
+  PIPELINE_STATUS_TONE,
+} from "../../../../../../core/modules/workspace/index.ts";
+import UiStatusDot from "../../../../../common/ui/UiStatusDot.vue";
+import { computed } from "vue";
 import { usePagedList } from "../lib/paged-list.ts";
 import { useTrackerPanel } from "../lib/tracker-panel.ts";
 import TrackerPanel from "./TrackerPanel.vue";
@@ -8,6 +14,7 @@ import IconOpen from "~icons/lucide/git-pull-request";
 import IconDraft from "~icons/lucide/git-pull-request-draft";
 import IconClosed from "~icons/lucide/git-pull-request-closed";
 import IconMerged from "~icons/lucide/git-merge";
+import IconMessage from "~icons/lucide/message-square";
 
 /** Сайдбар-блок трекера (pull requests, merge requests): состояние, список и подгрузка страниц. */
 const props = withDefaults(
@@ -66,6 +73,17 @@ const stateIcon = (pull: PullRequest) =>
         : IconOpen;
 const stateClass = (pull: PullRequest) =>
   pull.draft && pull.state === "open" ? "draft" : pull.state;
+/** GitLab has a separate `merged` state; GitHub shows merged requests under `closed`. */
+const states = computed(() =>
+  props.kind === "mergeRequests"
+    ? [
+        { value: "open" as const, label: "открытые" },
+        { value: "closed" as const, label: "закрытые" },
+        { value: "merged" as const, label: "влитые" },
+        { value: "all" as const, label: "все" },
+      ]
+    : undefined,
+);
 defineExpose({ refresh: () => list.load() });
 </script>
 
@@ -81,6 +99,7 @@ defineExpose({ refresh: () => list.load() });
     :loading-more="list.loadingMore.value"
     :error="list.error.value"
     :has-more="list.next.value !== null"
+    :states="states"
     @toggle="run('block.toggle')"
     @filter="run('filter', { state: $event })"
     @more="run('more')"
@@ -106,6 +125,17 @@ defineExpose({ refresh: () => list.load() });
           <span class="branches u-truncate" :title="`${pull.head} → ${pull.base}`">
             {{ pull.head }} → {{ pull.base }}
           </span>
+          <span
+            v-if="pull.pipeline"
+            class="ci"
+            :title="`Pipeline #${pull.pipeline.id}: ${PIPELINE_STATUS_LABEL[pull.pipeline.status]}`"
+          >
+            <UiStatusDot :tone="PIPELINE_STATUS_TONE[pull.pipeline.status]" shrink />
+          </span>
+          <span v-if="pull.hasConflicts" class="conflict" title="Есть конфликты">конфликт</span>
+          <span v-if="pull.comments" class="comments" :title="`${pull.comments} комментариев`">
+            <IconMessage aria-hidden="true" />{{ pull.comments }}
+          </span>
         </template>
       </TrackerRow>
     </li>
@@ -129,5 +159,20 @@ defineExpose({ refresh: () => list.load() });
 .branches {
   min-width: 0;
   font-family: var(--mono);
+}
+.ci,
+.comments {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.comments svg {
+  width: 11px;
+  height: 11px;
+}
+.conflict {
+  flex-shrink: 0;
+  color: var(--err);
 }
 </style>

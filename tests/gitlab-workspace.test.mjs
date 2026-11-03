@@ -126,6 +126,12 @@ test("the readonly GitLab source reads tree, files, history, issues and merge re
       async readMergeRequest(repository, number) {
         return { action: "merge-request", repository, number };
       },
+      async readMergeRequestFiles(repository, number) {
+        return { action: "merge-request-files", repository, number };
+      },
+      async readMergeRequestDiff(repository, number, path) {
+        return { action: "merge-request-diff", repository, number, path };
+      },
       async readPipelines(repository, params) {
         return { action: "pipelines", repository, params };
       },
@@ -272,6 +278,23 @@ test("the readonly GitLab source reads tree, files, history, issues and merge re
       number: 9,
     });
     await expect(workspaceRequest(projectId, "pull", { number: "0" })).rejects.toThrow();
+    expect(await workspaceRequest(projectId, "pull-files", { number: "9" })).toStrictEqual({
+      action: "merge-request-files",
+      repository: REPOSITORY,
+      number: 9,
+    });
+    expect(
+      await workspaceRequest(projectId, "pull-diff", { number: "9", path: "src/main.ts" }),
+    ).toStrictEqual({
+      action: "merge-request-diff",
+      repository: REPOSITORY,
+      number: 9,
+      path: "src/main.ts",
+    });
+    await expect(workspaceRequest(projectId, "pull-files", { number: "0" })).rejects.toThrow();
+    await expect(
+      workspaceRequest(projectId, "pull-diff", { number: "9", path: "" }),
+    ).rejects.toThrow();
     expect(
       await workspaceRequest(projectId, "pipelines", { status: "failed", page: "1" }),
     ).toStrictEqual({

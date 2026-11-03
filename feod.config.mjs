@@ -73,7 +73,12 @@ export default {
     extra: {
       largeFiles: {
         thresholds: { default: 400, ".vue": 500 },
-        files: {},
+        files: {
+          "server/modules/gitlab/browser.ts": {
+            ceiling: 402,
+            plan: "Вынести чтение файлов и ассетов GitLab в отдельный files.ts",
+          },
+        },
       },
       confine: adapters,
     },

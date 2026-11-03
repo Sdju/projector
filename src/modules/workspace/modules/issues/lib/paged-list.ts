@@ -1,7 +1,7 @@
 import { ref, type Ref } from "vue";
 import { workspaceRequest } from "../../../../workspace-api/index.ts";
 
-export type TrackerState = "open" | "closed" | "all";
+export type TrackerState = "open" | "closed" | "all" | "merged";
 
 /**
  * Список сущностей проекта (issues, pull requests) с фильтром по состоянию: первая страница и

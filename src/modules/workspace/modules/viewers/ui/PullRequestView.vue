@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import UiHint from "../../../../../common/ui/UiHint.vue";
-import UiHeading from "../../../../../common/ui/UiHeading.vue";
 import UiStatusDot from "../../../../../common/ui/UiStatusDot.vue";
 import { computed } from "vue";
 import type {
@@ -9,16 +8,24 @@ import type {
   PullRequestReview,
 } from "../../../../../../core/modules/workspace/index.ts";
 import { countRu } from "../../../../../common/utilities/plural.ts";
-import { relativeTime } from "../../../../../common/utilities/commit-format.ts";
 import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab-readout.ts";
 import {
-  durationLabel,
+  mergeStatusLabel,
+  mergeStatusTone,
   PIPELINE_STATUS_LABEL,
-  PIPELINE_STATUS_TONE,
 } from "../../../../../../core/modules/workspace/index.ts";
+import {
+  commandArgs,
+  useCommandRegistrar,
+  useCommandScope,
+} from "../../../../../common/utilities/commands.ts";
+import type { SidebarType } from "../../../../workspace-api/index.ts";
 import { useTrackerDetail } from "../lib/tracker-detail.ts";
+import { usePullDiffs } from "../lib/pull-diffs.ts";
 import TrackerComments from "./TrackerComments.vue";
 import TrackerDetail from "./TrackerDetail.vue";
+import PullRequestFiles from "./PullRequestFiles.vue";
+import PullRequestPipeline from "./PullRequestPipeline.vue";
 
 /** Вкладка pull request: метаданные, Markdown-описание, ревью, обсуждение и изменённые файлы. */
 const props = withDefaults(
@@ -30,6 +37,10 @@ const props = withDefaults(
     /** Короткая подпись в readout: «PR» у GitHub, «MR» у GitLab. */
     short?: string;
     noun?: string;
+    /** Workspace actions: a temporary tree section and a base → head file tab. */
+    onOpenSection?: (type: SidebarType) => void;
+    onOpenPullFile?: (number: number, path: string, head?: string, pinned?: boolean) => void;
+    onOpenJob?: (job: { id: number; title: string }) => void;
   }>(),
   { host: "GitHub", short: "PR", noun: "pull request" },
 );
@@ -37,12 +48,33 @@ const emit = defineEmits<{
   open: [path: string];
   openPipeline: [pipeline: { id: number; title?: string }];
 }>();
-const { detail, loading, error } = useTrackerDetail<PullRequestDetail>(
+const { detail, loading, error, reload } = useTrackerDetail<PullRequestDetail>(
   () => props.projectId,
   () => props.number,
   "pull",
   `Не удалось открыть ${props.noun}`,
 );
+const headSha = computed(() => detail.value?.diffRefs?.headSha ?? "");
+const mergeStatus = computed(() => detail.value?.mergeStatus ?? "");
+const {
+  expanded,
+  heights,
+  diffs,
+  toggle: toggleFile,
+} = usePullDiffs(
+  () => props.projectId,
+  () => props.number,
+  () => headSha.value,
+);
+const textFiles = computed(() =>
+  (detail.value?.files ?? []).filter((file) => !file.binary && !file.tooLarge),
+);
+const commands = useCommandScope(`merge-request:${props.projectId}:${props.number}`, () => ({
+  surface: "merge-request",
+  projectId: props.projectId,
+  number: props.number,
+}));
+const register = useCommandRegistrar(commands.scope);
 
 const STATE_LABEL = { open: "открыт", closed: "закрыт", merged: "влит" } as const;
 const REVIEW_LABEL: Record<PullRequestReview["state"], string> = {
@@ -99,6 +131,106 @@ const reviewers = computed(() => {
 const openPipeline = () => {
   if (pipeline.value) emit("openPipeline", { id: pipeline.value.id, title: pipeline.value.name });
 };
+const openChangesTree = () => {
+  const detailValue = detail.value;
+  props.onOpenSection?.({
+    id: `merge-request-files:${props.number}`,
+    title: `Изменения !${props.number}`,
+    source: "Только чтение · MR",
+    group: "merge-requests",
+    kind: "merge-request-files",
+    params: {
+      number: props.number,
+      head: headSha.value,
+      ...(detailValue
+        ? {
+            snapshot: {
+              files: detailValue.files,
+              changedFiles: detailValue.changedFiles,
+              changedFilesCapped: detailValue.changedFilesCapped === true,
+              filesTruncated: detailValue.filesTruncated,
+              ...(detailValue.diffRefs ? { diffRefs: detailValue.diffRefs } : {}),
+            },
+          }
+        : {}),
+    },
+    closable: true,
+  });
+};
+const openFile = (path: string, pinned = false) =>
+  props.onOpenPullFile?.(props.number, path, headSha.value, pinned);
+const openJob = (job: { id: number; title: string }) => props.onOpenJob?.(job);
+register(
+  "ide.mergeRequest.refresh",
+  "Обновить merge request",
+  "Перечитывает состояние, ревью, обсуждение и изменённые файлы merge request.",
+  () => reload(),
+);
+register(
+  "ide.mergeRequest.files.open",
+  "Дерево изменений merge request",
+  "Открывает временный раздел боковой панели с деревом изменённых файлов merge request.",
+  () => openChangesTree(),
+);
+register(
+  "ide.mergeRequest.file.open",
+  "Открыть изменения файла merge request",
+  "Открывает файл merge request отдельной вкладкой base → head.",
+  (value) => {
+    const { path, pinned } = commandArgs(value);
+    if (typeof path !== "string" || !path) throw new Error("Укажите path файла");
+    openFile(path, pinned === true);
+  },
+  {
+    path: "string: путь файла в merge request",
+    pinned: "boolean (необязательно): true — постоянная вкладка",
+  },
+);
+register(
+  "ide.mergeRequest.file.toggle",
+  "Раскрыть изменения файла merge request",
+  "Раскрывает diff файла прямо в карточке merge request.",
+  async (value) => {
+    const { path, open } = commandArgs(value);
+    if (typeof path !== "string" || !path) throw new Error("Укажите path файла");
+    if (open !== undefined && typeof open !== "boolean")
+      throw new Error("open должен быть boolean");
+    await toggleFile(path, open as boolean | undefined);
+  },
+  { path: "string: путь файла", open: "boolean (необязательно): true/false" },
+);
+register(
+  "ide.mergeRequest.files.toggleAll",
+  "Раскрыть или свернуть все файлы merge request",
+  "Раскрывает diff всех текстовых файлов merge request или сворачивает их.",
+  async (value) => {
+    const { open } = commandArgs(value);
+    const expand = typeof open === "boolean" ? open : expanded.value.size === 0;
+    if (!expand) {
+      expanded.value.clear();
+      return;
+    }
+    await Promise.all(textFiles.value.map((file) => toggleFile(file.path, true)));
+  },
+  { open: "boolean (необязательно): true — раскрыть всё, false — свернуть" },
+);
+register(
+  "ide.mergeRequest.pipeline.open",
+  "Открыть pipeline merge request",
+  "Открывает вкладку последнего pipeline источника merge request.",
+  () => openPipeline(),
+);
+register(
+  "ide.mergeRequest.pipeline.job.open",
+  "Открыть джоб merge request",
+  "Открывает вкладку джоба pipeline merge request.",
+  (value) => {
+    const { id, title } = commandArgs(value);
+    if (typeof id !== "number") throw new Error("Укажите номер джоба");
+    openJob({ id, title: typeof title === "string" ? title : "" });
+  },
+  { id: "number: номер джоба", title: "string (необязательно): заголовок" },
+);
 
 // Что штатный агент видит во вкладке pull request: состояние, ветки, статистика, ревью и файлы.
 useTabReadout(() => {
@@ -120,6 +252,10 @@ useTabReadout(() => {
       `${pull.title} (#${pull.number})`,
       `Автор: ${pull.author.login}, создано ${pull.createdAt}`,
       `Ветки: ${pull.head} → ${pull.base}`,
+      mergeStatus.value ? `Готовность: ${mergeStatusLabel(mergeStatus.value)}` : "",
+      data.diffRefs
+        ? `Diff: ${data.diffRefs.baseSha.slice(0, 7)}..${data.diffRefs.headSha.slice(0, 7)}`
+        : "Diff ещё не подготовлен",
       `Коммитов: ${data.commits}, файлов: ${data.changedFiles}, +${data.additions} −${data.deletions}`,
       data.pipeline
         ? `Pipeline: #${data.pipeline.id} ${PIPELINE_STATUS_LABEL[data.pipeline.status]}`
@@ -140,7 +276,7 @@ useTabReadout(() => {
           }`
         : "Файлы: нет",
       data.filesTruncated
-        ? `Файлы показаны не все (${data.files.length} из ${data.changedFiles}).`
+        ? `Файлы показаны не все (${data.files.length} из ${data.changedFiles}${data.changedFilesCapped ? "+" : ""}).`
         : "",
       data.commentsTruncated ? "Комментарии показаны не все." : "",
       body,
@@ -173,32 +309,26 @@ useTabReadout(() => {
       <span class="branches">{{ detail?.pull.head }} → {{ detail?.pull.base }}</span>
     </template>
     <template #summary>
-      <div v-if="pipeline" class="pipeline-bar">
-        <button
-          type="button"
-          class="pipeline-open"
-          :title="`Открыть pipeline #${pipeline.id}`"
-          @click="openPipeline"
+      <p
+        v-if="mergeStatus && !(detail?.pull.draft && mergeStatus === 'draft_status')"
+        class="merge-status"
+        :class="mergeStatusTone(mergeStatus)"
+      >
+        <UiStatusDot :tone="mergeStatusTone(mergeStatus)" shrink />
+        <span>{{ mergeStatusLabel(mergeStatus) }}</span>
+        <span v-if="detail?.hasConflicts" class="conflict">конфликты</span>
+        <span v-else-if="detail?.blockingDiscussionsResolved === false" class="conflict"
+          >обсуждения не решены</span
         >
-          <UiStatusDot :tone="PIPELINE_STATUS_TONE[pipeline.status]" shrink />
-          <span class="pipeline-title">Pipeline #{{ pipeline.id }}</span>
-          <span class="pipeline-state">{{ PIPELINE_STATUS_LABEL[pipeline.status] }}</span>
-          <span v-if="durationLabel(pipeline.duration)" class="pipeline-meta"
-            >за {{ durationLabel(pipeline.duration) }}</span
-          >
-          <span v-if="pipeline.createdAt" class="pipeline-meta" :title="pipeline.createdAt"
-            >создан {{ relativeTime(pipeline.createdAt) }}</span
-          >
-        </button>
-        <a
-          v-if="pipeline.webUrl"
-          class="pipeline-external"
-          :href="pipeline.webUrl"
-          target="_blank"
-          rel="noopener noreferrer"
-          >на {{ host }}</a
-        >
-      </div>
+      </p>
+      <PullRequestPipeline
+        v-if="pipeline"
+        :project-id="projectId"
+        :pipeline="pipeline"
+        :host="host"
+        @open-pipeline="emit('openPipeline', $event)"
+        @open-job="openJob"
+      />
       <p v-if="reviewers.length" class="review-line">
         <span class="approvals">Ревьюеры</span>
         <span v-for="reviewer in reviewers" :key="reviewer.author.login" class="reviewer">
@@ -212,7 +342,10 @@ useTabReadout(() => {
     <template #stats>
       <p v-if="detail" class="stats">
         <span>{{ countRu(detail.commits, "коммит", "коммита", "коммитов") }}</span>
-        <span>{{ countRu(detail.changedFiles, "файл", "файла", "файлов") }}</span>
+        <span
+          >{{ countRu(detail.changedFiles, "файл", "файла", "файлов")
+          }}{{ detail.changedFilesCapped ? "+" : "" }}</span
+        >
         <span class="add">+{{ detail.additions }}</span>
         <span class="del">−{{ detail.deletions }}</span>
       </p>
@@ -224,34 +357,23 @@ useTabReadout(() => {
       :items="reviews"
       @open="emit('open', $event)"
     />
-    <template v-if="detail">
-      <UiHeading as="h3" size="sm" tone="secondary" :space-before="4" :space-after="2"
-        >Изменённые файлы</UiHeading
-      >
-      <UiHint size="xs" leading="inherit" :space-before="2" v-if="!detail.files.length" class="note"
-        >Файлов нет</UiHint
-      >
-      <ul v-else class="file-list">
-        <li v-for="file in detail.files" :key="file.path">
-          <span class="mark" :class="file.status" :title="file.status">{{
-            FILE_MARK[file.status]
-          }}</span>
-          <span class="path u-truncate" :title="filePath(file)">{{ filePath(file) }}</span>
-          <span class="add">+{{ file.additions }}</span>
-          <span class="del">−{{ file.deletions }}</span>
-        </li>
-      </ul>
-      <UiHint
-        size="xs"
-        leading="inherit"
-        :space-before="2"
-        v-if="detail.filesTruncated"
-        class="note"
-      >
-        Показано {{ detail.files.length }} из {{ detail.changedFiles }} файлов. Остальные — на
-        {{ host }}.
-      </UiHint>
-    </template>
+    <PullRequestFiles
+      v-if="detail"
+      :files="detail.files"
+      :changed-files="detail.changedFiles"
+      :changed-files-capped="detail.changedFilesCapped"
+      :files-truncated="detail.filesTruncated"
+      :diff-refs="detail.diffRefs"
+      :host="host"
+      :expanded="expanded"
+      :heights="heights"
+      :diffs="diffs"
+      @toggle="(path, open) => commands.run('ide.mergeRequest.file.toggle', { path, open })"
+      @toggle-all="commands.run('ide.mergeRequest.files.toggleAll')"
+      @open="openFile"
+      @open-tree="commands.run('ide.mergeRequest.files.open')"
+      @resize="(path, height) => (heights[path] = height)"
+    />
     <TrackerComments
       :project-id="projectId"
       title="Обсуждение"
@@ -283,45 +405,30 @@ useTabReadout(() => {
   color: var(--muted);
   font-size: var(--fs-xs);
 }
-.pipeline-bar {
+.merge-status {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--sp-2);
-  margin-top: var(--sp-3);
-  padding: var(--sp-2) var(--sp-3);
+  margin: var(--sp-2) 0 0;
+  padding: var(--sp-1) var(--sp-2);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   background: var(--bg-2);
-  font-size: var(--fs-xs);
-}
-.pipeline-open {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  min-width: 0;
-  flex: 1;
-  text-align: left;
-  color: var(--text-2);
-}
-.pipeline-open:hover {
-  color: var(--text);
-}
-.pipeline-title {
-  font-family: var(--mono);
-}
-.pipeline-state {
-  color: var(--muted);
-}
-.pipeline-meta {
-  color: var(--faint);
-  font-size: var(--fs-2xs);
-  white-space: nowrap;
-}
-.pipeline-external {
   color: var(--muted);
   font-size: var(--fs-2xs);
-  text-decoration: underline;
-  white-space: nowrap;
+}
+.merge-status.success {
+  color: var(--run);
+}
+.merge-status.warning {
+  color: var(--warn);
+}
+.merge-status.danger {
+  color: var(--err);
+}
+.conflict {
+  color: var(--err);
 }
 .review-line {
   display: flex;
@@ -356,40 +463,5 @@ useTabReadout(() => {
 .del {
   color: var(--err);
   font-family: var(--mono);
-}
-.file-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-}
-.file-list li {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-1) var(--sp-3);
-  font-size: var(--fs-xs);
-}
-.file-list li + li {
-  border-top: 1px solid var(--line);
-}
-.mark {
-  width: 14px;
-  color: var(--muted);
-  font-family: var(--mono);
-  text-align: center;
-}
-.mark.added {
-  color: var(--run);
-}
-.mark.removed {
-  color: var(--err);
-}
-.path {
-  flex: 1;
-  min-width: 0;
-  font-family: var(--mono);
-  color: var(--text-2);
 }
 </style>

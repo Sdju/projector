@@ -38,21 +38,25 @@ const { detail, loading, error, reload } = usePipelineDetail(
 const problemsOnly = ref(false);
 const PROBLEM_STATUSES = new Set<PipelineStatus>(["failed", "canceled"]);
 const groups = computed(() => {
-  const stages = new Map<string, PipelineJob[]>();
+  const stages = new Map<string, { jobs: PipelineJob[]; first: number }>();
   for (const job of detail.value?.jobs ?? []) {
     if (problemsOnly.value && !PROBLEM_STATUSES.has(job.status)) continue;
     const stage = job.stage || "без стадии";
-    const rows = stages.get(stage) ?? [];
-    rows.push(job);
-    stages.set(stage, rows);
+    const entry = stages.get(stage) ?? { jobs: [], first: job.id };
+    entry.jobs.push(job);
+    entry.first = Math.min(entry.first, job.id);
+    stages.set(stage, entry);
   }
-  return [...stages.entries()].map(([stage, jobs]) => ({
-    stage,
-    jobs,
-    count: countRu(jobs.length, "джоб", "джоба", "джобов"),
-    summary: stageSummary(jobs),
-    tone: stageTone(jobs),
-  }));
+  // GitLab allocates job ids in reverse stage order, so the earliest id is the stage order.
+  return [...stages.entries()]
+    .sort(([, left], [, right]) => left.first - right.first)
+    .map(([stage, { jobs }]) => ({
+      stage,
+      jobs,
+      count: countRu(jobs.length, "джоб", "джоба", "джобов"),
+      summary: stageSummary(jobs),
+      tone: stageTone(jobs),
+    }));
 });
 const failing = computed(
   () => (detail.value?.jobs ?? []).filter((job) => PROBLEM_STATUSES.has(job.status)).length,

@@ -11,8 +11,9 @@ export function useTrackerDetail<T>(
   const detail = shallowRef<T>();
   const loading = ref(false);
   const error = ref("");
+  const revision = ref(0);
   watch(
-    () => [projectId(), number()] as const,
+    () => [projectId(), number(), revision.value] as const,
     async ([projectId, number], _, onCleanup) => {
       const controller = new AbortController();
       let active = true;
@@ -39,5 +40,5 @@ export function useTrackerDetail<T>(
     },
     { immediate: true },
   );
-  return { detail, loading, error };
+  return { detail, loading, error, reload: () => revision.value++ };
 }

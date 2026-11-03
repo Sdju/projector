@@ -1,6 +1,7 @@
 import { inject, onBeforeUnmount, provide, type Component, type InjectionKey } from "vue";
 import {
   createTabRegistry,
+  type SidebarType,
   type TabBehavior,
   type TabParams,
   type TabRegistry,
@@ -53,6 +54,10 @@ export interface TabHost {
   openTab(id: string, params?: TabParams, options?: { preview?: boolean }): void;
   openCommitDiff(hash: string, path: string): void;
   openCommitTree(hash: string): void;
+  /** Opens a changed file of a merge request as a read-only base → head tab. */
+  openPullFile(number: number, path: string, head?: string, pinned?: boolean): void;
+  /** Adds a temporary sidebar section (a merge request tree, a pipeline panel). */
+  openSection(type: SidebarType): void;
   /** Runs an editor command of this workspace (a button of a view is a command too). */
   run(command: string, args?: unknown): void;
 }
@@ -123,6 +128,10 @@ export function baseTabViews(): TabViews {
         projectId: host.projectId,
         number: tab.params?.number,
         onOpen: host.openFile,
+        onOpenSection: host.openSection,
+        onOpenPullFile: host.openPullFile,
+        onOpenJob: (job: { id: number; title: string }) =>
+          host.openTab("job", job, { preview: false }),
         onOpenPipeline: (pipeline: { id: number; title?: string }) =>
           host.openTab("pipeline", pipeline, { preview: false }),
       }),

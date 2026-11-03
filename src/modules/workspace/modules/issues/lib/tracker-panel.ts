@@ -53,11 +53,13 @@ export function useTrackerPanel(options: TrackerPanelOptions) {
     "Переключает state и перечитывает список.",
     (value) => {
       const { state } = commandArgs(value);
-      if (state !== "open" && state !== "closed" && state !== "all")
-        throw new Error("Укажите state: open, closed или all");
-      return list.filter(state);
+      const states = ["open", "closed", "all", ...(kind === "mergeRequests" ? ["merged"] : [])];
+      if (!states.includes(String(state))) throw new Error(`Укажите state: ${states.join(", ")}`);
+      return list.filter(state as "open" | "closed" | "all" | "merged");
     },
-    { state: "string: open, closed или all" },
+    {
+      state: `string: ${kind === "mergeRequests" ? "open, closed, merged или all" : "open, closed или all"}`,
+    },
   );
   register(
     `ide.${kind}.more`,

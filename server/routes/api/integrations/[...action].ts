@@ -51,6 +51,8 @@ import {
   browseGitlabIssue,
   browseGitlabMergeRequests,
   browseGitlabMergeRequest,
+  browseGitlabMergeRequestFiles,
+  browseGitlabMergeRequestDiff,
   browseGitlabPipelines,
   browseGitlabPipeline,
   browseGitlabJob,
@@ -208,6 +210,22 @@ export async function handleIntegrationsActions({
           res,
           200,
           await browseGitlabMergeRequest(repository, Number(url.searchParams.get("number"))),
+        );
+      else if (path === "/api/integrations/gitlab/browse/merge-request-files")
+        json(
+          res,
+          200,
+          await browseGitlabMergeRequestFiles(repository, Number(url.searchParams.get("number"))),
+        );
+      else if (path === "/api/integrations/gitlab/browse/merge-request-diff")
+        json(
+          res,
+          200,
+          await browseGitlabMergeRequestDiff(
+            repository,
+            Number(url.searchParams.get("number")),
+            url.searchParams.get("path") || "",
+          ),
         );
       else if (path === "/api/integrations/gitlab/browse/pipelines")
         json(

@@ -2,11 +2,12 @@
 import UiScrollArea from "../../../../../common/ui/UiScrollArea.vue";
 import UiEmpty from "../../../../../common/ui/UiEmpty.vue";
 import UiMessage from "../../../../../common/ui/UiMessage.vue";
+import { computed } from "vue";
 import type { TrackerState } from "../lib/paged-list.ts";
 import IconChevronRight from "~icons/lucide/chevron-right";
 
 /** Оболочка сайдбар-блока списка (issues, pull requests): заголовок, фильтр, состояния, «ещё». */
-defineProps<{
+const props = defineProps<{
   title: string;
   /** Префикс команд блока: `ide.issues`. */
   prefix: string;
@@ -19,13 +20,16 @@ defineProps<{
   hasMore: boolean;
   /** Подпись состояний фильтра и пустого списка. */
   noun: string;
+  /** Фильтры состояния; по умолчанию открытые, закрытые и все. */
+  states?: Array<{ value: TrackerState; label: string }>;
 }>();
 const emit = defineEmits<{ toggle: []; filter: [state: TrackerState]; more: [] }>();
-const states: Array<{ value: TrackerState; label: string }> = [
+const defaultStates: Array<{ value: TrackerState; label: string }> = [
   { value: "open", label: "открытые" },
   { value: "closed", label: "закрытые" },
   { value: "all", label: "все" },
 ];
+const filters = computed(() => props.states ?? defaultStates);
 </script>
 
 <template>
@@ -45,7 +49,7 @@ const states: Array<{ value: TrackerState; label: string }> = [
     <UiScrollArea v-show="open" class="block-body">
       <div class="state-filter" role="group" :aria-label="`Состояние: ${noun}`">
         <button
-          v-for="option in states"
+          v-for="option in filters"
           :key="option.value"
           type="button"
           :class="{ active: state === option.value }"

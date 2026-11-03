@@ -6,8 +6,14 @@ import {
   type WorkspaceProfile,
 } from "../../workspace-api/index.ts";
 import type { GitBranchesState, GitHistoryState, GitOverviewState } from "../modules/git/index.ts";
+import type { PullRequestChanges } from "../../../../core/modules/workspace/index.ts";
 import { GitPanel } from "../modules/git/index.ts";
-import { DiscussionsPanel, IssuesPanel, PullsPanel } from "../modules/issues/index.ts";
+import {
+  DiscussionsPanel,
+  IssuesPanel,
+  PullsPanel,
+  PullRequestFilesSection,
+} from "../modules/issues/index.ts";
 import { PipelinesPanel } from "../modules/pipelines/index.ts";
 import { DockerSidebar } from "../../docker/index.ts";
 import SearchPanel from "../ui/SearchPanel.vue";
@@ -59,6 +65,7 @@ export interface SidebarHost {
   ): unknown;
   openTab(id: string, params?: Record<string, unknown>, options?: { preview?: boolean }): void;
   openCommitTree(hash: string): void;
+  openPullFile(number: number, path: string, head?: string, pinned?: boolean): void;
   command(id: string, args?: unknown): void;
   refreshWorkspace(): void;
   changed(): void;
@@ -182,6 +189,23 @@ export const baseSidebarViews: SidebarViews = {
       host: "GitLab",
       action: "pulls",
     }),
+    refresh: (_, panel) => panel?.refresh?.(),
+  },
+  "merge-request-files": {
+    icon: IconFiles,
+    component: PullRequestFilesSection,
+    props: (host, _selected, type) => {
+      const number = Number(type?.params?.number);
+      const head = typeof type?.params?.head === "string" ? type.params.head : "";
+      return {
+        projectId: host.projectId,
+        number,
+        head,
+        snapshot: type?.params?.snapshot as PullRequestChanges | undefined,
+        onOpen: (path: string, pinned?: boolean, nextHead?: string) =>
+          host.openPullFile(number, path, nextHead || head, pinned),
+      };
+    },
     refresh: (_, panel) => panel?.refresh?.(),
   },
   pipelines: {

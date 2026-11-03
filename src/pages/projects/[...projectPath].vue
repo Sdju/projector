@@ -20,6 +20,7 @@ import { RunMenu, useRunner } from "../../modules/runner/index.ts";
 import { DevcontainerTrust } from "../../modules/devcontainer/index.ts";
 import {
   ProjectWorkspace,
+  PullRequestView,
   PipelineView,
   JobView,
   type TabViews,
@@ -63,6 +64,24 @@ const tabViews = computed<TabViews>(() => {
     ...settingsTabViews,
     ...(gitlab
       ? {
+          pull: {
+            component: PullRequestView,
+            keepAlive: true,
+            props: (tab, host) => ({
+              projectId: host.projectId,
+              number: tab.params?.number,
+              host: "GitLab",
+              short: "MR",
+              noun: "merge request",
+              onOpen: host.openFile,
+              onOpenSection: host.openSection,
+              onOpenPullFile: host.openPullFile,
+              onOpenJob: (job: { id: number; title: string }) =>
+                host.openTab("job", job, { preview: false }),
+              onOpenPipeline: (pipeline: { id: number; title?: string }) =>
+                host.openTab("pipeline", pipeline, { preview: false }),
+            }),
+          },
           pipeline: {
             component: PipelineView,
             keepAlive: true,

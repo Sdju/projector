@@ -34,6 +34,12 @@ export interface WorkspaceSessionContext {
     options?: OpenFileOptions,
   ) => Promise<number | undefined>;
   openCommitFile: (hash: string, path: string, preview?: boolean) => Promise<number | undefined>;
+  openPullFile: (
+    number: number,
+    path: string,
+    head?: string,
+    preview?: boolean,
+  ) => Promise<number | undefined>;
   fileGeneration: () => number;
   resetFiles: () => void;
   resetGit: () => void;
@@ -54,6 +60,7 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
           virtual: tab.virtual,
           params: tab.params,
           commit: tab.commit,
+          pull: tab.pull,
           rev: tab.rev,
           external: tab.external,
           staged: tab.staged,
@@ -80,13 +87,15 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
           ctx.ensureTab(tab.virtual, tab.params ?? (tab.commit ? { hash: tab.commit } : undefined));
           continue;
         }
-        const completed = tab.commit
-          ? await ctx.openCommitFile(tab.commit, tab.path, false)
-          : await ctx.openFile(tab.path, undefined, undefined, tab.staged, {
-              external: tab.external,
-              rev: tab.rev,
-              preview: false,
-            });
+        const completed = tab.pull
+          ? await ctx.openPullFile(tab.pull, tab.path, tab.commit ?? "", false)
+          : tab.commit
+            ? await ctx.openCommitFile(tab.commit, tab.path, false)
+            : await ctx.openFile(tab.path, undefined, undefined, tab.staged, {
+                external: tab.external,
+                rev: tab.rev,
+                preview: false,
+              });
         // A project switch or a user opening another file takes precedence over restoration.
         if (
           generation !== sessionGeneration ||

@@ -15,6 +15,8 @@ import {
   readIssues,
   readJob,
   readMergeRequest,
+  readMergeRequestDiff,
+  readMergeRequestFiles,
   readMergeRequests,
   readPipeline,
   readPipelines,
@@ -116,6 +118,31 @@ function numberedProvider(
   };
 }
 
+/** Merge requests add changed-file reads to the numbered resource contract. */
+function mergeRequestProvider(repository: string, api: GitlabWorkspaceApi = defaultApi) {
+  const base = numberedProvider(
+    "pulls",
+    "pull",
+    "merge request",
+    repository,
+    api.readMergeRequests ?? readMergeRequests,
+    api.readMergeRequest ?? readMergeRequest,
+  );
+  return {
+    read(action: string, params: Record<string, string>, signal?: AbortSignal) {
+      if (action !== "pull-files" && action !== "pull-diff")
+        return base.read(action, params, signal);
+      const number = Number(params.number);
+      if (!Number.isInteger(number) || number <= 0) throw new Error("Укажите номер merge request");
+      if (action === "pull-files")
+        return (api.readMergeRequestFiles ?? readMergeRequestFiles)(repository, number, signal);
+      const path = params.path || "";
+      if (!path) throw new Error("Укажите путь файла merge request");
+      return (api.readMergeRequestDiff ?? readMergeRequestDiff)(repository, number, path, signal);
+    },
+  };
+}
+
 export interface GitlabWorkspaceApi {
   readRepository: typeof readRepository;
   readTree: typeof readTree;
@@ -125,6 +152,8 @@ export interface GitlabWorkspaceApi {
   readIssue?: typeof readIssue;
   readMergeRequests?: typeof readMergeRequests;
   readMergeRequest?: typeof readMergeRequest;
+  readMergeRequestFiles?: typeof readMergeRequestFiles;
+  readMergeRequestDiff?: typeof readMergeRequestDiff;
   readPipelines?: typeof readPipelines;
   readPipeline?: typeof readPipeline;
   readJob?: typeof readJob;
@@ -139,6 +168,8 @@ const defaultApi: GitlabWorkspaceApi = {
   readIssue,
   readMergeRequests,
   readMergeRequest,
+  readMergeRequestFiles,
+  readMergeRequestDiff,
   readPipelines,
   readPipeline,
   readJob,
@@ -176,14 +207,7 @@ export function createGitlabEnabledLocalProfile(
   const repository = `${instance}/${path}`;
   const local = createLocalWorkspaceProfile(projectId);
   const issues = numberedProvider("issues", "issue", "issue", repository, readIssues, readIssue);
-  const pulls = numberedProvider(
-    "pulls",
-    "pull",
-    "merge request",
-    repository,
-    readMergeRequests,
-    readMergeRequest,
-  );
+  const pulls = mergeRequestProvider(repository);
   return {
     ...local,
     id: "local-gitlab",
@@ -313,14 +337,7 @@ export function createGitlabWorkspaceProfile(
     api.readIssues ?? readIssues,
     api.readIssue ?? readIssue,
   );
-  const pulls = numberedProvider(
-    "pulls",
-    "pull",
-    "merge request",
-    repository,
-    api.readMergeRequests ?? readMergeRequests,
-    api.readMergeRequest ?? readMergeRequest,
-  );
+  const pulls = mergeRequestProvider(repository, api);
   return {
     id: "gitlab",
     layout: "editor",

@@ -9,6 +9,8 @@ import type {
   PipelineDetail,
   PipelineJobDetail,
   PipelineList,
+  PullRequestChanges,
+  PullRequestComparison,
   PullRequestDetail,
   PullRequestList,
 } from "../../../core/modules/workspace/index.ts";
@@ -72,6 +74,23 @@ export const readMergeRequests = (
 ) => readGitlab<PullRequestList>("merge-requests", { repository, ...params }, signal);
 export const readMergeRequest = (repository: string, number: number, signal?: AbortSignal) =>
   readGitlab<PullRequestDetail>("merge-request", { repository, number: String(number) }, signal);
+export const readMergeRequestFiles = (repository: string, number: number, signal?: AbortSignal) =>
+  readGitlab<PullRequestChanges>(
+    "merge-request-files",
+    { repository, number: String(number) },
+    signal,
+  );
+export const readMergeRequestDiff = (
+  repository: string,
+  number: number,
+  path: string,
+  signal?: AbortSignal,
+) =>
+  readGitlab<PullRequestComparison>(
+    "merge-request-diff",
+    { repository, number: String(number), path },
+    signal,
+  );
 export const readPipelines = (
   repository: string,
   params: Record<string, string>,

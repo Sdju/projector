@@ -299,6 +299,32 @@ test("GitLab merge requests list maps states, drafts, branches and pages", async
   expect(queries.slice(2).map((query) => query.state)).toStrictEqual(["opened", "all", "opened"]);
 });
 
+test("GitLab merge request list exposes CI, comments and merge readiness", async () => {
+  await setup();
+  mockFetch(() =>
+    Response.json([
+      mergeRequestRow({
+        iid: 12,
+        head_pipeline: { id: 5, status: "failed", ref: "feat/search", sha: "c".repeat(40) },
+        user_notes_count: 4,
+        detailed_merge_status: "discussions_not_resolved",
+        has_conflicts: true,
+        blocking_discussions_resolved: false,
+      }),
+    ]),
+  );
+  const { browseGitlabMergeRequests } = await import("../server/modules/gitlab/index.ts");
+  const list = await browseGitlabMergeRequests(repository);
+  expect(list.pulls[0]).toMatchObject({
+    number: 12,
+    comments: 4,
+    mergeStatus: "discussions_not_resolved",
+    hasConflicts: true,
+    blockingDiscussionsResolved: false,
+    pipeline: { id: 5, status: "failed", ref: "feat/search" },
+  });
+});
+
 test("GitLab merge request detail maps notes, approvals, files and diff counts", async () => {
   await setup();
   const diffQueries = [];

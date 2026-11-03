@@ -104,6 +104,10 @@ const tabViews: TabViews = {
       short: "MR",
       noun: "merge request",
       onOpen: host.openFile,
+      onOpenSection: host.openSection,
+      onOpenPullFile: host.openPullFile,
+      onOpenJob: (job: { id: number; title: string }) =>
+        host.openTab("job", job, { preview: false }),
       onOpenPipeline: (pipeline: { id: number; title?: string }) =>
         host.openTab("pipeline", pipeline, { preview: false }),
     }),

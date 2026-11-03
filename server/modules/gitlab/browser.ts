@@ -111,6 +111,9 @@ export interface ApiDiff {
   renamed_file?: boolean;
   deleted_file?: boolean;
   copied_file?: boolean;
+  generated_file?: boolean;
+  collapsed?: boolean;
+  too_large?: boolean;
   a_mode?: string;
   b_mode?: string;
   diff?: string;
@@ -347,10 +350,20 @@ export async function browseGitlabFile(
   ref: string,
   path: string,
 ): Promise<GitlabFile> {
+  const reader = await gitlabReader(repository);
+  return readGitlabFileAt(reader, projectId(reader.target.path), ref, path);
+}
+
+/** Read one file from an already resolved project id or path; used for both sides of an MR diff. */
+export async function readGitlabFileAt(
+  reader: GitlabReader,
+  project: string,
+  ref: string,
+  path: string,
+): Promise<GitlabFile> {
   safePath(path);
-  const { get, target } = await gitlabReader(repository);
-  const file = await get<ApiFile>(
-    `/projects/${projectId(target.path)}/repository/files/${encodeURIComponent(path)}${refQuery(ref)}`,
+  const file = await reader.get<ApiFile>(
+    `/projects/${project}/repository/files/${encodeURIComponent(path)}${refQuery(ref)}`,
   );
   if ((file.size ?? 0) > FILE_LIMIT) throw new HttpError(413, "Файл больше 5 MiB");
   let bytes: Buffer;

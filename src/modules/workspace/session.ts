@@ -6,6 +6,7 @@ const tabSchema = z.object({
   virtual: z.string().optional(),
   params: z.record(z.string(), z.unknown()).optional(),
   commit: z.string().optional(),
+  pull: z.number().int().positive().optional(),
   rev: z.string().optional(),
   external: z.boolean().optional(),
   staged: z.boolean().optional(),

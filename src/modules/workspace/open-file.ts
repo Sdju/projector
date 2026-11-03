@@ -10,6 +10,8 @@ export interface OpenFile extends FileContent {
   commit?: string;
   /** Короткий хеш родителя в diff коммита; пусто у корневого коммита. */
   parent?: string;
+  /** Номер merge request, к которому относится diff-вкладка. */
+  pull?: number;
   /** Снимок файла на этом коммите: вкладка только для чтения. */
   rev?: string;
   external?: boolean;

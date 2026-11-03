@@ -12,12 +12,12 @@ import {
 import { projectRelativePath, previewBrowserFile } from "../file-drop.ts";
 import { isEditable, isMarkdown, type OpenFile, type OpenFileOptions } from "../open-file.ts";
 import { dropPreviewExcept as dropPreviewTabs, opensAsPreview } from "./preview-tabs.ts";
+import { createDiffOpeners } from "./open-diff-files.ts";
 import { ensureTab } from "./service-tabs.ts";
 import { useDirtyGuard } from "./dirty-guard.ts";
 import { useFileSync } from "./file-sync.ts";
 import { confirmBrowserFile, readOpenData } from "./read-file.ts";
 import { treeDragType } from "../modules/tree/index.ts";
-import type { CommitComparison } from "../../../../core/modules/workspace/index.ts";
 
 export interface OpenFilesContext {
   projectId: () => string;
@@ -118,45 +118,28 @@ export function useOpenFiles(ctx: OpenFilesContext) {
       if (generation === fileGeneration) loading.value = false;
     }
   }
-  /** Diff файла внутри коммита: родитель → коммит, только для чтения. */
-  async function openCommitFile(hash: string, path: string, preview = true) {
-    const key = `${path}:commit:${hash}`;
-    const existing = tabs.value.find((tab) => tab.key === key);
-    if (existing) {
-      if (!preview) existing.preview = false;
-      selectTab(key);
+  /** Diff-вкладки коммита и merge request: читают две стороны и открывают обычный файл. */
+  const { openCommitFile, openPullFile } = createDiffOpeners({
+    projectId: ctx.projectId,
+    tabs,
+    selectTab,
+    dropPreview: (key) => dropPreviewExcept(key),
+    generation: () => fileGeneration,
+    begin: () => {
+      fileGeneration++;
+      loading.value = true;
+      fileError.value = "";
       return fileGeneration;
-    }
-    const generation = ++fileGeneration;
-    loading.value = true;
-    fileError.value = "";
-    try {
-      const data = await workspaceRequest<CommitComparison>(ctx.projectId(), "commit-diff", {
-        hash,
-        path,
-      });
-      if (generation !== fileGeneration) return;
-      if (preview) dropPreviewExcept(key);
-      tabs.value.push({
-        key,
-        path,
-        content: data.modified,
-        original: data.original,
-        commit: data.hash,
-        parent: data.parent,
-        preview,
-      });
-      selectTab(key);
-      return fileGeneration;
-    } catch (err) {
-      if (generation === fileGeneration) {
-        fileError.value = err instanceof Error ? err.message : "Не удалось открыть изменения";
-        return generation;
-      }
-    } finally {
+    },
+    finish: (generation) => {
       if (generation === fileGeneration) loading.value = false;
-    }
-  }
+    },
+    fail: (generation, message) => {
+      if (generation !== fileGeneration) return undefined;
+      fileError.value = message;
+      return generation;
+    },
+  });
   /** Вкладка с подробным обзором коммита; `subject` — подсказка до загрузки деталей. */
   const openCommit = (hash: string, subject = "") => openTab("commit", { hash, subject });
   /** Открывает вкладку зарегистрированного типа (временную, если тип так задан и не `preview: false`) или фокусирует открытую. */
@@ -373,6 +356,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
     openFile,
     openCommit,
     openCommitFile,
+    openPullFile,
     openTab,
     openBrowserFile,
     acceptsFileDrop,

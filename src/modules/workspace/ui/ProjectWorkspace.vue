@@ -130,8 +130,23 @@ function openCommitTree(hash: string) {
 function closeSection(id: string) {
   const index = extraSections.value.findIndex((type) => type.id === id);
   if (index < 0) return;
-  extraSections.value.splice(index, 1);
-  if (section.value === id) section.value = capabilities.git ? "git" : "files";
+  const [removed] = extraSections.value.splice(index, 1);
+  if (section.value === id)
+    section.value =
+      removed?.group && sections.value.has(removed.group)
+        ? removed.group
+        : capabilities.git
+          ? "git"
+          : "files";
+}
+
+/** Adds or updates a temporary sidebar section and reveals it; tab views own its contents. */
+function openSection(type: SidebarType) {
+  const index = extraSections.value.findIndex((item) => item.id === type.id);
+  if (index >= 0) extraSections.value.splice(index, 1, type);
+  else extraSections.value.push(type);
+  section.value = type.id;
+  showSidebar();
 }
 const revision = ref(0);
 const isDirty = (file: OpenFile) =>
@@ -184,6 +199,15 @@ provideTabHost({
   openTab,
   openCommitDiff: (hash, path) => void files.openCommitFile(hash, path),
   openCommitTree,
+  openPullFile: (number, path, head, pinned) => {
+    // Opening a file must not replace the merge request preview tab that led to it.
+    const pull = tabs.value.find(
+      (tab) => tab.virtual === "pull" && Number(tab.params?.number) === number,
+    );
+    if (pull) pull.preview = false;
+    void files.openPullFile(number, path, head, !pinned);
+  },
+  openSection,
   run: (command, args) => editorCommands.run(command, args),
 });
 const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
@@ -307,6 +331,7 @@ useWorkspaceSession({
   fileGeneration: files.generation,
   resetFiles: files.reset,
   openCommitFile: files.openCommitFile,
+  openPullFile: files.openPullFile,
   resetGit: () => {
     overview.reset();
     history.reset();
@@ -345,7 +370,7 @@ const { refresh, entryMoved } = useWorkspaceRefresh({
   searchPanel: () => sidebar.value,
   loadGit,
 });
-defineExpose({ openFile, refresh, openTab });
+defineExpose({ openFile, refresh, openTab, openSection });
 onBeforeUnmount(() => overview.cancel());
 </script>
 

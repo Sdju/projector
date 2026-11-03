@@ -75,6 +75,8 @@ const host: SidebarHost = {
     emit("navigate");
   },
   openCommitTree: (hash) => emit("openCommitTree", hash),
+  openPullFile: (number, path, head, pinned) =>
+    props.files.openPullFile(number, path, head, !pinned),
   command: (id, args) => emit("command", id, args),
   refreshWorkspace: () => emit("refresh"),
   changed: () => emit("changed"),

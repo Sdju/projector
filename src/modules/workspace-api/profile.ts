@@ -135,6 +135,8 @@ const READ_DOMAIN: Record<
   issue: "issues",
   pulls: "pulls",
   pull: "pulls",
+  "pull-files": "pulls",
+  "pull-diff": "pulls",
   discussions: "discussions",
   discussion: "discussions",
   pipelines: "pipelines",
