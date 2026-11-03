@@ -61,6 +61,7 @@ import {
   browseGitlabPipelines,
   browseGitlabPipeline,
   browseGitlabJob,
+  searchGitlabBlobs,
 } from "../../../modules/gitlab/index.ts";
 
 import { isLocalRequest } from "../../../modules/access/index.ts";
@@ -269,6 +270,8 @@ export async function handleIntegrationsActions({
             url.searchParams.get("originalPath") || undefined,
           ),
         );
+      else if (path === "/api/integrations/gitlab/browse/search")
+        json(res, 200, await searchGitlabBlobs(repository, Object.fromEntries(url.searchParams)));
       else if (path === "/api/integrations/gitlab/browse/merge-request-diff")
         json(
           res,

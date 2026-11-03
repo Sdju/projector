@@ -52,6 +52,15 @@ export const readTree = (repository: string, sha: string, path = "", signal?: Ab
   );
 export const readFile = (repository: string, sha: string, path: string, signal?: AbortSignal) =>
   readGitlab<GitlabFile>("file", { repository, sha, path }, signal);
+export const searchSnapshots = (
+  repository: string,
+  params: Record<string, string>,
+  signal?: AbortSignal,
+) =>
+  readGitlab<{
+    hits: import("../../../core/modules/workspace/index.ts").SearchHit[];
+    truncated: boolean;
+  }>("search", { repository, ...params }, signal);
 /** History actions (`log`, `commit`, `commit-diff`); the server decides which parameters it needs. */
 export function readGit<T = unknown>(
   action: string,

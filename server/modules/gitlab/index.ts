@@ -36,6 +36,7 @@ export { browseGitlabCompareChanges, browseGitlabCompareFile } from "./compare.t
 export { browseGitlabDirectories } from "./navigation.ts";
 export { searchGitlabProjects } from "./search.ts";
 export type { GitlabSearchHit } from "./search.ts";
+export { searchGitlabBlobs } from "./blob-search.ts";
 export { browseGitlabLog, browseGitlabCommit, browseGitlabComparison } from "./history.ts";
 export { browseGitlabIssues, browseGitlabIssue } from "./issues.ts";
 export {

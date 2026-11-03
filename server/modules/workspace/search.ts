@@ -6,6 +6,7 @@ import { git } from "./git.ts";
 import { resolveRevision } from "./git-tree.ts";
 import {
   isExcludedPath,
+  searchMatches,
   type SearchHit,
   type SearchMatch,
   type SearchOptions,
@@ -77,29 +78,6 @@ export async function searchProject(root: string, query: string, options: Search
   return { hits: hits.slice(0, 200), truncated: hits.length > 200 };
 }
 
-function positions(text: string, query: string, options: SearchOptions) {
-  const matches: SearchMatch[] = [];
-  if (options.regex) {
-    const expression = new RegExp(query, options.caseSensitive ? "g" : "gi");
-    for (const match of text.matchAll(expression)) {
-      if (!match[0]) break;
-      matches.push({ start: match.index ?? 0, end: (match.index ?? 0) + match[0].length });
-      if (matches.length >= 20) break;
-    }
-    return matches;
-  }
-  const haystack = options.caseSensitive ? text : text.toLowerCase();
-  const needle = options.caseSensitive ? query : query.toLowerCase();
-  let offset = 0;
-  while (offset <= haystack.length && matches.length < 20) {
-    const start = haystack.indexOf(needle, offset);
-    if (start < 0) break;
-    matches.push({ start, end: start + needle.length });
-    offset = start + Math.max(needle.length, 1);
-  }
-  return matches;
-}
-
 /** Search a committed tree with `git grep`; paths stay relative to the project folder. */
 export async function searchProjectGit(
   root: string,
@@ -136,7 +114,7 @@ export async function searchProjectGit(
     const path = location.slice(colon + 1);
     if (!path || isExcludedPath(path, patterns)) continue;
     const text = row.slice(second + 1).slice(0, 500);
-    const matches = positions(text, query, options);
+    const matches = searchMatches(text, query, options);
     hits.push({
       path,
       line,

@@ -4,6 +4,7 @@ import {
   createGithubEnabledLocalProfile,
   createGithubWorkspaceProfile,
 } from "../src/modules/github-workspace/source.ts";
+import { createGitlabWorkspaceProfile } from "../src/modules/gitlab-workspace/source.ts";
 import {
   registerWorkspaceProfile,
   workspaceCapabilities,
@@ -418,6 +419,84 @@ test("search accepts a committed file scope", async () => {
         rev: "a".repeat(40),
       },
     });
+  } finally {
+    unregister();
+  }
+});
+
+test("a remote GitLab workspace sends the snapshot ref to blob search", async () => {
+  const initial = {
+    fullName: "group/project",
+    description: "",
+    defaultBranch: "main",
+    branch: "main",
+    commit: "a".repeat(40),
+    private: false,
+    empty: false,
+    archived: false,
+    visibility: "public",
+    webUrl: "",
+    httpUrlToRepo: "",
+    owner: "",
+    avatarUrl: "",
+    stars: 0,
+    forks: 0,
+    openIssues: 0,
+    openMergeRequests: 0,
+    language: "",
+    languages: {},
+    license: "",
+    homepage: "",
+    topics: [],
+    createdAt: "",
+    updatedAt: "",
+  };
+  const calls = [];
+  const profile = createGitlabWorkspaceProfile(
+    "gitlab.com/group/project",
+    "gitlab.com",
+    "group/project",
+    initial,
+    "main",
+    () => {},
+    {
+      async readRepository() {
+        return initial;
+      },
+      async readTree() {
+        return { entries: [], truncated: false };
+      },
+      async readFile() {
+        return { content: "", binary: false, image: null, size: 0 };
+      },
+      async searchSnapshots(repository, params) {
+        calls.push({ repository, params });
+        return { hits: [], truncated: false };
+      },
+    },
+  );
+  const unregister = registerWorkspaceProfile("gitlab-search-test", profile);
+  try {
+    expect(workspaceCapabilities("gitlab-search-test").search).toBe(true);
+    await searchWorkspace(
+      "gitlab-search-test",
+      "FileScope",
+      { caseSensitive: false, wholeWord: false, regex: false },
+      undefined,
+      { kind: "commit", rev: "b".repeat(40) },
+    );
+    expect(calls).toStrictEqual([
+      {
+        repository: "gitlab.com/group/project",
+        params: {
+          q: "FileScope",
+          case: "false",
+          word: "false",
+          regex: "false",
+          rev: "b".repeat(40),
+        },
+      },
+    ]);
   } finally {
     unregister();
   }

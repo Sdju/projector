@@ -22,6 +22,7 @@ import {
   readPipelines,
   readRepository,
   readTree,
+  searchSnapshots,
 } from "./client.ts";
 
 const integrationTab = singletonTab(
@@ -157,6 +158,7 @@ export interface GitlabWorkspaceApi {
   readPipelines?: typeof readPipelines;
   readPipeline?: typeof readPipeline;
   readJob?: typeof readJob;
+  searchSnapshots?: typeof searchSnapshots;
 }
 
 const defaultApi: GitlabWorkspaceApi = {
@@ -173,6 +175,7 @@ const defaultApi: GitlabWorkspaceApi = {
   readPipelines,
   readPipeline,
   readJob,
+  searchSnapshots,
 };
 
 /** Pipelines, a pipeline with its jobs, and one job with its trace. */
@@ -354,6 +357,12 @@ export function createGitlabWorkspaceProfile(
     api.readIssue ?? readIssue,
   );
   const pulls = mergeRequestProvider(repository, api);
+  const search: WorkspaceProfile["providers"]["search"] = {
+    read(action, params, signal) {
+      if (action !== "search") throw new Error(UNAVAILABLE);
+      return (api.searchSnapshots ?? searchSnapshots)(repository, params, signal);
+    },
+  };
   return {
     id: "gitlab",
     layout: "editor",
@@ -374,6 +383,7 @@ export function createGitlabWorkspaceProfile(
     providers: {
       files,
       git,
+      search,
       issues,
       pulls,
       pipelines: pipelineProvider(repository, api),

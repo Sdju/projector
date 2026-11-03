@@ -142,6 +142,9 @@ test("the readonly GitLab source reads tree, files, history, issues and merge re
       async readJob(repository, id) {
         return { action: "job", repository, id };
       },
+      async searchSnapshots(repository, params) {
+        return { action: "search", repository, params };
+      },
     },
   );
   const projectId = "gitlab-workspace-test";
@@ -252,7 +255,7 @@ test("the readonly GitLab source reads tree, files, history, issues and merge re
       action: "commit-diff",
       params: { hash: "abc1234", path: "src/main.ts", repository: REPOSITORY, sha: COMMIT },
     });
-    for (const action of ["branches", "diff", "search", "external"])
+    for (const action of ["branches", "diff", "external"])
       await expect(workspaceRequest(projectId, action)).rejects.toThrow();
 
     expect(await workspaceRequest(projectId, "issues", { state: "open", page: "1" })).toStrictEqual(
@@ -316,10 +319,15 @@ test("the readonly GitLab source reads tree, files, history, issues and merge re
     await expect(workspaceRequest(projectId, "pipeline", { id: "0" })).rejects.toThrow();
     await expect(workspaceRequest(projectId, "job", { id: "nope" })).rejects.toThrow();
 
+    expect(await workspaceRequest(projectId, "search", { q: "hello" })).toStrictEqual({
+      action: "search",
+      repository: REPOSITORY,
+      params: { q: "hello" },
+    });
     const capabilities = workspaceCapabilities(projectId);
     expect(capabilities.write).toBe(false);
     expect(capabilities.git).toBe(true);
-    expect(capabilities.search).toBe(false);
+    expect(capabilities.search).toBe(true);
     expect(capabilities.issues).toBe(true);
     expect(capabilities.pulls).toBe(true);
     expect(capabilities.discussions).toBe(false);

@@ -517,6 +517,65 @@ test("GitLab search errors stay explicit and API failures keep their status", as
   });
 });
 
+test("GitLab blob search reads a pinned commit and maps snippets", async () => {
+  await setup();
+  const hash = "a".repeat(40);
+  mockFetch((address) => {
+    const url = new URL(address);
+    if (url.pathname.endsWith("/search")) {
+      expect(url.searchParams.get("scope")).toBe("blobs");
+      expect(url.searchParams.get("search")).toBe("hello");
+      expect(url.searchParams.get("ref")).toBe(hash);
+      expect(url.searchParams.get("per_page")).toBe("100");
+      return Response.json(
+        [
+          { path: "src/app.ts", data: "before\nconst hello = 1;\nafter", startline: 10 },
+          { path: "src/other.ts", data: "hello again", startline: 3 },
+        ],
+        { headers: { "X-Next-Page": "" } },
+      );
+    }
+    return Response.json({}, { status: 404 });
+  });
+  const { searchGitlabBlobs } = await import("../server/modules/gitlab/index.ts");
+  expect(
+    await searchGitlabBlobs("gitlab.com/group/project", { q: "hello", rev: hash }),
+  ).toStrictEqual({
+    hits: [
+      {
+        path: "src/app.ts",
+        line: 11,
+        column: 7,
+        text: "const hello = 1;",
+        matches: [{ start: 6, end: 11 }],
+      },
+      {
+        path: "src/other.ts",
+        line: 3,
+        column: 1,
+        text: "hello again",
+        matches: [{ start: 0, end: 5 }],
+      },
+    ],
+    truncated: false,
+  });
+  await expect(
+    searchGitlabBlobs("gitlab.com/group/project", { q: "[", regex: "true", rev: hash }),
+  ).rejects.toMatchObject({ status: 400, message: /регулярное выражение/ });
+});
+
+test("GitLab blob search explains when Advanced Search is unavailable", async () => {
+  await setup();
+  mockFetch(() => Response.json({ message: "400 Bad request" }, { status: 400 }));
+  const { searchGitlabBlobs } = await import("../server/modules/gitlab/index.ts");
+  await expect(
+    searchGitlabBlobs("gitlab.com/group/project", { q: "hello", rev: "a".repeat(40) }),
+  ).rejects.toMatchObject({
+    status: 400,
+    message: /Advanced Search/,
+  });
+});
+
 test("GitLab comparison reads changed paths and both file sides", async () => {
   await setup();
   mockFetch((address) => {
