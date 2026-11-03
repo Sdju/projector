@@ -15,7 +15,7 @@ export {
 } from "./import.ts";
 export { watchProject, bindWorkspaceEvents } from "./watcher.ts";
 export { openProjectSiteFile } from "./site.ts";
-export { searchProject } from "./search.ts";
+export { searchProject, searchProjectGit } from "./search.ts";
 export { findProjectPaths } from "./find-paths.ts";
 export {
   projectGit,

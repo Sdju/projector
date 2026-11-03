@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import UiScrollArea from "../../../../../common/ui/UiScrollArea.vue";
+import UiButton from "../../../../../common/ui/UiButton.vue";
 import { computed, ref, watch } from "vue";
 import FileTree from "./FileTree.vue";
 import { workspaceRequest } from "../../../../workspace-api/index.ts";
@@ -17,6 +18,7 @@ const props = defineProps<{
   scope: FileScope;
   revision?: number;
   selected?: string;
+  onSearch?: (scope: FileScope) => void;
   onOpen?: (path: string, pinned?: boolean) => void;
 }>();
 const detail = ref<GitCommitDetail>();
@@ -51,6 +53,9 @@ defineExpose({ reveal: (path: string) => tree.value?.reveal(path) });
 
 <template>
   <div class="scope-tree">
+    <div v-if="onSearch" class="tree-actions">
+      <UiButton size="sm" @click="onSearch(scope)">Поиск в снимке</UiButton>
+    </div>
     <p v-if="error" class="note" role="alert">{{ error }}</p>
     <UiScrollArea v-if="!error" class="side-content">
       <FileTree
@@ -72,6 +77,11 @@ defineExpose({ reveal: (path: string) => tree.value?.reveal(path) });
   flex: 1;
   flex-direction: column;
   min-height: 0;
+}
+.tree-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--sp-2) var(--sp-3) 0;
 }
 .note {
   margin: 0;

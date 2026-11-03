@@ -8,6 +8,7 @@ import {
   readExternalImage,
   previewProjectFile,
   searchProject,
+  searchProjectGit,
   findProjectPaths,
   projectGit,
   projectComparison,
@@ -286,17 +287,20 @@ export async function handleProjectWorkspace({
           url.searchParams.get("originalPath") || filePath,
         ),
       );
-    } else if (sessionId === "search")
+    } else if (sessionId === "search") {
+      const options = {
+        caseSensitive: url.searchParams.get("case") === "true",
+        wholeWord: url.searchParams.get("word") === "true",
+        regex: url.searchParams.get("regex") === "true",
+      };
       json(
         res,
         200,
-        await searchProject(project.path, url.searchParams.get("q") ?? "", {
-          caseSensitive: url.searchParams.get("case") === "true",
-          wholeWord: url.searchParams.get("word") === "true",
-          regex: url.searchParams.get("regex") === "true",
-        }),
+        rev
+          ? await searchProjectGit(project.path, rev, url.searchParams.get("q") ?? "", options)
+          : await searchProject(project.path, url.searchParams.get("q") ?? "", options),
       );
-    else if (sessionId === "paths")
+    } else if (sessionId === "paths")
       json(res, 200, {
         paths: await findProjectPaths(project.path, url.searchParams.get("q") ?? ""),
       });

@@ -4,7 +4,7 @@ import UiControl from "../../../common/ui/UiControl.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 import UiMessage from "../../../common/ui/UiMessage.vue";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import type { SearchHit } from "../../../../core/modules/workspace/index.ts";
+import type { FileScope, SearchHit } from "../../../../core/modules/workspace/index.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { searchWorkspace } from "../../workspace-api/index.ts";
 import IconCaseSensitive from "~icons/lucide/case-sensitive";
@@ -14,7 +14,7 @@ import IconChevronRight from "~icons/lucide/chevron-right";
 import IconChevronDown from "~icons/lucide/chevron-down";
 import IconFile from "~icons/lucide/file";
 
-const props = defineProps<{ projectId: string }>();
+const props = defineProps<{ projectId: string; scope?: FileScope }>();
 const emit = defineEmits<{ open: [path: string, line: number, column: number] }>();
 const query = ref("");
 const searchCase = ref(false);
@@ -52,6 +52,7 @@ async function search() {
         regex: searchRegex.value,
       },
       searchAbort.signal,
+      props.scope,
     );
     if (generation !== searchGeneration) return;
     hits.value = data.hits;

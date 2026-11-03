@@ -1,6 +1,7 @@
 import type { Component } from "vue";
 import {
   createSidebarRegistry,
+  workspaceCapabilities,
   type SidebarType,
   type WorkspaceCapabilities,
   type WorkspaceProfile,
@@ -72,6 +73,8 @@ export interface SidebarHost {
   ): unknown;
   openTab(id: string, params?: Record<string, unknown>, options?: { preview?: boolean }): void;
   openCommitTree(hash: string): void;
+  /** Opens a read-only search panel for a committed snapshot. */
+  openSearch(scope: FileScope): void;
   openPullFile(number: number, path: string, head?: string, pinned?: boolean): void;
   command(id: string, args?: unknown): void;
   refreshWorkspace(): void;
@@ -118,6 +121,21 @@ export const baseSidebarViews: SidebarViews = {
     component: SearchPanel,
     props: (host) => ({ projectId: host.projectId, onOpen: host.openFile }),
   },
+  "search-scope": {
+    icon: IconSearch,
+    component: SearchPanel,
+    props: (host, _selected, type) => {
+      const scope = type?.params?.scope as FileScope | undefined;
+      if (!scope) throw new Error("У поиска нет источника");
+      return {
+        projectId: host.projectId,
+        scope,
+        onOpen: (path: string, line: number, column: number) =>
+          host.openFile(path, line, column, undefined, { scope, preview: false }),
+      };
+    },
+    refresh: (_, panel) => panel?.refresh?.(),
+  },
   git: {
     icon: IconGit,
     component: GitPanel,
@@ -155,6 +173,7 @@ export const baseSidebarViews: SidebarViews = {
           host.active?.scope && fileScopeKey(host.active.scope) === fileScopeKey(scope)
             ? host.active.path
             : "",
+        onSearch: workspaceCapabilities(host.projectId).search ? host.openSearch : undefined,
         onOpen: (path: string, pinned?: boolean) =>
           host.openFile(path, undefined, undefined, undefined, {
             scope,

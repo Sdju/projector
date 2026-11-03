@@ -10,6 +10,7 @@ import {
   workspaceRequest,
   workspaceScopeRequest,
   workspaceScopeAssetUrl,
+  searchWorkspace,
   workspaceAssetUrl,
   saveWorkspaceFile,
   moveWorkspaceEntry,
@@ -387,4 +388,37 @@ test("a profile is a set of replaceable providers and capabilities follow from t
   expect(profileCapabilities(profiles.resolve("/tmp/a")).git).toBe(false);
   expect(workspaceProfile("/tmp/local").id).toBe("local");
   expect(profileCapabilities(workspaceProfile("/tmp/local")).write).toBe(true);
+});
+
+test("search accepts a committed file scope", async () => {
+  const unregister = registerWorkspaceProfile("search-scope-test", {
+    id: "search-scope",
+    layout: "editor",
+    features: {},
+    providers: {
+      files: { read: async () => ({}), assetUrl: () => "" },
+      search: { read: async (action, params) => ({ action, params }) },
+    },
+  });
+  try {
+    const result = await searchWorkspace(
+      "search-scope-test",
+      "hello",
+      { caseSensitive: true, wholeWord: true },
+      undefined,
+      { kind: "commit", rev: "a".repeat(40) },
+    );
+    expect(result).toStrictEqual({
+      action: "search",
+      params: {
+        q: "hello",
+        case: "true",
+        word: "true",
+        regex: "false",
+        rev: "a".repeat(40),
+      },
+    });
+  } finally {
+    unregister();
+  }
 });

@@ -5,6 +5,7 @@ import type { GitBranchesState, GitHistoryState, GitOverviewState } from "../mod
 import type { useGitChangeSync } from "../lib/git-change-sync.ts";
 import type { useOpenFiles } from "../lib/open-files.ts";
 import type { OpenFile } from "../open-file.ts";
+import type { FileScope } from "../../../../core/modules/workspace/index.ts";
 import { baseSidebarViews, type SidebarHost, type SidebarViews } from "../lib/sidebar-views.ts";
 import SidebarTabs from "./SidebarTabs.vue";
 import IconRefresh from "~icons/lucide/rotate-cw";
@@ -37,6 +38,7 @@ const emit = defineEmits<{
   deleted: [path: string];
   moved: [source: string, destination: string];
   openCommitTree: [hash: string];
+  openSearch: [scope: FileScope];
 }>();
 const views = { ...baseSidebarViews, ...props.views };
 const panels = new Map<string, { refresh?: () => unknown; [name: string]: unknown }>();
@@ -75,6 +77,7 @@ const host: SidebarHost = {
     emit("navigate");
   },
   openCommitTree: (hash) => emit("openCommitTree", hash),
+  openSearch: (scope) => emit("openSearch", scope),
   openPullFile: (number, path, head, pinned) =>
     props.files.openPullFile(number, path, head, !pinned),
   command: (id, args) => emit("command", id, args),

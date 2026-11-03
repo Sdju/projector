@@ -136,6 +136,23 @@ function openTree(scope: FileScope) {
 function openCommitTree(hash: string) {
   openTree({ kind: "commit", rev: hash });
 }
+function openSearch(scope: FileScope) {
+  if (scope.kind !== "commit") throw new Error("Поиск доступен только для коммита");
+  if (!capabilities.search) throw new Error("Источник не умеет искать по снимку");
+  const id = `search:${fileScopeKey(scope)}`;
+  if (!extraSections.value.some((type) => type.id === id))
+    extraSections.value.push({
+      id,
+      title: "Поиск по снимку",
+      source: fileScopeNote(scope),
+      group: capabilities.git ? "git" : undefined,
+      kind: "search-scope",
+      params: { scope },
+      closable: true,
+    });
+  section.value = id;
+  showSidebar();
+}
 /** Rebuilds temporary sections from a session; view kinds and scopes are derived, not trusted. */
 function restoreSections(saved: SidebarType[]) {
   extraSections.value = saved.flatMap((type) => {
@@ -150,13 +167,15 @@ function restoreSections(saved: SidebarType[]) {
           : undefined;
     if (!scope) return [];
     if (scope.kind === "compare" ? !capabilities.compare : !capabilities.snapshots) return [];
+    const search = type.kind === "search-scope";
+    if (search && (scope.kind !== "commit" || !capabilities.search)) return [];
     return [
       {
-        id: `tree:${fileScopeKey(scope)}`,
-        title: fileScopeTitle(scope),
+        id: search ? `search:${fileScopeKey(scope)}` : `tree:${fileScopeKey(scope)}`,
+        title: search ? "Поиск по снимку" : fileScopeTitle(scope),
         source: fileScopeNote(scope),
         group: capabilities.git ? "git" : undefined,
-        kind: scope.kind === "compare" ? "changes" : "tree",
+        kind: search ? "search-scope" : scope.kind === "compare" ? "changes" : "tree",
         params: { scope },
         closable: true,
       } satisfies SidebarType,
@@ -493,6 +512,7 @@ onBeforeUnmount(() => overview.cancel());
         "
         @navigate="mobileSidebarOpen = false"
         @open-commit-tree="openCommitTree"
+        @open-search="openSearch"
         @refresh="refresh"
         @changed="treeChanged"
         @deleted="entryDeleted"

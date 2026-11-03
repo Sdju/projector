@@ -130,21 +130,23 @@ export function searchWorkspace(
   query: string,
   options: import("../../../core/modules/workspace/index.ts").SearchOptions,
   signal?: AbortSignal,
+  scope?: FileScope,
 ) {
+  const params = {
+    q: query,
+    case: String(!!options.caseSensitive),
+    word: String(!!options.wholeWord),
+    regex: String(!!options.regex),
+  };
+  if (scope)
+    return workspaceScopeRequest<{
+      hits: import("../../../core/modules/workspace/index.ts").SearchHit[];
+      truncated: boolean;
+    }>(projectId, scope, "search", params, signal);
   return workspaceRequest<{
     hits: import("../../../core/modules/workspace/index.ts").SearchHit[];
     truncated: boolean;
-  }>(
-    projectId,
-    "search",
-    {
-      q: query,
-      case: String(!!options.caseSensitive),
-      word: String(!!options.wholeWord),
-      regex: String(!!options.regex),
-    },
-    signal,
-  );
+  }>(projectId, "search", params, signal);
 }
 
 /** Files and folders of the project whose path matches the query, best first. */
