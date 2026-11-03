@@ -1,6 +1,7 @@
 import { expect, test } from "vite-plus/test";
 import { effectScope, ref } from "vue";
 import { answeredFormSources, useAnswerForm } from "../src/modules/agent/model/answer-form.ts";
+import { restoreFormAnswers } from "../src/modules/agent/model/form-reply.ts";
 import { intelligentFormWidget } from "../core/modules/agent-widgets/intelligent-form/index.ts";
 import { inputWidget } from "../core/modules/agent-widgets/input/index.ts";
 import { registerWidget } from "../src/modules/widget-runtime/registry.ts";
@@ -60,4 +61,35 @@ test("the chat gives each answer its own form state", () => {
   expect(answer.answerFormFor(turns.value[1])).toEqual({});
   expect(answer.answerFormFor(turns.value[2])).toEqual({});
   scope.stop();
+});
+
+test("a native session restores the form snapshot from the reply", () => {
+  const turns = [
+    turn("a1", "assistant", `Готово\n\n${form}`),
+    turn("u1", "user", 'Проверка\n\n```json\n{\n  "next": "да"\n}\n```'),
+  ];
+  restoreFormAnswers(turns);
+  expect(turns[1].form).toEqual({
+    source: form,
+    values: { next: "да" },
+    summary: "Проверка",
+  });
+});
+
+test("a JSON block with other keys does not become a form", () => {
+  const turns = [
+    turn("a1", "assistant", `Готово\n\n${form}`),
+    turn("u1", "user", '```json\n{"other": 1}\n```'),
+  ];
+  expect(restoreFormAnswers(turns)).toBe(0);
+  expect(turns[1].form).toBeUndefined();
+});
+
+test("a JSON block without an answer form stays text", () => {
+  const turns = [
+    turn("a1", "assistant", "Просто текст"),
+    turn("u1", "user", '```json\n{"next": "да"}\n```'),
+  ];
+  expect(restoreFormAnswers(turns)).toBe(0);
+  expect(turns[1].form).toBeUndefined();
 });

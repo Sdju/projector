@@ -19,6 +19,7 @@ import {
   updateChat,
 } from "../api/chats.ts";
 import { saves, type ChatState } from "./chat-state.ts";
+import { restoreFormAnswers } from "./form-reply.ts";
 import { isBuiltinAgent } from "./modes.ts";
 import { requestChatTab } from "./job-open.ts";
 import type {
@@ -264,7 +265,9 @@ export function useExternalAgent(
     state.loading = true;
     try {
       if (external) {
-        state.turns = await loadSessionTurns(backend, projectId, id);
+        const turns = await loadSessionTurns(backend, projectId, id);
+        restoreFormAnswers(turns);
+        state.turns = turns;
         persist();
       } else {
         await flush();
