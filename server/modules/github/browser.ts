@@ -157,6 +157,12 @@ export async function browseGithubFile(
   };
 }
 
+export async function browseGithubCommitAsset(repository: string, commit: string, path: string) {
+  objectId(commit);
+  const get = await githubReader(repository);
+  const info = await get<{ tree: { sha: string } }>(`/git/commits/${commit}`);
+  return browseGithubAsset(repository, info.tree.sha, path);
+}
 export async function browseGithubAsset(repository: string, root: string, path: string) {
   objectId(root);
   const parts = path.split("/");

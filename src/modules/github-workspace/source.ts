@@ -242,6 +242,11 @@ export function createGithubWorkspaceProfile(
     assetUrl(path) {
       return `/api/integrations/github/browse/asset?${new URLSearchParams({ repository, sha: metadata.tree, path })}`;
     },
+    scopeAssetUrl(scope, path) {
+      return scope.kind === "commit"
+        ? `/api/integrations/github/browse/asset?${new URLSearchParams({ repository, commit: scope.rev, path })}`
+        : "";
+    },
     async read(action, params, signal) {
       const snapshot = params.rev ? await snapshotAt(params.rev) : metadata;
       const path = params.path || "";

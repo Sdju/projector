@@ -6,11 +6,13 @@ import IconCode from "~icons/lucide/code-xml";
 import IconDocument from "~icons/lucide/file-text";
 import EditorTopbarActions from "./EditorTopbarActions.vue";
 import VisualMarkdownEditor from "./VisualMarkdownEditor.vue";
+import type { FileScope } from "../../../../../../core/modules/workspace/index.ts";
 const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
 withDefaults(
   defineProps<{
     projectId: string;
     path: string;
+    scope?: FileScope;
     content: string;
     mode: "document" | "source";
     error?: string;
@@ -61,6 +63,7 @@ function focusOut(event: FocusEvent) {
         :path="path"
         :editable="editable !== false"
         :project-id="projectId"
+        :scope="scope"
         :content="content"
         @change="emit('change', $event)"
         @open="emit('open', $event)"

@@ -84,7 +84,11 @@ const hasStatusLine = computed(
       <ImageViewport v-else-if="file.image" :src="file.image" :alt="file.path" />
       <ArchiveViewer v-else-if="file.archive" :archive="file.archive" />
       <SvgViewer
-        v-else-if="/\.svg$/i.test(file.path) && file.original === undefined && isLiveFile(file)"
+        v-else-if="
+          /\.svg$/i.test(file.path) &&
+          file.original === undefined &&
+          (!file.scope || file.scope.kind !== 'compare')
+        "
         :path="file.path"
         :content="file.draft ?? file.content"
         :editable="isEditable(file)"
@@ -111,6 +115,7 @@ const hasStatusLine = computed(
         :key="file.readonly ? revision : undefined"
         v-else-if="isMarkdown(file)"
         :project-id="projectId"
+        :scope="file.scope"
         :editable="isEditable(file)"
         :path="file.path"
         :content="file.draft ?? file.content"

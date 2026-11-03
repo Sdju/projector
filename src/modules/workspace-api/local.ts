@@ -146,6 +146,10 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
         watch: localWorkspaceWatch(projectId),
         assetUrl: (path, external = false) =>
           `${base(projectId)}/${external ? "external-asset" : "asset"}?${new URLSearchParams({ path })}`,
+        scopeAssetUrl: (scope, path) =>
+          scope.kind === "commit"
+            ? `${base(projectId)}/asset?${new URLSearchParams({ path, rev: scope.rev })}`
+            : "",
         siteUrl: (path) =>
           `/api/projects/${encodeURIComponent(projectId)}/site/${path.split("/").map(encodeURIComponent).join("/")}`,
         upload: async (directory, path, body, signal) => {

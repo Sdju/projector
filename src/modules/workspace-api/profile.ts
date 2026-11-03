@@ -1,3 +1,4 @@
+import type { FileScope } from "../../../core/modules/workspace/index.ts";
 import type { SidebarType } from "./sidebar.ts";
 import type { TabType } from "./tabs.ts";
 
@@ -40,6 +41,8 @@ export interface WorkspaceWatch {
 }
 export interface FilesProvider extends ReadProvider {
   assetUrl(path: string, external?: boolean): string;
+  /** Address of an asset inside a snapshot; only providers that can serve it implement this. */
+  scopeAssetUrl?(scope: FileScope, path: string): string;
   /** Address that serves the file as part of a site (relative links resolve); absent when it cannot. */
   siteUrl?(path: string): string;
   /** Reads a historical tree and its files read-only (`tree`/`file` with `rev`). */

@@ -16,6 +16,7 @@ export {
   browseGithubTree,
   browseGithubFile,
   browseGithubAsset,
+  browseGithubCommitAsset,
 } from "./browser.ts";
 export { browseGithubLog, browseGithubCommit, browseGithubComparison } from "./history.ts";
 export { browseGithubDirectories } from "./navigation.ts";

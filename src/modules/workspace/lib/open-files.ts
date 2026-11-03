@@ -6,6 +6,7 @@ import {
   saveWorkspaceFile,
   workspaceAssetUrl,
   workspaceCapabilities,
+  workspaceScopeAssetUrl,
   type TabParams,
   type TabRegistry,
 } from "../../workspace-api/index.ts";
@@ -95,8 +96,12 @@ export function useOpenFiles(ctx: OpenFilesContext) {
         readonly: (!!scope && !isLiveScope(scope)) || !workspaceCapabilities(ctx.projectId()).write,
         external,
         image:
-          (!scope || isLiveScope(scope)) && "image" in data && data.image
-            ? workspaceAssetUrl(ctx.projectId(), path, external)
+          "image" in data && data.image
+            ? !scope || isLiveScope(scope)
+              ? workspaceAssetUrl(ctx.projectId(), path, external)
+              : scope.kind === "commit"
+                ? workspaceScopeAssetUrl(ctx.projectId(), scope, path)
+                : undefined
             : undefined,
         path,
         content: "modified" in data ? data.modified : data.content,

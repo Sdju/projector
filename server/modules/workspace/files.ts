@@ -25,6 +25,21 @@ import { isExcludedPath } from "../../../core/modules/workspace/index.ts";
 const archiveHelper = fileURLToPath(new URL("./archive.py", import.meta.url));
 import type { FileContent, ArchiveContent } from "../../../core/modules/workspace/index.ts";
 
+const IMAGE_TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  avif: "image/avif",
+  svg: "image/svg+xml",
+};
+/** MIME of an image path; SVG is text and is edited as source, rasters are shown by URL. */
+export function imageType(path: string) {
+  return IMAGE_TYPES[path.split(".").at(-1)?.toLowerCase() ?? ""];
+}
+export const isRasterImage = (path: string) => /\.(?:png|jpe?g|gif|webp|avif)$/i.test(path);
+
 const tooLarge = () =>
   new HttpError(
     413,
@@ -145,16 +160,7 @@ export async function previewProjectFile(
   return { path, content: "", archive: data };
 }
 export async function readProjectImage(root: string, path: string) {
-  const types: Record<string, string> = {
-    png: "image/png",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    gif: "image/gif",
-    webp: "image/webp",
-    avif: "image/avif",
-    svg: "image/svg+xml",
-  };
-  const type = types[path.split(".").at(-1)?.toLowerCase() ?? ""];
+  const type = imageType(path);
   if (!type) throw new HttpError(415, "Поддерживаются только изображения");
   const file = await open(await location(root, path), "r");
   try {

@@ -17,6 +17,7 @@ import {
   browseGithubTree,
   browseGithubFile,
   browseGithubAsset,
+  browseGithubCommitAsset,
   browseGithubLog,
   browseGithubCommit,
   browseGithubComparison,
@@ -109,7 +110,10 @@ export async function handleIntegrationsActions({
           ),
         );
       else if (path === "/api/integrations/github/browse/asset") {
-        const asset = await browseGithubAsset(repository, sha, url.searchParams.get("path") || "");
+        const commit = url.searchParams.get("commit") || "";
+        const asset = commit
+          ? await browseGithubCommitAsset(repository, commit, url.searchParams.get("path") || "")
+          : await browseGithubAsset(repository, sha, url.searchParams.get("path") || "");
         res.setHeader("Content-Type", asset.mime);
         res.setHeader("X-Content-Type-Options", "nosniff");
         res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");

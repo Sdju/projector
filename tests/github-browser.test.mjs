@@ -69,6 +69,7 @@ test("readonly GitHub browser reads snapshots, trees and blobs without cloning o
         created_at: "2020-01-01T00:00:00Z",
         updated_at: "2026-01-01T00:00:00Z",
       });
+    if (url.pathname.includes("/git/commits/")) return Response.json({ tree: { sha: tree } });
     if (url.pathname.includes("/commits/")) {
       if (mode === "empty") return Response.json({}, { status: 409 });
       return Response.json({ sha, commit: { tree: { sha: tree } } });
@@ -148,6 +149,9 @@ test("readonly GitHub browser reads snapshots, trees and blobs without cloning o
     const asset = await api.browseGithubAsset("octocat/repo", tree, "src/image.png");
     expect(asset.mime).toBe("image/png");
     expect(asset.bytes.toString()).toBe("# Hello");
+    const commitAsset = await api.browseGithubCommitAsset("octocat/repo", sha, "image.png");
+    expect(commitAsset.mime).toBe("image/png");
+    expect(commitAsset.bytes.toString()).toBe("# Hello");
     await expect(api.browseGithubAsset("octocat/repo", tree, "missing.png")).rejects.toMatchObject({
       status: 404,
     });

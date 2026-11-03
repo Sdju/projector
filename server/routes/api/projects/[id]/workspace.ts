@@ -19,6 +19,7 @@ import {
   projectCommitComparison,
   listProjectGitTree,
   readProjectGitFile,
+  readProjectGitImage,
   compareProjectChanges,
   compareProjectFile,
   mutateProjectGit,
@@ -222,11 +223,14 @@ export async function handleProjectWorkspace({
       throw new HttpError(403, "Обзор доступен только со страницы Projector");
     res.setHeader("Cache-Control", "no-store");
     const filePath = url.searchParams.get("path") ?? "";
+    const rev = url.searchParams.get("rev") ?? "";
     if (sessionId === "asset" || sessionId === "external-asset") {
       const image =
         sessionId === "external-asset"
           ? await readExternalImage(filePath)
-          : await readProjectImage(project.path, filePath);
+          : rev
+            ? await readProjectGitImage(project.path, rev, filePath)
+            : await readProjectImage(project.path, filePath);
       res.setHeader("Content-Type", image.type);
       res.setHeader("X-Content-Type-Options", "nosniff");
       res.setHeader(
@@ -237,7 +241,6 @@ export async function handleProjectWorkspace({
       return true;
     }
     const ask = url.searchParams.get("ask") === "1";
-    const rev = url.searchParams.get("rev") ?? "";
     const from = url.searchParams.get("from") ?? "";
     const to = url.searchParams.get("to") ?? "";
     if (sessionId === "external") json(res, 200, await previewExternalFile(filePath, { ask }));

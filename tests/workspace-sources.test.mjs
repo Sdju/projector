@@ -9,6 +9,7 @@ import {
   workspaceCapabilities,
   workspaceRequest,
   workspaceScopeRequest,
+  workspaceScopeAssetUrl,
   workspaceAssetUrl,
   saveWorkspaceFile,
   moveWorkspaceEntry,
@@ -198,6 +199,23 @@ test("the shared workspace uses a readonly source for tree, files, assets and re
     expect(
       isMarkdown({ path: "README.md", content: "# Readonly", key: "readme", readonly: true }),
     ).toBe(true);
+    expect(
+      isMarkdown({
+        path: "README.md",
+        content: "# Snapshot",
+        key: "readme",
+        scope: { kind: "commit", rev: "a".repeat(40) },
+      }),
+    ).toBe(true);
+    expect(
+      isMarkdown({
+        path: "README.md",
+        content: "# Compare",
+        key: "readme",
+        original: "",
+        scope: { kind: "compare", from: "a".repeat(40), to: "b".repeat(40) },
+      }),
+    ).toBe(false);
   } finally {
     unregister();
   }
@@ -259,6 +277,16 @@ test("a remote profile reads a tree and its files at a pinned commit", async () 
     expect(calls.filter((call) => call.ref === pinned.commit).length).toBe(1);
     expect(calls.some((call) => call.sha === pinned.tree)).toBe(true);
     expect(workspaceCapabilities("pinned-remote-test").snapshots).toBe(true);
+    expect(workspaceScopeAssetUrl("pinned-remote-test", scope, "docs/picture.png")).toContain(
+      `commit=${pinned.commit}`,
+    );
+    expect(() =>
+      workspaceScopeAssetUrl(
+        "pinned-remote-test",
+        { kind: "compare", from: pinned.commit, to: live.commit },
+        "docs/picture.png",
+      ),
+    ).toThrow(/вложения снимка/);
     const liveTree = await workspaceRequest("pinned-remote-test", "tree");
     expect(liveTree.entries.map((entry) => entry.name)).toStrictEqual(["live.ts"]);
   } finally {

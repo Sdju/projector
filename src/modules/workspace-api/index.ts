@@ -7,7 +7,11 @@ import {
   type WorkspaceWatchPatch,
   type WorkspaceWatchHandlers,
 } from "./profile.ts";
-import { fileScopeQuery, type FileScope } from "../../../core/modules/workspace/index.ts";
+import {
+  fileScopeQuery,
+  isLiveScope,
+  type FileScope,
+} from "../../../core/modules/workspace/index.ts";
 import { createLocalWorkspaceProfile } from "./local.ts";
 export {
   createWorkspaceProfiles,
@@ -55,6 +59,13 @@ export const workspaceCapabilities = (projectId: string) =>
   profileCapabilities(workspaceProfile(projectId));
 export const workspaceAssetUrl = (projectId: string, path: string, external = false) =>
   workspaceProfile(projectId).providers.files.assetUrl(path, external);
+/** Asset URL of a snapshot; live keeps the ordinary project asset URL. */
+export function workspaceScopeAssetUrl(projectId: string, scope: FileScope, path: string) {
+  if (isLiveScope(scope)) return workspaceAssetUrl(projectId, path);
+  const url = workspaceProfile(projectId).providers.files.scopeAssetUrl?.(scope, path);
+  if (!url) throw new Error("Источник не умеет отдавать вложения снимка");
+  return url;
+}
 export const workspaceSiteUrl = (projectId: string, path: string) =>
   workspaceProfile(projectId).providers.files.siteUrl?.(path) ?? "";
 export const refreshWorkspace = (projectId: string) =>

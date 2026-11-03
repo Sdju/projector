@@ -3,7 +3,11 @@ import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
-import { listProjectGitTree, readProjectGitFile } from "../server/modules/workspace/index.ts";
+import {
+  listProjectGitTree,
+  readProjectGitFile,
+  readProjectGitImage,
+} from "../server/modules/workspace/index.ts";
 
 async function repository() {
   const base = await mkdtemp(join(tmpdir(), "projector-git-tree-"));
@@ -76,4 +80,33 @@ test("a committed tree keeps the same files.exclude contract", async () => {
   const next = run("rev-parse", "HEAD").trim();
   const tree = await listProjectGitTree(base, next);
   expect(tree.entries.map((entry) => entry.name)).toStrictEqual(["sub", "root.txt"]);
+});
+
+test("a committed raster image is served by URL and an SVG stays text", async () => {
+  const { base, run } = await repository();
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 1, 2, 3]);
+  await writeFile(join(base, "picture.png"), png);
+  await writeFile(join(base, "icon.svg"), '<svg xmlns="http://www.w3.org/2000/svg"></svg>\n');
+  run("add", ".");
+  run("commit", "-qm", "images");
+  const next = run("rev-parse", "HEAD").trim();
+  expect(await readProjectGitFile(base, next, "picture.png")).toStrictEqual({
+    path: "picture.png",
+    content: "",
+    image: true,
+    readonly: true,
+    size: png.length,
+  });
+  expect(await readProjectGitImage(base, next, "picture.png")).toStrictEqual({
+    type: "image/png",
+    content: png,
+  });
+  expect(await readProjectGitFile(base, next, "icon.svg")).toMatchObject({
+    path: "icon.svg",
+    content: '<svg xmlns="http://www.w3.org/2000/svg"></svg>\n',
+    readonly: true,
+  });
+  await expect(readProjectGitImage(base, next, "missing.png")).rejects.toMatchObject({
+    status: 404,
+  });
 });

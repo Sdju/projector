@@ -19,6 +19,7 @@ import {
   registerWorkspaceProfile,
   saveWorkspaceFile,
   workspaceAssetUrl,
+  workspaceScopeAssetUrl,
   workspaceCapabilities,
   workspaceProfile,
   workspaceRequest,
@@ -332,6 +333,16 @@ test("the readonly GitLab source reads tree, files, history, issues and merge re
     expect(revision).toBe(1);
     expect(metadata.length).toBe(1);
     expect(workspaceAssetUrl(projectId, "docs/image.png").includes(NEXT_COMMIT)).toBeTruthy();
+    expect(
+      workspaceScopeAssetUrl(projectId, { kind: "commit", rev: COMMIT }, "docs/image.png"),
+    ).toContain(`sha=${COMMIT}`);
+    expect(() =>
+      workspaceScopeAssetUrl(
+        projectId,
+        { kind: "compare", from: COMMIT, to: NEXT_COMMIT },
+        "docs/image.png",
+      ),
+    ).toThrow(/вложения снимка/);
     expect((await workspaceRequest(projectId, "log")).params.sha).toBe(NEXT_COMMIT);
     expect((await workspaceRequest(projectId, "file", { path: "src/main.ts" })).content).toBe(
       NEXT_COMMIT,

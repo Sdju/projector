@@ -7,7 +7,8 @@ import { remarkImageBlockPlugin } from "@milkdown/kit/component/image-block";
 import { Plugin } from "@milkdown/kit/prose/state";
 import type { Node } from "@milkdown/kit/prose/model";
 import { $prose, $view, replaceAll } from "@milkdown/kit/utils";
-import { workspaceAssetUrl } from "../../../../workspace-api/index.ts";
+import { workspaceAssetUrl, workspaceScopeAssetUrl } from "../../../../workspace-api/index.ts";
+import type { FileScope } from "../../../../../../core/modules/workspace/index.ts";
 import { loadGithubEmojis } from "../../../../../common/utilities/github-emoji.ts";
 import {
   addFrontmatterEntry,
@@ -30,6 +31,7 @@ const props = withDefaults(
     content: string;
     path: string;
     projectId: string;
+    scope?: FileScope;
     editable?: boolean;
     /** Без полей документа: рендер встроенного блока (issue, комментарий). */
     compact?: boolean;
@@ -99,7 +101,10 @@ async function commitKey() {
 }
 function imageUrl(url: string) {
   const path = markdownPath(url, props.path);
-  if (path) return workspaceAssetUrl(props.projectId, path);
+  if (path)
+    return props.scope
+      ? workspaceScopeAssetUrl(props.projectId, props.scope, path)
+      : workspaceAssetUrl(props.projectId, path);
   return /^(https?:|data:image\/(?:png|jpeg|gif|webp|avif);base64,)/i.test(url) ? url : "";
 }
 function publish(doc: Node, serialize: (doc: Node) => string) {
@@ -157,6 +162,7 @@ onMounted(async () => {
           props.path,
           props.projectId,
           emojiMap,
+          props.scope,
         );
         return { dom, ignoreMutation: () => true };
       }),

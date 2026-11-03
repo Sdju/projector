@@ -49,6 +49,20 @@ export async function git(root: string, args: string[], maxBuffer = 4 * MAX_BYTE
     })
   ).stdout;
 }
+/** Binary output of a read-only Git command; text commands still use `git`. */
+export async function gitBytes(root: string, args: string[], maxBuffer = 8 * MAX_BYTES) {
+  const project = await environmentForPath(root);
+  if (project) throw new HttpError(501, "Изображения из контейнера пока недоступны");
+  return (
+    await exec("git", ["--literal-pathspecs", "-C", root, ...args], {
+      windowsHide: true,
+      maxBuffer,
+      timeout: 10000,
+      encoding: "buffer",
+      env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+    })
+  ).stdout as Buffer;
+}
 /** `owner/repository` when the project's `origin` points at GitHub, otherwise null. */
 export async function projectGithubRepository(root: string): Promise<string | null> {
   const remote = await git(root, ["remote", "get-url", "origin"]).catch(() => "");

@@ -8,9 +8,10 @@ import {
   type FileEntry,
   type TreePage,
 } from "../../../core/modules/workspace/index.ts";
-import { git, gitText } from "./git.ts";
+import { git, gitBytes, gitText } from "./git.ts";
 import { excludePatterns } from "./files-exclude.ts";
-import { validatePath } from "./paths.ts";
+import { imageType, isRasterImage } from "./files.ts";
+import { MAX_BYTES, validatePath } from "./paths.ts";
 
 const COMMIT = /^[0-9a-f]{7,40}$/i;
 
@@ -79,12 +80,30 @@ export async function listProjectGitTree(
 }
 
 /** Text of a committed file; the answer is always read-only. */
+/** Raw image bytes of a committed file; raster images are shown by URL, SVG is read as text. */
+export async function readProjectGitImage(root: string, rev: string, path: string) {
+  validateRelativePath(path);
+  const type = imageType(path);
+  if (!type) throw new HttpError(415, "Поддерживаются только изображения");
+  const commit = await resolveRevision(root, rev);
+  const prefix = (await git(root, ["rev-parse", "--show-prefix"])).trim();
+  const spec = `${commit}:${prefix}${path}`;
+  const kind = (await git(root, ["cat-file", "-t", spec]).catch(() => "")).trim();
+  if (kind !== "blob") throw new HttpError(404, "Изображение не найдено в этом коммите");
+  const size = Number((await git(root, ["cat-file", "-s", spec])).trim());
+  const limit = 8 * MAX_BYTES;
+  if (!Number.isSafeInteger(size) || size < 0)
+    throw new HttpError(404, "Изображение не найдено в этом коммите");
+  if (size > limit) throw new HttpError(413, "Изображение больше 8 МБ");
+  return { type, content: await gitBytes(root, ["show", spec], limit + 1) };
+}
+
 export async function readProjectGitFile(
   root: string,
   rev: string,
   path: string,
   options: { ask?: boolean } = {},
-): Promise<FileContent> {
+): Promise<FileContent & { image?: boolean }> {
   const commit = await resolveRevision(root, rev);
   validateRelativePath(path);
   if (!path) throw new HttpError(400, "Выберите файл");
@@ -96,6 +115,10 @@ export async function readProjectGitFile(
   const size = Number((await git(root, ["cat-file", "-s", spec])).trim());
   if (!Number.isSafeInteger(size) || size < 0)
     throw new HttpError(404, "Файл не найден в этом коммите");
+  if (isRasterImage(path)) {
+    if (size > 8 * MAX_BYTES) throw new HttpError(413, "Изображение больше 8 МБ");
+    return { path, content: "", image: true, readonly: true, size };
+  }
   if (size > MAX_TEXT_BYTES)
     throw new HttpError(
       413,

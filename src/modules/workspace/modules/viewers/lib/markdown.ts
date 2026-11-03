@@ -1,4 +1,5 @@
-import { workspaceAssetUrl } from "../../../../workspace-api/index.ts";
+import { workspaceAssetUrl, workspaceScopeAssetUrl } from "../../../../workspace-api/index.ts";
+import type { FileScope } from "../../../../../../core/modules/workspace/index.ts";
 import { markdownPath } from "../../../../../common/utilities/markdown-path.ts";
 import { splitEmoji, type EmojiMap } from "../../../../../common/utilities/github-emoji.ts";
 import MarkdownIt from "markdown-it";
@@ -50,6 +51,7 @@ export function renderMarkdown(
   path: string,
   projectId: string,
   emojis: EmojiMap = {},
+  scope?: FileScope,
 ) {
   const md = new MarkdownIt({
     html: true,
@@ -96,7 +98,13 @@ export function renderMarkdown(
   }
   for (const image of document.querySelectorAll("img")) {
     const target = markdownPath(image.getAttribute("src") ?? "", path);
-    if (target) image.setAttribute("src", workspaceAssetUrl(projectId, target));
+    if (target)
+      image.setAttribute(
+        "src",
+        scope
+          ? workspaceScopeAssetUrl(projectId, scope, target)
+          : workspaceAssetUrl(projectId, target),
+      );
     image.setAttribute("loading", "lazy");
   }
   decorateEmoji(document, emojis);

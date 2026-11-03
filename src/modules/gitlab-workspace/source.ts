@@ -290,6 +290,15 @@ export function createGitlabWorkspaceProfile(
         path: file,
       })}`;
     },
+    scopeAssetUrl(scope, file) {
+      return scope.kind === "commit"
+        ? `/api/integrations/gitlab/browse/asset?${new URLSearchParams({
+            repository,
+            sha: scope.rev,
+            path: file,
+          })}`
+        : "";
+    },
     async read(action, params, signal) {
       const snapshot = metadata;
       const commit = params.rev || snapshot.commit;

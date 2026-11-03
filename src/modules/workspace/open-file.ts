@@ -79,7 +79,7 @@ export const isEditable = (file: OpenFile) =>
   !file.archive &&
   (file.original === undefined || file.staged === false);
 export const isMarkdown = (file: OpenFile) =>
-  isLiveFile(file) &&
+  (!file.scope || file.scope.kind !== "compare") &&
   !file.virtual &&
   !file.binary &&
   !file.image &&
