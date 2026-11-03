@@ -13,6 +13,9 @@ import {
   readDiscussion,
   readDiscussions,
   readIssues,
+  readJob,
+  readPipeline,
+  readPipelines,
   readPull,
   readPulls,
   readRepository,
@@ -20,6 +23,7 @@ import {
   readFile,
   readGit,
 } from "./client.ts";
+import { pipelineProvider } from "./pipelines.ts";
 
 const connectionTab = singletonTab(
   "github-integration",
@@ -69,6 +73,8 @@ const numberedTab = (id: string, label: string) =>
 const issueTab = numberedTab("issue", "Issue");
 const pullTab = numberedTab("pull", "PR");
 const discussionTab = numberedTab("discussion", "Discussion");
+const pipelineTab = numberedTab("pipeline", "Pipeline");
+const jobTab = numberedTab("job", "Job");
 
 /** Read provider for a numbered resource (issues, pull requests): a list action and a single-item one. */
 function numberedProvider(
@@ -123,6 +129,7 @@ export function createGithubEnabledLocalProfile(
       { id: "issues", title: "Issues" },
       { id: "pulls", title: "Pull requests" },
       { id: "discussions", title: "Discussions" },
+      { id: "pipelines", title: "Pipelines", requires: "pipelines" },
     ],
     tabs: [
       ...(local.tabs ?? []),
@@ -135,8 +142,16 @@ export function createGithubEnabledLocalProfile(
       issueTab,
       pullTab,
       discussionTab,
+      pipelineTab,
+      jobTab,
     ],
-    providers: { ...local.providers, issues, pulls, discussions },
+    providers: {
+      ...local.providers,
+      issues,
+      pulls,
+      discussions,
+      pipelines: pipelineProvider(repository),
+    },
   };
 }
 
@@ -157,6 +172,9 @@ export function createGithubWorkspaceProfile(
     readPull?: typeof readPull;
     readDiscussions?: typeof readDiscussions;
     readDiscussion?: typeof readDiscussion;
+    readPipelines?: typeof readPipelines;
+    readPipeline?: typeof readPipeline;
+    readJob?: typeof readJob;
   } = {
     readRepository,
     readTree,
@@ -168,6 +186,9 @@ export function createGithubWorkspaceProfile(
     readPull,
     readDiscussions,
     readDiscussion,
+    readPipelines,
+    readPipeline,
+    readJob,
   },
 ): WorkspaceProfile {
   let metadata = initial;
@@ -331,6 +352,7 @@ export function createGithubWorkspaceProfile(
       { id: "issues", title: "Issues" },
       { id: "pulls", title: "Pull requests" },
       { id: "discussions", title: "Discussions" },
+      { id: "pipelines", title: "Pipelines", requires: "pipelines" },
     ],
     tabs: [
       connectionTab,
@@ -343,6 +365,8 @@ export function createGithubWorkspaceProfile(
       issueTab,
       pullTab,
       discussionTab,
+      pipelineTab,
+      jobTab,
     ],
     features: {
       terminals: false,
@@ -352,6 +376,13 @@ export function createGithubWorkspaceProfile(
       persist: false,
       externalFiles: false,
     },
-    providers: { files, git, issues, pulls, discussions },
+    providers: {
+      files,
+      git,
+      issues,
+      pulls,
+      discussions,
+      pipelines: pipelineProvider(repository, api),
+    },
   };
 }

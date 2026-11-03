@@ -103,7 +103,30 @@ const tabViews = computed<TabViews>(() => {
             }),
           },
         }
-      : {}),
+      : github
+        ? {
+            pipeline: {
+              component: PipelineView,
+              keepAlive: true,
+              props: (tab, host) => ({
+                projectId: host.projectId,
+                id: tab.params?.id,
+                host: "GitHub",
+                onOpenJob: (job: { id: number; title: string }, pinned?: boolean) =>
+                  host.openTab("job", job, { preview: !pinned }),
+              }),
+            },
+            job: {
+              component: JobView,
+              keepAlive: true,
+              props: (tab, host) => ({
+                projectId: host.projectId,
+                id: tab.params?.id,
+                host: "GitHub",
+              }),
+            },
+          }
+        : {}),
     repository: gitlab
       ? {
           component: GitlabRepositoryInfoLoader,

@@ -30,3 +30,4 @@ export { browseGithubIssue, browseGithubIssues } from "./issues.ts";
 export { browseGithubDiscussion, browseGithubDiscussions } from "./discussions.ts";
 export { githubEmojis } from "./emojis.ts";
 export { browseGithubPull, browseGithubPulls } from "./pulls.ts";
+export { browseGithubJob, browseGithubPipeline, browseGithubPipelines } from "./pipelines.ts";

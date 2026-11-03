@@ -3,6 +3,7 @@ import { HttpError } from "../modules/http/index.ts";
 import { json } from "../modules/transport/index.ts";
 import { localOrigin } from "../middlewares/local-origin.ts";
 import { handleIntegrationsActions } from "../routes/api/integrations/[...action].ts";
+import { handleGithubBrowse } from "../routes/api/integrations/github-browse.ts";
 import { handleDirectories } from "../routes/api/directories.ts";
 import { handleHealth } from "../routes/api/health.ts";
 import { handleAppOpen } from "../routes/api/app/open.ts";
@@ -68,6 +69,7 @@ const routes = [
   handleEditorSettings,
   handleIdeKeybindings,
   handleIdeCommands,
+  handleGithubBrowse,
   handleIntegrationsActions,
   handleDirectories,
   handleHealth,

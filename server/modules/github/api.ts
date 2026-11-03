@@ -32,17 +32,27 @@ export function repositoryName(value: unknown): string {
     throw new HttpError(400, "Укажите owner/repository или ссылку github.com");
   return name;
 }
-export async function github<T>(path: string, token: string = ""): Promise<T> {
-  const response = await fetch(`https://api.github.com${path}`, {
+/** One raw REST response; redirects stay manual for endpoints that answer with a signed link (job logs). */
+export async function githubResponse(
+  path: string,
+  token: string = "",
+  init: RequestInit = {},
+): Promise<Response> {
+  return fetch(`https://api.github.com${path}`, {
+    ...init,
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       Accept: "application/vnd.github+json",
       "X-GitHub-Api-Version": "2022-11-28",
       "User-Agent": "Projector",
+      ...(init.headers as Record<string, string> | undefined),
     },
     signal: AbortSignal.timeout(30_000),
-    redirect: "error",
+    redirect: init.redirect ?? "error",
   });
+}
+export async function github<T>(path: string, token: string = ""): Promise<T> {
+  const response = await githubResponse(path, token);
   if (!response.ok)
     throw new HttpError(
       [401, 403, 404, 409, 429].includes(response.status) ? response.status : 400,

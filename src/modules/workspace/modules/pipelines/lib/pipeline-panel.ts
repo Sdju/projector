@@ -33,7 +33,7 @@ export function usePipelinesPanel(options: PipelinesPanelOptions) {
   register(
     "ide.pipelines.refresh",
     "Обновить список pipelines",
-    "Перечитывает первую страницу pipelines GitLab с текущим фильтром статуса.",
+    "Перечитывает первую страницу pipelines с текущим фильтром статуса.",
     () => list.load(),
   );
   register(

@@ -52,9 +52,20 @@ const SOURCE_LABEL: Record<string, string> = {
   webide: "Web IDE",
   ondemand_dast_scan: "DAST-сканирование",
   ondemand_dast_validation: "проверка DAST",
+  pull_request: "PR",
+  pull_request_target: "PR",
+  merge_group: "merge queue",
+  workflow_dispatch: "вручную",
+  workflow_run: "workflow",
+  repository_dispatch: "API",
+  release: "релиз",
+  deployment: "деплой",
+  deployment_status: "деплой",
+  issue_comment: "комментарий",
+  discussion: "discussion",
 };
 
-/** GitLab pipeline source as a short human label; unknown sources stay as reported. */
+/** Host event of a CI run as a short human label; unknown sources stay as reported. */
 export function sourceLabel(source: string) {
   if (!source) return "";
   return SOURCE_LABEL[source] ?? source;

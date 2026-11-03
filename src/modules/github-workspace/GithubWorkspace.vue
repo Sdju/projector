@@ -3,7 +3,7 @@ import UiMessage from "../../common/ui/UiMessage.vue";
 import { onBeforeUnmount, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import type { GithubRepository } from "../../../core/modules/github/index.ts";
-import { ProjectWorkspace, type TabViews } from "../workspace/index.ts";
+import { ProjectWorkspace, PipelineView, JobView, type TabViews } from "../workspace/index.ts";
 import { settingsTabViews } from "../app-settings/index.ts";
 import { registerWorkspaceProfile, workspaceRequest } from "../workspace-api/index.ts";
 import { useCommandScope } from "../../common/utilities/commands.ts";
@@ -69,6 +69,26 @@ const tabViews: TabViews = {
     component: GithubRepositoryInfo,
     keepAlive: true,
     props: () => ({ repository: metadata.value }),
+  },
+  pipeline: {
+    component: PipelineView,
+    keepAlive: true,
+    props: (tab, host) => ({
+      projectId: host.projectId,
+      id: tab.params?.id,
+      host: "GitHub",
+      onOpenJob: (job: { id: number; title: string }) =>
+        host.openTab("job", job, { preview: false }),
+    }),
+  },
+  job: {
+    component: JobView,
+    keepAlive: true,
+    props: (tab, host) => ({
+      projectId: host.projectId,
+      id: tab.params?.id,
+      host: "GitHub",
+    }),
   },
 };
 async function loadRepository() {

@@ -8,6 +8,9 @@ import type {
   DiscussionList,
   IssueDetail,
   IssueList,
+  PipelineDetail,
+  PipelineJobDetail,
+  PipelineList,
   PullRequestDetail,
   PullRequestList,
 } from "../../../core/modules/workspace/index.ts";
@@ -59,3 +62,12 @@ export const readDiscussions = (
 ) => readGit<DiscussionList>("discussions", { repository, ...params }, signal);
 export const readDiscussion = (repository: string, number: number, signal?: AbortSignal) =>
   readGit<DiscussionDetail>("discussion", { repository, number: String(number) }, signal);
+export const readPipelines = (
+  repository: string,
+  params: Record<string, string>,
+  signal?: AbortSignal,
+) => readGit<PipelineList>("pipelines", { repository, ...params }, signal);
+export const readPipeline = (repository: string, id: number, signal?: AbortSignal) =>
+  readGit<PipelineDetail>("pipeline", { repository, id: String(id) }, signal);
+export const readJob = (repository: string, id: number, signal?: AbortSignal) =>
+  readGit<PipelineJobDetail>("job", { repository, id: String(id) }, signal);

@@ -14,6 +14,8 @@ test("pipeline refs drop GitLab prefixes and name merge requests", () => {
 
 test("pipeline sources have short human labels", () => {
   expect(sourceLabel("merge_request_event")).toBe("MR");
+  expect(sourceLabel("pull_request")).toBe("PR");
+  expect(sourceLabel("workflow_dispatch")).toBe("вручную");
   expect(sourceLabel("push")).toBe("push");
   expect(sourceLabel("schedule")).toBe("расписание");
   expect(sourceLabel("custom_source")).toBe("custom_source");
