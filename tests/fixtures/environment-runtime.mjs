@@ -172,6 +172,7 @@ try {
     assert.equal(server.environments.ssr, environment);
     assert.equal((await call("/api/health")).pid, process.pid);
     assert.equal(data.socket.readyState, WebSocket.OPEN);
+    console.log(`live generation ${revision}`);
   }
   const workingErrors = errors.length;
   await writeFile(healthFile, "export const broken = ;");
