@@ -635,10 +635,12 @@ test("real PTY: deleting a busy session needs a fresh confirmation and kills TER
       "background sleep started",
     );
   expect((await request(`/${other.session.id}`, "DELETE")).status).toBe(200);
-  await until(
-    async () => (await os.processes.identity(childPid)) === null,
-    "background child terminated",
-  );
+  // Git Bash reports MSYS pids, so Windows process queries cannot prove the child left.
+  if (process.platform !== "win32")
+    await until(
+      async () => (await os.processes.identity(childPid)) === null,
+      "background child terminated",
+    );
   const shell = (
     await (await request("", "POST", { program: "shell", cols: 100, rows: 30 })).json()
   ).session;

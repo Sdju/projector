@@ -317,7 +317,14 @@ const ownerOnly = (path: string) => [
  * keeps access, so other local accounts cannot read tokens and passwords.
  */
 export async function restrictToOwner(path: string): Promise<void> {
-  await execute(system32("icacls.exe"), ownerOnly(path), { windowsHide: true });
+  const args = ownerOnly(path);
+  try {
+    await execute(system32("icacls.exe"), args, { windowsHide: true });
+  } catch {
+    // Antivirus and the indexer can hold a freshly written file for a moment: one retry.
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    await execute(system32("icacls.exe"), args, { windowsHide: true });
+  }
 }
 export function restrictToOwnerSync(path: string): void {
   execFileSync(system32("icacls.exe"), ownerOnly(path), { stdio: "ignore", windowsHide: true });

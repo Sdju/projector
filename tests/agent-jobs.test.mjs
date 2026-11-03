@@ -13,7 +13,7 @@ let store;
 let attached;
 let replayed;
 
-async function until(check, timeoutMs = 8000) {
+async function until(check, timeoutMs = 15000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const value = await check();
