@@ -1,6 +1,7 @@
 import type { AgentJobView } from "../api/jobs.ts";
 import { useIdeCommands } from "../../ide/index.ts";
 import { jobFinished } from "../api/jobs.ts";
+import { resolveJobTitle } from "./job-titles.ts";
 import { continuationPrompt, continued, useProjectJobs } from "./project-jobs.ts";
 
 interface Options {
@@ -8,7 +9,7 @@ interface Options {
   enabled: () => boolean;
   /** The key of this chat: only a job it started continues it. */
   chat: string;
-  send: (text: string, options?: { auto?: string }) => Promise<void>;
+  send: (text: string, options?: { auto?: string; autoTitle?: string }) => Promise<void>;
 }
 
 const KEY = (id: string) => `projector:job-continued:${id}`;
@@ -65,7 +66,8 @@ export function useJobChat(projectId: string, options: Options) {
 
   async function continueAfter(job: AgentJobView): Promise<void> {
     try {
-      await options.send(continuationPrompt(job), { auto: job.id });
+      const name = await resolveJobTitle(job);
+      await options.send(continuationPrompt(job, name), { auto: job.id, autoTitle: name });
     } catch {
       // The chat shows its own error; a failed continuation must not repeat on the next poll.
     }

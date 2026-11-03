@@ -198,6 +198,8 @@ export interface AgentTurn {
   tasks?: AgentTask[];
   /** What the user wrote, with chips; `text` holds the same message as plain text. */
   content?: MessagePart[];
+  /** On a user turn from a native session: Projector's instructions before the user's text. */
+  injected?: string;
   /** On a user turn: the form that was filled instead of typing, shown in place of the text. */
   form?: AgentFormAnswer;
   /** Order of text and tool calls; absent in turns saved before it existed. */
@@ -206,6 +208,8 @@ export interface AgentTurn {
   stopped?: "steps" | "loop" | "tokens" | "time";
   /** The IDE wrote this message, not the user: the id of the job that triggered it. */
   auto?: string;
+  /** What to call that job in the note; the id stays for the agent's commands. */
+  autoTitle?: string;
   /** Context fullness after this turn; the chat shows the latest one. */
   context?: AgentContext;
   /** Tokens of this answer and how much of the prompt the cache served. */
@@ -242,6 +246,8 @@ export interface QueuedMessage {
   form?: AgentFormAnswer;
   /** The IDE wrote this message after a job: it is shown as a continuation note. */
   auto?: string;
+  /** The job's name for that note; the id remains in `auto`. */
+  autoTitle?: string;
 }
 
 /**

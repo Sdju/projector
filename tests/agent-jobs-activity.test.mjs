@@ -2,6 +2,8 @@ import { expect, test } from "vite-plus/test";
 import { jobItems } from "../src/modules/agent/model/activity.ts";
 import { jobTurn } from "../src/modules/agent/model/job-turn.ts";
 import { canContinueInChat } from "../src/modules/agent/model/job-continue.ts";
+import { jobBarSections } from "../src/modules/agent/lib/job-bar.ts";
+import { taskSummaryLine } from "../src/modules/agent/lib/task-detail.ts";
 import { registerBuiltinClientAgents } from "../src/app/agents.ts";
 
 registerBuiltinClientAgents();
@@ -54,6 +56,36 @@ test("only a job in the project itself continues in a chat", () => {
   expect(canContinueInChat(job("a", "done", { sessionId: "s", worktree: { id: "w" } }))).toBe(
     false,
   );
+});
+
+test("the dock keeps this chat's finished jobs next to the active ones", () => {
+  const own = "projector:p1:chat";
+  const sections = jobBarSections(
+    [
+      job("run", "running", { origin: own, startedAt: 10, createdAt: 10 }),
+      job("wait", "needs-user", { startedAt: 10, createdAt: 10 }),
+      job("old", "done", { origin: own, endedAt: 50, createdAt: 10 }),
+      job("new", "done", { origin: own, endedAt: 90, createdAt: 10 }),
+      job("failed", "error", { origin: own, endedAt: 70, createdAt: 10 }),
+      job("stopped", "stopped", { origin: own, endedAt: 60, createdAt: 10 }),
+      job("other", "done", { origin: "projector:p1:another", endedAt: 100, createdAt: 10 }),
+      job("api", "done", { endedAt: 110, createdAt: 10 }),
+    ],
+    own,
+  );
+  expect(sections.active.map((item) => item.id)).toEqual(["run", "wait"]);
+  expect(sections.recent.map((item) => item.id)).toEqual(["new", "failed", "stopped", "old"]);
+  // Without a chat there is no owner: finished work stays out of the dock.
+  expect(jobBarSections([job("old", "done", { origin: own })], undefined).recent).toEqual([]);
+  expect(jobBarSections([job("old", "done", { origin: own })], own, 1).recent).toHaveLength(1);
+});
+
+test("a task summary loses markdown before it reaches the compact row", () => {
+  expect(taskSummaryLine("**AgentJob** — это `запись` в job.json")).toBe(
+    "AgentJob — это запись в job.json",
+  );
+  expect(taskSummaryLine("## Итог\n\nСм. [отчёт](https://example.com)")).toBe("Итог См. отчёт");
+  expect(taskSummaryLine(undefined)).toBe("");
 });
 
 test("a page hears about a job that waits for the user or ended, once", async () => {

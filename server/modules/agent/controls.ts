@@ -62,6 +62,8 @@ export interface AgentSessionTurn {
   session?: { backend: string; id: string };
   /** When the message was written, in ms since the epoch; absent when the agent does not tell. */
   at?: number;
+  /** Instructions Projector injected before the user's text, kept for a separate view. */
+  injected?: string;
   /** Text, reasoning and tool calls in the order they happened. */
   parts?: AgentSessionPart[];
   /** Subagents and background commands the answer started. */

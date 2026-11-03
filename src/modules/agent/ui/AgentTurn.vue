@@ -257,8 +257,9 @@ const lastWork = computed(
           @submit="submitForm"
         />
       </div>
-      <p v-else-if="turn.auto" class="user-message auto">
-        Продолжение после задания <code>{{ turn.auto }}</code>
+      <p v-else-if="turn.auto" class="user-message" :title="turn.auto">
+        Фоновое задание<template v-if="turn.autoTitle"> «{{ turn.autoTitle }}»</template>
+        завершилось. Проверь результат и скажи, что изменилось.
       </p>
       <p v-else class="user-message">
         <template v-if="turn.content?.length">
@@ -283,6 +284,10 @@ const lastWork = computed(
         </template>
         <template v-else>{{ turn.text }}</template>
       </p>
+      <details v-if="turn.injected" class="injected">
+        <summary>Возможности Projector</summary>
+        <pre class="injected-text">{{ turn.injected }}</pre>
+      </details>
     </div>
     <div v-else class="assistant-body">
       <template v-for="segment in segments" :key="segment.key">
@@ -463,14 +468,36 @@ const lastWork = computed(
 .note {
   margin: 0 0 var(--sp-3) auto;
 }
-.user-message.auto {
-  padding: var(--sp-1) 0;
-  background: none;
-  color: var(--muted);
+.injected {
+  max-width: 90%;
+  margin: var(--sp-1) 0 0 auto;
+  color: var(--faint);
   font-size: var(--fs-2xs);
 }
-.user-message.auto code {
+.injected > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.injected > summary::-webkit-details-marker {
+  display: none;
+}
+.injected[open] > summary {
+  color: var(--muted);
+}
+.injected-text {
+  max-height: 260px;
+  margin: var(--sp-1) 0 0;
+  padding: var(--sp-2);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  color: var(--muted);
   font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .chip {
   display: inline-flex;

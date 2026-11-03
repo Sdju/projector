@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useIdeCommands } from "../../ide/index.ts";
 import { readoutLines, useTabReadout } from "../../../common/utilities/tab-readout.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
+import UiDisclosureSummary from "../../../common/ui/UiDisclosureSummary.vue";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import {
   answerJob,
@@ -14,6 +15,7 @@ import {
 } from "../api/jobs.ts";
 import { jobDuration, jobStatusLabel } from "../lib/job-labels.ts";
 import { useElapsedClock } from "../lib/elapsed.ts";
+import { useJobTitle } from "../model/job-titles.ts";
 import { agentLabel } from "../model/modes.ts";
 import { canContinueInChat, continueJobInChat } from "../model/job-continue.ts";
 import { jobTurn } from "../model/job-turn.ts";
@@ -25,6 +27,7 @@ import AgentTurn from "./AgentTurn.vue";
 import IconBot from "~icons/lucide/bot";
 import IconSquare from "~icons/lucide/square";
 import IconChat from "~icons/lucide/message-square-share";
+import IconChevron from "~icons/lucide/chevron-right";
 import IconFile from "~icons/lucide/file-diff";
 
 /** A background job followed in its own tab (read-only): its journal, requests, answer and files. */
@@ -37,6 +40,18 @@ const journal = ref<AgentJobEntry[]>([]);
 const error = ref("");
 const actionError = ref("");
 const missing = ref(false);
+// The agent names its session while it works: the header and tab title follow that name.
+const name = useJobTitle(
+  () => props.projectId,
+  () => job.value,
+);
+watch(
+  name,
+  (title) => {
+    if (job.value) emit("title", title);
+  },
+  { immediate: true },
+);
 
 const finished = computed(() => !!job.value && jobFinished(job.value.status));
 const turn = computed(() =>
@@ -90,7 +105,6 @@ function apply(data: { job: AgentJobView; journal: AgentJobEntry[] }): void {
   job.value = data.job;
   journal.value = data.journal;
   error.value = "";
-  emit("title", `${agentLabel(data.job.backend)}: ${data.job.task.trim().slice(0, 40)}`);
 }
 
 async function follow(): Promise<void> {
@@ -182,7 +196,7 @@ useTabReadout(() => ({
     <header class="head">
       <IconBot class="kind" aria-hidden="true" />
       <div class="titles">
-        <div class="title u-truncate" :title="job?.task">{{ job?.task || "Задание" }}</div>
+        <div class="title u-truncate" :title="job?.task">{{ name }}</div>
         <div class="meta">
           <UiSpinner v-if="job && !finished" />
           {{ meta }}
@@ -208,6 +222,13 @@ useTabReadout(() => ({
       </UiButton>
     </header>
     <div class="body" role="log" aria-label="Журнал задания">
+      <details v-if="job?.task" class="assignment">
+        <UiDisclosureSummary variant="fit" class="assignment-summary">
+          <span class="label">Задание</span>
+          <IconChevron class="chevron" aria-hidden="true" />
+        </UiDisclosureSummary>
+        <p class="task-text">{{ job.task }}</p>
+      </details>
       <p v-if="error" class="note error" role="alert">{{ error }}</p>
       <p v-if="actionError" class="note error" role="alert">{{ actionError }}</p>
       <p v-if="job?.error" class="note error" role="alert">{{ job.error }}</p>
@@ -296,6 +317,8 @@ svg {
 }
 .body {
   display: grid;
+  /* A scrollable result block must keep its content height instead of collapsing into a strip. */
+  grid-auto-rows: max-content;
   align-content: start;
   gap: var(--sp-2);
   width: min(100%, var(--chat-width, 680px));
@@ -311,6 +334,41 @@ svg {
   align-items: center;
   margin-top: var(--sp-2);
   color: var(--faint);
+}
+.assignment {
+  display: grid;
+  gap: var(--sp-1);
+}
+.assignment-summary {
+  padding: 2px 0;
+  color: var(--faint);
+}
+.assignment-summary .label {
+  margin-top: 0;
+}
+.chevron {
+  width: 12px;
+  height: 12px;
+  transition: transform var(--t-fast);
+}
+.assignment[open] > .assignment-summary .chevron {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
+}
+.task-text {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-lg);
+  background: var(--bg-3);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .note {
   margin: 0;

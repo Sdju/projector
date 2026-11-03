@@ -2,6 +2,8 @@ import { afterEach, expect, test, vi } from "vite-plus/test";
 import { effectScope } from "vue";
 import { continuationPrompt, useProjectJobs } from "../src/modules/agent/model/project-jobs.ts";
 import { shouldContinue } from "../src/modules/agent/model/job-chat.ts";
+import { resolveJobTitle, useJobTitles } from "../src/modules/agent/model/job-titles.ts";
+import { jobShortTitle } from "../src/modules/agent/lib/job-name.ts";
 
 const job = (extra = {}) => ({
   id: "aaaaaaaaaaaa",
@@ -94,7 +96,55 @@ test("the continuation prompt names the job and asks for the diff", () => {
   expect(text).toContain("aaaaaaaaaaaa");
   expect(text).toContain("ide.agent.job.diff");
   expect(text).toContain("изолированной копии");
+  const named = continuationPrompt(job({ status: "done" }), "Починить guard");
+  expect(named).toContain("«Починить guard»");
+  expect(named).toContain("aaaaaaaaaaaa");
   const failed = continuationPrompt(job({ status: "error", error: "boom" }));
   expect(failed).toContain("Ошибка: boom");
   expect(failed).not.toContain("изолированной копии");
+});
+
+test("a long job task gets a short name for the header and the note", () => {
+  expect(jobShortTitle("  fix   it  ")).toBe("fix it");
+  expect(jobShortTitle("Первое предложение. Второе предложение с длинным хвостом", 30)).toBe(
+    "Первое предложение.",
+  );
+  const long = jobShortTitle("слово ".repeat(40), 40);
+  expect(long.length).toBeLessThanOrEqual(41);
+  expect(long.endsWith("…")).toBe(true);
+  expect(jobShortTitle("")).toBe("Задание");
+});
+
+test("a job takes the session name the agent gave it, once the session list has it", async () => {
+  const fetchMock = vi.fn(async () => ({
+    ok: true,
+    json: async () => ({
+      sessions: [
+        { id: "ses_named", title: "Починить read-only guard" },
+        { id: "ses_other", title: "Другое" },
+      ],
+    }),
+  }));
+  vi.stubGlobal("fetch", fetchMock);
+  const running = job({
+    id: "named",
+    projectId: "names-project",
+    sessionId: "ses_named",
+    status: "running",
+  });
+  const scope = effectScope();
+  const names = scope.run(() =>
+    useJobTitles(
+      () => "names-project",
+      () => [running],
+    ),
+  );
+  await vi.waitFor(() => expect(names.value.get("named")).toBe("Починить read-only guard"));
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(await resolveJobTitle(running)).toBe("Починить read-only guard");
+  // A job in an isolated copy keeps the short task: its session lives in another folder.
+  expect(await resolveJobTitle(job({ sessionId: "ses_named", worktree: { id: "w" } }))).toBe(
+    "fix it",
+  );
+  scope.stop();
 });

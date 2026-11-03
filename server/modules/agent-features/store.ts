@@ -135,9 +135,45 @@ export async function enabledFeatureText(agentId: string, features?: string[]): 
     .join("\n\n");
 }
 
+/** Marks where the injected abilities end and the user's own message begins. */
+export const FEATURE_PROMPT_END = "<!-- projector:features:end -->";
+
 /** The feature text framed for an agent that has no Projector prompt of its own. */
 export async function featurePrompt(agentId: string, features?: string[]): Promise<string> {
   const text = await enabledFeatureText(agentId, features);
   if (!text) return "";
-  return `[Projector] В этом чате включены дополнительные возможности Projector. Пользуйся ими, когда это уместно; обычные вопросы не загромождай.\n\n${text}`;
+  return `[Projector] В этом чате включены дополнительные возможности Projector. Пользуйся ими, когда это уместно; обычные вопросы не загромождай.\n\n${text}\n\n${FEATURE_PROMPT_END}`;
+}
+
+/**
+ * Splits a native session's first message into the instructions Projector injected and what the
+ * user actually wrote. Sessions from before the marker are matched against the same prefix when
+ * the agent still has the same abilities.
+ */
+export function splitFeaturePrompt(
+  text: string,
+  legacy?: string,
+): { text: string; injected?: string } {
+  const marker = FEATURE_PROMPT_END;
+  const index = text.indexOf(marker);
+  let rest: string;
+  let injected: string | undefined;
+  if (index >= 0) {
+    injected = text.slice(0, index).trim() || undefined;
+    rest = text.slice(index + marker.length).trim();
+  } else {
+    const prefix = legacy?.trim();
+    if (prefix && text.startsWith(prefix)) {
+      injected = prefix;
+      rest = text.slice(prefix.length).trim();
+    } else {
+      rest = text;
+    }
+  }
+  // A resumed session also carries the replayed chat before the new message: the actual words
+  // are after this heading, the transcript itself is already shown as the session's own turns.
+  const heading = "Новое сообщение пользователя:\n";
+  const message = rest.lastIndexOf(heading);
+  if (message >= 0) rest = rest.slice(message + heading.length).trim();
+  return { text: rest, ...(injected ? { injected } : {}) };
 }

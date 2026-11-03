@@ -230,6 +230,8 @@ svg {
 }
 .body {
   display: grid;
+  /* A scrollable result block must keep its content height instead of collapsing into a strip. */
+  grid-auto-rows: max-content;
   align-content: start;
   gap: var(--sp-1);
   width: min(100%, var(--chat-width, 680px));

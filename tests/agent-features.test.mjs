@@ -9,11 +9,13 @@ import { registerBuiltinWidgetDefinitions } from "../server/app/widgets.ts";
 import {
   enabledFeatureText,
   enabledFeatures,
+  FEATURE_PROMPT_END,
   featureEnabled,
   featurePrompt,
   featureSettings,
   featuresFile,
   setFeatureAgent,
+  splitFeaturePrompt,
 } from "../server/modules/agent-features/index.ts";
 import { readChatFeatures, writeAgentHistory } from "../server/modules/agent/index.ts";
 import { promptWithHistory } from "../server/modules/agent/agent-host.ts";
@@ -88,6 +90,27 @@ describe("agent features", () => {
     const off = await setFeatureAgent("widgets", "codex", false);
     expect(agentOf(off, "codex").enabled).toBe(false);
     expect(await featurePrompt("codex")).toBe("");
+  });
+
+  it("marks where the injected abilities end so the user's message stays clean", async () => {
+    await setFeatureAgent("widgets", "codex", true);
+    const prompt = await featurePrompt("codex");
+    expect(prompt).toContain(FEATURE_PROMPT_END);
+    const sent = promptWithHistory("почини guard", [], prompt);
+    const split = splitFeaturePrompt(sent);
+    expect(split.text).toBe("почини guard");
+    expect(split.injected).toContain("[Projector]");
+    expect(split.injected).not.toContain(FEATURE_PROMPT_END);
+    // A resumed session's replayed transcript is not part of the user's message either.
+    const resumed = promptWithHistory("новое", [{ role: "user", content: "старое" }], prompt);
+    expect(splitFeaturePrompt(resumed)).toMatchObject({ text: "новое" });
+    // A session from before the marker is split by the same prefix, without touching the text.
+    const legacy = prompt.replace(FEATURE_PROMPT_END, "").trim();
+    expect(splitFeaturePrompt(`${legacy}\n\nпочини guard`, legacy)).toEqual({
+      text: "почини guard",
+      injected: legacy,
+    });
+    expect(splitFeaturePrompt("просто вопрос")).toEqual({ text: "просто вопрос" });
   });
 
   it("removes the widget section from the Projector prompt when switched off", async () => {

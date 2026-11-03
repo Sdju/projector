@@ -4,7 +4,7 @@ import UiButton from "../../../common/ui/UiButton.vue";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import { useElapsedClock } from "../lib/elapsed.ts";
 import type { PlanItem } from "../lib/plan.ts";
-import { taskElapsed } from "../lib/task-detail.ts";
+import { taskElapsed, taskSummaryLine } from "../lib/task-detail.ts";
 import { toolLabel } from "../lib/tool-labels.ts";
 import { useAgentLens } from "../model/lens.ts";
 import { useTaskTurns } from "../model/task-turns.ts";
@@ -42,7 +42,9 @@ function note() {
     task.subagent,
     task.tools ? `вызовов: ${task.tools}` : "",
     duration.value,
-    task.status === "running" && task.lastTool ? toolLabel(task.lastTool) : task.summary,
+    task.status === "running" && task.lastTool
+      ? toolLabel(task.lastTool)
+      : taskSummaryLine(task.summary),
   ];
   return parts.filter(Boolean).join(" · ");
 }

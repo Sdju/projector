@@ -12,6 +12,9 @@ import type { ChatIndex } from "./history-store.ts";
 interface StoredTurn {
   id: string;
   variants?: StoredTurn[][];
+  auto?: string;
+  autoTitle?: string;
+  injected?: string;
 }
 
 const turnSchema: z.ZodType<StoredTurn> = z.lazy(() =>
@@ -25,6 +28,11 @@ const turnSchema: z.ZodType<StoredTurn> = z.lazy(() =>
     session: z.object({ backend: z.string(), id: z.string() }).optional(),
     /** The agent process still answering this turn; lets a reloaded page rejoin it. */
     run: z.string().optional(),
+    /** The IDE wrote this message after a job: shown as a note with the job's name. */
+    auto: z.string().optional(),
+    autoTitle: z.string().optional(),
+    /** Projector's instructions before a native session's first user message, shown separately. */
+    injected: z.string().optional(),
     tools: z.array(
       z.object({
         id: z.string(),

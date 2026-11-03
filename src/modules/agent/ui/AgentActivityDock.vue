@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import type { AgentJobView } from "../api/jobs.ts";
+import { jobBarSections } from "../lib/job-bar.ts";
 import type { PlanItem } from "../lib/plan.ts";
 import type { AgentBackendId, AgentSelection, AgentTask, QueuedMessage } from "../model/types.ts";
 import AgentJobBar from "./AgentJobBar.vue";
@@ -15,6 +16,8 @@ import IconListChecks from "~icons/lucide/list-checks";
 /** One line for everything running in the background; the lists live behind it. */
 const props = defineProps<{
   jobs: AgentJobView[];
+  /** The key of this chat: only jobs it started stay in its finished list. */
+  chat?: string;
   tasks: AgentTask[];
   plan: PlanItem[];
   queue: QueuedMessage[];
@@ -35,11 +38,9 @@ const emit = defineEmits<{
 }>();
 
 const expanded = ref(false);
-const activeJobs = computed(() =>
-  props.jobs.filter(
-    (job) => job.status === "running" || job.status === "queued" || job.status === "needs-user",
-  ),
-);
+const jobSections = computed(() => jobBarSections(props.jobs, props.chat));
+const activeJobs = computed(() => jobSections.value.active);
+const recentJobs = computed(() => jobSections.value.recent);
 const runningTasks = computed(() => props.tasks.filter((task) => task.status === "running").length);
 const failedTasks = computed(() => props.tasks.filter((task) => task.status === "error").length);
 const planDone = computed(() => props.plan.filter((item) => item.status === "completed").length);
@@ -50,6 +51,7 @@ const waiting = computed(
 const has = computed(
   () =>
     activeJobs.value.length > 0 ||
+    recentJobs.value.length > 0 ||
     props.tasks.length > 0 ||
     planLeft.value > 0 ||
     props.queue.length > 0,
@@ -63,6 +65,7 @@ const summary = computed(() => {
     parts.push(
       `задания: ${activeJobs.value.length}${waiting.value ? ` · ждёт ответа: ${waiting.value}` : ""}`,
     );
+  if (recentJobs.value.length) parts.push(`завершено: ${recentJobs.value.length}`);
   if (props.tasks.length)
     parts.push(
       `задачи: ${props.tasks.length}${
@@ -89,7 +92,12 @@ const summary = computed(() => {
       <IconChevron class="chevron" :class="{ expanded }" aria-hidden="true" />
     </button>
     <div v-if="expanded" class="body">
-      <AgentJobBar :jobs="jobs" @open="emit('open', $event)" />
+      <AgentJobBar
+        :project-id="projectId"
+        :active="activeJobs"
+        :recent="recentJobs"
+        @open="emit('open', $event)"
+      />
       <AgentPlan :items="plan" :busy="busy" />
       <AgentTaskBar
         :tasks="tasks"

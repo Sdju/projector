@@ -60,6 +60,20 @@ export const taskStatusLabel = {
   stopped: "Остановлено",
 } as const;
 
+/** One line of a task's report for the compact row: markdown syntax only adds noise there. */
+export function taskSummaryLine(text: string | undefined): string {
+  return (text ?? "")
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`([^`\n]*)`/g, "$1")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/\*\*([^*\n]+)\*\*/g, "$1")
+    .replace(/__([^_\n]+)__/g, "$1")
+    .replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,!?:;]|$)/g, "$1$2")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /** One line for the tab readout of the built-in agent. */
 export function taskReadout(detail: AgentTaskDetail): string {
   const { task, call, calls } = detail;

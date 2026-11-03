@@ -42,7 +42,7 @@ import type {
   MessagePart,
 } from "./types.ts";
 
-type SendOptions = { auto?: string; form?: AgentFormAnswer };
+type SendOptions = { auto?: string; autoTitle?: string; form?: AgentFormAnswer };
 
 /** A restarting server answers again within seconds; this much patience covers a slow restart. */
 const REJOIN_DELAY_MS = 1000;
@@ -232,7 +232,7 @@ export function useAgent(
         text: message,
         parts: content ?? [],
         ...(options?.form ? { form: options.form } : {}),
-        ...(options?.auto ? { auto: options.auto } : {}),
+        ...(options?.auto ? { auto: options.auto, autoTitle: options.autoTitle } : {}),
       });
       void actions.deliverQueue();
       return;

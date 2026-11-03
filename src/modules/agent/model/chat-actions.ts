@@ -27,7 +27,7 @@ export function useChatActions(
     send: (
       text?: string,
       chips?: MessagePart[],
-      options?: { auto?: string; form?: AgentFormAnswer },
+      options?: { auto?: string; autoTitle?: string; form?: AgentFormAnswer },
     ) => Promise<void>;
     stop: () => void;
   },
@@ -57,6 +57,7 @@ export function useChatActions(
     const next = state.queue.shift()!;
     const options = {
       ...(next.auto ? { auto: next.auto } : {}),
+      ...(next.autoTitle ? { autoTitle: next.autoTitle } : {}),
       ...(next.form ? { form: next.form } : {}),
     };
     if (Object.keys(options).length) void send(next.text, next.parts, options);

@@ -24,14 +24,21 @@ import {
   readAgentHistory,
   readChatFeatures,
   readChatJudge,
+  readRecentChats,
   readAttachment,
   saveAttachment,
   writeAgentHistory,
   detachEventStream,
+  type AgentSessionTurn,
   handleAgentRun,
 } from "../../modules/agent/index.ts";
 
 import { accessAllowed } from "../../modules/access/index.ts";
+import {
+  FEATURE_PROMPT_END,
+  featurePrompt,
+  splitFeaturePrompt,
+} from "../../modules/agent-features/index.ts";
 import { HttpError } from "../../modules/http/index.ts";
 import { readBody, asString, json } from "../../modules/transport/index.ts";
 
@@ -41,6 +48,37 @@ async function projectPath(projectId: string): Promise<string> {
   const project = (await loadProjects()).find((item) => item.id === projectId);
   if (!project) throw new Error("Проект не найден");
   return project.path;
+}
+
+/**
+ * A native session keeps the first message exactly as Projector sent it: the abilities injected
+ * before the user's words. The chat shows the user's message as written and puts the injected
+ * text into its own collapsible block; the transcript itself stays untouched.
+ */
+async function withoutInjected(
+  turns: AgentSessionTurn[],
+  backend: string,
+  projectId: string,
+  sessionId: string,
+): Promise<AgentSessionTurn[]> {
+  const index = turns.findIndex((turn) => turn.role === "user");
+  if (index < 0) return turns;
+  const chat = projectId
+    ? readRecentChats(projectId, backend).find((item) => item.session === sessionId)?.chat
+    : undefined;
+  // Sessions written before the end marker are matched against the same abilities, when they
+  // still match: a changed feature list leaves the message as it is instead of cutting it.
+  const legacy = (await featurePrompt(backend, chat ? readChatFeatures(chat) : undefined))
+    .replace(FEATURE_PROMPT_END, "")
+    .trim();
+  const turn = turns[index]!;
+  const split = splitFeaturePrompt(turn.text, legacy);
+  if (!split.injected && split.text === turn.text) return turns;
+  return turns.map((item, at) =>
+    at === index
+      ? { ...item, text: split.text, ...(split.injected ? { injected: split.injected } : {}) }
+      : item,
+  );
 }
 
 /** The folder a chat's agent works in: the project, or the isolated copy the chat was given. */
@@ -219,10 +257,13 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
   }
   if (path === "/api/agent/sessions/load" && method === "POST") {
     const body = await readBody(req);
-    const cwd = await projectPath(asString(body.projectId));
+    const project = asString(body.projectId);
+    const backend = asString(body.backend);
+    const cwd = await projectPath(project);
     const sessionId = asString(body.sessionId);
     if (!sessionId) throw new Error("Укажите сессию");
-    json(res, 200, { turns: await loadAgentSession(asString(body.backend), cwd, sessionId) });
+    const turns = await loadAgentSession(backend, cwd, sessionId);
+    json(res, 200, { turns: await withoutInjected(turns, backend, project, sessionId) });
     return true;
   }
   if (path === "/api/agent/tool-result" && method === "POST") {

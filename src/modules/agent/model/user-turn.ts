@@ -5,7 +5,7 @@ import type { AgentFormAnswer, AgentTurn, MessagePart } from "./types.ts";
 export function userTurnOf(
   message: string,
   content: MessagePart[] | undefined,
-  options?: { auto?: string; form?: AgentFormAnswer },
+  options?: { auto?: string; autoTitle?: string; form?: AgentFormAnswer },
 ): AgentTurn {
   return {
     id: newId(),
@@ -16,5 +16,6 @@ export function userTurnOf(
     ...(content ? { content } : {}),
     ...(options?.form ? { form: options.form } : {}),
     ...(options?.auto ? { auto: options.auto } : {}),
+    ...(options?.autoTitle ? { autoTitle: options.autoTitle } : {}),
   };
 }

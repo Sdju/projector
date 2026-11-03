@@ -9,9 +9,11 @@ export {
 export {
   enabledFeatureText,
   enabledFeatures,
+  FEATURE_PROMPT_END,
   featureEnabled,
   featurePrompt,
   featureSettings,
   featuresFile,
   setFeatureAgent,
+  splitFeaturePrompt,
 } from "./store.ts";

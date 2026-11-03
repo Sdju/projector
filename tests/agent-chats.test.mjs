@@ -77,6 +77,15 @@ describe("Projector agent chat history", () => {
     expect((await readAgentHistory("t"))[0].at).toBe(1760000000000);
   });
 
+  it("keeps the job a continuation belongs to and the name shown for it", async () => {
+    const job = { auto: "aaaaaaaaaaaa", autoTitle: "Починить guard" };
+    const injected = "[Projector] возможности";
+    await writeAgentHistory("j", [
+      { ...turn("1", "user", "задание завершилось"), ...job, injected },
+    ]);
+    expect((await readAgentHistory("j"))[0]).toMatchObject({ ...job, injected });
+  });
+
   it("keeps the form a user answered, with the values that were sent", async () => {
     const form = {
       source: "<Form><Checks name=\"next\" :options=\"['a','b']\" /></Form>",

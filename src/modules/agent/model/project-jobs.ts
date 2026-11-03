@@ -1,5 +1,6 @@
 import { onScopeDispose, ref } from "vue";
 import { fetchJobs, type AgentJobView } from "../api/jobs.ts";
+import { jobShortTitle } from "../lib/job-name.ts";
 
 /** How often an open Projector chat asks for the jobs of its project. */
 const POLL_MS = 2500;
@@ -8,9 +9,9 @@ const POLL_MS = 2500;
 export const continued = new Set<string>();
 
 /** What the Projector chat sends to itself when a job it started has finished. */
-export function continuationPrompt(job: AgentJobView): string {
+export function continuationPrompt(job: AgentJobView, name = jobShortTitle(job.task)): string {
   return [
-    `Фоновое задание ${job.id} (${job.backend}) завершилось: ${job.status}.`,
+    `Фоновое задание «${name}» (${job.id}, ${job.backend}) завершилось: ${job.status}.`,
     job.error ? `Ошибка: ${job.error}` : "",
     "Проверь результат командами ide.agent.job.result, ide.agent.job.diff и ide.agent.job.log, сверь с заданием и скажи пользователю, что изменилось и чем это проверено.",
     job.worktree

@@ -6,7 +6,7 @@ interface Options {
   projectId: string;
   chat: string;
   enabled: () => boolean;
-  send: (text: string, options?: { auto?: string }) => Promise<void>;
+  send: (text: string, options?: { auto?: string; autoTitle?: string }) => Promise<void>;
   permissions: { readonly value: AgentPermission[] };
   questions: { readonly value: AgentQuestionRequest[] };
   secrets: { readonly value: AgentSecretRequest[] };

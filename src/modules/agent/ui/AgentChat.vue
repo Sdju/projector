@@ -693,6 +693,7 @@ onBeforeUnmount(() => {
       </p>
       <AgentActivityDock
         :jobs="jobsState.jobs"
+        :chat="chatKey"
         :tasks="tasks"
         :plan="plan"
         :queue="queue"
