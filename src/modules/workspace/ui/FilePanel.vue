@@ -37,7 +37,18 @@ const topbarActions = provideEditorTopbar();
 const setTopbarActions = (el: unknown) => {
   topbarActions.value = el as HTMLElement | null;
 };
-const siteUrl = computed(() => workspaceSiteUrl(props.projectId, props.file.path));
+const siteUrl = computed(() =>
+  isLiveFile(props.file) ? workspaceSiteUrl(props.projectId, props.file.path) : "",
+);
+/** A snapshot has no live site URL and no archive unpacker; say so instead of showing a stale view. */
+const snapshotLimit = computed(() => {
+  if (isLiveFile(props.file) || props.file.virtual || props.file.image) return "";
+  if (/\.html?$/i.test(props.file.path))
+    return "HTML из снимка открыт как код: встроенный просмотр страницы доступен только для рабочей копии";
+  if (/\.(?:tar|tgz|gz|gzip|bz2|tbz2?|xz|txz|zip)$/i.test(props.file.path))
+    return "Архив из снимка не распаковывается: показано только содержимое файла";
+  return "";
+});
 const view = computed(() => (props.file.virtual ? tabs.views[props.file.virtual] : undefined));
 const subtitle = computed(() =>
   props.file.virtual ? tabs.types.get(props.file.virtual)?.subtitle : undefined,
@@ -56,6 +67,7 @@ const hasStatusLine = computed(
       <span v-if="file.external || file.readonly" class="topbar-note">только просмотр</span>
       <div :ref="setTopbarActions" class="topbar-actions" />
     </div>
+    <p v-if="snapshotLimit" class="file-note">{{ snapshotLimit }}</p>
     <p v-if="file.saveError && !isMarkdown(file)" class="file-error" role="alert">
       {{ file.saveError }}
     </p>
@@ -198,6 +210,13 @@ const hasStatusLine = computed(
   margin: 0;
   padding: var(--sp-3);
   color: var(--err);
+  font-size: var(--fs-xs);
+  border-bottom: 1px solid var(--line);
+}
+.file-note {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--muted);
   font-size: var(--fs-xs);
   border-bottom: 1px solid var(--line);
 }
