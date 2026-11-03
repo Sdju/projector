@@ -322,6 +322,36 @@ registerEditor(
   },
 );
 registerEditor(
+  "ide.workbench.tree.open",
+  "Открыть дерево файлов снимка",
+  (value) => {
+    const args = commandArgs(value);
+    const stringArg = (key: string) => {
+      const item = args[key];
+      if (item !== undefined && typeof item !== "string")
+        throw new Error(`${key} должен быть строкой`);
+      return item as string | undefined;
+    };
+    const rev = stringArg("rev");
+    const from = stringArg("from");
+    const to = stringArg("to");
+    if (rev) openTree({ kind: "commit", rev });
+    else if (from && to) openTree({ kind: "compare", from, to });
+    else throw new Error("Укажите rev или пару from/to");
+  },
+  () => capabilities.snapshots || capabilities.compare,
+  undefined,
+  {
+    description:
+      "Открывает в боковой панели read-only дерево файлов коммита или список изменений двух коммитов. Для коммита передайте rev; для сравнения — from и to. Хеши должны быть полными или однозначно разрешаться Git провайдера.",
+    arguments: {
+      rev: "Хеш коммита для дерева файлов",
+      from: "Начальный хеш сравнения",
+      to: "Конечный хеш сравнения",
+    },
+  },
+);
+registerEditor(
   "ide.workbench.section.close",
   "Закрыть временный раздел боковой панели",
   (value) => {

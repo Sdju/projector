@@ -177,6 +177,7 @@ carries `commit`, `commitPath` and `historyOpen`. Commands:
 - `ide.git.commit.openDiff` `{ hash, path }` opens a read-only diff `parent → commit` (tab title shows both hashes);
 - `ide.git.commit.openTree` `{ hash }` opens **Файлы коммита @hash** in the sidebar: a read-only tree at that commit, grouped with Git, with a source label above the panel; files open read-only. Available when the source supports snapshot trees (local projects, GitHub and GitLab). Close it with the icon context menu (desktop) or the panel-head button (mobile); both use `ide.workbench.section.close` `{ section }`;
 - `ide.git.commit.openChanges` opens the changed files of a non-root commit against its first parent in the sidebar. The section is a `compare` file scope: paths carry A/M/D/R marks, clicking a row opens a read-only diff `parent → commit`; filtering and collapsing a single-child directory chain are shared with the merge request changes tree. It works for local repositories, GitHub and GitLab;
+- `ide.workbench.tree.open` `{ rev }` or `{ from, to }` opens the same tree/changes section without an overview tab; useful for the agent and future revision pickers;
 - `ide.git.commit.file.toggle` `{ path, open? }` and `ide.git.commit.files.toggleAll` `{ open? }` expand the code of files
   right inside the overview tab (read lazily, short files get a short viewer). The handle under each viewer resizes it
   (drag, arrows, double click resets); squeezing it to the minimum collapses the file like `file.toggle { open: false }`,
