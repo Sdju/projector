@@ -4,13 +4,13 @@ import { chromium, createChromium } from "./fixtures/chromium-driver.mjs";
 
 const html = `<!doctype html><div id="fixture" style="height:400px;overflow:auto"></div><pre id="result">WAITING</pre>
 <script type="module">
-import '/src/app/styles.css';
+import '/packages/client/app/styles.css';
 import {createApp,h,ref} from 'vue';
-import FileTree from '/src/modules/workspace/modules/tree/ui/FileTree.vue';
-import {registerWorkspaceProfile} from '/src/modules/workspace-api/index.ts';
-import {commandHostKey} from '/src/common/utilities/commands.ts';
-import {toasts} from '/src/common/utilities/notice.ts';
-import {treePageRange} from '/core/modules/workspace/index.ts';
+import FileTree from '/packages/client/modules/workspace/modules/tree/ui/FileTree.vue';
+import {registerWorkspaceProfile} from '/packages/client/modules/workspace-api/index.ts';
+import {commandHostKey} from '/packages/client/common/utilities/commands.ts';
+import {toasts} from '/packages/client/common/utilities/notice.ts';
+import {treePageRange} from '/packages/core/modules/workspace/index.ts';
 const calls=[];
 let fail=false;
 const files=(path,count)=>Array.from({length:count},(_,index)=>({name:'file-'+String(index).padStart(4,'0'),path:(path?path+'/':'')+'file-'+String(index).padStart(4,'0'),directory:false}));

@@ -32,7 +32,7 @@
 
 Текст виджетов собирается из живого каталога (`widgetCatalog.guide()`), как и промпт Projector: описание компонентов не может разойтись с тем, что умеет рисовать клиент. Обычные виджеты описаны целиком, специальные (`special: true`) — только именем и условием использования. Их свойства и пример выдаёт `describe_widget`: у штатного Projector это встроенный инструмент, внешним агентам при включённых виджетах передаётся stdio-сервер `projector-widgets`.
 
-Hosted-ход — отдельный процесс со своей композицией. `server/app/plugin.ts` регистрирует возможности для сервера, `projector-runner.ts` и `claude-runner.ts` — для ответов Projector и Claude Code; новый раннер обязан сделать те же вызовы, иначе каталог в нём пуст и включённая галочка ничего не добавит. Это проверяет тест, который запускает раннер отдельным процессом.
+Hosted-ход — отдельный процесс со своей композицией. `packages/server/app/plugin.ts` регистрирует возможности для сервера, `projector-runner.ts` и `claude-runner.ts` — для ответов Projector и Claude Code; новый раннер обязан сделать те же вызовы, иначе каталог в нём пуст и включённая галочка ничего не добавит. Это проверяет тест, который запускает раннер отдельным процессом.
 
 ## Команды IDE через MCP
 
@@ -48,28 +48,28 @@ Hosted-ход — отдельный процесс со своей композ
 
 ## Где что лежит
 
-| Место                                  | Что                                                                                    |
-| -------------------------------------- | -------------------------------------------------------------------------------------- |
-| `core/modules/agent-features`          | Контракт `AgentFeature` (id, название, описание, умолчания, `instruction()`) и каталог |
-| `server/modules/agent-features`        | Реестр агентов, умолчания, `enabledFeatures`, `featureEnabled` и `featurePrompt`       |
-| `server/app/features.ts`               | Единственное место, где возможности названы: `widgets` и `ide`                         |
-| `server/app/plugin.ts`                 | Регистрация при старте сервера                                                         |
-| `server/app/projector-runner.ts`       | Регистрация в процессе ответа Projector                                                |
-| `server/app/claude-runner.ts`          | Регистрация в процессе ответа Claude Code                                              |
-| `server/routes/api/agent-features.ts`  | `GET` умолчаний и `PUT` одного переключателя                                           |
-| `server/modules/agents/ide-mcp`        | Stdio-сервер `projector-ide` и его конфиги для Claude Code и ACP                       |
-| `server/modules/agents/widgets-mcp`    | Конфиги stdio-сервера `projector-widgets` для Claude Code и ACP                        |
-| `server/app/widgets-mcp.ts`            | Точка входа сервера: регистрирует виджеты и отдаёт `describe_widget`                   |
-| `server/modules/ide/mcp-bridge.ts`     | Ключ, ожидание ответа страницы, claim и результат                                      |
-| `server/routes/api/ide/commands.ts`    | `POST /api/ide/command-request`, `/claim` и `/result`                                  |
-| `src/modules/ide/command-bridge.ts`    | Страница: claim, подтверждение изменяющей команды, вызов SDK                           |
-| `src/modules/agent-features`           | Общий каталог, модель умолчаний, остров чата и раздел настроек                         |
-| `src/modules/agent/ui/AgentChat.vue`   | Место острова: панель инструментов таба агента                                         |
-| `src/modules/app-settings/sections.ts` | Раздел настроек `agent-features`                                                       |
+| Место                                              | Что                                                                                    |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `packages/core/modules/agent-features`             | Контракт `AgentFeature` (id, название, описание, умолчания, `instruction()`) и каталог |
+| `packages/server/modules/agent-features`           | Реестр агентов, умолчания, `enabledFeatures`, `featureEnabled` и `featurePrompt`       |
+| `packages/server/app/features.ts`                  | Единственное место, где возможности названы: `widgets` и `ide`                         |
+| `packages/server/app/plugin.ts`                    | Регистрация при старте сервера                                                         |
+| `packages/server/app/projector-runner.ts`          | Регистрация в процессе ответа Projector                                                |
+| `packages/server/app/claude-runner.ts`             | Регистрация в процессе ответа Claude Code                                              |
+| `packages/server/routes/api/agent-features.ts`     | `GET` умолчаний и `PUT` одного переключателя                                           |
+| `packages/server/modules/agents/ide-mcp`           | Stdio-сервер `projector-ide` и его конфиги для Claude Code и ACP                       |
+| `packages/server/modules/agents/widgets-mcp`       | Конфиги stdio-сервера `projector-widgets` для Claude Code и ACP                        |
+| `packages/server/app/widgets-mcp.ts`               | Точка входа сервера: регистрирует виджеты и отдаёт `describe_widget`                   |
+| `packages/server/modules/ide/mcp-bridge.ts`        | Ключ, ожидание ответа страницы, claim и результат                                      |
+| `packages/server/routes/api/ide/commands.ts`       | `POST /api/ide/command-request`, `/claim` и `/result`                                  |
+| `packages/client/modules/ide/command-bridge.ts`    | Страница: claim, подтверждение изменяющей команды, вызов SDK                           |
+| `packages/client/modules/agent-features`           | Общий каталог, модель умолчаний, остров чата и раздел настроек                         |
+| `packages/client/modules/agent/ui/AgentChat.vue`   | Место острова: панель инструментов таба агента                                         |
+| `packages/client/modules/app-settings/sections.ts` | Раздел настроек `agent-features`                                                       |
 
 ### Как добавить возможность
 
-1. `server/app/features.ts`: `registerAgentFeature({ id, title, summary, defaults, instruction: () => "…" })`. `instruction` вызывается при каждом ходе, поэтому может читать актуальный каталог.
+1. `packages/server/app/features.ts`: `registerAgentFeature({ id, title, summary, defaults, instruction: () => "…" })`. `instruction` вызывается при каждом ходе, поэтому может читать актуальный каталог.
 2. Если возможность умеет только часть агентов, ограничьте `defaults` и проверяйте id в своём бэкенде.
 3. Добавьте доставку в бэкенды, где она нужна: Projector — в `buildSystemPrompt`, Claude Code — в `claudeSystemPrompt` (`systemPrompt.append`), ACP — в `featurePrompt` первого сообщения. `featurePrompt` фильтрует по включённым возможностям и принимает выбор чата.
 4. Для нового hosted-раннера вызовите `registerBuiltinWidgetDefinitions()` и `registerBuiltinAgentFeatures()` до `runHostedRunner`, как в `projector-runner.ts` и `claude-runner.ts`.

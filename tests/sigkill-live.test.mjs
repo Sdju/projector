@@ -61,7 +61,7 @@ test(
         "--input-type=module",
         "-e",
         `
-    const { environmentLaunch } = await import(${JSON.stringify(new URL("../server/modules/environments/index.ts", import.meta.url).href)});
+    const { environmentLaunch } = await import(${JSON.stringify(new URL("../packages/server/modules/environments/index.ts", import.meta.url).href)});
     const { spawn } = await import("node:child_process");
     const launch = environmentLaunch(${JSON.stringify(project)}, ["/bin/bash", "-c", "sleep 300"], false);
     spawn(launch.file, launch.args, { stdio: "ignore" });
@@ -77,7 +77,7 @@ test(
       await sleep(1500);
       expect(count(), "the orphan survives the killed server").toBe(1);
       let log = "";
-      second = spawn(process.execPath, ["server/app/standalone.ts"], {
+      second = spawn(process.execPath, ["packages/server/app/standalone.ts"], {
         env: { ...env, PROJECTOR_PORT: "4393" },
         stdio: ["ignore", "pipe", "pipe"],
       });

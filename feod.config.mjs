@@ -4,19 +4,19 @@ const adapters = [
   {
     name: "linux-adapter",
     literals: ["^/proc(/|$)", "^(xdotool|xprop|wmctrl)$", "^org\\.kde\\."],
-    allowedIn: ["core/modules/os/modules/linux/**"],
+    allowedIn: ["packages/core/modules/os/modules/linux/**"],
     message: "Linux-specific operations must live in the os Linux adapter",
   },
   {
     name: "windows-adapter",
     literals: ["powershell\\.exe|taskkill|ntdll|advapi32|LOCALAPPDATA|WScript\\.Shell|CredRead"],
-    allowedIn: ["core/modules/os/modules/windows/**"],
+    allowedIn: ["packages/core/modules/os/modules/windows/**"],
     message: "Windows-specific operations must live in the os Windows adapter",
   },
   {
     name: "darwin-adapter",
     literals: ["^/usr/bin/security$|^osascript$|Library/Application Support"],
-    allowedIn: ["core/modules/os/modules/darwin/**"],
+    allowedIn: ["packages/core/modules/os/modules/darwin/**"],
     message: "macOS-specific operations must live in the os darwin adapter",
   },
 ];
@@ -26,13 +26,26 @@ const nodeOnly = [
   {
     name: "node-platform",
     imports: ["node:**", "node-gtk", "dbus-next", "node-pty", "ws"],
-    allowedIn: ["core/modules/app-paths/**", "core/modules/os/**", "core/modules/os-posix/**"],
+    allowedIn: [
+      "packages/core/modules/app-paths/**",
+      "packages/core/modules/os/**",
+      "packages/core/modules/os-posix/**",
+    ],
     message: "Platform dependency in browser/domain code",
   },
   {
     name: "node-infrastructure-modules",
-    imports: ["@core/os", "@core/os/**", "@core/app-paths", "@core/app-paths/**"],
-    allowedIn: ["core/modules/app-paths/**", "core/modules/os/**", "core/modules/os-posix/**"],
+    imports: [
+      "@projector/core/modules/os",
+      "@projector/core/modules/os/**",
+      "@projector/core/modules/app-paths",
+      "@projector/core/modules/app-paths/**",
+    ],
+    allowedIn: [
+      "packages/core/modules/app-paths/**",
+      "packages/core/modules/os/**",
+      "packages/core/modules/os-posix/**",
+    ],
     message: "Browser/domain code cannot consume Node OS infrastructure",
   },
 ];
@@ -43,6 +56,8 @@ export default {
   rootDefault: {
     // Only the configured roots are architecture; tooling, tests and docs are not.
     ignore: [
+      "**/node_modules/**",
+      "**/package.json",
       "tests/**",
       "evals/**",
       "scripts/**",
@@ -55,7 +70,13 @@ export default {
       "feod.config.mjs",
     ],
     layerDirs: { global: "globals" },
-    layerAliases: { "@core": "core/modules" },
+    layerAliases: {
+      "@projector/client": "packages/client",
+      "@projector/server": "packages/server",
+      "@projector/native": "packages/native",
+      "@projector/core": "packages/core",
+      "@projector/cli": "packages/cli",
+    },
     imports: { computed: "forbid", unresolved: "forbid" },
     cycles: { modules: true, types: "include" },
     submodules: {
@@ -74,7 +95,7 @@ export default {
       largeFiles: {
         thresholds: { default: 400, ".vue": 500 },
         files: {
-          "server/modules/gitlab/browser.ts": {
+          "packages/server/modules/gitlab/browser.ts": {
             ceiling: 402,
             plan: "Вынести чтение файлов и ассетов GitLab в отдельный files.ts",
           },
@@ -84,22 +105,22 @@ export default {
     },
   },
   roots: {
-    src: {
-      dependencies: ["core"],
+    "packages/client": {
+      dependencies: ["packages/core"],
       transitModules: ["agents-integration", "agent-widgets"],
       extra: { confine: [...nodeOnly, ...adapters] },
     },
-    server: {
+    "packages/server": {
       layers: backendLayers,
-      dependencies: ["core"],
+      dependencies: ["packages/core"],
       transitModules: ["agents-integration", "agents"],
     },
-    native: { dependencies: ["core"] },
-    core: {
+    "packages/native": { dependencies: ["packages/core"] },
+    "packages/core": {
       layers: libraryLayers,
       transitModules: ["agents-integration", "agent-widgets"],
       extra: { confine: [...nodeOnly, ...adapters] },
     },
-    cli: { layers: libraryLayers, dependencies: ["core"] },
+    "packages/cli": { layers: libraryLayers, dependencies: ["packages/core"] },
   },
 };

@@ -5,11 +5,11 @@ import {
   guardBash,
   guardCommand,
   isReadOnlyBash,
-} from "../server/modules/agents/projector/projector-guard.ts";
+} from "../packages/server/modules/agents/projector/projector-guard.ts";
 import {
   historyMessages,
   recentTurns,
-} from "../server/modules/agents/projector/projector-history.ts";
+} from "../packages/server/modules/agents/projector/projector-history.ts";
 
 describe("agent guard", () => {
   it("passes allowed read-only commands", () => {
@@ -174,7 +174,8 @@ describe("agent history", () => {
 
 describe("auto mode review", () => {
   it("runs a command the reviewer calls safe and asks about the rest with the reason", async () => {
-    const { parseVerdict } = await import("../server/modules/agents/projector/projector-review.ts");
+    const { parseVerdict } =
+      await import("../packages/server/modules/agents/projector/projector-review.ts");
     expect(parseVerdict('x {"safe": true, "reason": "тесты"} y')).toEqual({
       safe: true,
       reason: "тесты",

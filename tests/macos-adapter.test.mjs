@@ -13,7 +13,7 @@ import { expect, onTestFinished, test } from "vite-plus/test";
 
 const execute = promisify(execFile);
 const mac = process.platform === "darwin";
-const { os } = await import("../core/modules/os/index.ts");
+const { os } = await import("../packages/core/modules/os/index.ts");
 
 test.skipIf(!mac)("the application catalog lists, launches and resolves .app bundles", async () => {
   const home = await realpath(await mkdtemp(join(tmpdir(), "projector-mac-home-")));
@@ -31,7 +31,7 @@ test.skipIf(!mac)("the application catalog lists, launches and resolves .app bun
   );
   const executable = join(app, "Contents/MacOS/probe");
   await writeFile(executable, `#!/bin/sh\necho started > '${marker}'\n`, { mode: 0o755 });
-  const { os } = await import("../core/modules/os/index.ts");
+  const { os } = await import("../packages/core/modules/os/index.ts");
   const catalog = await os.catalog();
   const probe = (await catalog.listApplications()).find((item) => item.name === "Projector Probe");
   expect(probe).toBeTruthy();
@@ -49,7 +49,7 @@ test.skipIf(!mac)("the application catalog lists, launches and resolves .app bun
 test.skipIf(!mac)(
   "ps/lsof report identity, parents, foreground and working directory",
   async () => {
-    const { os } = await import("../core/modules/os/index.ts");
+    const { os } = await import("../packages/core/modules/os/index.ts");
     const directory = await realpath(await mkdtemp(join(tmpdir(), "projector-mac-cwd-")));
     const child = (await import("node:child_process")).spawn("sleep", ["30"], { cwd: directory });
     onTestFinished(() => child.kill());
@@ -70,9 +70,9 @@ test.skipIf(!mac)(
   "the resident compiles its helper, owns one menu-bar item and registers the hotkey",
   async () => {
     const data = await realpath(await mkdtemp(join(tmpdir(), "projector-mac-resident-")));
-    const entry = fileURLToPath(new URL("../native/app/entry.ts", import.meta.url));
+    const entry = fileURLToPath(new URL("../packages/native/app/entry.ts", import.meta.url));
     const env = { ...process.env, XDG_DATA_HOME: data };
-    const { os } = await import("../core/modules/os/index.ts");
+    const { os } = await import("../packages/core/modules/os/index.ts");
     const loader = os.capabilities.gtkPalette
       ? [
           "--import",
@@ -101,7 +101,7 @@ test.skipIf(!mac)(
     // Hosted runners install GTK4: a silent fall back to Chromium would hide a broken palette.
     expect(os.capabilities.gtkPalette).toBe(true);
     expect(output).toContain("PALETTE:gtk");
-    const { ensureHelper } = await import("../core/modules/os/modules/darwin/shell.ts");
+    const { ensureHelper } = await import("../packages/core/modules/os/modules/darwin/shell.ts");
     const windows = async () =>
       Number(
         (await execute(await ensureHelper(), ["--windows", String(resident.pid)])).stdout.match(
@@ -155,7 +155,7 @@ test.skipIf(!mac)(
   async () => {
     const data = await realpath(await mkdtemp(join(tmpdir(), "projector-mac-helper-")));
     process.env.XDG_DATA_HOME = data;
-    const { ensureHelper } = await import("../core/modules/os/modules/darwin/shell.ts");
+    const { ensureHelper } = await import("../packages/core/modules/os/modules/darwin/shell.ts");
     const helper = spawn(await ensureHelper(), [], {
       env: { ...process.env, PROJECTOR_SHELL_TEST: "1" },
       stdio: ["pipe", "pipe", "inherit"],
@@ -189,7 +189,7 @@ test.skipIf(!mac || !existsSync("/Applications/Google Chrome.app"))(
   async () => {
     const data = await realpath(await mkdtemp(join(tmpdir(), "projector-mac-window-")));
     process.env.XDG_DATA_HOME = data;
-    const { os } = await import("../core/modules/os/index.ts");
+    const { os } = await import("../packages/core/modules/os/index.ts");
     const server = createServer((_, response) => response.end("<title>Palette</title>")).listen(0);
     await once(server, "listening");
     const url = `http://127.0.0.1:${server.address().port}/`;
@@ -224,7 +224,7 @@ test.skipIf(!mac)(
   async () => {
     const data = await realpath(await mkdtemp(join(tmpdir(), "projector-mac-input-")));
     process.env.XDG_DATA_HOME = data;
-    const { ensureHelper } = await import("../core/modules/os/modules/darwin/shell.ts");
+    const { ensureHelper } = await import("../packages/core/modules/os/modules/darwin/shell.ts");
     const helper = spawn(await ensureHelper(), [], {
       env: { ...process.env, PROJECTOR_SHELL_TEST: "1" },
       stdio: ["pipe", "pipe", "inherit"],
@@ -268,7 +268,7 @@ test.skipIf(!mac || !existsSync("/Applications/Google Chrome.app"))(
   async () => {
     const data = await realpath(await mkdtemp(join(tmpdir(), "projector-mac-window-")));
     process.env.XDG_DATA_HOME = data;
-    const { os } = await import("../core/modules/os/index.ts");
+    const { os } = await import("../packages/core/modules/os/index.ts");
     const server = createServer((_, response) => response.end("<title>Palette</title>")).listen(0);
     await once(server, "listening");
     const url = `http://127.0.0.1:${server.address().port}/`;

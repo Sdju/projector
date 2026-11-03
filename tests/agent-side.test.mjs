@@ -3,11 +3,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ref } from "vue";
 import { expect, test } from "vite-plus/test";
-import { sideRequestFrom } from "../server/modules/agent/side-request.ts";
-import { projectorBackend } from "../server/modules/agents/projector/projector-backend.ts";
-import { sideAbort } from "../server/modules/agents/projector/projector-side.ts";
-import { btwQuestion } from "../src/modules/agent/lib/side-command.ts";
-import { sideHistory, useSideQuestion } from "../src/modules/agent/model/side-question.ts";
+import { sideRequestFrom } from "../packages/server/modules/agent/side-request.ts";
+import { projectorBackend } from "../packages/server/modules/agents/projector/projector-backend.ts";
+import { sideAbort } from "../packages/server/modules/agents/projector/projector-side.ts";
+import { btwQuestion } from "../packages/client/modules/agent/lib/side-command.ts";
+import {
+  sideHistory,
+  useSideQuestion,
+} from "../packages/client/modules/agent/model/side-question.ts";
 import { scriptedModel } from "./helpers/scripted-model.mjs";
 
 test("the /btw command takes the rest of the message", () => {

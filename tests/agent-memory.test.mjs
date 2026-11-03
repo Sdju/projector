@@ -8,8 +8,8 @@ import {
   projectMemories,
   readMemory,
   writeMemory,
-} from "../server/modules/agents/projector/projector-memory.ts";
-import { guardMemory } from "../server/modules/agents/projector/projector-guard.ts";
+} from "../packages/server/modules/agents/projector/projector-memory.ts";
+import { guardMemory } from "../packages/server/modules/agents/projector/projector-guard.ts";
 
 let previous;
 beforeEach(async () => {

@@ -7,14 +7,14 @@ import {
   fetchPage,
   htmlToText,
   isPrivateAddress,
-} from "../server/modules/agents/projector/projector-web.ts";
+} from "../packages/server/modules/agents/projector/projector-web.ts";
 import {
   configureWebSearch,
   storeSearchKey,
   webSearch,
   webSearchSettings,
-} from "../server/modules/agents/projector/projector-web-search.ts";
-import { guardWebFetch } from "../server/modules/agents/projector/projector-guard.ts";
+} from "../packages/server/modules/agents/projector/projector-web-search.ts";
+import { guardWebFetch } from "../packages/server/modules/agents/projector/projector-guard.ts";
 
 let previous;
 beforeEach(async () => {

@@ -2,15 +2,15 @@ import { expect, test } from "vite-plus/test";
 import {
   initializeAcp,
   mergeClientCapabilities,
-} from "../server/modules/agents/acp/acp-process.ts";
-import { registerAcpProgram } from "../server/modules/agents/acp/acp-programs.ts";
-import { createCursorDialect } from "../server/modules/agents/cursor/dialect.ts";
-import { showCursorImage } from "../server/modules/agents/cursor/images.ts";
-import { cursorProgram } from "../server/modules/agents/cursor/index.ts";
-import { createCursorPlan } from "../server/modules/agents/cursor/plan.ts";
-import { normalizeCursorSelection } from "../server/modules/agents/cursor/selection.ts";
-import { reportCursorTask } from "../server/modules/agents/cursor/task.ts";
-import { updateCursorTodos } from "../server/modules/agents/cursor/todos.ts";
+} from "../packages/server/modules/agents/acp/acp-process.ts";
+import { registerAcpProgram } from "../packages/server/modules/agents/acp/acp-programs.ts";
+import { createCursorDialect } from "../packages/server/modules/agents/cursor/dialect.ts";
+import { showCursorImage } from "../packages/server/modules/agents/cursor/images.ts";
+import { cursorProgram } from "../packages/server/modules/agents/cursor/index.ts";
+import { createCursorPlan } from "../packages/server/modules/agents/cursor/plan.ts";
+import { normalizeCursorSelection } from "../packages/server/modules/agents/cursor/selection.ts";
+import { reportCursorTask } from "../packages/server/modules/agents/cursor/task.ts";
+import { updateCursorTodos } from "../packages/server/modules/agents/cursor/todos.ts";
 
 test("Cursor's ACP program asks for the parameterized picker and keeps guts in the adapter", () => {
   expect(cursorProgram.clientCapabilities).toEqual({

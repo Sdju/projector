@@ -3,8 +3,8 @@ import { test } from "node:test";
 import Gtk from "gi:Gtk-4.0";
 import GLib from "gi:GLib-2.0";
 import { createApp, nextTick } from "@zede/vio";
-import Palette from "../native/modules/desktop/Palette.vue";
-import { os } from "../core/modules/os/index.ts";
+import Palette from "../packages/native/modules/desktop/Palette.vue";
+import { os } from "../packages/core/modules/os/index.ts";
 
 if (process.platform === "win32") await import("gi:GdkWin32-4.0");
 
@@ -114,7 +114,8 @@ await test("palette hides after losing real window focus during the startup grac
     other.destroy();
     globalThis.fetch = originalFetch;
     if (process.platform === "win32") {
-      const { stopWindowHost } = await import("../core/modules/os/modules/windows/hwnd.ts");
+      const { stopWindowHost } =
+        await import("../packages/core/modules/os/modules/windows/hwnd.ts");
       await stopWindowHost();
     }
   }

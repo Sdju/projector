@@ -3,9 +3,9 @@ import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vite-plus/test";
-import { handleApi } from "../server/app/api.ts";
-import { registerAgentBackend } from "../server/modules/agent/index.ts";
-import { projectorBackend } from "../server/modules/agents/projector/projector-backend.ts";
+import { handleApi } from "../packages/server/app/api.ts";
+import { registerAgentBackend } from "../packages/server/modules/agent/index.ts";
+import { projectorBackend } from "../packages/server/modules/agents/projector/projector-backend.ts";
 import { scriptedModel } from "./helpers/scripted-model.mjs";
 
 function parse(chunk) {

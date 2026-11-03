@@ -1,10 +1,10 @@
 import { expect, test, vi, afterEach } from "vite-plus/test";
-import { createState, chatHistory } from "../src/modules/agent/model/chat-state.ts";
-import { useChatActions } from "../src/modules/agent/model/chat-actions.ts";
-import { applyAgentEvent } from "../src/modules/agent/model/turn-events.ts";
-import { injectMessage } from "../server/modules/agent/injection.ts";
-import { createTurnInput } from "../server/modules/agents/projector/projector-input.ts";
-import { projectorBackend } from "../server/modules/agents/projector/index.ts";
+import { createState, chatHistory } from "../packages/client/modules/agent/model/chat-state.ts";
+import { useChatActions } from "../packages/client/modules/agent/model/chat-actions.ts";
+import { applyAgentEvent } from "../packages/client/modules/agent/model/turn-events.ts";
+import { injectMessage } from "../packages/server/modules/agent/injection.ts";
+import { createTurnInput } from "../packages/server/modules/agents/projector/projector-input.ts";
+import { projectorBackend } from "../packages/server/modules/agents/projector/index.ts";
 import { scriptedModel } from "./helpers/scripted-model.mjs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -183,8 +183,8 @@ test("real model loop consumes additions after tool results and after a final te
 });
 
 test("hosted delivery waits for the runner's boundary acknowledgement", async () => {
-  const { createRun, removeRun } = await import("../server/modules/agent/agent-runs.ts");
-  const { runHostedAgent } = await import("../server/modules/agent/hosted-run.ts");
+  const { createRun, removeRun } = await import("../packages/server/modules/agent/agent-runs.ts");
+  const { runHostedAgent } = await import("../packages/server/modules/agent/hosted-run.ts");
   const { writeFile } = await import("node:fs/promises");
   const directory = await mkdtemp(join(tmpdir(), "projector-queue-host-"));
   const record = { backend: "projector", message: "start", history: [], messageId: "hosted-input" };
@@ -199,8 +199,8 @@ test("hosted delivery waits for the runner's boundary acknowledgement", async ()
       runner,
       `
       import { existsSync } from "node:fs";
-      import { runHostedRunner } from ${modulePath("../server/modules/agent/hosted-runner.ts")};
-      import { createTurnInput } from ${modulePath("../server/modules/agents/projector/projector-input.ts")};
+      import { runHostedRunner } from ${modulePath("../packages/server/modules/agent/hosted-runner.ts")};
+      import { createTurnInput } from ${modulePath("../packages/server/modules/agents/projector/projector-input.ts")};
       const release = ${JSON.stringify(release)};
       runHostedRunner(async (options) => {
         const input = createTurnInput(options);

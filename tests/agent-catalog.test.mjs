@@ -1,10 +1,14 @@
 import { expect, test } from "vite-plus/test";
-import { listAgentBackends, registerAgentBackend } from "../server/modules/agent/index.ts";
-import { registerBuiltinAgentFeatures } from "../server/app/features.ts";
-import { featureSettings } from "../server/modules/agent-features/index.ts";
-import { preferences, setAgentEnabled, setAgentMode } from "../server/modules/preferences/index.ts";
-import { registerBuiltinClientAgents } from "../src/app/agents.ts";
-import { clientAgents } from "../src/modules/agents-integration/catalog/index.ts";
+import { listAgentBackends, registerAgentBackend } from "../packages/server/modules/agent/index.ts";
+import { registerBuiltinAgentFeatures } from "../packages/server/app/features.ts";
+import { featureSettings } from "../packages/server/modules/agent-features/index.ts";
+import {
+  preferences,
+  setAgentEnabled,
+  setAgentMode,
+} from "../packages/server/modules/preferences/index.ts";
+import { registerBuiltinClientAgents } from "../packages/client/app/agents.ts";
+import { clientAgents } from "../packages/client/modules/agents-integration/catalog/index.ts";
 
 registerBuiltinClientAgents();
 

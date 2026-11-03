@@ -1,7 +1,7 @@
 import { expect, test, vi } from "vite-plus/test";
 import { effectScope, ref } from "vue";
-import { useAgentActivity } from "../src/modules/agent/model/activity.ts";
-import { registerChat } from "../src/modules/agent/model/chat-registry.ts";
+import { useAgentActivity } from "../packages/client/modules/agent/model/activity.ts";
+import { registerChat } from "../packages/client/modules/agent/model/chat-registry.ts";
 
 test("a disconnected chat does not hide a live server run, and an active chat does not duplicate it", async () => {
   const document = Object.assign(new EventTarget(), { visibilityState: "visible" });

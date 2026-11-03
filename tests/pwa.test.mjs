@@ -2,8 +2,8 @@ import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "vite-plus/test";
-import { pwaServiceWorkerAction } from "../src/modules/pwa/environment.ts";
-import { serveStatic } from "../server/app/static.ts";
+import { pwaServiceWorkerAction } from "../packages/client/modules/pwa/environment.ts";
+import { serveStatic } from "../packages/server/app/static.ts";
 
 const root = fileURLToPath(new URL("../public", import.meta.url));
 const repo = fileURLToPath(new URL("..", import.meta.url));
@@ -47,7 +47,7 @@ test("manifest is installable, points at existing icons and is linked from the s
 test("shell worker keeps API and dev traffic out of its fetch handler", async () => {
   const worker = await readFile(`${root}/sw.js`, "utf8");
   expect(worker).toContain('url.pathname.startsWith("/api/")');
-  expect(worker).toContain('url.pathname.startsWith("/src/")');
+  expect(worker).toContain('url.pathname.startsWith("/packages/")');
   expect(worker).toContain('request.mode === "navigate"');
   expect(worker).not.toContain("cache.put");
   expect(worker).not.toContain("cache.add");

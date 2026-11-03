@@ -1,10 +1,10 @@
 import { expect, test } from "vite-plus/test";
-import { jobItems } from "../src/modules/agent/model/activity.ts";
-import { jobTurn } from "../src/modules/agent/model/job-turn.ts";
-import { canContinueInChat } from "../src/modules/agent/model/job-continue.ts";
-import { jobBarSections } from "../src/modules/agent/lib/job-bar.ts";
-import { taskSummaryLine } from "../src/modules/agent/lib/task-detail.ts";
-import { registerBuiltinClientAgents } from "../src/app/agents.ts";
+import { jobItems } from "../packages/client/modules/agent/model/activity.ts";
+import { jobTurn } from "../packages/client/modules/agent/model/job-turn.ts";
+import { canContinueInChat } from "../packages/client/modules/agent/model/job-continue.ts";
+import { jobBarSections } from "../packages/client/modules/agent/lib/job-bar.ts";
+import { taskSummaryLine } from "../packages/client/modules/agent/lib/task-detail.ts";
+import { registerBuiltinClientAgents } from "../packages/client/app/agents.ts";
 
 registerBuiltinClientAgents();
 
@@ -89,7 +89,7 @@ test("a task summary loses markdown before it reaches the compact row", () => {
 });
 
 test("a page hears about a job that waits for the user or ended, once", async () => {
-  const { jobNotices } = await import("../src/modules/agent/lib/job-notify.ts");
+  const { jobNotices } = await import("../packages/client/modules/agent/lib/job-notify.ts");
   const known = new Map();
   // The first look only records what is there.
   expect(jobNotices(known, [job("a", "running"), job("old", "done")])).toEqual([]);

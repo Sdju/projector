@@ -32,13 +32,13 @@
   <body>
     <div id="fixture"></div>
     <script type="module">
-      import "/src/app/styles.css";
+      import "/packages/client/app/styles.css";
       import { createApp, defineComponent, h, nextTick, reactive, ref, computed } from "vue";
-      import AgentTurn from "/src/modules/agent/ui/AgentTurn.vue";
-      import AgentMessage from "/src/modules/agent/ui/AgentMessage.vue";
-      import { useChatWindow } from "/src/modules/agent/model/chat-window.ts";
-      import { registerBuiltinWidgets } from "/src/app/widgets.ts";
-      import { widgetReplyKey } from "/src/modules/widget-runtime/index.ts";
+      import AgentTurn from "/packages/client/modules/agent/ui/AgentTurn.vue";
+      import AgentMessage from "/packages/client/modules/agent/ui/AgentMessage.vue";
+      import { useChatWindow } from "/packages/client/modules/agent/model/chat-window.ts";
+      import { registerBuiltinWidgets } from "/packages/client/app/widgets.ts";
+      import { widgetReplyKey } from "/packages/client/modules/widget-runtime/index.ts";
 
       registerBuiltinWidgets();
 

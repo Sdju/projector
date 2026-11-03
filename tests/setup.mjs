@@ -4,9 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, vi } from "vite-plus/test";
 // The agents the server offers are registered at startup; tests run against the same set.
-import { registerBuiltinAgents } from "../server/app/agents.ts";
-import { registerBuiltinWidgetDefinitions } from "../server/app/widgets.ts";
-import { registerBuiltinAgentFeatures } from "../server/app/features.ts";
+import { registerBuiltinAgents } from "../packages/server/app/agents.ts";
+import { registerBuiltinWidgetDefinitions } from "../packages/server/app/widgets.ts";
+import { registerBuiltinAgentFeatures } from "../packages/server/app/features.ts";
 
 registerBuiltinAgents();
 registerBuiltinWidgetDefinitions();

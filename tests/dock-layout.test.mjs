@@ -17,7 +17,7 @@ import {
   setGroupHidden,
   setSplitSizes,
   toggleMaximized,
-} from "../src/modules/dock/model/layout.ts";
+} from "../packages/client/modules/dock/model/layout.ts";
 
 const sum = (values) => values.reduce((total, value) => total + value, 0);
 function assertValid(layout) {
@@ -301,7 +301,8 @@ test("layouts survive serialisation; hostile data does not throw", () => {
 });
 
 test("mobile surfaces separate mixed panels without changing desktop splits or hidden groups", async () => {
-  const { mobileDockSurfaces } = await import("../src/modules/dock/model/mobile-surfaces.ts");
+  const { mobileDockSurfaces } =
+    await import("../packages/client/modules/dock/model/mobile-surfaces.ts");
   let layout = createDockLayout();
   layout = addPanel(layout, "a", { groupId: "g1", zone: "center" });
   layout = addPanel(layout, "terminal:1", { groupId: "g1", zone: "center" });
@@ -334,8 +335,10 @@ test("mobile surfaces separate mixed panels without changing desktop splits or h
 });
 
 test("tab reader lists panels and reads files, diffs, terminals and rejects unknown tabs", async () => {
-  const { registerTabReader } = await import("../src/modules/workspace/lib/tab-reader.ts");
-  const { createTabRegistry, defineTab } = await import("../src/modules/workspace-api/tabs.ts");
+  const { registerTabReader } =
+    await import("../packages/client/modules/workspace/lib/tab-reader.ts");
+  const { createTabRegistry, defineTab } =
+    await import("../packages/client/modules/workspace-api/tabs.ts");
   const tabTypes = createTabRegistry([
     defineTab({
       id: "note",
@@ -395,9 +398,11 @@ test("tab reader lists panels and reads files, diffs, terminals and rejects unkn
 });
 
 test("tab reader prefers the live view readout over the kind's static reader", async () => {
-  const { registerTabReader } = await import("../src/modules/workspace/lib/tab-reader.ts");
-  const { createTabRegistry, defineTab } = await import("../src/modules/workspace-api/tabs.ts");
-  const { registerTabReadout } = await import("../src/common/utilities/tab-readout.ts");
+  const { registerTabReader } =
+    await import("../packages/client/modules/workspace/lib/tab-reader.ts");
+  const { createTabRegistry, defineTab } =
+    await import("../packages/client/modules/workspace-api/tabs.ts");
+  const { registerTabReadout } = await import("../packages/client/common/utilities/tab-readout.ts");
   const tabTypes = createTabRegistry([
     defineTab({
       id: "note",
@@ -451,7 +456,7 @@ test("tab reader prefers the live view readout over the kind's static reader", a
 test("nested readouts keep the tab owner over child views and survive their unmount", async () => {
   const { createRenderer, defineComponent, h, ref, nextTick } = await import("vue");
   const { provideTabReadout, readTabReadout, useTabReadout } =
-    await import("../src/common/utilities/tab-readout.ts");
+    await import("../packages/client/common/utilities/tab-readout.ts");
   // A minimal headless renderer exercises the real component lifecycle without a DOM.
   const node = () => ({});
   const renderer = createRenderer({
@@ -503,7 +508,7 @@ test("nested readouts keep the tab owner over child views and survive their unmo
 
 test("a nested readout is used only while the owner has nothing to say", async () => {
   const { readTabReadout, registerTabReadout } =
-    await import("../src/common/utilities/tab-readout.ts");
+    await import("../packages/client/common/utilities/tab-readout.ts");
   const key = "readout:fallback";
   const disposeOwner = registerTabReadout(key, () => undefined);
   const disposeNested = registerTabReadout(key, () => ({ text: "nested" }));

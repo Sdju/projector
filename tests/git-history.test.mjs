@@ -7,7 +7,7 @@ import {
   projectLog,
   projectCommit,
   projectCommitComparison,
-} from "../server/modules/workspace/index.ts";
+} from "../packages/server/modules/workspace/index.ts";
 
 async function repository() {
   const base = await mkdtemp(join(tmpdir(), "projector-history-"));

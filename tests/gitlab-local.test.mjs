@@ -10,11 +10,11 @@ process.env.PROJECTOR_SECRET_STORE = "file";
 
 const root = await mkdtemp(join(tmpdir(), "projector-gitlab-local-"));
 process.env.XDG_DATA_HOME = join(root, "data");
-const { projectGitlabRepository } = await import("../server/modules/workspace/index.ts");
-const { updateIntegration } = await import("../server/modules/integration-store/index.ts");
-const { searchGitlabProjects } = await import("../server/modules/gitlab/index.ts");
-const { launchItem, searchLauncher } = await import("../server/modules/launcher/index.ts");
-const { handleApi } = await import("../server/app/api.ts");
+const { projectGitlabRepository } = await import("../packages/server/modules/workspace/index.ts");
+const { updateIntegration } = await import("../packages/server/modules/integration-store/index.ts");
+const { searchGitlabProjects } = await import("../packages/server/modules/gitlab/index.ts");
+const { launchItem, searchLauncher } = await import("../packages/server/modules/launcher/index.ts");
+const { handleApi } = await import("../packages/server/app/api.ts");
 
 afterAll(async () => {
   vi.restoreAllMocks();

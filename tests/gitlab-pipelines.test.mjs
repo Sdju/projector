@@ -11,7 +11,8 @@ const id = encodeURIComponent("group/project");
 async function setup(url = "https://gitlab.com", token = "") {
   const root = await mkdtemp(join(tmpdir(), "projector-gitlab-pipelines-"));
   process.env.XDG_DATA_HOME = join(root, "data");
-  const { updateIntegration } = await import("../server/modules/integration-store/index.ts");
+  const { updateIntegration } =
+    await import("../packages/server/modules/integration-store/index.ts");
   await updateIntegration("gitlab", () => ({
     enabled: true,
     settings: { url, directory: join(root, "projects") },
@@ -78,7 +79,7 @@ test("GitLab pipelines map statuses, fields and pages", async () => {
       { headers: { "X-Next-Page": "2" } },
     );
   });
-  const { browseGitlabPipelines } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabPipelines } = await import("../packages/server/modules/gitlab/index.ts");
   const list = await browseGitlabPipelines(repository);
   expect(queries[0]).toStrictEqual({
     per_page: "30",
@@ -139,7 +140,7 @@ test("GitLab pipeline detail maps jobs and reports a truncated list", async () =
     }
     return Response.json({}, { status: 404 });
   });
-  const { browseGitlabPipeline } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabPipeline } = await import("../packages/server/modules/gitlab/index.ts");
   const detail = await browseGitlabPipeline(repository, "42");
   expect(detail.pipeline.id).toBe(42);
   expect(detail.pipeline.status).toBe("success");
@@ -181,7 +182,7 @@ test("GitLab job detail reads a trace, strips ANSI and survives a missing trace"
       );
     return Response.json({}, { status: 404 });
   });
-  const { browseGitlabJob } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabJob } = await import("../packages/server/modules/gitlab/index.ts");
   const detail = await browseGitlabJob(repository, 7);
   expect(detail.job.id).toBe(7);
   expect(detail.job.failureReason).toBe("script_failure");

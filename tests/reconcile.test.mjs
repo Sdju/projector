@@ -1,8 +1,8 @@
 import { expect, test } from "vite-plus/test";
 import { execFileSync } from "node:child_process";
-import { reconcileEnvironmentContainers } from "../server/modules/environments/index.ts";
-import { serverId } from "../server/modules/environments/reconcile.ts";
-import { os } from "../core/modules/os/index.ts";
+import { reconcileEnvironmentContainers } from "../packages/server/modules/environments/index.ts";
+import { serverId } from "../packages/server/modules/environments/reconcile.ts";
+import { os } from "../packages/core/modules/os/index.ts";
 
 test("only containers whose owner process is gone are removed", async () => {
   const calls = [];

@@ -11,7 +11,8 @@ const id = encodeURIComponent("group/project");
 async function setup(url = "https://gitlab.com", token = "") {
   const root = await mkdtemp(join(tmpdir(), "projector-gitlab-trackers-"));
   process.env.XDG_DATA_HOME = join(root, "data");
-  const { updateIntegration } = await import("../server/modules/integration-store/index.ts");
+  const { updateIntegration } =
+    await import("../packages/server/modules/integration-store/index.ts");
   await updateIntegration("gitlab", () => ({
     enabled: true,
     settings: { url, directory: join(root, "projects") },
@@ -83,7 +84,7 @@ test("GitLab issues list maps fields, states and pages", async () => {
       return Response.json(rows, { headers: { "X-Next-Page": "2" } });
     return Response.json([]);
   });
-  const { browseGitlabIssues } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabIssues } = await import("../packages/server/modules/gitlab/index.ts");
   const list = await browseGitlabIssues(repository);
   expect(queries[0]).toStrictEqual({
     state: "opened",
@@ -167,7 +168,7 @@ test("GitLab issue detail hides system notes and maps award emoji", async () => 
     }
     return Response.json({}, { status: 404 });
   });
-  const { browseGitlabIssue } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabIssue } = await import("../packages/server/modules/gitlab/index.ts");
   const detail = await browseGitlabIssue(repository, 12);
   expect(notesQueries[0]).toStrictEqual({
     sort: "asc",
@@ -228,7 +229,7 @@ test("GitLab issue notes stop after five pages and report truncation", async () 
     }
     return Response.json({}, { status: 404 });
   });
-  const { browseGitlabIssue } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabIssue } = await import("../packages/server/modules/gitlab/index.ts");
   const detail = await browseGitlabIssue(repository, 3);
   expect(pages).toStrictEqual([1, 2, 3, 4, 5]);
   expect(detail.comments).toHaveLength(495);
@@ -254,7 +255,7 @@ test("GitLab merge requests list maps states, drafts, branches and pages", async
       return Response.json(rows);
     return Response.json([mergeRequestRow({ iid: 30, state: "merged", merged_at: "2024-01-04Z" })]);
   });
-  const { browseGitlabMergeRequests } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabMergeRequests } = await import("../packages/server/modules/gitlab/index.ts");
   const list = await browseGitlabMergeRequests(repository);
   expect(queries[0]).toStrictEqual({
     state: "opened",
@@ -313,7 +314,7 @@ test("GitLab merge request list exposes CI, comments and merge readiness", async
       }),
     ]),
   );
-  const { browseGitlabMergeRequests } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabMergeRequests } = await import("../packages/server/modules/gitlab/index.ts");
   const list = await browseGitlabMergeRequests(repository);
   expect(list.pulls[0]).toMatchObject({
     number: 12,
@@ -366,7 +367,7 @@ test("GitLab merge request detail maps notes, approvals, files and diff counts",
     }
     return Response.json({}, { status: 404 });
   });
-  const { browseGitlabMergeRequest } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabMergeRequest } = await import("../packages/server/modules/gitlab/index.ts");
   const detail = await browseGitlabMergeRequest(repository, 7);
   expect(diffQueries).toStrictEqual([{ per_page: "100", page: "1" }]);
   expect(detail.pull.number).toBe(7);
@@ -452,7 +453,7 @@ test("GitLab merge request falls back to /changes and tolerates missing approval
     if (path.endsWith("/merge_requests/9/changes")) return Response.json({ changes: [] });
     return Response.json({}, { status: 404 });
   });
-  const { browseGitlabMergeRequest } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabMergeRequest } = await import("../packages/server/modules/gitlab/index.ts");
   const detail = await browseGitlabMergeRequest(repository, 8);
   expect(detail.files).toHaveLength(300);
   expect(detail.filesTruncated).toBe(true);
@@ -506,7 +507,7 @@ test("GitLab merge request exposes its latest pipeline, reviewers and approval q
     if (path === `/api/v4/projects/${id}/merge_requests/11/diffs`) return Response.json([]);
     return Response.json({}, { status: 404 });
   });
-  const { browseGitlabMergeRequest } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabMergeRequest } = await import("../packages/server/modules/gitlab/index.ts");
   const detail = await browseGitlabMergeRequest(repository, 11);
   expect(detail.pipeline).toStrictEqual({
     id: 99,
@@ -557,7 +558,7 @@ test("GitLab merge request files stop at 300 and report truncation", async () =>
     }
     return Response.json({}, { status: 404 });
   });
-  const { browseGitlabMergeRequest } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabMergeRequest } = await import("../packages/server/modules/gitlab/index.ts");
   const detail = await browseGitlabMergeRequest(repository, 10);
   expect(pages).toStrictEqual([1, 2, 3]);
   expect(detail.files).toHaveLength(300);
@@ -574,7 +575,7 @@ test("GitLab tracker errors keep their status and reject bad numbers", async () 
     browseGitlabIssue,
     browseGitlabMergeRequests,
     browseGitlabMergeRequest,
-  } = await import("../server/modules/gitlab/index.ts");
+  } = await import("../packages/server/modules/gitlab/index.ts");
   await expect(browseGitlabIssues(repository)).rejects.toMatchObject({
     status: 401,
     message: /Авторизация GitLab истекла или недействительна/,

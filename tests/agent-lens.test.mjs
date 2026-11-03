@@ -1,11 +1,11 @@
 import { expect, test, vi } from "vite-plus/test";
 import { effectScope, nextTick, ref } from "vue";
 
-vi.mock("../src/modules/agent/api/lens.ts", () => ({ fetchLens: vi.fn() }));
+vi.mock("../packages/client/modules/agent/api/lens.ts", () => ({ fetchLens: vi.fn() }));
 
-const { fetchLens } = await import("../src/modules/agent/api/lens.ts");
+const { fetchLens } = await import("../packages/client/modules/agent/api/lens.ts");
 const { LENS_THINKING_TEXT, lensHistory, lensState, lensStep, useAgentLens } =
-  await import("../src/modules/agent/model/lens.ts");
+  await import("../packages/client/modules/agent/model/lens.ts");
 
 function conversation() {
   return [

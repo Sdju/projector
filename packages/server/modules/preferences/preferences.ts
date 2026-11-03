@@ -1,0 +1,165 @@
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { dataDir } from "@projector/core/modules/app-paths/index.ts";
+import { shortcuts, type InterfaceMode } from "@projector/core/modules/launcher/index.ts";
+interface Usage {
+  count: number;
+  last: number;
+}
+interface Preferences {
+  mode: InterfaceMode;
+  shortcut: string;
+  usage: Record<string, Usage>;
+  /** Ids (`app:…`, `project:…`) pinned to the top of the palette. */
+  favorites: string[];
+  /** Absolute folders whose projects rank first and in which new projects are created. */
+  directories: string[];
+  /** Terminal programs that have a graphical chat, mapped to how new sessions open. */
+  agentModes: Record<string, AgentSessionMode>;
+  /** Last model/effort/mode choice per agent backend, by control id; new chats start from it. */
+  agentDefaults: Record<string, Record<string, string>>;
+  /** Agent backends the user switched off: their runs are refused and the UI hides them. */
+  disabledAgents: string[];
+}
+
+export type AgentSessionMode = "tui" | "gui";
+
+/** What the settings ask the live agent registry: the composition fills it after registration. */
+export interface AgentPreferencesCatalog {
+  /** Terminal programs whose sessions can be shown as a chat; everything else is a terminal. */
+  programs(): readonly string[];
+  /** Chat backends the user can switch off; the built-in agent always stays on. */
+  toggleable(): readonly string[];
+}
+
+let catalog: AgentPreferencesCatalog = { programs: () => [], toggleable: () => [] };
+
+/** Points the settings at the registry; `server/app/agents.ts` calls it after registering. */
+export function configureAgentPreferences(value: AgentPreferencesCatalog): void {
+  catalog = value;
+}
+
+const preferencesPath = () => join(dataDir(), "launcher.json");
+let saving: Promise<unknown> = Promise.resolve();
+export async function preferences(): Promise<Preferences> {
+  try {
+    const data = JSON.parse(await readFile(preferencesPath(), "utf8"));
+    return {
+      mode: interfaceMode(data.mode),
+      shortcut: shortcuts.includes(data.shortcut) ? data.shortcut : "Ctrl+Alt+Space",
+      usage: data.usage ?? {},
+      favorites: Array.isArray(data.favorites)
+        ? data.favorites.filter((id: unknown): id is string => typeof id === "string")
+        : [],
+      directories: Array.isArray(data.directories)
+        ? data.directories.filter((path: unknown): path is string => typeof path === "string")
+        : [],
+      agentModes: agentModes(data.agentModes),
+      agentDefaults: agentDefaults(data.agentDefaults),
+      disabledAgents: disabledAgents(data.disabledAgents),
+    };
+  } catch {
+    return {
+      mode: "native",
+      shortcut: "Ctrl+Alt+Space",
+      usage: {},
+      favorites: [],
+      directories: [],
+      agentModes: {},
+      agentDefaults: {},
+      disabledAgents: [],
+    };
+  }
+}
+function disabledAgents(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (id): id is string => typeof id === "string" && catalog.toggleable().includes(id),
+  );
+}
+function agentDefaults(value: unknown): Record<string, Record<string, string>> {
+  const defaults: Record<string, Record<string, string>> = {};
+  if (!value || typeof value !== "object") return defaults;
+  for (const [backend, choice] of Object.entries(value as Record<string, unknown>)) {
+    if (!choice || typeof choice !== "object") continue;
+    const picked: Record<string, string> = {};
+    for (const [id, item] of Object.entries(choice as Record<string, unknown>))
+      if (typeof item === "string") picked[id] = item;
+    if (Object.keys(picked).length) defaults[backend] = picked;
+  }
+  return defaults;
+}
+function agentModes(value: unknown): Record<string, AgentSessionMode> {
+  const modes: Record<string, AgentSessionMode> = {};
+  if (value && typeof value === "object")
+    for (const program of catalog.programs())
+      if ((value as Record<string, unknown>)[program] === "gui") modes[program] = "gui";
+  return modes;
+}
+export function interfaceMode(value: unknown): InterfaceMode {
+  return value === "window" || value === "browser" ? value : "native";
+}
+export function updatePreferences(update: (value: Preferences) => void): Promise<void> {
+  const task = saving.then(async () => {
+    const value = await preferences();
+    update(value);
+    await mkdir(dataDir(), { recursive: true });
+    const file = preferencesPath();
+    await writeFile(`${file}.tmp`, JSON.stringify(value, null, 2) + "\n");
+    await rename(`${file}.tmp`, file);
+  });
+  saving = task.catch(() => undefined);
+  return task;
+}
+export function saveInterface(mode: InterfaceMode, shortcut?: string): Promise<void> {
+  return updatePreferences((value) => {
+    value.mode = mode;
+    if (shortcut !== undefined) value.shortcut = shortcut;
+  });
+}
+/** Adds or removes a favorite and returns the new state. */
+export async function toggleFavorite(id: string): Promise<boolean> {
+  let favorite = false;
+  await updatePreferences((value) => {
+    favorite = !value.favorites.includes(id);
+    value.favorites = favorite
+      ? [...value.favorites, id]
+      : value.favorites.filter((entry) => entry !== id);
+  });
+  return favorite;
+}
+/** Adds or removes a favorite folder; `on` forces the state, otherwise it toggles. Returns the new state. */
+export async function setFavoriteDirectory(path: string, on?: boolean): Promise<boolean> {
+  let favorite = false;
+  await updatePreferences((value) => {
+    favorite = on ?? !value.directories.includes(path);
+    const rest = value.directories.filter((entry) => entry !== path);
+    value.directories = favorite ? [...rest, path] : rest;
+  });
+  return favorite;
+}
+/** Sets how new sessions of `program` open; TUI is the default and is stored as absence. */
+export async function setAgentMode(program: string, mode: AgentSessionMode): Promise<void> {
+  if (!catalog.programs().includes(program))
+    throw new Error("У этого агента нет графического режима");
+  await updatePreferences((value) => {
+    if (mode === "gui") value.agentModes[program] = "gui";
+    else delete value.agentModes[program];
+  });
+}
+/** Switches an agent backend on or off; the built-in Projector agent cannot be disabled. */
+export async function setAgentEnabled(backend: string, enabled: boolean): Promise<void> {
+  if (!catalog.toggleable().includes(backend)) throw new Error("Этого агента нельзя отключить");
+  await updatePreferences((value) => {
+    const rest = value.disabledAgents.filter((id) => id !== backend);
+    value.disabledAgents = enabled ? rest : [...rest, backend];
+  });
+}
+/** Remembers one control choice of an agent backend as the default for new chats. */
+export async function setAgentDefault(backend: string, id: string, value: string): Promise<void> {
+  if (!backend || !id || backend.length > 40 || id.length > 100 || value.length > 300)
+    throw new Error("Некорректный выбор");
+  await updatePreferences((preferences) => {
+    preferences.agentDefaults[backend] = { ...preferences.agentDefaults[backend], [id]: value };
+  });
+}

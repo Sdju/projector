@@ -3,8 +3,8 @@ import { once } from "node:events";
 import { createServer, request } from "node:http";
 import { setTimeout as sleep } from "node:timers/promises";
 import { expect, onTestFinished, test } from "vite-plus/test";
-import { restartAfterExit, waitForProcessExit } from "../cli/app/restart.mjs";
-import { handleApi } from "../server/app/api.ts";
+import { restartAfterExit, waitForProcessExit } from "../packages/cli/app/restart.mjs";
+import { handleApi } from "../packages/server/app/api.ts";
 
 async function sleeper() {
   const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });

@@ -19,12 +19,18 @@
     "noFallthroughCasesInSwitch": true,
     "paths": {
       "node-gtk": ["./node_modules/.node-gtk-types/node-gtk.d.ts"],
-      "@app/*": ["./src/app/*"],
-      "@pages/*": ["./src/pages/*"],
-      "@modules/*": ["./src/modules/*"],
-      "@common/*": ["./src/common/*"],
-      "@core/*": ["./core/modules/*"]
+      "@app/*": ["./packages/client/app/*"],
+      "@pages/*": ["./packages/client/pages/*"],
+      "@modules/*": ["./packages/client/modules/*"],
+      "@common/*": ["./packages/client/common/*"]
     }
   },
-  "include": ["src", "server", "native", "node_modules/.node-gtk-types/node-gtk.d.ts", "core"]
+  "include": [
+    "packages/client",
+    "packages/server",
+    "packages/native",
+    "packages/core",
+    "packages/cli",
+    "node_modules/.node-gtk-types/node-gtk.d.ts"
+  ]
 }

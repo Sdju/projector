@@ -13,15 +13,17 @@ import {
   ideMcpTokenFile,
   ideMcpTokenMatches,
   requestIdeCommand,
-} from "../server/modules/ide/index.ts";
+} from "../packages/server/modules/ide/index.ts";
 import {
   ideMcpServer,
   claudeIdeMcpServer,
   acpIdeMcpServer,
-} from "../server/modules/agents/ide-mcp/index.ts";
-import { sessionMcpServers } from "../server/modules/agents/acp/acp-backend.ts";
+} from "../packages/server/modules/agents/ide-mcp/index.ts";
+import { sessionMcpServers } from "../packages/server/modules/agents/acp/acp-backend.ts";
 
-const entry = fileURLToPath(new URL("../server/modules/agents/ide-mcp/server.ts", import.meta.url));
+const entry = fileURLToPath(
+  new URL("../packages/server/modules/agents/ide-mcp/server.ts", import.meta.url),
+);
 let previous;
 let directory;
 beforeEach(async () => {

@@ -7,10 +7,10 @@ import {
   subscribeWorkspace,
   watchWorkspace,
   workspaceWatchable,
-} from "../src/modules/workspace-api/index.ts";
-import { useDirectoryWatch } from "../src/modules/workspace/modules/tree/lib/directory-watch.ts";
-import { useFileSync } from "../src/modules/workspace/lib/file-sync.ts";
-import { registerBuiltinClientAgents } from "../src/app/agents.ts";
+} from "../packages/client/modules/workspace-api/index.ts";
+import { useDirectoryWatch } from "../packages/client/modules/workspace/modules/tree/lib/directory-watch.ts";
+import { useFileSync } from "../packages/client/modules/workspace/lib/file-sync.ts";
+import { registerBuiltinClientAgents } from "../packages/client/app/agents.ts";
 
 registerBuiltinClientAgents();
 

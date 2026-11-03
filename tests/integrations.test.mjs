@@ -98,7 +98,7 @@ test("GitHub integration persists authorization and imports authenticated reposi
     return { on() {} };
   };
   syncBuiltinESMExports();
-  const { handleApi } = await import("../server/app/api.ts");
+  const { handleApi } = await import("../packages/server/app/api.ts");
   const server = createServer((req, res) => {
     void handleApi(req, res);
   });
@@ -150,7 +150,8 @@ test("GitHub integration persists authorization and imports authenticated reposi
   );
   await expectPrivate(file);
   expect((await request("")).headers.get("cache-control")).toBe("no-store");
-  const reloaded = await import("../server/modules/integration-store/index.ts?reload-check");
+  const reloaded =
+    await import("../packages/server/modules/integration-store/index.ts?reload-check");
   expect((await reloaded.integrationConfig("github")).credentials.login).toBe("octocat");
   expect((await request("/github/repositories?page=0")).status).toBe(400);
   const firstPage = (await request("/github/repositories")).data;
@@ -262,9 +263,9 @@ test("GitHub integration persists authorization and imports authenticated reposi
   });
   expect(failedClone.status).toBe(400);
   await expect(access(join(selectedDirectory, "failure"))).rejects.toThrow();
-  const { os } = await import("../core/modules/os/index.ts");
+  const { os } = await import("../packages/core/modules/os/index.ts");
   const { parseDockerEnvironment, environmentLaunch, environmentForPath, runEnvironmentCommand } =
-    await import("../server/modules/environments/index.ts");
+    await import("../packages/server/modules/environments/index.ts");
   const dockerCalls = [];
   const docker = vi.spyOn(os.tools, "runDocker").mockImplementation(async (args) => {
     dockerCalls.push(args);
@@ -335,14 +336,15 @@ test("GitHub integration persists authorization and imports authenticated reposi
     { kind: "docker", network: "bridge", ports: [0] },
   ])
     expect(() => parseDockerEnvironment(config)).toThrow(expect.objectContaining({ status: 400 }));
-  const { normalizeProject } = await import("../server/modules/project-presentation/index.ts");
+  const { normalizeProject } =
+    await import("../packages/server/modules/project-presentation/index.ts");
   const normalized = normalizeProject(
     { ...isolated, path: "/tmp/changed", environment: null },
     isolated,
   );
   expect(normalized.path).toBe(isolated.path);
   expect(normalized.environment).toStrictEqual(isolated.environment);
-  const { createTerminalSession } = await import("../server/modules/terminal/index.ts");
+  const { createTerminalSession } = await import("../packages/server/modules/terminal/index.ts");
   expect(() =>
     createTerminalSession(isolated, { program: "shell" }, undefined, undefined, {
       file: "/bin/bash",

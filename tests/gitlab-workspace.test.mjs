@@ -3,7 +3,7 @@ import {
   createGitlabConnectionProfile,
   createGitlabEnabledLocalProfile,
   createGitlabWorkspaceProfile,
-} from "../src/modules/gitlab-workspace/source.ts";
+} from "../packages/client/modules/gitlab-workspace/source.ts";
 import {
   GitlabRequestError,
   readIssues,
@@ -11,7 +11,7 @@ import {
   readMergeRequest,
   readPipeline,
   readPipelines,
-} from "../src/modules/gitlab-workspace/client.ts";
+} from "../packages/client/modules/gitlab-workspace/client.ts";
 import {
   moveWorkspaceEntry,
   mutateWorkspaceEntry,
@@ -23,7 +23,7 @@ import {
   workspaceCapabilities,
   workspaceProfile,
   workspaceRequest,
-} from "../src/modules/workspace-api/index.ts";
+} from "../packages/client/modules/workspace-api/index.ts";
 
 const REPOSITORY = "gitlab.com/group/sub/project";
 const COMMIT = "a".repeat(40);
@@ -382,7 +382,7 @@ test("a local project with a GitLab origin keeps local providers and adds tracke
 });
 
 test("the GitLab resolver claims gl:/ projects instead of falling back to local files", async () => {
-  await import("../src/modules/gitlab-workspace/resolve.ts");
+  await import("../packages/client/modules/gitlab-workspace/resolve.ts");
   expect(() => workspaceProfile("gl:/gitlab.com/group/missing")).toThrow(/GitLab/);
 });
 

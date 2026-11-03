@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { layoutGraph } from "../core/modules/workspace/index.ts";
+import { layoutGraph } from "../packages/core/modules/workspace/index.ts";
 
 const commit = (hash, ...parents) => ({ hash, parents });
 

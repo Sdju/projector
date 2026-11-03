@@ -5,7 +5,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const RUNNER = fileURLToPath(new URL("../server/modules/agent/hosted-runner.ts", import.meta.url));
+const RUNNER = fileURLToPath(
+  new URL("../packages/server/modules/agent/hosted-runner.ts", import.meta.url),
+);
 
 // The host stops a run by signalling the whole group and then the runner once more: the answer
 // must see `abort` and end what it started, not be killed by the second signal.

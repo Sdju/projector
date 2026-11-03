@@ -53,11 +53,11 @@ test.skipIf(process.platform === "win32")("an agent run survives its server and 
   const previous = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = directory;
   try {
-    const { createRun } = await import("../server/modules/agent/agent-runs.ts");
-    const { startHosted, attachHosted } = await import("../server/modules/agent/hosted-process.ts");
+    const { createRun } = await import("../packages/server/modules/agent/agent-runs.ts");
+    const { startHosted, attachHosted } = await import("../packages/server/modules/agent/hosted-process.ts");
     const { createAcpConnection, NO_TIMEOUT } =
-      await import("../server/modules/agents/acp/acp-client.ts");
-    const { os } = await import("../core/modules/os/index.ts");
+      await import("../packages/server/modules/agents/acp/acp-client.ts");
+    const { os } = await import("../packages/core/modules/os/index.ts");
 
     const script = join(directory, "fake-agent.cjs");
     const received = join(directory, "received.log");
@@ -168,10 +168,10 @@ test.skipIf(process.platform === "win32")("stopping a hosted run kills the agent
   const previous = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = directory;
   try {
-    const { createRun } = await import("../server/modules/agent/agent-runs.ts");
-    const { startHosted } = await import("../server/modules/agent/hosted-process.ts");
-    const { createAcpConnection } = await import("../server/modules/agents/acp/acp-client.ts");
-    const { os } = await import("../core/modules/os/index.ts");
+    const { createRun } = await import("../packages/server/modules/agent/agent-runs.ts");
+    const { startHosted } = await import("../packages/server/modules/agent/hosted-process.ts");
+    const { createAcpConnection } = await import("../packages/server/modules/agents/acp/acp-client.ts");
+    const { os } = await import("../packages/core/modules/os/index.ts");
     const runId = await createRun({ backend: "codex", message: "hi", history: [] });
     const child = await startHosted(runId, {
       command: process.execPath,
@@ -205,9 +205,9 @@ test.skipIf(process.platform === "win32")("a run started by an earlier server is
   process.env.XDG_DATA_HOME = directory;
   try {
     const { createRun, stopRun, cancelRun, readRun } =
-      await import("../server/modules/agent/agent-runs.ts");
-    const { startHosted } = await import("../server/modules/agent/hosted-process.ts");
-    const { os } = await import("../core/modules/os/index.ts");
+      await import("../packages/server/modules/agent/agent-runs.ts");
+    const { startHosted } = await import("../packages/server/modules/agent/hosted-process.ts");
+    const { os } = await import("../packages/core/modules/os/index.ts");
     const runId = await createRun({ backend: "codex", message: "hi", history: [] });
     const child = await startHosted(runId, {
       command: process.execPath,
@@ -240,7 +240,8 @@ test("finished runs nobody rejoined are collected after their retention", async 
   const previous = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = directory;
   try {
-    const { createRun, pruneRuns, readRun } = await import("../server/modules/agent/agent-runs.ts");
+    const { createRun, pruneRuns, readRun } =
+      await import("../packages/server/modules/agent/agent-runs.ts");
     const { utimes } = await import("node:fs/promises");
     const record = { backend: "codex", message: "hi", history: [] };
     const fresh = await createRun(record);

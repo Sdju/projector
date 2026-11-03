@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
-import { registerBuiltinAgentFeatures } from "../server/app/features.ts";
-import { registerBuiltinWidgetDefinitions } from "../server/app/widgets.ts";
+import { registerBuiltinAgentFeatures } from "../packages/server/app/features.ts";
+import { registerBuiltinWidgetDefinitions } from "../packages/server/app/widgets.ts";
 import {
   enabledFeatureText,
   enabledFeatures,
@@ -16,11 +16,11 @@ import {
   featuresFile,
   setFeatureAgent,
   splitFeaturePrompt,
-} from "../server/modules/agent-features/index.ts";
-import { readChatFeatures, writeAgentHistory } from "../server/modules/agent/index.ts";
-import { promptWithHistory } from "../server/modules/agent/agent-host.ts";
-import { claudeSystemPrompt } from "../server/modules/agents/claude-code/claude-code-backend.ts";
-import { buildSystemPrompt } from "../server/modules/agents/projector/prompts.ts";
+} from "../packages/server/modules/agent-features/index.ts";
+import { readChatFeatures, writeAgentHistory } from "../packages/server/modules/agent/index.ts";
+import { promptWithHistory } from "../packages/server/modules/agent/agent-host.ts";
+import { claudeSystemPrompt } from "../packages/server/modules/agents/claude-code/claude-code-backend.ts";
+import { buildSystemPrompt } from "../packages/server/modules/agents/projector/prompts.ts";
 
 registerBuiltinWidgetDefinitions();
 registerBuiltinAgentFeatures();
@@ -157,7 +157,7 @@ describe("agent features", () => {
   });
 
   it("passes the chat's feature choice to the agent request", async () => {
-    const { requestFrom } = await import("../server/modules/agent/index.ts");
+    const { requestFrom } = await import("../packages/server/modules/agent/index.ts");
     expect(
       (await requestFrom({ message: "привет", features: ["widgets"] })).request.features,
     ).toEqual(["widgets"]);
@@ -178,8 +178,8 @@ describe("agent features", () => {
     await setFeatureAgent("widgets", "claude-code", true);
     const url = (path) => pathToFileURL(fileURLToPath(new URL(path, import.meta.url))).href;
     const script = `
-      const { featurePrompt } = await import(${JSON.stringify(url("../server/modules/agent-features/index.ts"))});
-      await import(${JSON.stringify(url("../server/app/claude-runner.ts"))});
+      const { featurePrompt } = await import(${JSON.stringify(url("../packages/server/modules/agent-features/index.ts"))});
+      await import(${JSON.stringify(url("../packages/server/app/claude-runner.ts"))});
       process.stdout.write(await featurePrompt("claude-code"));
     `;
     const child = spawn(process.execPath, ["--input-type=module", "-e", script], {

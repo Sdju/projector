@@ -2,8 +2,11 @@ import { expect, onTestFinished, test } from "vite-plus/test";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { defaultFilesExclude, treePageRange } from "../core/modules/workspace/index.ts";
-import { listProjectDirectory, withFilesExclude } from "../server/modules/workspace/index.ts";
+import { defaultFilesExclude, treePageRange } from "../packages/core/modules/workspace/index.ts";
+import {
+  listProjectDirectory,
+  withFilesExclude,
+} from "../packages/server/modules/workspace/index.ts";
 
 const entries = Array.from({ length: 1105 }, (_, i) => ({
   name: `file-${String(i).padStart(4, "0")}`,

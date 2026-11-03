@@ -8,7 +8,7 @@ import {
   clearImportNames,
   importProjectEntries,
   uploadProjectEntry,
-} from "../server/modules/workspace/index.ts";
+} from "../packages/server/modules/workspace/index.ts";
 
 async function scratch() {
   const base = await mkdtemp(join(tmpdir(), "projector-import-"));

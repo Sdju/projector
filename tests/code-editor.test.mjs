@@ -16,12 +16,12 @@ const page = (
   body,
 ) => `<!doctype html><div id="editor" style="height:400px"></div><pre id="result">WAITING</pre>
   <script type="module">
-    import '/src/app/styles.css';
+    import '/packages/client/app/styles.css';
     import {createApp, defineAsyncComponent, h, nextTick, ref} from 'vue';
     import {EditorView} from '@codemirror/view';
-    import {provideEditorStatus} from '/src/modules/workspace/modules/viewers/lib/editor-status.ts';
-    import EditorStatusLine from '/src/modules/workspace/modules/viewers/ui/EditorStatusLine.vue';
-    const CodeViewer = defineAsyncComponent(() => import('/src/modules/workspace/modules/viewers/ui/CodeViewer.vue'));
+    import {provideEditorStatus} from '/packages/client/modules/workspace/modules/viewers/lib/editor-status.ts';
+    import EditorStatusLine from '/packages/client/modules/workspace/modules/viewers/ui/EditorStatusLine.vue';
+    const CodeViewer = defineAsyncComponent(() => import('/packages/client/modules/workspace/modules/viewers/ui/CodeViewer.vue'));
     ${helpers}
     const view = () => EditorView.findFromDOM(document.querySelector('.cm-editor'));
     const text = () => view().state.doc.toString();

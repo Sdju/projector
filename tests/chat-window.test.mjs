@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import { nextTick, ref } from "vue";
-import { useChatWindow } from "../src/modules/agent/model/chat-window.ts";
+import { useChatWindow } from "../packages/client/modules/agent/model/chat-window.ts";
 
 const chat = (requests) =>
   Array.from({ length: requests * 2 }, (_, i) => ({

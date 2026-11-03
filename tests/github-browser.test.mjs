@@ -2,9 +2,9 @@ import { expect, test, vi } from "vite-plus/test";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { githubProjectRoute } from "../core/modules/github/index.ts";
-import { projectRoute } from "../src/modules/project/project-route.ts";
-import { parseProjectRef, projectRefSegments } from "../core/modules/project/index.ts";
+import { githubProjectRoute } from "../packages/core/modules/github/index.ts";
+import { projectRoute } from "../packages/client/modules/project/project-route.ts";
+import { parseProjectRef, projectRefSegments } from "../packages/core/modules/project/index.ts";
 
 const projectPathSegments = (path) => projectRefSegments(parseProjectRef(path));
 
@@ -33,8 +33,9 @@ test("GitHub paths use gh:/ in the segmented path and a dedicated browser route"
 test("readonly GitHub browser reads snapshots, trees and blobs without cloning or persisting projects", async () => {
   const root = await mkdtemp(join(tmpdir(), "projector-gh-browser-"));
   process.env.XDG_DATA_HOME = root;
-  const api = await import("../server/modules/github/index.ts");
-  const { updateIntegration } = await import("../server/modules/integration-store/index.ts");
+  const api = await import("../packages/server/modules/github/index.ts");
+  const { updateIntegration } =
+    await import("../packages/server/modules/integration-store/index.ts");
   const sha = "a".repeat(40);
   const tree = "b".repeat(40);
   let mode = "normal";
@@ -181,7 +182,7 @@ test("GitHub history paginates filtered commits and reads exact before/after blo
   const root = await mkdtemp(join(tmpdir(), "projector-gh-history-"));
   process.env.XDG_DATA_HOME = root;
   const { browseGithubLog, browseGithubCommit, browseGithubComparison } =
-    await import("../server/modules/github/index.ts");
+    await import("../packages/server/modules/github/index.ts");
   const head = "a".repeat(40),
     parent = "b".repeat(40);
   const remote = (index) => ({
@@ -343,8 +344,9 @@ test("GitHub history paginates filtered commits and reads exact before/after blo
 test("GitHub path suggestions paginate owners, filter prefixes and respect authentication", async () => {
   const root = await mkdtemp(join(tmpdir(), "projector-gh-navigation-"));
   process.env.XDG_DATA_HOME = root;
-  const { browseGithubDirectories } = await import("../server/modules/github/index.ts");
-  const { updateIntegration } = await import("../server/modules/integration-store/index.ts");
+  const { browseGithubDirectories } = await import("../packages/server/modules/github/index.ts");
+  const { updateIntegration } =
+    await import("../packages/server/modules/integration-store/index.ts");
   const requests = [];
   let token = "";
   let total = 102;
@@ -409,7 +411,7 @@ test("GitHub issues list filters pull requests, paginates and reads discussion c
   const root = await mkdtemp(join(tmpdir(), "projector-gh-issues-"));
   process.env.XDG_DATA_HOME = root;
   const { browseGithubIssues, browseGithubIssue } =
-    await import("../server/modules/github/index.ts");
+    await import("../packages/server/modules/github/index.ts");
   const requests = [];
   let mode = "normal";
   const remoteIssue = (number, extra = {}) => ({
@@ -499,7 +501,8 @@ test("GitHub issues list filters pull requests, paginates and reads discussion c
 test("GitHub pull requests list derives state and detail gathers reviews, comments and files", async () => {
   const root = await mkdtemp(join(tmpdir(), "projector-gh-pulls-"));
   process.env.XDG_DATA_HOME = root;
-  const { browseGithubPulls, browseGithubPull } = await import("../server/modules/github/index.ts");
+  const { browseGithubPulls, browseGithubPull } =
+    await import("../packages/server/modules/github/index.ts");
   const requests = [];
   const remotePull = (number, extra = {}) => ({
     number,
@@ -595,8 +598,9 @@ test("GitHub discussions need a token, page by cursor and nest replies under com
   const root = await mkdtemp(join(tmpdir(), "projector-gh-discussions-"));
   process.env.XDG_DATA_HOME = root;
   const { browseGithubDiscussions, browseGithubDiscussion } =
-    await import("../server/modules/github/index.ts");
-  const { updateIntegration } = await import("../server/modules/integration-store/index.ts");
+    await import("../packages/server/modules/github/index.ts");
+  const { updateIntegration } =
+    await import("../packages/server/modules/integration-store/index.ts");
   const requests = [];
   const remote = (number, extra = {}) => ({
     number,
@@ -713,7 +717,7 @@ test("GitHub discussions need a token, page by cursor and nest replies under com
 test("GitHub comparison reads changed paths and both file sides", async () => {
   const root = await mkdtemp(join(tmpdir(), "projector-gh-compare-"));
   process.env.XDG_DATA_HOME = root;
-  const api = await import("../server/modules/github/index.ts");
+  const api = await import("../packages/server/modules/github/index.ts");
   const from = "a".repeat(40);
   const to = "b".repeat(40);
   const tree = "c".repeat(40);

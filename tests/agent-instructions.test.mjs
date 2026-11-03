@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vite-plus/test";
-import { projectInstructions } from "../server/modules/agents/projector/project-instructions.ts";
+import { projectInstructions } from "../packages/server/modules/agents/projector/project-instructions.ts";
 
 const dirs = [];
 const project = async (files) => {

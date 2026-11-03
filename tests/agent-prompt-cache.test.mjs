@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
-import { contextOf, tokensOf } from "../server/modules/agents/projector/projector-usage.ts";
+import {
+  contextOf,
+  tokensOf,
+} from "../packages/server/modules/agents/projector/projector-usage.ts";
 
 describe("prompt cache", () => {
   it("splits the prompt into cached and fresh tokens", () => {
@@ -40,7 +43,7 @@ describe("prompt cache", () => {
 
 describe("usage conversion", () => {
   it("reads the cache hits of DeepSeek and of the OpenAI shape", async () => {
-    const { convertUsage } = await import("../server/modules/providers/openai-client.ts");
+    const { convertUsage } = await import("../packages/server/modules/providers/openai-client.ts");
     expect(
       convertUsage({ prompt_tokens: 100, completion_tokens: 5, prompt_cache_hit_tokens: 80 })
         .inputTokens,

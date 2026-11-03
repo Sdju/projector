@@ -4,7 +4,7 @@
 
 ## Агент
 
-- [ ] Бюджет токенов размышления: `thinking_budget` для Qwen, `reasoning.max_tokens` для OpenRouter (`server/modules/providers/thinking.ts`).
+- [ ] Бюджет токенов размышления: `thinking_budget` для Qwen, `reasoning.max_tokens` для OpenRouter (`packages/server/modules/providers/thinking.ts`).
 - [ ] Явный `cache_control` для Anthropic/Gemini через OpenRouter: SDK кладёт его на уровень сообщения, OpenRouter ждёт в части содержимого; нужна проверка на живом API.
 - [ ] `task` — субагент для read-only исследования в отдельном контексте; результат — сводка.
 - [ ] Расход: цена ответа и всего чата уже считается; открыты цены по умолчанию для известных моделей, учёт сжатия истории и проверки команд, расход за период.

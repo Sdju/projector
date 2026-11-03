@@ -6,7 +6,7 @@ import {
   groupOfPanel,
   movePanel,
   reconcileDock,
-} from "../src/modules/dock/index.ts";
+} from "../packages/client/modules/dock/index.ts";
 
 const open = (ids) => ids.reduce((layout, id) => addPanel(layout, id, {}), createDockLayout());
 const close = (layout, id) =>

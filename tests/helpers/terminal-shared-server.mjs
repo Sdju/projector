@@ -18,10 +18,10 @@ const projects = Array.from({ length: 8 }, (_, index) => ({
 }));
 await writeFile(join(root, "projector/projects.json"), JSON.stringify({ projects }));
 const { attachTerminalServer, closeProjectTerminals } =
-  await import("../../server/modules/terminal/index.ts");
+  await import("../../packages/server/modules/terminal/index.ts");
 const { attachTerminalControlServer, attachSharedTerminalServer } =
-  await import("../../server/modules/terminal-control/index.ts");
-const { handleApi } = await import("../../server/app/api.ts");
+  await import("../../packages/server/modules/terminal-control/index.ts");
+const { handleApi } = await import("../../packages/server/app/api.ts");
 const live = new Map();
 function attach(httpServer) {
   attachTerminalServer(httpServer);
@@ -61,7 +61,7 @@ const port = Number(process.env.PROBE_PORT) || 4188;
 let close;
 if (process.env.PROBE_PRODUCTION === "1") {
   const { createServer } = await import("node:http");
-  const { serveStatic } = await import("../../server/app/static.ts");
+  const { serveStatic } = await import("../../packages/server/app/static.ts");
   const { fileURLToPath } = await import("node:url");
   const dist = fileURLToPath(new URL("../../dist", import.meta.url));
   const server = createServer((req, res) =>

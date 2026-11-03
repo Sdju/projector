@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test } from "vite-plus/test";
 import { effectScope, nextTick, ref } from "vue";
-import { registerWorkspaceProfile } from "../src/modules/workspace-api/index.ts";
-import { useTrackerDetail } from "../src/modules/workspace/modules/viewers/lib/tracker-detail.ts";
+import { registerWorkspaceProfile } from "../packages/client/modules/workspace-api/index.ts";
+import { useTrackerDetail } from "../packages/client/modules/workspace/modules/viewers/lib/tracker-detail.ts";
 
 for (const action of ["issue", "pull", "discussion"]) {
   test(`${action} detail ignores stale replies and errors, resets and disposes`, async () => {

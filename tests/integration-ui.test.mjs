@@ -5,12 +5,12 @@ import { chromium, createChromium } from "./fixtures/chromium-driver.mjs";
 const html = `<!doctype html><div id="settings"></div><div id="connection"></div><pre id="result">WAITING</pre>
 <script type="module">
 import {createApp,ref,nextTick} from 'vue';
-import GithubSettings from '/src/modules/github/GithubSettings.vue';
-import GitlabSettings from '/src/modules/gitlab/GitlabSettings.vue';
-import {agentCommandHandler} from '/src/modules/agent/model/commands.ts';
-import GithubConnection from '/src/modules/github/GithubConnection.vue';
-import {createCommandService} from '/core/modules/ide/index.ts';
-import {commandHostKey} from '/src/common/utilities/commands.ts';
+import GithubSettings from '/packages/client/modules/github/GithubSettings.vue';
+import GitlabSettings from '/packages/client/modules/gitlab/GitlabSettings.vue';
+import {agentCommandHandler} from '/packages/client/modules/agent/model/commands.ts';
+import GithubConnection from '/packages/client/modules/github/GithubConnection.vue';
+import {createCommandService} from '/packages/core/modules/ide/index.ts';
+import {commandHostKey} from '/packages/client/common/utilities/commands.ts';
 const check=(value,label)=>{if(!value)throw new Error(label);};
 const originalFetch=window.fetch;
 const wait=async(condition,label)=>{const until=Date.now()+8000;while(!condition()){if(Date.now()>until)throw new Error(label);await originalFetch('/__tick');}};

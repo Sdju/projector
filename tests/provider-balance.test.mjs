@@ -2,11 +2,11 @@ import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { providerBalance } from "../server/modules/providers/balance.ts";
-import { deepseekEntries } from "../server/modules/providers/balance.ts";
-import { inferProviderKind } from "../server/modules/providers/kinds.ts";
-import { handleProvidersBalance } from "../server/routes/api/providers/balance.ts";
-import { formatBalance } from "../src/modules/provider/model/format-balance.ts";
+import { providerBalance } from "../packages/server/modules/providers/balance.ts";
+import { deepseekEntries } from "../packages/server/modules/providers/balance.ts";
+import { inferProviderKind } from "../packages/server/modules/providers/kinds.ts";
+import { handleProvidersBalance } from "../packages/server/routes/api/providers/balance.ts";
+import { formatBalance } from "../packages/client/modules/provider/model/format-balance.ts";
 
 const payload = {
   is_available: true,

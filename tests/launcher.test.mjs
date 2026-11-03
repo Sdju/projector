@@ -85,9 +85,9 @@ if (process.argv.includes("--prepare")) {
 } else {
   process.env.XDG_DATA_HOME = data;
   const { searchLauncher, matchScore, launchDetail } =
-    await import("../server/modules/launcher/index.ts");
-  const { handleApi } = await import("../server/app/api.ts");
-  const { getSnapshot } = await import("../server/modules/processes/index.ts");
+    await import("../packages/server/modules/launcher/index.ts");
+  const { handleApi } = await import("../packages/server/app/api.ts");
+  const { getSnapshot } = await import("../packages/server/modules/processes/index.ts");
   const server = createServer((req, res) => {
     void handleApi(req, res);
   });
@@ -312,7 +312,8 @@ if (process.argv.includes("--prepare")) {
       expect(failed.failure.command).toBe("boom");
       expect(failed.failure.output).toMatch(/boom-output/);
       expect((await searchLauncher("Failing workspace")).items[0].status.state).toBe("error");
-      const reloaded = await import("../server/modules/processes/processes.ts?reload-check");
+      const reloaded =
+        await import("../packages/server/modules/processes/processes.ts?reload-check");
       expect(reloaded.getSnapshot("probe-project").commandId).toBe("dev");
       expect(reloaded.getSnapshot("probe-project").exitCode).toBe(0);
     },

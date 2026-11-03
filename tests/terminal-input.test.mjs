@@ -8,9 +8,9 @@ import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import ts from "typescript";
-import { terminalTextForPaths } from "../src/modules/terminal/lib/drop.ts";
-import { terminalLinks } from "../src/modules/terminal/lib/links.ts";
-import { resolveTerminalPath } from "../server/modules/terminal/link-files.ts";
+import { terminalTextForPaths } from "../packages/client/modules/terminal/lib/drop.ts";
+import { terminalLinks } from "../packages/client/modules/terminal/lib/links.ts";
+import { resolveTerminalPath } from "../packages/server/modules/terminal/link-files.ts";
 import { mkdir, writeFile, symlink } from "node:fs/promises";
 
 test("terminal links parse paths, diagnostic locations, quoted names and URLs", () => {
@@ -107,7 +107,10 @@ test(
   async () => {
     const profile = await mkdtemp(join(tmpdir(), "projector-input-browser-"));
     const keyboard = ts.transpileModule(
-      await readFile(new URL("../src/modules/terminal/lib/keyboard.ts", import.meta.url), "utf8"),
+      await readFile(
+        new URL("../packages/client/modules/terminal/lib/keyboard.ts", import.meta.url),
+        "utf8",
+      ),
       { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
     ).outputText;
     const xterm = await readFile(
@@ -118,20 +121,32 @@ test(
       "utf8",
     );
     const forwarding = ts.transpileModule(
-      await readFile(new URL("../src/modules/terminal/lib/input.ts", import.meta.url), "utf8"),
+      await readFile(
+        new URL("../packages/client/modules/terminal/lib/input.ts", import.meta.url),
+        "utf8",
+      ),
       { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
     ).outputText;
     const links = ts.transpileModule(
-      await readFile(new URL("../src/modules/terminal/lib/links.ts", import.meta.url), "utf8"),
+      await readFile(
+        new URL("../packages/client/modules/terminal/lib/links.ts", import.meta.url),
+        "utf8",
+      ),
       { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
     ).outputText;
     const dropPaths = ts.transpileModule(
-      await readFile(new URL("../src/modules/path-drop/drop-paths.ts", import.meta.url), "utf8"),
+      await readFile(
+        new URL("../packages/client/modules/path-drop/drop-paths.ts", import.meta.url),
+        "utf8",
+      ),
       { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
     ).outputText;
     const drop = ts
       .transpileModule(
-        await readFile(new URL("../src/modules/terminal/lib/drop.ts", import.meta.url), "utf8"),
+        await readFile(
+          new URL("../packages/client/modules/terminal/lib/drop.ts", import.meta.url),
+          "utf8",
+        ),
         { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } },
       )
       .outputText.replace("../../path-drop/index.ts", "/drop-paths.js");

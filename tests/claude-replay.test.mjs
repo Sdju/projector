@@ -8,7 +8,7 @@ vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
 // The setup already loaded the real SDK through the registered agents.
 vi.resetModules();
 const { claudeLoadSession } =
-  await import("../server/modules/agents/claude-code/claude-code-sessions.ts");
+  await import("../packages/server/modules/agents/claude-code/claude-code-sessions.ts");
 
 const user = (content) => ({ type: "user", message: { content }, parent_tool_use_id: null });
 const assistant = (content) => ({

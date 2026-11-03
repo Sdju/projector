@@ -5,17 +5,17 @@ import {
   normalizeJudgeOverride,
   normalizeJudgeSettings,
   resolveJudgeSettings,
-} from "../core/modules/agent-judge/index.ts";
+} from "../packages/core/modules/agent-judge/index.ts";
 import {
   createJudgedApproval,
   judgeFallback,
   parseJudgeVerdict,
-} from "../server/modules/judge/index.ts";
+} from "../packages/server/modules/judge/index.ts";
 import {
   canRememberPermission,
   permissionRiskClass,
   permissionTone,
-} from "../src/modules/agent/lib/permission-risk.ts";
+} from "../packages/client/modules/agent/lib/permission-risk.ts";
 
 const verdict = (score, confidence = "high") => ({
   score,

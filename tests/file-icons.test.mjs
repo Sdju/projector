@@ -1,6 +1,6 @@
 import { readFile, access } from "node:fs/promises";
 import { expect, test } from "vite-plus/test";
-import { createFileIconResolver } from "../core/modules/file-icons/index.ts";
+import { createFileIconResolver } from "../packages/core/modules/file-icons/index.ts";
 
 const theme = JSON.parse(
   await readFile(new URL("../public/file-icons/theme.json", import.meta.url)),

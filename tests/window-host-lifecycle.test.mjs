@@ -7,7 +7,7 @@ import {
   setWindowHostSpawn,
   stopWindowHost,
   windowCall,
-} from "../core/modules/os/modules/windows/hwnd.ts";
+} from "../packages/core/modules/os/modules/windows/hwnd.ts";
 
 test("the window helper releases its exit hook after normal exit and failed spawn", async () => {
   const count = process.listenerCount("exit");

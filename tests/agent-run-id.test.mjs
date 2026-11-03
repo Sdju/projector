@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from "vite-plus/test";
-import { streamAgent } from "../src/modules/agent/api/client.ts";
-import { streamViaEvents } from "../src/modules/agent/api/event-stream.ts";
+import { streamAgent } from "../packages/client/modules/agent/api/client.ts";
+import { streamViaEvents } from "../packages/client/modules/agent/api/event-stream.ts";
 
 afterEach(() => vi.unstubAllGlobals());
 

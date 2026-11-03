@@ -1,11 +1,11 @@
 import { expect, onTestFinished, test, vi } from "vite-plus/test";
-import { createState } from "../src/modules/agent/model/chat-state.ts";
-import { useExternalAgent } from "../src/modules/agent/model/external.ts";
-import { useChatActions } from "../src/modules/agent/model/chat-actions.ts";
-import { registerAgentCommands } from "../src/modules/agent/model/agent-commands.ts";
-import { registerChat } from "../src/modules/agent/model/chat-registry.ts";
-import { agentCapabilities, agentControls } from "../server/modules/agent/registry.ts";
-import { claudeCodeBackend } from "../server/modules/agents/claude-code/claude-code-backend.ts";
+import { createState } from "../packages/client/modules/agent/model/chat-state.ts";
+import { useExternalAgent } from "../packages/client/modules/agent/model/external.ts";
+import { useChatActions } from "../packages/client/modules/agent/model/chat-actions.ts";
+import { registerAgentCommands } from "../packages/client/modules/agent/model/agent-commands.ts";
+import { registerChat } from "../packages/client/modules/agent/model/chat-registry.ts";
+import { agentCapabilities, agentControls } from "../packages/server/modules/agent/registry.ts";
+import { claudeCodeBackend } from "../packages/server/modules/agents/claude-code/claude-code-backend.ts";
 
 test("permission policy is the same control for the UI and IDE commands and is saved", async () => {
   const offered = await agentControls("claude-code", "/tmp");

@@ -4,9 +4,9 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, request } from "node:http";
 import { once } from "node:events";
-import { handleApi } from "../server/app/api.ts";
-import { setGatewayEnabled } from "../server/modules/openai-gateway/index.ts";
-import { providersPath } from "../core/modules/app-paths/index.ts";
+import { handleApi } from "../packages/server/app/api.ts";
+import { setGatewayEnabled } from "../packages/server/modules/openai-gateway/index.ts";
+import { providersPath } from "../packages/core/modules/app-paths/index.ts";
 
 async function listen(server) {
   server.listen(0, "127.0.0.1");
@@ -49,7 +49,7 @@ async function setup(network = "local", { respond, providerApiKey = "" } = {}) {
     res.end("data: [DONE]\n\n");
   });
   const upstreamPort = await listen(upstream);
-  const { dataDir } = await import("../core/modules/app-paths/index.ts");
+  const { dataDir } = await import("../packages/core/modules/app-paths/index.ts");
   await import("node:fs/promises").then((fs) => fs.mkdir(dataDir(), { recursive: true }));
   await writeFile(
     providersPath(),
@@ -170,7 +170,8 @@ test("a whitelisted origin gets its own origin echoed, others stay refused", asy
 
 test("an access key is required once set and is never a session for the rest of the API", async () => {
   const { base } = await setup("lan");
-  const { authorizeHttp, setLanPassword } = await import("../server/modules/access/index.ts");
+  const { authorizeHttp, setLanPassword } =
+    await import("../packages/server/modules/access/index.ts");
   setLanPassword("lan-password");
   const set = await fetch(`${base}/api/openai`, {
     method: "PUT",
@@ -244,8 +245,9 @@ test("in a password-protected LAN the gateway key replaces the password only for
     }
     await rm(dir, { recursive: true, force: true });
   });
-  const { setLanPassword, authorizeHttp } = await import("../server/modules/access/index.ts");
-  const { setGatewayKey } = await import("../server/modules/openai-gateway/index.ts");
+  const { setLanPassword, authorizeHttp } =
+    await import("../packages/server/modules/access/index.ts");
+  const { setGatewayKey } = await import("../packages/server/modules/openai-gateway/index.ts");
   setLanPassword("lan-password");
   setGatewayKey("sk-lan-key");
 

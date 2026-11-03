@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
-import { refLabel, sourceLabel } from "../core/modules/workspace/pipeline-status.ts";
-import { countRu } from "../src/common/utilities/plural.ts";
+import { refLabel, sourceLabel } from "../packages/core/modules/workspace/pipeline-status.ts";
+import { countRu } from "../packages/client/common/utilities/plural.ts";
 
 test("pipeline refs drop GitLab prefixes and name merge requests", () => {
   expect(refLabel("refs/merge-requests/267267/merge")).toBe("!267267");

@@ -7,13 +7,13 @@ import {
   cutAt,
   switchVersion,
   versionsOf,
-} from "../src/modules/agent/model/branches.ts";
-import { turnChanges } from "../src/modules/agent/lib/turn-changes.ts";
-import { applyAgentEvent } from "../src/modules/agent/model/turn-events.ts";
-import { latestPlan, shownPlan } from "../src/modules/agent/lib/plan.ts";
-import { chatMarkdown } from "../src/modules/agent/lib/export.ts";
-import { readAgentHistory, writeAgentHistory } from "../server/modules/agent/index.ts";
-import { registerBuiltinClientAgents } from "../src/app/agents.ts";
+} from "../packages/client/modules/agent/model/branches.ts";
+import { turnChanges } from "../packages/client/modules/agent/lib/turn-changes.ts";
+import { applyAgentEvent } from "../packages/client/modules/agent/model/turn-events.ts";
+import { latestPlan, shownPlan } from "../packages/client/modules/agent/lib/plan.ts";
+import { chatMarkdown } from "../packages/client/modules/agent/lib/export.ts";
+import { readAgentHistory, writeAgentHistory } from "../packages/server/modules/agent/index.ts";
+import { registerBuiltinClientAgents } from "../packages/client/app/agents.ts";
 
 registerBuiltinClientAgents();
 
@@ -261,7 +261,7 @@ test("saved history keeps versions of a conversation", async () => {
     expect(saved[0].variants?.[0]?.[1]).toMatchObject({ tail: "t", detached: true });
     expect(saved[0].slot).toBe(1);
   } finally {
-    (await import("../server/modules/agent/index.ts")).closeHistoryStore();
+    (await import("../packages/server/modules/agent/index.ts")).closeHistoryStore();
     await rm(dir, { recursive: true, force: true });
   }
 });
@@ -290,9 +290,9 @@ test("a call before any text is listed once among the parts of the answer", () =
 });
 
 test("history store keeps a forked chat as a tree and rewrites only what changed", async () => {
-  const { closeHistoryStore } = await import("../server/modules/agent/index.ts");
+  const { closeHistoryStore } = await import("../packages/server/modules/agent/index.ts");
   const { loadHistory, saveHistory, historyRevision } =
-    await import("../server/modules/agent/history-store.ts");
+    await import("../packages/server/modules/agent/history-store.ts");
   const dir = await mkdtemp(join(tmpdir(), "projector-branches-db-"));
   const previous = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = dir;
@@ -343,8 +343,8 @@ test("history store keeps a forked chat as a tree and rewrites only what changed
 });
 
 test("a chat saved as a JSON file by an earlier version moves into the database", async () => {
-  const { closeHistoryStore } = await import("../server/modules/agent/index.ts");
-  const { legacyHistoryPath } = await import("../server/modules/agent/history-store.ts");
+  const { closeHistoryStore } = await import("../packages/server/modules/agent/index.ts");
+  const { legacyHistoryPath } = await import("../packages/server/modules/agent/history-store.ts");
   const { mkdir, writeFile, access } = await import("node:fs/promises");
   const { dirname } = await import("node:path");
   const dir = await mkdtemp(join(tmpdir(), "projector-branches-legacy-"));

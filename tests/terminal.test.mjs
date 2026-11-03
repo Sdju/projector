@@ -7,8 +7,8 @@ import { once } from "node:events";
 import { WebSocket } from "ws";
 import headless from "@xterm/headless";
 import serialization from "@xterm/addon-serialize";
-import { trackMouseEncoding } from "../server/modules/terminal/index.ts";
-import { listAgentBackends } from "../server/modules/agent/index.ts";
+import { trackMouseEncoding } from "../packages/server/modules/terminal/index.ts";
+import { listAgentBackends } from "../packages/server/modules/agent/index.ts";
 
 test("mouse encoding survives snapshots, fragmented modes, disable, RIS and retained sessions", async () => {
   const screen = new headless.Terminal({ allowProposedApi: true });
@@ -76,15 +76,16 @@ const project = {
   createdAt: "",
 };
 await writeFile(join(root, "projector/projects.json"), JSON.stringify({ projects: [project] }));
-const { handleApi } = await import("../server/app/api.ts");
+const { handleApi } = await import("../packages/server/app/api.ts");
 const { attachTerminalServer, listTerminalSessions, closeTerminalSession } =
-  await import("../server/modules/terminal/index.ts");
+  await import("../packages/server/modules/terminal/index.ts");
 const server = createServer((req, res) => {
   void handleApi(req, res).then((handled) => {
     if (!handled) res.writeHead(404).end();
   });
 });
-const { attachTerminalControlServer } = await import("../server/modules/terminal-control/index.ts");
+const { attachTerminalControlServer } =
+  await import("../packages/server/modules/terminal-control/index.ts");
 attachTerminalServer(server);
 attachTerminalControlServer(server);
 server.listen(0, "127.0.0.1");
@@ -253,7 +254,8 @@ test("WS project control: push, cross-client mutations, process protection and r
 });
 test("session model preserves restart placement and reconnects its WS subscription", async () => {
   const { createRenderer } = await import("vue");
-  const { useTerminalSessions } = await import("../src/modules/terminal/model/sessions.ts");
+  const { useTerminalSessions } =
+    await import("../packages/client/modules/terminal/model/sessions.ts");
   const keys = ["WebSocket", "location", "window", "sessionStorage"];
   const globals = keys.map((key) => [key, globalThis[key]]);
   const connections = [];
@@ -503,7 +505,7 @@ test("real PTY: file links resolve against the live shell cwd", async () => {
   const linkRequest = (path) => request(`/${session.id}?${new URLSearchParams({ link: path })}`);
   const localLink = await (await linkRequest("local.ts")).json();
   if (localLink.error) {
-    const { os } = await import("../core/modules/os/index.ts");
+    const { os } = await import("../packages/core/modules/os/index.ts");
     const rows = (await os.processes.list()) ?? [];
     const directories = await os.processes.workingDirectories(session.pid, "(fallback)");
     throw new Error(
@@ -588,7 +590,7 @@ test("real PTY: sessions are isolated and flow control bounds the output queue u
   const session = await openShell();
   const other = await (await request("", "POST", { program: "shell" })).json();
   expect(other.session.pid).not.toBe(session.pid);
-  const reloaded = await import("../server/modules/terminal/terminal.ts?reload-test");
+  const reloaded = await import("../packages/server/modules/terminal/terminal.ts?reload-test");
   expect(reloaded.listTerminalSessions(project.id).length).toBe(2);
   const floodSession = await (await request("", "POST", { program: "shell" })).json();
   const flood = await connect(floodSession.session.id, false);
@@ -626,7 +628,7 @@ test("real PTY: deleting a busy session needs a fresh confirmation and kills TER
     () => `background child started: ${JSON.stringify(running.output())}`,
   );
   const childPid = Number(await readFile(join(root, "child-pid"), "utf8"));
-  const { os } = await import("../core/modules/os/index.ts");
+  const { os } = await import("../packages/core/modules/os/index.ts");
   // The confirmation hashes the process tree, which must stop changing before it is read.
   // Git Bash reports MSYS pids, which Windows process queries do not know.
   if (process.platform !== "win32")
@@ -657,7 +659,7 @@ test("real PTY: deleting a busy session needs a fresh confirmation and kills TER
       ),
     "foreground process is busy",
   ).catch(async (error) => {
-    const { os } = await import("../core/modules/os/index.ts");
+    const { os } = await import("../packages/core/modules/os/index.ts");
     const session = (await (await request(`/${shell.id}`)).json()).session;
     const rows = (await os.processes.list()) ?? [];
     const family = new Set([session.pid]);
@@ -709,7 +711,7 @@ test("real PTY: deleting a busy session needs a fresh confirmation and kills TER
 
 test("real PTY: project commands start, reconnect, restart, stop and keep the project status", async () => {
   // Project commands use the same interactive PTY and reconnectable screen as shells.
-  const { getSnapshot } = await import("../server/modules/processes/index.ts");
+  const { getSnapshot } = await import("../packages/server/modules/processes/index.ts");
   const run = (action, body) =>
     fetch(`${base}/api/projects/${project.id}/${action}`, {
       method: "POST",

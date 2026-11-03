@@ -3,8 +3,8 @@ import {
   answerLost,
   recoverTurn,
   restoreLostAnswer,
-} from "../src/modules/agent/model/lost-answer.ts";
-import { INTERRUPTED } from "../src/modules/agent/model/load-history.ts";
+} from "../packages/client/modules/agent/model/lost-answer.ts";
+import { INTERRUPTED } from "../packages/client/modules/agent/model/load-history.ts";
 
 const user = (text) => ({ id: `u${text}`, role: "user", text, tools: [] });
 const answer = (text, extra = {}) => ({

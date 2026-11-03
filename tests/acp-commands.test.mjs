@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, expect, test } from "vite-plus/test";
-import { acpAdvertisedDelete } from "../server/modules/agents/acp/acp-process.ts";
-import { registerAcpProgram } from "../server/modules/agents/acp/acp-programs.ts";
-import { acpCommands, acpControls } from "../server/modules/agents/acp/acp-tools.ts";
+import { acpAdvertisedDelete } from "../packages/server/modules/agents/acp/acp-process.ts";
+import { registerAcpProgram } from "../packages/server/modules/agents/acp/acp-programs.ts";
+import { acpCommands, acpControls } from "../packages/server/modules/agents/acp/acp-tools.ts";
 
 /** A file, not an `-e` argument: Windows shell quoting would mangle the multi-line script. */
 const SCRIPT = fileURLToPath(new URL("./fixtures/acp-commands-probe.mjs", import.meta.url));

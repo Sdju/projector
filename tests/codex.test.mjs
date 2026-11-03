@@ -2,9 +2,12 @@ import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
-import { weeklyWindow, codexUsage } from "../server/modules/agents-integration/codex/usage.ts";
-import { readCodexRateLimits } from "../server/modules/agents-integration/codex/cli.ts";
-import { NETWORK_CONTEXT_URL } from "../server/modules/network/index.ts";
+import {
+  weeklyWindow,
+  codexUsage,
+} from "../packages/server/modules/agents-integration/codex/usage.ts";
+import { readCodexRateLimits } from "../packages/server/modules/agents-integration/codex/cli.ts";
+import { NETWORK_CONTEXT_URL } from "../packages/server/modules/network/index.ts";
 
 const weekly = { usedPercent: 40, windowDurationMins: 10080, resetsAt: 1791574411 };
 test("weekly quota follows duration and codex bucket, never another model's quota", () => {

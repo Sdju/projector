@@ -4,11 +4,11 @@
 
 ## Пределы
 
-- `MAX_SESSIONS = 24` терминальных сессий (`server/modules/terminal/session-state.ts`); 25-я получает «Лимит терминалов».
+- `MAX_SESSIONS = 24` терминальных сессий (`packages/server/modules/terminal/session-state.ts`); 25-я получает «Лимит терминалов».
 - Сервер однопоточен для ввода-вывода: вывод PTY, снимки экрана (`@xterm/headless`) и HTTP делят одно ядро.
 - Один поток PTY — 12–34 МБ/с на сессию; при медленной отрисовке чтение приостанавливается до подтверждения браузера.
 - Клиент держит 5000 строк истории терминала; после 1 млн строк память renderer растёт примерно вдвое.
-- Слежение за файлами — `fs.watch` без рекурсии, только раскрытые папки и открытые файлы (300 папок и 200 файлов на реестр, `server/modules/workspace/watcher.ts`).
+- Слежение за файлами — `fs.watch` без рекурсии, только раскрытые папки и открытые файлы (300 папок и 200 файлов на реестр, `packages/server/modules/workspace/watcher.ts`).
 - Dev-режим тяжелее prod в 7–8 раз по памяти: это цена Vite, native и HMR, а не данных пользователя.
 - Окно чата держит последние 5 запросов: 10 000 запросов в истории не отличаются от 10 по цене открытия и потока. Полный монтаж линеен (~3,5 мс и ~77 DOM-узлов на запрос).
 - Закрытая «Работа» держит в DOM только заголовок: 200 вызовов — 80 узлов вместо 3 749. Расход перенесён на явное раскрытие.
@@ -41,7 +41,7 @@
 S=$(mktemp -d)
 cd <repo>
 export XDG_DATA_HOME=$S/data XDG_CONFIG_HOME=$S/data/cfg PROJECTOR_PORT=4213
-node server/app/standalone.ts &
+node packages/server/app/standalone.ts &
 curl -s localhost:4213/api/health            # поле "pid"
 grep -E 'VmRSS|VmHWM' /proc/<pid>/status
 grep -E 'Rss|Pss|Anonymous' /proc/<pid>/smaps_rollup

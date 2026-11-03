@@ -2,13 +2,13 @@ import { expect, onTestFinished, test } from "vite-plus/test";
 import { mkdtemp, readFile, writeFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createPageReload } from "../src/modules/ide/reload.ts";
+import { createPageReload } from "../packages/client/modules/ide/reload.ts";
 import {
   createCommandService,
   defaultKeybindings,
   parseKeybindings,
   matchesKey,
-} from "../core/modules/ide/index.ts";
+} from "../packages/core/modules/ide/index.ts";
 
 function reloadHost(replies, confirm = true) {
   const messages = [];
@@ -222,10 +222,11 @@ test("keybindings persist atomically with validation and local HTTP origin prote
   const directory = await mkdtemp(join(tmpdir(), "projector-ide-"));
   const previous = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = directory;
-  const { readKeybindings, writeKeybindings } = await import("../server/modules/ide/index.ts");
+  const { readKeybindings, writeKeybindings } =
+    await import("../packages/server/modules/ide/index.ts");
   const { createServer } = await import("node:http");
   const { once } = await import("node:events");
-  const { handleApi } = await import("../server/app/api.ts");
+  const { handleApi } = await import("../packages/server/app/api.ts");
   const server = createServer((req, res) => void handleApi(req, res));
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -262,7 +263,7 @@ test("keybindings persist atomically with validation and local HTTP origin prote
 });
 
 test("keyboard settings preserve other rules, conditions and arguments through edit, remove and reset", async () => {
-  const { editKeybinding } = await import("../core/modules/ide/index.ts");
+  const { editKeybinding } = await import("../packages/core/modules/ide/index.ts");
   const defaults = [
     {
       command: "menu",
@@ -301,7 +302,7 @@ test("keyboard settings preserve other rules, conditions and arguments through e
 });
 
 test("shortcut recorder ignores modifiers, composition and repeats, and recorded strokes resolve", async () => {
-  const { recordedKey } = await import("../core/modules/ide/index.ts");
+  const { recordedKey } = await import("../packages/core/modules/ide/index.ts");
   expect(recordedKey({ key: "Control", ctrlKey: true })).toBe(undefined);
   expect(recordedKey({ key: "a", isComposing: true })).toBe(undefined);
   expect(recordedKey({ key: "F6", repeat: true })).toBe(undefined);
@@ -323,7 +324,7 @@ test("shortcut recorder ignores modifiers, composition and repeats, and recorded
 });
 
 test("command palette preserves originating scope, chooses project commands and searches IDs and titles", async () => {
-  const { paletteCommands } = await import("../core/modules/ide/index.ts");
+  const { paletteCommands } = await import("../packages/core/modules/ide/index.ts");
   const sdk = createCommandService(defaultKeybindings);
   const a = sdk.createScope("tree-a", () => ({ surface: "fileTree", projectId: "a" }));
   const b = sdk.createScope("tree-b", () => ({ surface: "fileTree", projectId: "b" }));
@@ -393,10 +394,10 @@ test("editor themes default, persist, reject unknown values and protect HTTP wri
   const previous = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = directory;
   const { readEditorSettings, writeEditorSettings } =
-    await import("../server/modules/ide/index.ts");
+    await import("../packages/server/modules/ide/index.ts");
   const { createServer } = await import("node:http");
   const { once } = await import("node:events");
-  const { handleApi } = await import("../server/app/api.ts");
+  const { handleApi } = await import("../packages/server/app/api.ts");
   const server = createServer((req, res) => void handleApi(req, res));
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -435,11 +436,11 @@ test("files exclude defaults, persist globs, reject invalid patterns and protect
   const previous = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = directory;
   const { readFilesExclude, writeFilesExclude } =
-    await import("../server/modules/workspace/index.ts");
-  const { defaultFilesExclude } = await import("../core/modules/workspace/index.ts");
+    await import("../packages/server/modules/workspace/index.ts");
+  const { defaultFilesExclude } = await import("../packages/core/modules/workspace/index.ts");
   const { createServer } = await import("node:http");
   const { once } = await import("node:events");
-  const { handleApi } = await import("../server/app/api.ts");
+  const { handleApi } = await import("../packages/server/app/api.ts");
   const server = createServer((req, res) => void handleApi(req, res));
   server.listen(0, "127.0.0.1");
   await once(server, "listening");

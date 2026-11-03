@@ -1,5 +1,8 @@
 import { expect, test, vi } from "vite-plus/test";
-import { createLauncherModel, resolveLauncherAction } from "../core/modules/launcher/index.ts";
+import {
+  createLauncherModel,
+  resolveLauncherAction,
+} from "../packages/core/modules/launcher/index.ts";
 
 for (const kind of ["github", "gitlab", "directory"]) {
   test(`${kind} does not synthesize an unsupported favorite action`, async () => {

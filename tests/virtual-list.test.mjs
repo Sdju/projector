@@ -4,9 +4,9 @@ import { chromium, createChromium } from "./fixtures/chromium-driver.mjs";
 
 const html = `<!doctype html><div id="fixture" style="height:400px;display:flex;flex-direction:column"></div><pre id="result">WAITING</pre>
 <script type="module">
-import '/src/app/styles.css';
+import '/packages/client/app/styles.css';
 import {createApp, h, ref, nextTick} from 'vue';
-import KeybindingsTable from '/src/modules/ide/ui/KeybindingsTable.vue';
+import KeybindingsTable from '/packages/client/modules/ide/ui/KeybindingsTable.vue';
 const rows = ref(Array.from({length:10000}, (_,index) => ({
   command:'ide.test.'+index, title:'Command '+index, index:0, custom:false,
   rule:{command:'ide.test.'+index, key:'Mod+K'}

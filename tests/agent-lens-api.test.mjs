@@ -3,8 +3,12 @@ import { mkdir, mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vite-plus/test";
-import { handleApi } from "../server/app/api.ts";
-import { LENS_THINKING_TEXT, lensLine, runLens } from "../server/modules/agents/projector/index.ts";
+import { handleApi } from "../packages/server/app/api.ts";
+import {
+  LENS_THINKING_TEXT,
+  lensLine,
+  runLens,
+} from "../packages/server/modules/agents/projector/index.ts";
 import { scriptedModel } from "./helpers/scripted-model.mjs";
 
 test("Lens cleans its caption into one line", () => {

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { fileURLToPath, URL } from "node:url";
 import vue from "@vitejs/plugin-vue";
 import Icons from "unplugin-icons/vite";
@@ -5,10 +6,9 @@ import { defineConfig, type Plugin } from "vite-plus";
 import { createConfig as createFeodConfig } from "@o-feod/oxlint-structure-plugin/configs";
 import feod from "./feod.config.mjs";
 import { checkFeod, checkFeodAsync } from "./scripts/check-feod.mjs";
-import { APP_PORT, readNetworkMode } from "./core/modules/app-paths/index.ts";
-import { networkHost } from "./core/modules/network-mode/index.ts";
-import { projectorPlugin } from "./server/app/dev-plugin.ts";
-import manifest from "./package.json" with { type: "json" };
+import { APP_PORT, readNetworkMode } from "./packages/core/modules/app-paths/index.ts";
+import { networkHost } from "./packages/core/modules/network-mode/index.ts";
+import { projectorPlugin } from "./packages/server/app/dev-plugin.ts";
 
 function architecturePlugin(): Plugin {
   const describe = (errors: ReturnType<typeof checkFeod>) =>
@@ -40,18 +40,29 @@ function architecturePlugin(): Plugin {
   };
 }
 
+const packageManifest = (name: string) =>
+  JSON.parse(readFileSync(new URL(`./packages/${name}/package.json`, import.meta.url), "utf8")) as {
+    dependencies?: Record<string, string>;
+  };
+
+/** Third-party packages are external for SSR; workspace packages stay in the Vite graph. */
+const ssrExternal = [
+  ...new Set(
+    ["server", "core"].flatMap((name) => Object.keys(packageManifest(name).dependencies ?? {})),
+  ),
+].filter((name) => !name.startsWith("@projector/"));
+
 const feodLint = createFeodConfig(feod, { rootDir: fileURLToPath(new URL(".", import.meta.url)) });
 
 export default defineConfig({
-  ssr: { external: Object.keys(manifest.dependencies) },
+  ssr: { external: ssrExternal },
   plugins: [architecturePlugin(), vue(), Icons({ compiler: "vue3" }), projectorPlugin()],
   resolve: {
     alias: {
-      "@app": fileURLToPath(new URL("./src/app", import.meta.url)),
-      "@pages": fileURLToPath(new URL("./src/pages", import.meta.url)),
-      "@modules": fileURLToPath(new URL("./src/modules", import.meta.url)),
-      "@common": fileURLToPath(new URL("./src/common", import.meta.url)),
-      "@core": fileURLToPath(new URL("./core/modules", import.meta.url)),
+      "@app": fileURLToPath(new URL("./packages/client/app", import.meta.url)),
+      "@pages": fileURLToPath(new URL("./packages/client/pages", import.meta.url)),
+      "@modules": fileURLToPath(new URL("./packages/client/modules", import.meta.url)),
+      "@common": fileURLToPath(new URL("./packages/client/common", import.meta.url)),
     },
   },
   server: {
@@ -73,7 +84,7 @@ export default defineConfig({
       toggle: { command: "./bin/projector toggle", cache: false },
       tray: { command: "./bin/projector --tray", cache: false },
       launch: { command: "./bin/projector", cache: false },
-      desktop: { command: "node cli/app/install-desktop.mjs", cache: false },
+      desktop: { command: "node packages/cli/app/install-desktop.mjs", cache: false },
     },
   },
   test: {

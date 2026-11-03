@@ -4,12 +4,12 @@ import { chromium, createChromium } from "./fixtures/chromium-driver.mjs";
 
 const html = `<!doctype html><div id="settings"></div><div id="panel"></div><pre id="result">WAITING</pre>
 <script type="module">
-import '/src/app/styles.css';
+import '/packages/client/app/styles.css';
 import {createApp,h,ref,nextTick} from 'vue';
-import NetworkSettings from '/src/modules/network/NetworkSettings.vue';
-import LanInfoPanel from '/src/modules/network/LanInfoPanel.vue';
-import {createCommandService} from '/core/modules/ide/index.ts';
-import {commandHostKey} from '/src/common/utilities/commands.ts';
+import NetworkSettings from '/packages/client/modules/network/NetworkSettings.vue';
+import LanInfoPanel from '/packages/client/modules/network/LanInfoPanel.vue';
+import {createCommandService} from '/packages/core/modules/ide/index.ts';
+import {commandHostKey} from '/packages/client/common/utilities/commands.ts';
 const check=(value,label)=>{if(!value)throw new Error(label);};
 const wait=async(condition,label)=>{const until=Date.now()+8000;while(!condition()){if(Date.now()>until)throw new Error(label);await originalFetch('/__tick');}};
 const saved={mode:'lan',passwordRequired:true,lanUrl:'http://192.0.2.1:4177',lanUrls:['http://192.0.2.1:4177','http://192.0.2.2:4177']};

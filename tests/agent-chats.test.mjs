@@ -14,8 +14,8 @@ import {
   removeChatsWithSession,
   renameArchivedChat,
   writeAgentHistory,
-} from "../server/modules/agent/index.ts";
-import { historyDatabase } from "../server/modules/agent/history-store.ts";
+} from "../packages/server/modules/agent/index.ts";
+import { historyDatabase } from "../packages/server/modules/agent/history-store.ts";
 
 const turn = (id, role, text) => ({ id, role, text, tools: [] });
 let directory;

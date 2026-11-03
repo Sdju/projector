@@ -8,13 +8,13 @@
   <body>
     <div id="fixture"></div>
     <script type="module">
-      import "/src/app/styles.css";
+      import "/packages/client/app/styles.css";
       import { createApp, h, reactive, ref, nextTick } from "vue";
-      import UiButton from "/src/common/ui/UiButton.vue";
-      import UiField from "/src/common/ui/UiField.vue";
-      import UiControl from "/src/common/ui/UiControl.vue";
-      import UiResizeHandle from "/src/common/ui/UiResizeHandle.vue";
-      import { usePointerDrag } from "/src/common/utilities/pointer-drag.ts";
+      import UiButton from "/packages/client/common/ui/UiButton.vue";
+      import UiField from "/packages/client/common/ui/UiField.vue";
+      import UiControl from "/packages/client/common/ui/UiControl.vue";
+      import UiResizeHandle from "/packages/client/common/ui/UiResizeHandle.vue";
+      import { usePointerDrag } from "/packages/client/common/utilities/pointer-drag.ts";
 
       const state = reactive({
         name: "",

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
-import { sanitizeModels, resolveModel } from "../server/modules/providers/models.ts";
-import { costOf } from "../server/modules/agents/projector/projector-usage.ts";
+import { sanitizeModels, resolveModel } from "../packages/server/modules/providers/models.ts";
+import { costOf } from "../packages/server/modules/agents/projector/projector-usage.ts";
 
 describe("model prices", () => {
   it("keeps a price only when input and output are sound numbers", () => {
@@ -39,7 +39,8 @@ describe("model prices", () => {
 
 describe("usage of a chat", () => {
   it("adds answers up and keeps the objects of entries that did not change", async () => {
-    const { chatUsageByTurn } = await import("../src/modules/agent/model/chat-usage.ts");
+    const { chatUsageByTurn } =
+      await import("../packages/client/modules/agent/model/chat-usage.ts");
     const answer = (id, cost) => ({
       id,
       role: "assistant",

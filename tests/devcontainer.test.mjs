@@ -3,12 +3,12 @@ import { mkdtemp, mkdir, writeFile, readFile, symlink, rm } from "node:fs/promis
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { classifyDevcontainer } from "../core/modules/devcontainer/index.ts";
+import { classifyDevcontainer } from "../packages/core/modules/devcontainer/index.ts";
 import {
   decideDevcontainer,
   devcontainerLaunch,
   devcontainerState,
-} from "../server/modules/devcontainer/index.ts";
+} from "../packages/server/modules/devcontainer/index.ts";
 
 const ids = (config) => classifyDevcontainer(config).map((finding) => finding.id);
 
@@ -153,7 +153,7 @@ test("projects without a config have nothing to decide", async () => {
   ).rejects.toThrow(/нет devcontainer/);
 });
 
-const { containerToHost } = await import("../server/modules/terminal/link-files.ts");
+const { containerToHost } = await import("../packages/server/modules/terminal/link-files.ts");
 test("terminal links map container paths into the project and refuse escapes", () => {
   const map = (path) =>
     containerToHost(path, "/workspaces/app", "/home/me/app").replaceAll("\\", "/");

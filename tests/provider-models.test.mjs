@@ -4,7 +4,7 @@ import {
   fetchRemoteModels,
   pickModel,
   sanitizeModels,
-} from "../server/modules/providers/models.ts";
+} from "../packages/server/modules/providers/models.ts";
 
 test("registered models get unique aliases and migrate the single legacy model", () => {
   expect(sanitizeModels([{ id: "a" }, { id: "b", alias: "a" }, { id: "c", alias: "x" }])).toEqual([

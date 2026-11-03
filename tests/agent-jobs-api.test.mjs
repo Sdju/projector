@@ -23,7 +23,7 @@ await writeFile(
   JSON.stringify({ projects: [{ id: "p1", name: "work", path: work, commands: [] }] }),
 );
 
-const { registerAgentBackend } = await import("../server/modules/agent/index.ts");
+const { registerAgentBackend } = await import("../packages/server/modules/agent/index.ts");
 const seen = [];
 registerAgentBackend({
   id: "fake-api",
@@ -54,7 +54,7 @@ registerAgentBackend({
 });
 registerAgentBackend({ id: "fake-local", label: "Fake Local", run: async () => {} });
 
-const { handleApi } = await import("../server/app/api.ts");
+const { handleApi } = await import("../packages/server/app/api.ts");
 const server = createServer((req, res) => void handleApi(req, res));
 server.listen(0, "127.0.0.1");
 await once(server, "listening");
@@ -281,7 +281,7 @@ test("a job in an isolated copy works there and can be stopped", async () => {
   );
   // This is the state visible during a retry/merge race: the old record still names the copy,
   // but the active retry owns it. Merge must refuse rather than delete the retry's folder.
-  const storage = await import("../server/modules/agent/jobs-store.ts");
+  const storage = await import("../packages/server/modules/agent/jobs-store.ts");
   const contended = await storage.loadJob(job.id);
   contended.worktree = job.worktree;
   delete contended.worktreeCleared;

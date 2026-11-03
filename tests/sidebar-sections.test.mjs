@@ -3,7 +3,7 @@ import {
   createSidebarRegistry,
   extendSidebarRegistry,
   groupSidebar,
-} from "../src/modules/workspace-api/index.ts";
+} from "../packages/client/modules/workspace-api/index.ts";
 
 const base = createSidebarRegistry(
   () => true,

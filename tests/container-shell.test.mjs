@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import { spawnSync } from "node:child_process";
-import { bashShellLaunch, createOs } from "../core/modules/os/index.ts";
+import { bashShellLaunch, createOs } from "../packages/core/modules/os/index.ts";
 
 test("container Bash does not inherit the host's PowerShell arguments", () => {
   const previous = process.env.SHELL;

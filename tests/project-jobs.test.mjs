@@ -1,9 +1,15 @@
 import { afterEach, expect, test, vi } from "vite-plus/test";
 import { effectScope } from "vue";
-import { continuationPrompt, useProjectJobs } from "../src/modules/agent/model/project-jobs.ts";
-import { shouldContinue } from "../src/modules/agent/model/job-chat.ts";
-import { resolveJobTitle, useJobTitles } from "../src/modules/agent/model/job-titles.ts";
-import { jobShortTitle } from "../src/modules/agent/lib/job-name.ts";
+import {
+  continuationPrompt,
+  useProjectJobs,
+} from "../packages/client/modules/agent/model/project-jobs.ts";
+import { shouldContinue } from "../packages/client/modules/agent/model/job-chat.ts";
+import {
+  resolveJobTitle,
+  useJobTitles,
+} from "../packages/client/modules/agent/model/job-titles.ts";
+import { jobShortTitle } from "../packages/client/modules/agent/lib/job-name.ts";
 
 const job = (extra = {}) => ({
   id: "aaaaaaaaaaaa",

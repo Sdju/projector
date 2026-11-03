@@ -1,8 +1,12 @@
 import { expect, test } from "vite-plus/test";
-import { createTabRegistry, defineTab, singletonTab } from "../src/modules/workspace-api/tabs.ts";
-import { ensureTab } from "../src/modules/workspace/lib/service-tabs.ts";
-import { baseTabTypes } from "../src/modules/workspace/lib/virtual-tabs.ts";
-import { workspaceSessionSchema } from "../src/modules/workspace/session.ts";
+import {
+  createTabRegistry,
+  defineTab,
+  singletonTab,
+} from "../packages/client/modules/workspace-api/tabs.ts";
+import { ensureTab } from "../packages/client/modules/workspace/lib/service-tabs.ts";
+import { baseTabTypes } from "../packages/client/modules/workspace/lib/virtual-tabs.ts";
+import { workspaceSessionSchema } from "../packages/client/modules/workspace/session.ts";
 
 const issue = defineTab({
   id: "issue",

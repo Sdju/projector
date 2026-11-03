@@ -3,7 +3,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { describe, expect, it } from "vite-plus/test";
 
-const entry = fileURLToPath(new URL("../server/app/widgets-mcp.ts", import.meta.url));
+const entry = fileURLToPath(new URL("../packages/server/app/widgets-mcp.ts", import.meta.url));
 
 describe("widgets MCP", () => {
   it("describes special and ordinary widgets", async () => {

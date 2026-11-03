@@ -8,8 +8,8 @@ import {
   listSkills,
   parseFrontmatter,
   skillsSection,
-} from "../server/modules/agents/projector/projector-skills.ts";
-import { projectorBackend } from "../server/modules/agents/projector/index.ts";
+} from "../packages/server/modules/agents/projector/projector-skills.ts";
+import { projectorBackend } from "../packages/server/modules/agents/projector/index.ts";
 
 let previous;
 let data;

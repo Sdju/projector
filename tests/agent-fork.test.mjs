@@ -3,13 +3,13 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { reactive } from "vue";
-import { forkAt } from "../src/modules/agent/model/branches.ts";
-import { registerBranchCommands } from "../src/modules/agent/model/branch-commands.ts";
-import { forkChat } from "../src/modules/agent/model/chat-fork.ts";
-import { registerChat } from "../src/modules/agent/model/chat-registry.ts";
-import { chatKeyOf } from "../src/modules/agent/model/chat-key.ts";
-import { takeDraft } from "../src/modules/agent/model/drafts.ts";
-import { registerBuiltinClientAgents } from "../src/app/agents.ts";
+import { forkAt } from "../packages/client/modules/agent/model/branches.ts";
+import { registerBranchCommands } from "../packages/client/modules/agent/model/branch-commands.ts";
+import { forkChat } from "../packages/client/modules/agent/model/chat-fork.ts";
+import { registerChat } from "../packages/client/modules/agent/model/chat-registry.ts";
+import { chatKeyOf } from "../packages/client/modules/agent/model/chat-key.ts";
+import { takeDraft } from "../packages/client/modules/agent/model/drafts.ts";
+import { registerBuiltinClientAgents } from "../packages/client/app/agents.ts";
 import {
   archiveLiveChat,
   closeHistoryStore,
@@ -17,7 +17,7 @@ import {
   readAgentHistory,
   readRecentChats,
   writeAgentHistory,
-} from "../server/modules/agent/index.ts";
+} from "../packages/server/modules/agent/index.ts";
 
 const turn = (id, role, extra = {}) => ({ id, role, text: id, tools: [], ...extra });
 registerBuiltinClientAgents();

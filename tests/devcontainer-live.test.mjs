@@ -9,7 +9,7 @@ import {
   runDevcontainerCommand,
   stopDevcontainer,
   usesDevcontainer,
-} from "../server/modules/devcontainer/index.ts";
+} from "../packages/server/modules/devcontainer/index.ts";
 
 // Builds a real container with the local Docker daemon, so it is opt-in.
 const enabled = process.env.PROJECTOR_TEST_DEVCONTAINER === "1";

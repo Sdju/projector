@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { splitMessage } from "../src/modules/widget-runtime/split.ts";
+import { splitMessage } from "../packages/client/modules/widget-runtime/split.ts";
 
 const known = (name) => ["Card", "Bars"].includes(name);
 const split = (text, streaming = false) => splitMessage(text, { known, streaming });
@@ -35,7 +35,7 @@ test("code fences and unknown names are not components", () => {
 
 test("a template compiles once per text and its script becomes setup state", async () => {
   const { compileScript, compileTemplate, loadCompiler } =
-    await import("../src/modules/widget-runtime/compile.ts");
+    await import("../packages/client/modules/widget-runtime/compile.ts");
   await loadCompiler();
   const render = compileTemplate("<Card>{{ n * 3 }}</Card>");
   expect(compileTemplate("<Card>{{ n * 3 }}</Card>")).toBe(render);
@@ -47,7 +47,7 @@ test("a template compiles once per text and its script becomes setup state", asy
 
 test("a broken template throws instead of rendering", async () => {
   const { compileTemplate, loadCompiler } =
-    await import("../src/modules/widget-runtime/compile.ts");
+    await import("../packages/client/modules/widget-runtime/compile.ts");
   await loadCompiler();
   expect(() => compileTemplate("<Card><div></Card>")).toThrow();
 });
@@ -80,9 +80,9 @@ test("a script between blocks is the message's; one inside a component is that c
 
 test("autoClose turns a half-written component into one that compiles", async () => {
   const { autoClose, parseWidgetSource } =
-    await import("../src/modules/widget-runtime/autoclose.ts");
+    await import("../packages/client/modules/widget-runtime/autoclose.ts");
   const { compileTemplate, loadCompiler } =
-    await import("../src/modules/widget-runtime/compile.ts");
+    await import("../packages/client/modules/widget-runtime/compile.ts");
   await loadCompiler();
   const full = `<Card title="a > b">
   <Row><Stat label="Л" :value="n" /><Stat label="Д" value="2" /></Row>
@@ -115,14 +115,14 @@ test("autoClose turns a half-written component into one that compiles", async ()
 });
 
 test("a form can be the next answer only as the last block of a finished message", async () => {
-  const { defineWidget } = await import("../core/modules/widget-catalog/index.ts");
-  const { formWidget } = await import("../core/modules/agent-widgets/form/index.ts");
+  const { defineWidget } = await import("../packages/core/modules/widget-catalog/index.ts");
+  const { formWidget } = await import("../packages/core/modules/agent-widgets/form/index.ts");
   const { intelligentFormWidget } =
-    await import("../core/modules/agent-widgets/intelligent-form/index.ts");
+    await import("../packages/core/modules/agent-widgets/intelligent-form/index.ts");
   expect(formWidget.answer).toBe(true);
   expect(intelligentFormWidget.answer).toBe(true);
-  const { registerWidget } = await import("../src/modules/widget-runtime/registry.ts");
-  const { answerFormSource } = await import("../src/modules/widget-runtime/answer.ts");
+  const { registerWidget } = await import("../packages/client/modules/widget-runtime/registry.ts");
+  const { answerFormSource } = await import("../packages/client/modules/widget-runtime/answer.ts");
   registerWidget({
     definition: intelligentFormWidget,
     component: { render: () => null },
@@ -163,10 +163,10 @@ test("a form can be the next answer only as the last block of a finished message
 });
 
 test("Form Doctor heuristics fix duplicate attributes and validate the result", async () => {
-  const { registerBuiltinWidgets } = await import("../src/app/widgets.ts");
+  const { registerBuiltinWidgets } = await import("../packages/client/app/widgets.ts");
   registerBuiltinWidgets();
   const { dedupeAttributes, doctorFormSource, formProblem, heuristicFormRepair } =
-    await import("../src/modules/widget-runtime/repair.ts");
+    await import("../packages/client/modules/widget-runtime/repair.ts");
   const broken =
     '<IntelligentForm><Checks name="next" single name="next" :options="[{value:\'release\'}]" /><Button submit>Продолжить</Button></IntelligentForm>';
   expect(await formProblem(broken)).toMatch(/Duplicate attribute/);
@@ -185,7 +185,7 @@ test("Form Doctor heuristics fix duplicate attributes and validate the result", 
 
 test("the catalog's guide is made from the definitions and covers every registered component", async () => {
   const { createWidgetCatalog, defineWidget } =
-    await import("../core/modules/widget-catalog/index.ts");
+    await import("../packages/core/modules/widget-catalog/index.ts");
   const catalog = createWidgetCatalog();
   catalog.register(
     defineWidget({
@@ -211,7 +211,7 @@ test("the catalog's guide is made from the definitions and covers every register
 
 test("special widgets stay in the guide as a name and use case, with details on demand", async () => {
   const { createWidgetCatalog, defineWidget } =
-    await import("../core/modules/widget-catalog/index.ts");
+    await import("../packages/core/modules/widget-catalog/index.ts");
   const catalog = createWidgetCatalog();
   catalog.register(
     defineWidget({
@@ -246,22 +246,31 @@ test("special widgets stay in the guide as a name and use case, with details on 
 });
 
 test("InlineIcon offers exactly the names its prompt documents", async () => {
-  const { INLINE_ICON_NAMES } = await import("../core/modules/agent-widgets/inline-icon/index.ts");
-  const { icons } = await import("../src/modules/agent-widgets/_/index.ts");
+  const { INLINE_ICON_NAMES } =
+    await import("../packages/core/modules/agent-widgets/inline-icon/index.ts");
+  const { icons } = await import("../packages/client/modules/agent-widgets/_/index.ts");
   expect(Object.keys(icons).sort()).toEqual([...INLINE_ICON_NAMES].sort());
 });
 
 test("the definitions, the client components and both composition lists stay one set", async () => {
   const { readdirSync, readFileSync } = await import("node:fs");
-  const { widgetCatalog } = await import("../server/modules/agents/projector/index.ts");
-  const names = readdirSync(new URL("../core/modules/agent-widgets", import.meta.url)).sort();
+  const { widgetCatalog } = await import("../packages/server/modules/agents/projector/index.ts");
+  const names = readdirSync(
+    new URL("../packages/core/modules/agent-widgets", import.meta.url),
+  ).sort();
   expect(names.length).toBeGreaterThan(10);
-  const server = readFileSync(new URL("../server/app/widgets.ts", import.meta.url), "utf8");
-  const client = readFileSync(new URL("../src/app/widgets.ts", import.meta.url), "utf8");
+  const server = readFileSync(
+    new URL("../packages/server/app/widgets.ts", import.meta.url),
+    "utf8",
+  );
+  const client = readFileSync(
+    new URL("../packages/client/app/widgets.ts", import.meta.url),
+    "utf8",
+  );
   for (const name of names) {
     const id = name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
-    const entry = (await import(`../src/modules/agent-widgets/${name}/index.ts`))[id];
-    const definition = (await import(`../core/modules/agent-widgets/${name}/index.ts`))[
+    const entry = (await import(`../packages/client/modules/agent-widgets/${name}/index.ts`))[id];
+    const definition = (await import(`../packages/core/modules/agent-widgets/${name}/index.ts`))[
       `${id}Widget`
     ];
     expect(entry.definition, name).toBe(definition);

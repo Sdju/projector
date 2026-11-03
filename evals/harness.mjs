@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { projectorBackend } from "../server/modules/agents/projector/index.ts";
+import { projectorBackend } from "../packages/server/modules/agents/projector/index.ts";
 
 /** The IDE the agent sees in the evals: a few commands, every call recorded, nothing really done. */
 /** What a shell command may not do in the evals: it would change the machine the evals run on. */

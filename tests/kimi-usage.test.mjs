@@ -2,9 +2,9 @@ import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { kimiWindows } from "../server/modules/agents-integration/kimi/usage.ts";
-import { kimiUsage } from "../server/modules/agents-integration/kimi/index.ts";
-import { handleKimi } from "../server/routes/api/kimi.ts";
+import { kimiWindows } from "../packages/server/modules/agents-integration/kimi/usage.ts";
+import { kimiUsage } from "../packages/server/modules/agents-integration/kimi/index.ts";
+import { handleKimi } from "../packages/server/routes/api/kimi.ts";
 
 const payload = {
   usages: {

@@ -1,9 +1,9 @@
 import { expect, test } from "vite-plus/test";
 import { effectScope, nextTick, ref, watch } from "vue";
 import { setTimeout as delay } from "node:timers/promises";
-import { useSessionSnapshot } from "../src/common/utilities/session-snapshot.ts";
-import { treeSessionSchema } from "../src/modules/workspace/modules/tree/lib/tree-session.ts";
-import { workspaceSessionSchema } from "../src/modules/workspace/session.ts";
+import { useSessionSnapshot } from "../packages/client/common/utilities/session-snapshot.ts";
+import { treeSessionSchema } from "../packages/client/modules/workspace/modules/tree/lib/tree-session.ts";
+import { workspaceSessionSchema } from "../packages/client/modules/workspace/session.ts";
 
 function fixture() {
   const values = new Map();
@@ -141,8 +141,9 @@ test("continuous activity is persisted by maxWait without a quiet interval", asy
 });
 
 async function mobileWorkspace(saved, { mobile = true, terminals = true } = {}) {
-  const { useWorkspaceSession } = await import("../src/modules/workspace/lib/workspace-session.ts");
-  const { createDockLayout } = await import("../src/modules/dock/model/layout.ts");
+  const { useWorkspaceSession } =
+    await import("../packages/client/modules/workspace/lib/workspace-session.ts");
+  const { createDockLayout } = await import("../packages/client/modules/dock/model/layout.ts");
   const values = new Map();
   if (saved) values.set("projector:workspace:v1:project", JSON.stringify(saved));
   globalThis.window = new EventTarget();

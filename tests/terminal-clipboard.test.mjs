@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { readTerminalClipboard } from "../src/modules/terminal/lib/clipboard.ts";
+import { readTerminalClipboard } from "../packages/client/modules/terminal/lib/clipboard.ts";
 
 test("clipboard read succeeds without a separate permission request", async () => {
   const calls = [];

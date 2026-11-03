@@ -124,12 +124,12 @@ beforeAll(async () => {
   await writeFile(join(folder, "a.txt"), "one\n");
   execFileSync("git", ["add", "-A"], { cwd: folder });
   execFileSync("git", ["commit", "-qm", "init"], { cwd: folder });
-  const agent = await import("../server/modules/agent/index.ts");
+  const agent = await import("../packages/server/modules/agent/index.ts");
   agent.registerAgentBackend(fake);
   agent.registerAgentBackend(replay);
   jobs = agent;
   runs = agent;
-  store = await import("../server/modules/agent/jobs-store.ts");
+  store = await import("../packages/server/modules/agent/jobs-store.ts");
   attached = [];
   replayed = [];
 });

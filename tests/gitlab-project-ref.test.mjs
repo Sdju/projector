@@ -7,13 +7,16 @@ import {
   gitlabRepositoryFromRemote,
   normalizeGitlabInstance,
   normalizeGitlabProjectPath,
-} from "../core/modules/gitlab/index.ts";
+} from "../packages/core/modules/gitlab/index.ts";
 import {
   formatProjectRef,
   parseProjectRef,
   projectRefSegments,
-} from "../core/modules/project/index.ts";
-import { gitlabProjectFromParams, projectRoute } from "../src/modules/project/project-route.ts";
+} from "../packages/core/modules/project/index.ts";
+import {
+  gitlabProjectFromParams,
+  projectRoute,
+} from "../packages/client/modules/project/project-route.ts";
 
 test("GitLab instance normalization keeps the authority and rejects unsafe inputs", () => {
   expect(GITLAB_DEFAULT_INSTANCE).toBe("gitlab.com");

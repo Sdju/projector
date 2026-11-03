@@ -3,7 +3,7 @@ import {
   selectTreeRange,
   topLevelTreePaths,
   createTreeSelection,
-} from "../src/modules/workspace/modules/tree/lib/tree-selection.ts";
+} from "../packages/client/modules/workspace/modules/tree/lib/tree-selection.ts";
 
 const visible = ["a", "folder", "folder/b", "folder/c", "z"];
 test("plain clicks replace, Ctrl/Meta toggle files and directories", () => {

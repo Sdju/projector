@@ -11,10 +11,10 @@ import {
   removeRun,
   runDirectory,
   stopRun,
-} from "../server/modules/agent/agent-runs.ts";
-import { startHosted, attachHosted } from "../server/modules/agent/hosted-process.ts";
-import { createAcpConnection } from "../server/modules/agents/acp/acp-client.ts";
-import { os } from "../core/modules/os/index.ts";
+} from "../packages/server/modules/agent/agent-runs.ts";
+import { startHosted, attachHosted } from "../packages/server/modules/agent/hosted-process.ts";
+import { createAcpConnection } from "../packages/server/modules/agents/acp/acp-client.ts";
+import { os } from "../packages/core/modules/os/index.ts";
 
 async function until(check) {
   const deadline = Date.now() + 8000;

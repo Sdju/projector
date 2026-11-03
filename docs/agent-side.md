@@ -25,10 +25,10 @@
 ## Как устроено
 
 - `POST /api/agent/side` — SSE-поток одного вопроса. Не создаёт `run.json`, не пишет `history.sqlite`, не участвует в `run-hub`; перезагрузка страницы обрывает ответ.
-- `server/modules/agent/side-request.ts` — проверка входа и сборка сообщения из вопроса, предыдущих side-обменов, выполняющихся инструментов и плана.
-- `server/modules/agents/projector/projector-side.ts` — системный промпт и два read-only инструмента.
+- `packages/server/modules/agent/side-request.ts` — проверка входа и сборка сообщения из вопроса, предыдущих side-обменов, выполняющихся инструментов и плана.
+- `packages/server/modules/agents/projector/projector-side.ts` — системный промпт и два read-only инструмента.
 - `projector-backend.ts` в режиме `side` пропускает MCP, хуки, навыки и сжатие истории, использует отдельный лимит (4 шага, 45 секунд) и не пишет историю.
-- `src/modules/agent/model/side-question.ts` — состояние панели и контекст; `AgentSideQuestion.vue` — панель; `side-commands.ts` — команды `ide.agent.side.open|ask|clear`.
+- `packages/client/modules/agent/model/side-question.ts` — состояние панели и контекст; `AgentSideQuestion.vue` — панель; `side-commands.ts` — команды `ide.agent.side.open|ask|clear`.
 - `chat_status` выполняется в открытой странице через мост IDE-команд: side-ответ получает `command-request` по своему SSE-потоку и возвращает результат через `POST /api/agent/tool-result`.
 
 ## Ограничения

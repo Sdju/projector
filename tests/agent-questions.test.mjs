@@ -2,10 +2,10 @@ import { expect, test } from "vite-plus/test";
 import {
   completeCommandRequest,
   createQuestionBridge,
-} from "../server/modules/agent/command-bridge.ts";
-import { askClaudeQuestions } from "../server/modules/agents/claude-code/questions.ts";
-import { askCursorQuestions } from "../server/modules/agents/cursor/questions.ts";
-import { codexProgram } from "../server/modules/agents/codex/index.ts";
+} from "../packages/server/modules/agent/command-bridge.ts";
+import { askClaudeQuestions } from "../packages/server/modules/agents/claude-code/questions.ts";
+import { askCursorQuestions } from "../packages/server/modules/agents/cursor/questions.ts";
+import { codexProgram } from "../packages/server/modules/agents/codex/index.ts";
 
 const claudeInput = {
   questions: [
@@ -119,7 +119,7 @@ test("the question bridge delivers the answers of the page and null for a skip",
 });
 
 test("an OpenCode question form is shown as questions and answered with choices and own words", async () => {
-  const { elicitForm } = await import("../server/modules/agents/acp/acp-elicitation.ts");
+  const { elicitForm } = await import("../packages/server/modules/agents/acp/acp-elicitation.ts");
   const params = {
     mode: "form",
     message: "Questions",
@@ -174,7 +174,7 @@ test("an OpenCode question form is shown as questions and answered with choices 
 });
 
 test("a Codex user-input form keeps its note field and 'none of the above' fallback", async () => {
-  const { elicitForm } = await import("../server/modules/agents/acp/acp-elicitation.ts");
+  const { elicitForm } = await import("../packages/server/modules/agents/acp/acp-elicitation.ts");
   const params = {
     mode: "form",
     message: "Codex needs your input to continue.",
@@ -228,8 +228,8 @@ test("a question an ACP agent asks reaches the user through runAgent and the ans
   const { join } = await import("node:path");
   const { fileURLToPath } = await import("node:url");
   const { acpProgram, registerAcpProgram } =
-    await import("../server/modules/agents/acp/acp-programs.ts");
-  const { runAgent } = await import("../server/modules/agent/index.ts");
+    await import("../packages/server/modules/agents/acp/acp-programs.ts");
+  const { runAgent } = await import("../packages/server/modules/agent/index.ts");
   const fake = fileURLToPath(new URL("./fixtures/fake-acp-asker.mjs", import.meta.url));
   const cwd = await mkdtemp(join(tmpdir(), "projector-ask-"));
   const saved = { cursor: acpProgram("cursor"), opencode: acpProgram("opencode") };

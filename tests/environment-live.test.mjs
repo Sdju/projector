@@ -9,7 +9,7 @@ import {
   environmentPorts,
   runEnvironmentCommand,
   stopEnvironmentContainer,
-} from "../server/modules/environments/index.ts";
+} from "../packages/server/modules/environments/index.ts";
 
 // Needs a local Docker daemon and the default image; opt-in.
 const enabled = process.env.PROJECTOR_TEST_DOCKER === "1";

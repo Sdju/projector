@@ -5,7 +5,7 @@ import {
   compactHistory,
   splitAtCompaction,
   summarySection,
-} from "../server/modules/agents/projector/projector-compaction.ts";
+} from "../packages/server/modules/agents/projector/projector-compaction.ts";
 
 const mock = (answer, calls) =>
   new MockLanguageModelV3({

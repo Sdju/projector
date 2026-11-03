@@ -26,10 +26,11 @@ const project = {
   createdAt: "",
 };
 await writeFile(join(root, "projector/projects.json"), JSON.stringify({ projects: [project] }));
-const { attachSharedTerminalServer } = await import("../server/modules/terminal-control/index.ts");
+const { attachSharedTerminalServer } =
+  await import("../packages/server/modules/terminal-control/index.ts");
 const { attachTerminalServer, createTerminalSession, closeProjectTerminals, listTerminalSessions } =
-  await import("../server/modules/terminal/index.ts");
-const { state } = await import("../server/modules/terminal/session-state.ts");
+  await import("../packages/server/modules/terminal/index.ts");
+const { state } = await import("../packages/server/modules/terminal/session-state.ts");
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function until(predicate) {
   for (let i = 0; i < 400; i++) {
@@ -169,7 +170,7 @@ test("shared channels preserve PTY, ACK, resize, reconnect, control isolation an
       }
     }
     const workerSource = await readFile(
-      new URL("../src/modules/terminal/lib/shared.worker.ts", import.meta.url),
+      new URL("../packages/client/modules/terminal/lib/shared.worker.ts", import.meta.url),
       "utf8",
     );
     runInNewContext(stripTypeScriptTypes(workerSource), {
@@ -217,7 +218,7 @@ test("shared channels preserve PTY, ACK, resize, reconnect, control isolation an
     await until(() =>
       payloads(restored, "closed-terminal").some((item) => item.type === "snapshot"),
     );
-    const { closeTerminalSession } = await import("../server/modules/terminal/index.ts");
+    const { closeTerminalSession } = await import("../packages/server/modules/terminal/index.ts");
     closeTerminalSession(project.id, b.id);
     await until(() =>
       restored.messages.some(

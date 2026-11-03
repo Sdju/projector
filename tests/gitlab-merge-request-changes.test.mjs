@@ -13,7 +13,8 @@ const head = "b".repeat(40);
 async function setup(url = "https://gitlab.com") {
   const root = await mkdtemp(join(tmpdir(), "projector-gitlab-mr-changes-"));
   process.env.XDG_DATA_HOME = join(root, "data");
-  const { updateIntegration } = await import("../server/modules/integration-store/index.ts");
+  const { updateIntegration } =
+    await import("../packages/server/modules/integration-store/index.ts");
   await updateIntegration("gitlab", () => ({
     enabled: true,
     settings: { url, directory: join(root, "projects") },
@@ -74,7 +75,8 @@ test("GitLab merge request files keep the pinned diff refs and cap changes_count
       ]);
     return Response.json({}, { status: 404 });
   });
-  const { browseGitlabMergeRequestFiles } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabMergeRequestFiles } =
+    await import("../packages/server/modules/gitlab/index.ts");
   const changes = await browseGitlabMergeRequestFiles(repository, 7);
   expect(changes.diffRefs).toStrictEqual({ baseSha: base, startSha: base, headSha: head });
   expect(changes.changedFiles).toBe(10);
@@ -118,7 +120,8 @@ test("GitLab merge request files treat changes_count 1000+ as capped", async () 
       ]);
     return Response.json({}, { status: 404 });
   });
-  const { browseGitlabMergeRequestFiles } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabMergeRequestFiles } =
+    await import("../packages/server/modules/gitlab/index.ts");
   const changes = await browseGitlabMergeRequestFiles(repository, 8);
   expect(changes.changedFiles).toBe(1000);
   expect(changes.changedFilesCapped).toBe(true);
@@ -168,7 +171,8 @@ test("GitLab merge request diff reads both pinned sides and handles added/delete
     }
     return Response.json({}, { status: 404 });
   });
-  const { browseGitlabMergeRequestDiff } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabMergeRequestDiff } =
+    await import("../packages/server/modules/gitlab/index.ts");
   const modified = await browseGitlabMergeRequestDiff(repository, 7, "src/app.ts");
   expect(modified).toStrictEqual({
     path: "src/app.ts",
@@ -208,7 +212,8 @@ test("GitLab merge request diff reports binary, too large, missing refs and unkn
     if (path.endsWith("/merge_requests/7/diffs")) return Response.json(files);
     return Response.json({}, { status: 404 });
   });
-  const { browseGitlabMergeRequestDiff } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabMergeRequestDiff } =
+    await import("../packages/server/modules/gitlab/index.ts");
   expect(await browseGitlabMergeRequestDiff(repository, 7, "logo.png")).toMatchObject({
     binary: true,
     tooLarge: false,
@@ -244,7 +249,8 @@ test("GitLab merge request diff turns an oversized side into tooLarge", async ()
     if (path.includes("/repository/files/")) return Response.json({ size: 6 * 1024 * 1024 });
     return Response.json({}, { status: 404 });
   });
-  const { browseGitlabMergeRequestDiff } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabMergeRequestDiff } =
+    await import("../packages/server/modules/gitlab/index.ts");
   expect(await browseGitlabMergeRequestDiff(repository, 7, "big.ts")).toMatchObject({
     tooLarge: true,
     original: "",

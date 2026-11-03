@@ -3,8 +3,11 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
-import { connectMcp, mcpToolName } from "../server/modules/agents/projector/projector-mcp.ts";
-import { mcpServerConfigs } from "../server/modules/agents/projector/projector-mcp-config.ts";
+import {
+  connectMcp,
+  mcpToolName,
+} from "../packages/server/modules/agents/projector/projector-mcp.ts";
+import { mcpServerConfigs } from "../packages/server/modules/agents/projector/projector-mcp-config.ts";
 
 const server = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "mcp-echo-server.mjs");
 const entry = { command: process.execPath, args: [server] };

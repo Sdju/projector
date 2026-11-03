@@ -1,0 +1,370 @@
+<script setup lang="ts">
+import { ActivityIsland } from "../../modules/agent/index.ts";
+import { useCommandScope, commandArgs } from "../../common/utilities/commands.ts";
+import { useCompactViewport } from "../../common/utilities/compact-viewport.ts";
+import { computed, ref } from "vue";
+import { githubProjectRoute } from "@projector/core/modules/github/index.ts";
+import { useRoute, useRouter } from "vue-router";
+import {
+  useProjects,
+  projectRoute,
+  gitlabOpenRoute,
+  type ProjectLocation,
+} from "../../modules/project/index.ts";
+import { fetchIntegrations } from "../../modules/integration-api/index.ts";
+import { ProjectSwitcher, MobileProjectPicker } from "../../modules/catalog/index.ts";
+import { isFileDrag, pathsFromDataTransfer } from "../../modules/path-drop/index.ts";
+
+defineProps<{ currentProject?: ProjectLocation }>();
+const { openPath } = useProjects();
+const route = useRoute();
+const router = useRouter();
+/** On a phone the project header is hidden; the island moves into the terminal header there. */
+const compact = useCompactViewport();
+
+const commands = useCommandScope("project:path", () => ({ surface: "project-path" }));
+commands.scope.registerCommand({
+  id: "ide.project.path.open",
+  title: "Открыть проект по пути",
+  description:
+    "Открывает локальную папку, gh:/owner/repository или gl:/<instance>/<group>/<project> в readonly без клонирования.",
+  arguments: {
+    path: "string: абсолютный путь, gh:/owner/repository или gl:/<instance>/<group>/<project>",
+  },
+  run: async (value) => {
+    const { path } = commandArgs(value);
+    if (typeof path !== "string") throw new Error("Укажите path");
+    await router.push(projectRoute(path));
+  },
+});
+commands.scope.registerCommand({
+  id: "ide.github.repository.open",
+  title: "Открыть репозиторий GitHub",
+  description:
+    "Открывает репозиторий GitHub в readonly без клонирования; публичный репозиторий не требует входа.",
+  arguments: { repository: "string: owner/repository или ссылка GitHub" },
+  run: async (value) => {
+    const { repository } = commandArgs(value);
+    if (typeof repository !== "string") throw new Error("Укажите repository");
+    await router.push(githubProjectRoute(repository));
+  },
+});
+commands.scope.registerCommand({
+  id: "ide.gitlab.repository.open",
+  title: "Открыть проект GitLab",
+  description:
+    "Открывает проект GitLab в readonly без клонирования: ссылку, gl:/<instance>/<group>/<project> или group/project настроенного инстанса. Публичные проекты gitlab.com доступны без входа.",
+  arguments: {
+    repository:
+      "string: group/project, <instance>/group/project, gl:/<instance>/group/project или ссылка GitLab",
+  },
+  run: async (value) => {
+    const { repository } = commandArgs(value);
+    if (typeof repository !== "string") throw new Error("Укажите repository");
+    const data = await fetchIntegrations();
+    const integration = data.integrations.find((item) => item.id === "gitlab");
+    await router.push(gitlabOpenRoute(repository, integration?.settings.url));
+  },
+});
+commands.scope.registerCommand({
+  id: "ide.project.paths.open",
+  title: "Открыть папки как проекты",
+  description:
+    "Создаёт проекты для локальных папок, которых нет в каталоге, и открывает первую из них.",
+  arguments: { paths: "string[]: абсолютные пути папок" },
+  run: async (value) => {
+    const { paths } = commandArgs(value);
+    if (!Array.isArray(paths) || !paths.length || paths.some((path) => typeof path !== "string"))
+      throw new Error("Укажите paths");
+    const opened = [];
+    for (const path of paths as string[]) opened.push((await openPath(path)).project);
+    await router.push(projectRoute(opened[0].path));
+  },
+});
+// Inside a workspace the terminal and file tree own dropped files; elsewhere a folder becomes a project.
+const dropsProjects = computed(() => route.name === "launcher");
+const dragging = ref(false);
+const dropError = ref("");
+let dragDepth = 0;
+function dragEnter(event: DragEvent) {
+  if (!dropsProjects.value || !isFileDrag(event.dataTransfer)) return;
+  dragDepth++;
+  dragging.value = true;
+}
+function dragLeave() {
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (!dragDepth) dragging.value = false;
+}
+async function drop(event: DragEvent) {
+  dragging.value = false;
+  dragDepth = 0;
+  if (!dropsProjects.value || !isFileDrag(event.dataTransfer)) return;
+  const paths = pathsFromDataTransfer(event.dataTransfer);
+  dropError.value = "";
+  if (!paths.length) {
+    dropError.value = "Не удалось прочитать путь. Перетащите папку из файлового менеджера.";
+    return;
+  }
+  try {
+    await commands.scope.executeCommand<void>("ide.project.paths.open", { paths });
+  } catch (err) {
+    dropError.value = err instanceof Error ? err.message : "Не удалось открыть папку";
+  }
+}
+const navigatePath = (path: string) =>
+  commands.scope.executeCommand<void>("ide.project.path.open", { path });
+</script>
+
+<template>
+  <div
+    class="shell"
+    :class="{
+      workspace:
+        route.name === 'project' ||
+        route.name === 'github-project' ||
+        route.name === 'gitlab-project',
+      settings: route.name === 'settings',
+    }"
+    @dragenter="dragEnter"
+    @dragover.prevent
+    @dragleave="dragLeave"
+    @drop.prevent="drop"
+  >
+    <div v-if="dragging" class="drop-hint">Бросьте папку — откроем проект</div>
+    <header class="top" :class="{ 'has-project': currentProject }">
+      <MobileProjectPicker
+        v-if="currentProject"
+        :key="currentProject.id"
+        class="mobile-picker"
+        :project="currentProject"
+      />
+      <ProjectSwitcher
+        v-if="currentProject"
+        :key="currentProject.id"
+        class="project-switcher"
+        :project="currentProject"
+        :navigate="navigatePath"
+      />
+      <div v-if="currentProject" id="header-tools" class="header-tools" />
+      <router-link v-else class="brand" to="/" title="Открыть поиск">
+        <span class="u-truncate">projector</span>
+      </router-link>
+      <nav class="nav">
+        <router-link v-if="!currentProject" to="/settings">настройки</router-link>
+        <ActivityIsland v-if="!currentProject || !compact" />
+      </nav>
+    </header>
+    <p v-if="dropError" class="drop-error" role="alert">{{ dropError }}</p>
+    <main>
+      <slot />
+    </main>
+  </div>
+</template>
+
+<style scoped>
+.drop-hint {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-sticky);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  border: 1px dashed var(--focus);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  color: var(--text);
+}
+.drop-error {
+  margin: 0 0 var(--sp-3);
+  color: var(--err);
+  font-size: var(--fs-xs);
+}
+.mobile-picker {
+  display: none;
+}
+
+.shell {
+  --page-width: 760px;
+  --brand-track: 0.16em;
+  width: min(var(--page-width), calc(100% - var(--sp-4) * 2));
+  margin: 0 auto;
+  padding: var(--sp-4) 0 56px;
+  min-height: 100%;
+  position: relative;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--sp-3);
+  gap: var(--sp-4);
+}
+
+.header-tools {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+.nav {
+  margin-left: auto;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-shrink: 0;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--brand-track);
+  text-transform: lowercase;
+  color: var(--muted);
+}
+
+.brand img {
+  flex-shrink: 0;
+  object-fit: contain;
+  border-radius: var(--r-sm);
+}
+
+.nav {
+  flex-shrink: 0;
+  display: flex;
+  gap: var(--sp-3);
+  align-items: center;
+}
+
+.nav a,
+.nav button {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+.nav a:hover,
+.nav button:hover {
+  color: var(--text);
+}
+
+.nav a.router-link-active {
+  color: var(--text);
+}
+
+/* Рабочая область: один внешний отступ — зазор между островами, фон общий */
+.shell.workspace {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: var(--island-gap);
+  height: 100dvh;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas);
+}
+.workspace .top {
+  margin-bottom: var(--island-gap);
+  padding-inline: var(--sp-2);
+}
+/* Логотип проекта встаёт по центру колонки иконок слева */
+.workspace .top :deep(.project-switcher .trigger) {
+  margin-inline-start: calc(-1 * var(--sp-2));
+  padding-inline-start: 5px;
+}
+.workspace main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.workspace main :deep(.project-page) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.shell.settings {
+  --page-width: 1100px;
+  padding-bottom: var(--sp-4);
+}
+@media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {
+  .shell,
+  .shell.workspace {
+    width: auto;
+    margin-inline: max(var(--sp-2), env(safe-area-inset-left))
+      max(var(--sp-2), env(safe-area-inset-right));
+    padding-top: max(var(--sp-2), env(safe-area-inset-top));
+    padding-bottom: max(var(--sp-3), env(safe-area-inset-bottom));
+  }
+  .top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-2);
+  }
+  .brand {
+    max-width: none;
+    min-width: 0;
+    min-height: 44px;
+    --brand-track: 0.06em;
+  }
+  .nav {
+    grid-column: 2;
+    grid-row: 1;
+    gap: var(--sp-3);
+  }
+  .nav a,
+  .nav button {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  /* Шапка проекта: выбор проекта слева, запуск и ссылки справа; лист выбора привязан к шапке */
+  .top.has-project {
+    position: relative;
+    display: flex;
+    margin-bottom: 0;
+  }
+  .has-project .project-switcher,
+  .has-project .nav {
+    display: none;
+  }
+  .has-project .header-tools {
+    flex: none;
+    --control-h: 34px;
+    --control-h-sm: 34px;
+  }
+  .mobile-picker {
+    display: block;
+  }
+  /* Редактор и терминалы получают весь экран: шапка проекта (выбор и запуск) живёт на экране «Файлы» */
+  .shell.workspace:has(main [data-surface]:not([data-surface="files"])) .top.has-project {
+    display: none;
+  }
+  .shell.workspace {
+    margin-inline: 0;
+    padding: max(var(--island-gap), env(safe-area-inset-top))
+      max(var(--island-gap), env(safe-area-inset-right))
+      max(var(--island-gap), min(env(safe-area-inset-bottom), var(--sp-3)))
+      max(var(--island-gap), env(safe-area-inset-left));
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background: var(--canvas);
+  }
+  .workspace .top {
+    padding-inline: 0;
+    margin-bottom: var(--island-gap);
+  }
+  .workspace main {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .workspace main :deep(.project-page) {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+}
+</style>

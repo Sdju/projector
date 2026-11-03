@@ -12,7 +12,8 @@
           }
         };
       }
-      const { openTerminalSocket } = await import("/src/modules/terminal/lib/socket.ts");
+      const { openTerminalSocket } =
+        await import("/packages/client/modules/terminal/lib/socket.ts");
       const channels = new Map();
       let nextId = 0;
       const until = async (predicate) => {

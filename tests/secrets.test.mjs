@@ -3,15 +3,15 @@ import { expectPrivate } from "./fixtures/private.mjs";
 import { mkdtemp, readFile, writeFile, mkdir, stat, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { os } from "../core/modules/os/index.ts";
-import { createVault } from "../server/modules/secrets/index.ts";
+import { os } from "../packages/core/modules/os/index.ts";
+import { createVault } from "../packages/server/modules/secrets/index.ts";
 import {
   integrationConfig,
   migrateIntegrationSecrets,
   revealIntegrationCredential,
   updateIntegration,
   useIntegrationVault,
-} from "../server/modules/integration-store/index.ts";
+} from "../packages/server/modules/integration-store/index.ts";
 
 function fakeBackend({ available = true } = {}) {
   const items = new Map();

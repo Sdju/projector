@@ -4,8 +4,8 @@ import {
   createCommandBridge,
   completeCommandRequest,
   isBridgeRequestPending,
-} from "../server/modules/agent/command-bridge.ts";
-import { driveRun, isRunDriven, joinRun } from "../server/modules/agent/run-hub.ts";
+} from "../packages/server/modules/agent/command-bridge.ts";
+import { driveRun, isRunDriven, joinRun } from "../packages/server/modules/agent/run-hub.ts";
 
 // Each test uses its own run id: the hub is kept across module reloads, like the server's other state.
 let counter = 0;

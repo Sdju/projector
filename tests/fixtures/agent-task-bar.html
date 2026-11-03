@@ -3,12 +3,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <div id="fixture"></div>
 <script type="module">
-  import "/src/app/styles.css";
+  import "/packages/client/app/styles.css";
   import { createApp, h, ref } from "vue";
-  import AgentTurn from "/src/modules/agent/ui/AgentTurn.vue";
-  import AgentTaskView from "/src/modules/agent/ui/AgentTaskView.vue";
-  import { taskDetail } from "/src/modules/agent/lib/task-detail.ts";
-  import AgentTaskBar from "/src/modules/agent/ui/AgentTaskBar.vue";
+  import AgentTurn from "/packages/client/modules/agent/ui/AgentTurn.vue";
+  import AgentTaskView from "/packages/client/modules/agent/ui/AgentTaskView.vue";
+  import { taskDetail } from "/packages/client/modules/agent/lib/task-detail.ts";
+  import AgentTaskBar from "/packages/client/modules/agent/ui/AgentTaskBar.vue";
   const task = (n, status) => ({
     id: `t${n}`,
     kind: n % 2 ? "shell" : "agent",

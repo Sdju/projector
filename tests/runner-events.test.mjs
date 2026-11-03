@@ -34,7 +34,7 @@ test.each(["shared", "legacy", "fallback"])(
       },
     );
     const oldHandler = vi.fn();
-    const { connectEvents } = await import("../src/modules/runner/lib/events.ts");
+    const { connectEvents } = await import("../packages/client/modules/runner/lib/events.ts");
     connectEvents("page", oldHandler);
     if (mode === "shared") workers[0].port.onmessage({ data: { type: "ready" } });
     if (mode === "fallback") await vi.advanceTimersByTimeAsync(8000);
@@ -44,7 +44,7 @@ test.each(["shared", "legacy", "fallback"])(
     // Re-evaluate the module, just as HMR does while an answer is streaming.
     for (let i = 0; i < 4; i++) {
       vi.resetModules();
-      const reloaded = await import("../src/modules/runner/lib/events.ts");
+      const reloaded = await import("../packages/client/modules/runner/lib/events.ts");
       reloaded.connectEvents("page", handler);
     }
     for (const text of ["Ре", "ализовал", " раздел"]) {

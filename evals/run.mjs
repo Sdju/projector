@@ -1,7 +1,7 @@
 // Runs the evals against a provider saved in Projector (its key comes from the system keyring):
 //   node evals/run.mjs <provider id> [model alias] [scenario id…]
 // It is a script, not a test: tests must never reach the real keyring (see secrets/vault.ts).
-import { registerBuiltinWidgetDefinitions } from "../server/app/widgets.ts";
+import { registerBuiltinWidgetDefinitions } from "../packages/server/app/widgets.ts";
 import { judge, runScenario } from "./harness.mjs";
 import { scenarios } from "./scenarios.mjs";
 

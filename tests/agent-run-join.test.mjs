@@ -8,9 +8,9 @@ test("a page opening a chat being answered here joins the run instead of attachi
   const previous = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = directory;
   try {
-    const { createRun } = await import("../server/modules/agent/agent-runs.ts");
-    const { driveRun } = await import("../server/modules/agent/run-hub.ts");
-    const { handleAgentRun } = await import("../server/modules/agent/run-request.ts");
+    const { createRun } = await import("../packages/server/modules/agent/agent-runs.ts");
+    const { driveRun } = await import("../packages/server/modules/agent/run-hub.ts");
+    const { handleAgentRun } = await import("../packages/server/modules/agent/run-request.ts");
 
     const runId = await createRun({ backend: "codex", message: "hi", history: [] });
     const chunks = [];

@@ -6,8 +6,8 @@ import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { expect, onTestFinished, test } from "vite-plus/test";
-import { os } from "../core/modules/os/index.ts";
-import { runPowerShell } from "../core/modules/os/modules/windows/ps.ts";
+import { os } from "../packages/core/modules/os/index.ts";
+import { runPowerShell } from "../packages/core/modules/os/modules/windows/ps.ts";
 
 const windows = process.platform === "win32";
 const execute = promisify(execFile);

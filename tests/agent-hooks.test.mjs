@@ -10,7 +10,7 @@ import {
   runStopHooks,
   withHooks,
   writeUserHooks,
-} from "../server/modules/agents/projector/projector-hooks.ts";
+} from "../packages/server/modules/agents/projector/projector-hooks.ts";
 
 let previous;
 let data;

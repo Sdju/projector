@@ -11,12 +11,12 @@ import {
   authorizeHttp,
   setLanPassword,
   hasLanPassword,
-} from "../server/modules/access/index.ts";
-import { lanPasswordPath } from "../core/modules/app-paths/index.ts";
-import { handleApi } from "../server/app/api.ts";
-import { attachTerminalServer } from "../server/modules/terminal/index.ts";
-import { attachTerminalControlServer } from "../server/modules/terminal-control/index.ts";
-import { updateProjects } from "../server/modules/projects/index.ts";
+} from "../packages/server/modules/access/index.ts";
+import { lanPasswordPath } from "../packages/core/modules/app-paths/index.ts";
+import { handleApi } from "../packages/server/app/api.ts";
+import { attachTerminalServer } from "../packages/server/modules/terminal/index.ts";
+import { attachTerminalControlServer } from "../packages/server/modules/terminal-control/index.ts";
+import { updateProjects } from "../packages/server/modules/projects/index.ts";
 import { WebSocket } from "ws";
 
 async function isolatedLan() {
@@ -184,7 +184,7 @@ test("fetch isolates LAN credentials and prompts only on an explicit LAN challen
     else globalThis.window = previous.window;
     delete globalThis[Symbol.for("projector.native-fetch")];
   });
-  const auth = await import("../src/common/utilities/lan-auth.ts");
+  const auth = await import("../packages/client/common/utilities/lan-auth.ts");
   auth.setLanPassword("test-only-password");
   for (const url of [
     "//attacker.invalid/collect",
@@ -233,7 +233,10 @@ test("Vite and static resources require LAN authentication, and the session cook
   const unauthorized = await send(server, address, "/api/app/network", headers);
   expect(unauthorized.status).toBe(401);
   expect(unauthorized.headers["www-authenticate"]).toBe('Bearer realm="Projector LAN"');
-  const resources = ["/package.json", `/@fs${process.cwd()}/server/modules/access/access.ts?raw`];
+  const resources = [
+    "/package.json",
+    `/@fs${process.cwd()}/packages/server/modules/access/access.ts?raw`,
+  ];
   for (const path of resources) {
     expect((await send(server, address, path, headers)).status, path).toBe(401);
   }

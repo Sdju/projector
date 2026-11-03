@@ -1,6 +1,6 @@
 // Runs outside Vitest, with the `gi:` loader: opens a real GTK window and reports what Win32 sees.
-import { os } from "../../core/modules/os/index.ts";
-import { runPowerShell } from "../../core/modules/os/modules/windows/ps.ts";
+import { os } from "../../packages/core/modules/os/index.ts";
+import { runPowerShell } from "../../packages/core/modules/os/modules/windows/ps.ts";
 
 const { default: Gtk } = await import("gi:Gtk-4.0");
 const { default: GLib } = await import("gi:GLib-2.0");

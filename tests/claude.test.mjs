@@ -15,10 +15,10 @@ vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
 }));
 
 const { ClaudeUsageError, readClaudeUsage } =
-  await import("../server/modules/agents-integration/claude/client.ts");
+  await import("../packages/server/modules/agents-integration/claude/client.ts");
 const { claudeWindows, claudeUsage } =
-  await import("../server/modules/agents-integration/claude/usage.ts");
-const { handleClaude } = await import("../server/routes/api/claude.ts");
+  await import("../packages/server/modules/agents-integration/claude/usage.ts");
+const { handleClaude } = await import("../packages/server/routes/api/claude.ts");
 
 const window = { utilization: 29, resets_at: "2026-10-11T19:00:00.220419+00:00" };
 const rateLimits = { five_hour: window, seven_day: { ...window, utilization: 4 } };

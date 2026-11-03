@@ -8,12 +8,12 @@ import {
   completeCommandRequest,
   readAgentHistory,
   writeAgentHistory,
-} from "../server/modules/agent/index.ts";
-import { createAgentTools } from "../server/modules/agents/projector/agent-tools.ts";
-import { createCommandService } from "../core/modules/ide/index.ts";
-import { agentCommandHandler } from "../src/modules/agent/model/commands.ts";
-import { os } from "../core/modules/os/index.ts";
-import { runStreamingProcess } from "../core/modules/os-posix/index.ts";
+} from "../packages/server/modules/agent/index.ts";
+import { createAgentTools } from "../packages/server/modules/agents/projector/agent-tools.ts";
+import { createCommandService } from "../packages/core/modules/ide/index.ts";
+import { agentCommandHandler } from "../packages/client/modules/agent/model/commands.ts";
+import { os } from "../packages/core/modules/os/index.ts";
+import { runStreamingProcess } from "../packages/core/modules/os-posix/index.ts";
 
 test("command bridge routes concurrent replies once, expires and cancels requests", async () => {
   const requests = [];
@@ -198,8 +198,9 @@ test("chat history persists on disk, validates data and separates project IDs", 
 test("HTTP agent streams discovery, description, execution, Bash and final text through its SSE client", async () => {
   const { createServer } = await import("node:http");
   const { once } = await import("node:events");
-  const { saveProviders, useProviderVault } = await import("../server/modules/providers/index.ts");
-  const { createVault } = await import("../server/modules/secrets/index.ts");
+  const { saveProviders, useProviderVault } =
+    await import("../packages/server/modules/providers/index.ts");
+  const { createVault } = await import("../packages/server/modules/secrets/index.ts");
   // Provider keys live only in the keyring; the test keeps it in memory.
   const keyring = new Map();
   useProviderVault(
@@ -213,14 +214,14 @@ test("HTTP agent streams discovery, description, execution, Bash and final text 
       () => undefined,
     ),
   );
-  const { handleApi } = await import("../server/app/api.ts");
-  const { streamAgent } = await import("../src/modules/agent/api/client.ts");
+  const { handleApi } = await import("../packages/server/app/api.ts");
+  const { streamAgent } = await import("../packages/client/modules/agent/api/client.ts");
   const directory = await mkdtemp(join(tmpdir(), "projector-agent-http-"));
   const previousData = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = directory;
   // This mock provider answers by request number; the judge's extra request would shift the
   // scripted steps, so the test runs with the optional review turned off.
-  const { writeJudgeSettings } = await import("../server/modules/judge/index.ts");
+  const { writeJudgeSettings } = await import("../packages/server/modules/judge/index.ts");
   await writeJudgeSettings({ show: false, auto: false, maxRisk: 1, confidence: "high-medium" });
   const requests = [];
   const steps = [
@@ -325,7 +326,7 @@ test("HTTP agent streams discovery, description, execution, Bash and final text 
         .messages.some((m) => m.role === "tool" && m.content.includes("agent-shell-ok")),
     ).toBeTruthy();
     // The same answer through the page's events stream: the request returns at once.
-    const { pageClientId } = await import("../src/common/utilities/page-client.ts");
+    const { pageClientId } = await import("../packages/client/common/utilities/page-client.ts");
     const { get } = await import("node:http");
     const page = new EventTarget();
     globalThis.window = page;
@@ -385,7 +386,7 @@ test("HTTP agent streams discovery, description, execution, Bash and final text 
 });
 
 test("approval bridge resolves only an explicit allow and cancels with the request", async () => {
-  const { createApprovalBridge } = await import("../server/modules/agent/index.ts");
+  const { createApprovalBridge } = await import("../packages/server/modules/agent/index.ts");
   const requests = [];
   const abort = new AbortController();
   const approve = createApprovalBridge((_, request) => requests.push(request), abort.signal, 20);
@@ -404,7 +405,7 @@ test("approval bridge resolves only an explicit allow and cancels with the reque
 
 test("Claude Code messages become the shared chat events", async () => {
   const { createClaudeEventMapper } =
-    await import("../server/modules/agents/claude-code/claude-code-events.ts");
+    await import("../packages/server/modules/agents/claude-code/claude-code-events.ts");
   const events = [];
   const mapper = createClaudeEventMapper((event, data) => events.push([event, data]));
   const stream = (event, parent = null) => ({
@@ -506,7 +507,8 @@ test("Claude Code messages become the shared chat events", async () => {
 });
 
 test("ACP session updates become the shared chat events", async () => {
-  const { createAcpEventMapper } = await import("../server/modules/agents/acp/acp-events.ts");
+  const { createAcpEventMapper } =
+    await import("../packages/server/modules/agents/acp/acp-events.ts");
   const events = [];
   const mapper = createAcpEventMapper((event, data) => events.push([event, data]), "OpenCode");
   mapper.handleUpdate("s1", {
@@ -567,7 +569,8 @@ test("ACP session updates become the shared chat events", async () => {
 
 test("ACP client frames JSON-RPC over a real child process", async () => {
   const { spawn } = await import("node:child_process");
-  const { createAcpConnection } = await import("../server/modules/agents/acp/acp-client.ts");
+  const { createAcpConnection } =
+    await import("../packages/server/modules/agents/acp/acp-client.ts");
   const script = `
     const readline = require("node:readline");
     const rl = readline.createInterface({ input: process.stdin });
@@ -611,8 +614,9 @@ test("ACP client frames JSON-RPC over a real child process", async () => {
 
 test("stopping an agent kills its whole process tree", async () => {
   if (process.platform === "win32") return;
-  const { os } = await import("../core/modules/os/index.ts");
-  const { createAcpConnection } = await import("../server/modules/agents/acp/acp-client.ts");
+  const { os } = await import("../packages/core/modules/os/index.ts");
+  const { createAcpConnection } =
+    await import("../packages/server/modules/agents/acp/acp-client.ts");
   const child = os.tools.spawnAgentProcess({
     command: process.execPath,
     args: [
@@ -632,7 +636,7 @@ test("stopping an agent kills its whole process tree", async () => {
 
 test("ACP permission prefers one-time options and previews the change", async () => {
   const { decidePermission, toolCallDetail } =
-    await import("../server/modules/agents/acp/acp-backend.ts");
+    await import("../packages/server/modules/agents/acp/acp-backend.ts");
   const capture = (answer) => {
     const state = { request: undefined };
     return {
@@ -699,7 +703,7 @@ test("ACP permission prefers one-time options and previews the change", async ()
 });
 
 test("ACP backend keeps the terminal program and executable its overrides resolve to", async () => {
-  const { createAcpBackend } = await import("../server/modules/agents/acp/index.ts");
+  const { createAcpBackend } = await import("../packages/server/modules/agents/acp/index.ts");
 
   // The terminal may be a different program than the backend; the chat mode follows the terminal.
   const overridden = createAcpBackend({
@@ -717,7 +721,7 @@ test("ACP backend keeps the terminal program and executable its overrides resolv
 });
 
 test("approval bridge turns an always answer into a durable choice", async () => {
-  const { createApprovalBridge } = await import("../server/modules/agent/index.ts");
+  const { createApprovalBridge } = await import("../packages/server/modules/agent/index.ts");
   const requests = [];
   const abort = new AbortController();
   const approve = createApprovalBridge((_, request) => requests.push(request), abort.signal, 20);
@@ -733,7 +737,7 @@ test("approval bridge turns an always answer into a durable choice", async () =>
 });
 
 test("ACP resume keeps the requested session, replays history only on a fresh one", async () => {
-  const { openSession } = await import("../server/modules/agents/acp/acp-backend.ts");
+  const { openSession } = await import("../packages/server/modules/agents/acp/acp-backend.ts");
   const calls = [];
   const replay = [];
   const loading = {
@@ -772,7 +776,7 @@ test("ACP resume keeps the requested session, replays history only on a fresh on
 });
 
 test("ACP session open does not mask real failures as a missing session", async () => {
-  const { openSession } = await import("../server/modules/agents/acp/acp-backend.ts");
+  const { openSession } = await import("../packages/server/modules/agents/acp/acp-backend.ts");
   const options = { sessionId: "old-1", cwd: "/tmp" };
 
   // No loadSession capability: go straight to a fresh session without trying to load.
@@ -819,7 +823,7 @@ test("ACP session open does not mask real failures as a missing session", async 
 test("ACP client times out silent requests but not when disabled", async () => {
   const { spawn } = await import("node:child_process");
   const { createAcpConnection, NO_TIMEOUT } =
-    await import("../server/modules/agents/acp/acp-client.ts");
+    await import("../packages/server/modules/agents/acp/acp-client.ts");
   const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
     stdio: ["pipe", "pipe", "pipe"],
   });
@@ -842,7 +846,7 @@ test("ACP client times out silent requests but not when disabled", async () => {
 test("agent processes resolve programs through the interactive shell PATH", async () => {
   if (process.platform === "win32") return;
   const { mkdtemp, writeFile, chmod } = await import("node:fs/promises");
-  const { os } = await import("../core/modules/os/index.ts");
+  const { os } = await import("../packages/core/modules/os/index.ts");
   const dir = await mkdtemp(join(tmpdir(), "projector-shell-path-"));
   await writeFile(join(dir, "fake-agent"), "#!/bin/sh\n");
   await chmod(join(dir, "fake-agent"), 0o755);
@@ -925,7 +929,8 @@ const codexSession = {
 };
 
 test("ACP controls: model, effort, mode first; config options win over the legacy lists", async () => {
-  const { controlsFromSession } = await import("../server/modules/agents/acp/acp-controls.ts");
+  const { controlsFromSession } =
+    await import("../packages/server/modules/agents/acp/acp-controls.ts");
   const controls = controlsFromSession(codexSession);
   expect(controls.map((control) => [control.id, control.category])).toStrictEqual([
     ["model", "model"],
@@ -958,7 +963,7 @@ test("ACP controls: model, effort, mode first; config options win over the legac
 
 test("ACP selection is applied in order, re-reads dependent options and skips refusals", async () => {
   const { applySelection, controlsFromSession } =
-    await import("../server/modules/agents/acp/acp-controls.ts");
+    await import("../packages/server/modules/agents/acp/acp-controls.ts");
   const calls = [];
   let state = codexSession.configOptions;
   const connection = {
@@ -1028,7 +1033,8 @@ test("ACP selection is applied in order, re-reads dependent options and skips re
 });
 
 test("ACP replay rebuilds the chat from a loaded session", async () => {
-  const { createAcpReplayCollector } = await import("../server/modules/agents/acp/acp-events.ts");
+  const { createAcpReplayCollector } =
+    await import("../packages/server/modules/agents/acp/acp-events.ts");
   const replay = createAcpReplayCollector("opencode", "ses_1");
   const chunk = (sessionUpdate, text) => ({ sessionUpdate, content: { type: "text", text } });
   replay.handleUpdate(chunk("user_message_chunk", "Создай "));
@@ -1060,7 +1066,7 @@ test("ACP replay rebuilds the chat from a loaded session", async () => {
 });
 
 test("agent choices are stored per backend and validated", async () => {
-  const { selectionFrom } = await import("../server/modules/agent/index.ts");
+  const { selectionFrom } = await import("../packages/server/modules/agent/index.ts");
   expect(selectionFrom({ model: "opus", bad: 1, effort: "low" })).toStrictEqual({
     model: "opus",
     effort: "low",
@@ -1070,7 +1076,8 @@ test("agent choices are stored per backend and validated", async () => {
   const previous = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = directory;
   try {
-    const { preferences, setAgentDefault } = await import("../server/modules/preferences/index.ts");
+    const { preferences, setAgentDefault } =
+      await import("../packages/server/modules/preferences/index.ts");
     expect((await preferences()).agentDefaults).toStrictEqual({});
     await setAgentDefault("codex", "model", "gpt-6-luna");
     await setAgentDefault("codex", "reasoning_effort", "high");
@@ -1088,12 +1095,12 @@ test("agent choices are stored per backend and validated", async () => {
 });
 
 test("the codex npx fallback is pinned to a version", async () => {
-  const { codexProgram } = await import("../server/modules/agents/codex/index.ts");
+  const { codexProgram } = await import("../packages/server/modules/agents/codex/index.ts");
   expect(codexProgram.args.at(-1)).toMatch(/^@agentclientprotocol\/codex-acp@\d+\.\d+\.\d+$/);
 });
 
 test("ACP authenticates once when the agent refuses a session", async () => {
-  const { openSession } = await import("../server/modules/agents/acp/acp-backend.ts");
+  const { openSession } = await import("../packages/server/modules/agents/acp/acp-backend.ts");
   const calls = [];
   let authenticated = false;
   const connection = {
@@ -1138,7 +1145,8 @@ test("chat history keeps the native session of a turn", async () => {
 });
 
 test("agent session modes default to the terminal and persist only a GUI choice", async () => {
-  const { preferences, setAgentMode } = await import("../server/modules/preferences/index.ts");
+  const { preferences, setAgentMode } =
+    await import("../packages/server/modules/preferences/index.ts");
   const directory = await mkdtemp(join(tmpdir(), "projector-agent-modes-"));
   const previous = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = directory;
@@ -1167,8 +1175,10 @@ test("agent session modes default to the terminal and persist only a GUI choice"
 });
 
 test("disabled agents persist and refuse runs", async () => {
-  const { preferences, setAgentEnabled } = await import("../server/modules/preferences/index.ts");
-  const { registerAgentBackend, runAgent } = await import("../server/modules/agent/index.ts");
+  const { preferences, setAgentEnabled } =
+    await import("../packages/server/modules/preferences/index.ts");
+  const { registerAgentBackend, runAgent } =
+    await import("../packages/server/modules/agent/index.ts");
   const directory = await mkdtemp(join(tmpdir(), "projector-agent-disabled-"));
   const previous = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = directory;

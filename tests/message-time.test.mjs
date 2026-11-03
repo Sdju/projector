@@ -2,13 +2,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, expect, test, vi } from "vite-plus/test";
-import { createAcpReplayCollector } from "../server/modules/agents/acp/acp-events.ts";
-import { uuidV7Time } from "../server/modules/agents/acp/acp-dialect.ts";
-import { createCodexDialect } from "../server/modules/agents/codex/dialect.ts";
+import { createAcpReplayCollector } from "../packages/server/modules/agents/acp/acp-events.ts";
+import { uuidV7Time } from "../packages/server/modules/agents/acp/acp-dialect.ts";
+import { createCodexDialect } from "../packages/server/modules/agents/codex/dialect.ts";
 import {
   createOpencodeDialect,
   opencodeIdTime,
-} from "../server/modules/agents/opencode/dialect.ts";
+} from "../packages/server/modules/agents/opencode/dialect.ts";
 
 const transcript = vi.hoisted(() => []);
 vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
@@ -16,7 +16,7 @@ vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
 }));
 vi.resetModules();
 const { claudeLoadSession } =
-  await import("../server/modules/agents/claude-code/claude-code-sessions.ts");
+  await import("../packages/server/modules/agents/claude-code/claude-code-sessions.ts");
 
 test("a UUIDv7 carries its time, any other id does not", () => {
   expect(uuidV7Time("01a13e17-a880-7962-b3f2-6e1a5433545a")).toBe(

@@ -3,14 +3,14 @@ import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createOs } from "../core/modules/os/index.ts";
-import { expandPath, sameLocalPath } from "../server/modules/projects/index.ts";
-import { hotkeys } from "../core/modules/os/modules/windows/shortcut.ts";
+import { createOs } from "../packages/core/modules/os/index.ts";
+import { expandPath, sameLocalPath } from "../packages/server/modules/projects/index.ts";
+import { hotkeys } from "../packages/core/modules/os/modules/windows/shortcut.ts";
 import {
   parseAppsUseLightTheme,
   readWindowsColorScheme,
-} from "../core/modules/os/modules/windows/color-scheme.ts";
-import { startDesktopShell } from "../core/modules/os/modules/windows/shell.ts";
+} from "../packages/core/modules/os/modules/windows/color-scheme.ts";
+import { startDesktopShell } from "../packages/core/modules/os/modules/windows/shell.ts";
 import {
   closeWindow,
   foregroundWindow,
@@ -21,7 +21,7 @@ import {
   stopWindowHost,
   windowCall,
   windowHostPid,
-} from "../core/modules/os/modules/windows/hwnd.ts";
+} from "../packages/core/modules/os/modules/windows/hwnd.ts";
 
 const credentials = { username: "x-access-token", tokenEnv: "PROJECTOR_GITHUB_TOKEN", failure: "" };
 const handlers = () => ({

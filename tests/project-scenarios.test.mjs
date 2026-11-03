@@ -5,9 +5,12 @@ import { expect, test } from "vite-plus/test";
 import {
   launchHtml,
   parseCommands,
-} from "../server/modules/project-presentation/implementation.ts";
-import { scenarioDirectory } from "../server/modules/terminal/scenario-folder.ts";
-import { commandError, settingsError } from "../src/modules/project/model/project-settings.ts";
+} from "../packages/server/modules/project-presentation/implementation.ts";
+import { scenarioDirectory } from "../packages/server/modules/terminal/scenario-folder.ts";
+import {
+  commandError,
+  settingsError,
+} from "../packages/client/modules/project/model/project-settings.ts";
 
 const row = (extra) => ({ id: "a", name: "dev", cmd: "pnpm dev", ...extra });
 

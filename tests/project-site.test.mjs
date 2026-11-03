@@ -2,7 +2,7 @@ import { expect, test } from "vite-plus/test";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
-import { openProjectSiteFile } from "../server/modules/workspace/index.ts";
+import { openProjectSiteFile } from "../packages/server/modules/workspace/index.ts";
 
 async function withSite(run) {
   const root = await mkdtemp(join(tmpdir(), "projector-site-"));

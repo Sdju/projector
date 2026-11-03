@@ -10,7 +10,8 @@ const secret = "glpat-navigation-secret";
 async function setup(url = "https://gitlab.com", token = "") {
   const root = await mkdtemp(join(tmpdir(), "projector-gitlab-navigation-"));
   process.env.XDG_DATA_HOME = join(root, "data");
-  const { updateIntegration } = await import("../server/modules/integration-store/index.ts");
+  const { updateIntegration } =
+    await import("../packages/server/modules/integration-store/index.ts");
   await updateIntegration("gitlab", () => ({
     enabled: true,
     settings: { url, directory: join(root, "projects") },
@@ -54,7 +55,7 @@ test("GitLab root hints list groups and projects for a token", async () => {
     }
     return Response.json({}, { status: 404 });
   });
-  const { browseGitlabDirectories } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabDirectories } = await import("../packages/server/modules/gitlab/index.ts");
   const listing = await browseGitlabDirectories("gl:/gitlab.com", false);
   expect(listing).toStrictEqual({
     path: "gl:/gitlab.com",
@@ -83,7 +84,7 @@ test("GitLab root hints stay public without a token and hide forbidden groups", 
     }
     return Response.json({}, { status: 404 });
   });
-  const { browseGitlabDirectories } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabDirectories } = await import("../packages/server/modules/gitlab/index.ts");
   expect(await browseGitlabDirectories("gl:/gitlab.com", false)).toStrictEqual({
     path: "gl:/gitlab.com",
     entries: [{ name: "Public", path: "gl:/gitlab.com/public/app" }],
@@ -111,7 +112,7 @@ test("GitLab group hints use the group id for subgroups and projects", async () 
     }
     return Response.json({}, { status: 404 });
   });
-  const { browseGitlabDirectories } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabDirectories } = await import("../packages/server/modules/gitlab/index.ts");
   const listing = await browseGitlabDirectories("gl:/gitlab.com/team/sub", false);
   expect(listing).toStrictEqual({
     path: "gl:/gitlab.com/team/sub",
@@ -144,7 +145,7 @@ test("GitLab complete hints treat the last segment as a prefix of the parent gro
       ]);
     return Response.json({}, { status: 404 });
   });
-  const { browseGitlabDirectories } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabDirectories } = await import("../packages/server/modules/gitlab/index.ts");
   const listing = await browseGitlabDirectories("gl:/gitlab.com/group/ap", true);
   expect(listing.entries).toStrictEqual([
     { name: "App", path: "gl:/gitlab.com/group/app" },
@@ -175,7 +176,7 @@ test("GitLab complete hints fall back to a personal namespace", async () => {
     }
     return Response.json({}, { status: 404 });
   });
-  const { browseGitlabDirectories } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabDirectories } = await import("../packages/server/modules/gitlab/index.ts");
   const listing = await browseGitlabDirectories("gl:/gitlab.com/alice/re", true);
   expect(listing).toStrictEqual({
     path: "gl:/gitlab.com/alice/re",
@@ -204,7 +205,7 @@ test("GitLab hints list projects of a personal namespace when its arrow is opene
       return Response.json([{ name: "Repo", path_with_namespace: "alice/repo" }]);
     return Response.json({}, { status: 404 });
   });
-  const { browseGitlabDirectories } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabDirectories } = await import("../packages/server/modules/gitlab/index.ts");
   expect(await browseGitlabDirectories("gl:/gitlab.com/alice", false)).toStrictEqual({
     path: "gl:/gitlab.com/alice",
     entries: [{ name: "Repo", path: "gl:/gitlab.com/alice/repo" }],
@@ -230,7 +231,7 @@ test("GitLab hints stop at 100 entries and report the next page", async () => {
     if (url.pathname === "/api/v4/groups/20/projects") return Response.json([]);
     return Response.json({}, { status: 404 });
   });
-  const { browseGitlabDirectories } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabDirectories } = await import("../packages/server/modules/gitlab/index.ts");
   const listing = await browseGitlabDirectories("gl:/gitlab.com/big", false);
   expect(listing.entries.length).toBe(100);
   expect(listing.entries[0]).toStrictEqual({
@@ -243,7 +244,7 @@ test("GitLab hints stop at 100 entries and report the next page", async () => {
 test("GitLab hints reject foreign hosts and malformed paths before any request", async () => {
   await setup("https://gitlab.com", secret);
   const fetch = mockFetch(() => Response.json({}));
-  const { browseGitlabDirectories } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabDirectories } = await import("../packages/server/modules/gitlab/index.ts");
   await expect(
     browseGitlabDirectories("gl:/evil.example.com/group/project", false),
   ).rejects.toMatchObject({ status: 403 });
@@ -261,7 +262,8 @@ test("fetchPathSuggestions sends gl:/ paths to the GitLab route", async () => {
     }),
   );
   try {
-    const { fetchPathSuggestions } = await import("../src/modules/project/api/client.ts");
+    const { fetchPathSuggestions } =
+      await import("../packages/client/modules/project/api/client.ts");
     const listing = await fetchPathSuggestions("gl:/gitlab.com/group/ap", true);
     expect(String(fetch.mock.calls[0][0])).toBe(
       `/api/integrations/gitlab/browse/directories?${new URLSearchParams({
@@ -276,7 +278,7 @@ test("fetchPathSuggestions sends gl:/ paths to the GitLab route", async () => {
 });
 
 test("ide.gitlab.repository.open normalizes references into the GitLab route", async () => {
-  const { gitlabOpenRoute } = await import("../src/modules/project/index.ts");
+  const { gitlabOpenRoute } = await import("../packages/client/modules/project/index.ts");
   expect(gitlabOpenRoute("gl:/gitlab.com/group/sub/app")).toBe(
     "/gl/projects/gitlab.com/group/sub/app",
   );

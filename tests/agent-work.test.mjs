@@ -7,9 +7,9 @@ const html = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <div id="fixture"></div>
 <script type="module">
-  import "/src/app/styles.css";
+  import "/packages/client/app/styles.css";
   import { createApp, h, reactive, ref } from "vue";
-  import AgentTurn from "/src/modules/agent/ui/AgentTurn.vue";
+  import AgentTurn from "/packages/client/modules/agent/ui/AgentTurn.vue";
 
   const startedAt = Date.now() - 4200;
   const finishedAt = Date.now() - 1000;

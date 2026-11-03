@@ -1,5 +1,8 @@
 import { expect, test } from "vite-plus/test";
-import { createSwipeTracker, swipeCommit } from "../src/common/utilities/swipe-gesture.ts";
+import {
+  createSwipeTracker,
+  swipeCommit,
+} from "../packages/client/common/utilities/swipe-gesture.ts";
 
 const point = (x, y, time) => ({ x, y, time });
 

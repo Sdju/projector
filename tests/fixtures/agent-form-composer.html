@@ -3,10 +3,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <div id="fixture"></div>
 <script type="module">
-  import "/src/app/styles.css";
+  import "/packages/client/app/styles.css";
   import { createApp, h } from "vue";
-  import AgentFormPanel from "/src/modules/agent/ui/AgentFormPanel.vue";
-  import { registerBuiltinWidgets } from "/src/app/widgets.ts";
+  import AgentFormPanel from "/packages/client/modules/agent/ui/AgentFormPanel.vue";
+  import { registerBuiltinWidgets } from "/packages/client/app/widgets.ts";
   registerBuiltinWidgets();
 
   const source =

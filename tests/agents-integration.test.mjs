@@ -1,12 +1,12 @@
 import { expect, onTestFinished, test, vi } from "vite-plus/test";
 import { setImmediate } from "node:timers/promises";
 import { createRenderer } from "vue";
-import { createUsageCache } from "../server/modules/agents-integration/_/usage-cache.ts";
-import { useUsagePolling } from "../src/modules/agents-integration/_/use-usage-polling.ts";
+import { createUsageCache } from "../packages/server/modules/agents-integration/_/usage-cache.ts";
+import { useUsagePolling } from "../packages/client/modules/agents-integration/_/use-usage-polling.ts";
 import {
   USAGE_PERIOD_SECONDS,
   usagePaceTone,
-} from "../src/modules/agents-integration/_/usage-pace.ts";
+} from "../packages/client/modules/agents-integration/_/usage-pace.ts";
 
 test("usage cache survives loader replacement during a pending HMR request", async () => {
   vi.useFakeTimers({ toFake: ["Date"], now: 100000 });

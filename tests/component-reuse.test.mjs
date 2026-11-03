@@ -4,19 +4,19 @@ import { chromium, createChromium } from "./fixtures/chromium-driver.mjs";
 
 const html = `<!doctype html><div id="tracker"></div><div id="docker"></div><div id="usage" style="position:fixed;right:20px;bottom:20px"></div><pre id="result">WAITING</pre>
 <script type="module">
-import '/src/app/styles.css';
+import '/packages/client/app/styles.css';
 import {createApp,h,ref,nextTick} from 'vue';
-import IssueView from '/src/modules/workspace/modules/viewers/ui/IssueView.vue';
-import {registerWorkspaceProfile} from '/src/modules/workspace-api/index.ts';
-import {useDocker} from '/src/modules/docker/model.ts';
-import DockerSidebar from '/src/modules/docker/ui/DockerSidebar.vue';
-import DockerPanel from '/src/modules/docker/ui/DockerPanel.vue';
-import CodexUsageIndicator from '/src/modules/agents-integration/codex/ui/CodexUsageIndicator.vue';
-import ClaudeUsageIndicator from '/src/modules/agents-integration/claude/ui/ClaudeUsageIndicator.vue';
-import CursorUsageIndicator from '/src/modules/agents-integration/cursor/ui/CursorUsageIndicator.vue';
-import OpenCodeUsageIndicator from '/src/modules/agents-integration/opencode/ui/OpenCodeUsageIndicator.vue';
-import {agentUsageSummary} from '/src/modules/agents-integration/_/usage-summary.ts';
-import {commandHostKey} from '/src/common/utilities/commands.ts';
+import IssueView from '/packages/client/modules/workspace/modules/viewers/ui/IssueView.vue';
+import {registerWorkspaceProfile} from '/packages/client/modules/workspace-api/index.ts';
+import {useDocker} from '/packages/client/modules/docker/model.ts';
+import DockerSidebar from '/packages/client/modules/docker/ui/DockerSidebar.vue';
+import DockerPanel from '/packages/client/modules/docker/ui/DockerPanel.vue';
+import CodexUsageIndicator from '/packages/client/modules/agents-integration/codex/ui/CodexUsageIndicator.vue';
+import ClaudeUsageIndicator from '/packages/client/modules/agents-integration/claude/ui/ClaudeUsageIndicator.vue';
+import CursorUsageIndicator from '/packages/client/modules/agents-integration/cursor/ui/CursorUsageIndicator.vue';
+import OpenCodeUsageIndicator from '/packages/client/modules/agents-integration/opencode/ui/OpenCodeUsageIndicator.vue';
+import {agentUsageSummary} from '/packages/client/modules/agents-integration/_/usage-summary.ts';
+import {commandHostKey} from '/packages/client/common/utilities/commands.ts';
 const check=(value,label)=>{if(!value)throw new Error(label);};
 const wait=async(condition,label)=>{const until=Date.now()+8000;while(!condition()){if(Date.now()>until)throw new Error(label);await fetch('/__tick');}};
 const author={login:'tester',avatarUrl:''};

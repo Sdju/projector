@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, onTestFinished, test } from "vite-plus/test";
-import { os } from "../core/modules/os/index.ts";
+import { os } from "../packages/core/modules/os/index.ts";
 
 const windows = process.platform === "win32";
 const scratch = async () => {

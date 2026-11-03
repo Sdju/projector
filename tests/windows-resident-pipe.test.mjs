@@ -3,8 +3,8 @@ import { randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { processIdentity } from "../core/modules/os/modules/windows/processes.ts";
-import { killTree } from "../core/modules/os/modules/windows/kill-tree.ts";
+import { processIdentity } from "../packages/core/modules/os/modules/windows/processes.ts";
+import { killTree } from "../packages/core/modules/os/modules/windows/kill-tree.ts";
 import {
   bindPipe,
   forward,
@@ -13,10 +13,12 @@ import {
   launcherTokenPath,
   reclaim,
   waitForForward,
-} from "../core/modules/os/modules/windows/resident-pipe.ts";
+} from "../packages/core/modules/os/modules/windows/resident-pipe.ts";
 
-vi.mock("../core/modules/os/modules/windows/processes.ts", () => ({ processIdentity: vi.fn() }));
-vi.mock("../core/modules/os/modules/windows/kill-tree.ts", () => ({ killTree: vi.fn() }));
+vi.mock("../packages/core/modules/os/modules/windows/processes.ts", () => ({
+  processIdentity: vi.fn(),
+}));
+vi.mock("../packages/core/modules/os/modules/windows/kill-tree.ts", () => ({ killTree: vi.fn() }));
 
 async function fixture() {
   const directory = await mkdtemp(join(tmpdir(), "projector-resident-pipe-"));

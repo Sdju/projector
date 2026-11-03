@@ -2,9 +2,9 @@ import { expect, test } from "vite-plus/test";
 import {
   createAcpEventMapper,
   createAcpReplayCollector,
-} from "../server/modules/agents/acp/acp-events.ts";
-import { createCodexDialect } from "../server/modules/agents/codex/dialect.ts";
-import { createOpencodeDialect } from "../server/modules/agents/opencode/dialect.ts";
+} from "../packages/server/modules/agents/acp/acp-events.ts";
+import { createCodexDialect } from "../packages/server/modules/agents/codex/dialect.ts";
+import { createOpencodeDialect } from "../packages/server/modules/agents/opencode/dialect.ts";
 
 const delta = (data) => ({
   sessionUpdate: "tool_call_update",

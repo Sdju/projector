@@ -2,27 +2,27 @@ import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { providersPath } from "../core/modules/app-paths/index.ts";
+import { providersPath } from "../packages/core/modules/app-paths/index.ts";
 import {
   DEFAULT_PROVIDERS_SECRET,
   obfuscateSecret,
-} from "../server/modules/providers/secret-obfuscation.ts";
-import { createVault } from "../server/modules/secrets/index.ts";
+} from "../packages/server/modules/providers/secret-obfuscation.ts";
+import { createVault } from "../packages/server/modules/secrets/index.ts";
 import {
   loadPublicProviders,
   resolveOpenAIProvider,
   useProviderVault,
-} from "../server/modules/providers/index.ts";
+} from "../packages/server/modules/providers/index.ts";
 import { expect, test } from "vite-plus/test";
 import {
   completeCommandRequest,
   createSecretBridge,
-} from "../server/modules/agent/command-bridge.ts";
-import { createToolSpecs } from "../server/modules/agents/projector/tool-specs.ts";
+} from "../packages/server/modules/agent/command-bridge.ts";
+import { createToolSpecs } from "../packages/server/modules/agents/projector/tool-specs.ts";
 import {
   resolveEnvTarget,
   writeEnvSecret,
-} from "../server/modules/agents/projector/secrets/secret-destination.ts";
+} from "../packages/server/modules/agents/projector/secrets/secret-destination.ts";
 
 async function project() {
   const root = await mkdtemp(join(tmpdir(), "projector-secret-"));

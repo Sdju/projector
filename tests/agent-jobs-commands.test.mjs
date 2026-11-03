@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from "vite-plus/test";
-import { registerBuiltinClientAgents } from "../src/app/agents.ts";
-import { registerJobCommands } from "../src/modules/agent/model/job-commands.ts";
+import { registerBuiltinClientAgents } from "../packages/client/app/agents.ts";
+import { registerJobCommands } from "../packages/client/modules/agent/model/job-commands.ts";
 
 registerBuiltinClientAgents();
 

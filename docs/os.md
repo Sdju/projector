@@ -1,6 +1,6 @@
 # Адаптер ОС
 
-`core/modules/os/index.ts` — единственный публичный вход для системных операций CLI, сервера и native. Браузер и доменные модули `core` не могут его импортировать.
+`packages/core/modules/os/index.ts` — единственный публичный вход для системных операций CLI, сервера и native. Браузер и доменные модули `core` не могут его импортировать.
 
 ```ts
 import { os } from "../../../core/modules/os/index.ts";
@@ -19,7 +19,7 @@ await os.tools.moveNoReplace(source, destination);
 ## Структура
 
 ```text
-core/modules/os/
+packages/core/modules/os/
   index.ts                  публичный API и типы
   os.ts                     выбор адаптера, capabilities и единый фасад
   contract.ts               процесс и интерфейс контроллера палитры
@@ -58,7 +58,7 @@ Capabilities означают наличие реализации, а не ус�
 Порт сервера и модель хранения проектов — настройки приложения; они не относятся к OS-адаптеру. Импорт ключей ai-companion принимает путь аргументом:
 
 ```bash
-node cli/app/import-companion-key.mjs /path/to/providers.json
+node packages/cli/app/import-companion-key.mjs /path/to/providers.json
 ```
 
 ## macOS: как устроено и что не поддерживается
@@ -68,7 +68,7 @@ node cli/app/import-companion-key.mjs /path/to/providers.json
 - **Один экземпляр:** команда, уже доставленная резиденту, повторно не отправляется (иначе `toggle` выполнился бы дважды); пока процесс резидента жив, второй не стартует. Unix-сокет `launcher.sock` в каталоге данных (0600) + токен `launcher.token`; повторный запуск пересылает команду.
 - **Каталог** — `.app` из `/Applications`, `/System/Applications`, `~/Applications`; запуск `open -a`, иконка — `.icns` → PNG через `sips`.
 - **Установка (`vp run desktop` / `installDesktop`)** — `~/.local/bin/projector` и `~/Applications/Projector.app` (обёртка над командой, с `.icns` из `resources/icons`). Raycast и Spotlight индексируют `.app`, а не бинарники из `PATH`; без бандла GUI-лаунчеры Projector не находят. Повторный запуск перезаписывает бандл и регистрирует его через `lsregister`.
-- **Процессы** — `ps -axo` (в том числе `tpgid` для foreground-группы), cwd — `lsof -d cwd`. Общий POSIX-код (агенты, process groups, Git askpass, Docker, bash, права `0600`) живёт в модуле `core/modules/os-posix`.
+- **Процессы** — `ps -axo` (в том числе `tpgid` для foreground-группы), cwd — `lsof -d cwd`. Общий POSIX-код (агенты, process groups, Git askpass, Docker, bash, права `0600`) живёт в модуле `packages/core/modules/os-posix`.
 - **Секреты** — Keychain через `security -i`: значение идёт по stdin (не попадает в `ps`) и хранится в base64.
 - **Данные** — `~/Library/Application Support` (с приоритетом `XDG_DATA_HOME`); `moveNoReplace` — атомарное «занять и переименовать» вместо GNU `mv`.
 - **Окна** — `open -na <Chromium-браузер> --args --app=…`; фокус окна по классу недоступен. Выбор папки — `osascript`.
@@ -85,7 +85,7 @@ node cli/app/import-companion-key.mjs /path/to/providers.json
 - **Дерево процессов** завершает один `killTree` (`taskkill /T /F`, ожидается его завершение). Job Object не используется: после падения сервера дерево агента остаётся. `ProcessInfo.group/foreground` на Windows `null` (групп процессов нет), `conhost`/`OpenConsole` из списка исключены, иначе каждый PTY выглядел бы занятым.
 - **Канал резидента** `\\.\pipe\dev.projector.Launcher.<пользователь>` создаётся с DACL по умолчанию (запись только владельцу, SYSTEM и администраторам); команда дополнительно требует токен из профиля, сравнение с постоянным временем.
 - **Восстановление резидента:** перед принудительным завершением PID и время создания процесса сверяются с `launcher.identity.json`; старого файла `launcher.pid` для завершения недостаточно. Повторные отправки одной команды по каналу используют общий ID и выполняются один раз.
-- **Запуск агентов** (`os.tools.agentLaunch`): `.cmd`-шимы идут через shell, аргументы с пробелами и метасимволами кавычатся; тот же результат читает `cli/app/agent-host.mjs`.
+- **Запуск агентов** (`os.tools.agentLaunch`): `.cmd`-шимы идут через shell, аргументы с пробелами и метасимволами кавычатся; тот же результат читает `packages/cli/app/agent-host.mjs`.
 - **Права файлов:** `0600` заменён на ACL только для текущего пользователя (`os.tools.restrictToOwner`: `icacls /inheritance:r`, `/grant:r *<SID>:F`, `/remove:g` для Administrators, SYSTEM, Everyone, Users, Authenticated Users). Применяется к `integrations.json`, паролю LAN, токену резидента, файлу с токеном для Docker-клонирования и `devcontainer-trust.json`. Системные утилиты (`icacls`, `whoami`, `taskkill`) запускаются из `System32`: Git кладёт в PATH собственный `whoami`.
 - **Исполняемость файла:** по расширению из `PATHEXT` и `.ps1` (`os.tools.isExecutableFile`), а не по биту режима.
 - **Ссылки из терминала:** каталог берётся у каждого процесса оболочки (Git Bash — цепочка `bash`); тест `windows-adapter` показывает, что Git Bash выставляет Win32-каталог сразу после `cd`, без запуска программы.

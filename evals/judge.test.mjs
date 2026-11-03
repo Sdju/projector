@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vite-plus/test";
-import { clearJudgeCache, judgeAction } from "../server/modules/judge/index.ts";
+import { clearJudgeCache, judgeAction } from "../packages/server/modules/judge/index.ts";
 import { judgeScenarios, judgeVerdict } from "./judge-scenarios.mjs";
 import { scriptedModel } from "../tests/helpers/scripted-model.mjs";
 

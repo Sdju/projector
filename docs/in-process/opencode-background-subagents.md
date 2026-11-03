@@ -12,11 +12,11 @@
 
 ## Где смотреть
 
-- `server/modules/agents/acp/acp-events.ts` — `finishTool` отдаёт диалекту `content` инструмента, а при его отсутствии — сериализованный `rawOutput`; в фоновом ответе `sessionID` приходит текстом, а не в `metadata`.
-- `server/modules/agents/opencode/dialect.ts` — `end()` распознаёт только JSON с `"sessionID"` и `"status":"running"`.
-- `src/modules/agent/model/turn-events.ts` — на `done` задача с `untracked` переводится в `stopped`, иначе жила бы вечно.
-- `src/modules/agent/lib/task-detail.ts` — `barTasks()` оставляет задачи последнего ответа и выполняющиеся.
-- `src/modules/agent/model/task-turns.ts` — читает дочернюю сессию по `task.session`, пока задача `running`.
+- `packages/server/modules/agents/acp/acp-events.ts` — `finishTool` отдаёт диалекту `content` инструмента, а при его отсутствии — сериализованный `rawOutput`; в фоновом ответе `sessionID` приходит текстом, а не в `metadata`.
+- `packages/server/modules/agents/opencode/dialect.ts` — `end()` распознаёт только JSON с `"sessionID"` и `"status":"running"`.
+- `packages/client/modules/agent/model/turn-events.ts` — на `done` задача с `untracked` переводится в `stopped`, иначе жила бы вечно.
+- `packages/client/modules/agent/lib/task-detail.ts` — `barTasks()` оставляет задачи последнего ответа и выполняющиеся.
+- `packages/client/modules/agent/model/task-turns.ts` — читает дочернюю сессию по `task.session`, пока задача `running`.
 
 ## Варианты
 

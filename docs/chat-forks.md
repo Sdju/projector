@@ -2,7 +2,7 @@
 
 Форк — новый чат-вкладка от выбранного сообщения. Префикс ходов копируется в историю под новым ключом; исходный чат не меняется, обе ветки живут одновременно. Сохранённый чат попадает в индекс проекта (`chat_index`), поэтому закрытая вкладка находится в «Недавних чатах» и открывается снова.
 
-Ключ истории — произвольная строка: `PUT /api/agent/history/<key>` принимает любые ходы, а вкладка `ide.workbench.<agent>.open` открывается с готовым `chatId` (`src/modules/workspace-api/local.ts`, `src/modules/workspace/lib/editor-commands.ts`). Форк не отменяет версии разговора: версии переключают линию внутри чата, форк оставляет обе линии живыми.
+Ключ истории — произвольная строка: `PUT /api/agent/history/<key>` принимает любые ходы, а вкладка `ide.workbench.<agent>.open` открывается с готовым `chatId` (`packages/client/modules/workspace-api/local.ts`, `packages/client/modules/workspace/lib/editor-commands.ts`). Форк не отменяет версии разговора: версии переключают линию внутри чата, форк оставляет обе линии живыми.
 
 ## Режимы
 
@@ -14,31 +14,31 @@
 ## Бэкенды
 
 - **Projector** переигрывает префикс целиком вместе с вызовами инструментов (до ~90 тыс. знаков), для него форк полноценный.
-- **Claude Code** хранит в префиксе `session` и `tail`. Первое сообщение форка вызывает `sessionAt`; если нативный транскрипт ушёл дальше `tail`, создаётся ветка `forkSession(upToMessageId: tail)` (`server/modules/agents/claude-code/claude-code-checkpoints.ts`). Если форк сделан с конца и исходный чат больше не используется, первое сообщение форка дописывается в ту же нативную сессию; при следующем сообщении исходный чат ответвляется от своего `tail`. `rewind-files` в форке ссылается на `messageId` общей сессии — при `forkSession` нужно проверять сохранение UUID.
-- **ACP (Codex, OpenCode, Cursor, Kimi)** получает `detached` у последнего скопированного ответа. Без этого первый запрос сделал бы `session/load` той же нативной сессии и агент увидел бы чужие ходы. С `detached` создаётся `session/new`, а префикс уходит `promptWithHistory`: последние 10 ходов без результатов инструментов (`server/modules/agents/acp/acp-backend.ts`).
+- **Claude Code** хранит в префиксе `session` и `tail`. Первое сообщение форка вызывает `sessionAt`; если нативный транскрипт ушёл дальше `tail`, создаётся ветка `forkSession(upToMessageId: tail)` (`packages/server/modules/agents/claude-code/claude-code-checkpoints.ts`). Если форк сделан с конца и исходный чат больше не используется, первое сообщение форка дописывается в ту же нативную сессию; при следующем сообщении исходный чат ответвляется от своего `tail`. `rewind-files` в форке ссылается на `messageId` общей сессии — при `forkSession` нужно проверять сохранение UUID.
+- **ACP (Codex, OpenCode, Cursor, Kimi)** получает `detached` у последнего скопированного ответа. Без этого первый запрос сделал бы `session/load` той же нативной сессии и агент увидел бы чужие ходы. С `detached` создаётся `session/new`, а префикс уходит `promptWithHistory`: последние 10 ходов без результатов инструментов (`packages/server/modules/agents/acp/acp-backend.ts`).
 
 ## Изолированная копия
 
-Скопированный `worktree` заставляет форк работать **в той же** копии. После `merge` или `discard` из любой ветки вторая получит «Изолированная копия уже удалена» (`server/modules/agent/worktrees.ts`). Описание команды предупреждает об этом. Отдельной копии для форка нет.
+Скопированный `worktree` заставляет форк работать **в той же** копии. После `merge` или `discard` из любой ветки вторая получит «Изолированная копия уже удалена» (`packages/server/modules/agent/worktrees.ts`). Описание команды предупреждает об этом. Отдельной копии для форка нет.
 
 ## Хранение и закрытие вкладки
 
-- Ходы пишутся в SQLite под ключом чата при каждом сохранении (`server/modules/agent/history-store.ts`). `deleteHistory` вызывается только из `deleteChat`/`removeArchivedChat`, закрытие вкладки его не вызывает.
-- Закрытие вкладки удаляет её из массива вкладок (`src/modules/workspace/lib/open-files.ts`); `chatId` и снимок вкладок живут в `sessionStorage` (`src/modules/workspace/lib/workspace-session.ts`, `src/common/utilities/session-snapshot.ts`). Перезагрузка страницы вкладку восстановит, закрытие — нет; ключ и заголовок остаются в `chat_index`.
+- Ходы пишутся в SQLite под ключом чата при каждом сохранении (`packages/server/modules/agent/history-store.ts`). `deleteHistory` вызывается только из `deleteChat`/`removeArchivedChat`, закрытие вкладки его не вызывает.
+- Закрытие вкладки удаляет её из массива вкладок (`packages/client/modules/workspace/lib/open-files.ts`); `chatId` и снимок вкладок живут в `sessionStorage` (`packages/client/modules/workspace/lib/workspace-session.ts`, `packages/client/common/utilities/session-snapshot.ts`). Перезагрузка страницы вкладку восстановит, закрытие — нет; ключ и заголовок остаются в `chat_index`.
 - `chat_index` хранит для каждого непустого чата проект, бэкенд, заголовок из первого сообщения и время сохранения; пишется в той же транзакции, что и ходы. Пустой чат из списка удаляется. `archiveLiveChat` запоминает проект и бэкенд в строке `archives`, `openArchivedChat` возвращает чат в индекс.
 - `GET /api/agent/chats/recent?projectId=&backend=` — чаты проекта, новые первыми; `session` показывает, что чат продолжает нативную сессию. Команда для агента — `ide.agent.chats.recent`.
 - Записи, созданные до появления индекса, в него не попадают, но и не удаляются: доступны прямым `GET /api/agent/history/<key>`, если ключ известен.
 
 ## Код и команды
 
-| Механизм                   | Где                                                                      |
-| -------------------------- | ------------------------------------------------------------------------ |
-| Рез разговора              | `forkAt(turns, turnId, mode)` в `src/modules/agent/model/branches.ts`    |
-| Ключ чата                  | `src/modules/agent/model/chat-key.ts`                                    |
-| Запись форка и черновик    | `src/modules/agent/model/chat-fork.ts`, `model/drafts.ts`                |
-| Действия и список недавних | `src/modules/agent/model/chat-branch.ts`                                 |
-| UI                         | `AgentTurn.vue`, `AgentSessions.vue`                                     |
-| Команды                    | `ide.agent.chat.fork { turnId, mode?, chat? }`, `ide.agent.chats.recent` |
+| Механизм                   | Где                                                                               |
+| -------------------------- | --------------------------------------------------------------------------------- |
+| Рез разговора              | `forkAt(turns, turnId, mode)` в `packages/client/modules/agent/model/branches.ts` |
+| Ключ чата                  | `packages/client/modules/agent/model/chat-key.ts`                                 |
+| Запись форка и черновик    | `packages/client/modules/agent/model/chat-fork.ts`, `model/drafts.ts`             |
+| Действия и список недавних | `packages/client/modules/agent/model/chat-branch.ts`                              |
+| UI                         | `AgentTurn.vue`, `AgentSessions.vue`                                              |
+| Команды                    | `ide.agent.chat.fork { turnId, mode?, chat? }`, `ide.agent.chats.recent`          |
 
 `forkAt` глубоко клонирует ходы, снимает `run`, `variants`/`slot`, переводит задачи `running` в `stopped`. Заголовок вкладки — «Ветка · <первая строка сообщения>». Префикс пишется через `PUT` до открытия вкладки, для внешних агентов без `branchSession` ставится `detached`; черновик забирает `useAgent` при создании состояния.
 

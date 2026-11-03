@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { spawn, execFileSync } from "node:child_process";
 import { once } from "node:events";
 import { pathToFileURL } from "node:url";
-import { os, createOs, UnsupportedPlatformError } from "../core/modules/os/index.ts";
+import { os, createOs, UnsupportedPlatformError } from "../packages/core/modules/os/index.ts";
 
 // This file runs without GI loaders/display: importing os must not load GTK or D-Bus.
 test("OS selection is automatic; unsupported systems never fall through to Linux operations", async () => {
@@ -231,7 +231,7 @@ test(
     });
     await writeFile(join(root, "package.json"), JSON.stringify({ version: "9.9.9" }));
     await writeFile(join(root, "cli", "app", "launch.mjs"), "export {};\n");
-    const facade = new URL("../core/modules/os/index.ts", import.meta.url).href;
+    const facade = new URL("../packages/core/modules/os/index.ts", import.meta.url).href;
     execFileSync(
       process.execPath,
       [
@@ -339,7 +339,7 @@ test(
       join(root, "bin/projector"),
       `#!${process.execPath}\nimport { writeFileSync } from "node:fs";writeFileSync(${JSON.stringify(marker)},JSON.stringify(process.argv.slice(2)));\n`,
     );
-    const facade = new URL("../core/modules/os/index.ts", import.meta.url).href;
+    const facade = new URL("../packages/core/modules/os/index.ts", import.meta.url).href;
     const env = { ...process.env, HOME: home, XDG_DATA_HOME: data };
     execFileSync(
       process.execPath,
@@ -395,7 +395,7 @@ test(
     process.env.PROJECTOR_LAUNCHER_PIPE = `\\\\.\\pipe\\projector-test-${process.pid}-${Date.now()}`;
     const { createRequire } = await import("node:module");
     const require = createRequire(import.meta.url);
-    const facade = pathToFileURL(join(process.cwd(), "core/modules/os/index.ts")).href;
+    const facade = pathToFileURL(join(process.cwd(), "packages/core/modules/os/index.ts")).href;
     const env = { ...process.env };
     delete env.NODE_OPTIONS;
     const child = spawn(
@@ -460,7 +460,7 @@ await createOs("win32").runDesktop("http://127.0.0.1:9", "show", {
     });
     // The pipe keeps Windows' default DACL: nobody but the owner, SYSTEM and administrators may write.
     {
-      const { runPowerShell } = await import("../core/modules/os/modules/windows/ps.ts");
+      const { runPowerShell } = await import("../packages/core/modules/os/modules/windows/ps.ts");
       const { stdout } = await runPowerShell(
         `
 Add-Type -TypeDefinition @"

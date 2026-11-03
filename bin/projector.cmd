@@ -6,4 +6,4 @@ if errorlevel 1 (
   echo Нужен node в PATH 1>&2
   exit /b 1
 )
-node "%~dp0..\cli\app\launch.mjs" %*
+node "%~dp0..\packages\cli\app\launch.mjs" %*

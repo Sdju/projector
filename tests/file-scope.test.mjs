@@ -8,8 +8,8 @@ import {
   fileScopeTitle,
   gitChangesToFileChanges,
   pullRequestFilesToFileChanges,
-} from "../core/modules/workspace/index.ts";
-import { fileTabKey } from "../src/modules/workspace/open-file.ts";
+} from "../packages/core/modules/workspace/index.ts";
+import { fileTabKey } from "../packages/client/modules/workspace/open-file.ts";
 
 test("a file scope is a stable serializable identity", () => {
   const live = { kind: "live" };

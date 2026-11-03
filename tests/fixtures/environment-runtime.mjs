@@ -12,7 +12,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { createLogger, createServer, preview } from "vite-plus";
@@ -32,9 +32,40 @@ const until = async (check, label) => {
   throw new Error(`Timed out: ${label}`);
 };
 try {
-  for (const name of ["server", "core", "cli", "resources"])
-    await cp(join(source, name), join(root, name), { recursive: true });
-  const manifest = JSON.parse(await readFile(join(source, "package.json"), "utf8"));
+  await cp(join(source, "packages"), join(root, "packages"), {
+    recursive: true,
+    filter: (entry) => !entry.split(sep).includes("node_modules"),
+  });
+  await cp(join(source, "resources"), join(root, "resources"), { recursive: true });
+  // Third-party dependencies stay in the working checkout; workspace links point at the copy.
+  const workspace = await readdir(join(source, "packages"));
+  for (const name of workspace) {
+    const modules = join(root, "packages", name, "node_modules");
+    await mkdir(join(modules, "@projector"), { recursive: true });
+    for (const entry of await readdir(join(source, "packages", name, "node_modules")).catch(
+      () => [],
+    )) {
+      if (entry === "@projector") continue;
+      await symlink(
+        join(source, "packages", name, "node_modules", entry),
+        join(modules, entry),
+        "junction",
+      );
+    }
+    for (const dependency of workspace)
+      await symlink(
+        join(root, "packages", dependency),
+        join(modules, "@projector", dependency),
+        "junction",
+      );
+  }
+  const external = new Set();
+  for (const name of ["server", "core"]) {
+    const manifest = JSON.parse(
+      await readFile(join(source, "packages", name, "package.json"), "utf8"),
+    );
+    for (const dependency of Object.keys(manifest.dependencies ?? {})) external.add(dependency);
+  }
   await writeFile(join(root, "package.json"), JSON.stringify({ type: "module" }));
   // A real directory prevents Vite's temporary config files from reaching the working checkout.
   await mkdir(join(root, "node_modules"));
@@ -47,7 +78,7 @@ try {
   process.env.PROJECTOR_NETWORK = "local";
   delete process.env.PROJECTOR_WINDOW;
   // Only the fixture suppresses desktop startup; all API and transport code is the real code.
-  const plugin = join(root, "server/app/plugin.ts");
+  const plugin = join(root, "packages/server/app/plugin.ts");
   await writeFile(
     plugin,
     (await readFile(plugin, "utf8")).replace("os.capabilities.nativeDesktop", "false"),
@@ -56,10 +87,10 @@ try {
   await writeFile(
     configFile,
     `
-    import { projectorPlugin } from './server/app/dev-plugin.ts';
+    import { projectorPlugin } from './packages/server/app/dev-plugin.ts';
     export default {
       plugins: [projectorPlugin()],
-      ssr: { external: ${JSON.stringify(Object.keys(manifest.dependencies))} },
+      ssr: { external: ${JSON.stringify([...external].filter((name) => !name.startsWith("@projector/")))} },
       optimizeDeps: { noDiscovery: true, entries: [] },
       server: { host: '127.0.0.1', port: 0 },
       preview: { host: '127.0.0.1', port: 0 }
@@ -128,15 +159,18 @@ try {
     } catch {}
   })();
   const environment = server.environments.ssr;
-  const healthFile = join(root, "server/routes/api/health.ts");
-  await writeFile(join(root, "server/app/deferred.ts"), 'export const value = "loaded later";');
+  const healthFile = join(root, "packages/server/routes/api/health.ts");
+  await writeFile(
+    join(root, "packages/server/app/deferred.ts"),
+    'export const value = "loaded later";',
+  );
   const healthSource = (await readFile(healthFile, "utf8")).replace(
     "ok: true,",
     'ok: true, deferred: (await import(new URL("../../app/deferred.ts", import.meta.url).href)).value,',
   );
   const health = (revision) =>
     healthSource.replace("ok: true,", `ok: true, revision: ${revision},`);
-  const controlFile = join(root, "server/modules/terminal-control/control.ts");
+  const controlFile = join(root, "packages/server/modules/terminal-control/control.ts");
   const controlSource = await readFile(controlFile, "utf8");
   for (let revision = 1; revision <= 12; revision++) {
     await writeFile(
@@ -203,7 +237,9 @@ try {
   assert.equal(failed.status, 400);
   await failed.text();
   assert.equal(globalThis.testMutations, 1);
-  const { broadcastEvent } = await environment.runner.import("/server/modules/events/index.ts");
+  const { broadcastEvent } = await environment.runner.import(
+    "/packages/server/modules/events/index.ts",
+  );
   broadcastEvent("environment-test", {});
   await until(() => events.includes("environment-test"), "SSE after reloads");
   assert.equal(
@@ -222,7 +258,7 @@ try {
   assert.equal(foreign.status, 403);
   await foreign.text();
   // Changing transport implementation disposes its old listeners and permits a fresh connection.
-  const socketFile = join(root, "server/modules/terminal-control/socket.ts");
+  const socketFile = join(root, "packages/server/modules/terminal-control/socket.ts");
   await writeFile(socketFile, (await readFile(socketFile, "utf8")) + "\n// transport reload\n");
   await until(() => control.socket.readyState === WebSocket.CLOSED, "old transport disposed");
   const replacement = await connect(`/api/terminal/control?project=${project.id}`);

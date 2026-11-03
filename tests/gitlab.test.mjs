@@ -61,7 +61,7 @@ test("GitLab integration connects with a token, searches and imports nested proj
     return { on() {} };
   };
   syncBuiltinESMExports();
-  const { handleApi } = await import("../server/app/api.ts");
+  const { handleApi } = await import("../packages/server/app/api.ts");
   const server = createServer((req, res) => void handleApi(req, res));
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -100,7 +100,7 @@ test("GitLab integration connects with a token, searches and imports nested proj
   expect(listed.repositories[0].fullName).toBe("team/tools/app");
   expect(listed.repositories[0].private).toBe(true);
 
-  const { searchGitlabProjects } = await import("../server/modules/gitlab/index.ts");
+  const { searchGitlabProjects } = await import("../packages/server/modules/gitlab/index.ts");
   for (const query of ["", "team/", "TEAM/to", "to", "tools/app", "app"])
     expect(
       (await searchGitlabProjects(query)).map((hit) => hit.fullName),

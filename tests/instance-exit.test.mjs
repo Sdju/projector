@@ -5,8 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { expect, onTestFinished, test } from "vite-plus/test";
-import { clearInstance, writeInstance } from "../server/modules/instance/index.ts";
-import { instancePath } from "../core/modules/app-paths/index.ts";
+import { clearInstance, writeInstance } from "../packages/server/modules/instance/index.ts";
+import { instancePath } from "../packages/core/modules/app-paths/index.ts";
 
 test("exit cleanup finishes synchronously and preserves a replacement server's instance", async () => {
   await writeInstance(4321);
@@ -21,7 +21,7 @@ test("exit cleanup finishes synchronously and preserves a replacement server's i
 
   const data = await mkdtemp(join(tmpdir(), "projector-exit-"));
   onTestFinished(() => rm(data, { recursive: true, force: true }));
-  const module = new URL("../server/modules/instance/index.ts", import.meta.url).href;
+  const module = new URL("../packages/server/modules/instance/index.ts", import.meta.url).href;
   await promisify(execFile)(
     process.execPath,
     [

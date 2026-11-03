@@ -10,7 +10,8 @@ const secret = "glpat-browser-secret";
 async function setup(url = "https://gitlab.com", token = "") {
   const root = await mkdtemp(join(tmpdir(), "projector-gitlab-browser-"));
   process.env.XDG_DATA_HOME = join(root, "data");
-  const { updateIntegration } = await import("../server/modules/integration-store/index.ts");
+  const { updateIntegration } =
+    await import("../packages/server/modules/integration-store/index.ts");
   await updateIntegration("gitlab", () => ({
     enabled: true,
     settings: { url, directory: join(root, "projects") },
@@ -38,7 +39,7 @@ function encoded(path) {
 }
 
 test("GitLab target allowlists gitlab.com and the configured instance without leaking the token", async () => {
-  const { gitlabTarget } = await import("../server/modules/gitlab/index.ts");
+  const { gitlabTarget } = await import("../packages/server/modules/gitlab/index.ts");
   await setup("https://gitlab.com");
   expect(await gitlabTarget("gitlab.com/group/project")).toStrictEqual({
     instance: "gitlab.com",
@@ -47,7 +48,8 @@ test("GitLab target allowlists gitlab.com and the configured instance without le
     token: "",
   });
 
-  const { updateIntegration } = await import("../server/modules/integration-store/index.ts");
+  const { updateIntegration } =
+    await import("../packages/server/modules/integration-store/index.ts");
   await updateIntegration("gitlab", (config) => ({
     ...config,
     settings: { ...config.settings, url: "https://git.example.com/gitlab" },
@@ -83,7 +85,7 @@ test("GitLab target allowlists gitlab.com and the configured instance without le
       visibility: "public",
     });
   });
-  const { browseGitlabRepository } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabRepository } = await import("../packages/server/modules/gitlab/index.ts");
   expect((await browseGitlabRepository("gitlab.com/group/project")).commit).toBe("a".repeat(40));
   for (const repository of ["evil.example.com/group/project", "gl:/evil.example.com/group/project"])
     await expect(gitlabTarget(repository)).rejects.toMatchObject({ status: 403 });
@@ -129,7 +131,7 @@ test("GitLab project card reads metadata, languages and the pinned commit", asyn
       return Response.json({ path_with_namespace: "missing/commit", default_branch: "main" });
     return Response.json({}, { status: 404 });
   });
-  const { browseGitlabRepository } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabRepository } = await import("../packages/server/modules/gitlab/index.ts");
   const project = await browseGitlabRepository("gitlab.com/group/project");
   expect(project).toMatchObject({
     fullName: "group/project",
@@ -182,7 +184,7 @@ test("GitLab project card falls back to statistics endpoints for counts", async 
     if (path.endsWith("/merge_requests")) return Response.json([], { headers: { "X-Total": "9" } });
     return Response.json({}, { status: 404 });
   });
-  const { browseGitlabRepository } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabRepository } = await import("../packages/server/modules/gitlab/index.ts");
   const project = await browseGitlabRepository("gitlab.com/group/stats");
   expect(project.openIssues).toBe(7);
   expect(project.openMergeRequests).toBe(9);
@@ -210,7 +212,7 @@ test("GitLab tree follows pages, sorts folders first and reports truncation", as
       { name: "a.ts", path: "src/a.ts", type: "blob", mode: "100644", size: 5 },
     ]);
   });
-  const { browseGitlabTree } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabTree } = await import("../packages/server/modules/gitlab/index.ts");
   const tree = await browseGitlabTree("gitlab.com/group/project", "abc1234", "src");
   expect(tree.truncated).toBe(false);
   expect(tree.entries.map((entry) => entry.path)).toStrictEqual([
@@ -277,7 +279,7 @@ test("GitLab file decodes text, base64 and images and rejects large files", asyn
     const file = files[filePath];
     return file ? Response.json(file) : Response.json({}, { status: 404 });
   });
-  const { browseGitlabFile } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabFile } = await import("../packages/server/modules/gitlab/index.ts");
   expect(
     await browseGitlabFile("gitlab.com/group/project", "abc1234", "dir/text.txt"),
   ).toStrictEqual({ content: "hello", image: null, binary: false, size: 5 });
@@ -326,7 +328,7 @@ test("GitLab asset returns bytes and a MIME type", async () => {
       return new Response(bytes, { headers: { "Content-Type": "application/x-test" } });
     return Response.json({}, { status: 404 });
   });
-  const { browseGitlabAsset } = await import("../server/modules/gitlab/index.ts");
+  const { browseGitlabAsset } = await import("../packages/server/modules/gitlab/index.ts");
   const image = await browseGitlabAsset("gitlab.com/group/project", "abc1234", "dir/logo.png");
   expect(image.mime).toBe("image/png");
   expect(image.bytes.equals(bytes)).toBe(true);
@@ -394,7 +396,7 @@ test("GitLab history maps commits, search, commit detail and comparison", async 
     return Response.json({}, { status: 404 });
   });
   const { browseGitlabLog, browseGitlabCommit, browseGitlabComparison } =
-    await import("../server/modules/gitlab/index.ts");
+    await import("../packages/server/modules/gitlab/index.ts");
   const log = await browseGitlabLog("gitlab.com/group/project", { sha: hash, page: "1" });
   expect(log.head).toBe(hash);
   expect(log.next).toBe(2);
@@ -497,7 +499,7 @@ test("GitLab search errors stay explicit and API failures keep their status", as
     return Response.json({}, { status: 404 });
   });
   const { browseGitlabLog, browseGitlabRepository } =
-    await import("../server/modules/gitlab/index.ts");
+    await import("../packages/server/modules/gitlab/index.ts");
   await expect(
     browseGitlabLog("gitlab.com/group/project", { query: "login" }),
   ).rejects.toMatchObject({ status: 400, message: /Поиск коммитов GitLab недоступен/ });
@@ -537,7 +539,7 @@ test("GitLab blob search reads a pinned commit and maps snippets", async () => {
     }
     return Response.json({}, { status: 404 });
   });
-  const { searchGitlabBlobs } = await import("../server/modules/gitlab/index.ts");
+  const { searchGitlabBlobs } = await import("../packages/server/modules/gitlab/index.ts");
   expect(
     await searchGitlabBlobs("gitlab.com/group/project", { q: "hello", rev: hash }),
   ).toStrictEqual({
@@ -567,7 +569,7 @@ test("GitLab blob search reads a pinned commit and maps snippets", async () => {
 test("GitLab blob search explains when Advanced Search is unavailable", async () => {
   await setup();
   mockFetch(() => Response.json({ message: "400 Bad request" }, { status: 400 }));
-  const { searchGitlabBlobs } = await import("../server/modules/gitlab/index.ts");
+  const { searchGitlabBlobs } = await import("../packages/server/modules/gitlab/index.ts");
   await expect(
     searchGitlabBlobs("gitlab.com/group/project", { q: "hello", rev: "a".repeat(40) }),
   ).rejects.toMatchObject({
@@ -605,7 +607,7 @@ test("GitLab comparison reads changed paths and both file sides", async () => {
     return Response.json({});
   });
   const { browseGitlabCompareChanges, browseGitlabCompareFile } =
-    await import("../server/modules/gitlab/index.ts");
+    await import("../packages/server/modules/gitlab/index.ts");
   const repository = "gitlab.com/group/project";
   const from = "a".repeat(40);
   const to = "b".repeat(40);

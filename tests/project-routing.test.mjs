@@ -5,8 +5,11 @@ import { join } from "node:path";
 import { createServer } from "node:http";
 import { once } from "node:events";
 import { createRouter, createMemoryHistory } from "vue-router";
-import { projectRoute, projectPathFromParams } from "../src/modules/project/project-route.ts";
-import { parseProjectRef, projectRefSegments } from "../core/modules/project/index.ts";
+import {
+  projectRoute,
+  projectPathFromParams,
+} from "../packages/client/modules/project/project-route.ts";
+import { parseProjectRef, projectRefSegments } from "../packages/core/modules/project/index.ts";
 
 test("project URLs round-trip nested paths, root and reserved characters", () => {
   const router = createRouter({
@@ -56,8 +59,8 @@ test("opening a path reuses saved settings and resolves arbitrary directories on
   const root = await mkdtemp(join(tmpdir(), "projector-routing-"));
   const previousDataHome = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = root;
-  const { handleApi } = await import("../server/app/api.ts");
-  const { loadProjects } = await import("../server/modules/projects/index.ts");
+  const { handleApi } = await import("../packages/server/app/api.ts");
+  const { loadProjects } = await import("../packages/server/modules/projects/index.ts");
   const server = createServer((req, res) => {
     void handleApi(req, res).then((handled) => {
       if (!handled) res.writeHead(404).end();
@@ -136,8 +139,8 @@ test("a project whose folder disappeared can recreate it or move to a new path",
   const root = await mkdtemp(join(tmpdir(), "projector-missing-"));
   const previousDataHome = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = root;
-  const { handleApi } = await import("../server/app/api.ts");
-  const { loadProjects } = await import("../server/modules/projects/index.ts");
+  const { handleApi } = await import("../packages/server/app/api.ts");
+  const { loadProjects } = await import("../packages/server/modules/projects/index.ts");
   const server = createServer((req, res) => {
     void handleApi(req, res).then((handled) => {
       if (!handled) res.writeHead(404).end();
@@ -216,7 +219,7 @@ test("a project whose folder disappeared can recreate it or move to a new path",
 
 test("settings import preserves custom commands and does not duplicate scripts", async () => {
   const { missingCommands, projectDraft, settingsError } =
-    await import("../src/modules/project/model/project-settings.ts");
+    await import("../packages/client/modules/project/model/project-settings.ts");
   const project = {
     name: "App",
     path: "/tmp/app",
@@ -245,8 +248,9 @@ test("settings import preserves custom commands and does not duplicate scripts",
 });
 
 test("command discovery reads all actual scripts without running them or inventing commands", async () => {
-  const { inspectProjectCommands } = await import("../server/modules/projects/index.ts");
-  const { normalizeProject } = await import("../server/modules/project-presentation/index.ts");
+  const { inspectProjectCommands } = await import("../packages/server/modules/projects/index.ts");
+  const { normalizeProject } =
+    await import("../packages/server/modules/project-presentation/index.ts");
   const root = await mkdtemp(join(tmpdir(), "projector-settings-"));
   try {
     expect(await inspectProjectCommands(root)).toStrictEqual([]);

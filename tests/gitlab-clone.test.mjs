@@ -22,7 +22,8 @@ async function sandbox() {
 }
 
 async function configureGitlab(root, { enabled = true, url, token = secret } = {}) {
-  const { updateIntegration } = await import("../server/modules/integration-store/index.ts");
+  const { updateIntegration } =
+    await import("../packages/server/modules/integration-store/index.ts");
   await updateIntegration("gitlab", (config) => ({
     ...config,
     enabled,
@@ -80,7 +81,7 @@ async function waitFor(check) {
 test("gitlabCloneTarget resolves relative, canonical, gl:/ and link forms on allowed hosts", async () => {
   const root = await sandbox();
   await configureGitlab(root);
-  const { gitlabCloneTarget } = await import("../server/modules/gitlab/index.ts");
+  const { gitlabCloneTarget } = await import("../packages/server/modules/gitlab/index.ts");
   const expected = {
     instance: "git.example.com",
     path: "team/tools/app",
@@ -137,8 +138,8 @@ test("a local GitLab clone registers the project and honours the selected folder
     expect(options.env.GIT_TERMINAL_PROMPT).toBe("0");
     clones.push({ url: args.at(-2), destination: args.at(-1) });
   });
-  const { cloneGitlabProject } = await import("../server/modules/gitlab/index.ts");
-  const { loadProjects } = await import("../server/modules/projects/index.ts");
+  const { cloneGitlabProject } = await import("../packages/server/modules/gitlab/index.ts");
+  const { loadProjects } = await import("../packages/server/modules/projects/index.ts");
 
   const selected = join(root, "selected folder");
   const { project } = await cloneGitlabProject({
@@ -185,7 +186,7 @@ test("a public gitlab.com project clones anonymously without PRIVATE-TOKEN", asy
     expect(options.env.PROJECTOR_GITLAB_TOKEN).toBe("");
     expect(!JSON.stringify(args).includes(secret)).toBe(true);
   });
-  const { cloneGitlabProject } = await import("../server/modules/gitlab/index.ts");
+  const { cloneGitlabProject } = await import("../packages/server/modules/gitlab/index.ts");
   const { project } = await cloneGitlabProject({ repository: "team/public" });
   expect(project.path).toBe(join(root, "projects", "team", "public"));
   expect(requests[0].headers["PRIVATE-TOKEN"]).toBe(undefined);
@@ -209,7 +210,7 @@ test("a GitLab Docker clone keeps the token in a private env file", async () => 
       ),
     }),
   );
-  const { os } = await import("../core/modules/os/index.ts");
+  const { os } = await import("../packages/core/modules/os/index.ts");
   const dockerCalls = [];
   let runArgs;
   let credentialsText = "";
@@ -235,7 +236,7 @@ test("a GitLab Docker clone keeps the token in a private env file", async () => 
     }
     return { stdout: "", stderr: "" };
   });
-  const { cloneGitlabProject } = await import("../server/modules/gitlab/index.ts");
+  const { cloneGitlabProject } = await import("../packages/server/modules/gitlab/index.ts");
   const phases = [];
   const { project } = await cloneGitlabProject(
     {
@@ -291,8 +292,8 @@ test("a GitLab clone job reports cloning and stays cancelled", async () => {
     syncBuiltinESMExports();
   });
   const { startCloneJob, cloneJob, cancelCloneJob } =
-    await import("../server/modules/git-import/index.ts");
-  const { cloneGitlabProject } = await import("../server/modules/gitlab/index.ts");
+    await import("../packages/server/modules/git-import/index.ts");
+  const { cloneGitlabProject } = await import("../packages/server/modules/gitlab/index.ts");
   const job = startCloneJob(
     { repository: "team/tools/app", directory: join(root, "jobs") },
     cloneGitlabProject,

@@ -2,11 +2,14 @@ import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readCursorUsage } from "../server/modules/agents-integration/cursor/client.ts";
-import { readCursorAccessToken } from "../server/modules/agents-integration/cursor/credentials.ts";
-import { cursorWindows, cursorUsage } from "../server/modules/agents-integration/cursor/usage.ts";
-import { NETWORK_CONTEXT_URL } from "../server/modules/network/index.ts";
-import { handleCursor } from "../server/routes/api/cursor.ts";
+import { readCursorUsage } from "../packages/server/modules/agents-integration/cursor/client.ts";
+import { readCursorAccessToken } from "../packages/server/modules/agents-integration/cursor/credentials.ts";
+import {
+  cursorWindows,
+  cursorUsage,
+} from "../packages/server/modules/agents-integration/cursor/usage.ts";
+import { NETWORK_CONTEXT_URL } from "../packages/server/modules/network/index.ts";
+import { handleCursor } from "../packages/server/routes/api/cursor.ts";
 
 const payload = {
   billingCycleEnd: "1792862002000",

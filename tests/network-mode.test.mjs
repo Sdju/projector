@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { createServer, request as httpRequest } from "node:http";
 import { once } from "node:events";
 import { networkInterfaces } from "node:os";
-import { handleApi } from "../server/app/api.ts";
-import { readNetworkMode, writeNetworkMode } from "../core/modules/app-paths/index.ts";
+import { handleApi } from "../packages/server/app/api.ts";
+import { readNetworkMode, writeNetworkMode } from "../packages/core/modules/app-paths/index.ts";
 import {
   accessAllowed,
   isLocalRequest,
@@ -14,7 +14,7 @@ import {
   setLanPassword,
   clearLanPassword,
   verifyLanPassword,
-} from "../server/modules/access/index.ts";
+} from "../packages/server/modules/access/index.ts";
 
 function request(headers, remoteAddress = "192.168.1.20", encrypted = false) {
   return { headers, socket: { remoteAddress, encrypted } };

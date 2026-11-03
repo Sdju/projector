@@ -1,0 +1,12 @@
+{
+  "name": "@projector/cli",
+  "version": "0.9.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./*"
+  },
+  "dependencies": {
+    "@projector/core": "workspace:*"
+  }
+}

@@ -1,4 +1,4 @@
-import { JUDGE_DEFAULTS, judgeAllows } from "../core/modules/agent-judge/index.ts";
+import { JUDGE_DEFAULTS, judgeAllows } from "../packages/core/modules/agent-judge/index.ts";
 
 /** The policy the evals check: the user's default, score 1 may run unasked. */
 export const JUDGE_EVAL_SETTINGS = {

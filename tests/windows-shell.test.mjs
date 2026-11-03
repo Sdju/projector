@@ -2,8 +2,8 @@ import { expect, onTestFinished, test } from "vite-plus/test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { os } from "../core/modules/os/index.ts";
-import { startDesktopShell } from "../core/modules/os/modules/windows/shell.ts";
+import { os } from "../packages/core/modules/os/index.ts";
+import { startDesktopShell } from "../packages/core/modules/os/modules/windows/shell.ts";
 
 test(
   "Windows tray host registers a hotkey and releases it on exit",
@@ -48,7 +48,7 @@ test(
   "pressing the registered hotkey reaches the palette handler",
   { skip: process.platform !== "win32" },
   async () => {
-    const { runPowerShell } = await import("../core/modules/os/modules/windows/ps.ts");
+    const { runPowerShell } = await import("../packages/core/modules/os/modules/windows/ps.ts");
     const root = await mkdtemp(join(tmpdir(), "projector-win-hotkey-"));
     const data = join(root, "projector");
     await mkdir(data);

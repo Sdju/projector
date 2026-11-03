@@ -4,7 +4,7 @@ import {
   isRetryable,
   pause,
   retryDelay,
-} from "../server/modules/agents/projector/projector-retry.ts";
+} from "../packages/server/modules/agents/projector/projector-retry.ts";
 
 const api = (statusCode, responseHeaders) =>
   new APICallError({

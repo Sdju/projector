@@ -1,6 +1,6 @@
 # Интеграции
 
-Настройки и секреты — `server/modules/integration-store`, GitHub — `server/modules/github`, GitLab — `server/modules/gitlab`, общее клонирование — `server/modules/git-import`, статусы — `/api/integrations`.
+Настройки и секреты — `packages/server/modules/integration-store`, GitHub — `packages/server/modules/github`, GitLab — `packages/server/modules/gitlab`, общее клонирование — `packages/server/modules/git-import`, статусы — `/api/integrations`.
 
 ## Хранение и доступ
 
@@ -47,7 +47,7 @@
 
 ## Лимиты агентов в статусной строке
 
-Код: `server/modules/agents-integration/{codex,claude,opencode,cursor,kimi}` и клиентские индикаторы; общее ядро — `_` в обоих корнях. Projector не хранит секреты: используется авторизация CLI. Запросы всех окон объединяются, кеш переживает HMR, опрос — раз в минуту только в видимой вкладке, перенаправления запрещены, таймаут 10 с. `GET /api/{codex,claude,opencode,cursor,kimi}/usage` отдаёт только нормализованные окна, время и безопасную ошибку. Файлы авторизации читаются через `core/modules/os`.
+Код: `packages/server/modules/agents-integration/{codex,claude,opencode,cursor,kimi}` и клиентские индикаторы; общее ядро — `_` в обоих корнях. Projector не хранит секреты: используется авторизация CLI. Запросы всех окон объединяются, кеш переживает HMR, опрос — раз в минуту только в видимой вкладке, перенаправления запрещены, таймаут 10 с. `GET /api/{codex,claude,opencode,cursor,kimi}/usage` отдаёт только нормализованные окна, время и безопасную ошибку. Файлы авторизации читаются через `packages/core/modules/os`.
 
 | Сервис   | Источник                                                                                    | Авторизация                                                                                  | Особенности                                                                                                              |
 | -------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -57,13 +57,13 @@
 | Cursor   | ConnectRPC `POST https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage` | `$XDG_CONFIG_HOME/cursor/auth.json` (`CURSOR_AUTH_CONTENT`), `agent login`                   | Окна: всего, авто-модели, API-модели; кеш 1 мин                                                                          |
 | Kimi     | `GET https://api.kimi.com/coding/v1/usages`                                                 | OAuth-токен из `~/.kimi-code/credentials/*.json` с учётом `expires_at` (`KIMI_AUTH_CONTENT`) | Окна 5 часов, неделя и месяц (`usages.limit_5h`/`limit_7d` `used_ratio`, `totalQuota`); неизвестная форма — «недоступно» |
 
-Codex и Cursor перед запросом выполняют probe `GET https://ipwho.is/` (`server/modules/network/eu-context.ts`): лимиты запрашиваются только при `success: true` и `is_eu: true`.
+Codex и Cursor перед запросом выполняют probe `GET https://ipwho.is/` (`packages/server/modules/network/eu-context.ts`): лимиты запрашиваются только при `success: true` и `is_eu: true`.
 
 Индикатор показывает **оставшийся** процент окна; клик переключает окно без запросов (`ide.<агент>.usage.window.cycle`), выбор не сохраняется. Ошибка — «—», а не исчерпание квоты. На мобильном те же значения показывает меню «Новая сессия», опрос идёт только пока меню открыто.
 
 ### Баланс провайдера
 
-Пятый индикатор показывает баланс **активного** провайдера (`server/modules/providers/balance.ts`, `GET /api/providers/balance?id=…`). Тип (`kind`) — `deepseek`, `qwencloud`, `local` или `custom`; у старых провайдеров определяется по адресу.
+Пятый индикатор показывает баланс **активного** провайдера (`packages/server/modules/providers/balance.ts`, `GET /api/providers/balance?id=…`). Тип (`kind`) — `deepseek`, `qwencloud`, `local` или `custom`; у старых провайдеров определяется по адресу.
 
 | Тип               | Баланс                                                                                                                                                      |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |

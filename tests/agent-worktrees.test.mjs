@@ -9,7 +9,7 @@ const root = await realpath(await mkdtemp(join(tmpdir(), "projector-worktrees-")
 process.env.XDG_DATA_HOME = join(root, "data");
 await mkdir(process.env.XDG_DATA_HOME, { recursive: true });
 const { createWorktree, mergeWorktree, removeWorktree, worktreeCwd, worktreeStatus } =
-  await import("../server/modules/agent/worktrees.ts");
+  await import("../packages/server/modules/agent/worktrees.ts");
 
 const git = (cwd, ...args) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
 

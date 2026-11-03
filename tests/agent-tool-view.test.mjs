@@ -1,7 +1,7 @@
 import { expect, test } from "vite-plus/test";
-import { applyAgentEvent } from "../src/modules/agent/model/turn-events.ts";
-import { toolVisual } from "../src/modules/agent/lib/tool-visual.ts";
-import { codeLanguage } from "../src/modules/agent/lib/code-language.ts";
+import { applyAgentEvent } from "../packages/client/modules/agent/model/turn-events.ts";
+import { toolVisual } from "../packages/client/modules/agent/lib/tool-visual.ts";
+import { codeLanguage } from "../packages/client/modules/agent/lib/code-language.ts";
 
 test("a call is shaped by what it does, not only by its name", () => {
   expect(toolVisual("Read")).toBe("read");

@@ -1,10 +1,10 @@
 import { expect, onTestFinished, test, vi } from "vite-plus/test";
 import { setImmediate } from "node:timers/promises";
 import { createRenderer, ref } from "vue";
-import { createCommandService } from "../core/modules/ide/index.ts";
-import { commandHostKey } from "../src/common/utilities/commands.ts";
-import { useNetworkSettings } from "../src/modules/network/model.ts";
-import { waitForNetworkRestart } from "../src/modules/network/client.ts";
+import { createCommandService } from "../packages/core/modules/ide/index.ts";
+import { commandHostKey } from "../packages/client/common/utilities/commands.ts";
+import { useNetworkSettings } from "../packages/client/modules/network/model.ts";
+import { waitForNetworkRestart } from "../packages/client/modules/network/client.ts";
 
 function mount(view = "settings", sdk = createCommandService()) {
   const renderer = createRenderer({

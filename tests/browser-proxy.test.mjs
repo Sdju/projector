@@ -7,15 +7,15 @@ import {
   proxyAvailableFor,
   proxySuffix,
   proxyUrl,
-} from "../core/modules/browser/index.ts";
-import { rewriteCss, rewriteHtml } from "../server/modules/browser/rewrite.ts";
+} from "../packages/core/modules/browser/index.ts";
+import { rewriteCss, rewriteHtml } from "../packages/server/modules/browser/rewrite.ts";
 import {
   clearCookies,
   cookieHeader,
   siteOf,
   storeCookie,
-} from "../server/modules/browser/cookies.ts";
-import { isInternalAddress, isInternalLiteral } from "../server/modules/browser/guard.ts";
+} from "../packages/server/modules/browser/cookies.ts";
+import { isInternalAddress, isInternalLiteral } from "../packages/server/modules/browser/guard.ts";
 
 const suffix = proxySuffix("0123456789abcdef", 4177);
 const origin = (host) => `http://${host}.0123456789abcdef.proxy.localhost:4177`;

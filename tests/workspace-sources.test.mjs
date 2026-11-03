@@ -3,8 +3,8 @@ import {
   createGithubConnectionProfile,
   createGithubEnabledLocalProfile,
   createGithubWorkspaceProfile,
-} from "../src/modules/github-workspace/source.ts";
-import { createGitlabWorkspaceProfile } from "../src/modules/gitlab-workspace/source.ts";
+} from "../packages/client/modules/github-workspace/source.ts";
+import { createGitlabWorkspaceProfile } from "../packages/client/modules/gitlab-workspace/source.ts";
 import {
   registerWorkspaceProfile,
   workspaceCapabilities,
@@ -18,9 +18,9 @@ import {
   mutateWorkspaceEntry,
   mutateWorkspaceGit,
   mutateWorkspaceBranch,
-} from "../src/modules/workspace-api/index.ts";
-import { isEditable, isMarkdown } from "../src/modules/workspace/open-file.ts";
-import { registerBuiltinClientAgents } from "../src/app/agents.ts";
+} from "../packages/client/modules/workspace-api/index.ts";
+import { isEditable, isMarkdown } from "../packages/client/modules/workspace/open-file.ts";
+import { registerBuiltinClientAgents } from "../packages/client/app/agents.ts";
 
 registerBuiltinClientAgents();
 
@@ -362,7 +362,7 @@ test("readonly guards reject all shared write helpers before any HTTP request", 
 
 test("a profile is a set of replaceable providers and capabilities follow from them", async () => {
   const { createWorkspaceProfiles, profileCapabilities, workspaceProfile } =
-    await import("../src/modules/workspace-api/index.ts");
+    await import("../packages/client/modules/workspace-api/index.ts");
   const calls = [];
   const memory = {
     id: "memory",

@@ -5,7 +5,7 @@ import {
   removeFrontmatterEntry,
   setFrontmatterValue,
   splitFrontmatter,
-} from "../src/modules/workspace/modules/viewers/lib/frontmatter.ts";
+} from "../packages/client/modules/workspace/modules/viewers/lib/frontmatter.ts";
 
 const doc = '---\nname: demo\n# note\ndescription: "a: b"\nlong: |\n  one\n  two\n---\n# Title\n';
 

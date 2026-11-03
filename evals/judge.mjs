@@ -4,8 +4,8 @@
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { judgeAction, clearJudgeCache } from "../server/modules/judge/index.ts";
-import { judgeAllows } from "../core/modules/agent-judge/index.ts";
+import { judgeAction, clearJudgeCache } from "../packages/server/modules/judge/index.ts";
+import { judgeAllows } from "../packages/core/modules/agent-judge/index.ts";
 import { JUDGE_EVAL_SETTINGS, judgeScenarios, judgeVerdict } from "./judge-scenarios.mjs";
 
 const [providerId, model, ...only] = process.argv.slice(2);

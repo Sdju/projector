@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
-import { bindTerminalTouchScroll } from "../src/modules/terminal/lib/touch-scroll.ts";
+import { bindTerminalTouchScroll } from "../packages/client/modules/terminal/lib/touch-scroll.ts";
 
 let frames;
 let clock;

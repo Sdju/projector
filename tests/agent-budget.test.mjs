@@ -3,7 +3,7 @@ import {
   isLooping,
   tokensSpent,
   turnBudget,
-} from "../server/modules/agents/projector/projector-budget.ts";
+} from "../packages/server/modules/agents/projector/projector-budget.ts";
 
 const step = (name, input, output) => ({
   toolCalls: [{ toolName: name, input }],

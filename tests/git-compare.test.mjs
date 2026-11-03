@@ -3,7 +3,10 @@ import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
-import { compareProjectChanges, compareProjectFile } from "../server/modules/workspace/index.ts";
+import {
+  compareProjectChanges,
+  compareProjectFile,
+} from "../packages/server/modules/workspace/index.ts";
 
 async function repository() {
   const base = await mkdtemp(join(tmpdir(), "projector-git-compare-"));

@@ -3,7 +3,10 @@ import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
-import { projectBranches, mutateProjectBranch } from "../server/modules/workspace/index.ts";
+import {
+  projectBranches,
+  mutateProjectBranch,
+} from "../packages/server/modules/workspace/index.ts";
 
 async function repository() {
   const base = await mkdtemp(join(tmpdir(), "projector-branches-"));

@@ -1,0 +1,250 @@
+<script setup lang="ts">
+import UiPanel from "../../../common/ui/UiPanel.vue";
+import UiToolbar from "../../../common/ui/UiToolbar.vue";
+import { computed } from "vue";
+import { workspaceSiteUrl } from "../../workspace-api/index.ts";
+import { shortRevision } from "@projector/core/modules/workspace/index.ts";
+import { useTabHost, useWorkspaceTabs } from "../lib/tab-views.ts";
+import { isEditable, isHtml, isLiveFile, isMarkdown, type OpenFile } from "../open-file.ts";
+import TabReadoutScope from "../../../common/ui/TabReadoutScope.vue";
+import {
+  ArchiveViewer,
+  CodeViewer,
+  EditorStatusLine,
+  HtmlViewer,
+  ImageViewport,
+  MarkdownViewer,
+  SvgViewer,
+  provideEditorStatus,
+  provideEditorTopbar,
+} from "../modules/viewers/index.ts";
+
+/** Содержимое одной вкладки файла: верхняя панель (путь и действия редактора), ошибка сохранения и подходящий просмотрщик. */
+const props = defineProps<{ file: OpenFile; projectId: string; revision: number }>();
+const emit = defineEmits<{
+  change: [draft: string];
+  save: [];
+  mode: [mode: "document" | "source"];
+  open: [path: string];
+  reload: [];
+  keep: [];
+}>();
+const tabs = useWorkspaceTabs();
+const host = useTabHost();
+provideEditorStatus();
+const topbarActions = provideEditorTopbar();
+/** В шаблоне ref верхнего уровня разворачивается, поэтому значение задаётся здесь. */
+const setTopbarActions = (el: unknown) => {
+  topbarActions.value = el as HTMLElement | null;
+};
+const siteUrl = computed(() =>
+  isLiveFile(props.file) ? workspaceSiteUrl(props.projectId, props.file.path) : "",
+);
+/** A snapshot has no live site URL and no archive unpacker; say so instead of showing a stale view. */
+const snapshotLimit = computed(() => {
+  if (isLiveFile(props.file) || props.file.virtual || props.file.image) return "";
+  if (/\.html?$/i.test(props.file.path))
+    return "HTML из снимка открыт как код: встроенный просмотр страницы доступен только для рабочей копии";
+  if (/\.(?:tar|tgz|gz|gzip|bz2|tbz2?|xz|txz|zip)$/i.test(props.file.path))
+    return "Архив из снимка не распаковывается: показано только содержимое файла";
+  return "";
+});
+const view = computed(() => (props.file.virtual ? tabs.views[props.file.virtual] : undefined));
+const subtitle = computed(() =>
+  props.file.virtual ? tabs.types.get(props.file.virtual)?.subtitle : undefined,
+);
+/** Текстовый файл: у него есть строка состояния с позицией, языком и переводом строк. */
+const hasStatusLine = computed(
+  () => !props.file.virtual && !props.file.binary && !props.file.image && !props.file.archive,
+);
+</script>
+
+<template>
+  <UiPanel as="div" sizing="flex" class="file-panel">
+    <div class="topbar">
+      <span class="topbar-path u-truncate">{{ file.path }}</span>
+      <span v-if="subtitle" class="topbar-note">{{ subtitle }}</span>
+      <span v-if="file.external || file.readonly" class="topbar-note">только просмотр</span>
+      <div :ref="setTopbarActions" class="topbar-actions" />
+    </div>
+    <p v-if="snapshotLimit" class="file-note">{{ snapshotLimit }}</p>
+    <p v-if="file.saveError && !isMarkdown(file)" class="file-error" role="alert">
+      {{ file.saveError }}
+    </p>
+    <UiToolbar v-if="file.conflict" class="file-conflict" role="alert" wrap text="xs">
+      <span>
+        {{
+          file.conflict.error
+            ? `Файл недоступен на диске: ${file.conflict.error}`
+            : "Файл изменён на диске, а во вкладке есть несохранённые правки"
+        }}
+      </span>
+      <button type="button" @click="emit('reload')">
+        {{ file.conflict.error ? "Проверить снова" : "Загрузить с диска" }}
+      </button>
+      <button v-if="file.conflict.disk !== undefined" type="button" @click="emit('keep')">
+        Оставить мою версию
+      </button>
+    </UiToolbar>
+    <div class="panel-body" :data-own-keys="view?.ownKeys || undefined">
+      <TabReadoutScope v-if="view" :tab-key="file.key">
+        <component :is="view.component" v-bind="view.props?.(file, host)" />
+      </TabReadoutScope>
+      <p v-else-if="file.binary && !file.image" class="file-error">
+        Бинарный файл · {{ file.size }} байт
+      </p>
+      <ImageViewport v-else-if="file.image" :src="file.image" :alt="file.path" />
+      <ArchiveViewer v-else-if="file.archive" :archive="file.archive" />
+      <SvgViewer
+        v-else-if="
+          /\.svg$/i.test(file.path) &&
+          file.original === undefined &&
+          (!file.scope || file.scope.kind !== 'compare')
+        "
+        :path="file.path"
+        :content="file.draft ?? file.content"
+        :editable="isEditable(file)"
+        :line="file.line"
+        :column="file.column"
+        @change="emit('change', $event)"
+        @save="emit('save')"
+      />
+      <HtmlViewer
+        v-else-if="isHtml(file) && siteUrl"
+        :path="file.path"
+        :content="file.draft ?? file.content"
+        :saved="file.content"
+        :site-url="siteUrl"
+        :reload="file.htmlReload"
+        :editable="isEditable(file)"
+        :line="file.line"
+        :column="file.column"
+        @change="emit('change', $event)"
+        @save="emit('save')"
+        @command="(id, args) => host.run(id, args)"
+      />
+      <MarkdownViewer
+        :key="file.readonly ? revision : undefined"
+        v-else-if="isMarkdown(file)"
+        :project-id="projectId"
+        :scope="file.scope"
+        :editable="isEditable(file)"
+        :path="file.path"
+        :content="file.draft ?? file.content"
+        :mode="file.markdownMode ?? 'document'"
+        :error="file.saveError"
+        :line="file.line"
+        :column="file.column"
+        @change="emit('change', $event)"
+        @mode="emit('mode', $event)"
+        @command="(id) => host.run(id)"
+        @save="emit('save')"
+        @open="emit('open', $event)"
+      />
+      <CodeViewer
+        v-else-if="!file.virtual"
+        :path="file.path"
+        :project-id="isLiveFile(file) ? projectId : ''"
+        :revision="revision"
+        :content="file.draft ?? file.content"
+        :editable="isEditable(file)"
+        :original="file.original"
+        :original-label="
+          file.commit
+            ? file.parent || '∅'
+            : file.scope?.kind === 'compare'
+              ? shortRevision(file.scope.from)
+              : file.staged
+                ? 'HEAD'
+                : 'Индекс'
+        "
+        :modified-label="
+          file.commit
+            ? file.commit.slice(0, 7)
+            : file.scope?.kind === 'compare'
+              ? shortRevision(file.scope.to)
+              : file.staged
+                ? 'Индекс'
+                : 'Рабочий файл'
+        "
+        :line="file.line"
+        :column="file.column"
+        @change="emit('change', $event)"
+        @save="emit('save')"
+      />
+    </div>
+    <EditorStatusLine
+      v-if="hasStatusLine"
+      :path="file.path"
+      :content="file.draft ?? file.content"
+    />
+  </UiPanel>
+</template>
+
+<style scoped>
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: calc(var(--control-h) - 4px);
+  padding: 0 var(--sp-3);
+  font: var(--fs-2xs) var(--mono);
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+.topbar-path {
+  flex: 1;
+  min-width: 0;
+}
+.topbar-note {
+  flex-shrink: 0;
+  color: var(--faint);
+}
+.topbar-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--sp-1);
+}
+.file-error {
+  margin: 0;
+  padding: var(--sp-3);
+  color: var(--err);
+  font-size: var(--fs-xs);
+  border-bottom: 1px solid var(--line);
+}
+.file-note {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  border-bottom: 1px solid var(--line);
+}
+
+.file-conflict span {
+  flex: 1;
+  min-width: 200px;
+}
+.file-conflict button {
+  padding: 2px var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.file-conflict button:hover {
+  background: var(--active);
+}
+.panel-body {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+@media (max-width: 600px) {
+  .topbar-note {
+    display: none;
+  }
+}
+</style>

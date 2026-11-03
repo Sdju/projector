@@ -3,7 +3,7 @@ import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { previewProjectFile, readProjectFile } from "../server/modules/workspace/index.ts";
+import { previewProjectFile, readProjectFile } from "../packages/server/modules/workspace/index.ts";
 
 const fixtures = String.raw`
 import io, tarfile, zipfile, gzip, bz2, lzma, sys

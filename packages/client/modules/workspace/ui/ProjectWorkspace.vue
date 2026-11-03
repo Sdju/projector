@@ -1,0 +1,724 @@
+<script setup lang="ts">
+import UiResizeHandle from "../../../common/ui/UiResizeHandle.vue";
+import { computed, onBeforeUnmount, ref } from "vue";
+import {
+  workspaceProfile,
+  profileCapabilities,
+  searchWorkspace,
+  extendSidebarRegistry,
+  type SidebarType,
+  type WorkspaceCapability,
+} from "../../workspace-api/index.ts";
+import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
+import WorkbenchToolbar from "./WorkbenchToolbar.vue";
+import MobileSurfaces from "./MobileSurfaces.vue";
+import WorkspaceSidebar from "./WorkspaceSidebar.vue";
+import { useGitOverview, useGitHistory, useGitBranches } from "../modules/git/index.ts";
+import { useGitChangeSync } from "../lib/git-change-sync.ts";
+import { useSidebarResize } from "../lib/sidebar-resize.ts";
+import { useOpenFiles } from "../lib/open-files.ts";
+import { ensureTab } from "../lib/service-tabs.ts";
+import { useWorkbenchLayout } from "../lib/workbench-layout.ts";
+import { registerAgentCommands } from "../../agent/index.ts";
+import { registerEditorCommands } from "../lib/editor-commands.ts";
+import { useWorkspaceSession } from "../lib/workspace-session.ts";
+import WorkbenchDock from "./WorkbenchDock.vue";
+import StatusBar from "./StatusBar.vue";
+import type { DockTarget } from "../../dock/index.ts";
+import { type OpenFile } from "../open-file.ts";
+import {
+  fileScopeKey,
+  fileScopeNote,
+  fileScopeTitle,
+  isLiveScope,
+  type FileScope,
+} from "@projector/core/modules/workspace/index.ts";
+import { createPanelHosts } from "../panel-hosts.ts";
+import { TerminalCloseDialog } from "../../terminal/index.ts";
+import { useDocker } from "../../docker/index.ts";
+import { sidebarSections } from "../lib/sidebar-views.ts";
+import { provideTabHost, useWorkspaceTabTypes, type TabViews } from "../lib/tab-views.ts";
+import { useWorkspaceRefresh } from "../lib/workspace-refresh.ts";
+import { useMobileSurfaces, registerMobileCommands } from "../lib/mobile-surfaces.ts";
+import { useSurfaceSwipe } from "../lib/surface-swipe.ts";
+const props = defineProps<{
+  projectId: string;
+  projectSettingsDirty?: boolean;
+  beforeCloseProjectSettings?: () => boolean;
+  saveProjectSettings?: () => void | Promise<void>;
+  tabViews?: TabViews; // views of the kinds the embedding page owns
+}>();
+const profile = workspaceProfile(props.projectId);
+const capabilities = profileCapabilities(profile);
+const tabTypes = useWorkspaceTabTypes(profile, props.tabViews, {
+  project: {
+    dirty: () => !!props.projectSettingsDirty,
+    beforeClose: () => props.beforeCloseProjectSettings?.(),
+    save: () => props.saveProjectSettings?.(),
+  },
+});
+const workspaceElement = ref<HTMLElement>();
+const sidebarHidden = ref(false);
+const { mobile, mobileSurface, mobileSidebarOpen, sidebarInvisible, showSidebar } =
+  useMobileSurfaces(sidebarHidden);
+const { treeWidth, sizes, resizeTree, resizeTreeKey } = useSidebarResize(workspaceElement);
+const sidebar = ref<InstanceType<typeof WorkspaceSidebar>>();
+const editorCommands = useCommandScope(`editor:${props.projectId}`, () => ({
+  surface: "editor",
+  projectId: props.projectId,
+}));
+useSurfaceSwipe({
+  workspace: workspaceElement,
+  mobile,
+  surface: mobileSurface,
+  terminals: () => capabilities.terminals,
+  show: (surface) => editorCommands.run("ide.workbench.mobile.surface.show", { surface }),
+});
+const registerEditor = (
+  id: string,
+  title: string,
+  run: (args?: unknown) => unknown,
+  enabled: (args?: unknown) => boolean,
+  requires?: WorkspaceCapability,
+  meta?: { description?: string; arguments?: Record<string, string> },
+) =>
+  editorCommands.scope.registerCommand({
+    id,
+    title,
+    ...meta,
+    run,
+    enabled: (args) => (!requires || capabilities[requires]) && enabled(args),
+  });
+// The agent chats are tabs that come and go; their commands live as long as this workspace.
+registerAgentCommands(registerEditor, props.projectId);
+function treeChanged() {
+  revision.value++;
+  void loadGit();
+}
+function entryDeleted(path: string) {
+  files.invalidate();
+  tabs.value = tabs.value.filter(
+    (tab) =>
+      tab.virtual ||
+      tab.commit ||
+      (tab.scope && !isLiveScope(tab.scope)) ||
+      (tab.path !== path && !tab.path.startsWith(path + "/")),
+  );
+  revision.value++;
+  void loadGit();
+  sidebar.value?.refreshSearch();
+}
+const overview = useGitOverview(() => props.projectId);
+const history = useGitHistory(() => props.projectId);
+const branches = useGitBranches(() => props.projectId);
+const { gutterRevision } = overview;
+const loadGit = () => (capabilities.git ? overview.load() : Promise.resolve());
+const section = ref("files");
+const extraSections = ref<SidebarType[]>([]);
+const sections = computed(() =>
+  extendSidebarRegistry(sidebarSections(profile, capabilities), () => extraSections.value),
+);
+function openTree(scope: FileScope) {
+  if (!capabilities.snapshots) throw new Error("Источник не умеет показывать файлы снимка");
+  const id = `tree:${fileScopeKey(scope)}`;
+  if (!extraSections.value.some((type) => type.id === id))
+    extraSections.value.push({
+      id,
+      title: fileScopeTitle(scope),
+      source: fileScopeNote(scope),
+      group: capabilities.git ? "git" : undefined,
+      kind: scope.kind === "compare" ? "changes" : "tree",
+      params: { scope },
+      closable: true,
+    });
+  section.value = id;
+  showSidebar();
+}
+function openCommitTree(hash: string) {
+  openTree({ kind: "commit", rev: hash });
+}
+function openSearch(scope: FileScope) {
+  if (scope.kind !== "commit") throw new Error("Поиск доступен только для коммита");
+  if (!capabilities.search) throw new Error("Источник не умеет искать по снимку");
+  const id = `search:${fileScopeKey(scope)}`;
+  if (!extraSections.value.some((type) => type.id === id))
+    extraSections.value.push({
+      id,
+      title: "Поиск по снимку",
+      source: fileScopeNote(scope),
+      group: capabilities.git ? "git" : undefined,
+      kind: "search-scope",
+      params: { scope },
+      closable: true,
+    });
+  section.value = id;
+  showSidebar();
+}
+/** Rebuilds temporary sections from a session; view kinds and scopes are derived, not trusted. */
+function restoreSections(saved: SidebarType[]) {
+  extraSections.value = saved.flatMap((type) => {
+    const raw = type.params?.scope;
+    if (!raw || typeof raw !== "object") return [];
+    const value = raw as { kind?: unknown; rev?: unknown; from?: unknown; to?: unknown };
+    const scope: FileScope | undefined =
+      value.kind === "commit" && typeof value.rev === "string"
+        ? { kind: "commit", rev: value.rev }
+        : value.kind === "compare" && typeof value.from === "string" && typeof value.to === "string"
+          ? { kind: "compare", from: value.from, to: value.to }
+          : undefined;
+    if (!scope) return [];
+    if (scope.kind === "compare" ? !capabilities.compare : !capabilities.snapshots) return [];
+    const search = type.kind === "search-scope";
+    if (search && (scope.kind !== "commit" || !capabilities.search)) return [];
+    return [
+      {
+        id: search ? `search:${fileScopeKey(scope)}` : `tree:${fileScopeKey(scope)}`,
+        title: search ? "Поиск по снимку" : fileScopeTitle(scope),
+        source: fileScopeNote(scope),
+        group: capabilities.git ? "git" : undefined,
+        kind: search ? "search-scope" : scope.kind === "compare" ? "changes" : "tree",
+        params: { scope },
+        closable: true,
+      } satisfies SidebarType,
+    ];
+  });
+}
+function closeSection(id: string) {
+  const index = extraSections.value.findIndex((type) => type.id === id);
+  if (index < 0) return;
+  const [removed] = extraSections.value.splice(index, 1);
+  if (section.value === id)
+    section.value =
+      removed?.group && sections.value.has(removed.group)
+        ? removed.group
+        : capabilities.git
+          ? "git"
+          : "files";
+}
+
+/** Adds or updates a temporary sidebar section and reveals it; tab views own its contents. */
+function openSection(type: SidebarType) {
+  const index = extraSections.value.findIndex((item) => item.id === type.id);
+  if (index >= 0) extraSections.value.splice(index, 1, type);
+  else extraSections.value.push(type);
+  section.value = type.id;
+  showSidebar();
+}
+const revision = ref(0);
+const isDirty = (file: OpenFile) =>
+  file.virtual
+    ? !!tabTypes.behaviorOf(file.virtual)?.dirty?.()
+    : file.draft !== undefined && file.draft !== file.content;
+const tabs = ref<OpenFile[]>([]);
+/** Куда поместить следующую открытую вкладку: заполняется при перетаскивании файла на блок. */
+const pending: { target?: DockTarget } = {};
+const workbench = useWorkbenchLayout({
+  projectId: () => props.projectId,
+  capabilities,
+  layout: profile.layout,
+  tabs,
+  pending,
+  isDirty,
+  tabTypes,
+  selectTab: (key) => files.selectTab(key),
+  closeTab: (key) => files.closeTab(key),
+  closeManyTabs: (ids) => files.closeManyTabs(ids),
+  showSidebar,
+  register: registerEditor,
+});
+const {
+  layout,
+  restoringSession,
+  terminals,
+  fileOf,
+  activeKey,
+  revealPanel,
+  layoutGroups,
+  currentPreset,
+  presetsAvailable,
+} = workbench;
+const files = useOpenFiles({
+  projectId: () => props.projectId,
+  tabs,
+  active: () => active.value,
+  activeKey: () => activeKey.value,
+  reveal: (id) => revealPanel(id),
+  isDirty,
+  saved: () => void loadGit(),
+  pending,
+  tabTypes,
+});
+const { fileError, loading, openFile, openTab, saveFile, toggleMarkdownSource } = files;
+provideTabHost({
+  projectId: props.projectId,
+  openFile: (path) => void openFile(path),
+  openTab,
+  openCommitDiff: (hash, path) => void files.openCommitFile(hash, path),
+  openCommitTree,
+  openCompareTree: (from, to) => openTree({ kind: "compare", from, to }),
+  openPullFile: (number, path, head, pinned) => {
+    // Opening a file must not replace the merge request preview tab that led to it.
+    const pull = tabs.value.find(
+      (tab) => tab.virtual === "pull" && Number(tab.params?.number) === number,
+    );
+    if (pull) pull.preview = false;
+    void files.openPullFile(number, path, head, !pinned);
+  },
+  openSection,
+  run: (command, args) => editorCommands.run(command, args),
+});
+const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
+  projectId: props.projectId,
+  editorCommands,
+  register: registerEditor,
+  tabs,
+  active: () => active.value,
+  activeKey: () => activeKey.value,
+  fileOf,
+  saveFile,
+  reloadFromDisk: files.reloadFromDisk,
+  keepMine: files.keepMine,
+  openFile,
+  openTab,
+  selectTab: (key) => revealPanel(key),
+  onOpenTab: () => (mobileSidebarOpen.value = false),
+  toggleMarkdownSource,
+  revealInTree: (path, scope) => {
+    if (scope && !isLiveScope(scope)) {
+      const id = `tree:${fileScopeKey(scope)}`;
+      if (sections.value.has(id)) {
+        section.value = id;
+        showSidebar();
+        sidebar.value?.reveal(path, id);
+      }
+      return;
+    }
+    section.value = "files";
+    showSidebar();
+    sidebar.value?.reveal(path);
+  },
+  tabTypes,
+});
+const docker = useDocker(props.projectId, {
+  enabled: capabilities.docker,
+  sidebar: () => {
+    section.value = "docker";
+    showSidebar();
+  },
+  open: () => openTab("docker"),
+  terminal: async (session) => {
+    await terminals.refresh();
+    revealPanel(`terminal:${session.id}`);
+  },
+});
+const panelHosts = createPanelHosts();
+registerEditor(
+  "ide.workbench.sidebar.refresh",
+  "Обновить раздел боковой панели",
+  () => sidebar.value?.refreshSection(),
+  () => true,
+);
+registerEditor(
+  "ide.workbench.section.show",
+  "Открыть раздел боковой панели",
+  (value) => {
+    const id = commandArgs(value).section;
+    if (typeof id !== "string" || !sections.value.has(id))
+      throw new Error(
+        `section: ${sections.value
+          .list()
+          .map((type) => type.id)
+          .join(", ")}`,
+      );
+    section.value = id;
+    showSidebar();
+  },
+  () => true,
+  undefined,
+  {
+    description:
+      "Переключает боковую панель на раздел проекта (файлы, поиск, Git и другие, если они есть у проекта) и показывает её.",
+    arguments: { section: "Идентификатор раздела: files, search, git, docker, issues и т. д." },
+  },
+);
+registerEditor(
+  "ide.workbench.tree.search",
+  "Искать в снимке",
+  async (value) => {
+    const args = commandArgs(value);
+    if (typeof args.rev !== "string" || !args.rev) throw new Error("Укажите rev");
+    if (typeof args.q !== "string" || !args.q.trim()) throw new Error("Укажите q");
+    for (const key of ["case", "word", "regex"])
+      if (args[key] !== undefined && typeof args[key] !== "boolean")
+        throw new Error(`${key} должен быть boolean`);
+    return searchWorkspace(
+      props.projectId,
+      args.q,
+      {
+        caseSensitive: args.case === true,
+        wholeWord: args.word === true,
+        regex: args.regex === true,
+      },
+      undefined,
+      { kind: "commit", rev: args.rev },
+    );
+  },
+  () => capabilities.search && capabilities.snapshots,
+  undefined,
+  {
+    description:
+      "Ищет текст в файлах коммита и возвращает совпадения с путями и позициями. Локальный снимок читается через git grep, GitLab — через поиск по blobs с ref; GitHub не поддерживает поиск по произвольному коммиту. Найденные файлы открываются в том же коммите.",
+    arguments: {
+      rev: "Хеш коммита",
+      q: "Строка поиска",
+      case: "true — учитывать регистр",
+      word: "true — искать целое слово",
+      regex: "true — регулярное выражение",
+    },
+  },
+);
+registerEditor(
+  "ide.workbench.tree.open",
+  "Открыть дерево файлов снимка",
+  (value) => {
+    const args = commandArgs(value);
+    const stringArg = (key: string) => {
+      const item = args[key];
+      if (item !== undefined && typeof item !== "string")
+        throw new Error(`${key} должен быть строкой`);
+      return item as string | undefined;
+    };
+    const rev = stringArg("rev");
+    const from = stringArg("from");
+    const to = stringArg("to");
+    if (rev) openTree({ kind: "commit", rev });
+    else if (from && to) openTree({ kind: "compare", from, to });
+    else throw new Error("Укажите rev или пару from/to");
+  },
+  () => capabilities.snapshots || capabilities.compare,
+  undefined,
+  {
+    description:
+      "Открывает в боковой панели read-only дерево файлов коммита или список изменений двух коммитов. Для коммита передайте rev; для сравнения — from и to. Хеши должны быть полными или однозначно разрешаться Git провайдера.",
+    arguments: {
+      rev: "Хеш коммита для дерева файлов",
+      from: "Начальный хеш сравнения",
+      to: "Конечный хеш сравнения",
+    },
+  },
+);
+registerEditor(
+  "ide.workbench.section.close",
+  "Закрыть временный раздел боковой панели",
+  (value) => {
+    const id = commandArgs(value).section;
+    if (typeof id !== "string" || !id) throw new Error("Укажите section");
+    closeSection(id);
+  },
+  (value) => {
+    const id = commandArgs(value).section;
+    return typeof id === "string" && extraSections.value.some((type) => type.id === id);
+  },
+  undefined,
+  {
+    description: "Закрывает временный раздел боковой панели, например файлы коммита.",
+    arguments: { section: "Идентификатор временного раздела" },
+  },
+);
+registerEditor(
+  "ide.workbench.sidebar.toggle",
+  "Показать или скрыть боковую панель",
+  () => {
+    if (mobile.value) mobileSidebarOpen.value = !mobileSidebarOpen.value;
+    else sidebarHidden.value = !sidebarHidden.value;
+  },
+  () => true,
+);
+useWorkspaceSession({
+  persist: capabilities.persist,
+  initialLayout: workbench.initialLayout,
+  projectId: () => props.projectId,
+  tabs,
+  layout,
+  restoringSession,
+  activeKey,
+  section,
+  sections: sections.value,
+  sectionExists: (id) => sections.value.has(id),
+  extraSections,
+  restoreSections,
+  treeWidth,
+  sidebarHidden,
+  mobile,
+  mobileSurface,
+  terminals: capabilities.terminals,
+  ensureTab: (id, params) => ensureTab(tabs, tabTypes, id, params),
+  openFile,
+  fileGeneration: files.generation,
+  resetFiles: files.reset,
+  openCommitFile: files.openCommitFile,
+  openPullFile: files.openPullFile,
+  resetGit: () => {
+    overview.reset();
+    history.reset();
+    branches.reset();
+  },
+  reloadGit: () => void loadGit(),
+});
+registerMobileCommands({
+  editorCommands,
+  capabilities,
+  surface: mobileSurface,
+  mobile,
+  activeKey,
+  focusedPanel: () => workbench.focusedGroup.value?.active,
+  restoringSession,
+});
+const active = computed(() => tabs.value.find((file) => file.key === activeKey.value));
+const gitSync = useGitChangeSync({
+  projectId: () => props.projectId,
+  tabs,
+  active: () => active.value,
+  files,
+  bumpRevision: () => revision.value++,
+  refreshSearch: () => sidebar.value?.refreshSearch(),
+});
+const { refresh, entryMoved } = useWorkspaceRefresh({
+  projectId: () => props.projectId,
+  capabilities,
+  tabs,
+  layout,
+  files,
+  active: () => active.value,
+  activeKey: () => activeKey.value,
+  revision,
+  section,
+  searchPanel: () => sidebar.value,
+  loadGit,
+});
+defineExpose({ openFile, refresh, openTab, openSection });
+onBeforeUnmount(() => overview.cancel());
+</script>
+
+<template>
+  <div
+    ref="workspaceElement"
+    class="workspace"
+    :class="{ 'sidebar-hidden': sidebarInvisible }"
+    :data-surface="mobile ? mobileSurface : undefined"
+    :style="sizes"
+  >
+    <div class="toolbar-host">
+      <Teleport to="#header-tools" defer>
+        <WorkbenchToolbar
+          :capabilities="capabilities"
+          :mobile="mobile"
+          :sidebar-hidden="sidebarInvisible"
+          :terminals-busy="terminals.busy.value"
+          :terminals-error="terminals.error.value"
+          :layout-groups="layoutGroups"
+          :preset="currentPreset"
+          :presets-available="presetsAvailable"
+          @command="(id, args) => editorCommands.run(id, args)"
+        >
+          <template #terminal-actions><slot name="terminal-actions" /></template>
+          <template #terminal-status><slot name="terminal-status" /></template>
+        </WorkbenchToolbar>
+      </Teleport>
+    </div>
+    <p v-if="fileError" class="file-error" role="alert">{{ fileError }}</p>
+    <Transition name="mobile-left">
+      <WorkspaceSidebar
+        ref="sidebar"
+        v-model:section="section"
+        :project-id="projectId"
+        :capabilities="capabilities"
+        :sections="sections"
+        :hidden="sidebarInvisible"
+        :rail="!mobile"
+        :active="active"
+        :revision="revision"
+        :overview="overview"
+        :history="history"
+        :branches="branches"
+        :files="files"
+        :git-sync="gitSync"
+        @command="
+          (id, args) =>
+            (id.startsWith('ide.docker.') ? docker.commands : editorCommands).run(id, args)
+        "
+        @navigate="mobileSidebarOpen = false"
+        @open-commit-tree="openCommitTree"
+        @open-search="openSearch"
+        @refresh="refresh"
+        @changed="treeChanged"
+        @deleted="entryDeleted"
+        @moved="entryMoved"
+      />
+    </Transition>
+    <UiResizeHandle
+      appearance="gap"
+      orientation="vertical"
+      v-show="!sidebarInvisible"
+      class="resize-handle tree-resize"
+      aria-label="Ширина дерева файлов"
+      tabindex="0"
+      @pointerdown="resizeTree"
+      @keydown="resizeTreeKey"
+    />
+    <button
+      v-if="mobile && mobileSidebarOpen"
+      class="sidebar-backdrop"
+      aria-label="Закрыть боковую панель"
+      data-command="ide.workbench.sidebar.toggle"
+      @click="editorCommands.run('ide.workbench.sidebar.toggle')"
+    />
+    <section
+      class="dock-pane"
+      :inert="mobile && mobileSidebarOpen"
+      aria-label="Блоки редактора и терминалов"
+      @focusin="editorFocus"
+      @keydown.capture="editorKeydown"
+    >
+      <p v-if="loading" class="loading" role="status">читаю файл…</p>
+      <WorkbenchDock
+        :project-id="projectId"
+        :workbench="workbench"
+        :mobile="mobile"
+        :mobile-surface="mobileSurface"
+        :files="files"
+        :tab-actions="tabActions"
+        :panel-hosts="panelHosts"
+        :gutter-revision="gutterRevision"
+        :tabs="tabs"
+        :terminals-busy="terminals.busy.value"
+        :agent="capabilities.agent"
+        @command="(id, args) => editorCommands.run(id, args)"
+      />
+    </section>
+    <MobileSurfaces
+      v-if="mobile"
+      :terminals="capabilities.terminals"
+      :surface="mobileSurface"
+      @command="(id, args) => editorCommands.run(id, args)"
+    />
+    <TerminalCloseDialog
+      :session="terminals.pendingClose.value"
+      :busy="terminals.busy.value"
+      @cancel="terminals.cancelClose"
+      @confirm="terminals.confirmClose"
+    />
+    <StatusBar v-if="!mobile" class="workspace-status" />
+  </div>
+</template>
+
+<style scoped>
+.workspace {
+  --rail-w: 40px;
+  display: grid;
+  grid-template-columns: var(--tree-width, clamp(240px, 21vw, 320px)) var(--island-gap) minmax(
+      0,
+      1fr
+    );
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+/* Панель свёрнута, полоса разделов остаётся */
+.workspace.sidebar-hidden {
+  grid-template-columns: calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr);
+  column-gap: 0;
+}
+.tree-resize {
+  grid-column: 2;
+  grid-row: 3;
+}
+.dock-pane {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  grid-column: 3;
+  grid-row: 3;
+}
+.file-error {
+  grid-column: 1 / -1;
+  margin: 0 0 var(--island-gap);
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--err);
+  font-size: var(--fs-xs);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--bg);
+}
+.loading {
+  position: absolute;
+  top: 4px;
+  right: 14px;
+  z-index: var(--z-sticky);
+  background: var(--bg-2);
+  padding: 6px var(--sp-3);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+@media (max-width: 1050px) and (min-width: 701px) {
+  .dock-pane {
+    overflow: auto;
+  }
+  .workspace {
+    grid-template-columns: 260px var(--island-gap) minmax(0, 1fr);
+  }
+  .workspace.sidebar-hidden {
+    grid-template-columns: calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr);
+  }
+}
+@media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {
+  .workspace,
+  .workspace.sidebar-hidden {
+    position: relative;
+    grid-template-columns: minmax(0, 1fr);
+    flex: 1;
+    height: 100%;
+    min-height: 0;
+    padding: 0;
+    background: none;
+    border-radius: 0;
+  }
+  .tree-resize {
+    display: none;
+  }
+  .dock-pane {
+    grid-column: 1;
+    grid-row: 3;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    background: var(--bg);
+  }
+  .mobile-left-enter-active,
+  .mobile-left-leave-active {
+    transition: transform var(--t-base);
+  }
+  .mobile-left-enter-from,
+  .mobile-left-leave-to {
+    transform: translateX(-100%);
+  }
+  .sidebar-backdrop {
+    display: none;
+  }
+}
+.toolbar-host {
+  grid-column: 1 / -1;
+}
+/* Полоса действий вынесена в шапку (Teleport), здесь остаётся только якорь */
+.toolbar-host {
+  display: none;
+}
+.workspace-status {
+  grid-column: 1 / -1;
+  grid-row: 4;
+  margin-top: var(--island-gap);
+}
+</style>

@@ -15,7 +15,8 @@ const pat = "glpat-never-return";
 async function sandbox(credentials = {}, settings = {}) {
   const root = await mkdtemp(join(tmpdir(), "projector-gitlab-oauth-"));
   process.env.XDG_DATA_HOME = join(root, "data");
-  const { updateIntegration } = await import("../server/modules/integration-store/index.ts");
+  const { updateIntegration } =
+    await import("../packages/server/modules/integration-store/index.ts");
   await updateIntegration("gitlab", () => ({
     enabled: true,
     settings: { url: base, clientId, directory: join(root, "projects"), ...settings },
@@ -57,7 +58,7 @@ function mockSequence(handler) {
 
 test("GitLab settings save Client ID and reset credentials when the instance changes", async () => {
   const root = await sandbox({ token: pat, login: "tester" }, { clientId: "" });
-  const { configureGitlab } = await import("../server/modules/gitlab/index.ts");
+  const { configureGitlab } = await import("../packages/server/modules/gitlab/index.ts");
   const saved = await configureGitlab({
     enabled: true,
     url: base,
@@ -101,7 +102,7 @@ test("Device Flow starts with the configured client, scopes and form encoding", 
       interval: 5,
     });
   });
-  const { beginGitlabLogin } = await import("../server/modules/gitlab/index.ts");
+  const { beginGitlabLogin } = await import("../packages/server/modules/gitlab/index.ts");
   const login = await beginGitlabLogin();
   expect(login).toMatchObject({
     userCode: "ABCD-EFGH",
@@ -110,7 +111,8 @@ test("Device Flow starts with the configured client, scopes and form encoding", 
   });
   expect(calls).toHaveLength(1);
 
-  const { updateIntegration } = await import("../server/modules/integration-store/index.ts");
+  const { updateIntegration } =
+    await import("../packages/server/modules/integration-store/index.ts");
   await updateIntegration("gitlab", (config) => ({
     ...config,
     settings: { ...config.settings, directory: join(root, "projects"), clientId: "" },
@@ -165,7 +167,8 @@ test("Device Flow polls pending and stores an OAuth credential after Bearer /use
     }
     return Response.json({}, { status: 404 });
   });
-  const { beginGitlabLogin, pollGitlabLogin } = await import("../server/modules/gitlab/index.ts");
+  const { beginGitlabLogin, pollGitlabLogin } =
+    await import("../packages/server/modules/gitlab/index.ts");
   const login = await beginGitlabLogin();
   // The interval is enforced locally, so the first poll does not touch the network.
   expect(await pollGitlabLogin({ id: login.id })).toStrictEqual({ pending: true, interval: 5 });
@@ -187,7 +190,8 @@ test("Device Flow polls pending and stores an OAuth credential after Bearer /use
   expect(JSON.stringify(result)).not.toContain(access);
   expect(JSON.stringify(result)).not.toContain("refresh-2");
 
-  const { integrationConfig } = await import("../server/modules/integration-store/index.ts");
+  const { integrationConfig } =
+    await import("../packages/server/modules/integration-store/index.ts");
   const stored = await integrationConfig("gitlab");
   expect(stored.credentials.kind).toBe("oauth");
   expect(stored.credentials.token).toBe(access);
@@ -211,7 +215,8 @@ test("Device Flow increases the interval on slow_down", async () => {
     if (address === `${base}/oauth/token`) return Response.json({ error: "slow_down" });
     return Response.json({}, { status: 404 });
   });
-  const { beginGitlabLogin, pollGitlabLogin } = await import("../server/modules/gitlab/index.ts");
+  const { beginGitlabLogin, pollGitlabLogin } =
+    await import("../packages/server/modules/gitlab/index.ts");
   const login = await beginGitlabLogin();
   advance(5.1);
   expect(await pollGitlabLogin({ id: login.id })).toStrictEqual({ pending: true, interval: 10 });
@@ -233,7 +238,8 @@ test("Device Flow reports expired codes and denied access", async () => {
     if (address === `${base}/oauth/token`) return Response.json({ error });
     return Response.json({}, { status: 404 });
   });
-  const { beginGitlabLogin, pollGitlabLogin } = await import("../server/modules/gitlab/index.ts");
+  const { beginGitlabLogin, pollGitlabLogin } =
+    await import("../packages/server/modules/gitlab/index.ts");
   let login = await beginGitlabLogin();
   advance(5.1);
   await expect(pollGitlabLogin({ id: login.id })).rejects.toMatchObject({
@@ -277,7 +283,7 @@ test("an expiring OAuth token refreshes once for parallel requests and preserves
       token_type: "Bearer",
     });
   });
-  const { gitlabTarget } = await import("../server/modules/gitlab/index.ts");
+  const { gitlabTarget } = await import("../packages/server/modules/gitlab/index.ts");
   const [first, second] = await Promise.all([
     gitlabTarget("git.example.com/team/app"),
     gitlabTarget("git.example.com/team/app"),
@@ -286,7 +292,8 @@ test("an expiring OAuth token refreshes once for parallel requests and preserves
   expect(first).toMatchObject({ token: refreshed, tokenType: "oauth" });
   expect(second).toMatchObject({ token: refreshed, tokenType: "oauth" });
 
-  const { integrationConfig } = await import("../server/modules/integration-store/index.ts");
+  const { integrationConfig } =
+    await import("../packages/server/modules/integration-store/index.ts");
   const stored = await integrationConfig("gitlab");
   expect(stored.credentials).toMatchObject({
     kind: "oauth",
@@ -320,7 +327,7 @@ test("an OAuth 401 refreshes and retries once, while a PAT 401 is returned once"
     }
     return Response.json({}, { status: 404 });
   });
-  const { gitlabReader } = await import("../server/modules/gitlab/index.ts");
+  const { gitlabReader } = await import("../packages/server/modules/gitlab/index.ts");
   const reader = await gitlabReader("git.example.com/team/app");
   expect(await reader.get("/user")).toStrictEqual({ username: "tanuki" });
   expect(reader.target.token).toBe(refreshed);
@@ -337,7 +344,7 @@ test("a PAT 401 is not refreshed and is returned once", async () => {
     apiCalls++;
     return Response.json({}, { status: 401 });
   });
-  const { gitlabReader } = await import("../server/modules/gitlab/index.ts");
+  const { gitlabReader } = await import("../packages/server/modules/gitlab/index.ts");
   const reader = await gitlabReader("git.example.com/team/app");
   await expect(reader.get("/user")).rejects.toMatchObject({ status: 401 });
   expect(apiCalls).toBe(1);
@@ -358,7 +365,7 @@ test("OAuth sends only Bearer and never leaks a self-hosted token to gitlab.com"
     return Response.json({}, { status: 404 });
   });
   const { gitlab, browseGitlabRepository, gitlabTarget } =
-    await import("../server/modules/gitlab/index.ts");
+    await import("../packages/server/modules/gitlab/index.ts");
   await gitlab(base, "/user", access, { tokenType: "oauth" });
   await gitlab(base, "/user", pat);
   expect(seen[0].headers.Authorization).toBe(`Bearer ${access}`);

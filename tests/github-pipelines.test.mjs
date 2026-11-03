@@ -11,7 +11,8 @@ const base = `https://api.github.com/repos/${repository}`;
 async function setup(token = "") {
   const root = await mkdtemp(join(tmpdir(), "projector-github-pipelines-"));
   process.env.XDG_DATA_HOME = join(root, "data");
-  const { updateIntegration } = await import("../server/modules/integration-store/index.ts");
+  const { updateIntegration } =
+    await import("../packages/server/modules/integration-store/index.ts");
   await updateIntegration("github", () => ({
     enabled: true,
     settings: { directory: join(root, "projects") },
@@ -92,7 +93,7 @@ test("GitHub workflow runs map statuses, fields, filters and pages", async () =>
       ],
     });
   });
-  const { browseGithubPipelines } = await import("../server/modules/github/index.ts");
+  const { browseGithubPipelines } = await import("../packages/server/modules/github/index.ts");
   const list = await browseGithubPipelines(repository);
   expect(queries[0]).toStrictEqual({ per_page: "30", page: "1" });
   expect(list.next).toBe(null);
@@ -141,7 +142,7 @@ test("GitHub workflow runs report the next page and map GitHub conclusions", asy
       ),
     }),
   );
-  const { browseGithubPipelines } = await import("../server/modules/github/index.ts");
+  const { browseGithubPipelines } = await import("../packages/server/modules/github/index.ts");
   const list = await browseGithubPipelines(repository);
   expect(list.next).toBe(2);
   expect(list.pipelines[0].status).toBe("manual");
@@ -167,7 +168,7 @@ test("GitHub run detail maps jobs and reports a truncated list", async () => {
     }
     return Response.json({}, { status: 404 });
   });
-  const { browseGithubPipeline } = await import("../server/modules/github/index.ts");
+  const { browseGithubPipeline } = await import("../packages/server/modules/github/index.ts");
   const detail = await browseGithubPipeline(repository, "42");
   expect(detail.pipeline.id).toBe(42);
   expect(detail.pipeline.status).toBe("success");
@@ -215,7 +216,7 @@ test("GitHub job detail follows the signed log link and strips ANSI", async () =
       });
     return Response.json({}, { status: 404 });
   });
-  const { browseGithubJob } = await import("../server/modules/github/index.ts");
+  const { browseGithubJob } = await import("../packages/server/modules/github/index.ts");
   const detail = await browseGithubJob(repository, 7);
   expect(detail.job.id).toBe(7);
   expect(detail.job.failureReason).toBe("npm test");

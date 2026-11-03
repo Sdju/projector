@@ -5,7 +5,7 @@ import {
   broadcastEvent,
   onEventClientClose,
   updateEventPages,
-} from "../server/modules/events/index.ts";
+} from "../packages/server/modules/events/index.ts";
 
 function stream(client) {
   const req = Object.assign(new EventEmitter(), { url: `/api/events?client=${client}` });

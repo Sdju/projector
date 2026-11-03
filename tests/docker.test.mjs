@@ -82,10 +82,10 @@ else { console.log('OPERATION_DONE'); }
     JSON.stringify({ projects: [project] }),
   );
   const { dockerSnapshot, configureDocker, bindDocker, dockerAction, dockerLogs } =
-    await import("../server/modules/docker/index.ts");
+    await import("../packages/server/modules/docker/index.ts");
   const { listTerminalSessions, closeTerminalSession, resolveTerminalFile } =
-    await import("../server/modules/terminal/index.ts");
-  const { handleApi } = await import("../server/app/api.ts");
+    await import("../packages/server/modules/terminal/index.ts");
+  const { handleApi } = await import("../packages/server/app/api.ts");
   const server = createServer((req, res) => void handleApi(req, res));
   server.listen(0, "127.0.0.1");
   await once(server, "listening");

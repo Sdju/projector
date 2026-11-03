@@ -7,7 +7,7 @@ import {
   openCodeDatabasePath,
   openCodeSessionMeta,
   withOpenCodeBranches,
-} from "../server/modules/agents/opencode/sessions.ts";
+} from "../packages/server/modules/agents/opencode/sessions.ts";
 
 /** Creates an OpenCode database with the given session table and rows. */
 async function database(directory, table, rows) {

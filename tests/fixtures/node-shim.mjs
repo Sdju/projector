@@ -2,7 +2,7 @@
 // CreateProcess (node-pty, execFile) cannot start `.cmd` files or scripts.
 import { chmod, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { runPowerShell } from "../../core/modules/os/modules/windows/ps.ts";
+import { runPowerShell } from "../../packages/core/modules/os/modules/windows/ps.ts";
 
 const stub = (node, script) => String.raw`
 using System;

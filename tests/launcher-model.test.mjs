@@ -1,6 +1,6 @@
 import { expect, test, vi } from "vite-plus/test";
-import { createLauncherModel } from "../core/modules/launcher/index.ts";
-import { createLauncherClient } from "../core/modules/launcher/index.ts";
+import { createLauncherModel } from "../packages/core/modules/launcher/index.ts";
+import { createLauncherClient } from "../packages/core/modules/launcher/index.ts";
 
 const item = (id) => ({ id, name: id, description: "", keywords: "", kind: "application" });
 const deferred = () => {
@@ -144,7 +144,7 @@ test("entering an item loads its detail, leaving or a new query closes it, launc
 });
 
 test("query prefixes choose the search scope", async () => {
-  const { parseLaunchQuery } = await import("../core/modules/launcher/index.ts");
+  const { parseLaunchQuery } = await import("../packages/core/modules/launcher/index.ts");
   expect(parseLaunchQuery("chrome")).toStrictEqual({ scope: "all", text: "chrome" });
   expect(parseLaunchQuery("/proj")).toStrictEqual({ scope: "projects", text: "proj" });
   expect(parseLaunchQuery("/")).toStrictEqual({ scope: "projects", text: "" });

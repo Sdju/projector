@@ -1,6 +1,6 @@
 // Runs outside Vitest, with the `gi:` loader: which GTK call really removes a window on macOS.
 import { execFileSync } from "node:child_process";
-import { ensureHelperSync } from "../../core/modules/os/modules/darwin/shell.ts";
+import { ensureHelperSync } from "../../packages/core/modules/os/modules/darwin/shell.ts";
 
 const { default: Gtk } = await import("gi:Gtk-4.0");
 const { default: GLib } = await import("gi:GLib-2.0");

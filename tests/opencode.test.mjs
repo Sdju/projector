@@ -2,11 +2,14 @@ import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readGoUsage } from "../server/modules/agents-integration/opencode/client.ts";
-import { readOpenCodeGoKey } from "../server/modules/agents-integration/opencode/credentials.ts";
-import { goWindows, openCodeUsage } from "../server/modules/agents-integration/opencode/usage.ts";
-import { handleOpenCode } from "../server/routes/api/opencode.ts";
-import { resetCountdown } from "../src/common/utilities/reset-time.ts";
+import { readGoUsage } from "../packages/server/modules/agents-integration/opencode/client.ts";
+import { readOpenCodeGoKey } from "../packages/server/modules/agents-integration/opencode/credentials.ts";
+import {
+  goWindows,
+  openCodeUsage,
+} from "../packages/server/modules/agents-integration/opencode/usage.ts";
+import { handleOpenCode } from "../packages/server/routes/api/opencode.ts";
+import { resetCountdown } from "../packages/client/common/utilities/reset-time.ts";
 
 const window = { status: "ok", percent: 42, resetsAt: "2026-10-10T12:00:00Z" };
 const payload = { usage: { rolling: window, weekly: window, monthly: window } };

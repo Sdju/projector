@@ -5,7 +5,7 @@ import {
   thinkingBody,
   thinkingLevel,
   thinkingOptions,
-} from "../server/modules/providers/thinking.ts";
+} from "../packages/server/modules/providers/thinking.ts";
 
 describe("thinking adapter", () => {
   it("speaks the dialect of each provider", () => {

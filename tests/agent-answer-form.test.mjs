@@ -1,10 +1,13 @@
 import { expect, test } from "vite-plus/test";
 import { effectScope, ref } from "vue";
-import { answeredFormSources, useAnswerForm } from "../src/modules/agent/model/answer-form.ts";
-import { restoreFormAnswers } from "../src/modules/agent/model/form-reply.ts";
-import { intelligentFormWidget } from "../core/modules/agent-widgets/intelligent-form/index.ts";
-import { inputWidget } from "../core/modules/agent-widgets/input/index.ts";
-import { registerWidget } from "../src/modules/widget-runtime/registry.ts";
+import {
+  answeredFormSources,
+  useAnswerForm,
+} from "../packages/client/modules/agent/model/answer-form.ts";
+import { restoreFormAnswers } from "../packages/client/modules/agent/model/form-reply.ts";
+import { intelligentFormWidget } from "../packages/core/modules/agent-widgets/intelligent-form/index.ts";
+import { inputWidget } from "../packages/core/modules/agent-widgets/input/index.ts";
+import { registerWidget } from "../packages/client/modules/widget-runtime/registry.ts";
 
 registerWidget({ definition: intelligentFormWidget, component: { render: () => null } });
 registerWidget({ definition: inputWidget, component: { render: () => null } });

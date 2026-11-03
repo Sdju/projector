@@ -29,16 +29,19 @@ import {
   readProjectImage,
   previewProjectFile,
   withFilesExclude,
-} from "../server/modules/workspace/index.ts";
-import { projectRelativePath, previewBrowserFile } from "../src/modules/workspace/file-drop.ts";
+} from "../packages/server/modules/workspace/index.ts";
+import {
+  projectRelativePath,
+  previewBrowserFile,
+} from "../packages/client/modules/workspace/file-drop.ts";
 import {
   defaultFilesExclude,
   moveDestination,
   parentPath,
   relocatedPath,
-} from "../core/modules/workspace/index.ts";
-import { githubRepositoryFromRemote } from "../core/modules/github/index.ts";
-import { fitImage, zoomImageAt } from "../src/common/utilities/image-viewport.ts";
+} from "../packages/core/modules/workspace/index.ts";
+import { githubRepositoryFromRemote } from "../packages/core/modules/github/index.ts";
+import { fitImage, zoomImageAt } from "../packages/client/common/utilities/image-viewport.ts";
 
 /** Workspace excludes are global settings; isolate them from the developer machine. */
 function withDefaultExcludes(run) {
@@ -632,7 +635,7 @@ async function withWorkspaceApi(run) {
         ],
       }),
     );
-    const { handleApi } = await import("../server/app/api.ts");
+    const { handleApi } = await import("../packages/server/app/api.ts");
     server = createServer((req, res) => {
       void handleApi(req, res).then((handled) => {
         if (!handled) res.writeHead(404).end();
@@ -848,7 +851,7 @@ test("workspace HTTP routes reject invalid input, stale drafts and paths outside
 });
 
 test("path bar lists real directories and symlinks, completes prefixes and rejects invalid paths", async () => {
-  const { listDirectories } = await import("../server/modules/directories/index.ts");
+  const { listDirectories } = await import("../packages/server/modules/directories/index.ts");
   const base = await mkdtemp(join(tmpdir(), "projector-directories-"));
   try {
     await mkdir(join(base, "alpha"));
@@ -884,7 +887,7 @@ test("path bar lists real directories and symlinks, completes prefixes and rejec
 });
 
 test("Git tree backgrounds aggregate nested changes, renames, deletions and conflicts without prefix collisions", async () => {
-  const { gitTreeDecorations } = await import("../core/modules/workspace/index.ts");
+  const { gitTreeDecorations } = await import("../packages/core/modules/workspace/index.ts");
   const change = (path, index = " ", worktree = "M", originalPath) => ({
     path,
     index,

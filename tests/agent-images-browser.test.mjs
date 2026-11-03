@@ -7,10 +7,10 @@ const html = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <div id="fixture" style="padding: 24px; max-width: 760px"></div>
 <script type="module">
-  import "/src/app/styles.css";
+  import "/packages/client/app/styles.css";
   import { createApp, h, ref } from "vue";
-  import AgentMessage from "/src/modules/agent/ui/AgentMessage.vue";
-  import { chatProjectKey } from "/src/modules/chat-images/index.ts";
+  import AgentMessage from "/packages/client/modules/agent/ui/AgentMessage.vue";
+  import { chatProjectKey } from "/packages/client/modules/chat-images/index.ts";
   const text = ref("");
   const app = createApp({
     setup: () => () => h(AgentMessage, { text: text.value, streaming: false }),
