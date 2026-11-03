@@ -72,8 +72,8 @@ node cli/app/import-companion-key.mjs /path/to/providers.json
 - **Секреты** — Keychain через `security -i`: значение идёт по stdin (не попадает в `ps`) и хранится в base64.
 - **Данные** — `~/Library/Application Support` (с приоритетом `XDG_DATA_HOME`); `moveNoReplace` — атомарное «занять и переименовать» вместо GNU `mv`.
 - **Окна** — `open -na <Chromium-браузер> --args --app=…`; фокус окна по классу недоступен. Выбор папки — `osascript`.
-- **Ввод в CI:** хоткей и меню проверяются настоящими HID-событиями (`CGEvent`): нажатие `Ctrl+Alt+Space`, клик по значку, реальный указатель наводится на каждую из четырёх строк меню и кликает по ней (проверяются подсветка и событие строки). Окно GTK-палитры проверяется по `CGWindowListCopyWindowInfo`: показ, скрытие `toggle` (с учётом автоскрытия при потере фокуса) и повторный показ. Тест лаунчера работает с `.app`: скрытыми считаются бандлы с `LSUIElement`/`LSBackgroundOnly`, а запуск подтверждается скриптом внутри бандла.
-- **Проверка** — `.github/workflows/macos.yml` (`macos-15`, Homebrew GTK4): архитектура, `vp test run` (включая `tests/macos-adapter.test.mjs`: каталог, процессы, резидент с GTK-палитрой, меню/хоткей помощника, окно Chromium) и `test:gtk`.
+- **Ввод в CI:** хоткей и меню проверяются настоящими HID-событиями (`CGEvent`), окно GTK-палитры — по `CGWindowListCopyWindowInfo` (показ, скрытие, повторный показ). Тест лаунчера работает с `.app`: скрытыми считаются бандлы с `LSUIElement`/`LSBackgroundOnly`.
+- **Проверка** — `.github/workflows/macos.yml` (`macos-15`, Homebrew GTK4): архитектура, `vp test run` (включая `tests/macos-adapter.test.mjs`) и `test:gtk`.
 
 ## Windows: как устроено и что не поддерживается
 
@@ -95,6 +95,6 @@ node cli/app/import-companion-key.mjs /path/to/providers.json
 
 ## Проверка
 
-`.github/workflows/windows.yml` запускает на `windows-2025` архитектурную проверку и весь `vp test run`, включая `tests/windows-adapter.test.mjs` (реальные процессы, Credential Manager, перенос файлов, окна, дерево процессов). Типы проверяет Linux-job: GIR-типы на Windows не генерируются.
+`.github/workflows/windows.yml` на `windows-2025` запускает архитектуру и весь `vp test run`, включая `tests/windows-adapter.test.mjs`. Типы проверяет Linux-job: GIR-типы на Windows не генерируются.
 
-`tests/os.test.mjs` проверяет выбор ОС, отсутствие чужого fallback, каталоги, реальные процессы/cwd и перенос файлов с Unicode и конфликтом имён. Входит в `vp run test`. Архитектурные тесты запрещают прямой доступ к подмодулям Linux и Windows и импорт Node OS-инфраструктуры в браузер.
+`tests/os.test.mjs` проверяет выбор ОС, отсутствие чужого fallback, каталоги, процессы/cwd и перенос файлов с Unicode и конфликтом имён. Архитектурные тесты запрещают прямой доступ к подмодулям Linux и Windows и импорт Node OS-инфраструктуры в браузер.

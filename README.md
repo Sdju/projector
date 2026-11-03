@@ -140,7 +140,7 @@ projector quit       # завершить Projector и запущенные им
 
 Настройки, избранное и список проектов сохраняются в `~/.local/share/projector` или `$XDG_DATA_HOME/projector`, если эта переменная задана.
 
-Подробнее: [использование](docs/usage.md) и [подключение GitHub](docs/integrations.md). Инструкции для разработки находятся в [AGENTS.md](AGENTS.md).
+Подробнее: [поведение и ограничения](docs/usage.md) и [интеграции](docs/integrations.md). Инструкции для разработки находятся в [AGENTS.md](AGENTS.md).
 
 ## Разработка и лицензия
 

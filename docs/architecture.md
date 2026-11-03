@@ -18,32 +18,7 @@ Projector использует FEOD для всех собственных пр�
 
 Сквозной модуль — контейнер публичных адаптеров с приватным общим ядром. Он объявляется через `transitModules` в настройках конкретного корня `feod.config.mjs`. У контейнера нет собственного `index.ts` или файлов реализации: непосредственные подмодули располагаются без промежуточной папки `modules/`, каждый имеет свой `index.ts`. Внешний код и соседние адаптеры обращаются к ним через эти публичные входы. Обычная вложенность `modules/` внутри адаптеров сохраняет прежние ограничения.
 
-Интеграции Codex, Claude Code, OpenCode, Cursor и Kimi Code находятся в `modules/agents-integration` трёх корней:
-
-```text
-src/modules/agents-integration/
-  _/                 # приватные polling и UsageMeter
-  codex/index.ts     # индикатор Codex
-  claude/index.ts
-  opencode/index.ts
-  cursor/index.ts
-  kimi/index.ts
-  status-bar/index.ts # композиция индикаторов для workspace
-
-server/modules/agents-integration/
-  _/                 # объединение запросов и кеширование
-  codex/index.ts     # получение лимитов через CLI
-  claude/index.ts
-  opencode/index.ts
-  cursor/index.ts
-  kimi/index.ts
-
-core/modules/agents-integration/
-  codex/index.ts     # browser-compatible контракты
-  claude/index.ts
-  opencode/index.ts
-  cursor/index.ts
-```
+Интеграции Codex, Claude Code, OpenCode, Cursor и Kimi Code — контейнер `agents-integration` в трёх корнях: `src` (индикаторы, `catalog`, `provider` и приватное `_` с polling и UsageMeter), `server` (получение лимитов, объединение запросов и кеш, приватное `_`) и `core` (browser-compatible контракты). Каждый агент — отдельный подмодуль со своим `index.ts`; клиентский `catalog` — единственное место с дескрипторами агентов для меню, вкладок и команд.
 
 Тем же приёмом сделаны компоненты в ответах агента: контейнер `agent-widgets` в `core` (определения) и `src` (реализации), общий каталог и рантайм — модули `widget-catalog` и `widget-runtime`, регистрация — в `src/app/widgets.ts` и `server/app/widgets.ts` ([подробно](agent-widgets.md)).
 

@@ -53,4 +53,4 @@
 
 ## Тесты
 
-`tests/agent-fork.test.mjs`: `forkAt` для `before`/`after`, черновик с чипами, снятие `run`/`variants`, остановка задач; `forkChat` с подставным `fetch` (ключ, тело запроса, `detached` для ACP, заголовок, одноразовый черновик); отказ без проекта; индекс проекта — список, фильтр по бэкенду, архивирование и возврат чата, исчезновение пустого чата. Плюс `agent-chats`, `agent-branches`, `agent-edit`, `agent-sessions` и проверки типов/архитектуры.
+`tests/agent-fork.test.mjs`: `forkAt` для `before`/`after`, черновик с чипами, снятие `run`/`variants`, остановка задач; `forkChat` с подставным `fetch` (ключ, тело, `detached` для ACP, заголовок, одноразовый черновик); отказ без проекта; индекс проекта. Плюс `agent-chats`, `agent-branches`, `agent-edit`, `agent-sessions`.

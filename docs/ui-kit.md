@@ -22,7 +22,7 @@
 | Содержимое       | UiCard, UiTable, UiDisclosureSummary                           | рамка, native table, native summary                                                                                                                        |
 | Resize           | UiResizeHandle, usePointerDrag                                 | capture/cleanup общие; clamp/rollback/keyboard у владельца                                                                                                 |
 
-`UiButton` имеет один API: appearance `outline | solid | quiet`, tone `neutral | muted | danger`, shape `rect | icon | chip | pill`, size `sm | md`. По умолчанию — outline/neutral/rect/md; icon — quiet/muted. Старые `variant` и `icon` удалены, потребители переведены. Для иконки задавайте `aria-label`. `type` по умолчанию button; submit/reset задаются явно. `busy` блокирует кнопку и сохраняет место под содержимое. `active` — оформление; `aria-pressed` нужен только настоящему toggle.
+`UiButton` имеет один API: appearance `outline | solid | quiet`, tone `neutral | muted | danger`, shape `rect | icon | chip | pill`, size `sm | md`. По умолчанию — outline/neutral/rect/md; icon — quiet/muted. Для иконки задавайте `aria-label`. `type` по умолчанию button; submit/reset задаются явно. `busy` блокирует кнопку и сохраняет место под содержимое. `active` — оформление; `aria-pressed` нужен только настоящему toggle.
 
 `UiControl` рендерит один native input/select/textarea, передаёт атрибуты и события, поддерживает v-model и modifiers. Ref предоставляет `element`, `focus()` и `select()`. `UiField` выдаёт через slot атрибуты связи label/control/hint/error. Не привязывайте контрол к служебным классам соседней формы.
 
@@ -71,6 +71,6 @@ vp run build
 
 Нужен установленный Chromium; без него browser tests пропускаются. Fixtures используют отдельный профиль и сервер, не меняют настройки Projector.
 
-Для визуального изменения проверяйте затронутый экран на обычной и узкой ширине и его реальное взаимодействие. Автоматизируйте воспроизводимый риск, а не каждый цвет и отступ. Для layout/panel изменений проверяйте resize и сохранение editor/terminal state; для popup — focus, Escape и правый клик. Массовые PNG-матрицы, frozen-копии экранов и требование побайтового совпадения удалены: они делали общий check медленным и нестабильным.
+Для визуального изменения проверяйте затронутый экран на обычной и узкой ширине и его реальное взаимодействие. Автоматизируйте воспроизводимый риск, а не каждый цвет и отступ. Для layout/panel изменений проверяйте resize и сохранение editor/terminal state; для popup — focus, Escape и правый клик. Побайтовые скриншоты и frozen-копии экранов не используем: они делают общий check медленным и нестабильным.
 
 Общий gate остаётся `vp run check`; перед коммитом — Oxfmt через `vp fmt` и `git diff --check`. Тесты UI-кита не должны превращаться в отдельный длительный gate или копию реализации.
