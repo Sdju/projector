@@ -15,14 +15,18 @@ const props = defineProps<{
   projectId: string;
   hash: string;
   onOpenTree?: (hash: string) => void;
+  onOpenCompare?: (from: string, to: string) => void;
 }>();
 const emit = defineEmits<{
   openCommit: [hash: string];
   openDiff: [hash: string, path: string];
   subject: [text: string];
 }>();
-const canOpenTree = computed(() => workspaceCapabilities(props.projectId).snapshots);
 const detail = ref<GitCommitDetail>();
+const canOpenTree = computed(() => workspaceCapabilities(props.projectId).snapshots);
+const canCompare = computed(
+  () => workspaceCapabilities(props.projectId).compare && !!detail.value?.parents[0],
+);
 const error = ref("");
 const loading = ref(false);
 let generation = 0;
@@ -42,6 +46,17 @@ const commands = useCommandScope(`commit:${props.projectId}:${props.hash}`, () =
   hash: props.hash,
 }));
 const textFiles = computed(() => (detail.value?.files ?? []).filter((file) => !file.binary));
+commands.scope.registerCommand({
+  id: "ide.git.commit.openChanges",
+  title: "Изменения коммита",
+  description:
+    "Показывает изменённые файлы коммита относительно первого родителя в боковой панели; строки открывают diff.",
+  enabled: () => canCompare.value,
+  run: () => {
+    const parent = detail.value?.parents[0];
+    if (parent) props.onOpenCompare?.(parent, props.hash);
+  },
+});
 commands.scope.registerCommand({
   id: "ide.git.commit.openTree",
   title: "Файлы коммита",
@@ -138,8 +153,17 @@ watch(() => [props.projectId, props.hash], load, { immediate: true });
     >
     <article v-else-if="detail">
       <CommitMeta :detail="detail" @open-commit="emit('openCommit', $event)" />
-      <div v-if="canOpenTree" class="commit-actions">
+      <div v-if="canOpenTree || canCompare" class="commit-actions">
         <UiButton
+          v-if="canCompare"
+          size="sm"
+          data-command="ide.git.commit.openChanges"
+          @click="commands.run('ide.git.commit.openChanges')"
+        >
+          Изменения коммита
+        </UiButton>
+        <UiButton
+          v-if="canOpenTree"
           size="sm"
           data-command="ide.git.commit.openTree"
           @click="commands.run('ide.git.commit.openTree')"

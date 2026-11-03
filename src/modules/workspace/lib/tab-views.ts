@@ -54,6 +54,8 @@ export interface TabHost {
   openTab(id: string, params?: TabParams, options?: { preview?: boolean }): void;
   openCommitDiff(hash: string, path: string): void;
   openCommitTree(hash: string): void;
+  /** Opens the changed files of two snapshots in a sidebar section. */
+  openCompareTree(from: string, to: string): void;
   /** Opens a changed file of a merge request as a read-only base → head tab. */
   openPullFile(number: number, path: string, head?: string, pinned?: boolean): void;
   /** Adds a temporary sidebar section (a merge request tree, a pipeline panel). */
@@ -154,6 +156,7 @@ export function baseTabViews(): TabViews {
         onOpenCommit: (hash: string) => host.openTab("commit", { hash }),
         onOpenDiff: host.openCommitDiff,
         onOpenTree: host.openCommitTree,
+        onOpenCompare: host.openCompareTree,
         onSubject: (text: string) => (tab.content = text),
       }),
     },

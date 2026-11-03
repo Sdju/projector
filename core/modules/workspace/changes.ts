@@ -15,6 +15,12 @@ export interface FileChange {
   generated?: boolean;
 }
 
+/** A comparison of two snapshots: changed paths only, plus whether the list was capped. */
+export interface FileChangeList {
+  changes: FileChange[];
+  truncated: boolean;
+}
+
 /** A tree mark: renamed and copied files are still changes of an existing row. */
 export type FileDecoration = "added" | "modified" | "deleted" | "conflict";
 
@@ -54,6 +60,7 @@ export function commitChangeKind(status: string): FileChangeKind {
   if (status === "D") return "deleted";
   if (status === "R") return "renamed";
   if (status === "C") return "copied";
+  if (status === "U") return "conflict";
   return "modified";
 }
 

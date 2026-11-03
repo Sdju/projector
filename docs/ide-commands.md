@@ -175,7 +175,8 @@ carries `commit`, `commitPath` and `historyOpen`. Commands:
 - `ide.git.history.filter` `{ query?, all? }` — message search, `@name` searches authors, `all` includes every branch;
 - `ide.git.commit.toggle` `{ hash }` expands the changes made by that commit only;
 - `ide.git.commit.openDiff` `{ hash, path }` opens a read-only diff `parent → commit` (tab title shows both hashes);
-- `ide.git.commit.openTree` `{ hash }` opens **Файлы коммита @hash** in the sidebar: a read-only tree at that commit, grouped with Git, with a source label above the panel; files open read-only. Available when the source supports history trees (local projects). Close it with the icon context menu (desktop) or the panel-head button (mobile); both use `ide.workbench.section.close` `{ section }`;
+- `ide.git.commit.openTree` `{ hash }` opens **Файлы коммита @hash** in the sidebar: a read-only tree at that commit, grouped with Git, with a source label above the panel; files open read-only. Available when the source supports snapshot trees (local projects, GitHub and GitLab). Close it with the icon context menu (desktop) or the panel-head button (mobile); both use `ide.workbench.section.close` `{ section }`;
+- `ide.git.commit.openChanges` opens the changed files of a non-root commit against its first parent in the sidebar. The section is a `compare` file scope: paths carry A/M/D/R marks, clicking a row opens a read-only diff `parent → commit`; filtering and collapsing a single-child directory chain are shared with the merge request changes tree;
 - `ide.git.commit.file.toggle` `{ path, open? }` and `ide.git.commit.files.toggleAll` `{ open? }` expand the code of files
   right inside the overview tab (read lazily, short files get a short viewer). The handle under each viewer resizes it
   (drag, arrows, double click resets); squeezing it to the minimum collapses the file like `file.toggle { open: false }`,
@@ -185,6 +186,7 @@ carries `commit`, `commitPath` and `historyOpen`. Commands:
 
 `hash` may be abbreviated; without it the commit under the cursor is used. Reads use
 `GET /api/projects/:id/workspace/log?skip&limit&q&all`, `commit?hash` and `commit-diff?hash&path`.
+A comparison reads `changes?from&to` and `compare-file?from&to&path&originalPath`; the same parameters are added by `FileScope` for `tree`/`file` (`rev`).
 Commit contents are immutable, so the client caches them by hash; the list is re-read on every Git refresh with
 the loaded extent. Merge commits are shown against their first parent, and files are limited to the project folder.
 Commit diff tabs are history: staging, discarding or moving files never closes them.

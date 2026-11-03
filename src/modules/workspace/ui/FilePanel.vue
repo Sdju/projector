@@ -3,6 +3,7 @@ import UiPanel from "../../../common/ui/UiPanel.vue";
 import UiToolbar from "../../../common/ui/UiToolbar.vue";
 import { computed } from "vue";
 import { workspaceSiteUrl } from "../../workspace-api/index.ts";
+import { shortRevision } from "../../../../core/modules/workspace/index.ts";
 import { useTabHost, useWorkspaceTabs } from "../lib/tab-views.ts";
 import { isEditable, isHtml, isLiveFile, isMarkdown, type OpenFile } from "../open-file.ts";
 import TabReadoutScope from "../../../common/ui/TabReadoutScope.vue";
@@ -131,9 +132,23 @@ const hasStatusLine = computed(
         :content="file.draft ?? file.content"
         :editable="isEditable(file)"
         :original="file.original"
-        :original-label="file.commit ? file.parent || '∅' : file.staged ? 'HEAD' : 'Индекс'"
+        :original-label="
+          file.commit
+            ? file.parent || '∅'
+            : file.scope?.kind === 'compare'
+              ? shortRevision(file.scope.from)
+              : file.staged
+                ? 'HEAD'
+                : 'Индекс'
+        "
         :modified-label="
-          file.commit ? file.commit.slice(0, 7) : file.staged ? 'Индекс' : 'Рабочий файл'
+          file.commit
+            ? file.commit.slice(0, 7)
+            : file.scope?.kind === 'compare'
+              ? shortRevision(file.scope.to)
+              : file.staged
+                ? 'Индекс'
+                : 'Рабочий файл'
         "
         :line="file.line"
         :column="file.column"

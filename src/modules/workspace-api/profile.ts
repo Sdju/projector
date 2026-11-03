@@ -15,7 +15,8 @@ export type WorkspaceCapability =
   | "settings"
   | "persist"
   | "externalFiles"
-  | "snapshots";
+  | "snapshots"
+  | "compare";
 export type WorkspaceCapabilities = Record<WorkspaceCapability, boolean>;
 
 export type WorkspaceParams = Record<string, string>;
@@ -43,6 +44,8 @@ export interface FilesProvider extends ReadProvider {
   siteUrl?(path: string): string;
   /** Reads a historical tree and its files read-only (`tree`/`file` with `rev`). */
   snapshots?: boolean;
+  /** Reads changed paths and two file sides between snapshots (`changes`/`compare-file`). */
+  compare?: boolean;
   /** Present only when the files can change. */
   write?(endpoint: FileWrite, body: unknown, failure?: string): Promise<unknown>;
   /** Loads one browser file (or an empty folder when `body` is absent) into the project; present only where uploads are possible. */
@@ -108,6 +111,7 @@ export function profileCapabilities(profile: WorkspaceProfile): Readonly<Workspa
       discussions: !!profile.providers.discussions,
       pipelines: !!profile.providers.pipelines,
       snapshots: !!profile.providers.files.snapshots,
+      compare: !!profile.providers.files.compare,
     });
     capabilityCache.set(profile, capabilities);
   }
@@ -137,6 +141,8 @@ const READ_DOMAIN: Record<
   pull: "pulls",
   "pull-files": "pulls",
   "pull-diff": "pulls",
+  changes: "files",
+  "compare-file": "files",
   discussions: "discussions",
   discussion: "discussions",
   pipelines: "pipelines",

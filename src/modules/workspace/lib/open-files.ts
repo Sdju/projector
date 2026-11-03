@@ -60,7 +60,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
     line?: number,
     column?: number,
     staged?: boolean,
-    { reload = false, external = false, preview = true, scope }: OpenFileOptions = {},
+    { reload = false, external = false, preview = true, scope, originalPath }: OpenFileOptions = {},
   ) {
     if (external && !workspaceCapabilities(ctx.projectId()).externalFiles)
       throw new Error("Внешние файлы недоступны для этого источника");
@@ -84,6 +84,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
         external,
         staged,
         scope,
+        originalPath,
         ask: !existing,
         wanted: () => generation === fileGeneration,
       });

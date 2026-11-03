@@ -6,8 +6,9 @@ import {
   type FileComparison,
   type FileContent,
   type FileScope,
+  type FileSides,
 } from "../../../../core/modules/workspace/index.ts";
-import { workspaceRequest } from "../../workspace-api/index.ts";
+import { workspaceRequest, workspaceScopeRequest } from "../../workspace-api/index.ts";
 
 /**
  * Reads a file for a new tab. A large one is announced first instead of read: the user is asked,
@@ -41,10 +42,16 @@ export async function readOpenData(
     external: boolean;
     staged?: boolean;
     scope?: FileScope;
+    originalPath?: string;
     ask: boolean;
     wanted: () => boolean;
   },
-): Promise<(FileContent & { image?: boolean }) | FileComparison | undefined> {
+): Promise<(FileContent & { image?: boolean }) | FileComparison | FileSides | undefined> {
+  if (options.scope?.kind === "compare")
+    return workspaceScopeRequest<FileSides>(projectId, options.scope, "compare-file", {
+      path,
+      ...(options.originalPath ? { originalPath: options.originalPath } : {}),
+    });
   if (options.scope && !isLiveScope(options.scope))
     return readFileConfirmed(projectId, path, false, options.ask, options.wanted, options.scope);
   if (options.staged === undefined)

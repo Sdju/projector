@@ -29,6 +29,7 @@ export { projectBranches, mutateProjectBranch } from "./git-branches.ts";
 export { previewExternalFile, readExternalImage } from "./external-files.ts";
 export { projectLog, projectCommit, projectCommitComparison } from "./git-history.ts";
 export { listProjectGitTree, readProjectGitFile } from "./git-tree.ts";
+export { compareProjectChanges, compareProjectFile } from "./git-compare.ts";
 export {
   readFilesExclude,
   writeFilesExclude,

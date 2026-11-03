@@ -126,7 +126,7 @@ function openTree(scope: FileScope) {
       title: fileScopeTitle(scope),
       source: fileScopeNote(scope),
       group: capabilities.git ? "git" : undefined,
-      kind: "tree",
+      kind: scope.kind === "compare" ? "changes" : "tree",
       params: { scope },
       closable: true,
     });
@@ -208,6 +208,7 @@ provideTabHost({
   openTab,
   openCommitDiff: (hash, path) => void files.openCommitFile(hash, path),
   openCommitTree,
+  openCompareTree: (from, to) => openTree({ kind: "compare", from, to }),
   openPullFile: (number, path, head, pinned) => {
     // Opening a file must not replace the merge request preview tab that led to it.
     const pull = tabs.value.find(

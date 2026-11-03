@@ -19,6 +19,8 @@ import {
   projectCommitComparison,
   listProjectGitTree,
   readProjectGitFile,
+  compareProjectChanges,
+  compareProjectFile,
   mutateProjectGit,
   moveProjectEntry,
   mutateProjectEntry,
@@ -236,6 +238,8 @@ export async function handleProjectWorkspace({
     }
     const ask = url.searchParams.get("ask") === "1";
     const rev = url.searchParams.get("rev") ?? "";
+    const from = url.searchParams.get("from") ?? "";
+    const to = url.searchParams.get("to") ?? "";
     if (sessionId === "external") json(res, 200, await previewExternalFile(filePath, { ask }));
     else if (sessionId === "root") json(res, 200, { root: project.path });
     else if (sessionId === "tree")
@@ -263,7 +267,23 @@ export async function handleProjectWorkspace({
           ? await readProjectGitFile(project.path, rev, filePath, { ask })
           : await previewProjectFile(project.path, filePath, { ask }),
       );
-    else if (sessionId === "search")
+    else if (sessionId === "changes") {
+      if (!from || !to) throw new HttpError(400, "Укажите оба снимка для сравнения");
+      json(res, 200, await compareProjectChanges(project.path, from, to));
+    } else if (sessionId === "compare-file") {
+      if (!from || !to) throw new HttpError(400, "Укажите оба снимка для сравнения");
+      json(
+        res,
+        200,
+        await compareProjectFile(
+          project.path,
+          from,
+          to,
+          filePath,
+          url.searchParams.get("originalPath") || filePath,
+        ),
+      );
+    } else if (sessionId === "search")
       json(
         res,
         200,

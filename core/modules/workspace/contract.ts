@@ -64,6 +64,14 @@ export interface FileComparison {
   modified: string;
   staged: boolean;
 }
+/** Two sides of a file compared between snapshots; no working-copy state is involved. */
+export interface FileSides {
+  path: string;
+  original: string;
+  modified: string;
+  binary?: boolean;
+  tooLarge?: boolean;
+}
 /** Index text of a tracked file; the editor diffs against it live, like VS Code. */
 export interface GitGutter {
   available: boolean;

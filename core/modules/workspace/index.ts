@@ -1,4 +1,4 @@
-export type { FileComparison, GitGutter } from "./contract.ts";
+export type { FileComparison, FileSides, GitGutter } from "./contract.ts";
 export type { GitOverview } from "./contract.ts";
 export type { SearchHit } from "./contract.ts";
 export type { SearchMatch, SearchOptions } from "./contract.ts";
@@ -19,7 +19,7 @@ export {
   pullRequestChangeKind,
   pullRequestFilesToFileChanges,
 } from "./changes.ts";
-export type { FileChange, FileChangeKind, FileDecoration } from "./changes.ts";
+export type { FileChange, FileChangeKind, FileChangeList, FileDecoration } from "./changes.ts";
 export {
   fileScopeKey,
   fileScopeNote,

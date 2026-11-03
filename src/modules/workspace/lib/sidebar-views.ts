@@ -24,6 +24,7 @@ import { PipelinesPanel } from "../modules/pipelines/index.ts";
 import { DockerSidebar } from "../../docker/index.ts";
 import SearchPanel from "../ui/SearchPanel.vue";
 import FilesSection from "../ui/FilesSection.vue";
+import CompareTreeSection from "../ui/CompareTreeSection.vue";
 import { ScopeTreeSection } from "../modules/tree/index.ts";
 import type { OpenFile, OpenFileOptions } from "../open-file.ts";
 import type { useGitChangeSync } from "./git-change-sync.ts";
@@ -161,6 +162,30 @@ export const baseSidebarViews: SidebarViews = {
           }),
       };
     },
+  },
+  changes: {
+    icon: IconFiles,
+    component: CompareTreeSection,
+    props: (host, _selected, type) => {
+      const scope = type?.params?.scope as FileScope | undefined;
+      if (!scope) throw new Error("У раздела сравнения нет источника");
+      return {
+        projectId: host.projectId,
+        scope,
+        revision: host.revision,
+        selected:
+          host.active?.scope && fileScopeKey(host.active.scope) === fileScopeKey(scope)
+            ? host.active.path
+            : "",
+        onOpen: (path: string, pinned?: boolean, originalPath?: string) =>
+          host.openFile(path, undefined, undefined, undefined, {
+            scope,
+            originalPath,
+            preview: !pinned,
+          }),
+      };
+    },
+    refresh: (_, panel) => panel?.refresh?.(),
   },
   issues: {
     icon: IconIssues,

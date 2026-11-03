@@ -14,7 +14,7 @@ import { validatePath } from "./paths.ts";
 
 const COMMIT = /^[0-9a-f]{7,40}$/i;
 
-async function resolveRevision(root: string, rev: string) {
+export async function resolveRevision(root: string, rev: string) {
   if (!COMMIT.test(rev)) throw new HttpError(400, "Некорректный хеш коммита");
   const full = (
     await git(root, ["rev-parse", "--verify", "--quiet", `${rev}^{commit}`]).catch(() => "")
@@ -23,7 +23,7 @@ async function resolveRevision(root: string, rev: string) {
   return full;
 }
 
-function validateRelativePath(path: string) {
+export function validateRelativePath(path: string) {
   validatePath(path);
   if (path.includes("\\")) throw new HttpError(403, "Некорректный путь");
 }

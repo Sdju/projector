@@ -46,6 +46,8 @@ export interface OpenFileOptions {
   preview?: boolean;
   /** Read the file from a snapshot instead of the working copy. */
   scope?: FileScope;
+  /** Old path of a renamed file in a comparison. */
+  originalPath?: string;
 }
 
 /** A file of the working copy; absent scope is the same as an explicit live one. */
