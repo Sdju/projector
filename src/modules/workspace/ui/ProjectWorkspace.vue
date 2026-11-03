@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, ref } from "vue";
 import {
   workspaceProfile,
   profileCapabilities,
+  searchWorkspace,
   extendSidebarRegistry,
   type SidebarType,
   type WorkspaceCapability,
@@ -338,6 +339,42 @@ registerEditor(
     description:
       "Переключает боковую панель на раздел проекта (файлы, поиск, Git и другие, если они есть у проекта) и показывает её.",
     arguments: { section: "Идентификатор раздела: files, search, git, docker, issues и т. д." },
+  },
+);
+registerEditor(
+  "ide.workbench.tree.search",
+  "Искать в снимке",
+  async (value) => {
+    const args = commandArgs(value);
+    if (typeof args.rev !== "string" || !args.rev) throw new Error("Укажите rev");
+    if (typeof args.q !== "string" || !args.q.trim()) throw new Error("Укажите q");
+    for (const key of ["case", "word", "regex"])
+      if (args[key] !== undefined && typeof args[key] !== "boolean")
+        throw new Error(`${key} должен быть boolean`);
+    return searchWorkspace(
+      props.projectId,
+      args.q,
+      {
+        caseSensitive: args.case === true,
+        wholeWord: args.word === true,
+        regex: args.regex === true,
+      },
+      undefined,
+      { kind: "commit", rev: args.rev },
+    );
+  },
+  () => capabilities.search && capabilities.snapshots,
+  undefined,
+  {
+    description:
+      "Ищет текст в файлах коммита через git grep и возвращает совпадения с путями и позициями. Доступно для локальных снимков; найденные файлы открываются в том же коммите.",
+    arguments: {
+      rev: "Хеш коммита",
+      q: "Строка поиска",
+      case: "true — учитывать регистр",
+      word: "true — искать целое слово",
+      regex: "true — регулярное выражение",
+    },
   },
 );
 registerEditor(
