@@ -19,6 +19,8 @@ export interface OpenFile extends FileContent {
   pull?: number;
   /** Снимок, из которого прочитан файл; отсутствует у рабочей копии. */
   scope?: FileScope;
+  /** Old path of a renamed file in a comparison. */
+  originalPath?: string;
   external?: boolean;
   image?: string;
   localFile?: File;

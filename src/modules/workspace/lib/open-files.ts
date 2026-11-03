@@ -104,6 +104,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
         original: "original" in data ? data.original : undefined,
         staged,
         scope,
+        originalPath,
         line,
         column,
         key,

@@ -99,6 +99,20 @@ test("workspace snapshots validate tab kinds and reject invalid panel sizes", ()
     tabs: [
       { key: "README.md:file", path: "README.md", markdownMode: "source" },
       { key: "x:working", path: "x", staged: false },
+      {
+        key: `x:rev:${"a".repeat(40)}`,
+        path: "x",
+        scope: { kind: "commit", rev: "a".repeat(40) },
+      },
+    ],
+    sections: [
+      {
+        id: `tree:commit:${"a".repeat(40)}`,
+        title: "Файлы коммита @aaaaaaa",
+        kind: "tree",
+        params: { scope: { kind: "commit", rev: "a".repeat(40) } },
+        closable: true,
+      },
     ],
     activeKey: "x:working",
     section: "git",
@@ -107,6 +121,9 @@ test("workspace snapshots validate tab kinds and reject invalid panel sizes", ()
   expect(workspaceSessionSchema.safeParse(value).success).toBe(true);
   expect(workspaceSessionSchema.safeParse({ ...value, treeWidth: -1 }).success).toBe(false);
   expect(workspaceSessionSchema.safeParse({ ...value, tabs: [null] }).success).toBe(false);
+  expect(workspaceSessionSchema.safeParse({ ...value, sections: [{ id: "tree:x" }] }).success).toBe(
+    false,
+  );
 });
 
 test("continuous activity is persisted by maxWait without a quiet interval", async () => {

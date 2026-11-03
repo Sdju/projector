@@ -1,6 +1,11 @@
 import { nextTick, onBeforeUnmount, watch, type Ref } from "vue";
 import { parseDockLayout, serializeDockLayout, type DockLayout } from "../../dock/index.ts";
-import type { SidebarRegistry, TabParams } from "../../workspace-api/index.ts";
+import type { SidebarRegistry, SidebarType, TabParams } from "../../workspace-api/index.ts";
+import {
+  fileScopeKey,
+  isLiveScope,
+  type FileScope,
+} from "../../../../core/modules/workspace/index.ts";
 import { isLiveFile, type OpenFile, type OpenFileOptions } from "../open-file.ts";
 import { useSessionSnapshot } from "../../../common/utilities/session-snapshot.ts";
 import { workspaceSessionSchema, type WorkspaceSession } from "../session.ts";
@@ -18,6 +23,12 @@ export interface WorkspaceSessionContext {
   section: Ref<string>;
   /** Sections of this workspace; a saved one it does not have falls back to files. */
   sections: SidebarRegistry;
+  /** Checks the live registry, including sections restored from the session. */
+  sectionExists?: (id: string) => boolean;
+  /** Temporary sections (commit tree, comparison) that live outside the profile. */
+  extraSections?: Ref<SidebarType[]>;
+  /** Rebuilds temporary sections from a session before the saved section is selected. */
+  restoreSections?: (sections: SidebarType[]) => void;
   treeWidth: Ref<number | undefined>;
   sidebarHidden: Ref<boolean>;
   mobile: Ref<boolean>;
@@ -48,31 +59,49 @@ export interface WorkspaceSessionContext {
 
 /** Сохраняет и восстанавливает вкладки, раскладку и размеры панелей проекта; сбрасывает всё при смене проекта. */
 export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
+  const sectionScopes = (sections: readonly SidebarType[]) =>
+    new Set(
+      sections.flatMap((type) => {
+        const scope = type.params?.scope as FileScope | undefined;
+        return scope ? [fileScopeKey(scope)] : [];
+      }),
+    );
   const session = useSessionSnapshot(
     () => `projector:workspace:v1:${ctx.projectId()}`,
-    (): WorkspaceSession => ({
-      tabs: ctx.tabs.value
-        // A historical snapshot is tied to its temporary sidebar section, which is not restored.
-        .filter((tab) => !tab.localFile && isLiveFile(tab))
-        .map((tab) => ({
-          key: tab.key,
-          path: tab.path,
-          virtual: tab.virtual,
-          params: tab.params,
-          commit: tab.commit,
-          pull: tab.pull,
-          scope: tab.scope,
-          external: tab.external,
-          staged: tab.staged,
-          markdownMode: tab.markdownMode,
-        })),
-      activeKey: ctx.activeKey.value,
-      section: ctx.section.value,
-      mobileSurface: ctx.mobileSurface.value,
-      treeWidth: ctx.treeWidth.value,
-      sidebarHidden: ctx.sidebarHidden.value,
-      layout: serializeDockLayout(ctx.layout.value),
-    }),
+    (): WorkspaceSession => {
+      const sections = ctx.extraSections?.value ?? [];
+      const scopes = sectionScopes(sections);
+      return {
+        sections,
+        tabs: ctx.tabs.value
+          // A snapshot tab travels with the temporary section that gives it a tree.
+          .filter(
+            (tab) =>
+              !tab.localFile &&
+              (isLiveFile(tab) ||
+                (!!tab.scope && !isLiveScope(tab.scope) && scopes.has(fileScopeKey(tab.scope)))),
+          )
+          .map((tab) => ({
+            key: tab.key,
+            path: tab.path,
+            virtual: tab.virtual,
+            params: tab.params,
+            commit: tab.commit,
+            pull: tab.pull,
+            scope: tab.scope,
+            originalPath: tab.originalPath,
+            external: tab.external,
+            staged: tab.staged,
+            markdownMode: tab.markdownMode,
+          })),
+        activeKey: ctx.activeKey.value,
+        section: ctx.section.value,
+        mobileSurface: ctx.mobileSurface.value,
+        treeWidth: ctx.treeWidth.value,
+        sidebarHidden: ctx.sidebarHidden.value,
+        layout: serializeDockLayout(ctx.layout.value),
+      };
+    },
     workspaceSessionSchema,
     () => ctx.persist && !ctx.restoringSession.value,
   );
@@ -94,6 +123,7 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
             : await ctx.openFile(tab.path, undefined, undefined, tab.staged, {
                 external: tab.external,
                 scope: tab.scope ?? (tab.rev ? { kind: "commit", rev: tab.rev } : undefined),
+                originalPath: tab.originalPath,
                 preview: false,
               });
         // A project switch or a user opening another file takes precedence over restoration.
@@ -134,7 +164,10 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
       ctx.resetFiles();
       ctx.resetGit();
       ctx.layout.value = parseDockLayout(saved?.layout) ?? ctx.initialLayout();
-      ctx.section.value = ctx.sections.has(saved?.section ?? "") ? saved!.section : "files";
+      ctx.restoreSections?.(saved?.sections ?? []);
+      const exists = (id: string) =>
+        ctx.sectionExists ? ctx.sectionExists(id) : ctx.sections.has(id);
+      ctx.section.value = exists(saved?.section ?? "") ? saved!.section : "files";
       ctx.treeWidth.value = saved?.treeWidth;
       ctx.sidebarHidden.value = !!saved?.sidebarHidden;
       ctx.reloadGit();

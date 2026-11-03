@@ -136,6 +136,33 @@ function openTree(scope: FileScope) {
 function openCommitTree(hash: string) {
   openTree({ kind: "commit", rev: hash });
 }
+/** Rebuilds temporary sections from a session; view kinds and scopes are derived, not trusted. */
+function restoreSections(saved: SidebarType[]) {
+  extraSections.value = saved.flatMap((type) => {
+    const raw = type.params?.scope;
+    if (!raw || typeof raw !== "object") return [];
+    const value = raw as { kind?: unknown; rev?: unknown; from?: unknown; to?: unknown };
+    const scope: FileScope | undefined =
+      value.kind === "commit" && typeof value.rev === "string"
+        ? { kind: "commit", rev: value.rev }
+        : value.kind === "compare" && typeof value.from === "string" && typeof value.to === "string"
+          ? { kind: "compare", from: value.from, to: value.to }
+          : undefined;
+    if (!scope) return [];
+    if (scope.kind === "compare" ? !capabilities.compare : !capabilities.snapshots) return [];
+    return [
+      {
+        id: `tree:${fileScopeKey(scope)}`,
+        title: fileScopeTitle(scope),
+        source: fileScopeNote(scope),
+        group: capabilities.git ? "git" : undefined,
+        kind: scope.kind === "compare" ? "changes" : "tree",
+        params: { scope },
+        closable: true,
+      } satisfies SidebarType,
+    ];
+  });
+}
 function closeSection(id: string) {
   const index = extraSections.value.findIndex((type) => type.id === id);
   if (index < 0) return;
@@ -331,6 +358,9 @@ useWorkspaceSession({
   activeKey,
   section,
   sections: sections.value,
+  sectionExists: (id) => sections.value.has(id),
+  extraSections,
+  restoreSections,
   treeWidth,
   sidebarHidden,
   mobile,
