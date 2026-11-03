@@ -177,7 +177,9 @@ export function useWorkbenchLayout(ctx: WorkbenchLayoutContext) {
             ? `${file.path} · ${file.saveError}`
             : file.commit
               ? `${file.path} · ${file.parent || "∅"} → ${file.commit.slice(0, 7)}`
-              : `${file.path}${file.original !== undefined ? (file.staged ? " · HEAD → index" : " · index → рабочий файл") : ""}`,
+              : file.rev
+                ? `${file.path} · @${file.rev.slice(0, 7)}`
+                : `${file.path}${file.original !== undefined ? (file.staged ? " · HEAD → index" : " · index → рабочий файл") : ""}`,
         dirty: ctx.isDirty(file),
         saving: !!file.saving,
         error: !!file.saveError,

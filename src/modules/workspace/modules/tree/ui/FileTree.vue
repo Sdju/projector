@@ -42,6 +42,8 @@ const props = withDefaults(
     selected: string;
     depth?: number;
     revision: number;
+    rev?: string;
+    readonly?: boolean;
     gitChanges?: GitOverview["changes"];
     beforeChange?: (path: string) => Promise<boolean>;
   }>(),
@@ -134,7 +136,7 @@ const { source, target, busy, expanded, error: moveError, message, hint, progres
 if (props.depth === 0) {
   const session = workspaceCapabilities(props.projectId).persist
     ? useSessionSnapshot(
-        () => `projector:tree:v1:${props.projectId}`,
+        () => `projector:tree:v1:${props.projectId}${props.rev ? `:rev:${props.rev}` : ""}`,
         () => [...expanded.value],
         treeSessionSchema,
       )
@@ -325,6 +327,8 @@ defineExpose({ reveal });
         :selected="selected"
         :depth="depth + 1"
         :revision="revision"
+        :rev="rev"
+        :readonly="readonly"
         :before-change="beforeChange"
         @changed="emit('changed')"
         @deleted="emit('deleted', $event)"

@@ -7,15 +7,21 @@ import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab
 import CommitFiles from "./CommitFiles.vue";
 import CommitMeta from "./CommitMeta.vue";
 import { useCommitDiffs } from "../lib/commit-diffs.ts";
-import { workspaceRequest } from "../../../../workspace-api/index.ts";
+import { workspaceRequest, workspaceCapabilities } from "../../../../workspace-api/index.ts";
+import UiButton from "../../../../../common/ui/UiButton.vue";
 
 /** Вкладка «Обзор коммита»: сообщение, метаданные и все файлы коммита с числом строк. */
-const props = defineProps<{ projectId: string; hash: string }>();
+const props = defineProps<{
+  projectId: string;
+  hash: string;
+  onOpenTree?: (hash: string) => void;
+}>();
 const emit = defineEmits<{
   openCommit: [hash: string];
   openDiff: [hash: string, path: string];
   subject: [text: string];
 }>();
+const canOpenTree = computed(() => workspaceCapabilities(props.projectId).historyTree);
 const detail = ref<GitCommitDetail>();
 const error = ref("");
 const loading = ref(false);
@@ -36,6 +42,14 @@ const commands = useCommandScope(`commit:${props.projectId}:${props.hash}`, () =
   hash: props.hash,
 }));
 const textFiles = computed(() => (detail.value?.files ?? []).filter((file) => !file.binary));
+commands.scope.registerCommand({
+  id: "ide.git.commit.openTree",
+  title: "Файлы коммита",
+  description:
+    "Показывает дерево файлов на момент коммита в боковой панели рядом с Git; дерево доступно только для чтения.",
+  enabled: () => canOpenTree.value,
+  run: () => props.onOpenTree?.(props.hash),
+});
 // Что штатный агент видит во вкладке обзора коммита: сообщение, автор, статистика и файлы.
 useTabReadout(() => {
   if (error.value)
@@ -124,6 +138,15 @@ watch(() => [props.projectId, props.hash], load, { immediate: true });
     >
     <article v-else-if="detail">
       <CommitMeta :detail="detail" @open-commit="emit('openCommit', $event)" />
+      <div v-if="canOpenTree" class="commit-actions">
+        <UiButton
+          size="sm"
+          data-command="ide.git.commit.openTree"
+          @click="commands.run('ide.git.commit.openTree')"
+        >
+          Файлы коммита
+        </UiButton>
+      </div>
       <CommitFiles
         :detail="detail"
         :expanded="expanded"
@@ -146,6 +169,11 @@ watch(() => [props.projectId, props.hash], load, { immediate: true });
 }
 article {
   max-width: 880px;
+}
+.commit-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 var(--sp-2);
 }
 .note.error {
   color: var(--err);

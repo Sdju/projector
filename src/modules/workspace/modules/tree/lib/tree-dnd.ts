@@ -17,17 +17,16 @@ export function useTreeDragDrop(
   importer: Pick<ReturnType<typeof useTreeImport>, "accepts" | "importInto">,
 ) {
   const { source, busy, expanded, error: moveError, message } = drag;
+  const canWrite = () => workspaceCapabilities(props.projectId).write && !props.readonly;
   function startDrag(event: DragEvent, entry: FileEntry) {
-    if (busy.value || !event.dataTransfer) {
+    if (busy.value || !canWrite() || !event.dataTransfer) {
       event.preventDefault();
       return;
     }
     if (!selection.paths.value.has(entry.path)) selection.replace(entry.path);
     selection.dragged.value = topLevelTreePaths(selection.paths.value);
     source.value = entry.path;
-    event.dataTransfer.effectAllowed = workspaceCapabilities(props.projectId).write
-      ? "copyMove"
-      : "copy";
+    event.dataTransfer.effectAllowed = canWrite() ? "copyMove" : "copy";
     event.dataTransfer.setData(
       treeDragType,
       JSON.stringify({
@@ -48,7 +47,7 @@ export function useTreeDragDrop(
     drag.hover(valid ? directory : undefined, valid && !!entry?.directory);
   }
   function dragOver(event: DragEvent, entry?: FileEntry) {
-    if (!workspaceCapabilities(props.projectId).write) return;
+    if (!canWrite()) return;
     if (!source.value && !busy.value && importer.accepts(event.dataTransfer)) {
       event.preventDefault();
       event.dataTransfer!.dropEffect = "copy";
@@ -68,7 +67,7 @@ export function useTreeDragDrop(
     drag.hover();
   }
   async function drop(event: DragEvent, entry?: FileEntry) {
-    if (!workspaceCapabilities(props.projectId).write) {
+    if (!canWrite()) {
       drag.clear();
       return;
     }

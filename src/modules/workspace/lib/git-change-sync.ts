@@ -17,7 +17,9 @@ export interface GitChangeSyncContext {
 export function useGitChangeSync(ctx: GitChangeSyncContext) {
   /** Смена HEAD затрагивает любые файлы: сохраняются все открытые. */
   const openTabs = () =>
-    ctx.tabs.value.filter((tab) => !tab.virtual && !tab.commit && !tab.external && !tab.localFile);
+    ctx.tabs.value.filter(
+      (tab) => !tab.virtual && !tab.commit && !tab.rev && !tab.external && !tab.localFile,
+    );
   async function prepare(action: string, paths: string[]) {
     if (action === "checkout") {
       for (const tab of openTabs())
@@ -59,6 +61,7 @@ export function useGitChangeSync(ctx: GitChangeSyncContext) {
     ctx.tabs.value = ctx.tabs.value.filter(
       (tab) =>
         tab.commit ||
+        tab.rev ||
         !paths.includes(tab.path) ||
         (tab.original === undefined && action !== "discard"),
     );

@@ -10,7 +10,7 @@ import type { GitOverviewState } from "../lib/git-overview.ts";
 import type { GitBranchesState } from "../lib/git-branches.ts";
 import type { GitHistoryState } from "../lib/git-history.ts";
 import { registerChangeCommands } from "../lib/change-commands.ts";
-import { workspaceProfile } from "../../../../workspace-api/index.ts";
+import { workspaceProfile, workspaceCapabilities } from "../../../../workspace-api/index.ts";
 import GitBranchBar from "./GitBranchBar.vue";
 import GitSplitter from "./GitSplitter.vue";
 import GitChangesTree from "./GitChangesTree.vue";
@@ -36,6 +36,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   open: [path: string, staged?: boolean, pinned?: boolean];
   openCommit: [hash: string];
+  openCommitTree: [hash: string];
   openCommitDiff: [hash: string, path: string, pinned?: boolean];
 }>();
 const { git, error: gitError, loading: gitLoading, load } = props.overview;
@@ -47,6 +48,7 @@ const gitMenu = ref<InstanceType<typeof ContextMenu>>();
 const gitTarget = ref({ path: "", staged: false });
 const gitProvider = workspaceProfile(props.projectId).providers.git;
 const writable = !!gitProvider?.write;
+const historyTree = workspaceCapabilities(props.projectId).historyTree;
 const historyOpen = ref(!writable);
 /** Высота истории, подогнанная перетаскиванием; без неё история занимает место по содержимому. */
 const historyHeight = ref<number>();
@@ -260,9 +262,11 @@ defineExpose({
           v-model:target="commitTarget"
           :history="history"
           :all-branches="gitProvider?.allBranches !== false"
+          :history-tree="historyTree"
           :commands="gitCommands"
           :revision="overview.gutterRevision.value"
           @open-commit="emit('openCommit', $event)"
+          @open-tree="emit('openCommitTree', $event)"
           @open-diff="(hash, path, pinned) => emit('openCommitDiff', hash, path, pinned)"
           @open-file="emit('open', $event)"
         />

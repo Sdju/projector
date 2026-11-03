@@ -12,6 +12,7 @@ import { PipelinesPanel } from "../modules/pipelines/index.ts";
 import { DockerSidebar } from "../../docker/index.ts";
 import SearchPanel from "../ui/SearchPanel.vue";
 import FilesSection from "../ui/FilesSection.vue";
+import { CommitTreeSection } from "../modules/tree/index.ts";
 import type { OpenFile, OpenFileOptions } from "../open-file.ts";
 import type { useGitChangeSync } from "./git-change-sync.ts";
 import type { useOpenFiles } from "./open-files.ts";
@@ -57,7 +58,8 @@ export interface SidebarHost {
     options?: OpenFileOptions,
   ): unknown;
   openTab(id: string, params?: Record<string, unknown>, options?: { preview?: boolean }): void;
-  command(id: string): void;
+  openCommitTree(hash: string): void;
+  command(id: string, args?: unknown): void;
   refreshWorkspace(): void;
   changed(): void;
   deleted(path: string): void;
@@ -70,7 +72,7 @@ export interface SidebarView {
   /** Root owns its fill/scroll recipe; the host keeps panels mounted with v-show. */
   component: Component;
   /** Props and listeners of the panel. */
-  props(host: SidebarHost, selected: boolean): Record<string, unknown>;
+  props(host: SidebarHost, selected: boolean, type?: SidebarType): Record<string, unknown>;
   /** Count shown next to the icon. */
   badge?(host: SidebarHost): number;
   /** Runs when the section becomes the selected one. */
@@ -117,12 +119,31 @@ export const baseSidebarViews: SidebarViews = {
       onOpen: (path: string, staged?: boolean, pinned?: boolean) =>
         host.openFile(path, undefined, undefined, staged, { preview: !pinned }),
       onOpenCommit: host.files.openCommit,
+      onOpenCommitTree: host.openCommitTree,
       onOpenCommitDiff: (hash: string, path: string, pinned?: boolean) =>
         host.files.openCommitFile(hash, path, !pinned),
     }),
     badge: (host) => host.overview.git.value.changes.length,
     activate: (host) => void host.overview.load(),
     refresh: (_, panel) => panel?.refresh?.(),
+  },
+  "commit-tree": {
+    icon: IconFiles,
+    component: CommitTreeSection,
+    props: (host, _selected, type) => {
+      const hash = typeof type?.params?.hash === "string" ? type.params.hash : "";
+      return {
+        projectId: host.projectId,
+        rev: hash,
+        revision: host.revision,
+        selected: host.active?.rev === hash ? host.active.path : "",
+        onOpen: (path: string, pinned?: boolean) =>
+          host.openFile(path, undefined, undefined, undefined, {
+            rev: hash,
+            preview: !pinned,
+          }),
+      };
+    },
   },
   issues: {
     icon: IconIssues,

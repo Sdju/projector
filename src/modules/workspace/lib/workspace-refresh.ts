@@ -36,7 +36,7 @@ export function useWorkspaceRefresh(ctx: WorkspaceRefreshContext) {
     if (!ctx.capabilities.write) {
       const selected = ctx.activeKey();
       for (const tab of [...tabs.value])
-        if (!tab.virtual && !tab.commit && !tab.localFile)
+        if (!tab.virtual && !tab.commit && !tab.rev && !tab.localFile)
           await openFile(tab.path, tab.line, tab.column, undefined, {
             reload: true,
             preview: !!tab.preview,
@@ -45,7 +45,7 @@ export function useWorkspaceRefresh(ctx: WorkspaceRefreshContext) {
       return;
     }
     const current = ctx.active();
-    if (!current || current.virtual || current.commit) return;
+    if (!current || current.virtual || current.commit || current.rev) return;
     if (current.localFile) void openBrowserFile(current.localFile, true);
     else
       void openFile(current.path, current.line, current.column, current.staged, {
@@ -56,7 +56,7 @@ export function useWorkspaceRefresh(ctx: WorkspaceRefreshContext) {
   function entryMoved(source: string, destination: string) {
     files.invalidate();
     for (const tab of [...tabs.value]) {
-      if (tab.virtual || tab.commit) continue;
+      if (tab.virtual || tab.commit || tab.rev) continue;
       const path = relocatedPath(tab.path, source, destination);
       if (path === tab.path) continue;
       if (tab.staged !== undefined) {

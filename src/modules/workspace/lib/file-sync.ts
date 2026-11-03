@@ -21,6 +21,7 @@ const synced = (file: OpenFile) =>
   !file.virtual &&
   !file.external &&
   !file.commit &&
+  !file.rev &&
   !file.localFile &&
   !file.binary &&
   !file.image &&

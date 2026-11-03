@@ -17,6 +17,8 @@ import {
   mutateProjectBranch,
   projectCommit,
   projectCommitComparison,
+  listProjectGitTree,
+  readProjectGitFile,
   mutateProjectGit,
   moveProjectEntry,
   mutateProjectEntry,
@@ -233,16 +235,34 @@ export async function handleProjectWorkspace({
       return true;
     }
     const ask = url.searchParams.get("ask") === "1";
+    const rev = url.searchParams.get("rev") ?? "";
     if (sessionId === "external") json(res, 200, await previewExternalFile(filePath, { ask }));
     else if (sessionId === "root") json(res, 200, { root: project.path });
     else if (sessionId === "tree")
       json(
         res,
         200,
-        await listProjectDirectory(project.path, filePath, Object.fromEntries(url.searchParams)),
+        rev
+          ? await listProjectGitTree(
+              project.path,
+              rev,
+              filePath,
+              Object.fromEntries(url.searchParams),
+            )
+          : await listProjectDirectory(
+              project.path,
+              filePath,
+              Object.fromEntries(url.searchParams),
+            ),
       );
     else if (sessionId === "file")
-      json(res, 200, await previewProjectFile(project.path, filePath, { ask }));
+      json(
+        res,
+        200,
+        rev
+          ? await readProjectGitFile(project.path, rev, filePath, { ask })
+          : await previewProjectFile(project.path, filePath, { ask }),
+      );
     else if (sessionId === "search")
       json(
         res,

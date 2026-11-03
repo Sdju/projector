@@ -1,14 +1,18 @@
 <script setup lang="ts">
 import UiStatusDot from "../../../common/ui/UiStatusDot.vue";
-import { computed, type Component } from "vue";
+import { computed, ref, type Component } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiIsland from "../../../common/ui/UiIsland.vue";
+import ContextMenu from "../../../common/ui/ContextMenu.vue";
+import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import { useCommandScope } from "../../../common/utilities/commands.ts";
 import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
 import IconRefresh from "~icons/lucide/rotate-cw";
 import IconSettings from "~icons/lucide/settings-2";
 import IconChevron from "~icons/lucide/chevron-down";
 import IconCheck from "~icons/lucide/check";
+import IconX from "~icons/lucide/x";
+import { groupSidebar } from "../../workspace-api/index.ts";
 
 export interface SidebarItem {
   id: string;
@@ -16,6 +20,12 @@ export interface SidebarItem {
   icon: Component;
   badge: number;
   command?: string;
+  /** Родительский раздел: иконка стоит рядом с ним в общей подложке. */
+  group?: string;
+  /** Вид раздела, по которому берутся компонент и подписи. */
+  kind?: string;
+  /** Временный раздел можно закрыть. */
+  closable?: boolean;
 }
 const props = defineProps<{
   section: string;
@@ -27,7 +37,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{
   "update:section": [section: string];
-  command: [id: string];
+  command: [id: string, args?: unknown];
 }>();
 
 // Compact view: one titled picker instead of a row of bare icons.
@@ -36,9 +46,11 @@ const picker = useIslandMenu({
   initialFocus: [".section-item.selected", ".section-item"],
   items: ".section-item",
 });
-const current = computed(() => props.items.find((item) => item.id === props.section));
+const groups = computed(() => groupSidebar(props.items));
+const ordered = computed(() => groups.value.flat());
+const current = computed(() => ordered.value.find((item) => item.id === props.section));
 const otherBadges = computed(() =>
-  props.items.some((item) => item.id !== props.section && item.badge),
+  ordered.value.some((item) => item.id !== props.section && item.badge),
 );
 const commands = useCommandScope("sidebar-sections", () => ({ surface: "workbench" }));
 commands.scope.registerCommand({
@@ -49,6 +61,29 @@ commands.scope.registerCommand({
   enabled: () => !props.vertical,
   run: () => void picker.toggle(),
 });
+const sectionMenu = ref<InstanceType<typeof ContextMenu>>();
+const menuTarget = ref<SidebarItem>();
+const menuItems = computed<ContextMenuItem[]>(() => {
+  const item = menuTarget.value;
+  if (!item) return [];
+  return [
+    {
+      id: "section.close",
+      label: `Закрыть «${item.title}»`,
+      icon: IconX,
+      command: "ide.workbench.section.close",
+      args: { section: item.id },
+      run: () => emit("command", "ide.workbench.section.close", { section: item.id }),
+    },
+  ];
+});
+function openSectionMenu(event: MouseEvent, item: SidebarItem) {
+  if (!props.vertical || !item.closable) return;
+  event.preventDefault();
+  event.stopPropagation();
+  menuTarget.value = item;
+  void sectionMenu.value?.open(event, event.currentTarget as HTMLElement);
+}
 function choose(item: SidebarItem) {
   picker.close();
   if (item.command) emit("command", item.command);
@@ -97,10 +132,10 @@ function choose(item: SidebarItem) {
   </nav>
   <UiIsland v-if="!vertical" :menu="picker" label="Разделы проекта" :width="260">
     <button
-      v-for="item in items"
+      v-for="item in ordered"
       :key="item.id"
       class="section-item"
-      :class="{ selected: section === item.id }"
+      :class="{ selected: section === item.id, subgroup: !!item.group }"
       :aria-current="section === item.id ? 'true' : undefined"
       @click="choose(item)"
     >
@@ -122,18 +157,32 @@ function choose(item: SidebarItem) {
     </button>
   </UiIsland>
   <nav v-else class="side-tabs vertical" aria-label="Разделы проекта">
-    <button
-      v-for="item in items"
-      :key="item.id"
-      :class="{ selected: section === item.id && !collapsed }"
-      :aria-pressed="section === item.id && !collapsed"
-      :title="item.title"
-      :aria-label="item.badge ? `${item.title}: ${item.badge}` : item.title"
-      @click="item.command ? emit('command', item.command) : emit('update:section', item.id)"
+    <div
+      v-for="group in groups"
+      :key="group[0]?.id"
+      class="side-group"
+      :class="{ grouped: group.length > 1 }"
     >
-      <component :is="item.icon" :class="{ 'git-logo': item.id === 'git' }" aria-hidden="true" />
-      <span v-if="item.badge" aria-hidden="true">{{ item.badge }}</span>
-    </button>
+      <template v-for="(item, index) in group" :key="item.id">
+        <i v-if="index" class="side-separator" aria-hidden="true" />
+        <button
+          :class="{ selected: section === item.id && !collapsed }"
+          :aria-pressed="section === item.id && !collapsed"
+          :title="item.closable ? `${item.title} · ПКМ: закрыть` : item.title"
+          :aria-label="item.badge ? `${item.title}: ${item.badge}` : item.title"
+          :aria-haspopup="item.closable ? 'menu' : undefined"
+          @click="item.command ? emit('command', item.command) : emit('update:section', item.id)"
+          @contextmenu="openSectionMenu($event, item)"
+        >
+          <component
+            :is="item.icon"
+            :class="{ 'git-logo': item.id === 'git' }"
+            aria-hidden="true"
+          />
+          <span v-if="item.badge" aria-hidden="true">{{ item.badge }}</span>
+        </button>
+      </template>
+    </div>
     <div class="side-actions">
       <UiButton
         shape="icon"
@@ -147,6 +196,7 @@ function choose(item: SidebarItem) {
       </UiButton>
     </div>
   </nav>
+  <ContextMenu ref="sectionMenu" :items="menuItems" label="Действия раздела" />
 </template>
 
 <style scoped>
@@ -208,24 +258,41 @@ function choose(item: SidebarItem) {
   padding: 0;
   border: 0;
 }
-.side-tabs.vertical > button {
+.side-tabs.vertical .side-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 32px;
+  border-radius: var(--r-md);
+}
+/* Дочерние разделы делят подложку с родителем: это одна «стопка», а не отдельные кнопки */
+.side-tabs.vertical .side-group.grouped {
+  background: var(--bg-2);
+}
+.side-tabs.vertical .side-separator {
+  width: 16px;
+  height: 1px;
+  flex-shrink: 0;
+  background: var(--line-strong);
+}
+.side-tabs.vertical .side-group > button {
   position: relative;
   width: 32px;
   height: 32px;
   border: 0;
   border-radius: var(--r-md);
 }
-.side-tabs.vertical > button:hover {
+.side-tabs.vertical .side-group > button:hover {
   background: var(--hover);
 }
-.side-tabs.vertical > button.selected {
+.side-tabs.vertical .side-group > button.selected {
   background: var(--active);
 }
-.side-tabs.vertical > button svg {
+.side-tabs.vertical .side-group > button svg {
   width: 16px;
   height: 16px;
 }
-.side-tabs.vertical > button span {
+.side-tabs.vertical .side-group > button span {
   position: absolute;
   top: 0;
   right: 0;
@@ -316,6 +383,9 @@ function choose(item: SidebarItem) {
 }
 .section-item.selected {
   background: var(--active);
+}
+.section-item.subgroup {
+  padding-left: calc(var(--sp-3) * 2);
 }
 .section-item svg {
   width: 17px;

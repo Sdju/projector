@@ -175,6 +175,7 @@ carries `commit`, `commitPath` and `historyOpen`. Commands:
 - `ide.git.history.filter` `{ query?, all? }` — message search, `@name` searches authors, `all` includes every branch;
 - `ide.git.commit.toggle` `{ hash }` expands the changes made by that commit only;
 - `ide.git.commit.openDiff` `{ hash, path }` opens a read-only diff `parent → commit` (tab title shows both hashes);
+- `ide.git.commit.openTree` `{ hash }` opens **Файлы коммита @hash** in the sidebar: a read-only tree at that commit, grouped with Git, with a source label above the panel; files open read-only. Available when the source supports history trees (local projects). Close it with the icon context menu (desktop) or the panel-head button (mobile); both use `ide.workbench.section.close` `{ section }`;
 - `ide.git.commit.file.toggle` `{ path, open? }` and `ide.git.commit.files.toggleAll` `{ open? }` expand the code of files
   right inside the overview tab (read lazily, short files get a short viewer). The handle under each viewer resizes it
   (drag, arrows, double click resets); squeezing it to the minimum collapses the file like `file.toggle { open: false }`,

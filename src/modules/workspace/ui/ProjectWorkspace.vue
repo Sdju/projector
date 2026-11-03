@@ -4,6 +4,8 @@ import { computed, onBeforeUnmount, ref } from "vue";
 import {
   workspaceProfile,
   profileCapabilities,
+  extendSidebarRegistry,
+  type SidebarType,
   type WorkspaceCapability,
 } from "../../workspace-api/index.ts";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
@@ -88,7 +90,11 @@ function treeChanged() {
 function entryDeleted(path: string) {
   files.invalidate();
   tabs.value = tabs.value.filter(
-    (tab) => tab.virtual || tab.commit || (tab.path !== path && !tab.path.startsWith(path + "/")),
+    (tab) =>
+      tab.virtual ||
+      tab.commit ||
+      tab.rev ||
+      (tab.path !== path && !tab.path.startsWith(path + "/")),
   );
   revision.value++;
   void loadGit();
@@ -100,7 +106,33 @@ const branches = useGitBranches(() => props.projectId);
 const { gutterRevision } = overview;
 const loadGit = () => (capabilities.git ? overview.load() : Promise.resolve());
 const section = ref("files");
-const sections = sidebarSections(profile, capabilities);
+const extraSections = ref<SidebarType[]>([]);
+const sections = computed(() =>
+  extendSidebarRegistry(sidebarSections(profile, capabilities), () => extraSections.value),
+);
+function openCommitTree(hash: string) {
+  if (!capabilities.git || !capabilities.historyTree)
+    throw new Error("Источник не умеет показывать файлы коммита");
+  const id = `commit-tree:${hash}`;
+  if (!extraSections.value.some((type) => type.id === id))
+    extraSections.value.push({
+      id,
+      title: `Файлы коммита @${hash.slice(0, 7)}`,
+      source: `Только чтение · коммит ${hash.slice(0, 7)}`,
+      group: "git",
+      kind: "commit-tree",
+      params: { hash },
+      closable: true,
+    });
+  section.value = id;
+  showSidebar();
+}
+function closeSection(id: string) {
+  const index = extraSections.value.findIndex((type) => type.id === id);
+  if (index < 0) return;
+  extraSections.value.splice(index, 1);
+  if (section.value === id) section.value = capabilities.git ? "git" : "files";
+}
 const revision = ref(0);
 const isDirty = (file: OpenFile) =>
   file.virtual
@@ -151,6 +183,7 @@ provideTabHost({
   openFile: (path) => void openFile(path),
   openTab,
   openCommitDiff: (hash, path) => void files.openCommitFile(hash, path),
+  openCommitTree,
   run: (command, args) => editorCommands.run(command, args),
 });
 const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
@@ -169,7 +202,16 @@ const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
   selectTab: (key) => revealPanel(key),
   onOpenTab: () => (mobileSidebarOpen.value = false),
   toggleMarkdownSource,
-  revealInTree: (path) => {
+  revealInTree: (path, rev) => {
+    if (rev) {
+      const id = `commit-tree:${rev}`;
+      if (sections.value.has(id)) {
+        section.value = id;
+        showSidebar();
+        sidebar.value?.reveal(path, id);
+      }
+      return;
+    }
     section.value = "files";
     showSidebar();
     sidebar.value?.reveal(path);
@@ -200,9 +242,9 @@ registerEditor(
   "Открыть раздел боковой панели",
   (value) => {
     const id = commandArgs(value).section;
-    if (typeof id !== "string" || !sections.has(id))
+    if (typeof id !== "string" || !sections.value.has(id))
       throw new Error(
-        `section: ${sections
+        `section: ${sections.value
           .list()
           .map((type) => type.id)
           .join(", ")}`,
@@ -216,6 +258,24 @@ registerEditor(
     description:
       "Переключает боковую панель на раздел проекта (файлы, поиск, Git и другие, если они есть у проекта) и показывает её.",
     arguments: { section: "Идентификатор раздела: files, search, git, docker, issues и т. д." },
+  },
+);
+registerEditor(
+  "ide.workbench.section.close",
+  "Закрыть временный раздел боковой панели",
+  (value) => {
+    const id = commandArgs(value).section;
+    if (typeof id !== "string" || !id) throw new Error("Укажите section");
+    closeSection(id);
+  },
+  (value) => {
+    const id = commandArgs(value).section;
+    return typeof id === "string" && extraSections.value.some((type) => type.id === id);
+  },
+  undefined,
+  {
+    description: "Закрывает временный раздел боковой панели, например файлы коммита.",
+    arguments: { section: "Идентификатор временного раздела" },
   },
 );
 registerEditor(
@@ -236,7 +296,7 @@ useWorkspaceSession({
   restoringSession,
   activeKey,
   section,
-  sections,
+  sections: sections.value,
   treeWidth,
   sidebarHidden,
   mobile,
@@ -332,8 +392,12 @@ onBeforeUnmount(() => overview.cancel());
         :branches="branches"
         :files="files"
         :git-sync="gitSync"
-        @command="($event.startsWith('ide.docker.') ? docker.commands : editorCommands).run($event)"
+        @command="
+          (id, args) =>
+            (id.startsWith('ide.docker.') ? docker.commands : editorCommands).run(id, args)
+        "
         @navigate="mobileSidebarOpen = false"
+        @open-commit-tree="openCommitTree"
         @refresh="refresh"
         @changed="treeChanged"
         @deleted="entryDeleted"

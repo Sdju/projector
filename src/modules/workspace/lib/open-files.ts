@@ -15,13 +15,9 @@ import { dropPreviewExcept as dropPreviewTabs, opensAsPreview } from "./preview-
 import { ensureTab } from "./service-tabs.ts";
 import { useDirtyGuard } from "./dirty-guard.ts";
 import { useFileSync } from "./file-sync.ts";
-import { confirmBrowserFile, readFileConfirmed } from "./read-file.ts";
+import { confirmBrowserFile, readOpenData } from "./read-file.ts";
 import { treeDragType } from "../modules/tree/index.ts";
-import type {
-  CommitComparison,
-  FileComparison,
-  FileContent,
-} from "../../../../core/modules/workspace/index.ts";
+import type { CommitComparison } from "../../../../core/modules/workspace/index.ts";
 
 export interface OpenFilesContext {
   projectId: () => string;
@@ -57,11 +53,13 @@ export function useOpenFiles(ctx: OpenFilesContext) {
     line?: number,
     column?: number,
     staged?: boolean,
-    { reload = false, external = false, preview = true }: OpenFileOptions = {},
+    { reload = false, external = false, preview = true, rev }: OpenFileOptions = {},
   ) {
     if (external && !workspaceCapabilities(ctx.projectId()).externalFiles)
       throw new Error("Внешние файлы недоступны для этого источника");
-    const key = `${external ? "external:" : ""}${path}:${staged === undefined ? "file" : staged ? "index" : "working"}`;
+    const key = rev
+      ? `${path}:rev:${rev}`
+      : `${external ? "external:" : ""}${path}:${staged === undefined ? "file" : staged ? "index" : "working"}`;
     const existing = tabs.value.find((tab) => tab.key === key);
     const asPreview = opensAsPreview(preview, existing);
     if (existing && (!reload || ctx.isDirty(existing) || existing.saving)) {
@@ -76,29 +74,22 @@ export function useOpenFiles(ctx: OpenFilesContext) {
     loading.value = true;
     fileError.value = "";
     try {
-      let data: (FileContent & { image?: boolean }) | FileComparison | undefined;
       // A tab already open is only read again: the question was answered when it was opened.
-      if (staged === undefined)
-        data = await readFileConfirmed(
-          ctx.projectId(),
-          path,
-          external,
-          !existing,
-          () => generation === fileGeneration,
-        );
-      else
-        data = await workspaceRequest<FileComparison>(ctx.projectId(), "diff", {
-          path,
-          staged: String(staged),
-        });
+      const data = await readOpenData(ctx.projectId(), path, {
+        external,
+        staged,
+        rev,
+        ask: !existing,
+        wanted: () => generation === fileGeneration,
+      });
       if (!data || generation !== fileGeneration) return;
       if (asPreview) dropPreviewExcept(key);
       const file: OpenFile = {
         ...data,
-        readonly: !workspaceCapabilities(ctx.projectId()).write,
+        readonly: !!rev || !workspaceCapabilities(ctx.projectId()).write,
         external,
         image:
-          "image" in data && data.image
+          !rev && "image" in data && data.image
             ? workspaceAssetUrl(ctx.projectId(), path, external)
             : undefined,
         path,
@@ -106,6 +97,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
         archive: "archive" in data ? data.archive : undefined,
         original: "original" in data ? data.original : undefined,
         staged,
+        rev,
         line,
         column,
         key,

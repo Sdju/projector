@@ -1,5 +1,5 @@
 import { LARGE_FILE_BYTES, largeFileQuestion } from "../../../../core/modules/workspace/index.ts";
-import type { FileContent } from "../../../../core/modules/workspace/index.ts";
+import type { FileComparison, FileContent } from "../../../../core/modules/workspace/index.ts";
 import { workspaceRequest } from "../../workspace-api/index.ts";
 
 /**
@@ -12,17 +12,40 @@ export async function readFileConfirmed(
   external: boolean,
   ask: boolean,
   wanted: () => boolean,
+  rev?: string,
 ): Promise<(FileContent & { image?: boolean }) | undefined> {
   const read = (announce: boolean) =>
-    workspaceRequest<FileContent & { image?: boolean }>(
-      projectId,
-      external ? "external" : "file",
-      announce ? { path, ask: "1" } : { path },
-    );
+    workspaceRequest<FileContent & { image?: boolean }>(projectId, external ? "external" : "file", {
+      path,
+      ...(announce ? { ask: "1" } : {}),
+      ...(rev ? { rev } : {}),
+    });
   const file = await read(ask);
   if (file.large === undefined) return file;
   if (!wanted() || !window.confirm(largeFileQuestion(path, file.large))) return undefined;
   return read(false);
+}
+
+/** Picks the source of a new tab: a committed snapshot, a working file, or a Git diff. */
+export async function readOpenData(
+  projectId: string,
+  path: string,
+  options: {
+    external: boolean;
+    staged?: boolean;
+    rev?: string;
+    ask: boolean;
+    wanted: () => boolean;
+  },
+): Promise<(FileContent & { image?: boolean }) | FileComparison | undefined> {
+  if (options.rev)
+    return readFileConfirmed(projectId, path, false, options.ask, options.wanted, options.rev);
+  if (options.staged === undefined)
+    return readFileConfirmed(projectId, path, options.external, options.ask, options.wanted);
+  return workspaceRequest<FileComparison>(projectId, "diff", {
+    path,
+    staged: String(options.staged),
+  });
 }
 
 /** A file picked from the system is not read by the server: the same question, by its size. */

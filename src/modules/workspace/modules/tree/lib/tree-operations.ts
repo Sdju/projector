@@ -1,6 +1,6 @@
 import { computed, nextTick, useId, type Ref } from "vue";
 import { useCommandScope, commandArgs } from "../../../../../common/utilities/commands.ts";
-import type { ContextMenuItem } from "../../../../../common/ui/context-menu.ts";
+import { treeMenuItems } from "./tree-menu.ts";
 import {
   workspaceRequest,
   moveWorkspaceEntry,
@@ -36,7 +36,13 @@ export interface TreeEmit {
   (event: "deleted", path: string): void;
 }
 export interface TreeContext {
-  props: { projectId: string; path: string; beforeChange?: (path: string) => Promise<boolean> };
+  props: {
+    projectId: string;
+    path: string;
+    rev?: string;
+    readonly?: boolean;
+    beforeChange?: (path: string) => Promise<boolean>;
+  };
   emit: TreeEmit;
   selection: ReturnType<typeof createTreeSelection>;
   drag: ReturnType<typeof createTreeDrag>;
@@ -267,6 +273,7 @@ export function useTreeOperations({
     }
   }
   const capabilities = workspaceCapabilities(props.projectId);
+  const writable = capabilities.write && !props.readonly;
   const requirements = new Map<string, WorkspaceCapability>();
   /** `requires` is the profile capability a command needs; commands never inspect the project. */
   const register = (
@@ -281,7 +288,10 @@ export function useTreeOperations({
       id: `ide.fileTree.${id}`,
       title,
       run,
-      enabled: (args) => (!requires || capabilities[requires]) && !drag.busy.value && enabled(args),
+      enabled: (args) =>
+        (!requires || (requires === "write" ? writable : capabilities[requires])) &&
+        !drag.busy.value &&
+        enabled(args),
     });
   };
   const registerWrite = (
@@ -361,40 +371,16 @@ export function useTreeOperations({
     if (!target) return;
     return menu.value?.openForElement(target);
   });
-  const menuItems = computed<ContextMenuItem[]>(() => {
-    const entry = contextEntry.value;
-    const item = (
-      id: string,
-      options: { separator?: boolean; danger?: boolean; label?: string } = {},
-    ) => treeCommands.item(`ide.fileTree.${id}`, undefined, options);
-    const items: ContextMenuItem[] = [];
-    if (entry && !entry.directory) items.push(item("file.open"));
-    if (!entry || entry.directory) items.push(item("file.create"), item("directory.create"));
-    if (entry)
-      items.push(
-        item(`${entry.directory ? "directory" : "file"}.rename`, { separator: true }),
-        item("entry.cut"),
-        item("entry.copy"),
-        item("entry.duplicate"),
-      );
-    items.push(
-      item("entry.paste"),
-      item("entry.copyRelativePath", { separator: true }),
-      item("entry.copyPath"),
-    );
-    if (entry?.directory)
-      items.push(
-        item("directory.toggle", {
-          label: expanded.value.has(entry.path) ? "Свернуть папку" : "Развернуть папку",
-        }),
-      );
-    if (!entry) items.push(item("collapseAll"));
-    items.push(item("refresh"));
-    if (entry) items.push(item("entry.delete", { danger: true, separator: true }));
-    return items.filter((item) => {
-      const requires = requirements.get(item.id);
-      return !requires || capabilities[requires];
-    });
-  });
+  const menuItems = computed(() =>
+    treeMenuItems({
+      entry: contextEntry.value,
+      expanded: expanded.value,
+      item: (id, options) => treeCommands.item(`ide.fileTree.${id}`, undefined, options),
+      allowed: (id) => {
+        const requires = requirements.get(id);
+        return !requires || (requires === "write" ? writable : capabilities[requires]);
+      },
+    }),
+  );
   return { contextEntry, clipboard, treeCommands, menuItems, runOperation };
 }

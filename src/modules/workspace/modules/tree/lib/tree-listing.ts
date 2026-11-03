@@ -20,7 +20,7 @@ export const treePagingKey: InjectionKey<ReturnType<typeof createTreePaging>> =
   Symbol("tree-paging");
 
 export function useTreeListing(
-  props: { projectId: string; path: string; revision: number },
+  props: { projectId: string; path: string; revision: number; rev?: string },
   paging: ReturnType<typeof createTreePaging>,
   removed: (path: string) => void,
 ) {
@@ -46,7 +46,7 @@ export function useTreeListing(
     controller = new AbortController();
     loading.value = true;
     error.value = "";
-    const nextIdentity = `${props.projectId}\0${props.path}`;
+    const nextIdentity = `${props.projectId}\0${props.rev ?? ""}\0${props.path}`;
     if (identity !== nextIdentity) {
       entries.value = [];
       total.value = 0;
@@ -66,6 +66,7 @@ export function useTreeListing(
           offset: String(offset),
           limit: String(Math.min(count, 1000)),
           ...(reveal ? { reveal } : {}),
+          ...(props.rev ? { rev: props.rev } : {}),
         },
         controller.signal,
       );
@@ -99,7 +100,7 @@ export function useTreeListing(
     { immediate: true },
   );
   watch(
-    () => [props.projectId, props.path, props.revision, revealChild()],
+    () => [props.projectId, props.rev, props.path, props.revision, revealChild()],
     () => void load(),
     { immediate: true },
   );

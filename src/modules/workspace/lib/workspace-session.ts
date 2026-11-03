@@ -46,13 +46,15 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
     () => `projector:workspace:v1:${ctx.projectId()}`,
     (): WorkspaceSession => ({
       tabs: ctx.tabs.value
-        .filter((tab) => !tab.localFile)
+        // A historical snapshot is tied to its temporary sidebar section, which is not restored.
+        .filter((tab) => !tab.localFile && !tab.rev)
         .map((tab) => ({
           key: tab.key,
           path: tab.path,
           virtual: tab.virtual,
           params: tab.params,
           commit: tab.commit,
+          rev: tab.rev,
           external: tab.external,
           staged: tab.staged,
           markdownMode: tab.markdownMode,
@@ -82,6 +84,7 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
           ? await ctx.openCommitFile(tab.commit, tab.path, false)
           : await ctx.openFile(tab.path, undefined, undefined, tab.staged, {
               external: tab.external,
+              rev: tab.rev,
               preview: false,
             });
         // A project switch or a user opening another file takes precedence over restoration.

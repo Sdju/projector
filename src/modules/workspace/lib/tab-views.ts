@@ -52,6 +52,7 @@ export interface TabHost {
   openFile(path: string): void;
   openTab(id: string, params?: TabParams, options?: { preview?: boolean }): void;
   openCommitDiff(hash: string, path: string): void;
+  openCommitTree(hash: string): void;
   /** Runs an editor command of this workspace (a button of a view is a command too). */
   run(command: string, args?: unknown): void;
 }
@@ -143,6 +144,7 @@ export function baseTabViews(): TabViews {
         hash: tab.params?.hash,
         onOpenCommit: (hash: string) => host.openTab("commit", { hash }),
         onOpenDiff: host.openCommitDiff,
+        onOpenTree: host.openCommitTree,
         onSubject: (text: string) => (tab.content = text),
       }),
     },

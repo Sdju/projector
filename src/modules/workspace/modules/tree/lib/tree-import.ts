@@ -56,6 +56,7 @@ export function useTreeImport(
   function accepts(data: DataTransfer | null) {
     const capabilities = workspaceCapabilities(props.projectId);
     return (
+      !props.readonly &&
       capabilities.write &&
       capabilities.externalFiles &&
       isFileDrag(data) &&
@@ -218,9 +219,12 @@ export function useTreeImport(
     },
     enabled: () => {
       const capabilities = workspaceCapabilities(props.projectId);
-      return capabilities.write && capabilities.externalFiles && !drag.busy.value;
+      return (
+        !props.readonly && capabilities.write && capabilities.externalFiles && !drag.busy.value
+      );
     },
     run: async (value?: unknown) => {
+      if (props.readonly) throw new Error("Историческое дерево доступно только для чтения");
       const args = commandArgs(value);
       if (
         !Array.isArray(args.paths) ||

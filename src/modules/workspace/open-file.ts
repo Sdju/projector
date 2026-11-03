@@ -10,6 +10,8 @@ export interface OpenFile extends FileContent {
   commit?: string;
   /** Короткий хеш родителя в diff коммита; пусто у корневого коммита. */
   parent?: string;
+  /** Снимок файла на этом коммите: вкладка только для чтения. */
+  rev?: string;
   external?: boolean;
   image?: string;
   localFile?: File;
@@ -35,11 +37,14 @@ export interface OpenFileOptions {
   reload?: boolean;
   external?: boolean;
   preview?: boolean;
+  /** Read the file from a commit instead of the working copy. */
+  rev?: string;
 }
 
 /** Diff against the Git index shows the real file on the right, so it can be edited in place. */
 export const isEditable = (file: OpenFile) =>
   !file.readonly &&
+  !file.rev &&
   !file.binary &&
   !file.virtual &&
   !file.external &&
@@ -47,12 +52,14 @@ export const isEditable = (file: OpenFile) =>
   !file.archive &&
   (file.original === undefined || file.staged === false);
 export const isMarkdown = (file: OpenFile) =>
+  !file.rev &&
   !file.virtual &&
   !file.binary &&
   !file.image &&
   file.original === undefined &&
   /\.(?:md|markdown)$/i.test(file.path);
 export const isHtml = (file: OpenFile) =>
+  !file.rev &&
   !file.virtual &&
   !file.binary &&
   !file.image &&

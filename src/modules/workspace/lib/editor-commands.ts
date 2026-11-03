@@ -34,7 +34,7 @@ export interface EditorCommandContext {
   onOpenTab?: () => void;
   toggleMarkdownSource: () => void;
   /** Показывает файл в дереве: открывает сайдбар и раздел «Файлы». */
-  revealInTree: (path: string) => void;
+  revealInTree: (path: string, rev?: string) => void;
   tabTypes: TabRegistry;
 }
 
@@ -110,7 +110,7 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
     "ide.editor.file.reveal",
     "Показать в дереве файлов",
     (args) => {
-      ctx.revealInTree(commandFile(args)!.path);
+      ctx.revealInTree(commandFile(args)!.path, commandFile(args)!.rev);
     },
     (args) => !!commandFile(args) && !commandFile(args)!.external,
   );

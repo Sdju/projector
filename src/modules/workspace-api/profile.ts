@@ -14,7 +14,8 @@ export type WorkspaceCapability =
   | "agent"
   | "settings"
   | "persist"
-  | "externalFiles";
+  | "externalFiles"
+  | "historyTree";
 export type WorkspaceCapabilities = Record<WorkspaceCapability, boolean>;
 
 export type WorkspaceParams = Record<string, string>;
@@ -40,6 +41,8 @@ export interface FilesProvider extends ReadProvider {
   assetUrl(path: string, external?: boolean): string;
   /** Address that serves the file as part of a site (relative links resolve); absent when it cannot. */
   siteUrl?(path: string): string;
+  /** Reads a committed tree and its files read-only (`tree`/`file` with `rev`). */
+  historyTree?: boolean;
   /** Present only when the files can change. */
   write?(endpoint: FileWrite, body: unknown, failure?: string): Promise<unknown>;
   /** Loads one browser file (or an empty folder when `body` is absent) into the project; present only where uploads are possible. */
@@ -104,6 +107,7 @@ export function profileCapabilities(profile: WorkspaceProfile): Readonly<Workspa
       pulls: !!profile.providers.pulls,
       discussions: !!profile.providers.discussions,
       pipelines: !!profile.providers.pipelines,
+      historyTree: !!profile.providers.files.historyTree,
     });
     capabilityCache.set(profile, capabilities);
   }

@@ -22,6 +22,7 @@ import IconRefresh from "~icons/lucide/refresh-cw";
 const props = defineProps<{
   history: GitHistoryState;
   allBranches?: boolean;
+  historyTree?: boolean;
   commands: ReturnType<typeof useCommandScope>;
   /** Растёт при каждом обновлении Git: открытая история перечитывается следом. */
   revision: number;
@@ -30,6 +31,7 @@ const emit = defineEmits<{
   openCommit: [hash: string];
   openDiff: [hash: string, path: string, pinned?: boolean];
   openFile: [path: string];
+  openTree: [hash: string];
 }>();
 const target = defineModel<{ hash: string; path: string }>("target", {
   default: () => ({ hash: "", path: "" }),
@@ -129,6 +131,14 @@ register(
   hashHelp,
 );
 register(
+  "ide.git.commit.openTree",
+  "Файлы коммита",
+  "Показывает дерево файлов на момент коммита в боковой панели рядом с Git.",
+  (value) => emit("openTree", hashArg(value)),
+  hashHelp,
+  () => !!props.historyTree,
+);
+register(
   "ide.git.commit.openDiff",
   "Открыть изменения файла в коммите",
   "Открывает diff файла: родитель коммита → коммит.",
@@ -154,10 +164,15 @@ const menuItems = computed<ContextMenuItem[]>(() => {
   const args = { ...target.value };
   const { item } = props.commands;
   return args.path
-    ? [item("ide.git.commit.openDiff", args), item("ide.git.commit.openFile", args)]
+    ? [
+        item("ide.git.commit.openDiff", args),
+        item("ide.git.commit.openFile", args),
+        ...(props.historyTree ? [item("ide.git.commit.openTree", args)] : []),
+      ]
     : [
         item("ide.git.commit.toggle", args),
         item("ide.git.commit.open", args),
+        ...(props.historyTree ? [item("ide.git.commit.openTree", args)] : []),
         item("ide.git.commit.copyHash", args, { separator: true }),
       ];
 });

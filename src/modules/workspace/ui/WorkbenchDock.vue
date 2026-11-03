@@ -74,7 +74,9 @@ const hostOf = (key: string) => props.panelHosts.hosts[key] ?? null;
         @change="fileOf(id)!.draft = $event"
         @save="files.saveFile(fileOf(id))"
         @mode="fileOf(id)!.markdownMode = $event"
-        @open="files.openFile($event)"
+        @open="
+          (path) => files.openFile(path, undefined, undefined, undefined, { rev: fileOf(id)?.rev })
+        "
         @reload="files.reloadFromDisk(fileOf(id)!)"
         @keep="files.keepMine(fileOf(id)!)"
       />

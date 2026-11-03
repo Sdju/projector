@@ -42,7 +42,10 @@ const MIN_FOCUS_GAP_MS = 5000;
  * удалили или переименовали снаружи. Страховка от потерянных событий — возврат фокуса в окно
  * и переподключение потока событий.
  */
-export function useDirectoryWatch(props: { projectId: string; path: string }, reload: () => void) {
+export function useDirectoryWatch(
+  props: { projectId: string; path: string; rev?: string },
+  reload: () => void,
+) {
   let release: (() => void) | undefined;
   let unsubscribe: (() => void) | undefined;
   let lastFocus = 0;
@@ -64,6 +67,7 @@ export function useDirectoryWatch(props: { projectId: string; path: string }, re
     notify(null, message, "error", 10000);
   }
   onMounted(() => {
+    if (props.rev) return;
     if (workspaceWatchable(props.projectId)) {
       release = track(props.projectId, props.path);
       unsubscribe = subscribeWorkspace(props.projectId, {

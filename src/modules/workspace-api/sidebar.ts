@@ -10,6 +10,16 @@ export interface SidebarType {
   requires?: string;
   /** IDE command that opens the section; the button runs it instead of just selecting. */
   command?: string;
+  /** Section this one belongs to; grouped children sit next to their parent icon. */
+  group?: string;
+  /** View kind that draws the section; defaults to its id. */
+  kind?: string;
+  /** Parameters of a dynamic section instance (a commit tree, an opened request). */
+  params?: Record<string, unknown>;
+  /** A temporary section can be closed from the sidebar. */
+  closable?: boolean;
+  /** Short note about the source shown above the panel when the section is temporary. */
+  source?: string;
 }
 
 export interface SidebarRegistry {
@@ -32,4 +42,40 @@ export function createSidebarRegistry(
     list: () => [...types.values()],
   };
   return registry;
+}
+
+/** A registry with sections that appear at runtime (a commit tree, an opened request). */
+export function extendSidebarRegistry(
+  base: SidebarRegistry,
+  extra: () => readonly SidebarType[],
+): SidebarRegistry {
+  return {
+    has: (id) => base.has(id) || extra().some((type) => type.id === id),
+    get: (id) => extra().find((type) => type.id === id) ?? base.get(id),
+    list: () => [...base.list(), ...extra()],
+  };
+}
+
+/** Parents stay in place; children follow their parent, even when they were appended later. */
+export function groupSidebar<T extends { id: string; group?: string }>(items: readonly T[]): T[][] {
+  const ids = new Set(items.map((item) => item.id));
+  const groups: T[][] = [];
+  const byId = new Map<string, T[]>();
+  for (const item of items) {
+    if (item.group && ids.has(item.group)) continue;
+    const group = [item];
+    groups.push(group);
+    byId.set(item.id, group);
+  }
+  for (const item of items) {
+    if (!item.group || !ids.has(item.group)) continue;
+    const parent = byId.get(item.group);
+    if (parent) parent.push(item);
+    else {
+      const group = [item];
+      groups.push(group);
+      byId.set(item.id, group);
+    }
+  }
+  return groups;
 }
