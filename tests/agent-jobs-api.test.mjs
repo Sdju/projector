@@ -287,7 +287,8 @@ test("a job in an isolated copy works there and can be stopped", async () => {
   delete contended.worktreeCleared;
   await storage.saveJob(contended);
   expect((await request(`/api/agent/jobs/${job.id}/worktree/merge`, "POST", {})).status).toBe(409);
-  expect(await readFile(join(next.cwd, "a.txt"), "utf8")).toBe("1\n");
+  // A Windows checkout of the copy can convert line endings, so compare the text itself.
+  expect((await readFile(join(next.cwd, "a.txt"), "utf8")).replace(/\r\n/g, "\n")).toBe("1\n");
   await request(`/api/agent/jobs/${next.id}/stop`, "POST", {});
   await until(
     async () =>

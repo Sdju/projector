@@ -191,7 +191,10 @@ describe("background agent jobs", () => {
       { role: "user", content: "second" },
       { role: "assistant", content: "answer to second" },
     ]);
-    const saved = await store.loadJob(job.id);
+    const saved = await until(async () => {
+      const found = await store.loadJob(job.id);
+      return found?.history?.length === 6 ? found : undefined;
+    });
     expect(saved.history).toHaveLength(6);
     expect((await jobs.readJob(job.id)).job.history).toBeUndefined();
     expect((await jobs.listJobs("p1")).find((item) => item.id === job.id).history).toBeUndefined();
