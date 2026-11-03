@@ -18,7 +18,13 @@ export {
   browseGithubAsset,
   browseGithubCommitAsset,
 } from "./browser.ts";
-export { browseGithubLog, browseGithubCommit, browseGithubComparison } from "./history.ts";
+export {
+  browseGithubLog,
+  browseGithubCommit,
+  browseGithubComparison,
+  browseGithubCompareChanges,
+  browseGithubCompareFile,
+} from "./history.ts";
 export { browseGithubDirectories } from "./navigation.ts";
 export { browseGithubIssue, browseGithubIssues } from "./issues.ts";
 export { browseGithubDiscussion, browseGithubDiscussions } from "./discussions.ts";

@@ -709,3 +709,68 @@ test("GitHub discussions need a token, page by cursor and nest replies under com
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("GitHub comparison reads changed paths and both file sides", async () => {
+  const root = await mkdtemp(join(tmpdir(), "projector-gh-compare-"));
+  process.env.XDG_DATA_HOME = root;
+  const api = await import("../server/modules/github/index.ts");
+  const from = "a".repeat(40);
+  const to = "b".repeat(40);
+  const tree = "c".repeat(40);
+  const blob = "d".repeat(40);
+  const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (address) => {
+    const url = new URL(address);
+    if (url.pathname.includes("/compare/"))
+      return Response.json({
+        status: "ahead",
+        files: [
+          { filename: "README.md", status: "modified", additions: 2, deletions: 1 },
+          {
+            filename: "renamed.md",
+            previous_filename: "old.md",
+            status: "renamed",
+            additions: 0,
+            deletions: 0,
+          },
+          { filename: "gone.md", status: "removed", additions: 0, deletions: 4 },
+          { filename: "same.md", status: "unchanged", additions: 0, deletions: 0 },
+        ],
+      });
+    if (url.pathname.includes("/git/commits/")) return Response.json({ tree: { sha: tree } });
+    if (url.pathname.includes("/git/trees/"))
+      return Response.json({
+        tree: [
+          {
+            path: "README.md",
+            type: "blob",
+            mode: "100644",
+            sha: blob,
+            size: 7,
+          },
+        ],
+      });
+    return Response.json({
+      encoding: "base64",
+      size: 7,
+      content: Buffer.from("# Hello").toString("base64"),
+    });
+  });
+  try {
+    const changes = await api.browseGithubCompareChanges("octocat/repo", from, to);
+    expect(changes.truncated).toBe(false);
+    expect(changes.changes.map((change) => [change.path, change.kind])).toStrictEqual([
+      ["README.md", "modified"],
+      ["renamed.md", "renamed"],
+      ["gone.md", "deleted"],
+    ]);
+    expect(changes.changes[1].originalPath).toBe("old.md");
+    expect(await api.browseGithubCompareFile("octocat/repo", from, to, "README.md")).toStrictEqual({
+      path: "README.md",
+      original: "# Hello",
+      modified: "# Hello",
+    });
+  } finally {
+    fetch.mockRestore();
+    await rm(root, { recursive: true, force: true });
+  }
+});

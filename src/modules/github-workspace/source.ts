@@ -233,6 +233,7 @@ export function createGithubWorkspaceProfile(
   };
   const files: WorkspaceProfile["providers"]["files"] = {
     snapshots: true,
+    compare: true,
     async refresh() {
       const next = await api.readRepository(repository, ref);
       directories.clear();
@@ -252,6 +253,10 @@ export function createGithubWorkspaceProfile(
       const path = params.path || "";
       if (action === "root")
         return { root: formatProjectRef({ kind: "github", repository: snapshot.fullName }) };
+      if (action === "changes" || action === "compare-file") {
+        const name = action === "changes" ? "compare-changes" : "compare-file";
+        return (api.readGit ?? readGit)(name, { ...params, repository }, signal);
+      }
       if (action === "tree") {
         const entries: FileEntry[] = (await directory(snapshot, path, signal)).map((entry) => ({
           name: entry.name,

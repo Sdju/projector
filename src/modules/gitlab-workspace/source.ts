@@ -277,6 +277,7 @@ export function createGitlabWorkspaceProfile(
   };
   const files: WorkspaceProfile["providers"]["files"] = {
     snapshots: true,
+    compare: true,
     async refresh() {
       const next = await api.readRepository(repository, ref);
       directories.clear();
@@ -304,6 +305,10 @@ export function createGitlabWorkspaceProfile(
       const commit = params.rev || snapshot.commit;
       const folder = params.path || "";
       if (action === "root") return { root: formatProjectRef({ kind: "gitlab", instance, path }) };
+      if (action === "changes" || action === "compare-file") {
+        const name = action === "changes" ? "compare-changes" : "compare-file";
+        return (api.readGit ?? readGit)(name, { ...params, repository }, signal);
+      }
       if (action === "tree") {
         const entries: FileEntry[] = (await directory(commit, folder, signal)).map((entry) => ({
           name: entry.name,

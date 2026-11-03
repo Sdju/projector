@@ -21,6 +21,8 @@ import {
   browseGithubLog,
   browseGithubCommit,
   browseGithubComparison,
+  browseGithubCompareChanges,
+  browseGithubCompareFile,
   browseGithubIssues,
   browseGithubIssue,
   browseGithubPulls,
@@ -48,6 +50,8 @@ import {
   browseGitlabLog,
   browseGitlabCommit,
   browseGitlabComparison,
+  browseGitlabCompareChanges,
+  browseGitlabCompareFile,
   browseGitlabIssues,
   browseGitlabIssue,
   browseGitlabMergeRequests,
@@ -127,6 +131,28 @@ export async function handleIntegrationsActions({
         json(res, 200, await browseGithubLog(repository, Object.fromEntries(url.searchParams)));
       else if (path.endsWith("/commit"))
         json(res, 200, await browseGithubCommit(repository, url.searchParams.get("hash") || ""));
+      else if (path.endsWith("/compare-changes"))
+        json(
+          res,
+          200,
+          await browseGithubCompareChanges(
+            repository,
+            url.searchParams.get("from") || "",
+            url.searchParams.get("to") || "",
+          ),
+        );
+      else if (path.endsWith("/compare-file"))
+        json(
+          res,
+          200,
+          await browseGithubCompareFile(
+            repository,
+            url.searchParams.get("from") || "",
+            url.searchParams.get("to") || "",
+            url.searchParams.get("path") || "",
+            url.searchParams.get("originalPath") || undefined,
+          ),
+        );
       else if (path.endsWith("/commit-diff"))
         json(
           res,
@@ -220,6 +246,28 @@ export async function handleIntegrationsActions({
           res,
           200,
           await browseGitlabMergeRequestFiles(repository, Number(url.searchParams.get("number"))),
+        );
+      else if (path.endsWith("/compare-changes"))
+        json(
+          res,
+          200,
+          await browseGitlabCompareChanges(
+            repository,
+            url.searchParams.get("from") || "",
+            url.searchParams.get("to") || "",
+          ),
+        );
+      else if (path.endsWith("/compare-file"))
+        json(
+          res,
+          200,
+          await browseGitlabCompareFile(
+            repository,
+            url.searchParams.get("from") || "",
+            url.searchParams.get("to") || "",
+            url.searchParams.get("path") || "",
+            url.searchParams.get("originalPath") || undefined,
+          ),
         );
       else if (path === "/api/integrations/gitlab/browse/merge-request-diff")
         json(

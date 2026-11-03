@@ -516,3 +516,61 @@ test("GitLab search errors stay explicit and API failures keep their status", as
     message: /Превышен лимит GitLab/,
   });
 });
+
+test("GitLab comparison reads changed paths and both file sides", async () => {
+  await setup();
+  mockFetch((address) => {
+    const path = apiPath(address);
+    const url = new URL(address);
+    if (path.includes("/repository/compare"))
+      return Response.json({
+        diffs: [
+          { old_path: "a.txt", new_path: "a.txt", diff: "@@ -1 +1,2 @@\n-a\n+b\n+c\n" },
+          { old_path: "old.txt", new_path: "new.txt", renamed_file: true, diff: "" },
+          { old_path: "gone.txt", new_path: "gone.txt", deleted_file: true, diff: "" },
+        ],
+      });
+    if (path.includes("/repository/files/")) {
+      if (
+        path.includes(encodeURIComponent("gone.txt")) &&
+        (url.searchParams.get("ref") || "").startsWith("b")
+      )
+        return Response.json({ message: "404 File Not Found" }, { status: 404 });
+      const content = (url.searchParams.get("ref") || "").startsWith("a") ? "old\n" : "new\n";
+      return Response.json({
+        encoding: "base64",
+        size: Buffer.byteLength(content),
+        content: Buffer.from(content).toString("base64"),
+      });
+    }
+    return Response.json({});
+  });
+  const { browseGitlabCompareChanges, browseGitlabCompareFile } =
+    await import("../server/modules/gitlab/index.ts");
+  const repository = "gitlab.com/group/project";
+  const from = "a".repeat(40);
+  const to = "b".repeat(40);
+  const changes = await browseGitlabCompareChanges(repository, from, to);
+  expect(changes.truncated).toBe(false);
+  expect(changes.changes.map((change) => [change.path, change.kind])).toStrictEqual([
+    ["a.txt", "modified"],
+    ["new.txt", "renamed"],
+    ["gone.txt", "deleted"],
+  ]);
+  expect(changes.changes[0]).toMatchObject({ additions: 2, deletions: 1 });
+  expect(await browseGitlabCompareFile(repository, from, to, "a.txt")).toStrictEqual({
+    path: "a.txt",
+    original: "old\n",
+    modified: "new\n",
+  });
+  expect(await browseGitlabCompareFile(repository, from, to, "gone.txt")).toStrictEqual({
+    path: "gone.txt",
+    original: "old\n",
+    modified: "",
+  });
+  expect(await browseGitlabCompareFile(repository, from, to, "new.txt", "old.txt")).toStrictEqual({
+    path: "new.txt",
+    original: "old\n",
+    modified: "new\n",
+  });
+});

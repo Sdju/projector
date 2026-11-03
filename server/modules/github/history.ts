@@ -1,6 +1,9 @@
 import { githubReader, browseGithubFile, browseGithubTree } from "./browser.ts";
 import { HttpError } from "../http/index.ts";
 import type {
+  FileChange,
+  FileChangeList,
+  FileSides,
   GitCommit,
   GitCommitDetail,
   GitLog,
@@ -140,6 +143,99 @@ export async function browseGithubCommit(
       .sort((a, b) => a.path.localeCompare(b.path)),
   };
 }
+/** Text of one path at a commit; `undefined` means the path does not exist there. */
+async function githubTextAt(repository: string, ref: string, path: string) {
+  if (
+    !path ||
+    path.includes("\\") ||
+    path.includes("\0") ||
+    path.split("/").some((part) => !part || part === "." || part === "..")
+  )
+    throw new HttpError(400, "Неверный путь файла");
+  const get = await githubReader(repository);
+  const info = await get<{ tree: { sha: string } }>(`/git/commits/${hash(ref)}`);
+  let sha = info.tree.sha;
+  const parts = path.split("/");
+  for (const [index, name] of parts.entries()) {
+    const directory = await browseGithubTree(repository, sha);
+    if (directory.truncated) throw new HttpError(413, "GitHub вернул неполное дерево коммита");
+    const entry = directory.entries.find((item) => item.name === name);
+    if (!entry) return undefined;
+    if (index < parts.length - 1 ? entry.type !== "tree" : entry.type !== "blob")
+      throw new HttpError(415, "Этот объект нельзя сравнить как текст");
+    sha = entry.sha;
+  }
+  const blob = await browseGithubFile(repository, sha, path);
+  if (blob.binary) throw new HttpError(415, "Бинарный файл нельзя сравнить как текст");
+  return blob.content;
+}
+
+function compareStatus(status: string): FileChange["kind"] | undefined {
+  if (status === "added") return "added";
+  if (status === "removed") return "deleted";
+  if (status === "renamed") return "renamed";
+  if (status === "copied") return "copied";
+  if (status === "unchanged") return undefined;
+  return "modified";
+}
+
+interface RemoteCompareFile {
+  filename: string;
+  previous_filename?: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  patch?: string;
+  binary?: boolean;
+}
+
+/** Changed files of two commits through the host comparison API (GitHub caps the list at 300). */
+export async function browseGithubCompareChanges(
+  repository: string,
+  from: string,
+  to: string,
+): Promise<FileChangeList> {
+  const get = await githubReader(repository);
+  const data = await get<{ status: string; files?: RemoteCompareFile[] }>(
+    `/compare/${hash(from)}...${hash(to)}`,
+  );
+  const files = data.files ?? [];
+  const changes: FileChange[] = [];
+  for (const file of files) {
+    const kind = compareStatus(file.status);
+    if (!kind) continue;
+    changes.push({
+      path: file.filename,
+      kind,
+      ...(file.previous_filename ? { originalPath: file.previous_filename } : {}),
+      additions: file.additions,
+      deletions: file.deletions,
+      ...(file.binary ? { binary: true } : {}),
+    });
+  }
+  return {
+    changes,
+    // GitHub omits `files` for very large comparisons; the list is capped at 300 otherwise.
+    truncated: (!data.files && data.status !== "identical") || files.length >= 300,
+  };
+}
+
+export async function browseGithubCompareFile(
+  repository: string,
+  from: string,
+  to: string,
+  path: string,
+  originalPath = path,
+): Promise<FileSides> {
+  const [original, modified] = await Promise.all([
+    githubTextAt(repository, from, originalPath),
+    githubTextAt(repository, to, path),
+  ]);
+  if (original === undefined && modified === undefined)
+    throw new HttpError(404, "Файл не найден в этом сравнении");
+  return { path, original: original ?? "", modified: modified ?? "" };
+}
+
 export async function browseGithubComparison(
   repository: string,
   value: string,
@@ -155,25 +251,12 @@ export async function browseGithubComparison(
   const detail = await browseGithubCommit(repository, value);
   const file = detail.files.find((item) => item.path === path);
   if (!file) throw new HttpError(404, "Файл не входит в этот коммит");
-  const get = await githubReader(repository);
-  async function text(ref: string, filename: string) {
-    const info = await get<{ tree: { sha: string } }>(`/git/commits/${ref}`);
-    let sha = info.tree.sha;
-    const parts = filename.split("/");
-    for (const [index, name] of parts.entries()) {
-      const directory = await browseGithubTree(repository, sha);
-      if (directory.truncated) throw new HttpError(413, "GitHub вернул неполное дерево коммита");
-      const entry = directory.entries.find((item) => item.name === name);
-      if (!entry) throw new HttpError(404, "Файл не найден в коммите");
-      if (index < parts.length - 1 ? entry.type !== "tree" : entry.type !== "blob")
-        throw new HttpError(415, "Этот объект нельзя сравнить как текст");
-      sha = entry.sha;
-    }
-    const blob = await browseGithubFile(repository, sha, filename);
-    if (blob.binary) throw new HttpError(415, "Бинарный файл нельзя сравнить как текст");
-    return blob.content;
-  }
   const parent = detail.parents[0];
+  const text = async (ref: string, filename: string) => {
+    const value = await githubTextAt(repository, ref, filename);
+    if (value === undefined) throw new HttpError(404, "Файл не найден в коммите");
+    return value;
+  };
   const [original, modified] = await Promise.all([
     !parent || file.status === "A" ? "" : text(parent, file.originalPath || path),
     file.status === "D" ? "" : text(detail.hash, path),

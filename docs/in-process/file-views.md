@@ -21,14 +21,14 @@
 - `OpenFile.scope` заменил `OpenFile.rev`; ключ вкладки собирает `fileTabKey`. Live-ключи (`path:file`, `path:index`, `path:working`, `external:...`) сохранены, чтобы старые сессии открывались. Схема сессии понимает и новый `scope`, и старый `rev`.
 - Возможность профиля `snapshots` заменила `historyTree`. Локальный профиль читает `tree`/`file` с `rev`; GitHub и GitLab читают дерево и файлы по произвольному sha и кешируют каталоги по снимку (`sha:path`), а не по изменяемому `metadata`.
 - Статусы Git, коммитов и merge request сведены к `FileChange` (`kind`: added, modified, deleted, renamed, copied, conflict). `fileChangeDecorations` строит пометки дерева, `ScopeTreeSection` и панель изменений MR используют одну нормализацию.
-- Сравнение локальных снимков подключено: `changes?from&to` и `compare-file?from&to&path&originalPath`, общий `ChangesTree` для панели MR и нового раздела `changes`, вход из обзора коммита (`ide.git.commit.openChanges`, первый родитель → коммит). `FileScope.compare` открывает diff-вкладки с двумя сторонами, подписи — короткие хеши.
+- Сравнение локальных и удалённых снимков подключено: `changes?from&to` и `compare-file?from&to&path&originalPath`, общий `ChangesTree` для панели MR и нового раздела `changes`, вход из обзора коммита (`ide.git.commit.openChanges`, первый родитель → коммит). `FileScope.compare` открывает diff-вкладки с двумя сторонами, подписи — короткие хеши. GitHub использует compare API (лимит 300 файлов), GitLab — `repository/compare`; обе стороны файла читаются по ref.
 - Временные разделы и их read-only-вкладки сохраняются в сессии: scope сериализуется, раздел восстанавливается из параметров, вкладки снимка — только вместе со своим разделом.
 - Вложения снимка: `workspaceScopeAssetUrl`, локальный `asset?rev`, GitHub `asset?commit`, GitLab `asset?sha`; растровые изображения и SVG из коммита открываются своими просмотрщиками, Markdown рендерится с картинками и ссылками того же снимка.
 - Серверные и браузерные тесты дерева, `FileScope`, удалённого чтения по коммиту, сравнения снимков и группировки разделов.
 
 ## Текущие границы
 
-- `FileScope.compare` работает локально; GitHub/GitLab ещё не объявляют `compare`, панель MR пока читает `pull-files`, хотя внутри уже переведена на `FileChange` и общий `ChangesTree`.
+- Панель MR пока читает `pull-files`: у merge request есть `diffRefs`, но локальная копия GitHub-проекта может не знать удалённые хеши, а GitLab compare теряет часть MR-метаданных. UI уже использует общий `ChangesTree`; переход на compare scope требует отдельного сигнала провайдера, а не проверки записи проекта.
 - HTML, `siteUrl` и архивы на снимке не поддерживаются: HTML открывается как код, `siteUrl` остаётся только для live. Compare-снимок остаётся текстовым diff без Markdown-рендера и картинок.
 - Поиск внутри снимка (`git grep <rev>`) не сделан.
 - Полного union-дерева с неизменёнными и удалёнными узлами нет. Для сравнения выбран список изменённых файлов.
@@ -59,7 +59,7 @@ export type FileScope =
 
 ## Следующие этапы
 
-1. **Сравнение.** Локальный транспорт `changes`/`compare-file` готов, diff коммита открывается через compare scope. Дальше — `pull-files`/`pull-diff` за провайдера, сравнение GitHub/GitLab по sha и удалённый `compare`; остаётся список изменённых файлов, не union-дерево.
+1. **Merge request.** `changes`/`compare-file` готовы для локальных и удалённых снимков. Дальше — сигнал провайдера, что MR можно читать как compare (или адаптер `pull-*` за тем же `FileChangeList`), без эвристик по `write`.
 2. **Просмотрщики.** Markdown, изображения и SVG на коммите готовы. Осталось решить HTML/`siteUrl` и архивы: явно отключить с подписью или поддержать отдельно.
 3. **Поиск и удалённые сравнения.** `git grep <rev>`, сравнение GitHub/GitLab по sha, выбор ревизии. Отдельно решить про индекс.
 
