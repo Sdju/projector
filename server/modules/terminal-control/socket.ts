@@ -32,8 +32,13 @@ export function attachTerminalControlServer(
     }
     client.send(JSON.stringify(message));
   };
-  const snapshot = (client: WebSocket, projectId: string) =>
-    send(client, { type: "sessions", sessions: handlers.sessions(projectId) });
+  // The runtime throws between generations (a failed reload or a config restart): an open socket
+  // keeps its last snapshot instead of crashing the process with an unhandled throw.
+  const snapshot = (client: WebSocket, projectId: string) => {
+    try {
+      send(client, { type: "sessions", sessions: handlers.sessions(projectId) });
+    } catch {}
+  };
   const dirty = new Set<string>();
   const unsubscribe = onTerminalSessionsChanged((projectId) => {
     if (dirty.has(projectId)) return;

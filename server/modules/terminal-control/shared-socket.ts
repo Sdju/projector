@@ -159,8 +159,19 @@ function bind(socket: WebSocket, kind: "control" | "data", handlers: TerminalCon
     if ([...channels.values()].some((channel) => channel.queue.length))
       pumping = setTimeout(pump, socket.bufferedAmount > 256 * 1024 ? 10 : 1);
   };
-  const snapshot = (peer: Channel) =>
-    peer.send(JSON.stringify({ type: "sessions", sessions: handlers.sessions(peer.projectId) }));
+  // The runtime throws between generations (a failed reload or a config restart): a socket that is
+  // still open keeps its last snapshot instead of crashing the process with an unhandled throw.
+  const sessions = (projectId: string) => {
+    try {
+      return handlers.sessions(projectId);
+    } catch {
+      return undefined;
+    }
+  };
+  const snapshot = (peer: Channel) => {
+    const current = sessions(peer.projectId);
+    if (current) peer.send(JSON.stringify({ type: "sessions", sessions: current }));
+  };
   const dirty = new Set<string>();
   const unsubscribe =
     kind === "control"
@@ -172,10 +183,9 @@ function bind(socket: WebSocket, kind: "control" | "data", handlers: TerminalCon
             // Compute process activity once per project, not once per browser subscriber.
             const peers = [...channels.values()].filter((peer) => peer.projectId === projectId);
             if (!peers.length) return;
-            const data = JSON.stringify({
-              type: "sessions",
-              sessions: handlers.sessions(projectId),
-            });
+            const current = sessions(projectId);
+            if (!current) return;
+            const data = JSON.stringify({ type: "sessions", sessions: current });
             for (const peer of peers) peer.send(data);
           });
         })
