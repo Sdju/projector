@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import UiDisclosureSummary from "../../../common/ui/UiDisclosureSummary.vue";
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, inject, nextTick, ref, watch } from "vue";
 import AgentCodeBlock from "./AgentCodeBlock.vue";
+import ImageModal from "../../../common/ui/ImageModal.vue";
 import { formatElapsed, useElapsedClock } from "../lib/elapsed.ts";
 import {
   formatToolInput,
@@ -10,8 +11,11 @@ import {
   parseToolInput,
   toolFilePath,
 } from "../lib/tool-input.ts";
+import { isImageFile, skillName } from "../lib/tool-file.ts";
 import { toolLabel } from "../lib/tool-labels.ts";
 import { lineCount, relativePath, toolVisual } from "../lib/tool-visual.ts";
+import { stripReadLineNumbers } from "@projector/core/modules/agent-read/index.ts";
+import { chatImageSource, chatProjectKey } from "../../chat-images/index.ts";
 import type { AgentToolChip, AgentToolView } from "../model/types.ts";
 import IconChevron from "~icons/lucide/chevron-right";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
@@ -68,11 +72,31 @@ function output(tool: AgentToolChip): {
 }
 
 const visual = computed(() => toolVisual(props.tool.name, props.tool.kind));
+const projectId = inject(chatProjectKey, "");
 const data = computed(() => parseToolInput(props.tool.input ?? ""));
 const path = computed(() => toolFilePath(props.tool.input ?? ""));
 const shownPath = computed(() => relativePath(path.value, props.root));
 const command = computed(() => (typeof data.value?.command === "string" ? data.value.command : ""));
 const written = computed(() => (typeof data.value?.content === "string" ? data.value.content : ""));
+// A read of `SKILL.md` is the skill being loaded: its folder names it in the row.
+const skill = computed(() => skillName(path.value));
+// A picture read by the agent is shown as the picture itself, with the shared zoom viewer.
+const imagePath = computed(() => {
+  if (visual.value !== "read") return "";
+  if (isImageFile(path.value)) return path.value;
+  // Kimi names the media file in the call title; the input may still be missing.
+  const named = /^Reading media:\s*(.+)$/i.exec(props.tool.name)?.[1]?.trim() ?? "";
+  return isImageFile(named) ? named : "";
+});
+const image = computed(() => {
+  const file = imagePath.value;
+  if (!file) return undefined;
+  const src = chatImageSource(file, projectId);
+  return src ? { src, alt: relativePath(file, props.root) || file } : undefined;
+});
+const imageFailed = ref(false);
+watch(image, () => (imageFailed.value = false));
+const preview = ref<{ src: string; alt: string }>();
 
 const view = computed(() => {
   const tool = props.tool;
@@ -80,12 +104,16 @@ const view = computed(() => {
   const raw = tool.input ?? (tool.status === "running" ? tool.detail : "");
   const kind = visual.value;
   const running = tool.status === "running";
+  // A stored result from before the cleaning (or a server that is not reloaded) is numbered too.
+  const shown = !running && kind === "read" ? stripReadLineNumbers(result.text) : result.text;
   return {
-    label: toolLabel(tool.name),
-    hint: path.value ? shownPath.value : command.value || inputHint(raw) || result.hint,
+    label: skill.value ? "Чтение навыка" : toolLabel(tool.name),
+    hint:
+      skill.value ||
+      (path.value ? shownPath.value : command.value || inputHint(raw) || result.hint),
     path: path.value ? shownPath.value : "",
     status: result.status ?? tool.status,
-    result: running ? "" : result.text,
+    result: running ? "" : shown,
     resultHint: running ? "" : result.hint,
     live: running ? (tool.output ?? "") : "",
     input: raw ? formatToolInput(tool.name, raw) : "",
@@ -99,7 +127,9 @@ const view = computed(() => {
       : kind === "write"
         ? `+${lineCount(written.value)}`
         : kind === "read"
-          ? `${lineCount(result.text)} стр.`
+          ? image.value
+            ? ""
+            : `${lineCount(shown)} стр.`
           : kind === "bash"
             ? result.hint
             : "",
@@ -205,14 +235,36 @@ const timeTitle = computed(() =>
             {{ view.path }}
           </button>
         </div>
-        <div class="io-label">{{ view.status === "error" ? "Ошибка" : "Содержимое" }}</div>
-        <AgentCodeBlock
-          :path="path"
-          :text="
-            view.result ||
-            (view.running ? 'Ожидание результата…' : 'Файл пуст или ничего не вернул')
-          "
-        />
+        <template v-if="image && view.status !== 'error'">
+          <div class="io-label">Изображение</div>
+          <button
+            v-if="!imageFailed"
+            type="button"
+            class="picture"
+            :aria-label="`Открыть изображение: ${image.alt}`"
+            @click="preview = image"
+          >
+            <img
+              :src="image.src"
+              :alt="image.alt"
+              loading="lazy"
+              decoding="async"
+              referrerpolicy="no-referrer"
+              @error="imageFailed = true"
+            />
+          </button>
+          <p v-else class="picture-fallback">{{ image.alt }}</p>
+        </template>
+        <template v-else>
+          <div class="io-label">{{ view.status === "error" ? "Ошибка" : "Содержимое" }}</div>
+          <AgentCodeBlock
+            :path="path"
+            :text="
+              view.result ||
+              (view.running ? 'Ожидание результата…' : 'Файл пуст или ничего не вернул')
+            "
+          />
+        </template>
       </template>
 
       <template v-else-if="visual === 'write'">
@@ -276,6 +328,8 @@ const timeTitle = computed(() =>
       />
     </div>
   </details>
+
+  <ImageModal v-if="preview" :src="preview.src" :alt="preview.alt" @close="preview = undefined" />
 </template>
 
 <style scoped>
@@ -352,6 +406,32 @@ svg {
 .file:hover {
   color: var(--text);
   text-decoration: underline;
+}
+.picture {
+  display: block;
+  max-width: min(100%, 720px);
+  margin: var(--sp-1) 0 var(--sp-2);
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-md);
+  background: none;
+  cursor: zoom-in;
+}
+.picture img {
+  display: block;
+  width: 100%;
+  max-height: min(70vh, 720px);
+  padding: var(--sp-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  object-fit: contain;
+  box-sizing: border-box;
+}
+.picture-fallback {
+  margin: var(--sp-1) 0 var(--sp-2);
+  color: var(--muted);
+  overflow-wrap: anywhere;
 }
 .nested {
   margin: var(--sp-1) 0 0 var(--sp-2);

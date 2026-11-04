@@ -1,10 +1,16 @@
 import { expect, test } from "vite-plus/test";
 import { applyAgentEvent } from "../packages/client/modules/agent/model/turn-events.ts";
+import { isImageFile, skillName } from "../packages/client/modules/agent/lib/tool-file.ts";
+import { inputHint } from "../packages/client/modules/agent/lib/tool-input.ts";
+import { toolLabel } from "../packages/client/modules/agent/lib/tool-labels.ts";
 import { toolVisual } from "../packages/client/modules/agent/lib/tool-visual.ts";
+import { stripReadLineNumbers } from "../packages/core/modules/agent-read/index.ts";
 import { codeLanguage } from "../packages/client/modules/agent/lib/code-language.ts";
 
 test("a call is shaped by what it does, not only by its name", () => {
   expect(toolVisual("Read")).toBe("read");
+  expect(toolVisual("ReadMediaFile")).toBe("read");
+  expect(toolVisual("Reading media: /tmp/shot.png", "other")).toBe("read");
   expect(toolVisual("write_file")).toBe("write");
   expect(toolVisual("MultiEdit")).toBe("edit");
   expect(toolVisual("Bash")).toBe("bash");
@@ -16,6 +22,29 @@ test("a call is shaped by what it does, not only by its name", () => {
   expect(toolVisual("cat src/app.ts", "read")).toBe("read");
   expect(toolVisual("Собрать проект", "edit")).toBe("edit");
   expect(toolVisual("mcp__server__tool")).toBe("other");
+});
+
+test("a read picture is known by its name and a skill by its folder", () => {
+  expect(isImageFile("/tmp/shot.png")).toBe(true);
+  expect(isImageFile("assets/logo.SVG?raw=1")).toBe(true);
+  expect(isImageFile("src/app.ts")).toBe(false);
+  expect(skillName("/home/u/.claude/skills/release/SKILL.md")).toBe("release");
+  expect(skillName("skills\\lint\\SKILL.md")).toBe("lint");
+  expect(skillName("src/SKILL.ts")).toBe("");
+  expect(toolLabel("ReadMediaFile")).toBe("Чтение изображения");
+  expect(toolLabel("Reading media: /tmp/shot.png")).toBe("Чтение изображения");
+  expect(toolLabel("use_skill")).toBe("Загрузка навыка");
+  expect(toolLabel("Invoke skill release")).toBe("Загрузка навыка");
+  // The skill a call loads is its own name, not the word "skill".
+  expect(inputHint(JSON.stringify({ skill: "release", args: "1.2" }))).toBe("release");
+  expect(inputHint(JSON.stringify({ name: "release" }))).toBe("release");
+});
+
+test("a numbered file body loses its line numbers, anything else stays", () => {
+  expect(stripReadLineNumbers("1\t# Title\n2\t\n3\tBody")).toBe("# Title\n\nBody");
+  expect(stripReadLineNumbers("7\tfirst\n8\tsecond\n")).toBe("first\nsecond");
+  expect(stripReadLineNumbers("1\tfirst\n3\tsecond")).toBe("1\tfirst\n3\tsecond");
+  expect(stripReadLineNumbers("plain text")).toBe("plain text");
 });
 
 test("a file body is highlighted by the language of its name", () => {

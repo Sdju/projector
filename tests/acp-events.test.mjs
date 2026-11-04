@@ -4,6 +4,7 @@ import {
   createAcpReplayCollector,
 } from "../packages/server/modules/agents/acp/acp-events.ts";
 import { createCodexDialect } from "../packages/server/modules/agents/codex/dialect.ts";
+import { createKimiDialect } from "../packages/server/modules/agents/kimi/dialect.ts";
 import { createOpencodeDialect } from "../packages/server/modules/agents/opencode/dialect.ts";
 
 const delta = (data) => ({
@@ -180,6 +181,49 @@ const readResult = (id, text) => ({
   toolCallId: id,
   status: "completed",
   content: [{ type: "content", content: { type: "text", text } }],
+});
+
+test("kimi read result loses its numbered lines", () => {
+  const events = [];
+  const mapper = createAcpEventMapper(
+    (type, data) => events.push([type, data]),
+    "Kimi",
+    createKimiDialect(),
+  );
+  mapper.handleUpdate("s", {
+    sessionUpdate: "tool_call",
+    toolCallId: "r1",
+    title: "Reading AGENTS.md",
+    kind: "read",
+    status: "in_progress",
+    rawInput: { path: "AGENTS.md" },
+  });
+  mapper.handleUpdate("s", readResult("r1", "1\t# Projector\n2\t\n3\tЛокальный лаунчер\n4\tКонец"));
+  expect(events.at(-1)).toEqual([
+    "tool-result",
+    { id: "r1", name: "Reading AGENTS.md", output: "# Projector\n\nЛокальный лаунчер\nКонец" },
+  ]);
+});
+
+test("kimi leaves text that is not a numbered read untouched", () => {
+  const events = [];
+  const mapper = createAcpEventMapper(
+    (type, data) => events.push([type, data]),
+    "Kimi",
+    createKimiDialect(),
+  );
+  mapper.handleUpdate("s", {
+    sessionUpdate: "tool_call",
+    toolCallId: "b1",
+    title: "Running tests",
+    kind: "execute",
+    status: "in_progress",
+  });
+  mapper.handleUpdate("s", readResult("b1", "1\tnot a file\nplain line"));
+  expect(events.at(-1)).toEqual([
+    "tool-result",
+    { id: "b1", name: "Running tests", output: "1\tnot a file\nplain line" },
+  ]);
 });
 
 test("opencode read result loses its frame and line numbers", () => {

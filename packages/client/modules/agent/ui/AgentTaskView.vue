@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, provide, ref } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import { useElapsedClock } from "../lib/elapsed.ts";
 import type { PlanItem } from "../lib/plan.ts";
 import { taskElapsed, taskStatusLabel, type AgentTaskDetail } from "../lib/task-detail.ts";
 import { toolLabel } from "../lib/tool-labels.ts";
+import { chatProjectKey } from "../../chat-images/index.ts";
 import { useAgentLens } from "../model/lens.ts";
 import { useTaskTurns } from "../model/task-turns.ts";
 import type { AgentBackendId, AgentSelection, QueuedMessage } from "../model/types.ts";
@@ -28,6 +29,9 @@ const props = defineProps<{
   selection?: AgentSelection;
 }>();
 const emit = defineEmits<{ back: []; tab: [] }>();
+
+// Pictures read by the subagent resolve against the project, as in a chat answer.
+provide(chatProjectKey, props.projectId);
 
 const task = computed(() => props.detail.task);
 const now = useElapsedClock();

@@ -1,5 +1,15 @@
 /** Fields the agent usually passes as a short "what" of a call, in the order they are tried. */
-const HINT_KEYS = ["command", "query", "path", "file_path", "filePath", "pattern", "url"] as const;
+const HINT_KEYS = [
+  "command",
+  "query",
+  "path",
+  "file_path",
+  "filePath",
+  "pattern",
+  "url",
+  "skill",
+  "name",
+] as const;
 
 function parse(raw: string): Record<string, unknown> | undefined {
   try {

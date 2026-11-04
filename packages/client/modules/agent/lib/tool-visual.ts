@@ -2,7 +2,16 @@
 export type ToolVisual = "read" | "write" | "edit" | "bash" | "search" | "web" | "task" | "other";
 
 const KINDS: Record<Exclude<ToolVisual, "other">, readonly string[]> = {
-  read: ["read", "read_file", "readfile", "read_file_content"],
+  read: [
+    "read",
+    "read_file",
+    "readfile",
+    "read_file_content",
+    "readmediafile",
+    "read_media_file",
+    "view_image",
+    "viewimage",
+  ],
   write: ["write", "write_file", "writefile", "create_file"],
   edit: ["edit", "multiedit", "edit_file", "apply_patch", "patch"],
   bash: ["bash", "shell", "terminal", "run", "run_command", "execute", "command", "sh"],
@@ -28,9 +37,17 @@ const BY_KIND: Record<string, ToolVisual> = {
   fetch: "web",
 };
 
+/** A title that names the action when neither the name nor the kind does (Kimi's media read). */
+const BY_TITLE: [RegExp, ToolVisual][] = [[/^reading media\b/i, "read"]];
+
 /** The kind of a call by its name; agents disagree on case and separators, the meaning is the same. */
 export function toolVisual(name: string, kind?: string): ToolVisual {
-  return BY_NAME.get(name.toLowerCase()) ?? (kind ? BY_KIND[kind] : undefined) ?? "other";
+  return (
+    BY_NAME.get(name.toLowerCase()) ??
+    (kind ? BY_KIND[kind] : undefined) ??
+    BY_TITLE.find(([pattern]) => pattern.test(name))?.[1] ??
+    "other"
+  );
 }
 
 /** File tools show a path and its content; a command shows its line and live output. */

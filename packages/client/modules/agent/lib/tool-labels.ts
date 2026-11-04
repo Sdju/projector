@@ -2,6 +2,10 @@ export const toolLabels: Record<string, string> = {
   list_commands: "Поиск команд",
   describe_command: "Описание команды",
   execute_command: "Вызов команды",
+  describe_widget: "Описание виджета",
+  use_skill: "Загрузка навыка",
+  Skill: "Загрузка навыка",
+  skill: "Загрузка навыка",
   bash: "Команда",
   shell: "Команда",
   terminal: "Терминал",
@@ -18,6 +22,10 @@ export const toolLabels: Record<string, string> = {
   Read: "Чтение файла",
   read: "Чтение файла",
   read_file: "Чтение файла",
+  ReadMediaFile: "Чтение изображения",
+  read_media_file: "Чтение изображения",
+  view_image: "Чтение изображения",
+  viewimage: "Чтение изображения",
   Edit: "Правка файла",
   edit: "Правка файла",
   edit_file: "Правка файла",
@@ -52,4 +60,8 @@ const lowerLabels = Object.fromEntries(
 );
 
 export const toolLabel = (name: string) =>
-  toolLabels[name] || lowerLabels[name.toLowerCase()] || name;
+  /^(?:invoke|load|use)\s+skill\s+/i.test(name)
+    ? "Загрузка навыка"
+    : /^reading media\b/i.test(name)
+      ? "Чтение изображения"
+      : toolLabels[name] || lowerLabels[name.toLowerCase()] || name;
