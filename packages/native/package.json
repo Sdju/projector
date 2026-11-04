@@ -8,6 +8,6 @@
   },
   "dependencies": {
     "@projector/core": "workspace:*",
-    "@zede/vio": "0.7.1"
+    "@zede/vio": "catalog:"
   }
 }

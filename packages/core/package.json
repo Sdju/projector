@@ -7,8 +7,8 @@
     "./*": "./*"
   },
   "dependencies": {
-    "dbus-next": "0.10.2",
-    "node-gtk": "4.1.1",
-    "zod": "^4.6.5"
+    "dbus-next": "catalog:",
+    "node-gtk": "catalog:",
+    "zod": "catalog:"
   }
 }

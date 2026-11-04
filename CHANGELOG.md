@@ -4,7 +4,7 @@
 
 ### Структура
 
-- Код разложен по пакетам pnpm workspace: `@projector/client`, `@projector/server`, `@projector/native`, `@projector/core`, `@projector/cli` с манифестами и зависимостями через `workspace:*`. Межпакетные импорты идут по имени, FEOD проверяет корни через `layerAliases`, tsconfig, Vite, bin-скрипты и тесты переведены на новые пути. Оболочка приложения (`index.html`, `public`, `resources`, `dist`, `bin`, тесты) остаётся в корне.
+- Код разложен по пакетам pnpm workspace: `@projector/client`, `@projector/server`, `@projector/native`, `@projector/core`, `@projector/cli` с манифестами и зависимостями через `workspace:*`. Межпакетные импорты идут по имени, FEOD проверяет корни через `layerAliases`, tsconfig, Vite, bin-скрипты и тесты переведены на новые пути. Оболочка приложения (`index.html`, `public`, `resources`, `dist`, `bin`, тесты) остаётся в корне. Версии внешних зависимостей вынесены в `catalog` (`pnpm-workspace.yaml`), манифесты ссылаются на них через `catalog:`.
 
 ## 0.9.0
 
