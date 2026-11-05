@@ -8,7 +8,7 @@ const TTL_MS = 30_000;
 const RETRY_MS = 5_000;
 const RETRY_LIMIT = 6;
 
-interface SessionTitles {
+export interface SessionTitles {
   at: number;
   titles: Map<string, string>;
 }
@@ -21,7 +21,11 @@ const version = ref(0);
 const cacheKey = (backend: AgentBackendId, projectId: string) => `${backend}:${projectId}`;
 
 /** Titles of the agent's sessions in the project, fetched at most once per half a minute. */
-function load(backend: AgentBackendId, projectId: string, force = false): Promise<SessionTitles> {
+export function loadSessionTitles(
+  backend: AgentBackendId,
+  projectId: string,
+  force = false,
+): Promise<SessionTitles> {
   const key = cacheKey(backend, projectId);
   const known = cache.get(key);
   if (!force && known && Date.now() - known.at < TTL_MS) return Promise.resolve(known);
@@ -52,9 +56,9 @@ const named = (job: AgentJobView) => !!job.sessionId && !job.worktree;
  */
 export async function resolveJobTitle(job: AgentJobView): Promise<string> {
   if (!named(job)) return jobTitleOf(job);
-  let entry = await load(job.backend, job.projectId);
+  let entry = await loadSessionTitles(job.backend, job.projectId);
   if (!entry.titles.get(job.sessionId!)?.trim())
-    entry = await load(job.backend, job.projectId, true);
+    entry = await loadSessionTitles(job.backend, job.projectId, true);
   return jobTitleOf(job, entry.titles);
 }
 
@@ -87,7 +91,9 @@ export function useJobTitles(
     if (project) {
       const backends = [...new Set(list.filter(named).map((job) => job.backend))];
       const loaded = await Promise.all(
-        backends.map(async (backend) => [backend, (await load(backend, project)).titles] as const),
+        backends.map(
+          async (backend) => [backend, (await loadSessionTitles(backend, project)).titles] as const,
+        ),
       );
       if (mine !== generation) return;
       for (const [backend, titles] of loaded) byBackend.set(backend, titles);

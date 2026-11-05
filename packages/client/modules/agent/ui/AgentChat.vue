@@ -51,6 +51,7 @@ import { fetchMcpServers } from "../api/client.ts";
 import { useMcpServers } from "../model/mcp-panel.ts";
 import { activateChat, registerChat, type ChatController } from "../model/chat-registry.ts";
 import { useChatWindow } from "../model/chat-window.ts";
+import { useAgentChatTabTitle } from "../model/chat-titles.ts";
 import { useRewindPanel } from "../model/rewind-panel.ts";
 import { useWorktreePanel } from "../model/worktree-panel.ts";
 import { chatUsageByTurn } from "../model/chat-usage.ts";
@@ -131,6 +132,8 @@ const {
   backend: props.backend,
   chatId: props.chatId,
 });
+const emit = defineEmits<{ title: [title: string] }>();
+useAgentChatTabTitle(emit, props, turns, busy, sessions, agentName);
 const jobsState = useChatJobs({
   projectId: props.projectId,
   chat: chatKey,

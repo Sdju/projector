@@ -36,6 +36,10 @@ export interface TabView {
 }
 export type TabViews = Record<string, TabView>;
 
+/** A chat tab names itself after its session unless the opener gave it a title (a fork, history). */
+const chatTitle = (tab: OpenFile) =>
+  tab.params?.title ? {} : { onTitle: (title: string) => (tab.path = title) };
+
 /** A chat tab of one external agent: its own conversation, history and approvals. */
 const agentChat = (backend: string): TabView => ({
   component: AgentChat,
@@ -44,6 +48,7 @@ const agentChat = (backend: string): TabView => ({
     projectId: host.projectId,
     backend,
     chatId: tab.params?.chatId,
+    ...chatTitle(tab),
   }),
 });
 
@@ -86,7 +91,11 @@ export function baseTabViews(): TabViews {
     agent: {
       component: AgentChat,
       keepAlive: true,
-      props: (tab, host) => ({ projectId: host.projectId, chatId: tab.params?.chatId }),
+      props: (tab, host) => ({
+        projectId: host.projectId,
+        chatId: tab.params?.chatId,
+        ...chatTitle(tab),
+      }),
     },
     "agent-task": {
       component: AgentTaskTab,
