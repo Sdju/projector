@@ -3,7 +3,7 @@ import { os } from "@projector/core/modules/os/index.ts";
 import { APP_CLASS, chromeProfileDir } from "@projector/core/modules/app-paths/index.ts";
 import { preferences } from "../preferences/index.ts";
 import type { InterfaceMode } from "@projector/core/modules/launcher/index.ts";
-import { nativeArgs } from "./desktop.ts";
+import { hasNativePalette, nativeArgs } from "./desktop.ts";
 
 const PALETTE_CLASS = "ProjectorLauncher";
 export const focusAppWindow = () => os.windows.focusApp(APP_CLASS);
@@ -14,7 +14,7 @@ export const openOrFocusApp = (url: string) =>
 export const hidePalette = () => os.windows.hidePalette(PALETTE_CLASS);
 
 function desktopCommand(url: string, action: "show" | "toggle" | "tray" | "quit"): Promise<void> {
-  os.requireSupported("native desktop");
+  os.requireSupported("desktop shell");
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [...nativeArgs(), "native", url, action], {
       // Та же группа, что и сервер: Ctrl+C в `vp dev` доходит до резидента и снимает трей.
@@ -73,7 +73,8 @@ export async function openLauncher(
   mode?: InterfaceMode,
   toggle = false,
 ): Promise<InterfaceMode> {
-  const selected = mode ?? (await preferences()).mode;
+  let selected = mode ?? (await preferences()).mode;
+  if (selected === "native" && !hasNativePalette()) selected = "browser";
   if (selected === "native") await desktopCommand(url, toggle ? "toggle" : "show");
   else {
     await startTray(url).catch((error) => console.warn("Трей недоступен:", error.message));

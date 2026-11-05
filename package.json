@@ -33,7 +33,8 @@
     "check": "vp run build:prepare && vp test run && vp run --cache build:app",
     "prepare": "node scripts/ensure-vite-plus-core.mjs && vp hooks enable",
     "test:gtk": "node --import @zede/vio/register tests/native-palette.gtk.mjs",
-    "bench:chat": "node scripts/bench-chat/run.mjs"
+    "bench:chat": "node scripts/bench-chat/run.mjs",
+    "build:distribution": "vp run build && node scripts/build-distribution.mjs"
   },
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "catalog:",
@@ -44,6 +45,7 @@
     "@modelcontextprotocol/sdk": "catalog:",
     "@o-feod/eslint-structure-plugin": "catalog:",
     "@o-feod/oxlint-structure-plugin": "catalog:",
+    "@projector/native": "workspace:*",
     "@types/markdown-it": "catalog:",
     "@types/node": "catalog:",
     "@types/ws": "catalog:",

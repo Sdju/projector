@@ -138,50 +138,53 @@ async function own(
   pidPath: string,
   arm: (dispatch: (action: DesktopAction) => Promise<void>) => Array<() => Promise<void>>,
 ) {
-  const { default: Gtk } = await import("gi:Gtk-4.0");
-  const { default: GLib } = await import("gi:GLib-2.0");
-  // Loaded before any window exists: only then is its surface wrapped as a Win32Surface.
-  await import("gi:GdkWin32-4.0").catch(() => undefined);
-  Gtk.init();
-  warmWindowHelper();
-  const applyColorScheme = async () => {
-    try {
-      const resolved = await readWindowsColorScheme();
-      if (!resolved) return;
-      const settings = Gtk.Settings.getDefault();
-      if (!settings) return;
-      // GtkInterfaceColorScheme exists in newer GTK; older Windows bundles only follow the
-      // system theme themselves, so there is nothing to set.
-      const schemes = (
-        Gtk as unknown as {
-          InterfaceColorScheme?: { DARK: unknown; LIGHT: unknown };
-        }
-      ).InterfaceColorScheme;
-      if (!schemes) return;
-      const next = resolved === "dark" ? schemes.DARK : schemes.LIGHT;
-      const target = settings as unknown as { gtkInterfaceColorScheme?: unknown };
-      if (target.gtkInterfaceColorScheme !== next) target.gtkInterfaceColorScheme = next;
-    } catch (error) {
-      console.error("Тема:", error instanceof Error ? error.message : error);
-    }
-  };
-  await applyColorScheme();
-  const loop = GLib.MainLoop.new(null, false);
-  // Node owns the thread. Blocking in MainLoop.run does not deliver named-pipe
-  // events on Windows, so GTK is pumped from a libuv timer: fast while events
-  // flow, slow while idle so a hidden palette costs almost nothing.
-  const context = loop.getContext();
-  let lastActive = Date.now();
   let pulse: ReturnType<typeof setTimeout> | undefined;
-  const pump = () => {
-    try {
-      for (let step = 0; step < 64 && context.iteration(false); step++) lastActive = Date.now();
-    } catch (error) {
-      console.error(error instanceof Error ? error.message : error);
-    }
-    pulse = setTimeout(pump, Date.now() - lastActive < 2000 ? 10 : 50);
-  };
-  pump();
+  let applyColorScheme = async () => {};
+  if (!options.webPalette) {
+    const { default: Gtk } = await import("gi:Gtk-4.0");
+    const { default: GLib } = await import("gi:GLib-2.0");
+    // Loaded before any window exists: only then is its surface wrapped as a Win32Surface.
+    await import("gi:GdkWin32-4.0").catch(() => undefined);
+    Gtk.init();
+    warmWindowHelper();
+    applyColorScheme = async () => {
+      try {
+        const resolved = await readWindowsColorScheme();
+        if (!resolved) return;
+        const settings = Gtk.Settings.getDefault();
+        if (!settings) return;
+        // GtkInterfaceColorScheme exists in newer GTK; older Windows bundles only follow the
+        // system theme themselves, so there is nothing to set.
+        const schemes = (
+          Gtk as unknown as {
+            InterfaceColorScheme?: { DARK: unknown; LIGHT: unknown };
+          }
+        ).InterfaceColorScheme;
+        if (!schemes) return;
+        const next = resolved === "dark" ? schemes.DARK : schemes.LIGHT;
+        const target = settings as unknown as { gtkInterfaceColorScheme?: unknown };
+        if (target.gtkInterfaceColorScheme !== next) target.gtkInterfaceColorScheme = next;
+      } catch (error) {
+        console.error("Тема:", error instanceof Error ? error.message : error);
+      }
+    };
+    await applyColorScheme();
+    const loop = GLib.MainLoop.new(null, false);
+    // Node owns the thread. Blocking in MainLoop.run does not deliver named-pipe
+    // events on Windows, so GTK is pumped from a libuv timer: fast while events
+    // flow, slow while idle so a hidden palette costs almost nothing.
+    const context = loop.getContext();
+    let lastActive = Date.now();
+    const pump = () => {
+      try {
+        for (let step = 0; step < 64 && context.iteration(false); step++) lastActive = Date.now();
+      } catch (error) {
+        console.error(error instanceof Error ? error.message : error);
+      }
+      pulse = setTimeout(pump, Date.now() - lastActive < 2000 ? 10 : 50);
+    };
+    pump();
+  }
   try {
     // The tray host compiles C# while the palette loads. Sequential startup misses the
     // server's READY deadline when Vite is bundling at the same time.

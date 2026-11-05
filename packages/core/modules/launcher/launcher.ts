@@ -139,7 +139,8 @@ export function createLauncherClient(baseUrl = "") {
       return () => controller.abort();
     },
     hide: () => request<{ ok: boolean }>("/api/app/hide", {}),
-    open: (toggle = false) => request<{ ok: boolean }>("/api/app/open", { toggle }),
+    open: (toggle = false, mode?: InterfaceMode) =>
+      request<{ ok: boolean }>("/api/app/open", { toggle, mode }),
     quit: () => request<{ ok: boolean }>("/api/app/quit", {}),
     restart: () => request<{ ok: boolean }>("/api/app/restart", {}),
   };

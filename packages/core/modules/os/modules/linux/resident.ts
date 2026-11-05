@@ -1,4 +1,4 @@
-import type { DesktopAction, ResidentOptions } from "../../contract.ts";
+import type { DesktopAction, DesktopPalette, ResidentOptions } from "../../contract.ts";
 import dbus from "dbus-next";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -65,11 +65,29 @@ export async function runResident(
     bus.disconnect();
     return;
   }
-  const { default: Gtk } = await import("gi:Gtk-4.0");
-  const { default: GLib } = await import("gi:GLib-2.0");
-  Gtk.init();
-  const loop = GLib.MainLoop.new(null, false);
-  const palette = await options.createPalette(baseUrl);
+  let palette: Promise<DesktopPalette> | undefined;
+  let pulse: ReturnType<typeof setTimeout> | undefined;
+  const getPalette = () => (palette ??= createPalette());
+  async function createPalette() {
+    if (!options.webPalette) {
+      const { default: Gtk } = await import("gi:Gtk-4.0");
+      const { default: GLib } = await import("gi:GLib-2.0");
+      Gtk.init();
+      const context = GLib.MainContext.default();
+      let lastActive = Date.now();
+      const pump = () => {
+        for (let step = 0; step < 64 && context.iteration(false); step++) lastActive = Date.now();
+        pulse = setTimeout(pump, Date.now() - lastActive < 2000 ? 10 : 50);
+      };
+      pump();
+    }
+    return options.createPalette(baseUrl);
+  }
+  const invoke = (run: (palette: DesktopPalette) => void | Promise<void>) => {
+    void getPalette()
+      .then(run)
+      .catch((error) => console.error("Палитра:", error.message));
+  };
   let stopping = false;
   const shortcut = new Shortcut(
     bus,
@@ -84,20 +102,20 @@ export async function runResident(
       }
     },
     () => {
-      void palette.invokeSelected(true);
+      invoke((item) => item.invokeSelected(true));
     },
   );
   const removeTray = await startTray(
     bus,
     () => {
-      void palette.invokeSelected();
+      invoke((item) => item.invokeSelected());
     },
-    (path) => palette.openPage(path),
+    (path) => invoke((item) => item.openPage(path)),
     () => {
-      void palette.quitProjector();
+      invoke((item) => item.quitProjector());
     },
     () => {
-      void palette.restartProjector();
+      invoke((item) => item.restartProjector());
     },
   );
   await shortcut.start().catch((error) => console.error("Хоткей:", error.message));
@@ -105,10 +123,10 @@ export async function runResident(
     if (stopping) return;
     stopping = true;
     await shortcut.stop();
-    palette.dispose();
+    if (palette) (await palette.catch(() => undefined))?.dispose();
+    clearTimeout(pulse);
     removeTray();
     bus.disconnect();
-    loop.quit();
   }
   const dispatch = async (requested: DesktopAction) => {
     if (requested === "quit") {
@@ -117,8 +135,8 @@ export async function runResident(
         void stop();
       }, 50);
     } else if (requested === "tray") await shortcut.configure();
-    else if (requested === "toggle") await palette.toggle();
-    else await palette.show();
+    else if (requested === "toggle") await (await getPalette()).toggle();
+    else await (await getPalette()).show();
   };
   bus.export(path, new Control(dispatch));
   process.once("SIGTERM", () => {
@@ -129,5 +147,4 @@ export async function runResident(
   });
   await dispatch(action);
   console.log("READY");
-  loop.run();
 }

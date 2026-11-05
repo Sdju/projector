@@ -4,10 +4,12 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./*": "./*"
+    "./*": "./*",
+    "./entry": "./app/entry.ts"
   },
   "dependencies": {
     "@projector/core": "workspace:*",
-    "@zede/vio": "catalog:"
+    "@zede/vio": "catalog:",
+    "node-gtk": "catalog:"
   }
 }

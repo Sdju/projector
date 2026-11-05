@@ -16,6 +16,7 @@
     "@xterm/headless": "catalog:",
     "ai": "catalog:",
     "jsonc-parser": "catalog:",
+    "node-gyp": "catalog:",
     "node-pty": "catalog:",
     "tldts": "catalog:",
     "vite": "catalog:",

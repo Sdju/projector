@@ -211,7 +211,8 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
     pickFolder: () => backend("pickFolder").pickFolder(),
     catalog: () => backend("catalog").catalog(),
     async runDesktop(url: string, action: DesktopAction, options: ResidentOptions) {
-      if (!nativeDesktop) throw new UnsupportedPlatformError(platform, "runDesktop");
+      if (!supported || (!options.webPalette && !nativeDesktop))
+        throw new UnsupportedPlatformError(platform, "runDesktop");
       const { runResident } = await backend("runDesktop").resident();
       return runResident(url, action, options);
     },

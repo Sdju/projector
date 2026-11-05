@@ -23,6 +23,8 @@ export interface DesktopPalette {
 
 export interface ResidentOptions {
   dataDirectory: string;
+  /** Browser-only shell: tray and hotkey run without loading GTK. */
+  webPalette?: boolean;
   createPalette(baseUrl: string): Promise<DesktopPalette>;
 }
 

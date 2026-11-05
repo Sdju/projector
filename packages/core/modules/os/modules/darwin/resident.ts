@@ -145,7 +145,9 @@ export async function runResident(
   await mkdir(directory, { recursive: true });
   const token = randomBytes(24).toString("hex");
   let pulse: ReturnType<typeof setTimeout> | undefined;
-  const palette = await gtkPalette(baseUrl, options, (timer) => (pulse = timer));
+  const palette = options.webPalette
+    ? await options.createPalette(baseUrl)
+    : await gtkPalette(baseUrl, options, (timer) => (pulse = timer));
   let stopping = false;
   let release = () => {};
   const untilStop = new Promise<void>((resolve) => (release = resolve));

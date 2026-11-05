@@ -12,6 +12,8 @@ import { delimiter, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
+const packaged = existsSync(join(ROOT, "packages/server/app/standalone.js"));
+const launchMode = () => (packaged ? "prod" : readServerMode());
 const APP_URL = "http://localhost:4177";
 const DATA_DIR = join(os.dataHome(), "projector");
 const LOCK_PATH = join(DATA_DIR, "launch.lock");
@@ -187,12 +189,14 @@ function buildFrontend(vp) {
 }
 
 async function ensureBuilt(vp, serverMode) {
-  if (serverMode === "prod" && !existsSync(join(ROOT, "dist", "index.html")))
+  if (serverMode === "prod" && !existsSync(join(ROOT, "dist", "index.html"))) {
+    if (packaged) throw new Error("Повреждена установка: отсутствует dist/index.html");
     await buildFrontend(vp);
+  }
 }
 
 function serverPaths(vp) {
-  return { vp, node: process.execPath, root: ROOT };
+  return { vp, node: process.execPath, root: ROOT, compiled: packaged };
 }
 
 /** `vp` is a wrapper: it spawns `vite.js` without CREATE_NO_WINDOW. A detached wrapper on Windows therefore leaves an empty `node.exe` console. */
@@ -204,7 +208,7 @@ function windowsViteCli() {
 }
 
 function daemonCommand(vp) {
-  const planned = serverCommand(readServerMode(), serverPaths(vp));
+  const planned = serverCommand(launchMode(), serverPaths(vp));
   if (process.platform !== "win32" || planned.args[0] !== "dev") return planned;
   const viteJs = windowsViteCli();
   if (!viteJs) return planned;
@@ -221,7 +225,7 @@ function daemonEnv() {
 }
 
 function startForeground(vp) {
-  const { command, args } = serverCommand(readServerMode(), serverPaths(vp));
+  const { command, args } = serverCommand(launchMode(), serverPaths(vp));
   const child = spawnVp(command, args, {
     cwd: ROOT,
     stdio: "inherit",
@@ -268,14 +272,16 @@ function startDaemon(vp) {
 async function switchMode(target) {
   const info = await serverInfo();
   if (!target) {
-    console.log(`режим: ${readServerMode()}`);
+    console.log(`режим: ${launchMode()}`);
     console.log(info ? `сервер: ${info.mode ?? "dev"} (pid ${info.pid})` : "сервер не запущен");
     return;
   }
   if (!isServerMode(target)) throw new Error(`Режим: ${SERVER_MODES.join(" | ")}`);
+  if (packaged && target === "dev")
+    throw new Error("Режим dev доступен только в checkout исходников Projector");
   const vp = findVp();
   // Сборку делаем до остановки сервера: при ошибке старый процесс и терминалы остаются.
-  if (target === "prod") await buildFrontend(vp);
+  if (target === "prod" && !packaged) await buildFrontend(vp);
   writeServerMode(target);
   if (!info) {
     console.log(`режим ${target} сохранён; сервер не запущен`);
@@ -325,7 +331,7 @@ function vitePlusCliPresent() {
 }
 
 function assertDevToolchain(vp) {
-  if (readServerMode() !== "dev") return;
+  if (launchMode() !== "dev") return;
   if (!existsSync(vp) && vp === "vp")
     throw new Error(`Не найден vp. Выполните pnpm install в ${ROOT}`);
   // vite-plus requires bin/vite.js even when node/cli.js is still present.
@@ -366,7 +372,7 @@ async function main() {
     const vp = findVp();
     if (quit) return;
     assertDevToolchain(vp);
-    await ensureBuilt(vp, readServerMode());
+    await ensureBuilt(vp, launchMode());
     if (serverOnly) {
       await release();
       startForeground(vp);

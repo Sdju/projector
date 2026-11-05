@@ -97,7 +97,7 @@ export function bindRuntime(
     process.env.PROJECTOR_URL = url;
     if (process.env.PROJECTOR_WINDOW === "1") {
       void openLauncher(url).catch(console.error);
-    } else if (os.capabilities.nativeDesktop) {
+    } else if (os.supported) {
       // `vp dev` не открывает палитру, но хоткей и иконка должны быть сразу.
       void startTray(url).catch((error: unknown) =>
         console.warn("Трей недоступен:", error instanceof Error ? error.message : error),

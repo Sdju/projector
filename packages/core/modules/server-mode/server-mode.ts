@@ -10,9 +10,12 @@ export function isServerMode(value: unknown): value is ServerMode {
 /** Команда запуска сервера: dev — `vp dev`, prod — Node без `vp`. */
 export function serverCommand(
   mode: ServerMode,
-  options: { vp: string; node: string; root: string },
+  options: { vp: string; node: string; root: string; compiled?: boolean },
 ): { command: string; args: string[] } {
   if (mode === "prod")
-    return { command: options.node, args: [`${options.root}/packages/server/app/standalone.ts`] };
+    return {
+      command: options.node,
+      args: [`${options.root}/packages/server/app/standalone.${options.compiled ? "js" : "ts"}`],
+    };
   return { command: options.vp, args: ["dev"] };
 }
