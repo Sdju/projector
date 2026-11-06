@@ -29,6 +29,7 @@ import {
   saveAttachment,
   writeAgentHistory,
   detachEventStream,
+  type AgentSessionInfo,
   type AgentSessionTurn,
   handleAgentRun,
 } from "../../modules/agent/index.ts";
@@ -37,6 +38,7 @@ import { accessAllowed } from "../../modules/access/index.ts";
 import {
   FEATURE_PROMPT_END,
   featurePrompt,
+  sessionTitleWithoutInjected,
   splitFeaturePrompt,
 } from "../../modules/agent-features/index.ts";
 import { HttpError } from "../../modules/http/index.ts";
@@ -85,6 +87,45 @@ async function withoutInjected(
 async function agentFolder(projectId: string, worktree: string): Promise<string> {
   const path = await projectPath(projectId);
   return worktree ? worktreeCwd(projectId, worktree, path) : path;
+}
+
+/**
+ * Some agents name a session after its first prompt, which for Projector is the injected abilities
+ * text. The list shows the user's own words instead; a title that cannot be split (an old or
+ * truncated one) falls back to the name of the chat that continued the session.
+ */
+async function withoutInjectedTitles(
+  sessions: AgentSessionInfo[],
+  backend: string,
+  projectId: string,
+): Promise<AgentSessionInfo[]> {
+  const suspicious = (title: string) =>
+    title.includes(FEATURE_PROMPT_END) || title.startsWith("[Projector]");
+  if (!sessions.some((session) => suspicious(session.title))) return sessions;
+  const chats = projectId ? readRecentChats(projectId, backend) : [];
+  const chatOf = new Map(
+    chats.flatMap((chat) => (chat.session ? [[chat.session, chat] as const] : [])),
+  );
+  const prompts = new Map<string, string>();
+  const legacyOf = async (chat?: string) => {
+    const key = chat ?? "";
+    const known = prompts.get(key);
+    if (known !== undefined) return known;
+    const prompt = (await featurePrompt(backend, chat ? readChatFeatures(chat) : undefined))
+      .replace(FEATURE_PROMPT_END, "")
+      .trim();
+    prompts.set(key, prompt);
+    return prompt;
+  };
+  return Promise.all(
+    sessions.map(async (session) => {
+      if (!suspicious(session.title)) return session;
+      const chat = chatOf.get(session.id);
+      const title = sessionTitleWithoutInjected(session.title, await legacyOf(chat?.chat));
+      if (title !== session.title) return { ...session, title };
+      return chat?.title ? { ...session, title: chat.title } : session;
+    }),
+  );
 }
 
 /** Terminal programs of the registered chat backends, in registration order. */
@@ -222,9 +263,11 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
     return true;
   }
   if (path === "/api/agent/sessions" && method === "GET") {
-    const cwd = await projectPath(url.searchParams.get("projectId") ?? "");
-    const backend = url.searchParams.get("backend") ?? undefined;
-    json(res, 200, { sessions: await agentSessions(backend, cwd) });
+    const projectId = url.searchParams.get("projectId") ?? "";
+    const cwd = await projectPath(projectId);
+    const backend = url.searchParams.get("backend") ?? "";
+    const sessions = await agentSessions(backend || undefined, cwd);
+    json(res, 200, { sessions: await withoutInjectedTitles(sessions, backend, projectId) });
     return true;
   }
   if (path === "/api/agent/sessions/update" && method === "POST") {

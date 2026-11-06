@@ -177,3 +177,19 @@ export function splitFeaturePrompt(
   if (message >= 0) rest = rest.slice(message + heading.length).trim();
   return { text: rest, ...(injected ? { injected } : {}) };
 }
+
+/**
+ * The title of a session an agent named after its first prompt: Projector's injected abilities
+ * are not the conversation, so the user's own words become the title. An old title whose prompt
+ * no longer matches the current abilities still ends with the message: its last paragraph is the
+ * best name available.
+ */
+export function sessionTitleWithoutInjected(title: string, legacy?: string): string {
+  const split = splitFeaturePrompt(title, legacy);
+  if (split.text !== title) return split.text || title;
+  if (!title.startsWith("[Projector]")) return title;
+  const at = title.lastIndexOf("\n\n");
+  if (at < 0) return title;
+  const tail = title.slice(at + 2).trim();
+  return tail && tail !== title ? tail : title;
+}

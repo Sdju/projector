@@ -14,6 +14,7 @@ import {
   featurePrompt,
   featureSettings,
   featuresFile,
+  sessionTitleWithoutInjected,
   setFeatureAgent,
   splitFeaturePrompt,
 } from "../packages/server/modules/agent-features/index.ts";
@@ -111,6 +112,27 @@ describe("agent features", () => {
       injected: legacy,
     });
     expect(splitFeaturePrompt("просто вопрос")).toEqual({ text: "просто вопрос" });
+  });
+
+  it("names a session by the user's words, not by the injected abilities", async () => {
+    await setFeatureAgent("widgets", "codex", true);
+    const prompt = await featurePrompt("codex");
+    const sent = promptWithHistory("почини guard", [], prompt);
+    expect(sessionTitleWithoutInjected(sent)).toBe("почини guard");
+    const legacy = prompt.replace(FEATURE_PROMPT_END, "").trim();
+    expect(sessionTitleWithoutInjected(`${legacy}\n\nпочини guard`, legacy)).toBe("почини guard");
+    // A title the agent wrote itself is left as it is.
+    expect(sessionTitleWithoutInjected("Починить guard")).toBe("Починить guard");
+    // An old injected prompt that no longer matches the current abilities still ends with the message.
+    expect(
+      sessionTitleWithoutInjected(
+        "[Projector] Старые возможности.\n\nраздел виджетов\n\nпочини guard",
+      ),
+    ).toBe("почини guard");
+    // A truncated injected prompt has no user text to show: the caller keeps the original.
+    expect(sessionTitleWithoutInjected("[Projector] В этом чате включены")).toBe(
+      "[Projector] В этом чате включены",
+    );
   });
 
   it("removes the widget section from the Projector prompt when switched off", async () => {

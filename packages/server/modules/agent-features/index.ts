@@ -14,6 +14,7 @@ export {
   featurePrompt,
   featureSettings,
   featuresFile,
+  sessionTitleWithoutInjected,
   setFeatureAgent,
   splitFeaturePrompt,
 } from "./store.ts";
