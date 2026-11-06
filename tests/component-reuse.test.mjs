@@ -1,4 +1,4 @@
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { expect, onTestFinished, test } from "vite-plus/test";
 import { createBrowserFixture } from "./fixtures/browser-server.mjs";
 import { chromium, createChromium } from "./fixtures/chromium-driver.mjs";
 
@@ -114,9 +114,9 @@ let trackerApp,dockerApp,usageApp,state;
      check(meter().classList.contains('tone-over'),'Codex uses API window duration for pace');
     }
    }else if(scenario==='partial'){
-    check(!meter().hasAttribute('aria-valuenow')&&tooltip.querySelectorAll('.quota-row').length===1,'Claude missing selected window');
+    check(meter().getAttribute('aria-valuenow')==='80'&&tooltip.querySelectorAll('.quota-row').length===1,'Claude falls back to available window');
     indicator.click();await nextTick();
-    check(meter().getAttribute('aria-valuenow')==='80','Claude available rolling window');
+    check(meter().getAttribute('aria-valuenow')==='80','Claude keeps the only available window');
    }else{
     check(!meter().hasAttribute('aria-valuenow')&&tooltip.querySelectorAll('.quota-row').length===0,provider+' unavailable meter');
     check(tooltip.textContent.includes(scenario==='failed'?'не удалось':'Fixture unavailable')||tooltip.textContent.includes('Не удалось'),provider+' failure text');

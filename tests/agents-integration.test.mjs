@@ -3,6 +3,7 @@ import { setImmediate } from "node:timers/promises";
 import { createRenderer } from "vue";
 import { createUsageCache } from "../packages/server/modules/agents-integration/_/usage-cache.ts";
 import { useUsagePolling } from "../packages/client/modules/agents-integration/_/use-usage-polling.ts";
+import { useUsageWindows } from "../packages/client/modules/agents-integration/_/usage-windows.ts";
 import {
   USAGE_PERIOD_SECONDS,
   usagePaceTone,
@@ -182,4 +183,33 @@ test("usage pace tones compare spent percent to elapsed fraction of the cycle", 
   expect(usagePaceTone(100, left(week / 2), week, now)).toBe("over");
   expect(usagePaceTone(40, null, week, now)).toBe(null);
   expect(usagePaceTone(40, left(week / 2), 0, now)).toBe(null);
+});
+
+test("usage windows fall back to an available window and skip missing ones when cycling", () => {
+  const definitions = [
+    { name: "rolling", label: "5 часов", shortLabel: "5ч", periodSeconds: 18000, ticks: [] },
+    { name: "weekly", label: "Неделя", shortLabel: "нед", periodSeconds: 604800, ticks: [] },
+    { name: "monthly", label: "Месяц", shortLabel: "мес", periodSeconds: 2592000, ticks: [] },
+  ];
+  const model = useUsageWindows({
+    title: "Kimi",
+    definitions,
+    cycleOrder: ["rolling", "weekly", "monthly"],
+    initial: "weekly",
+    usage: () => ({ status: "ready" }),
+    windows: () => ({
+      rolling: { usedPercent: 20, resetsAt: null, limited: false },
+      monthly: { usedPercent: 40, resetsAt: null, limited: false },
+    }),
+    failed: () => false,
+    now: () => Date.parse("2026-11-07T00:00:00Z"),
+  });
+
+  expect(model.remaining.value).toBe(80);
+  expect(model.selected.value.name).toBe("rolling");
+  expect(model.tooltip.value).not.toMatch(/Неделя: —/);
+  model.cycle();
+  expect(model.selected.value.name).toBe("monthly");
+  model.cycle();
+  expect(model.selected.value.name).toBe("rolling");
 });

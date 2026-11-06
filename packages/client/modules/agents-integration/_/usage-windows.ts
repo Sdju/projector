@@ -58,9 +58,6 @@ export function useUsageWindows<Name extends string>(options: {
   now: () => number;
 }) {
   const selectedWindow = shallowRef<Name>(options.initial);
-  const selected = computed(() =>
-    options.definitions.find((item) => item.name === selectedWindow.value)!,
-  );
   const windows = computed(() =>
     !options.failed() && options.usage()?.status === "ready" ? options.windows() : undefined,
   );
@@ -70,8 +67,16 @@ export function useUsageWindows<Name extends string>(options: {
       return data ? [usageWindowView(definition, data, options.now())] : [];
     }),
   );
-  const current = computed(() =>
-    tooltipRows.value.find((row) => row.name === selectedWindow.value),
+  /** A plan may omit a window (new Kimi plans have no week); show the first one that exists. */
+  const current = computed(
+    () =>
+      tooltipRows.value.find((row) => row.name === selectedWindow.value) ?? tooltipRows.value[0],
+  );
+  const activeName = computed(() => current.value?.name ?? selectedWindow.value);
+  const selected = computed(
+    () =>
+      options.definitions.find((definition) => definition.name === activeName.value) ??
+      options.definitions[0]!,
   );
   const remaining = computed(() => current.value?.remaining ?? null);
   const tone = computed(() => current.value?.tone ?? null);
@@ -83,20 +88,21 @@ export function useUsageWindows<Name extends string>(options: {
     if (!windows.value) return `${heading}\n${usage.message ?? "Лимиты недоступны"}`;
     return [
       `${heading} · остаток`,
-      ...options.definitions.map((definition) => {
+      ...tooltipRows.value.map((row) => {
+        const definition = options.definitions.find((item) => item.name === row.name)!;
         const data = windows.value?.[definition.name];
-        if (!data) return `${definition.label}: —`;
-        const row = usageWindowView(definition, data, options.now());
-        return `${definition.label}: ${row.remaining}%${row.limited ? " · исчерпан" : ""} · ${row.countdown} (${resetTimestamp(data.resetsAt)})`;
+        return `${definition.label}: ${row.remaining}%${row.limited ? " · исчерпан" : ""} · ${row.countdown} (${resetTimestamp(data?.resetsAt)})`;
       }),
       "Клик — сменить лимит",
     ].join("\n");
   });
   function cycle() {
-    selectedWindow.value =
-      options.cycleOrder[
-        (options.cycleOrder.indexOf(selectedWindow.value) + 1) % options.cycleOrder.length
-      ]!;
+    const available = new Set(tooltipRows.value.map((row) => row.name));
+    const order = options.cycleOrder.filter((name) => available.has(name));
+    const from = activeName.value as Name;
+    const nextOrder = order.length ? order : options.cycleOrder;
+    const index = nextOrder.indexOf(from);
+    selectedWindow.value = nextOrder[(index + 1) % nextOrder.length]!;
     return { window: selectedWindow.value };
   }
   return { selectedWindow, selected, remaining, tone, tooltipRows, tooltip, cycle };
