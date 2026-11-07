@@ -9,7 +9,7 @@ import { workspaceSiteUrl } from "../../workspace-api/index.ts";
 import { normalizeBrowserInput } from "@projector/core/modules/browser/index.ts";
 import { isEditable, isHtml, isMarkdown, type OpenFile } from "../open-file.ts";
 import { attachRangeToChat } from "../../agent/index.ts";
-import { provideEditorSelection } from "./editor-selection.ts";
+import { createEditorSelection, provideEditorSelection } from "./editor-selection.ts";
 
 export interface EditorCommandContext {
   projectId: string;
@@ -47,7 +47,9 @@ export interface EditorCommandContext {
 export function registerEditorCommands(ctx: EditorCommandContext) {
   const { editorCommands, register, tabs, active, activeKey, fileOf, saveFile, openTab } = ctx;
   const { openFile, toggleMarkdownSource } = ctx;
-  const selection = provideEditorSelection();
+  const selection = provideEditorSelection(
+    createEditorSelection(() => editorCommands.run("ide.editor.selection.toChat")),
+  );
   function commandFile(value?: unknown) {
     const args = commandArgs(value);
     if (args.id !== undefined && typeof args.id !== "string")

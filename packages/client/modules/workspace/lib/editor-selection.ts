@@ -15,9 +15,11 @@ export interface EditorSelectionStore {
   report(range: EditorRange): void;
   /** An editor went away: only its own report is forgotten. */
   clear(path: string): void;
+  /** Adds the current range to the chat; a no-op when no editor reported one. */
+  add(): void;
 }
 
-export function createEditorSelection(): EditorSelectionStore {
+export function createEditorSelection(add?: () => void): EditorSelectionStore {
   const current = shallowRef<EditorRange>();
   return {
     current,
@@ -26,6 +28,9 @@ export function createEditorSelection(): EditorSelectionStore {
     },
     clear(path) {
       if (current.value?.path === path) current.value = undefined;
+    },
+    add() {
+      if (current.value) add?.();
     },
   };
 }

@@ -10,8 +10,10 @@ import {
   highlightActiveLineGutter,
   keymap,
   drawSelection,
+  showTooltip,
+  type Tooltip,
 } from "@codemirror/view";
-import { EditorState } from "@codemirror/state";
+import { EditorState, StateField } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { bracketMatching, foldGutter, indentOnInput } from "@codemirror/language";
 import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
@@ -55,6 +57,8 @@ const statusId = statusStore.acquire();
 interface EditorSelectionSink {
   report(range: { path: string; from: number; to: number }): void;
   clear(path: string): void;
+  /** Adds the current range to the agent chat. */
+  add(): void;
 }
 const editorSelection = inject<EditorSelectionSink | undefined>(
   Symbol.for("projector.editor-selection"),
@@ -78,6 +82,36 @@ function reportSelection(state: EditorState) {
   if (main.to > main.from && last.from === main.to && last.number > first.number)
     last = state.doc.line(last.number - 1);
   editorSelection!.report({ path: props.path, from: first.number, to: last.number });
+}
+
+/** A small button at the end of a non-empty selection: adds those lines to the agent chat. */
+function selectionChatTooltip() {
+  const field = StateField.define<readonly Tooltip[]>({
+    create: () => [],
+    update(_tooltips, transaction) {
+      const range = transaction.state.selection.main;
+      if (range.empty) return [];
+      return [
+        {
+          pos: Math.max(range.from, range.to - 1),
+          above: false,
+          create: () => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "selection-chat";
+            button.textContent = "В чат";
+            button.title = "Добавить выделенные строки в чат агента";
+            button.setAttribute("aria-label", "Добавить выделенные строки в чат агента");
+            // Keep the selection while the button is pressed.
+            button.addEventListener("mousedown", (event) => event.preventDefault());
+            button.addEventListener("click", () => editorSelection?.add());
+            return { dom: button };
+          },
+        },
+      ];
+    },
+  });
+  return [field, showTooltip.computeN([field], (state) => state.field(field))];
 }
 
 function reportCursor(state: EditorState) {
@@ -138,6 +172,7 @@ function extensions(mode: "inline" | "side" = "inline") {
     EditorState.readOnly.of(!props.editable),
     EditorView.editable.of(!!props.editable),
     props.editable ? EditorView.lineWrapping : [],
+    ...(tracksSelection() ? selectionChatTooltip() : []),
     themeCompartment.of(themeExtension(editorTheme.value)),
     languageCompartment.of([]),
     EditorState.phrases.of({
@@ -372,6 +407,24 @@ onBeforeUnmount(() => {
   height: auto;
   min-height: 0;
   overflow: hidden;
+}
+.code-viewer :deep(.selection-chat) {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-full);
+  background: var(--bg-3);
+  box-shadow: var(--shadow-popover);
+  color: var(--text);
+  font: var(--fs-xs) var(--sans);
+  cursor: pointer;
+}
+.code-viewer :deep(.selection-chat:hover),
+.code-viewer :deep(.selection-chat:focus-visible) {
+  border-color: var(--focus);
+  background: var(--hover);
 }
 .code-viewer :deep(.cm-dirty-gutter) {
   width: 10px;

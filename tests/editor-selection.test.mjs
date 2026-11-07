@@ -29,6 +29,16 @@ test("the workspace remembers the last focused editor range and forgets it with 
   expect(selection.current.value).toBeUndefined();
 });
 
+test("the selection button acts only while an editor has a range", () => {
+  let added = 0;
+  const selection = createEditorSelection(() => added++);
+  selection.add();
+  expect(added).toBe(0);
+  selection.report({ path: "src/app.ts", from: 4, to: 9 });
+  selection.add();
+  expect(added).toBe(1);
+});
+
 test("a range chip goes into the open chat without sending it", async () => {
   const added = [];
   const dispose = registerChat(
