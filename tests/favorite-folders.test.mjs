@@ -14,6 +14,7 @@ await mkdir(join(work, "node_modules"), { recursive: true });
 await mkdir(join(work, ".hidden"), { recursive: true });
 process.env.XDG_DATA_HOME = data;
 const { searchLauncher, launchItem } = await import("../packages/server/modules/launcher/index.ts");
+const { createLauncherClient } = await import("../packages/core/modules/launcher/index.ts");
 const { handleApi } = await import("../packages/server/app/api.ts");
 const server = createServer((req, res) => void handleApi(req, res));
 server.listen(0, "127.0.0.1");
@@ -38,13 +39,19 @@ test("favorite folders rank first and create projects", async () => {
   // The favorite folder itself is not a launch target; its unregistered children are.
   expect(isFavoriteFolder((await searchLauncher("")).items)).toBe(false);
   expect(isFavoriteFolder((await searchLauncher("work")).items)).toBe(false);
-  const onDisk = (await searchLauncher("")).items.filter((item) => item.section === "disk");
+  // The empty overview must not scan favorite folders; `/` asks for them explicitly.
+  expect((await searchLauncher("")).items.some((item) => item.section === "disk")).toBe(false);
+  expect((await searchLauncher("   ")).items.some((item) => item.section === "disk")).toBe(false);
+  const onDisk = (await searchLauncher("/")).items.filter((item) => item.section === "disk");
   expect(onDisk.map((item) => item.name)).toEqual(["alpha"]);
   expect(onDisk[0]).toMatchObject({
     id: `potential:${join(work, "alpha")}`,
     kind: "directory",
     actions: [{ id: "open" }],
   });
+  // The project switcher asks for the project scope without the expensive disk scan.
+  const diskless = await createLauncherClient(base).search("/", undefined, { disk: false });
+  expect(diskless.items.some((item) => item.id.startsWith("potential:"))).toBe(false);
   await mkdir(join(work, "bundle-alpha-temp"));
   expect((await searchLauncher("bapm")).items).toEqual([]);
   const found = (await searchLauncher("alpha")).items;
@@ -52,7 +59,7 @@ test("favorite folders rank first and create projects", async () => {
   const opened = await launchItem(found[0].id, "open", true);
   expect(opened.route).toContain("alpha");
   expect(
-    (await searchLauncher("")).items.some(
+    (await searchLauncher("/")).items.some(
       (item) => item.section === "disk" && item.name === "alpha",
     ),
   ).toBe(false);

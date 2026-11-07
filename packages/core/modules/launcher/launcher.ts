@@ -77,6 +77,11 @@ export interface SearchResult {
   items: LaunchItem[];
   warning?: string;
 }
+/** Extra knobs of one search; the launcher UI uses the defaults. */
+export interface LauncherSearchOptions {
+  /** Also look for unregistered folders in favorite directories; defaults to true. */
+  disk?: boolean;
+}
 export interface ShortcutStatus {
   supported: boolean;
   active: boolean;
@@ -97,12 +102,11 @@ export function createLauncherClient(baseUrl = "") {
     return data as T;
   }
   return {
-    search: (query: string, signal?: AbortSignal) =>
-      request<SearchResult>(
-        `/api/launcher/search?q=${encodeURIComponent(query)}`,
-        undefined,
-        signal,
-      ),
+    search: (query: string, signal?: AbortSignal, options?: LauncherSearchOptions) => {
+      const params = new URLSearchParams({ q: query });
+      if (options?.disk === false) params.set("disk", "0");
+      return request<SearchResult>(`/api/launcher/search?${params}`, undefined, signal);
+    },
     /** `inline` — клиент сам перейдёт по `route`, сервер не открывает окно. */
     launch: (id: string, action?: LaunchActionId, inline = false, arg?: string) =>
       request<LaunchResult>("/api/launcher/launch", { id, action, inline, arg }),

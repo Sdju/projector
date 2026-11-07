@@ -35,8 +35,11 @@ export async function potentialItems(
     const entries = await readdir(folder, { withFileTypes: true }).catch(() => []);
     for (const entry of entries) {
       if (entry.name.startsWith(".") || SKIP.has(entry.name)) continue;
+      // Regular files are the overwhelming majority; the dirent already says so, and a
+      // stat per entry makes a home-sized favorite folder crawl.
+      if (entry.isFile()) continue;
       const path = join(folder, entry.name);
-      if (!(await isDirectory(path))) continue;
+      if (!entry.isDirectory() && !(await isDirectory(path))) continue;
       if (projects.some((project) => sameLocalPath(project.path, path))) continue;
       group.push({
         id: potentialId(path),

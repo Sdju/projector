@@ -7,7 +7,9 @@ export const routes: RouteDefinition[] = [
     method: "GET",
     path: "/api/launcher/search",
     handler: async ({ res, url }) => {
-      json(res, 200, await searchLauncher(url.searchParams.get("q") ?? ""));
+      const query = url.searchParams.get("q") ?? "";
+      const disk = url.searchParams.get("disk") !== "0";
+      json(res, 200, await searchLauncher(query, { disk }));
     },
   },
   {

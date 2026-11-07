@@ -73,7 +73,14 @@ const rows = computed(() =>
 );
 
 function start() {
-  model = createLauncherModel(createLauncherClient());
+  const launcher = createLauncherClient();
+  model = createLauncherModel({
+    ...launcher,
+    // The switcher lists known projects; unregistered folders in favorite directories
+    // would make opening it as expensive as a full disk scan.
+    search: (query: string, signal?: AbortSignal) =>
+      launcher.search(query, signal, { disk: false }),
+  });
   state.value = { ...model.state };
   unsubscribe = model.subscribe((value) => (state.value = value));
   model.setQuery("/");

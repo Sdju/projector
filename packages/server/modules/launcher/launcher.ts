@@ -173,6 +173,7 @@ const GITLAB = {
 
 export async function searchLauncher(
   query: string,
+  options: { disk?: boolean } = {},
 ): Promise<{ items: LaunchItem[]; warning?: string }> {
   const parsed = parseLaunchQuery(query);
   if (parsed.scope === "new") return creationItems(parsed.text, (await preferences()).directories);
@@ -213,6 +214,10 @@ export async function searchLauncher(
     };
   }
   const { scope, text } = parseLaunchQuery(query);
+  // Discovering unregistered folders means reading every favorite folder, which can be huge.
+  // The empty overview must stay cheap: scan only for a text query or the explicit `/` scope.
+  // Surfaces that never need on-disk candidates (the project switcher) opt out explicitly.
+  const disk = options.disk !== false && (scope === "projects" || text !== "");
   const items: LaunchItem[] = [
     ...(scope === "all"
       ? apps.map((app): LaunchItem => ({ ...app, actions: [{ id: "launch", title: "Запустить" }] }))
@@ -221,7 +226,7 @@ export async function searchLauncher(
       ...projectItem(project),
       folder: inFavoriteFolder(project, prefs.directories) || undefined,
     })),
-    ...(await potentialItems(prefs.directories, projects)),
+    ...(disk ? await potentialItems(prefs.directories, projects) : []),
   ].map((item) => (prefs.favorites.includes(item.id) ? { ...item, favorite: true } : item));
   if (!text) return { items: browse(items, prefs.usage), warning };
 
