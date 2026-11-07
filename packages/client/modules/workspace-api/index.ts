@@ -74,6 +74,13 @@ export const refreshWorkspace = (projectId: string) =>
 export const workspaceWatchable = (projectId: string) =>
   !!workspaceProfile(projectId).providers.files.watch;
 
+/** Shows an entry in the file manager of the server's desktop; unsupported sources have no reveal. */
+export function revealWorkspaceEntry(projectId: string, path: string) {
+  const { files } = workspaceProfile(projectId).providers;
+  if (!files.reveal) throw new Error("Проводник недоступен для этого проекта");
+  return files.reveal(path);
+}
+
 /**
  * Сообщает провайдеру открытые файлы (`paths`) и раскрытые папки (`directories`).
  * Пропущенное поле остаётся как было; изменения приходят через `subscribeWorkspace`.

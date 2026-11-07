@@ -83,6 +83,11 @@ export function openBrowser(url: string): void {
   openDefault(url);
 }
 
+/** Selects the entry in Explorer. */
+export async function revealInFileManager(path: string): Promise<void> {
+  spawnDetached("explorer.exe", [`/select,${path}`]);
+}
+
 export function openWindow(url: string): void {
   const browser = findBrowser();
   if (browser) {

@@ -1,5 +1,11 @@
-import { execFileSync, spawn } from "node:child_process";
+import { execFile, execFileSync, spawn } from "node:child_process";
 import { mkdirSync } from "node:fs";
+import { stat } from "node:fs/promises";
+import { dirname } from "node:path";
+import { pathToFileURL } from "node:url";
+import { promisify } from "node:util";
+
+const execute = promisify(execFile);
 
 const BROWSERS = [
   "google-chrome-stable",
@@ -60,6 +66,33 @@ export function openWindow(url: string): void {
 
 export function openBrowser(url: string): void {
   spawnDetached("xdg-open", [url]);
+}
+
+/**
+ * Selects the entry in the desktop file manager. The standard `org.freedesktop.FileManager1`
+ * interface handles every desktop that implements it; otherwise the parent folder is opened.
+ */
+export async function revealInFileManager(path: string): Promise<void> {
+  try {
+    await execute(
+      "dbus-send",
+      [
+        "--session",
+        "--dest=org.freedesktop.FileManager1",
+        "--type=method_call",
+        "/org/freedesktop/FileManager1",
+        "org.freedesktop.FileManager1.ShowItems",
+        `array:string:${pathToFileURL(path).href}`,
+        "string:",
+      ],
+      { timeout: 5000, env: process.env },
+    );
+    return;
+  } catch {
+    /* No file manager on the session bus: open the containing folder instead. */
+  }
+  const info = await stat(path);
+  spawnDetached("xdg-open", [info.isDirectory() ? path : dirname(path)]);
 }
 
 export function openOrFocusApp(url: string, appClass: string, profile: string): void {

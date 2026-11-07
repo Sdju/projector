@@ -8,6 +8,7 @@ import {
   workspaceCapabilities,
   type WorkspaceCapability,
 } from "../../../../workspace-api/index.ts";
+import { registerTreeReveal } from "./tree-reveal.ts";
 import type { createTreeDrag } from "./tree-drag.ts";
 import { topLevelTreePaths, type createTreeSelection } from "./tree-selection.ts";
 import {
@@ -317,6 +318,7 @@ export function useTreeOperations({
     (args) => emit("open", resolveEntry(args)!.path, commandArgs(args).pinned === true),
     (args) => !!resolveEntry(args) && !resolveEntry(args)!.directory,
   );
+  const revealAvailable = registerTreeReveal(treeCommands.scope, props, drag, resolveEntry);
   registerWrite("file.create", "Новый файл…", (args) => requestAction("create-file", "", args));
   registerWrite("directory.create", "Новая папка…", (args) =>
     requestAction("create-directory", "", args),
@@ -383,6 +385,7 @@ export function useTreeOperations({
       expanded: expanded.value,
       item: (id, options) => treeCommands.item(`ide.fileTree.${id}`, undefined, options),
       allowed: (id) => {
+        if (id === "entry.reveal") return revealAvailable();
         const requires = requirements.get(id);
         return !requires || (requires === "write" ? canWrite() : capabilities[requires]);
       },

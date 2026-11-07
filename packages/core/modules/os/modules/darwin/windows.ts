@@ -67,6 +67,10 @@ export function openWindow(url: string): void {
 export function openBrowser(url: string): void {
   run("open", [http(url)]);
 }
+/** Selects the entry in Finder. */
+export async function revealInFileManager(path: string): Promise<void> {
+  run("open", ["-R", path]);
+}
 export function openOrFocusApp(url: string, appClass: string, profile: string): void {
   if (focusAppWindow(appClass)) return;
   const browser = findBrowser();

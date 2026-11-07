@@ -209,6 +209,8 @@ export function createOs(platform: NodeJS.Platform = process.platform) {
       delete: (key: SecretKey) => backend("secrets.delete").deleteSecret(key),
     },
     pickFolder: () => backend("pickFolder").pickFolder(),
+    /** Shows a file or folder in the desktop file manager; path must be absolute. */
+    revealInFileManager: (path: string) => backend("revealInFileManager").revealInFileManager(path),
     catalog: () => backend("catalog").catalog(),
     async runDesktop(url: string, action: DesktopAction, options: ResidentOptions) {
       if (!supported || (!options.webPalette && !nativeDesktop))

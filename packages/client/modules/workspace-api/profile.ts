@@ -17,7 +17,8 @@ export type WorkspaceCapability =
   | "persist"
   | "externalFiles"
   | "snapshots"
-  | "compare";
+  | "compare"
+  | "reveal";
 export type WorkspaceCapabilities = Record<WorkspaceCapability, boolean>;
 
 export type WorkspaceParams = Record<string, string>;
@@ -51,6 +52,8 @@ export interface FilesProvider extends ReadProvider {
   compare?: boolean;
   /** Present only when the files can change. */
   write?(endpoint: FileWrite, body: unknown, failure?: string): Promise<unknown>;
+  /** Shows an entry in the OS file manager; present only where the files live on this machine. */
+  reveal?(path: string): Promise<unknown>;
   /** Loads one browser file (or an empty folder when `body` is absent) into the project; present only where uploads are possible. */
   upload?(
     directory: string,
@@ -115,6 +118,7 @@ export function profileCapabilities(profile: WorkspaceProfile): Readonly<Workspa
       pipelines: !!profile.providers.pipelines,
       snapshots: !!profile.providers.files.snapshots,
       compare: !!profile.providers.files.compare,
+      reveal: !!profile.providers.files.reveal,
     });
     capabilityCache.set(profile, capabilities);
   }

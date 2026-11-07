@@ -15,6 +15,7 @@ export interface TreeMenuOptions {
 export function treeMenuItems({ entry, expanded, item, allowed }: TreeMenuOptions) {
   const items: ContextMenuItem[] = [];
   if (entry && !entry.directory) items.push(item("file.open"));
+  items.push(item("entry.reveal"));
   if (!entry || entry.directory) items.push(item("file.create"), item("directory.create"));
   if (entry)
     items.push(

@@ -13,6 +13,7 @@ export {
   importProjectEntries,
   uploadProjectEntry,
 } from "./import.ts";
+export { revealProjectEntry } from "./reveal.ts";
 export { watchProject, bindWorkspaceEvents } from "./watcher.ts";
 export { openProjectSiteFile } from "./site.ts";
 export { searchProject, searchProjectGit } from "./search.ts";

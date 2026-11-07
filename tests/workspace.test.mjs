@@ -25,6 +25,7 @@ import {
   mutateProjectGit,
   moveProjectEntry,
   mutateProjectEntry,
+  revealProjectEntry,
   saveProjectFile,
   readProjectImage,
   previewProjectFile,
@@ -215,6 +216,8 @@ test("entry actions reject traversal, invalid names and symlinked directories", 
           await expect(mutateProjectEntry(base, action, path, "", "valid")).rejects.toMatchObject({
             status: 403,
           });
+      for (const path of ["../outside", join(base, "folder")])
+        await expect(revealProjectEntry(base, path)).rejects.toMatchObject({ status: 403 });
       for (const name of [
         "../outside",
         "a/b",

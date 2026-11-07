@@ -17,6 +17,7 @@ import {
   clearImportNames,
   importProjectEntries,
   uploadProjectEntry,
+  revealProjectEntry,
   watchProject,
 } from "../../../../modules/workspace/index.ts";
 
@@ -91,6 +92,19 @@ export const routes: RouteDefinition[] = [
         directories: body.directories as string[] | undefined,
       });
       json(res, 200, { ok: true });
+    },
+  ),
+  mutation(
+    "POST",
+    "/api/projects/:id/workspace/reveal",
+    "Показ в проводнике доступен только со страницы Projector",
+    async ({ req, res }, project) => {
+      if (!isLocalRequest(req))
+        throw new HttpError(403, "Показ в проводнике доступен только на этом компьютере");
+      const body = await readBody(req);
+      if (typeof body.path !== "string") throw new HttpError(400, "Укажите путь");
+      res.setHeader("Cache-Control", "no-store");
+      json(res, 200, await revealProjectEntry(project.path, body.path));
     },
   ),
   mutation(

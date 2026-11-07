@@ -40,6 +40,7 @@ export {
   focusAppWindow,
   openWindow,
   openBrowser,
+  revealInFileManager,
   openOrFocusApp,
   hidePalette,
   openWebPalette,

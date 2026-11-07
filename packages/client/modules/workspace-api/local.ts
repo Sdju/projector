@@ -168,6 +168,8 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
             body,
             failure,
           ),
+        reveal: (path) =>
+          send(`${base(projectId)}/reveal`, "POST", { path }, "Не удалось показать в проводнике"),
       },
       git: {
         read,
