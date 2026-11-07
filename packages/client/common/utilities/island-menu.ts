@@ -36,8 +36,12 @@ export function useIslandMenu(options: {
     if (!open.value) return;
     ++generation;
     open.value = false;
-    if (restoreFocus && !disposed)
-      trigger.value?.querySelector<HTMLElement>(options.returnFocus ?? "button")?.focus();
+    if (restoreFocus && !disposed) {
+      const root = trigger.value;
+      const nested = root?.querySelector<HTMLElement>(options.returnFocus ?? "button");
+      // Context menus open from the row itself; there is no nested button to restore to.
+      (nested ?? root)?.focus?.();
+    }
   }
   async function toggle(force = !open.value) {
     if (disposed || force === open.value) return;

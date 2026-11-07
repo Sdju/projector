@@ -1,11 +1,24 @@
 <script setup lang="ts">
 import UiPopupSurface from "./UiPopupSurface.vue";
 import UiBadge from "./UiBadge.vue";
-import { nextTick, onBeforeUnmount, ref, useId, computed } from "vue";
+import UiActionRow from "./UiActionRow.vue";
+import UiIsland from "./UiIsland.vue";
+import UiIslandHeader from "./UiIslandHeader.vue";
+import { nextTick, onBeforeUnmount, ref, useId, computed, watch } from "vue";
+import { useCompactViewport } from "../utilities/compact-viewport.ts";
+import { useIslandMenu } from "../utilities/island-menu.ts";
 import type { ContextMenuItem } from "./context-menu.ts";
+
 const props = defineProps<{ items: ContextMenuItem[]; label?: string }>();
+const compact = useCompactViewport();
+const island = useIslandMenu({
+  anchor: "left",
+  initialFocus: ".sheet-items button:not(:disabled)",
+  items: ".sheet-items button",
+});
 const surface = ref<InstanceType<typeof UiPopupSurface>>();
 const menu = computed(() => surface.value?.element);
+const title = computed(() => props.label || "Действия");
 const anchorName = `--context-${useId().replace(/[^a-z0-9-]/gi, "")}`;
 const point = ref({ x: 0, y: 0 });
 let trigger: HTMLElement | undefined;
@@ -14,10 +27,30 @@ let opening = 0;
 let releaseListener: (() => void) | undefined;
 function close(focus = true) {
   opening++;
-  if (releaseListener) window.removeEventListener("pointerup", releaseListener);
-  releaseListener = undefined;
+  releaseListener?.();
   restoreFocus = focus;
   menu.value?.hidePopover();
+  island.close(false);
+  if (compact.value && focus && trigger?.isConnected) trigger.focus();
+}
+function waitForRelease(event: Event) {
+  if (!(event instanceof MouseEvent)) return Promise.resolve();
+  // Linux right-click and a touch long-press both fire contextmenu while the pointer is down.
+  // Showing after release keeps popover light-dismiss and the island click-outside from eating it.
+  const held = event.buttons !== 0 || (compact.value && Boolean(document.querySelector(":active")));
+  if (!held) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    const finish = () => {
+      if (releaseListener !== finish) return;
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", finish);
+      releaseListener = undefined;
+      setTimeout(resolve, 0);
+    };
+    releaseListener = finish;
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", finish);
+  });
 }
 async function open(event: MouseEvent | KeyboardEvent, source?: HTMLElement) {
   event.preventDefault();
@@ -32,19 +65,15 @@ async function open(event: MouseEvent | KeyboardEvent, source?: HTMLElement) {
     y: Math.max(4, Math.min(pointer ? event.clientY : bounds.bottom, window.innerHeight - 4)),
   };
   const generation = ++opening;
-  // On Linux contextmenu fires on press; showing before release lets the native
-  // popover light-dismiss consume the same right click that opened the menu.
-  if (event instanceof MouseEvent && event.buttons !== 0) {
-    await new Promise<void>((resolve) => {
-      releaseListener = () => {
-        releaseListener = undefined;
-        setTimeout(resolve, 0);
-      };
-      window.addEventListener("pointerup", releaseListener, { once: true });
-    });
-  }
+  await waitForRelease(event);
   await nextTick();
   if (generation !== opening) return;
+  if (compact.value) {
+    if (island.open.value) island.close(false);
+    island.trigger.value = trigger;
+    await island.toggle(true);
+    return;
+  }
   menu.value?.showPopover({ source: trigger });
   await nextTick();
   menu.value?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
@@ -88,10 +117,12 @@ function activate(item: ContextMenuItem) {
   void item.run();
 }
 function dismiss(event: Event) {
+  if (compact.value) return;
   if (event.type === "scroll" && event.target instanceof Node && menu.value?.contains(event.target))
     return;
   close(false);
 }
+watch(compact, () => close(false));
 window.addEventListener("resize", dismiss);
 window.addEventListener("blur", dismiss);
 window.addEventListener("scroll", dismiss, true);
@@ -116,7 +147,32 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
 }
 </script>
 <template>
-  <Teleport to="body">
+  <UiIsland v-if="compact" :menu="island" :label="title" :width="320">
+    <UiIslandHeader class="island-head" aria-label="Закрыть" @click="close()">{{
+      title
+    }}</UiIslandHeader>
+    <div class="sheet-items" role="menu" :aria-label="title">
+      <template v-for="item in items" :key="item.id">
+        <div v-if="item.separator" role="separator" class="menu-separator" />
+        <UiActionRow
+          class="sheet-item"
+          role="menuitem"
+          justify="between"
+          :disabled="item.disabled"
+          :tone="item.danger ? 'danger' : undefined"
+          :data-command="item.command"
+          @click="activate(item)"
+        >
+          <span class="item-label"
+            ><component :is="item.icon" v-if="item.icon" aria-hidden="true" />{{ item.label }}</span
+          ><UiBadge v-if="item.hint" class="hint" mono shrink :tone="hintTone(item.hint.tone)">{{
+            item.hint.text
+          }}</UiBadge>
+        </UiActionRow>
+      </template>
+    </div>
+  </UiIsland>
+  <Teleport v-else to="body">
     <span
       class="context-anchor"
       :style="{ left: `${point.x}px`, top: `${point.y}px`, anchorName }"
@@ -129,7 +185,7 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
       popover="auto"
       role="menu"
       class="context-menu"
-      :aria-label="label || 'Действия'"
+      :aria-label="title"
       :style="{ positionAnchor: anchorName }"
       @toggle="toggle"
       @keydown="keydown"
@@ -201,6 +257,9 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
 .context-menu button.danger {
   color: var(--err);
 }
+.sheet-item {
+  min-height: var(--control-h-sm);
+}
 .item-label {
   display: flex;
   align-items: center;
@@ -210,6 +269,10 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
   width: 14px;
   height: 14px;
   flex-shrink: 0;
+}
+.sheet-item .item-label svg {
+  width: 16px;
+  height: 16px;
 }
 kbd {
   color: var(--muted);

@@ -1,0 +1,120 @@
+<!doctype html>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<div id="fixture"></div>
+<pre id="result">WAITING</pre>
+<script type="module">
+  import "/packages/client/app/styles.css";
+  import { createApp, h, ref, nextTick } from "vue";
+  import ContextMenu from "/packages/client/common/ui/ContextMenu.vue";
+  const actions = [];
+  const errors = [];
+  window.addEventListener("error", (event) => errors.push(event.message));
+  const menu = ref();
+  const host = ref();
+  const items = [
+    {
+      id: "open",
+      label: "Открыть",
+      shortcut: "Enter",
+      command: "file.open",
+      run: () => actions.push("open"),
+    },
+    {
+      id: "rename",
+      label: "Переименовать",
+      separator: true,
+      run: () => actions.push("rename"),
+    },
+    { id: "delete", label: "Удалить", danger: true, run: () => actions.push("delete") },
+  ];
+  const app = createApp({
+    setup() {
+      return () =>
+        h("div", { style: "padding:24px" }, [
+          h(
+            "button",
+            {
+              ref: host,
+              id: "host",
+              onContextmenu: (event) => menu.value.open(event),
+            },
+            "Файл",
+          ),
+          h(ContextMenu, { ref: menu, items, label: "Действия с файлами" }),
+        ]);
+    },
+  });
+  app.mount("#fixture");
+  const check = (value, label) => {
+    if (!value) throw new Error(label);
+  };
+  const key = (value) =>
+    document.activeElement.dispatchEvent(
+      new KeyboardEvent("keydown", { key: value, bubbles: true, cancelable: true }),
+    );
+  const sheet = () => document.querySelector('.island[role="dialog"]');
+  const popover = () => document.querySelector('.context-menu[role="menu"]');
+  const wait = async (condition, label) => {
+    const deadline = Date.now() + 8000;
+    while (!condition()) {
+      if (Date.now() > deadline) throw new Error(label);
+      await fetch("/__tick");
+    }
+  };
+  const openMenu = async (trigger, compact) => {
+    trigger.dispatchEvent(
+      new MouseEvent("contextmenu", {
+        bubbles: true,
+        cancelable: true,
+        clientX: 40,
+        clientY: 40,
+        button: 2,
+        buttons: 0,
+      }),
+    );
+    await wait(
+      () => (compact ? sheet() : popover()?.matches(":popover-open")),
+      compact ? "opens island" : "opens pointer menu",
+    );
+  };
+  if (!new URLSearchParams(location.search).has("manual"))
+    (async () => {
+      try {
+        const trigger = document.getElementById("host");
+        const compact = innerWidth <= 700;
+        await openMenu(trigger, compact);
+        if (compact) {
+          await wait(() => sheet()?.contains(document.activeElement), "focuses a sheet item");
+          check(sheet().classList.contains("mobile-sheet"), "mobile sheet");
+          check(!popover(), "hides pointer menu");
+          check(sheet().getAttribute("aria-label") === "Действия с файлами", "sheet label");
+          check(!sheet().querySelector("kbd"), "hides shortcuts");
+          for (const animation of sheet().getAnimations()) animation.finish();
+          const rect = sheet().getBoundingClientRect();
+          check(
+            rect.left >= 0 && rect.right <= innerWidth && rect.bottom <= innerHeight + 1,
+            "bounded geometry",
+          );
+          sheet().querySelector('[data-command="file.open"]').click();
+          await wait(() => !sheet() && actions.at(-1) === "open", "item runs and closes");
+          await openMenu(trigger, compact);
+          key("Escape");
+          await wait(() => !sheet(), "Escape closes");
+          check(document.activeElement === trigger, "Escape restores trigger");
+        } else {
+          check(!sheet(), "keeps desktop popover");
+          popover().querySelector('[data-command="file.open"]').click();
+          await wait(
+            () => !popover()?.matches(":popover-open") && actions.at(-1) === "open",
+            "item runs",
+          );
+        }
+        check(errors.length === 0, "no runtime errors: " + errors.join(";"));
+        app.unmount();
+        document.getElementById("result").textContent = "PASS";
+      } catch (error) {
+        document.getElementById("result").textContent = "FAIL: " + error.stack;
+        app.unmount();
+      }
+    })();
+</script>
