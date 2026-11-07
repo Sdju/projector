@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, openSync, readdirSync, writeSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, writeSync } from "node:fs";
 import { open, readFile, unlink } from "node:fs/promises";
 import { os } from "@projector/core/modules/os/index.ts";
 import {
@@ -7,7 +7,12 @@ import {
   isServerMode,
   serverCommand,
 } from "@projector/core/modules/server-mode/index.ts";
-import { readServerMode, writeServerMode } from "@projector/core/modules/app-paths/index.ts";
+import {
+  openLog,
+  readServerMode,
+  serverLogPath,
+  writeServerMode,
+} from "@projector/core/modules/app-paths/index.ts";
 import { delimiter, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -114,13 +119,13 @@ async function waitUntilReady(timeoutMs = 30000, daemonPid) {
   while (Date.now() - started < timeoutMs) {
     if (await health()) return;
     if (daemonPid && !isPidAlive(daemonPid)) {
-      const logPath = join(DATA_DIR, "server.log");
+      const logPath = serverLogPath();
       throw new Error(`Сервер сразу завершился. См. лог: ${logPath}`);
     }
     await sleep(200);
   }
   throw new Error(
-    `Сервер не поднялся за ${Math.round(timeoutMs / 1000)} с. См. ${join(DATA_DIR, "server.log")}`,
+    `Сервер не поднялся за ${Math.round(timeoutMs / 1000)} с. См. ${serverLogPath()}`,
   );
 }
 
@@ -243,7 +248,8 @@ function startForeground(vp) {
 
 function startDaemon(vp) {
   mkdirSync(DATA_DIR, { recursive: true });
-  const logFd = openSync(join(DATA_DIR, "server.log"), "a");
+  const logPath = serverLogPath();
+  const logFd = openLog(logPath);
   const { command, args } = daemonCommand(vp);
   // Hidden console: Start Menu uses wscript, but a detached console-subsystem
   // child still gets a window unless CREATE_NO_WINDOW is set on that process.
@@ -251,7 +257,7 @@ function startDaemon(vp) {
     cwd: ROOT,
     detached: true,
     stdio: ["ignore", logFd, logFd],
-    env: daemonEnv(),
+    env: { ...daemonEnv(), PROJECTOR_SERVER_LOG: logPath },
     windowsHide: true,
   });
   // Without a listener, spawn ENOENT becomes an uncaught exception and aborts launch.mjs

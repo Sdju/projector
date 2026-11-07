@@ -1,8 +1,7 @@
 import { spawn } from "node:child_process";
-import { closeSync, mkdirSync, openSync } from "node:fs";
-import { join } from "node:path";
+import { closeSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dataDir } from "@projector/core/modules/app-paths/index.ts";
+import { dataDir, openLog, serverLogPath } from "@projector/core/modules/app-paths/index.ts";
 import { isServerMode } from "@projector/core/modules/server-mode/index.ts";
 import { HttpError } from "../../../modules/http/index.ts";
 import { isLocalRequest } from "../../../modules/access/index.ts";
@@ -24,7 +23,7 @@ export async function handleAppMode({ req, res, method, path }: RouteContext): P
   if (host.projectorModeSwitch) throw new HttpError(409, "Переключение режима уже выполняется");
   host.projectorModeSwitch = true;
   mkdirSync(dataDir(), { recursive: true });
-  const log = openSync(join(dataDir(), "server.log"), "a");
+  const log = openLog(serverLogPath(), { rotate: false });
   try {
     const child = spawn(
       process.execPath,

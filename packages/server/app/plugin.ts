@@ -4,7 +4,11 @@ import type { RuntimeHandlers } from "./runtime-contract.ts";
 import type { HttpServer } from "vite-plus";
 import { handleApi } from "./api.ts";
 import { clearInstance, writeInstance } from "../modules/instance/index.ts";
-import { APP_PORT, appUrl } from "@projector/core/modules/app-paths/index.ts";
+import {
+  APP_PORT,
+  appUrl,
+  startServerLogRotation,
+} from "@projector/core/modules/app-paths/index.ts";
 import { os } from "@projector/core/modules/os/index.ts";
 import { CLAUDE_SESSION_ENV } from "../modules/agents/claude-code/index.ts";
 import { openLauncher, startTray } from "../modules/window/index.ts";
@@ -50,6 +54,8 @@ export function bindRuntime(
   mode: ServerMode,
   handlers: () => RuntimeHandlers = getRuntimeHandlers,
 ): () => void {
+  // The daemon owns its log file: keep it bounded while dev warnings write megabytes.
+  startServerLogRotation();
   // Регистрация при вызове, а не при импорте: импорт конфига Vite не должен трогать агентов.
   registerBuiltinAgents();
   registerBuiltinWidgetDefinitions();

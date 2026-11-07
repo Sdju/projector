@@ -1,9 +1,8 @@
 import { spawn } from "node:child_process";
-import { closeSync, mkdirSync, openSync } from "node:fs";
-import { join } from "node:path";
+import { closeSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { os } from "@projector/core/modules/os/index.ts";
-import { dataDir } from "@projector/core/modules/app-paths/index.ts";
+import { dataDir, openLog, serverLogPath } from "@projector/core/modules/app-paths/index.ts";
 import { quitDesktop } from "../window/index.ts";
 
 const host = globalThis as typeof globalThis & { projectorRestart?: Promise<void> };
@@ -11,7 +10,7 @@ const host = globalThis as typeof globalThis & { projectorRestart?: Promise<void
 async function prepareRestart(url: string): Promise<void> {
   const nativePid = await os.desktopPid("dev.projector.Launcher");
   mkdirSync(dataDir(), { recursive: true });
-  const log = openSync(join(dataDir(), "server.log"), "a");
+  const log = openLog(serverLogPath(), { rotate: false });
   const child = (() => {
     try {
       return spawn(

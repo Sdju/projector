@@ -80,7 +80,7 @@ node --import @zede/vio/register packages/native/app/entry.ts native http://loca
 | `projects.json`                                                  | Каталог проектов                                                                        |
 | `providers.json`, `integrations.json`                            | Провайдеры, интеграции и секреты                                                        |
 | `keybindings.json`                                               | Привязки команд IDE                                                                     |
-| `instance.json`, `launch.lock`, `server.log`                     | Запуск, блокировка и диагностика                                                        |
+| `instance.json`, `launch.lock`, `server.log`, `server.log.1…5`   | Запуск, блокировка и диагностика (ротация лога: 10 МиБ на файл, пять архивов)           |
 | `chrome-profile-launcher`, `chrome-profile`                      | Отдельные профили app-окон                                                              |
 | `server-mode`, `network-mode`, `lan-password`                    | Режим сервера (dev/prod), доступ по сети и scrypt-хеш пароля LAN                        |
 | `editor.json`, `files-exclude.json`, `hotkey.json`               | Настройки редактора, исключения дерева, хоткей на Windows и macOS                       |
