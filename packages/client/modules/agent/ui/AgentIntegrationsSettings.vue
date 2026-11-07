@@ -9,6 +9,10 @@ import { ref } from "vue";
 import { guiAgents, hasGui, useAgentModes } from "../model/modes.ts";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 
+/** One agent's settings page passes its backend; the overview and commands still cover them all. */
+const props = defineProps<{ agentId?: string }>();
+const shown = () =>
+  props.agentId ? guiAgents().filter((agent) => agent.backend === props.agentId) : guiAgents();
 const { isEnabled, setEnabled, error } = useAgentModes();
 const busy = ref("");
 const programs = () => guiAgents().map((agent) => agent.program);
@@ -63,7 +67,7 @@ function toggle(program: string, event: Event) {
 
 <template>
   <UiStack as="section" :gap="4" @pointerdown="commands.scope.activate()">
-    <UiField v-for="agent in guiAgents()" :key="agent.program" :label="agent.title">
+    <UiField v-for="agent in shown()" :key="agent.program" :label="agent.title">
       <UiInline as="label" justify="normal">
         <UiControl
           type="checkbox"

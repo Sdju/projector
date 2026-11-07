@@ -3,10 +3,25 @@ import UiControl from "../../../common/ui/UiControl.vue";
 import UiHint from "../../../common/ui/UiHint.vue";
 import UiMessage from "../../../common/ui/UiMessage.vue";
 import UiStack from "../../../common/ui/UiStack.vue";
+import { computed } from "vue";
 import { useAgentFeatureDefaults } from "../model/defaults.ts";
 
-/** Defaults of the feature matrix; the chat tab overrides them for its own conversation. */
+/**
+ * Defaults of the feature matrix; the chat tab overrides them for its own conversation.
+ * An agent's settings page passes its backend and sees only that agent's switches.
+ */
+const props = defineProps<{ agent?: string }>();
 const { data, busy, error, set, commands } = useAgentFeatureDefaults();
+const shown = computed(() =>
+  data.value.features
+    .map((feature) => ({
+      ...feature,
+      agents: props.agent
+        ? feature.agents.filter((agent) => agent.id === props.agent)
+        : feature.agents,
+    }))
+    .filter((feature) => !props.agent || feature.agents.length),
+);
 
 function toggle(feature: string, agent: string, event: Event) {
   const enabled = (event.target as HTMLInputElement).checked;
@@ -21,7 +36,7 @@ function toggle(feature: string, agent: string, event: Event) {
     @focusin="commands.scope.activate()"
     @pointerdown="commands.scope.activate()"
   >
-    <section v-for="feature in data.features" :key="feature.id" class="feature">
+    <section v-for="feature in shown" :key="feature.id" class="feature">
       <h3>{{ feature.title }}</h3>
       <p class="summary">{{ feature.summary }}</p>
       <div class="agents">
@@ -39,7 +54,7 @@ function toggle(feature: string, agent: string, event: Event) {
         </label>
       </div>
     </section>
-    <p v-if="!data.features.length" class="hint">Возможностей пока нет.</p>
+    <p v-if="!shown.length" class="hint">Возможностей пока нет.</p>
     <UiHint>
       Это умолчания для новых чатов. В табе агента остров «возможности» переопределяет их только для
       текущего чата; кнопка «Как по умолчанию» возвращает к этим значениям. Файл:

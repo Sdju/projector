@@ -1,6 +1,6 @@
 # Возможности агентов
 
-Необязательные умения, которые Projector добавляет агенту: виджеты в ответах — графики, показатели, вкладки и формы прямо в markdown — и команды IDE через MCP. Умолчания задаются в настройках «Возможности агентов» для каждого агента, а остров **возможности** в табе агента переопределяет их только для текущего чата.
+Необязательные умения, которые Projector добавляет агенту: виджеты в ответах — графики, показатели, вкладки и формы прямо в markdown — и команды IDE через MCP. Умолчания задаются на странице агента в настройках «Агенты» рядом с его включением и режимом сессий, а остров **возможности** в табе агента переопределяет их только для текущего чата.
 
 ## Умолчания и переопределение
 
@@ -14,7 +14,7 @@
 
 - **Выбор чата** — список id возможностей, сохранённый вместе с чатом (`chats.features` в `agent/history.sqlite`). Пока его нет, действуют умолчания; пустой список — «в этом чате всё выключено». Кнопка «Как по умолчанию» удаляет выбор чата.
 - Переопределение передаётся серверу вместе с каждым ходом (`features` в `POST /api/agent`), поэтому применяется и после перезагрузки страницы.
-- Остров в табе агента показывает только возможности этого чата; матрица всех агентов — в настройках. Изменение умолчания в настройках сразу видно в открытых чатах без собственного выбора.
+- Остров в табе агента показывает только возможности этого чата; умолчания каждого агента лежат на его странице в настройках «Агенты». Изменение умолчания в настройках сразу видно в открытых чатах без собственного выбора.
 
 ## Как возможность попадает в модель
 
@@ -48,24 +48,25 @@ Hosted-ход — отдельный процесс со своей композ
 
 ## Где что лежит
 
-| Место                                              | Что                                                                                    |
-| -------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `packages/core/modules/agent-features`             | Контракт `AgentFeature` (id, название, описание, умолчания, `instruction()`) и каталог |
-| `packages/server/modules/agent-features`           | Реестр агентов, умолчания, `enabledFeatures`, `featureEnabled` и `featurePrompt`       |
-| `packages/server/app/features.ts`                  | Единственное место, где возможности названы: `widgets` и `ide`                         |
-| `packages/server/app/plugin.ts`                    | Регистрация при старте сервера                                                         |
-| `packages/server/app/projector-runner.ts`          | Регистрация в процессе ответа Projector                                                |
-| `packages/server/app/claude-runner.ts`             | Регистрация в процессе ответа Claude Code                                              |
-| `packages/server/routes/api/agent-features.ts`     | `GET` умолчаний и `PUT` одного переключателя                                           |
-| `packages/server/modules/agents/ide-mcp`           | Stdio-сервер `projector-ide` и его конфиги для Claude Code и ACP                       |
-| `packages/server/modules/agents/widgets-mcp`       | Конфиги stdio-сервера `projector-widgets` для Claude Code и ACP                        |
-| `packages/server/app/widgets-mcp.ts`               | Точка входа сервера: регистрирует виджеты и отдаёт `describe_widget`                   |
-| `packages/server/modules/ide/mcp-bridge.ts`        | Ключ, ожидание ответа страницы, claim и результат                                      |
-| `packages/server/routes/api/ide/commands.ts`       | `POST /api/ide/command-request`, `/claim` и `/result`                                  |
-| `packages/client/modules/ide/command-bridge.ts`    | Страница: claim, подтверждение изменяющей команды, вызов SDK                           |
-| `packages/client/modules/agent-features`           | Общий каталог, модель умолчаний, остров чата и раздел настроек                         |
-| `packages/client/modules/agent/ui/AgentChat.vue`   | Место острова: панель инструментов таба агента                                         |
-| `packages/client/modules/app-settings/sections.ts` | Раздел настроек `agent-features`                                                       |
+| Место                                                | Что                                                                                    |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `packages/core/modules/agent-features`               | Контракт `AgentFeature` (id, название, описание, умолчания, `instruction()`) и каталог |
+| `packages/server/modules/agent-features`             | Реестр агентов, умолчания, `enabledFeatures`, `featureEnabled` и `featurePrompt`       |
+| `packages/server/app/features.ts`                    | Единственное место, где возможности названы: `widgets` и `ide`                         |
+| `packages/server/app/plugin.ts`                      | Регистрация при старте сервера                                                         |
+| `packages/server/app/projector-runner.ts`            | Регистрация в процессе ответа Projector                                                |
+| `packages/server/app/claude-runner.ts`               | Регистрация в процессе ответа Claude Code                                              |
+| `packages/server/routes/api/agent-features.ts`       | `GET` умолчаний и `PUT` одного переключателя                                           |
+| `packages/server/modules/agents/ide-mcp`             | Stdio-сервер `projector-ide` и его конфиги для Claude Code и ACP                       |
+| `packages/server/modules/agents/widgets-mcp`         | Конфиги stdio-сервера `projector-widgets` для Claude Code и ACP                        |
+| `packages/server/app/widgets-mcp.ts`                 | Точка входа сервера: регистрирует виджеты и отдаёт `describe_widget`                   |
+| `packages/server/modules/ide/mcp-bridge.ts`          | Ключ, ожидание ответа страницы, claim и результат                                      |
+| `packages/server/routes/api/ide/commands.ts`         | `POST /api/ide/command-request`, `/claim` и `/result`                                  |
+| `packages/client/modules/ide/command-bridge.ts`      | Страница: claim, подтверждение изменяющей команды, вызов SDK                           |
+| `packages/client/modules/agent-features`             | Общий каталог, модель умолчаний и остров чата                                          |
+| `packages/client/modules/agent/ui/AgentChat.vue`     | Место острова: панель инструментов таба агента                                         |
+| `packages/client/modules/agent/ui/AgentSettings.vue` | Страница адаптера: включение, режим сессий и возможности                               |
+| `packages/client/modules/app-settings/sections.ts`   | Раздел настроек `agents` со страницей у каждого адаптера                               |
 
 ### Как добавить возможность
 

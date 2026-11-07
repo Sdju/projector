@@ -7,6 +7,10 @@ import UiField from "../../../common/ui/UiField.vue";
 import UiHint from "../../../common/ui/UiHint.vue";
 import { guiAgents, useAgentModes, type AgentSessionMode } from "../model/modes.ts";
 
+/** One agent's settings page passes its backend; without one the section lists every agent. */
+const props = defineProps<{ agentId?: string }>();
+const shown = () =>
+  props.agentId ? guiAgents().filter((agent) => agent.backend === props.agentId) : guiAgents();
 const { modeOf, setMode, isEnabled, error } = useAgentModes();
 </script>
 
@@ -14,8 +18,7 @@ const { modeOf, setMode, isEnabled, error } = useAgentModes();
   <UiStack as="section" :gap="4">
     <UiField
       v-slot="{ control }"
-      v-for="agent in guiAgents()"
-      v-show="isEnabled(agent.program)"
+      v-for="agent in shown()"
       :key="agent.program"
       :label="agent.title"
     >
@@ -23,6 +26,7 @@ const { modeOf, setMode, isEnabled, error } = useAgentModes();
         as="select"
         v-bind="control"
         :aria-label="`Режим сессий ${agent.title}`"
+        :disabled="!isEnabled(agent.program)"
         :value="modeOf(agent.program)"
         @change="
           setMode(agent.program, ($event.target as HTMLSelectElement).value as AgentSessionMode)

@@ -9,15 +9,13 @@ import { ProviderPanel } from "../provider/index.ts";
 import { PwaSettings } from "../pwa/index.ts";
 import {
   AgentHooksSettings,
-  AgentIntegrationsSettings,
   AgentMcpSettings,
   AgentSkillsSettings,
+  AgentSettings,
   AgentWebSettings,
   AgentMemorySettings,
-  AgentModeSettings,
   AgentJudgeSettings,
 } from "../agent/index.ts";
-import { AgentFeatureDefaults } from "../agent-features/index.ts";
 import { type SettingsSection } from "../settings/index.ts";
 
 export const settingsSections: SettingsSection[] = [
@@ -123,28 +121,14 @@ export const settingsSections: SettingsSection[] = [
     component: ProviderPanel,
   },
   {
-    id: "agent-integrations",
-    title: "Интеграции агентов",
+    id: "agents",
+    title: "Агенты",
     group: "Агент",
-    description: "Включение и отключение адаптеров кодовых агентов.",
-    keywords: "интеграции адаптеры кодовые агенты отключить выключить агент",
-    component: AgentIntegrationsSettings,
-  },
-  {
-    id: "agent-sessions",
-    title: "Сессии агентов",
-    group: "Агент",
-    description: "Терминал или графический чат для новых сессий агентов.",
-    keywords: "GUI TUI терминал чат режим вывод",
-    component: AgentModeSettings,
-  },
-  {
-    id: "agent-features",
-    title: "Возможности агентов",
-    group: "Агент",
-    description: "Умения агентов по умолчанию; в табе агента их можно переопределить для чата.",
-    keywords: "возможности умения фичи виджеты widgets графики формы агент",
-    component: AgentFeatureDefaults,
+    description:
+      "Включение, режим сессий и возможности каждого адаптера — на одной странице у агента.",
+    keywords:
+      "интеграции адаптеры кодовые агенты включить отключить выключить сессия терминал GUI TUI графический чат режим вывод возможности умения фичи виджеты widgets графики формы команды IDE MCP",
+    component: AgentSettings,
   },
   {
     id: "agent-judge",

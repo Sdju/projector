@@ -15,8 +15,10 @@ export {
   agentLabel,
 } from "./model/modes.ts";
 export type { AgentSessionMode } from "./model/modes.ts";
+export { default as AgentSettings } from "./ui/AgentSettings.vue";
 export { default as AgentModeSettings } from "./ui/AgentModeSettings.vue";
 export { default as AgentIntegrationsSettings } from "./ui/AgentIntegrationsSettings.vue";
+export { agentSection, agentOf } from "./model/nav.ts";
 export { default as AgentSkillsSettings } from "./ui/AgentSkillsSettings.vue";
 export { default as AgentWebSettings } from "./ui/AgentWebSettings.vue";
 export { default as AgentMcpSettings } from "./ui/AgentMcpSettings.vue";
