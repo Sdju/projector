@@ -8,7 +8,7 @@ import type { FileScope } from "@projector/core/modules/workspace/index.ts";
 import { workspaceSiteUrl } from "../../workspace-api/index.ts";
 import { normalizeBrowserInput } from "@projector/core/modules/browser/index.ts";
 import { isEditable, isHtml, isMarkdown, type OpenFile } from "../open-file.ts";
-import { attachRangeToChat } from "../../agent/index.ts";
+import { registerSelectionCommands } from "./selection-commands.ts";
 import { createEditorSelection, provideEditorSelection } from "./editor-selection.ts";
 
 export interface EditorCommandContext {
@@ -88,44 +88,12 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
       },
     },
   );
-  register(
-    "ide.editor.selection.toChat",
-    "Добавить выделение в чат",
-    async (value) => {
-      const args = commandArgs(value);
-      const current = selection.current.value;
-      const explicitPath = typeof args.path === "string" ? args.path : undefined;
-      const explicitFrom = lineArg(args.from, "from");
-      if (explicitPath && !explicitFrom) throw new Error("Укажите from для выбранного файла");
-      const path = explicitPath ?? current?.path;
-      const from = explicitFrom ?? current?.from;
-      const to = lineArg(args.to, "to") ?? (explicitFrom ? from : current?.to);
-      if (!path || !from || !to) throw new Error("Выделите строки в файле");
-      if (to < from) throw new Error("to: конец диапазона раньше начала");
-      if (args.chat !== undefined && typeof args.chat !== "string")
-        throw new Error("chat должен быть строкой");
-      await attachRangeToChat(ctx.projectId, path, { from, to }, args.chat, (id, commandArgument) =>
-        ctx.editorCommands.scope.executeCommand(id, commandArgument),
-      );
-      return { path, from, to };
-    },
-    (value) => {
-      const args = commandArgs(value);
-      if (typeof args.path === "string" && typeof args.from === "number") return true;
-      return !!selection.current.value;
-    },
-    "agent",
-    {
-      description:
-        "Добавляет чип с выбранными строками файла в поле ввода открытого чата агента, не отправляя сообщение. Без выделения берётся строка под курсором. Целевой чат — видимый, иначе последний, с которым работали; если чатов нет, открывается самый свежий сохранённый или новый чат Projector. Текст выделения не передаётся: агент видит @path:12-34 и читает файл сам.",
-      arguments: {
-        path: "Путь относительно корня проекта; без него — файл активного редактора",
-        from: "Первая строка диапазона (с 1); без него — строка под курсором",
-        to: "Последняя строка диапазона; по умолчанию совпадает с from",
-        chat: "Ключ чата из ide.agent.chats.list; без него — чат в использовании",
-      },
-    },
-  );
+  registerSelectionCommands({
+    projectId: ctx.projectId,
+    run: (id, commandArgument) => ctx.editorCommands.scope.executeCommand(id, commandArgument),
+    current: () => selection.current.value,
+    register,
+  });
   register(
     "ide.editor.file.save",
     "Сохранить",

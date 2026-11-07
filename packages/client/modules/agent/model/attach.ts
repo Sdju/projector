@@ -27,21 +27,52 @@ export function attachRangeToChat(
  * Puts chips into a chat's draft: the open chat in use, or the most recent saved chat when no
  * chat is open. The chat is not sent: the user sees the chips and writes the message.
  */
-export async function attachChipsToChat(
+export function attachChipsToChat(
   projectId: string,
   chips: MessageChip[],
   options: AttachChatOptions,
+): Promise<ChatController> {
+  return withChat(projectId, options, (chat) => chat.attach(chips));
+}
+
+export interface AttachTextOptions extends AttachChatOptions {
+  /** What the text is, shown before it in the draft: a file, a terminal. */
+  source?: string;
+}
+
+/**
+ * Puts selected text into a chat's draft, for surfaces without file lines (the visual Markdown
+ * editor, a terminal). The message is not sent: the user sees the text and writes the message.
+ */
+export async function attachTextToChat(
+  projectId: string,
+  text: string,
+  options: AttachTextOptions,
+): Promise<ChatController> {
+  const body = text.trim();
+  if (!body) throw new Error("Выделите текст");
+  const source = options.source?.trim();
+  return withChat(projectId, options, (chat) =>
+    chat.appendText(source ? `${source}:\n${body}` : body),
+  );
+}
+
+/** Runs `apply` on the chat that takes context: the one in use, else the newest saved one. */
+async function withChat(
+  projectId: string,
+  options: AttachChatOptions,
+  apply: (chat: ChatController) => Promise<void>,
 ): Promise<ChatController> {
   const open = chatsOf(projectId);
   if (options.chat) {
     const named = open.find((chat) => chat.key === options.chat);
     if (!named)
       throw new Error(`Чат «${options.chat}» не открыт; открытые даёт ide.agent.chats.list`);
-    await named.attach(chips);
+    await apply(named);
     return named;
   }
   if (open.length) {
-    await open[0]!.attach(chips);
+    await apply(open[0]!);
     return open[0]!;
   }
   if (options.open === false) throw new Error("Нет открытого чата агента");
@@ -52,12 +83,12 @@ export async function attachChipsToChat(
     if (!tab) continue;
     await options.run(tab.command, tab.args);
     const chat = await waitForChat(projectId, item.chat);
-    await chat.attach(chips);
+    await apply(chat);
     return chat;
   }
 
   await options.run("ide.workbench.agent.open");
   const chat = await waitForChat(projectId);
-  await chat.attach(chips);
+  await apply(chat);
   return chat;
 }

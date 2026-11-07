@@ -203,7 +203,6 @@ function openAgent(program: string) {
     });
 }
 attach();
-// Subagents and background commands sit above the input; one can be read here or in a tab.
 const {
   tasks,
   viewing: viewingTask,
@@ -331,6 +330,7 @@ const controller: ChatController = {
   toggleControlsMenu: () => controlsMenu.value?.toggle(),
   send: (text) => send(text),
   attach: async (chips) => composer.value?.attach(chips),
+  appendText: async (text) => composer.value?.appendText(text),
   pendingForm: () => pendingForm.value,
   showForm: () => composer.value?.showForm(),
   hideForm: () => composer.value?.hideForm(),

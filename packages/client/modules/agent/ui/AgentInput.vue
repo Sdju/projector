@@ -368,10 +368,32 @@ function appendChips(chips: MessageChip[]) {
   insertDropped(target, chips, position);
   target.focus();
 }
+/** Appends selected text after the whole draft, separated by a blank line. */
+function appendText(value: string) {
+  const target = view.value;
+  const text = value.trim();
+  if (!target || !text) return;
+  const current = target.state.doc.toString();
+  const separator = !current
+    ? ""
+    : current.endsWith("\n\n")
+      ? ""
+      : current.endsWith("\n")
+        ? "\n"
+        : "\n\n";
+  const at = target.state.doc.length;
+  target.dispatch({
+    changes: { from: at, insert: separator + text },
+    selection: EditorSelection.cursor(at + separator.length + text.length),
+    userEvent: "input.paste",
+  });
+  target.focus();
+}
 defineExpose({
   focus: () => view.value?.focus(),
   insertChips,
   appendChips,
+  appendText,
   acceptsDrag,
   dropData,
   /** Puts the cursor behind everything written. */

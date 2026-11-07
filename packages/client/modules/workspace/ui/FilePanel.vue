@@ -142,7 +142,7 @@ const hasStatusLine = computed(
         :column="file.column"
         @change="emit('change', $event)"
         @mode="emit('mode', $event)"
-        @command="(id) => host.run(id)"
+        @command="(id, args) => host.run(id, args)"
         @save="emit('save')"
         @open="emit('open', $event)"
       />

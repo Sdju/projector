@@ -27,7 +27,7 @@ const emit = defineEmits<{
   change: [content: string];
   mode: [mode: "document" | "source"];
   save: [];
-  command: [id: string];
+  command: [id: string, args?: unknown];
   open: [path: string];
 }>();
 const editorError = ref("");
@@ -69,6 +69,7 @@ function focusOut(event: FocusEvent) {
         @change="emit('change', $event)"
         @open="emit('open', $event)"
         @source="emit('mode', 'source')"
+        @command="(id, args) => emit('command', id, args)"
         @error="editorError = $event"
       />
       <CodeViewer

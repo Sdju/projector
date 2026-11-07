@@ -1,12 +1,14 @@
 import { provide, shallowRef, type ShallowRef } from "vue";
 
-/** The lines the focused editor has selected, or the line under its cursor. */
+/** The lines the focused editor has selected, or the text when lines are not meaningful. */
 export interface EditorRange {
   path: string;
   /** First line, counted from 1. */
-  from: number;
+  from?: number;
   /** Last line, counted from 1 and included. */
-  to: number;
+  to?: number;
+  /** Selected text, for a visual editor that has no source lines to point at. */
+  text?: string;
 }
 
 export interface EditorSelectionStore {

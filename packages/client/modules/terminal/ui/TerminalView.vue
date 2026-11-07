@@ -15,6 +15,7 @@ import { bindTerminalInput } from "../lib/input.ts";
 import { bindTerminalTouchScroll, terminalScroller } from "../lib/touch-scroll.ts";
 import { bindTerminalLinks, type TerminalLink } from "../lib/links.ts";
 import { droppedTerminalPaths, isTerminalFileDrag, terminalTextForPaths } from "../lib/drop.ts";
+import { useTerminalSelection } from "../lib/selection.ts";
 import { terminalRequest } from "../lib/api.ts";
 import type {
   TerminalClientMessage,
@@ -43,6 +44,7 @@ const emit = defineEmits<{
   status: [session: TerminalSession];
   sessions: [sessions: TerminalSession[]];
   ended: [];
+  command: [id: string, args?: unknown];
 }>();
 const container = ref<HTMLElement>();
 const error = ref("");
@@ -80,6 +82,7 @@ const statusText = computed(() => {
 });
 let terminal: Terminal | undefined;
 let links: IDisposable | undefined;
+let selectionListener: IDisposable | undefined;
 let unbindTouchScroll: (() => void) | undefined;
 let fit: FitAddon | undefined;
 let observer: ResizeObserver | undefined;
@@ -92,6 +95,18 @@ let generation = 0;
 let linkGeneration = 0;
 let resizeFrame = 0;
 let rendering = Promise.resolve();
+const {
+  text: selectionText,
+  position: selectionPosition,
+  begin: beginSelection,
+  changed: selectionChanged,
+  add: addSelectionToChat,
+} = useTerminalSelection({
+  terminal: () => terminal,
+  container,
+  source: () => `Выделение из терминала «${props.session.customTitle ?? props.session.title}»`,
+  toChat: (text, source) => emit("command", "ide.terminal.selection.toChat", { text, source }),
+});
 
 const running = () => ready && props.session.status === "running" && !props.session.stopRequested;
 const clipboardFailure = ref<TerminalClipboardFailure>();
@@ -353,6 +368,7 @@ onMounted(() => {
   fit = new FitAddon();
   terminal.loadAddon(fit);
   terminal.open(container.value!);
+  selectionListener = terminal.onSelectionChange(selectionChanged);
   links = bindTerminalLinks(terminal, (link) => {
     void openTerminalLink(link);
   });
@@ -393,6 +409,7 @@ onBeforeUnmount(() => {
   cancelAnimationFrame(resizeFrame);
   observer?.disconnect();
   links?.dispose();
+  selectionListener?.dispose();
   unbindTouchScroll?.();
   terminal?.dispose();
 });
@@ -426,6 +443,7 @@ onBeforeUnmount(() => {
     <div
       class="screen-wrap"
       data-terminal-drop
+      @mousedown.capture="beginSelection"
       @dragenter.stop="dragFiles"
       @dragover.stop="dragFiles"
       @dragleave.stop="
@@ -435,6 +453,18 @@ onBeforeUnmount(() => {
       @drop.stop="dropFiles"
     >
       <div v-if="draggingFiles" class="drop-hint">Бросьте файлы — вставим пути в терминал</div>
+      <button
+        v-if="selectionText && selectionPosition"
+        type="button"
+        class="selection-chat"
+        title="Добавить выделенный текст в чат агента"
+        aria-label="Добавить выделенный текст в чат агента"
+        :style="{ left: `${selectionPosition.left}px`, top: `${selectionPosition.top}px` }"
+        @mousedown.prevent
+        @click="addSelectionToChat"
+      >
+        В чат
+      </button>
       <div ref="container" class="screen" />
     </div>
   </UiPanel>
@@ -492,6 +522,28 @@ onBeforeUnmount(() => {
   background: color-mix(in srgb, var(--bg) 82%, transparent);
   color: var(--text);
   font-size: var(--fs-sm);
+}
+.selection-chat {
+  position: absolute;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-full);
+  background: var(--bg-3);
+  box-shadow: var(--shadow-popover);
+  color: var(--text);
+  font: var(--fs-xs) var(--sans);
+  cursor: pointer;
+}
+.selection-chat:hover {
+  background: var(--bg-4);
+}
+.selection-chat:focus-visible {
+  border-color: var(--focus);
+  background: var(--bg-4);
 }
 .screen {
   height: 100%;

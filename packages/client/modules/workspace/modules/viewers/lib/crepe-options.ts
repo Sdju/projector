@@ -1,12 +1,26 @@
 import { Crepe } from "@milkdown/crepe";
+import { editorViewCtx } from "@milkdown/kit/core";
 import { $remark } from "@milkdown/kit/utils";
 import { languages } from "@codemirror/language-data";
 import { oneDark } from "@codemirror/theme-one-dark";
 
+/** A filled comment bubble, like the built-in toolbar icons. */
+const chatIcon = `
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+    <path d="M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Zm-3 9h-4v4h-2v-4H7V9h4V5h2v4h4v2Z" />
+  </svg>
+`;
+
 function embedImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        reject(new Error("Не удалось прочитать изображение"));
+        return;
+      }
+      resolve(reader.result);
+    };
     reader.onerror = () => reject(new Error("Не удалось прочитать изображение"));
     reader.readAsDataURL(file);
   });
@@ -18,6 +32,8 @@ export function createCrepe(options: {
   content: string;
   editable: boolean;
   imageUrl: (url: string) => string;
+  /** Adds the selected Markdown text to the agent chat from the native toolbar. */
+  selectionToChat?: (text: string) => void;
 }) {
   return new Crepe({
     root: options.root,
@@ -35,6 +51,18 @@ export function createCrepe(options: {
         strikethroughLabel: "Зачёркнутый",
         codeLabel: "Код",
         linkLabel: "Ссылка",
+        buildToolbar: (builder) => {
+          builder.addGroup("projector", "Projector").addItem("to-chat", {
+            icon: chatIcon,
+            label: "В чат",
+            active: () => false,
+            onRun: (ctx) => {
+              const view = ctx.get(editorViewCtx);
+              const { from, to } = view.state.selection;
+              options.selectionToChat?.(view.state.doc.textBetween(from, to, "\n", "\n"));
+            },
+          });
+        },
       },
       [Crepe.Feature.LinkTooltip]: { inputPlaceholder: "Адрес ссылки" },
       [Crepe.Feature.ImageBlock]: {

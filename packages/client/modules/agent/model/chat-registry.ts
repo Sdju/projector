@@ -44,6 +44,8 @@ export interface ChatController {
   send(text: string): Promise<void>;
   /** Adds chips to the end of the draft without sending; a form gives way to the text field. */
   attach(chips: MessageChip[]): Promise<void>;
+  /** Appends plain text to the draft without sending; a form gives way to the text field. */
+  appendText(text: string): Promise<void>;
   /** The block the last answer ended with, if the chat waits for it: a form instead of the field. */
   pendingForm(): string | undefined;
   /** Shows that form in the composer again. */

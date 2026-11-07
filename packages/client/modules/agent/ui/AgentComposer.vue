@@ -101,12 +101,19 @@ async function attach(chips: MessageChip[]) {
   await nextTick();
   input.value?.appendChips(chips);
 }
+/** Adds selected text to the end of the draft; a form gives way to the text field. */
+async function appendText(text: string) {
+  dismissForm();
+  await nextTick();
+  input.value?.appendText(text);
+}
 defineExpose({
   resize: () => {},
   focus: () => {
     if (!formOpen.value) input.value?.focus();
   },
   attach,
+  appendText,
   acceptsDrag: (data: DataTransfer | null) => !!input.value?.acceptsDrag(data),
   dropData: (data: DataTransfer) => !!input.value?.dropData(data),
   showForm: restoreForm,

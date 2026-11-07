@@ -93,6 +93,7 @@ const hostOf = (key: string) => props.panelHosts.hosts[key] ?? null;
         @status="terminals.update"
         @sessions="terminals.replace"
         @ended="terminals.refresh"
+        @command="(id, args) => emit('command', id, args)"
       />
     </template>
     <template #leading="{ group }">

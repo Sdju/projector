@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { Crepe } from "@milkdown/crepe";
 import { editorViewCtx, serializerCtx } from "@milkdown/kit/core";
 import { htmlSchema } from "@milkdown/kit/preset/commonmark";
 import { remarkImageBlockPlugin } from "@milkdown/kit/component/image-block";
 import { Plugin } from "@milkdown/kit/prose/state";
 import type { Node } from "@milkdown/kit/prose/model";
+import type { EditorView } from "@milkdown/kit/prose/view";
 import { $prose, $view, replaceAll } from "@milkdown/kit/utils";
 import { workspaceAssetUrl, workspaceScopeAssetUrl } from "../../../../workspace-api/index.ts";
 import type { FileScope } from "@projector/core/modules/workspace/index.ts";
@@ -43,10 +44,24 @@ const emit = defineEmits<{
   open: [path: string];
   error: [message: string];
   source: [];
+  command: [id: string, args?: unknown];
 }>();
 const root = ref<HTMLElement>();
 const loading = ref(true);
 let crepe: Crepe | undefined;
+let prose: EditorView | undefined;
+let scroller: HTMLElement | null = null;
+let selectionFrame = 0;
+/** The workspace's selection store; the key is global so this view does not import the command layer. */
+interface EditorSelectionSink {
+  report(range: { path: string; text: string }): void;
+  clear(path: string): void;
+  add(): void;
+}
+const editorSelection = inject<EditorSelectionSink | undefined>(
+  Symbol.for("projector.editor-selection"),
+  undefined,
+);
 let ready = false;
 let disposed = false;
 let applying = false;
@@ -107,6 +122,41 @@ function imageUrl(url: string) {
       : workspaceAssetUrl(props.projectId, path);
   return /^(https?:|data:image\/(?:png|jpeg|gif|webp|avif);base64,)/i.test(url) ? url : "";
 }
+/** The workspace command and `Mod+Shift+L` read the same store; only a focused editor reports. */
+function scheduleSelectionReport() {
+  cancelAnimationFrame(selectionFrame);
+  selectionFrame = requestAnimationFrame(reportSelection);
+}
+function reportSelection() {
+  const view = prose;
+  if (!view || props.compact || !view.hasFocus()) {
+    editorSelection?.clear(props.path);
+    return;
+  }
+  const { from, to } = view.state.selection;
+  if (from === to) {
+    editorSelection?.clear(props.path);
+    return;
+  }
+  const text = view.state.doc.textBetween(from, to, "\n", "\n").trim();
+  if (text) editorSelection?.report({ path: props.path, text });
+  else editorSelection?.clear(props.path);
+}
+/** The native Milkdown toolbar item and the hotkey both put the selected text into the chat. */
+function selectionToChat(text: string) {
+  const body = text.trim();
+  if (!body) return;
+  if (editorSelection) {
+    editorSelection.report({ path: props.path, text: body });
+    editorSelection.add();
+    return;
+  }
+  emit("command", "ide.editor.selection.toChat", {
+    path: props.path,
+    text: body,
+    source: `Выделение из ${props.path}`,
+  });
+}
 function publish(doc: Node, serialize: (doc: Node) => string) {
   if (!ready || applying || props.editable === false) return;
   let markdown = doc.eq(baselineDocument!) ? baselineContent : serialize(doc);
@@ -128,6 +178,7 @@ onMounted(async () => {
     content: baselineContent,
     editable: props.editable !== false,
     imageUrl,
+    selectionToChat,
   });
   crepe = editor;
   editor.editor.use(normalizeImageAttributes);
@@ -147,6 +198,7 @@ onMounted(async () => {
                 // is debounced and can miss the last edit before Save or a tab switch.
                 if (!view.state.doc.eq(previous.doc))
                   publish(view.state.doc, ctx.get(serializerCtx));
+                if (!view.state.selection.eq(previous.selection)) scheduleSelectionReport();
               },
             }),
           }),
@@ -180,6 +232,7 @@ onMounted(async () => {
     }
     editor.editor.action((ctx) => {
       const view = ctx.get(editorViewCtx);
+      prose = view;
       baselineDocument = view.state.doc;
       view.dom.setAttribute("role", "textbox");
       view.dom.setAttribute(
@@ -190,6 +243,10 @@ onMounted(async () => {
       view.dom.setAttribute("aria-multiline", "true");
       view.dom.setAttribute("spellcheck", "true");
     });
+    scroller = root.value?.parentElement ?? null;
+    document.addEventListener("selectionchange", scheduleSelectionReport);
+    scroller?.addEventListener("focusout", scheduleSelectionReport);
+    scroller?.addEventListener("focusin", scheduleSelectionReport);
     ready = true;
     // Props may change while the asynchronously created editor is mounting.
     if (props.content !== currentContent) setContent(props.content);
@@ -230,6 +287,13 @@ watch(
 onBeforeUnmount(() => {
   disposed = true;
   ready = false;
+  cancelAnimationFrame(selectionFrame);
+  document.removeEventListener("selectionchange", scheduleSelectionReport);
+  scroller?.removeEventListener("focusout", scheduleSelectionReport);
+  scroller?.removeEventListener("focusin", scheduleSelectionReport);
+  scroller = null;
+  prose = undefined;
+  editorSelection?.clear(props.path);
   if (crepe && !loading.value) void crepe.destroy();
 });
 </script>

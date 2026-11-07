@@ -2,18 +2,20 @@ import { expect, onTestFinished, test, vi } from "vite-plus/test";
 import {
   attachChipsToChat,
   attachRangeToChat,
+  attachTextToChat,
 } from "../packages/client/modules/agent/model/attach.ts";
 import { registerChat } from "../packages/client/modules/agent/model/chat-registry.ts";
 import { createEditorSelection } from "../packages/client/modules/workspace/lib/editor-selection.ts";
 
 const rangeChip = { type: "file", path: "src/app.ts", range: { from: 12, to: 34 } };
 
-function chat(projectId, key, attach) {
+function chat(projectId, key, attach, appendText = async () => {}) {
   return {
     key,
     projectId,
     visible: () => true,
     attach,
+    appendText,
   };
 }
 
@@ -66,6 +68,31 @@ test("the editor action builds a file chip with the selected lines", async () =>
     async () => {},
   );
   expect(added).toEqual([[{ type: "file", path: "src/app.ts", range: { from: 12, to: 34 } }]]);
+});
+
+test("a selected text goes into the open chat without sending it", async () => {
+  const added = [];
+  const dispose = registerChat(
+    chat(
+      "selection-text",
+      "selection-text-chat",
+      async () => {},
+      async (text) => added.push(text),
+    ),
+  );
+  onTestFinished(dispose);
+  const result = await attachTextToChat("selection-text", "  error: failed  ", {
+    source: "Выделение из терминала «zsh»",
+    run: async () => {},
+  });
+  expect(result.key).toBe("selection-text-chat");
+  expect(added).toEqual(["Выделение из терминала «zsh»:\nerror: failed"]);
+});
+
+test("an empty text selection is refused before opening a chat", async () => {
+  await expect(attachTextToChat("selection-empty", "   ", { run: async () => {} })).rejects.toThrow(
+    "Выделите текст",
+  );
 });
 
 test("without an open chat a new chat opens and takes the chip", async () => {

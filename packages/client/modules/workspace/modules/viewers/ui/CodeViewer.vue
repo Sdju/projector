@@ -11,9 +11,11 @@ import {
   keymap,
   drawSelection,
   showTooltip,
+  ViewPlugin,
   type Tooltip,
+  type ViewUpdate,
 } from "@codemirror/view";
-import { EditorState, StateField } from "@codemirror/state";
+import { EditorState, StateEffect, StateField } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { bracketMatching, foldGutter, indentOnInput } from "@codemirror/language";
 import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
@@ -84,16 +86,83 @@ function reportSelection(state: EditorState) {
   editorSelection!.report({ path: props.path, from: first.number, to: last.number });
 }
 
+/** A selection is settled only after the pointer is released or typing stops: no button mid-drag. */
+const selectionSettled = StateEffect.define<boolean>();
+const selectionSettledField = StateField.define<boolean>({
+  create: () => true,
+  update(settled, transaction) {
+    let next = settled;
+    if (transaction.selection) next = transaction.state.selection.main.empty;
+    for (const effect of transaction.effects) if (effect.is(selectionSettled)) next = effect.value;
+    return next;
+  },
+});
+const selectionSettlePlugin = ViewPlugin.fromClass(
+  class {
+    private timer: ReturnType<typeof setTimeout> | undefined;
+    private pointerDown = false;
+    private readonly view: EditorView;
+    private readonly onMouseDown: (event: MouseEvent) => void;
+    private readonly onMouseUp: () => void;
+    constructor(view: EditorView) {
+      this.view = view;
+      const doc = view.dom.ownerDocument;
+      this.onMouseDown = (event) => {
+        const target = event.target;
+        if (!(target instanceof Node) || !view.dom.contains(target)) return;
+        // The button itself keeps the selection: do not hide it in its own mousedown.
+        if (target instanceof Element && target.closest(".selection-chat")) return;
+        this.pointerDown = true;
+        this.clear();
+        view.dispatch({ effects: selectionSettled.of(false) });
+      };
+      this.onMouseUp = () => {
+        if (!this.pointerDown) return;
+        this.pointerDown = false;
+        this.schedule(120);
+      };
+      doc.addEventListener("mousedown", this.onMouseDown, true);
+      doc.addEventListener("mouseup", this.onMouseUp, true);
+    }
+    private clear() {
+      clearTimeout(this.timer);
+      this.timer = undefined;
+    }
+    private schedule(delay: number) {
+      this.clear();
+      this.timer = setTimeout(() => {
+        this.timer = undefined;
+        if (!this.view.state.selection.main.empty)
+          this.view.dispatch({ effects: selectionSettled.of(true) });
+      }, delay);
+    }
+    update(update: ViewUpdate) {
+      if (!update.selectionSet) return;
+      this.clear();
+      if (update.state.selection.main.empty) return;
+      if (!this.pointerDown) this.schedule(180);
+    }
+    destroy() {
+      this.clear();
+      const doc = this.view.dom.ownerDocument;
+      doc.removeEventListener("mousedown", this.onMouseDown, true);
+      doc.removeEventListener("mouseup", this.onMouseUp, true);
+    }
+  },
+);
+
 /** A small button at the end of a non-empty selection: adds those lines to the agent chat. */
 function selectionChatTooltip() {
   const field = StateField.define<readonly Tooltip[]>({
     create: () => [],
     update(_tooltips, transaction) {
       const range = transaction.state.selection.main;
-      if (range.empty) return [];
+      if (range.empty || !transaction.state.field(selectionSettledField)) return [];
       return [
         {
-          pos: Math.max(range.from, range.to - 1),
+          // Anchor to the cursor end, not to the end of the range: a backwards selection
+          // must show the button where the user actually is.
+          pos: range.head,
           above: false,
           create: () => {
             const button = document.createElement("button");
@@ -111,7 +180,12 @@ function selectionChatTooltip() {
       ];
     },
   });
-  return [field, showTooltip.computeN([field], (state) => state.field(field))];
+  return [
+    selectionSettledField,
+    selectionSettlePlugin,
+    field,
+    showTooltip.computeN([field], (state) => state.field(field)),
+  ];
 }
 
 function reportCursor(state: EditorState) {
@@ -421,10 +495,12 @@ onBeforeUnmount(() => {
   font: var(--fs-xs) var(--sans);
   cursor: pointer;
 }
-.code-viewer :deep(.selection-chat:hover),
+.code-viewer :deep(.selection-chat:hover) {
+  background: var(--bg-4);
+}
 .code-viewer :deep(.selection-chat:focus-visible) {
   border-color: var(--focus);
-  background: var(--hover);
+  background: var(--bg-4);
 }
 .code-viewer :deep(.cm-dirty-gutter) {
   width: 10px;
