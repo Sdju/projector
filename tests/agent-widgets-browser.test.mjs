@@ -823,3 +823,49 @@ test(
     expect(await browser.evaluate("document.querySelectorAll('.widget-failure').length")).toBe(0);
   },
 );
+
+test(
+  "Answer Doctor replaces broken widget Markdown in the real chat",
+  { skip: !chromium, timeout: 30000, retry: 1 },
+  async () => {
+    const html = await readFile(
+      new URL("./fixtures/agent-answer-doctor.html", import.meta.url),
+      "utf8",
+    );
+    const fixture = await createBrowserFixture({
+      pages: { "/answer-doctor": html },
+      responses: [
+        {
+          startsWith: "/api/agent/answer-repair",
+          type: "application/json",
+          body: JSON.stringify({
+            answer:
+              "<Card><h3>Контракт</h3><ul><li><strong>UI</strong>: <code>панель</code></li></ul></Card>",
+          }),
+        },
+      ],
+    });
+    onTestFinished(() => fixture.close());
+    const browser = await createChromium(fixture.directory);
+    onTestFinished(() => browser.close());
+    await browser.open(fixture.url("/answer-doctor"));
+    await browser.viewport(760, 600);
+    for (let waited = 0; waited < 8000; waited += 50) {
+      if (await browser.evaluate('document.querySelector(".agent-message h3") !== null')) break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    expect(await browser.evaluate('document.querySelector(".agent-message h3").textContent')).toBe(
+      "Контракт",
+    );
+    expect(
+      await browser.evaluate('document.querySelector(".agent-message").textContent'),
+    ).not.toContain("###");
+    expect(
+      await browser.evaluate('document.querySelector(".agent-message").textContent'),
+    ).not.toContain("Лишний хвост");
+    expect(
+      await browser.evaluate('document.querySelector(".agent-message strong").textContent'),
+    ).toBe("UI");
+    expect(await browser.evaluate("window.fixture.persisted")).toBe(true);
+  },
+);

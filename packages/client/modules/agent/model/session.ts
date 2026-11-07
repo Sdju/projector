@@ -340,6 +340,7 @@ export function useAgent(
   return {
     key,
     turns: computed(() => state.turns),
+    persist,
     loading,
     draft,
     draftParts,

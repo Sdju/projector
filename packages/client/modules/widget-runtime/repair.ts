@@ -4,12 +4,12 @@ import { compileScript, compileTemplate, loadCompiler } from "./compile.ts";
 import { isWidgetName } from "./registry.ts";
 import { splitMessage } from "./split.ts";
 
-/** Nothing here executes the form: a valid template and script syntax is enough to offer it. */
-export async function formProblem(source: string): Promise<string | undefined> {
+/** Nothing here executes the widget: valid template and script syntax is enough to show it. */
+async function widgetProblem(source: string, empty: string): Promise<string | undefined> {
   await loadCompiler();
   const parsed = parseWidgetSource(source);
   if (parsed.scriptOpen) return "Незакрытый <script>";
-  if (!parsed.template.trim()) return "Пустая форма";
+  if (!parsed.template.trim()) return empty;
   const unknown = [...parsed.template.matchAll(/<([A-Z][A-Za-z0-9]*)\b/g)].find(
     ([, name]) => !isWidgetName(name!),
   );
@@ -21,6 +21,56 @@ export async function formProblem(source: string): Promise<string | undefined> {
   } catch (error) {
     return error instanceof Error ? error.message : String(error);
   }
+}
+
+export function formProblem(source: string): Promise<string | undefined> {
+  return widgetProblem(source, "Пустая форма");
+}
+
+const MARKDOWN_TEXT =
+  /(^|\n)\s{0,3}(#{1,6}\s+\S|[-*+]\s+\S|\d+\.\s+\S)|\*\*[^*\n]+\*\*|`[^`\n]+`|(^|\n)\s*\|?\s*:?-{3,}/;
+
+/** Markdown in a Vue slot is rendered literally instead of becoming formatted content. */
+function widgetMarkdownProblem(source: string): string | undefined {
+  const { template } = parseWidgetSource(source);
+  const text = template.replace(/<!--[\s\S]*?-->/g, "").replace(/<[^>]*>/g, "\n");
+  return MARKDOWN_TEXT.test(text)
+    ? "Внутри виджета остался Markdown: он показывается как сломанный исходный текст"
+    : undefined;
+}
+
+/** A finished answer is repaired only for visible structural problems, never just to rewrite it. */
+export async function answerProblem(source: string): Promise<string | undefined> {
+  const parts = splitMessage(source, { known: isWidgetName, streaming: false });
+  for (const part of parts) {
+    if (part.type === "widget") {
+      const problem =
+        (await widgetProblem(part.source, `Пустой виджет ${part.name}`)) ??
+        widgetMarkdownProblem(part.source);
+      if (problem) return `${part.name}: ${problem}`;
+      continue;
+    }
+    if (part.type !== "markdown") continue;
+    let fence = "";
+    for (const line of part.text.split("\n")) {
+      const mark = /^ {0,3}(`{3,}|~{3,})/.exec(line)?.[1];
+      if (mark) {
+        if (!fence) fence = mark;
+        else if (mark[0] === fence[0] && mark.length >= fence.length) fence = "";
+        continue;
+      }
+      const name = !fence && /^ {0,3}<([A-Z][A-Za-z0-9]*)(?=[\s/>]|$)/.exec(line)?.[1];
+      if (name && isWidgetName(name)) return `Незакрытый или неверно оформленный виджет ${name}`;
+    }
+  }
+  return undefined;
+}
+
+/** Accept a bare answer or one fenced block, but never an empty doctor response. */
+export function doctorAnswerSource(text: string): string | undefined {
+  const fenced = /^```(?:markdown|md|text|vue|html)?\s*\n?([\s\S]*?)\n?```$/i.exec(text.trim());
+  const candidate = (fenced?.[1] ?? text).trim();
+  return candidate || undefined;
 }
 
 /** End of a tag, skipping `>` inside quoted attribute values. */

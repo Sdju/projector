@@ -18,6 +18,7 @@ import { useSideQuestion } from "../model/side-question.ts";
 import { useAutoCompact } from "../model/use-auto-compact.ts";
 import { useChatInputActions, useChatRetry } from "../model/use-chat-input-actions.ts";
 import { useAnswerForm } from "../model/answer-form.ts";
+import { useAnswerDoctor } from "../model/answer-doctor.ts";
 import UiPanel from "../../../common/ui/UiPanel.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
@@ -72,6 +73,7 @@ const judgeIsland = ref<InstanceType<typeof AgentJudgeIsland>>();
 const {
   key: chatKey,
   turns,
+  persist,
   loading,
   draft,
   draftParts,
@@ -222,7 +224,6 @@ const {
       });
   },
 });
-// Что штатный агент видит в чате: статус, последний ответ и чипы инструментов.
 useChatReadout({
   backend: props.backend,
   agent: agentName.value,
@@ -266,7 +267,7 @@ const { pendingForm, answerFormFor, submitComposerForm, submitTurnForm } = useAn
   send,
   edit,
 });
-// The plan stays pinned while it has unfinished items, even after later messages.
+useAnswerDoctor({ turns, busy, selection, persist });
 const plan = computed(() => shownPlan(turns.value, props.backend));
 const contextShare = computed(() =>
   latestContext.value ? latestContext.value.used / Math.max(1, latestContext.value.size) : 0,
@@ -471,7 +472,6 @@ watch(
     void topUp(true);
   },
 );
-// A chat tab stays mounted while hidden: the input takes focus each time the tab is shown.
 let tabShown = false;
 onMounted(() => {
   composer.value?.resize();

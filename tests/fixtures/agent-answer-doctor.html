@@ -1,0 +1,41 @@
+<!doctype html>
+<link rel="icon" href="data:," />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<div id="fixture"></div>
+<script type="module">
+  import "/packages/client/app/styles.css";
+  import { createApp, h, ref } from "vue";
+  import AgentTurn from "/packages/client/modules/agent/ui/AgentTurn.vue";
+  import { useAnswerDoctor } from "/packages/client/modules/agent/model/answer-doctor.ts";
+  import { registerBuiltinWidgets } from "/packages/client/app/widgets.ts";
+  registerBuiltinWidgets();
+
+  const broken = "<Card>\n### Контракт\n\n- **UI**: `панель`\n</Card>";
+  const turns = ref([
+    {
+      id: "answer",
+      role: "assistant",
+      text: broken,
+      parts: [
+        { type: "text", text: broken },
+        { type: "tool", id: "tool" },
+        { type: "text", text: "\n\nЛишний хвост" },
+      ],
+      tools: [{ id: "tool", name: "read", status: "done", input: "", detail: "file.ts" }],
+      at: Date.now(),
+    },
+  ]);
+  const busy = ref(false);
+  const selection = ref({});
+  useAnswerDoctor({ turns, busy, selection, persist: () => (window.fixture.persisted = true) });
+  createApp({
+    setup: () => () =>
+      h(AgentTurn, {
+        turn: turns.value[0],
+        busy: false,
+        last: true,
+        copied: false,
+      }),
+  }).mount("#fixture");
+  window.fixture = { ready: true };
+</script>

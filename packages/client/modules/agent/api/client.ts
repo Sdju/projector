@@ -133,26 +133,7 @@ export async function streamAgent(
   }
 }
 
-/** Asks the Projector Form Doctor to rewrite a form the compiler rejected. */
-export async function repairForm(input: {
-  form: string;
-  error: string;
-  history?: string;
-  selection?: AgentSelection;
-  signal?: AbortSignal;
-}): Promise<string> {
-  const response = await fetch("/api/agent/form-repair", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-    signal: input.signal,
-  });
-  const data = (await response.json().catch(() => ({}))) as { form?: string; error?: string };
-  if (!response.ok) throw new Error(data.error || "Form Doctor недоступен");
-  if (typeof data.form !== "string" || !data.form.trim())
-    throw new Error("Form Doctor не вернул форму");
-  return data.form;
-}
+export { repairAnswer, repairForm } from "./repair.ts";
 
 /** Stops an answer in progress; closing the page only detaches from it. */
 export async function cancelAgentRun(runId: string): Promise<void> {

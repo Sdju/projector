@@ -1,5 +1,6 @@
 export { projectorBackend, runProjector } from "./projector-backend.ts";
 export { repairForm, type FormDoctorRequest } from "./form-doctor.ts";
+export { repairAnswer, type AnswerDoctorRequest } from "./answer-doctor.ts";
 export { lensLine, runLens, LENS_LIMITS, LENS_THINKING_TEXT } from "./agent-lens.ts";
 export { registerWidgetDefinition, widgetCatalog } from "./widgets.ts";
 export { projectMemories, readMemory, writeMemory } from "./projector-memory.ts";
