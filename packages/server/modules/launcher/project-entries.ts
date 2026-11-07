@@ -33,6 +33,7 @@ export function projectItem(project: Project): LaunchItem {
     name: project.name,
     kind: "project",
     description: `проект · ${running ? "работает" : state === "stopping" ? "останавливается" : state === "error" ? "ошибка запуска" : (command?.name ?? "без команды")}`,
+    route: workspaceRoute(project.path),
     status: running
       ? { state, label: state === "starting" ? "запускается" : "работает" }
       : state === "stopping"

@@ -7,7 +7,6 @@ import { getSnapshot, startProject, stopProject } from "../processes/index.ts";
 import { openBrowser, openWindow } from "../window/index.ts";
 import { desktopArgs } from "../window/index.ts";
 import type {
-  LaunchAction,
   LaunchActionId,
   LaunchItem,
   LaunchResult,
@@ -15,6 +14,7 @@ import type {
 import { parseLaunchQuery } from "@projector/core/modules/launcher/index.ts";
 import { browse } from "./browse.ts";
 import { projectItem, workspaceRoute } from "./project-entries.ts";
+import { searchGithub, searchGitlab } from "./hosted-search.ts";
 import {
   createProjectIn,
   creationItems,
@@ -26,9 +26,8 @@ import {
   setFavoriteDirectory,
 } from "./folders.ts";
 import { parsePotentialId, potentialItems } from "./potential.ts";
-import { searchGithubRepositories } from "../github/index.ts";
-import { searchGitlabProjects, importGitlabProject, gitlabCloneTarget } from "../gitlab/index.ts";
 import { appUrl, projectAppUrl } from "@projector/core/modules/app-paths/index.ts";
+import { importGitlabProject, gitlabCloneTarget } from "../gitlab/index.ts";
 import { githubProjectRoute } from "@projector/core/modules/github/index.ts";
 import { gitlabProjectRoute } from "@projector/core/modules/gitlab/index.ts";
 export {
@@ -129,58 +128,14 @@ export function matchScore(item: LaunchItem, query: string): number {
   return score;
 }
 
-interface HostedHit {
-  fullName: string;
-  description: string;
-  private: boolean;
-  /** GitLab instance of the hit; GitHub results have no instance and keep `gh:<fullName>`. */
-  instance?: string;
-}
-/** Search results of a code host (`gh:` / `gl:`); every host differs only in id prefix and wording. */
-async function searchHosted(
-  host: { prefix: "gh" | "gl"; kind: "github" | "gitlab"; noun: string; action: LaunchAction },
-  find: () => Promise<HostedHit[]>,
-): Promise<{ items: LaunchItem[]; warning?: string }> {
-  try {
-    const hits = await find();
-    return {
-      items: hits.map((repo): LaunchItem => ({
-        id: `${host.prefix}:${repo.instance ? `${repo.instance}/` : ""}${repo.fullName}`,
-        name: repo.fullName,
-        kind: host.kind,
-        description: `${repo.private ? "приватный · " : ""}${repo.description || host.noun}`,
-        keywords: "",
-        actions: [host.action],
-      })),
-      warning: hits.length ? undefined : "Ничего не найдено",
-    };
-  } catch (error) {
-    return { items: [], warning: error instanceof Error ? error.message : "Сервис недоступен" };
-  }
-}
-const GITHUB = {
-  prefix: "gh",
-  kind: "github",
-  noun: "репозиторий GitHub",
-  action: { id: "open", title: "Открыть репозиторий" },
-} as const;
-const GITLAB = {
-  prefix: "gl",
-  kind: "gitlab",
-  noun: "проект GitLab",
-  action: { id: "open", title: "Открыть проект GitLab" },
-} as const;
-
 export async function searchLauncher(
   query: string,
   options: { disk?: boolean } = {},
 ): Promise<{ items: LaunchItem[]; warning?: string }> {
   const parsed = parseLaunchQuery(query);
   if (parsed.scope === "new") return creationItems(parsed.text, (await preferences()).directories);
-  if (parsed.scope === "github")
-    return searchHosted(GITHUB, () => searchGithubRepositories(parsed.text));
-  if (parsed.scope === "gitlab")
-    return searchHosted(GITLAB, () => searchGitlabProjects(parsed.text));
+  if (parsed.scope === "github") return searchGithub(parsed.text);
+  if (parsed.scope === "gitlab") return searchGitlab(parsed.text);
   let warning: string | undefined;
   const [apps, projects, prefs] = await Promise.all([
     applications().catch(() => {
@@ -206,6 +161,7 @@ export async function searchLauncher(
           name: basename(directPath),
           kind: "directory",
           description: "открыть папку как проект",
+          route: workspaceRoute(directPath),
           keywords: directPath,
           actions: [{ id: "open", title: "Открыть" }],
         };

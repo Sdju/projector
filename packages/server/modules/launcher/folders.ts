@@ -102,6 +102,7 @@ export async function creationItems(
           ? `создать «${name}» здесь`
           : `новый проект в ${tildePath(folder)}`,
       keywords: "",
+      ...(exists ? { route: workspaceRoute(join(folder, ...segments)) } : {}),
       actions: exists
         ? [{ id: "open", title: "Открыть" }]
         : [{ id: "create", title: "Создать проект" }],

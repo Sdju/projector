@@ -39,6 +39,8 @@ export interface LaunchItem {
   keywords: string;
   kind: "application" | "project" | "directory" | "github" | "gitlab";
   icon?: string;
+  /** Browser route that opens the project; project-like results become links in the UI. */
+  route?: string;
   section?: LaunchSection;
   /** В избранном: такие результаты идут первыми и в поиске, и в обзоре. */
   favorite?: boolean;

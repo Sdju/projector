@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { sameLocalPath, type Project } from "../projects/index.ts";
 import type { LaunchItem } from "@projector/core/modules/launcher/index.ts";
 import { isDirectory } from "./folders.ts";
-import { tildePath } from "./project-entries.ts";
+import { tildePath, workspaceRoute } from "./project-entries.ts";
 
 /** Direct children that are never a project the user would open from a favorite folder. */
 const SKIP = new Set([
@@ -46,6 +46,7 @@ export async function potentialItems(
         name: entry.name,
         kind: "directory",
         description: `на диске · ${tildePath(folder)}`,
+        route: workspaceRoute(path),
         keywords: path,
         folder: true,
         actions: [{ id: "open", title: "Открыть" }],

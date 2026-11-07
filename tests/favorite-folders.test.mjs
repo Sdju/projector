@@ -49,6 +49,7 @@ test("favorite folders rank first and create projects", async () => {
     kind: "directory",
     actions: [{ id: "open" }],
   });
+  expect(onDisk[0].route).toContain("alpha");
   // The project switcher asks for the project scope without the expensive disk scan.
   const diskless = await createLauncherClient(base).search("/", undefined, { disk: false });
   expect(diskless.items.some((item) => item.id.startsWith("potential:"))).toBe(false);
@@ -75,6 +76,7 @@ test("favorite folders rank first and create projects", async () => {
     kind: "directory",
     actions: [{ id: "open", title: "Открыть" }],
   });
+  expect(direct.items[0].route).toContain("absolute-project");
   expect((await launchItem(direct.items[0].id, "open", true)).route).toContain("absolute-project");
   expect((await searchLauncher(absolute)).items[0].id.startsWith("project:")).toBe(true);
 
@@ -93,6 +95,7 @@ test("favorite folders rank first and create projects", async () => {
   expect((await stat(join(work, "group", "delta"))).isDirectory()).toBe(true);
   const existing = (await searchLauncher("new/gamma")).items[0];
   expect(existing.actions).toEqual([{ id: "open", title: "Открыть" }]);
+  expect(existing.route).toContain("gamma");
   expect((await launchItem(existing.id, "open", true)).route).toContain("gamma");
   await expect(launchItem(offer[0].id, "create", true)).rejects.toThrow("уже существует");
   await expect(launchItem(`new:${join(root, "other")}\nx`, "create", true)).rejects.toThrow(

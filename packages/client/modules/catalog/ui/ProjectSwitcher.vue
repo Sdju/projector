@@ -121,6 +121,16 @@ async function go(path: string) {
   await props.navigate(path);
   await toggle(false);
 }
+/** Модифицированный клик оставляем ссылке: проект откроется в новой вкладке. */
+function activate(event: MouseEvent, item: LaunchItem) {
+  if (
+    item.route &&
+    (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+  )
+    return;
+  event.preventDefault();
+  void pick(item);
+}
 function keydown(event: KeyboardEvent) {
   if (event.key === "ArrowDown" || event.key === "ArrowUp") {
     event.preventDefault();
@@ -176,15 +186,17 @@ function keydown(event: KeyboardEvent) {
       <div :id="listId" class="results" role="listbox">
         <template v-for="row in rows" :key="row.item.id">
           <UiIslandLabel v-if="row.heading">{{ row.heading }}</UiIslandLabel>
-          <button
+          <component
+            :is="row.item.route ? 'a' : 'button'"
             :id="`${listId}-${row.index}`"
+            :href="row.item.route"
             class="row"
             :class="{ active: row.index === selected }"
             role="option"
             :aria-selected="row.index === selected"
-            :disabled="state?.busy"
+            :disabled="row.item.route ? undefined : state?.busy"
             @mousemove="model?.select(row.index)"
-            @click="pick(row.item)"
+            @click="activate($event, row.item)"
           >
             <img v-if="row.item.icon" :src="row.item.icon" alt="" width="28" height="28" />
             <UiActionCopy
@@ -193,7 +205,7 @@ function keydown(event: KeyboardEvent) {
               truncate-title
             />
             <UiBadge v-if="row.item.status">{{ row.item.status.label }}</UiBadge>
-          </button>
+          </component>
         </template>
         <p v-if="state && !state.loading && !items.length" class="empty">Ничего не найдено</p>
         <p v-if="state?.error" class="empty error" role="alert">{{ state.error }}</p>

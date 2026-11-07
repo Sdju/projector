@@ -180,6 +180,7 @@ if (process.argv.includes("--prepare")) {
         })
       ).json();
       expect(opened.route).toMatch(/^\/projects\//);
+      expect(projectItem.route).toBe(opened.route);
       expect(projectItem.status).toBe(undefined);
       expect(
         (
