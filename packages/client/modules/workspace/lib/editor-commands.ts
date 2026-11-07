@@ -141,6 +141,22 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
     (args) => !!commandFile(args) && !commandFile(args)!.external,
   );
   register(
+    "ide.workbench.tree.reveal",
+    "Показать в проекте",
+    (value) => {
+      const { path } = commandArgs(value);
+      if (typeof path !== "string" || !path.trim()) throw new Error("Укажите path");
+      ctx.revealInTree(path);
+    },
+    () => true,
+    undefined,
+    {
+      description:
+        "Открывает боковую панель «Файлы» и показывает в дереве проекта файл или папку по пути относительно корня проекта, раскрывая родительские каталоги.",
+      arguments: { path: "Путь относительно корня проекта" },
+    },
+  );
+  register(
     "ide.editor.file.copyRelativePath",
     "Копировать относительный путь",
     async (args) => {

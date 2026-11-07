@@ -152,6 +152,7 @@ export const baseSidebarViews: SidebarViews = {
       applied: host.gitSync.applied,
       onOpen: (path: string, staged?: boolean, pinned?: boolean) =>
         host.openFile(path, undefined, undefined, staged, { preview: !pinned }),
+      reveal: (path: string) => host.command("ide.workbench.tree.reveal", { path }),
       onOpenCommit: host.files.openCommit,
       onOpenCommitTree: host.openCommitTree,
       onOpenCommitDiff: (hash: string, path: string, pinned?: boolean) =>

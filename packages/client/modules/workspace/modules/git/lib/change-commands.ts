@@ -16,6 +16,8 @@ export interface ChangeCommandContext {
   /** Приводит вкладки и дерево в соответствие с новым состоянием Git. */
   applied: (action: string, paths: string[]) => Promise<void>;
   open: (path: string, staged: boolean | undefined, pinned: boolean) => void;
+  /** Показывает путь в дереве файлов проекта, раскрывая родительские каталоги. */
+  reveal: (path: string) => void;
 }
 
 /** Команды над изменениями рабочей папки: открыть diff или файл, Staged, Unstaged и откат. */
@@ -114,5 +116,16 @@ export function registerChangeCommands(ctx: ChangeCommandContext) {
       },
     });
   }
+  gitCommands.scope.registerCommand({
+    id: "ide.git.reveal",
+    title: "Показать в проекте",
+    description:
+      "Открывает боковую панель «Файлы» и показывает в дереве проекта файл или папку из списка изменений Git, раскрывая родительские каталоги.",
+    arguments: {
+      path: "Путь записи внутри проекта; без аргумента — запись из контекстного меню",
+    },
+    enabled: (value) => !gitBusy.value && !!gitArgs(value).path,
+    run: (value) => ctx.reveal(gitArgs(value).path),
+  });
   return { gitChange, stagedChanges, workingChanges };
 }

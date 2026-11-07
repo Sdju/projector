@@ -32,6 +32,8 @@ const props = defineProps<{
   invalidate: () => void;
   /** Приводит вкладки и дерево в соответствие с новым состоянием Git. */
   applied: (action: string, paths: string[]) => Promise<void>;
+  /** Показывает путь в дереве файлов проекта. */
+  reveal: (path: string) => void;
 }>();
 const emit = defineEmits<{
   open: [path: string, staged?: boolean, pinned?: boolean];
@@ -87,6 +89,7 @@ const { gitChange, stagedChanges, workingChanges } = registerChangeCommands({
   invalidate: props.invalidate,
   applied: props.applied,
   open: (path, staged, pinned) => emit("open", path, staged, pinned),
+  reveal: (path) => props.reveal(path),
 });
 gitCommands.scope.registerCommand({
   id: "ide.git.group.toggle",
@@ -130,6 +133,7 @@ const gitMenuItems = computed<ContextMenuItem[]>(() => {
     ...(file
       ? [gitCommands.item("ide.git.openDiff", args), gitCommands.item("ide.git.openFile", args)]
       : []),
+    gitCommands.item("ide.git.reveal", args),
     gitCommands.item(args.staged ? "ide.git.unstage" : "ide.git.stage", args, { separator: true }),
     ...(!args.staged ? [gitCommands.item("ide.git.discard", args, { danger: true })] : []),
   ];
