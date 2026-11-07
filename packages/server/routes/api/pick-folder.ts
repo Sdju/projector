@@ -1,14 +1,14 @@
 import { pickFolder } from "../../modules/folder-picker/index.ts";
 
-import { json } from "../../modules/transport/index.ts";
+import { json, type RouteDefinition } from "../../modules/transport/index.ts";
 
-import type { RouteContext } from "../../modules/transport/index.ts";
-
-export async function handlePickFolder({ res, method, path }: RouteContext): Promise<boolean> {
-  if (path === "/api/pick-folder" && method === "POST") {
-    const picked = await pickFolder();
-    json(res, 200, { path: picked, cancelled: !picked });
-    return true;
-  }
-  return false;
-}
+export const routes: RouteDefinition[] = [
+  {
+    method: "POST",
+    path: "/api/pick-folder",
+    handler: async ({ res }) => {
+      const picked = await pickFolder();
+      json(res, 200, { path: picked, cancelled: !picked });
+    },
+  },
+];

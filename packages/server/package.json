@@ -18,6 +18,7 @@
     "jsonc-parser": "catalog:",
     "node-gyp": "catalog:",
     "node-pty": "catalog:",
+    "rou3": "catalog:",
     "tldts": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:",

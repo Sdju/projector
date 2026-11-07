@@ -1,3 +1,4 @@
+import { createRouteDispatcher } from "../packages/server/modules/transport/index.ts";
 import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -5,7 +6,8 @@ import { join } from "node:path";
 import { providerBalance } from "../packages/server/modules/providers/balance.ts";
 import { deepseekEntries } from "../packages/server/modules/providers/balance.ts";
 import { inferProviderKind } from "../packages/server/modules/providers/kinds.ts";
-import { handleProvidersBalance } from "../packages/server/routes/api/providers/balance.ts";
+import { routes } from "../packages/server/routes/api/providers/balance.ts";
+const handleProvidersBalance = createRouteDispatcher(routes);
 import { formatBalance } from "../packages/client/modules/provider/model/format-balance.ts";
 
 const payload = {

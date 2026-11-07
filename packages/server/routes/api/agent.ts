@@ -9,7 +9,6 @@ import {
   agentCommands,
   agentControls,
   agentCapabilities,
-  agentMcpServers,
   agentSessions,
   rewindAgentFiles,
   updateAgentSession,
@@ -44,7 +43,13 @@ import {
 import { HttpError } from "../../modules/http/index.ts";
 import { readBody, asString, json } from "../../modules/transport/index.ts";
 
-import type { RouteContext } from "../../modules/transport/index.ts";
+import type { RouteDefinition, RouteHandler } from "../../modules/transport/index.ts";
+
+const route = (method: string, path: string, handler: RouteHandler): RouteDefinition => ({
+  method,
+  path,
+  handler,
+});
 
 async function projectPath(projectId: string): Promise<string> {
   const project = (await loadProjects()).find((item) => item.id === projectId);
@@ -133,93 +138,89 @@ function agentPrograms(): string[] {
   return listAgentBackends().flatMap(({ program }) => (program ? [program] : []));
 }
 
-export async function handleAgent({ req, res, url, method, path }: RouteContext): Promise<boolean> {
-  const historyMatch = path.match(/^\/api\/agent\/history\/([^/]+)$/);
-  if (historyMatch && (method === "GET" || method === "PUT")) {
-    const id = decodeURIComponent(historyMatch[1]!);
-    let turns;
-    if (method === "GET") turns = await readAgentHistory(id);
-    else {
-      const body = await readBody(req);
-      const project = asString(body.projectId);
-      const backend = asString(body.backend);
-      const title = asString(body.title);
-      turns = await writeAgentHistory(
-        id,
-        body.turns,
-        project && backend ? { project, backend, ...(title ? { title } : {}) } : undefined,
-        body.features,
-        body.judge,
-      );
-    }
-    json(res, 200, {
-      turns,
-      features: readChatFeatures(id) ?? null,
-      judge: readChatJudge(id) ?? null,
-    });
-    return true;
-  }
-  if (path === "/api/agent/backends" && method === "GET") {
+async function modeState() {
+  const prefs = await preferences();
+  return {
+    modes: prefs.agentModes,
+    programs: agentPrograms(),
+    disabled: prefs.disabledAgents,
+  };
+}
+
+async function defaultsState() {
+  return { defaults: (await preferences()).agentDefaults };
+}
+
+function historyState<Turns>(id: string, turns: Turns) {
+  return {
+    turns,
+    features: readChatFeatures(id) ?? null,
+    judge: readChatJudge(id) ?? null,
+  };
+}
+
+export const routes: RouteDefinition[] = [
+  route("GET", "/api/agent/history/:id", async ({ res, params }) => {
+    const id = decodeURIComponent(params.id!);
+    json(res, 200, historyState(id, await readAgentHistory(id)));
+  }),
+  route("PUT", "/api/agent/history/:id", async ({ req, res, params }) => {
+    const id = decodeURIComponent(params.id!);
+    const body = await readBody(req);
+    const project = asString(body.projectId);
+    const backend = asString(body.backend);
+    const title = asString(body.title);
+    const turns = await writeAgentHistory(
+      id,
+      body.turns,
+      project && backend ? { project, backend, ...(title ? { title } : {}) } : undefined,
+      body.features,
+      body.judge,
+    );
+    json(res, 200, historyState(id, turns));
+  }),
+  route("GET", "/api/agent/backends", ({ res }) => {
     json(res, 200, { backends: listAgentBackends() });
-    return true;
-  }
-  if (path === "/api/agent/modes" && method === "GET") {
-    const prefs = await preferences();
-    json(res, 200, {
-      modes: prefs.agentModes,
-      programs: agentPrograms(),
-      disabled: prefs.disabledAgents,
-    });
-    return true;
-  }
-  if (path === "/api/agent/modes" && method === "PUT") {
+  }),
+  route("GET", "/api/agent/modes", async ({ res }) => {
+    json(res, 200, await modeState());
+  }),
+  route("PUT", "/api/agent/modes", async ({ req, res }) => {
     const body = await readBody(req);
     if (body.mode !== "tui" && body.mode !== "gui") throw new Error("Неизвестный режим сессии");
     await setAgentMode(asString(body.program), body.mode);
-    const prefs = await preferences();
-    json(res, 200, {
-      modes: prefs.agentModes,
-      programs: agentPrograms(),
-      disabled: prefs.disabledAgents,
-    });
-    return true;
-  }
-  if (path === "/api/agent/integrations" && method === "PUT") {
+    json(res, 200, await modeState());
+  }),
+  route("PUT", "/api/agent/integrations", async ({ req, res }) => {
     const body = await readBody(req);
     if (typeof body.enabled !== "boolean") throw new Error("Укажите, включён ли агент");
     await setAgentEnabled(asString(body.backend), body.enabled);
     json(res, 200, { disabled: (await preferences()).disabledAgents });
-    return true;
-  }
-  if (path === "/api/agent/attachments" && method === "POST") {
+  }),
+  route("POST", "/api/agent/attachments", async ({ req, res, url }) => {
     if (!accessAllowed(req, true))
       throw new HttpError(403, "Загрузка доступна только со страницы Projector");
     const type = (req.headers["content-type"] ?? "").split(";")[0]!.trim();
     json(res, 201, await saveAttachment(req, type, url.searchParams.get("name") ?? ""));
-    return true;
-  }
-  const attachment = path.match(/^\/api\/agent\/attachments\/([0-9a-f]+)$/);
-  if (attachment && method === "GET") {
-    const image = await readAttachment(attachment[1]!);
+  }),
+  route("GET", "/api/agent/attachments/:id([0-9a-f]+)", async ({ res, params }) => {
+    const image = await readAttachment(params.id!);
     if (!image) throw new HttpError(404, "Изображение не найдено");
     res.setHeader("Content-Type", image.mime);
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Cache-Control", "private, max-age=31536000, immutable");
     res.setHeader("Content-Security-Policy", "sandbox; default-src 'none'");
     res.end(image.content);
-    return true;
-  }
-  if (path === "/api/agent/defaults" && method === "GET") {
-    json(res, 200, { defaults: (await preferences()).agentDefaults });
-    return true;
-  }
-  if (path === "/api/agent/defaults" && method === "PUT") {
+  }),
+  route("GET", "/api/agent/defaults", async ({ res }) => {
+    json(res, 200, await defaultsState());
+  }),
+  route("PUT", "/api/agent/defaults", async ({ req, res }) => {
     const body = await readBody(req);
     await setAgentDefault(asString(body.backend), asString(body.id), asString(body.value));
-    json(res, 200, { defaults: (await preferences()).agentDefaults });
-    return true;
-  }
-  if (path === "/api/agent/controls" && method === "GET") {
+    json(res, 200, await defaultsState());
+  }),
+  route("GET", "/api/agent/controls", async ({ res, url }) => {
     const projectId = url.searchParams.get("projectId") ?? "";
     // The Projector agent also works outside any project, on the catalog.
     const cwd = projectId ? await projectPath(projectId) : "";
@@ -228,22 +229,14 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
       controls: await agentControls(backend, cwd),
       capabilities: agentCapabilities(backend),
     });
-    return true;
-  }
-  if (path === "/api/agent/commands" && method === "GET") {
+  }),
+  route("GET", "/api/agent/commands", async ({ res, url }) => {
     const projectId = url.searchParams.get("projectId") ?? "";
     const cwd = projectId ? await projectPath(projectId) : "";
     const backend = url.searchParams.get("backend") ?? undefined;
     json(res, 200, { commands: await agentCommands(backend, cwd) });
-    return true;
-  }
-  if (path === "/api/agent/mcp" && method === "GET") {
-    const cwd = await projectPath(url.searchParams.get("projectId") ?? "");
-    const backend = url.searchParams.get("backend") ?? undefined;
-    json(res, 200, { servers: await agentMcpServers(backend, cwd) });
-    return true;
-  }
-  if (path === "/api/agent/rewind-files" && method === "POST") {
+  }),
+  route("POST", "/api/agent/rewind-files", async ({ req, res }) => {
     if (!accessAllowed(req, true))
       throw new HttpError(403, "Откат доступен только со страницы Projector");
     const body = await readBody(req);
@@ -260,17 +253,15 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
         body.dryRun === true,
       ),
     );
-    return true;
-  }
-  if (path === "/api/agent/sessions" && method === "GET") {
+  }),
+  route("GET", "/api/agent/sessions", async ({ res, url }) => {
     const projectId = url.searchParams.get("projectId") ?? "";
     const cwd = await projectPath(projectId);
     const backend = url.searchParams.get("backend") ?? "";
     const sessions = await agentSessions(backend || undefined, cwd);
     json(res, 200, { sessions: await withoutInjectedTitles(sessions, backend, projectId) });
-    return true;
-  }
-  if (path === "/api/agent/sessions/update" && method === "POST") {
+  }),
+  route("POST", "/api/agent/sessions/update", async ({ req, res }) => {
     if (!accessAllowed(req, true))
       throw new HttpError(403, "Изменение доступно только со страницы Projector");
     const body = await readBody(req);
@@ -282,9 +273,8 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
       ...(typeof body.pinned === "boolean" ? { pinned: body.pinned } : {}),
     });
     json(res, 200, { ok: true });
-    return true;
-  }
-  if (path === "/api/agent/sessions/delete" && method === "POST") {
+  }),
+  route("POST", "/api/agent/sessions/delete", async ({ req, res }) => {
     if (!accessAllowed(req, true))
       throw new HttpError(403, "Удаление доступно только со страницы Projector");
     const body = await readBody(req);
@@ -296,9 +286,8 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
       ...(asString(body.chat) ? { keep: asString(body.chat) } : {}),
     });
     json(res, 200, { ok: true });
-    return true;
-  }
-  if (path === "/api/agent/sessions/load" && method === "POST") {
+  }),
+  route("POST", "/api/agent/sessions/load", async ({ req, res }) => {
     const body = await readBody(req);
     const project = asString(body.projectId);
     const backend = asString(body.backend);
@@ -307,18 +296,16 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
     if (!sessionId) throw new Error("Укажите сессию");
     const turns = await loadAgentSession(backend, cwd, sessionId);
     json(res, 200, { turns: await withoutInjected(turns, backend, project, sessionId) });
-    return true;
-  }
-  if (path === "/api/agent/tool-result" && method === "POST") {
+  }),
+  route("POST", "/api/agent/tool-result", async ({ req, res }) => {
     const body = await readBody(req);
     const accepted = completeCommandRequest(asString(body.id), {
       output: body.output,
       error: asString(body.error) || undefined,
     });
     json(res, accepted ? 200 : 410, { accepted });
-    return true;
-  }
-  if (path === "/api/agent/inject" && method === "POST") {
+  }),
+  route("POST", "/api/agent/inject", async ({ req, res }) => {
     if (!accessAllowed(req, true))
       throw new HttpError(403, "Доступно только со страницы Projector");
     const body = await readBody(req);
@@ -330,28 +317,22 @@ export async function handleAgent({ req, res, url, method, path }: RouteContext)
       asString(body.inputId) || undefined,
     );
     json(res, accepted ? 200 : 410, { accepted });
-    return true;
-  }
-  if (path === "/api/agent/runs" && method === "GET") {
+  }),
+  route("GET", "/api/agent/runs", async ({ res }) => {
     json(res, 200, { runs: await listLiveRuns() });
-    return true;
-  }
-  if (path === "/api/agent/cancel" && method === "POST") {
+  }),
+  route("POST", "/api/agent/cancel", async ({ req, res }) => {
     const body = await readBody(req);
     await cancelRun(asString(body.runId));
     json(res, 200, { ok: true });
-    return true;
-  }
-  if (path === "/api/agent/detach" && method === "POST") {
+  }),
+  route("POST", "/api/agent/detach", async ({ req, res }) => {
     const body = await readBody(req);
     detachEventStream(asString(body.stream));
     json(res, 200, { ok: true });
-    return true;
-  }
-  if (path === "/api/agent" && method === "POST") {
+  }),
+  route("POST", "/api/agent", async ({ req, res }) => {
     const body = await readBody(req);
     await handleAgentRun({ res, body });
-    return true;
-  }
-  return false;
-}
+  }),
+];

@@ -1,9 +1,13 @@
 import { openCodeUsage } from "../../modules/agents-integration/opencode/index.ts";
-import { json, type RouteContext } from "../../modules/transport/index.ts";
+import { json, type RouteDefinition } from "../../modules/transport/index.ts";
 
-export async function handleOpenCode({ res, method, path }: RouteContext) {
-  if (path !== "/api/opencode/usage" || method !== "GET") return false;
-  res.setHeader("Cache-Control", "no-store");
-  json(res, 200, await openCodeUsage());
-  return true;
-}
+export const routes: RouteDefinition[] = [
+  {
+    method: "GET",
+    path: "/api/opencode/usage",
+    handler: async ({ res }) => {
+      res.setHeader("Cache-Control", "no-store");
+      json(res, 200, await openCodeUsage());
+    },
+  },
+];

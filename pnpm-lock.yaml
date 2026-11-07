@@ -293,6 +293,9 @@ catalogs:
     node-pty:
       specifier: ^1.1.0
       version: 1.1.0
+    rou3:
+      specifier: ^1.0.0
+      version: 1.0.0
     tldts:
       specifier: ^7.4.18
       version: 7.4.18
@@ -559,6 +562,9 @@ importers:
       node-pty:
         specifier: 'catalog:'
         version: 1.1.0
+      rou3:
+        specifier: 'catalog:'
+        version: 1.0.0
       tldts:
         specifier: 'catalog:'
         version: 7.4.18
@@ -3581,6 +3587,10 @@ packages:
 
   rope-sequence@1.3.4:
     resolution: {integrity: sha512-UT5EDe2cu2E/6O4igUr5PSFs23nvvukicWHx6GnOPlHAiiYbzNuCRQCuiUdHJQcqKalLKlrYJnjY0ySGsXNQXQ==}
+
+  rou3@1.0.0:
+    resolution: {integrity: sha512-ySeaQkSrua+ut9g+65I7FHqOFBaY8tV0FmccXItoq0q21se32Q3u4YiW7/RqXSosWgYJaaKwRHXy3BST9PeCNQ==}
+    engines: {node: '>=20.19.0'}
 
   router@2.2.0:
     resolution: {integrity: sha512-nLTrUKm2UyiL7rlhapu/Zl45FwNgkZGaCpZbIHajDYgwlJCOzLSk+cIPAnsEqV955GjILJnKbdQC1nVPz+gAYQ==}
@@ -7906,6 +7916,8 @@ snapshots:
     optional: true
 
   rope-sequence@1.3.4: {}
+
+  rou3@1.0.0: {}
 
   router@2.2.0:
     dependencies:

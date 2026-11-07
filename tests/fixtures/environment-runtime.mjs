@@ -164,10 +164,13 @@ try {
     join(root, "packages/server/app/deferred.ts"),
     'export const value = "loaded later";',
   );
-  const healthSource = (await readFile(healthFile, "utf8")).replace(
-    "ok: true,",
-    'ok: true, deferred: (await import(new URL("../../app/deferred.ts", import.meta.url).href)).value,',
-  );
+  const healthSource = (await readFile(healthFile, "utf8"))
+    // The fixture injects a deferred import even when the real health handler is synchronous.
+    .replace(/handler:\s*(?:async\s+)?\(/, "handler: async (")
+    .replace(
+      "ok: true,",
+      'ok: true, deferred: (await import(new URL("../../app/deferred.ts", import.meta.url).href)).value,',
+    );
   const health = (revision) =>
     healthSource.replace("ok: true,", `ok: true, revision: ${revision},`);
   const controlFile = join(root, "packages/server/modules/terminal-control/control.ts");
@@ -223,8 +226,8 @@ try {
   await writeFile(
     healthFile,
     health(15).replace(
-      '  if (path === "/api/health"',
-      '  if (path === "/api/test-once" && method === "POST") { globalThis.testMutations = (globalThis.testMutations ?? 0) + 1; throw new Error("request failure"); }\n  if (path === "/api/health"',
+      "export const routes: RouteDefinition[] = [",
+      'export const routes: RouteDefinition[] = [{ method: "POST", path: "/api/test-once", handler: () => { globalThis.testMutations = (globalThis.testMutations ?? 0) + 1; throw new Error("request failure"); } },',
     ),
   );
   await until(async () => (await call("/api/health")).revision === 15, "mutation test activated");

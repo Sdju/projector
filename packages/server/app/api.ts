@@ -1,117 +1,120 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { HttpError } from "../modules/http/index.ts";
-import { json } from "../modules/transport/index.ts";
+import { createRouteDispatcher, json } from "../modules/transport/index.ts";
 import { localOrigin } from "../middlewares/local-origin.ts";
-import { handleIntegrationsActions } from "../routes/api/integrations/[...action].ts";
-import { handleGithubBrowse } from "../routes/api/integrations/github-browse.ts";
-import { handleDirectories } from "../routes/api/directories.ts";
-import { handleHealth } from "../routes/api/health.ts";
-import { handleAppOpen } from "../routes/api/app/open.ts";
-import { handleAppHide } from "../routes/api/app/hide.ts";
-import { handleAppRestart } from "../routes/api/app/restart.ts";
-import { handleAppMode } from "../routes/api/app/mode.ts";
-import { handleAppQuit } from "../routes/api/app/quit.ts";
-import { handleAppNetwork } from "../routes/api/app/network.ts";
-import { handleLauncherSettings } from "../routes/api/launcher/settings.ts";
-import { handleLauncherSearch } from "../routes/api/launcher/search.ts";
-import { handleLauncherLaunch } from "../routes/api/launcher/launch.ts";
-import { handleLauncherIcon } from "../routes/api/launcher/icon.ts";
-import { handleEvents } from "../routes/api/events.ts";
-import { handleStatus } from "../routes/api/status.ts";
-import { handleProviders } from "../routes/api/providers.ts";
-import { handleProvidersActive } from "../routes/api/providers/active.ts";
-import { handleProvidersBalance } from "../routes/api/providers/balance.ts";
-import { handleProvidersModels } from "../routes/api/providers/models.ts";
-import { handleAgent } from "../routes/api/agent.ts";
-import { handleAgentFormRepair } from "../routes/api/agent-form-repair.ts";
-import { handleAgentLens } from "../routes/api/agent-lens.ts";
-import { handleAgentSide } from "../routes/api/agent-side.ts";
-import { handleAgentSkills } from "../routes/api/agent-skills.ts";
-import { handleAgentFeatures } from "../routes/api/agent-features.ts";
-import { handleAgentJudge } from "../routes/api/agent-judge.ts";
-import { handleAgentWeb } from "../routes/api/agent-web.ts";
-import { handleAgentMcp } from "../routes/api/agent-mcp.ts";
-import { handleAgentHooks } from "../routes/api/agent-hooks.ts";
-import { handleAgentMemory } from "../routes/api/agent-memory.ts";
-import { handleAgentJobs } from "../routes/api/agent-jobs.ts";
-import { handleAgentChats } from "../routes/api/agent-chats.ts";
-import { handleAgentWorktrees } from "../routes/api/agent-worktrees.ts";
-import { handleInspect } from "../routes/api/inspect.ts";
-import { handlePickFolder } from "../routes/api/pick-folder.ts";
-import { handlePreviewIcon } from "../routes/api/preview-icon.ts";
-import { handleProjectsIndex } from "../routes/api/projects/index.ts";
-import { handleProjectWorkspace } from "../routes/api/projects/[id]/workspace.ts";
-import { handleProjectSite } from "../routes/api/projects/[id]/site.ts";
-import { handleProjectTerminals } from "../routes/api/projects/[id]/terminals.ts";
-import { handleProjectActions } from "../routes/api/projects/[id]/index.ts";
-import { handleIdeKeybindings } from "../routes/api/ide/keybindings.ts";
-import { handleIdeCommands } from "../routes/api/ide/commands.ts";
-import { handleEditorSettings } from "../routes/api/ide/editor.ts";
-import { handleFilesExclude } from "../routes/api/ide/files-exclude.ts";
-import { handleDocker } from "../routes/api/docker.ts";
-import { handleCodex } from "../routes/api/codex.ts";
-import { handleOpenCode } from "../routes/api/opencode.ts";
-import { handleCursor } from "../routes/api/cursor.ts";
-import { handleKimi } from "../routes/api/kimi.ts";
-import { handleClaude } from "../routes/api/claude.ts";
-import { handleOpenAi } from "../routes/api/openai.ts";
-import { handleBrowser } from "../routes/api/browser.ts";
-const routes = [
-  handleOpenAi,
-  handleBrowser,
-  handleClaude,
-  handleCursor,
-  handleKimi,
-  handleOpenCode,
-  handleCodex,
-  handleDocker,
-  handleFilesExclude,
-  handleEditorSettings,
-  handleIdeKeybindings,
-  handleIdeCommands,
-  handleGithubBrowse,
-  handleIntegrationsActions,
-  handleDirectories,
-  handleHealth,
-  handleAppOpen,
-  handleAppHide,
-  handleAppRestart,
-  handleAppQuit,
-  handleAppMode,
-  handleAppNetwork,
-  handleLauncherSettings,
-  handleLauncherSearch,
-  handleLauncherLaunch,
-  handleLauncherIcon,
-  handleEvents,
-  handleStatus,
-  handleProviders,
-  handleProvidersActive,
-  handleProvidersBalance,
-  handleProvidersModels,
-  handleAgentMemory,
-  handleAgentMcp,
-  handleAgentHooks,
-  handleAgentWeb,
-  handleAgentSkills,
-  handleAgentFeatures,
-  handleAgentJudge,
-  handleAgent,
-  handleAgentFormRepair,
-  handleAgentLens,
-  handleAgentSide,
-  handleAgentJobs,
-  handleAgentChats,
-  handleAgentWorktrees,
-  handleInspect,
-  handlePickFolder,
-  handlePreviewIcon,
-  handleProjectsIndex,
-  handleProjectSite,
-  handleProjectWorkspace,
-  handleProjectTerminals,
-  handleProjectActions,
-];
+import { routes as integrationsActionsRoutes } from "../routes/api/integrations/[...action].ts";
+import { routes as githubBrowseRoutes } from "../routes/api/integrations/github-browse.ts";
+import { routes as directoriesRoutes } from "../routes/api/directories.ts";
+import { routes as healthRoutes } from "../routes/api/health.ts";
+import { routes as appOpenRoutes } from "../routes/api/app/open.ts";
+import { routes as appHideRoutes } from "../routes/api/app/hide.ts";
+import { routes as appRestartRoutes } from "../routes/api/app/restart.ts";
+import { routes as appModeRoutes } from "../routes/api/app/mode.ts";
+import { routes as appQuitRoutes } from "../routes/api/app/quit.ts";
+import { routes as appNetworkRoutes } from "../routes/api/app/network.ts";
+import { routes as launcherSettingsRoutes } from "../routes/api/launcher/settings.ts";
+import { routes as launcherSearchRoutes } from "../routes/api/launcher/search.ts";
+import { routes as launcherLaunchRoutes } from "../routes/api/launcher/launch.ts";
+import { routes as launcherIconRoutes } from "../routes/api/launcher/icon.ts";
+import { routes as eventsRoutes } from "../routes/api/events.ts";
+import { routes as statusRoutes } from "../routes/api/status.ts";
+import { routes as providersRoutes } from "../routes/api/providers.ts";
+import { routes as providersActiveRoutes } from "../routes/api/providers/active.ts";
+import { routes as providersBalanceRoutes } from "../routes/api/providers/balance.ts";
+import { routes as providersModelsRoutes } from "../routes/api/providers/models.ts";
+import { routes as agentRoutes } from "../routes/api/agent.ts";
+import { routes as agentFormRepairRoutes } from "../routes/api/agent-form-repair.ts";
+import { routes as agentLensRoutes } from "../routes/api/agent-lens.ts";
+import { routes as agentSideRoutes } from "../routes/api/agent-side.ts";
+import { routes as agentSkillsRoutes } from "../routes/api/agent-skills.ts";
+import { routes as agentFeaturesRoutes } from "../routes/api/agent-features.ts";
+import { routes as agentJudgeRoutes } from "../routes/api/agent-judge.ts";
+import { routes as agentWebRoutes } from "../routes/api/agent-web.ts";
+import { routes as agentMcpRoutes } from "../routes/api/agent-mcp.ts";
+import { routes as agentHooksRoutes } from "../routes/api/agent-hooks.ts";
+import { routes as agentMemoryRoutes } from "../routes/api/agent-memory.ts";
+import { routes as agentJobsRoutes } from "../routes/api/agent-jobs.ts";
+import { routes as agentChatsRoutes } from "../routes/api/agent-chats.ts";
+import { routes as agentWorktreesRoutes } from "../routes/api/agent-worktrees.ts";
+import { routes as inspectRoutes } from "../routes/api/inspect.ts";
+import { routes as pickFolderRoutes } from "../routes/api/pick-folder.ts";
+import { routes as previewIconRoutes } from "../routes/api/preview-icon.ts";
+import { routes as projectsIndexRoutes } from "../routes/api/projects/index.ts";
+import { routes as projectWorkspaceRoutes } from "../routes/api/projects/[id]/workspace.ts";
+import { routes as projectWorkspaceReadRoutes } from "../routes/api/projects/[id]/workspace-read.ts";
+import { routes as projectSiteRoutes } from "../routes/api/projects/[id]/site.ts";
+import { routes as projectTerminalsRoutes } from "../routes/api/projects/[id]/terminals.ts";
+import { routes as projectActionsRoutes } from "../routes/api/projects/[id]/index.ts";
+import { routes as ideKeybindingsRoutes } from "../routes/api/ide/keybindings.ts";
+import { routes as ideCommandsRoutes } from "../routes/api/ide/commands.ts";
+import { routes as editorSettingsRoutes } from "../routes/api/ide/editor.ts";
+import { routes as filesExcludeRoutes } from "../routes/api/ide/files-exclude.ts";
+import { routes as dockerRoutes } from "../routes/api/docker.ts";
+import { routes as codexRoutes } from "../routes/api/codex.ts";
+import { routes as openCodeRoutes } from "../routes/api/opencode.ts";
+import { routes as cursorRoutes } from "../routes/api/cursor.ts";
+import { routes as kimiRoutes } from "../routes/api/kimi.ts";
+import { routes as claudeRoutes } from "../routes/api/claude.ts";
+import { routes as openAiRoutes } from "../routes/api/openai.ts";
+import { routes as browserRoutes } from "../routes/api/browser.ts";
+const dispatch = createRouteDispatcher([
+  ...openAiRoutes,
+  ...browserRoutes,
+  ...claudeRoutes,
+  ...cursorRoutes,
+  ...kimiRoutes,
+  ...openCodeRoutes,
+  ...codexRoutes,
+  ...dockerRoutes,
+  ...filesExcludeRoutes,
+  ...editorSettingsRoutes,
+  ...ideKeybindingsRoutes,
+  ...ideCommandsRoutes,
+  ...githubBrowseRoutes,
+  ...integrationsActionsRoutes,
+  ...directoriesRoutes,
+  ...healthRoutes,
+  ...appOpenRoutes,
+  ...appHideRoutes,
+  ...appRestartRoutes,
+  ...appQuitRoutes,
+  ...appModeRoutes,
+  ...appNetworkRoutes,
+  ...launcherSettingsRoutes,
+  ...launcherSearchRoutes,
+  ...launcherLaunchRoutes,
+  ...launcherIconRoutes,
+  ...eventsRoutes,
+  ...statusRoutes,
+  ...providersRoutes,
+  ...providersActiveRoutes,
+  ...providersBalanceRoutes,
+  ...providersModelsRoutes,
+  ...agentMemoryRoutes,
+  ...agentMcpRoutes,
+  ...agentHooksRoutes,
+  ...agentWebRoutes,
+  ...agentSkillsRoutes,
+  ...agentFeaturesRoutes,
+  ...agentJudgeRoutes,
+  ...agentRoutes,
+  ...agentFormRepairRoutes,
+  ...agentLensRoutes,
+  ...agentSideRoutes,
+  ...agentJobsRoutes,
+  ...agentChatsRoutes,
+  ...agentWorktreesRoutes,
+  ...inspectRoutes,
+  ...pickFolderRoutes,
+  ...previewIconRoutes,
+  ...projectsIndexRoutes,
+  ...projectSiteRoutes,
+  ...projectWorkspaceRoutes,
+  ...projectWorkspaceReadRoutes,
+  ...projectTerminalsRoutes,
+  ...projectActionsRoutes,
+]);
+
 export async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
   let url: URL;
   try {
@@ -122,10 +125,11 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse): Prom
     return true;
   }
   if (!url.pathname.startsWith("/api")) return false;
-  const context = { req, res, url, path: url.pathname, method: req.method ?? "GET" };
+  const method = req.method ?? "GET";
+  const context = { req, res, url, path: url.pathname, method };
   try {
     if (!localOrigin(context)) return true;
-    for (const route of routes) if (await route(context)) return true;
+    if (await dispatch(context)) return true;
     json(res, 404, { error: "Не найден" });
   } catch (error) {
     json(res, error instanceof HttpError ? error.status : 400, {

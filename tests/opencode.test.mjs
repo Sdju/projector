@@ -1,3 +1,4 @@
+import { createRouteDispatcher } from "../packages/server/modules/transport/index.ts";
 import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -8,7 +9,8 @@ import {
   goWindows,
   openCodeUsage,
 } from "../packages/server/modules/agents-integration/opencode/usage.ts";
-import { handleOpenCode } from "../packages/server/routes/api/opencode.ts";
+import { routes } from "../packages/server/routes/api/opencode.ts";
+const handleOpenCode = createRouteDispatcher(routes);
 import { resetCountdown } from "../packages/client/common/utilities/reset-time.ts";
 
 const window = { status: "ok", percent: 42, resetsAt: "2026-10-10T12:00:00Z" };

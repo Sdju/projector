@@ -27,7 +27,7 @@ import { accessAllowed } from "../../modules/access/index.ts";
 import { HttpError } from "../../modules/http/index.ts";
 import { loadProjects } from "../../modules/projects/index.ts";
 import { asString, json, readBody } from "../../modules/transport/index.ts";
-import type { RouteContext } from "../../modules/transport/index.ts";
+import type { RouteContext, RouteDefinition } from "../../modules/transport/index.ts";
 
 /** The longest task text. */
 const TASK_LIMIT = 20_000;
@@ -92,166 +92,212 @@ async function startFrom(body: Record<string, unknown>) {
 }
 
 /** Background agent jobs: start, list, read with the journal, stop, answer and remove. */
-export async function handleAgentJobs({
-  req,
-  res,
-  url,
-  method,
-  path,
-}: RouteContext): Promise<boolean> {
-  if (path === "/api/agent/jobs" && method === "GET") {
-    json(res, 200, { jobs: await listJobs(url.searchParams.get("projectId") || undefined) });
-    return true;
-  }
-  if (path === "/api/agent/jobs" && method === "POST") {
-    pageOnly(req);
-    json(res, 201, { job: await startFrom(await readBody(req)) });
-    return true;
-  }
-  const match = path.match(
-    /^\/api\/agent\/jobs\/([0-9a-f]{12})(?:\/(stop|answer|diff|send|retry|fork|worktree(?:\/(?:merge|discard))?))?$/,
-  );
-  if (!match) return false;
-  const id = match[1]!;
-  const action = match[2];
-  if (action === "diff" && method === "GET") {
-    const found = await readJob(id);
-    if (!found) throw new HttpError(404, "Задание не найдено");
-    if (found.job.worktreeCleared)
-      throw new HttpError(409, "Изолированная копия удалена или передана другому заданию");
-    const limit = Number(url.searchParams.get("limit"));
-    json(res, 200, {
-      diff: await jobDiff(found.job.cwd, limit || undefined, found.job.base, found.job.dirty),
-    });
-    return true;
-  }
-  if (action === "send" && method === "POST") {
-    pageOnly(req);
-    const found = await readJob(id);
-    if (!found) throw new HttpError(404, "Задание не найдено");
-    const text = asString((await readBody(req)).text).trim();
-    if (!text) throw new HttpError(400, "Напишите уточнение агенту");
-    if (isFinished(found.job.status)) {
-      // A finished job takes a follow-up as a new run in the same record, copy and session.
+export const routes: RouteDefinition[] = [
+  {
+    method: "GET",
+    path: "/api/agent/jobs",
+    handler: async ({ res, url }) => {
+      json(res, 200, { jobs: await listJobs(url.searchParams.get("projectId") || undefined) });
+    },
+  },
+  {
+    method: "POST",
+    path: "/api/agent/jobs",
+    handler: async ({ req, res }) => {
+      pageOnly(req);
+      json(res, 201, { job: await startFrom(await readBody(req)) });
+    },
+  },
+  {
+    method: "GET",
+    path: "/api/agent/jobs/:id([0-9a-f]{12})",
+    handler: async ({ res, url, params }) => {
+      const id = params.id!;
+      const wait = Math.min(Math.max(Number(url.searchParams.get("wait")) || 0, 0), WAIT_LIMIT);
+      const rev = Number(url.searchParams.get("rev"));
+      const found =
+        wait && Number.isFinite(rev) ? await waitForJob(id, rev, wait) : await readJob(id);
+      if (!found) throw new HttpError(404, "Задание не найдено");
+      json(res, 200, found);
+    },
+  },
+  {
+    method: "DELETE",
+    path: "/api/agent/jobs/:id([0-9a-f]{12})",
+    handler: async ({ req, res, params }) => {
+      pageOnly(req);
+      await removeJob(params.id!);
+      json(res, 200, { ok: true });
+    },
+  },
+  {
+    method: "GET",
+    path: "/api/agent/jobs/:id([0-9a-f]{12})/diff",
+    handler: async ({ res, url, params }) => {
+      const found = await readJob(params.id!);
+      if (!found) throw new HttpError(404, "Задание не найдено");
+      if (found.job.worktreeCleared)
+        throw new HttpError(409, "Изолированная копия удалена или передана другому заданию");
+      const limit = Number(url.searchParams.get("limit"));
+      json(res, 200, {
+        diff: await jobDiff(found.job.cwd, limit || undefined, found.job.base, found.job.dirty),
+      });
+    },
+  },
+  {
+    method: "POST",
+    path: "/api/agent/jobs/:id([0-9a-f]{12})/send",
+    handler: async ({ req, res, params }) => {
+      const id = params.id!;
+      pageOnly(req);
+      const found = await readJob(id);
+      if (!found) throw new HttpError(404, "Задание не найдено");
+      const text = asString((await readBody(req)).text).trim();
+      if (!text) throw new HttpError(400, "Напишите уточнение агенту");
+      if (isFinished(found.job.status)) {
+        // A finished job takes a follow-up as a new run in the same record, copy and session.
+        try {
+          const job = await followUpJob(id, text);
+          if (!job) throw new HttpError(404, "Задание не найдено");
+          json(res, 200, { accepted: true, continued: true, job });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "";
+          if (/ещё работает|уже занята/.test(message)) throw new HttpError(409, message);
+          throw error;
+        }
+        return;
+      }
+      const accepted = await injectMessage(found.job.messageId, text);
+      json(res, 200, { accepted, continued: false });
+    },
+  },
+  {
+    method: "POST",
+    path: "/api/agent/jobs/:id([0-9a-f]{12})/retry",
+    handler: async ({ req, res, params }) => {
+      const id = params.id!;
+      pageOnly(req);
+      const body = await readBody(req);
+      const task = asString(body.task).trim() || undefined;
+      if (task && task.length > TASK_LIMIT)
+        throw new Error(`Задание длиннее ${TASK_LIMIT} символов`);
+      const found = await readJob(id);
+      if (!found) throw new HttpError(404, "Задание не найдено");
+      if (!isHostedAgent(found.job.backend) || !isAgentAvailable(found.job.backend))
+        throw new Error("Агент этого задания больше не может работать в фоне");
+      let job;
       try {
-        const job = await followUpJob(id, text);
-        if (!job) throw new HttpError(404, "Задание не найдено");
-        json(res, 200, { accepted: true, continued: true, job });
+        job = await retryJob(id, task, body.append === true);
       } catch (error) {
         const message = error instanceof Error ? error.message : "";
         if (/ещё работает|уже занята/.test(message)) throw new HttpError(409, message);
         throw error;
       }
-      return true;
-    }
-    const accepted = await injectMessage(found.job.messageId, text);
-    json(res, 200, { accepted, continued: false });
-    return true;
-  }
-  if (action === "retry" && method === "POST") {
-    pageOnly(req);
-    const body = await readBody(req);
-    const task = asString(body.task).trim() || undefined;
-    if (task && task.length > TASK_LIMIT) throw new Error(`Задание длиннее ${TASK_LIMIT} символов`);
-    const found = await readJob(id);
-    if (!found) throw new HttpError(404, "Задание не найдено");
-    if (!isHostedAgent(found.job.backend) || !isAgentAvailable(found.job.backend))
-      throw new Error("Агент этого задания больше не может работать в фоне");
-    let job;
-    try {
-      job = await retryJob(id, task, body.append === true);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "";
-      if (/ещё работает|уже занята/.test(message)) throw new HttpError(409, message);
-      throw error;
-    }
-    json(res, 201, { job });
-    return true;
-  }
-  if (action === "fork" && method === "POST") {
-    pageOnly(req);
-    const task = asString((await readBody(req)).task).trim() || undefined;
-    if (task && task.length > TASK_LIMIT) throw new Error(`Задание длиннее ${TASK_LIMIT} символов`);
-    try {
-      const job = await forkJob(id, task);
-      if (!job) throw new HttpError(404, "Задание не найдено");
       json(res, 201, { job });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "";
-      if (/Дождитесь|уже занята/.test(message)) throw new HttpError(409, message);
-      throw error;
-    }
-    return true;
-  }
-  if (action === "worktree" && method === "GET") {
-    const found = await readJob(id);
-    if (!found) throw new HttpError(404, "Задание не найдено");
-    if (!found.job.worktree) {
-      json(res, 200, { worktree: null });
-      return true;
-    }
-    const project = (await loadProjects()).find((item) => item.id === found.job.projectId);
-    if (!project) throw new HttpError(404, "Проект не найден");
-    json(res, 200, {
-      worktree: await worktreeStatus(project.id, found.job.worktree.id, project.path),
-    });
-    return true;
-  }
-  if ((action === "worktree/merge" || action === "worktree/discard") && method === "POST") {
-    pageOnly(req);
-    try {
-      const result = await settleJobWorktree(id, action.endsWith("/merge") ? "merge" : "discard");
-      if (!result) throw new HttpError(404, "Задание не найдено");
-      json(res, 200, result);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "";
-      if (/Дождитесь|уже занята/.test(message)) throw new HttpError(409, message);
-      if (/Проект не найден/.test(message)) throw new HttpError(404, message);
-      throw error;
-    }
-    return true;
-  }
-  if (!action && method === "GET") {
-    const wait = Math.min(Math.max(Number(url.searchParams.get("wait")) || 0, 0), WAIT_LIMIT);
-    const rev = Number(url.searchParams.get("rev"));
-    const found =
-      wait && Number.isFinite(rev) ? await waitForJob(id, rev, wait) : await readJob(id);
-    if (!found) throw new HttpError(404, "Задание не найдено");
-    json(res, 200, found);
-    return true;
-  }
-  if (!action && method === "DELETE") {
-    pageOnly(req);
-    await removeJob(id);
-    json(res, 200, { ok: true });
-    return true;
-  }
-  if (action === "stop" && method === "POST") {
-    pageOnly(req);
-    const job = await stopJob(id);
-    if (!job) throw new HttpError(404, "Задание не найдено");
-    json(res, 200, { job });
-    return true;
-  }
-  if (action === "answer" && method === "POST") {
-    pageOnly(req);
-    const body = await readBody(req);
-    const answers = body.answers;
-    json(res, 200, {
-      job: await answerJob(id, {
-        request: asString(body.request) || undefined,
-        allow: typeof body.allow === "boolean" ? body.allow : undefined,
-        always: typeof body.always === "boolean" ? body.always : undefined,
-        text: asString(body.text) || undefined,
-        answers:
-          answers === null
-            ? null
-            : answers && typeof answers === "object"
-              ? (answers as Record<string, string[]>)
-              : undefined,
-      }),
-    });
-    return true;
-  }
-  return false;
-}
+    },
+  },
+  {
+    method: "POST",
+    path: "/api/agent/jobs/:id([0-9a-f]{12})/fork",
+    handler: async ({ req, res, params }) => {
+      const id = params.id!;
+      pageOnly(req);
+      const task = asString((await readBody(req)).task).trim() || undefined;
+      if (task && task.length > TASK_LIMIT)
+        throw new Error(`Задание длиннее ${TASK_LIMIT} символов`);
+      try {
+        const job = await forkJob(id, task);
+        if (!job) throw new HttpError(404, "Задание не найдено");
+        json(res, 201, { job });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (/Дождитесь|уже занята/.test(message)) throw new HttpError(409, message);
+        throw error;
+      }
+    },
+  },
+  {
+    method: "GET",
+    path: "/api/agent/jobs/:id([0-9a-f]{12})/worktree",
+    handler: async ({ res, params }) => {
+      const found = await readJob(params.id!);
+      if (!found) throw new HttpError(404, "Задание не найдено");
+      if (!found.job.worktree) {
+        json(res, 200, { worktree: null });
+        return;
+      }
+      const project = (await loadProjects()).find((item) => item.id === found.job.projectId);
+      if (!project) throw new HttpError(404, "Проект не найден");
+      json(res, 200, {
+        worktree: await worktreeStatus(project.id, found.job.worktree.id, project.path),
+      });
+    },
+  },
+  {
+    method: "POST",
+    path: "/api/agent/jobs/:id([0-9a-f]{12})/worktree/merge",
+    handler: async ({ req, res, params }) => {
+      pageOnly(req);
+      try {
+        const result = await settleJobWorktree(params.id!, "merge");
+        if (!result) throw new HttpError(404, "Задание не найдено");
+        json(res, 200, result);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (/Дождитесь|уже занята/.test(message)) throw new HttpError(409, message);
+        if (/Проект не найден/.test(message)) throw new HttpError(404, message);
+        throw error;
+      }
+    },
+  },
+  {
+    method: "POST",
+    path: "/api/agent/jobs/:id([0-9a-f]{12})/worktree/discard",
+    handler: async ({ req, res, params }) => {
+      pageOnly(req);
+      try {
+        const result = await settleJobWorktree(params.id!, "discard");
+        if (!result) throw new HttpError(404, "Задание не найдено");
+        json(res, 200, result);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (/Дождитесь|уже занята/.test(message)) throw new HttpError(409, message);
+        if (/Проект не найден/.test(message)) throw new HttpError(404, message);
+        throw error;
+      }
+    },
+  },
+  {
+    method: "POST",
+    path: "/api/agent/jobs/:id([0-9a-f]{12})/stop",
+    handler: async ({ req, res, params }) => {
+      pageOnly(req);
+      const job = await stopJob(params.id!);
+      if (!job) throw new HttpError(404, "Задание не найдено");
+      json(res, 200, { job });
+    },
+  },
+  {
+    method: "POST",
+    path: "/api/agent/jobs/:id([0-9a-f]{12})/answer",
+    handler: async ({ req, res, params }) => {
+      pageOnly(req);
+      const body = await readBody(req);
+      const answers = body.answers;
+      json(res, 200, {
+        job: await answerJob(params.id!, {
+          request: asString(body.request) || undefined,
+          allow: typeof body.allow === "boolean" ? body.allow : undefined,
+          always: typeof body.always === "boolean" ? body.always : undefined,
+          text: asString(body.text) || undefined,
+          answers:
+            answers === null
+              ? null
+              : answers && typeof answers === "object"
+                ? (answers as Record<string, string[]>)
+                : undefined,
+        }),
+      });
+    },
+  },
+];

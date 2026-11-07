@@ -1,3 +1,4 @@
+import { createRouteDispatcher } from "../packages/server/modules/transport/index.ts";
 import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -9,7 +10,8 @@ import {
   cursorUsage,
 } from "../packages/server/modules/agents-integration/cursor/usage.ts";
 import { NETWORK_CONTEXT_URL } from "../packages/server/modules/network/index.ts";
-import { handleCursor } from "../packages/server/routes/api/cursor.ts";
+import { routes } from "../packages/server/routes/api/cursor.ts";
+const handleCursor = createRouteDispatcher(routes);
 
 const payload = {
   billingCycleEnd: "1792862002000",

@@ -50,13 +50,25 @@ import {
 
 import { isLocalRequest } from "../../../modules/access/index.ts";
 import { HttpError } from "../../../modules/http/index.ts";
-import { json, readBody } from "../../../modules/transport/index.ts";
+import {
+  json,
+  readBody,
+  type RouteDefinition,
+  type RouteHandler,
+} from "../../../modules/transport/index.ts";
 
 import { sendIconBytes, withRuntime } from "../../../modules/project-presentation/index.ts";
 import { letterIconSvg } from "../../../modules/projects/index.ts";
-import type { RouteContext } from "../../../modules/transport/index.ts";
 
-const hosts = {
+type HostActions = {
+  configure: (body: Record<string, unknown>) => Promise<unknown>;
+  connect: (body: Record<string, unknown>) => Promise<unknown>;
+  disconnect: () => Promise<unknown>;
+  reveal: () => Promise<unknown>;
+  repositories: (page: number) => Promise<unknown>;
+};
+
+const hosts: Record<"github" | "gitlab", HostActions> = {
   github: {
     configure: configureGithub,
     connect: connectGithub,
@@ -73,237 +85,270 @@ const hosts = {
   },
 };
 
-export async function handleIntegrationsActions({
-  req,
-  res,
-  url,
-  method,
-  path,
-}: RouteContext): Promise<boolean> {
-  if (path.startsWith("/api/integrations")) {
-    res.setHeader("Cache-Control", "no-store");
-    if (path === "/api/integrations/github/emojis" && method === "GET") {
-      res.setHeader("Cache-Control", "private, max-age=3600");
-      json(res, 200, await githubEmojis());
-      return true;
-    }
-    // GitLab browsing is checked before hostMatch so `/browse/...` never falls through.
-    if (path.startsWith("/api/integrations/gitlab/browse/") && method === "GET") {
-      const repository = url.searchParams.get("repository") || "";
-      const sha = url.searchParams.get("sha") || "";
-      if (path === "/api/integrations/gitlab/browse/directories")
-        json(
-          res,
-          200,
-          await browseGitlabDirectories(
-            url.searchParams.get("path") || "",
-            url.searchParams.get("complete") === "true",
-          ),
-        );
-      else if (path === "/api/integrations/gitlab/browse/icon") {
-        const icon = await browseGitlabIcon(repository, url.searchParams.get("ref") || sha).catch(
-          () => null,
-        );
-        const name = repository.split("/").filter(Boolean).at(-1) || "GitLab";
-        sendIconBytes(
-          res,
-          icon?.mime ?? "image/svg+xml",
-          icon?.bytes ?? Buffer.from(letterIconSvg(name)),
-        );
-      } else if (path === "/api/integrations/gitlab/browse/asset") {
-        const asset = await browseGitlabAsset(repository, sha, url.searchParams.get("path") || "");
-        res.setHeader("Content-Type", asset.mime);
-        res.setHeader("X-Content-Type-Options", "nosniff");
-        res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
-        res.end(asset.bytes);
-      } else if (path === "/api/integrations/gitlab/browse/repository")
-        json(res, 200, await browseGitlabRepository(repository, url.searchParams.get("ref") || ""));
-      else if (path === "/api/integrations/gitlab/browse/tree")
-        json(res, 200, await browseGitlabTree(repository, sha, url.searchParams.get("path") || ""));
-      else if (path === "/api/integrations/gitlab/browse/file")
-        json(res, 200, await browseGitlabFile(repository, sha, url.searchParams.get("path") || ""));
-      else if (path === "/api/integrations/gitlab/browse/log")
-        json(res, 200, await browseGitlabLog(repository, Object.fromEntries(url.searchParams)));
-      else if (path === "/api/integrations/gitlab/browse/commit")
-        json(res, 200, await browseGitlabCommit(repository, url.searchParams.get("hash") || ""));
-      else if (path === "/api/integrations/gitlab/browse/commit-diff")
-        json(
-          res,
-          200,
-          await browseGitlabComparison(
-            repository,
-            url.searchParams.get("hash") || "",
-            url.searchParams.get("path") || "",
-          ),
-        );
-      else if (path === "/api/integrations/gitlab/browse/issues")
-        json(res, 200, await browseGitlabIssues(repository, Object.fromEntries(url.searchParams)));
-      else if (path === "/api/integrations/gitlab/browse/issue")
-        json(res, 200, await browseGitlabIssue(repository, Number(url.searchParams.get("number"))));
-      else if (path === "/api/integrations/gitlab/browse/merge-requests")
-        json(
-          res,
-          200,
-          await browseGitlabMergeRequests(repository, Object.fromEntries(url.searchParams)),
-        );
-      else if (path === "/api/integrations/gitlab/browse/merge-request")
-        json(
-          res,
-          200,
-          await browseGitlabMergeRequest(repository, Number(url.searchParams.get("number"))),
-        );
-      else if (path === "/api/integrations/gitlab/browse/merge-request-files")
-        json(
-          res,
-          200,
-          await browseGitlabMergeRequestFiles(repository, Number(url.searchParams.get("number"))),
-        );
-      else if (path.endsWith("/compare-changes"))
-        json(
-          res,
-          200,
-          await browseGitlabCompareChanges(
-            repository,
-            url.searchParams.get("from") || "",
-            url.searchParams.get("to") || "",
-          ),
-        );
-      else if (path.endsWith("/compare-file"))
-        json(
-          res,
-          200,
-          await browseGitlabCompareFile(
-            repository,
-            url.searchParams.get("from") || "",
-            url.searchParams.get("to") || "",
-            url.searchParams.get("path") || "",
-            url.searchParams.get("originalPath") || undefined,
-          ),
-        );
-      else if (path === "/api/integrations/gitlab/browse/search")
-        json(res, 200, await searchGitlabBlobs(repository, Object.fromEntries(url.searchParams)));
-      else if (path === "/api/integrations/gitlab/browse/merge-request-diff")
-        json(
-          res,
-          200,
-          await browseGitlabMergeRequestDiff(
-            repository,
-            Number(url.searchParams.get("number")),
-            url.searchParams.get("path") || "",
-          ),
-        );
-      else if (path === "/api/integrations/gitlab/browse/pipelines")
-        json(
-          res,
-          200,
-          await browseGitlabPipelines(repository, Object.fromEntries(url.searchParams)),
-        );
-      else if (path === "/api/integrations/gitlab/browse/pipeline")
-        json(res, 200, await browseGitlabPipeline(repository, url.searchParams.get("id") || ""));
-      else if (path === "/api/integrations/gitlab/browse/job")
-        json(res, 200, await browseGitlabJob(repository, url.searchParams.get("id") || ""));
-      else return false;
-      return true;
-    }
-    if (path === "/api/integrations" && method === "GET") {
-      json(res, 200, await listIntegrations([githubStatus, gitlabStatus, dockerIntegrationStatus]));
-      return true;
-    }
-    // Settings, token and repository list behave identically for every code host.
-    const hostMatch = path.match(
-      /^\/api\/integrations\/(github|gitlab)(\/auth|\/token|\/repositories)?$/,
-    );
-    if (hostMatch) {
-      const host = hosts[hostMatch[1] as keyof typeof hosts];
-      const action = hostMatch[2] ?? "";
-      if (action === "" && method === "PUT") {
-        json(res, 200, await host.configure(await readBody(req)));
-        return true;
-      }
-      if (action === "/auth" && method === "POST") {
-        json(res, 200, await host.connect(await readBody(req)));
-        return true;
-      }
-      if (action === "/auth" && method === "DELETE") {
-        json(res, 200, await host.disconnect());
-        return true;
-      }
-      if (action === "/token" && method === "POST") {
-        // Secrets are shown only on this machine, never over LAN and never to the agent.
-        if (!isLocalRequest(req))
-          throw new HttpError(403, "Токен можно показать только на локальной машине");
-        json(res, 200, await host.reveal());
-        return true;
-      }
-      if (action === "/repositories" && method === "GET") {
-        json(res, 200, await host.repositories(Number(url.searchParams.get("page") ?? 1)));
-        return true;
-      }
-    }
-    if (path === "/api/integrations/github/device" && method === "POST") {
-      json(res, 200, await beginGithubLogin());
-      return true;
-    }
-    if (path === "/api/integrations/github/device/poll" && method === "POST") {
-      json(res, 200, await pollGithubLogin(await readBody(req)));
-      return true;
-    }
-    if (path === "/api/integrations/gitlab/device" && method === "POST") {
-      json(res, 200, await beginGitlabLogin());
-      return true;
-    }
-    if (path === "/api/integrations/gitlab/device/poll" && method === "POST") {
-      json(res, 200, await pollGitlabLogin(await readBody(req)));
-      return true;
-    }
-    if (path === "/api/integrations/gitlab/import" && method === "POST") {
-      const result = await importGitlabProject(await readBody(req));
-      json(res, 201, { project: withRuntime(result.project) });
-      return true;
-    }
-    if (path === "/api/integrations/gitlab/clone" && method === "POST") {
-      const result = await cloneGitlabProject(await readBody(req));
-      json(res, 201, { project: withRuntime(result.project) });
-      return true;
-    }
-    if (path === "/api/integrations/gitlab/clone-jobs" && method === "POST") {
-      json(res, 202, { job: startCloneJob(await readBody(req), cloneGitlabProject) });
-      return true;
-    }
-    const gitlabJobMatch = path.match(/^\/api\/integrations\/gitlab\/clone-jobs\/([0-9a-f-]{36})$/);
-    if (gitlabJobMatch && method === "GET") {
-      const job = cloneJob(gitlabJobMatch[1]);
-      json(res, 200, { job: job.project ? { ...job, project: withRuntime(job.project) } : job });
-      return true;
-    }
-    if (gitlabJobMatch && method === "DELETE") {
-      json(res, 200, { job: cancelCloneJob(gitlabJobMatch[1]) });
-      return true;
-    }
-    if (path === "/api/integrations/github/clone-jobs" && method === "POST") {
-      json(res, 202, { job: startCloneJob(await readBody(req), cloneGithubProject) });
-      return true;
-    }
-    const jobMatch = path.match(/^\/api\/integrations\/github\/clone-jobs\/([0-9a-f-]{36})$/);
-    if (jobMatch && method === "GET") {
-      const job = cloneJob(jobMatch[1]);
-      json(res, 200, { job: job.project ? { ...job, project: withRuntime(job.project) } : job });
-      return true;
-    }
-    if (jobMatch && method === "DELETE") {
-      json(res, 200, { job: cancelCloneJob(jobMatch[1]) });
-      return true;
-    }
-    if (path === "/api/integrations/github/clone" && method === "POST") {
-      const result = await cloneGithubProject(await readBody(req));
-      json(res, 201, { project: withRuntime(result.project) });
-      return true;
-    }
-    if (path === "/api/integrations/github/import" && method === "POST") {
-      const result = await importGithubProject(await readBody(req));
-      json(res, 201, { project: withRuntime(result.project) });
-      return true;
-    }
-  }
-  return false;
+const text = (url: URL, key: string) => url.searchParams.get(key) || "";
+
+function endpoint(
+  method: string | readonly string[],
+  path: string,
+  handler: RouteHandler,
+): RouteDefinition {
+  return {
+    method,
+    path,
+    handler: (context) => {
+      context.res.setHeader("Cache-Control", "no-store");
+      return handler(context);
+    },
+  };
 }
+
+function hostRoutes(hostName: keyof typeof hosts): RouteDefinition[] {
+  const host = hosts[hostName];
+  const base = `/api/integrations/${hostName}`;
+  return [
+    endpoint("PUT", base, async ({ req, res }) => {
+      json(res, 200, await host.configure(await readBody(req)));
+    }),
+    endpoint("POST", `${base}/auth`, async ({ req, res }) => {
+      json(res, 200, await host.connect(await readBody(req)));
+    }),
+    endpoint("DELETE", `${base}/auth`, async ({ res }) => {
+      json(res, 200, await host.disconnect());
+    }),
+    endpoint("POST", `${base}/token`, async ({ req, res }) => {
+      // Secrets are shown only on this machine, never over LAN and never to the agent.
+      if (!isLocalRequest(req))
+        throw new HttpError(403, "Токен можно показать только на локальной машине");
+      json(res, 200, await host.reveal());
+    }),
+    endpoint("GET", `${base}/repositories`, async ({ res, url }) => {
+      json(res, 200, await host.repositories(Number(url.searchParams.get("page") ?? 1)));
+    }),
+  ];
+}
+
+function jobRoutes(hostName: "github" | "gitlab"): RouteDefinition[] {
+  const path = `/api/integrations/${hostName}/clone-jobs/:id([0-9a-f-]{36})`;
+  return [
+    endpoint("GET", path, async ({ res, params }) => {
+      const job = cloneJob(params.id);
+      json(res, 200, { job: job.project ? { ...job, project: withRuntime(job.project) } : job });
+    }),
+    endpoint("DELETE", path, async ({ res, params }) => {
+      json(res, 200, { job: cancelCloneJob(params.id) });
+    }),
+  ];
+}
+
+export const routes: RouteDefinition[] = [
+  endpoint("GET", "/api/integrations", async ({ res }) => {
+    json(res, 200, await listIntegrations([githubStatus, gitlabStatus, dockerIntegrationStatus]));
+  }),
+  endpoint("GET", "/api/integrations/github/emojis", async ({ res }) => {
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    json(res, 200, await githubEmojis());
+  }),
+
+  ...hostRoutes("github"),
+  ...hostRoutes("gitlab"),
+
+  // GitLab browsing is registered explicitly so `/browse/...` never falls through to host actions.
+  endpoint("GET", "/api/integrations/gitlab/browse/directories", async ({ res, url }) => {
+    json(
+      res,
+      200,
+      await browseGitlabDirectories(text(url, "path"), url.searchParams.get("complete") === "true"),
+    );
+  }),
+  endpoint("GET", "/api/integrations/gitlab/browse/icon", async ({ res, url }) => {
+    const repository = text(url, "repository");
+    const icon = await browseGitlabIcon(repository, text(url, "ref") || text(url, "sha")).catch(
+      () => null,
+    );
+    sendIconBytes(
+      res,
+      icon?.mime ?? "image/svg+xml",
+      icon?.bytes ??
+        Buffer.from(letterIconSvg(repository.split("/").filter(Boolean).at(-1) || "GitLab")),
+    );
+  }),
+  endpoint("GET", "/api/integrations/gitlab/browse/asset", async ({ res, url }) => {
+    const asset = await browseGitlabAsset(
+      text(url, "repository"),
+      text(url, "sha"),
+      text(url, "path"),
+    );
+    res.setHeader("Content-Type", asset.mime);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
+    res.end(asset.bytes);
+  }),
+  endpoint("GET", "/api/integrations/gitlab/browse/repository", async ({ res, url }) => {
+    json(res, 200, await browseGitlabRepository(text(url, "repository"), text(url, "ref")));
+  }),
+  endpoint("GET", "/api/integrations/gitlab/browse/tree", async ({ res, url }) => {
+    json(
+      res,
+      200,
+      await browseGitlabTree(text(url, "repository"), text(url, "sha"), text(url, "path")),
+    );
+  }),
+  endpoint("GET", "/api/integrations/gitlab/browse/file", async ({ res, url }) => {
+    json(
+      res,
+      200,
+      await browseGitlabFile(text(url, "repository"), text(url, "sha"), text(url, "path")),
+    );
+  }),
+  endpoint("GET", "/api/integrations/gitlab/browse/log", async ({ res, url }) => {
+    json(
+      res,
+      200,
+      await browseGitlabLog(text(url, "repository"), Object.fromEntries(url.searchParams)),
+    );
+  }),
+  endpoint("GET", "/api/integrations/gitlab/browse/commit", async ({ res, url }) => {
+    json(res, 200, await browseGitlabCommit(text(url, "repository"), text(url, "hash")));
+  }),
+  endpoint("GET", "/api/integrations/gitlab/browse/commit-diff", async ({ res, url }) => {
+    json(
+      res,
+      200,
+      await browseGitlabComparison(text(url, "repository"), text(url, "hash"), text(url, "path")),
+    );
+  }),
+  endpoint("GET", "/api/integrations/gitlab/browse/issues", async ({ res, url }) => {
+    json(
+      res,
+      200,
+      await browseGitlabIssues(text(url, "repository"), Object.fromEntries(url.searchParams)),
+    );
+  }),
+  endpoint("GET", "/api/integrations/gitlab/browse/issue", async ({ res, url }) => {
+    json(
+      res,
+      200,
+      await browseGitlabIssue(text(url, "repository"), Number(url.searchParams.get("number"))),
+    );
+  }),
+  endpoint("GET", "/api/integrations/gitlab/browse/merge-requests", async ({ res, url }) => {
+    json(
+      res,
+      200,
+      await browseGitlabMergeRequests(
+        text(url, "repository"),
+        Object.fromEntries(url.searchParams),
+      ),
+    );
+  }),
+  endpoint("GET", "/api/integrations/gitlab/browse/merge-request", async ({ res, url }) => {
+    json(
+      res,
+      200,
+      await browseGitlabMergeRequest(
+        text(url, "repository"),
+        Number(url.searchParams.get("number")),
+      ),
+    );
+  }),
+  endpoint("GET", "/api/integrations/gitlab/browse/merge-request-files", async ({ res, url }) => {
+    json(
+      res,
+      200,
+      await browseGitlabMergeRequestFiles(
+        text(url, "repository"),
+        Number(url.searchParams.get("number")),
+      ),
+    );
+  }),
+  endpoint("GET", "/api/integrations/gitlab/browse/compare-changes", async ({ res, url }) => {
+    json(
+      res,
+      200,
+      await browseGitlabCompareChanges(text(url, "repository"), text(url, "from"), text(url, "to")),
+    );
+  }),
+  endpoint("GET", "/api/integrations/gitlab/browse/compare-file", async ({ res, url }) => {
+    json(
+      res,
+      200,
+      await browseGitlabCompareFile(
+        text(url, "repository"),
+        text(url, "from"),
+        text(url, "to"),
+        text(url, "path"),
+        url.searchParams.get("originalPath") || undefined,
+      ),
+    );
+  }),
+  endpoint("GET", "/api/integrations/gitlab/browse/search", async ({ res, url }) => {
+    json(
+      res,
+      200,
+      await searchGitlabBlobs(text(url, "repository"), Object.fromEntries(url.searchParams)),
+    );
+  }),
+  endpoint("GET", "/api/integrations/gitlab/browse/merge-request-diff", async ({ res, url }) => {
+    json(
+      res,
+      200,
+      await browseGitlabMergeRequestDiff(
+        text(url, "repository"),
+        Number(url.searchParams.get("number")),
+        text(url, "path"),
+      ),
+    );
+  }),
+  endpoint("GET", "/api/integrations/gitlab/browse/pipelines", async ({ res, url }) => {
+    json(
+      res,
+      200,
+      await browseGitlabPipelines(text(url, "repository"), Object.fromEntries(url.searchParams)),
+    );
+  }),
+  endpoint("GET", "/api/integrations/gitlab/browse/pipeline", async ({ res, url }) => {
+    json(res, 200, await browseGitlabPipeline(text(url, "repository"), text(url, "id")));
+  }),
+  endpoint("GET", "/api/integrations/gitlab/browse/job", async ({ res, url }) => {
+    json(res, 200, await browseGitlabJob(text(url, "repository"), text(url, "id")));
+  }),
+
+  endpoint("POST", "/api/integrations/github/device", async ({ res }) => {
+    json(res, 200, await beginGithubLogin());
+  }),
+  endpoint("POST", "/api/integrations/github/device/poll", async ({ req, res }) => {
+    json(res, 200, await pollGithubLogin(await readBody(req)));
+  }),
+  endpoint("POST", "/api/integrations/gitlab/device", async ({ res }) => {
+    json(res, 200, await beginGitlabLogin());
+  }),
+  endpoint("POST", "/api/integrations/gitlab/device/poll", async ({ req, res }) => {
+    json(res, 200, await pollGitlabLogin(await readBody(req)));
+  }),
+
+  endpoint("POST", "/api/integrations/gitlab/import", async ({ req, res }) => {
+    const result = await importGitlabProject(await readBody(req));
+    json(res, 201, { project: withRuntime(result.project) });
+  }),
+  endpoint("POST", "/api/integrations/gitlab/clone", async ({ req, res }) => {
+    const result = await cloneGitlabProject(await readBody(req));
+    json(res, 201, { project: withRuntime(result.project) });
+  }),
+  endpoint("POST", "/api/integrations/gitlab/clone-jobs", async ({ req, res }) => {
+    json(res, 202, { job: startCloneJob(await readBody(req), cloneGitlabProject) });
+  }),
+  ...jobRoutes("gitlab"),
+
+  endpoint("POST", "/api/integrations/github/clone-jobs", async ({ req, res }) => {
+    json(res, 202, { job: startCloneJob(await readBody(req), cloneGithubProject) });
+  }),
+  ...jobRoutes("github"),
+  endpoint("POST", "/api/integrations/github/clone", async ({ req, res }) => {
+    const result = await cloneGithubProject(await readBody(req));
+    json(res, 201, { project: withRuntime(result.project) });
+  }),
+  endpoint("POST", "/api/integrations/github/import", async ({ req, res }) => {
+    const result = await importGithubProject(await readBody(req));
+    json(res, 201, { project: withRuntime(result.project) });
+  }),
+];

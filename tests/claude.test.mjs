@@ -1,3 +1,4 @@
+import { createRouteDispatcher } from "../packages/server/modules/transport/index.ts";
 import { beforeEach, describe, expect, test, vi } from "vite-plus/test";
 
 // The usage comes from Claude Code itself, through the Agent SDK: the fake query stands in for it.
@@ -18,7 +19,8 @@ const { ClaudeUsageError, readClaudeUsage } =
   await import("../packages/server/modules/agents-integration/claude/client.ts");
 const { claudeWindows, claudeUsage } =
   await import("../packages/server/modules/agents-integration/claude/usage.ts");
-const { handleClaude } = await import("../packages/server/routes/api/claude.ts");
+const { routes } = await import("../packages/server/routes/api/claude.ts");
+const handleClaude = createRouteDispatcher(routes);
 
 const window = { utilization: 29, resets_at: "2026-10-11T19:00:00.220419+00:00" };
 const rateLimits = { five_hour: window, seven_day: { ...window, utilization: 4 } };

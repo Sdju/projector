@@ -105,7 +105,7 @@ test("gateway lists provider models and routes requests by model", async () => {
   expect(await streamed.text()).toContain("[DONE]");
   expect(seen[0].url).toBe("/x/v2/chat/completions");
 
-  await fetch(`${base}/api/openai/v1/chat/completions`, { method: "POST", body: "{}" });
+  await fetch(`${base}/api/openai/v1/chat/completions/`, { method: "POST", body: "{}" });
   expect(seen[1].url).toBe("/v1/chat/completions");
   expect(JSON.parse(seen[1].body).model).toBe("model-a");
 

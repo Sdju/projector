@@ -12,7 +12,6 @@ export const GATEWAY_PREFIX = "/api/openai/v1";
 const MAX_BODY = 32 * 1024 * 1024;
 /** Enough for a provider error; a larger body is replaced by a generated error. */
 const MAX_ERROR_BODY = 64 * 1024;
-const UPSTREAM_PATHS = new Set(["/chat/completions", "/completions", "/embeddings"]);
 /** Hop-by-hop and length headers must not be copied from a decoded upstream body. */
 const SKIP_HEADERS = new Set([
   "content-length",
@@ -199,8 +198,4 @@ export async function forward(req: IncomingMessage, res: ServerResponse, endpoin
       res.destroy();
     })
     .pipe(res);
-}
-
-export function isUpstreamPath(path: string): boolean {
-  return UPSTREAM_PATHS.has(path);
 }

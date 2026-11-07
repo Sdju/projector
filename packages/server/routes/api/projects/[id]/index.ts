@@ -22,7 +22,13 @@ import {
   projectGithubRepository,
   projectGitlabRepository,
 } from "../../../../modules/workspace/index.ts";
-import { json, readBody, asString } from "../../../../modules/transport/index.ts";
+import {
+  json,
+  readBody,
+  asString,
+  type RouteContext,
+  type RouteDefinition,
+} from "../../../../modules/transport/index.ts";
 import {
   parseMode,
   normalizeProject,
@@ -31,53 +37,60 @@ import {
   sendLetterIcon,
   launchHtml,
 } from "../../../../modules/project-presentation/index.ts";
-import type { RouteContext } from "../../../../modules/transport/index.ts";
 
-export async function handleProjectActions({
-  req,
-  res,
-  method,
-  path,
-}: RouteContext): Promise<boolean> {
-  const projectMatch = path.match(/^\/api\/projects\/([^/]+)(?:\/([^/]+))?$/);
-  if (projectMatch) {
-    const [, id, action] = projectMatch;
-    const project = await findProject(id);
-    if (!project) {
-      json(res, 404, { error: "Проект не найден" });
-      return true;
-    }
+async function requireProject({ res, params }: Pick<RouteContext, "res" | "params">) {
+  const project = await findProject(params.id);
+  if (!project) json(res, 404, { error: "Проект не найден" });
+  return project;
+}
 
-    if (!action && method === "GET") {
-      json(res, 200, { project: withRuntime(project) });
-      return true;
-    }
-
-    if (!action && method === "PATCH") {
+export const routes: RouteDefinition[] = [
+  {
+    method: "GET",
+    path: "/api/projects/:id",
+    handler: async (context) => {
+      const project = await requireProject(context);
+      if (project) json(context.res, 200, { project: withRuntime(project) });
+    },
+  },
+  {
+    method: "PATCH",
+    path: "/api/projects/:id",
+    handler: async ({ req, res, params }) => {
+      const project = await requireProject({ res, params });
+      if (!project) return;
       const body = await readBody(req);
       const next = normalizeProject({ ...project, ...body }, project);
       await updateProjects((current) => {
-        const currentIndex = current.findIndex((item) => item.id === id);
+        const currentIndex = current.findIndex((item) => item.id === params.id);
         if (currentIndex === -1) throw new HttpError(404, "Проект не найден");
         current[currentIndex] = next;
       });
       json(res, 200, { project: withRuntime(next) });
-      return true;
-    }
-
-    if (!action && method === "DELETE") {
-      stopProject(id);
-      closeProjectTerminals(id);
+    },
+  },
+  {
+    method: "DELETE",
+    path: "/api/projects/:id",
+    handler: async (context) => {
+      const project = await requireProject(context);
+      if (!project) return;
+      stopProject(context.params.id);
+      closeProjectTerminals(context.params.id);
       await updateProjects((current) => {
-        const currentIndex = current.findIndex((item) => item.id === id);
+        const currentIndex = current.findIndex((item) => item.id === context.params.id);
         if (currentIndex !== -1) current.splice(currentIndex, 1);
       });
-      json(res, 200, { ok: true });
-      return true;
-    }
-
+      json(context.res, 200, { ok: true });
+    },
+  },
+  {
     // Recovery of a project whose folder is gone: recreate it or point the project elsewhere.
-    if (action === "directory" && method === "POST") {
+    method: "POST",
+    path: "/api/projects/:id/directory",
+    handler: async ({ req, res, params }) => {
+      const project = await requireProject({ res, params });
+      if (!project) return;
       const body = await readBody(req);
       const isDirectory = (dir: string) =>
         stat(dir).then(
@@ -100,103 +113,140 @@ export async function handleProjectActions({
       }
       if (mode === "relocate" && !sameLocalPath(project.path, target)) {
         const duplicate = (await loadProjects()).find(
-          (item) => item.id !== id && sameLocalPath(item.path, target),
+          (item) => item.id !== params.id && sameLocalPath(item.path, target),
         );
         if (duplicate) throw new HttpError(409, `Путь уже занят проектом «${duplicate.name}»`);
-        stopProject(id);
-        closeProjectTerminals(id);
+        stopProject(params.id);
+        closeProjectTerminals(params.id);
         await updateProjects((current) => {
-          const item = current.find((entry) => entry.id === id);
+          const item = current.find((entry) => entry.id === params.id);
           if (!item) throw new HttpError(404, "Проект не найден");
           item.path = target;
         });
       }
       json(res, 200, { project: withRuntime({ ...project, path: target }) });
-      return true;
-    }
-
-    if (action === "start" && method === "POST") {
-      const body = await readBody(req);
+    },
+  },
+  {
+    method: "POST",
+    path: "/api/projects/:id/start",
+    handler: async (context) => {
+      const project = await requireProject(context);
+      if (!project) return;
+      const body = await readBody(context.req);
       const runtime = startProject(
         project,
         asString(body.commandId) || undefined,
         parseMode(body.mode),
       );
-      json(res, 200, { runtime });
-      return true;
-    }
-
-    if (action === "stop" && method === "POST") {
-      json(res, 200, { runtime: stopProject(id) });
-      return true;
-    }
-
-    if (action === "open" && method === "POST") {
-      const body = await readBody(req);
-      const runtime = getSnapshot(id);
+      json(context.res, 200, { runtime });
+    },
+  },
+  {
+    method: "POST",
+    path: "/api/projects/:id/stop",
+    handler: async (context) => {
+      if (!(await requireProject(context))) return;
+      json(context.res, 200, { runtime: stopProject(context.params.id) });
+    },
+  },
+  {
+    method: "POST",
+    path: "/api/projects/:id/open",
+    handler: async (context) => {
+      const project = await requireProject(context);
+      if (!project) return;
+      const body = await readBody(context.req);
+      const runtime = getSnapshot(context.params.id);
       const target = runtime.url || project.url;
       if (!target) throw new Error("Нет адреса для открытия");
-      if (parseMode(body.mode) === "window") openWindow(projectAppUrl(id));
+      if (parseMode(body.mode) === "window") openWindow(projectAppUrl(context.params.id));
       else openBrowser(target);
-      json(res, 200, { ok: true, url: target });
-      return true;
-    }
-
-    if (action === "github" && method === "GET") {
-      res.setHeader("Cache-Control", "no-store");
-      json(res, 200, {
+      json(context.res, 200, { ok: true, url: target });
+    },
+  },
+  {
+    method: "GET",
+    path: "/api/projects/:id/github",
+    handler: async (context) => {
+      const project = await requireProject(context);
+      if (!project) return;
+      context.res.setHeader("Cache-Control", "no-store");
+      json(context.res, 200, {
         repository: project.environment ? null : await projectGithubRepository(project.path),
       });
-      return true;
-    }
-
-    if (action === "gitlab" && method === "GET") {
-      res.setHeader("Cache-Control", "no-store");
-      json(res, 200, {
+    },
+  },
+  {
+    method: "GET",
+    path: "/api/projects/:id/gitlab",
+    handler: async (context) => {
+      const project = await requireProject(context);
+      if (!project) return;
+      context.res.setHeader("Cache-Control", "no-store");
+      json(context.res, 200, {
         repository: project.environment ? null : await projectGitlabRepository(project.path),
       });
-      return true;
-    }
-
-    if (action === "devcontainer" && method === "GET") {
-      res.setHeader("Cache-Control", "no-store");
-      json(res, 200, devcontainerState(project));
-      return true;
-    }
-
-    if (action === "devcontainer" && method === "POST") {
+    },
+  },
+  {
+    method: "GET",
+    path: "/api/projects/:id/devcontainer",
+    handler: async (context) => {
+      const project = await requireProject(context);
+      if (!project) return;
+      context.res.setHeader("Cache-Control", "no-store");
+      json(context.res, 200, devcontainerState(project));
+    },
+  },
+  {
+    method: "POST",
+    path: "/api/projects/:id/devcontainer",
+    handler: async (context) => {
+      const project = await requireProject(context);
+      if (!project) return;
       // Trust is granted at the keyboard of this machine: never over LAN, never by the agent.
-      if (!isLocalRequest(req))
+      if (!isLocalRequest(context.req))
         throw new HttpError(403, "Доверие к репозиторию задаётся только на локальной машине");
-      const body = await readBody(req);
+      const body = await readBody(context.req);
       if (body.decision !== "trusted" && body.decision !== "declined" && body.decision !== "forget")
         throw new HttpError(400, "decision: trusted, declined или forget");
-      json(res, 200, await decideDevcontainer(project, body.decision, body.hash));
-      return true;
-    }
-
-    if (action === "devcontainer-stop" && method === "POST") {
-      json(res, 200, await stopDevcontainer(project));
-      return true;
-    }
-
-    if (action === "icon" && method === "GET") {
+      json(context.res, 200, await decideDevcontainer(project, body.decision, body.hash));
+    },
+  },
+  {
+    method: "POST",
+    path: "/api/projects/:id/devcontainer-stop",
+    handler: async (context) => {
+      const project = await requireProject(context);
+      if (!project) return;
+      json(context.res, 200, await stopDevcontainer(project));
+    },
+  },
+  {
+    method: "GET",
+    path: "/api/projects/:id/icon",
+    handler: async (context) => {
+      const project = await requireProject(context);
+      if (!project) return;
       const file = await resolveProjectIcon(project.path, project.icon);
-      if (file) sendIconFile(res, file);
-      else sendLetterIcon(res, project.name);
-      return true;
-    }
-
-    if (action === "app" && method === "GET") {
-      const runtime = getSnapshot(id);
+      if (file) sendIconFile(context.res, file);
+      else sendLetterIcon(context.res, project.name);
+    },
+  },
+  {
+    method: "GET",
+    path: "/api/projects/:id/app",
+    handler: async (context) => {
+      const project = await requireProject(context);
+      if (!project) return;
+      const runtime = getSnapshot(context.params.id);
       const target = runtime.url || project.url;
       if (!target) throw new Error("Нет адреса для открытия");
-      res.statusCode = 200;
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.setHeader("Cache-Control", "no-store");
-      res.end(launchHtml(project, target));
-      return true;
-    }
-  }
-  return false;
-}
+      context.res.statusCode = 200;
+      context.res.setHeader("Content-Type", "text/html; charset=utf-8");
+      context.res.setHeader("Cache-Control", "no-store");
+      context.res.end(launchHtml(project, target));
+    },
+  },
+];

@@ -15,4 +15,4 @@ export {
   setGatewayEnabled,
   setGatewayKey,
 } from "./config.ts";
-export { GATEWAY_PREFIX, forward, isUpstreamPath, listModels, openAiError } from "./gateway.ts";
+export { GATEWAY_PREFIX, forward, listModels, openAiError } from "./gateway.ts";
