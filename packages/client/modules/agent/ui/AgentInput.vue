@@ -389,11 +389,42 @@ function appendText(value: string) {
   });
   target.focus();
 }
+/** Inserts a quote at the cursor, separated from the text around it by a blank line. */
+function insertQuote(value: string) {
+  const target = view.value;
+  const text = value.trim();
+  if (!target || !text) return;
+  const { from, to } = target.state.selection.main;
+  const before = target.state.doc.sliceString(0, from);
+  const after = target.state.doc.sliceString(to);
+  const prefix = !before
+    ? ""
+    : before.endsWith("\n\n")
+      ? ""
+      : before.endsWith("\n")
+        ? "\n"
+        : "\n\n";
+  const suffix = !after
+    ? "\n\n"
+    : after.startsWith("\n\n")
+      ? ""
+      : after.startsWith("\n")
+        ? "\n"
+        : "\n\n";
+  const insert = prefix + text + suffix;
+  target.dispatch({
+    changes: { from, to, insert },
+    selection: EditorSelection.cursor(from + prefix.length + text.length + suffix.length),
+    userEvent: "input.paste",
+  });
+  target.focus();
+}
 defineExpose({
   focus: () => view.value?.focus(),
   insertChips,
   appendChips,
   appendText,
+  insertQuote,
   acceptsDrag,
   dropData,
   /** Puts the cursor behind everything written. */

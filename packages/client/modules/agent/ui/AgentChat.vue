@@ -720,6 +720,7 @@ onBeforeUnmount(() => {
       v-model="draft"
       v-model:parts="draftParts"
       :project-id="projectId"
+      :quote-root="log"
       :commands="slashCommands"
       :busy="busy"
       :started-at="turns.findLast((turn) => turn.role === 'assistant')?.at"

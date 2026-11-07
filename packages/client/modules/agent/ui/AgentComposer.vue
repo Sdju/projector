@@ -5,6 +5,7 @@ import type { MessageChip, MessagePart } from "../model/types.ts";
 import AgentInput from "./AgentInput.vue";
 import AgentFormPanel from "./AgentFormPanel.vue";
 import AgentWorkClock from "./AgentWorkClock.vue";
+import AgentQuote from "./AgentQuote.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import IconArrowUp from "~icons/lucide/arrow-up";
 import IconSquare from "~icons/lucide/square";
@@ -23,6 +24,8 @@ const props = defineProps<{
   error: string;
   copied: boolean;
   projectId?: string;
+  /** The chat log whose selection can be quoted into the draft. */
+  quoteRoot?: HTMLElement;
   commands?: { name: string; description?: string }[];
   /** The form the last answer ended with: it takes the place of the text field. */
   form?: string;
@@ -107,6 +110,12 @@ async function appendText(text: string) {
   await nextTick();
   input.value?.appendText(text);
 }
+/** Puts a quote into the draft at the cursor; a form gives way to the text field. */
+async function quote(text: string) {
+  dismissForm();
+  await nextTick();
+  input.value?.insertQuote(text);
+}
 defineExpose({
   resize: () => {},
   focus: () => {
@@ -114,6 +123,7 @@ defineExpose({
   },
   attach,
   appendText,
+  quote,
   acceptsDrag: (data: DataTransfer | null) => !!input.value?.acceptsDrag(data),
   dropData: (data: DataTransfer) => !!input.value?.dropData(data),
   showForm: restoreForm,
@@ -151,6 +161,7 @@ defineExpose({
         <IconX aria-hidden="true" />
       </button>
     </div>
+    <AgentQuote :root="quoteRoot" @quote="quote" />
     <form
       class="composer"
       :class="{ working: busy, 'form-mode': formOpen }"
