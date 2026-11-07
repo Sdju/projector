@@ -2,6 +2,7 @@ import {
   extendPlainDialect,
   inputOf,
   isOver,
+  shorten,
   type AcpDialect,
   type AcpTaskPatch,
   type AcpUpdate,
@@ -39,6 +40,27 @@ function deltaOf(update: AcpUpdate): string {
   const meta = update._meta as { terminal_output_delta?: { data?: unknown } } | undefined;
   const data = meta?.terminal_output_delta?.data;
   return typeof data === "string" ? data : "";
+}
+
+/** What Codex reports when a terminal command exits: output arrives separately as deltas. */
+function terminalExitOf(update: AcpUpdate) {
+  const exit = (
+    update._meta as { terminal_exit?: { exit_code?: unknown; signal?: unknown } } | undefined
+  )?.terminal_exit;
+  if (!exit) return undefined;
+  return {
+    code: typeof exit.exit_code === "number" ? exit.exit_code : undefined,
+    signal: typeof exit.signal === "string" && exit.signal ? exit.signal : undefined,
+  };
+}
+
+/** The one-line end of a command: its last output line, or the exit status when it said nothing. */
+function endSummary(update: AcpUpdate, output: string): string {
+  const exit = terminalExitOf(update);
+  if (exit?.signal) return `Прервано сигналом ${exit.signal}`;
+  if (output.trim()) return shorten(output);
+  if (exit?.code === undefined) return "";
+  return exit.code === 0 ? "Завершено без вывода" : `Код выхода ${exit.code}`;
 }
 
 export function createCodexDialect(): AcpDialect {
@@ -98,11 +120,18 @@ export function createCodexDialect(): AcpDialect {
       return output;
     },
     outputChunk: (update) => deltaOf(update),
-    end(update, id) {
+    result: (update, _id, output) => output || endSummary(update, ""),
+    end(update, id, output) {
       running.delete(id);
-      return detached.delete(id)
-        ? [{ id, status: update.status === "failed" ? "error" : "done" }]
-        : [];
+      if (!detached.delete(id)) return [];
+      const summary = endSummary(update, output);
+      return [
+        {
+          id,
+          status: update.status === "failed" ? "error" : "done",
+          ...(summary ? { summary } : {}),
+        },
+      ];
     },
     speak: detach,
     finish: detach,

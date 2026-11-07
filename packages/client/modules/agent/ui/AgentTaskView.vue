@@ -184,7 +184,7 @@ const outcome = computed(() => {
         <div class="label">Итог</div>
         <AgentCodeBlock :text="outcome" />
       </template>
-      <p v-else-if="task.status !== 'running'" class="note">Без итога</p>
+      <p v-else-if="task.status !== 'running'" class="note">Агент не сообщил итог</p>
     </div>
   </section>
 </template>

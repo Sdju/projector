@@ -460,6 +460,34 @@ test("a terminal command that the agent moved on from ends as a finished task", 
   expect(tasks.map((task) => task.status)).toEqual(["running", "done"]);
 });
 
+test("a finished background command reports its exit status instead of staying without a result", () => {
+  const events = [];
+  const mapper = createAcpEventMapper(
+    (type, data) => events.push([type, data]),
+    "Codex",
+    createCodexDialect(),
+  );
+  mapper.handleUpdate("s", exec("e1"));
+  mapper.handleUpdate("s", {
+    sessionUpdate: "agent_message_chunk",
+    content: { type: "text", text: "started" },
+  });
+  mapper.handleUpdate("s", {
+    sessionUpdate: "tool_call_update",
+    toolCallId: "e1",
+    name: "exec_command",
+    status: "failed",
+    _meta: { terminal_exit: { exit_code: 1, signal: null, terminal_id: "e1" } },
+  });
+  const tasks = events.filter(([type]) => type === "task").map(([, data]) => data);
+  expect(tasks.at(-1)).toEqual({
+    id: "e1",
+    status: "error",
+    summary: "Код выхода 1",
+  });
+  expect(events.at(-1)[1]).toMatchObject({ id: "e1", error: "Код выхода 1" });
+});
+
 test("without a dialect the extensions of other agents change nothing", () => {
   const events = [];
   const mapper = createAcpEventMapper((type, data) => events.push([type, data]), "Other");
