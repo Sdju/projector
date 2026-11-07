@@ -20,6 +20,8 @@ export {
   readIssues,
   readMergeRequest,
   readMergeRequests,
+  readRelease,
+  readReleases,
   readRepository,
   readTree,
 } from "./client.ts";

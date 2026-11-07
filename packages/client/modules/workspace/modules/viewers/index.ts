@@ -5,6 +5,7 @@ export { default as ImageViewport } from "../../../../common/ui/ImageViewport.vu
 export const IssueView = defineAsyncComponent(() => import("./ui/IssueView.vue"));
 export const PullRequestView = defineAsyncComponent(() => import("./ui/PullRequestView.vue"));
 export const DiscussionView = defineAsyncComponent(() => import("./ui/DiscussionView.vue"));
+export const ReleaseView = defineAsyncComponent(() => import("./ui/ReleaseView.vue"));
 export const CodeViewer = defineAsyncComponent(() => import("./ui/CodeViewer.vue"));
 export const MarkdownViewer = defineAsyncComponent(() => import("./ui/MarkdownViewer.vue"));
 export const SvgViewer = defineAsyncComponent(() => import("./ui/SvgViewer.vue"));

@@ -47,5 +47,10 @@ export {
   browseGitlabMergeRequestDiff,
 } from "./merge-requests.ts";
 export { browseGitlabPipelines, browseGitlabPipeline, browseGitlabJob } from "./pipelines.ts";
+export {
+  browseGitlabRelease,
+  browseGitlabReleases,
+  downloadGitlabReleaseSource,
+} from "./releases.ts";
 export { cloneGitlabProject, importGitlabProject } from "./clone.ts";
 export { cloneGitlabContainer } from "./container.ts";

@@ -20,6 +20,7 @@ import {
   DiscussionView,
   IssueView,
   PullRequestView,
+  ReleaseView,
 } from "../modules/viewers/index.ts";
 
 /** How a tab kind is drawn; the owner of the kind supplies it, the workspace only mounts it. */
@@ -154,6 +155,14 @@ export function baseTabViews(): TabViews {
         projectId: host.projectId,
         number: tab.params?.number,
         onOpen: host.openFile,
+      }),
+    },
+    release: {
+      component: ReleaseView,
+      keepAlive: true,
+      props: (tab, host) => ({
+        projectId: host.projectId,
+        tag: typeof tab.params?.tag === "string" ? tab.params.tag : "",
       }),
     },
     commit: {

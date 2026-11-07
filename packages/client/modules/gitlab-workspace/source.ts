@@ -3,7 +3,6 @@ import type { FileContent, FileEntry } from "@projector/core/modules/workspace/i
 import { treePageRange } from "@projector/core/modules/workspace/index.ts";
 import {
   createLocalWorkspaceProfile,
-  defineTab,
   singletonTab,
   type WorkspaceProfile,
 } from "../workspace-api/index.ts";
@@ -20,10 +19,14 @@ import {
   readMergeRequests,
   readPipeline,
   readPipelines,
+  readRelease,
+  readReleases,
   readRepository,
   readTree,
   searchSnapshots,
 } from "./client.ts";
+import { releaseProvider } from "./releases.ts";
+import { issueTab, jobTab, pipelineTab, pullTab, releaseTab } from "./tabs.ts";
 
 const integrationTab = singletonTab(
   "gitlab-integration",
@@ -61,30 +64,6 @@ export function createGitlabConnectionProfile(instance: string, path: string): W
 }
 
 const UNAVAILABLE = "Действие недоступно для этого источника workspace";
-
-const numberedTab = (id: string, label: string) =>
-  defineTab<{ number: number; title?: string }>({
-    id,
-    key: ({ number }) => `${id}:${number}`,
-    path: ({ number }) => `${label} #${number}`,
-    title: ({ number, title }) => `${title ? `${title} · ` : ""}${label} #${number}`,
-    hint: ({ title }) => title ?? "",
-    preview: true,
-  });
-const issueTab = numberedTab("issue", "Issue");
-const pullTab = numberedTab("pull", "MR");
-
-const idTab = (kind: string, label: string) =>
-  defineTab<{ id: number; title?: string }>({
-    id: kind,
-    key: ({ id }) => `${kind}:${id}`,
-    path: ({ id }) => `${label} #${id}`,
-    title: ({ id, title }) => `${title ? `${title} · ` : ""}${label} #${id}`,
-    hint: ({ title }) => title ?? "",
-    preview: true,
-  });
-const pipelineTab = idTab("pipeline", "Pipeline");
-const jobTab = idTab("job", "Job");
 
 const repositoryTab = singletonTab(
   "repository",
@@ -158,6 +137,8 @@ export interface GitlabWorkspaceApi {
   readPipelines?: typeof readPipelines;
   readPipeline?: typeof readPipeline;
   readJob?: typeof readJob;
+  readReleases?: typeof readReleases;
+  readRelease?: typeof readRelease;
   searchSnapshots?: typeof searchSnapshots;
 }
 
@@ -175,6 +156,8 @@ const defaultApi: GitlabWorkspaceApi = {
   readPipelines,
   readPipeline,
   readJob,
+  readReleases,
+  readRelease,
   searchSnapshots,
 };
 
@@ -219,9 +202,24 @@ export function createGitlabEnabledLocalProfile(
       { id: "issues", title: "Issues" },
       { id: "merge-requests", title: "Merge requests" },
       { id: "pipelines", title: "Pipelines", requires: "pipelines" },
+      { id: "releases", title: "Releases", requires: "releases" },
     ],
-    tabs: [...(local.tabs ?? []), repositoryTab, issueTab, pullTab, pipelineTab, jobTab],
-    providers: { ...local.providers, issues, pulls, pipelines: pipelineProvider(repository) },
+    tabs: [
+      ...(local.tabs ?? []),
+      repositoryTab,
+      issueTab,
+      pullTab,
+      pipelineTab,
+      jobTab,
+      releaseTab,
+    ],
+    providers: {
+      ...local.providers,
+      issues,
+      pulls,
+      pipelines: pipelineProvider(repository),
+      releases: releaseProvider(repository),
+    },
   };
 }
 
@@ -370,8 +368,9 @@ export function createGitlabWorkspaceProfile(
       { id: "issues", title: "Issues" },
       { id: "merge-requests", title: "Merge requests" },
       { id: "pipelines", title: "Pipelines", requires: "pipelines" },
+      { id: "releases", title: "Releases", requires: "releases" },
     ],
-    tabs: [integrationTab, repositoryTab, issueTab, pullTab, pipelineTab, jobTab],
+    tabs: [integrationTab, repositoryTab, issueTab, pullTab, pipelineTab, jobTab, releaseTab],
     features: {
       terminals: false,
       docker: false,
@@ -387,6 +386,7 @@ export function createGitlabWorkspaceProfile(
       issues,
       pulls,
       pipelines: pipelineProvider(repository, api),
+      releases: releaseProvider(repository, api),
     },
   };
 }

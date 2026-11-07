@@ -32,3 +32,9 @@ export { browseGithubDiscussion, browseGithubDiscussions } from "./discussions.t
 export { githubEmojis } from "./emojis.ts";
 export { browseGithubPull, browseGithubPulls } from "./pulls.ts";
 export { browseGithubJob, browseGithubPipeline, browseGithubPipelines } from "./pipelines.ts";
+export {
+  browseGithubRelease,
+  browseGithubReleases,
+  downloadGithubReleaseAsset,
+  downloadGithubReleaseSource,
+} from "./releases.ts";

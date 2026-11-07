@@ -10,6 +10,7 @@ import {
   PullRequestView,
   PipelineView,
   JobView,
+  ReleaseView,
   type TabViews,
 } from "../workspace/index.ts";
 import { settingsTabViews } from "../app-settings/index.ts";
@@ -129,6 +130,15 @@ const tabViews: TabViews = {
     props: (tab, host) => ({
       projectId: host.projectId,
       id: tab.params?.id,
+      host: "GitLab",
+    }),
+  },
+  release: {
+    component: ReleaseView,
+    keepAlive: true,
+    props: (tab, host) => ({
+      projectId: host.projectId,
+      tag: typeof tab.params?.tag === "string" ? tab.params.tag : "",
       host: "GitLab",
     }),
   },

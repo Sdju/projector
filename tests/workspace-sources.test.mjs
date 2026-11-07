@@ -117,6 +117,12 @@ test("the shared workspace uses a readonly source for tree, files, assets and re
       async readDiscussion(repository, number) {
         return { action: "discussion", repository, number };
       },
+      async readReleases(repository, params) {
+        return { action: "releases", repository, params };
+      },
+      async readRelease(repository, tag) {
+        return { action: "release", repository, tag };
+      },
     },
   );
   const unregister = registerWorkspaceProfile("remote-test", profile);
@@ -192,6 +198,18 @@ test("the shared workspace uses a readonly source for tree, files, assets and re
       repository: "octocat/repo",
       number: 4,
     });
+    expect(workspaceCapabilities("remote-test").releases).toBe(true);
+    expect(await workspaceRequest("remote-test", "releases", { page: "1" })).toStrictEqual({
+      action: "releases",
+      repository: "octocat/repo",
+      params: { page: "1" },
+    });
+    expect(await workspaceRequest("remote-test", "release", { tag: "v1.2.3" })).toStrictEqual({
+      action: "release",
+      repository: "octocat/repo",
+      tag: "v1.2.3",
+    });
+    await expect(workspaceRequest("remote-test", "release", { tag: "" })).rejects.toThrow();
     expect(profile.providers.git.write).toBe(undefined);
     for (const action of ["search", "external", "diff"])
       await expect(workspaceRequest("remote-test", action)).rejects.toThrow();
@@ -306,6 +324,8 @@ test("a local project with a GitHub origin keeps local providers and adds issues
   expect(profile.tabs.some((tab) => tab.id === "pull")).toBeTruthy();
   expect(profile.sidebar.some((section) => section.id === "discussions")).toBeTruthy();
   expect(profile.tabs.some((tab) => tab.id === "discussion")).toBeTruthy();
+  expect(profile.sidebar.some((section) => section.id === "releases")).toBeTruthy();
+  expect(profile.tabs.some((tab) => tab.id === "release")).toBeTruthy();
   const calls = [];
   const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
     calls.push(String(url));
@@ -318,6 +338,7 @@ test("a local project with a GitHub origin keeps local providers and adds issues
     expect(capabilities.git).toBe(true);
     expect(capabilities.search).toBe(true);
     expect(capabilities.issues).toBe(true);
+    expect(capabilities.releases).toBe(true);
     expect(capabilities.terminals).toBe(true);
     await workspaceRequest("local-github-test", "issues", { state: "open", page: "1" });
     expect(calls[0]).toMatch(/repository=octocat%2Frepo/);
@@ -473,11 +494,28 @@ test("a remote GitLab workspace sends the snapshot ref to blob search", async ()
         calls.push({ repository, params });
         return { hits: [], truncated: false };
       },
+      async readReleases(repository, params) {
+        return { action: "releases", repository, params };
+      },
+      async readRelease(repository, tag) {
+        return { action: "release", repository, tag };
+      },
     },
   );
   const unregister = registerWorkspaceProfile("gitlab-search-test", profile);
   try {
     expect(workspaceCapabilities("gitlab-search-test").search).toBe(true);
+    expect(workspaceCapabilities("gitlab-search-test").releases).toBe(true);
+    expect(await workspaceRequest("gitlab-search-test", "releases", { page: "1" })).toStrictEqual({
+      action: "releases",
+      repository: "gitlab.com/group/project",
+      params: { page: "1" },
+    });
+    expect(await workspaceRequest("gitlab-search-test", "release", { tag: "v1" })).toStrictEqual({
+      action: "release",
+      repository: "gitlab.com/group/project",
+      tag: "v1",
+    });
     await searchWorkspace(
       "gitlab-search-test",
       "FileScope",

@@ -24,7 +24,7 @@ Projector — локальное приложение для Linux, Windows и m
 
 ### GitHub и GitLab без клонирования
 
-`gh:/owner/repository` и `gl:/instance/group/project` открывают удалённый проект как локальный: дерево, файлы, Markdown, Issues, Pull/Merge requests, Pipelines с джобами и логами, историю, коммиты и diff. Публичные репозитории GitHub и GitLab читаются без входа, приватные — по токену из системного хранилища секретов. В локальном проекте с GitHub или GitLab в `origin` те же разделы добавляются к обычным файлам, Git и терминалам. Запись, Git-мутации и запуск кода в удалённых проектах отключены — это read-only клиент. Подробности — [интеграции](docs/integrations.md).
+`gh:/owner/repository` и `gl:/instance/group/project` открывают удалённый проект как локальный: дерево, файлы, Markdown, Issues, Pull/Merge requests, Pipelines с джобами и логами, Releases с ассетами и source archives, историю, коммиты и diff. Публичные репозитории GitHub и GitLab читаются без входа, приватные — по токену из системного хранилища секретов. В локальном проекте с GitHub или GitLab в `origin` те же разделы добавляются к обычным файлам, Git и терминалам. Запись, Git-мутации и запуск кода в удалённых проектах отключены — это read-only клиент. Подробности — [интеграции](docs/integrations.md).
 
 ### Браузер с настоящими origin
 
@@ -44,7 +44,7 @@ GTK-палитра по хоткею ищет приложения и проек
 
 Всё нужное для проекта — в одном окне: дерево файлов, вкладки редактора и терминалы.
 Слева рейка разделов (файлы, поиск, Git, Docker), а у проекта с GitHub или GitLab
-в `origin` — ещё Issues, Pull/Merge requests, Discussions и Pipelines. Сверху
+в `origin` — ещё Issues, Pull/Merge requests, Discussions, Pipelines и Releases. Сверху
 переключатель проектов, сценарии запуска и настройки.
 
 ### Git

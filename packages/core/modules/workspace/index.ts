@@ -68,6 +68,10 @@ export type {
   PipelineJobDetail,
   PipelineList,
   PipelineStatus,
+  Release,
+  ReleaseAsset,
+  ReleaseDetail,
+  ReleaseList,
 } from "./contract.ts";
 export type {
   PullRequest,

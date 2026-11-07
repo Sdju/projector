@@ -3,7 +3,13 @@ import UiMessage from "../../common/ui/UiMessage.vue";
 import { onBeforeUnmount, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import type { GithubRepository } from "@projector/core/modules/github/index.ts";
-import { ProjectWorkspace, PipelineView, JobView, type TabViews } from "../workspace/index.ts";
+import {
+  ProjectWorkspace,
+  PipelineView,
+  JobView,
+  ReleaseView,
+  type TabViews,
+} from "../workspace/index.ts";
 import { settingsTabViews } from "../app-settings/index.ts";
 import { registerWorkspaceProfile, workspaceRequest } from "../workspace-api/index.ts";
 import { useCommandScope } from "../../common/utilities/commands.ts";
@@ -87,6 +93,15 @@ const tabViews: TabViews = {
     props: (tab, host) => ({
       projectId: host.projectId,
       id: tab.params?.id,
+      host: "GitHub",
+    }),
+  },
+  release: {
+    component: ReleaseView,
+    keepAlive: true,
+    props: (tab, host) => ({
+      projectId: host.projectId,
+      tag: typeof tab.params?.tag === "string" ? tab.params.tag : "",
       host: "GitHub",
     }),
   },

@@ -13,6 +13,8 @@ import type {
   PullRequestComparison,
   PullRequestDetail,
   PullRequestList,
+  ReleaseDetail,
+  ReleaseList,
 } from "@projector/core/modules/workspace/index.ts";
 
 export class GitlabRequestError extends Error {
@@ -109,3 +111,10 @@ export const readPipeline = (repository: string, id: number, signal?: AbortSigna
   readGitlab<PipelineDetail>("pipeline", { repository, id: String(id) }, signal);
 export const readJob = (repository: string, id: number, signal?: AbortSignal) =>
   readGitlab<PipelineJobDetail>("job", { repository, id: String(id) }, signal);
+export const readReleases = (
+  repository: string,
+  params: Record<string, string>,
+  signal?: AbortSignal,
+) => readGitlab<ReleaseList>("releases", { repository, ...params }, signal);
+export const readRelease = (repository: string, tag: string, signal?: AbortSignal) =>
+  readGitlab<ReleaseDetail>("release", { repository, tag }, signal);

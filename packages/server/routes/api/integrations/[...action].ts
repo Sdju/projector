@@ -45,11 +45,14 @@ import {
   browseGitlabPipelines,
   browseGitlabPipeline,
   browseGitlabJob,
+  browseGitlabRelease,
+  browseGitlabReleases,
+  downloadGitlabReleaseSource,
   searchGitlabBlobs,
 } from "../../../modules/gitlab/index.ts";
 
 import { isLocalRequest } from "../../../modules/access/index.ts";
-import { HttpError } from "../../../modules/http/index.ts";
+import { HttpError, sendDownload } from "../../../modules/http/index.ts";
 import {
   json,
   readBody,
@@ -311,6 +314,24 @@ export const routes: RouteDefinition[] = [
   }),
   endpoint("GET", "/api/integrations/gitlab/browse/job", async ({ res, url }) => {
     json(res, 200, await browseGitlabJob(text(url, "repository"), text(url, "id")));
+  }),
+  endpoint("GET", "/api/integrations/gitlab/browse/releases", async ({ res, url }) => {
+    json(
+      res,
+      200,
+      await browseGitlabReleases(text(url, "repository"), Object.fromEntries(url.searchParams)),
+    );
+  }),
+  endpoint("GET", "/api/integrations/gitlab/browse/release", async ({ res, url }) => {
+    json(res, 200, await browseGitlabRelease(text(url, "repository"), text(url, "tag")));
+  }),
+  endpoint("GET", "/api/integrations/gitlab/browse/release-source", async ({ res, url }) => {
+    const download = await downloadGitlabReleaseSource(
+      text(url, "repository"),
+      text(url, "tag"),
+      text(url, "format"),
+    );
+    sendDownload(res, download.response, download.name, download.contentType);
   }),
 
   endpoint("POST", "/api/integrations/github/device", async ({ res }) => {

@@ -18,9 +18,14 @@ import {
   browseGithubPipelines,
   browseGithubPull,
   browseGithubPulls,
+  browseGithubRelease,
+  browseGithubReleases,
   browseGithubRepository,
   browseGithubTree,
+  downloadGithubReleaseAsset,
+  downloadGithubReleaseSource,
 } from "../../../modules/github/index.ts";
+import { sendDownload } from "../../../modules/http/index.ts";
 import { json, type RouteDefinition } from "../../../modules/transport/index.ts";
 import { letterIconSvg } from "../../../modules/projects/index.ts";
 import { sendIconBytes } from "../../../modules/project-presentation/index.ts";
@@ -315,6 +320,58 @@ export const routes: RouteDefinition[] = [
           url.searchParams.get("id") || "",
         ),
       );
+    },
+  },
+  {
+    method: "GET",
+    path: "/api/integrations/github/browse/releases",
+    handler: async ({ res, url }) => {
+      json(
+        res,
+        200,
+        await browseGithubReleases(
+          url.searchParams.get("repository") || "",
+          Object.fromEntries(url.searchParams),
+        ),
+      );
+    },
+  },
+  {
+    method: "GET",
+    path: "/api/integrations/github/browse/release",
+    handler: async ({ res, url }) => {
+      json(
+        res,
+        200,
+        await browseGithubRelease(
+          url.searchParams.get("repository") || "",
+          url.searchParams.get("tag") || "",
+        ),
+      );
+    },
+  },
+  {
+    method: "GET",
+    path: "/api/integrations/github/browse/release-asset",
+    handler: async ({ res, url }) => {
+      const download = await downloadGithubReleaseAsset(
+        url.searchParams.get("repository") || "",
+        url.searchParams.get("asset") || "",
+        url.searchParams.get("name") || "",
+      );
+      sendDownload(res, download.response, download.name, download.contentType);
+    },
+  },
+  {
+    method: "GET",
+    path: "/api/integrations/github/browse/release-source",
+    handler: async ({ res, url }) => {
+      const download = await downloadGithubReleaseSource(
+        url.searchParams.get("repository") || "",
+        url.searchParams.get("tag") || "",
+        url.searchParams.get("format") || "",
+      );
+      sendDownload(res, download.response, download.name, download.contentType);
     },
   },
 ];

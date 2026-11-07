@@ -3,7 +3,6 @@ import type { FileContent, FileEntry } from "@projector/core/modules/workspace/i
 import { treePageRange } from "@projector/core/modules/workspace/index.ts";
 import {
   createLocalWorkspaceProfile,
-  defineTab,
   singletonTab,
   type WorkspaceProfile,
 } from "../workspace-api/index.ts";
@@ -22,8 +21,12 @@ import {
   readTree,
   readFile,
   readGit,
+  readReleases,
+  readRelease,
 } from "./client.ts";
 import { pipelineProvider } from "./pipelines.ts";
+import { releaseProvider } from "./releases.ts";
+import { discussionTab, issueTab, jobTab, pipelineTab, pullTab, releaseTab } from "./tabs.ts";
 
 const connectionTab = singletonTab(
   "github-integration",
@@ -60,21 +63,6 @@ export function createGithubConnectionProfile(repository: string): WorkspaceProf
 }
 
 const UNAVAILABLE = "Действие недоступно для этого источника workspace";
-
-const numberedTab = (id: string, label: string) =>
-  defineTab<{ number: number; title?: string }>({
-    id,
-    key: ({ number }) => `${id}:${number}`,
-    path: ({ number }) => `${label} #${number}`,
-    title: ({ number, title }) => `${title ? `${title} · ` : ""}${label} #${number}`,
-    hint: ({ title }) => title ?? "",
-    preview: true,
-  });
-const issueTab = numberedTab("issue", "Issue");
-const pullTab = numberedTab("pull", "PR");
-const discussionTab = numberedTab("discussion", "Discussion");
-const pipelineTab = numberedTab("pipeline", "Pipeline");
-const jobTab = numberedTab("job", "Job");
 
 /** Read provider for a numbered resource (issues, pull requests): a list action and a single-item one. */
 function numberedProvider(
@@ -130,6 +118,7 @@ export function createGithubEnabledLocalProfile(
       { id: "pulls", title: "Pull requests" },
       { id: "discussions", title: "Discussions" },
       { id: "pipelines", title: "Pipelines", requires: "pipelines" },
+      { id: "releases", title: "Releases", requires: "releases" },
     ],
     tabs: [
       ...(local.tabs ?? []),
@@ -144,6 +133,7 @@ export function createGithubEnabledLocalProfile(
       discussionTab,
       pipelineTab,
       jobTab,
+      releaseTab,
     ],
     providers: {
       ...local.providers,
@@ -151,6 +141,7 @@ export function createGithubEnabledLocalProfile(
       pulls,
       discussions,
       pipelines: pipelineProvider(repository),
+      releases: releaseProvider(repository),
     },
   };
 }
@@ -175,6 +166,8 @@ export function createGithubWorkspaceProfile(
     readPipelines?: typeof readPipelines;
     readPipeline?: typeof readPipeline;
     readJob?: typeof readJob;
+    readReleases?: typeof readReleases;
+    readRelease?: typeof readRelease;
   } = {
     readRepository,
     readTree,
@@ -189,6 +182,8 @@ export function createGithubWorkspaceProfile(
     readPipelines,
     readPipeline,
     readJob,
+    readReleases,
+    readRelease,
   },
 ): WorkspaceProfile {
   let metadata = initial;
@@ -353,6 +348,7 @@ export function createGithubWorkspaceProfile(
       { id: "pulls", title: "Pull requests" },
       { id: "discussions", title: "Discussions" },
       { id: "pipelines", title: "Pipelines", requires: "pipelines" },
+      { id: "releases", title: "Releases", requires: "releases" },
     ],
     tabs: [
       connectionTab,
@@ -367,6 +363,7 @@ export function createGithubWorkspaceProfile(
       discussionTab,
       pipelineTab,
       jobTab,
+      releaseTab,
     ],
     features: {
       terminals: false,
@@ -383,6 +380,7 @@ export function createGithubWorkspaceProfile(
       pulls,
       discussions,
       pipelines: pipelineProvider(repository, api),
+      releases: releaseProvider(repository, api),
     },
   };
 }

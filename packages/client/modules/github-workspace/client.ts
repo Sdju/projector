@@ -13,6 +13,8 @@ import type {
   PipelineList,
   PullRequestDetail,
   PullRequestList,
+  ReleaseDetail,
+  ReleaseList,
 } from "@projector/core/modules/workspace/index.ts";
 export class GithubRequestError extends Error {
   readonly status: number;
@@ -71,3 +73,10 @@ export const readPipeline = (repository: string, id: number, signal?: AbortSigna
   readGit<PipelineDetail>("pipeline", { repository, id: String(id) }, signal);
 export const readJob = (repository: string, id: number, signal?: AbortSignal) =>
   readGit<PipelineJobDetail>("job", { repository, id: String(id) }, signal);
+export const readReleases = (
+  repository: string,
+  params: Record<string, string>,
+  signal?: AbortSignal,
+) => readGit<ReleaseList>("releases", { repository, ...params }, signal);
+export const readRelease = (repository: string, tag: string, signal?: AbortSignal) =>
+  readGit<ReleaseDetail>("release", { repository, tag }, signal);

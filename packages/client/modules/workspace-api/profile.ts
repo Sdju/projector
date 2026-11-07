@@ -10,6 +10,7 @@ export type WorkspaceCapability =
   | "pulls"
   | "discussions"
   | "pipelines"
+  | "releases"
   | "terminals"
   | "docker"
   | "agent"
@@ -93,6 +94,7 @@ export interface WorkspaceProfile {
     pulls?: ReadProvider;
     discussions?: ReadProvider;
     pipelines?: ReadProvider;
+    releases?: ReadProvider;
   };
   features: Readonly<WorkspaceFeatures>;
   /** Service tab kinds this workspace adds to the base set. */
@@ -116,6 +118,7 @@ export function profileCapabilities(profile: WorkspaceProfile): Readonly<Workspa
       pulls: !!profile.providers.pulls,
       discussions: !!profile.providers.discussions,
       pipelines: !!profile.providers.pipelines,
+      releases: !!profile.providers.releases,
       snapshots: !!profile.providers.files.snapshots,
       compare: !!profile.providers.files.compare,
       reveal: !!profile.providers.files.reveal,
@@ -128,7 +131,7 @@ export function profileCapabilities(profile: WorkspaceProfile): Readonly<Workspa
 /** Which provider serves a read action; the table is the only place that knows the split. */
 const READ_DOMAIN: Record<
   string,
-  "files" | "git" | "search" | "issues" | "pulls" | "discussions" | "pipelines"
+  "files" | "git" | "search" | "issues" | "pulls" | "discussions" | "pipelines" | "releases"
 > = {
   tree: "files",
   file: "files",
@@ -155,6 +158,8 @@ const READ_DOMAIN: Record<
   pipelines: "pipelines",
   pipeline: "pipelines",
   job: "pipelines",
+  releases: "releases",
+  release: "releases",
 };
 export function readProviderFor(profile: WorkspaceProfile, action: string): ReadProvider {
   const domain = READ_DOMAIN[action];

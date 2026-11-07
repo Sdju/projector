@@ -24,12 +24,13 @@
 - Реакции — только чтение; шорткоды `:name:` заменяются эмодзи через `GET /api/integrations/github/emojis` (прокси к `/emojis`, кеш сутки).
 - История — Commits API: поиск до 500 коммитов за запрос, бинарные файлы не сравниваются, для коммитов с 3000+ файлов обзор сообщает об ограничении. Режима «все ветки» нет.
 - Pipelines — Actions workflow runs: фильтр статуса → `in_progress`/`failure`/`success`/`cancelled`, страницы по 30, лог до 2 MiB по подписанной ссылке (токен не передаётся хранилищу).
+- Releases — GitHub Releases API: страницы по 30, `latest`, тело Markdown, вложенные ассеты и source archives (`zip`, `tar.gz`). Ассеты и исходники скачиваются через Projector потоком; токен остаётся на `api.github.com` и не уходит на подписанный URL. Черновики и приватные ассеты требуют токен с доступом к репозиторию.
 - Список репозиториев владельца ограничен 1000. Команды: `ide.github.repository.open|refresh|info|clone*`, файлы и раскладка — общие `ide.fileTree.*`, `ide.editor.*`, `ide.workbench.*`.
 - Клонирование — фоновая задача (`POST/GET/DELETE /api/integrations/github/clone-jobs`, отмена `ide.github.repository.clone.abort`), по умолчанию в Docker (см. [docker](docker.md)).
 
 ### GitHub в локальном проекте
 
-Если `origin` указывает на GitHub (HTTPS, `git@github.com:…`, `ssh://…`), в обычный workspace добавляются Issues, Pull requests, Discussions, Pipelines и «О репозитории»; файлы, Git, поиск и терминалы остаются локальными. `upstream` и другие remote игнорируются. Проекты в Docker и Dev Container панели не получают.
+Если `origin` указывает на GitHub (HTTPS, `git@github.com:…`, `ssh://…`), в обычный workspace добавляются Issues, Pull requests, Discussions, Pipelines, Releases и «О репозитории»; файлы, Git, поиск и терминалы остаются локальными. `upstream` и другие remote игнорируются. Проекты в Docker и Dev Container панели не получают.
 
 ## GitLab
 
@@ -40,10 +41,11 @@
 - Клонирование — HTTPS в `<папка импорта>/<группа>/<подгруппа>/<проект>`, `git` с `core.hooksPath=/dev/null`, токен через временный `GIT_ASKPASS`. Зависимости не ставятся, существующие папки не перезаписываются. Docker-клон общий с GitHub.
 - `/gl/projects/<instance>/<group>/<project>` (`gl:/…`) — readonly-workspace: дерево, файлы, Markdown и изображения, карточка проекта, Issues, Merge requests, Pipelines с джобами и логами, история, коммиты и diff. Снимок фиксируется на коммите; `?ref=` и `?path=` как у GitHub.
 - Pipelines: фильтр по статусу, джобы по стадиям, активный запуск обновляется каждые 10 секунд, лог до 2 MiB без ANSI и служебных префиксов GitLab. Провайдер общий с GitHub: `pipelines`, `pipeline`, `job`.
+- Releases: страницы по 30, `upcoming_release`, ссылки `assets.links` и source archives (`zip`, `tar.gz`, `tar`, `tar.bz2`). Ссылки открываются на GitLab, исходники скачиваются через Projector; токен не уходит на подписанный URL. Для приватного проекта нужны `read_api` и `read_repository`.
 - Merge requests: состояние, последний pipeline, `detailed_merge_status`, одобрения и ревьюеры, обсуждение (до 500 комментариев), изменённые файлы с inline-diff из `diff_refs`. Для fork head читается из `source_project_id`; `changes_count: "1000+"` не выдаётся за точное число; список ограничен 300 файлами, diff — 5 MiB на сторону. Approvals в списке не запрашиваются (N+1).
 - Реакции на комментариях не загружаются: award emoji требуют запроса на заметку (N+1). Приватный проект без токена отвечает `404`, поэтому вкладка подключения открывается только на `401/403`.
 - Команды: `ide.gitlab.repository.open|refresh|info|clone*|import`, `ide.gitlab.integration.*`; Issues — общие `ide.issues.*`, MR — `ide.mergeRequests.*`, история — `ide.git.*`.
-- В локальном проекте с GitLab в `origin` добавляются Issues, Merge requests, Pipelines и «О проекте»; файлы, Git и терминалы локальные. Проекты в Docker панели не получают.
+- В локальном проекте с GitLab в `origin` добавляются Issues, Merge requests, Pipelines, Releases и «О проекте»; файлы, Git и терминалы локальные. Проекты в Docker панели не получают.
 
 ## Лимиты агентов в статусной строке
 

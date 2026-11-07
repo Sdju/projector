@@ -156,6 +156,7 @@ test("the readonly GitLab source reads tree, files, history, issues and merge re
       "issues",
       "merge-requests",
       "pipelines",
+      "releases",
     ]);
     expect(profile.tabs.map((tab) => tab.id)).toStrictEqual([
       "gitlab-integration",
@@ -164,6 +165,7 @@ test("the readonly GitLab source reads tree, files, history, issues and merge re
       "pull",
       "pipeline",
       "job",
+      "release",
     ]);
     expect(profile.features).toStrictEqual({
       terminals: false,

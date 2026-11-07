@@ -181,6 +181,25 @@ Commands: `ide.project.settings.get`, `ide.project.settings.update` (`name`, `ic
 `catalog.save` as the settings form, and are unavailable while the open settings tab has unsaved edits.
 The chat agent uses them instead of editing Projector data files.
 
+## GitHub and GitLab releases
+
+`gh:` and `gl:` workspaces, and local projects whose `origin` points at GitHub or GitLab, register a
+`releases` sidebar section and a `release` tab. The sidebar scope is `releases:<projectId>` with
+`{ surface: 'releases', projectId }`; the tab scope is `release:<projectId>:<tag>` with
+`{ surface: 'release', projectId, tag, host }`.
+
+- `ide.releases.block.toggle`, `ide.releases.refresh`, `ide.releases.more`;
+- `ide.releases.open` `{ tag, title?, pinned? }` opens a release tab (temporary by default);
+- `ide.release.refresh` rereads the release and its files;
+- `ide.release.asset.download` `{ id }` opens the internal download or the external host link. Uploading
+  assets are refused.
+
+Reads use `GET /api/integrations/{github,gitlab}/browse/releases?repository&page`,
+`.../release?repository&tag`, `.../release-asset?repository&asset&name` and
+`.../release-source?repository&tag&format`. Pages are 30 releases; GitHub source formats are `zip` and
+`tar.gz`, GitLab also accepts `tar` and `tar.bz2`. Downloads are streamed, never buffered; Projector does
+not forward the integration token to a signed redirect host.
+
 ## Missing project folder
 
 When a saved project's folder no longer exists, its page shows a recovery view instead of the workspace

@@ -22,6 +22,7 @@ import {
   PullRequestFilesSection,
 } from "../modules/issues/index.ts";
 import { PipelinesPanel } from "../modules/pipelines/index.ts";
+import { ReleasesPanel } from "../modules/releases/index.ts";
 import { DockerSidebar } from "../../docker/index.ts";
 import SearchPanel from "../ui/SearchPanel.vue";
 import FilesSection from "../ui/FilesSection.vue";
@@ -39,6 +40,7 @@ import IconPulls from "~icons/lucide/git-pull-request";
 import IconMerge from "~icons/lucide/git-merge";
 import IconDiscussions from "~icons/lucide/messages-square";
 import IconPipelines from "~icons/lucide/workflow";
+import IconReleases from "~icons/lucide/tag";
 
 /** Sections every workspace has; profiles add their own through `profile.sidebar`. */
 export const baseSidebarTypes: SidebarType[] = [
@@ -270,6 +272,17 @@ export const baseSidebarViews: SidebarViews = {
       active: selected,
       onOpen: (pipeline: { id: number; title?: string }, pinned?: boolean) =>
         host.openTab("pipeline", pipeline, { preview: !pinned }),
+    }),
+    refresh: (_, panel) => panel?.refresh?.(),
+  },
+  releases: {
+    icon: IconReleases,
+    component: ReleasesPanel,
+    props: (host, selected) => ({
+      projectId: host.projectId,
+      active: selected,
+      onOpen: (release: { tag: string; title?: string }, pinned?: boolean) =>
+        host.openTab("release", release, { preview: !pinned }),
     }),
     refresh: (_, panel) => panel?.refresh?.(),
   },
