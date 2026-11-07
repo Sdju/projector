@@ -37,7 +37,7 @@ export function validProjectName(name: string): string {
   return value;
 }
 
-async function isDirectory(path: string) {
+export async function isDirectory(path: string) {
   return stat(path).then(
     (info) => info.isDirectory(),
     () => false,
@@ -65,8 +65,8 @@ export function projectPath(text: string): string[] {
 const newId = (folder: string, segments: string[]) => `new:${folder}\n${segments.join("/")}`;
 
 /**
- * `new/имя` results. One favorite folder creates the project right away; several folders are
- * offered as choices, so the user says where the project goes.
+ * `new/имя` results. One favorite folder creates or opens the project right away; several folders
+ * are offered as choices, so the user says where the project goes.
  */
 export async function creationItems(
   text: string,
@@ -84,27 +84,59 @@ export async function creationItems(
   } catch (error) {
     return { items: [], warning: error instanceof Error ? error.message : String(error) };
   }
+  const name = segments.join("/");
   const items: LaunchItem[] = [];
   for (const folder of folders) {
     if (!(await isDirectory(folder))) continue;
     const exists = await isDirectory(join(folder, ...segments));
     items.push({
       id: newId(folder, segments),
-      name: folders.length > 1 ? tildePath(folder) : `Создать «${segments.join("/")}»`,
+      name:
+        folders.length > 1 ? tildePath(folder) : exists ? `Открыть «${name}»` : `Создать «${name}»`,
       kind: "directory",
       description: exists
-        ? "такая папка уже существует"
+        ? folders.length > 1
+          ? `открыть «${name}» здесь`
+          : `открыть ${tildePath(join(folder, ...segments))}`
         : folders.length > 1
-          ? `создать «${segments.join("/")}» здесь`
+          ? `создать «${name}» здесь`
           : `новый проект в ${tildePath(folder)}`,
       keywords: "",
-      actions: exists ? [] : [{ id: "create", title: "Создать проект" }],
+      actions: exists
+        ? [{ id: "open", title: "Открыть" }]
+        : [{ id: "create", title: "Создать проект" }],
     });
   }
+  const existing = items.filter((item) => item.actions?.[0]?.id === "open").length;
   return {
     items,
-    warning: items.length > 1 ? `В какой папке создать «${segments.join("/")}»?` : undefined,
+    warning:
+      items.length > 1
+        ? existing === items.length
+          ? `Где открыть «${name}»?`
+          : existing === 0
+            ? `В какой папке создать «${name}»?`
+            : `Открыть или создать «${name}»?`
+        : undefined,
   };
+}
+
+async function registerProject(path: string): Promise<{ project: Project; route: string }> {
+  const project = normalizeProject({ ...(await inspectProject(path, true)) });
+  await updateProjects((projects) => {
+    if (!projects.some((item) => sameLocalPath(item.path, path))) projects.unshift(project);
+  });
+  const stored = (await loadProjects()).find((item) => sameLocalPath(item.path, path)) ?? project;
+  return { project: stored, route: workspaceRoute(stored.path) };
+}
+
+/** Registers an existing folder as a project, or returns the catalog entry if it is already there. */
+export async function openProjectAt(path: string): Promise<{ project: Project; route: string }> {
+  const directory = expandPath(path);
+  if (!(await isDirectory(directory))) throw new HttpError(400, "Папка не найдена");
+  const existing = (await loadProjects()).find((item) => sameLocalPath(item.path, directory));
+  if (existing) return { project: existing, route: workspaceRoute(existing.path) };
+  return registerProject(directory);
 }
 
 /** Creates the folder, registers it as a project and returns its workspace route. */
@@ -124,12 +156,7 @@ export async function createProjectIn(
       throw new HttpError(409, "Такая папка уже существует");
     throw error;
   }
-  const project = normalizeProject({ ...(await inspectProject(path, true)) });
-  await updateProjects((projects) => {
-    if (!projects.some((item) => sameLocalPath(item.path, path))) projects.unshift(project);
-  });
-  const stored = (await loadProjects()).find((item) => sameLocalPath(item.path, path)) ?? project;
-  return { project: stored, route: workspaceRoute(path) };
+  return registerProject(path);
 }
 
 export { setFavoriteDirectory };

@@ -10,6 +10,8 @@ const data = join(root, "data");
 const work = join(root, "work");
 await mkdir(join(data, "projector"), { recursive: true });
 await mkdir(join(work, "alpha"), { recursive: true });
+await mkdir(join(work, "node_modules"), { recursive: true });
+await mkdir(join(work, ".hidden"), { recursive: true });
 process.env.XDG_DATA_HOME = data;
 const { searchLauncher, launchItem } = await import("../packages/server/modules/launcher/index.ts");
 const { handleApi } = await import("../packages/server/app/api.ts");
@@ -32,9 +34,27 @@ test("favorite folders rank first and create projects", async () => {
   const added = await (await request("/api/launcher/folders", "POST", { path: work })).json();
   expect(added.folders).toEqual([work]);
 
-  // Folders are not launch targets: they never appear in the lists.
-  expect((await searchLauncher("")).items.some((i) => i.kind === "directory")).toBe(false);
-  expect((await searchLauncher("work")).items.some((i) => i.kind === "directory")).toBe(false);
+  const isFavoriteFolder = (items) => items.some((item) => item.id === `potential:${work}`);
+  // The favorite folder itself is not a launch target; its unregistered children are.
+  expect(isFavoriteFolder((await searchLauncher("")).items)).toBe(false);
+  expect(isFavoriteFolder((await searchLauncher("work")).items)).toBe(false);
+  const onDisk = (await searchLauncher("")).items.filter((item) => item.section === "disk");
+  expect(onDisk.map((item) => item.name)).toEqual(["alpha"]);
+  expect(onDisk[0]).toMatchObject({
+    id: `potential:${join(work, "alpha")}`,
+    kind: "directory",
+    actions: [{ id: "open" }],
+  });
+  const found = (await searchLauncher("alpha")).items;
+  expect(found[0].id).toBe(`potential:${join(work, "alpha")}`);
+  const opened = await launchItem(found[0].id, "open", true);
+  expect(opened.route).toContain("alpha");
+  expect(
+    (await searchLauncher("")).items.some(
+      (item) => item.section === "disk" && item.name === "alpha",
+    ),
+  ).toBe(false);
+  expect((await searchLauncher("alpha")).items[0].id.startsWith("project:")).toBe(true);
 
   // new/<path> with one favorite folder offers a single, immediate creation.
   expect((await searchLauncher("new/")).warning).toContain("имя проекта");
@@ -49,7 +69,9 @@ test("favorite folders rank first and create projects", async () => {
   const nested = (await searchLauncher("new/group/delta")).items[0];
   await launchItem(nested.id, "create", true);
   expect((await stat(join(work, "group", "delta"))).isDirectory()).toBe(true);
-  expect((await searchLauncher("new/gamma")).items[0].actions).toEqual([]);
+  const existing = (await searchLauncher("new/gamma")).items[0];
+  expect(existing.actions).toEqual([{ id: "open", title: "Открыть" }]);
+  expect((await launchItem(existing.id, "open", true)).route).toContain("gamma");
   await expect(launchItem(offer[0].id, "create", true)).rejects.toThrow("уже существует");
   await expect(launchItem(`new:${join(root, "other")}\nx`, "create", true)).rejects.toThrow(
     "избранных",

@@ -73,7 +73,7 @@ commands.scope.registerCommand({
   id: "ide.folders.favorite.add",
   title: "Добавить избранную папку",
   description:
-    "Делает папку избранной: её проекты идут в списке запуска первыми, в ней можно создавать новые проекты.",
+    "Делает папку избранной: её проекты идут в списке запуска первыми, в ней ищутся ещё не открытые папки, и в ней можно создавать новые проекты.",
   arguments: { path: "абсолютный путь или ~/…" },
   enabled: () => !busy.value,
   run: (value) => action(() => add(String(commandArgs(value).path ?? path.value))),
@@ -106,8 +106,9 @@ commands.scope.registerCommand({
   <section class="favorite-folders">
     <UiHeading as="h2" size="sm">Избранные папки</UiHeading>
     <UiHint class="hint"
-      >Проекты из этих папок идут в списке запуска первыми. В поиске наберите <code>new/имя</code>,
-      чтобы создать проект в одной из них.</UiHint
+      >Проекты из этих папок идут в списке запуска первыми, а ещё не открытые папки появляются в
+      разделе «На диске». В поиске наберите <code>new/имя</code>, чтобы создать проект или открыть
+      уже существующую папку.</UiHint
     >
     <ul v-if="folders.length">
       <li v-for="item in folders" :key="item">

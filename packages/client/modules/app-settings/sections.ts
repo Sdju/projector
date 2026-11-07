@@ -40,8 +40,9 @@ export const settingsSections: SettingsSection[] = [
     id: "folders",
     title: "Избранные папки",
     group: "Среда",
-    description: "Папки с проектами: их проекты идут первыми, внутри создаются новые.",
-    keywords: "избранное папки проекты создать новый проект каталог favorite folder",
+    description:
+      "Папки с проектами: их проекты идут первыми, на диске ищутся ещё не открытые, внутри создаются новые.",
+    keywords: "избранное папки проекты создать новый проект каталог на диске favorite folder",
     component: FavoriteFolders,
   },
   {

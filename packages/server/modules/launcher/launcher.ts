@@ -1,8 +1,8 @@
 import { execFile } from "node:child_process";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { os } from "@projector/core/modules/os/index.ts";
-import { loadProjects } from "../projects/index.ts";
+import { expandPath, loadProjects, sameLocalPath, type Project } from "../projects/index.ts";
 import { getSnapshot, startProject, stopProject } from "../processes/index.ts";
 import { openBrowser, openWindow } from "../window/index.ts";
 import { desktopArgs } from "../window/index.ts";
@@ -11,18 +11,21 @@ import type {
   LaunchActionId,
   LaunchItem,
   LaunchResult,
-  LaunchSection,
 } from "@projector/core/modules/launcher/index.ts";
 import { parseLaunchQuery } from "@projector/core/modules/launcher/index.ts";
+import { browse } from "./browse.ts";
 import { projectItem, workspaceRoute } from "./project-entries.ts";
 import {
   createProjectIn,
   creationItems,
   favoriteFolderPath,
+  isDirectory,
+  openProjectAt,
   parseNewId,
   inFavoriteFolder,
   setFavoriteDirectory,
 } from "./folders.ts";
+import { parsePotentialId, potentialItems } from "./potential.ts";
 import { searchGithubRepositories } from "../github/index.ts";
 import { searchGitlabProjects, importGitlabProject, gitlabCloneTarget } from "../gitlab/index.ts";
 import { appUrl, projectAppUrl } from "@projector/core/modules/app-paths/index.ts";
@@ -194,6 +197,7 @@ export async function searchLauncher(
       ...projectItem(project),
       folder: inFavoriteFolder(project, prefs.directories) || undefined,
     })),
+    ...(await potentialItems(prefs.directories, projects)),
   ].map((item) => (prefs.favorites.includes(item.id) ? { ...item, favorite: true } : item));
   if (!text) return { items: browse(items, prefs.usage), warning };
 
@@ -220,50 +224,26 @@ export async function searchLauncher(
   };
 }
 
-const RECENT_LIMIT = 5;
-const PROJECT_LIMIT = 30;
-const APP_LIMIT = 6;
-
-/** Empty query: running projects, recent items, the remaining projects, frequent applications. */
-function browse(
-  items: LaunchItem[],
-  usage: Record<string, { count: number; last: number } | undefined>,
-): LaunchItem[] {
-  const placed = new Set<string>();
-  const take = (section: LaunchSection, list: LaunchItem[], limit = Infinity) =>
-    list
-      .filter((item) => !placed.has(item.id))
-      .slice(0, limit)
-      .map((item) => {
-        placed.add(item.id);
-        return { ...item, section };
-      });
-  const byName = (a: LaunchItem, b: LaunchItem) => a.name.localeCompare(b.name);
-  const byRecent = (a: LaunchItem, b: LaunchItem) =>
-    (usage[b.id]?.last ?? 0) - (usage[a.id]?.last ?? 0) || byName(a, b);
-  const byFrequency = (a: LaunchItem, b: LaunchItem) =>
-    (usage[b.id]?.count ?? 0) - (usage[a.id]?.count ?? 0) || byRecent(a, b);
-  const projects = items.filter((item) => item.kind === "project");
-  const apps = items.filter((item) => item.kind === "application");
-  const byFolder = (a: LaunchItem, b: LaunchItem) =>
-    Number(!!b.folder) - Number(!!a.folder) || byName(a, b);
-  return [
-    ...take("favorites", items.filter((item) => item.favorite).sort(byRecent)),
-    ...take(
-      "running",
-      projects.filter((item) => item.status && item.status.state !== "error").sort(byRecent),
-    ),
-    ...take("recent", items.filter((item) => usage[item.id]).sort(byRecent), RECENT_LIMIT),
-    ...take("projects", projects.sort(byFolder), PROJECT_LIMIT),
-    ...take("apps", apps.sort(byFrequency), APP_LIMIT),
-  ];
-}
-
 /** Shows a Projector route in the window or browser, per the user's interface mode. */
 async function openRoute(route: string) {
   const url = appUrl() + route;
   if ((await preferences()).mode === "window") openWindow(url);
   else openBrowser(url);
+}
+
+async function rememberOpen(
+  result: LaunchResult,
+  opened: { project: Project; route: string },
+  inline: boolean,
+) {
+  result.route = opened.route;
+  if (!inline) await openRoute(result.route);
+  const id = `project:${opened.project.id}`;
+  await updatePreferences((value) => {
+    const usage = value.usage[id];
+    value.usage[id] = { count: (usage?.count ?? 0) + 1, last: Date.now() };
+  });
+  return result;
 }
 
 /** All actions of one result and, for a failed project, the tail of its terminal. */
@@ -275,14 +255,28 @@ export async function launchItem(
   arg?: string,
 ): Promise<LaunchResult> {
   const result: LaunchResult = { ok: true };
-  if (action === "create" || id.startsWith("new:")) {
-    if (!id.startsWith("new:") || (action && action !== "create"))
+  if (id.startsWith("potential:")) {
+    if (action && action !== "open") throw new Error("Для папки на диске доступно только открытие");
+    const path = parsePotentialId(id);
+    const folders = (await preferences()).directories;
+    if (!folders.some((folder) => sameLocalPath(folder, dirname(expandPath(path)))))
+      throw new Error("Открывать так можно только папку в избранной");
+    return rememberOpen(result, await openProjectAt(path), inline);
+  }
+  if (id.startsWith("new:")) {
+    if (action && action !== "create" && action !== "open")
       throw new Error("Создать проект можно в избранной папке: new/имя");
     const target = parseNewId(id);
-    const created = await createProjectIn(target.folder, target.segments);
-    result.route = created.route;
-    if (!inline) await openRoute(result.route);
-    return result;
+    const path = join(target.folder, ...target.segments);
+    const exists = await isDirectory(path);
+    if (action === "create" || (!action && !exists)) {
+      const created = await createProjectIn(target.folder, target.segments);
+      result.route = created.route;
+      if (!inline) await openRoute(result.route);
+      return result;
+    }
+    if (!exists) throw new Error("Папка не найдена");
+    return rememberOpen(result, await openProjectAt(path), inline);
   }
   if (action === "folder") {
     const project = (await loadProjects()).find((p) => `project:${p.id}` === id);

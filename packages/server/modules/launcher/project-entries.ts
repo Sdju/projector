@@ -1,4 +1,5 @@
-import { dirname, isAbsolute, relative, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, sep } from "node:path";
+import { stat } from "node:fs/promises";
 import { os } from "@projector/core/modules/os/index.ts";
 import { loadProjects } from "../projects/index.ts";
 import { getSnapshot, processOutput } from "../processes/index.ts";
@@ -82,8 +83,31 @@ async function favoriteFolder(path: string) {
   return (await preferences()).directories.includes(dirname(path));
 }
 
+async function pathExists(path: string) {
+  return stat(path).then(
+    (info) => info.isDirectory(),
+    () => false,
+  );
+}
+
 export async function launchDetail(id: string): Promise<LaunchDetail> {
-  if (id.startsWith("new:")) return { actions: [{ id: "create", title: "Создать проект" }] };
+  if (id.startsWith("potential:")) {
+    const path = id.slice(10);
+    return {
+      actions: [{ id: "open", title: "Открыть" }],
+      info: { path: tildePath(path), state: "idle", stateLabel: "на диске" },
+    };
+  }
+  if (id.startsWith("new:")) {
+    const [folder = "", rel = ""] = id.slice(4).split("\n");
+    const path = join(folder, ...rel.split("/").filter(Boolean));
+    if (await pathExists(path))
+      return {
+        actions: [{ id: "open", title: "Открыть" }],
+        info: { path: tildePath(path), state: "idle", stateLabel: "на диске" },
+      };
+    return { actions: [{ id: "create", title: "Создать проект" }] };
+  }
   if (!id.startsWith("project:")) {
     if (id.startsWith("gh:")) return { actions: [{ id: "open", title: "Открыть репозиторий" }] };
     if (id.startsWith("gl:"))

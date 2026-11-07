@@ -1,6 +1,7 @@
 export type InterfaceMode = "native" | "window" | "browser";
 export const shortcuts = ["", "Ctrl+Alt+Space", "Super+Space", "Alt+Space"];
-/** `launch` — запуск приложения; `open` — воркспейс проекта; `run` — основная команда проекта; `stop` — остановка запущенного; `browser`/`window` — открыть запущенный проект
+/** `launch` — запуск приложения; `open` — воркспейс проекта (в том числе папка на диске в избранной);
+ * `run` — основная команда проекта; `stop` — остановка запущенного; `browser`/`window` — открыть запущенный проект
  * в браузере или окне (для остановленного `window` запускает команду в окне);
  * `favorite` — добавить в избранное или убрать из него; `create` — создать проект в избранной папке (имя в `arg`);
  * `folder` — добавить папку проекта в избранные папки или убрать её. */
@@ -22,12 +23,13 @@ export interface LaunchAction {
   arg?: string;
 }
 /** Секции пустого запроса; при поиске по тексту список плоский. */
-export type LaunchSection = "favorites" | "running" | "recent" | "projects" | "apps";
+export type LaunchSection = "favorites" | "running" | "recent" | "projects" | "disk" | "apps";
 export const launchSectionTitles: Record<LaunchSection, string> = {
   favorites: "Избранное",
   running: "Работает",
   recent: "Недавние",
   projects: "Проекты",
+  disk: "На диске",
   apps: "Приложения",
 };
 export interface LaunchItem {

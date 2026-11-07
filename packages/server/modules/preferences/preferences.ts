@@ -12,7 +12,7 @@ interface Preferences {
   usage: Record<string, Usage>;
   /** Ids (`app:…`, `project:…`) pinned to the top of the palette. */
   favorites: string[];
-  /** Absolute folders whose projects rank first and in which new projects are created. */
+  /** Absolute folders whose projects rank first, whose unregistered children appear in search, and in which new projects are created. */
   directories: string[];
   /** Terminal programs that have a graphical chat, mapped to how new sessions open. */
   agentModes: Record<string, AgentSessionMode>;
