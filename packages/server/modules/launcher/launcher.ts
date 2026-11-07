@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { dirname, join } from "node:path";
+import { basename, dirname, isAbsolute, join } from "node:path";
 import { promisify } from "node:util";
 import { os } from "@projector/core/modules/os/index.ts";
 import { expandPath, loadProjects, sameLocalPath, type Project } from "../projects/index.ts";
@@ -101,7 +101,9 @@ export function matchScore(item: LaunchItem, query: string): number {
   const name = normalize(item.name);
   const terms = normalize(query).trim().split(/\s+/).filter(Boolean);
   if (!terms.length) return 0;
-  const haystack = normalize(`${item.name} ${item.keywords} ${item.description}`);
+  const haystack = normalize(
+    item.kind === "directory" ? item.name : `${item.name} ${item.keywords} ${item.description}`,
+  );
   let score = 0;
   for (const term of terms) {
     if (name === term) score += 120;
@@ -109,6 +111,7 @@ export function matchScore(item: LaunchItem, query: string): number {
     else if (name.includes(term)) score += 70;
     else if (haystack.includes(term)) score += 40;
     else {
+      if (item.kind === "directory") return -1;
       let cursor = 0;
       let start = -1;
       let end = 0;
@@ -188,6 +191,27 @@ export async function searchLauncher(
     loadProjects(),
     preferences(),
   ]);
+  const input = query.trim();
+  const directPath = expandPath(input);
+  if (input && input !== "/" && isAbsolute(directPath) && (await isDirectory(directPath))) {
+    const project = projects.find((item) => sameLocalPath(item.path, directPath));
+    const item: LaunchItem = project
+      ? {
+          ...projectItem(project),
+          folder: inFavoriteFolder(project, prefs.directories) || undefined,
+        }
+      : {
+          id: `path:${directPath}`,
+          name: basename(directPath),
+          kind: "directory",
+          description: "открыть папку как проект",
+          keywords: directPath,
+          actions: [{ id: "open", title: "Открыть" }],
+        };
+    return {
+      items: [prefs.favorites.includes(item.id) ? { ...item, favorite: true } : item],
+    };
+  }
   const { scope, text } = parseLaunchQuery(query);
   const items: LaunchItem[] = [
     ...(scope === "all"
@@ -255,6 +279,10 @@ export async function launchItem(
   arg?: string,
 ): Promise<LaunchResult> {
   const result: LaunchResult = { ok: true };
+  if (id.startsWith("path:")) {
+    if (action && action !== "open") throw new Error("Для папки доступно только открытие");
+    return rememberOpen(result, await openProjectAt(id.slice(5)), inline);
+  }
   if (id.startsWith("potential:")) {
     if (action && action !== "open") throw new Error("Для папки на диске доступно только открытие");
     const path = parsePotentialId(id);

@@ -45,6 +45,8 @@ test("favorite folders rank first and create projects", async () => {
     kind: "directory",
     actions: [{ id: "open" }],
   });
+  await mkdir(join(work, "bundle-alpha-temp"));
+  expect((await searchLauncher("bapm")).items).toEqual([]);
   const found = (await searchLauncher("alpha")).items;
   expect(found[0].id).toBe(`potential:${join(work, "alpha")}`);
   const opened = await launchItem(found[0].id, "open", true);
@@ -55,6 +57,19 @@ test("favorite folders rank first and create projects", async () => {
     ),
   ).toBe(false);
   expect((await searchLauncher("alpha")).items[0].id.startsWith("project:")).toBe(true);
+
+  const absolute = join(root, "absolute-project");
+  await mkdir(absolute);
+  const direct = await searchLauncher(absolute);
+  expect(direct.items).toHaveLength(1);
+  expect(direct.items[0]).toMatchObject({
+    id: `path:${absolute}`,
+    name: "absolute-project",
+    kind: "directory",
+    actions: [{ id: "open", title: "Открыть" }],
+  });
+  expect((await launchItem(direct.items[0].id, "open", true)).route).toContain("absolute-project");
+  expect((await searchLauncher(absolute)).items[0].id.startsWith("project:")).toBe(true);
 
   // new/<path> with one favorite folder offers a single, immediate creation.
   expect((await searchLauncher("new/")).warning).toContain("имя проекта");

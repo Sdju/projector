@@ -91,6 +91,13 @@ async function pathExists(path: string) {
 }
 
 export async function launchDetail(id: string): Promise<LaunchDetail> {
+  if (id.startsWith("path:")) {
+    const path = id.slice(5);
+    return {
+      actions: [{ id: "open", title: "Открыть" }],
+      info: { path: tildePath(path), state: "idle", stateLabel: "на диске" },
+    };
+  }
   if (id.startsWith("potential:")) {
     const path = id.slice(10);
     return {
