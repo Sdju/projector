@@ -34,13 +34,29 @@ function iconSvg(chip: MessageChip): string {
 
 /** The short name a chip shows: the file name, the command, the image name. */
 export function chipLabel(chip: MessageChip): string {
-  if (chip.type === "file") return chip.path.replace(/\/$/, "").split("/").pop() || chip.path;
+  if (chip.type === "file") {
+    const name = chip.path.replace(/\/$/, "").split("/").pop() || chip.path;
+    if (!chip.range) return name;
+    const lines =
+      chip.range.from === chip.range.to
+        ? `${chip.range.from}`
+        : `${chip.range.from}–${chip.range.to}`;
+    return `${name}:${lines}`;
+  }
   if (chip.type === "command") return `/${chip.name}`;
   return chip.name;
 }
 
 export function chipTitle(chip: MessageChip): string {
-  return chip.type === "file" ? chip.path : chip.type === "command" ? `/${chip.name}` : chip.name;
+  if (chip.type === "file") {
+    if (!chip.range) return chip.path;
+    const lines =
+      chip.range.from === chip.range.to
+        ? `строка ${chip.range.from}`
+        : `строки ${chip.range.from}–${chip.range.to}`;
+    return `${chip.path} · ${lines}`;
+  }
+  return chip.type === "command" ? `/${chip.name}` : chip.name;
 }
 
 class ChipWidget extends WidgetType {

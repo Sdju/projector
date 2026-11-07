@@ -1,4 +1,4 @@
-import { shallowReactive } from "vue";
+import { nextTick, shallowReactive } from "vue";
 import type { McpServer, WorktreeInfo } from "../api/client.ts";
 import type { ForkMode } from "./branches.ts";
 import type {
@@ -10,6 +10,7 @@ import type {
   AgentSessionInfo,
   AgentTask,
   AgentTurn,
+  MessageChip,
   QueuedMessage,
   RewindScope,
 } from "./types.ts";
@@ -41,6 +42,8 @@ export interface ChatController {
   removeSession(id: string): Promise<void>;
   toggleControlsMenu(): void;
   send(text: string): Promise<void>;
+  /** Adds chips to the end of the draft without sending; a form gives way to the text field. */
+  attach(chips: MessageChip[]): Promise<void>;
   /** The block the last answer ended with, if the chat waits for it: a form instead of the field. */
   pendingForm(): string | undefined;
   /** Shows that form in the composer again. */
@@ -132,4 +135,26 @@ export function resolveChat(
 /** All open chats of every project, for the overview of what works now. */
 export function openChats(): ChatController[] {
   return [...chats.values()];
+}
+
+/**
+ * Waits until a chat tab has registered its controller and has been mounted, so its composer can
+ * take chips. Used right after a command opens a chat.
+ */
+export async function waitForChat(
+  projectId: string,
+  key?: string,
+  timeout = 3000,
+): Promise<ChatController> {
+  const find = () => chatsOf(projectId).find((chat) => !key || chat.key === key);
+  const started = Date.now();
+  for (;;) {
+    const chat = find();
+    if (chat) {
+      await nextTick();
+      return chat;
+    }
+    if (Date.now() - started > timeout) throw new Error("Чат не открылся");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
 }

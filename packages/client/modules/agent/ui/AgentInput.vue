@@ -352,9 +352,26 @@ function insertChips(chips: MessageChip[]) {
   insertDropped(target, chips, target.state.selection.main.head);
   target.focus();
 }
+/** Appends chips after the whole draft, with a separating space when the text ends with a word. */
+function appendChips(chips: MessageChip[]) {
+  const target = view.value;
+  if (!target) return;
+  let position = target.state.doc.length;
+  const text = target.state.doc.toString();
+  if (text && !/\s$/.test(text)) {
+    target.dispatch({
+      changes: { from: position, insert: " " },
+      selection: EditorSelection.cursor(position + 1),
+    });
+    position += 1;
+  }
+  insertDropped(target, chips, position);
+  target.focus();
+}
 defineExpose({
   focus: () => view.value?.focus(),
   insertChips,
+  appendChips,
   acceptsDrag,
   dropData,
   /** Puts the cursor behind everything written. */

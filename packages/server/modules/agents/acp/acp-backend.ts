@@ -53,17 +53,17 @@ function promptBlocks(
   cwd: string | undefined,
   images: { mime: string; data: string }[],
 ) {
-  const links = (parts ?? []).flatMap((part) =>
-    part.type === "file"
-      ? [
-          {
-            type: "resource_link",
-            name: part.path.split("/").pop() || part.path,
-            uri: pathToFileURL(resolve(cwd ?? "/", part.path)).href,
-          },
-        ]
-      : [],
-  );
+  const links = (parts ?? []).flatMap((part) => {
+    if (part.type !== "file") return [];
+    const name = part.path.split("/").pop() || part.path;
+    return [
+      {
+        type: "resource_link",
+        name: part.range ? `${name}:${part.range.from}-${part.range.to}` : name,
+        uri: pathToFileURL(resolve(cwd ?? "/", part.path)).href,
+      },
+    ];
+  });
   return [
     { type: "text", text },
     ...links,

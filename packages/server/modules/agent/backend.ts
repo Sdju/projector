@@ -68,10 +68,16 @@ export interface AgentRunHandle {
   attach: boolean;
 }
 
+/** A range of lines in a file, both ends included and counted from 1. */
+export interface FileRange {
+  from: number;
+  to: number;
+}
+
 /** A message as the user wrote it: text with project files, images and commands between it. */
 export type MessagePart =
   | { type: "text"; text: string }
-  | { type: "file"; path: string; directory?: boolean }
+  | { type: "file"; path: string; directory?: boolean; range?: FileRange }
   | { type: "image"; id: string; name: string; mime: string }
   | { type: "command"; name: string };
 

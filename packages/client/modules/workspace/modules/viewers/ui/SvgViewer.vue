@@ -18,9 +18,11 @@ import { svgPreview } from "../lib/svg-preview.ts";
 const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
 const props = defineProps<{
   path: string;
+  projectId?: string;
   content: string;
   editable?: boolean;
   line?: number;
+  endLine?: number;
   column?: number;
 }>();
 const emit = defineEmits<{ change: [content: string]; save: [] }>();
@@ -244,9 +246,11 @@ commands.scope.registerCommand({
       <template #bottom>
         <CodeViewer
           :path="path"
+          :project-id="projectId"
           :content="content"
           :editable="editable"
           :line="line"
+          :end-line="endLine"
           :column="column"
           @change="emit('change', $event)"
           @save="emit('save')"

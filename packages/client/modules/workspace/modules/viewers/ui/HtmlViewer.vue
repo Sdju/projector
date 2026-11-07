@@ -12,6 +12,7 @@ import IconPanel from "~icons/lucide/app-window";
 const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
 const props = defineProps<{
   path: string;
+  projectId?: string;
   content: string;
   /** Сохранённая версия: iframe читает файл с диска, поэтому обновляется по ней. */
   saved: string;
@@ -19,6 +20,7 @@ const props = defineProps<{
   reload?: number;
   editable?: boolean;
   line?: number;
+  endLine?: number;
   column?: number;
 }>();
 const emit = defineEmits<{
@@ -106,9 +108,11 @@ const frameStyle = computed(() => {
       <template #bottom>
         <CodeViewer
           :path="path"
+          :project-id="projectId"
           :content="content"
           :editable="editable"
           :line="line"
+          :end-line="endLine"
           :column="column"
           @change="emit('change', $event)"
           @save="emit('save')"

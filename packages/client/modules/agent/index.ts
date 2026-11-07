@@ -26,6 +26,8 @@ export { default as AgentHooksSettings } from "./ui/AgentHooksSettings.vue";
 export { default as AgentMemorySettings } from "./ui/AgentMemorySettings.vue";
 export { default as AgentJudgeSettings } from "./ui/AgentJudgeSettings.vue";
 export { registerAgentCommands } from "./model/agent-commands.ts";
+export { attachChipsToChat, attachRangeToChat } from "./model/attach.ts";
+export type { AttachChatOptions } from "./model/attach.ts";
 export { useAgentActivity } from "./model/activity.ts";
 export type { AgentActivityItem } from "./model/activity.ts";
 export { formatElapsed, useElapsedClock } from "./lib/elapsed.ts";

@@ -27,6 +27,8 @@ export interface OpenFile extends FileContent {
   original?: string;
   staged?: boolean;
   line?: number;
+  /** Last line of the range a link points at; with `line`, the editor selects it. */
+  endLine?: number;
   column?: number;
   key: string;
   draft?: string;
@@ -52,6 +54,8 @@ export interface OpenFileOptions {
   originalPath?: string;
   /** Не показывать ошибку открытия: восстановление сессии не ругается на устаревшие вкладки. */
   quiet?: boolean;
+  /** Last line of the range to reveal; only meaningful with `line`. */
+  endLine?: number;
 }
 
 /** A file of the working copy; absent scope is the same as an explicit live one. */

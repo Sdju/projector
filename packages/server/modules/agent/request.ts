@@ -29,6 +29,25 @@ export function historyTools(value: unknown): AgentHistoryTool[] {
   });
 }
 
+/** A line range from a chip; malformed values are dropped, the file itself is kept. */
+function rangeFrom(value: unknown) {
+  if (!value || typeof value !== "object") return undefined;
+  const range = value as Record<string, unknown>;
+  const from = range.from;
+  const to = range.to;
+  if (
+    typeof from !== "number" ||
+    typeof to !== "number" ||
+    !Number.isInteger(from) ||
+    !Number.isInteger(to) ||
+    from < 1 ||
+    to < from ||
+    to > 10_000_000
+  )
+    return undefined;
+  return { from, to };
+}
+
 /** The chips of a message; anything that is not a well-formed part is dropped. */
 function partsFrom(value: unknown): MessagePart[] | undefined {
   if (!Array.isArray(value)) return undefined;
@@ -38,7 +57,14 @@ function partsFrom(value: unknown): MessagePart[] | undefined {
     if (part.type === "text" && typeof part.text === "string")
       return [{ type: "text", text: part.text }];
     if (part.type === "file" && typeof part.path === "string" && part.path)
-      return [{ type: "file", path: part.path, directory: part.directory === true || undefined }];
+      return [
+        {
+          type: "file",
+          path: part.path,
+          directory: part.directory === true || undefined,
+          range: rangeFrom(part.range),
+        },
+      ];
     if (part.type === "command" && typeof part.name === "string" && part.name)
       return [{ type: "command", name: part.name }];
     if (

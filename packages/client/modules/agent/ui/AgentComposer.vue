@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 import type { MessageChip, MessagePart } from "../model/types.ts";
 import AgentInput from "./AgentInput.vue";
@@ -91,11 +91,18 @@ function submitActive() {
   }
   emit("submit");
 }
+/** Adds chips to the end of the draft; a form gives way to the text field so they are visible. */
+async function attach(chips: MessageChip[]) {
+  dismissForm();
+  await nextTick();
+  input.value?.appendChips(chips);
+}
 defineExpose({
   resize: () => {},
   focus: () => {
     if (!formOpen.value) input.value?.focus();
   },
+  attach,
   acceptsDrag: (data: DataTransfer | null) => !!input.value?.acceptsDrag(data),
   dropData: (data: DataTransfer) => !!input.value?.dropData(data),
   showForm: restoreForm,

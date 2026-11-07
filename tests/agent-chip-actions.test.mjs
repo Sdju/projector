@@ -1,5 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import { openChatChip } from "../packages/client/modules/agent/lib/open-chip.ts";
+import { chipText } from "../packages/client/modules/agent/lib/message-parts.ts";
 import { useChipActions } from "../packages/client/modules/agent/model/use-chip-actions.ts";
 
 const imageChip = { type: "image", id: "pic 1", name: "Снимок.png", mime: "image/png" };
@@ -9,8 +10,8 @@ function actions() {
   return {
     opened,
     actions: {
-      openFile: (path, directory) => {
-        opened.files.push({ path, directory });
+      openFile: (path, directory, range) => {
+        opened.files.push({ path, directory, ...(range ? { range } : {}) });
         return Promise.resolve();
       },
       openImage: (src, alt) => opened.images.push({ src, alt }),
@@ -42,4 +43,22 @@ test("a file chip still opens its file in the editor", async () => {
   await Promise.resolve();
   expect(opened.files).toEqual([{ path: "src/app.ts", directory: false }]);
   expect(opened.images).toEqual([]);
+});
+
+test("a range chip opens its file at the same lines", async () => {
+  const { opened, actions: chipActions } = actions();
+  openChatChip({ type: "file", path: "src/app.ts", range: { from: 12, to: 34 } }, chipActions);
+  await Promise.resolve();
+  expect(opened.files).toEqual([
+    { path: "src/app.ts", directory: false, range: { from: 12, to: 34 } },
+  ]);
+});
+
+test("the plain text of a range chip names the file and its lines", () => {
+  expect(chipText({ type: "file", path: "src/app.ts", range: { from: 12, to: 34 } })).toBe(
+    "@src/app.ts:12-34",
+  );
+  expect(chipText({ type: "file", path: "docs/Мой файл.md", range: { from: 3, to: 3 } })).toBe(
+    '@"docs/Мой файл.md":3-3',
+  );
 });

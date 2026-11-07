@@ -330,6 +330,7 @@ const controller: ChatController = {
   removeSession,
   toggleControlsMenu: () => controlsMenu.value?.toggle(),
   send: (text) => send(text),
+  attach: async (chips) => composer.value?.attach(chips),
   pendingForm: () => pendingForm.value,
   showForm: () => composer.value?.showForm(),
   hideForm: () => composer.value?.hideForm(),
@@ -364,8 +365,7 @@ const controller: ChatController = {
     isolate.value = on;
   },
 };
-const unregisterChat = registerChat(controller);
-onBeforeUnmount(unregisterChat);
+onBeforeUnmount(registerChat(controller));
 // A file chip opens its file in the editor; an image chip opens the picture in the chat viewer.
 const { open: openChip, image: chipPreview } = useChipActions(props.projectId, api, (message) => {
   error.value = message;

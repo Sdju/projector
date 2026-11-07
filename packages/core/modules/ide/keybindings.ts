@@ -32,6 +32,12 @@ export const defaultKeybindings: Keybinding[] = [
   { key: "Alt+PageUp", command: "ide.workbench.tab.previous" },
   { key: "Mod+S", command: "ide.editor.file.save", when: { surface: "editor" }, allowInput: true },
   {
+    key: "Mod+Shift+L",
+    command: "ide.editor.selection.toChat",
+    when: { surface: "editor" },
+    allowInput: true,
+  },
+  {
     key: "Mod+Shift+M",
     command: "ide.editor.markdown.toggleSource",
     when: { surface: "editor" },

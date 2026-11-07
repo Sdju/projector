@@ -279,6 +279,7 @@ const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
   reloadFromDisk: files.reloadFromDisk,
   keepMine: files.keepMine,
   openFile,
+  openFileAt: (path, line, endLine, column) => openFile(path, line, column, undefined, { endLine }),
   openTab,
   selectTab: (key) => revealPanel(key),
   onOpenTab: () => (mobileSidebarOpen.value = false),

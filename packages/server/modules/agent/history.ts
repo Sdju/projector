@@ -55,6 +55,10 @@ const turnSchema: z.ZodType<StoredTurn> = z.lazy(() =>
             type: z.literal("file"),
             path: z.string(),
             directory: z.boolean().optional(),
+            range: z
+              .object({ from: z.number().int().positive(), to: z.number().int().positive() })
+              .refine((range) => range.to >= range.from)
+              .optional(),
           }),
           z.object({
             type: z.literal("image"),

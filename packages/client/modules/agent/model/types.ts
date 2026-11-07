@@ -95,9 +95,12 @@ export interface AgentSessionRef {
   id: string;
 }
 
+/** A range of lines, both ends included and counted from 1. */
+export type FileRange = { from: number; to: number };
+
 /** A reference inside a message: a project file or folder, an attached image, a slash command. */
 export type MessageChip =
-  | { type: "file"; path: string; directory?: boolean }
+  | { type: "file"; path: string; directory?: boolean; range?: FileRange }
   | { type: "image"; id: string; name: string; mime: string }
   | { type: "command"; name: string };
 

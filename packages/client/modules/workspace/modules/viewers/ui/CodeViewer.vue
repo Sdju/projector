@@ -2,7 +2,7 @@
 import UiPanel from "../../../../../common/ui/UiPanel.vue";
 import IconRows from "~icons/lucide/rows-2";
 import IconColumns from "~icons/lucide/columns-2";
-import { onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { inject, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import {
   EditorView,
   lineNumbers,
@@ -34,6 +34,8 @@ const props = defineProps<{
   originalLabel?: string;
   modifiedLabel?: string;
   line?: number;
+  /** With `line`, selects the whole range when the file opens. */
+  endLine?: number;
   column?: number;
   editable?: boolean;
   projectId?: string;
@@ -49,6 +51,34 @@ const states = new Map<string, EditorState>();
 let activePath = "";
 const statusStore = useEditorStatusStore();
 const statusId = statusStore.acquire();
+/** The workspace's selection store; the key is global so this view does not import the command layer. */
+interface EditorSelectionSink {
+  report(range: { path: string; from: number; to: number }): void;
+  clear(path: string): void;
+}
+const editorSelection = inject<EditorSelectionSink | undefined>(
+  Symbol.for("projector.editor-selection"),
+  undefined,
+);
+
+/** Only a live project file with a tab reports: diffs, previews and external paths are not chat context. */
+const tracksSelection = () =>
+  !!editorSelection &&
+  !!props.projectId &&
+  props.editable === true &&
+  props.original === undefined &&
+  !props.path.startsWith("/");
+
+function reportSelection(state: EditorState) {
+  if (!tracksSelection()) return;
+  const { main } = state.selection;
+  const first = state.doc.lineAt(main.from);
+  let last = state.doc.lineAt(main.to);
+  // A selection ending at the start of the next line does not include that line.
+  if (main.to > main.from && last.from === main.to && last.number > first.number)
+    last = state.doc.line(last.number - 1);
+  editorSelection!.report({ path: props.path, from: first.number, to: last.number });
+}
 
 function reportCursor(state: EditorState) {
   const { main } = state.selection;
@@ -128,6 +158,14 @@ function extensions(mode: "inline" | "side" = "inline") {
       if (update.view !== view) return;
       if (update.selectionSet) statusStore.activate(statusId, reportCursor(update.state));
       else if (update.docChanged) statusStore.update(statusId, reportCursor(update.state));
+      if ((update.selectionSet || update.docChanged) && update.view.hasFocus)
+        reportSelection(update.state);
+    }),
+    EditorView.domEventHandlers({
+      focus(_event, target) {
+        reportSelection(target.state);
+        return false;
+      },
     }),
   ];
 }
@@ -177,6 +215,16 @@ function render() {
 function reveal() {
   if (!view || !props.line) return;
   const line = view.state.doc.line(Math.min(props.line, view.state.doc.lines));
+  if (props.endLine) {
+    const end = view.state.doc.line(
+      Math.max(line.number, Math.min(props.endLine, view.state.doc.lines)),
+    );
+    view.dispatch({
+      selection: { anchor: line.from, head: end.to },
+      effects: EditorView.scrollIntoView(line.from, { y: "center" }),
+    });
+    return;
+  }
   const pos = Math.min(line.from + (props.column ?? 1) - 1, line.to);
   view.dispatch({
     selection: { anchor: pos },
@@ -210,13 +258,14 @@ watch(
   () => [props.projectId, props.revision],
   () => void loadGutter(),
 );
-watch(() => [props.line, props.column], reveal);
+watch(() => [props.line, props.column, props.endLine], reveal);
 onBeforeUnmount(() => {
   ++gutterToken;
   merge?.destroy();
   view?.destroy();
   states.clear();
   statusStore.release(statusId);
+  editorSelection?.clear(props.path);
 });
 </script>
 <template>

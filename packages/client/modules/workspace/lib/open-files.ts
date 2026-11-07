@@ -71,6 +71,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
       scope,
       originalPath,
       quiet = false,
+      endLine,
     }: OpenFileOptions = {},
   ) {
     if (external && !workspaceCapabilities(ctx.projectId()).externalFiles)
@@ -82,6 +83,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
       existing.preview = asPreview;
       selectTab(key);
       existing.line = line;
+      existing.endLine = endLine;
       existing.column = column;
       if (line && isMarkdown(existing)) existing.markdownMode = "source";
       return fileGeneration;
@@ -121,6 +123,7 @@ export function useOpenFiles(ctx: OpenFilesContext) {
         scope,
         originalPath,
         line,
+        endLine,
         column,
         key,
         markdownMode: line ? "source" : (existing?.markdownMode ?? "document"),

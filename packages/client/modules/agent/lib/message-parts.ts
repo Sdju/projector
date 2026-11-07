@@ -4,7 +4,8 @@ import type { MessageChip, MessagePart } from "../model/types.ts";
 export function chipText(chip: MessageChip): string {
   if (chip.type === "file") {
     const path = chip.directory && !chip.path.endsWith("/") ? `${chip.path}/` : chip.path;
-    return /\s/.test(path) ? `@"${path}"` : `@${path}`;
+    const token = /\s/.test(path) ? `@"${path}"` : `@${path}`;
+    return chip.range ? `${token}:${chip.range.from}-${chip.range.to}` : token;
   }
   if (chip.type === "command") return `/${chip.name}`;
   return `[${chip.name}]`;

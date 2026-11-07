@@ -18,6 +18,7 @@ withDefaults(
     error?: string;
     editable?: boolean;
     line?: number;
+    endLine?: number;
     column?: number;
   }>(),
   { editable: true },
@@ -73,8 +74,10 @@ function focusOut(event: FocusEvent) {
       <CodeViewer
         v-if="mode === 'source'"
         :path="path"
+        :project-id="projectId"
         :content="content"
         :line="line"
+        :end-line="endLine"
         :column="column"
         :editable="editable !== false"
         @change="emit('change', $event)"

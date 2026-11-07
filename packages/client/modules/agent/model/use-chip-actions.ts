@@ -5,7 +5,7 @@ import type { MessageChip } from "./types.ts";
 interface ChatApi {
   executeCommand(
     command: string,
-    args: { path: string; directory: boolean },
+    args: { path: string; directory: boolean; line?: number; endLine?: number },
     options: { scope: string },
   ): Promise<unknown>;
 }
@@ -15,10 +15,14 @@ export function useChipActions(projectId: string, api: ChatApi, fail: (message: 
   const image = ref<{ src: string; alt: string }>();
   const open = (chip: MessageChip) =>
     openChatChip(chip, {
-      openFile: (path, directory) =>
+      openFile: (path, directory, range) =>
         api.executeCommand(
           "ide.editor.path.open",
-          { path, directory },
+          {
+            path,
+            directory,
+            ...(range ? { line: range.from, endLine: range.to } : {}),
+          },
           { scope: `editor:${projectId}` },
         ),
       openImage: (src, alt) => (image.value = { src, alt }),

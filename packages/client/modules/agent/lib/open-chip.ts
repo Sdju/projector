@@ -1,7 +1,7 @@
-import type { MessageChip } from "../model/types.ts";
+import type { FileRange, MessageChip } from "../model/types.ts";
 
 export interface ChipActions {
-  openFile(path: string, directory: boolean): Promise<unknown>;
+  openFile(path: string, directory: boolean, range?: FileRange): Promise<unknown>;
   openImage(src: string, alt: string): void;
   fail(message: string): void;
 }
@@ -14,7 +14,7 @@ export function openChatChip(chip: MessageChip, actions: ChipActions) {
   }
   if (chip.type !== "file") return;
   void actions
-    .openFile(chip.path, chip.directory === true)
+    .openFile(chip.path, chip.directory === true, chip.range)
     .catch((cause) =>
       actions.fail(cause instanceof Error ? cause.message : "Не удалось открыть файл"),
     );
