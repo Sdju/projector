@@ -3,7 +3,7 @@ import UiDisclosureSummary from "../../../common/ui/UiDisclosureSummary.vue";
 import { computed } from "vue";
 import { formatElapsed, useElapsedClock } from "../lib/elapsed.ts";
 import { inputHint } from "../lib/tool-input.ts";
-import { toolLabel } from "../lib/tool-labels.ts";
+import { skillCallName, toolLabel } from "../lib/tool-labels.ts";
 import type { AgentToolView } from "../model/types.ts";
 import AgentCodeBlock from "./AgentCodeBlock.vue";
 import AgentToolCall from "./AgentToolCall.vue";
@@ -27,7 +27,9 @@ const tail = computed(() =>
 const failed = computed(() => props.tools.some((tool) => tool.status === "error"));
 const hint = computed(() => {
   const tool = current.value;
-  return tool ? inputHint(tool.input ?? tool.detail) : "";
+  if (!tool) return "";
+  const raw = tool.input ?? tool.detail;
+  return skillCallName(tool.name, raw) ? "" : inputHint(raw);
 });
 const now = useElapsedClock();
 const currentTime = computed(() => {
@@ -37,10 +39,12 @@ const currentTime = computed(() => {
 });
 // A finished group of one kind of call reads as "Запись файла ×2"; a mixed one, as a count.
 const title = computed(() => {
-  if (current.value) return toolLabel(current.value.name);
+  if (current.value)
+    return toolLabel(current.value.name, current.value.input ?? current.value.detail);
   const names = new Set(props.tools.map((tool) => tool.name));
+  const first = props.tools[0]!;
   return names.size === 1
-    ? `${toolLabel(props.tools[0]!.name)} ×${props.tools.length}`
+    ? `${toolLabel(first.name, first.input ?? first.detail)} ×${props.tools.length}`
     : "Действия";
 });
 </script>

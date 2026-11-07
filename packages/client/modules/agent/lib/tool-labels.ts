@@ -1,3 +1,5 @@
+import { parseToolInput } from "./tool-input.ts";
+
 export const toolLabels: Record<string, string> = {
   list_commands: "Поиск команд",
   describe_command: "Описание команды",
@@ -59,9 +61,33 @@ const lowerLabels = Object.fromEntries(
   Object.entries(toolLabels).map(([name, label]) => [name.toLowerCase(), label]),
 );
 
-export const toolLabel = (name: string) =>
-  /^(?:invoke|load|use)\s+skill\s+/i.test(name)
-    ? "Загрузка навыка"
-    : /^reading media\b/i.test(name)
-      ? "Чтение изображения"
-      : toolLabels[name] || lowerLabels[name.toLowerCase()] || name;
+/** A call that loads a skill: agents name it `Skill`, `use_skill`, `useSkill` or "Invoke skill <name>". */
+export const isSkillCall = (name: string) =>
+  /^(?:invoke|load|use)[\s_]*skill\b/i.test(name) || /^skill\b/i.test(name);
+
+/**
+ * The skill a loading call works on: the name the agent put in the call title, or the
+ * `skill`/`name`/`id` argument. Agents name the field differently, so all three are read.
+ */
+export function skillCallName(name: string, input = ""): string {
+  if (!isSkillCall(name)) return "";
+  const titled = /^(?:invoke|load|use)[\s_]*skill\s+(.+)$/i.exec(name)?.[1]?.trim();
+  if (titled) return titled;
+  const data = parseToolInput(input);
+  if (!data) return "";
+  for (const key of ["skill", "name", "id"] as const) {
+    const value = data[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+export const toolLabel = (name: string, input = "") => {
+  if (isSkillCall(name)) {
+    const skill = skillCallName(name, input);
+    return skill ? `Загрузка навыка: ${skill}` : "Загрузка навыка";
+  }
+  return /^reading media\b/i.test(name)
+    ? "Чтение изображения"
+    : toolLabels[name] || lowerLabels[name.toLowerCase()] || name;
+};

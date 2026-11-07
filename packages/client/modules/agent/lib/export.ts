@@ -1,5 +1,5 @@
 import { inputHint } from "./tool-input.ts";
-import { toolLabel } from "./tool-labels.ts";
+import { skillCallName, toolLabel } from "./tool-labels.ts";
 import { legacyParts } from "../model/turn-events.ts";
 import type { AgentTurn } from "../model/types.ts";
 
@@ -32,8 +32,9 @@ export function chatMarkdown(turns: AgentTurn[], title: string): string {
       }
       const tool = byId.get(part.id);
       if (!tool) continue;
-      const hint = inputHint(tool.input ?? "");
-      body.push(`> ${toolLabel(tool.name)}${hint ? `: \`${hint.replace(/`/g, "'")}\`` : ""}`);
+      const raw = tool.input ?? "";
+      const hint = skillCallName(tool.name, raw) ? "" : inputHint(raw);
+      body.push(`> ${toolLabel(tool.name, raw)}${hint ? `: \`${hint.replace(/`/g, "'")}\`` : ""}`);
     }
     out.push(`## ${title.split(" · ")[0] || "Агент"}\n\n${body.join("\n\n")}`);
   }

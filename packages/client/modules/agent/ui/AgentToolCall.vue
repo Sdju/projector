@@ -12,7 +12,7 @@ import {
   toolFilePath,
 } from "../lib/tool-input.ts";
 import { isImageFile, skillName } from "../lib/tool-file.ts";
-import { toolLabel } from "../lib/tool-labels.ts";
+import { skillCallName, toolLabel } from "../lib/tool-labels.ts";
 import { lineCount, relativePath, toolVisual } from "../lib/tool-visual.ts";
 import { stripReadLineNumbers } from "@projector/core/modules/agent-read/index.ts";
 import { chatImageSource, chatProjectKey } from "../../chat-images/index.ts";
@@ -106,11 +106,13 @@ const view = computed(() => {
   const running = tool.status === "running";
   // A stored result from before the cleaning (or a server that is not reloaded) is numbered too.
   const shown = !running && kind === "read" ? stripReadLineNumbers(result.text) : result.text;
+  // The skill being loaded is named in the row itself, so the hint has nothing to add.
+  const loaded = skillCallName(tool.name, raw);
   return {
-    label: skill.value ? "Чтение навыка" : toolLabel(tool.name),
+    label: skill.value ? "Чтение навыка" : toolLabel(tool.name, raw),
     hint:
       skill.value ||
-      (path.value ? shownPath.value : command.value || inputHint(raw) || result.hint),
+      (loaded ? "" : path.value ? shownPath.value : command.value || inputHint(raw) || result.hint),
     path: path.value ? shownPath.value : "",
     status: result.status ?? tool.status,
     result: running ? "" : shown,

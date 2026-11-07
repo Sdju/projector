@@ -8,7 +8,7 @@ import { useCompactViewport } from "../../../common/utilities/compact-viewport.t
 import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
 import { formatElapsed, useElapsedClock } from "../lib/elapsed.ts";
 import { inputHint } from "../lib/tool-input.ts";
-import { toolLabel } from "../lib/tool-labels.ts";
+import { skillCallName, toolLabel } from "../lib/tool-labels.ts";
 import type { AgentWorkItem } from "../lib/work-items.ts";
 import type { AgentLens } from "../model/lens.ts";
 import AgentLensPanel from "./AgentLens.vue";
@@ -102,12 +102,16 @@ const failed = computed(() =>
   ),
 );
 const step = computed(() => {
-  if (running.value) return toolLabel(running.value.name);
+  if (running.value)
+    return toolLabel(running.value.name, running.value.input ?? running.value.detail);
   return thinking.value ? "Думает…" : "";
 });
-const hint = computed(() =>
-  running.value ? inputHint(running.value.input ?? running.value.detail) : "",
-);
+const hint = computed(() => {
+  const tool = running.value;
+  if (!tool) return "";
+  const raw = tool.input ?? tool.detail;
+  return skillCallName(tool.name, raw) ? "" : inputHint(raw);
+});
 const title = computed(() => [step.value, hint.value].filter(Boolean).join(" "));
 const now = useElapsedClock();
 const elapsed = computed(() => {

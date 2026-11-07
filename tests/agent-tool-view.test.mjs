@@ -2,7 +2,7 @@ import { expect, test } from "vite-plus/test";
 import { applyAgentEvent } from "../packages/client/modules/agent/model/turn-events.ts";
 import { isImageFile, skillName } from "../packages/client/modules/agent/lib/tool-file.ts";
 import { inputHint } from "../packages/client/modules/agent/lib/tool-input.ts";
-import { toolLabel } from "../packages/client/modules/agent/lib/tool-labels.ts";
+import { skillCallName, toolLabel } from "../packages/client/modules/agent/lib/tool-labels.ts";
 import { toolVisual } from "../packages/client/modules/agent/lib/tool-visual.ts";
 import { stripReadLineNumbers } from "../packages/core/modules/agent-read/index.ts";
 import { codeLanguage } from "../packages/client/modules/agent/lib/code-language.ts";
@@ -34,10 +34,20 @@ test("a read picture is known by its name and a skill by its folder", () => {
   expect(toolLabel("ReadMediaFile")).toBe("Чтение изображения");
   expect(toolLabel("Reading media: /tmp/shot.png")).toBe("Чтение изображения");
   expect(toolLabel("use_skill")).toBe("Загрузка навыка");
-  expect(toolLabel("Invoke skill release")).toBe("Загрузка навыка");
+  expect(toolLabel("Invoke skill release")).toBe("Загрузка навыка: release");
   // The skill a call loads is its own name, not the word "skill".
   expect(inputHint(JSON.stringify({ skill: "release", args: "1.2" }))).toBe("release");
   expect(inputHint(JSON.stringify({ name: "release" }))).toBe("release");
+  expect(skillCallName("Skill", JSON.stringify({ id: "chromium-browser-use" }))).toBe(
+    "chromium-browser-use",
+  );
+  expect(toolLabel("Skill", JSON.stringify({ id: "chromium-browser-use" }))).toBe(
+    "Загрузка навыка: chromium-browser-use",
+  );
+  expect(toolLabel("useSkill", JSON.stringify({ name: "lint" }))).toBe("Загрузка навыка: lint");
+  expect(toolLabel("use_skill", JSON.stringify({ name: "release" }))).toBe(
+    "Загрузка навыка: release",
+  );
 });
 
 test("a numbered file body loses its line numbers, anything else stays", () => {
