@@ -169,7 +169,9 @@ async function mobileWorkspace(saved, { mobile = true, terminals = true } = {}) 
     mobileSurface: ref("editor"),
     terminals,
     ensureTab: () => undefined,
-    openFile: async (path) => {
+    openOptions: [],
+    openFile: async (path, _line, _column, _staged, options) => {
+      ctx.openOptions.push(options);
       ctx.tabs.value.push({ key: path, path });
       ctx.activeKey.value = path;
       return 1;
@@ -210,6 +212,17 @@ test("the mobile surface is saved and restored after restored tabs have taken th
     expect(JSON.parse(f.values.get("projector:workspace:v1:project")).mobileSurface).toBe(
       "terminal",
     );
+  } finally {
+    f.scope.stop();
+  }
+});
+
+test("restored tabs open quietly so a stale one does not report an error", async () => {
+  const f = await mobileWorkspace(savedSession("files"));
+  try {
+    await delay(20);
+    expect(f.ctx.openOptions.length).toBe(2);
+    expect(f.ctx.openOptions.every((options) => options?.quiet === true)).toBe(true);
   } finally {
     f.scope.stop();
   }

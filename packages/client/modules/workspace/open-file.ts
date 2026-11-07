@@ -50,6 +50,8 @@ export interface OpenFileOptions {
   scope?: FileScope;
   /** Old path of a renamed file in a comparison. */
   originalPath?: string;
+  /** Не показывать ошибку открытия: восстановление сессии не ругается на устаревшие вкладки. */
+  quiet?: boolean;
 }
 
 /** A file of the working copy; absent scope is the same as an explicit live one. */

@@ -1,4 +1,5 @@
 import { onBeforeUnmount, ref, type Ref } from "vue";
+import { toastErrors } from "../../../common/utilities/notice.ts";
 import { isFileDrag, pathsFromDataTransfer } from "../../path-drop/index.ts";
 import type { DockTarget } from "../../dock/index.ts";
 import {
@@ -47,6 +48,8 @@ export interface OpenFilesContext {
 export function useOpenFiles(ctx: OpenFilesContext) {
   const { tabs } = ctx;
   const fileError = ref("");
+  // Ошибка открытия — карточка поверх интерфейса: баннер сдвигал бы раскладку блоков.
+  toastErrors(() => fileError.value);
   const loading = ref(false);
   const sync = useFileSync({
     projectId: ctx.projectId,
@@ -61,7 +64,14 @@ export function useOpenFiles(ctx: OpenFilesContext) {
     line?: number,
     column?: number,
     staged?: boolean,
-    { reload = false, external = false, preview = true, scope, originalPath }: OpenFileOptions = {},
+    {
+      reload = false,
+      external = false,
+      preview = true,
+      scope,
+      originalPath,
+      quiet = false,
+    }: OpenFileOptions = {},
   ) {
     if (external && !workspaceCapabilities(ctx.projectId()).externalFiles)
       throw new Error("Внешние файлы недоступны для этого источника");
@@ -123,7 +133,8 @@ export function useOpenFiles(ctx: OpenFilesContext) {
       return fileGeneration;
     } catch (err) {
       if (generation === fileGeneration) {
-        fileError.value = err instanceof Error ? err.message : "Не удалось открыть файл";
+        if (!quiet)
+          fileError.value = err instanceof Error ? err.message : "Не удалось открыть файл";
         return generation;
       }
     } finally {

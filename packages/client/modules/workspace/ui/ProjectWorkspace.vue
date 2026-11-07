@@ -248,7 +248,7 @@ const files = useOpenFiles({
   pending,
   tabTypes,
 });
-const { fileError, loading, openFile, openTab, saveFile, toggleMarkdownSource } = files;
+const { loading, openFile, openTab, saveFile, toggleMarkdownSource } = files;
 provideTabHost({
   projectId: props.projectId,
   openFile: (path) => void openFile(path),
@@ -526,7 +526,6 @@ onBeforeUnmount(() => overview.cancel());
         </WorkbenchToolbar>
       </Teleport>
     </div>
-    <p v-if="fileError" class="file-error" role="alert">{{ fileError }}</p>
     <Transition name="mobile-left">
       <WorkspaceSidebar
         ref="sidebar"
@@ -642,16 +641,6 @@ onBeforeUnmount(() => overview.cancel());
   flex-direction: column;
   grid-column: 3;
   grid-row: 3;
-}
-.file-error {
-  grid-column: 1 / -1;
-  margin: 0 0 var(--island-gap);
-  padding: var(--sp-2) var(--sp-3);
-  color: var(--err);
-  font-size: var(--fs-xs);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  background: var(--bg);
 }
 .loading {
   position: absolute;

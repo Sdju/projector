@@ -125,6 +125,8 @@ export function useWorkspaceSession(ctx: WorkspaceSessionContext) {
                 scope: tab.scope ?? (tab.rev ? { kind: "commit", rev: tab.rev } : undefined),
                 originalPath: tab.originalPath,
                 preview: false,
+                // Устаревшая вкладка (например, diff исчезнувшего изменения) просто не откроется.
+                quiet: true,
               });
         // A project switch or a user opening another file takes precedence over restoration.
         if (
