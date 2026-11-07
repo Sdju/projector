@@ -6,6 +6,7 @@ import {
   useProjects,
   projectPathFromParams,
   projectIconUrl,
+  hostedProjectIconUrl,
   formatProjectRef,
   githubRepositoryFromParams,
   gitlabProjectFromParams,
@@ -24,6 +25,7 @@ const { load, projects } = useProjects();
 const { connect } = useRunner();
 const route = useRoute();
 const router = useRouter();
+const iconRef = computed(() => (typeof route.query.ref === "string" ? route.query.ref : ""));
 const gitlabProject = computed(() => {
   if (route.name !== "gitlab-project") return;
   try {
@@ -46,7 +48,7 @@ const currentProject = computed<ProjectLocation | undefined>(() => {
       id: path,
       path,
       name: repository.split("/").at(-1) || "GitHub",
-      iconUrl: "/github.svg",
+      iconUrl: hostedProjectIconUrl("github", repository, iconRef.value),
     };
   }
   if (route.name === "gitlab-project") {
@@ -57,7 +59,11 @@ const currentProject = computed<ProjectLocation | undefined>(() => {
       id: path,
       path,
       name: repository.path.split("/").at(-1) || "GitLab",
-      iconUrl: "/gitlab.svg",
+      iconUrl: hostedProjectIconUrl(
+        "gitlab",
+        `${repository.instance}/${repository.path}`,
+        iconRef.value,
+      ),
     };
   }
 });

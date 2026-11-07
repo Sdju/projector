@@ -3,6 +3,7 @@ export {
   parseMode,
   sendIconFile,
   sendLetterIcon,
+  sendIconBytes,
   launchHtml,
   normalizeProject,
   withRuntime,

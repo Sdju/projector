@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { githubProjectRoute } from "../packages/core/modules/github/index.ts";
 import { projectRoute } from "../packages/client/modules/project/project-route.ts";
+import { hostedProjectIconUrl } from "../packages/client/modules/project/api/client.ts";
 import { parseProjectRef, projectRefSegments } from "../packages/core/modules/project/index.ts";
 
 const projectPathSegments = (path) => projectRefSegments(parseProjectRef(path));
@@ -172,6 +173,74 @@ test("readonly GitHub browser reads snapshots, trees and blobs without cloning o
     await updateIntegration("github", (config) => ({ ...config, enabled: false }));
     authorized = false;
     await api.browseGithubRepository("octocat/repo");
+  } finally {
+    fetch.mockRestore();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("hosted project icon URL points at the repository icon endpoint", () => {
+  expect(hostedProjectIconUrl("github", "owner/repo")).toBe(
+    "/api/integrations/github/browse/icon?repository=owner%2Frepo&version=2",
+  );
+  expect(hostedProjectIconUrl("gitlab", "gitlab.com/group/project", "feature/x")).toBe(
+    "/api/integrations/gitlab/browse/icon?repository=gitlab.com%2Fgroup%2Fproject&version=2&ref=feature%2Fx",
+  );
+});
+
+test("GitHub project icon comes from repository files", async () => {
+  const root = await mkdtemp(join(tmpdir(), "projector-gh-icon-"));
+  process.env.XDG_DATA_HOME = root;
+  const { browseGithubIcon } = await import("../packages/server/modules/github/index.ts");
+  const tree = "c".repeat(40);
+  const htmlBlob = "d".repeat(40);
+  const iconBlob = "e".repeat(40);
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg"></svg>';
+  const html = '<link rel="icon" href="/favicon.svg">';
+  let entries = [
+    { path: "index.html", type: "blob", mode: "100644", sha: htmlBlob, size: html.length },
+    { path: "public", type: "tree", mode: "040000", sha: tree },
+    { path: "public/favicon.svg", type: "blob", mode: "100644", sha: iconBlob, size: svg.length },
+  ];
+  const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (address) => {
+    const url = new URL(address);
+    if (url.pathname === "/repos/octocat/icon") return Response.json({ default_branch: "main" });
+    if (url.pathname === "/repos/octocat/icon/commits/main")
+      return Response.json({ commit: { tree: { sha: tree } } });
+    if (url.pathname === `/repos/octocat/icon/git/trees/${tree}`)
+      return Response.json({ tree: entries, truncated: false });
+    if (url.pathname === `/repos/octocat/icon/git/blobs/${htmlBlob}`)
+      return Response.json({
+        encoding: "base64",
+        content: Buffer.from(html).toString("base64"),
+        size: html.length,
+      });
+    if (url.pathname === `/repos/octocat/icon/git/blobs/${iconBlob}`)
+      return Response.json({
+        encoding: "base64",
+        content: Buffer.from(svg).toString("base64"),
+        size: svg.length,
+      });
+    if (url.pathname === "/repos/octocat/avatar")
+      return Response.json({
+        default_branch: "main",
+        owner: { avatar_url: "https://avatars.example/u/1.png" },
+      });
+    if (url.hostname === "avatars.example")
+      return new Response(Buffer.from([1, 2, 3]), {
+        headers: { "Content-Type": "image/png", "Content-Length": "3" },
+      });
+    throw new Error(`Unexpected URL: ${url}`);
+  });
+  try {
+    const icon = await browseGithubIcon("octocat/icon");
+    expect(icon.mime).toBe("image/svg+xml");
+    expect(icon.bytes.toString()).toBe(svg);
+    entries = entries.filter((entry) => entry.path !== "public/favicon.svg");
+    expect(await browseGithubIcon("octocat/icon")).toBe(null);
+    const avatar = await browseGithubIcon("octocat/avatar");
+    expect(avatar.mime).toBe("image/png");
+    expect([...avatar.bytes]).toStrictEqual([1, 2, 3]);
   } finally {
     fetch.mockRestore();
     await rm(root, { recursive: true, force: true });

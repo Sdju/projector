@@ -71,6 +71,21 @@ export function sendLetterIcon(res: ServerResponse, name: string): void {
   res.end(letterIconSvg(name));
 }
 
+/** Icon bytes from a remote repository; cached briefly so one page load stays one API pass. */
+export function sendIconBytes(
+  res: ServerResponse,
+  mime: string,
+  bytes: Buffer,
+  cache = "private, max-age=300",
+): void {
+  res.statusCode = 200;
+  res.setHeader("Content-Type", mime);
+  res.setHeader("Cache-Control", cache);
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
+  res.end(bytes);
+}
+
 /** JSON is valid JS but not safe inside HTML: `</script>` would close the element. */
 function scriptString(value: string): string {
   return JSON.stringify(value)

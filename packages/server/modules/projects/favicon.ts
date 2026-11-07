@@ -1,5 +1,5 @@
 import { readFile, stat } from "node:fs/promises";
-import { dirname, extname, join, resolve, sep } from "node:path";
+import { dirname, extname, join, posix, resolve, sep } from "node:path";
 
 const ICON_FILES = [
   "public/favicon.svg",
@@ -29,7 +29,12 @@ const ICON_FILES = [
   "app/public/favicon.svg",
 ];
 
-const HTML_FILES = ["index.html", "public/index.html", "src/index.html", "client/index.html"];
+export const HTML_FILES = [
+  "index.html",
+  "public/index.html",
+  "src/index.html",
+  "client/index.html",
+];
 
 export const ICON_TYPES: Record<string, string> = {
   ".svg": "image/svg+xml",
@@ -68,17 +73,81 @@ function resolveHref(projectDir: string, htmlFile: string, href: string): string
   return [resolve(dirname(htmlFile), clean), join(projectDir, "public", clean)];
 }
 
+/** Icon hrefs in document order; the same scan feeds local folders and remote repositories. */
+function iconHrefs(raw: string): string[] {
+  const links = raw.slice(0, 48_000).match(/<link\b[^>]*>/gi) ?? [];
+  const hrefs: string[] = [];
+  for (const tag of links) {
+    const relAttr = /rel=["']([^"']+)["']/i.exec(tag)?.[1]?.toLowerCase() ?? "";
+    if (!relAttr.includes("icon")) continue;
+    const href = /href=["']([^"']+)["']/i.exec(tag)?.[1];
+    if (href) hrefs.push(href);
+  }
+  return hrefs;
+}
+
+/** Repository-relative targets of an icon link; empty for remote, data and escaping paths. */
+function remoteIconHrefs(htmlPath: string, href: string): string[] {
+  const trimmed = href.trim();
+  if (
+    !trimmed ||
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("//") ||
+    /^https?:/i.test(trimmed)
+  )
+    return [];
+  const clean = trimmed.split("?")[0]?.split("#")[0] ?? "";
+  if (!clean || clean.includes("\\") || clean.includes("\0")) return [];
+  const dir = posix.dirname(htmlPath);
+  const paths = clean.startsWith("/")
+    ? [
+        posix.join("public", clean.slice(1)),
+        posix.join("static", clean.slice(1)),
+        clean.slice(1),
+        posix.join(dir, clean.slice(1)),
+      ]
+    : [posix.join(dir, clean), posix.join("public", clean)];
+  return paths.flatMap((path) => {
+    const normalized = posix.normalize(path);
+    return !normalized ||
+      normalized === "." ||
+      normalized === ".." ||
+      normalized.startsWith("../") ||
+      normalized.startsWith("/")
+      ? []
+      : [normalized];
+  });
+}
+
+/**
+ * Remote twin of `findFavicon`: links from the repository's HTML pages first, then the known
+ * file names. `paths` is the flat list of blobs in the repository at the selected revision.
+ */
+export function remoteIconCandidates(
+  pages: Array<{ path: string; content: string }>,
+  paths: ReadonlySet<string>,
+): string[] {
+  const candidates: string[] = [];
+  const seen = new Set<string>();
+  const push = (path: string | null) => {
+    if (!path || seen.has(path) || !paths.has(path)) return;
+    seen.add(path);
+    candidates.push(path);
+  };
+  for (const page of pages) {
+    for (const href of iconHrefs(page.content))
+      for (const path of remoteIconHrefs(page.path, href)) push(path);
+  }
+  for (const rel of ICON_FILES) push(rel);
+  return candidates;
+}
+
 async function iconFromHtml(projectDir: string): Promise<string | null> {
   for (const rel of HTML_FILES) {
     const htmlFile = join(projectDir, rel);
     const raw = await readFile(htmlFile, "utf8").catch(() => null);
     if (!raw) continue;
-    const links = raw.slice(0, 48_000).match(/<link\b[^>]*>/gi) ?? [];
-    for (const tag of links) {
-      const relAttr = /rel=["']([^"']+)["']/i.exec(tag)?.[1]?.toLowerCase() ?? "";
-      if (!relAttr.includes("icon")) continue;
-      const href = /href=["']([^"']+)["']/i.exec(tag)?.[1];
-      if (!href) continue;
+    for (const href of iconHrefs(raw)) {
       for (const candidate of resolveHref(projectDir, htmlFile, href)) {
         if (isInside(projectDir, candidate) && (await existsFile(candidate))) {
           return candidate;

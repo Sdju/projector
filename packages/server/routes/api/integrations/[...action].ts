@@ -30,6 +30,7 @@ import {
   browseGitlabTree,
   browseGitlabFile,
   browseGitlabAsset,
+  browseGitlabIcon,
   browseGitlabLog,
   browseGitlabCommit,
   browseGitlabComparison,
@@ -51,7 +52,8 @@ import { isLocalRequest } from "../../../modules/access/index.ts";
 import { HttpError } from "../../../modules/http/index.ts";
 import { json, readBody } from "../../../modules/transport/index.ts";
 
-import { withRuntime } from "../../../modules/project-presentation/index.ts";
+import { sendIconBytes, withRuntime } from "../../../modules/project-presentation/index.ts";
+import { letterIconSvg } from "../../../modules/projects/index.ts";
 import type { RouteContext } from "../../../modules/transport/index.ts";
 
 const hosts = {
@@ -98,7 +100,17 @@ export async function handleIntegrationsActions({
             url.searchParams.get("complete") === "true",
           ),
         );
-      else if (path === "/api/integrations/gitlab/browse/asset") {
+      else if (path === "/api/integrations/gitlab/browse/icon") {
+        const icon = await browseGitlabIcon(repository, url.searchParams.get("ref") || sha).catch(
+          () => null,
+        );
+        const name = repository.split("/").filter(Boolean).at(-1) || "GitLab";
+        sendIconBytes(
+          res,
+          icon?.mime ?? "image/svg+xml",
+          icon?.bytes ?? Buffer.from(letterIconSvg(name)),
+        );
+      } else if (path === "/api/integrations/gitlab/browse/asset") {
         const asset = await browseGitlabAsset(repository, sha, url.searchParams.get("path") || "");
         res.setHeader("Content-Type", asset.mime);
         res.setHeader("X-Content-Type-Options", "nosniff");

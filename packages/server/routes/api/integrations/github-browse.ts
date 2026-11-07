@@ -9,6 +9,7 @@ import {
   browseGithubDiscussion,
   browseGithubDiscussions,
   browseGithubFile,
+  browseGithubIcon,
   browseGithubIssue,
   browseGithubIssues,
   browseGithubJob,
@@ -21,6 +22,8 @@ import {
   browseGithubTree,
 } from "../../../modules/github/index.ts";
 import { json, type RouteContext } from "../../../modules/transport/index.ts";
+import { letterIconSvg } from "../../../modules/projects/index.ts";
+import { sendIconBytes } from "../../../modules/project-presentation/index.ts";
 
 /** GitHub readonly browsing; `/browse/...` never falls through to the host actions. */
 export async function handleGithubBrowse({
@@ -41,7 +44,17 @@ export async function handleGithubBrowse({
         url.searchParams.get("complete") === "true",
       ),
     );
-  else if (path === "/api/integrations/github/browse/asset") {
+  else if (path === "/api/integrations/github/browse/icon") {
+    const icon = await browseGithubIcon(repository, url.searchParams.get("ref") || "").catch(
+      () => null,
+    );
+    const name = repository.split("/").filter(Boolean).at(-1) || "GitHub";
+    sendIconBytes(
+      res,
+      icon?.mime ?? "image/svg+xml",
+      icon?.bytes ?? Buffer.from(letterIconSvg(name)),
+    );
+  } else if (path === "/api/integrations/github/browse/asset") {
     const commit = url.searchParams.get("commit") || "";
     const asset = commit
       ? await browseGithubCommitAsset(repository, commit, url.searchParams.get("path") || "")

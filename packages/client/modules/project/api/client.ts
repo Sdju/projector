@@ -82,6 +82,18 @@ export function projectIconUrl(project: ProjectLocation): string {
   return `/api/projects/${encodeURIComponent(project.id)}/icon?${revision}`;
 }
 
+/** Project logo read from the repository at `ref`; falls back to a letter icon server-side. */
+export function hostedProjectIconUrl(
+  host: "github" | "gitlab",
+  repository: string,
+  ref = "",
+): string {
+  // Bumped when icon resolution changes so browsers do not keep an old fallback letter.
+  const query = new URLSearchParams({ repository, version: "2" });
+  if (ref) query.set("ref", ref);
+  return `/api/integrations/${host}/browse/icon?${query}`;
+}
+
 export async function fetchDirectories(
   path: string,
   complete = false,

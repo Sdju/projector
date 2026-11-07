@@ -1,6 +1,7 @@
 import { github, githubGraphql, repositoryName } from "./api.ts";
 import { integrationConfig } from "../integration-store/index.ts";
 import { HttpError } from "../http/index.ts";
+import { fetchRemoteIcon, HTML_FILES, remoteIconCandidates } from "../projects/index.ts";
 import type {
   GithubRepository,
   GithubEntry,
@@ -122,6 +123,16 @@ export async function browseGithubTree(
   };
 }
 const LIMIT = 5 * 1024 * 1024;
+const IMAGE_MIME: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  avif: "image/avif",
+  ico: "image/x-icon",
+  svg: "image/svg+xml",
+};
 export async function browseGithubFile(
   repository: string,
   sha: string,
@@ -135,18 +146,7 @@ export async function browseGithubFile(
     throw new HttpError(400, "GitHub вернул неподдерживаемую кодировку");
   const bytes = Buffer.from(blob.content, "base64");
   const extension = path.split(".").pop()?.toLowerCase() || "";
-  const mime = (
-    {
-      png: "image/png",
-      jpg: "image/jpeg",
-      jpeg: "image/jpeg",
-      gif: "image/gif",
-      webp: "image/webp",
-      avif: "image/avif",
-      ico: "image/x-icon",
-      svg: "image/svg+xml",
-    } as Record<string, string>
-  )[extension];
+  const mime = IMAGE_MIME[extension];
   const content = bytes.toString("utf8");
   const binary = bytes.includes(0) || !Buffer.from(content).equals(bytes);
   return {
@@ -162,6 +162,12 @@ export async function browseGithubCommitAsset(repository: string, commit: string
   const get = await githubReader(repository);
   const info = await get<{ tree: { sha: string } }>(`/git/commits/${commit}`);
   return browseGithubAsset(repository, info.tree.sha, path);
+}
+async function githubBlobAsset(repository: string, sha: string, path: string) {
+  const file = await browseGithubFile(repository, sha, path);
+  if (!file.image) throw new HttpError(400, "Неподдерживаемое изображение");
+  const [header, content] = file.image.split(",");
+  return { mime: header!.slice(5).split(";")[0]!, bytes: Buffer.from(content!, "base64") };
 }
 export async function browseGithubAsset(repository: string, root: string, path: string) {
   objectId(root);
@@ -184,11 +190,45 @@ export async function browseGithubAsset(repository: string, root: string, path: 
       if (entry.type !== "blob" || entry.mode === "120000")
         throw new HttpError(400, "Выберите изображение");
       if (entry.size > LIMIT) throw new HttpError(413, "Изображение больше 5 MiB");
-      const file = await browseGithubFile(repository, entry.sha, path);
-      if (!file.image) throw new HttpError(400, "Неподдерживаемое изображение");
-      const [header, content] = file.image.split(",");
-      return { mime: header!.slice(5).split(";")[0]!, bytes: Buffer.from(content!, "base64") };
+      return githubBlobAsset(repository, entry.sha, path);
     }
   }
   throw new HttpError(404, "Изображение не найдено");
+}
+
+/**
+ * Project logo from the repository itself: an icon linked by its HTML pages or one of the usual
+ * favicon/logo files. `null` means the repository has no such file.
+ */
+export async function browseGithubIcon(
+  repository: string,
+  ref = "",
+): Promise<{ mime: string; bytes: Buffer } | null> {
+  const get = await githubReader(repository);
+  const repo = await get<{ default_branch?: string; owner?: { avatar_url?: string } }>("");
+  const avatar = await fetchRemoteIcon(repo.owner?.avatar_url || "");
+  if (avatar) return avatar;
+  const branch = ref || repo.default_branch || "";
+  if (!branch) return null;
+  const head = await get<{ commit: { tree: { sha: string } } }>(
+    `/commits/${encodeURIComponent(branch)}`,
+  );
+  const tree = head.commit.tree.sha;
+  const data = await get<{
+    tree: Array<{ path: string; sha: string; type: string; size?: number }>;
+  }>(`/git/trees/${tree}?recursive=1`);
+  const blobs = new Map<string, { sha: string; size?: number }>();
+  for (const entry of data.tree)
+    if (entry.type === "blob") blobs.set(entry.path, { sha: entry.sha, size: entry.size });
+  const pages: Array<{ path: string; content: string }> = [];
+  for (const path of HTML_FILES) {
+    const entry = blobs.get(path);
+    if (!entry || (entry.size ?? 0) > 512 * 1024) continue;
+    const file = await browseGithubFile(repository, entry.sha, path).catch(() => null);
+    if (file && !file.binary) pages.push({ path, content: file.content });
+  }
+  const iconPath = remoteIconCandidates(pages, new Set(blobs.keys()))[0];
+  if (!iconPath) return null;
+  const entry = blobs.get(iconPath);
+  return entry ? githubBlobAsset(repository, entry.sha, iconPath) : null;
 }

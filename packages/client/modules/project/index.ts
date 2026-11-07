@@ -23,6 +23,7 @@ export {
   pickFolder,
   previewIconUrl,
   projectIconUrl,
+  hostedProjectIconUrl,
 } from "./api/client.ts";
 export { shortPath, statusLabel } from "./format.ts";
 export {

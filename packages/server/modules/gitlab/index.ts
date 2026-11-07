@@ -32,6 +32,7 @@ export {
   browseGitlabFile,
   browseGitlabAsset,
 } from "./browser.ts";
+export { browseGitlabIcon } from "./icon.ts";
 export { browseGitlabCompareChanges, browseGitlabCompareFile } from "./compare.ts";
 export { browseGitlabDirectories } from "./navigation.ts";
 export { searchGitlabProjects } from "./search.ts";

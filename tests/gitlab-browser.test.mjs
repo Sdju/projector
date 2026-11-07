@@ -635,3 +635,59 @@ test("GitLab comparison reads changed paths and both file sides", async () => {
     modified: "new\n",
   });
 });
+
+test("GitLab project icon comes from repository files", async () => {
+  await setup();
+  const project = encoded("group/icon");
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg"></svg>';
+  const html = '<link rel="icon" href="/favicon.svg">';
+  let blobs = ["public/favicon.svg", "index.html"];
+  mockFetch((address) => {
+    const url = new URL(address);
+    if (url.pathname === `/api/v4/projects/${project}`)
+      return Response.json({ path_with_namespace: "group/icon", default_branch: "main" });
+    if (url.pathname === `/api/v4/projects/${project}/repository/tree`) {
+      expect(url.searchParams.get("recursive")).toBe("true");
+      expect(url.searchParams.get("ref")).toBe("main");
+      return Response.json(
+        blobs.map((path) => ({
+          name: path.split("/").at(-1),
+          path,
+          type: "blob",
+        })),
+      );
+    }
+    if (url.pathname === `/api/v4/projects/${project}/repository/files/${encoded("index.html")}`)
+      return Response.json({
+        encoding: "base64",
+        content: Buffer.from(html).toString("base64"),
+        size: html.length,
+      });
+    if (
+      url.pathname ===
+      `/api/v4/projects/${project}/repository/files/${encoded("public/favicon.svg")}/raw`
+    )
+      return new Response(svg, {
+        headers: { "Content-Type": "image/svg+xml", "Content-Length": String(svg.length) },
+      });
+    if (url.pathname === `/api/v4/projects/${encoded("group/avatar")}`)
+      return Response.json({
+        default_branch: "main",
+        avatar_url: "/uploads/avatar.png",
+      });
+    if (url.pathname === "/uploads/avatar.png")
+      return new Response(Buffer.from([1, 2, 3]), {
+        headers: { "Content-Type": "image/png", "Content-Length": "3" },
+      });
+    return Response.json({}, { status: 404 });
+  });
+  const { browseGitlabIcon } = await import("../packages/server/modules/gitlab/index.ts");
+  const icon = await browseGitlabIcon("gitlab.com/group/icon");
+  expect(icon.mime).toBe("image/svg+xml");
+  expect(icon.bytes.toString()).toBe(svg);
+  blobs = ["index.html"];
+  expect(await browseGitlabIcon("gitlab.com/group/icon")).toBe(null);
+  const avatar = await browseGitlabIcon("gitlab.com/group/avatar");
+  expect(avatar.mime).toBe("image/png");
+  expect([...avatar.bytes]).toStrictEqual([1, 2, 3]);
+});

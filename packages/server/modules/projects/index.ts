@@ -15,3 +15,5 @@ export { iconContentType } from "./favicon.ts";
 export { letterIconSvg } from "./favicon.ts";
 export { resolveProjectIcon } from "./favicon.ts";
 export { findFavicon } from "./favicon.ts";
+export { HTML_FILES, remoteIconCandidates } from "./favicon.ts";
+export { fetchRemoteIcon } from "./remote-icon.ts";

@@ -17,6 +17,7 @@ export {
   browseGithubFile,
   browseGithubAsset,
   browseGithubCommitAsset,
+  browseGithubIcon,
 } from "./browser.ts";
 export {
   browseGithubLog,
