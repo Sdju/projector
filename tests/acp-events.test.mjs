@@ -598,3 +598,49 @@ test("opencode unwraps the subagent result when nothing was said", () => {
     summary: "42",
   });
 });
+
+test("opencode provider retries become a visible retrying status", () => {
+  const events = [];
+  const mapper = createAcpEventMapper(
+    (type, data) => events.push([type, data]),
+    "OpenCode",
+    createOpencodeDialect(),
+  );
+  const nextRetryAt = new Date(Date.now() + 5000).toISOString();
+  mapper.handleUpdate("s", {
+    sessionUpdate: "session_info_update",
+    _meta: {
+      "opencode/retry": {
+        attempt: 2,
+        nextRetryAt,
+        error: { message: "Upstream request failed: [overloaded]", status: 429 },
+      },
+    },
+  });
+
+  expect(events.at(-1)[0]).toBe("status");
+  expect(events.at(-1)[1]).toMatchObject({
+    phase: "retrying",
+    attempt: 1,
+    message: "Upstream request failed: [overloaded]",
+    provider: "OpenCode",
+  });
+  expect(events.at(-1)[1].delay).toBeGreaterThan(0);
+
+  // The retry started: the chat goes back to its normal thinking status.
+  mapper.handleUpdate("s", {
+    sessionUpdate: "session_info_update",
+    _meta: { "opencode/retry": null },
+  });
+  expect(events.at(-1)).toEqual(["status", { phase: "thinking", provider: "OpenCode", model: "" }]);
+});
+
+test("other agents' session info does not invent retries", () => {
+  const events = [];
+  const mapper = createAcpEventMapper((type, data) => events.push([type, data]), "Other");
+  mapper.handleUpdate("s", {
+    sessionUpdate: "session_info_update",
+    _meta: { "opencode/retry": { attempt: 2 } },
+  });
+  expect(events).toEqual([]);
+});

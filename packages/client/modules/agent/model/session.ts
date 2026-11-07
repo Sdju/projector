@@ -29,7 +29,7 @@ import { isBuiltinAgent } from "./modes.ts";
 import { watchChat } from "./chat-sync.ts";
 import { saveChat } from "./save-chat.ts";
 import { useExternalAgent } from "./external.ts";
-import { applyAgentEvent, resetAnswer } from "./turn-events.ts";
+import { applyAgentEvent, markAnswerFailed, resetAnswer } from "./turn-events.ts";
 import { hasChips, messageText, normalizeParts } from "../lib/message-parts.ts";
 import { restoreFormAnswers } from "./form-reply.ts";
 import { userTurnOf } from "./user-turn.ts";
@@ -190,8 +190,7 @@ export function useAgent(
       if (err instanceof AgentRunGone) {
         assistant.run = undefined;
         if (!(await recover(assistant)) && !assistant.text.trim()) assistant.text = INTERRUPTED;
-      } else if (!signal.aborted)
-        state.error = err instanceof Error ? err.message : "Агент не ответил";
+      } else if (!signal.aborted) markAnswerFailed(state, assistant, err);
     } finally {
       const stopped = signal.aborted;
       state.abort?.abort();

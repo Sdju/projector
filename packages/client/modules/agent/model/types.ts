@@ -8,12 +8,13 @@ export interface AgentCapabilities {
   compact?: { command: string; hintAt: number; autoAt: number };
 }
 
-import type { AgentTask, AgentTaskPatch } from "@projector/core/modules/agent-task/index.ts";
-import type { JudgeVerdict } from "@projector/core/modules/agent-judge/index.ts";
-import type { Project } from "../../project/index.ts";
+import type { AgentTask } from "@projector/core/modules/agent-task/index.ts";
 import type { JudgeNote } from "./judge-note.ts";
+import type { AgentEvent } from "./events.ts";
 
 export type { AgentPermission } from "./permissions.ts";
+export type { AgentTurn } from "./turn.ts";
+export type { AgentEvent } from "./events.ts";
 
 export type { AgentTask };
 
@@ -190,52 +191,6 @@ export interface AgentFormAnswer {
   summary?: string;
 }
 
-export interface AgentTurn {
-  id: string;
-  role: "user" | "assistant";
-  text: string;
-  /** When the message was written (ms since the epoch); absent in turns saved before it existed. */
-  at?: number;
-  tools: AgentToolChip[];
-  /** Subagents and background commands the agent started during this answer. */
-  tasks?: AgentTask[];
-  /** What the user wrote, with chips; `text` holds the same message as plain text. */
-  content?: MessagePart[];
-  /** On a user turn from a native session: Projector's instructions before the user's text. */
-  injected?: string;
-  /** On a user turn: the form that was filled instead of typing, shown in place of the text. */
-  form?: AgentFormAnswer;
-  /** Order of text and tool calls; absent in turns saved before it existed. */
-  parts?: AgentPart[];
-  /** The turn ended on its budget, not on an answer: the chat offers to continue it. */
-  stopped?: "steps" | "loop" | "tokens" | "time";
-  /** The IDE wrote this message, not the user: the id of the job that triggered it. */
-  auto?: string;
-  /** What to call that job in the note; the id stays for the agent's commands. */
-  autoTitle?: string;
-  /** Context fullness after this turn; the chat shows the latest one. */
-  context?: AgentContext;
-  /** Tokens of this answer and how much of the prompt the cache served. */
-  usage?: AgentUsage;
-  /** Native backend session (Claude Code) this turn belongs to; the next request resumes it. */
-  session?: AgentSessionRef;
-  /** The agent process still answering this turn; set until the turn ends, so it can be rejoined. */
-  run?: string;
-  /** The isolated copy of the project this answer was written in. */
-  worktree?: { id: string; branch: string };
-  /** Where this answer ends in the agent's transcript; the next message branches off from here. */
-  tail?: string;
-  /** The agent's own session cannot go on from this turn (the chat was cut back): replay instead. */
-  detached?: boolean;
-  /**
-   * On a user turn: the other versions of the conversation from this message on, which exist
-   * after the message was edited or its answer repeated. Each version starts with a user turn.
-   */
-  variants?: AgentTurn[][];
-  /** Which place the shown version takes among `variants` and itself. */
-  slot?: number;
-}
-
 /** What rolling the chat back to a message undoes: the conversation, the files, or both. */
 export type RewindScope = "conversation" | "files" | "both";
 
@@ -355,46 +310,3 @@ export interface AgentCommandRequest {
   scope?: string;
   args?: unknown;
 }
-
-export type AgentEvent =
-  | { event: "command-request"; data: AgentCommandRequest }
-  | {
-      event: "permission-request";
-      data: {
-        id: string;
-        tool: string;
-        input: unknown;
-        title?: string;
-        detail?: string;
-        persistent?: boolean;
-        judge?: JudgeVerdict;
-      };
-    }
-  | { event: "judge"; data: JudgeNote }
-  | { event: "question-request"; data: AgentQuestionRequest }
-  | { event: "secret-request"; data: AgentSecretRequest }
-  | { event: "run"; data: { id: string } }
-  | { event: "checkpoint"; data: { tail: string } }
-  | { event: "worktree"; data: { id: string; branch: string } }
-  | { event: "session"; data: AgentSessionRef }
-  | { event: "commands"; data: { commands: AgentCommand[] } }
-  | { event: "context"; data: AgentContext }
-  | { event: "usage"; data: AgentUsage }
-  | { event: "controls"; data: { controls: AgentControl[] } }
-  | {
-      event: "status";
-      data: { phase: string; provider?: string; model?: string; attempt?: number };
-    }
-  | { event: "input"; data: { text: string; inputId?: string } }
-  | { event: "text"; data: { text: string } }
-  | {
-      event: "tool";
-      data: { id: string; name: string; input: unknown; kind?: string; parent?: string };
-    }
-  | { event: "tool-output"; data: { id: string; chunk: string } }
-  | { event: "tool-result"; data: { id: string; name: string; output?: unknown; error?: string } }
-  | { event: "task"; data: AgentTaskPatch }
-  | { event: "thought"; data: { text: string } }
-  | { event: "project"; data: Project }
-  | { event: "done"; data: { text: string; stopped?: "steps" | "loop" | "tokens" | "time" } }
-  | { event: "error"; data: { error: string } };

@@ -6,9 +6,9 @@ import {
   retryDelay,
 } from "../packages/server/modules/agents/projector/projector-retry.ts";
 
-const api = (statusCode, responseHeaders) =>
+const api = (statusCode, responseHeaders, message = "fail") =>
   new APICallError({
-    message: "fail",
+    message,
     url: "x",
     requestBodyValues: {},
     statusCode,
@@ -20,6 +20,17 @@ describe("provider retry", () => {
     expect(isRetryable(api(429))).toBe(true);
     expect(isRetryable(api(503))).toBe(true);
     expect(isRetryable(new TypeError("fetch failed"))).toBe(true);
+  });
+
+  it("recognises a provider overload when it comes without a status", () => {
+    expect(isRetryable(new Error("Upstream request failed: [overloaded] retry shortly"))).toBe(
+      true,
+    );
+    expect(isRetryable(api(undefined, undefined, "Upstream request failed: overloaded"))).toBe(
+      true,
+    );
+    expect(isRetryable(api(200, undefined, "Upstream request failed: overloaded"))).toBe(true);
+    expect(isRetryable(new Error("bad request"))).toBe(false);
   });
 
   it("does not retry bad requests, keys or stops", () => {

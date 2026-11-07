@@ -68,6 +68,8 @@ function mergeAnswer(lost: AgentTurn, answer: AgentTurn[]): boolean {
   lost.text = text;
   lost.tools = tools;
   lost.parts = parts;
+  // The agent's own transcript has the answer: the earlier failure is not the last word.
+  lost.failure = undefined;
   return true;
 }
 

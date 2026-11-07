@@ -26,7 +26,14 @@ export function loadHistory(url: string, state: ChatState, quiet = false): Promi
       // A turn saved at its start but never finished: the page or server went away mid-answer.
       // One with a live agent process behind it is rejoined instead (`resumeRun`).
       const last = state.turns.at(-1);
-      if (last?.role === "assistant" && !last.run && !last.text.trim() && !last.tools.length)
+      // A failed answer keeps its reason and offers retry: it is not an interrupted one.
+      if (
+        last?.role === "assistant" &&
+        !last.run &&
+        !last.failure &&
+        !last.text.trim() &&
+        !last.tools.length
+      )
         last.text = INTERRUPTED;
       // Without a live agent process behind the chat nothing reports any more: a task still shown
       // as running was cut off with its process (older chats kept such rows forever).

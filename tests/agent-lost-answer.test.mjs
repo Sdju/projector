@@ -17,7 +17,7 @@ const answer = (text, extra = {}) => ({
 });
 
 test("an answer the page never received comes back from the agent's session", () => {
-  const turns = [user("почини баг"), answer(INTERRUPTED)];
+  const turns = [user("почини баг"), answer(INTERRUPTED, { failure: "overloaded" })];
   const native = [
     user("[Projector] подсказки\n\nпочини баг"),
     answer("Готово: починил.", {
@@ -33,6 +33,7 @@ test("an answer the page never received comes back from the agent's session", ()
   expect(turns[1].text).toBe("Готово: починил.");
   expect(turns[1].tools.map((tool) => tool.id)).toEqual(["t1"]);
   expect(turns[1].parts?.map((part) => part.type)).toEqual(["text", "tool"]);
+  expect(turns[1].failure).toBeUndefined();
   expect(turns[1].session).toEqual({ backend: "opencode", id: "s1" });
 });
 

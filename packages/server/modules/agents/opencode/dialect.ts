@@ -41,6 +41,30 @@ function childOf(update: AcpUpdate): ChildSession | undefined {
   return { id, ...(typeof title === "string" ? { title } : {}) };
 }
 
+/** The provider retry OpenCode reports while it waits: `null` means the wait is over. */
+function retryOf(update: AcpUpdate) {
+  const meta = update._meta as Record<string, unknown> | undefined;
+  if (!meta || !("opencode/retry" in meta)) return undefined;
+  const raw = meta["opencode/retry"];
+  if (raw === null) return null;
+  if (!raw || typeof raw !== "object") return undefined;
+  const { attempt, nextRetryAt, error } = raw as {
+    attempt?: unknown;
+    nextRetryAt?: unknown;
+    error?: { message?: unknown };
+  };
+  if (typeof attempt !== "number" || !Number.isFinite(attempt)) return undefined;
+  const at = typeof nextRetryAt === "string" ? Date.parse(nextRetryAt) : NaN;
+  const delay = Number.isFinite(at) ? Math.max(0, at - Date.now()) : undefined;
+  const message = typeof error?.message === "string" ? error.message : undefined;
+  return {
+    // OpenCode counts the attempt it is about to make; the chat names the repeat.
+    attempt: Math.max(1, Math.trunc(attempt) - 1),
+    ...(delay !== undefined ? { delay } : {}),
+    ...(message ? { message } : {}),
+  };
+}
+
 /** The input of the call that starts a subagent; it arrives with a later update, not the first. */
 function subagentOf(update: AcpUpdate) {
   const { agent, description, prompt } = inputOf(update);
@@ -98,6 +122,7 @@ export function createOpencodeDialect(): AcpDialect {
 
   const dialect: AcpDialect = extendPlainDialect({
     time: (update) => opencodeIdTime(update.messageId),
+    retry: retryOf,
     tool(update) {
       const child = childOf(update);
       const title = String(update.title || update.kind || "tool");

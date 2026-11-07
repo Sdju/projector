@@ -4,6 +4,16 @@ export type AcpTaskPatch = AgentTaskPatch;
 
 export type AcpUpdate = Record<string, unknown>;
 
+/** A provider retry an agent reports in its own updates. */
+export interface AcpRetry {
+  /** The attempt being made (1 is the first repeat). */
+  attempt: number;
+  /** How long the agent waits before it, when the update tells. */
+  delay?: number;
+  /** What the provider said: shown in place of the plain "thinking" status. */
+  message?: string;
+}
+
 /**
  * What one ACP agent adds to the protocol. ACP leaves subagents, background commands and streamed
  * command output to each agent's own extensions, so everything specific to an agent lives in its
@@ -39,6 +49,11 @@ export interface AcpDialect {
   finish(): AcpTaskPatch[];
   /** When a replayed message was written, if its `messageId` tells (ms since the epoch). */
   time(update: AcpUpdate): number | undefined;
+  /**
+   * A provider retry reported by the agent. `null` clears it (the retry began or succeeded);
+   * `undefined` means this update says nothing about retries.
+   */
+  retry(update: AcpUpdate): AcpRetry | null | undefined;
 }
 
 const UUID_V7 = /^([0-9a-f]{8})-?([0-9a-f]{4})-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -65,6 +80,7 @@ export function createPlainDialect(): AcpDialect {
     speak: () => [],
     finish: () => [],
     time: (update) => uuidV7Time(update.messageId),
+    retry: () => undefined,
   };
 }
 

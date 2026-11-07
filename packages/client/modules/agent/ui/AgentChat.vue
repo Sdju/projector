@@ -16,7 +16,7 @@ import { useChatJobs } from "../model/chat-jobs.ts";
 import { lensActions, useAgentLens } from "../model/lens.ts";
 import { useSideQuestion } from "../model/side-question.ts";
 import { useAutoCompact } from "../model/use-auto-compact.ts";
-import { useChatInputActions } from "../model/use-chat-input-actions.ts";
+import { useChatInputActions, useChatRetry } from "../model/use-chat-input-actions.ts";
 import { useAnswerForm } from "../model/answer-form.ts";
 import UiPanel from "../../../common/ui/UiPanel.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
@@ -296,7 +296,6 @@ async function retryMessage(id: string) {
   void toBottom();
   await retry(id);
 }
-/** The list of the chat's own history and the project's chats is read when the panel opens. */
 async function openHistory() {
   await Promise.all([loadSessions(), loadRecent()]);
 }
@@ -386,6 +385,7 @@ function dismissError() {
   error.value = "";
   copyError.value = "";
 }
+const { retryableError, retryFailed } = useChatRetry(turns, busy, error, copyError, retryMessage);
 let copyTimer: ReturnType<typeof setTimeout> | undefined;
 let observer: ResizeObserver | undefined;
 // Content growth never changes scrollTop, so only a decrease is a user scrolling up.
@@ -727,11 +727,13 @@ onBeforeUnmount(() => {
       :copied="!!copied"
       :form="pendingForm"
       :editing="!!editing"
+      :retryable="retryableError"
       @submit="submit"
       @form-submit="submitComposerForm"
       @open="openChip"
       @fail="(message) => (error = message)"
       @dismiss="dismissError"
+      @retry="retryFailed"
       @stop="stop"
     >
       <template v-if="latestContext" #status>

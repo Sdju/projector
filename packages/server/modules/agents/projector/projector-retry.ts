@@ -6,17 +6,27 @@ const BASE_DELAY_MS = 1_500;
 const MAX_DELAY_MS = 20_000;
 
 const TRANSIENT_CODES = new Set(["ECONNRESET", "ETIMEDOUT", "ECONNREFUSED", "EAI_AGAIN", "EPIPE"]);
+/** Providers sometimes report an overload without a status code: the text is all there is. */
+const TRANSIENT_MESSAGE =
+  /overloaded|rate.?limit|retry shortly|temporarily unavailable|service unavailable|server_error/i;
 
 /** Rate limits, provider-side failures and dropped connections are worth another try; bad requests and keys are not. */
 export function isRetryable(error: unknown): boolean {
   if (APICallError.isInstance(error)) {
     const status = error.statusCode;
-    return error.isRetryable || status === 429 || (status !== undefined && status >= 500);
+    if (error.isRetryable || status === 429 || (status !== undefined && status >= 500)) return true;
+    // A 4xx status the provider chose is a better answer than the text: do not retry it.
+    if (status !== undefined && status >= 400 && status < 500) return false;
+    return TRANSIENT_MESSAGE.test(error.message);
   }
   if (!(error instanceof Error)) return false;
   if (error.name === "AbortError") return false;
   const code = (error.cause as { code?: string } | undefined)?.code;
-  return error.message === "fetch failed" || (code !== undefined && TRANSIENT_CODES.has(code));
+  return (
+    error.message === "fetch failed" ||
+    (code !== undefined && TRANSIENT_CODES.has(code)) ||
+    TRANSIENT_MESSAGE.test(error.message)
+  );
 }
 
 /** Exponential backoff, or the provider's own `Retry-After` when it asks for a pause. */

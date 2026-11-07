@@ -140,7 +140,21 @@ export function createAcpEventMapper(
       }
       return;
     }
-    if (kind === "session_info_update" || kind === "current_mode_update") {
+    if (kind === "session_info_update") {
+      const retry = dialect.retry(update);
+      if (retry === null) emit("status", { phase: "thinking", provider: label, model });
+      else if (retry)
+        emit("status", {
+          phase: "retrying",
+          attempt: retry.attempt,
+          ...(retry.delay !== undefined ? { delay: retry.delay } : {}),
+          ...(retry.message ? { message: retry.message } : {}),
+          provider: label,
+          model,
+        });
+      return;
+    }
+    if (kind === "current_mode_update") {
       // Native title/mode live on the agent's session list; the chat keeps its own first-message title.
       return;
     }

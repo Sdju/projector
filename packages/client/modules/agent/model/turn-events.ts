@@ -65,6 +65,13 @@ export function appendThought(turn: AgentTurn, text: string) {
   else parts.push({ type: "thought", text });
 }
 
+/** Keeps the reason on the answer and in the chat banner: the turn can then offer retry. */
+export function markAnswerFailed(state: ChatState, assistant: AgentTurn, error: unknown): void {
+  const message = error instanceof Error ? error.message : "Агент не ответил";
+  state.error = message;
+  assistant.failure = message;
+}
+
 /** How much streamed output a running call keeps in the chat; the final result is kept apart. */
 const LIVE_OUTPUT_CHARS = 64_000;
 
@@ -257,6 +264,7 @@ export function applyAgentEvent(
       return false;
     case "error":
       state.error = event.data.error;
+      assistant.failure = event.data.error;
       assistant.run = undefined;
       return false;
     case "done":

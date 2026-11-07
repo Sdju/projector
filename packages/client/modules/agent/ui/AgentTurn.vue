@@ -19,6 +19,7 @@ import IconCheck from "~icons/lucide/check";
 import IconPencil from "~icons/lucide/pencil";
 import IconUndo from "~icons/lucide/undo-2";
 import IconRefresh from "~icons/lucide/refresh-cw";
+import IconAlert from "~icons/lucide/circle-alert";
 import IconGitFork from "~icons/lucide/git-fork";
 import IconPrev from "~icons/lucide/chevron-left";
 import IconNext from "~icons/lucide/chevron-right";
@@ -342,6 +343,18 @@ const lastWork = computed(
         @open="(path) => emit('openFile', path)"
         @revert="emit('revert', turn.id)"
       />
+      <div v-if="turn.failure" class="turn-failure" role="alert">
+        <IconAlert aria-hidden="true" />
+        <p class="turn-failure-text">{{ turn.failure }}</p>
+        <UiButton
+          v-if="last && !busy && !readonly"
+          size="sm"
+          title="Повторить запрос с начала; изменённые файлы не откатываются"
+          @click="emit('retry', turn.id)"
+        >
+          Повторить
+        </UiButton>
+      </div>
       <UiInline
         v-if="turn.text && !(busy && last) && !readonly"
         :gap="0.5"
@@ -371,7 +384,7 @@ const lastWork = computed(
           <IconCheck v-if="copied" aria-hidden="true" /><IconCopy v-else aria-hidden="true" />
         </UiButton>
         <UiButton
-          v-if="last"
+          v-if="last && !turn.failure"
           shape="icon"
           size="sm"
           class="copy-button"
@@ -528,6 +541,35 @@ const lastWork = computed(
 }
 .assistant-body {
   min-width: 0;
+}
+.turn-failure {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid color-mix(in srgb, var(--err) 40%, var(--bg-2));
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--err) 10%, var(--bg-2));
+  color: var(--err);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+}
+.turn-failure > svg {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.turn-failure-text {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.turn-failure button {
+  flex-shrink: 0;
 }
 .copy-button {
   display: flex;
