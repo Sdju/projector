@@ -42,9 +42,10 @@ const pageOnly = (req: RouteContext["req"]) => {
 
 /** A new job from the body of `POST /api/agent/jobs`; everything the client sends is checked here. */
 async function startFrom(body: Record<string, unknown>) {
+  const projectId = asString(body.projectId);
   const roleId = asString(body.role).trim();
-  const role = roleId ? await readAgentRole(roleId) : undefined;
-  if (roleId && !role) throw new Error(`Неизвестная роль: ${roleId}`);
+  const role = roleId ? await readAgentRole(roleId, projectId) : undefined;
+  if (roleId && !role) throw new Error(`Неизвестная или недоверенная роль: ${roleId}`);
   if (role && role.kind !== "chat")
     throw new Error("Служебную роль нельзя запустить как фоновое задание");
   const backend = asString(body.backend).trim() || role?.agent || "";

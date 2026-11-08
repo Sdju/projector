@@ -15,6 +15,7 @@ import type {
 } from "@projector/core/modules/agent-role/index.ts";
 import { clientAgents } from "../../agents-integration/catalog/index.ts";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
+import { readProjectRoles } from "../api/project-roles.ts";
 import { firstProjectId, readControls, type RoleControl } from "./controls.ts";
 export type { RoleControl, RoleControlOption } from "./controls.ts";
 
@@ -85,6 +86,20 @@ export function applyAgentRoles(data: AgentRoleSettings): void {
   state.error = "";
 }
 
+/** Chat roles of the current project: trusted project roles override global roles with the same id. */
+export async function loadChatRoles(projectId: string): Promise<AgentRoleView[]> {
+  const [data, project] = await Promise.all([
+    readAgentRoles(),
+    projectId ? readProjectRoles(projectId).catch(() => undefined) : Promise.resolve(undefined),
+  ]);
+  const roles = new Map(
+    data.roles.filter((role) => role.kind === "chat").map((role) => [role.id, role] as const),
+  );
+  for (const role of project?.trusted ? project.roles : [])
+    if (role.kind === "chat") roles.set(role.id, role);
+  return [...roles.values()];
+}
+
 /** The controls an agent offers for a preset; external agents are read in the first project. */
 export async function roleControls(agent: string): Promise<RoleControl[]> {
   if (agent === "projector") return loadAgentRoleControls();
@@ -93,16 +108,6 @@ export async function roleControls(agent: string): Promise<RoleControl[]> {
   const offered = await readControls(agent, await firstProjectId());
   controlsByAgent.set(agent, offered);
   return offered;
-}
-
-/** Chat roles and their agents, for the new session menu; it does not register settings commands. */
-export function useAgentRoleCatalog() {
-  return {
-    roles: computed(() => state.data.roles ?? []),
-    loaded: computed(() => state.loaded),
-    error: computed(() => state.error),
-    load: loadAgentRoles,
-  };
 }
 
 export function useAgentRoleSettings() {

@@ -41,6 +41,20 @@ export interface AgentRoleView extends AgentRole {
   inherited: boolean;
 }
 
+/** Project roles read from `.projector/roles.json`; they are inert until the file is trusted. */
+export interface AgentProjectRoleState {
+  projectId: string;
+  /** Real folder of the project, the key of the trust decision. */
+  path: string;
+  file: string;
+  exists: boolean;
+  trusted: boolean;
+  hash?: string;
+  roles: AgentRoleView[];
+  /** Why the file could not be read or is unsafe; roles stay empty. */
+  problem?: string;
+}
+
 export const SERVICE_AGENT = "projector";
 
 export const SERVICE_ROLE_IDS = ["doctor", "lens", "judge"] as const;

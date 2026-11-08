@@ -8,7 +8,7 @@ import UiActionRow from "../../../common/ui/UiActionRow.vue";
 import UiActionCopy from "../../../common/ui/UiActionCopy.vue";
 import UiIsland from "../../../common/ui/UiIsland.vue";
 import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
-import { computed, useId, watch } from "vue";
+import { computed, useId, ref, watch } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import {
   AgentUsageIndicators,
@@ -20,25 +20,33 @@ import IconPlus from "~icons/lucide/plus";
 import IconMessage from "~icons/lucide/message-square";
 import IconTerminal from "~icons/lucide/terminal";
 import { builtinAgent, guiAgents, guiCommand, hasGui, useAgentModes } from "../../agent/index.ts";
-import { useAgentRoleCatalog } from "../../agent-roles/index.ts";
+import { loadChatRoles } from "../../agent-roles/index.ts";
 import { clientAgentByBackend } from "../../agents-integration/catalog/index.ts";
 
 /**
  * «+» с островом создания сессии: при открытии рамка охватывает кнопку, как у переключателя
  * проекта. Остров рисуется поверх дока (Teleport), поэтому кнопка дублируется в его шапке.
  */
-const props = defineProps<{ busy: boolean; agent?: boolean }>();
+const props = defineProps<{ busy: boolean; agent?: boolean; projectId: string }>();
 const emit = defineEmits<{ command: [id: string, args?: unknown] }>();
 const { modeOf, setMode, isEnabled } = useAgentModes();
-const { roles: roleCatalog, load: loadRoles } = useAgentRoleCatalog();
+const chatRoles = ref<Awaited<ReturnType<typeof loadChatRoles>>>([]);
 const roleRows = computed(() =>
-  (roleCatalog.value ?? []).flatMap((role) => {
+  chatRoles.value.flatMap((role) => {
     if (role.kind !== "chat") return [];
     const agent = clientAgentByBackend(role.agent);
     if (!agent || !isEnabled(agent.program)) return [];
     return [{ role, agent, title: role.name, caption: `${agent.title} · роль` }];
   }),
 );
+async function loadRoles() {
+  try {
+    // A project role is listed only when its file is trusted; global roles are always available.
+    chatRoles.value = await loadChatRoles(props.projectId);
+  } catch {
+    chatRoles.value = [];
+  }
+}
 const programs = computed(() => [
   {
     program: "shell",
@@ -62,7 +70,7 @@ const menu = useIslandMenu({
 });
 const { open, toggle, close, active } = menu;
 watch(open, (value) => {
-  if (value) void loadRoles().catch(() => undefined);
+  if (value) void loadRoles();
 });
 const listId = useId();
 const rows = computed(() =>

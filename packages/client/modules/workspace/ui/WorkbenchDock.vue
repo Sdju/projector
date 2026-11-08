@@ -101,6 +101,7 @@ const hostOf = (key: string) => props.panelHosts.hosts[key] ?? null;
         v-if="group.role === 'terminal'"
         :busy="terminalsBusy"
         :agent="agent"
+        :project-id="projectId"
         @command="(id, args) => emit('command', id, args)"
       />
     </template>

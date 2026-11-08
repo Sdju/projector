@@ -32,6 +32,7 @@ export interface ProjectorTaskRequest {
   /** A chat role to run the task as; `projector` only. */
   role?: string;
   cwd?: string;
+  projectId?: string;
   signal?: AbortSignal;
   /** The chat's own selection, used when the task has no role of its own. */
   selection?: AgentSelection;
@@ -45,8 +46,8 @@ async function taskRole(
 ): Promise<{ name?: string; selection: AgentSelection }> {
   const id = request.role?.trim();
   if (id) {
-    const role = await readAgentRole(id);
-    if (!role) throw new Error(`Неизвестная роль: ${id}`);
+    const role = await readAgentRole(id, request.projectId);
+    if (!role) throw new Error(`Неизвестная или недоверенная роль: ${id}`);
     if (role.kind !== "chat") throw new Error("Служебная роль не подходит для task");
     if (role.agent !== "projector")
       throw new Error(`task работает на Projector, а роль «${role.name}» — на ${role.agent}`);
@@ -186,6 +187,7 @@ export interface ProjectorTaskResult {
 /** Binds the current chat's model and role to the `task` tool without leaking run options into it. */
 export function taskRunnerFor(options: {
   cwd?: string;
+  projectId?: string;
   selection?: AgentSelection;
   role?: AgentRoleSnapshot;
   signal?: AbortSignal;
@@ -195,6 +197,7 @@ export function taskRunnerFor(options: {
     runProjectorTask({
       ...request,
       cwd: options.cwd,
+      projectId: options.projectId,
       selection: options.selection,
       parentRole: options.role,
       signal: options.signal,

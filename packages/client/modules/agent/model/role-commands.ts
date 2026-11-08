@@ -2,7 +2,7 @@ import { getCurrentInstance } from "vue";
 import { newId } from "../../../common/utilities/new-id.ts";
 import { commandArgs } from "../../../common/utilities/commands.ts";
 import { clientAgentByBackend } from "../../agents-integration/catalog/index.ts";
-import { loadAgentRoles } from "../../agent-roles/index.ts";
+import { loadChatRoles } from "../../agent-roles/index.ts";
 import { roleParam } from "../lib/chat-tab.ts";
 import { useIdeCommands } from "../../ide/index.ts";
 import { snapshotOfRole } from "@projector/core/modules/agent-role/index.ts";
@@ -26,19 +26,16 @@ export function registerRoleCommands(
     "ide.agent.roles.chat.list",
     "Роли агентов для чата",
     async () => {
-      const data = await loadAgentRoles();
+      const roles = await loadChatRoles(projectId);
       return {
-        file: data.file,
-        roles: data.roles
-          .filter((role) => role.kind === "chat")
-          .map((role) => ({
-            id: role.id,
-            name: role.name,
-            description: role.description,
-            agent: role.agent,
-            selection: role.selection,
-            inherited: role.inherited,
-          })),
+        roles: roles.map((role) => ({
+          id: role.id,
+          name: role.name,
+          description: role.description,
+          agent: role.agent,
+          selection: role.selection,
+          inherited: role.inherited,
+        })),
       };
     },
     () => true,
@@ -54,9 +51,9 @@ export function registerRoleCommands(
     async (args) => {
       const id = commandArgs(args).role;
       if (typeof id !== "string" || !id) throw new Error("role: id chat-роли");
-      const data = await loadAgentRoles();
-      const role = data.roles.find((item) => item.id === id);
-      if (!role || role.kind !== "chat") throw new Error(`Неизвестная chat-роль: ${id}`);
+      const roles = await loadChatRoles(projectId);
+      const role = roles.find((item) => item.id === id);
+      if (!role) throw new Error(`Неизвестная chat-роль: ${id}`);
       const agent = clientAgentByBackend(role.agent);
       if (!agent) throw new Error(`Агент роли не найден: ${role.agent}`);
       if (!api) throw new Error("Роли открываются только в рабочей области проекта");

@@ -137,6 +137,7 @@ async function turn(
         guard,
         runTask: taskRunnerFor({
           cwd: options.cwd,
+          projectId: options.projectId,
           selection: options.selection,
           role: options.role,
           signal: options.abort,

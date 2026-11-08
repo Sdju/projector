@@ -14,6 +14,7 @@ import {
   type AgentRoleView,
   type ServiceRoleId,
 } from "@projector/core/modules/agent-role/index.ts";
+import { projectRoleState } from "./project.ts";
 
 /** The user's choices for the built-in service roles: `$XDG_DATA_HOME/projector/agent/roles.json`. */
 export const rolesFile = () => join(dataDir(), "agent", "roles.json");
@@ -109,7 +110,16 @@ export async function roleSettings(): Promise<AgentRoleSettings> {
 }
 
 /** One role by id, for opening a chat or capturing its snapshot. */
-export async function readAgentRole(id: string): Promise<AgentRoleView | undefined> {
+export async function readAgentRole(
+  id: string,
+  projectId?: string,
+): Promise<AgentRoleView | undefined> {
+  if (projectId) {
+    const project = await projectRoleState(projectId);
+    const projectRole = project.roles.find((role) => role.id === id);
+    // A project role with this id shadows the global one even when the file is not trusted.
+    if (projectRole) return project.trusted ? projectRole : undefined;
+  }
   const state = await readState();
   if (isServiceRoleId(id)) {
     const role = BUILTIN_SERVICE_ROLES.find((item) => item.id === id);

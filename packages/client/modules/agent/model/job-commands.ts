@@ -31,7 +31,7 @@ import {
   clientAgentOf,
   clientAgents,
 } from "../../agents-integration/catalog/index.ts";
-import { loadAgentRoles } from "../../agent-roles/index.ts";
+import { loadChatRoles } from "../../agent-roles/index.ts";
 import { chatsOf } from "./chat-registry.ts";
 import { isBuiltinAgent } from "./modes.ts";
 import { useJobTabRequests } from "./job-open.ts";
@@ -69,8 +69,8 @@ export function registerJobCommands(
       let agent = undefined;
       let isolate = options.isolate === true;
       if (roleId) {
-        const data = await loadAgentRoles();
-        const role = data.roles.find((item) => item.id === roleId && item.kind === "chat");
+        const roles = await loadChatRoles(projectId);
+        const role = roles.find((item) => item.id === roleId);
         if (!role) throw new Error(`Неизвестная chat-роль: ${roleId}`);
         agent = clientAgentByBackend(role.agent);
         if (!agent || agent.builtin)
