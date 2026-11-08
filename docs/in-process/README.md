@@ -16,4 +16,5 @@
 - [agent-roadmap.md](agent-roadmap.md) — открытые пункты штатного агента Projector и проверки Судьи в браузере.
 - [file-views.md](file-views.md) — что осталось у файловых снимков: произвольные папки, union-дерево, индекс, поиск по снимку и переименования.
 - [gitlab-client-roadmap.md](gitlab-client-roadmap.md) — что осталось у GitLab после паритета с GitHub: Snippets, Wiki, несколько инстансов и проверки.
+- [npm-release.md](npm-release.md) — первый выпуск `@projector-ai/*`: ручной publish, trusted publisher, ограничения установки native и проверка OIDC.
 - [opencode-background-subagents.md](opencode-background-subagents.md) — фоновый `subagent` OpenCode не виден как живая задача, поэтому Lens не читает его рассуждения.
