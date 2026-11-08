@@ -424,7 +424,7 @@ i {
   z-index: 2;
 }
 .tool {
-  background: var(--surface-2, rgba(0, 0, 0, 0.05));
+  background: var(--bg-3);
   border: 1px solid var(--line);
   border-radius: 4px;
   cursor: pointer;
@@ -434,18 +434,18 @@ i {
 }
 .tool.active {
   background: var(--info);
-  color: #fff;
+  color: var(--bg);
   border-color: var(--info);
 }
 .tooltip {
   position: absolute;
   pointer-events: none;
-  background: var(--surface, #fff);
+  background: var(--bg-3);
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 4px 8px;
   font-size: 11px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-popover);
   z-index: 3;
   white-space: nowrap;
 }

@@ -147,7 +147,7 @@ function place(notice: Notice) {
   border: 1px solid var(--err);
   border-radius: var(--r-md);
   background: var(--bg-2);
-  box-shadow: var(--shadow-pop, 0 4px 16px rgb(0 0 0 / 0.3));
+  box-shadow: var(--shadow-popover);
   color: var(--text);
   font-size: var(--fs-xs);
   line-height: var(--lh);

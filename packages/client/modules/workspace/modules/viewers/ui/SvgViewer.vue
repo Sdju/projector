@@ -27,7 +27,12 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ change: [content: string]; save: [] }>();
 const compact = useCompactViewport();
-const color = ref("#d8d2c4");
+/** The token is authored as a hex; a non-hex scheme value falls back to the old default. */
+function defaultColor() {
+  const value = getComputedStyle(document.documentElement).getPropertyValue("--text-2").trim();
+  return /^#[0-9a-f]{6}$/i.test(value) ? value : "#d8d2c4";
+}
+const color = ref(defaultColor());
 const size = ref(256);
 const background = ref("checker");
 const backgroundColor = ref("#808080");
@@ -57,7 +62,7 @@ const settings = useIslandMenu({
   items: "input,select,button",
 });
 function resetParameters() {
-  color.value = "#d8d2c4";
+  color.value = defaultColor();
   size.value = 256;
   background.value = "checker";
   backgroundColor.value = "#808080";

@@ -163,7 +163,7 @@ li {
   display: flex;
   gap: var(--sp-1);
   align-items: center;
-  border-radius: var(--radius);
+  border-radius: var(--r-md);
 }
 li.current {
   background: var(--hover);

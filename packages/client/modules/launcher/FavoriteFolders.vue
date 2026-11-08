@@ -175,6 +175,6 @@ li code {
 }
 
 .error {
-  color: #c33;
+  color: var(--err);
 }
 </style>

@@ -96,8 +96,8 @@ const showFinished = computed(() => !active.value.length);
   margin: 0 0 var(--sp-2);
   padding: var(--sp-1) var(--sp-2);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--panel);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
   color: var(--muted);
   font-size: var(--fs-2xs);
 }
