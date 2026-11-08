@@ -127,6 +127,40 @@
   --shadow-modal: 0 18px 60px #0000002e;
 }
 
+/* Высокий контраст: чистый чёрный, белый текст и яркие статусы. */
+[data-theme="contrast"] {
+  color-scheme: dark;
+
+  --bg: #000000;
+  --bg-2: #080808;
+  --bg-3: #121212;
+  --bg-4: #1e1e1e;
+  --bg-sunken: #000000;
+  --canvas: #000000;
+
+  --line: #3d3d3d;
+  --line-strong: #7a7a7a;
+
+  --text: #ffffff;
+  --text-2: #ededed;
+  --muted: #c2c2c2;
+  --faint: #a8a8a8;
+
+  --focus: #ffd45c;
+  --accent: #ffd45c;
+  --run: #7dff9b;
+  --err: #ff9b8a;
+  --warn: #ffd166;
+  --info: #8fd8ff;
+  --search: #4a3a00;
+
+  --selection: #3d3d3d;
+  --overlay: #000000d9;
+
+  --shadow-popover: 0 12px 32px #000000cc;
+  --shadow-modal: 0 18px 60px #000000e6;
+}
+
 * {
   box-sizing: border-box;
 }

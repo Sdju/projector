@@ -63,6 +63,16 @@ test(
         themeColorMeta: "#efeee8",
       });
 
+      await browser.evaluate("window.fixture.apply('contrast')");
+      expect(await browser.evaluate("window.fixture.read()")).toStrictEqual({
+        appearance: "contrast",
+        theme: "contrast",
+        scheme: "dark",
+        background: "rgb(0, 0, 0)",
+        colorSchemeMeta: "dark",
+        themeColorMeta: "#080808",
+      });
+
       await browser.call("Emulation.setEmulatedMedia", {
         features: [{ name: "prefers-color-scheme", value: "light" }],
       });

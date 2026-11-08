@@ -3,6 +3,7 @@ import {
   defaultAppearance,
   isAppearanceChoice,
   resolveScheme,
+  schemeMode,
   type AppearanceChoice,
   type ColorScheme,
 } from "@projector/core/modules/appearance/index.ts";
@@ -18,7 +19,7 @@ export function currentAppearance(): AppearanceChoice {
 }
 
 function updateMeta(scheme: ColorScheme) {
-  document.querySelector('meta[name="color-scheme"]')?.setAttribute("content", scheme);
+  document.querySelector('meta[name="color-scheme"]')?.setAttribute("content", schemeMode(scheme));
   const background = getComputedStyle(document.documentElement).getPropertyValue("--bg-2").trim();
   if (background)
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", background);

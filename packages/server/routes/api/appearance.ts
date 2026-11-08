@@ -18,9 +18,10 @@ function bootstrapScript(choice: AppearanceChoice): string {
         ? "light"
         : "dark"
       : choice;
+  const mode = scheme === "light" ? "light" : "dark";
   root.dataset.appearance = choice;
   root.dataset.theme = scheme;
-  document.querySelector('meta[name="color-scheme"]')?.setAttribute("content", scheme);
+  document.querySelector('meta[name="color-scheme"]')?.setAttribute("content", mode);
 })();
 `;
 }

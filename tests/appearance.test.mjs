@@ -6,6 +6,7 @@ import {
   defaultAppearance,
   isAppearanceChoice,
   resolveScheme,
+  schemeMode,
 } from "../packages/core/modules/appearance/index.ts";
 import {
   readAppearanceChoice,
@@ -14,15 +15,25 @@ import {
 import { handleApi } from "../packages/server/app/api.ts";
 
 test("appearance choice validates and resolves the system scheme", () => {
-  expect(appearanceOptions.map((option) => option.id)).toStrictEqual(["dark", "light", "auto"]);
+  expect(appearanceOptions.map((option) => option.id)).toStrictEqual([
+    "dark",
+    "light",
+    "contrast",
+    "auto",
+  ]);
   expect(defaultAppearance).toBe("dark");
   expect(isAppearanceChoice("auto")).toBe(true);
   expect(isAppearanceChoice("light")).toBe(true);
+  expect(isAppearanceChoice("contrast")).toBe(true);
   expect(isAppearanceChoice("sepia")).toBe(false);
   expect(resolveScheme("auto", true)).toBe("light");
   expect(resolveScheme("auto", false)).toBe("dark");
   expect(resolveScheme("light", true)).toBe("light");
   expect(resolveScheme("dark", true)).toBe("dark");
+  expect(resolveScheme("contrast", true)).toBe("contrast");
+  expect(schemeMode("light")).toBe("light");
+  expect(schemeMode("dark")).toBe("dark");
+  expect(schemeMode("contrast")).toBe("dark");
 });
 
 test("appearance is stored on disk and invalid values are rejected", async () => {
@@ -89,4 +100,9 @@ test("bootstrap script follows the saved choice on every request", async () => {
   const changed = await (await fetch(`${base}/api/appearance/bootstrap.js`)).text();
   expect(changed).toContain('const choice = "light"');
   expect(changed).not.toBe(script);
+
+  await writeAppearanceChoice("contrast");
+  const contrast = await (await fetch(`${base}/api/appearance/bootstrap.js`)).text();
+  expect(contrast).toContain('const choice = "contrast"');
+  expect(contrast).toContain('const mode = scheme === "light" ? "light" : "dark"');
 });
