@@ -14,6 +14,7 @@
 
 - [cursor-acp.md](cursor-acp.md) — оставшиеся пункты ACP Cursor: форк и подпись модели; ограничения CLI (`--trust`, Team MCP) описаны в [usage](../usage.md).
 - [agent-roadmap.md](agent-roadmap.md) — открытые пункты штатного агента Projector и проверки Судьи в браузере.
+- [color-schemes.md](color-schemes.md) — цветовые схемы интерфейса: контракт токенов, настройка, раннее применение и потребители вне CSS.
 - [file-views.md](file-views.md) — что осталось у файловых снимков: произвольные папки, union-дерево, индекс, поиск по снимку и переименования.
 - [gitlab-client-roadmap.md](gitlab-client-roadmap.md) — что осталось у GitLab после паритета с GitHub: Snippets, Wiki, несколько инстансов и проверки.
 - [npm-release.md](npm-release.md) — первый выпуск `@projector-ai/*`: ручной publish, trusted publisher, ограничения установки native и проверка OIDC.
