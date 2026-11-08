@@ -153,6 +153,7 @@ defineExpose({ search, refresh });
           grow
           v-model="query"
           type="search"
+          name="workspace-search"
           placeholder="Найти в проекте…"
           aria-label="Поиск по содержимому"
           maxlength="200"

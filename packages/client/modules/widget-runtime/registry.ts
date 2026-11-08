@@ -1,4 +1,4 @@
-import { reactive, ref } from "vue";
+import { ref, shallowReactive } from "vue";
 import type { Component } from "vue";
 import {
   createWidgetCatalog,
@@ -13,8 +13,8 @@ export interface WidgetEntry {
 
 /** The client's built-in catalog. Project widgets live beside it, scoped by project id. */
 export const widgetCatalog = createWidgetCatalog();
-const components = reactive<Record<string, Component>>({});
-const projects = reactive<Record<string, Record<string, WidgetEntry>>>({});
+const components = shallowReactive<Record<string, Component>>({});
+const projects = shallowReactive<Record<string, Record<string, WidgetEntry>>>({});
 
 /** Bumped when a project's widgets arrive: a computed message re-splits and finds them. */
 export const projectWidgetsVersion = ref(0);
@@ -54,10 +54,9 @@ export function widgetDefinition(name: string, projectId?: string): WidgetDefini
 export function registeredWidgets(projectId?: string): Record<string, Component> {
   const own = projectWidgetEntries(projectId);
   if (!Object.keys(own).length) return components;
-  return {
-    ...components,
-    ...Object.fromEntries(Object.entries(own).map(([name, entry]) => [name, entry.component])),
-  };
+  const merged: Record<string, Component> = Object.assign({}, components);
+  for (const [name, entry] of Object.entries(own)) merged[name] = entry.component;
+  return merged;
 }
 
 export const isWidgetName = (name: string, projectId?: string): boolean =>

@@ -112,6 +112,7 @@ function backdrop(event: MouseEvent) {
       ><UiControl
         ref="input"
         v-model="query"
+        name="command-query"
         role="combobox"
         aria-label="Найти команду"
         aria-autocomplete="list"
