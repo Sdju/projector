@@ -8,7 +8,6 @@ import UiInline from "../../../common/ui/UiInline.vue";
 import UiMessage from "../../../common/ui/UiMessage.vue";
 import UiStack from "../../../common/ui/UiStack.vue";
 import AgentChatRoleCard from "./AgentChatRoleCard.vue";
-import AgentProjectRoles from "./AgentProjectRoles.vue";
 import { onMounted, ref, watch } from "vue";
 import { useAgentRoleSettings } from "../model/roles.ts";
 
@@ -181,7 +180,6 @@ onMounted(() => void load().catch(() => undefined));
     <UiHint>
       Служебные роли не меняют модель чатов. Файл настроек: <code>{{ file }}</code>
     </UiHint>
-    <AgentProjectRoles />
     <UiMessage v-if="error" tone="danger" size="xs" flush role="alert">{{ error }}</UiMessage>
   </UiStack>
 </template>

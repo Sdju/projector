@@ -1,21 +1,18 @@
 <script setup lang="ts">
 import UiButton from "../../../common/ui/UiButton.vue";
-import UiControl from "../../../common/ui/UiControl.vue";
-import UiField from "../../../common/ui/UiField.vue";
 import UiHint from "../../../common/ui/UiHint.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 import UiMessage from "../../../common/ui/UiMessage.vue";
 import UiStack from "../../../common/ui/UiStack.vue";
 import AgentChatRoleCard from "./AgentChatRoleCard.vue";
-import { onMounted, ref, watch } from "vue";
-import { useProjects } from "../../project/index.ts";
+import { watch } from "vue";
 import { clientAgents } from "../../agents-integration/catalog/index.ts";
 import { roleControls } from "../model/roles.ts";
 import { useProjectRoleSettings } from "../model/project-roles.ts";
 import type { AgentRole } from "@projector/core/modules/agent-role/index.ts";
+import type { Project } from "../../project/index.ts";
 
-const projects = useProjects();
-const selected = ref("");
+const props = defineProps<{ project: Project }>();
 const {
   roles,
   trusted,
@@ -30,19 +27,14 @@ const {
   save,
   remove,
   commands,
-} = useProjectRoleSettings(() => selected.value);
+} = useProjectRoleSettings(() => props.project.id);
 const agents = clientAgents();
 
-function chooseProject(event: Event) {
-  selected.value = (event.target as HTMLSelectElement).value;
-}
-
-watch(selected, () => void load().catch(() => undefined));
-
-onMounted(async () => {
-  if (!projects.projects.value.length) await projects.load();
-  selected.value = projects.projects.value[0]?.id ?? "";
-});
+watch(
+  () => props.project.id,
+  () => void load().catch(() => undefined),
+  { immediate: true },
+);
 
 async function addRole() {
   await create().catch(() => undefined);
@@ -70,36 +62,13 @@ async function setTrust(value: boolean) {
     @pointerdown="commands.scope.activate()"
   >
     <div class="head">
-      <div>
-        <h3>Роли проекта</h3>
-        <p>
-          Файл ролей лежит в проекте и не используется, пока вы не доверите его текущему
-          содержимому. Правка файла автоматически отзывает доверие.
-        </p>
-      </div>
-      <UiButton
-        appearance="outline"
-        size="sm"
-        :busy="busy === 'new'"
-        :disabled="!!busy || !selected"
-        @click="addRole"
-        >Добавить роль</UiButton
-      >
-    </div>
-    <UiField v-if="projects.projects.value.length" v-slot="{ control }" label="проект">
-      <UiControl as="select" v-bind="control" :value="selected" @change="chooseProject">
-        <option v-for="project in projects.projects.value" :key="project.id" :value="project.id">
-          {{ project.name }} · {{ project.path }}
-        </option>
-      </UiControl>
-    </UiField>
-    <UiHint v-else>В каталоге нет проектов: роли проекта появятся после добавления проекта.</UiHint>
-    <template v-if="selected">
-      <UiInline wrap>
+      <UiInline wrap :gap="2">
         <span class="file">{{ file || ".projector/roles.json" }}</span>
         <span v-if="trusted" class="trusted">доверено</span>
         <span v-else-if="exists" class="untrusted">не доверено</span>
         <span v-else class="untrusted">файла ещё нет</span>
+      </UiInline>
+      <UiInline :gap="2">
         <UiButton
           v-if="exists && !trusted"
           appearance="solid"
@@ -117,56 +86,48 @@ async function setTrust(value: boolean) {
           @click="setTrust(false)"
           >Отозвать доверие</UiButton
         >
+        <UiButton
+          appearance="outline"
+          size="sm"
+          :busy="busy === 'new'"
+          :disabled="!!busy"
+          @click="addRole"
+          >Добавить роль</UiButton
+        >
       </UiInline>
-      <UiMessage v-if="problem" tone="danger" size="xs" flush role="alert">{{ problem }}</UiMessage>
-      <UiMessage v-else-if="exists && !trusted" tone="muted" variant="note" size="xs" flush>
-        Роли из этого файла не открываются в чатах, заданиях и task. Проверьте файл и выдайте
-        доверие.
-      </UiMessage>
-      <p v-if="!roles.length && !problem" class="empty">
-        В файле пока нет ролей. Добавьте роль — она появится в меню «+» после доверия.
-      </p>
-      <AgentChatRoleCard
-        v-for="role in roles"
-        :key="role.id"
-        :role="role"
-        :agents="agents"
-        :controls-for="roleControls"
-        :busy="busy === role.id"
-        @save="(value) => saveRole(role, value)"
-        @remove="removeRole(role)"
-      />
-      <UiHint>
-        Роли проекта действуют только в этом проекте. Доверие привязано к хешу файла; после
-        изменения файла его нужно выдать заново.
-      </UiHint>
-    </template>
+    </div>
+    <UiMessage v-if="problem" tone="danger" size="xs" flush role="alert">{{ problem }}</UiMessage>
+    <UiMessage v-else-if="exists && !trusted" tone="muted" variant="note" size="xs" flush>
+      Роли из этого файла не открываются в чатах, заданиях и task. Проверьте файл и выдайте доверие.
+    </UiMessage>
+    <p v-if="!roles.length && !problem" class="empty">
+      В файле пока нет ролей. Добавьте роль — она появится в меню «+» после доверия.
+    </p>
+    <AgentChatRoleCard
+      v-for="role in roles"
+      :key="role.id"
+      :role="role"
+      :agents="agents"
+      :controls-for="roleControls"
+      :busy="busy === role.id"
+      @save="(value) => saveRole(role, value)"
+      @remove="removeRole(role)"
+    />
+    <UiHint>
+      Роли проекта действуют только в этом проекте. Доверие привязано к хешу файла; после изменения
+      файла его нужно выдать заново.
+    </UiHint>
     <UiMessage v-if="error" tone="danger" size="xs" flush role="alert">{{ error }}</UiMessage>
   </UiStack>
 </template>
 
 <style scoped>
-.project-roles {
-  padding-top: var(--sp-2);
-  border-top: 1px solid var(--line);
-}
 .head {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--sp-3);
-}
-h3 {
-  margin: 0;
-  color: var(--text);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-}
-.head p {
-  margin: 2px 0 0;
-  color: var(--muted);
-  font-size: var(--fs-xs);
-  line-height: 1.5;
 }
 .file {
   min-width: 0;

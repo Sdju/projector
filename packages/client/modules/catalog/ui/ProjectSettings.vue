@@ -10,6 +10,7 @@ import {
 import { readoutLines } from "../../../common/utilities/tab-readout.ts";
 import type { Project } from "../../project/index.ts";
 import { shortcutKey } from "@projector/core/modules/ide/index.ts";
+import { AgentProjectRoles } from "../../agent-roles/index.ts";
 import {
   projectSettingsSection as selected,
   scenarioSection,
@@ -57,6 +58,16 @@ const sections = computed<SettingsSection[]>(() => [
       hint: command.id === form.draft.value.defaultCommandId ? "основной" : undefined,
       problem: !!form.problemOf(command.id),
     })),
+  },
+  {
+    id: "roles",
+    title: "Роли проекта",
+    group: "Агент",
+    description:
+      "Chat-роли из .projector/roles.json: агент, модель и настройки. Файл действует только после доверия.",
+    keywords: "роли agent roles проект чат пресет preset модель доверие trust",
+    component: AgentProjectRoles,
+    props: { project: props.project },
   },
   {
     id: "remove",
