@@ -6,6 +6,7 @@ import { checksWidget } from "@projector/core/modules/agent-widgets/checks/index
 import { chipsWidget } from "@projector/core/modules/agent-widgets/chips/index.ts";
 import { columnsWidget } from "@projector/core/modules/agent-widgets/columns/index.ts";
 import { donutWidget } from "@projector/core/modules/agent-widgets/donut/index.ts";
+import { fieldWidget } from "@projector/core/modules/agent-widgets/field/index.ts";
 import { formWidget } from "@projector/core/modules/agent-widgets/form/index.ts";
 import { gitInfoWidget } from "@projector/core/modules/agent-widgets/git-info/index.ts";
 import { imageWidget } from "@projector/core/modules/agent-widgets/image/index.ts";
@@ -33,6 +34,7 @@ export function registerBuiltinWidgetDefinitions(): void {
     chipsWidget,
     columnsWidget,
     donutWidget,
+    fieldWidget,
     formWidget,
     gitInfoWidget,
     imageWidget,

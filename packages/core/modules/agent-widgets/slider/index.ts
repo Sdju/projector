@@ -4,6 +4,7 @@ export const sliderWidget = defineWidget({
   name: "Slider",
   group: "form",
   summary: "число на шкале",
+  hidden: true,
   props: {
     label: { type: "string", description: "подпись" },
     min: { type: "number", description: "минимум, по умолчанию 0" },

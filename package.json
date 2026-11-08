@@ -25,6 +25,7 @@
     "architecture": "node scripts/check-feod.mjs",
     "test:evals": "vp test run --config vite.evals.config.ts",
     "eval:judge": "node evals/judge.mjs",
+    "eval:widgets:opencode": "node evals/run-widgets.mjs",
     "test:docker": "vp test run tests/docker.test.mjs",
     "test:file-icons": "vp test run tests/file-icons.test.mjs",
     "test:virtual-list": "vp test run tests/virtual-list.test.mjs",

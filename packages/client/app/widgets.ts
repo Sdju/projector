@@ -6,6 +6,7 @@ import { checks } from "../modules/agent-widgets/checks/index.ts";
 import { chips } from "../modules/agent-widgets/chips/index.ts";
 import { columns } from "../modules/agent-widgets/columns/index.ts";
 import { donut } from "../modules/agent-widgets/donut/index.ts";
+import { field } from "../modules/agent-widgets/field/index.ts";
 import { form } from "../modules/agent-widgets/form/index.ts";
 import { gitInfo } from "../modules/agent-widgets/git-info/index.ts";
 import { image } from "../modules/agent-widgets/image/index.ts";
@@ -33,6 +34,7 @@ export function registerBuiltinWidgets(): void {
     chips,
     columns,
     donut,
+    field,
     form,
     gitInfo,
     image,

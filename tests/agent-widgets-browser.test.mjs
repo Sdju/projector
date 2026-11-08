@@ -190,6 +190,105 @@ test.concurrent(
 );
 
 test.concurrent(
+  "Field covers text, number, select, checks, switch and segmented controls",
+  { skip: !chromium, timeout: 30000, retry: 1 },
+  async ({ onTestFinished }) => {
+    const html = await readFile(new URL("./fixtures/agent-widgets.html", import.meta.url), "utf8");
+    const fixture = await createBrowserFixture({ pages: { "/widgets": html } });
+    onTestFinished(() => fixture.close());
+    const browser = await createChromium(fixture.directory);
+    onTestFinished(() => browser.close());
+    await browser.open(fixture.url("/widgets"));
+    await browser.viewport(760, 700);
+    const wait = async (expression, ms = 8000) => {
+      for (let waited = 0; waited < ms; waited += 50) {
+        if (await browser.evaluate(expression)) return;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      expect(await browser.evaluate(expression)).toBeTruthy();
+    };
+    const source = `<Form>
+  <Field type="text" name="title" label="Название" initial="Проект" />
+  <Field type="number" name="port" label="Порт" :min="1" :max="65535" :initial="4177" />
+  <Field type="select" name="mode" label="Режим" :options="[{value:'server',label:'Сервер'},{value:'window',label:'Окно'}]" initial="server" />
+  <Field type="checks" name="scripts" :options="['start','test','lint']" :initial="['test']" />
+  <Field type="switch" name="watch" label="Следить" :initial="false" />
+  <Field type="segmented" name="target" :options="['local','remote']" initial="local" />
+  <Button id="send-field" submit summary="Field">Отправить</Button>
+</Form>`;
+    await browser.evaluate(`window.fixture.set(${JSON.stringify(source)}, false)`);
+    await wait('document.querySelector("#send-field") !== null');
+    expect(await browser.evaluate('document.querySelector("input[name=title]").value')).toBe(
+      "Проект",
+    );
+    expect(await browser.evaluate('document.querySelector("input[name=port]").value')).toBe("4177");
+    expect(await browser.evaluate('document.querySelector("select[name=mode]").value')).toBe(
+      "server",
+    );
+    expect(
+      await browser.evaluate(
+        '[...document.querySelectorAll("input[name=scripts]")].filter((i) => i.checked).length',
+      ),
+    ).toBe(1);
+    await browser.evaluate(`(() => {
+      const set = (selector, value, event = "input") => {
+        const input = document.querySelector(selector);
+        input.value = value;
+        input.dispatchEvent(new Event(event, { bubbles: true }));
+      };
+      set("input[name=title]", "Демо");
+      set("input[name=port]", "8080");
+      set("select[name=mode]", "window", "change");
+      document.querySelector("input[name=scripts]").click();
+      document.querySelector("input[name=watch]").click();
+      [...document.querySelectorAll(".segmented button")].find((b) => b.textContent.trim() === "remote").click();
+    })()`);
+    await browser.click("#send-field");
+    await wait('document.querySelector("#send-field").textContent.includes("Отправлено")');
+    const reply = await browser.evaluate("window.fixture.replies.at(-1)");
+    const data = JSON.parse(reply.split("```json\n")[1].split("\n```")[0]);
+    expect(data).toEqual({
+      title: "Демо",
+      port: 8080,
+      mode: "window",
+      scripts: ["test", "start"],
+      watch: true,
+      target: "remote",
+    });
+
+    await browser.evaluate("window.fixture.replies.length = 0");
+    await browser.evaluate(
+      `window.fixture.set(${JSON.stringify(
+        '<Form><Field type="text" name="name" label="Имя" required /><Button id="send-required" submit>Отправить</Button></Form>',
+      )}, false)`,
+    );
+    await wait('document.querySelector("#send-required") !== null');
+    await browser.click("#send-required");
+    await wait('document.querySelector(".field .error") !== null');
+    expect(await browser.evaluate("window.fixture.replies.length")).toBe(0);
+    expect(await browser.evaluate('document.querySelector(".field .error").textContent')).toBe(
+      "Заполните поле",
+    );
+    await browser.evaluate(`(() => {
+      const input = document.querySelector('input[name=name]');
+      input.value = "Ада";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    })()`);
+    await browser.click("#send-required");
+    await wait("window.fixture.replies.length === 1");
+    expect(
+      JSON.parse(
+        (await browser.evaluate("window.fixture.replies[0]"))
+          .split("```json\n")[1]
+          .split("\n```")[0],
+      ),
+    ).toEqual({
+      name: "Ада",
+    });
+  },
+);
+
+test.concurrent(
   "widgets stream without remounting, stay interactive and render charts",
   { skip: !chromium, timeout: 90000, retry: 1 },
   async ({ onTestFinished }) => {

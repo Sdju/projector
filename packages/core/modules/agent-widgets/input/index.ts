@@ -4,6 +4,7 @@ export const inputWidget = defineWidget({
   name: "Input",
   group: "form",
   summary: "строка или многострочный текст",
+  hidden: true,
   props: {
     label: { type: "string", description: "подпись" },
     placeholder: { type: "string", description: "подсказка в пустом поле" },

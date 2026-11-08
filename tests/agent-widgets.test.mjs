@@ -300,6 +300,21 @@ test("special widgets stay in the guide as a name and use case, with details on 
   expect(() => catalog.describeSpecial("Nope")).toThrow("Нет компонента");
 });
 
+test("the permanent guide spends its space on Field, not on old field aliases", async () => {
+  const { widgetCatalog } = await import("../packages/server/modules/agents/projector/index.ts");
+  const guide = widgetCatalog.guide();
+  expect(guide).toContain("Field — поле формы");
+  expect(guide).toContain('<Field type="select"');
+  expect(guide).not.toContain("Input —");
+  expect(guide).not.toContain("Checks —");
+  expect(guide).not.toContain("Slider —");
+  expect(guide).not.toContain("<Input ");
+  expect(guide.length).toBeLessThan(9_500);
+  expect(widgetCatalog.get("Input")?.hidden).toBe(true);
+  expect(widgetCatalog.describe("Input")).toContain("Свойства:");
+  expect(widgetCatalog.describe("Field")).toContain("type: string");
+});
+
 test("InlineIcon offers exactly the names its prompt documents", async () => {
   const { INLINE_ICON_NAMES } =
     await import("../packages/core/modules/agent-widgets/inline-icon/index.ts");

@@ -30,7 +30,8 @@ function click() {
   if (locked.value) return;
   if (props.reset) form?.reset();
   if (props.preset) form?.set(props.preset);
-  if (props.submit && form && reply(form.values(), props.summary)) form.sent.value = true;
+  if (props.submit && form && form.validate() && reply(form.values(), props.summary))
+    form.sent.value = true;
   else if (!props.submit && props.send !== undefined && reply(props.send, props.summary))
     sentAlone.value = true;
 }

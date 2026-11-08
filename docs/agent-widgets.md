@@ -78,6 +78,14 @@ API: `GET /api/agent/project-widgets?projectId=`, `PUT /api/agent/project-widget
 
 Ограничения: правка файла влияет на новые и повторно открытые ответы; уже смонтированный ответ сохраняет прежнее определение до перезагрузки; MCP-процесс читает определения при старте сессии; формы проекта не проходят Form Doctor для внутренней ошибки шаблона — невалидное определение видно в настройках и в ответе как ошибка виджета.
 
+## Field и бюджет справки
+
+Поля формы сведены в один виджет `Field` с полем `type` (по умолчанию `text`): `text`, `textarea`, `number`, `slider`, `select`, `radio`, `checks`, `switch`, `date`, `time` или `segmented`. Общие свойства — `name`, `label`, `hint`, `initial`, `placeholder`, `required`, `disabled`; `options` нужен для `select`/`radio`/`checks`, `min`/`max`/`step`/`unit` — для `number`/`slider`, `rows` — для `textarea`. `required` проверяется при отправке формы: ошибка показывается у поля, а ответ не уходит, пока поле не заполнено. `checks` возвращает массив, `switch` — boolean, числовые типы — number, остальные — string.
+
+Старые `Input`, `Checks` и `Slider` остаются зарегистрированными только для старых ответов: в `guide()` они скрыты (`hidden: true`), но `describe_widget` и рендер по-прежнему работают. Это позволяет не ломать историю и не тратить постоянный промпт на три legacy-определения. Для виджетов с большой матрицей свойств можно задать компактный `guide`, а полные `props`/`notes` оставить для `describe_widget`.
+
+Размер постоянной справки — часть контракта: тест `tests/agent-widgets.test.mjs` держит `widgetCatalog.guide()` ниже 9 500 символов. Сейчас после перевода полей на `Field` и компактных Form/IntelligentForm/Tabs справка занимает около 8,8 тыс. символов вместо прежних 11,6 тыс.
+
 ## Как рендерится
 
 - **Разбор** (`split.ts`). Блок — строка, начинающаяся с `<PascalCase`, чьё имя есть в реестре, вне кода. Всё остальное — markdown (`html: false`, DOMPurify). `<script>` между блоками — отдельная часть; внутри блока — часть блока.
@@ -120,4 +128,4 @@ API: `GET /api/agent/project-widgets?projectId=`, `PUT /api/agent/project-widget
 
 ## Проверка
 
-`tests/agent-widgets.test.mjs` (разбор, автозакрытие на каждом префиксе, каталог, сверка наборов, выбор `<IntelligentForm>`), `tests/project-widgets.test.mjs` (нормализация, отдельное поле `script`, доверие по хешу, данные, симлинк и секреты, справка проекта), `tests/project-widgets-api.test.mjs` (API доверия и данных) и `tests/agent-widgets-browser.test.mjs` (реальный Chromium: стриминг без пересоздания узлов, отсутствие ошибок на каждом шаге, одно выполнение скрипта, проектный скрипт с данными, формы, лейауты, общий контекст). Сценарии `intelligent-form-project`, `intelligent-form-release` и `intelligent-form-docker` в `evals/scenarios.mjs` проверяют, что в сложных настройках агент выбирает форму, а не серию вопросов.
+`tests/agent-widgets.test.mjs` (разбор, автозакрытие на каждом префиксе, каталог, бюджет справки, скрытые legacy-поля, сверка наборов, выбор `<IntelligentForm>`), `tests/project-widgets.test.mjs` (нормализация, отдельное поле `script`, доверие по хешу, данные, симлинк и секреты, справка проекта), `tests/project-widgets-api.test.mjs` (API доверия и данных) и `tests/agent-widgets-browser.test.mjs` (реальный Chromium: стриминг без пересоздания узлов, отсутствие ошибок на каждом шаге, одно выполнение скрипта, проектный скрипт с данными, `Field` со всеми основными типами, формы, лейауты, общий контекст). Сценарии `intelligent-form-project`, `intelligent-form-release` и `intelligent-form-docker` в `evals/scenarios.mjs` проверяют Projector-агента, а `pnpm eval:widgets:opencode` запускает `evals/widget-scenarios.mjs` на реальном OpenCode через ACP: агент должен собрать форму через `Field`, не используя скрытые `Input`/`Checks`/`Slider`.

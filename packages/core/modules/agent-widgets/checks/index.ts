@@ -4,6 +4,7 @@ export const checksWidget = defineWidget({
   name: "Checks",
   group: "form",
   summary: "выбор из списка: несколько (флажки) или один (single)",
+  hidden: true,
   props: {
     options: {
       type: "array",

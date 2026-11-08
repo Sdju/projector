@@ -102,7 +102,7 @@ export async function runScenario(scenario, connection) {
     process.env[name] = value;
   };
   const data = await mkdtemp(join(tmpdir(), "projector-eval-"));
-  let selection;
+  let selection = connection.selection;
   if (connection.providerId) {
     // A provider the user has saved: only its record is copied into the scratch data folder, and the
     // key is read from the system keyring as usual, so nothing else of the user's data is touched.
@@ -122,8 +122,10 @@ export async function runScenario(scenario, connection) {
     );
     selection = { provider: `${record.id}:${connection.model ?? record.models[0].alias}` };
   }
-  set("XDG_DATA_HOME", data);
-  if (!connection.providerId) {
+  // External ACP agents keep their own login/config in the real data directory. Their evals only
+  // need a scratch cwd; Projector's provider evals still isolate the saved provider record.
+  if (!connection.keepDataHome) set("XDG_DATA_HOME", data);
+  if (!connection.providerId && !connection.backend) {
     set("OPENAI_URL", connection.url);
     set("OPENAI_API_KEY", connection.key ?? "eval");
     set("OPENAI_MODEL", connection.model ?? "eval");
@@ -150,6 +152,8 @@ export async function runScenario(scenario, connection) {
     cwd: scenario.cwd ?? data,
     permissionMode: scenario.mode ?? "default",
     selection,
+    features: connection.features,
+    projectId: connection.projectId,
     history: scenario.history ?? [],
     commands: async (request) => {
       if (request.operation === "list") return { commands: CATALOG };
@@ -187,7 +191,7 @@ export async function runScenario(scenario, connection) {
     },
   };
   try {
-    await projectorBackend.run(options);
+    await (connection.backend ?? projectorBackend).run(options);
   } finally {
     for (const [name, value] of Object.entries(saved)) {
       if (value === undefined) delete process.env[name];
@@ -228,6 +232,8 @@ export function judge(scenario, run) {
     failures.push(`подтверждений ${run.approvals.length}, не больше ${expect.maxApprovals}`);
   if (expect.answer && !expect.answer.test(run.answer))
     failures.push(`ответ не подходит под ${expect.answer}`);
+  for (const pattern of expect.answerAll ?? [])
+    if (!pattern.test(run.answer)) failures.push(`ответ не подходит под ${pattern}`);
   if (expect.notInAnswer && expect.notInAnswer.test(run.answer))
     failures.push(`в ответе есть ${expect.notInAnswer}`);
   if (expect.formFields) {

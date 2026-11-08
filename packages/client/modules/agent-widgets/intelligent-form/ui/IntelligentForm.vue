@@ -26,7 +26,7 @@ const unregister = chrome?.registerSubmit?.(send);
 onBeforeUnmount(() => unregister?.());
 
 function send() {
-  if (locked.value) return false;
+  if (locked.value || !form.validate()) return false;
   if (!reply(form.values(), props.summary)) return false;
   form.sent.value = true;
   return true;
