@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { generateText, type LanguageModel } from "ai";
+import type { AgentRunOptions } from "../../agent/index.ts";
 import type { AgentHistoryTurn } from "../../providers/index.ts";
 import { recentTurns } from "./projector-history.ts";
 
@@ -125,6 +126,32 @@ export function splitAtCompaction(history: AgentHistoryTurn[]): {
       return { summary: answer.content.trim(), turns: history.slice(index + 2) };
   }
   return { summary: "", turns: history };
+}
+
+/** `/compact`: the answer is the summary of the whole chat, and what follows it builds on that. */
+export async function compactChat(
+  model: LanguageModel,
+  earlier: ReturnType<typeof splitAtCompaction>,
+  options: AgentRunOptions,
+  resolved: { model: string; contextTokens?: number },
+  defaultContextSize: number,
+): Promise<void> {
+  options.emit("status", { phase: "compacting" });
+  const summary = earlier.turns.length
+    ? await summarize(model, earlier.summary, earlier.turns, options.abort)
+    : earlier.summary;
+  if (!summary) {
+    options.emit("error", { error: "Пока нечего сжимать" });
+    return;
+  }
+  options.emit("text", { text: summary });
+  // The next request measures the real size; until then the ring shows about what the summary takes.
+  options.emit("context", {
+    used: Math.ceil((summary.length + 6_000) / 3),
+    size: resolved.contextTokens ?? defaultContextSize,
+    model: resolved.model,
+  });
+  options.emit("done", { text: summary, added: [] });
 }
 
 /** The system prompt section with the summary of the early conversation. */

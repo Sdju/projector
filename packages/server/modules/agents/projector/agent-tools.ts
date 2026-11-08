@@ -25,6 +25,13 @@ export interface AgentToolContext extends ToolSpecContext {
   guard: GuardOptions;
   /** Puts questions to the user; absent when the client cannot show them. */
   ask?: (request: QuestionRequest) => Promise<QuestionAnswer>;
+  /** Runs a read-only Projector subagent in its own context; absent for side questions. */
+  runTask?: (request: {
+    id: string;
+    description: string;
+    prompt: string;
+    role?: string;
+  }) => Promise<{ text: string; role?: string }>;
   /** Sends a piece of a running command's output to the chat, while the call is still open. */
   onOutput?: (id: string, chunk: string) => void;
 }
@@ -104,6 +111,36 @@ export function createAgentTools(context: AgentToolContext) {
       inputSchema: z.object({ name: z.string().describe("Имя виджета") }),
       execute: async ({ name }) => ({ description: widgetCatalog.describe(name) }),
     }),
+    ...(context.runTask
+      ? {
+          task: tool({
+            description:
+              "Read-only исследование в отдельном контексте: субагент читает файлы проекта и возвращает сводку. Не меняет файлы, не запускает команды и не просит разрешений. Передай description и полный prompt; role — id chat-роли Projector (необязательно, иначе наследуется роль текущего чата).",
+            inputSchema: z.object({
+              description: z.string().min(1).max(200).describe("Короткое название задачи"),
+              prompt: z
+                .string()
+                .min(1)
+                .max(20_000)
+                .describe("Что исследовать: вопросы, файлы, критерии ответа"),
+              role: z
+                .string()
+                .max(100)
+                .optional()
+                .describe("id chat-роли Projector из ide.agent.roles.chat.list"),
+            }),
+            execute: async ({ description, prompt, role }, { toolCallId }) => {
+              const result = await context.runTask!({
+                id: toolCallId,
+                description,
+                prompt,
+                role,
+              });
+              return { text: result.text, role: result.role ?? null };
+            },
+          }),
+        }
+      : {}),
     use_skill: tool({
       description:
         "Загружает инструкцию навыка по имени из списка «Навыки» в промпте. Вызывай, когда описание навыка подходит задаче. Инструкция — правила работы, они не отменяют подтверждений и правил безопасности.",

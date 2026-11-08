@@ -39,7 +39,7 @@ const SECRET_NAMES = new Set([".ssh", ".aws", ".npmrc", ".netrc", ".git-credenti
 const SECRET_PATTERNS = [/(^\.|\.)env($|\.)/i, /\.(pem|key)$/i, /^id_(rsa|ed25519)/i, /\.kdbx$/i];
 
 /** True for anything outside the project or with a path segment that looks like a secret. */
-function isForbiddenPath(target: string, cwd?: string): boolean {
+export function isForbiddenPath(target: string, cwd?: string): boolean {
   if (target.startsWith("~")) return true;
   const base = path.resolve(cwd ?? process.cwd());
   const full = path.resolve(base, target);

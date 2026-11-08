@@ -4,12 +4,12 @@ import {
   defaultSettingsMiddleware,
   streamText,
   wrapLanguageModel,
-  type LanguageModel,
   type ModelMessage,
   type StepResult,
 } from "ai";
 import type { Project } from "../../projects/index.ts";
 import { createAgentTools } from "./agent-tools.ts";
+import { taskRunnerFor } from "./projector-task.ts";
 import { createSideTools, SIDE_LIMITS, sideAbort, sideSystem } from "./projector-side.ts";
 import { buildSystemPrompt } from "./prompts.ts";
 import { enabledFeatureText } from "../../agent-features/index.ts";
@@ -41,9 +41,9 @@ import { controls, THINKING, TRUST } from "./projector-controls.ts";
 import { toMessages, userMessage } from "./projector-history.ts";
 import {
   COMPACT_COMMAND,
+  compactChat,
   compactHistory,
   splitAtCompaction,
-  summarize,
   summarySection,
 } from "./projector-compaction.ts";
 
@@ -135,6 +135,13 @@ async function turn(
         ask: options.ask,
         secret: options.secret,
         guard,
+        runTask: taskRunnerFor({
+          cwd: options.cwd,
+          selection: options.selection,
+          role: options.role,
+          signal: options.abort,
+          emit: options.emit,
+        }),
         onOutput: (id, chunk) => options.emit("tool-output", { id, chunk }),
         onProject: (project) => {
           added.push(project);
@@ -144,7 +151,7 @@ async function turn(
 
   const earlier = splitAtCompaction(options.history ?? []);
   if (!side && options.message.trim() === COMPACT_COMMAND) {
-    await compactChat(quietModel, earlier, options, resolved);
+    await compactChat(quietModel, earlier, options, resolved, DEFAULT_CONTEXT_SIZE);
     return;
   }
   const skills = side ? [] : await listSkills(options.cwd);
@@ -350,31 +357,6 @@ async function turn(
   });
   if (!side)
     await runStopHooks(hooks, options.cwd, { seconds: (Date.now() - started) / 1000, text });
-}
-
-/** `/compact`: the answer is the summary of the whole chat, and what follows it builds on that. */
-async function compactChat(
-  model: LanguageModel,
-  earlier: ReturnType<typeof splitAtCompaction>,
-  options: AgentRunOptions,
-  resolved: { model: string; contextTokens?: number },
-): Promise<void> {
-  options.emit("status", { phase: "compacting" });
-  const summary = earlier.turns.length
-    ? await summarize(model, earlier.summary, earlier.turns, options.abort)
-    : earlier.summary;
-  if (!summary) {
-    options.emit("error", { error: "Пока нечего сжимать" });
-    return;
-  }
-  options.emit("text", { text: summary });
-  // The next request measures the real size; until then the ring shows about what the summary takes.
-  options.emit("context", {
-    used: Math.ceil((summary.length + 6_000) / 3),
-    size: resolved.contextTokens ?? DEFAULT_CONTEXT_SIZE,
-    model: resolved.model,
-  });
-  options.emit("done", { text: summary, added: [] });
 }
 
 /** The Projector IDE assistant on the active OpenAI-compatible provider. */
