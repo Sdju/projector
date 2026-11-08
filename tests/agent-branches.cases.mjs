@@ -249,6 +249,7 @@ test("the chat exports as markdown", () => {
 
 test("saved history keeps versions of a conversation", async () => {
   const dir = await mkdtemp(join(tmpdir(), "projector-branches-"));
+  const previous = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = dir;
   try {
     const head = {
@@ -262,7 +263,9 @@ test("saved history keeps versions of a conversation", async () => {
     expect(saved[0].slot).toBe(1);
   } finally {
     (await import("../packages/server/modules/agent/index.ts")).closeHistoryStore();
-    await rm(dir, { recursive: true, force: true });
+    if (previous === undefined) delete process.env.XDG_DATA_HOME;
+    else process.env.XDG_DATA_HOME = previous;
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
@@ -338,7 +341,7 @@ test("history store keeps a forked chat as a tree and rewrites only what changed
     closeHistoryStore();
     if (previous === undefined) delete process.env.XDG_DATA_HOME;
     else process.env.XDG_DATA_HOME = previous;
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
@@ -370,6 +373,6 @@ test("a chat saved as a JSON file by an earlier version moves into the database"
     closeHistoryStore();
     if (previous === undefined) delete process.env.XDG_DATA_HOME;
     else process.env.XDG_DATA_HOME = previous;
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });

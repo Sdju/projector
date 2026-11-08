@@ -119,6 +119,7 @@ await writeFile(
       name: "@projector/ide",
       description: "Projector web IDE, terminals and agents without GTK",
       bin: { projector: "./packages/cli/app/launch.mjs" },
+      scripts: { postinstall: "node ./packages/cli/app/fix-node-pty.mjs" },
       exports: { "./core/*": "./packages/core/*" },
       dependencies: await dependencies(["core", "server"], ["vite", "vite-plus"]),
     },

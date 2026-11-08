@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { expect, test } from "vite-plus/test";
 import "./helpers/builtins.mjs";
 import { handleApi } from "../packages/server/app/api.ts";
+import { closeHistoryStore } from "../packages/server/modules/agent/history-store.ts";
 
 async function withServer(run) {
   const directory = await mkdtemp(join(tmpdir(), "projector-roles-api-"));
@@ -20,7 +21,9 @@ async function withServer(run) {
   try {
     await run(origin);
   } finally {
+    server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
+    closeHistoryStore();
     if (previous === undefined) delete process.env.XDG_DATA_HOME;
     else process.env.XDG_DATA_HOME = previous;
     await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });

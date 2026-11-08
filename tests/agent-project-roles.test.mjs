@@ -105,6 +105,6 @@ test("trust is bound to the file hash and the trust file is private", async () =
 
   await writeFile(file, JSON.stringify({ version: 1, roles: [] }), "utf8");
   expect((await projectRoleState("p1")).trusted).toBe(false);
-  const trust = await readFile(projectRolesTrustFile(), "utf8");
-  expect(trust).toContain(await realpath(project));
+  const trust = JSON.parse(await readFile(projectRolesTrustFile(), "utf8"));
+  expect(trust.projects[await realpath(project)]).toMatchObject({ hash: expect.any(String) });
 });

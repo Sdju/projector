@@ -31,7 +31,7 @@
     "test:tree": "vp test run tests/tree-page.test.mjs tests/tree-pagination.test.mjs",
     "test:live": "PROJECTOR_TEST_DOCKER=1 PROJECTOR_TEST_DEVCONTAINER=1 vp test run --no-file-parallelism tests/environment-live.test.mjs tests/reconcile.test.mjs tests/devcontainer-live.test.mjs tests/sigkill-live.test.mjs",
     "check": "vp run build:prepare && vp test run && vp run --cache build:app",
-    "prepare": "node scripts/ensure-vite-plus-core.mjs && vp hooks enable",
+    "prepare": "node scripts/ensure-vite-plus-core.mjs && node packages/cli/app/fix-node-pty.mjs && vp hooks enable",
     "test:gtk": "node --import @zede/vio/register tests/native-palette.gtk.mjs",
     "bench:chat": "node scripts/bench-chat/run.mjs",
     "build:distribution": "vp run build && node scripts/build-distribution.mjs"

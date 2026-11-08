@@ -1,11 +1,13 @@
 import {
   closeSync,
+  copyFileSync,
   existsSync,
   mkdirSync,
   openSync,
   renameSync,
   rmSync,
   statSync,
+  truncateSync,
   writeSync,
 } from "node:fs";
 import { basename, dirname, join } from "node:path";
@@ -124,24 +126,51 @@ function reopenStandardStreams(file: string): void {
 }
 
 /**
+ * Ротирует открытый файл без закрытия стандартных потоков: копирует его в
+ * архив и обнуляет активный. Так `console.log` продолжает писать в тот же
+ * дескриптор, что и на Windows, где переименовать открытый файл нельзя.
+ */
+function rotateOpenLog(file: string, settings: LogRotationSettings): boolean {
+  const size = fileSize(file);
+  if (size === undefined || size < settings.maxBytes) return false;
+  mkdirSync(dirname(file), { recursive: true });
+  rmSync(`${file}.${settings.maxFiles}`, { force: true });
+  for (let index = settings.maxFiles - 1; index >= 1; index -= 1) {
+    const source = `${file}.${index}`;
+    if (existsSync(source)) renameSync(source, `${file}.${index + 1}`);
+  }
+  rmSync(`${file}.1`, { force: true });
+  copyFileSync(file, `${file}.1`);
+  truncateSync(file, 0);
+  return true;
+}
+
+/**
  * Ротирует файл, в который перенаправлены `stdout` и `stderr` самого процесса.
- * На POSIX файл можно переименовать открытым; на Windows сначала закрываются
- * унаследованные дескрипторы, затем выполняется повторная попытка.
+ * На POSIX файл можно переименовать открытым, а затем вернуть дескрипторы;
+ * на Windows открытый файл остаётся на месте, а его содержимое уходит в архив.
  */
 export function rotateStandardStreams(file: string, options: LogRotationOptions = {}): boolean {
   const settings = logRotationSettings(options);
   const size = fileSize(file);
   if (size === undefined || size < settings.maxBytes) return false;
-  // Close first: Windows cannot rename a file with an open handle, and POSIX
-  // reopens the same descriptor numbers after the rename.
-  closeStandardStreams();
   let rotated = false;
-  try {
-    rotated = rotateLog(file, settings);
-  } catch {
-    rotated = false;
+  if (process.platform === "win32") {
+    try {
+      rotated = rotateOpenLog(file, settings);
+    } catch {
+      rotated = false;
+    }
+  } else {
+    // Close first: POSIX reopens the same descriptor numbers after the rename.
+    closeStandardStreams();
+    try {
+      rotated = rotateLog(file, settings);
+    } catch {
+      rotated = false;
+    }
+    reopenStandardStreams(file);
   }
-  reopenStandardStreams(file);
   if (rotated) {
     try {
       writeSync(

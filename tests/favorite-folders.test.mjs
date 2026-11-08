@@ -54,7 +54,10 @@ test("favorite folders rank first and create projects", async () => {
   const diskless = await createLauncherClient(base).search("/", undefined, { disk: false });
   expect(diskless.items.some((item) => item.id.startsWith("potential:"))).toBe(false);
   await mkdir(join(work, "bundle-alpha-temp"));
-  expect((await searchLauncher("bapm")).items).toEqual([]);
+  // Installed applications may legitimately match the acronym; the folder under test must not.
+  expect(
+    (await searchLauncher("bapm")).items.filter((item) => item.id.startsWith("potential:")),
+  ).toEqual([]);
   const found = (await searchLauncher("alpha")).items;
   expect(found[0].id).toBe(`potential:${join(work, "alpha")}`);
   const opened = await launchItem(found[0].id, "open", true);

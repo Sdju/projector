@@ -19,10 +19,12 @@ test("IDE window helpers import and resolve without any native package or GTK lo
         throw Object.assign(new Error('Absent in IDE installation: ' + name), { code: 'MODULE_NOT_FOUND' });
       return next(name, context);
     }});
+    import { basename, dirname } from 'node:path';
     const { desktopArgs, nativeArgs, hasNativePalette } = await import(${JSON.stringify(module)});
     assert.equal(hasNativePalette(), false);
     assert.equal(nativeArgs().length, 1);
-    assert.match(nativeArgs()[0], /cli[\\/]app[\\/]desktop.mjs$/);
+    assert.equal(basename(nativeArgs()[0]), 'desktop.mjs');
+    assert.equal(basename(dirname(dirname(nativeArgs()[0]))), 'cli');
     assert.deepEqual(desktopArgs(), nativeArgs());
     console.log('no GTK');
   `,
