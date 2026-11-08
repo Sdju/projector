@@ -52,6 +52,7 @@ import { routes as projectActionsRoutes } from "../routes/api/projects/[id]/inde
 import { routes as ideKeybindingsRoutes } from "../routes/api/ide/keybindings.ts";
 import { routes as ideCommandsRoutes } from "../routes/api/ide/commands.ts";
 import { routes as editorSettingsRoutes } from "../routes/api/ide/editor.ts";
+import { routes as appearanceRoutes } from "../routes/api/appearance.ts";
 import { routes as filesExcludeRoutes } from "../routes/api/ide/files-exclude.ts";
 import { routes as dockerRoutes } from "../routes/api/docker.ts";
 import { routes as codexRoutes } from "../routes/api/codex.ts";
@@ -72,6 +73,7 @@ const dispatch = createRouteDispatcher([
   ...dockerRoutes,
   ...filesExcludeRoutes,
   ...editorSettingsRoutes,
+  ...appearanceRoutes,
   ...ideKeybindingsRoutes,
   ...ideCommandsRoutes,
   ...githubBrowseRoutes,

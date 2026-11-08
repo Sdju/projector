@@ -60,6 +60,14 @@
 - API, команды, состояния загрузки, popup focus policy и domain status mapping не входят в визуальные примитивы.
 - Сохраняйте native label, form, button и summary semantics. При переносе element ref используйте `.element` вместо Vue instance.
 
+## Цветовые схемы
+
+Токены темы живут в `packages/client/app/styles.css`. Тёмная схема — значения в `:root`, светлая — блок `[data-theme="light"]` в том же файле. Схема задаёт только 25 цветовых и теневых токенов и `color-scheme`; типографика, радиусы, отступы и слои общие. `--hover` и `--active` выводятся из `--text`, поэтому работают на любой яркости.
+
+Выбор хранится на диске в `appearance.json` (`$XDG_DATA_HOME/projector`), API — `GET/PUT /api/appearance`. Допустимые значения — в `@projector/core/modules/appearance`: `dark`, `light` и `auto` (следует за `prefers-color-scheme`). Перед первым кадром сервер подставляет значение в `data-appearance` у `<html>` (`serveStatic` в проде, Vite-плагин в разработке), а короткий inline-скрипт выставляет `data-theme` и `color-scheme`. Клиент обновляет `data-theme` и `<meta name="theme-color">` при смене схемы и при изменении системной темы.
+
+Компоненты не пишут цвета литералами. Если потребитель не умеет CSS (CodeMirror, xterm, canvas), он читает токены через `getComputedStyle` или получает отдельную группу токенов — но не дублирует палитру схемы.
+
 ## Проверки
 
 Короткие browser tests проверяют native ввод/IME/modifiers/form/ref и взаимодействие кнопок, связей label и pointer cleanup:

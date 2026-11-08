@@ -93,6 +93,40 @@
   --z-popover: 100;
 }
 
+/* Светлая схема: тёплые поверхности и приглушённые акценты того же характера. */
+[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #f7f6f1;
+  --bg-2: #efeee8;
+  --bg-3: #e5e3db;
+  --bg-4: #d9d6cb;
+  --bg-sunken: #fbfaf7;
+  --canvas: #eceae3;
+
+  --line: #d9d6cc;
+  --line-strong: #b6b2a6;
+
+  --text: #1d1d1a;
+  --text-2: #38382f;
+  --muted: #5e5e56;
+  --faint: #64645b;
+
+  --focus: #6d5f2c;
+  --accent: #6f5d24;
+  --run: #2f6b34;
+  --err: #a33b2c;
+  --warn: #795812;
+  --info: #276b93;
+  --search: #f2dfa0;
+
+  --selection: #cfcabc;
+  --overlay: #00000066;
+
+  --shadow-popover: 0 12px 32px #0000001f;
+  --shadow-modal: 0 18px 60px #0000002e;
+}
+
 * {
   box-sizing: border-box;
 }

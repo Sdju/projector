@@ -24,8 +24,9 @@ export const settingsSections: SettingsSection[] = [
     id: "interface",
     title: "Интерфейс",
     group: "Среда",
-    description: "Режим запуска и системная горячая клавиша.",
-    keywords: "окно браузер GTK трей хоткей shortcut запуск",
+    description: "Режим запуска, системная горячая клавиша и цветовая схема.",
+    keywords:
+      "окно браузер GTK трей хоткей shortcut запуск цвет тема схема светлая тёмная appearance",
     component: InterfaceSettings,
   },
   {

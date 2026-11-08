@@ -7,15 +7,30 @@ import UiChoiceGroup from "../../common/ui/UiChoiceGroup.vue";
 import UiChoiceRow from "../../common/ui/UiChoiceRow.vue";
 import UiInline from "../../common/ui/UiInline.vue";
 
-import { onMounted, ref, useId } from "vue";
+import { onMounted, ref, useId, computed } from "vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import UiHint from "../../common/ui/UiHint.vue";
+import {
+  appearanceOptions,
+  isAppearanceChoice,
+  type AppearanceChoice,
+} from "@projector/core/modules/appearance/index.ts";
+import { applyAppearance, currentAppearance } from "../appearance/index.ts";
 const shortcutId = useId();
+const appearanceId = useId();
 const mode = ref("native");
 const saved = ref("native");
 const shortcut = ref("Ctrl+Alt+Space");
 const savedShortcut = ref("Ctrl+Alt+Space");
 const hotkey = ref<{ supported: boolean; active: boolean; shortcut: string }>();
+const appearance = ref<AppearanceChoice>(currentAppearance());
+const savedAppearance = ref<AppearanceChoice>(appearance.value);
+const appearanceBusy = ref(true);
+const appearanceError = ref("");
+const appearanceStatus = ref("");
+const appearanceDescription = computed(
+  () => appearanceOptions.find((option) => option.id === appearance.value)?.description ?? "",
+);
 const error = ref("");
 const status = ref("");
 const ready = ref(false);
@@ -44,6 +59,7 @@ async function request(method: string, body?: object) {
   return data;
 }
 onMounted(async () => {
+  void loadAppearance();
   try {
     const data = await request("GET");
     mode.value = saved.value = data.mode;
@@ -54,6 +70,46 @@ onMounted(async () => {
     error.value = err instanceof Error ? err.message : "Не удалось загрузить настройки";
   }
 });
+async function loadAppearance() {
+  try {
+    const response = await fetch("/api/appearance");
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Не удалось загрузить схему");
+    if (isAppearanceChoice(data.choice)) appearance.value = data.choice;
+    savedAppearance.value = appearance.value;
+    applyAppearance(appearance.value);
+  } catch (err) {
+    appearanceError.value = err instanceof Error ? err.message : "Не удалось загрузить схему";
+  } finally {
+    appearanceBusy.value = false;
+  }
+}
+async function saveAppearance() {
+  const next = appearance.value;
+  if (next === savedAppearance.value) return;
+  const previous = savedAppearance.value;
+  appearanceBusy.value = true;
+  appearanceError.value = "";
+  appearanceStatus.value = "";
+  applyAppearance(next);
+  try {
+    const response = await fetch("/api/appearance", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ choice: next }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Не удалось сохранить схему");
+    savedAppearance.value = next;
+    appearanceStatus.value = "Схема сохранена";
+  } catch (err) {
+    appearance.value = previous;
+    applyAppearance(previous);
+    appearanceError.value = err instanceof Error ? err.message : "Не удалось сохранить схему";
+  } finally {
+    appearanceBusy.value = false;
+  }
+}
 async function save() {
   busy.value = true;
   error.value = "";
@@ -143,6 +199,26 @@ async function open() {
     <UiMessage v-if="error || status" role="status" :tone="error ? 'danger' : undefined">{{
       error || status
     }}</UiMessage>
+    <UiHeading as="h2" size="sm" :space-before="4">Оформление</UiHeading>
+    <UiLabel :for="appearanceId" :space-after="2">Цветовая схема</UiLabel>
+    <UiControl
+      as="select"
+      :id="appearanceId"
+      v-model="appearance"
+      :disabled="appearanceBusy"
+      @change="saveAppearance"
+    >
+      <option v-for="option in appearanceOptions" :key="option.id" :value="option.id">
+        {{ option.title }}
+      </option>
+    </UiControl>
+    <UiHint class="hint">{{ appearanceDescription }} Схема применяется сразу и сохраняется.</UiHint>
+    <UiMessage
+      v-if="appearanceError || appearanceStatus"
+      role="status"
+      :tone="appearanceError ? 'danger' : undefined"
+      >{{ appearanceError || appearanceStatus }}</UiMessage
+    >
   </section>
 </template>
 

@@ -1,11 +1,27 @@
 <!doctype html>
-<html lang="ru">
+<html lang="ru" data-appearance="__PROJECTOR_APPEARANCE__">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#171716" />
     <meta name="color-scheme" content="dark" />
+    <script>
+      // Runs before styles and the app: the server replaces the placeholder with the saved choice.
+      (() => {
+        const value = document.documentElement.dataset.appearance;
+        const choice = value === "auto" || value === "light" ? value : "dark";
+        const scheme =
+          choice === "auto"
+            ? matchMedia("(prefers-color-scheme: light)").matches
+              ? "light"
+              : "dark"
+            : choice;
+        document.documentElement.dataset.appearance = choice;
+        document.documentElement.dataset.theme = scheme;
+        document.querySelector('meta[name="color-scheme"]')?.setAttribute("content", scheme);
+      })();
+    </script>
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <meta name="mobile-web-app-capable" content="yes" />
