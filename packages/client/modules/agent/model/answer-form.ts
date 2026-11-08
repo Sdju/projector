@@ -23,13 +23,13 @@ function formHistory(turns: AgentTurn[]): string {
  * Forms already answered: a user turn with a snapshot always follows the answer it came from.
  * Pairing the neighbouring turns survives reloads, retries and edits of the snapshot.
  */
-export function answeredFormSources(turns: AgentTurn[]): Map<string, string> {
+export function answeredFormSources(turns: AgentTurn[], projectId?: string): Map<string, string> {
   const result = new Map<string, string>();
   for (let index = 0; index < turns.length - 1; index++) {
     const turn = turns[index];
     const next = turns[index + 1];
     if (turn.role !== "assistant" || next.role !== "user" || !next.form) continue;
-    const source = answerFormSource(turn.text);
+    const source = answerFormSource(turn.text, projectId);
     if (source) result.set(turn.id, source);
   }
   return result;
@@ -54,17 +54,19 @@ export function useAnswerForm(options: {
     options?: { auto?: string; form?: AgentFormAnswer },
   ) => Promise<void>;
   edit: (id: string) => void;
+  /** The project whose trusted widgets may own the answer form. */
+  projectId?: string;
 }) {
   const rawForm = computed(() => {
     if (options.busy.value) return undefined;
     const last = options.turns.value.at(-1);
-    return last?.role === "assistant" ? answerFormSource(last.text) : undefined;
+    return last?.role === "assistant" ? answerFormSource(last.text, options.projectId) : undefined;
   });
   const pendingForm = shallowRef<string>();
   /** What the answer actually contains: the message hides this block while the composer shows a form. */
   const originalForm = shallowRef<string>();
   /** A sent form is shown by the user's snapshot only: the answer must not offer it again. */
-  const answeredForms = computed(() => answeredFormSources(options.turns.value));
+  const answeredForms = computed(() => answeredFormSources(options.turns.value, options.projectId));
   /** What this answer must hide: the composer owns the active form, the snapshot owns the sent one. */
   function answerFormFor(turn: AgentTurn): { promotedForm?: string; formAnswered?: boolean } {
     if (turn.role !== "assistant") return {};
@@ -88,7 +90,7 @@ export function useAnswerForm(options: {
     repairError.value = "";
     if (!source) return;
     let candidate = heuristicFormRepair(source);
-    let problem = await formProblem(candidate);
+    let problem = await formProblem(candidate, options.projectId);
     if (run !== generation) return;
     if (!problem) {
       pendingForm.value = candidate;
@@ -107,13 +109,13 @@ export function useAnswerForm(options: {
           signal: next.signal,
         });
         if (run !== generation || next.signal.aborted) return;
-        const extracted = doctorFormSource(answer);
+        const extracted = doctorFormSource(answer, options.projectId);
         if (!extracted) {
           problem = "Form Doctor вернул не форму";
           continue;
         }
         candidate = heuristicFormRepair(extracted);
-        problem = await formProblem(candidate);
+        problem = await formProblem(candidate, options.projectId);
         if (run !== generation || next.signal.aborted) return;
         if (!problem) {
           pendingForm.value = candidate;

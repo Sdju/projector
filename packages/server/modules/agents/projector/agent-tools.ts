@@ -18,9 +18,12 @@ import { fetchPage, PAGE_CHARS } from "./projector-web.ts";
 import { findSkill, listSkills, type Skill } from "./projector-skills.ts";
 import { webSearch } from "./projector-web-search.ts";
 import { widgetCatalog } from "./widgets.ts";
+import { trustedProjectWidgets } from "../../project-widgets/index.ts";
 
 export interface AgentToolContext extends ToolSpecContext {
   cwd?: string;
+  /** The project whose trusted widgets `describe_widget` may describe. */
+  projectId?: string;
   signal?: AbortSignal;
   guard: GuardOptions;
   /** Puts questions to the user; absent when the client cannot show them. */
@@ -109,9 +112,11 @@ export function createAgentTools(context: AgentToolContext) {
     }),
     describe_widget: tool({
       description:
-        "Полное описание виджета: свойства, ограничения и пример. Для специальных виджетов обязательно вызывай перед первым использованием; для обычных описание уже есть в промпте.",
+        "Полное описание виджета: свойства, ограничения и пример. Для специальных виджетов и виджетов проекта обязательно вызывай перед первым использованием; для обычных описание уже есть в промпте.",
       inputSchema: z.object({ name: z.string().describe("Имя виджета") }),
-      execute: async ({ name }) => ({ description: widgetCatalog.describe(name) }),
+      execute: async ({ name }) => ({
+        description: widgetCatalog.describe(name, await trustedProjectWidgets(context.projectId)),
+      }),
     }),
     ...(context.runTask
       ? {

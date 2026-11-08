@@ -100,7 +100,7 @@ export default {
             plan: "Вынести чтение файлов и ассетов GitLab в отдельный files.ts",
           },
           "packages/client/modules/agent/ui/AgentChat.vue": {
-            ceiling: 507,
+            ceiling: 505,
             plan: "Вынести панель инструментов чата и действия с сообщениями в отдельные composables; чат оставить композицией.",
           },
         },

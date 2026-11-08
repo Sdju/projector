@@ -10,19 +10,19 @@ export interface WidgetsMcpServer {
   env: Record<string, string>;
 }
 
-/** The stdio MCP server every external agent can start to read the special-widget catalogue. */
-export function widgetsMcpServer(): WidgetsMcpServer {
+/** The stdio MCP server every external agent can start to read the widget catalogue. */
+export function widgetsMcpServer(projectId?: string): WidgetsMcpServer {
   return {
     name: WIDGETS_MCP_SERVER,
     command: process.execPath,
     args: [fileURLToPath(new URL("../../../app/widgets-mcp.ts", import.meta.url))],
-    env: {},
+    env: projectId ? { PROJECTOR_PROJECT_ID: projectId } : {},
   };
 }
 
 /** The Claude Agent SDK takes a server object inline with the same fields. */
-export function claudeWidgetsMcpServer() {
-  const server = widgetsMcpServer();
+export function claudeWidgetsMcpServer(projectId?: string) {
+  const server = widgetsMcpServer(projectId);
   return {
     type: "stdio" as const,
     command: server.command,
@@ -34,8 +34,8 @@ export function claudeWidgetsMcpServer() {
 }
 
 /** ACP passes environment variables as a list of names and values. */
-export function acpWidgetsMcpServer() {
-  const server = widgetsMcpServer();
+export function acpWidgetsMcpServer(projectId?: string) {
+  const server = widgetsMcpServer(projectId);
   return {
     name: server.name,
     command: server.command,

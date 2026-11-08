@@ -289,7 +289,7 @@ export function useExternalAgent(
     try {
       if (external) {
         const turns = await loadSessionTurns(backend, projectId, id);
-        restoreFormAnswers(turns);
+        await restoreFormAnswers(turns, projectId);
         state.turns = turns;
         persist();
       } else {

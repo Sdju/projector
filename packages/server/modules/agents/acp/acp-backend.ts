@@ -4,6 +4,8 @@ import { featureEnabled, featurePrompt } from "../../agent-features/index.ts";
 import { acpIdeMcpServer } from "../ide-mcp/index.ts";
 import { acpWidgetsMcpServer } from "../widgets-mcp/index.ts";
 import { roleContext } from "../../agent-roles/index.ts";
+import { trustedProjectWidgets } from "../../project-widgets/index.ts";
+import { renderWidgetGuide } from "@projector/core/modules/widget-catalog/index.ts";
 import type {
   AgentBackend,
   AgentBackendId,
@@ -21,7 +23,7 @@ export { sessionMcpServers } from "./mcp-config.ts";
 import { elicitForm } from "./acp-elicitation.ts";
 import { type AcpConnection, type AcpError, NO_TIMEOUT } from "./acp-client.ts";
 import { applySelection, controlsFromSession, shownModel } from "./acp-controls.ts";
-import { contentText, createAcpEventMapper } from "./acp-events.ts";
+import { contentText, createAcpEventMapper, stopReasonError } from "./acp-events.ts";
 import { acpAdvertisedDelete, initializeAcp, startAcp } from "./acp-process.ts";
 import {
   acpCommands,
@@ -37,13 +39,6 @@ import { pathToFileURL } from "node:url";
 interface PermissionOption {
   optionId?: string;
   kind?: string;
-}
-
-function stopReasonError(stopReason: unknown): string {
-  if (stopReason === "max_tokens") return "Достигнут лимит ответа агента";
-  if (stopReason === "max_turn_requests") return "Достигнут лимит шагов агента";
-  if (stopReason === "refusal") return "Агент отказался выполнять запрос";
-  return "Агент завершился с ошибкой";
 }
 
 /**
@@ -157,9 +152,13 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
       featureEnabled(id, "widgets", options.features),
       roleContext(options.role, options.cwd),
     ]);
+    const projectWidgets = widgetsEnabled ? await trustedProjectWidgets(options.projectId) : [];
+    const extraPrompt = [roleText, projectWidgets.length ? renderWidgetGuide(projectWidgets) : ""]
+      .filter(Boolean)
+      .join("\n\n");
     const extraMcp = [
       ...(options.projectId && ideEnabled ? [acpIdeMcpServer(options.projectId)] : []),
-      ...(widgetsEnabled ? [acpWidgetsMcpServer()] : []),
+      ...(widgetsEnabled ? [acpWidgetsMcpServer(options.projectId)] : []),
       ...(options.role?.mcp
         ? await userMcpServers(
             options.cwd,
@@ -203,7 +202,7 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
       : promptWithHistory(
           options.message,
           options.history ?? [],
-          await featurePrompt(id, options.features, roleText),
+          await featurePrompt(id, options.features, extraPrompt),
         );
     const result = (await connection.request(
       "session/prompt",

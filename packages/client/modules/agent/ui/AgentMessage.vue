@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, toRef } from "vue";
+import { computed, ref, toRef, watch } from "vue";
 import AgentMarkdown from "./AgentMarkdown.vue";
 import {
   AgentWidget,
+  ensureProjectWidgets,
   isWidgetName,
+  projectWidgetsVersion,
   splitMessage,
   useMessageScope,
 } from "../../widget-runtime/index.ts";
@@ -14,11 +16,22 @@ const props = defineProps<{
   promoted?: string;
   /** The promoted form was already sent: the user's snapshot below shows it. */
   answered?: boolean;
+  /** The project whose trusted widgets this answer may use. */
+  projectId?: string;
 }>();
-// Text only grows, so earlier parts keep their position and source: Vue patches only the tail.
-const parts = computed(() =>
-  splitMessage(props.text, { known: isWidgetName, streaming: props.streaming }),
+watch(
+  () => props.projectId,
+  (projectId) => void ensureProjectWidgets(projectId),
+  { immediate: true },
 );
+// Text only grows, so earlier parts keep their position and source: Vue patches only the tail.
+const parts = computed(() => {
+  void projectWidgetsVersion.value;
+  return splitMessage(props.text, {
+    known: (name) => isWidgetName(name, props.projectId),
+    streaming: props.streaming,
+  });
+});
 // The message's own `<script>`s run once into a scope its components share.
 const scriptErrors = ref<string[]>([]);
 useMessageScope(
@@ -45,6 +58,7 @@ useMessageScope(
         v-else-if="part.type === 'widget'"
         :source="part.source"
         :complete="part.complete"
+        :project-id="projectId"
       />
     </template>
     <p v-for="error in scriptErrors" :key="error" class="script-error" role="alert">{{ error }}</p>

@@ -31,7 +31,7 @@ import { saveChat } from "./save-chat.ts";
 import { useExternalAgent } from "./external.ts";
 import { applyAgentEvent, markAnswerFailed, resetAnswer } from "./turn-events.ts";
 import { hasChips, messageText, normalizeParts } from "../lib/message-parts.ts";
-import { restoreFormAnswers } from "./form-reply.ts";
+import { restoreFormSnapshot } from "./form-reply.ts";
 import { userTurnOf } from "./user-turn.ts";
 import { applyRoleSnapshot } from "./role-apply.ts";
 import { sessionIdOf, tailOf } from "./session-tail.ts";
@@ -85,7 +85,7 @@ export function useAgent(
   const persist = () =>
     saveChat(key, historyUrl, state, projectId ? { project: projectId, backend } : undefined);
   // A native session keeps only the text: a saved external chat may still miss its form snapshot.
-  if (!own) void ready.then(() => restoreFormAnswers(state.turns) > 0 && persist());
+  if (!own) void ready.then(() => restoreFormSnapshot(state.turns, projectId, persist));
   /** The agent's own transcript still has an answer the page never received. */
   const recover = (turn: AgentTurn | undefined) =>
     recoverTurn(state.turns, turn, (id) => loadSessionTurns(backend, projectId, id), persist);

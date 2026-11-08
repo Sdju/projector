@@ -20,6 +20,8 @@ import { claudeIdeMcpServer, IDE_MCP_SERVER } from "../ide-mcp/index.ts";
 import { claudeWidgetsMcpServer, WIDGETS_MCP_SERVER } from "../widgets-mcp/index.ts";
 import { mcpConfigsForNames, mcpServerConfigs, processMcpConfig } from "../../agent-mcp/index.ts";
 import { roleContext } from "../../agent-roles/index.ts";
+import { trustedProjectWidgets } from "../../project-widgets/index.ts";
+import { renderWidgetGuide } from "@projector/core/modules/widget-catalog/index.ts";
 import type {
   Options,
   SDKControlGetContextUsageResponse as ContextUsage,
@@ -87,8 +89,9 @@ async function run(options: AgentRunOptions): Promise<void> {
 export async function claudeSystemPrompt(
   features?: string[],
   role = "",
+  projectWidgets = "",
 ): Promise<Options["systemPrompt"]> {
-  const text = [role.trim(), await featurePrompt("claude-code", features)]
+  const text = [role.trim(), await featurePrompt("claude-code", features), projectWidgets.trim()]
     .filter(Boolean)
     .join("\n\n");
   return {
@@ -127,11 +130,12 @@ export async function runClaudeCode(options: AgentRunOptions): Promise<void> {
     featureEnabled("claude-code", "widgets", options.features),
     roleContext(options.role, cwd),
   ]);
+  const projectWidgets = widgetsEnabled ? await trustedProjectWidgets(options.projectId) : [];
   const extraMcp = {
     ...(options.projectId && ideEnabled
       ? { [IDE_MCP_SERVER]: claudeIdeMcpServer(options.projectId) }
       : {}),
-    ...(widgetsEnabled ? { [WIDGETS_MCP_SERVER]: claudeWidgetsMcpServer() } : {}),
+    ...(widgetsEnabled ? { [WIDGETS_MCP_SERVER]: claudeWidgetsMcpServer(options.projectId) } : {}),
   };
   // A role with its own MCP list gets exactly those servers: Claude Code must not add the rest.
   const namedMcp = options.role?.mcp
@@ -152,7 +156,11 @@ export async function runClaudeCode(options: AgentRunOptions): Promise<void> {
     // A background subagent streams no calls of its own: its progress arrives as these summaries.
     agentProgressSummaries: true,
     settingSources: ["user", "project", "local"],
-    systemPrompt: await claudeSystemPrompt(options.features, roleText),
+    systemPrompt: await claudeSystemPrompt(
+      options.features,
+      roleText,
+      projectWidgets.length ? renderWidgetGuide(projectWidgets) : "",
+    ),
     ...(widgetsEnabled ? { allowedTools: [`mcp__${WIDGETS_MCP_SERVER}__describe_widget`] } : {}),
     permissionMode: mode,
     // Files are backed up before the agent changes them, so a step can be taken back later.

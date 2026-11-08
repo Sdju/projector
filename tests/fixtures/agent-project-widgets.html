@@ -1,0 +1,41 @@
+<!doctype html>
+<link rel="icon" href="data:," />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<div id="fixture"></div>
+<script type="module">
+  import "/packages/client/app/styles.css";
+  import { createApp, h, ref } from "vue";
+  import AgentMessage from "/packages/client/modules/agent/ui/AgentMessage.vue";
+  import { chatProjectKey } from "/packages/client/modules/chat-images/index.ts";
+  import { widgetReplyKey } from "/packages/client/modules/widget-runtime/index.ts";
+  import { registerBuiltinWidgets } from "/packages/client/app/widgets.ts";
+  registerBuiltinWidgets();
+  const text = ref("");
+  const streaming = ref(true);
+  const projectId = ref("p");
+  const replies = [];
+  const app = createApp({
+    setup: () => () =>
+      h("div", { style: "padding: 24px; max-width: 760px" }, [
+        h(AgentMessage, {
+          text: text.value,
+          streaming: streaming.value,
+          projectId: projectId.value,
+        }),
+      ]),
+  });
+  app.provide(widgetReplyKey, (message) => replies.push(message));
+  app.provide(chatProjectKey, "p");
+  app.mount("#fixture");
+  window.fixture = {
+    ready: true,
+    replies,
+    set(value, live = true) {
+      text.value = value;
+      streaming.value = live;
+    },
+    project(value) {
+      projectId.value = value;
+    },
+  };
+</script>

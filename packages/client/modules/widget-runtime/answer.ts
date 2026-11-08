@@ -1,4 +1,4 @@
-import { isWidgetName, widgetCatalog } from "./registry.ts";
+import { answerWidgetNames, isWidgetName } from "./registry.ts";
 import { splitMessage } from "./split.ts";
 
 const opens = (name: string) => new RegExp(`<${name}(?=[\\s/>])`);
@@ -8,13 +8,13 @@ const opens = (name: string) => new RegExp(`<${name}(?=[\\s/>])`);
  * last meaningful block can be answered counts: a form in the middle of a report stays a report.
  * A layout around the form (`<Card><Form>…`) is kept as it is, so its title and hint survive.
  */
-export function answerFormSource(text: string): string | undefined {
-  const names = widgetCatalog
-    .list()
-    .filter((definition) => definition.answer)
-    .map((definition) => definition.name);
+export function answerFormSource(text: string, projectId?: string): string | undefined {
+  const names = answerWidgetNames(projectId);
   if (!names.length) return undefined;
-  const parts = splitMessage(text, { known: isWidgetName, streaming: false });
+  const parts = splitMessage(text, {
+    known: (name) => isWidgetName(name, projectId),
+    streaming: false,
+  });
   const last = parts
     .filter((part) => part.type !== "script" && (part.type !== "markdown" || part.text.trim()))
     .at(-1);

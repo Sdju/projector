@@ -162,9 +162,6 @@ onMounted(() => {
 let shownUsage: Map<string, ChatUsage> | undefined;
 const chatUsage = computed(() => (shownUsage = chatUsageByTurn(turns.value, shownUsage)));
 const latestContext = computed(() => turns.value.findLast((turn) => turn.context)?.context);
-const activeSession = computed(
-  () => turns.value.findLast((turn) => turn.role === "assistant")?.session?.id,
-);
 const side = useSideQuestion({
   chat: chatKey,
   projectId: props.projectId,
@@ -272,8 +269,9 @@ const { pendingForm, answerFormFor, submitComposerForm, submitTurnForm } = useAn
   selection,
   send,
   edit,
+  projectId: props.projectId,
 });
-useAnswerDoctor({ turns, busy, selection, persist });
+useAnswerDoctor({ turns, busy, selection, persist, projectId: props.projectId });
 const plan = computed(() => shownPlan(turns.value, props.backend));
 const contextShare = computed(() =>
   latestContext.value ? latestContext.value.used / Math.max(1, latestContext.value.size) : 0,
@@ -536,7 +534,7 @@ onBeforeUnmount(() => {
         :loading="sessionsLoading"
         :error="sessionsError"
         :disabled="busy"
-        :active="activeSession"
+        :active="turns.findLast((turn) => turn.role === 'assistant')?.session?.id"
         :editable="!plain || capabilities.editSessions"
         :deletable="!plain || capabilities.deleteSessions"
         :recent="recentChats"
@@ -629,6 +627,7 @@ onBeforeUnmount(() => {
           :chat-usage="chatUsage.get(turn.id)"
           :faded="editFrom >= 0 && firstShown + offset >= editFrom"
           :root="projectRoot"
+          :project-id="projectId"
           :can-revert="canRevert(turn.id)"
           :promoted-form="answerFormFor(turn).promotedForm"
           :form-answered="answerFormFor(turn).formAnswered"

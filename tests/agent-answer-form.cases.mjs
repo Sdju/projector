@@ -66,12 +66,12 @@ test("the chat gives each answer its own form state", () => {
   scope.stop();
 });
 
-test("a native session restores the form snapshot from the reply", () => {
+test("a native session restores the form snapshot from the reply", async () => {
   const turns = [
     turn("a1", "assistant", `Готово\n\n${form}`),
     turn("u1", "user", 'Проверка\n\n```json\n{\n  "next": "да"\n}\n```'),
   ];
-  restoreFormAnswers(turns);
+  await restoreFormAnswers(turns);
   expect(turns[1].form).toEqual({
     source: form,
     values: { next: "да" },
@@ -79,20 +79,20 @@ test("a native session restores the form snapshot from the reply", () => {
   });
 });
 
-test("a JSON block with other keys does not become a form", () => {
+test("a JSON block with other keys does not become a form", async () => {
   const turns = [
     turn("a1", "assistant", `Готово\n\n${form}`),
     turn("u1", "user", '```json\n{"other": 1}\n```'),
   ];
-  expect(restoreFormAnswers(turns)).toBe(0);
+  expect(await restoreFormAnswers(turns)).toBe(0);
   expect(turns[1].form).toBeUndefined();
 });
 
-test("a JSON block without an answer form stays text", () => {
+test("a JSON block without an answer form stays text", async () => {
   const turns = [
     turn("a1", "assistant", "Просто текст"),
     turn("u1", "user", '```json\n{"next": "да"}\n```'),
   ];
-  expect(restoreFormAnswers(turns)).toBe(0);
+  expect(await restoreFormAnswers(turns)).toBe(0);
   expect(turns[1].form).toBeUndefined();
 });

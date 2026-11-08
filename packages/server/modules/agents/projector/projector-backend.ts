@@ -12,7 +12,7 @@ import { createAgentTools } from "./agent-tools.ts";
 import { taskRunnerFor } from "./projector-task.ts";
 import { createSideTools, SIDE_LIMITS, sideAbort, sideSystem } from "./projector-side.ts";
 import { buildSystemPrompt } from "./prompts.ts";
-import { enabledFeatureText } from "../../agent-features/index.ts";
+import { enabledFeatureText, featureEnabled } from "../../agent-features/index.ts";
 import {
   createQwenOpenAI,
   envFallbackFromProcess,
@@ -47,6 +47,8 @@ import {
   summarySection,
 } from "./projector-compaction.ts";
 import { rolePromptText } from "../../agent-roles/index.ts";
+import { trustedProjectWidgets } from "../../project-widgets/index.ts";
+import { widgetCatalog } from "./widgets.ts";
 
 /** The window of a model that has none registered in the provider settings; the context ring is measured against it. */
 const DEFAULT_CONTEXT_SIZE = Number(process.env.PROJECTOR_AGENT_CONTEXT_TOKENS) || 128_000;
@@ -124,6 +126,10 @@ async function turn(
       mode === "auto" ? createBashReviewer(quietModel, options.cwd, options.abort) : undefined,
   };
   const skills = side ? [] : skillsForRole(await listSkills(options.cwd), options.role?.skills);
+  const projectWidgets =
+    side || !(await featureEnabled("projector", "widgets", options.features))
+      ? []
+      : await trustedProjectWidgets(options.projectId);
   const own = side
     ? createSideTools({
         commands: options.commands,
@@ -132,6 +138,7 @@ async function turn(
       })
     : createAgentTools({
         cwd: options.cwd,
+        projectId: options.projectId,
         commands: options.commands,
         signal: options.abort,
         ask: options.ask,
@@ -201,7 +208,10 @@ async function turn(
 
   const system = side
     ? sideSystem(options.cwd, summary)
-    : buildSystemPrompt(await enabledFeatureText("projector", options.features)) +
+    : buildSystemPrompt(
+        (await enabledFeatureText("projector", options.features)) +
+          (projectWidgets.length ? `\n\n${widgetCatalog.extraGuide(projectWidgets)}` : ""),
+      ) +
       (options.cwd ? `\nТекущий проект: ${options.cwd}` : "") +
       (await projectInstructions(options.cwd)) +
       (await memorySection(options.cwd)) +

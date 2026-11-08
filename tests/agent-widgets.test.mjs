@@ -115,6 +115,49 @@ test("autoClose turns a half-written component into one that compiles", async ()
   });
 });
 
+test("project widgets are scoped and can own the answer form", async () => {
+  const { registerProjectWidgets, clearProjectWidgets, isWidgetName } =
+    await import("../packages/client/modules/widget-runtime/registry.ts");
+  const { answerFormSource } = await import("../packages/client/modules/widget-runtime/answer.ts");
+  const definition = {
+    name: "ProjectForm",
+    group: "project",
+    summary: "форма проекта",
+    answer: true,
+    template: "<div />",
+    example: "<ProjectForm />",
+  };
+  registerProjectWidgets("p1", {
+    ProjectForm: { definition, component: { render: () => null } },
+  });
+  expect(isWidgetName("ProjectForm", "p1")).toBe(true);
+  expect(isWidgetName("ProjectForm", "p2")).toBe(false);
+  expect(answerFormSource("<ProjectForm />", "p1")).toBe("<ProjectForm />");
+  expect(answerFormSource("<ProjectForm />", "p2")).toBeUndefined();
+  clearProjectWidgets("p1");
+  expect(isWidgetName("ProjectForm", "p1")).toBe(false);
+});
+
+test("a project form compiles its own template for the composer", async () => {
+  const { registerProjectWidgets, clearProjectWidgets } =
+    await import("../packages/client/modules/widget-runtime/registry.ts");
+  const { formProblem } = await import("../packages/client/modules/widget-runtime/repair.ts");
+  const definition = {
+    name: "ProjectForm",
+    group: "project",
+    summary: "форма проекта",
+    answer: true,
+    template: '<IntelligentForm><Input name="note" label="Заметка" /></IntelligentForm>',
+    example: "<ProjectForm />",
+  };
+  registerProjectWidgets("p1", {
+    ProjectForm: { definition, component: { render: () => null } },
+  });
+  expect(await formProblem("<ProjectForm />", "p1")).toBeUndefined();
+  expect(await formProblem("<ProjectForm />", "p2")).toContain("Неизвестный компонент");
+  clearProjectWidgets("p1");
+});
+
 test("a form can be the next answer only as the last block of a finished message", async () => {
   const { defineWidget } = await import("../packages/core/modules/widget-catalog/index.ts");
   const { formWidget } = await import("../packages/core/modules/agent-widgets/form/index.ts");
@@ -182,6 +225,17 @@ test("Form Doctor heuristics fix duplicate attributes and validate the result", 
   const answer = `<IntelligentForm><Input name="next" /></IntelligentForm>`;
   expect(doctorFormSource(`Вот исправление:\n\n\`\`\`vue\n${answer}\n\`\`\``)).toBe(answer);
   expect(doctorFormSource("<IntelligentForm>не закрыта")).toBeUndefined();
+});
+
+test("the reserved project-widget names match the built-in catalogue", async () => {
+  const { BUILTIN_WIDGET_NAMES } = await import("../packages/core/modules/widget-catalog/index.ts");
+  const { widgetCatalog } = await import("../packages/server/modules/agents/projector/index.ts");
+  expect(
+    widgetCatalog
+      .list()
+      .map((widget) => widget.name)
+      .sort(),
+  ).toEqual([...BUILTIN_WIDGET_NAMES].sort());
 });
 
 test("the catalog's guide is made from the definitions and covers every registered component", async () => {

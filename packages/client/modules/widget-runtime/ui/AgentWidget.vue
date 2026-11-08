@@ -12,14 +12,14 @@ import { createWidgetHost } from "../host.ts";
 import { registeredWidgets } from "../registry.ts";
 import { messageScopeKey } from "../scope.ts";
 
-const props = defineProps<{ source: string; complete: boolean }>();
+const props = defineProps<{ source: string; complete: boolean; projectId?: string }>();
 const render = shallowRef<RenderFn>();
 const script = shallowRef<ScriptFn>();
 const failure = shallowRef("");
 /** A different message in the same place gets a fresh host; a longer one keeps it. */
 const generation = ref(0);
 const Host = createWidgetHost({
-  components: registeredWidgets(),
+  components: registeredWidgets(props.projectId),
   render,
   script,
   strict: toRef(props, "complete"),
@@ -101,6 +101,14 @@ onErrorCaptured((error) => {
   height: 56px;
   border: 1px dashed var(--line);
   border-radius: var(--r-md);
+}
+.widget :deep(.project-widget-loading) {
+  color: var(--muted);
+  font-size: var(--fs-2xs);
+}
+.widget :deep(.project-widget-failure) {
+  color: var(--err);
+  font-size: var(--fs-xs);
 }
 .widget-failure {
   color: var(--err);

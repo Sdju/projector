@@ -59,6 +59,87 @@ const message = `## Квартал в цифрах
 Готово.`;
 
 test.concurrent(
+  "project widgets render their own data and disappear in another project",
+  { skip: !chromium, timeout: 30000, retry: 1 },
+  async ({ onTestFinished }) => {
+    const html = await readFile(
+      new URL("./fixtures/agent-project-widgets.html", import.meta.url),
+      "utf8",
+    );
+    const widget = {
+      name: "ModelMetrics",
+      group: "project",
+      summary: "метрики модели",
+      props: { model: { type: "string", description: "имя модели", required: true } },
+      data: { metrics: "metrics.json" },
+      refresh: 5,
+      styles: ".value { color: rgb(1, 2, 3) }",
+      template:
+        '<Card :title="model"><Stat class="value" label="Скорость" :value="data.metrics?.speed ?? 0" /></Card>',
+      example: '<ModelMetrics model="gpt-5" />',
+    };
+    const fixture = await createBrowserFixture({
+      pages: { "/widgets": html },
+      responses: [
+        {
+          startsWith: "/api/agent/project-widgets/data",
+          type: "application/json",
+          body: JSON.stringify({ data: { metrics: { speed: 42 } }, errors: {} }),
+        },
+        {
+          startsWith: "/api/agent/project-widgets?projectId=p2",
+          type: "application/json",
+          body: JSON.stringify({
+            projectId: "p2",
+            path: "/p2",
+            file: "/p2/.projector/widgets.json",
+            exists: false,
+            trusted: false,
+            widgets: [],
+          }),
+        },
+        {
+          startsWith: "/api/agent/project-widgets?projectId=p",
+          type: "application/json",
+          body: JSON.stringify({
+            projectId: "p",
+            path: "/p",
+            file: "/p/.projector/widgets.json",
+            exists: true,
+            trusted: true,
+            widgets: [widget],
+          }),
+        },
+      ],
+    });
+    onTestFinished(() => fixture.close());
+    const browser = await createChromium(fixture.directory);
+    onTestFinished(() => browser.close());
+    await browser.open(fixture.url("/widgets"));
+    await browser.viewport(700, 500);
+    const wait = async (expression, ms = 8000) => {
+      for (let waited = 0; waited < ms; waited += 50) {
+        if (await browser.evaluate(expression)) return;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      expect(await browser.evaluate(expression)).toBeTruthy();
+    };
+
+    await browser.evaluate('window.fixture.set(`<ModelMetrics model="gpt-5" />`, false)');
+    await wait('document.querySelector(".project-widget .stat .value")?.textContent === "42"');
+    expect(
+      await browser.evaluate(
+        'getComputedStyle(document.querySelector(".project-widget .value")).color',
+      ),
+    ).toBe("rgb(1, 2, 3)");
+
+    await browser.evaluate('window.fixture.project("p2")');
+    await wait('document.querySelector(".project-widget") === null');
+    expect(await browser.evaluate("document.querySelector('.stat') === null")).toBe(true);
+  },
+);
+
+test.concurrent(
   "the composer owns the submit button of an IntelligentForm",
   { skip: !chromium, timeout: 30000, retry: 1 },
   async ({ onTestFinished }) => {

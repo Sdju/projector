@@ -5,14 +5,18 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { registerBuiltinWidgetDefinitions } from "./widgets.ts";
 import { widgetCatalog } from "../modules/agents/projector/index.ts";
+import { trustedProjectWidgets } from "../modules/project-widgets/index.ts";
 
 registerBuiltinWidgetDefinitions();
+
+const projectId = process.env.PROJECTOR_PROJECT_ID?.trim() ?? "";
+const projectWidgets = await trustedProjectWidgets(projectId);
 
 const server = new McpServer(
   { name: "projector-widgets", version: "1" },
   {
     instructions:
-      "Полные описания виджетов Projector. Для виджета из раздела «Специальные виджеты» вызови describe_widget перед первым использованием; обычные уже описаны в промпте.",
+      "Полные описания виджетов Projector. Для виджетов из разделов «Специальные виджеты» и «Виджеты проекта» вызывай describe_widget перед первым использованием; обычные уже описаны в промпте.",
   },
 );
 
@@ -25,7 +29,9 @@ server.registerTool(
   },
   async ({ name }) => {
     try {
-      return { content: [{ type: "text" as const, text: widgetCatalog.describe(name) }] };
+      return {
+        content: [{ type: "text" as const, text: widgetCatalog.describe(name, projectWidgets) }],
+      };
     } catch (error) {
       return {
         isError: true,

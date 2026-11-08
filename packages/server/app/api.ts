@@ -32,6 +32,7 @@ import { routes as agentFeaturesRoutes } from "../routes/api/agent-features.ts";
 import { routes as agentJudgeRoutes } from "../routes/api/agent-judge.ts";
 import { routes as agentRolesRoutes } from "../routes/api/agent-roles.ts";
 import { routes as agentProjectRolesRoutes } from "../routes/api/agent-project-roles.ts";
+import { routes as agentProjectWidgetsRoutes } from "../routes/api/agent-project-widgets.ts";
 import { routes as agentWebRoutes } from "../routes/api/agent-web.ts";
 import { routes as agentMcpRoutes } from "../routes/api/agent-mcp.ts";
 import { routes as agentHooksRoutes } from "../routes/api/agent-hooks.ts";
@@ -102,6 +103,7 @@ const dispatch = createRouteDispatcher([
   ...agentJudgeRoutes,
   ...agentRolesRoutes,
   ...agentProjectRolesRoutes,
+  ...agentProjectWidgetsRoutes,
   ...agentRoutes,
   ...agentFormRepairRoutes,
   ...agentAnswerRepairRoutes,

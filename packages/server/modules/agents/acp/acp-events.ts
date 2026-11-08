@@ -29,6 +29,14 @@ export function availableCommands(list: unknown): AgentCommand[] {
   });
 }
 
+/** ACP stop reasons are a short code; the chat shows a readable sentence. */
+export function stopReasonError(stopReason: unknown): string {
+  if (stopReason === "max_tokens") return "Достигнут лимит ответа агента";
+  if (stopReason === "max_turn_requests") return "Достигнут лимит шагов агента";
+  if (stopReason === "refusal") return "Агент отказался выполнять запрос";
+  return "Агент завершился с ошибкой";
+}
+
 export function contentText(content: unknown): string {
   if (typeof content === "string") return content;
   if (Array.isArray(content))

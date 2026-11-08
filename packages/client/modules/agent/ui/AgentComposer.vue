@@ -172,6 +172,7 @@ defineExpose({
           ref="formPanel"
           composer
           :source="activeForm"
+          :project-id="projectId"
           @submit="submitForm"
           @submittable="formSubmittable = $event"
         />

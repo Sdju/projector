@@ -1,30 +1,42 @@
 import { answerFormSource } from "./answer.ts";
 import { autoClose, parseWidgetSource } from "./autoclose.ts";
 import { compileScript, compileTemplate, loadCompiler } from "./compile.ts";
-import { isWidgetName } from "./registry.ts";
+import { isWidgetName, projectWidgetEntries } from "./registry.ts";
 import { splitMessage } from "./split.ts";
+import type { ProjectWidgetDefinition } from "@projector/core/modules/widget-catalog/index.ts";
 
 /** Nothing here executes the widget: valid template and script syntax is enough to show it. */
-async function widgetProblem(source: string, empty: string): Promise<string | undefined> {
+async function widgetProblem(
+  source: string,
+  empty: string,
+  projectId?: string,
+): Promise<string | undefined> {
   await loadCompiler();
   const parsed = parseWidgetSource(source);
   if (parsed.scriptOpen) return "Незакрытый <script>";
   if (!parsed.template.trim()) return empty;
   const unknown = [...parsed.template.matchAll(/<([A-Z][A-Za-z0-9]*)\b/g)].find(
-    ([, name]) => !isWidgetName(name!),
+    ([, name]) => !isWidgetName(name!, projectId),
   );
   if (unknown) return `Неизвестный компонент ${unknown[1]}`;
   try {
     if (parsed.script) compileScript(parsed.script);
     compileTemplate(parsed.template);
+    // A project widget's own template is compiled when it mounts; check it here too, so the doctor
+    // sees a broken definition before an answer becomes the composer form.
+    for (const [, name] of parsed.template.matchAll(/<([A-Z][A-Za-z0-9]*)\b/g)) {
+      const entry = projectId ? projectWidgetEntries(projectId)[name!] : undefined;
+      const definition = entry?.definition as ProjectWidgetDefinition | undefined;
+      if (definition?.template) compileTemplate(definition.template);
+    }
     return undefined;
   } catch (error) {
     return error instanceof Error ? error.message : String(error);
   }
 }
 
-export function formProblem(source: string): Promise<string | undefined> {
-  return widgetProblem(source, "Пустая форма");
+export function formProblem(source: string, projectId?: string): Promise<string | undefined> {
+  return widgetProblem(source, "Пустая форма", projectId);
 }
 
 const MARKDOWN_TEXT =
@@ -40,12 +52,18 @@ function widgetMarkdownProblem(source: string): string | undefined {
 }
 
 /** A finished answer is repaired only for visible structural problems, never just to rewrite it. */
-export async function answerProblem(source: string): Promise<string | undefined> {
-  const parts = splitMessage(source, { known: isWidgetName, streaming: false });
+export async function answerProblem(
+  source: string,
+  projectId?: string,
+): Promise<string | undefined> {
+  const parts = splitMessage(source, {
+    known: (name) => isWidgetName(name, projectId),
+    streaming: false,
+  });
   for (const part of parts) {
     if (part.type === "widget") {
       const problem =
-        (await widgetProblem(part.source, `Пустой виджет ${part.name}`)) ??
+        (await widgetProblem(part.source, `Пустой виджет ${part.name}`, projectId)) ??
         widgetMarkdownProblem(part.source);
       if (problem) return `${part.name}: ${problem}`;
       continue;
@@ -60,7 +78,8 @@ export async function answerProblem(source: string): Promise<string | undefined>
         continue;
       }
       const name = !fence && /^ {0,3}<([A-Z][A-Za-z0-9]*)(?=[\s/>]|$)/.exec(line)?.[1];
-      if (name && isWidgetName(name)) return `Незакрытый или неверно оформленный виджет ${name}`;
+      if (name && isWidgetName(name, projectId))
+        return `Незакрытый или неверно оформленный виджет ${name}`;
     }
   }
   return undefined;
@@ -172,14 +191,17 @@ export function heuristicFormRepair(source: string): string {
 }
 
 /** A doctor answer may be wrapped in prose or a fenced block; take the last answer-form block. */
-export function doctorFormSource(text: string): string | undefined {
+export function doctorFormSource(text: string, projectId?: string): string | undefined {
   const fenced = [...text.matchAll(/```(?:vue|html)?\s*([\s\S]*?)```/gi)].at(-1);
   const candidate = (fenced?.[1] ?? text).trim();
   if (!candidate) return undefined;
-  const parts = splitMessage(candidate, { known: isWidgetName, streaming: false });
+  const parts = splitMessage(candidate, {
+    known: (name) => isWidgetName(name, projectId),
+    streaming: false,
+  });
   const last = parts
     .filter((part) => part.type !== "script" && (part.type !== "markdown" || part.text.trim()))
     .at(-1);
   if (last?.type !== "widget") return undefined;
-  return answerFormSource(candidate);
+  return answerFormSource(candidate, projectId);
 }

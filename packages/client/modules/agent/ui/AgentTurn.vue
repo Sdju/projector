@@ -35,6 +35,8 @@ const props = defineProps<{
   faded?: boolean;
   /** The project folder, to show edited files relative to it. */
   root?: string;
+  /** The project whose trusted widgets answers may use. */
+  projectId?: string;
   /** Files can be taken back to before the request this answer belongs to. */
   canRevert?: boolean;
   /** A conversation only to read (a subagent's): no editing, retrying or rolling back. */
@@ -255,6 +257,7 @@ const lastWork = computed(
           :source="turn.form.source"
           :values="turn.form.values"
           :busy="busy"
+          :project-id="projectId"
           @submit="submitForm"
         />
       </div>
@@ -298,6 +301,7 @@ const lastWork = computed(
           :streaming="busy && last && segment === segments.at(-1)"
           :promoted="promotedForm"
           :answered="formAnswered"
+          :project-id="projectId"
         />
         <p v-else-if="segment.type === 'note'" class="user-message note">{{ segment.text }}</p>
         <AgentWork

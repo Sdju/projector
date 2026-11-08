@@ -11,6 +11,8 @@ const props = defineProps<{
   source: string;
   values: unknown;
   busy?: boolean;
+  /** The project whose trusted widgets the form may contain. */
+  projectId?: string;
 }>();
 const emit = defineEmits<{ submit: [text: string, data: unknown, summary?: string] }>();
 
@@ -32,7 +34,13 @@ defineExpose({ start, cancel });
 
 <template>
   <div class="answer-form" :class="{ editing }">
-    <AgentFormPanel :source="source" :values="values" :readonly="readonly" @submit="submit" />
+    <AgentFormPanel
+      :source="source"
+      :values="values"
+      :readonly="readonly"
+      :project-id="projectId"
+      @submit="submit"
+    />
     <div v-if="editing" class="edit-bar">
       <span>Измените ответ и нажмите кнопку в форме.</span>
       <UiButton size="sm" @click="cancel">Отмена</UiButton>

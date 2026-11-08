@@ -20,6 +20,8 @@ const props = defineProps<{
   readonly?: boolean;
   /** The composer owns the single send button; the form does not draw its own. */
   composer?: boolean;
+  /** The project whose trusted widgets the form may contain. */
+  projectId?: string;
 }>();
 const emit = defineEmits<{
   submit: [text: string, data: unknown, summary?: string];
@@ -53,5 +55,5 @@ provide(widgetReplyKey, ((text, data, summary) =>
 </script>
 
 <template>
-  <AgentWidget :source="source" :complete="true" />
+  <AgentWidget :source="source" :complete="true" :project-id="projectId" />
 </template>

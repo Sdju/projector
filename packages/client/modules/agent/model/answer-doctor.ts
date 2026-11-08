@@ -34,6 +34,8 @@ export function useAnswerDoctor(options: {
   busy: Ref<boolean>;
   selection?: Ref<AgentSelection>;
   persist: () => void;
+  /** The project whose trusted widgets this answer may use. */
+  projectId?: string;
 }) {
   const attempted = new Map<string, string>();
   const controllers = new Map<string, AbortController>();
@@ -42,7 +44,7 @@ export function useAnswerDoctor(options: {
     if (turn.role !== "assistant" || attempted.get(turn.id) === turn.text) return;
     attempted.set(turn.id, turn.text);
     controllers.get(turn.id)?.abort();
-    const problem = await answerProblem(turn.text);
+    const problem = await answerProblem(turn.text, options.projectId);
     if (!problem || attempted.get(turn.id) !== turn.text) return;
     let candidate = turn.text;
     let diagnosis = problem;
@@ -68,7 +70,7 @@ export function useAnswerDoctor(options: {
           continue;
         }
         candidate = extracted;
-        const nextProblem = await answerProblem(candidate);
+        const nextProblem = await answerProblem(candidate, options.projectId);
         if (controller.signal.aborted || attempted.get(turn.id) !== turn.text) return;
         if (!nextProblem) {
           const current = options.turns.value.find((item) => item.id === turn.id);
