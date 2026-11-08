@@ -32,6 +32,10 @@ export function useIdeCommands() {
   if (!host) throw new Error("IDE SDK unavailable");
   return host;
 }
+/** The IDE SDK when the page has one; content that only links out stays usable without it. */
+export function useOptionalIdeCommands() {
+  return inject(ideKey, undefined);
+}
 export function provideIdeCommands() {
   const sdk = createCommandService(defaultKeybindings);
   const revision = ref(0);

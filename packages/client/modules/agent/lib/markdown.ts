@@ -1,6 +1,7 @@
 import MarkdownIt, { type Env } from "markdown-it";
 import DOMPurify from "dompurify";
 import hljs from "highlight.js/lib/common";
+import { parseChatLink } from "./chat-links.ts";
 
 /** What a chat rendering needs to know beyond the text: where its images come from. */
 export type MarkdownEnv = Env & {
@@ -25,8 +26,22 @@ const markdown = new MarkdownIt({
 });
 const defaultLink = markdown.renderer.rules.link_open;
 markdown.renderer.rules.link_open = (tokens, index, options, env, self) => {
-  tokens[index]!.attrSet("target", "_blank");
-  tokens[index]!.attrSet("rel", "noopener noreferrer");
+  const token = tokens[index]!;
+  token.attrSet("target", "_blank");
+  token.attrSet("rel", "noopener noreferrer");
+  // A file link's click is handled in the chat; the hint says so before the click.
+  const link = parseChatLink(String(token.attrGet("href") ?? ""));
+  if (link.kind === "file") {
+    token.attrSet("data-chat-file", "");
+    if (!token.attrGet("title")) {
+      const range = link.line
+        ? link.endLine
+          ? `:${link.line}–${link.endLine}`
+          : `:${link.line}${link.column ? `:${link.column}` : ""}`
+        : "";
+      token.attrSet("title", range ? `Открыть ${link.path}${range}` : "Открыть файл в Projector");
+    }
+  }
   return defaultLink
     ? defaultLink(tokens, index, options, env, self)
     : self.renderToken(tokens, index, options);
@@ -56,6 +71,6 @@ export const parseMarkdown = (content: string) => markdown.parse(content, {});
 export function renderChatMarkdown(content: string, env: MarkdownEnv = {}): string {
   return DOMPurify.sanitize(renderMarkdown(content, env), {
     USE_PROFILES: { html: true },
-    ADD_ATTR: ["loading", "decoding", "referrerpolicy", "class"],
+    ADD_ATTR: ["target", "loading", "decoding", "referrerpolicy", "class"],
   });
 }

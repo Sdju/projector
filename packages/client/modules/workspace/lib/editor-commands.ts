@@ -33,7 +33,13 @@ export interface EditorCommandContext {
   keepMine: (file: OpenFile) => void;
   openFile: (path: string) => unknown;
   /** Opens a file and puts the cursor on `line` or selects the whole `line`..`endLine`. */
-  openFileAt: (path: string, line?: number, endLine?: number, column?: number) => unknown;
+  openFileAt: (
+    path: string,
+    line?: number,
+    endLine?: number,
+    column?: number,
+    options?: { external?: boolean },
+  ) => unknown;
   openTab: (id: string, params?: Record<string, unknown>, options?: { preview?: boolean }) => void;
   selectTab: (key: string) => void;
   onOpenTab?: () => void;
@@ -68,19 +74,28 @@ export function registerEditorCommands(ctx: EditorCommandContext) {
     (value) => {
       const args = commandArgs(value);
       if (typeof args.path !== "string" || !args.path) throw new Error("Укажите путь");
+      if (args.external !== undefined && typeof args.external !== "boolean")
+        throw new Error("external должен быть boolean");
       const line = lineArg(args.line, "line");
       const endLine = lineArg(args.endLine, "endLine");
       if (endLine && !line) throw new Error("endLine требует line");
-      if (args.directory === true) ctx.revealInTree(args.path);
-      else return ctx.openFileAt(args.path, line, endLine, lineArg(args.column, "column"));
+      if (args.directory === true) {
+        if (args.external === true)
+          throw new Error("Внешнюю папку нельзя показать в дереве проекта");
+        ctx.revealInTree(args.path);
+      } else
+        return ctx.openFileAt(args.path, line, endLine, lineArg(args.column, "column"), {
+          external: args.external === true,
+        });
     },
     () => true,
     undefined,
     {
       description:
-        "Открывает файл проекта во вкладке редактора (или показывает папку в дереве) по пути, относительному корню проекта. Так открываются ссылки на файлы из чата; line и endLine показывают строку или выделяют диапазон.",
+        "Открывает файл проекта во вкладке редактора (или показывает папку в дереве) по пути, относительному корню проекта. Так открываются ссылки на файлы из чата; line и endLine показывают строку или выделяют диапазон. С external: true открывается файл на диске вне проекта.",
       arguments: {
-        path: "Путь относительно корня проекта",
+        path: "Путь относительно корня проекта или абсолютный путь при external",
+        external: "true, если путь — файл на диске вне проекта",
         directory: "true, если путь — папка: она будет показана в дереве",
         line: "Строка, на которую поставить курсор (с 1)",
         endLine: "Последняя строка диапазона: файл откроется с выделением line..endLine",

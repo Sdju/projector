@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from "vue";
 import { widgetReplyKey } from "../../widget-runtime/index.ts";
-import { chatProjectKey } from "../../chat-images/index.ts";
 import { useIdeCommands } from "../../ide/index.ts";
 import { workspaceRequest } from "../../workspace-api/index.ts";
 import { AgentFeaturesIsland } from "../../agent-features/index.ts";
@@ -42,6 +41,7 @@ import AgentChatMenu from "./AgentChatMenu.vue";
 import { chatTasks } from "../lib/task-detail.ts";
 import { useChatTaskView } from "../model/use-chat-task-view.ts";
 import { useChipActions } from "../model/use-chip-actions.ts";
+import { provideChatContext } from "../model/chat-link-actions.ts";
 import AgentRewind from "./AgentRewind.vue";
 import AgentWorktree from "./AgentWorktree.vue";
 import { exportChat, downloadChat as saveChatMarkdown } from "../lib/export.ts";
@@ -426,7 +426,7 @@ provide(widgetReplyKey, (text) => {
   void toBottom();
   void send(text);
 });
-provide(chatProjectKey, props.projectId);
+provideChatContext(props.projectId, api);
 const { submit, continueTurn, suggest, newChat } = useChatInputActions({
   draft,
   draftParts,

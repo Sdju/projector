@@ -17,6 +17,7 @@ import { jobDuration, jobStatusLabel } from "../lib/job-labels.ts";
 import { useElapsedClock } from "../lib/elapsed.ts";
 import { useJobTitle } from "../model/job-titles.ts";
 import { agentLabel } from "../model/modes.ts";
+import { provideChatContext } from "../model/chat-link-actions.ts";
 import { canContinueInChat, continueJobInChat } from "../model/job-continue.ts";
 import { jobTurn } from "../model/job-turn.ts";
 import type { AgentPermission, AgentQuestionRequest } from "../model/types.ts";
@@ -34,6 +35,7 @@ import IconFile from "~icons/lucide/file-diff";
 const props = defineProps<{ projectId: string; job: string }>();
 const emit = defineEmits<{ openFile: [path: string]; title: [title: string] }>();
 const { api } = useIdeCommands();
+provideChatContext(props.projectId, api);
 
 const job = ref<AgentJobView>();
 const journal = ref<AgentJobEntry[]>([]);

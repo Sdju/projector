@@ -195,7 +195,6 @@ function closeSection(id: string) {
           ? "git"
           : "files";
 }
-
 /** Adds or updates a temporary sidebar section and reveals it; tab views own its contents. */
 function openSection(type: SidebarType) {
   const index = extraSections.value.findIndex((item) => item.id === type.id);
@@ -279,7 +278,8 @@ const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
   reloadFromDisk: files.reloadFromDisk,
   keepMine: files.keepMine,
   openFile,
-  openFileAt: (path, line, endLine, column) => openFile(path, line, column, undefined, { endLine }),
+  openFileAt: (path, line, endLine, column, options) =>
+    openFile(path, line, column, undefined, { endLine, ...options }),
   openTab,
   selectTab: (key) => revealPanel(key),
   onOpenTab: () => (mobileSidebarOpen.value = false),
