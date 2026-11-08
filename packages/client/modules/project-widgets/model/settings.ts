@@ -75,7 +75,9 @@ export function useProjectWidgetSettings(projectId: () => string) {
       };
       return {
         ...state,
-        widgets: state.widgets.map(({ template: _template, styles: _styles, ...widget }) => widget),
+        widgets: state.widgets.map(
+          ({ template: _template, script: _script, styles: _styles, ...widget }) => widget,
+        ),
       };
     },
   });

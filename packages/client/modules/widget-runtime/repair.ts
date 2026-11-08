@@ -27,6 +27,7 @@ async function widgetProblem(
     for (const [, name] of parsed.template.matchAll(/<([A-Z][A-Za-z0-9]*)\b/g)) {
       const entry = projectId ? projectWidgetEntries(projectId)[name!] : undefined;
       const definition = entry?.definition as ProjectWidgetDefinition | undefined;
+      if (definition?.script) compileScript(definition.script);
       if (definition?.template) compileTemplate(definition.template);
     }
     return undefined;

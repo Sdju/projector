@@ -12,6 +12,7 @@ import {
 import {
   createWidgetCatalog,
   normalizeProjectWidget,
+  PROJECT_WIDGET_LIMITS,
   renderWidgetGuide,
 } from "../packages/core/modules/widget-catalog/index.ts";
 
@@ -117,6 +118,45 @@ test("only valid project widgets may use built-ins and trusted data files", asyn
       data: { leak: "../../.env" },
     }),
   ).toMatchObject({ name: "Escape" });
+});
+
+test("trust covers the script field of a project widget", async () => {
+  await writeWidgets([{ ...metrics, script: "return { ok: true };" }]);
+  expect((await projectWidgetState("p1")).widgets[0]).toMatchObject({
+    script: "return { ok: true };",
+  });
+  expect((await setProjectWidgetTrust("p1", true)).trusted).toBe(true);
+  await writeWidgets([{ ...metrics, script: "return { ok: false };" }]);
+  expect((await projectWidgetState("p1")).trusted).toBe(false);
+  expect(await trustedProjectWidgets("p1")).toEqual([]);
+});
+
+test("a project widget may keep its script in a separate field", () => {
+  const script = "const n = ref(1); return { n };";
+  expect(
+    normalizeProjectWidget({
+      name: "Scripted",
+      summary: "свой скрипт",
+      script,
+      template: '<Stat :value="n" />',
+    }),
+  ).toMatchObject({ name: "Scripted", script });
+  expect(
+    normalizeProjectWidget({
+      name: "TooLong",
+      summary: "слишком длинный скрипт",
+      script: "x".repeat(PROJECT_WIDGET_LIMITS.script + 1),
+      template: "<div />",
+    }),
+  ).toBeUndefined();
+  expect(
+    normalizeProjectWidget({
+      name: "InlineScript",
+      summary: "скрипт внутри шаблона запрещён",
+      script,
+      template: "<script>alert(1)</script><div />",
+    }),
+  ).toBeUndefined();
 });
 
 test("widget data files are read only for a trusted widget and never from secrets", async () => {

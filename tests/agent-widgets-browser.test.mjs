@@ -73,9 +73,14 @@ test.concurrent(
       props: { model: { type: "string", description: "имя модели", required: true } },
       data: { metrics: "metrics.json" },
       refresh: 5,
+      script: `window.__projectScriptRuns = (window.__projectScriptRuns ?? 0) + 1;
+const speed = computed(() => data.metrics.speed);
+const title = computed(() => props.model + " / " + speed.value);
+const clicks = ref(0);
+return { speed, title, clicks };`,
       styles: ".value { color: rgb(1, 2, 3) }",
       template:
-        '<Card :title="model"><Stat class="value" label="Скорость" :value="data.metrics?.speed ?? 0" /></Card>',
+        '<Card :title="title"><Stat class="value" label="Скорость" :value="speed" /><Button id="bump" @click="clicks++">Нажато: {{ clicks }}</Button></Card>',
       example: '<ModelMetrics model="gpt-5" />',
     };
     const fixture = await createBrowserFixture({
@@ -129,13 +134,23 @@ test.concurrent(
     await wait('document.querySelector(".project-widget .stat .value")?.textContent === "42"');
     expect(
       await browser.evaluate(
+        'document.querySelector(".project-widget .ui-card .title").textContent',
+      ),
+    ).toBe("gpt-5 / 42");
+    expect(await browser.evaluate("window.__projectScriptRuns")).toBe(1);
+    expect(
+      await browser.evaluate(
         'getComputedStyle(document.querySelector(".project-widget .value")).color',
       ),
     ).toBe("rgb(1, 2, 3)");
+    await browser.click("#bump");
+    await wait('document.querySelector("#bump").textContent.includes("1")');
+    expect(await browser.evaluate("window.__projectScriptRuns")).toBe(1);
 
     await browser.evaluate('window.fixture.project("p2")');
     await wait('document.querySelector(".project-widget") === null');
     expect(await browser.evaluate("document.querySelector('.stat') === null")).toBe(true);
+    expect(await browser.evaluate("window.__projectScriptRuns")).toBe(1);
   },
 );
 

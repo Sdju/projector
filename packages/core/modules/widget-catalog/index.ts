@@ -40,11 +40,18 @@ export interface WidgetDefinition {
 
 /**
  * A widget a project defines for itself. It is a normal definition plus the Vue template the client
- * compiles at runtime, so the project does not need its own build step. Scripts are not allowed.
+ * compiles at runtime, so the project does not need its own build step. The file must be trusted by
+ * hash before the template is used or the script is run.
  */
 export interface ProjectWidgetDefinition extends WidgetDefinition {
   /** Vue template made of the built-in widgets and ordinary HTML/SVG. */
   template: string;
+  /**
+   * Body of a function run once after the widget's data is loaded. It gets `ref`, `reactive`,
+   * `computed`, `watch`, `onMounted`, `reply`, `props`, `data`, `dataErrors`, `dataLoading` and
+   * `dataError`; it may end with `return { … }` to expose values to the template.
+   */
+  script?: string;
   /** CSS injected once for this widget; selectors are scoped to its wrapper. */
   styles?: string;
   /** Project-relative JSON files exposed to the template as `data.<key>`. */
@@ -89,6 +96,7 @@ export const PROJECT_WIDGET_LIMITS = {
   note: 400,
   example: 4_000,
   template: 40_000,
+  script: 20_000,
   styles: 20_000,
   data: 8,
   dataKey: 40,
@@ -202,6 +210,8 @@ export function normalizeProjectWidget(
   if (!template || template.length > PROJECT_WIDGET_LIMITS.template) return undefined;
   const allowed = new Set<string>([...BUILTIN_WIDGET_NAMES, ...siblings.filter((n) => n !== name)]);
   if (!templateIsAllowed(template, allowed)) return undefined;
+  const script = typeof row.script === "string" ? row.script.trim() : "";
+  if (script.length > PROJECT_WIDGET_LIMITS.script) return undefined;
   const styles = typeof row.styles === "string" ? row.styles.trim() : "";
   if (styles.length > PROJECT_WIDGET_LIMITS.styles) return undefined;
   const notes = normalizeNotes(row.notes);
@@ -225,6 +235,7 @@ export function normalizeProjectWidget(
     ...(row.special === true ? { special: true } : {}),
     ...(row.answer === true && /<(IntelligentForm|Form)\b/.test(template) ? { answer: true } : {}),
     template,
+    ...(script ? { script } : {}),
     ...(styles ? { styles } : {}),
     ...(data ? { data } : {}),
     ...(refresh !== undefined ? { refresh } : {}),

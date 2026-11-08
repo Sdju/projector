@@ -73,18 +73,21 @@ async function setTrust(value: boolean) {
         <code>{{ widget.name }}</code>
         <span v-if="widget.special" class="tag">по требованию</span>
         <span v-if="widget.answer" class="tag">форма ответа</span>
+        <span v-if="widget.script" class="tag">свой скрипт</span>
       </div>
       <p class="summary">{{ widget.summary }}</p>
       <UiInline wrap :gap="2" class="meta">
         <span v-if="widget.data"> данные: {{ Object.keys(widget.data).join(", ") }} </span>
         <span v-if="widget.refresh">обновление: {{ widget.refresh }} с</span>
         <span v-if="widget.styles">свои стили</span>
+        <span v-if="widget.script">скрипт: {{ widget.script.length }} символов</span>
         <span>{{ Object.keys(widget.props ?? {}).length }} свойств</span>
       </UiInline>
     </UiCard>
     <UiHint>
-      Файл действует только после доверия. Шаблон собирается из встроенных виджетов и HTML; скрипты
-      не исполняются. Данные читаются из JSON-файлов проекта, указанных в виджете.
+      Файл действует только после доверия. Шаблон собирается из встроенных виджетов и HTML, а
+      отдельное поле <code>script</code> выполняется в интерфейсе после загрузки данных. Доверяйте
+      только тому коду, который готовы запустить. Данные читаются из JSON-файлов проекта.
     </UiHint>
     <UiMessage v-if="error && error !== problem" tone="danger" size="xs" flush role="alert">{{
       error
