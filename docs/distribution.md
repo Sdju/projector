@@ -18,11 +18,11 @@ vp -C artifacts/distribution/ide pm pack --pack-destination ..
 vp -C artifacts/distribution/native pm pack --pack-destination ..
 
 # Только IDE — GTK, vio и Vite не устанавливаются.
-npm install -g ./artifacts/distribution/projector-ide-0.9.0.tgz
+npm install -g ./artifacts/distribution/projector-ide-0.10.0.tgz
 projector --browser
 
 # Необязательное дополнение — в тот же npm prefix.
-npm install -g ./artifacts/distribution/projector-native-0.9.0.tgz
+npm install -g ./artifacts/distribution/projector-native-0.10.0.tgz
 projector --native
 ```
 
