@@ -10,17 +10,39 @@ const PROJECTOR = "projector/openai-provider-keys/v1";
 const SOURCE = process.argv[2];
 if (!SOURCE)
   throw new Error(
-    "Укажите путь к providers.json: node packages/cli/app/import-companion-key.mjs <path>",
+    "Укажите путь к providers.json: node packages/cli/app/import-companion-key.ts <path>",
   );
 const TARGET = join(os.dataHome(), "projector", "providers.json");
 
-function deriveKey(secret) {
+interface CompanionProvider {
+  id?: string;
+  name?: string;
+  url?: string;
+  model?: string;
+  apiKey?: string;
+}
+
+interface CompanionFile {
+  providers?: CompanionProvider[];
+  activeProviderId?: string | null;
+}
+
+interface ProjectorProvider {
+  id?: string;
+  name?: string;
+  url?: string;
+  model?: string;
+  apiKey: string;
+}
+
+function deriveKey(secret: string): Buffer {
   return createHash("sha256").update(secret).digest();
 }
 
-function reveal(value, secret) {
+function reveal(value: string, secret: string): string {
   const payload = value.slice(PREFIX.length);
   const [ivPart, tagPart, dataPart] = payload.split(".");
+  if (!ivPart || !tagPart || !dataPart) throw new Error("Повреждённый ключ ai-companion");
   const decipher = createDecipheriv(ALGORITHM, deriveKey(secret), Buffer.from(ivPart, "base64url"));
   decipher.setAuthTag(Buffer.from(tagPart, "base64url"));
   return Buffer.concat([
@@ -29,7 +51,7 @@ function reveal(value, secret) {
   ]).toString("utf8");
 }
 
-function obfuscate(plain, secret) {
+function obfuscate(plain: string, secret: string): string {
   const iv = randomBytes(12);
   const cipher = createCipheriv(ALGORITHM, deriveKey(secret), iv);
   const encrypted = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
@@ -37,11 +59,11 @@ function obfuscate(plain, secret) {
   return `${PREFIX}${iv.toString("base64url")}.${tag.toString("base64url")}.${encrypted.toString("base64url")}`;
 }
 
-const source = JSON.parse(readFileSync(SOURCE, "utf8"));
-const providers = [];
+const source = JSON.parse(readFileSync(SOURCE, "utf8")) as CompanionFile;
+const providers: ProjectorProvider[] = [];
 
 for (const item of source.providers ?? []) {
-  const next = {
+  const next: ProjectorProvider = {
     id: item.id,
     name: item.name,
     url: item.url,
@@ -57,7 +79,7 @@ for (const item of source.providers ?? []) {
 }
 
 const active = providers.some((item) => item.id === source.activeProviderId)
-  ? source.activeProviderId
+  ? (source.activeProviderId ?? null)
   : (providers.find((item) => item.apiKey)?.id ?? providers[0]?.id ?? null);
 
 mkdirSync(dirname(TARGET), { recursive: true });

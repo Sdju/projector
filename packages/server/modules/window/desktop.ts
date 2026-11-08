@@ -3,7 +3,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { os } from "@projector/core/modules/os/index.ts";
 
 const require = createRequire(import.meta.url);
-const shellHelper = fileURLToPath(new URL("../../../cli/app/desktop.mjs", import.meta.url));
+const shellHelper = fileURLToPath(new URL("../../../cli/app/desktop.ts", import.meta.url));
 
 /** Resolve the add-on from its own package: IDE installations never need vio or GTK. */
 function nativeHelper(): string[] | undefined {

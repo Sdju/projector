@@ -139,6 +139,20 @@ projector --browser
 
 Open <http://localhost:4177> while Projector is running. Without \`${NATIVE_PACKAGE}\` the default launch mode opens the browser.
 
+The CLI can drive projects without the UI:
+
+\`\`\`bash
+projector open ~/code/app       # registers and opens a folder as a project
+projector projects              # saved projects
+projector status .              # server, project and process state
+projector run . --command dev   # start the project command
+projector stop .
+projector search opencode
+projector start | restart | quit
+\`\`\`
+
+Use \`--json\` for machine-readable output. \`projector open\` also accepts a project id or name, \`gh:/owner/repository\` and \`gl:/<instance>/<group>/<project>\`.
+
 Requirements: Node.js 24.11–24.x; on Linux, Python 3, \`make\` and a C++ compiler to build \`node-pty\`. Projector also uses \`git\`, \`rg\` and GNU \`mv\`.
 
 To add a desktop entry and the \`projector\` command:
@@ -177,10 +191,10 @@ await writeFile(
       description: "Projector web IDE, terminals and agents without GTK",
       keywords: ["projector", "ide", "terminal", "agents", "workspace"],
       bin: {
-        projector: "./packages/cli/app/launch.mjs",
-        "projector-install-desktop": "./packages/cli/app/install-desktop.mjs",
+        projector: "./packages/cli/app/launch.js",
+        "projector-install-desktop": "./packages/cli/app/install-desktop.js",
       },
-      scripts: { postinstall: "node ./packages/cli/app/fix-node-pty.mjs" },
+      scripts: { postinstall: "node ./packages/cli/app/fix-node-pty.js" },
       exports: { "./core/*": "./packages/core/*" },
       files: ["bin", "dist", "packages", "resources", "LICENSE", "README.md"],
       dependencies: await dependencies(["core", "server"], ["vite", "vite-plus"]),
@@ -210,8 +224,8 @@ await writeFile(
 );
 // npm bin requires a shebang; the checkout also invokes these files through node directly.
 for (const [file, mode] of [
-  [join(ide, "packages/cli/app/launch.mjs"), 0o755],
-  [join(ide, "packages/cli/app/install-desktop.mjs"), 0o755],
+  [join(ide, "packages/cli/app/launch.js"), 0o755],
+  [join(ide, "packages/cli/app/install-desktop.js"), 0o755],
 ]) {
   await writeFile(file, "#!/usr/bin/env node\n" + (await readFile(file, "utf8")));
   await chmod(file, mode);

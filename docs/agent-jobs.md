@@ -12,7 +12,7 @@
 
 ## Поток
 
-1. `POST /api/agent/jobs` проверяет вход и создаёт запись. `packages/server/modules/agent/jobs.ts` создаёт ход (`createRun`, `chat: "job:<id>"`) и вызывает `runAgent` со своим эмиттером. Ход живёт в `packages/cli/app/agent-host.mjs`, как и у обычного чата.
+1. `POST /api/agent/jobs` проверяет вход и создаёт запись. `packages/server/modules/agent/jobs.ts` создаёт ход (`createRun`, `chat: "job:<id>"`) и вызывает `runAgent` со своим эмиттером. Ход живёт в `packages/cli/app/agent-host.ts`, как и у обычного чата.
 2. Эмиттер пишет журнал и обновляет запись: `session` → `sessionId`, `done` → итог, `error` → ошибка.
 3. Разрешения и вопросы идут через `createApprovalBridge` и `createQuestionBridge`: карточка журнала, состояние `needs-user`, ответ — `POST /api/agent/jobs/:id/answer`. Мост команд Projector и мост секретов не подключаются.
 4. В конце вычисляются изменённые файлы: `git status` до и после, коммиты после стартового `HEAD`, пути из `Write`/`Edit`/`MultiEdit`. Ход удаляется (`removeRun`).

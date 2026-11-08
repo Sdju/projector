@@ -84,3 +84,16 @@ export async function openLauncher(
   }
   return selected;
 }
+
+/** Opens a workspace route. The native palette is a launcher-only surface, so it opens a browser. */
+export async function openRoute(
+  url: string,
+  route: string,
+  mode?: InterfaceMode,
+): Promise<InterfaceMode> {
+  const selected = mode ?? (await preferences()).mode;
+  const target = `${url}${route}`;
+  if (selected === "window") openWindow(target);
+  else openBrowser(target);
+  return selected === "native" ? "browser" : selected;
+}

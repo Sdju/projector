@@ -1,5 +1,5 @@
 // The process side of a hosted run: one agent answer, held by its own process so that a server
-// restart or a hot reload leaves it going. `agent-host.mjs` keeps this process and its trace (see
+// restart or a hot reload leaves it going. `agent-host.ts` keeps this process and its trace (see
 // `hosted-process.ts`); the server only relays what it prints and the answers it reads.
 //
 // Lines on stdout are either

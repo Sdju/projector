@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { os, type AgentProcess, type AgentProcessSpec } from "@projector/core/modules/os/index.ts";
 import { rememberHost, runDirectory } from "./agent-runs.ts";
 
-const HOST_SCRIPT = fileURLToPath(new URL("../../../cli/app/agent-host.mjs", import.meta.url));
+const HOST_SCRIPT = fileURLToPath(new URL("../../../cli/app/agent-host.ts", import.meta.url));
 /** How long a freshly started host gets to open its socket. */
 const START_TIMEOUT_MS = 8000;
 const STOP_TIMEOUT_MS = 5000;
@@ -36,7 +36,7 @@ function parse(line: string): Entry | undefined {
 }
 
 /**
- * Start a hosted agent: `agent-host.mjs` keeps the process and the log of its JSON-RPC traffic
+ * Start a hosted agent: `agent-host.ts` keeps the process and the log of its JSON-RPC traffic
  * outside this server, which only holds a socket to it. The returned process behaves like a
  * spawned one for `createAcpConnection`.
  */

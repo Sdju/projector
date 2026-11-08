@@ -11,7 +11,7 @@ function vbsQuote(value: string) {
 /**
  * Command string for WScript.Shell.Run: each argv is quoted, then the whole
  * command is wrapped once more so the Run call sees one VB string.
- * Result: sh.Run """C:\node.exe"" ""C:\launch.mjs""", 0, False
+ * Result: sh.Run """C:\node.exe"" ""C:\launch.ts""", 0, False
  */
 function vbsRunCommand(argv: string[]) {
   const inner = argv.map((part) => `"${part.replace(/"/g, '""')}"`).join(" ");
@@ -67,8 +67,17 @@ Write-Output 'path-added'
   ).trim();
 }
 
+function launchEntry(root: string): string {
+  const directory = join(root, "packages", "cli", "app");
+  for (const name of ["launch.ts", "launch.js"]) {
+    const file = join(directory, name);
+    if (existsSync(file)) return file;
+  }
+  return join(directory, "launch.js");
+}
+
 export function installDesktop(root: string) {
-  const launch = join(root, "packages", "cli", "app", "launch.mjs");
+  const launch = launchEntry(root);
   const png = join(root, "resources", "icons", "256.png");
   const svg = join(root, "resources", "icons", "projector.svg");
   const { applications, icons, bin } = desktopPaths();
@@ -100,7 +109,7 @@ export function installDesktop(root: string) {
       "' Projector — silent Start Menu launch (no console window)",
       'Set sh = CreateObject("WScript.Shell")',
       `sh.CurrentDirectory = ${vbsQuote(root)}`,
-      // So launch.mjs can show a MessageBox if the hidden process fails.
+      // So launch.ts can show a MessageBox if the hidden process fails.
       'sh.Environment("Process")("PROJECTOR_FROM_SHORTCUT") = "1"',
       `sh.Run ${vbsRunCommand([process.execPath, launch])}, 0, False`,
       "",

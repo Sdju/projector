@@ -5,12 +5,17 @@ ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
 export PATH="${HOME}/.vite-plus/bin:${ROOT}/node_modules/.bin:/usr/local/bin:/usr/bin:/bin:${PATH}"
 cd "$ROOT"
 
+ENTRY="$ROOT/packages/cli/app/launch.ts"
+if [[ ! -f "$ENTRY" ]]; then
+  ENTRY="$ROOT/packages/cli/app/launch.js"
+fi
+
 if [[ -x "${HOME}/.vite-plus/bin/node" ]]; then
-  exec "${HOME}/.vite-plus/bin/node" "$ROOT/packages/cli/app/launch.mjs" "$@"
+  exec "${HOME}/.vite-plus/bin/node" "$ENTRY" "$@"
 fi
 
 if command -v node >/dev/null 2>&1; then
-  exec node "$ROOT/packages/cli/app/launch.mjs" "$@"
+  exec node "$ENTRY" "$@"
 fi
 
 echo "Нужны vp или node в PATH" >&2

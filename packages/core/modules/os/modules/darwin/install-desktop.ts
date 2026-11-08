@@ -70,8 +70,17 @@ function installIcon(root: string, resources: string) {
  * Installs `~/.local/bin/projector` and `~/Applications/Projector.app`.
  * The .app is what Raycast, Spotlight and Launchpad index; the CLI alone is invisible to them.
  */
+function launchEntry(root: string): string {
+  const directory = join(root, "packages", "cli", "app");
+  for (const name of ["launch.ts", "launch.js"]) {
+    const file = join(directory, name);
+    if (existsSync(file)) return file;
+  }
+  return join(directory, "launch.js");
+}
+
 export function installDesktop(root: string) {
-  const launch = join(root, "packages", "cli", "app", "launch.mjs");
+  const launch = launchEntry(root);
   const { applications, bin } = desktopPaths();
   mkdirSync(bin, { recursive: true });
   const command = join(bin, "projector");

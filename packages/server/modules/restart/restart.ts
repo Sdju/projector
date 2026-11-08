@@ -16,7 +16,7 @@ async function prepareRestart(url: string): Promise<void> {
       return spawn(
         process.execPath,
         [
-          fileURLToPath(new URL("../../../cli/app/restart.mjs", import.meta.url)),
+          fileURLToPath(new URL("../../../cli/app/restart.ts", import.meta.url)),
           String(process.pid),
           String(nativePid ?? ""),
         ],

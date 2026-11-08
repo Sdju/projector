@@ -29,7 +29,7 @@ export const routes: RouteDefinition[] = [
       try {
         const child = spawn(
           process.execPath,
-          [fileURLToPath(new URL("../../../../cli/app/launch.mjs", import.meta.url)), "mode", mode],
+          [fileURLToPath(new URL("../../../../cli/app/launch.ts", import.meta.url)), "mode", mode],
           { detached: true, stdio: ["ignore", log, log], windowsHide: true },
         );
         child.once("exit", (code) => {

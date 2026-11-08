@@ -1,4 +1,4 @@
-import { backendLayers, libraryLayers } from "@o-feod/oxlint-structure-plugin/presets";
+import { backendLayers, cliLayers, libraryLayers } from "@o-feod/oxlint-structure-plugin/presets";
 
 const adapters = [
   {
@@ -125,6 +125,6 @@ export default {
       transitModules: ["agents-integration", "agent-widgets"],
       extra: { confine: [...nodeOnly, ...adapters] },
     },
-    "packages/cli": { layers: libraryLayers, dependencies: ["packages/core"] },
+    "packages/cli": { layers: cliLayers, dependencies: ["packages/core"] },
   },
 };

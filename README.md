@@ -195,23 +195,40 @@ vp run desktop
 
 Для терминалов и графических чатов Codex, Claude Code, OpenCode, Cursor и Kimi Code соответствующие CLI должны быть заранее установлены и авторизованы (`agent login` для Cursor).
 
-## Запуск и завершение
+## CLI
 
-После установки команды доступны:
+После установки команда `projector` умеет не только открывать палитру, но и работать с проектами:
 
 ```bash
-projector toggle     # показать или скрыть поиск
-projector --native   # GTK-палитра
-projector --window   # отдельное окно Chromium
-projector --browser  # открыть в браузере
-projector --tray     # запустить в трее без окна поиска
-projector --lan | --local   # одноразово: доступ по сети / только localhost
-projector mode [dev|prod]   # показать или переключить режим сервера
-projector quit       # завершить Projector и запущенные им процессы
-projector-install-desktop   # пункт меню и команда из npm-пакета
+projector open .                 # открыть текущую папку как проект
+projector open ~/code/app --window
+projector open gh:/owner/repository
+projector projects               # сохранённые проекты
+projector status .               # сервер, проект и процесс
+projector run . --command dev    # основная команда проекта
+projector stop .
+projector search opencode
+projector start                  # сервер без окна
+projector restart
+projector quit                   # завершить Projector и его процессы
 ```
 
-Для автозапуска добавьте `projector --tray` в настройки автозапуска рабочего окружения. Esc скрывает поиск; выход и перезапуск Projector завершают его терминальные сессии и процессы.
+Локальная папка регистрируется при первом `projector open`. Для `run` и `stop` без аргумента используется проект, содержащий текущую папку; `status` без аргумента показывает сервер и все проекты. `--json` даёт машиночитаемый вывод, `--quiet` скрывает обычные сообщения.
+
+Старые флаги сохранены:
+
+```bash
+projector toggle              # показать или скрыть поиск
+projector --native            # GTK-палитра
+projector --window            # отдельное окно Chromium
+projector --browser           # открыть в браузере
+projector --tray              # запустить в трее без окна поиска
+projector --lan | --local     # одноразово: доступ по сети / только localhost
+projector mode [dev|prod]     # показать или переключить режим сервера
+projector-install-desktop     # пункт меню и команда из npm-пакета
+```
+
+Для автозапуска добавьте `projector --tray` в настройки автозапуска рабочего окружения. Esc скрывает поиск; выход и перезапуск Projector завершают его терминальные сессии и процессы. Полный список команд — в [CLI](docs/cli.md).
 
 Настройки, избранное и список проектов сохраняются в `~/.local/share/projector` или `$XDG_DATA_HOME/projector`, если эта переменная задана.
 

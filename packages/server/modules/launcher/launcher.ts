@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import { os } from "@projector/core/modules/os/index.ts";
 import { expandPath, loadProjects, sameLocalPath, type Project } from "../projects/index.ts";
 import { getSnapshot, startProject, stopProject } from "../processes/index.ts";
-import { openBrowser, openWindow } from "../window/index.ts";
+import { openBrowser, openWindow, openRoute as openAppRoute } from "../window/index.ts";
 import { desktopArgs } from "../window/index.ts";
 import type {
   LaunchActionId,
@@ -211,9 +211,7 @@ export async function searchLauncher(
 
 /** Shows a Projector route in the window or browser, per the user's interface mode. */
 async function openRoute(route: string) {
-  const url = appUrl() + route;
-  if ((await preferences()).mode === "window") openWindow(url);
-  else openBrowser(url);
+  await openAppRoute(appUrl(), route);
 }
 
 async function rememberOpen(

@@ -1,5 +1,6 @@
 export { openBrowser } from "./window.ts";
 export { openLauncher } from "./window.ts";
+export { openRoute } from "./window.ts";
 export { hidePalette } from "./window.ts";
 export { openWindow } from "./window.ts";
 export { startTray } from "./window.ts";

@@ -5,8 +5,13 @@ ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
 export PATH="${HOME}/.vite-plus/bin:${ROOT}/node_modules/.bin:/usr/local/bin:/usr/bin:/bin:${PATH}"
 cd "$ROOT"
 
-if [[ -x "${HOME}/.vite-plus/bin/node" ]]; then
-  exec "${HOME}/.vite-plus/bin/node" "$ROOT/packages/cli/app/install-desktop.mjs" "$@"
+ENTRY="$ROOT/packages/cli/app/install-desktop.ts"
+if [[ ! -f "$ENTRY" ]]; then
+  ENTRY="$ROOT/packages/cli/app/install-desktop.js"
 fi
 
-exec node "$ROOT/packages/cli/app/install-desktop.mjs" "$@"
+if [[ -x "${HOME}/.vite-plus/bin/node" ]]; then
+  exec "${HOME}/.vite-plus/bin/node" "$ENTRY" "$@"
+fi
+
+exec node "$ENTRY" "$@"

@@ -1,11 +1,15 @@
 import { spawn } from "node:child_process";
-import { os } from "@projector/core/modules/os/index.ts";
 import { fileURLToPath } from "node:url";
+import { os } from "@projector/core/modules/os/index.ts";
 
-export const waitForProcessExit = (pid, timeoutMs = 15000) =>
+export const waitForProcessExit = (pid: number, timeoutMs = 15000): Promise<void> =>
   os.processes.waitForExit(pid, timeoutMs);
 
-export async function restartAfterExit(serverPid, desktopPid, launch) {
+export async function restartAfterExit(
+  serverPid: number,
+  desktopPid: number | undefined,
+  launch: () => Promise<void>,
+): Promise<void> {
   await Promise.all([
     waitForProcessExit(serverPid),
     desktopPid ? waitForProcessExit(desktopPid) : Promise.resolve(),
@@ -13,11 +17,11 @@ export async function restartAfterExit(serverPid, desktopPid, launch) {
   await launch();
 }
 
-function launchProjector() {
+function launchProjector(): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(
       process.execPath,
-      [fileURLToPath(new URL("./launch.mjs", import.meta.url)), "--tray"],
+      [fileURLToPath(new URL("./launch.ts", import.meta.url)), "--tray"],
       {
         stdio: "inherit",
       },
@@ -35,8 +39,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   if (!Number.isInteger(serverPid) || serverPid <= 0) throw new Error("Некорректный PID сервера");
   process.send?.("READY");
   process.disconnect?.();
-  restartAfterExit(serverPid, desktopPid, launchProjector).catch((error) => {
-    console.error("Перезапуск Projector:", error.message);
+  restartAfterExit(serverPid, desktopPid, launchProjector).catch((error: unknown) => {
+    console.error("Перезапуск Projector:", error instanceof Error ? error.message : error);
     process.exitCode = 1;
   });
 }

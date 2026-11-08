@@ -73,7 +73,7 @@ if (role === "resident") {
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
   const url = `http://127.0.0.1:${server.address().port}`;
-  const helper = fileURLToPath(new URL("../../packages/cli/app/desktop.mjs", import.meta.url));
+  const helper = fileURLToPath(new URL("../../packages/cli/app/desktop.ts", import.meta.url));
   const env = { ...process.env, XDG_DATA_HOME: directory };
   const web = spawn(process.execPath, [helper, "native", url, "tray"], {
     env,

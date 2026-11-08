@@ -58,7 +58,7 @@ Capabilities означают наличие реализации, а не ус�
 Порт сервера и модель хранения проектов — настройки приложения; они не относятся к OS-адаптеру. Импорт ключей ai-companion принимает путь аргументом:
 
 ```bash
-node packages/cli/app/import-companion-key.mjs /path/to/providers.json
+node packages/cli/app/import-companion-key.ts /path/to/providers.json
 ```
 
 ## macOS: как устроено и что не поддерживается
@@ -85,7 +85,7 @@ node packages/cli/app/import-companion-key.mjs /path/to/providers.json
 - **Дерево процессов** завершает один `killTree` (`taskkill /T /F`, ожидается его завершение). Job Object не используется: после падения сервера дерево агента остаётся. `ProcessInfo.group/foreground` на Windows `null` (групп процессов нет), `conhost`/`OpenConsole` из списка исключены, иначе каждый PTY выглядел бы занятым.
 - **Канал резидента** `\\.\pipe\dev.projector.Launcher.<пользователь>` создаётся с DACL по умолчанию (запись только владельцу, SYSTEM и администраторам); команда дополнительно требует токен из профиля, сравнение с постоянным временем.
 - **Восстановление резидента:** перед принудительным завершением PID и время создания процесса сверяются с `launcher.identity.json`; старого файла `launcher.pid` для завершения недостаточно. Повторные отправки одной команды по каналу используют общий ID и выполняются один раз.
-- **Запуск агентов** (`os.tools.agentLaunch`): `.cmd`-шимы идут через shell, аргументы с пробелами и метасимволами кавычатся; тот же результат читает `packages/cli/app/agent-host.mjs`.
+- **Запуск агентов** (`os.tools.agentLaunch`): `.cmd`-шимы идут через shell, аргументы с пробелами и метасимволами кавычатся; тот же результат читает `packages/cli/app/agent-host.ts`.
 - **Права файлов:** `0600` заменён на ACL только для текущего пользователя (`os.tools.restrictToOwner`: `icacls /inheritance:r`, `/grant:r *<SID>:F`, `/remove:g` для Administrators, SYSTEM, Everyone, Users, Authenticated Users). Применяется к `integrations.json`, паролю LAN, токену резидента, файлу с токеном для Docker-клонирования и `devcontainer-trust.json`. Системные утилиты (`icacls`, `whoami`, `taskkill`) запускаются из `System32`: Git кладёт в PATH собственный `whoami`.
 - **Исполняемость файла:** по расширению из `PATHEXT` и `.ps1` (`os.tools.isExecutableFile`), а не по биту режима.
 - **Ссылки из терминала:** каталог берётся у каждого процесса оболочки (Git Bash — цепочка `bash`); тест `windows-adapter` показывает, что Git Bash выставляет Win32-каталог сразу после `cd`, без запуска программы.

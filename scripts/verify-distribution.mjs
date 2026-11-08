@@ -62,12 +62,12 @@ check(
   "native repository.url must match the root repository for provenance",
 );
 check(
-  ide.bin?.projector === "./packages/cli/app/launch.mjs",
-  "IDE bin.projector must point to launch.mjs",
+  ide.bin?.projector === "./packages/cli/app/launch.js",
+  "IDE bin.projector must point to launch.js",
 );
 check(
-  ide.bin?.["projector-install-desktop"] === "./packages/cli/app/install-desktop.mjs",
-  "IDE bin.projector-install-desktop must point to install-desktop.mjs",
+  ide.bin?.["projector-install-desktop"] === "./packages/cli/app/install-desktop.js",
+  "IDE bin.projector-install-desktop must point to install-desktop.js",
 );
 
 for (const [label, manifest] of [
@@ -82,9 +82,9 @@ for (const [label, manifest] of [
 const required = [
   "ide/dist/index.html",
   "ide/packages/server/app/standalone.js",
-  "ide/packages/cli/app/launch.mjs",
-  "ide/packages/cli/app/install-desktop.mjs",
-  "ide/packages/cli/app/fix-node-pty.mjs",
+  "ide/packages/cli/app/launch.js",
+  "ide/packages/cli/app/install-desktop.js",
+  "ide/packages/cli/app/fix-node-pty.js",
   "ide/bin/projector",
   "ide/resources/icons/projector.svg",
   "ide/LICENSE",
@@ -102,8 +102,8 @@ for (const file of required) {
 }
 
 for (const [label, file] of [
-  ["IDE launch", "ide/packages/cli/app/launch.mjs"],
-  ["IDE install-desktop", "ide/packages/cli/app/install-desktop.mjs"],
+  ["IDE launch", "ide/packages/cli/app/launch.js"],
+  ["IDE install-desktop", "ide/packages/cli/app/install-desktop.js"],
 ]) {
   const text = await readFile(join(output, file), "utf8").catch(() => "");
   check(text.startsWith("#!/usr/bin/env node\n"), `${label} must start with a Node shebang`);
@@ -121,7 +121,7 @@ const walk = async (directory) => {
 };
 
 for (const file of await walk(output)) {
-  if (!/\.(js|mjs|json)$/.test(file)) continue;
+  if (!/\.(js|mjs|json|ts)$/.test(file)) continue;
   const text = await readFile(file, "utf8");
   if (text.includes("@projector/")) {
     failures.push(`${relative(output, file)} still references private scope @projector/`);

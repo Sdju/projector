@@ -3,7 +3,7 @@ import { once } from "node:events";
 import { createServer, request } from "node:http";
 import { setTimeout as sleep } from "node:timers/promises";
 import { expect, onTestFinished, test } from "vite-plus/test";
-import { restartAfterExit, waitForProcessExit } from "../packages/cli/app/restart.mjs";
+import { restartAfterExit, waitForProcessExit } from "../packages/cli/app/restart.ts";
 import { handleApi } from "../packages/server/app/api.ts";
 
 async function sleeper() {

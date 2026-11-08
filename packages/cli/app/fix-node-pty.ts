@@ -11,8 +11,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 
-function packageRoots() {
-  const roots = [];
+function packageRoots(): string[] {
+  const roots: string[] = [];
   for (const base of [
     import.meta.url,
     pathToFileURL(join(ROOT, "packages/server/package.json")).href,

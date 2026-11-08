@@ -23,7 +23,7 @@ test("IDE window helpers import and resolve without any native package or GTK lo
     const { desktopArgs, nativeArgs, hasNativePalette } = await import(${JSON.stringify(module)});
     assert.equal(hasNativePalette(), false);
     assert.equal(nativeArgs().length, 1);
-    assert.equal(basename(nativeArgs()[0]), 'desktop.mjs');
+    assert.equal(basename(nativeArgs()[0]), 'desktop.ts');
     assert.equal(basename(dirname(dirname(nativeArgs()[0]))), 'cli');
     assert.deepEqual(desktopArgs(), nativeArgs());
     console.log('no GTK');

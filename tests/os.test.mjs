@@ -230,7 +230,7 @@ test(
       recursive: true,
     });
     await writeFile(join(root, "package.json"), JSON.stringify({ version: "9.9.9" }));
-    await writeFile(join(root, "cli", "app", "launch.mjs"), "export {};\n");
+    await writeFile(join(root, "cli", "app", "launch.ts"), "export {};\n");
     const facade = new URL("../packages/core/modules/os/index.ts", import.meta.url).href;
     execFileSync(
       process.execPath,
@@ -246,7 +246,7 @@ test(
     const app = join(home, "Applications/Projector.app");
     const wrapper = await readFile(command, "utf8");
     expect(wrapper).toMatch(/checkout with spaces/);
-    expect(wrapper).toMatch(/cli\/app\/launch\.mjs/);
+    expect(wrapper).toMatch(/cli\/app\/launch\.ts/);
     expect(await readFile(join(app, "Contents/MacOS/Projector"), "utf8")).toContain(command);
     const plist = await readFile(join(app, "Contents/Info.plist"), "utf8");
     expect(plist).toMatch(/dev\.projector\.app/);
