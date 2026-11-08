@@ -6,9 +6,6 @@ export type AppearanceChoice = ColorScheme | "auto";
 
 export const appearanceFile = "appearance.json";
 
-/** Сервер подставляет это значение в `data-appearance` при отдаче `index.html`. */
-export const appearancePlaceholder = "__PROJECTOR_APPEARANCE__";
-
 export const appearanceOptions = [
   {
     id: "dark",

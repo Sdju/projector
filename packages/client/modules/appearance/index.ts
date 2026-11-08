@@ -11,7 +11,7 @@ const choice = shallowRef<AppearanceChoice>(defaultAppearance);
 let media: MediaQueryList | undefined;
 let initialized = false;
 
-/** The stored choice arrives in `data-appearance` with index.html; nothing is fetched for it. */
+/** `data-appearance` is set by the bootstrap script before the app starts; nothing is fetched here. */
 export function currentAppearance(): AppearanceChoice {
   const value = document.documentElement.dataset.appearance;
   return isAppearanceChoice(value) ? value : defaultAppearance;

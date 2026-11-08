@@ -1,5 +1,4 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { fileURLToPath, URL } from "node:url";
 import vue from "@vitejs/plugin-vue";
 import Icons from "unplugin-icons/vite";
@@ -7,14 +6,7 @@ import { defineConfig, type Plugin } from "vite-plus";
 import { createConfig as createFeodConfig } from "@o-feod/oxlint-structure-plugin/configs";
 import feod from "./feod.config.mjs";
 import { checkFeod, checkFeodAsync } from "./scripts/check-feod.mjs";
-import { APP_PORT, dataDir, readNetworkMode } from "./packages/core/modules/app-paths/index.ts";
-import {
-  appearanceFile,
-  appearancePlaceholder,
-  defaultAppearance,
-  isAppearanceChoice,
-  type AppearanceChoice,
-} from "./packages/core/modules/appearance/index.ts";
+import { APP_PORT, readNetworkMode } from "./packages/core/modules/app-paths/index.ts";
 import { networkHost } from "./packages/core/modules/network-mode/index.ts";
 import { projectorPlugin } from "./packages/server/app/dev-plugin.ts";
 
@@ -51,26 +43,6 @@ function architecturePlugin(): Plugin {
   };
 }
 
-/** The dev server renders index.html itself, so the stored choice must reach it before first paint. */
-function appearancePlugin(): Plugin {
-  return {
-    name: "projector-appearance",
-    apply(_config, env) {
-      return env.command === "serve" && env.mode !== "test";
-    },
-    transformIndexHtml(html) {
-      let choice: AppearanceChoice = defaultAppearance;
-      try {
-        const data = JSON.parse(readFileSync(join(dataDir(), appearanceFile), "utf8"));
-        if (isAppearanceChoice(data?.choice)) choice = data.choice;
-      } catch {
-        // No saved choice yet, or the file is unreadable: the default scheme is already in :root.
-      }
-      return html.replaceAll(appearancePlaceholder, choice);
-    },
-  };
-}
-
 const packageManifest = (name: string) =>
   JSON.parse(readFileSync(new URL(`./packages/${name}/package.json`, import.meta.url), "utf8")) as {
     dependencies?: Record<string, string>;
@@ -87,13 +59,7 @@ const feodLint = createFeodConfig(feod, { rootDir: fileURLToPath(new URL(".", im
 
 export default defineConfig({
   ssr: { external: ssrExternal },
-  plugins: [
-    architecturePlugin(),
-    appearancePlugin(),
-    vue(),
-    Icons({ compiler: "vue3" }),
-    projectorPlugin(),
-  ],
+  plugins: [architecturePlugin(), vue(), Icons({ compiler: "vue3" }), projectorPlugin()],
   resolve: {
     alias: {
       "@app": fileURLToPath(new URL("./packages/client/app", import.meta.url)),

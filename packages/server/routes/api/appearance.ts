@@ -1,9 +1,43 @@
+import type { AppearanceChoice } from "@projector/core/modules/appearance/index.ts";
 import { readAppearanceChoice, writeAppearanceChoice } from "../../modules/appearance/index.ts";
 import { json, readBody, type RouteDefinition } from "../../modules/transport/index.ts";
 import { accessAllowed } from "../../modules/access/index.ts";
 import { HttpError } from "../../modules/http/index.ts";
 
+/**
+ * A blocking classic script in <head>: it applies the saved scheme before the app and styles paint.
+ * The response is built per request, so changing the theme needs neither a rebuild nor a page reload.
+ */
+function bootstrapScript(choice: AppearanceChoice): string {
+  return `(() => {
+  const choice = ${JSON.stringify(choice)};
+  const root = document.documentElement;
+  const scheme =
+    choice === "auto"
+      ? matchMedia("(prefers-color-scheme: light)").matches
+        ? "light"
+        : "dark"
+      : choice;
+  root.dataset.appearance = choice;
+  root.dataset.theme = scheme;
+  document.querySelector('meta[name="color-scheme"]')?.setAttribute("content", scheme);
+})();
+`;
+}
+
 export const routes: RouteDefinition[] = [
+  {
+    method: "GET",
+    path: "/api/appearance/bootstrap.js",
+    handler: async ({ req, res }) => {
+      if (!accessAllowed(req, false))
+        throw new HttpError(403, "Настройки доступны только со страницы Projector");
+      res.setHeader("Content-Type", "text/javascript; charset=utf-8");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Cache-Control", "no-store");
+      res.end(bootstrapScript(await readAppearanceChoice()));
+    },
+  },
   {
     method: "GET",
     path: "/api/appearance",

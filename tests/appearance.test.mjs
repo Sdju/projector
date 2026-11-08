@@ -1,8 +1,5 @@
 import { createServer } from "node:http";
 import { once } from "node:events";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { expect, onTestFinished, test } from "vite-plus/test";
 import {
   appearanceOptions,
@@ -15,7 +12,6 @@ import {
   writeAppearanceChoice,
 } from "../packages/server/modules/appearance/index.ts";
 import { handleApi } from "../packages/server/app/api.ts";
-import { serveStatic } from "../packages/server/app/static.ts";
 
 test("appearance choice validates and resolves the system scheme", () => {
   expect(appearanceOptions.map((option) => option.id)).toStrictEqual(["dark", "light", "auto"]);
@@ -70,26 +66,27 @@ test("appearance API reads and writes the saved choice", async () => {
   expect(await readAppearanceChoice()).toBe("light");
 });
 
-test("index.html gets the stored appearance before first paint", async () => {
-  await writeAppearanceChoice("light");
-  const root = await mkdtemp(join(tmpdir(), "projector-appearance-"));
-  onTestFinished(() => rm(root, { recursive: true, force: true }));
-  await writeFile(
-    join(root, "index.html"),
-    '<!doctype html><html lang="ru" data-appearance="__PROJECTOR_APPEARANCE__"></html>',
-  );
+test("bootstrap script follows the saved choice on every request", async () => {
+  await writeAppearanceChoice("auto");
   const server = createServer((req, res) => {
-    void serveStatic(root, req, res);
+    void handleApi(req, res);
   });
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
   onTestFinished(() => new Promise((resolve) => server.close(resolve)));
   const base = `http://127.0.0.1:${server.address().port}`;
 
-  for (const path of ["/", "/project/workspace"]) {
-    const response = await fetch(base + path);
-    expect(response.status).toBe(200);
-    expect(response.headers.get("cache-control")).toBe("no-cache");
-    expect(await response.text()).toContain('data-appearance="light"');
-  }
+  const response = await fetch(`${base}/api/appearance/bootstrap.js`);
+  expect(response.status).toBe(200);
+  expect(response.headers.get("content-type")).toContain("text/javascript");
+  expect(response.headers.get("cache-control")).toBe("no-store");
+  const script = await response.text();
+  expect(script).toContain('const choice = "auto"');
+  expect(script).toContain('matchMedia("(prefers-color-scheme: light)")');
+  expect(script).toContain("root.dataset.theme = scheme");
+
+  await writeAppearanceChoice("light");
+  const changed = await (await fetch(`${base}/api/appearance/bootstrap.js`)).text();
+  expect(changed).toContain('const choice = "light"');
+  expect(changed).not.toBe(script);
 });

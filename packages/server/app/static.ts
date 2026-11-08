@@ -1,9 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createReadStream } from "node:fs";
-import { readFile, stat } from "node:fs/promises";
+import { stat } from "node:fs/promises";
 import { extname, join, normalize, sep } from "node:path";
-import { appearancePlaceholder } from "@projector/core/modules/appearance/index.ts";
-import { readAppearanceChoice } from "../modules/appearance/index.ts";
 
 const TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -58,20 +56,6 @@ export async function serveStatic(
     file = join(root, "index.html");
   }
   const immutable = file.startsWith(join(root, "assets") + sep);
-  if (file === join(root, "index.html")) {
-    const html = (await readFile(file, "utf8")).replaceAll(
-      appearancePlaceholder,
-      await readAppearanceChoice(),
-    );
-    res.writeHead(200, {
-      "Content-Type": TYPES[".html"],
-      "Content-Length": Buffer.byteLength(html),
-      "Cache-Control": "no-cache",
-    });
-    if (req.method === "HEAD") res.end();
-    else res.end(html);
-    return;
-  }
   res.writeHead(200, {
     "Content-Type": TYPES[extname(file)] ?? "application/octet-stream",
     "Cache-Control": immutable ? "public, max-age=31536000, immutable" : "no-cache",
