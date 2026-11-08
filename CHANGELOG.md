@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Установка
+
+- Публичные npm-пакеты переименованы в `@projector-ai/ide` и `@projector-ai/native`; внутренние workspace-пакеты остаются `@projector/*` и не публикуются. В манифестах появились `publishConfig`, `files`, README и `projector-install-desktop`; `vp run verify:distribution` проверяет поставку перед публикацией.
+- Добавлен `.github/workflows/publish.yml` для публикации из GitHub Release через OIDC trusted publishing, без `NPM_TOKEN`. Первый выпуск каждого имени до настройки trusted publisher выполняется вручную; порядок описан в `docs/distribution.md`.
+
 ## 0.10.0
 
 Выпуск вводит роли агентов — глобальные, служебные и проектные — и read-only субагента `task`, делает ответы надёжнее за счёт Answer Doctor и точных ссылок, а выделение из чата, редактора и терминала теперь попадает в поле ввода. Код разложен по пакетам pnpm workspace, IDE и GTK-палитра разделены для установки, а проекты получили раздел Releases.

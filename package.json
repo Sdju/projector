@@ -34,7 +34,8 @@
     "prepare": "node scripts/ensure-vite-plus-core.mjs && node packages/cli/app/fix-node-pty.mjs && vp hooks enable",
     "test:gtk": "node --import @zede/vio/register tests/native-palette.gtk.mjs",
     "bench:chat": "node scripts/bench-chat/run.mjs",
-    "build:distribution": "vp run build && node scripts/build-distribution.mjs"
+    "build:distribution": "vp run build && node scripts/build-distribution.mjs",
+    "verify:distribution": "node scripts/verify-distribution.mjs"
   },
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "catalog:",

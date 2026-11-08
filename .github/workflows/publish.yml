@@ -1,0 +1,75 @@
+name: Publish npm
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3 pkg-config libgtk-4-dev libgirepository1.0-dev gir1.2-gtk-4.0 gir1.2-glib-2.0 ripgrep
+      - uses: voidzero-dev/setup-vp@v1.21.1
+        with:
+          node-version-file: .node-version
+          cache: false
+          run-install: false
+      - name: Install locked dependencies
+        run: vp install --frozen-lockfile
+      - name: Check npm CLI for trusted publishing
+        run: |
+          npm --version
+          node -e '
+            const [major, minor, patch] = process.argv[1].split(".").map(Number);
+            if (major < 11 || (major === 11 && (minor < 5 || (minor === 5 && patch < 1)))) {
+              console.error("Trusted publishing requires npm >= 11.5.1");
+              process.exit(1);
+            }
+          ' "$(npm --version)"
+      - name: Verify release version
+        run: |
+          node --input-type=module -e '
+            import { readFile } from "node:fs/promises";
+            const manifest = JSON.parse(await readFile("package.json", "utf8"));
+            const ref = process.env.GITHUB_REF_NAME ?? "";
+            if (ref.startsWith("v") && ref.slice(1) !== manifest.version) {
+              console.error(`Tag ${ref} does not match package.json version ${manifest.version}`);
+              process.exit(1);
+            }
+            console.log(`release version ${manifest.version}${ref ? ` (${ref})` : ""}`);
+          '
+      - name: Build distribution
+        run: vp run build:distribution
+      - name: Verify distribution
+        run: vp run verify:distribution
+      - name: Publish packages
+        run: |
+          set -euo pipefail
+          npm config set registry https://registry.npmjs.org/
+          publish_if_missing() {
+            local directory="$1"
+            local name="$2"
+            local version
+            version="$(node -p "require('./${directory}/package.json').version")"
+            if npm view "${name}@${version}" version >/dev/null 2>&1; then
+              echo "${name}@${version} is already published, skipping"
+              return
+            fi
+            npm publish "./${directory}" --access public --provenance
+          }
+          publish_if_missing artifacts/distribution/ide "@projector-ai/ide"
+          publish_if_missing artifacts/distribution/native "@projector-ai/native"

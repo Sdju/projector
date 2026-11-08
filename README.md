@@ -111,7 +111,33 @@ Claude Code, Codex, OpenCode, Cursor и Kimi Code открываются не т
 
 ## Установка
 
-Projector пока устанавливается из исходников. Проверенное окружение — KDE Plasma с X11; Windows и macOS поддерживаются через адаптеры ОС и проверяются в CI.
+Projector можно установить из npm (готовые пакеты) или из исходников. Проверенное окружение — KDE Plasma с X11; Windows и macOS поддерживаются через адаптеры ОС и проверяются в CI.
+
+### Из npm
+
+Веб-IDE, терминалы и агенты:
+
+```bash
+npm install -g @projector-ai/ide
+projector --browser
+```
+
+Необязательная GTK-палитра ставится отдельно и в тот же npm prefix:
+
+```bash
+npm install -g @projector-ai/native
+projector --native
+```
+
+`@projector-ai/ide` не требует GTK, Vite+ или `@zede/vio`. Ему нужны Node.js 24.11–24.x и на Linux Python 3, `make` и компилятор C++ для сборки `node-pty`. `@projector-ai/native` требует GTK4, GObject Introspection, `pkg-config` и компилятор C++ для `node-gtk`. Пакеты публикуются из GitHub Releases; если нужной версии ещё нет в registry, используйте установку из исходников.
+
+Чтобы добавить пункт меню и команду `projector` после npm-установки:
+
+```bash
+projector-install-desktop
+```
+
+### Из исходников
 
 Перед установкой понадобятся:
 
@@ -150,7 +176,7 @@ bin\projector.cmd --browser
 
 Веб-интерфейс доступен по адресу <http://localhost:4177> при работающем Projector.
 
-Чтобы добавить Projector в меню приложений и установить команду `projector`:
+Чтобы добавить Projector в меню приложений и установить команду `projector` из checkout:
 
 ```bash
 vp run desktop
@@ -182,6 +208,7 @@ projector --tray     # запустить в трее без окна поиск
 projector --lan | --local   # одноразово: доступ по сети / только localhost
 projector mode [dev|prod]   # показать или переключить режим сервера
 projector quit       # завершить Projector и запущенные им процессы
+projector-install-desktop   # пункт меню и команда из npm-пакета
 ```
 
 Для автозапуска добавьте `projector --tray` в настройки автозапуска рабочего окружения. Esc скрывает поиск; выход и перезапуск Projector завершают его терминальные сессии и процессы.

@@ -39,7 +39,7 @@ async function main() {
   else if (command === "shortcut-status") console.log(JSON.stringify(await os.shortcutStatus()));
   else {
     if (os.capabilities.giLoader)
-      throw new Error("Системные приложения требуют дополнения @projector/native (GIO).");
+      throw new Error("Системные приложения требуют дополнения @projector-ai/native (GIO).");
     const catalog = await os.catalog();
     if (command === "list") console.log(JSON.stringify(await catalog.listApplications()));
     else if (command === "launch") await catalog.launchApplication(value);

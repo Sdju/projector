@@ -15,7 +15,7 @@ test("IDE window helpers import and resolve without any native package or GTK lo
     import { registerHooks } from 'node:module';
     import assert from 'node:assert/strict';
     registerHooks({ resolve(name, context, next) {
-      if (name.startsWith('@projector/native') || name.startsWith('@zede/vio') || name.startsWith('node-gtk') || name.startsWith('gi:'))
+      if (name.startsWith('@projector/native') || name.startsWith('@projector-ai/native') || name.startsWith('@zede/vio') || name.startsWith('node-gtk') || name.startsWith('gi:'))
         throw Object.assign(new Error('Absent in IDE installation: ' + name), { code: 'MODULE_NOT_FOUND' });
       return next(name, context);
     }});
