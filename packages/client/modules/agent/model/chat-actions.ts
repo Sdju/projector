@@ -1,4 +1,4 @@
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import {
   discardWorktree,
   fetchWorktree,
@@ -33,6 +33,8 @@ export function useChatActions(
   },
 ) {
   const { backend, projectId, ready, persist, send, stop } = chat;
+  // Every change of the queue reaches the history at once, so a reload cannot lose a message.
+  watch(() => state.queue, persist, { deep: true, flush: "sync" });
 
   /**
    * After the chat was cut back, an agent that cannot go back inside its own session starts a new

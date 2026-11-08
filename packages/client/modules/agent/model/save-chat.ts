@@ -1,5 +1,5 @@
 import { announceChat } from "./chat-sync.ts";
-import { queued, saves, type ChatState } from "./chat-state.ts";
+import { queued, savedQueue, saves, type ChatState } from "./chat-state.ts";
 
 /**
  * Saves the chat to the server. Events arrive far faster than a save takes: saves queued behind
@@ -23,6 +23,7 @@ export function saveChat(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           turns: state.turns,
+          queue: savedQueue(state.queue),
           features: state.featureOverrides ?? null,
           judge: state.judgeOverride ?? null,
           role: state.roleSnapshot ?? null,

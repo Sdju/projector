@@ -66,8 +66,9 @@ export async function archiveLiveChat(scope: string): Promise<string | undefined
     )
     .all(scope, KEEP) as unknown as { id: string }[];
   for (const row of extra) removeArchivedChat(row.id);
-  // The live chat is empty now: it should not linger in the project's list of chats.
-  await writeAgentHistory(scope, [], meta);
+  // The live chat is empty now: it should not linger in the project's list of chats, and its
+  // queue belongs to the chat that was put aside.
+  await writeAgentHistory(scope, [], meta, undefined, undefined, undefined, null);
   return id;
 }
 
@@ -84,7 +85,7 @@ export async function openArchivedChat(scope: string, id: string) {
     row.project && row.backend
       ? { project: row.project, backend: row.backend, title: row.title }
       : undefined;
-  return writeAgentHistory(scope, turns, index);
+  return writeAgentHistory(scope, turns, index, undefined, undefined, undefined, null);
 }
 
 export function renameArchivedChat(id: string, change: { title?: string; pinned?: boolean }) {

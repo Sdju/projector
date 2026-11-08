@@ -9,6 +9,7 @@ import {
   listArchivedChats,
   openArchivedChat,
   readAgentHistory,
+  readChatQueue,
   readRecentChats,
   removeArchivedChat,
   removeChatsWithSession,
@@ -70,6 +71,31 @@ describe("Projector agent chat history", () => {
     };
     await writeAgentHistory("u", [{ ...turn("1", "assistant", "ответ"), usage }]);
     expect((await readAgentHistory("u"))[0].usage).toEqual(usage);
+  });
+
+  it("keeps the messages waiting for the answer and clears them with a new chat", async () => {
+    const queue = [
+      {
+        id: "q1",
+        text: "подожди ответа",
+        parts: [{ type: "text", text: "подожди ответа" }],
+        form: { source: "<Form />", values: { next: "a" }, summary: "Дальше" },
+        auto: "job-1",
+        autoTitle: "Проверка",
+      },
+    ];
+    await writeAgentHistory(
+      "queue",
+      [turn("1", "user", "вопрос")],
+      { project: "queue-project", backend: "projector" },
+      undefined,
+      undefined,
+      undefined,
+      queue,
+    );
+    expect(readChatQueue("queue")).toEqual(queue);
+    await archiveLiveChat("queue");
+    expect(readChatQueue("queue")).toBeUndefined();
   });
 
   it("keeps when a message was written", async () => {

@@ -1,4 +1,4 @@
-import type { ChatState } from "./chat-state.ts";
+import { restoredQueue, savedQueue, type ChatState } from "./chat-state.ts";
 import { normalizeRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
 import { applyRoleSnapshot } from "./role-apply.ts";
 
@@ -15,6 +15,7 @@ export function loadHistory(url: string, state: ChatState, quiet = false): Promi
       const features = Array.isArray(data.features) ? data.features : undefined;
       const judge = data.judge && typeof data.judge === "object" ? data.judge : undefined;
       const role = normalizeRoleSnapshot(data.role);
+      const queue = restoredQueue(data.queue);
       // A refresh of an unchanged chat must not re-render it. A missing saved role is not a
       // change: a new chat gets its role from the tab before the first save. The tab's snapshot
       // is the same preset even when the saved copy is slightly older.
@@ -25,10 +26,12 @@ export function loadHistory(url: string, state: ChatState, quiet = false): Promi
         JSON.stringify(data.turns) === JSON.stringify(state.turns) &&
         JSON.stringify(features ?? null) === JSON.stringify(state.featureOverrides ?? null) &&
         JSON.stringify(judge ?? null) === JSON.stringify(state.judgeOverride ?? null) &&
+        JSON.stringify(queue) === JSON.stringify(savedQueue(state.queue)) &&
         !roleChanged
       )
         return;
       state.turns = data.turns;
+      state.queue = queue;
       state.featureOverrides = features;
       state.judgeOverride = judge;
       // The tab's snapshot is the same preset; do not overwrite a control changed in this chat

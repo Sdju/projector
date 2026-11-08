@@ -1,6 +1,12 @@
 import { expect, test, vi, afterEach } from "vite-plus/test";
-import { createState, chatHistory } from "../packages/client/modules/agent/model/chat-state.ts";
+import {
+  createState,
+  chatHistory,
+  restoredQueue,
+  savedQueue,
+} from "../packages/client/modules/agent/model/chat-state.ts";
 import { useChatActions } from "../packages/client/modules/agent/model/chat-actions.ts";
+import { loadHistory } from "../packages/client/modules/agent/model/load-history.ts";
 import { applyAgentEvent } from "../packages/client/modules/agent/model/turn-events.ts";
 import { injectMessage } from "../packages/server/modules/agent/injection.ts";
 import { createTurnInput } from "../packages/server/modules/agents/projector/projector-input.ts";
@@ -30,6 +36,63 @@ function setup() {
   });
   return { state, actions, send };
 }
+
+test("a change of the queue saves the chat at once", () => {
+  const state = createState();
+  const persist = vi.fn();
+  useChatActions(state, {
+    backend: "projector",
+    projectId: "p",
+    ready: Promise.resolve(),
+    persist,
+    send: async () => {},
+    stop: () => {},
+  });
+  expect(persist).not.toHaveBeenCalled();
+
+  state.queue = [{ id: "one", text: "one", parts: [] }];
+  expect(persist).toHaveBeenCalledTimes(1);
+  state.queue[0].delivering = true;
+  expect(persist).toHaveBeenCalledTimes(2);
+  state.queue = [];
+  expect(persist).toHaveBeenCalledTimes(3);
+});
+
+test("a queued message is saved without the live delivery flag and comes back after a reload", async () => {
+  const message = {
+    id: "saved",
+    text: "подожди ответа",
+    parts: [{ type: "text", text: "подожди ответа" }],
+    auto: "job",
+    autoTitle: "Задание",
+    delivering: true,
+  };
+  expect(savedQueue([message])).toEqual([
+    {
+      id: "saved",
+      text: "подожди ответа",
+      parts: [{ type: "text", text: "подожди ответа" }],
+      auto: "job",
+      autoTitle: "Задание",
+    },
+  ]);
+  expect(restoredQueue([message, { id: "broken" }, null])).toEqual([
+    {
+      id: "saved",
+      text: "подожди ответа",
+      parts: [{ type: "text", text: "подожди ответа" }],
+      auto: "job",
+      autoTitle: "Задание",
+    },
+  ]);
+  vi.stubGlobal("fetch", async () => ({
+    ok: true,
+    json: async () => ({ turns: [], queue: [message] }),
+  }));
+  const state = createState();
+  await loadHistory("/h", state);
+  expect(state.queue).toEqual(restoredQueue([message]));
+});
 
 test("automatic delivery is FIFO, waits for consumption, and does not duplicate concurrent requests", async () => {
   const { state, actions } = setup();

@@ -148,3 +148,39 @@ test("roles API creates, updates and deletes a chat role", async () => {
     expect(serviceDelete.status).toBe(400);
   });
 });
+
+test("history API keeps the messages waiting for the answer", async () => {
+  await withServer(async (origin) => {
+    const queue = [
+      {
+        id: "queued-1",
+        text: "после ответа",
+        parts: [
+          { type: "text", text: "после ответа" },
+          { type: "file", path: "src/app.ts", range: { from: 3, to: 9 } },
+        ],
+        form: { source: "<Form />", values: { next: "a" }, summary: "Дальше" },
+        auto: "job-1",
+        autoTitle: "Проверка",
+      },
+    ];
+    const write = await fetch(`${origin}/api/agent/history/queue-chat`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Origin: origin },
+      body: JSON.stringify({ turns: [], queue }),
+    });
+    expect(write.status).toBe(200);
+    expect((await write.json()).queue).toEqual(queue);
+
+    const read = await (await fetch(`${origin}/api/agent/history/queue-chat`)).json();
+    expect(read.queue).toEqual(queue);
+
+    const cleared = await fetch(`${origin}/api/agent/history/queue-chat`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Origin: origin },
+      body: JSON.stringify({ turns: [], queue: [] }),
+    });
+    expect(cleared.status).toBe(200);
+    expect((await (await fetch(`${origin}/api/agent/history/queue-chat`)).json()).queue).toBeNull();
+  });
+});

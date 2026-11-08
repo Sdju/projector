@@ -7,6 +7,7 @@ import {
   saveHistory,
 } from "./history-store.ts";
 import { saveChatJudge } from "./judge-store.ts";
+import { saveChatQueue } from "./queue-store.ts";
 import { saveChatRole } from "./role-store.ts";
 import { normalizeJudgeOverride } from "@projector/core/modules/agent-judge/index.ts";
 import { normalizeRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
@@ -19,6 +20,40 @@ interface StoredTurn {
   injected?: string;
 }
 
+const partSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("text"), text: z.string() }),
+  z.object({
+    type: z.literal("file"),
+    path: z.string(),
+    directory: z.boolean().optional(),
+    range: z
+      .object({ from: z.number().int().positive(), to: z.number().int().positive() })
+      .refine((range) => range.to >= range.from)
+      .optional(),
+  }),
+  z.object({
+    type: z.literal("image"),
+    id: z.string(),
+    name: z.string(),
+    mime: z.string(),
+  }),
+  z.object({ type: z.literal("command"), name: z.string() }),
+]);
+const formSchema = z.object({
+  source: z.string(),
+  values: z.unknown(),
+  summary: z.string().optional(),
+});
+const queueSchema = z.array(
+  z.object({
+    id: z.string(),
+    text: z.string(),
+    parts: z.array(partSchema),
+    form: formSchema.optional(),
+    auto: z.string().optional(),
+    autoTitle: z.string().optional(),
+  }),
+);
 const turnSchema: z.ZodType<StoredTurn> = z.lazy(() =>
   z.object({
     id: z.string(),
@@ -49,37 +84,9 @@ const turnSchema: z.ZodType<StoredTurn> = z.lazy(() =>
       }),
     ),
     tasks: z.array(agentTaskSchema).optional(),
-    content: z
-      .array(
-        z.discriminatedUnion("type", [
-          z.object({ type: z.literal("text"), text: z.string() }),
-          z.object({
-            type: z.literal("file"),
-            path: z.string(),
-            directory: z.boolean().optional(),
-            range: z
-              .object({ from: z.number().int().positive(), to: z.number().int().positive() })
-              .refine((range) => range.to >= range.from)
-              .optional(),
-          }),
-          z.object({
-            type: z.literal("image"),
-            id: z.string(),
-            name: z.string(),
-            mime: z.string(),
-          }),
-          z.object({ type: z.literal("command"), name: z.string() }),
-        ]),
-      )
-      .optional(),
+    content: z.array(partSchema).optional(),
     /** A form answer: the block the user filled and the values that were sent. */
-    form: z
-      .object({
-        source: z.string(),
-        values: z.unknown(),
-        summary: z.string().optional(),
-      })
-      .optional(),
+    form: formSchema.optional(),
     /** Tokens, cache use and cost of the answer, for the usage tooltip after a reload. */
     usage: z
       .object({
@@ -163,8 +170,11 @@ export async function writeAgentHistory(
   features?: unknown,
   judge?: unknown,
   role?: unknown,
+  queue?: unknown,
 ) {
   const turns = schema.parse(value);
+  // Parsed before anything is written: a broken queue must not leave the chat half saved.
+  const queued = queue === undefined ? undefined : queue === null ? null : queueSchema.parse(queue);
   saveHistory(id, turns, index);
   // `undefined` keeps the chat's choice; `null` clears it back to the user's defaults.
   if (features !== undefined)
@@ -173,5 +183,7 @@ export async function writeAgentHistory(
     saveChatJudge(id, judge === null ? null : (normalizeJudgeOverride(judge) ?? null));
   if (role !== undefined)
     saveChatRole(id, role === null ? null : (normalizeRoleSnapshot(role) ?? null));
+  // `undefined` keeps a queue saved before the field existed; `null` or `[]` empties it.
+  if (queued !== undefined) saveChatQueue(id, queued);
   return turns;
 }

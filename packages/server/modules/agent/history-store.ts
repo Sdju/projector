@@ -97,6 +97,8 @@ export function historyDatabase(): DatabaseSync {
   ensureColumn(db, "chats", "judge", "TEXT");
   // The role snapshot a chat started with, as JSON; NULL means the chat has no role.
   ensureColumn(db, "chats", "role", "TEXT");
+  // Messages waiting for the answer, as JSON; NULL means the queue is empty.
+  ensureColumn(db, "chats", "queue", "TEXT");
   void chmod(file, 0o600).catch(() => {});
   databases.set(file, db);
   return db;

@@ -69,6 +69,23 @@ export const createState = () =>
 
 export type ChatState = ReturnType<typeof createState>;
 
+/** A queued message as it is saved: whether it is being delivered belongs to the live page. */
+export function savedQueue(queue: QueuedMessage[]): QueuedMessage[] {
+  return queue.map(({ delivering: _delivering, ...item }) => item);
+}
+
+/** Messages restored from history: no message is mid-delivery, and broken entries are ignored. */
+export function restoredQueue(value: unknown): QueuedMessage[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item): QueuedMessage[] => {
+    if (!item || typeof item !== "object") return [];
+    const { id, text, parts } = item as Partial<QueuedMessage>;
+    if (typeof id !== "string" || typeof text !== "string" || !Array.isArray(parts)) return [];
+    const { delivering: _delivering, ...rest } = item as QueuedMessage;
+    return [rest];
+  });
+}
+
 export function summarize(value: unknown): string {
   if (value == null) return "";
   if (typeof value === "string") return value.slice(0, 8000);
