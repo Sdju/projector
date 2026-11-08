@@ -113,6 +113,7 @@ async function main(answer: (options: AgentRunOptions) => Promise<void>): Promis
     backend: record.backend,
     permissionMode: record.permissionMode,
     selection: record.selection,
+    role: record.role,
     message: record.message,
     parts: record.parts,
     projectId: record.projectId,

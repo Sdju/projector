@@ -20,6 +20,7 @@ export function describe(job: AgentJobView) {
   return {
     job: job.id,
     agent: job.backend,
+    ...(job.role ? { role: { id: job.role.roleId, name: job.role.name } } : {}),
     status: job.status,
     task: job.task.slice(0, 200),
     ...(job.error ? { error: job.error } : {}),

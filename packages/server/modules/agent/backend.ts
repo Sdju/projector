@@ -14,6 +14,7 @@ export interface AgentCapabilities {
 }
 
 import type { JudgeOverride } from "@projector/core/modules/agent-judge/index.ts";
+import type { AgentRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
 import type { AgentHistoryTurn } from "../providers/index.ts";
 import type {
   AgentControl,
@@ -95,6 +96,8 @@ export interface AgentRunOptions {
   permissionMode?: AgentPermissionMode;
   /** Model, effort and mode chosen in the chat, by control id. */
   selection?: AgentSelection;
+  /** The chat role the run belongs to; a future task subagent can use the same preset. */
+  role?: AgentRoleSnapshot;
   message: string;
   /** `message` with its chips; the text already names every file (`@path`). */
   parts?: MessagePart[];

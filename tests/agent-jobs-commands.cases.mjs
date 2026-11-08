@@ -50,6 +50,52 @@ test("start sends the task of the project to the API and reports the job", async
   });
 });
 
+test("start can use a chat role instead of an agent", async () => {
+  const fetchMock = vi.fn(async (url) => {
+    if (url === "/api/agent/roles") {
+      return reply({
+        roles: [
+          {
+            id: "role-1",
+            name: "Reviewer",
+            kind: "chat",
+            agent: "codex",
+            selection: { model: "fast" },
+            inherited: false,
+          },
+          { id: "doctor", name: "Doctor", kind: "service", agent: "projector", selection: {} },
+        ],
+        file: "/tmp/roles.json",
+      });
+    }
+    return reply({
+      job: job({
+        status: "queued",
+        role: { roleId: "role-1", name: "Reviewer", selection: { model: "fast" } },
+      }),
+    });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  const result = await commands
+    .get("ide.agent.job.start")
+    .run({ role: "role-1", task: "review this" });
+  expect(result).toMatchObject({ job: "aaaaaaaaaaaa", role: { id: "role-1", name: "Reviewer" } });
+  const [url, init] = fetchMock.mock.calls.at(-1);
+  expect(url).toBe("/api/agent/jobs");
+  expect(JSON.parse(init.body)).toMatchObject({
+    projectId: "p1",
+    role: "role-1",
+    backend: "codex",
+    task: "review this",
+  });
+  await expect(
+    commands.get("ide.agent.job.start").run({ role: "doctor", task: "x" }),
+  ).rejects.toThrow(/Неизвестная chat-роль/);
+  await expect(
+    commands.get("ide.agent.job.start").run({ role: "role-1", agent: "claude", task: "x" }),
+  ).rejects.toThrow(/принадлежит/);
+});
+
 test("result waits for a change only while the job is not finished and returns the full answer", async () => {
   vi.stubGlobal(
     "fetch",

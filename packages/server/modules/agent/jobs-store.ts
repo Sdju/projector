@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { dataDir } from "@projector/core/modules/app-paths/index.ts";
 import type { AgentBackendId, AgentPermissionMode } from "./backend.ts";
 import type { AgentSelection } from "./controls.ts";
+import type { AgentRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
 import type { AgentHistoryTurn } from "../providers/index.ts";
 
 export type AgentJobStatus = "queued" | "running" | "needs-user" | "done" | "error" | "stopped";
@@ -49,6 +50,8 @@ export interface AgentJob {
   history?: AgentHistoryTurn[];
   /** The Projector chat that started the job: its completion continues that conversation. */
   origin?: string;
+  /** The chat role the job started with; the job keeps its snapshot for retries and forks. */
+  role?: AgentRoleSnapshot;
   selection?: AgentSelection;
   permissionMode?: AgentPermissionMode;
   /** The message id the backend keeps for this job; a follow-up written mid-run is delivered to it. */

@@ -6,7 +6,7 @@
 
 Хранилище: `$XDG_DATA_HOME/projector/agent/jobs/<id>/` (`id` — 12 hex-символов).
 
-- `job.json` — `AgentJob`: `id`, `backend`, `task`, `projectId`, `cwd`, `worktree` (`{ id, branch }`), `worktreeCleared`, `history` (для агентов без нативной сессии, в API не отдаётся), `selection`, `permissionMode`, `unattended`, `status`, `rev` (растёт при каждой смене), `createdAt`/`startedAt`/`endedAt`, `runId`, `sessionId`, `result` (до 100 000 символов), `error`, `files`, `pending`.
+- `job.json` — `AgentJob`: `id`, `backend`, `task`, `projectId`, `cwd`, `worktree` (`{ id, branch }`), `worktreeCleared`, `history` (для агентов без нативной сессии, в API не отдаётся), `role` (снимок chat-роли), `selection`, `permissionMode`, `unattended`, `status`, `rev` (растёт при каждой смене), `createdAt`/`startedAt`/`endedAt`, `runId`, `sessionId`, `result` (до 100 000 символов), `error`, `files`, `pending`.
 - `journal.json` — события в формате чата (`text`, `tool`, `tool-result`, `task`, `thought`, `permission-request`, `question-request`, `answer`, `status`). Соседние `text` склеиваются, большие входы и выходы обрезаются, не больше 1500 записей. Вкладка задания свёртывает журнал через `applyAgentEvent` и рисует `AgentTurn`.
 - Состояния: `queued` (создано, ход ещё не запущен), `running`, `needs-user`, `done`, `error`, `stopped`. Завершённые хранятся 14 дней.
 
@@ -20,7 +20,7 @@
 
 ## API
 
-- `POST /api/agent/jobs` — `{ projectId, backend, task, isolate?, selection?, mode?, unattended?, origin? }` (`mode` — режим Claude Code или `mode` ACP; `origin` — ключ чата, который запустил задание).
+- `POST /api/agent/jobs` — `{ projectId, backend?, role?, task, isolate?, selection?, mode?, unattended?, origin? }` (`backend` необязателен, если указан `role`; `role` — id chat-роли, её агент и настройки становятся снимком задания; `mode` — режим Claude Code или `mode` ACP; `origin` — ключ чата, который запустил задание).
 - `GET /api/agent/jobs` — список без журнала; `?projectId=` фильтрует. `GET /api/agent/jobs/:id` — с журналом; `?wait=<сек ≤45>&rev=<N>` ждёт роста `rev`.
 - `GET /api/agent/jobs/:id/diff` — файлы, `--stat`, patch без секретных путей; `?limit=`. После удаления или передачи копии — `409`.
 - `GET /api/agent/jobs/:id/worktree`, `POST …/worktree/merge|discard` — копия. Операции взаимоисключающие; слияние и удаление отклоняются, если копию использует другое активное задание.
@@ -30,7 +30,7 @@
 
 Scope проекта, регистрируются вместе с командами чатов (`model/job-commands.ts`):
 
-- `ide.agent.job.start` `{ agent, task, isolate? }` — изменяющая команда, штатный агент спрашивает подтверждение; режим разрешений задаёт пользователь.
+- `ide.agent.job.start` `{ agent?, role?, task, isolate? }` — изменяющая команда, штатный агент спрашивает подтверждение; режим разрешений задаёт пользователь. Вместо `agent` можно указать chat-роль: её агент, `selection` и `permissionMode` сохраняются снимком, `isolate` роли включает копию.
 - `ide.agent.jobs.list` — состояние, запросы, файлы, начало итога. `ide.agent.job.result` `{ job, wait? }` — полный итог, `wait` до 45 с.
 - `ide.agent.job.diff` `{ job, limit? }`, `ide.agent.job.log` `{ job, tail? }` — проверка вместо доверия итогу.
 - `ide.agent.job.stop`, `.answer` (только вопросы, по идентификаторам вариантов), `.send`, `.retry`, `.continue`, `.fork`, `.open`.
@@ -46,6 +46,7 @@ Scope проекта, регистрируются вместе с команд�
 - Когда задание, запущенное этим чатом (`origin`), завершается, чат продолжает разговор сам: в историю добавляется сообщение о завершении с именем сессии, агент проверяет diff и итог.
 - Артефакты задания недоверенные: промпт требует сверять их с diff. Файлы с секретными именами (`.env`, ключи, `.ssh`) исключаются из списка, статистики и patch, включая обе стороны переименования.
 - `retry`, `fork`, `send`, `merge`, `discard` над одной копией взаимоисключающие. После передачи копии повтору старая запись не может её читать.
+- `retry` и `fork` сохраняют снимок роли задания (`job.role`), даже если роль в настройках позже изменена или удалена.
 - Задания стартуют сразу; `queued` — короткое состояние до запуска. Планировщика, триггеров и автоповтора нет; повтор после ошибки — явная команда. Вложенное делегирование глубже одного уровня не поддерживается.
 
 ## Чат и остров

@@ -31,6 +31,7 @@ import {
   clientAgentOf,
   clientAgents,
 } from "../../agents-integration/catalog/index.ts";
+import { loadAgentRoles } from "../../agent-roles/index.ts";
 import { chatsOf } from "./chat-registry.ts";
 import { isBuiltinAgent } from "./modes.ts";
 import { useJobTabRequests } from "./job-open.ts";
@@ -64,14 +65,35 @@ export function registerJobCommands(
     "Запустить фонового агента",
     async (args) => {
       const options = commandArgs(args);
-      const name = text(options, "agent").toLowerCase();
-      const agent = clientAgentByBackend(name) ?? clientAgentOf(name);
-      if (!agent || agent.builtin) throw new Error(`agent: ${agentIds()}`);
+      const roleId = typeof options.role === "string" ? options.role.trim() : "";
+      let agent = undefined;
+      let isolate = options.isolate === true;
+      if (roleId) {
+        const data = await loadAgentRoles();
+        const role = data.roles.find((item) => item.id === roleId && item.kind === "chat");
+        if (!role) throw new Error(`Неизвестная chat-роль: ${roleId}`);
+        agent = clientAgentByBackend(role.agent);
+        if (!agent || agent.builtin)
+          throw new Error(`Роль «${role.name}» указывает на агента без фоновых заданий`);
+        if (typeof options.agent === "string" && options.agent.trim()) {
+          const named =
+            clientAgentByBackend(options.agent.toLowerCase()) ??
+            clientAgentOf(options.agent.toLowerCase());
+          if (named && named.backend !== role.agent)
+            throw new Error(`Роль «${role.name}» принадлежит агенту ${agent.title}`);
+        }
+        isolate = isolate || role.isolate === true;
+      } else {
+        const name = text(options, "agent").toLowerCase();
+        agent = clientAgentByBackend(name) ?? clientAgentOf(name);
+        if (!agent || agent.builtin) throw new Error(`agent: ${agentIds()}`);
+      }
       const job = await startJob({
         projectId,
         backend: agent.backend,
+        role: roleId || undefined,
         task: text(options, "task"),
-        isolate: options.isolate === true,
+        isolate,
         origin: chatsOf(projectId).find((chat) => isBuiltinAgent(chat.backend))?.key,
       });
       return describe(job);
@@ -79,9 +101,10 @@ export function registerJobCommands(
     () => true,
     undefined,
     {
-      description: `Запускает фонового агента (${agentTitles()}) с заданием в проекте: сервер ведёт его сам, вкладка чата не нужна, прогресс виден в острове активности. Возвращает идентификатор задания. Запросы разрешений и вопросы агента приходят как состояние needs-user и ждут ответа (ide.agent.job.answer). С isolate: true агент работает в изолированной git-копии проекта (слияние только по просьбе пользователя). Код пишут фоновые агенты, не вы: поручайте им работу, потом проверяйте результат через ide.agent.job.result и git diff.`,
+      description: `Запускает фонового агента (${agentTitles()}) с заданием в проекте: сервер ведёт его сам, вкладка чата не нужна, прогресс виден в острове активности. Возвращает идентификатор задания. Вместо agent можно указать role — chat-роль из ide.agent.roles.chat.list: её агент, модель и режим станут снимком задания, а isolate роли включит копию. Запросы разрешений и вопросы агента приходят как состояние needs-user и ждут ответа (ide.agent.job.answer). С isolate: true агент работает в изолированной git-копии проекта (слияние только по просьбе пользователя). Код пишут фоновые агенты, не вы: поручайте им работу, потом проверяйте результат через ide.agent.job.result и git diff.`,
       arguments: {
-        agent: agentIds(),
+        agent: `id агента: ${agentIds()}; необязателен, если указан role`,
+        role: "id chat-роли из ide.agent.roles.chat.list (необязательно)",
         task: "Полное задание агенту: цель, файлы, критерии готовности",
         isolate:
           "true — работать в изолированной копии проекта (для независимых задач, которые идут параллельно)",

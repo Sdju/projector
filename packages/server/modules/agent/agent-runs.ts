@@ -8,6 +8,7 @@ import type { JudgeOverride } from "@projector/core/modules/agent-judge/index.ts
 import type { AgentHistoryTurn } from "../providers/index.ts";
 import type { AgentBackendId, AgentPermissionMode, MessagePart } from "./backend.ts";
 import type { AgentSelection } from "./controls.ts";
+import type { AgentRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
 
 /** What a restarted server needs to repeat a run and so rejoin its answer in progress. */
 export interface AgentRunRecord {
@@ -25,6 +26,8 @@ export interface AgentRunRecord {
   tail?: string;
   selection?: AgentSelection;
   permissionMode?: AgentPermissionMode;
+  /** The role the run belongs to, when a job or a future task started it. */
+  role?: AgentRoleSnapshot;
   providerId?: string;
   /** The client can show permission and question prompts (its answers come back to the run). */
   approvals?: boolean;

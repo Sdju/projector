@@ -9,6 +9,7 @@ import type { AgentRunRecord } from "./agent-runs.ts";
 import type { AgentBackendId, AgentEventName, AgentPermissionMode } from "./backend.ts";
 import type { AgentHistoryTurn } from "../providers/index.ts";
 import type { AgentSelection } from "./controls.ts";
+import type { AgentRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
 import { changedSince, snapshotGit } from "./jobs-files.ts";
 import { resolveJudgeSettings } from "@projector/core/modules/agent-judge/index.ts";
 import { createJudgedApproval, readJudgeSettings } from "../judge/index.ts";
@@ -57,6 +58,8 @@ export interface StartJobInput {
   origin?: string;
   /** A native session to resume: a retry goes on in the same conversation. */
   sessionId?: string;
+  /** The role the job is started with; its snapshot is stored with the job. */
+  role?: AgentRoleSnapshot;
   selection?: AgentSelection;
   permissionMode?: AgentPermissionMode;
   unattended?: boolean;
@@ -103,6 +106,7 @@ export async function drive(
         history,
         cwd: job.cwd,
         selection: job.selection,
+        role: job.role,
         permissionMode: job.permissionMode,
         approvals: true,
         projectId: job.projectId,
@@ -220,6 +224,7 @@ export async function startJob(input: StartJobInput): Promise<AgentJob> {
     ...(input.origin ? { origin: input.origin } : {}),
     messageId: randomUUID(),
     ...(input.sessionId ? { sessionId: input.sessionId } : {}),
+    ...(input.role ? { role: input.role } : {}),
     ...(input.selection ? { selection: input.selection } : {}),
     ...(input.permissionMode ? { permissionMode: input.permissionMode } : {}),
     unattended: input.unattended === true,

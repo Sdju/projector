@@ -1,4 +1,5 @@
 import type { AgentBackendId } from "../model/types.ts";
+import type { AgentRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
 
 export type AgentJobStatus = "queued" | "running" | "needs-user" | "done" | "error" | "stopped";
 
@@ -34,6 +35,8 @@ export interface AgentJobView {
   worktreeCleared?: boolean;
   /** The Projector chat that started the job, when it did. */
   origin?: string;
+  /** The role the job started with; the snapshot stays with the job. */
+  role?: AgentRoleSnapshot;
   unattended: boolean;
   status: AgentJobStatus;
   rev: number;
@@ -89,7 +92,10 @@ export function fetchJob(id: string, wait = 0, rev = 0, signal?: AbortSignal) {
 
 export interface StartJobOptions {
   projectId: string;
-  backend: AgentBackendId;
+  /** The agent; with a role the server takes the role's agent and checks it. */
+  backend?: AgentBackendId;
+  /** A chat role: its agent, selection and permission mode become the job's snapshot. */
+  role?: string;
   task: string;
   isolate?: boolean;
   mode?: string;

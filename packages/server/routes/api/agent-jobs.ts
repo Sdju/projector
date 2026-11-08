@@ -23,6 +23,8 @@ import {
   waitForJob,
   worktreeStatus,
 } from "../../modules/agent/index.ts";
+import { readAgentRole } from "../../modules/agent-roles/index.ts";
+import { snapshotOfRole } from "@projector/core/modules/agent-role/index.ts";
 import { accessAllowed } from "../../modules/access/index.ts";
 import { HttpError } from "../../modules/http/index.ts";
 import { loadProjects } from "../../modules/projects/index.ts";
@@ -40,7 +42,14 @@ const pageOnly = (req: RouteContext["req"]) => {
 
 /** A new job from the body of `POST /api/agent/jobs`; everything the client sends is checked here. */
 async function startFrom(body: Record<string, unknown>) {
-  const backend = asString(body.backend);
+  const roleId = asString(body.role).trim();
+  const role = roleId ? await readAgentRole(roleId) : undefined;
+  if (roleId && !role) throw new Error(`Неизвестная роль: ${roleId}`);
+  if (role && role.kind !== "chat")
+    throw new Error("Служебную роль нельзя запустить как фоновое задание");
+  const backend = asString(body.backend).trim() || role?.agent || "";
+  if (role && backend !== role.agent)
+    throw new Error(`Роль «${role.name}» принадлежит агенту ${role.agent}`);
   const catalog = listAgentBackends();
   const isBuiltin = catalog.some(({ id, builtin }) => id === backend && builtin);
   if (!backend || isBuiltin || !isAgentBackend(backend)) {
@@ -59,8 +68,14 @@ async function startFrom(body: Record<string, unknown>) {
   if (!project) throw new Error("Проект не найден");
   if (!(await stat(project.path).catch(() => null))?.isDirectory())
     throw new Error("Папка проекта не найдена");
-  const mode = asString(body.mode) || asString(body.permissionMode);
-  const selection = selectionFrom(body.selection);
+  const selection = { ...role?.selection, ...selectionFrom(body.selection) };
+  const mode =
+    asString(body.mode) ||
+    asString(body.permissionMode) ||
+    role?.permissionMode ||
+    selection.mode ||
+    selection["permission-mode"] ||
+    "";
   // Every agent reads the mode its own way: from `permissionMode` or from the selection.
   if (mode) {
     selection.mode = mode;
@@ -68,7 +83,7 @@ async function startFrom(body: Record<string, unknown>) {
   }
   let cwd = project.path;
   let worktree: { id: string; branch: string } | undefined;
-  if (body.isolate === true) {
+  if (body.isolate === true || role?.isolate === true) {
     const copy = await createWorktree(project.id, project.path);
     cwd = copy.cwd;
     worktree = { id: copy.id, branch: copy.branch };
@@ -83,6 +98,7 @@ async function startFrom(body: Record<string, unknown>) {
       origin: asString(body.origin) || undefined,
       permissionMode: mode || undefined,
       selection,
+      role: role ? snapshotOfRole(role) : undefined,
       unattended: body.unattended === true,
     });
   } catch (error) {

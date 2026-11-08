@@ -161,6 +161,74 @@ test("the jobs API validates what a client sends and runs a job to its answer", 
   expect((await request(`/api/agent/jobs/${created.job.id}`)).status).toBe(404);
 });
 
+test("a job can start from a chat role and keeps its snapshot", async () => {
+  const roleResponse = await request("/api/agent/roles", "POST", {
+    role: {
+      name: "Job reviewer",
+      agent: "fake-api",
+      selection: { model: "fast" },
+      permissionMode: "auto",
+    },
+  });
+  expect(roleResponse.status).toBe(201);
+  const role = (await roleResponse.json()).created;
+  expect(role).toMatchObject({ kind: "chat", agent: "fake-api" });
+
+  const service = await request("/api/agent/jobs", "POST", {
+    projectId: "p1",
+    role: "doctor",
+    task: "review",
+  });
+  expect(service.status).toBe(400);
+  expect((await service.json()).error).toMatch(/Служебную/);
+
+  const conflict = await request("/api/agent/jobs", "POST", {
+    projectId: "p1",
+    role: role.id,
+    backend: "fake-local",
+    task: "review",
+  });
+  expect(conflict.status).toBe(400);
+  expect((await conflict.json()).error).toMatch(/принадлежит/);
+
+  const started = await request("/api/agent/jobs", "POST", {
+    projectId: "p1",
+    role: role.id,
+    task: "review it",
+  });
+  expect(started.status).toBe(201);
+  const job = (await started.json()).job;
+  expect(job).toMatchObject({
+    backend: "fake-api",
+    role: { roleId: role.id, name: "Job reviewer", selection: { model: "fast" } },
+  });
+  const done = await until(async () => {
+    const body = await (await request(`/api/agent/jobs/${job.id}`)).json();
+    return body.job.status === "done" ? body : undefined;
+  });
+  expect(done.job.role).toMatchObject({ roleId: role.id, name: "Job reviewer" });
+  expect(seen.at(-1)).toMatchObject({
+    selection: { model: "fast", mode: "auto", "permission-mode": "auto" },
+    mode: "auto",
+  });
+
+  const retried = await request(`/api/agent/jobs/${job.id}/retry`, "POST", {
+    task: "review again",
+  });
+  expect(retried.status).toBe(201);
+  const next = (await retried.json()).job;
+  expect(next).toMatchObject({
+    role: { roleId: role.id, name: "Job reviewer" },
+    task: "review again",
+  });
+  await request(`/api/agent/jobs/${next.id}/stop`, "POST", {});
+  await until(
+    async () =>
+      (await (await request(`/api/agent/jobs/${next.id}`)).json()).job.status === "stopped",
+  );
+  await request(`/api/agent/roles/${role.id}`, "DELETE");
+});
+
 test("a job reports an unsupported follow-up and can be retried in place", async () => {
   const start = async (task) =>
     (
