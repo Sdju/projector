@@ -1,5 +1,4 @@
 import { expect, onTestFinished, test } from "vite-plus/test";
-import { existsSync } from "node:fs";
 import { readFile, mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { once } from "node:events";
@@ -8,6 +7,7 @@ import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import ts from "typescript";
+import { chromium, createChromium } from "./fixtures/chromium-driver.mjs";
 import { terminalTextForPaths } from "../packages/client/modules/terminal/lib/drop.ts";
 import { terminalLinks } from "../packages/client/modules/terminal/lib/links.ts";
 import { resolveTerminalPath } from "../packages/server/modules/terminal/link-files.ts";
@@ -95,17 +95,13 @@ test("dropped paths survive shell quoting without command execution or Enter", a
   expect(stdout.split("\0").slice(0, -1)).toStrictEqual(paths);
 });
 
-const chromium =
-  process.env.CHROMIUM_BIN ??
-  ["/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome"].find(existsSync);
-
 test(
   "xterm in Chromium: IME, Unicode, controls, mouse protocols and selection",
   {
     skip: !chromium,
   },
   async () => {
-    const profile = await mkdtemp(join(tmpdir(), "projector-input-browser-"));
+    const directory = await mkdtemp(join(tmpdir(), "projector-input-browser-"));
     const keyboard = ts.transpileModule(
       await readFile(
         new URL("../packages/client/modules/terminal/lib/keyboard.ts", import.meta.url),
@@ -332,31 +328,21 @@ test(
                     : html,
       );
     });
+    let browser;
     onTestFinished(async () => {
+      await browser?.close();
       await new Promise((resolve) => server.close(resolve));
-      await rm(profile, { recursive: true, force: true });
+      await rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     });
     server.listen(0, "127.0.0.1");
     await once(server, "listening");
-    const { stdout, stderr } = await promisify(execFile)(
-      chromium,
-      [
-        "--headless",
-        "--no-sandbox",
-        "--disable-gpu",
-        "--disable-dev-shm-usage",
-        "--no-first-run",
-        "--no-default-browser-check",
-        `--user-data-dir=${profile}`,
-        "--virtual-time-budget=5000",
-        "--dump-dom",
-        `http://127.0.0.1:${server.address().port}/`,
-      ],
-      { timeout: 20000, maxBuffer: 1024 * 1024 },
-    );
+    // CDP waits for the fixture to report PASS instead of dumping the DOM on a virtual-time budget:
+    // under the full suite the worker can be starved before the module scripts run.
+    browser = await createChromium(directory);
+    const result = await browser.result(`http://127.0.0.1:${server.address().port}/`);
     expect(
-      stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/)?.[1],
-      `Browser input regression failed:\n${stdout.slice(-4000)}\n${stderr.slice(-2000)}`,
+      result,
+      `Browser input regression failed:\n${JSON.stringify(browser.errors)}\n${browser.diagnostics.stderr}`,
     ).toBe("PASS");
   },
 );
