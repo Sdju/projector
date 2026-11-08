@@ -2,9 +2,10 @@
 import UiButton from "../../../common/ui/UiButton.vue";
 import { computed } from "vue";
 import { guiAgents, useAgentModes } from "../model/modes.ts";
-withDefaults(defineProps<{ plain?: boolean; agentName?: string }>(), {
+withDefaults(defineProps<{ plain?: boolean; agentName?: string; roleName?: string }>(), {
   plain: false,
   agentName: "Агент",
+  roleName: undefined,
 });
 const emit = defineEmits<{ suggest: [text: string]; open: [program: string] }>();
 const { isEnabled } = useAgentModes();
@@ -28,6 +29,7 @@ const suggestions = [
 <template>
   <div class="welcome">
     <h1>{{ plain ? agentName : "С чего начнём?" }}</h1>
+    <p v-if="roleName" class="role">Роль: {{ roleName }}</p>
     <p v-if="plain">Работает в папке проекта, как в терминале.</p>
     <div v-else class="suggestions">
       <UiButton
@@ -84,6 +86,9 @@ h1 {
   color: var(--muted);
   font-size: var(--fs-xs);
   margin: 0;
+}
+.welcome > p.role {
+  color: var(--info);
 }
 .suggestions {
   display: flex;

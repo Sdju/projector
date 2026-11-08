@@ -5,6 +5,7 @@ import {
   type JudgeScore,
   type JudgeVerdict,
 } from "@projector/core/modules/agent-judge/index.ts";
+import { serviceRoleSelection } from "../agent-roles/index.ts";
 import { quietChatModel } from "../providers/index.ts";
 
 const JUDGE_PROMPT = `Ты Projector Judge — оцениваешь одно действие, которое ИИ-агент просит выполнить на машине разработчика. Пользователь решает, разрешить ли его, и хочет понять смысл и риск.
@@ -122,7 +123,9 @@ function actionText(action: JudgeAction): string {
   try {
     return JSON.stringify(action.input, null, 2).slice(0, JUDGE_LIMITS.input);
   } catch {
-    return String(action.input).slice(0, JUDGE_LIMITS.input);
+    return typeof action.input === "string"
+      ? action.input.slice(0, JUDGE_LIMITS.input)
+      : "не удалось прочитать";
   }
 }
 
@@ -134,7 +137,7 @@ export async function judgeAction(action: JudgeAction): Promise<JudgeVerdict> {
   const timeout = AbortSignal.timeout(JUDGE_LIMITS.seconds * 1_000);
   const signal = action.signal ? AbortSignal.any([action.signal, timeout]) : timeout;
   try {
-    const { model } = await quietChatModel(action.selection);
+    const { model } = await quietChatModel(await serviceRoleSelection("judge", action.selection));
     const { text } = await generateText({
       model,
       system: JUDGE_PROMPT,

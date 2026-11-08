@@ -77,10 +77,22 @@ export function useExternalAgent(
     await ready;
     if (state.permissionMode !== "default" && !state.selection["permission-mode"])
       state.selection["permission-mode"] = state.permissionMode;
-    state.selection = { ...((await savedDefaults())[backend] ?? {}), ...state.selection };
+    state.selection = { ...(await savedDefaults())[backend], ...state.selection };
     try {
       const offered = await fetchControls(backend, projectId);
       state.capabilities = offered.capabilities;
+      // A role may outlive a model or a mode: keep the chat on the agent's current values.
+      if (state.roleSnapshot)
+        state.selection = Object.fromEntries(
+          Object.entries(state.selection).filter(([id, value]) => {
+            const control = offered.controls.find((item) => item.id === id);
+            return (
+              !control ||
+              !control.options.length ||
+              control.options.some((item) => item.value === value)
+            );
+          }),
+        );
       state.controls = withChoice(offered.controls);
       state.controlsError = "";
     } catch (err) {
@@ -106,6 +118,17 @@ export function useExternalAgent(
       throw new Error(`У настройки «${control.name}» нет значения «${value}»`);
     state.selection = { ...state.selection, [id]: value };
     state.controls = withChoice(state.controls);
+    // A role chat keeps its own copy: changing a model here must not rewrite the global default
+    // for every new chat of this agent.
+    if (state.roleSnapshot) {
+      state.roleSnapshot = {
+        ...state.roleSnapshot,
+        selection: { ...state.roleSnapshot.selection, [id]: value },
+      };
+      // An empty chat is not saved in the project list; its snapshot goes with the first message.
+      if (state.turns.length) persist();
+      return;
+    }
     try {
       await saveDefault(backend, id, value);
       const defaults = await savedDefaults();

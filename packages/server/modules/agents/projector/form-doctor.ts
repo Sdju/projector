@@ -1,4 +1,5 @@
 import { generateText } from "ai";
+import { serviceRoleSelection } from "../../agent-roles/index.ts";
 import { quietChatModel } from "../../providers/index.ts";
 
 /** The doctor gets only the conversation and the broken block; it must not call tools or change files. */
@@ -18,7 +19,7 @@ export interface FormDoctorRequest {
 
 /** Repairs one form with the same provider/model as the chat; no tools, history or side effects. */
 export async function repairForm(request: FormDoctorRequest): Promise<string> {
-  const { model } = await quietChatModel(request.selection);
+  const { model } = await quietChatModel(await serviceRoleSelection("doctor", request.selection));
   const history = (request.history ?? "").slice(-20_000);
   const form = request.form.slice(0, 30_000);
   const error = request.error.slice(0, 2_000);

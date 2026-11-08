@@ -4,7 +4,7 @@ import { chatTabCommand } from "../lib/chat-tab.ts";
 
 /** A tab that a page outside the workspace (the activity island) wants shown in a project. */
 const request = ref<
-  { projectId: string; command: string; args: Record<string, string> } | undefined
+  { projectId: string; command: string; args: Record<string, unknown> } | undefined
 >();
 
 export function requestJobTab(projectId: string, job: string): void {

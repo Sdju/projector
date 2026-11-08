@@ -8,7 +8,7 @@ import UiActionRow from "../../../common/ui/UiActionRow.vue";
 import UiActionCopy from "../../../common/ui/UiActionCopy.vue";
 import UiIsland from "../../../common/ui/UiIsland.vue";
 import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
-import { computed, useId } from "vue";
+import { computed, useId, watch } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import {
   AgentUsageIndicators,
@@ -20,6 +20,8 @@ import IconPlus from "~icons/lucide/plus";
 import IconMessage from "~icons/lucide/message-square";
 import IconTerminal from "~icons/lucide/terminal";
 import { builtinAgent, guiAgents, guiCommand, hasGui, useAgentModes } from "../../agent/index.ts";
+import { useAgentRoleCatalog } from "../../agent-roles/index.ts";
+import { clientAgentByBackend } from "../../agents-integration/catalog/index.ts";
 
 /**
  * «+» с островом создания сессии: при открытии рамка охватывает кнопку, как у переключателя
@@ -28,6 +30,15 @@ import { builtinAgent, guiAgents, guiCommand, hasGui, useAgentModes } from "../.
 const props = defineProps<{ busy: boolean; agent?: boolean }>();
 const emit = defineEmits<{ command: [id: string, args?: unknown] }>();
 const { modeOf, setMode, isEnabled } = useAgentModes();
+const { roles: roleCatalog, load: loadRoles } = useAgentRoleCatalog();
+const roleRows = computed(() =>
+  (roleCatalog.value ?? []).flatMap((role) => {
+    if (role.kind !== "chat") return [];
+    const agent = clientAgentByBackend(role.agent);
+    if (!agent || !isEnabled(agent.program)) return [];
+    return [{ role, agent, title: role.name, caption: `${agent.title} · роль` }];
+  }),
+);
 const programs = computed(() => [
   {
     program: "shell",
@@ -50,6 +61,9 @@ const menu = useIslandMenu({
   closeOnTab: true,
 });
 const { open, toggle, close, active } = menu;
+watch(open, (value) => {
+  if (value) void loadRoles().catch(() => undefined);
+});
 const listId = useId();
 const rows = computed(() =>
   programs.value
@@ -69,6 +83,11 @@ const toggleMode = (program: string) => setMode(program, modeOf(program) === "gu
 function openChat() {
   close();
   emit("command", "ide.workbench.agent.open");
+}
+function pickRole(role: string) {
+  if (props.busy) return;
+  close();
+  emit("command", "ide.agent.role.open", { role });
 }
 function pick(program: string) {
   if (props.busy) return;
@@ -107,19 +126,39 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
     <UiIslandHeader anchor="start" class="island-head" aria-label="Закрыть" @click="toggle(false)">
       <IconPlus aria-hidden="true" /><span>Новая сессия</span>
     </UiIslandHeader>
+    <template v-if="roleRows.length">
+      <UiIslandLabel divided>Роли</UiIslandLabel>
+      <UiStack flow="flex" gap="none" class="list" role="menu" aria-label="Роли агентов">
+        <div v-for="(row, index) in roleRows" :key="row.role.id" class="entry">
+          <UiActionRow
+            class="row"
+            role="menuitem"
+            :disabled="busy"
+            :tabindex="index === active ? 0 : -1"
+            data-command="ide.agent.role.open"
+            @mousemove="active = index"
+            @click="pickRole(row.role.id)"
+          >
+            <component :is="row.agent.icon" class="row-icon" aria-hidden="true" />
+            <UiActionCopy :title="row.title" :description="row.caption" />
+          </UiActionRow>
+        </div>
+      </UiStack>
+      <UiIslandLabel>Агенты</UiIslandLabel>
+    </template>
     <UiStack flow="flex" gap="none" :id="listId" class="list" role="menu">
       <div v-for="(row, index) in rows" :key="row.program" class="entry">
         <UiActionRow
           class="row"
           role="menuitem"
           :disabled="busy"
-          :tabindex="index === active ? 0 : -1"
+          :tabindex="roleRows.length + index === active ? 0 : -1"
           :data-command="
             canOpenChat(row.program) && modeOf(row.program) === 'gui'
               ? guiCommand(row.program)
               : 'ide.workbench.terminal.new'
           "
-          @mousemove="active = index"
+          @mousemove="active = roleRows.length + index"
           @click="pick(row.program)"
         >
           <component :is="row.icon" class="row-icon" aria-hidden="true" />
@@ -159,8 +198,8 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
         class="row"
         role="menuitem"
         data-command="ide.workbench.agent.open"
-        :tabindex="active === rows.length ? 0 : -1"
-        @mousemove="active = rows.length"
+        :tabindex="active === roleRows.length + rows.length ? 0 : -1"
+        @mousemove="active = roleRows.length + rows.length"
         @click="openChat"
       >
         <component :is="builtin.icon" class="row-icon" aria-hidden="true" />

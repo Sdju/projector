@@ -6,7 +6,8 @@ import { workspaceRequest } from "../../workspace-api/index.ts";
 import { AgentFeaturesIsland } from "../../agent-features/index.ts";
 import AgentJudgeIsland from "./AgentJudgeIsland.vue";
 import { agentCommandHandler } from "../model/commands.ts";
-import { agentLabel, guiCommand, isBuiltinAgent } from "../model/modes.ts";
+import { agentLabel, isBuiltinAgent } from "../model/modes.ts";
+import { openAgentChat } from "../model/open-agent.ts";
 import { chatDropHandlers } from "../lib/chat-drop.ts";
 import { useChatBranch } from "../model/chat-branch.ts";
 import { useChatReadout } from "../model/chat-readout.ts";
@@ -20,6 +21,7 @@ import { useAnswerForm } from "../model/answer-form.ts";
 import { useAnswerDoctor } from "../model/answer-doctor.ts";
 import UiPanel from "../../../common/ui/UiPanel.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
+import UiBadge from "../../../common/ui/UiBadge.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import AgentWelcome from "./AgentWelcome.vue";
@@ -57,11 +59,17 @@ import { useRewindPanel } from "../model/rewind-panel.ts";
 import { useWorktreePanel } from "../model/worktree-panel.ts";
 import { chatUsageByTurn } from "../model/chat-usage.ts";
 import type { AgentBackendId, ChatUsage, RewindScope } from "../model/types.ts";
+import type { AgentRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
 import IconArrowDown from "~icons/lucide/arrow-down";
 import IconSquarePen from "~icons/lucide/square-pen";
 const props = withDefaults(
-  defineProps<{ projectId: string; backend?: AgentBackendId; chatId?: string }>(),
-  { backend: "projector", chatId: undefined },
+  defineProps<{
+    projectId: string;
+    backend?: AgentBackendId;
+    chatId?: string;
+    role?: AgentRoleSnapshot;
+  }>(),
+  { backend: "projector", chatId: undefined, role: undefined },
 );
 /** External agents are plain coding agents: no Projector tools, their own approvals. */
 const plain = computed(() => !isBuiltinAgent(props.backend));
@@ -86,6 +94,7 @@ const {
   secrets,
   controls,
   selection,
+  roleSnapshot,
   capabilities,
   sessions,
   sessionsLoading,
@@ -133,6 +142,7 @@ const {
 } = useAgent(props.projectId, plain.value ? undefined : agentCommandHandler(api, props.projectId), {
   backend: props.backend,
   chatId: props.chatId,
+  role: props.role,
 });
 const emit = defineEmits<{ title: [title: string] }>();
 useAgentChatTabTitle(emit, props, turns, busy, sessions, agentName);
@@ -187,6 +197,7 @@ const {
   turns: () => turns.value,
   capabilities: () => capabilities.value,
   recent: () => recent.value,
+  role: () => roleSnapshot.value,
   api,
   fail: (message) => {
     error.value = message;
@@ -194,13 +205,9 @@ const {
 });
 // Opening a chat is a workspace command, not one of this chat's own.
 function openAgent(program: string) {
-  void api
-    .executeCommand(guiCommand(program), undefined, {
-      scope: `editor:${props.projectId}`,
-    })
-    .catch((cause) => {
-      error.value = cause instanceof Error ? cause.message : "Не удалось открыть агента";
-    });
+  openAgentChat(api, props.projectId, program, (message) => {
+    error.value = message;
+  });
 }
 attach();
 const {
@@ -517,6 +524,13 @@ onBeforeUnmount(() => {
       Бросьте файлы или папки — добавим в сообщение
     </div>
     <UiInline class="chat-tools" :gap="1" align="normal" justify="end">
+      <UiBadge
+        v-if="roleSnapshot"
+        tone="info"
+        class="role-badge"
+        :title="`Роль: ${roleSnapshot.name}`"
+        >{{ roleSnapshot.name }}</UiBadge
+      >
       <AgentSessions
         :sessions="sessions"
         :loading="sessionsLoading"
@@ -590,6 +604,7 @@ onBeforeUnmount(() => {
         v-else-if="!turns.length"
         :plain="plain"
         :agent-name="agentName"
+        :role-name="roleSnapshot?.name"
         @suggest="suggest"
         @open="openAgent"
       />
@@ -780,6 +795,14 @@ onBeforeUnmount(() => {
   background: var(--bg);
   container-type: inline-size;
   position: relative;
+}
+.role-badge {
+  margin-right: auto;
+  align-self: center;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .chat-tools {
   flex: none;

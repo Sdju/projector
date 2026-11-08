@@ -18,8 +18,8 @@
 - `packages/client/modules/agent/ui/AgentLens.vue` — строка без карточки; `AgentWork.vue`, `AgentTaskRow.vue`, `AgentTaskView.vue` только размещают её.
 - `POST /api/agent/lens` (`packages/server/routes/api/agent-lens.ts`) — только страница Projector (`accessAllowed`), отмена по закрытию соединения.
 - `packages/server/modules/agent/lens-request.ts` — границы: 40 реплик, 12 инструментов, 30 пунктов плана; страница отправляет не больше 20 реплик и 8 выполняющихся вызовов.
-- `packages/server/modules/agents/projector/agent-lens.ts` — промпт и один `generateText`: провайдер и модель чата, без инструментов, без истории на диске, thinking погашен (`quietChatModel`). Свежее рассуждение дублируется отдельным блоком. Ответ чистится до одной строки ≤ 400 символов; если описывать нечего, сервер возвращает «Агент обдумывает задачу…» без вызова модели.
-- `packages/server/modules/providers/quiet-model.ts` — общий выбор дешёвой модели для Form Doctor, Lens и Судьи.
+- `packages/server/modules/agents/projector/agent-lens.ts` — промпт и один `generateText`: провайдер и модель роли `lens` (по умолчанию — модель чата), без инструментов, без истории на диске, thinking погашен (`quietChatModel`). Свежее рассуждение дублируется отдельным блоком. Ответ чистится до одной строки ≤ 400 символов; если описывать нечего, сервер возвращает «Агент обдумывает задачу…» без вызова модели.
+- `packages/server/modules/providers/quiet-model.ts` — общий выбор дешёвой модели для Form Doctor, Lens и Судьи; модель каждой роли задаётся в разделе «Роли агентов» ([подробно](agent-roles.md)).
 
 Lens — отдельный процесс чтения, а не второй агент: не создаёт run-файл, не пишет историю, не продолжается после перезагрузки и не имеет инструментов.
 

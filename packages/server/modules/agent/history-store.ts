@@ -95,6 +95,8 @@ export function historyDatabase(): DatabaseSync {
   ensureColumn(db, "chats", "features", "TEXT");
   // Judge settings of a chat, as JSON; NULL means the global settings apply.
   ensureColumn(db, "chats", "judge", "TEXT");
+  // The role snapshot a chat started with, as JSON; NULL means the chat has no role.
+  ensureColumn(db, "chats", "role", "TEXT");
   void chmod(file, 0o600).catch(() => {});
   databases.set(file, db);
   return db;

@@ -7,7 +7,9 @@ import {
   saveHistory,
 } from "./history-store.ts";
 import { saveChatJudge } from "./judge-store.ts";
+import { saveChatRole } from "./role-store.ts";
 import { normalizeJudgeOverride } from "@projector/core/modules/agent-judge/index.ts";
+import { normalizeRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
 import type { ChatIndex } from "./history-store.ts";
 interface StoredTurn {
   id: string;
@@ -160,6 +162,7 @@ export async function writeAgentHistory(
   index?: ChatIndex,
   features?: unknown,
   judge?: unknown,
+  role?: unknown,
 ) {
   const turns = schema.parse(value);
   saveHistory(id, turns, index);
@@ -168,5 +171,7 @@ export async function writeAgentHistory(
     saveChatFeatures(id, features === null ? null : featuresSchema.parse(features));
   if (judge !== undefined)
     saveChatJudge(id, judge === null ? null : (normalizeJudgeOverride(judge) ?? null));
+  if (role !== undefined)
+    saveChatRole(id, role === null ? null : (normalizeRoleSnapshot(role) ?? null));
   return turns;
 }

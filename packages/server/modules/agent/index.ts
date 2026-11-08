@@ -98,6 +98,7 @@ export {
   type ChatIndex,
 } from "./history-store.ts";
 export { readChatJudge } from "./judge-store.ts";
+export { readChatRole } from "./role-store.ts";
 export {
   forgetChat,
   readRecentChats,

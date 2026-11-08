@@ -1,4 +1,5 @@
 import { generateText } from "ai";
+import { serviceRoleSelection } from "../../agent-roles/index.ts";
 import { quietChatModel } from "../../providers/index.ts";
 
 const SYSTEM = `Ты Answer Doctor — ремонтируешь только сломанную разметку готового ответа Projector. На вход приходят история чата, ответ и диагностика клиента.
@@ -17,7 +18,7 @@ export interface AnswerDoctorRequest {
 
 /** Repairs presentation only; the doctor has no tools and cannot change the conversation or files. */
 export async function repairAnswer(request: AnswerDoctorRequest): Promise<string> {
-  const { model } = await quietChatModel(request.selection);
+  const { model } = await quietChatModel(await serviceRoleSelection("doctor", request.selection));
   const history = (request.history ?? "").slice(-20_000);
   const answer = request.answer.slice(0, 60_000);
   const error = request.error.slice(0, 2_000);

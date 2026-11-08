@@ -12,7 +12,7 @@ import type { OpenFile } from "../open-file.ts";
 import { KeybindingsEditor } from "../../ide/index.ts";
 import { LanInfoPanel } from "../../network/index.ts";
 import { DockerPanel } from "../../docker/index.ts";
-import { AgentChat, AgentJobTab, AgentTaskTab } from "../../agent/index.ts";
+import { AgentChat, AgentJobTab, AgentTaskTab, roleFromParam } from "../../agent/index.ts";
 import { clientAgents } from "../../agents-integration/catalog/index.ts";
 import { BrowserPanel } from "../../browser/index.ts";
 import {
@@ -49,6 +49,7 @@ const agentChat = (backend: string): TabView => ({
     projectId: host.projectId,
     backend,
     chatId: tab.params?.chatId,
+    role: roleFromParam(tab.params?.role),
     ...chatTitle(tab),
   }),
 });
@@ -95,6 +96,7 @@ export function baseTabViews(): TabViews {
       props: (tab, host) => ({
         projectId: host.projectId,
         chatId: tab.params?.chatId,
+        role: roleFromParam(tab.params?.role),
         ...chatTitle(tab),
       }),
     },

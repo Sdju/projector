@@ -3,6 +3,7 @@ import { text, turnArg } from "../lib/command-args.ts";
 import { registerBranchCommands } from "./branch-commands.ts";
 import { chatsOf, resolveChat, type ChatController } from "./chat-registry.ts";
 import { registerJobCommands } from "./job-commands.ts";
+import { registerRoleCommands } from "./role-commands.ts";
 import { isBuiltinAgent } from "./modes.ts";
 import type { RegisterCommand } from "./register-command.ts";
 import { registerSessionCommands } from "./session-commands.ts";
@@ -25,6 +26,7 @@ const SCOPES: RewindScope[] = ["conversation", "files", "both"];
 export function registerAgentCommands(register: RegisterCommand, projectId: string): void {
   registerTaskCommands(register, projectId);
   registerJobCommands(register, projectId);
+  registerRoleCommands(register, projectId);
   registerSessionCommands(register, projectId);
   registerBranchCommands(register, projectId);
   registerSideCommands(register, projectId);

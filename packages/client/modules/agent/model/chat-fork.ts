@@ -4,6 +4,7 @@ import { chatKeyOf } from "./chat-key.ts";
 import { holdDraft } from "./drafts.ts";
 import { isBuiltinAgent } from "./modes.ts";
 import type { AgentBackendId, AgentTurn } from "./types.ts";
+import type { AgentRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
 
 export interface ForkRequest {
   backend: AgentBackendId;
@@ -13,6 +14,8 @@ export interface ForkRequest {
   mode: ForkMode;
   /** The agent branches its own native session (Claude Code); others replay the copied turns. */
   branchSession?: boolean;
+  /** The role of the source chat; the branch keeps the same snapshot. */
+  role?: AgentRoleSnapshot;
 }
 
 export interface ForkResult {
@@ -55,7 +58,13 @@ export async function forkChat(request: ForkRequest): Promise<ForkResult> {
   const response = await fetch(`/api/agent/history/${encodeURIComponent(chat)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ turns: slice.turns, projectId, backend, title }),
+    body: JSON.stringify({
+      turns: slice.turns,
+      projectId,
+      backend,
+      title,
+      ...(request.role ? { role: request.role } : {}),
+    }),
   });
   if (!response.ok) {
     const data = (await response.json().catch(() => ({}))) as { error?: string };

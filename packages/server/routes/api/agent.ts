@@ -23,6 +23,7 @@ import {
   readAgentHistory,
   readChatFeatures,
   readChatJudge,
+  readChatRole,
   readRecentChats,
   readAttachment,
   saveAttachment,
@@ -156,6 +157,7 @@ function historyState<Turns>(id: string, turns: Turns) {
     turns,
     features: readChatFeatures(id) ?? null,
     judge: readChatJudge(id) ?? null,
+    role: readChatRole(id) ?? null,
   };
 }
 
@@ -176,6 +178,7 @@ export const routes: RouteDefinition[] = [
       project && backend ? { project, backend, ...(title ? { title } : {}) } : undefined,
       body.features,
       body.judge,
+      body.role,
     );
     json(res, 200, historyState(id, turns));
   }),

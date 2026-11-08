@@ -1,4 +1,5 @@
 export { default as AgentChat } from "./ui/AgentChat.vue";
+export { roleFromParam } from "./lib/chat-tab.ts";
 export { default as AgentTaskTab } from "./ui/AgentTaskTab.vue";
 export { default as AgentJobTab } from "./ui/AgentJobTab.vue";
 export { default as ActivityIsland } from "./ui/ActivityIsland.vue";

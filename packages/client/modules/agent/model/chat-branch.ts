@@ -3,6 +3,7 @@ import { chatTabCommand } from "../lib/chat-tab.ts";
 import type { ForkMode } from "./branches.ts";
 import { forkChat } from "./chat-fork.ts";
 import type { AgentBackendId, AgentCapabilities, AgentRecentChat, AgentTurn } from "./types.ts";
+import type { AgentRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
 
 /** The part of the IDE command service a branch needs: opening the tab of the new chat. */
 export interface BranchCommands {
@@ -22,6 +23,8 @@ export function useChatBranch(chat: {
   turns: () => AgentTurn[];
   capabilities: () => AgentCapabilities;
   recent: () => AgentRecentChat[];
+  /** The role of the chat being forked; a branch keeps the same preset. */
+  role: () => AgentRoleSnapshot | undefined;
   api: BranchCommands;
   fail: (message: string) => void;
 }) {
@@ -36,8 +39,9 @@ export function useChatBranch(chat: {
       turnId: id,
       mode,
       branchSession: chat.capabilities().branchSession,
+      role: chat.role(),
     });
-    const tab = chatTabCommand(chat.projectId, branch.chat, branch.title);
+    const tab = chatTabCommand(chat.projectId, branch.chat, branch.title, chat.role());
     if (!tab) throw new Error("Для этой ветки нет вкладки чата");
     await chat.api.executeCommand(tab.command, tab.args, { scope });
     return { chat: branch.chat };
@@ -53,7 +57,8 @@ export function useChatBranch(chat: {
 
   /** A chat of the project opens in its tab; one already open gets the focus. */
   function openRecent(key: string, title?: string): void {
-    const tab = chatTabCommand(chat.projectId, key, title);
+    const role = chat.recent().find((item) => item.chat === key)?.role;
+    const tab = chatTabCommand(chat.projectId, key, title, role);
     if (!tab) return;
     void Promise.resolve(chat.api.executeCommand(tab.command, tab.args, { scope })).catch(
       (cause: unknown) => {

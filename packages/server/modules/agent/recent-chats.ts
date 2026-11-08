@@ -1,4 +1,6 @@
 import { currentSession, deleteHistory, historyDatabase, loadHistory } from "./history-store.ts";
+import { readChatRole } from "./role-store.ts";
+import type { AgentRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
 
 /** A chat of the project, open in a tab or closed but still on disk. */
 export interface RecentChat {
@@ -8,6 +10,8 @@ export interface RecentChat {
   updatedAt: string;
   /** Native session of the agent the chat continues, when it is known: the same talk is listed once. */
   session?: string;
+  /** The role the chat started with; kept even when the role is later edited or deleted. */
+  role?: AgentRoleSnapshot;
 }
 
 /** The native session saved with a chat, for rows created before the index stored it. */
@@ -44,12 +48,14 @@ export function readRecentChats(project: string, backend?: string, limit = 50): 
     // Rows written before the index knew sessions get theirs from the saved turns, once.
     const session = row.session ?? sessionFromHistory(row.chat);
     if (!row.session && session) remember.run(session, row.chat);
+    const role = readChatRole(row.chat);
     return {
       chat: row.chat,
       backend: row.backend,
       title: row.title,
       updatedAt: row.updated,
       ...(session ? { session } : {}),
+      ...(role ? { role } : {}),
     };
   });
 }

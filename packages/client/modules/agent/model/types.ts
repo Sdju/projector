@@ -9,6 +9,7 @@ export interface AgentCapabilities {
 }
 
 import type { AgentTask } from "@projector/core/modules/agent-task/index.ts";
+import type { AgentRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
 import type { JudgeNote } from "./judge-note.ts";
 import type { AgentEvent } from "./events.ts";
 
@@ -89,6 +90,8 @@ export interface AgentRecentChat {
   updatedAt: string;
   /** Native session this chat continues: its session row and this chat are one entry. */
   session?: string;
+  /** The role the chat started with; kept even when the role is edited or deleted. */
+  role?: AgentRoleSnapshot;
 }
 
 export interface AgentSessionRef {

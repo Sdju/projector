@@ -1,0 +1,87 @@
+import { getCurrentInstance } from "vue";
+import { newId } from "../../../common/utilities/new-id.ts";
+import { commandArgs } from "../../../common/utilities/commands.ts";
+import { clientAgentByBackend } from "../../agents-integration/catalog/index.ts";
+import { loadAgentRoles } from "../../agent-roles/index.ts";
+import { roleParam } from "../lib/chat-tab.ts";
+import { useIdeCommands } from "../../ide/index.ts";
+import { snapshotOfRole } from "@projector/core/modules/agent-role/index.ts";
+import type { RegisterCommand } from "./register-command.ts";
+
+/** The part of the IDE command service a role launch needs: opening the chat tab. */
+interface RoleCommands {
+  executeCommand(id: string, args?: unknown, options?: { scope?: string }): Promise<unknown>;
+}
+
+/**
+ * Roles are opened from the workspace, not from a chat: the command survives tabs and knows how
+ * to turn a role into the chat tab of its agent with a snapshot of the settings.
+ */
+export function registerRoleCommands(
+  register: RegisterCommand,
+  projectId: string,
+  api: RoleCommands | undefined = getCurrentInstance() ? useIdeCommands().api : undefined,
+): void {
+  register(
+    "ide.agent.roles.chat.list",
+    "Роли агентов для чата",
+    async () => {
+      const data = await loadAgentRoles();
+      return {
+        file: data.file,
+        roles: data.roles
+          .filter((role) => role.kind === "chat")
+          .map((role) => ({
+            id: role.id,
+            name: role.name,
+            description: role.description,
+            agent: role.agent,
+            selection: role.selection,
+            inherited: role.inherited,
+          })),
+      };
+    },
+    () => true,
+    undefined,
+    {
+      description:
+        "Возвращает chat-роли, которые можно открыть командой ide.agent.role.open: id, название, агент и выбранные настройки. Служебные роли (Доктор, Lens, Судья) сюда не входят — они не открывают чат.",
+    },
+  );
+  register(
+    "ide.agent.role.open",
+    "Открыть чат с ролью",
+    async (args) => {
+      const id = commandArgs(args).role;
+      if (typeof id !== "string" || !id) throw new Error("role: id chat-роли");
+      const data = await loadAgentRoles();
+      const role = data.roles.find((item) => item.id === id);
+      if (!role || role.kind !== "chat") throw new Error(`Неизвестная chat-роль: ${id}`);
+      const agent = clientAgentByBackend(role.agent);
+      if (!agent) throw new Error(`Агент роли не найден: ${role.agent}`);
+      if (!api) throw new Error("Роли открываются только в рабочей области проекта");
+      const tab = agent.builtin ? "agent" : agent.program;
+      const chatId = newId();
+      const command = `ide.workbench.${tab}.open`;
+      await api.executeCommand(
+        command,
+        { chatId, role: roleParam(snapshotOfRole(role)) },
+        { scope: `editor:${projectId}` },
+      );
+      return {
+        role: role.id,
+        name: role.name,
+        agent: role.agent,
+        chatId,
+        command,
+      };
+    },
+    () => true,
+    undefined,
+    {
+      description:
+        "Открывает новый чат с chat-ролью: агент роли, её модель и настройки применяются к новому разговору и сохраняются в его истории. Правка роли позже не меняет уже открытый чат. Идентификаторы ролей даёт ide.agent.roles.chat.list.",
+      arguments: { role: "id chat-роли из ide.agent.roles.chat.list" },
+    },
+  );
+}

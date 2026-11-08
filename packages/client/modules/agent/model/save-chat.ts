@@ -25,6 +25,7 @@ export function saveChat(
           turns: state.turns,
           features: state.featureOverrides ?? null,
           judge: state.judgeOverride ?? null,
+          role: state.roleSnapshot ?? null,
           ...(index ? { projectId: index.project, backend: index.backend } : {}),
         }),
       });

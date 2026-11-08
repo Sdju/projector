@@ -1,4 +1,5 @@
 import { generateText } from "ai";
+import { serviceRoleSelection } from "../../agent-roles/index.ts";
 import { quietChatModel, type AgentHistoryTurn } from "../../providers/index.ts";
 import type { LensRequest } from "../../agent/index.ts";
 
@@ -95,7 +96,7 @@ export async function runLens(request: LensRequest & { signal?: AbortSignal }): 
   // there is nothing to describe, so the page gets the same short placeholder for free.
   if (!lensHasMaterial(request))
     return request.busy ? LENS_THINKING_TEXT : "В чате пока нет работы, которую можно описать.";
-  const { model } = await quietChatModel(request.selection);
+  const { model } = await quietChatModel(await serviceRoleSelection("lens", request.selection));
   const timeout = AbortSignal.timeout(LENS_LIMITS.seconds * 1_000);
   const signal = request.signal ? AbortSignal.any([request.signal, timeout]) : timeout;
   const history = lensHistoryText(request.history);

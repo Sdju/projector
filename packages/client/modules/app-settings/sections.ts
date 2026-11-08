@@ -16,6 +16,7 @@ import {
   AgentMemorySettings,
   AgentJudgeSettings,
 } from "../agent/index.ts";
+import { AgentRoleSettings } from "../agent-roles/index.ts";
 import { type SettingsSection } from "../settings/index.ts";
 
 export const settingsSections: SettingsSection[] = [
@@ -130,6 +131,15 @@ export const settingsSections: SettingsSection[] = [
     keywords:
       "интеграции адаптеры кодовые агенты включить отключить выключить сессия терминал GUI TUI графический чат режим вывод возможности умения фичи виджеты widgets графики формы команды IDE MCP",
     component: AgentSettings,
+  },
+  {
+    id: "agent-roles",
+    title: "Роли агентов",
+    group: "Агент",
+    description: "Служебные роли и пресеты чатов: агент, модель и настройки.",
+    keywords:
+      "роли agent roles doctor lens judge доктор линза судья модель служебные внутренние вызовы chat роль чата пресет preset",
+    component: AgentRoleSettings,
   },
   {
     id: "agent-judge",

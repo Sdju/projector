@@ -21,7 +21,7 @@ async function send(url: string, method: string, body: unknown, failure: string)
 /** A plain coding agent behind a chat instead of the TUI; every opening is a new conversation. */
 function agentChatTab(agent: ClientAgent) {
   const { program, title: label } = agent;
-  return defineTab<{ chatId?: string; title?: string }>({
+  return defineTab<{ chatId?: string; title?: string; role?: string }>({
     id: program,
     key: (params) => `${program}:${params.chatId ?? "main"}`,
     path: (params) => params.title ?? label,
@@ -35,6 +35,7 @@ function agentChatTab(agent: ClientAgent) {
       optional: {
         chatId: "Идентификатор уже открытого чата: вкладка этого чата получает фокус",
         title: "Заголовок вкладки; по умолчанию — название агента",
+        role: "JSON-снимок роли: id, name и selection нового чата",
       },
     },
   });
@@ -56,7 +57,7 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
     sidebar: [{ id: "docker", title: "Docker", command: "ide.docker.sidebar.open" }],
     tabs: [
       // The Projector agent: the tab without a chat id is the project's original conversation.
-      defineTab<{ chatId?: string; title?: string }>({
+      defineTab<{ chatId?: string; title?: string; role?: string }>({
         id: "agent",
         key: (params) => (params.chatId ? `agent:chat:${params.chatId}` : "agent:chat"),
         path: (params) => params.title ?? "Агент",
@@ -71,6 +72,7 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
           optional: {
             chatId: "Идентификатор уже открытого чата: вкладка этого чата получает фокус",
             title: "Заголовок вкладки; по умолчанию — «Агент»",
+            role: "JSON-снимок роли: id, name и selection нового чата",
           },
         },
       }),

@@ -1,4 +1,6 @@
 import type { ChatState } from "./chat-state.ts";
+import { normalizeRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
+import { applyRoleSnapshot } from "./role-apply.ts";
 
 export const INTERRUPTED =
   "Ответ прерван: страница или сервер были перезапущены. Отправьте сообщение ещё раз — разговор продолжится.";
@@ -12,17 +14,27 @@ export function loadHistory(url: string, state: ChatState, quiet = false): Promi
       const data = await response.json();
       const features = Array.isArray(data.features) ? data.features : undefined;
       const judge = data.judge && typeof data.judge === "object" ? data.judge : undefined;
-      // A refresh of an unchanged chat must not re-render it.
+      const role = normalizeRoleSnapshot(data.role);
+      // A refresh of an unchanged chat must not re-render it. A missing saved role is not a
+      // change: a new chat gets its role from the tab before the first save. The tab's snapshot
+      // is the same preset even when the saved copy is slightly older.
+      const roleChanged =
+        !!role && (!state.roleSnapshot || state.roleSnapshot.roleId !== role.roleId);
       if (
         quiet &&
         JSON.stringify(data.turns) === JSON.stringify(state.turns) &&
         JSON.stringify(features ?? null) === JSON.stringify(state.featureOverrides ?? null) &&
-        JSON.stringify(judge ?? null) === JSON.stringify(state.judgeOverride ?? null)
+        JSON.stringify(judge ?? null) === JSON.stringify(state.judgeOverride ?? null) &&
+        !roleChanged
       )
         return;
       state.turns = data.turns;
       state.featureOverrides = features;
       state.judgeOverride = judge;
+      // The tab's snapshot is the same preset; do not overwrite a control changed in this chat
+      // with a save that has not reached the server yet.
+      if (role && (!state.roleSnapshot || state.roleSnapshot.roleId !== role.roleId))
+        applyRoleSnapshot(state, role, true);
       // A turn saved at its start but never finished: the page or server went away mid-answer.
       // One with a live agent process behind it is rejoined instead (`resumeRun`).
       const last = state.turns.at(-1);

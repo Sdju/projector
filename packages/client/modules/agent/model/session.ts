@@ -33,6 +33,8 @@ import { applyAgentEvent, markAnswerFailed, resetAnswer } from "./turn-events.ts
 import { hasChips, messageText, normalizeParts } from "../lib/message-parts.ts";
 import { restoreFormAnswers } from "./form-reply.ts";
 import { userTurnOf } from "./user-turn.ts";
+import { applyRoleSnapshot } from "./role-apply.ts";
+import { sessionIdOf, tailOf } from "./session-tail.ts";
 import type {
   AgentBackendId,
   AgentEvent,
@@ -41,6 +43,7 @@ import type {
   AgentCommandRequest,
   MessagePart,
 } from "./types.ts";
+import type { AgentRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
 
 type SendOptions = { auto?: string; autoTitle?: string; form?: AgentFormAnswer };
 
@@ -52,7 +55,12 @@ export function useAgent(
   projectId = "",
   commands?: (request: AgentCommandRequest) => Promise<unknown>,
   /** External-agent chats are separate conversations: one per `chatId`, no Projector tools. */
-  options: { backend?: AgentBackendId; chatId?: string } = {},
+  options: {
+    backend?: AgentBackendId;
+    chatId?: string;
+    /** The role captured for a new chat; a saved history may carry its own snapshot. */
+    role?: AgentRoleSnapshot;
+  } = {},
 ) {
   const backend = options.backend ?? "projector";
   const own = isBuiltinAgent(backend) && !options.chatId;
@@ -70,7 +78,7 @@ export function useAgent(
     }
   }
   const state = sessions.get(key)!;
-
+  applyRoleSnapshot(state, options.role);
   const historyUrl = `/api/agent/history/${encodeURIComponent(key || "catalog")}`;
   if (!loads.has(key)) loads.set(key, loadHistory(historyUrl, state));
   const ready = loads.get(key)!;
@@ -102,15 +110,6 @@ export function useAgent(
     removeSession,
     clear,
   } = useExternalAgent(state, { backend, projectId, ready, persist, key });
-  /** The native session of the last answer, so Claude Code continues the same conversation. */
-  function sessionId(): string | undefined {
-    const last = state.turns.findLast((item) => item.role === "assistant");
-    return last && !last.detached ? last.session?.id : undefined;
-  }
-  /** Where the kept conversation ends in the agent's transcript (Claude Code branches from it). */
-  function tail(): string | undefined {
-    return state.turns.findLast((item) => item.role === "assistant")?.tail;
-  }
   async function decide(id: string, allow: boolean, always = false): Promise<void> {
     state.permissions = state.permissions.filter((item) => item.id !== id);
     try {
@@ -207,7 +206,7 @@ export function useAgent(
       state.secrets = [];
       persist();
       if (!stopped) notifyAnswer(assistant.text, !!state.error);
-      drainQueue(stopped && !state.interrupting);
+      void drainQueue(stopped && !state.interrupting);
     }
   }
 
@@ -241,8 +240,8 @@ export function useAgent(
     state.error = "";
     void requestNotifications();
     const previousHistory = chatHistory(state.turns, isBuiltinAgent(backend));
-    const resume = sessionId();
-    const branchFrom = tail();
+    const resume = sessionIdOf(state.turns);
+    const branchFrom = tailOf(state.turns);
     const copy = worktreeId();
     const isolate = state.isolate && !copy && !resume && !isBuiltinAgent(backend);
     state.isolate = false;
@@ -353,6 +352,7 @@ export function useAgent(
     secrets,
     controls,
     selection,
+    roleSnapshot: computed(() => state.roleSnapshot),
     capabilities: computed(() => state.capabilities),
     controlsError: computed(() => state.controlsError),
     sessions: sessionList,

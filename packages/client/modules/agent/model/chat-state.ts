@@ -1,5 +1,6 @@
 import { reactive } from "vue";
 import type { JudgeOverride } from "@projector/core/modules/agent-judge/index.ts";
+import type { AgentRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
 import type {
   AgentCapabilities,
   AgentCommand,
@@ -37,6 +38,8 @@ export const createState = () =>
     capabilities: {} as AgentCapabilities,
     commands: [] as AgentCommand[],
     selection: {} as AgentSelection,
+    /** The role the chat started with; absent for an ordinary chat. */
+    roleSnapshot: undefined as AgentRoleSnapshot | undefined,
     controlsError: "",
     sessions: [] as AgentSessionInfo[],
     sessionsLoading: false,
