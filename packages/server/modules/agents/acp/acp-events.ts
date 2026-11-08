@@ -1,5 +1,11 @@
 import { createReplay, type AgentCommand, type AgentEmitter } from "../../agent/index.ts";
-import { createPlainDialect, isOver, type AcpDialect, type AcpTaskPatch } from "./acp-dialect.ts";
+import {
+  createPlainDialect,
+  isOver,
+  type AcpCompaction,
+  type AcpDialect,
+  type AcpTaskPatch,
+} from "./acp-dialect.ts";
 
 interface ContentBlock {
   type?: string;
@@ -90,6 +96,10 @@ export function createAcpEventMapper(
   emit: AgentEmitter,
   label: string,
   dialect: AcpDialect = createPlainDialect(),
+  options: {
+    /** The run is a `/compact` command: its summary is the answer, not just a note. */
+    compactCommand?: boolean;
+  } = {},
 ) {
   let text = "";
   let model = "";
@@ -97,6 +107,39 @@ export function createAcpEventMapper(
   const emitTasks = (patches: AcpTaskPatch[]) => {
     for (const patch of patches) emit("task", patch);
   };
+  /** A compaction took the context away: show its progress and keep its result in the chat. */
+  function applyCompaction(compaction: AcpCompaction): void {
+    const inputId = compaction.id ? `compaction:${compaction.id}` : undefined;
+    const note = (message: string) =>
+      emit("input", { text: message, ...(inputId ? { inputId } : {}) });
+    // The compaction is over; the answer (or the next step of it) goes on from here.
+    const done = () => emit("status", { phase: "thinking", provider: label, model });
+    if (compaction.status === "started") {
+      emit("status", { phase: "compacting" });
+      return;
+    }
+    if (compaction.status === "completed") {
+      const summary = compaction.summary?.trim();
+      if (options.compactCommand) {
+        const answer = summary || "Контекст сжат.";
+        text += answer;
+        emit("text", { text: answer });
+      } else note("Контекст сжат");
+      done();
+      return;
+    }
+    if (compaction.status === "cancelled") {
+      note("Сжатие контекста отменено");
+      done();
+      return;
+    }
+    note(
+      compaction.error
+        ? `Не удалось сжать контекст: ${compaction.error}`
+        : "Не удалось сжать контекст",
+    );
+    done();
+  }
 
   function finishTool(update: Record<string, unknown>, id: string, name: string): void {
     const output = dialect.output(id) || toolOutput(update);
@@ -116,6 +159,11 @@ export function createAcpEventMapper(
 
   function handleUpdate(_sessionId: string, update: Record<string, unknown>): void {
     const kind = update.sessionUpdate;
+    const compaction = dialect.compaction(update);
+    if (compaction) {
+      applyCompaction(compaction);
+      return;
+    }
     if (kind === "agent_message_chunk") {
       const chunk = contentText(update.content);
       if (!chunk) return;
@@ -241,6 +289,17 @@ export function createAcpReplayCollector(
   function handleUpdate(update: Record<string, unknown>): void {
     const kind = update.sessionUpdate;
     const call = String(update.toolCallId ?? "");
+    const compaction = dialect.compaction(update);
+    if (compaction) {
+      if (compaction.status === "completed") replay.note("Контекст сжат");
+      else if (compaction.status === "failed")
+        replay.note(
+          compaction.error
+            ? `Не удалось сжать контекст: ${compaction.error}`
+            : "Не удалось сжать контекст",
+        );
+      return;
+    }
     if (kind === "user_message_chunk" || kind === "agent_message_chunk")
       replay.mark(dialect.time(update));
     if (kind === "user_message_chunk") replay.user(contentText(update.content));

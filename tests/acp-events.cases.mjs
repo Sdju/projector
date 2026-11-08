@@ -3,6 +3,7 @@ import {
   createAcpEventMapper,
   createAcpReplayCollector,
 } from "../packages/server/modules/agents/acp/acp-events.ts";
+import { isCompactCommand } from "../packages/server/modules/agents/acp/acp-dialect.ts";
 import { createCodexDialect } from "../packages/server/modules/agents/codex/dialect.ts";
 import { createKimiDialect } from "../packages/server/modules/agents/kimi/dialect.ts";
 import { createOpencodeDialect } from "../packages/server/modules/agents/opencode/dialect.ts";
@@ -643,4 +644,112 @@ test("other agents' session info does not invent retries", () => {
     _meta: { "opencode/retry": { attempt: 2 } },
   });
   expect(events).toEqual([]);
+});
+
+test("a manual /compact shows its progress and the summary as the answer", () => {
+  expect(isCompactCommand(" /compact ")).toBe(true);
+  expect(isCompactCommand("/compact focus on tests")).toBe(true);
+  expect(isCompactCommand("/compaction")).toBe(false);
+  expect(isCompactCommand("/anything", [{ type: "command", name: "Compact" }])).toBe(true);
+  const events = [];
+  const mapper = createAcpEventMapper(
+    (type, data) => events.push([type, data]),
+    "OpenCode",
+    createOpencodeDialect(),
+    { compactCommand: true },
+  );
+  mapper.handleUpdate("s", {
+    sessionUpdate: "compaction_update",
+    compactionId: "c1",
+    status: "in_progress",
+  });
+  expect(events.at(-1)).toEqual(["status", { phase: "compacting" }]);
+  // Chunks stream the same summary that the completed update carries: keep them out of the chat.
+  mapper.handleUpdate("s", {
+    sessionUpdate: "compaction_summary_chunk",
+    compactionId: "c1",
+    content: { type: "text", text: "half" },
+  });
+  expect(events.filter(([type]) => type !== "status")).toEqual([]);
+  mapper.handleUpdate("s", {
+    sessionUpdate: "compaction_update",
+    compactionId: "c1",
+    status: "completed",
+    summary: [{ type: "text", text: "## Сводка\n- сделано" }],
+  });
+  expect(events).toContainEqual(["text", { text: "## Сводка\n- сделано" }]);
+  expect(events.at(-1)).toEqual(["status", { phase: "thinking", provider: "OpenCode", model: "" }]);
+  expect(mapper.text).toBe("## Сводка\n- сделано");
+});
+
+test("an automatic compaction leaves a note and does not replace the answer", () => {
+  const events = [];
+  const mapper = createAcpEventMapper(
+    (type, data) => events.push([type, data]),
+    "OpenCode",
+    createOpencodeDialect(),
+  );
+  mapper.handleUpdate("s", {
+    sessionUpdate: "compaction_update",
+    compactionId: "c2",
+    status: "completed",
+    summary: [{ type: "text", text: "long summary" }],
+  });
+  expect(events).toContainEqual(["input", { text: "Контекст сжат", inputId: "compaction:c2" }]);
+  expect(mapper.text).toBe("");
+});
+
+test("opencode compaction markers of older builds are visible too", () => {
+  const events = [];
+  const mapper = createAcpEventMapper(
+    (type, data) => events.push([type, data]),
+    "OpenCode",
+    createOpencodeDialect(),
+    { compactCommand: true },
+  );
+  mapper.handleUpdate("s", {
+    sessionUpdate: "session_info_update",
+    _meta: { "opencode/compaction": { status: "started", messageId: "m1", reason: "manual" } },
+  });
+  expect(events.at(-1)).toEqual(["status", { phase: "compacting" }]);
+  mapper.handleUpdate("s", {
+    sessionUpdate: "session_info_update",
+    _meta: { "opencode/compaction": { status: "completed", messageId: "m1", reason: "manual" } },
+  });
+  expect(events).toContainEqual(["text", { text: "Контекст сжат." }]);
+});
+
+test("a failed compaction is reported without failing the answer", () => {
+  const events = [];
+  const mapper = createAcpEventMapper(
+    (type, data) => events.push([type, data]),
+    "OpenCode",
+    createOpencodeDialect(),
+  );
+  mapper.handleUpdate("s", {
+    sessionUpdate: "compaction_update",
+    compactionId: "c3",
+    status: "failed",
+    error: { message: "provider overloaded" },
+  });
+  expect(events).toContainEqual([
+    "input",
+    { text: "Не удалось сжать контекст: provider overloaded", inputId: "compaction:c3" },
+  ]);
+  expect(events.some(([type]) => type === "error")).toBe(false);
+});
+
+test("replaying a compacted session marks where the context was compacted", () => {
+  const collector = createAcpReplayCollector("opencode", "s", createOpencodeDialect());
+  collector.handleUpdate({
+    sessionUpdate: "agent_message_chunk",
+    content: { type: "text", text: "answer" },
+  });
+  collector.handleUpdate({
+    sessionUpdate: "compaction_update",
+    compactionId: "c4",
+    status: "completed",
+    summary: [{ type: "text", text: "long summary" }],
+  });
+  expect(collector.turns.at(-1).parts).toContainEqual({ type: "note", text: "Контекст сжат" });
 });

@@ -4,6 +4,17 @@ export type AcpTaskPatch = AgentTaskPatch;
 
 export type AcpUpdate = Record<string, unknown>;
 
+/** The message asks the agent to compact its context: the compaction summary is the answer. */
+export function isCompactCommand(
+  message: string,
+  parts?: readonly { type: string; name?: string }[],
+): boolean {
+  return (
+    message.trim().split(/\s+/, 1)[0] === "/compact" ||
+    !!parts?.some((part) => part.type === "command" && part.name?.toLowerCase() === "compact")
+  );
+}
+
 /** A provider retry an agent reports in its own updates. */
 export interface AcpRetry {
   /** The attempt being made (1 is the first repeat). */
@@ -12,6 +23,48 @@ export interface AcpRetry {
   delay?: number;
   /** What the provider said: shown in place of the plain "thinking" status. */
   message?: string;
+}
+
+/** A context compaction an agent reports: the summary is the result of a manual `/compact`. */
+export type AcpCompaction =
+  | { id?: string; status: "started" }
+  | { id?: string; status: "completed"; summary?: string }
+  | { id?: string; status: "cancelled" }
+  | { id?: string; status: "failed"; error?: string };
+
+/** Text of an ACP content block (a string, one block or a list of blocks). */
+function contentText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value))
+    return value
+      .map((item) => contentText((item as { text?: unknown } | null)?.text ?? ""))
+      .filter(Boolean)
+      .join("");
+  const text = (value as { text?: unknown } | null)?.text;
+  return typeof text === "string" ? text : "";
+}
+
+/** The standard `compaction_update` of ACP v2, which also carries the summary at the end. */
+export function readCompaction(update: AcpUpdate): AcpCompaction | undefined {
+  if (update.sessionUpdate !== "compaction_update") return undefined;
+  const id = typeof update.compactionId === "string" ? update.compactionId : undefined;
+  if (update.status === "in_progress") return { ...(id ? { id } : {}), status: "started" };
+  if (update.status === "completed") {
+    const summary = contentText(update.summary).trim();
+    return { ...(id ? { id } : {}), status: "completed", ...(summary ? { summary } : {}) };
+  }
+  if (update.status === "cancelled") return { ...(id ? { id } : {}), status: "cancelled" };
+  if (update.status === "failed") {
+    const error = update.error;
+    const message =
+      typeof error === "string"
+        ? error
+        : typeof (error as { message?: unknown } | null)?.message === "string"
+          ? (error as { message: string }).message
+          : "";
+    return { ...(id ? { id } : {}), status: "failed", ...(message ? { error: message } : {}) };
+  }
+  return undefined;
 }
 
 /**
@@ -54,6 +107,8 @@ export interface AcpDialect {
    * `undefined` means this update says nothing about retries.
    */
   retry(update: AcpUpdate): AcpRetry | null | undefined;
+  /** A context compaction this update reports; `undefined` when it says nothing about one. */
+  compaction(update: AcpUpdate): AcpCompaction | undefined;
 }
 
 const UUID_V7 = /^([0-9a-f]{8})-?([0-9a-f]{4})-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -81,6 +136,7 @@ export function createPlainDialect(): AcpDialect {
     finish: () => [],
     time: (update) => uuidV7Time(update.messageId),
     retry: () => undefined,
+    compaction: readCompaction,
   };
 }
 

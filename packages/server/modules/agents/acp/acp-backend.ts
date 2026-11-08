@@ -23,6 +23,7 @@ export { sessionMcpServers } from "./mcp-config.ts";
 import { elicitForm } from "./acp-elicitation.ts";
 import { type AcpConnection, type AcpError, NO_TIMEOUT } from "./acp-client.ts";
 import { applySelection, controlsFromSession, shownModel } from "./acp-controls.ts";
+import { isCompactCommand } from "./acp-dialect.ts";
 import { contentText, createAcpEventMapper, stopReasonError } from "./acp-events.ts";
 import { acpAdvertisedDelete, initializeAcp, startAcp } from "./acp-process.ts";
 import {
@@ -105,7 +106,10 @@ export function createAcpBackend(program: AcpProgram): AgentBackend {
 
 async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> {
   const program = acpProgram(id);
-  const mapper = createAcpEventMapper(options.emit, program.label, program.dialect?.());
+  const compactCommand = isCompactCommand(options.message, options.parts);
+  const mapper = createAcpEventMapper(options.emit, program.label, program.dialect?.(), {
+    compactCommand,
+  });
   let sessionId = "";
   // `session/load` replays the whole conversation; those updates are history, not this answer.
   let replaying = false;

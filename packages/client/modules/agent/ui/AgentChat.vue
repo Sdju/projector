@@ -632,6 +632,7 @@ onBeforeUnmount(() => {
           :promoted-form="answerFormFor(turn).promotedForm"
           :form-answered="answerFormFor(turn).formAnswered"
           :lens="turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? lens : undefined"
+          :phase="turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? phase : undefined"
           @copy="copyMessage"
           @open="openChip"
           @edit="editMessage"

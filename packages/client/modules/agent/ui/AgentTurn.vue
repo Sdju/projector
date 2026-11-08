@@ -47,6 +47,8 @@ const props = defineProps<{
   formAnswered?: boolean;
   /** The chat's Lens: only the last work group of the last answer shows it. */
   lens?: AgentLens;
+  /** What the chat is doing now: `compacting` is shown while the context is summarized. */
+  phase?: string;
 }>();
 const emit = defineEmits<{
   copy: [id: string, text: string];
@@ -323,7 +325,7 @@ const lastWork = computed(
         class="early"
       />
       <UiInline
-        v-if="busy && last && waiting"
+        v-if="busy && last && (waiting || phase === 'compacting')"
         :gap="2"
         justify="normal"
         class="thinking"
@@ -336,8 +338,15 @@ const lastWork = computed(
           justify="normal"
           class="thinking-dots"
           aria-hidden="true"
-          ><i /><i /><i /></UiInline
-        >{{ turn.tools.some((t) => t.status === "running") ? "Выполняет задачу" : "Думает" }}
+          ><i /><i /><i
+        /></UiInline>
+        {{
+          phase === "compacting"
+            ? "Сжимаю историю"
+            : turn.tools.some((t) => t.status === "running")
+              ? "Выполняет задачу"
+              : "Думает"
+        }}
       </UiInline>
       <AgentChanges
         v-if="!busy || !last"

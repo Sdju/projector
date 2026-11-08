@@ -10,6 +10,8 @@ export const opencodeProgram = {
   command: "opencode",
   args: ["acp"],
   dialect: createOpencodeDialect,
+  // ACP v2 compaction updates carry the summary; older builds fall back to `_meta` markers.
+  clientCapabilities: { session: { compaction: {} } },
 };
 
 /**

@@ -122,6 +122,14 @@ async function refresh() {
   }, 60);
 }
 watch(trigger, refresh, { deep: true });
+// The agent's commands are loaded asynchronously: a list that arrives mid-typing should complete.
+watch(
+  () => props.commands,
+  () => {
+    if (trigger.value?.kind === "command") void refresh();
+  },
+  { deep: true },
+);
 const open = computed(() => !!trigger.value && suggestions.value.length > 0);
 
 function accept(index = active.value): boolean {

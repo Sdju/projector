@@ -1,7 +1,9 @@
 import {
   extendPlainDialect,
   inputOf,
+  readCompaction,
   shorten,
+  type AcpCompaction,
   type AcpDialect,
   type AcpTaskPatch,
   type AcpUpdate,
@@ -65,6 +67,42 @@ function retryOf(update: AcpUpdate) {
   };
 }
 
+/**
+ * Older OpenCode builds report compaction in `session_info_update._meta`; newer ones (with the
+ * client's `session.compaction` capability) use the standard `compaction_update` instead.
+ */
+function compactionOf(update: AcpUpdate): AcpCompaction | undefined {
+  if (update.sessionUpdate !== "session_info_update") return readCompaction(update);
+  const meta = update._meta as Record<string, unknown> | undefined;
+  const raw = meta?.["opencode/compaction"];
+  if (!raw || typeof raw !== "object") return undefined;
+  const { status, messageId, summary, error } = raw as {
+    status?: unknown;
+    messageId?: unknown;
+    summary?: unknown;
+    error?: unknown;
+  };
+  const id = typeof messageId === "string" ? messageId : undefined;
+  const withId = id ? { id } : {};
+  if (status === "started") return { ...withId, status: "started" };
+  if (status === "completed")
+    return {
+      ...withId,
+      status: "completed",
+      ...(typeof summary === "string" && summary.trim() ? { summary: summary.trim() } : {}),
+    };
+  if (status === "failed") {
+    const text =
+      typeof error === "string"
+        ? error
+        : typeof (error as { message?: unknown } | null)?.message === "string"
+          ? (error as { message: string }).message
+          : "";
+    return { ...withId, status: "failed", ...(text ? { error: text } : {}) };
+  }
+  return undefined;
+}
+
 /** The input of the call that starts a subagent; it arrives with a later update, not the first. */
 function subagentOf(update: AcpUpdate) {
   const { agent, description, prompt } = inputOf(update);
@@ -123,6 +161,7 @@ export function createOpencodeDialect(): AcpDialect {
   const dialect: AcpDialect = extendPlainDialect({
     time: (update) => opencodeIdTime(update.messageId),
     retry: retryOf,
+    compaction: compactionOf,
     tool(update) {
       const child = childOf(update);
       const title = String(update.title || update.kind || "tool");
