@@ -53,7 +53,7 @@ else if (args.includes('ps')) console.log('${id}');
 else if (args.includes('inspect')) console.log(JSON.stringify([${JSON.stringify(inspected)}]));
 else if (args.includes('exec')) { console.log('SHELL_READY'); process.stdin.once('data', (data) => { console.log('INPUT:' + data.toString().trim()); process.exit(7); }); }
 else if (args.includes('logs')) console.log('FIXTURE_LOG');
-else if (args.includes('build')) setTimeout(() => { console.log('BUILD_DONE'); process.exit(0); }, 150);
+else if (args.includes('build')) setTimeout(() => { console.log('BUILD_DONE'); process.exit(0); }, 2000);
 else { console.log('OPERATION_DONE'); }
 `,
   );
@@ -172,6 +172,7 @@ else { console.log('OPERATION_DONE'); }
     }),
   ).rejects.toThrow(/shell/);
   expect((await dockerLogs("default", id)).text).toMatch(/FIXTURE_LOG/);
+  // The fake build stays alive while both projects check that "up" waits for it.
   const build = await dockerAction(project, { action: "build", context: "default" });
   await expect(dockerAction(project, { action: "up", context: "default" })).rejects.toThrow(
     /Дождитесь/,
