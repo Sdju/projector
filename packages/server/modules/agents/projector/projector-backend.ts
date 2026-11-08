@@ -32,7 +32,7 @@ import { createTurnInput } from "./projector-input.ts";
 import { budgetNote, turnBudget } from "./projector-budget.ts";
 import { isRetryable, MAX_RETRIES, pause, retryDelay } from "./projector-retry.ts";
 import { connectMcp, mcpSection, type McpConnection } from "./projector-mcp.ts";
-import { expandSlash, listSkills, skillsSection } from "./projector-skills.ts";
+import { expandSlash, listSkills, skillsForRole, skillsSection } from "./projector-skills.ts";
 import { memorySection } from "./projector-memory.ts";
 import { loadHooks, runStopHooks, withHooks } from "./projector-hooks.ts";
 import { projectInstructions } from "./project-instructions.ts";
@@ -46,6 +46,7 @@ import {
   splitAtCompaction,
   summarySection,
 } from "./projector-compaction.ts";
+import { rolePromptText } from "../../agent-roles/index.ts";
 
 /** The window of a model that has none registered in the provider settings; the context ring is measured against it. */
 const DEFAULT_CONTEXT_SIZE = Number(process.env.PROJECTOR_AGENT_CONTEXT_TOKENS) || 128_000;
@@ -122,6 +123,7 @@ async function turn(
     review:
       mode === "auto" ? createBashReviewer(quietModel, options.cwd, options.abort) : undefined,
   };
+  const skills = side ? [] : skillsForRole(await listSkills(options.cwd), options.role?.skills);
   const own = side
     ? createSideTools({
         commands: options.commands,
@@ -135,6 +137,7 @@ async function turn(
         ask: options.ask,
         secret: options.secret,
         guard,
+        skills,
         runTask: taskRunnerFor({
           cwd: options.cwd,
           projectId: options.projectId,
@@ -155,7 +158,6 @@ async function turn(
     await compactChat(quietModel, earlier, options, resolved, DEFAULT_CONTEXT_SIZE);
     return;
   }
-  const skills = side ? [] : await listSkills(options.cwd);
   const { recent, summary } = side
     ? { recent: earlier.turns, summary: earlier.summary }
     : await compactHistory(quietModel, earlier.turns, {
@@ -165,7 +167,7 @@ async function turn(
       });
   const mcp: McpConnection = side
     ? { tools: {}, problems: [], servers: [], close: async () => {} }
-    : await connectMcp(options.cwd, guard, options.abort);
+    : await connectMcp(options.cwd, guard, options.abort, options.role?.mcp);
   open.close = mcp.close;
   const hooks = side ? [] : await loadHooks(options.cwd, guard);
   const started = Date.now();
@@ -205,7 +207,8 @@ async function turn(
       (await memorySection(options.cwd)) +
       mcpSection(mcp) +
       skillsSection(skills) +
-      summarySection(summary);
+      summarySection(summary) +
+      rolePromptText(options.role);
   const budget = turnBudget(side ? SIDE_LIMITS : undefined);
   const wanted = options.selection?.[THINKING];
   let answering = model;

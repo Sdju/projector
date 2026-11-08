@@ -10,6 +10,7 @@ import UiStack from "../../../common/ui/UiStack.vue";
 import AgentChatRoleCard from "./AgentChatRoleCard.vue";
 import { onMounted, ref, watch } from "vue";
 import { useAgentRoleSettings } from "../model/roles.ts";
+import { roleResources } from "../model/resources.ts";
 
 const {
   serviceRoles,
@@ -173,6 +174,7 @@ onMounted(() => void load().catch(() => undefined));
       :role="role"
       :agents="agents"
       :controls-for="controlsFor"
+      :resources-for="roleResources"
       :busy="busy === role.id"
       @save="(value) => saveChatRole(role, value)"
       @remove="removeChatRole(role)"

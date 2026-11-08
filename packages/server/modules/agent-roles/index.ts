@@ -20,3 +20,4 @@ export {
   saveProjectRole,
   setProjectRoleTrust,
 } from "./project.ts";
+export { roleContext, rolePromptText, selectedNames } from "./runtime.ts";

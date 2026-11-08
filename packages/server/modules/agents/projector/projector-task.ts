@@ -43,7 +43,7 @@ export interface ProjectorTaskRequest {
 
 async function taskRole(
   request: ProjectorTaskRequest,
-): Promise<{ name?: string; selection: AgentSelection }> {
+): Promise<{ name?: string; selection: AgentSelection; prompt?: string }> {
   const id = request.role?.trim();
   if (id) {
     const role = await readAgentRole(id, request.projectId);
@@ -51,12 +51,17 @@ async function taskRole(
     if (role.kind !== "chat") throw new Error("Служебная роль не подходит для task");
     if (role.agent !== "projector")
       throw new Error(`task работает на Projector, а роль «${role.name}» — на ${role.agent}`);
-    return { name: role.name, selection: role.selection };
+    return {
+      name: role.name,
+      selection: role.selection,
+      ...(role.prompt ? { prompt: role.prompt } : {}),
+    };
   }
   const inherited = request.parentRole;
   return {
     ...(inherited?.name ? { name: inherited.name } : {}),
     selection: inherited?.selection ?? {},
+    ...(inherited?.prompt ? { prompt: inherited.prompt } : {}),
   };
 }
 
@@ -243,7 +248,9 @@ export async function runProjectorTask(
   try {
     const result = streamText({
       model,
-      system: TASK_PROMPT,
+      system: role.prompt
+        ? `${TASK_PROMPT}\n\nИнструкции роли «${role.name ?? "Projector"}»:\n${role.prompt}`
+        : TASK_PROMPT,
       prompt: `Проект: ${request.cwd ?? process.cwd()}\n\n${request.description}\n\n${request.prompt}`,
       tools: taskTools(request.cwd, signal),
       stopWhen: stepCountIs(TASK_LIMITS.steps),

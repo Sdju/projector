@@ -1,6 +1,7 @@
 import type { McpServerInfo } from "../../agent/index.ts";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { mcpServerConfigs, type McpServerConfig } from "../../agent-mcp/index.ts";
 
 /** An MCP server in the shape ACP's `session/new` takes: a process, or a remote one. */
 export type AcpMcpServer =
@@ -74,6 +75,59 @@ export async function projectMcpServers(
     if (!kind || !support[kind]) return [];
     return [{ type: kind, name, url: expand(String(entry.url)), headers: pairs(entry.headers) }];
   });
+}
+
+/** A parsed config in the shape ACP takes; a remote kind the agent lacks is left out. */
+function acpServer(config: McpServerConfig, support: McpSupport): AcpMcpServer[] {
+  if ("command" in config)
+    return [
+      {
+        name: config.name,
+        command: config.command,
+        args: config.args,
+        env: Object.entries(config.env).map(([name, value]) => ({ name, value })),
+      },
+    ];
+  if (config.sse ? !support.sse : !support.http) return [];
+  return [
+    {
+      type: config.sse ? "sse" : "http",
+      name: config.name,
+      url: config.url,
+      headers: Object.entries(config.headers).map(([name, value]) => ({ name, value })),
+    },
+  ];
+}
+
+/** The user's own servers a role names; the project's are passed separately from `.mcp.json`. */
+export async function userMcpServers(
+  cwd: string | undefined,
+  names: readonly string[],
+  support: McpSupport = {},
+): Promise<AcpMcpServer[]> {
+  if (!names.length) return [];
+  return (await mcpServerConfigs(cwd))
+    .filter((config) => config.source === "user" && names.includes(config.name))
+    .flatMap((config) => acpServer(config, support));
+}
+
+/**
+ * The MCP servers of a session: the project's own, plus the built-in IDE and widget servers when
+ * their features are on. Only those additions may hide a same-named project server; with the
+ * feature off the user's `projector-ide` or `projector-widgets` from `.mcp.json` is passed as is.
+ */
+export async function sessionMcpServers(
+  cwd: string | undefined,
+  support: McpSupport,
+  extra: AcpMcpServer[],
+  only?: readonly string[],
+): Promise<AcpMcpServer[]> {
+  const project = only
+    ? (await projectMcpServers(cwd, support)).filter((server) => only.includes(server.name))
+    : await projectMcpServers(cwd, support);
+  if (!extra.length) return project;
+  const names = new Set(extra.map((server) => server.name));
+  return [...project.filter((server) => !names.has(server.name)), ...extra];
 }
 
 /** What the chat shows for an ACP agent: which servers of the project it is given. */

@@ -141,13 +141,16 @@ export function useProjectRoleSettings(projectId: () => string) {
     palette: false,
     title: "Сохранить роль проекта",
     description:
-      "Меняет chat-роль в .projector/roles.json. Любая запись меняет хеш файла и отзывает доверие.",
+      "Меняет chat-роль в .projector/roles.json: название, агента, настройки, промпт, навыки и MCP. Не переданные поля сохраняются; пустой массив skills или mcp выключает их. Любая запись меняет хеш файла и отзывает доверие.",
     arguments: {
       role: "string: id роли проекта",
       name: "string: название",
       agent: "string: id агента",
       description: "string: описание",
       selection: "object: control id → value",
+      prompt: "string: дополнительные инструкции роли",
+      skills: "array: имена навыков",
+      mcp: "array: имена MCP-серверов",
     },
     enabled: () => !busy.value,
     run: (value) => {
@@ -155,14 +158,24 @@ export function useProjectRoleSettings(projectId: () => string) {
       if (typeof args.role !== "string" || !args.role) throw new Error("role: id роли проекта");
       if (typeof args.name !== "string" || !args.name.trim()) throw new Error("name: название");
       if (typeof args.agent !== "string" || !args.agent) throw new Error("agent: id агента");
+      const known = roles.value.find((role) => role.id === args.role);
+      if (!known) throw new Error(`Неизвестная роль проекта: ${args.role}`);
+      const names = (input: unknown, fallback: string[] | undefined) =>
+        Array.isArray(input)
+          ? input.filter((item): item is string => typeof item === "string")
+          : fallback;
       return save(args.role, {
+        ...known,
         name: args.name,
         agent: args.agent,
-        description: typeof args.description === "string" ? args.description : "",
+        description: typeof args.description === "string" ? args.description : known.description,
         selection:
           args.selection && typeof args.selection === "object" && !Array.isArray(args.selection)
             ? (args.selection as Record<string, string>)
-            : {},
+            : known.selection,
+        prompt: typeof args.prompt === "string" ? args.prompt : known.prompt,
+        skills: names(args.skills, known.skills),
+        mcp: names(args.mcp, known.mcp),
       });
     },
   });

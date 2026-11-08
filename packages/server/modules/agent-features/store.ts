@@ -139,8 +139,14 @@ export async function enabledFeatureText(agentId: string, features?: string[]): 
 export const FEATURE_PROMPT_END = "<!-- projector:features:end -->";
 
 /** The feature text framed for an agent that has no Projector prompt of its own. */
-export async function featurePrompt(agentId: string, features?: string[]): Promise<string> {
-  const text = await enabledFeatureText(agentId, features);
+export async function featurePrompt(
+  agentId: string,
+  features?: string[],
+  extra = "",
+): Promise<string> {
+  const text = [extra.trim(), await enabledFeatureText(agentId, features)]
+    .filter(Boolean)
+    .join("\n\n");
   if (!text) return "";
   return `[Projector] В этом чате включены дополнительные возможности Projector. Пользуйся ими, когда это уместно; обычные вопросы не загромождай.\n\n${text}\n\n${FEATURE_PROMPT_END}`;
 }

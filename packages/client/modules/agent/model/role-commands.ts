@@ -34,6 +34,9 @@ export function registerRoleCommands(
           description: role.description,
           agent: role.agent,
           selection: role.selection,
+          prompt: role.prompt,
+          skills: role.skills,
+          mcp: role.mcp,
           inherited: role.inherited,
         })),
       };

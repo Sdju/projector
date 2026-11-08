@@ -3,6 +3,7 @@ import {
   readUserMcp,
   writeUserMcp,
 } from "../../modules/agents/projector/index.ts";
+import { loadProjects } from "../../modules/projects/index.ts";
 import { HttpError } from "../../modules/http/index.ts";
 import { asString, json, readBody } from "../../modules/transport/index.ts";
 import type { RouteDefinition } from "../../modules/transport/index.ts";
@@ -14,7 +15,12 @@ export const routes: RouteDefinition[] = [
     path: "/api/agent/mcp",
     handler: async ({ res, url }) => {
       res.setHeader("Cache-Control", "no-store");
-      const cwd = url.searchParams.get("path") || undefined;
+      const projectId = url.searchParams.get("projectId") ?? "";
+      const project = projectId
+        ? (await loadProjects()).find((item) => item.id === projectId)
+        : undefined;
+      if (projectId && !project) throw new HttpError(404, "Проект не найден");
+      const cwd = project ? project.path : url.searchParams.get("path") || undefined;
       const servers = (await mcpServerConfigs(cwd)).map((item) => ({
         name: item.name,
         source: item.source,

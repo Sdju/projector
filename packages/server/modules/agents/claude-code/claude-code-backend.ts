@@ -18,6 +18,8 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 import { featureEnabled, featurePrompt } from "../../agent-features/index.ts";
 import { claudeIdeMcpServer, IDE_MCP_SERVER } from "../ide-mcp/index.ts";
 import { claudeWidgetsMcpServer, WIDGETS_MCP_SERVER } from "../widgets-mcp/index.ts";
+import { mcpConfigsForNames, mcpServerConfigs, processMcpConfig } from "../../agent-mcp/index.ts";
+import { roleContext } from "../../agent-roles/index.ts";
 import type {
   Options,
   SDKControlGetContextUsageResponse as ContextUsage,
@@ -81,9 +83,14 @@ async function run(options: AgentRunOptions): Promise<void> {
   return runClaudeCode(options);
 }
 
-/** The prompt of a Claude Code session: its own preset plus the abilities switched on for the chat. */
-export async function claudeSystemPrompt(features?: string[]): Promise<Options["systemPrompt"]> {
-  const text = await featurePrompt("claude-code", features);
+/** The prompt of a Claude Code session: its own preset plus the abilities and role switched on for the chat. */
+export async function claudeSystemPrompt(
+  features?: string[],
+  role = "",
+): Promise<Options["systemPrompt"]> {
+  const text = [role.trim(), await featurePrompt("claude-code", features)]
+    .filter(Boolean)
+    .join("\n\n");
   return {
     type: "preset",
     preset: "claude_code",
@@ -115,9 +122,10 @@ export async function runClaudeCode(options: AgentRunOptions): Promise<void> {
   else options.abort?.addEventListener("abort", forwardAbort, { once: true });
 
   const selected = chosen(options);
-  const [ideEnabled, widgetsEnabled] = await Promise.all([
+  const [ideEnabled, widgetsEnabled, roleText] = await Promise.all([
     featureEnabled("claude-code", "ide", options.features),
     featureEnabled("claude-code", "widgets", options.features),
+    roleContext(options.role, cwd),
   ]);
   const extraMcp = {
     ...(options.projectId && ideEnabled
@@ -125,16 +133,26 @@ export async function runClaudeCode(options: AgentRunOptions): Promise<void> {
       : {}),
     ...(widgetsEnabled ? { [WIDGETS_MCP_SERVER]: claudeWidgetsMcpServer() } : {}),
   };
+  // A role with its own MCP list gets exactly those servers: Claude Code must not add the rest.
+  const namedMcp = options.role?.mcp
+    ? Object.fromEntries(
+        mcpConfigsForNames(await mcpServerConfigs(cwd), options.role.mcp)
+          .filter((config) => !(config.name in extraMcp))
+          .map((config) => [config.name, processMcpConfig(config)]),
+      )
+    : {};
+  const mcpServers = { ...namedMcp, ...extraMcp };
   const base: Options = {
     cwd,
     abortController,
     env: claudeEnv(),
-    ...(Object.keys(extraMcp).length ? { mcpServers: extraMcp } : {}),
+    ...(Object.keys(mcpServers).length ? { mcpServers } : {}),
+    ...(options.role?.mcp ? { strictMcpConfig: true } : {}),
     includePartialMessages: true,
     // A background subagent streams no calls of its own: its progress arrives as these summaries.
     agentProgressSummaries: true,
     settingSources: ["user", "project", "local"],
-    systemPrompt: await claudeSystemPrompt(options.features),
+    systemPrompt: await claudeSystemPrompt(options.features, roleText),
     ...(widgetsEnabled ? { allowedTools: [`mcp__${WIDGETS_MCP_SERVER}__describe_widget`] } : {}),
     permissionMode: mode,
     // Files are backed up before the agent changes them, so a step can be taken back later.

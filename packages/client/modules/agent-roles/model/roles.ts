@@ -256,6 +256,9 @@ export function useAgentRoleSettings() {
           kind: role.kind,
           agent: role.agent,
           selection: role.selection,
+          prompt: role.prompt,
+          skills: role.skills,
+          mcp: role.mcp,
           inherited: role.inherited,
         })),
       };
@@ -309,13 +312,16 @@ export function useAgentRoleSettings() {
     palette: false,
     title: "Сохранить chat-роль",
     description:
-      "Меняет название, описание, агента и выбранные настройки chat-роли. selection — объект control id → value; отсутствующее значение наследует умолчание агента. Роль действует на новые чаты; уже начатые чаты сохраняют снимок.",
+      "Меняет название, описание, агента, выбранные настройки, промпт, навыки и MCP chat-роли. selection — объект control id → value; отсутствующее значение наследует умолчание агента. prompt добавляется к системному промпту; skills и mcp — имена, пустой массив выключает их. Не переданные поля сохраняются. Роль действует на новые чаты; уже начатые чаты сохраняют снимок.",
     arguments: {
       role: "string: id chat-роли",
       name: "string: название роли",
       agent: "string: id агента из каталога",
       description: "string: описание (необязательно)",
       selection: "object: control id → value (необязательно)",
+      prompt: "string: дополнительные инструкции роли (необязательно)",
+      skills: "array: имена навыков; пустой массив выключает (необязательно)",
+      mcp: "array: имена MCP-серверов; пустой массив выключает (необязательно)",
     },
     enabled: () => !busy.value,
     run: (value) => {
@@ -324,15 +330,25 @@ export function useAgentRoleSettings() {
       if (typeof args.name !== "string" || !args.name.trim())
         throw new Error("name: название роли");
       if (typeof args.agent !== "string" || !args.agent) throw new Error("agent: id агента");
+      const known = chatRoles.value.find((role) => role.id === args.role);
+      if (!known) throw new Error(`Неизвестная chat-роль: ${args.role}`);
       const selection =
         args.selection && typeof args.selection === "object" && !Array.isArray(args.selection)
           ? (args.selection as AgentRoleSelection)
-          : {};
+          : known.selection;
+      const names = (input: unknown, fallback: string[] | undefined) =>
+        Array.isArray(input)
+          ? input.filter((item): item is string => typeof item === "string")
+          : fallback;
       return saveChat(args.role, {
+        ...known,
         name: args.name,
         agent: args.agent,
-        description: typeof args.description === "string" ? args.description : "",
+        description: typeof args.description === "string" ? args.description : known.description,
         selection,
+        prompt: typeof args.prompt === "string" ? args.prompt : known.prompt,
+        skills: names(args.skills, known.skills),
+        mcp: names(args.mcp, known.mcp),
       });
     },
   });

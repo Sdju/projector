@@ -96,7 +96,7 @@ export interface AgentRunOptions {
   permissionMode?: AgentPermissionMode;
   /** Model, effort and mode chosen in the chat, by control id. */
   selection?: AgentSelection;
-  /** The chat role the run belongs to; a future task subagent can use the same preset. */
+  /** The chat role the run belongs to; its prompt, skills and MCP choice apply to this run. */
   role?: AgentRoleSnapshot;
   message: string;
   /** `message` with its chips; the text already names every file (`@path`). */

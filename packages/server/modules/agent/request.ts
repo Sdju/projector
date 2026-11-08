@@ -4,6 +4,7 @@ import { selectionFrom } from "./controls.ts";
 import { worktreeCwd, createWorktree } from "./worktrees.ts";
 import { asString } from "../transport/index.ts";
 import { normalizeJudgeOverride } from "@projector/core/modules/agent-judge/index.ts";
+import { normalizeRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
 
 import type { MessagePart } from "./index.ts";
 import type { AgentHistoryTool, AgentHistoryTurn } from "../providers/index.ts";
@@ -115,6 +116,7 @@ export async function requestFrom(body: Record<string, unknown>) {
     backend: resolveAgentBackend(body.backend),
     permissionMode: asString(body.permissionMode) || undefined,
     selection: selectionFrom(body.selection),
+    role: normalizeRoleSnapshot(body.role),
     sessionId: asString(body.sessionId) || undefined,
     messageId: asString(body.messageId) || undefined,
     tail: asString(body.tail) || undefined,

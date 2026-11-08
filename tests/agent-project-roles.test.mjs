@@ -40,6 +40,9 @@ test("project roles are inert until their file is trusted", async () => {
     name: "Ревьюер проекта",
     agent: "projector",
     selection: { provider: "env:test" },
+    prompt: "Сверяйся с AGENTS.md.",
+    skills: ["review"],
+    mcp: [],
   });
   expect(created).toMatchObject({
     projectId: "p1",
@@ -48,13 +51,22 @@ test("project roles are inert until their file is trusted", async () => {
   });
   expect(created.roles).toHaveLength(1);
   const role = created.roles[0];
-  expect(role).toMatchObject({ kind: "chat", name: "Ревьюер проекта" });
+  expect(role).toMatchObject({
+    kind: "chat",
+    name: "Ревьюер проекта",
+    prompt: "Сверяйся с AGENTS.md.",
+    skills: ["review"],
+    mcp: [],
+  });
   expect(await readProjectAgentRole("p1", role.id)).toBeUndefined();
 
   const trusted = await setProjectRoleTrust("p1", true);
   expect(trusted.trusted).toBe(true);
   expect(await readProjectAgentRole("p1", role.id)).toMatchObject({
     name: "Ревьюер проекта",
+    prompt: "Сверяйся с AGENTS.md.",
+    skills: ["review"],
+    mcp: [],
   });
 
   const updated = await saveProjectRole("p1", role.id, {

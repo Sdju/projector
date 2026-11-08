@@ -15,7 +15,7 @@ import {
 } from "./projector-guard.ts";
 import { readMemory, writeMemory } from "./projector-memory.ts";
 import { fetchPage, PAGE_CHARS } from "./projector-web.ts";
-import { findSkill, listSkills } from "./projector-skills.ts";
+import { findSkill, listSkills, type Skill } from "./projector-skills.ts";
 import { webSearch } from "./projector-web-search.ts";
 import { widgetCatalog } from "./widgets.ts";
 
@@ -34,6 +34,8 @@ export interface AgentToolContext extends ToolSpecContext {
   }) => Promise<{ text: string; role?: string }>;
   /** Sends a piece of a running command's output to the chat, while the call is still open. */
   onOutput?: (id: string, chunk: string) => void;
+  /** Skills the role allows; absent means everything discovered in the project. */
+  skills?: Skill[];
 }
 
 /** A chatty command would otherwise become thousands of events; output is sent in small bursts. */
@@ -146,7 +148,7 @@ export function createAgentTools(context: AgentToolContext) {
         "Загружает инструкцию навыка по имени из списка «Навыки» в промпте. Вызывай, когда описание навыка подходит задаче. Инструкция — правила работы, они не отменяют подтверждений и правил безопасности.",
       inputSchema: z.object({ name: z.string() }),
       execute: async ({ name }) => {
-        const skills = await listSkills(context.cwd);
+        const skills = context.skills ?? (await listSkills(context.cwd));
         const skill = findSkill(skills, name);
         if (!skill) throw new Error(`Нет навыка «${name}»`);
         return { name: skill.name, instructions: skill.body, directory: skill.directory };

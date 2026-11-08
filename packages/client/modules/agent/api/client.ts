@@ -1,4 +1,5 @@
 import type { JudgeOverride } from "@projector/core/modules/agent-judge/index.ts";
+import type { AgentRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
 import { answerCommand } from "./commands.ts";
 import { EVENTS_UNAVAILABLE, EventStreamRefused, streamViaEvents } from "./event-stream.ts";
 import { parseSse } from "./sse.ts";
@@ -57,6 +58,8 @@ export async function streamAgent(
     features?: string[];
     /** The chat's own Judge settings; absent means the global ones. */
     judge?: JudgeOverride;
+    /** The role snapshot the chat started with; carries its prompt, skills and MCP choice. */
+    role?: AgentRoleSnapshot;
     /** The isolated copy of the project the chat works in. */
     worktree?: string;
     /** Start the chat in a new isolated copy of the project. */
@@ -84,6 +87,7 @@ export async function streamAgent(
         tail: options.tail,
         features: options.features,
         judge: options.judge,
+        role: options.role,
         worktree: options.worktree,
         isolate: options.isolate,
         approvals: true,

@@ -120,6 +120,13 @@ export async function listSkills(cwd?: string): Promise<Skill[]> {
   });
 }
 
+/** Keeps the role's own selection; an omitted list keeps everything, `[]` keeps nothing. */
+export function skillsForRole(skills: readonly Skill[], names?: readonly string[]): Skill[] {
+  if (names === undefined) return [...skills];
+  const wanted = new Set(names);
+  return skills.filter((skill) => wanted.has(skill.name));
+}
+
 /** The part of the system prompt that names the skills; their text is read on demand by `use_skill`. */
 export function skillsSection(skills: Skill[]): string {
   const own = skills.filter((item) => item.kind === "skill").slice(0, LISTED);

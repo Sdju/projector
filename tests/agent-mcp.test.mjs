@@ -8,6 +8,10 @@ import {
   mcpToolName,
 } from "../packages/server/modules/agents/projector/projector-mcp.ts";
 import { mcpServerConfigs } from "../packages/server/modules/agents/projector/projector-mcp-config.ts";
+import {
+  mcpConfigsForNames,
+  processMcpConfig,
+} from "../packages/server/modules/agent-mcp/index.ts";
 
 const server = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "mcp-echo-server.mjs");
 const entry = { command: process.execPath, args: [server] };
@@ -47,6 +51,18 @@ describe("agent MCP servers", () => {
     expect(configs[1].url).toBe("http://example/sse");
   });
 
+  it("keeps only the servers a role names", async () => {
+    await writeUser({ a: entry, b: entry });
+    const configs = await mcpServerConfigs(project);
+    expect(mcpConfigsForNames(configs, undefined).map((item) => item.name)).toEqual(["a", "b"]);
+    expect(mcpConfigsForNames(configs, ["b"]).map((item) => item.name)).toEqual(["b"]);
+    expect(mcpConfigsForNames(configs, [])).toEqual([]);
+    expect(processMcpConfig(configs[0])).toMatchObject({
+      type: "stdio",
+      command: process.execPath,
+    });
+  });
+
   it("names tools without clashes or illegal characters", () => {
     expect(mcpToolName("my server", "do.it")).toBe("mcp__my_server__do_it");
     expect(mcpToolName("s", "x".repeat(100))).toHaveLength(64);
@@ -83,6 +99,18 @@ describe("agent MCP servers", () => {
       expect(Object.keys(allowed.tools)).toHaveLength(2);
     } finally {
       await allowed.close();
+    }
+  });
+
+  it("connects only the servers a role names", async () => {
+    await writeUser({ echo: entry, other: entry });
+    const mcp = await connectMcp(project, { trusting: true }, undefined, ["echo"]);
+    try {
+      expect(Object.keys(mcp.tools).every((name) => name.startsWith("mcp__echo__"))).toBe(true);
+      expect(Object.keys(mcp.tools)).toHaveLength(2);
+      expect(mcp.servers.map((server) => server.name)).toEqual(["echo"]);
+    } finally {
+      await mcp.close();
     }
   });
 

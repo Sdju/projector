@@ -1,3 +1,4 @@
+import "./helpers/builtins.mjs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,6 +9,7 @@ import {
   normalizeRoleSelection,
   resolveRoleSelection,
   serviceRoleInheritsModel,
+  snapshotOfRole,
   SERVICE_ROLE_IDS,
 } from "../packages/core/modules/agent-role/index.ts";
 import {
@@ -15,6 +17,8 @@ import {
   deleteChatRole,
   readAgentRole,
   resetServiceRole,
+  roleContext,
+  rolePromptText,
   roleSettings,
   rolesFile,
   saveChatRole,
@@ -115,6 +119,9 @@ describe("agent roles", () => {
       description: "Проверяет изменения",
       agent: "claude-code",
       selection: { model: "claude" },
+      prompt: "Сначала читай diff.",
+      skills: ["review"],
+      mcp: ["github"],
     });
     const role = created.created;
     expect(role).toMatchObject({
@@ -122,6 +129,9 @@ describe("agent roles", () => {
       name: "Ревьюер",
       agent: "claude-code",
       selection: { model: "claude" },
+      prompt: "Сначала читай diff.",
+      skills: ["review"],
+      mcp: ["github"],
       inherited: false,
     });
     expect(role.id).toMatch(/^role-[0-9a-f]{8}$/);
@@ -132,11 +142,16 @@ describe("agent roles", () => {
       description: "Проверяет особенно внимательно",
       agent: "claude-code",
       selection: { model: "claude-opus" },
+      skills: [],
+      mcp: [],
     });
     expect(saved.roles.find((item) => item.id === role.id)).toMatchObject({
       name: "Старший ревьюер",
       selection: { model: "claude-opus" },
+      skills: [],
+      mcp: [],
     });
+    expect(saved.roles.find((item) => item.id === role.id)?.prompt).toBeUndefined();
     expect(await readAgentRole(role.id)).toMatchObject({ name: "Старший ревьюер" });
 
     const removed = await deleteChatRole(role.id);
@@ -157,6 +172,9 @@ describe("agent roles", () => {
       name: "Ревьюер",
       selection: { model: "claude" },
       permissionMode: "default",
+      prompt: "Ищи регрессии.",
+      skills: ["review"],
+      mcp: ["github"],
     };
     await writeAgentHistory("chat-role", [], undefined, undefined, undefined, snapshot);
     expect(readChatRole("chat-role")).toEqual(snapshot);
@@ -221,6 +239,9 @@ describe("agent roles", () => {
       name: "Ревьюер",
       selection: { model: "claude" },
       permissionMode: "default",
+      prompt: "Ищи регрессии.",
+      skills: [],
+      mcp: ["github"],
     };
     expect(roleFromParam(roleParam(snapshot))).toEqual(snapshot);
     expect(roleFromParam("not json")).toBeUndefined();
@@ -251,6 +272,46 @@ describe("agent roles", () => {
     expect(serviceRoleInheritsModel({ selection: { provider: "test:model" } })).toBe(false);
   });
 
+  it("builds role context for external agents from its prompt and skills", async () => {
+    await mkdir(join(directory, "projector", "agent", "skills", "review"), { recursive: true });
+    await writeFile(
+      join(directory, "projector", "agent", "skills", "review", "SKILL.md"),
+      "---\ndescription: Проверка\n---\nЧитай diff.",
+      "utf8",
+    );
+    const role = {
+      roleId: "role-a1b2c3d4",
+      name: "Ревьюер",
+      selection: {},
+      prompt: "Ищи регрессии.",
+      skills: ["review", "missing"],
+    };
+    const context = await roleContext(role, "");
+    expect(context).toContain("Роль «Ревьюер»");
+    expect(context).toContain("Ищи регрессии.");
+    expect(context).toContain("skills/review/SKILL.md");
+    expect(context).toContain("missing");
+    expect(rolePromptText(role)).toContain("Ищи регрессии.");
+    expect(rolePromptText({ name: "Пустая", selection: {} })).toBe("");
+    expect(await roleContext({ ...role, skills: [] })).toContain("отключены");
+    expect(await roleContext({ roleId: "r", name: "Без навыков", selection: {} })).toBe("");
+  });
+
+  it("passes a role snapshot from the chat request to the backend", async () => {
+    const { requestFrom } = await import("../packages/server/modules/agent/index.ts");
+    const role = {
+      roleId: "role-a1b2c3d4",
+      name: "Ревьюер",
+      selection: { model: "claude" },
+      prompt: "Ищи регрессии.",
+      skills: ["review"],
+      mcp: ["github"],
+    };
+    const { request } = await requestFrom({ message: "привет", role });
+    expect(request.role).toEqual(role);
+    expect((await requestFrom({ message: "привет" })).request.role).toBeUndefined();
+  });
+
   it("validates a role contract for later chat roles", () => {
     expect(
       normalizeAgentRole({
@@ -260,6 +321,9 @@ describe("agent roles", () => {
         agent: "claude-code",
         selection: { model: "claude" },
         permissionMode: "default",
+        prompt: "  Проверяй края.  ",
+        skills: [" review ", "review", ""],
+        mcp: [],
       }),
     ).toMatchObject({
       id: "reviewer",
@@ -268,6 +332,27 @@ describe("agent roles", () => {
       agent: "claude-code",
       selection: { model: "claude" },
       permissionMode: "default",
+      prompt: "Проверяй края.",
+      skills: ["review"],
+      mcp: [],
+    });
+    const normalized = normalizeAgentRole({
+      id: "reviewer",
+      name: "Ревьюер",
+      kind: "chat",
+      agent: "claude-code",
+      selection: { model: "claude" },
+      prompt: "Проверяй края.",
+      skills: ["review"],
+      mcp: [],
+    });
+    expect(snapshotOfRole(normalized)).toEqual({
+      roleId: "reviewer",
+      name: "Ревьюер",
+      selection: { model: "claude" },
+      prompt: "Проверяй края.",
+      skills: ["review"],
+      mcp: [],
     });
     expect(
       normalizeAgentRole({

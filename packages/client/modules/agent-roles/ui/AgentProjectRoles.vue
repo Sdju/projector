@@ -8,6 +8,7 @@ import AgentChatRoleCard from "./AgentChatRoleCard.vue";
 import { watch } from "vue";
 import { clientAgents } from "../../agents-integration/catalog/index.ts";
 import { roleControls } from "../model/roles.ts";
+import { roleResources } from "../model/resources.ts";
 import { useProjectRoleSettings } from "../model/project-roles.ts";
 import type { AgentRole } from "@projector/core/modules/agent-role/index.ts";
 import type { Project } from "../../project/index.ts";
@@ -29,6 +30,7 @@ const {
   commands,
 } = useProjectRoleSettings(() => props.project.id);
 const agents = clientAgents();
+const projectResources = () => roleResources(props.project.id);
 
 watch(
   () => props.project.id,
@@ -109,6 +111,7 @@ async function setTrust(value: boolean) {
       :role="role"
       :agents="agents"
       :controls-for="roleControls"
+      :resources-for="projectResources"
       :busy="busy === role.id"
       @save="(value) => saveRole(role, value)"
       @remove="removeRole(role)"

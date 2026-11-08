@@ -3,6 +3,7 @@ import { attachedImages, promptWithHistory } from "../../agent/index.ts";
 import { featureEnabled, featurePrompt } from "../../agent-features/index.ts";
 import { acpIdeMcpServer } from "../ide-mcp/index.ts";
 import { acpWidgetsMcpServer } from "../widgets-mcp/index.ts";
+import { roleContext } from "../../agent-roles/index.ts";
 import type {
   AgentBackend,
   AgentBackendId,
@@ -11,10 +12,12 @@ import type {
 } from "../../agent/index.ts";
 import {
   configuredMcpServers,
-  projectMcpServers,
+  sessionMcpServers,
+  userMcpServers,
   type AcpMcpServer,
   type McpSupport,
 } from "./mcp-config.ts";
+export { sessionMcpServers } from "./mcp-config.ts";
 import { elicitForm } from "./acp-elicitation.ts";
 import { type AcpConnection, type AcpError, NO_TIMEOUT } from "./acp-client.ts";
 import { applySelection, controlsFromSession, shownModel } from "./acp-controls.ts";
@@ -149,13 +152,21 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
   options.emit("status", { phase: "thinking", provider: program.label, model: "" });
   try {
     const init = await initializeAcp(connection, id);
-    const [ideEnabled, widgetsEnabled] = await Promise.all([
+    const [ideEnabled, widgetsEnabled, roleText] = await Promise.all([
       featureEnabled(id, "ide", options.features),
       featureEnabled(id, "widgets", options.features),
+      roleContext(options.role, options.cwd),
     ]);
     const extraMcp = [
       ...(options.projectId && ideEnabled ? [acpIdeMcpServer(options.projectId)] : []),
       ...(widgetsEnabled ? [acpWidgetsMcpServer()] : []),
+      ...(options.role?.mcp
+        ? await userMcpServers(
+            options.cwd,
+            options.role.mcp,
+            init.agentCapabilities?.mcpCapabilities,
+          )
+        : []),
     ];
     const session = await openSession(
       connection,
@@ -167,6 +178,7 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
       init.agentCapabilities?.loadSession === true,
       init.agentCapabilities?.mcpCapabilities,
       extraMcp,
+      options.role?.mcp,
     );
     sessionId = session.sessionId;
     options.emit("session", { id: sessionId, backend: id });
@@ -191,7 +203,7 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
       : promptWithHistory(
           options.message,
           options.history ?? [],
-          await featurePrompt(id, options.features),
+          await featurePrompt(id, options.features, roleText),
         );
     const result = (await connection.request(
       "session/prompt",
@@ -226,22 +238,6 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
 }
 
 /**
- * The MCP servers of a session: the project's own, plus the built-in IDE and widget servers when
- * their features are on. Only those additions may hide a same-named project server; with the
- * feature off the user's `projector-ide` or `projector-widgets` from `.mcp.json` is passed as is.
- */
-export async function sessionMcpServers(
-  cwd: string | undefined,
-  support: McpSupport,
-  extra: AcpMcpServer[],
-): Promise<AcpMcpServer[]> {
-  const project = await projectMcpServers(cwd, support);
-  if (!extra.length) return project;
-  const names = new Set(extra.map((server) => server.name));
-  return [...project.filter((server) => !names.has(server.name)), ...extra];
-}
-
-/**
  * Resume the native session when the agent supports it, otherwise start a fresh one. The ACP
  * `session/load` response has no `sessionId`, so the requested one is kept; an agent without
  * `loadSession`, or a load that finds no such session, falls back to `session/new` with the
@@ -256,8 +252,9 @@ export async function openSession(
   canLoad = true,
   mcp: McpSupport = {},
   extraMcp: AcpMcpServer[] = [],
+  roleMcp?: readonly string[],
 ): Promise<{ sessionId: string; resumed: boolean; result: unknown }> {
-  const servers = () => sessionMcpServers(options.cwd, mcp, extraMcp);
+  const servers = () => sessionMcpServers(options.cwd, mcp, extraMcp, roleMcp);
   const start = async () => {
     if (options.sessionId && canLoad) {
       replay(true);

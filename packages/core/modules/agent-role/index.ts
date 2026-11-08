@@ -23,6 +23,12 @@ export interface AgentRole {
   permissionMode?: AgentRolePermissionMode;
   /** The default for background jobs: work in an isolated copy of the project. */
   isolate?: boolean;
+  /** Extra instructions appended after the agent's own system prompt for this role. */
+  prompt?: string;
+  /** Skill and command names the role may use: omitted means all, `[]` means none. */
+  skills?: string[];
+  /** MCP server names the role may connect to: omitted means all, `[]` means none. */
+  mcp?: string[];
   /** Defined by the code, not by the user: it can be configured but not deleted. */
   builtin?: boolean;
 }
@@ -33,6 +39,9 @@ export interface AgentRoleSnapshot {
   name: string;
   selection: AgentRoleSelection;
   permissionMode?: AgentRolePermissionMode;
+  prompt?: string;
+  skills?: string[];
+  mcp?: string[];
 }
 
 /** A role as the settings show it: whether its model comes from the chat. */
@@ -108,7 +117,30 @@ export const ROLE_LIMITS = {
   selection: 24,
   key: 100,
   value: 300,
+  prompt: 8_000,
+  resources: 40,
+  resource: 80,
 } as const;
+
+/** Skill, command and MCP server names: ordered, unique and bounded. `[]` is a real choice. */
+export function normalizeRoleResources(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const names: string[] = [];
+  for (const item of value.slice(0, ROLE_LIMITS.resources)) {
+    if (typeof item !== "string") continue;
+    const name = item.trim();
+    if (!name || name.length > ROLE_LIMITS.resource || names.includes(name)) continue;
+    names.push(name);
+  }
+  return names;
+}
+
+/** The role's own instructions; an empty prompt means the role adds none. */
+export function normalizeRolePrompt(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const prompt = value.trim().slice(0, ROLE_LIMITS.prompt);
+  return prompt ? prompt : undefined;
+}
 
 /**
  * Keeps only the entries a control can use. A damaged settings file must not make the whole role
@@ -155,6 +187,9 @@ export function normalizeAgentRole(value: unknown): AgentRole | undefined {
     typeof row.description === "string"
       ? row.description.trim().slice(0, ROLE_LIMITS.description)
       : "";
+  const prompt = normalizeRolePrompt(row.prompt);
+  const skills = normalizeRoleResources(row.skills);
+  const mcp = normalizeRoleResources(row.mcp);
   return {
     id,
     name,
@@ -164,6 +199,9 @@ export function normalizeAgentRole(value: unknown): AgentRole | undefined {
     ...(description ? { description } : {}),
     ...(permissionMode ? { permissionMode } : {}),
     ...(row.isolate === true ? { isolate: true } : {}),
+    ...(prompt ? { prompt } : {}),
+    ...(skills !== undefined ? { skills } : {}),
+    ...(mcp !== undefined ? { mcp } : {}),
   };
 }
 
@@ -187,6 +225,9 @@ export function snapshotOfRole(role: AgentRole): AgentRoleSnapshot {
     name: role.name,
     selection: { ...role.selection },
     ...(role.permissionMode ? { permissionMode: role.permissionMode } : {}),
+    ...(role.prompt ? { prompt: role.prompt } : {}),
+    ...(role.skills !== undefined ? { skills: [...role.skills] } : {}),
+    ...(role.mcp !== undefined ? { mcp: [...role.mcp] } : {}),
   };
 }
 
@@ -204,10 +245,16 @@ export function normalizeRoleSnapshot(value: unknown): AgentRoleSnapshot | undef
     row.permissionMode === "bypassPermissions"
       ? row.permissionMode
       : undefined;
+  const prompt = normalizeRolePrompt(row.prompt);
+  const skills = normalizeRoleResources(row.skills);
+  const mcp = normalizeRoleResources(row.mcp);
   return {
     roleId,
     name,
     selection: normalizeRoleSelection(row.selection),
     ...(permissionMode ? { permissionMode } : {}),
+    ...(prompt ? { prompt } : {}),
+    ...(skills !== undefined ? { skills } : {}),
+    ...(mcp !== undefined ? { mcp } : {}),
   };
 }

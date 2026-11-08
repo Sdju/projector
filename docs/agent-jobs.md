@@ -30,7 +30,7 @@
 
 Scope проекта, регистрируются вместе с командами чатов (`model/job-commands.ts`):
 
-- `ide.agent.job.start` `{ agent?, role?, task, isolate? }` — изменяющая команда, штатный агент спрашивает подтверждение; режим разрешений задаёт пользователь. Вместо `agent` можно указать chat-роль: её агент, `selection` и `permissionMode` сохраняются снимком, `isolate` роли включает копию. Роль проекта должна быть доверена.
+- `ide.agent.job.start` `{ agent?, role?, task, isolate? }` — изменяющая команда, штатный агент спрашивает подтверждение; режим разрешений задаёт пользователь. Вместо `agent` можно указать chat-роль: её агент, `selection`, `permissionMode`, промпт, навыки и MCP сохраняются снимком, `isolate` роли включает копию. Роль проекта должна быть доверена.
 - `ide.agent.jobs.list` — состояние, запросы, файлы, начало итога. `ide.agent.job.result` `{ job, wait? }` — полный итог, `wait` до 45 с.
 - `ide.agent.job.diff` `{ job, limit? }`, `ide.agent.job.log` `{ job, tail? }` — проверка вместо доверия итогу.
 - `ide.agent.job.stop`, `.answer` (только вопросы, по идентификаторам вариантов), `.send`, `.retry`, `.continue`, `.fork`, `.open`.

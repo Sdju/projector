@@ -93,6 +93,11 @@ describe("IDE MCP bridge", () => {
     const replaced = await sessionMcpServers(cwd, {}, [acpIdeMcpServer("project-1")]);
     expect(replaced).toHaveLength(1);
     expect(replaced[0].command).toBe(process.execPath);
+
+    const filtered = await sessionMcpServers(cwd, {}, [], []);
+    expect(filtered).toEqual([]);
+    const named = await sessionMcpServers(cwd, {}, [], ["projector-ide"]);
+    expect(named.map((server) => server.name)).toEqual(["projector-ide"]);
   });
 });
 

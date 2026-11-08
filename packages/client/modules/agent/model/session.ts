@@ -140,7 +140,6 @@ export function useAgent(
 
   const actions = useChatActions(state, { backend, projectId, ready, persist, send, stop });
   const { drainQueue, worktreeId } = actions;
-
   /**
    * Runs one answer on the chat: `start` streams events, which are folded into `assistant`.
    * The agent process outlives the server, so when the stream breaks while the answer is still
@@ -275,6 +274,7 @@ export function useAgent(
         tail: branchFrom,
         features: state.featureOverrides,
         judge: state.judgeOverride,
+        role: state.roleSnapshot,
         worktree: copy,
         isolate,
         attach,

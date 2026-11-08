@@ -5,7 +5,11 @@ import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { jsonSchema, tool, type ToolSet } from "ai";
 import { guardMcpServer, guardMcpTool, type GuardOptions } from "./projector-guard.ts";
-import { mcpServerConfigs, type McpServerConfig } from "./projector-mcp-config.ts";
+import {
+  mcpConfigsForNames,
+  mcpServerConfigs,
+  type McpServerConfig,
+} from "../../agent-mcp/index.ts";
 
 const CONNECT_MS = 15_000;
 const CALL_MS = 120_000;
@@ -73,9 +77,10 @@ export async function connectMcp(
   cwd: string | undefined,
   guard: GuardOptions,
   signal?: AbortSignal,
+  only?: readonly string[],
 ): Promise<McpConnection> {
   const connection: McpConnection = { tools: {}, problems: [], servers: [], close: async () => {} };
-  const configs = await mcpServerConfigs(cwd);
+  const configs = mcpConfigsForNames(await mcpServerConfigs(cwd), only);
   const clients: Client[] = [];
   // Questions come one at a time, so the user sees one card for each server.
   const allowed: McpServerConfig[] = [];

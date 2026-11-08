@@ -10,8 +10,9 @@ export interface AgentMcp {
   servers: AgentMcpServer[];
 }
 
-async function call<T>(init?: RequestInit): Promise<T> {
-  const response = await fetch("/api/agent/mcp", {
+async function call<T>(init?: RequestInit, projectId = ""): Promise<T> {
+  const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : "";
+  const response = await fetch(`/api/agent/mcp${query}`, {
     ...init,
     headers: { "Content-Type": "application/json" },
   });
@@ -20,7 +21,7 @@ async function call<T>(init?: RequestInit): Promise<T> {
   return data as T;
 }
 
-export const readAgentMcp = () => call<AgentMcp>();
+export const readAgentMcp = (projectId = "") => call<AgentMcp>(undefined, projectId);
 
 /** Saves the user's server list (`{ "mcpServers": { … } }`); empty text removes it. */
 export const writeAgentMcp = (text: string) =>
