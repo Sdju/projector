@@ -1,3 +1,4 @@
+import "./helpers/builtins.mjs";
 import { expect, test } from "vite-plus/test";
 import {
   completeCommandRequest,

@@ -1,4 +1,4 @@
-import { expect, onTestFinished, test } from "vite-plus/test";
+import { expect, test } from "vite-plus/test";
 import { createBrowserFixture } from "./fixtures/browser-server.mjs";
 import { chromium, createChromium } from "./fixtures/chromium-driver.mjs";
 
@@ -113,14 +113,14 @@ const gutterPage = page(`
       } catch(error) {document.getElementById('result').textContent = 'FAIL: ' + error.stack;}
     })();`);
 
-test(
+test.concurrent(
   "CodeMirror editor renders files, diffs and Git markers, also after an in-process Vite restart",
   {
     skip: !chromium,
     timeout: 90000,
     retry: 2,
   },
-  async () => {
+  async ({ onTestFinished }) => {
     const pages = {
       "/__file_test": filePage,
       "/__diff_edit_test": diffEditPage,

@@ -52,7 +52,7 @@ const fixture = {
         return;
       }
       if (url === "/__tick") {
-        setTimeout(() => res.end("ok"), 20);
+        setTimeout(() => res.end("ok"), 5);
         return;
       }
       const rule = responses.find((item) => matches(item, url));

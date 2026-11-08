@@ -1,15 +1,15 @@
-import { expect, onTestFinished, test } from "vite-plus/test";
+import { expect, test } from "vite-plus/test";
 import { readFile } from "node:fs/promises";
 import { createBrowserFixture } from "./fixtures/browser-server.mjs";
 import { chromium, createChromium } from "./fixtures/chromium-driver.mjs";
 
-test(
+test.concurrent(
   "sessions focus the first item, cancel rename before closing, and restore the trigger",
   {
     skip: !chromium,
     timeout: 60000,
   },
-  async () => {
+  async ({ onTestFinished }) => {
     const html = await readFile(new URL("./fixtures/agent-sessions.html", import.meta.url), "utf8");
     const fixture = await createBrowserFixture({ pages: { "/sessions": html } });
     onTestFinished(() => fixture.close());
@@ -65,13 +65,13 @@ test(
     expect(browser.errors).toEqual([]);
   },
 );
-test(
+test.concurrent(
   "a chat and its native session are one row, not two",
   {
     skip: !chromium,
     timeout: 60000,
   },
-  async () => {
+  async ({ onTestFinished }) => {
     const html = await readFile(new URL("./fixtures/agent-sessions.html", import.meta.url), "utf8");
     const fixture = await createBrowserFixture({ pages: { "/sessions": html } });
     onTestFinished(() => fixture.close());
@@ -130,13 +130,13 @@ test(
     expect(browser.errors).toEqual([]);
   },
 );
-test(
+test.concurrent(
   "subagent branches stay folded under their chats and are found by search",
   {
     skip: !chromium,
     timeout: 60000,
   },
-  async () => {
+  async ({ onTestFinished }) => {
     const html = await readFile(new URL("./fixtures/agent-sessions.html", import.meta.url), "utf8");
     const fixture = await createBrowserFixture({ pages: { "/sessions": html } });
     onTestFinished(() => fixture.close());

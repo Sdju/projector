@@ -1,4 +1,4 @@
-import { describe, expect, onTestFinished, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 import { createBrowserFixture } from "./fixtures/browser-server.mjs";
 import { chromium, createChromium } from "./fixtures/chromium-driver.mjs";
 
@@ -68,10 +68,10 @@ const more=path=>branch(path).querySelector(':scope > li > button[data-tree-more
 }catch(error){document.getElementById('result').textContent='FAIL: '+error.stack;}})();
 </script>`;
 
-test(
+test.concurrent(
   "File tree loads 30 children per parent, retries, navigates and reveals hidden files",
   { skip: !chromium, timeout: 60000, retry: 2 },
-  async () => {
+  async ({ onTestFinished }) => {
     const fixture = await createBrowserFixture({ pages: { "/__tree_test": html } });
     onTestFinished(() => fixture.close());
     const browser = await createChromium(fixture.directory);

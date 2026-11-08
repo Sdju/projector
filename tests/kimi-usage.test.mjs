@@ -107,9 +107,12 @@ describe("Kimi reads CLI credentials, bounds and sanitizes requests, shares cach
       KIMI_CODE_HOME: process.env.KIMI_CODE_HOME,
       KIMI_OAUTH_HOST: process.env.KIMI_OAUTH_HOST,
       KIMI_CODE_OAUTH_HOST: process.env.KIMI_CODE_OAUTH_HOST,
+      PROJECTOR_KIMI_TIMEOUT_MS: process.env.PROJECTOR_KIMI_TIMEOUT_MS,
     };
     state = globalThis.projectorKimiUsage;
     calls = 0;
+    // The hanging-request case must observe the bound without spending the production ten seconds.
+    process.env.PROJECTOR_KIMI_TIMEOUT_MS = "250";
     // `os.homedir()` reads HOME on POSIX and USERPROFILE on Windows.
     process.env.HOME = directory;
     process.env.USERPROFILE = directory;

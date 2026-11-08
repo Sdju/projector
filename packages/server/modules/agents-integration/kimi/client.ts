@@ -2,6 +2,12 @@ import { readKimiAccessToken } from "./credentials.ts";
 
 const USAGE_URL = "https://api.kimi.com/coding/v1/usages";
 
+/** Production keeps ten seconds; a test can shorten the bound through the environment. */
+function usageTimeoutMs(): number {
+  const configured = Number(process.env.PROJECTOR_KIMI_TIMEOUT_MS);
+  return Number.isFinite(configured) && configured > 0 ? configured : 10_000;
+}
+
 /** Fixed official destination, bounded request, no upstream body in errors. */
 function requestUsage(token: string, timeoutMs: number): Promise<Response> {
   return fetch(USAGE_URL, {
@@ -24,7 +30,7 @@ function errorForResponse(response: Response): Error {
   return new Error(`Kimi Code: ошибка HTTP ${response.status}`);
 }
 
-export async function readKimiUsage(timeoutMs = 10000): Promise<unknown> {
+export async function readKimiUsage(timeoutMs = usageTimeoutMs()): Promise<unknown> {
   let token = await readKimiAccessToken();
   let response = await requestUsage(token, timeoutMs);
   if (response.status === 401 || response.status === 403) {

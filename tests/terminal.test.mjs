@@ -1,3 +1,4 @@
+import "./helpers/builtins.mjs";
 import { afterAll, expect, test } from "vite-plus/test";
 import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { delimiter, join } from "node:path";

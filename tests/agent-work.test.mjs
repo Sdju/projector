@@ -1,4 +1,4 @@
-import { expect, onTestFinished, test } from "vite-plus/test";
+import { expect, test } from "vite-plus/test";
 import { createBrowserFixture } from "./fixtures/browser-server.mjs";
 import { chromium, createChromium } from "./fixtures/chromium-driver.mjs";
 
@@ -85,10 +85,10 @@ const html = `<!doctype html>
   };
 </script>`;
 
-test(
+test.concurrent(
   "work groups collect thoughts and calls, stay closed and mount their body lazily",
   { skip: !chromium, timeout: 90000, retry: 1 },
-  async () => {
+  async ({ onTestFinished }) => {
     const fixture = await createBrowserFixture({ pages: { "/work": html } });
     onTestFinished(() => fixture.close());
     const browser = await createChromium(fixture.directory);
@@ -187,10 +187,10 @@ test(
   },
 );
 
-test(
+test.concurrent(
   "on a phone the work block opens as a bounded sheet that can always be closed",
   { skip: !chromium, timeout: 90000, retry: 1 },
-  async () => {
+  async ({ onTestFinished }) => {
     const fixture = await createBrowserFixture({ pages: { "/work": html } });
     onTestFinished(() => fixture.close());
     const browser = await createChromium(fixture.directory);

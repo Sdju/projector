@@ -1,3 +1,4 @@
+import "./helpers/builtins.mjs";
 import { expect, test } from "vite-plus/test";
 import { listAgentBackends, registerAgentBackend } from "../packages/server/modules/agent/index.ts";
 import { registerBuiltinAgentFeatures } from "../packages/server/app/features.ts";

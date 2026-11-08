@@ -53,7 +53,7 @@ else if (args.includes('ps')) console.log('${id}');
 else if (args.includes('inspect')) console.log(JSON.stringify([${JSON.stringify(inspected)}]));
 else if (args.includes('exec')) { console.log('SHELL_READY'); process.stdin.once('data', (data) => { console.log('INPUT:' + data.toString().trim()); process.exit(7); }); }
 else if (args.includes('logs')) console.log('FIXTURE_LOG');
-else if (args.includes('build')) setTimeout(() => { console.log('BUILD_DONE'); process.exit(0); }, 1000);
+else if (args.includes('build')) setTimeout(() => { console.log('BUILD_DONE'); process.exit(0); }, 150);
 else { console.log('OPERATION_DONE'); }
 `,
   );

@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import WebSocket from "ws";
@@ -24,7 +25,7 @@ export async function createChromium(directory) {
       "--no-first-run",
       "--no-default-browser-check",
       "--remote-debugging-port=0",
-      `--user-data-dir=${join(directory, "chromium")}`,
+      `--user-data-dir=${join(directory, `chromium-${randomUUID()}`)}`,
       "about:blank",
     ],
     { stdio: ["ignore", "ignore", "pipe"] },

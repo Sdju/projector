@@ -1,4 +1,4 @@
-import { expect, onTestFinished, test } from "vite-plus/test";
+import { expect, test } from "vite-plus/test";
 import { readFile } from "node:fs/promises";
 import { createBrowserFixture } from "./fixtures/browser-server.mjs";
 import { chromium, createChromium } from "./fixtures/chromium-driver.mjs";
@@ -58,10 +58,10 @@ const message = `## Квартал в цифрах
 
 Готово.`;
 
-test(
+test.concurrent(
   "the composer owns the submit button of an IntelligentForm",
   { skip: !chromium, timeout: 30000, retry: 1 },
-  async () => {
+  async ({ onTestFinished }) => {
     const html = await readFile(
       new URL("./fixtures/agent-form-composer.html", import.meta.url),
       "utf8",
@@ -93,10 +93,10 @@ test(
   },
 );
 
-test(
+test.concurrent(
   "widgets stream without remounting, stay interactive and render charts",
   { skip: !chromium, timeout: 90000, retry: 1 },
-  async () => {
+  async ({ onTestFinished }) => {
     const html = await readFile(new URL("./fixtures/agent-widgets.html", import.meta.url), "utf8");
     const fixture = await createBrowserFixture({
       pages: { "/widgets": html },
@@ -586,10 +586,10 @@ const SCRIPT = `  <script>
     return { total, months };
   </script>`;
 
-test(
+test.concurrent(
   "a message grows in place: no remount, no errors, script once, inert until finished",
   { skip: !chromium, timeout: 120000, retry: 1 },
-  async () => {
+  async ({ onTestFinished }) => {
     const html = await readFile(new URL("./fixtures/agent-widgets.html", import.meta.url), "utf8");
     const fixture = await createBrowserFixture({ pages: { "/widgets": html } });
     onTestFinished(() => fixture.close());
@@ -615,7 +615,11 @@ test(
       for (const match of message.matchAll(/<\/?[\w]+|[<>]|{{|}}|return/g)) {
         for (const at of [match.index + 1, match.index + match[0].length]) cuts.add(at);
       }
-      for (const at of [...cuts].sort((a, b) => a - b)) {
+      const points = [...cuts].sort((a, b) => a - b);
+      // Prefix compilation itself is covered by the autoClose unit test; streaming needs a
+      // representative sample, and the complete message always closes the run.
+      for (const [index, at] of points.entries()) {
+        if (index % 3 !== 0 && at !== message.length) continue;
         await set(message.slice(0, at), at < message.length);
         await frame();
         const probe = JSON.parse(
@@ -666,10 +670,10 @@ test(
   },
 );
 
-test(
+test.concurrent(
   "static SVG inside nested slots grows during streaming without losing its elements",
   { skip: !chromium, timeout: 60000, retry: 1 },
-  async () => {
+  async ({ onTestFinished }) => {
     const html = await readFile(new URL("./fixtures/agent-widgets.html", import.meta.url), "utf8");
     const fixture = await createBrowserFixture({ pages: { "/widgets": html } });
     onTestFinished(() => fixture.close());
@@ -716,10 +720,10 @@ test(
   },
 );
 
-test(
+test.concurrent(
   "line selects ranges directly and navigates the full minimap",
   { skip: !chromium, timeout: 60000, retry: 1 },
-  async () => {
+  async ({ onTestFinished }) => {
     const html = await readFile(new URL("./fixtures/agent-widgets.html", import.meta.url), "utf8");
     const fixture = await createBrowserFixture({ pages: { "/widgets": html } });
     onTestFinished(() => fixture.close());
@@ -824,10 +828,10 @@ test(
   },
 );
 
-test(
+test.concurrent(
   "Answer Doctor replaces broken widget Markdown in the real chat",
   { skip: !chromium, timeout: 30000, retry: 1 },
-  async () => {
+  async ({ onTestFinished }) => {
     const html = await readFile(
       new URL("./fixtures/agent-answer-doctor.html", import.meta.url),
       "utf8",

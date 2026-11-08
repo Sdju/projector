@@ -1,12 +1,12 @@
-import { expect, onTestFinished, test } from "vite-plus/test";
+import { expect, test } from "vite-plus/test";
 import { readFile, writeFile } from "node:fs/promises";
 import { createBrowserFixture } from "./fixtures/browser-server.mjs";
 import { chromium, createChromium } from "./fixtures/chromium-driver.mjs";
 
-test(
+test.concurrent(
   "dozens of tasks stay in a scrolling list with the finished ones folded away",
   { skip: !chromium, timeout: 60000, retry: 2 },
-  async () => {
+  async ({ onTestFinished }) => {
     const html = await readFile(new URL("./fixtures/agent-task-bar.html", import.meta.url), "utf8");
     const fixture = await createBrowserFixture({ pages: { "/bar": html } });
     onTestFinished(() => fixture.close());
@@ -50,10 +50,10 @@ test(
   },
 );
 
-test(
+test.concurrent(
   "long commands fit the activity, task list and task view on narrow screens",
   { skip: !chromium },
-  async () => {
+  async ({ onTestFinished }) => {
     const html = await readFile(new URL("./fixtures/agent-task-bar.html", import.meta.url), "utf8");
     const fixture = await createBrowserFixture({ pages: { "/bar": html } });
     onTestFinished(() => fixture.close());
@@ -113,6 +113,7 @@ test(
       await browser.click(".activity-summary");
       await browser.click(".activity-list .tool > summary");
       await settle();
+      await wait('Boolean(document.querySelector(".activity-list .code"))');
       expect(
         await browser.evaluate(
           "document.documentElement.scrollWidth <= document.documentElement.clientWidth",
@@ -129,6 +130,7 @@ test(
       }
       await browser.click(".task-bar .row");
       await settle();
+      await wait('Boolean(document.querySelector(".task-view .code"))');
       expect(
         await browser.evaluate('document.querySelector(".task-view .code").textContent'),
       ).toContain("unbroken_argument_");

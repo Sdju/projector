@@ -2,7 +2,7 @@ import { expect, test } from "vite-plus/test";
 import { readFile } from "node:fs/promises";
 import { createBrowserFixture } from "./fixtures/browser-server.mjs";
 import { chromium, createChromium } from "./fixtures/chromium-driver.mjs";
-test(
+test.concurrent(
   "UiControl retains Vue native model, modifiers, events and form semantics",
   { skip: !chromium, timeout: 45000 },
   async () => {
@@ -113,7 +113,7 @@ test(
   },
 );
 
-test(
+test.concurrent(
   "UiControl supports native value/checked without a model and exposes the same input",
   { skip: !chromium, timeout: 45000 },
   async () => {

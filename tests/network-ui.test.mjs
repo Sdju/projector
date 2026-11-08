@@ -1,4 +1,4 @@
-import { expect, onTestFinished, test } from "vite-plus/test";
+import { expect, test } from "vite-plus/test";
 import { createBrowserFixture } from "./fixtures/browser-server.mjs";
 import { chromium, createChromium } from "./fixtures/chromium-driver.mjs";
 
@@ -99,10 +99,10 @@ let settingsApp,panelApp;
 finally{settingsApp?.unmount();panelApp?.unmount();window.fetch=originalFetch;}})();
 </script>`;
 
-test(
+test.concurrent(
   "Network settings and LAN panel save through scoped IDE commands",
   { skip: !chromium, timeout: 60000, retry: 2 },
-  async () => {
+  async ({ onTestFinished }) => {
     const fixture = await createBrowserFixture({ pages: { "/__network_test": html } });
     onTestFinished(() => fixture.close());
     const browser = await createChromium(fixture.directory);

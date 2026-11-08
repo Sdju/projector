@@ -1,15 +1,15 @@
-import { expect, onTestFinished, test } from "vite-plus/test";
+import { expect, test } from "vite-plus/test";
 import { createBrowserFixture } from "./fixtures/browser-server.mjs";
 import { chromium, createChromium } from "./fixtures/chromium-driver.mjs";
 
-test(
+test.concurrent(
   "visual Markdown: synchronous drafts, undo, media and source round trips",
   {
     skip: !chromium,
     timeout: 60000,
     retry: 2,
   },
-  async () => {
+  async ({ onTestFinished }) => {
     const html = `<!doctype html><div id="editor" style="height: 500px"></div><button id="outside">Outside editor</button><pre id="result">WAITING</pre><script type="module">
     import { createApp, h, nextTick, ref } from 'vue';
     import '/packages/client/app/styles.css';

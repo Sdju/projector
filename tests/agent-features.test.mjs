@@ -1,3 +1,4 @@
+import "./helpers/builtins.mjs";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";

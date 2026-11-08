@@ -1,12 +1,12 @@
-import { expect, onTestFinished, test } from "vite-plus/test";
+import { expect, test } from "vite-plus/test";
 import { readFile } from "node:fs/promises";
 import { createBrowserFixture } from "./fixtures/browser-server.mjs";
 import { chromium, createChromium } from "./fixtures/chromium-driver.mjs";
 
-test(
+test.concurrent(
   "three island menus open, close with focus restored and emit commands on desktop and mobile",
   { skip: !chromium, timeout: 90000, retry: 2 },
-  async () => {
+  async ({ onTestFinished }) => {
     const html = await readFile(new URL("./fixtures/island-menu.html", import.meta.url), "utf8");
     const fixture = await createBrowserFixture({ pages: { "/__island_test": html } });
     onTestFinished(() => fixture.close());

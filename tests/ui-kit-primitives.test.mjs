@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { createBrowserFixture } from "./fixtures/browser-server.mjs";
 import { chromium, createChromium } from "./fixtures/chromium-driver.mjs";
 
-test(
+test.concurrent(
   "UI kit retains native form, button and pointer lifecycle",
   { skip: !chromium, timeout: 45000 },
   async () => {

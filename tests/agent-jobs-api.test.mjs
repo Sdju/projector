@@ -1,3 +1,4 @@
+import "./helpers/builtins.mjs";
 import { execFileSync } from "node:child_process";
 import { once } from "node:events";
 import { createServer } from "node:http";

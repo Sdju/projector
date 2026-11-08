@@ -30,6 +30,9 @@ function architecturePlugin(): Plugin {
       if (errors.length) throw new Error(describe(errors));
     },
     configureServer(server) {
+      // Vitest owns these servers and runs the architecture task itself: a repo-wide oxlint scan
+      // beside the tests only competes for CPU, logs on timeout and keeps the worker alive.
+      if (process.env.VITEST || server.config.mode === "test") return;
       checkFeodAsync().then(
         (errors) => {
           if (errors.length) server.config.logger.error(describe(errors));
@@ -93,8 +96,9 @@ export default defineConfig({
     pool: "forks",
     // Browser tests also start Vite and Chromium processes; leave room for the desktop.
     maxWorkers: 2,
-    // GTK modules load through the vio `gi:` loader hook instead of Vite.
-    execArgv: ["--import", "@zede/vio/register"],
+    // Each browser test owns a Vite server and a Chromium: cap their overlap per worker so a
+    // four-core CI runner is not asked to host ten browsers at once.
+    maxConcurrency: process.env.CI ? 2 : 5,
     server: { deps: { external: [/^gi:/] } },
     restoreMocks: true,
     testTimeout: 60_000,

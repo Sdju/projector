@@ -1,4 +1,4 @@
-import { expect, onTestFinished, test } from "vite-plus/test";
+import { expect, test } from "vite-plus/test";
 import { createBrowserFixture } from "./fixtures/browser-server.mjs";
 import { chromium, createChromium } from "./fixtures/chromium-driver.mjs";
 
@@ -25,10 +25,10 @@ const html = `<!doctype html>
   };
 </script>`;
 
-test(
+test.concurrent(
   "markdown images in a chat answer load safely and open in the modal viewer",
   { skip: !chromium, timeout: 90000, retry: 1 },
-  async () => {
+  async ({ onTestFinished }) => {
     const fixture = await createBrowserFixture({
       pages: { "/images": html },
       responses: [

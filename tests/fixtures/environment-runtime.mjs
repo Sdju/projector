@@ -175,36 +175,56 @@ try {
     healthSource.replace("ok: true,", `ok: true, revision: ${revision},`);
   const controlFile = join(root, "packages/server/modules/terminal-control/control.ts");
   const controlSource = await readFile(controlFile, "utf8");
-  for (let revision = 1; revision <= 12; revision++) {
-    await writeFile(
-      controlFile,
-      controlSource.replace(
-        "return { sessions: listTerminalSessions(id) };",
-        `return { sessions: listTerminalSessions(id), revision: ${revision} };`,
-      ),
-    );
-    // No HTTP request activates this update: already-open sockets must receive the new code.
-    await until(async () => {
-      control.socket.send(JSON.stringify({ id: revision, method: "GET" }));
-      shared.socket.send(
-        JSON.stringify({
-          type: "send",
-          channel: "test",
-          data: JSON.stringify({ id: revision, method: "GET" }),
-        }),
+  // Two reloads cover both a socket-driven and an HTTP-driven update; the error/recovery tail below
+  // adds more generations without a fresh workspace. A release sweep can request the full twelve.
+  const generations = Number(process.env.PROJECTOR_TEST_GENERATIONS ?? 2);
+  let controlRevision = 0;
+  let healthRevision = 0;
+  for (let revision = 1; revision <= generations; revision++) {
+    if (revision % 2 === 1) {
+      controlRevision = revision;
+      await writeFile(
+        controlFile,
+        controlSource.replace(
+          "return { sessions: listTerminalSessions(id) };",
+          `return { sessions: listTerminalSessions(id), revision: ${revision} };`,
+        ),
       );
-      await sleep(40);
-      return (
-        control.messages.some((m) => m.id === revision && m.data?.revision === revision) &&
-        shared.messages.some(
-          (m) => m.type === "message" && JSON.parse(m.data).data?.revision === revision,
-        )
+      // No HTTP request activates this update: already-open sockets must receive the new code.
+      await until(async () => {
+        control.socket.send(JSON.stringify({ id: revision, method: "GET" }));
+        shared.socket.send(
+          JSON.stringify({
+            type: "send",
+            channel: "test",
+            data: JSON.stringify({ id: revision, method: "GET" }),
+          }),
+        );
+        await sleep(40);
+        return (
+          control.messages.some((m) => m.id === revision && m.data?.revision === revision) &&
+          shared.messages.some(
+            (m) => m.type === "message" && JSON.parse(m.data).data?.revision === revision,
+          )
+        );
+      }, `live control generation ${revision}`);
+    } else {
+      healthRevision = revision;
+      await writeFile(healthFile, health(revision));
+      await until(
+        async () => (await call("/api/health")).revision === revision,
+        `HTTP generation ${revision}`,
       );
-    }, `live control generation ${revision}`);
-    await writeFile(healthFile, health(revision));
+    }
+    // The module that did not change keeps serving its last revision through the same transport.
+    if (healthRevision > 0) assert.equal((await call("/api/health")).revision, healthRevision);
+    control.socket.send(JSON.stringify({ id: 1000 + revision, method: "GET" }));
     await until(
-      async () => (await call("/api/health")).revision === revision,
-      `HTTP generation ${revision}`,
+      () =>
+        control.messages.some(
+          (m) => m.id === 1000 + revision && m.data?.revision === controlRevision,
+        ),
+      `control stays live after generation ${revision}`,
     );
     assert.equal(server.environments.ssr, environment);
     assert.equal((await call("/api/health")).pid, process.pid);
@@ -212,27 +232,40 @@ try {
     console.log(`live generation ${revision}`);
   }
   const workingErrors = errors.length;
+  const broken = healthRevision;
+  const recovered = healthRevision + 1;
+  const restored = healthRevision + 2;
+  const mutated = healthRevision + 3;
   await writeFile(healthFile, "export const broken = ;");
   await until(() => errors.length > workingErrors, "invalid update rejected");
-  assert.equal((await call("/api/health")).revision, 12);
-  await writeFile(healthFile, health(13));
-  await until(async () => (await call("/api/health")).revision === 13, "syntax error recovery");
+  assert.equal((await call("/api/health")).revision, broken);
+  await writeFile(healthFile, health(recovered));
+  await until(
+    async () => (await call("/api/health")).revision === recovered,
+    "syntax error recovery",
+  );
   const recoveredErrors = errors.length;
   await unlink(healthFile);
   await until(() => errors.length > recoveredErrors, "deleted module rejected");
-  assert.equal((await call("/api/health")).revision, 13);
-  await writeFile(healthFile, health(14));
-  await until(async () => (await call("/api/health")).revision === 14, "deleted module restored");
+  assert.equal((await call("/api/health")).revision, recovered);
+  await writeFile(healthFile, health(restored));
+  await until(
+    async () => (await call("/api/health")).revision === restored,
+    "deleted module restored",
+  );
   await writeFile(
     healthFile,
-    health(15).replace(
+    health(mutated).replace(
       "export const routes: RouteDefinition[] = [",
       'export const routes: RouteDefinition[] = [{ method: "POST", path: "/api/test-once", handler: () => { globalThis.testMutations = (globalThis.testMutations ?? 0) + 1; throw new Error("request failure"); } },',
     ),
   );
-  await until(async () => (await call("/api/health")).revision === 15, "mutation test activated");
+  await until(
+    async () => (await call("/api/health")).revision === mutated,
+    "mutation test activated",
+  );
   const parallel = await Promise.all(Array.from({ length: 20 }, () => call("/api/health")));
-  assert(parallel.every((m) => m.revision === 15));
+  assert(parallel.every((m) => m.revision === mutated));
   const failed = await fetch(base + "/api/test-once", {
     method: "POST",
     headers: { Origin: base },

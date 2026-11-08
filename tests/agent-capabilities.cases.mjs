@@ -1,3 +1,4 @@
+import "./helpers/builtins.mjs";
 import { expect, onTestFinished, test, vi } from "vite-plus/test";
 import { createState } from "../packages/client/modules/agent/model/chat-state.ts";
 import { useExternalAgent } from "../packages/client/modules/agent/model/external.ts";
