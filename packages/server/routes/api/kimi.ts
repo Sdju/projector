@@ -1,4 +1,5 @@
 import { kimiUsage } from "../../modules/agents-integration/kimi/index.ts";
+import { recordAgentLimits } from "../../modules/usage-analytics/index.ts";
 import { json, type RouteDefinition } from "../../modules/transport/index.ts";
 
 export const routes: RouteDefinition[] = [
@@ -7,7 +8,9 @@ export const routes: RouteDefinition[] = [
     path: "/api/kimi/usage",
     handler: async ({ res }) => {
       res.setHeader("Cache-Control", "no-store");
-      json(res, 200, await kimiUsage());
+      const value = await kimiUsage();
+      recordAgentLimits("kimi", value);
+      json(res, 200, value);
     },
   },
 ];

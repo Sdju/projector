@@ -62,4 +62,6 @@ export interface ProviderBalance {
   available: boolean | null;
   checkedAt: number;
   message: string | null;
+  providerId?: string;
+  providerName?: string;
 }

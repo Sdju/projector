@@ -108,6 +108,12 @@ export async function providerBalance(providerId?: string): Promise<ProviderBala
     throw error;
   });
   if (!provider) return unavailable("Провайдер не настроен");
+  /** The route and the analytics store need to know whose money this is. */
+  const decorate = (value: ProviderBalance): ProviderBalance => ({
+    ...value,
+    providerId: provider.id,
+    providerName: provider.name,
+  });
   const key = createHash("sha256")
     .update(`${provider.id}\n${provider.kind}\n${provider.url}\n${provider.apiKey}`)
     .digest("hex");
@@ -118,7 +124,7 @@ export async function providerBalance(providerId?: string): Promise<ProviderBala
   const ttl = entry.value?.status === "ready" ? READY_TTL_MS : FAILED_TTL_MS;
   if (entry.value && Date.now() < entry.value.checkedAt + ttl) return entry.value;
   entry.pending = load(provider)
-    .then((value) => (entry.value = value))
+    .then((value) => (entry.value = decorate(value)))
     .finally(() => {
       entry.pending = undefined;
     });

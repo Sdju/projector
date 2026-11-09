@@ -7,6 +7,7 @@ import {
 } from "@projector/core/modules/agent-judge/index.ts";
 import { serviceRoleSelection } from "../agent-roles/index.ts";
 import { quietChatModel } from "../providers/index.ts";
+import { recordTaskSpend } from "../spend/index.ts";
 
 const JUDGE_PROMPT = `Ты Projector Judge — оцениваешь одно действие, которое ИИ-агент просит выполнить на машине разработчика. Пользователь решает, разрешить ли его, и хочет понять смысл и риск.
 
@@ -137,9 +138,9 @@ export async function judgeAction(action: JudgeAction): Promise<JudgeVerdict> {
   const timeout = AbortSignal.timeout(JUDGE_LIMITS.seconds * 1_000);
   const signal = action.signal ? AbortSignal.any([action.signal, timeout]) : timeout;
   try {
-    const { model } = await quietChatModel(await serviceRoleSelection("judge", action.selection));
-    const { text } = await generateText({
-      model,
+    const quiet = await quietChatModel(await serviceRoleSelection("judge", action.selection));
+    const result = await generateText({
+      model: quiet.model,
       system: JUDGE_PROMPT,
       prompt: [
         `Инструмент: ${action.tool}`,
@@ -153,7 +154,11 @@ export async function judgeAction(action: JudgeAction): Promise<JudgeVerdict> {
       maxOutputTokens: JUDGE_LIMITS.tokens,
       abortSignal: signal,
     });
-    const verdict = parseJudgeVerdict(text);
+    recordTaskSpend("judge", result.usage, quiet.price, {
+      provider: quiet.provider,
+      model: quiet.name,
+    });
+    const verdict = parseJudgeVerdict(result.text);
     if (verdict.confidence !== "low" || verdict.score < 4) remember(key, verdict);
     return verdict;
   } catch {

@@ -32,5 +32,6 @@ import "./swipe-gesture.cases.mjs";
 import "./terminal-clipboard.cases.mjs";
 import "./thoughts.cases.mjs";
 import "./tree-menu.cases.mjs";
+import "./usage-analytics.cases.mjs";
 import "./window-host-lifecycle.cases.mjs";
 import "./workspace-sources.cases.mjs";

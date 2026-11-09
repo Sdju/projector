@@ -11,4 +11,5 @@ export const codexAgent: ClientAgent = {
   caption: "Запустит агента OpenAI Codex",
   icon: IconCodex,
   usage: CodexUsageIndicator,
+  usageUrl: "/api/codex/usage",
 };

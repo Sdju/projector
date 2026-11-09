@@ -3,6 +3,7 @@ import type { LanguageModel } from "ai";
 import { createQwenOpenAI } from "./openai-client.ts";
 import { envFallbackFromProcess, resolveOpenAIProvider } from "./provider-store.ts";
 import { quietThinkingBody } from "./thinking.ts";
+import type { ModelPrice } from "./types.ts";
 
 /**
  * The chat's provider and model with thinking turned down: one cheap request, no tools and no
@@ -12,6 +13,7 @@ export async function quietChatModel(selection?: Record<string, string>): Promis
   model: LanguageModel;
   provider: string;
   name: string;
+  price?: ModelPrice;
 }> {
   const [providerId, ...rest] = (selection?.provider || "").split(":");
   const resolved = await resolveOpenAIProvider({
@@ -33,5 +35,10 @@ export async function quietChatModel(selection?: Record<string, string>): Promis
         }),
       })
     : provider.chatModel(resolved.model);
-  return { model, provider: resolved.id, name: resolved.modelName };
+  return {
+    model,
+    provider: resolved.id,
+    name: resolved.modelName,
+    ...(resolved.price ? { price: resolved.price } : {}),
+  };
 }

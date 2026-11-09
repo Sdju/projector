@@ -1,6 +1,7 @@
 import { generateText } from "ai";
 import { serviceRoleSelection } from "../../agent-roles/index.ts";
 import { quietChatModel } from "../../providers/index.ts";
+import { recordTaskSpend } from "../../spend/index.ts";
 
 /** The doctor gets only the conversation and the broken block; it must not call tools or change files. */
 const SYSTEM = `Ты Form Doctor — ремонтируешь Vue-разметку формы Projector. На вход приходят история чата, ошибочная форма и сообщение компилятора.
@@ -19,19 +20,23 @@ export interface FormDoctorRequest {
 
 /** Repairs one form with the same provider/model as the chat; no tools, history or side effects. */
 export async function repairForm(request: FormDoctorRequest): Promise<string> {
-  const { model } = await quietChatModel(await serviceRoleSelection("doctor", request.selection));
+  const quiet = await quietChatModel(await serviceRoleSelection("doctor", request.selection));
   const history = (request.history ?? "").slice(-20_000);
   const form = request.form.slice(0, 30_000);
   const error = request.error.slice(0, 2_000);
-  const { text } = await generateText({
-    model,
+  const result = await generateText({
+    model: quiet.model,
     system: SYSTEM,
     prompt: `История чата (последние сообщения):\n${history || "нет"}\n\nОшибочная форма:\n${form}\n\nОшибка компилятора:\n${error}\n\nВерни исправленную форму.`,
     maxRetries: 0,
     maxOutputTokens: 4_000,
     abortSignal: request.signal,
   });
-  const answer = text.trim();
+  recordTaskSpend("doctor-form", result.usage, quiet.price, {
+    provider: quiet.provider,
+    model: quiet.name,
+  });
+  const answer = result.text.trim();
   if (!answer) throw new Error("Form Doctor вернул пустой ответ");
   return answer;
 }

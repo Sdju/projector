@@ -60,12 +60,14 @@ import { routes as openCodeRoutes } from "../routes/api/opencode.ts";
 import { routes as cursorRoutes } from "../routes/api/cursor.ts";
 import { routes as kimiRoutes } from "../routes/api/kimi.ts";
 import { routes as claudeRoutes } from "../routes/api/claude.ts";
+import { routes as analyticsRoutes } from "../routes/api/analytics.ts";
 import { routes as openAiRoutes } from "../routes/api/openai.ts";
 import { routes as browserRoutes } from "../routes/api/browser.ts";
 const dispatch = createRouteDispatcher([
   ...openAiRoutes,
   ...browserRoutes,
   ...claudeRoutes,
+  ...analyticsRoutes,
   ...cursorRoutes,
   ...kimiRoutes,
   ...openCodeRoutes,

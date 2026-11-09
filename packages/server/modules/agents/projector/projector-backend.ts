@@ -23,6 +23,7 @@ import {
 import {
   contextOf,
   costOf,
+  taskSpendRecorder,
   tokensOf,
   type Price,
   type SdkUsage,
@@ -115,15 +116,19 @@ async function turn(
         }),
       })
     : model;
-
+  const charge = (task: string) =>
+    taskSpendRecorder(task, resolved.price, resolved.id, resolved.modelName);
   const mode = options.selection?.[TRUST] ?? options.permissionMode;
   const added: Project[] = [];
+  const review =
+    mode === "auto"
+      ? createBashReviewer(quietModel, options.cwd, options.abort, charge("review"))
+      : undefined;
   const guard = {
     cwd: options.cwd,
     approve: options.approve,
     trusting: mode === "bypassPermissions",
-    review:
-      mode === "auto" ? createBashReviewer(quietModel, options.cwd, options.abort) : undefined,
+    review,
   };
   const skills = side ? [] : skillsForRole(await listSkills(options.cwd), options.role?.skills);
   const projectWidgets =
@@ -162,7 +167,14 @@ async function turn(
 
   const earlier = splitAtCompaction(options.history ?? []);
   if (!side && options.message.trim() === COMPACT_COMMAND) {
-    await compactChat(quietModel, earlier, options, resolved, DEFAULT_CONTEXT_SIZE);
+    await compactChat(
+      quietModel,
+      earlier,
+      options,
+      resolved,
+      DEFAULT_CONTEXT_SIZE,
+      charge("compaction"),
+    );
     return;
   }
   const { recent, summary } = side
@@ -171,6 +183,7 @@ async function turn(
         signal: options.abort,
         base: earlier.summary,
         onStart: () => options.emit("status", { phase: "compacting" }),
+        onUsage: charge("compaction"),
       });
   const mcp: McpConnection = side
     ? { tools: {}, problems: [], servers: [], close: async () => {} }

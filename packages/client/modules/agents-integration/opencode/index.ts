@@ -11,4 +11,5 @@ export const opencodeAgent: ClientAgent = {
   caption: "Запустит агента OpenCode",
   icon: IconOpenCode,
   usage: OpenCodeUsageIndicator,
+  usageUrl: "/api/opencode/usage",
 };

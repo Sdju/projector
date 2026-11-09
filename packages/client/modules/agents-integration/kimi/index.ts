@@ -12,5 +12,6 @@ export const kimiAgent: ClientAgent = {
   caption: "Запустит агента Kimi Code",
   icon: IconKimi,
   usage: KimiUsageIndicator,
+  usageUrl: "/api/kimi/usage",
   plan: readKimiPlan,
 };

@@ -1,6 +1,7 @@
 import { generateText } from "ai";
 import { serviceRoleSelection } from "../../agent-roles/index.ts";
 import { quietChatModel, type AgentHistoryTurn } from "../../providers/index.ts";
+import { recordTaskSpend } from "../../spend/index.ts";
 import type { LensRequest } from "../../agent/index.ts";
 
 /**
@@ -96,7 +97,7 @@ export async function runLens(request: LensRequest & { signal?: AbortSignal }): 
   // there is nothing to describe, so the page gets the same short placeholder for free.
   if (!lensHasMaterial(request))
     return request.busy ? LENS_THINKING_TEXT : "В чате пока нет работы, которую можно описать.";
-  const { model } = await quietChatModel(await serviceRoleSelection("lens", request.selection));
+  const quiet = await quietChatModel(await serviceRoleSelection("lens", request.selection));
   const timeout = AbortSignal.timeout(LENS_LIMITS.seconds * 1_000);
   const signal = request.signal ? AbortSignal.any([request.signal, timeout]) : timeout;
   const history = lensHistoryText(request.history);
@@ -104,15 +105,19 @@ export async function runLens(request: LensRequest & { signal?: AbortSignal }): 
   const reasoning = thoughts
     ? `\n\nСамое свежее рассуждение агента (главный источник намерения):\n${thoughts}`
     : "";
-  const { text } = await generateText({
-    model,
+  const result = await generateText({
+    model: quiet.model,
     system: LENS_PROMPT,
     prompt: `История чата (последние сообщения):\n${history || "нет"}${reasoning}\n\n${lensStateText(request)}\n\nОпиши, чем агент занят сейчас.`,
     maxRetries: 0,
     maxOutputTokens: LENS_LIMITS.tokens,
     abortSignal: signal,
   });
-  const line = lensLine(text);
+  recordTaskSpend("lens", result.usage, quiet.price, {
+    provider: quiet.provider,
+    model: quiet.name,
+  });
+  const line = lensLine(result.text);
   if (!line) throw new Error("Lens не ответил");
   return line;
 }

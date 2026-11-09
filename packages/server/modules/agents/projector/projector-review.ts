@@ -1,4 +1,4 @@
-import { generateText, type LanguageModel } from "ai";
+import { generateText, type LanguageModel, type LanguageModelUsage } from "ai";
 
 export interface BashVerdict {
   safe: boolean;
@@ -31,17 +31,19 @@ export function createBashReviewer(
   model: LanguageModel,
   cwd: string | undefined,
   signal?: AbortSignal,
+  onUsage?: (usage: LanguageModelUsage) => void,
 ) {
   return async (command: string): Promise<BashVerdict> => {
     try {
-      const { text } = await generateText({
+      const result = await generateText({
         model,
         system: REVIEW_PROMPT,
         prompt: `Каталог проекта: ${cwd ?? "не задан"}\nКоманда:\n${command}`,
         abortSignal: signal,
         maxOutputTokens: 200,
       });
-      return parseVerdict(text);
+      onUsage?.(result.usage);
+      return parseVerdict(result.text);
     } catch {
       return { safe: false, reason: "проверка недоступна" };
     }

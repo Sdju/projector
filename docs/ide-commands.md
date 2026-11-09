@@ -239,7 +239,7 @@ The optional `ide` feature gives Claude Code and ACP agents three tools (`list_c
 
 `ide.workbench.settings.open` (**Открыть настройки Projector**) в scope `editor:<projectId>` открывает вкладку **Настройки** рядом с файлами. Повторный вызов фокусирует вкладку `settings:app`. Кнопки настроек в шапке, мобильном выборе проекта и сайдбаре вызывают ту же команду; она доступна через командный центр. Вкладка сохраняет черновики при переключении файлов и переносе между блоками; закрытие завершает её состояние. Вне проекта настройки доступны по `/settings`.
 
-Внутри вкладки scope `settings` предоставляет `ide.settings.sections.list`, `ide.settings.section.open` (`{ id }`) и `ide.settings.search` (`{ query? }`). Эти команды доступны встроенному агенту; формы используют прежние серверные API хранения настроек.
+Внутри вкладки scope `settings` предоставляет `ide.settings.sections.list`, `ide.settings.section.open` (`{ id }`) и `ide.settings.search` (`{ query? }`). Эти команды доступны встроенному агенту; формы используют прежние серверные API хранения настроек. Раздел «Аналитика расхода» добавляет `ide.analytics.refresh` (запросить лимиты и перечитать расход), `ide.analytics.range.set` (`{ days: 7 | 30 | 90 }`) и `ide.analytics.tasks.mode.set` (`{ mode: "tokens" | "cost" }`) для карточки «Куда ушли деньги»; команды живут в scope этого раздела и действуют, пока он открыт.
 
 ## HTML-страницы
 

@@ -12,5 +12,6 @@ export const claudeAgent: ClientAgent = {
   caption: "Запустит агента Anthropic",
   icon: IconClaude,
   usage: ClaudeUsageIndicator,
+  usageUrl: "/api/claude/usage",
   plan: readClaudePlan,
 };

@@ -149,4 +149,7 @@ export interface ProviderBalance {
   available: boolean | null;
   checkedAt: number;
   message: string | null;
+  /** Id and name of the provider the balance belongs to, when one was resolved. */
+  providerId?: string;
+  providerName?: string;
 }

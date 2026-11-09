@@ -37,6 +37,8 @@ export interface ClientAgent {
   builtin?: boolean;
   /** The limits indicator of the agent, if it has one. */
   usage?: Component;
+  /** Where a fresh limits answer comes from; the analytics page records it by asking. */
+  usageUrl?: string;
   /** How the agent keeps its task list, if it has one. */
   plan?: AgentPlanReader;
 }

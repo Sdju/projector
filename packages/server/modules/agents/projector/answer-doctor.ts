@@ -1,6 +1,7 @@
 import { generateText } from "ai";
 import { serviceRoleSelection } from "../../agent-roles/index.ts";
 import { quietChatModel } from "../../providers/index.ts";
+import { recordTaskSpend } from "../../spend/index.ts";
 
 const SYSTEM = `Ты Answer Doctor — ремонтируешь только сломанную разметку готового ответа Projector. На вход приходят история чата, ответ и диагностика клиента.
 
@@ -18,19 +19,23 @@ export interface AnswerDoctorRequest {
 
 /** Repairs presentation only; the doctor has no tools and cannot change the conversation or files. */
 export async function repairAnswer(request: AnswerDoctorRequest): Promise<string> {
-  const { model } = await quietChatModel(await serviceRoleSelection("doctor", request.selection));
+  const quiet = await quietChatModel(await serviceRoleSelection("doctor", request.selection));
   const history = (request.history ?? "").slice(-20_000);
   const answer = request.answer.slice(0, 60_000);
   const error = request.error.slice(0, 2_000);
-  const { text } = await generateText({
-    model,
+  const result = await generateText({
+    model: quiet.model,
     system: SYSTEM,
     prompt: `История чата (последние сообщения):\n${history || "нет"}\n\nСломанный ответ:\n${answer}\n\nДиагностика:\n${error}\n\nВерни весь исправленный ответ.`,
     maxRetries: 0,
     maxOutputTokens: 12_000,
     abortSignal: request.signal,
   });
-  const repaired = text.trim();
+  recordTaskSpend("doctor-answer", result.usage, quiet.price, {
+    provider: quiet.provider,
+    model: quiet.name,
+  });
+  const repaired = result.text.trim();
   if (!repaired) throw new Error("Answer Doctor вернул пустой ответ");
   return repaired;
 }

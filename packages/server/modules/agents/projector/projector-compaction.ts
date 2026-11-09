@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { generateText, type LanguageModel } from "ai";
+import { generateText, type LanguageModel, type LanguageModelUsage } from "ai";
 import type { AgentRunOptions } from "../../agent/index.ts";
 import type { AgentHistoryTurn } from "../../providers/index.ts";
 import { recentTurns } from "./projector-history.ts";
@@ -56,7 +56,12 @@ export interface CompactedHistory {
 export async function compactHistory(
   model: LanguageModel,
   history: AgentHistoryTurn[],
-  options: { signal?: AbortSignal; onStart?: () => void; base?: string } = {},
+  options: {
+    signal?: AbortSignal;
+    onStart?: () => void;
+    base?: string;
+    onUsage?: (usage: LanguageModelUsage) => void;
+  } = {},
 ): Promise<CompactedHistory> {
   const base = options.base ?? "";
   const recent = recentTurns(history);
@@ -73,7 +78,13 @@ export async function compactHistory(
 
   options.onStart?.();
   try {
-    const summary = await summarize(model, previous, older.slice(covered + 1), options.signal);
+    const summary = await summarize(
+      model,
+      previous,
+      older.slice(covered + 1),
+      options.signal,
+      options.onUsage,
+    );
     if (!summary) return { recent, summary: previous };
     remember(keys[last]!, summary);
     return { recent, summary };
@@ -89,8 +100,9 @@ export async function summarize(
   previous: string,
   turns: AgentHistoryTurn[],
   signal?: AbortSignal,
+  onUsage?: (usage: LanguageModelUsage) => void,
 ): Promise<string> {
-  const { text } = await generateText({
+  const result = await generateText({
     model,
     system: SUMMARY_PROMPT,
     prompt: [
@@ -100,7 +112,8 @@ export async function summarize(
     abortSignal: signal,
     maxOutputTokens: 2_000,
   });
-  return text.trim().slice(0, SUMMARY_CHARS);
+  onUsage?.(result.usage);
+  return result.text.trim().slice(0, SUMMARY_CHARS);
 }
 
 /** The message that asks the agent to compact the chat (the chat sends it by itself on a full context). */
@@ -135,10 +148,11 @@ export async function compactChat(
   options: AgentRunOptions,
   resolved: { model: string; contextTokens?: number },
   defaultContextSize: number,
+  onUsage?: (usage: LanguageModelUsage) => void,
 ): Promise<void> {
   options.emit("status", { phase: "compacting" });
   const summary = earlier.turns.length
-    ? await summarize(model, earlier.summary, earlier.turns, options.abort)
+    ? await summarize(model, earlier.summary, earlier.turns, options.abort, onUsage)
     : earlier.summary;
   if (!summary) {
     options.emit("error", { error: "Пока нечего сжимать" });

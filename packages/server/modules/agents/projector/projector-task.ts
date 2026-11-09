@@ -7,6 +7,7 @@ import type { AgentTaskPatch } from "@projector/core/modules/agent-task/index.ts
 import type { AgentRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
 import type { AgentEmitter, AgentSelection } from "../../agent/index.ts";
 import { readAgentRole } from "../../agent-roles/index.ts";
+import { recordTaskSpend } from "../../spend/index.ts";
 import {
   createQwenOpenAI,
   envFallbackFromProcess,
@@ -261,6 +262,10 @@ export async function runProjectorTask(
     });
     const text = (await result.text).trim();
     const steps = await result.steps;
+    recordTaskSpend("task", await result.usage, resolved.price, {
+      provider: resolved.id,
+      model: resolved.modelName,
+    });
     if (!text) throw new Error("Task не вернул ответ");
     patch({
       id: request.id,
