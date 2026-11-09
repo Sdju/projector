@@ -23,13 +23,14 @@
 - `workspace-api/pipeline-stages.ts` — `groupPipelineStages` для `PipelineView` и `PullRequestPipelineStages`.
 - `integration-api/remote-workspace.ts` — `useRemoteWorkspace`: загрузка, регистрация профиля, 401/403-ветка, открытие README и cleanup для GitHub и GitLab.
 - `viewers/ui/ChangedFileRow.vue` и `viewers/lib/file-diffs.ts` — общий ряд изменённого файла с diff-панелью и общий кэш diff; `CommitFiles` и `PullRequestFiles` маппят только свои данные.
+- `issues/lib/change-tree.ts` — построение, фолдинг и флаттен дерева снимка с тестами. Решение: `ChangesTree` и `GitChangesTree` остаются раздельными — у них разные модели данных и взаимодействия; общий компонент потребовал бы булевый набор режимов.
 - Удалены мёртвые `resize`-заглушка, несовпадающие `prefers-reduced-motion`, неиспользуемый `const props`, локальные `.sr-only`, мёртвые `.muted`/`.hint`/`.field`/`.link`.
 - `ReleaseView` переведён на `UiMessage tone="danger"`; `ArchiveViewer` — на `sizeLabel` и `UiEmpty`; `999px` заменены на `var(--r-full)`.
 - Реестр больших файлов синхронизирован: `AgentChat.vue` — 502, `projector-backend.ts` — 409, `gitlab/browser.ts` — 402.
 
 ## Приоритет P1
 
-- [ ] **Деревья изменений.** `ChangesTree` (490) и `GitChangesTree` (279) остаются двумя моделями: плоский список снимка против рекурсивного git-статуса. Решить, нужен ли общий `ChangedFileTree`, или оставить их раздельными и вынести только построение директорий. `PullRequestFilesSection ↔ CompareTreeSection` (style 0.91) тоже ещё дублируют загрузку снимка.
+- [ ] **Секции снимка.** `PullRequestFilesSection ↔ CompareTreeSection` (style 0.91) ещё дублируют загрузку снимка, `generation`, `watch` и оболочку секции. Вынести `useScopedSection` и общий `SidebarSection`.
 
 ## Приоритет P2
 
@@ -51,7 +52,7 @@
 
 ## Порядок работ
 
-1. Деревья изменений: решить судьбу двух моделей.
+1. Секции снимка: `useScopedSection` и общий `SidebarSection`.
 2. Scaffold настроек вне агента.
 3. Декомпозиция `AgentChat`/`AgentInput`/задач.
 4. Виджеты, графики и `common/ui`.

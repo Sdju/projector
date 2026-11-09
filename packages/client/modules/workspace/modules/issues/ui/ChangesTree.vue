@@ -13,7 +13,14 @@ import UiHint from "../../../../../common/ui/UiHint.vue";
 import UiActionRow from "../../../../../common/ui/UiActionRow.vue";
 import MiddleTruncate from "../../../../../common/ui/MiddleTruncate.vue";
 import { computed, ref, useId, watch } from "vue";
-import type { FileChange, FileChangeKind } from "@projector/core/modules/workspace/index.ts";
+import type { FileChange } from "@projector/core/modules/workspace/index.ts";
+import {
+  CHANGE_MARK,
+  buildChangeTree,
+  changeDirectoryPaths,
+  flattenChangeTree,
+  type ChangeTreeRow,
+} from "../lib/change-tree.ts";
 import { FileIcon, useFileIconTheme } from "../../../../file-icons/index.ts";
 import IconChevronRight from "~icons/lucide/chevron-right";
 import IconCollapse from "~icons/lucide/chevrons-down-up";
@@ -32,120 +39,11 @@ const emit = defineEmits<{
   open: [path: string, pinned?: boolean, originalPath?: string];
 }>();
 
-interface DirNode {
-  name: string;
-  path: string;
-  directories: DirNode[];
-  files: FileChange[];
-}
-interface Row {
-  kind: "directory" | "file";
-  name: string;
-  path: string;
-  depth: number;
-  files?: number;
-  additions?: number;
-  deletions?: number;
-  file?: FileChange;
-}
-
 const query = ref("");
 const expanded = ref(new Set<string>());
 const selected = ref(props.selected);
 const inputId = useId();
 const { resolver } = useFileIconTheme();
-
-const MARK: Record<FileChangeKind, string> = {
-  added: "A",
-  deleted: "D",
-  modified: "M",
-  renamed: "R",
-  copied: "C",
-  conflict: "U",
-};
-
-function build(files: FileChange[]) {
-  const root: DirNode = { name: "", path: "", directories: [], files: [] };
-  const directories = new Map<string, DirNode>([["", root]]);
-  const bucket = (path: string) => {
-    if (directories.has(path)) return directories.get(path)!;
-    const parts = path.split("/");
-    let parent = root;
-    let current = "";
-    for (const part of parts) {
-      current = current ? `${current}/${part}` : part;
-      let node = directories.get(current);
-      if (!node) {
-        node = { name: part, path: current, directories: [], files: [] };
-        directories.set(current, node);
-        parent.directories.push(node);
-      }
-      parent = node;
-    }
-    return parent;
-  };
-  for (const file of files) {
-    const slash = file.path.lastIndexOf("/");
-    bucket(slash < 0 ? "" : file.path.slice(0, slash)).files.push(file);
-  }
-  return root;
-}
-
-/** GitLab collapses single-child directory chains; the root keeps its own first row. */
-function fold(node: DirNode, rootLevel: boolean) {
-  let name = node.name;
-  let path = node.path;
-  let target = node;
-  if (!rootLevel) {
-    while (target.directories.length === 1 && target.files.length === 0) {
-      const child = target.directories[0]!;
-      name = name ? `${name}/${child.name}` : child.name;
-      path = child.path;
-      target = child;
-    }
-  }
-  return { name, path, node: target };
-}
-
-function fileRow(file: FileChange, depth: number): Row {
-  const name = file.path.split("/").pop() || file.path;
-  return { kind: "file", name, path: file.path, depth, file };
-}
-
-function flatten(node: DirNode, depth: number, rootLevel: boolean, allExpanded: boolean): Row[] {
-  const rows: Row[] = [];
-  const directories = [...node.directories].sort((left, right) =>
-    left.name.localeCompare(right.name, undefined, { sensitivity: "base" }),
-  );
-  for (const directory of directories) {
-    const folded = fold(directory, rootLevel);
-    const stats = directoryStats(folded.node);
-    rows.push({ kind: "directory", name: folded.name, path: folded.path, depth, ...stats });
-    if (allExpanded || expanded.value.has(folded.path))
-      rows.push(...flatten(folded.node, depth + 1, false, allExpanded));
-  }
-  const files = [...node.files].sort((left, right) =>
-    left.path.localeCompare(right.path, undefined, { sensitivity: "base" }),
-  );
-  for (const file of files) rows.push(fileRow(file, depth));
-  return rows;
-}
-
-function directoryStats(directory: DirNode) {
-  let files = 0;
-  let additions = 0;
-  let deletions = 0;
-  const walk = (node: DirNode) => {
-    for (const file of node.files) {
-      files++;
-      additions += file.additions ?? 0;
-      deletions += file.deletions ?? 0;
-    }
-    for (const child of node.directories) walk(child);
-  };
-  walk(directory);
-  return { files, additions, deletions };
-}
 
 const filtered = computed(() => {
   const needle = query.value.trim().toLowerCase();
@@ -154,7 +52,9 @@ const filtered = computed(() => {
     : props.changes;
 });
 const searching = computed(() => query.value.trim().length > 0);
-const rows = computed(() => flatten(build(filtered.value), 0, true, searching.value));
+const rows = computed(() =>
+  flattenChangeTree(buildChangeTree(filtered.value), 0, true, searching.value, expanded.value),
+);
 const totals = computed<ChangesSummary>(() => {
   if (props.totals) return props.totals;
   return {
@@ -168,22 +68,10 @@ function toggle(path: string) {
   if (expanded.value.has(path)) expanded.value.delete(path);
   else expanded.value.add(path);
 }
-function directoryPaths(files: FileChange[]) {
-  const next = new Set<string>();
-  const walk = (node: DirNode, rootLevel: boolean) => {
-    for (const directory of node.directories) {
-      const folded = fold(directory, rootLevel);
-      next.add(folded.path);
-      walk(folded.node, false);
-    }
-  };
-  walk(build(files), true);
-  return next;
-}
 function expandAll() {
-  expanded.value = expanded.value.size ? new Set() : directoryPaths(filtered.value);
+  expanded.value = expanded.value.size ? new Set() : changeDirectoryPaths(filtered.value);
 }
-function choose(row: Row, event?: MouseEvent) {
+function choose(row: ChangeTreeRow, event?: MouseEvent) {
   if (row.kind === "directory") {
     toggle(row.path);
     return;
@@ -202,7 +90,7 @@ function reveal(path: string) {
 watch(
   () => props.changes,
   (next) => {
-    expanded.value = directoryPaths(next);
+    expanded.value = changeDirectoryPaths(next);
   },
   { immediate: true },
 );
@@ -314,7 +202,7 @@ defineExpose({ reveal });
               class="mark"
               :class="row.file.kind"
               :title="row.file.kind"
-              >{{ MARK[row.file.kind] }}</span
+              >{{ CHANGE_MARK[row.file.kind] }}</span
             >
             <span class="add">+{{ row.file?.additions ?? 0 }}</span>
             <span class="del">−{{ row.file?.deletions ?? 0 }}</span>
