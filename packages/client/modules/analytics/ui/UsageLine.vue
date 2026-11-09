@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, ref } from "vue";
+import { useChartLayout } from "../lib/chart-layout.ts";
 
 const props = withDefaults(
   defineProps<{
@@ -12,42 +13,20 @@ const props = withDefaults(
   { height: 160, color: "var(--info)" },
 );
 
-const width = ref(560);
-const host = ref<HTMLElement>();
-let observer: ResizeObserver | undefined;
-onMounted(() => {
-  if (!host.value || typeof ResizeObserver === "undefined") return;
-  observer = new ResizeObserver(([entry]) => {
-    const next = Math.round(entry?.contentRect.width ?? 0);
-    if (next > 160) width.value = next;
-  });
-  observer.observe(host.value);
-});
-onBeforeUnmount(() => observer?.disconnect());
-
 const format = (value: number) => props.format?.(value) ?? String(Math.round(value));
-const height = computed(() => props.height);
-const pad = computed(() => ({ l: 42, r: 12, t: 12, b: 20 }));
-const innerWidth = computed(() => Math.max(20, width.value - pad.value.l - pad.value.r));
-const innerHeight = computed(() => Math.max(20, height.value - pad.value.t - pad.value.b));
+const host = ref<HTMLElement>();
+const { width, height, pad, innerWidth, innerHeight, ticks, labelIndexes, y } = useChartLayout({
+  host,
+  height: () => props.height,
+  maxValue: () => Math.max(0, ...props.points.map((point) => point.value)),
+  labelsCount: () => props.points.length,
+});
 
-function niceMax(value: number): number {
-  if (!Number.isFinite(value) || value <= 0) return 1;
-  const power = 10 ** Math.floor(Math.log10(value));
-  const scaled = value / power;
-  const step = scaled <= 1 ? 1 : scaled <= 2 ? 2 : scaled <= 5 ? 5 : 10;
-  return step * power;
-}
-
-const max = computed(() => niceMax(Math.max(0, ...props.points.map((point) => point.value))));
-const ticks = computed(() => [0, 0.5, 1].map((part) => part * max.value));
 const x = (index: number) =>
   pad.value.l +
   (props.points.length <= 1
     ? innerWidth.value / 2
     : (index / (props.points.length - 1)) * innerWidth.value);
-const y = (value: number) =>
-  pad.value.t + innerHeight.value - (value / max.value) * innerHeight.value;
 
 const line = computed(() =>
   props.points.map((point, index) => `${x(index)},${y(point.value)}`).join(" "),
@@ -60,14 +39,6 @@ const area = computed(() => {
   return `${first},${bottom} ${line.value} ${last},${bottom}`;
 });
 
-const labelIndexes = computed(() => {
-  const count = props.points.length;
-  if (count <= 12) return props.points.map((_, index) => index);
-  const keep = new Set([0, count - 1]);
-  const every = Math.ceil(count / 6);
-  for (let index = every; index < count - 1; index += every) keep.add(index);
-  return [...keep].sort((a, b) => a - b);
-});
 const empty = computed(() => props.points.every((point) => !point.value));
 </script>
 
