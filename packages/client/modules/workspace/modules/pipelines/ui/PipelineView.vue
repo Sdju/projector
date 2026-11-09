@@ -4,8 +4,8 @@ import UiHint from "../../../../../common/ui/UiHint.vue";
 import UiInline from "../../../../../common/ui/UiInline.vue";
 import UiStatusDot from "../../../../../common/ui/UiStatusDot.vue";
 import { computed, ref } from "vue";
-import type { PipelineJob, PipelineStatus } from "@projector/core/modules/workspace/index.ts";
 import { countRu } from "../../../../../common/utilities/plural.ts";
+import { groupPipelineStages, PIPELINE_PROBLEM_STATUSES } from "../../../../workspace-api/index.ts";
 import { relativeTime, shortHash } from "../../../../../common/utilities/commit-format.ts";
 import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab-readout.ts";
 import {
@@ -33,30 +33,12 @@ const { detail, loading, error, reload } = usePipelineDetail(
   () => props.id,
 );
 const problemsOnly = ref(false);
-const PROBLEM_STATUSES = new Set<PipelineStatus>(["failed", "canceled"]);
-const groups = computed(() => {
-  const stages = new Map<string, { jobs: PipelineJob[]; first: number }>();
-  for (const job of detail.value?.jobs ?? []) {
-    if (problemsOnly.value && !PROBLEM_STATUSES.has(job.status)) continue;
-    const stage = job.stage || "без стадии";
-    const entry = stages.get(stage) ?? { jobs: [], first: job.id };
-    entry.jobs.push(job);
-    entry.first = Math.min(entry.first, job.id);
-    stages.set(stage, entry);
-  }
-  // GitLab allocates job ids in reverse stage order, so the earliest id is the stage order.
-  return [...stages.entries()]
-    .sort(([, left], [, right]) => left.first - right.first)
-    .map(([stage, { jobs }]) => ({
-      stage,
-      jobs,
-      count: countRu(jobs.length, "джоб", "джоба", "джобов"),
-      summary: stageSummary(jobs),
-      tone: stageTone(jobs),
-    }));
-});
+const groups = computed(() =>
+  groupPipelineStages(detail.value?.jobs ?? [], { problemsOnly: problemsOnly.value }),
+);
 const failing = computed(
-  () => (detail.value?.jobs ?? []).filter((job) => PROBLEM_STATUSES.has(job.status)).length,
+  () =>
+    (detail.value?.jobs ?? []).filter((job) => PIPELINE_PROBLEM_STATUSES.has(job.status)).length,
 );
 const commands = useCommandScope(`pipeline:${props.projectId}:${props.id}`, () => ({
   surface: "pipeline",
@@ -87,32 +69,6 @@ register(
     pinned: "boolean (необязательно): true — постоянная вкладка",
   },
 );
-
-/** Statuses of one stage in a short form: `10 успешно · 2 ошибки · 1 идёт`. */
-function stageSummary(jobs: PipelineJob[]) {
-  const counts = new Map<PipelineStatus, number>();
-  for (const job of jobs) counts.set(job.status, (counts.get(job.status) ?? 0) + 1);
-  const order: PipelineStatus[] = [
-    "failed",
-    "canceled",
-    "running",
-    "queued",
-    "manual",
-    "success",
-    "skipped",
-    "unknown",
-  ];
-  return order.flatMap((status) => {
-    const count = counts.get(status);
-    return count ? [`${count} ${PIPELINE_STATUS_LABEL[status]}`] : [];
-  });
-}
-function stageTone(jobs: PipelineJob[]) {
-  if (jobs.some((job) => PROBLEM_STATUSES.has(job.status))) return "danger" as const;
-  if (jobs.some((job) => job.status === "running")) return "warning" as const;
-  if (jobs.every((job) => job.status === "success")) return "success" as const;
-  return "muted" as const;
-}
 
 useTabReadout(() => {
   const note = `Pipeline #${props.id}`;
@@ -221,7 +177,8 @@ useTabReadout(() => {
       <div v-for="group in groups" :key="group.stage" class="stage">
         <details
           :open="
-            group.jobs.length <= 20 || group.jobs.some((job) => PROBLEM_STATUSES.has(job.status))
+            group.jobs.length <= 20 ||
+            group.jobs.some((job) => PIPELINE_PROBLEM_STATUSES.has(job.status))
           "
         >
           <summary>

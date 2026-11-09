@@ -2,12 +2,8 @@
 import UiHint from "../../../../../common/ui/UiHint.vue";
 import UiStatusDot from "../../../../../common/ui/UiStatusDot.vue";
 import { computed } from "vue";
-import type { PipelineJob, PipelineStatus } from "@projector/core/modules/workspace/index.ts";
-import {
-  durationLabel,
-  PIPELINE_STATUS_LABEL,
-  PIPELINE_STATUS_TONE,
-} from "@projector/core/modules/workspace/index.ts";
+import { durationLabel, PIPELINE_STATUS_TONE } from "@projector/core/modules/workspace/index.ts";
+import { groupPipelineStages } from "../../../../workspace-api/index.ts";
 import { usePullPipeline } from "../lib/pull-pipeline.ts";
 
 /** Ход pipeline по стадиям внутри карточки merge request; обновляется, пока стадии раскрыты. */
@@ -17,58 +13,7 @@ const { detail, error } = usePullPipeline(
   () => props.projectId,
   () => props.id,
 );
-const PROBLEM = new Set<PipelineStatus>(["failed", "canceled"]);
-const ORDER: PipelineStatus[] = [
-  "failed",
-  "canceled",
-  "running",
-  "queued",
-  "manual",
-  "success",
-  "skipped",
-  "unknown",
-];
-const groups = computed(() => {
-  const stages = new Map<string, { jobs: PipelineJob[]; first: number }>();
-  for (const job of detail.value?.jobs ?? []) {
-    const stage = job.stage || "без стадии";
-    const entry = stages.get(stage) ?? { jobs: [], first: job.id };
-    entry.jobs.push(job);
-    entry.first = Math.min(entry.first, job.id);
-    stages.set(stage, entry);
-  }
-  // GitLab allocates job ids in reverse stage order, so the earliest id is the stage order.
-  return [...stages.entries()]
-    .sort(([, left], [, right]) => left.first - right.first)
-    .map(([stage, { jobs }]) => {
-      const counts = new Map<PipelineStatus, number>();
-      for (const job of jobs) counts.set(job.status, (counts.get(job.status) ?? 0) + 1);
-      const problems = jobs.filter((job) => PROBLEM.has(job.status));
-      const running = jobs.filter((job) => job.status === "running");
-      const visible = problems.length ? problems.slice(0, 5) : running.slice(0, 1);
-      return {
-        stage,
-        jobs,
-        total: jobs.length,
-        done: jobs.filter((job) => !["queued", "running", "manual"].includes(job.status)).length,
-        problems,
-        running,
-        visible,
-        hidden: problems.length + running.length - visible.length,
-        summary: ORDER.flatMap((status) => {
-          const count = counts.get(status);
-          return count ? [`${count} ${PIPELINE_STATUS_LABEL[status]}`] : [];
-        }),
-        tone: problems.length
-          ? ("danger" as const)
-          : running.length
-            ? ("warning" as const)
-            : jobs.every((job) => job.status === "success")
-              ? ("success" as const)
-              : ("muted" as const),
-      };
-    });
-});
+const groups = computed(() => groupPipelineStages(detail.value?.jobs ?? []));
 </script>
 
 <template>

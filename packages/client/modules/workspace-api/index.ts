@@ -29,6 +29,12 @@ export {
   type WorkspaceWatchHandlers,
 } from "./profile.ts";
 export { createLocalWorkspaceProfile } from "./local.ts";
+export {
+  groupPipelineStages,
+  PIPELINE_PROBLEM_STATUSES,
+  type PipelineStageGroup,
+  type PipelineStageTone,
+} from "./pipeline-stages.ts";
 export { createSidebarRegistry, type SidebarRegistry, type SidebarType } from "./sidebar.ts";
 export { extendSidebarRegistry, groupSidebar } from "./sidebar.ts";
 export {
