@@ -3,7 +3,7 @@ import { computed } from "vue";
 import UiIsland from "../../../common/ui/UiIsland.vue";
 import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
 import { contextCategoryColors, contextCategoryNames } from "../lib/context-palette.ts";
-import type { AgentContext } from "../model/types.ts";
+import type { AgentContext } from "../../agent-core/index.ts";
 
 const props = defineProps<{ context: AgentContext }>();
 

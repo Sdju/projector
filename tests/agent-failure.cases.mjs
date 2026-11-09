@@ -1,8 +1,11 @@
 import { afterEach, expect, test, vi } from "vite-plus/test";
-import { createState } from "../packages/client/modules/agent/model/chat-state.ts";
-import { useChatActions } from "../packages/client/modules/agent/model/chat-actions.ts";
-import { loadHistory, INTERRUPTED } from "../packages/client/modules/agent/model/load-history.ts";
-import { applyAgentEvent } from "../packages/client/modules/agent/model/turn-events.ts";
+import { createState } from "../packages/client/modules/agent-core/model/chat-state.ts";
+import { useChatActions } from "../packages/client/modules/agent-core/model/chat-actions.ts";
+import {
+  loadHistory,
+  INTERRUPTED,
+} from "../packages/client/modules/agent-core/model/load-history.ts";
+import { applyAgentEvent } from "../packages/client/modules/agent-core/model/turn-events.ts";
 
 const turn = (id, role, text = id, extra = {}) => ({ id, role, text, tools: [], ...extra });
 

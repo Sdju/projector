@@ -1,8 +1,13 @@
 import { computed } from "vue";
-import { chatTabCommand } from "../lib/chat-tab.ts";
-import type { ForkMode } from "./branches.ts";
+import { chatTabCommand } from "../../agent-core/index.ts";
+import type { ForkMode } from "../../agent-core/index.ts";
 import { forkChat } from "./chat-fork.ts";
-import type { AgentBackendId, AgentCapabilities, AgentRecentChat, AgentTurn } from "./types.ts";
+import type {
+  AgentBackendId,
+  AgentCapabilities,
+  AgentRecentChat,
+  AgentTurn,
+} from "../../agent-core/index.ts";
 import type { AgentRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
 
 /** The part of the IDE command service a branch needs: opening the tab of the new chat. */

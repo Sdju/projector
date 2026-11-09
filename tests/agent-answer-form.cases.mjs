@@ -4,7 +4,7 @@ import {
   answeredFormSources,
   useAnswerForm,
 } from "../packages/client/modules/agent/model/answer-form.ts";
-import { restoreFormAnswers } from "../packages/client/modules/agent/model/form-reply.ts";
+import { restoreFormAnswers } from "../packages/client/modules/agent-core/model/form-reply.ts";
 import { intelligentFormWidget } from "../packages/core/modules/agent-widgets/intelligent-form/index.ts";
 import { inputWidget } from "../packages/core/modules/agent-widgets/input/index.ts";
 import { registerWidget } from "../packages/client/modules/widget-runtime/registry.ts";

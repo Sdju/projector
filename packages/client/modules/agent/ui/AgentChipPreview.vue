@@ -2,7 +2,7 @@
 import UiPopupSurface from "../../../common/ui/UiPopupSurface.vue";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { workspaceAssetUrl } from "../../workspace-api/index.ts";
-import type { MessageChip } from "../model/types.ts";
+import type { MessageChip } from "../../agent-core/index.ts";
 
 const props = defineProps<{ projectId: string; scope: HTMLElement | undefined }>();
 

@@ -13,9 +13,9 @@
 
 ## Как устроено
 
-- `packages/client/modules/agent/model/lens.ts` — состояние чата (`open`, `text`, `at`, `auto`, `busy`, `error`), сборка контекста (`lensHistory`, `lensState`), готовность (`lensHasMaterial`), смена шага (`lensStep`), подпись (`lensSignature`), таймер, отложенный запрос после первой мысли, отмена устаревших ответов и `lensActions`.
-- `packages/client/modules/agent/model/task-turns.ts` — сессия сабагента по требованию и повторное чтение, пока задача работает.
-- `packages/client/modules/agent/ui/AgentLens.vue` — строка без карточки; `AgentWork.vue`, `AgentTaskRow.vue`, `AgentTaskView.vue` только размещают её.
+- `packages/client/modules/agent-turns/model/lens.ts` — состояние чата (`open`, `text`, `at`, `auto`, `busy`, `error`), сборка контекста (`lensHistory`, `lensState`), готовность (`lensHasMaterial`), смена шага (`lensStep`), подпись (`lensSignature`), таймер, отложенный запрос после первой мысли, отмена устаревших ответов и `lensActions`.
+- `packages/client/modules/agent-turns/model/task-turns.ts` — сессия сабагента по требованию и повторное чтение, пока задача работает.
+- `packages/client/modules/agent-turns/ui/AgentLens.vue` — строка без карточки; `AgentWork.vue`, `AgentTaskRow.vue`, `AgentTaskView.vue` только размещают её.
 - `POST /api/agent/lens` (`packages/server/routes/api/agent-lens.ts`) — только страница Projector (`accessAllowed`), отмена по закрытию соединения.
 - `packages/server/modules/agent/lens-request.ts` — границы: 40 реплик, 12 инструментов, 30 пунктов плана; страница отправляет не больше 20 реплик и 8 выполняющихся вызовов.
 - `packages/server/modules/agents/projector/agent-lens.ts` — промпт и один `generateText`: провайдер и модель роли `lens` (по умолчанию — модель чата), без инструментов, без истории на диске, thinking погашен (`quietChatModel`). Свежее рассуждение дублируется отдельным блоком. Ответ чистится до одной строки ≤ 400 символов; если описывать нечего, сервер возвращает «Агент обдумывает задачу…» без вызова модели.

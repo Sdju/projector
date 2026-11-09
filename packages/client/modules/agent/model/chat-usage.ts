@@ -1,4 +1,4 @@
-import type { AgentTurn, ChatUsage } from "./types.ts";
+import type { AgentTurn, ChatUsage } from "../../agent-core/index.ts";
 
 const same = (a: ChatUsage, b: ChatUsage) =>
   a.tokens === b.tokens && a.cost === b.cost && a.priced === b.priced;

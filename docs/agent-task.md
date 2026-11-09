@@ -30,7 +30,7 @@
 | `packages/server/modules/agents/projector/projector-task.ts`    | Промпт, выбор роли и модели, read-only инструменты, пределы и события |
 | `packages/server/modules/agents/projector/projector-backend.ts` | Передаёт `runTask` в инструменты Projector                            |
 | `packages/server/modules/agents/projector/projector-guard.ts`   | Общая проверка путей и секретов                                       |
-| `packages/client/modules/agent/model/turn-events.ts`            | События `task` сворачиваются в строку задачи                          |
+| `packages/client/modules/agent-core/model/turn-events.ts`       | События `task` сворачиваются в строку задачи                          |
 
 ## Ограничения
 

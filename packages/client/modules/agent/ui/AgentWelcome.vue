@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import UiButton from "../../../common/ui/UiButton.vue";
 import { computed } from "vue";
-import { guiAgents, useAgentModes } from "../model/modes.ts";
+import { guiAgents, useAgentModes } from "../../agent-core/index.ts";
 withDefaults(defineProps<{ plain?: boolean; agentName?: string; roleName?: string }>(), {
   plain: false,
   agentName: "Агент",

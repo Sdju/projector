@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import { chatImageSource } from "../packages/client/modules/chat-images/index.ts";
-import { renderMarkdown } from "../packages/client/modules/agent/lib/markdown.ts";
+import { renderMarkdown } from "../packages/client/modules/agent-turns/lib/markdown.ts";
 
 const project = "p";
 

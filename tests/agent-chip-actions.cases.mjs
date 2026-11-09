@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 import { openChatChip } from "../packages/client/modules/agent/lib/open-chip.ts";
-import { chipText } from "../packages/client/modules/agent/lib/message-parts.ts";
+import { chipText } from "../packages/client/modules/agent-core/lib/message-parts.ts";
 import { useChipActions } from "../packages/client/modules/agent/model/use-chip-actions.ts";
 
 const imageChip = { type: "image", id: "pic 1", name: "Снимок.png", mime: "image/png" };

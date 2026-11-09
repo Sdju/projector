@@ -4,10 +4,10 @@ import {
   chatHistory,
   restoredQueue,
   savedQueue,
-} from "../packages/client/modules/agent/model/chat-state.ts";
-import { useChatActions } from "../packages/client/modules/agent/model/chat-actions.ts";
-import { loadHistory } from "../packages/client/modules/agent/model/load-history.ts";
-import { applyAgentEvent } from "../packages/client/modules/agent/model/turn-events.ts";
+} from "../packages/client/modules/agent-core/model/chat-state.ts";
+import { useChatActions } from "../packages/client/modules/agent-core/model/chat-actions.ts";
+import { loadHistory } from "../packages/client/modules/agent-core/model/load-history.ts";
+import { applyAgentEvent } from "../packages/client/modules/agent-core/model/turn-events.ts";
 import { injectMessage } from "../packages/server/modules/agent/injection.ts";
 import { createTurnInput } from "../packages/server/modules/agents/projector/projector-input.ts";
 import { projectorBackend } from "../packages/server/modules/agents/projector/index.ts";

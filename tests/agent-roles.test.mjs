@@ -29,9 +29,9 @@ import { readChatRole } from "../packages/server/modules/agent/role-store.ts";
 import { writeAgentHistory } from "../packages/server/modules/agent/history.ts";
 import { closeHistoryStore } from "../packages/server/modules/agent/history-store.ts";
 import { readRecentChats } from "../packages/server/modules/agent/recent-chats.ts";
-import { createState } from "../packages/client/modules/agent/model/chat-state.ts";
-import { applyRoleSnapshot } from "../packages/client/modules/agent/model/role-apply.ts";
-import { roleFromParam, roleParam } from "../packages/client/modules/agent/lib/chat-tab.ts";
+import { createState } from "../packages/client/modules/agent-core/model/chat-state.ts";
+import { applyRoleSnapshot } from "../packages/client/modules/agent-core/model/role-apply.ts";
+import { roleFromParam, roleParam } from "../packages/client/modules/agent-core/lib/chat-tab.ts";
 
 let directory;
 let previous;

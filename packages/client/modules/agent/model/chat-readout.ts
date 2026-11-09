@@ -1,6 +1,6 @@
 import { readoutLines, useTabReadout } from "../../../common/utilities/tab-readout.ts";
 import type { Ref } from "vue";
-import type { AgentBackendId, AgentControl, AgentTurn } from "./types.ts";
+import type { AgentBackendId, AgentControl, AgentTurn } from "../../agent-core/index.ts";
 
 /** What the built-in agent sees when it reads the chat's tab: status, last answer and tool chips. */
 export function useChatReadout(chat: {

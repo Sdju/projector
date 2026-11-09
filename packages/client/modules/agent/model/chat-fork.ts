@@ -1,9 +1,9 @@
 import { newId } from "../../../common/utilities/new-id.ts";
-import { forkAt, type ForkMode } from "./branches.ts";
-import { chatKeyOf } from "./chat-key.ts";
-import { holdDraft } from "./drafts.ts";
-import { isBuiltinAgent } from "./modes.ts";
-import type { AgentBackendId, AgentTurn } from "./types.ts";
+import { forkAt, type ForkMode } from "../../agent-core/index.ts";
+import { chatKeyOf } from "../../agent-core/index.ts";
+import { holdDraft } from "../../agent-core/index.ts";
+import { isBuiltinAgent } from "../../agent-core/index.ts";
+import type { AgentBackendId, AgentTurn } from "../../agent-core/index.ts";
 import type { AgentRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
 
 export interface ForkRequest {

@@ -3,13 +3,13 @@ import { effectScope } from "vue";
 import {
   continuationPrompt,
   useProjectJobs,
-} from "../packages/client/modules/agent/model/project-jobs.ts";
-import { shouldContinue } from "../packages/client/modules/agent/model/job-chat.ts";
+} from "../packages/client/modules/agent/modules/jobs/model/project-jobs.ts";
+import { shouldContinue } from "../packages/client/modules/agent/modules/jobs/model/job-chat.ts";
 import {
   resolveJobTitle,
   useJobTitles,
-} from "../packages/client/modules/agent/model/job-titles.ts";
-import { jobShortTitle } from "../packages/client/modules/agent/lib/job-name.ts";
+} from "../packages/client/modules/agent/modules/jobs/model/job-titles.ts";
+import { jobShortTitle } from "../packages/client/modules/agent/modules/jobs/lib/job-name.ts";
 
 const job = (extra = {}) => ({
   id: "aaaaaaaaaaaa",

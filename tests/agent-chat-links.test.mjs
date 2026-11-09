@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
-import { parseChatLink } from "../packages/client/modules/agent/lib/chat-links.ts";
-import { renderMarkdown } from "../packages/client/modules/agent/lib/markdown.ts";
+import { parseChatLink } from "../packages/client/modules/agent-core/lib/chat-links.ts";
+import { renderMarkdown } from "../packages/client/modules/agent-turns/lib/markdown.ts";
 import {
   absoluteLocalPath,
   fileUrlPath,

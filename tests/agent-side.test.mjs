@@ -6,11 +6,11 @@ import { expect, test } from "vite-plus/test";
 import { sideRequestFrom } from "../packages/server/modules/agent/side-request.ts";
 import { projectorBackend } from "../packages/server/modules/agents/projector/projector-backend.ts";
 import { sideAbort } from "../packages/server/modules/agents/projector/projector-side.ts";
-import { btwQuestion } from "../packages/client/modules/agent/lib/side-command.ts";
+import { btwQuestion } from "../packages/client/modules/agent/modules/panels/lib/side-command.ts";
 import {
   sideHistory,
   useSideQuestion,
-} from "../packages/client/modules/agent/model/side-question.ts";
+} from "../packages/client/modules/agent/modules/panels/model/side-question.ts";
 import { scriptedModel } from "./helpers/scripted-model.mjs";
 
 test("the /btw command takes the rest of the message", () => {

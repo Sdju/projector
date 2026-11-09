@@ -5,10 +5,10 @@
 <script type="module">
   import "/packages/client/app/styles.css";
   import { createApp, h, ref } from "vue";
-  import AgentQueue from "/packages/client/modules/agent/ui/AgentQueue.vue";
-  import { createState } from "/packages/client/modules/agent/model/chat-state.ts";
-  import { useChatActions } from "/packages/client/modules/agent/model/chat-actions.ts";
-  import { applyAgentEvent } from "/packages/client/modules/agent/model/turn-events.ts";
+  import AgentQueue from "/packages/client/modules/agent/modules/jobs/ui/AgentQueue.vue";
+  import { createState } from "/packages/client/modules/agent-core/model/chat-state.ts";
+  import { useChatActions } from "/packages/client/modules/agent-core/model/chat-actions.ts";
+  import { applyAgentEvent } from "/packages/client/modules/agent-core/model/turn-events.ts";
   const state = createState();
   state.busy = true;
   state.activeMessage = "running";

@@ -1,5 +1,5 @@
 import { computed, type Ref } from "vue";
-import type { AgentTurn } from "./types.ts";
+import type { AgentTurn } from "../../agent-core/index.ts";
 
 interface ChatRetry {
   /** The last answer failed: the same request can be sent again. */

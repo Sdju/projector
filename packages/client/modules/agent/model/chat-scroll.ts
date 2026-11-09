@@ -1,5 +1,5 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from "vue";
-import type { AgentTurn } from "./types.ts";
+import type { AgentTurn } from "../../agent-core/index.ts";
 
 const BOTTOM_GAP = 72;
 

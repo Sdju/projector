@@ -3,12 +3,12 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { reactive } from "vue";
-import { forkAt } from "../packages/client/modules/agent/model/branches.ts";
+import { forkAt } from "../packages/client/modules/agent-core/model/branches.ts";
 import { registerBranchCommands } from "../packages/client/modules/agent/model/branch-commands.ts";
 import { forkChat } from "../packages/client/modules/agent/model/chat-fork.ts";
-import { registerChat } from "../packages/client/modules/agent/model/chat-registry.ts";
-import { chatKeyOf } from "../packages/client/modules/agent/model/chat-key.ts";
-import { takeDraft } from "../packages/client/modules/agent/model/drafts.ts";
+import { registerChat } from "../packages/client/modules/agent-core/model/chat-registry.ts";
+import { chatKeyOf } from "../packages/client/modules/agent-core/model/chat-key.ts";
+import { takeDraft } from "../packages/client/modules/agent-core/model/drafts.ts";
 import { registerBuiltinClientAgents } from "../packages/client/app/agents.ts";
 import {
   archiveLiveChat,

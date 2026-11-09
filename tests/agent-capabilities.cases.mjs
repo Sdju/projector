@@ -1,10 +1,10 @@
 import "./helpers/builtins.mjs";
 import { expect, onTestFinished, test, vi } from "vite-plus/test";
-import { createState } from "../packages/client/modules/agent/model/chat-state.ts";
-import { useExternalAgent } from "../packages/client/modules/agent/model/external.ts";
-import { useChatActions } from "../packages/client/modules/agent/model/chat-actions.ts";
+import { createState } from "../packages/client/modules/agent-core/model/chat-state.ts";
+import { useExternalAgent } from "../packages/client/modules/agent-core/model/external.ts";
+import { useChatActions } from "../packages/client/modules/agent-core/model/chat-actions.ts";
 import { registerAgentCommands } from "../packages/client/modules/agent/model/agent-commands.ts";
-import { registerChat } from "../packages/client/modules/agent/model/chat-registry.ts";
+import { registerChat } from "../packages/client/modules/agent-core/model/chat-registry.ts";
 import { agentCapabilities, agentControls } from "../packages/server/modules/agent/registry.ts";
 import { claudeCodeBackend } from "../packages/server/modules/agents/claude-code/claude-code-backend.ts";
 

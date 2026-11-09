@@ -1,9 +1,9 @@
 import { commandArgs } from "../../../common/utilities/commands.ts";
-import { fetchRecentChats } from "../api/chats.ts";
-import { chatTabCommand } from "../lib/chat-tab.ts";
-import type { RegisterCommand } from "./register-command.ts";
-import type { ForkMode } from "./branches.ts";
-import { chatsOf, resolveChat } from "./chat-registry.ts";
+import { fetchRecentChats } from "../../agent-core/index.ts";
+import { chatTabCommand } from "../../agent-core/index.ts";
+import type { RegisterCommand } from "../../agent-core/index.ts";
+import type { ForkMode } from "../../agent-core/index.ts";
+import { chatsOf, resolveChat } from "../../agent-core/index.ts";
 
 const CHAT = "Ключ чата из ide.agent.chats.list; без него — чат, с которым работали последним";
 

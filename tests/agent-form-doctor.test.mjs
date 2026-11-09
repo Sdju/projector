@@ -1,9 +1,9 @@
 import { expect, test, vi } from "vite-plus/test";
 import { effectScope, ref } from "vue";
 
-vi.mock("../packages/client/modules/agent/api/client.ts", () => ({ repairForm: vi.fn() }));
+vi.mock("../packages/client/modules/agent-core/api/client.ts", () => ({ repairForm: vi.fn() }));
 
-const { repairForm } = await import("../packages/client/modules/agent/api/client.ts");
+const { repairForm } = await import("../packages/client/modules/agent-core/api/client.ts");
 const { useAnswerForm } = await import("../packages/client/modules/agent/model/answer-form.ts");
 const { intelligentFormWidget } =
   await import("../packages/core/modules/agent-widgets/intelligent-form/index.ts");

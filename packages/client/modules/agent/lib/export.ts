@@ -1,7 +1,7 @@
-import { inputHint } from "./tool-input.ts";
-import { skillCallName, toolLabel } from "./tool-labels.ts";
-import { legacyParts } from "../model/turn-events.ts";
-import type { AgentTurn } from "../model/types.ts";
+import { inputHint } from "../../agent-core/index.ts";
+import { skillCallName, toolLabel } from "../../agent-core/index.ts";
+import { legacyParts } from "../../agent-core/index.ts";
+import type { AgentTurn } from "../../agent-core/index.ts";
 
 /** The chat as a Markdown document: who said what, with the tool calls between the words. */
 export function chatMarkdown(turns: AgentTurn[], title: string): string {

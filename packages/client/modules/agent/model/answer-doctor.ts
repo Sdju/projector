@@ -1,7 +1,7 @@
 import { onScopeDispose, watch, type Ref } from "vue";
 import { answerProblem, doctorAnswerSource } from "../../widget-runtime/index.ts";
-import { repairAnswer } from "../api/client.ts";
-import type { AgentPart, AgentSelection, AgentTurn } from "./types.ts";
+import { repairAnswer } from "../../agent-core/index.ts";
+import type { AgentPart, AgentSelection, AgentTurn } from "../../agent-core/index.ts";
 
 const ANSWER_DOCTOR_ATTEMPTS = 3;
 

@@ -1,6 +1,9 @@
 import { afterEach, expect, test, vi } from "vite-plus/test";
 import { effectScope } from "vue";
-import { chatShortTitle, chatTabTitle } from "../packages/client/modules/agent/lib/chat-name.ts";
+import {
+  chatShortTitle,
+  chatTabTitle,
+} from "../packages/client/modules/agent-core/lib/chat-name.ts";
 import { useChatTitle } from "../packages/client/modules/agent/model/chat-titles.ts";
 
 const reply = (body) => ({ ok: true, json: async () => body });

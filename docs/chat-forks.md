@@ -31,14 +31,14 @@
 
 ## Код и команды
 
-| Механизм                   | Где                                                                               |
-| -------------------------- | --------------------------------------------------------------------------------- |
-| Рез разговора              | `forkAt(turns, turnId, mode)` в `packages/client/modules/agent/model/branches.ts` |
-| Ключ чата                  | `packages/client/modules/agent/model/chat-key.ts`                                 |
-| Запись форка и черновик    | `packages/client/modules/agent/model/chat-fork.ts`, `model/drafts.ts`             |
-| Действия и список недавних | `packages/client/modules/agent/model/chat-branch.ts`                              |
-| UI                         | `AgentTurn.vue`, `AgentSessions.vue`                                              |
-| Команды                    | `ide.agent.chat.fork { turnId, mode?, chat? }`, `ide.agent.chats.recent`          |
+| Механизм                   | Где                                                                                                      |
+| -------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Рез разговора              | `forkAt(turns, turnId, mode)` в `packages/client/modules/agent-core/model/branches.ts`                   |
+| Ключ чата                  | `packages/client/modules/agent-core/model/chat-key.ts`                                                   |
+| Запись форка и черновик    | `packages/client/modules/agent/model/chat-fork.ts`, `packages/client/modules/agent-core/model/drafts.ts` |
+| Действия и список недавних | `packages/client/modules/agent/model/chat-branch.ts`                                                     |
+| UI                         | `AgentTurn.vue`, `AgentSessions.vue`                                                                     |
+| Команды                    | `ide.agent.chat.fork { turnId, mode?, chat? }`, `ide.agent.chats.recent`                                 |
 
 `forkAt` глубоко клонирует ходы, снимает `run`, `variants`/`slot`, переводит задачи `running` в `stopped`. Заголовок вкладки — «Ветка · <первая строка сообщения>». Префикс пишется через `PUT` до открытия вкладки, для внешних агентов без `branchSession` ставится `detached`; черновик забирает `useAgent` при создании состояния.
 

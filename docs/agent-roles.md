@@ -176,7 +176,7 @@ API: `GET /api/agent/project-roles?projectId=`, `POST /api/agent/project-roles`,
 | `packages/server/modules/agents/projector/*`              | Доктор и Lens получают выбор роли перед `quietChatModel`                                       |
 | `packages/server/modules/judge/verdict.ts`                | Судья получает выбор роли перед `quietChatModel`                                               |
 | `packages/client/modules/agent-roles`                     | API, каталог ролей, настройки и редактор chat-роли                                             |
-| `packages/client/modules/agent/model/role-apply.ts`       | Применение снимка к состоянию чата                                                             |
+| `packages/client/modules/agent-core/model/role-apply.ts`  | Применение снимка к состоянию чата                                                             |
 | `packages/client/modules/agent/model/role-commands.ts`    | `ide.agent.role.open` и `ide.agent.roles.available`                                            |
 | `packages/client/modules/workspace/ui/NewSessionMenu.vue` | Секция «Роли» в меню «+»                                                                       |
 

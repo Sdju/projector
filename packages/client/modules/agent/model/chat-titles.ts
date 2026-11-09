@@ -1,7 +1,7 @@
 import { computed, getCurrentScope, onScopeDispose, ref, watch, type ComputedRef } from "vue";
-import { chatTabTitle } from "../lib/chat-name.ts";
-import { loadSessionTitles } from "./job-titles.ts";
-import type { AgentBackendId, AgentSessionInfo, AgentTurn } from "./types.ts";
+import { chatTabTitle } from "../../agent-core/index.ts";
+import { loadSessionTitles } from "../modules/jobs/index.ts";
+import type { AgentBackendId, AgentSessionInfo, AgentTurn } from "../../agent-core/index.ts";
 
 const RETRY_MS = 5_000;
 const RETRY_LIMIT = 6;

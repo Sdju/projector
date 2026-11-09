@@ -2,7 +2,7 @@ import { expect, test } from "vite-plus/test";
 import { createOpencodeDialect } from "../packages/server/modules/agents/opencode/dialect.ts";
 import { createAcpEventMapper } from "../packages/server/modules/agents/acp/acp-events.ts";
 import { createClaudeEventMapper } from "../packages/server/modules/agents/claude-code/claude-code-events.ts";
-import { applyAgentEvent } from "../packages/client/modules/agent/model/turn-events.ts";
+import { applyAgentEvent } from "../packages/client/modules/agent-core/model/turn-events.ts";
 
 const thoughts = (events) =>
   events.filter(([type]) => type === "thought").map(([, data]) => data.text);

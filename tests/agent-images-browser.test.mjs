@@ -9,7 +9,7 @@ const html = `<!doctype html>
 <script type="module">
   import "/packages/client/app/styles.css";
   import { createApp, h, ref } from "vue";
-  import AgentMessage from "/packages/client/modules/agent/ui/AgentMessage.vue";
+  import AgentMessage from "/packages/client/modules/agent-turns/ui/AgentMessage.vue";
   import { chatProjectKey } from "/packages/client/modules/chat-images/index.ts";
   const text = ref("");
   const app = createApp({

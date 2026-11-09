@@ -2,7 +2,7 @@ import { expect, test } from "vite-plus/test";
 import {
   applyAgentEvent,
   resetAnswer,
-} from "../packages/client/modules/agent/model/turn-events.ts";
+} from "../packages/client/modules/agent-core/model/turn-events.ts";
 
 test("the chat times a tool call from the event and keeps it across a replay", () => {
   const state = { permissions: [], questions: [], secrets: [], turns: [] };

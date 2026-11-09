@@ -4,10 +4,10 @@ import {
   cutAt,
   switchVersion,
   versionsOf,
-} from "../packages/client/modules/agent/model/branches.ts";
-import { turnChanges } from "../packages/client/modules/agent/lib/turn-changes.ts";
-import { applyAgentEvent } from "../packages/client/modules/agent/model/turn-events.ts";
-import { latestPlan, shownPlan } from "../packages/client/modules/agent/lib/plan.ts";
+} from "../packages/client/modules/agent-core/model/branches.ts";
+import { turnChanges } from "../packages/client/modules/agent-core/lib/turn-changes.ts";
+import { applyAgentEvent } from "../packages/client/modules/agent-core/model/turn-events.ts";
+import { latestPlan, shownPlan } from "../packages/client/modules/agent-core/lib/plan.ts";
 import { chatMarkdown } from "../packages/client/modules/agent/lib/export.ts";
 import { registerBuiltinClientAgents } from "../packages/client/app/agents.ts";
 

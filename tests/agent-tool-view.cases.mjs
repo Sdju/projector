@@ -1,11 +1,11 @@
 import { expect, test } from "vite-plus/test";
-import { applyAgentEvent } from "../packages/client/modules/agent/model/turn-events.ts";
-import { isImageFile, skillName } from "../packages/client/modules/agent/lib/tool-file.ts";
-import { inputHint } from "../packages/client/modules/agent/lib/tool-input.ts";
-import { skillCallName, toolLabel } from "../packages/client/modules/agent/lib/tool-labels.ts";
-import { toolVisual } from "../packages/client/modules/agent/lib/tool-visual.ts";
+import { applyAgentEvent } from "../packages/client/modules/agent-core/model/turn-events.ts";
+import { isImageFile, skillName } from "../packages/client/modules/agent-core/lib/tool-file.ts";
+import { inputHint } from "../packages/client/modules/agent-core/lib/tool-input.ts";
+import { skillCallName, toolLabel } from "../packages/client/modules/agent-core/lib/tool-labels.ts";
+import { toolVisual } from "../packages/client/modules/agent-core/lib/tool-visual.ts";
 import { stripReadLineNumbers } from "../packages/core/modules/agent-read/index.ts";
-import { codeLanguage } from "../packages/client/modules/agent/lib/code-language.ts";
+import { codeLanguage } from "../packages/client/modules/agent-turns/lib/code-language.ts";
 
 test("a call is shaped by what it does, not only by its name", () => {
   expect(toolVisual("Read")).toBe("read");

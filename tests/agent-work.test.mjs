@@ -9,7 +9,7 @@ const html = `<!doctype html>
 <script type="module">
   import "/packages/client/app/styles.css";
   import { createApp, h, reactive, ref } from "vue";
-  import AgentTurn from "/packages/client/modules/agent/ui/AgentTurn.vue";
+  import AgentTurn from "/packages/client/modules/agent-turns/ui/AgentTurn.vue";
 
   const startedAt = Date.now() - 4200;
   const finishedAt = Date.now() - 1000;

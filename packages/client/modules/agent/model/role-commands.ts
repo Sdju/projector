@@ -3,10 +3,10 @@ import { newId } from "../../../common/utilities/new-id.ts";
 import { commandArgs } from "../../../common/utilities/commands.ts";
 import { clientAgentByBackend } from "../../agents-integration/catalog/index.ts";
 import { loadChatRoles } from "../../agent-roles/index.ts";
-import { roleParam } from "../lib/chat-tab.ts";
+import { roleParam } from "../../agent-core/index.ts";
 import { useIdeCommands } from "../../ide/index.ts";
 import { snapshotOfRole } from "@projector/core/modules/agent-role/index.ts";
-import type { RegisterCommand } from "./register-command.ts";
+import type { RegisterCommand } from "../../agent-core/index.ts";
 
 /** The part of the IDE command service a role launch needs: opening the chat tab. */
 interface RoleCommands {

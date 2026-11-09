@@ -5,7 +5,7 @@ import UiInline from "../../../common/ui/UiInline.vue";
 import UiControl, { type UiControlHandle } from "../../../common/ui/UiControl.vue";
 import { computed, nextTick, ref, watch } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
-import type { AgentRecentChat, AgentSessionInfo } from "../model/types.ts";
+import type { AgentRecentChat, AgentSessionInfo } from "../../agent-core/index.ts";
 import IconHistory from "~icons/lucide/history";
 import IconBranch from "~icons/lucide/git-branch";
 import IconPin from "~icons/lucide/pin";

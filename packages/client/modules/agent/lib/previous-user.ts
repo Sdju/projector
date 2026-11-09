@@ -1,4 +1,4 @@
-import type { AgentTurn } from "../model/types.ts";
+import type { AgentTurn } from "../../agent-core/index.ts";
 
 /** The user message a request belongs to: the nearest one at or before this turn. */
 export function previousUser(turns: AgentTurn[], id: string): string {

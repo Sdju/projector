@@ -1,5 +1,5 @@
 import { watch, type Ref } from "vue";
-import type { AgentCapabilities, AgentTurn, QueuedMessage } from "./types.ts";
+import type { AgentCapabilities, AgentTurn, QueuedMessage } from "../../agent-core/index.ts";
 
 /**
  * Compacts the chat after an answer once its context is nearly full, unless the user already asked

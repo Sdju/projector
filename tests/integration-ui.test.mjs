@@ -7,7 +7,7 @@ const html = `<!doctype html><div id="settings"></div><div id="connection"></div
 import {createApp,ref,nextTick} from 'vue';
 import GithubSettings from '/packages/client/modules/github/GithubSettings.vue';
 import GitlabSettings from '/packages/client/modules/gitlab/GitlabSettings.vue';
-import {agentCommandHandler} from '/packages/client/modules/agent/model/commands.ts';
+import {agentCommandHandler} from '/packages/client/modules/agent-core/model/commands.ts';
 import GithubConnection from '/packages/client/modules/github/GithubConnection.vue';
 import {createCommandService} from '/packages/core/modules/ide/index.ts';
 import {commandHostKey} from '/packages/client/common/utilities/commands.ts';

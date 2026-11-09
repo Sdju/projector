@@ -1,4 +1,4 @@
-import { guiCommand } from "./modes.ts";
+import { guiCommand } from "../../agent-core/index.ts";
 
 /** Opens another agent's chat from inside a chat; the workspace owns the tab. */
 export function openAgentChat(

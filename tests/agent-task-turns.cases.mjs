@@ -1,10 +1,12 @@
 import { expect, test, vi } from "vite-plus/test";
 import { effectScope, ref } from "vue";
 
-vi.mock("../packages/client/modules/agent/api/client.ts", () => ({ loadSessionTurns: vi.fn() }));
+vi.mock("../packages/client/modules/agent-core/api/client.ts", () => ({
+  loadSessionTurns: vi.fn(),
+}));
 
-const { loadSessionTurns } = await import("../packages/client/modules/agent/api/client.ts");
-const { useTaskTurns } = await import("../packages/client/modules/agent/model/task-turns.ts");
+const { loadSessionTurns } = await import("../packages/client/modules/agent-core/api/client.ts");
+const { useTaskTurns } = await import("../packages/client/modules/agent-turns/model/task-turns.ts");
 
 test("a task session is read only after Lens asks and refreshed while the task runs", async () => {
   vi.useFakeTimers();

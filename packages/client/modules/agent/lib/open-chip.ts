@@ -1,4 +1,4 @@
-import type { FileRange, MessageChip } from "../model/types.ts";
+import type { FileRange, MessageChip } from "../../agent-core/index.ts";
 
 export interface ChipActions {
   openFile(path: string, directory: boolean, range?: FileRange): Promise<unknown>;

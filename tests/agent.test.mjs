@@ -12,7 +12,7 @@ import {
 } from "../packages/server/modules/agent/index.ts";
 import { createAgentTools } from "../packages/server/modules/agents/projector/agent-tools.ts";
 import { createCommandService } from "../packages/core/modules/ide/index.ts";
-import { agentCommandHandler } from "../packages/client/modules/agent/model/commands.ts";
+import { agentCommandHandler } from "../packages/client/modules/agent-core/model/commands.ts";
 import { os } from "../packages/core/modules/os/index.ts";
 import { runStreamingProcess } from "../packages/core/modules/os-posix/index.ts";
 
@@ -216,7 +216,7 @@ test("HTTP agent streams discovery, description, execution, Bash and final text 
     ),
   );
   const { handleApi } = await import("../packages/server/app/api.ts");
-  const { streamAgent } = await import("../packages/client/modules/agent/api/client.ts");
+  const { streamAgent } = await import("../packages/client/modules/agent-core/api/client.ts");
   const directory = await mkdtemp(join(tmpdir(), "projector-agent-http-"));
   const previousData = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = directory;

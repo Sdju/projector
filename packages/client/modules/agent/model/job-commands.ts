@@ -14,7 +14,7 @@ import {
   sendJobMessage,
   startJob,
   stopJob,
-} from "../api/jobs.ts";
+} from "../../agent-core/index.ts";
 import {
   JOB,
   LOG_LIMIT,
@@ -24,7 +24,7 @@ import {
   followUps,
   text,
   toolCalls,
-} from "./job-view.ts";
+} from "../modules/jobs/index.ts";
 import { useIdeCommands } from "../../ide/index.ts";
 import {
   clientAgentByBackend,
@@ -32,10 +32,10 @@ import {
   clientAgents,
 } from "../../agents-integration/catalog/index.ts";
 import { loadChatRoles } from "../../agent-roles/index.ts";
-import { chatsOf } from "./chat-registry.ts";
-import { isBuiltinAgent } from "./modes.ts";
-import { useJobTabRequests } from "./job-open.ts";
-import type { RegisterCommand } from "./register-command.ts";
+import { chatsOf } from "../../agent-core/index.ts";
+import { isBuiltinAgent } from "../../agent-core/index.ts";
+import { useJobTabRequests } from "../../agent-core/index.ts";
+import type { RegisterCommand } from "../../agent-core/index.ts";
 
 /** External agents the catalog knows: only they can run as background jobs. */
 const externalAgents = () => clientAgents().filter((agent) => !agent.builtin);

@@ -1,6 +1,6 @@
 import { commandArgs } from "../../../common/utilities/commands.ts";
-import { chatsOf, resolveChat } from "./chat-registry.ts";
-import type { RegisterCommand } from "./register-command.ts";
+import { chatsOf, resolveChat } from "../../agent-core/index.ts";
+import type { RegisterCommand } from "../../agent-core/index.ts";
 
 const CHAT = "Ключ чата из ide.agent.chats.list; без него — чат, с которым работали последним";
 

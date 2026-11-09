@@ -5,8 +5,13 @@ import {
   formProblem,
   heuristicFormRepair,
 } from "../../widget-runtime/index.ts";
-import { repairForm } from "../api/client.ts";
-import type { AgentFormAnswer, AgentSelection, AgentTurn, MessagePart } from "./types.ts";
+import { repairForm } from "../../agent-core/index.ts";
+import type {
+  AgentFormAnswer,
+  AgentSelection,
+  AgentTurn,
+  MessagePart,
+} from "../../agent-core/index.ts";
 
 const FORM_DOCTOR_ATTEMPTS = 3;
 

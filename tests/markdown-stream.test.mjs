@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
-import { renderMarkdown } from "../packages/client/modules/agent/lib/markdown.ts";
-import { createMarkdownStream } from "../packages/client/modules/agent/lib/markdown-stream.ts";
+import { renderMarkdown } from "../packages/client/modules/agent-turns/lib/markdown.ts";
+import { createMarkdownStream } from "../packages/client/modules/agent-turns/lib/markdown-stream.ts";
 
 const code = Array.from({ length: 6 }, (_, i) => `  const v${i} = await load(${i});`).join("\n");
 const documents = {

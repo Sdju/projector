@@ -1,6 +1,6 @@
 import { ref } from "vue";
 import { openChatChip } from "../lib/open-chip.ts";
-import type { MessageChip } from "./types.ts";
+import type { MessageChip } from "../../agent-core/index.ts";
 
 interface ChatApi {
   executeCommand(

@@ -1,5 +1,5 @@
 import { computed, nextTick, ref, watch, type Ref } from "vue";
-import type { AgentTurn } from "./types.ts";
+import type { AgentTurn } from "../../agent-core/index.ts";
 
 /** Requests mounted at first and added each time the top is reached. */
 const PAGE = 5;

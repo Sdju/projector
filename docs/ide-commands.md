@@ -6,7 +6,7 @@ The model follows the [VS Code command API](https://code.visualstudio.com/api/ex
 
 ## Why every feature needs commands
 
-The built-in agent works through this registry: it lists `getCommands()` and runs `executeCommand(...)` (`packages/client/modules/agent/model/commands.ts`). A capability that exists only as a button or a private handler is invisible to it, and the agent quality depends directly on command coverage. When extending Projector:
+The built-in agent works through this registry: it lists `getCommands()` and runs `executeCommand(...)` (`packages/client/modules/agent-core/model/commands.ts`). A capability that exists only as a button or a private handler is invisible to it, and the agent quality depends directly on command coverage. When extending Projector:
 
 - register each user-visible action as a command and make the UI (button, menu, shortcut) invoke that ID instead of duplicating the logic;
 - give commands a clear `title` and a `description` that states arguments, effects and side effects (terminal loss, confirmations); the agent reads them to choose a command;

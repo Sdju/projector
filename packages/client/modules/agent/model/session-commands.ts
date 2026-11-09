@@ -1,7 +1,7 @@
 import { commandArgs } from "../../../common/utilities/commands.ts";
-import { chatsOf, resolveChat, type ChatController } from "./chat-registry.ts";
-import { isBuiltinAgent } from "./modes.ts";
-import type { RegisterCommand } from "./register-command.ts";
+import { chatsOf, resolveChat, type ChatController } from "../../agent-core/index.ts";
+import { isBuiltinAgent } from "../../agent-core/index.ts";
+import type { RegisterCommand } from "../../agent-core/index.ts";
 
 const CHAT = "Ключ чата из ide.agent.chats.list; без него — чат, с которым работали последним";
 const deletable = (chat: ChatController) =>

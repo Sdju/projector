@@ -1,6 +1,6 @@
 import { nextTick, type Ref } from "vue";
-import type { SideQuestion } from "./side-question.ts";
-import type { MessagePart } from "./types.ts";
+import type { SideQuestion } from "../modules/panels/index.ts";
+import type { MessagePart } from "../../agent-core/index.ts";
 
 export { useChatRetry } from "./use-chat-retry.ts";
 

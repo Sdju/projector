@@ -1,7 +1,7 @@
-import { fetchRecentChats } from "../api/chats.ts";
-import { chatTabCommand } from "../lib/chat-tab.ts";
-import { chatsOf, waitForChat, type ChatController } from "./chat-registry.ts";
-import type { FileRange, MessageChip } from "./types.ts";
+import { fetchRecentChats } from "../../agent-core/index.ts";
+import { chatTabCommand } from "../../agent-core/index.ts";
+import { chatsOf, waitForChat, type ChatController } from "../../agent-core/index.ts";
+import type { FileRange, MessageChip } from "../../agent-core/index.ts";
 
 export interface AttachChatOptions {
   /** A chat from `ide.agent.chats.list`; without it, the chat in use gets the chips. */

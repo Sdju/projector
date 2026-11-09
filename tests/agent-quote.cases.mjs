@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { blockquote } from "../packages/client/modules/agent/lib/chat-quote.ts";
+import { blockquote } from "../packages/client/modules/agent/modules/composer/lib/chat-quote.ts";
 
 test("a chat selection becomes a Markdown quote line by line", () => {
   expect(blockquote("  Первая строка\nвторая\n\nчетвёртая  ")).toBe(

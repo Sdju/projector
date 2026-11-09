@@ -5,10 +5,10 @@
 <script type="module">
   import "/packages/client/app/styles.css";
   import { createApp, h, ref } from "vue";
-  import AgentTurn from "/packages/client/modules/agent/ui/AgentTurn.vue";
-  import AgentTaskView from "/packages/client/modules/agent/ui/AgentTaskView.vue";
-  import { taskDetail } from "/packages/client/modules/agent/lib/task-detail.ts";
-  import AgentTaskBar from "/packages/client/modules/agent/ui/AgentTaskBar.vue";
+  import AgentTurn from "/packages/client/modules/agent-turns/ui/AgentTurn.vue";
+  import AgentTaskView from "/packages/client/modules/agent-turns/ui/AgentTaskView.vue";
+  import { taskDetail } from "/packages/client/modules/agent-core/lib/task-detail.ts";
+  import AgentTaskBar from "/packages/client/modules/agent/modules/jobs/ui/AgentTaskBar.vue";
   const task = (n, status) => ({
     id: `t${n}`,
     kind: n % 2 ? "shell" : "agent",

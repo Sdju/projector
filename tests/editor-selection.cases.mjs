@@ -4,7 +4,7 @@ import {
   attachRangeToChat,
   attachTextToChat,
 } from "../packages/client/modules/agent/model/attach.ts";
-import { registerChat } from "../packages/client/modules/agent/model/chat-registry.ts";
+import { registerChat } from "../packages/client/modules/agent-core/model/chat-registry.ts";
 import { createEditorSelection } from "../packages/client/modules/workspace/lib/editor-selection.ts";
 
 const rangeChip = { type: "file", path: "src/app.ts", range: { from: 12, to: 34 } };

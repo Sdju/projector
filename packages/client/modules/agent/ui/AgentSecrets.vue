@@ -3,7 +3,7 @@ import { reactive } from "vue";
 import UiCard from "../../../common/ui/UiCard.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
-import type { AgentSecretRequest } from "../model/types.ts";
+import type { AgentSecretRequest } from "../../agent-core/index.ts";
 import IconKey from "~icons/lucide/key-round";
 
 defineProps<{ requests: AgentSecretRequest[] }>();

@@ -15,7 +15,7 @@ import {
   canRememberPermission,
   permissionRiskClass,
   permissionTone,
-} from "../packages/client/modules/agent/lib/permission-risk.ts";
+} from "../packages/client/modules/agent-turns/lib/permission-risk.ts";
 
 const verdict = (score, confidence = "high") => ({
   score,

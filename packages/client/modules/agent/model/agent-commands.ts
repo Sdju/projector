@@ -1,17 +1,17 @@
 import { commandArgs } from "../../../common/utilities/commands.ts";
-import { text, turnArg } from "../lib/command-args.ts";
+import { text, turnArg } from "../../agent-core/index.ts";
 import { registerBranchCommands } from "./branch-commands.ts";
-import { chatsOf, resolveChat, type ChatController } from "./chat-registry.ts";
+import { chatsOf, resolveChat, type ChatController } from "../../agent-core/index.ts";
 import { registerJobCommands } from "./job-commands.ts";
 import { registerRoleCommands } from "./role-commands.ts";
-import { isBuiltinAgent } from "./modes.ts";
-import type { RegisterCommand } from "./register-command.ts";
+import { isBuiltinAgent } from "../../agent-core/index.ts";
+import type { RegisterCommand } from "../../agent-core/index.ts";
 import { registerSessionCommands } from "./session-commands.ts";
 import { registerSideCommands } from "./side-commands.ts";
 import { registerLensCommands } from "./lens-commands.ts";
 import { registerFormCommands } from "./form-commands.ts";
 import { registerTaskCommands } from "./task-commands.ts";
-import type { RewindScope } from "./types.ts";
+import type { RewindScope } from "../../agent-core/index.ts";
 
 export type { RegisterCommand };
 

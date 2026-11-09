@@ -1,9 +1,9 @@
 import { expect, test, vi } from "vite-plus/test";
 import { effectScope, ref } from "vue";
 
-vi.mock("../packages/client/modules/agent/api/client.ts", () => ({ repairAnswer: vi.fn() }));
+vi.mock("../packages/client/modules/agent-core/api/client.ts", () => ({ repairAnswer: vi.fn() }));
 
-const { repairAnswer } = await import("../packages/client/modules/agent/api/client.ts");
+const { repairAnswer } = await import("../packages/client/modules/agent-core/api/client.ts");
 const { useAnswerDoctor } = await import("../packages/client/modules/agent/model/answer-doctor.ts");
 const { answerProblem, doctorAnswerSource } =
   await import("../packages/client/modules/widget-runtime/repair.ts");
