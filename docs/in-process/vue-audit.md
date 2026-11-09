@@ -22,13 +22,14 @@
 - `gitlab-workspace/ui/GitlabWorkspaceGate.vue` — проверка инстанса и статус интеграции; `pages/gl/...` сокращена до маршрутной обёртки.
 - `workspace-api/pipeline-stages.ts` — `groupPipelineStages` для `PipelineView` и `PullRequestPipelineStages`.
 - `integration-api/remote-workspace.ts` — `useRemoteWorkspace`: загрузка, регистрация профиля, 401/403-ветка, открытие README и cleanup для GitHub и GitLab.
+- `viewers/ui/ChangedFileRow.vue` и `viewers/lib/file-diffs.ts` — общий ряд изменённого файла с diff-панелью и общий кэш diff; `CommitFiles` и `PullRequestFiles` маппят только свои данные.
 - Удалены мёртвые `resize`-заглушка, несовпадающие `prefers-reduced-motion`, неиспользуемый `const props`, локальные `.sr-only`, мёртвые `.muted`/`.hint`/`.field`/`.link`.
 - `ReleaseView` переведён на `UiMessage tone="danger"`; `ArchiveViewer` — на `sizeLabel` и `UiEmpty`; `999px` заменены на `var(--r-full)`.
 - Реестр больших файлов синхронизирован: `AgentChat.vue` — 502, `projector-backend.ts` — 409, `gitlab/browser.ts` — 402.
 
 ## Приоритет P1
 
-- [ ] **Изменённые файлы.** `CommitFiles:161-267 ↔ PullRequestFiles:266-369` (~86% CSS), `commit-diffs.ts ≈ pull-diffs.ts`, `ChangesTree` (490) + `GitChangesTree` (279) — две реализации дерева, `PullRequestFilesSection ↔ CompareTreeSection` (style 0.91). Вынести `ChangedFileList`, `ChangedFileTree`, `useFileDiffs`.
+- [ ] **Деревья изменений.** `ChangesTree` (490) и `GitChangesTree` (279) остаются двумя моделями: плоский список снимка против рекурсивного git-статуса. Решить, нужен ли общий `ChangedFileTree`, или оставить их раздельными и вынести только построение директорий. `PullRequestFilesSection ↔ CompareTreeSection` (style 0.91) тоже ещё дублируют загрузку снимка.
 
 ## Приоритет P2
 
@@ -50,7 +51,7 @@
 
 ## Порядок работ
 
-1. Изменённые файлы и деревья.
+1. Деревья изменений: решить судьбу двух моделей.
 2. Scaffold настроек вне агента.
 3. Декомпозиция `AgentChat`/`AgentInput`/задач.
 4. Виджеты, графики и `common/ui`.
