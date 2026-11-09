@@ -27,6 +27,7 @@ export {
   mutateProjectGit,
 } from "./git.ts";
 export { projectBranches, mutateProjectBranch } from "./git-branches.ts";
+export { mutateProjectSync } from "./git-sync.ts";
 export { previewExternalFile, readExternalImage } from "./external-files.ts";
 export { projectLog, projectCommit, projectCommitComparison } from "./git-history.ts";
 export { listProjectGitTree, readProjectGitFile, readProjectGitImage } from "./git-tree.ts";

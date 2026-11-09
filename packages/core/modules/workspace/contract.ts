@@ -156,7 +156,17 @@ export interface GitBranches {
   /** Current branch name, or the short hash while HEAD is detached. */
   current: string;
   detached: boolean;
+  /** Configured remote names; empty when the repository has no remote. */
+  remotes: string[];
   branches: GitBranch[];
+}
+export type GitSyncAction = "fetch" | "pull" | "push";
+export interface GitSync {
+  action: GitSyncAction;
+  /** Branch state after the network operation, ready to replace the previous list. */
+  branches: GitBranches;
+  /** Short human explanation of what happened; safe to show in a notification. */
+  message: string;
 }
 
 /** Reaction names of the GitHub REST API (`laugh` is 😄, `hooray` is 🎉). */

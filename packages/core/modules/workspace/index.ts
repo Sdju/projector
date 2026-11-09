@@ -40,7 +40,7 @@ export type {
 } from "./contract.ts";
 export { layoutGraph } from "./git-graph.ts";
 export type { GraphRow } from "./git-graph.ts";
-export type { GitBranch, GitBranches } from "./contract.ts";
+export type { GitBranch, GitBranches, GitSync, GitSyncAction } from "./contract.ts";
 export {
   durationLabel,
   PIPELINE_STATUS_LABEL,

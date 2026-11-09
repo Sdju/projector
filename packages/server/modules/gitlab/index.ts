@@ -13,6 +13,7 @@ export {
   gitlabBaseUrl,
   gitlabProjectName,
   gitlabCredentialsTokenType,
+  gitlabAccessToken,
   beginGitlabLogin,
   pollGitlabLogin,
   refreshGitlabToken,

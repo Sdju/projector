@@ -22,7 +22,22 @@ import type {
   GitOverview,
 } from "@projector/core/modules/workspace/index.ts";
 
-export async function git(root: string, args: string[], maxBuffer = 4 * MAX_BYTES) {
+export interface GitOptions {
+  maxBuffer?: number;
+  /** Network operations need more than the read timeout. */
+  timeout?: number;
+  /** Extra environment for host commands; Docker environments keep their own environment. */
+  env?: NodeJS.ProcessEnv;
+}
+
+export async function git(
+  root: string,
+  args: string[],
+  options: number | GitOptions = {},
+): Promise<string> {
+  const settings: GitOptions = typeof options === "number" ? { maxBuffer: options } : options;
+  const maxBuffer = settings.maxBuffer ?? 4 * MAX_BYTES;
+  const timeout = settings.timeout ?? 10_000;
   const project = await environmentForPath(root);
   if (project)
     return (
@@ -37,15 +52,20 @@ export async function git(root: string, args: string[], maxBuffer = 4 * MAX_BYTE
           "/workspace",
           ...args,
         ],
-        10_000,
+        timeout,
       )
     ).stdout;
   return (
     await exec("git", ["--literal-pathspecs", "-C", root, ...args], {
       windowsHide: true,
       maxBuffer,
-      timeout: 10000,
-      env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+      timeout,
+      env: {
+        ...process.env,
+        GIT_OPTIONAL_LOCKS: "0",
+        GIT_TERMINAL_PROMPT: "0",
+        ...settings.env,
+      },
     })
   ).stdout;
 }

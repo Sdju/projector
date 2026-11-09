@@ -282,3 +282,14 @@ export async function mutateWorkspaceBranch(
     "Не удалось выполнить действие с веткой",
   )) as import("@projector/core/modules/workspace/index.ts").GitBranches;
 }
+
+export async function mutateWorkspaceSync(
+  projectId: string,
+  action: import("@projector/core/modules/workspace/index.ts").GitSyncAction,
+) {
+  return (await gitWriter(projectId)(
+    "sync",
+    { action },
+    "Не удалось синхронизировать репозиторий",
+  )) as import("@projector/core/modules/workspace/index.ts").GitSync;
+}

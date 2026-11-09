@@ -67,7 +67,7 @@ export interface FilesProvider extends ReadProvider {
   /** Optional live change stream; transport and project filtering belong to the adapter. */
   watch?: WorkspaceWatch;
 }
-export type GitWrite = "git" | "branch";
+export type GitWrite = "git" | "branch" | "sync";
 export interface GitProvider extends ReadProvider {
   /** False when history can only follow the opened ref. */
   allBranches?: boolean;

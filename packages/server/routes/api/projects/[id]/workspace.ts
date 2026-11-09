@@ -10,6 +10,7 @@ import { accessAllowed, isLocalRequest } from "../../../../modules/access/index.
 import {
   mutateProjectBranch,
   mutateProjectGit,
+  mutateProjectSync,
   moveProjectEntry,
   mutateProjectEntry,
   saveProjectFile,
@@ -223,6 +224,18 @@ export const routes: RouteDefinition[] = [
           force: body.force === true,
         }),
       );
+    },
+  ),
+  mutation(
+    "POST",
+    "/api/projects/:id/workspace/sync",
+    "Операции доступны только со страницы Projector",
+    async ({ req, res }, project) => {
+      const body = await readBody(req);
+      if (typeof body.action !== "string")
+        throw new HttpError(400, "Укажите действие синхронизации");
+      res.setHeader("Cache-Control", "no-store");
+      json(res, 200, await mutateProjectSync(project.path, body.action));
     },
   ),
   mutation(

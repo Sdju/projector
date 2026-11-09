@@ -143,7 +143,27 @@ and `branchesOpen`. Commands:
 Open files are saved before HEAD moves and re-read afterwards; tabs whose file does not exist on the new branch close.
 Git's own explanation (for example the files blocking a checkout) is shown as the error. Writes use
 `POST /api/projects/:id/workspace/branch` with `{ action, name, newName, from, checkout, force }` and share the index write queue;
-`GET .../workspace/branches` lists them.
+`GET .../workspace/branches` lists them together with `remotes`.
+
+### Git sync
+
+The branch row shows remote actions only when the repository has a remote. A single contextual button
+does the current step — pull when the upstream is ahead, push when the local branch is ahead, publish
+when there is no upstream — while the `…` menu always offers fetch, pull and push. When both sides
+have commits the contextual button disappears: the branches have diverged, and the user chooses
+instead of getting a silent merge or force push. Fetch and push do not touch the working tree; pull
+saves open files, reloads the affected tabs and history, and uses `--ff-only`, so it never creates a
+merge commit or resolves conflicts silently.
+
+- `ide.git.sync.fetch` — `git fetch --prune` for the branch remote; updates remote branches and history;
+- `ide.git.sync.pull` — fast-forward only; rejects a diverged branch with Git's explanation;
+- `ide.git.sync.push` — pushes the current branch; without upstream (or after its deletion) publishes
+  it to `origin` or the first configured remote and sets the upstream.
+
+All actions use `POST /api/projects/:id/workspace/sync` with `{ action }`. HTTPS remotes matching a
+connected GitHub or GitLab integration use that token through a temporary askpass helper; the token
+never appears in arguments or error text. Commands are available only in the local writable workspace,
+not in snapshots or remote providers.
 
 ### Git history
 

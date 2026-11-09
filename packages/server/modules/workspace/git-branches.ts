@@ -36,7 +36,13 @@ async function run(root: string, args: string[]) {
 }
 
 export async function projectBranches(root: string): Promise<GitBranches> {
-  const empty: GitBranches = { available: false, current: "", detached: false, branches: [] };
+  const empty: GitBranches = {
+    available: false,
+    current: "",
+    detached: false,
+    remotes: [],
+    branches: [],
+  };
   if (
     await git(root, ["rev-parse", "--show-toplevel"]).then(
       () => false,
@@ -44,7 +50,7 @@ export async function projectBranches(root: string): Promise<GitBranches> {
     )
   )
     return empty;
-  const [rows, merged, symbolic, short] = await Promise.all([
+  const [rows, merged, symbolic, short, remotes] = await Promise.all([
     optional(root, [
       "for-each-ref",
       `--format=${refFormat}`,
@@ -55,6 +61,7 @@ export async function projectBranches(root: string): Promise<GitBranches> {
     optional(root, ["for-each-ref", "--merged=HEAD", "--format=%(refname:short)", "refs/heads"]),
     optional(root, ["symbolic-ref", "--short", "-q", "HEAD"]),
     optional(root, ["rev-parse", "--short", "HEAD"]),
+    optional(root, ["remote"]),
   ]);
   const mergedNames = new Set(merged.split("\n").filter(Boolean));
   const branches: GitBranch[] = [];
@@ -89,7 +96,13 @@ export async function projectBranches(root: string): Promise<GitBranches> {
   // Current branch first, then local branches, then remote ones; each by recency.
   const rank = (branch: GitBranch) => (branch.current ? 0 : branch.kind === "local" ? 1 : 2);
   branches.sort((a, b) => rank(a) - rank(b));
-  return { available: true, current: symbolic || short, detached: !symbolic, branches };
+  return {
+    available: true,
+    current: symbolic || short,
+    detached: !symbolic,
+    remotes: remotes.split("\n").filter(Boolean),
+    branches,
+  };
 }
 
 export interface BranchInput {

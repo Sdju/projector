@@ -8,14 +8,19 @@ import EntryDialog from "../../../../../common/ui/EntryDialog.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import type { ContextMenuItem } from "../../../../../common/ui/context-menu.ts";
 import { type useCommandScope } from "../../../../../common/utilities/commands.ts";
-import { toastErrors } from "../../../../../common/utilities/notice.ts";
+import { notify, toastErrors } from "../../../../../common/utilities/notice.ts";
 import { relativeTime } from "../../../../../common/utilities/commit-format.ts";
 import { registerBranchCommands } from "../lib/branch-commands.ts";
+import { registerSyncCommands } from "../lib/sync-commands.ts";
 import type { GitBranchesState } from "../lib/git-branches.ts";
 import IconBranch from "~icons/lucide/git-branch";
 import IconCheck from "~icons/lucide/check";
 import IconPlus from "~icons/lucide/plus";
 import IconChevron from "~icons/lucide/chevron-down";
+import IconArrowDown from "~icons/lucide/arrow-down";
+import IconArrowUp from "~icons/lucide/arrow-up";
+import IconCloudUpload from "~icons/lucide/cloud-upload";
+import IconEllipsis from "~icons/lucide/ellipsis";
 
 const props = defineProps<{
   branches: GitBranchesState;
@@ -83,6 +88,77 @@ registerBranchCommands({
   label: () => label.value,
   ask,
 });
+const syncMenu = ref<InstanceType<typeof ContextMenu>>();
+const syncAnchor = ref<HTMLElement>();
+const { syncing } = registerSyncCommands({
+  branches: props.branches,
+  commands: props.commands,
+  prepare: props.prepare,
+  applied: props.applied,
+  reload: props.reload,
+  busy,
+  notify: (message) => notify(syncAnchor.value, message),
+});
+const hasRemote = computed(() => state.value.available && state.value.remotes.length > 0);
+const canSync = computed(
+  () =>
+    hasRemote.value && !state.value.detached && state.value.branches.some((item) => item.current),
+);
+/** Одна явная кнопка для того, что сейчас важнее; остальные действия — в меню. */
+const primary = computed(() => {
+  const branch = current.value;
+  if (!canSync.value || !branch) return undefined;
+  if (!branch.upstream || branch.gone)
+    return {
+      action: "push" as const,
+      icon: IconCloudUpload,
+      title: branch.gone
+        ? "Upstream удалён: опубликовать ветку заново"
+        : `Опубликовать ветку ${branch.name}`,
+    };
+  // Разошедшиеся ветки требуют выбора: один клик не должен молча сливать или форсировать push.
+  if (branch.ahead > 0 && branch.behind > 0) return undefined;
+  if (branch.behind > 0)
+    return {
+      action: "pull" as const,
+      icon: IconArrowDown,
+      title: `Стянуть изменения: ↓${branch.behind}`,
+    };
+  if (branch.ahead > 0)
+    return {
+      action: "push" as const,
+      icon: IconArrowUp,
+      title: `Отправить коммиты: ↑${branch.ahead}`,
+    };
+  return undefined;
+});
+const syncItems = computed<ContextMenuItem[]>(() => {
+  const { item } = props.commands;
+  const branch = current.value;
+  const pull = item("ide.git.sync.pull");
+  const push = item("ide.git.sync.push");
+  return [
+    item("ide.git.sync.fetch"),
+    {
+      ...pull,
+      label: branch?.behind ? `Стянуть изменения` : pull.label,
+      hint: branch?.behind ? { text: `↓${branch.behind}` } : undefined,
+    },
+    {
+      ...push,
+      label: branch && (!branch.upstream || branch.gone) ? "Опубликовать ветку" : push.label,
+      hint: branch?.ahead ? { text: `↑${branch.ahead}` } : undefined,
+    },
+  ];
+});
+function openSyncMenu(event: MouseEvent | KeyboardEvent) {
+  props.commands.scope.activate();
+  void syncMenu.value?.open(event);
+}
+function runPrimary() {
+  const action = primary.value?.action;
+  if (action) props.commands.run(`ide.git.sync.${action}`);
+}
 
 const menuItems = computed<ContextMenuItem[]>(() => {
   const branch = state.value.branches.find((item) => item.name === target.value);
@@ -139,6 +215,38 @@ watch(open, (value) => {
         </span>
         <IconChevron class="chevron" :class="{ open }" aria-hidden="true" />
       </button>
+      <div
+        v-if="canSync"
+        ref="syncAnchor"
+        class="remote-actions"
+        role="group"
+        aria-label="Синхронизация с удалённым репозиторием"
+      >
+        <UiButton
+          v-if="primary"
+          shape="icon"
+          size="sm"
+          :busy="syncing === primary.action"
+          :disabled="busy"
+          :title="primary.title"
+          :aria-label="primary.title"
+          :data-command="`ide.git.sync.${primary.action}`"
+          @click="runPrimary"
+        >
+          <component :is="primary.icon" aria-hidden="true" />
+        </UiButton>
+        <UiButton
+          shape="icon"
+          size="sm"
+          :busy="!!syncing && syncing !== primary?.action"
+          :disabled="busy && !syncing"
+          title="Fetch, pull и push"
+          aria-label="Действия с удалённым репозиторием"
+          @click="openSyncMenu"
+        >
+          <IconEllipsis aria-hidden="true" />
+        </UiButton>
+      </div>
       <UiButton
         shape="icon"
         size="sm"
@@ -198,6 +306,7 @@ watch(open, (value) => {
       </template>
     </div>
     <ContextMenu ref="menu" :items="menuItems" label="Действия ветки" />
+    <ContextMenu ref="syncMenu" :items="syncItems" label="Синхронизация Git" />
     <EntryDialog ref="dialog" @submit="onSubmit" />
   </section>
 </template>
@@ -236,6 +345,12 @@ watch(open, (value) => {
   flex-shrink: 0;
   font: var(--fs-2xs) var(--mono);
   color: var(--warn);
+}
+.remote-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
 }
 .chevron {
   width: 12px;
