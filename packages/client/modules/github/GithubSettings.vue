@@ -6,17 +6,19 @@ import UiField from "../../common/ui/UiField.vue";
 import UiInline from "../../common/ui/UiInline.vue";
 import UiStack from "../../common/ui/UiStack.vue";
 
-import { onMounted, onBeforeUnmount, ref } from "vue";
+import { onMounted, ref } from "vue";
 import { useCommandScope } from "../../common/utilities/commands.ts";
 import { connectGithubToken } from "./connect.ts";
 import UiButton from "../../common/ui/UiButton.vue";
 import {
+  DeviceLoginPanel,
   fetchIntegrations,
   integrationRequest,
   TokenReveal,
+  useDeviceLogin,
   useIntegrationOperation,
 } from "../integration-api/index.ts";
-import type { Integration, DeviceLogin, SecretStorage } from "../integration-api/index.ts";
+import type { Integration, SecretStorage } from "../integration-api/index.ts";
 const github = ref<Integration | null>(null);
 const file = ref("");
 const secretStorage = ref<SecretStorage>({ backend: "file", reason: "unavailable" });
@@ -25,14 +27,7 @@ const clientId = ref("");
 const directory = ref("");
 const token = ref("");
 const { error, message, busy, action } = useIntegrationOperation();
-const device = ref<DeviceLogin | null>(null);
-let timer: ReturnType<typeof setTimeout> | undefined;
-let disposed = false;
 const tokenView = ref<InstanceType<typeof TokenReveal> | null>(null);
-function cancelDevice() {
-  clearTimeout(timer);
-  device.value = null;
-}
 function apply(value: Integration) {
   github.value = value;
   if (!value.connected) tokenView.value?.hide();
@@ -51,9 +46,19 @@ onMounted(() =>
     /* Initial load failures are shown by the form. */
   }),
 );
-onBeforeUnmount(() => {
-  disposed = true;
-  cancelDevice();
+const {
+  device,
+  start: login,
+  cancel: cancelDevice,
+} = useDeviceLogin({
+  endpoint: "/github/device",
+  pollEndpoint: "/github/device/poll",
+  connectedMessage: "GitHub подключён",
+  save: () => save(),
+  apply,
+  error,
+  message,
+  action,
 });
 async function save(enableIntegration = enabled.value) {
   cancelDevice();
@@ -64,36 +69,6 @@ async function save(enableIntegration = enabled.value) {
       directory: directory.value,
     }),
   );
-}
-async function poll(login: DeviceLogin) {
-  if (disposed || device.value?.id !== login.id) return;
-  try {
-    const result = await integrationRequest<{
-      pending: boolean;
-      interval?: number;
-      integration?: Integration;
-    }>("/github/device/poll", "POST", { id: login.id });
-    if (disposed || device.value?.id !== login.id) return;
-    if (result.pending) timer = setTimeout(() => void poll(login), (result.interval || 5) * 1000);
-    else {
-      if (result.integration) apply(result.integration);
-      cancelDevice();
-      message.value = "GitHub подключён";
-    }
-  } catch (err) {
-    if (!disposed && device.value?.id === login.id) {
-      cancelDevice();
-      error.value = err instanceof Error ? err.message : "Ошибка входа";
-    }
-  }
-}
-function login() {
-  return action(async () => {
-    await save();
-    const data = await integrationRequest<DeviceLogin>("/github/device", "POST");
-    device.value = data;
-    timer = setTimeout(() => void poll(data), data.interval * 1000);
-  });
 }
 function connectToken() {
   if (busy.value || !token.value.trim()) return;
@@ -235,20 +210,13 @@ commands.scope.registerCommand({
           >выйти</UiButton
         >
       </UiInline>
-      <div v-if="device" class="device" role="status">
-        <p>
-          Введите код <strong>{{ device.userCode }}</strong> на странице GitHub.
-        </p>
-        <a :href="device.verificationUri" target="_blank" rel="noopener noreferrer"
-          >открыть GitHub для входа ↗</a
-        >
-        <p class="muted">Ожидаем подтверждения…</p>
-        <UiButton
-          data-command="ide.github.integration.device.cancel"
-          @click="commands.run('ide.github.integration.device.cancel')"
-          >отменить</UiButton
-        >
-      </div>
+      <DeviceLoginPanel
+        v-if="device"
+        host="GitHub"
+        :device="device"
+        command-id="ide.github.integration.device.cancel"
+        @cancel="cancelDevice"
+      />
       <details>
         <summary>Войти с Personal Access Token</summary>
         <UiStack
@@ -329,8 +297,7 @@ label {
   margin: 0;
 }
 .actions,
-details,
-.device {
+details {
   margin-top: var(--sp-4);
 }
 summary {
@@ -341,12 +308,5 @@ summary {
 }
 a {
   text-decoration: underline;
-}
-.device {
-  padding: var(--sp-3);
-  background: var(--bg-2);
-}
-.device strong {
-  font-family: var(--mono);
 }
 </style>

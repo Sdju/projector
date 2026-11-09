@@ -1,6 +1,7 @@
 import "./resolve.ts";
 
 export { default as GitlabWorkspace } from "./GitlabWorkspace.vue";
+export { default as GitlabWorkspaceGate } from "./ui/GitlabWorkspaceGate.vue";
 export { default as GitlabClone } from "./GitlabClone.vue";
 export { default as GitlabConnection } from "./ui/GitlabConnection.vue";
 export { default as GitlabRepositoryInfo } from "./ui/GitlabRepositoryInfo.vue";
