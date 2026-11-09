@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ResolvedFileIcon } from "@projector/core/modules/file-icons/index.ts";
-defineProps<{ icon: ResolvedFileIcon }>();
+withDefaults(defineProps<{ icon: ResolvedFileIcon; size?: number }>(), { size: 16 });
 </script>
 
 <template>
@@ -8,7 +8,11 @@ defineProps<{ icon: ResolvedFileIcon }>();
     class="file-icon"
     aria-hidden="true"
     :data-icon="icon.id"
-    :style="{ '--icon-source': `url('${icon.src}')`, color: icon.color }"
+    :style="{
+      '--icon-source': `url('${icon.src}')`,
+      '--file-icon-size': `${size}px`,
+      color: icon.color,
+    }"
   >
     <span class="symbol" />
     <span
@@ -24,9 +28,9 @@ defineProps<{ icon: ResolvedFileIcon }>();
 <style scoped>
 .file-icon {
   display: inline-block;
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px;
+  width: var(--file-icon-size);
+  height: var(--file-icon-size);
+  flex: 0 0 var(--file-icon-size);
   position: relative;
 }
 .symbol,
@@ -37,22 +41,22 @@ defineProps<{ icon: ResolvedFileIcon }>();
   -webkit-mask: var(--icon-source) center / contain no-repeat;
 }
 .symbol {
-  width: 16px;
-  height: 16px;
+  width: var(--file-icon-size);
+  height: var(--file-icon-size);
 }
 .badge {
   position: absolute;
-  width: 12px;
-  height: 12px;
-  right: -3px;
-  bottom: -2px;
+  width: calc(var(--file-icon-size) * 0.75);
+  height: calc(var(--file-icon-size) * 0.75);
+  right: calc(var(--file-icon-size) * -0.1875);
+  bottom: calc(var(--file-icon-size) * -0.125);
   display: grid;
   place-items: center;
   background: var(--bg);
   border-radius: var(--r-sm);
 }
 .badge-symbol {
-  width: 11px;
-  height: 11px;
+  width: calc(var(--file-icon-size) * 0.6875);
+  height: calc(var(--file-icon-size) * 0.6875);
 }
 </style>

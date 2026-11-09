@@ -193,11 +193,14 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
     >
       <template v-for="item in items" :key="item.id">
         <div v-if="item.separator" role="separator" class="menu-separator" />
-        <button
+        <UiActionRow
+          class="menu-item"
           role="menuitem"
           :data-command="item.command"
           :disabled="item.disabled"
-          :class="{ danger: item.danger }"
+          :tone="item.danger ? 'danger' : undefined"
+          :gap="1.5"
+          justify="between"
           @click="activate(item)"
         >
           <span class="item-label"
@@ -206,7 +209,7 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
             item.hint.text
           }}</UiBadge
           ><kbd v-if="item.shortcut">{{ item.shortcut }}</kbd>
-        </button>
+        </UiActionRow>
       </template>
     </UiPopupSurface>
   </Teleport>
@@ -234,28 +237,6 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
   padding: var(--sp-1);
   color: var(--text);
   font: var(--fs-xs) var(--sans);
-}
-.context-menu button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-5);
-  width: 100%;
-  padding: 7px 10px;
-  text-align: left;
-  border-radius: var(--r-sm);
-  color: inherit;
-}
-.context-menu button:hover:not(:disabled),
-.context-menu button:focus-visible {
-  background: var(--active);
-  outline: none;
-}
-.context-menu button:disabled {
-  opacity: 0.45;
-}
-.context-menu button.danger {
-  color: var(--err);
 }
 .sheet-item {
   min-height: var(--control-h-sm);

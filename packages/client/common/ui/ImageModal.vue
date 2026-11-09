@@ -39,7 +39,8 @@ onMounted(() => dialog.value?.open());
     class="image-modal"
     :label="alt || 'Просмотр изображения'"
     width="1400px"
-    style="padding: 0; overflow: hidden"
+    fullscreen
+    flush
     @cancel="cancel"
     @close="closed"
     @click="backdrop"
@@ -94,18 +95,6 @@ onMounted(() => dialog.value?.open());
 }
 
 @media (max-width: 700px), (max-height: 520px) and (max-width: 1000px) {
-  /* A phone gets the whole screen: a small floating panel only gets in the way. */
-  .image-modal {
-    inset: 0 !important;
-    width: 100vw !important;
-    max-width: 100vw !important;
-    height: 100dvh !important;
-    max-height: 100dvh !important;
-    margin: 0 !important;
-    border: 0 !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-  }
   .frame {
     height: 100dvh;
   }

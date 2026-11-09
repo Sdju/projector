@@ -32,6 +32,7 @@
 - `analytics/lib/chart-layout.ts` — общий ResizeObserver, `niceMax`, масштаб, тики и прореживание подписей для `UsageBarChart` и `UsageLine`.
 - `common/ui/UiDonut.vue` — одно кольцо с внутренним расчётом доли; `Donut` и `UsageDonut` стали обёртками.
 - `agents-integration/_/use-agent-usage-indicator.ts` — polling, часы, окна, команда и публикация остатка; Claude, Cursor, Kimi и OpenCode оставили только определения окон и тексты.
+- `ContextMenu` использует `UiActionRow` и на десктопе, а не только в мобильном листе. `ImageModal` переведён на `UiDialog fullscreen flush` без девяти `!important`. `FileIcon` получил `size` и `--file-icon-size`.
 - `agent/model/chat-scroll.ts` — pin/away, ResizeObserver и подгрузка старых ходов; `AgentChat` сократился ниже 500 строк и удалён из реестра больших файлов.
 - `agent/lib/composer/suggestions.ts` и `editing.ts` — завершение `@`/`/` и вставка/добавление чипов, текста и цитат; `AgentInput` больше не держит эту логику.
 - `agent/lib/composer/drop.ts` — drop/paste, пути из дерева, загрузка картинок и root проекта; `AgentInput` оставил только CodeMirror-хост, команды и expose.
@@ -46,16 +47,14 @@
 
 - [ ] **AgentTurn — булевы и события.** 13 props, из них 7 boolean, и 11 emits; сгруппировать флаги (`busy/last/copied/faded/canRevert/readonly/formAnswered`) и действия в объекты. Остальные компоненты чата уже разгружены.
 - [ ] **Виджеты и графики.** Прогресс-бары и кольца сведены в `UiMeter`/`UiDonut` (кроме `UsageMeter` с подписями), раскладка `UsageLine`/`UsageBarChart` и 4 индикатора агентов общие. Осталось: `Line` (485, chart-движок, clamp продублирован 3×), `Field` (15 props, дублирует `Checks/Tabs/Slider/Input` и `UiField`), `Form ↔ IntelligentForm` (разные контракты: контекст формы против готовой формы ответа), `UsageMeter` и `CodexUsageIndicator`.
-- [ ] **`common/ui`.** Четыре реализации «поверхности» (`UiCard`, `UiPopupSurface`, `UiDialog`, тост `UiNoticeHost`); `ContextMenu` рендерит строку меню дважды; несовместимые API раскладок (`UiInline` считает `gap * 4` px, `UiActionRow` мапит `1.5 → 6px`); текстовые примитивы повторяют `size/space` inline-стилями; `ImageModal` — 9 `!important`; `UiStringList` — 10 props на одного потребителя; `FileIcon` — размеры захардкожены 6 раз.
+- [ ] **`common/ui` — поверхности и раскладки.** `UiCard`, `UiPopupSurface`, `UiDialog` и тост `UiNoticeHost` собирают рамку/фон/тень сами; `UiInline` считает дробный `gap * 4` px, `UiActionRow` мапит `1.5 → 6px`, `UiToolbar`/`UiStack` используют разные шкалы; текстовые примитивы повторяют `size/space` inline-стилями; `UiStringList` — 10 props на одного потребителя. Решение: объединять только при появлении третьего потребителя каждого варианта, иначе компонент обрастёт режимами.
 
 ## P3
 
 - [ ] Вынести hex-палитру `AgentContextMeter` в `lib/context-palette.ts` на токенах.
-- [ ] `FileIcon`: `--file-icon-size` вместо шести пар размеров.
 - [ ] Свести `.note` (26 файлов) к `UiMessage`/`UiHint`; убрать дубли `.note.error`.
 - [ ] Мобильный breakpoint `(max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse)` скопирован в 9 файлов — вынести в общий слой.
 - [ ] `SettingsWorkbench`: дубли `@media (max-width: 700px)` и `@container (max-width: 650px)` на ~54 строки.
-- [ ] `ImageModal`: заменить 9 `!important` вариантом `UiDialog` `fullscreen/flush`.
 - [ ] `DockTabs`: 19 props, тип `commandHandlers` разошёлся с `lib/tab-commands.ts`; проверить `renameable` и `closeSaved`.
 
 ## Порядок работ

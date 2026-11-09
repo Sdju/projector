@@ -8,6 +8,10 @@ defineProps<{
   /** `top` — как командная палитра, `center` — как обычный диалог. */
   align?: "center" | "top";
   width?: string;
+  /** On a phone the dialog takes the whole screen. */
+  fullscreen?: boolean;
+  /** No inner padding: the owner draws edge-to-edge content. */
+  flush?: boolean;
 }>();
 const emit = defineEmits<{ cancel: [Event]; close: [] }>();
 const dialog = ref<HTMLDialogElement>();
@@ -25,7 +29,7 @@ defineExpose({
   <dialog
     ref="dialog"
     class="ui-dialog"
-    :class="align ?? 'center'"
+    :class="[align ?? 'center', { fullscreen, flush }]"
     :style="width ? { '--dialog-width': width } : undefined"
     :aria-label="label"
     :aria-labelledby="labelledby"
@@ -57,8 +61,25 @@ defineExpose({
   overflow: hidden;
 }
 
+.ui-dialog.flush {
+  padding: 0;
+  overflow: hidden;
+}
 .ui-dialog::backdrop {
   background: var(--overlay);
+}
+@media (max-width: 700px), (max-height: 520px) and (max-width: 1000px) {
+  .ui-dialog.fullscreen {
+    inset: 0;
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
 }
 @media (max-width: 700px) {
   .ui-dialog {
