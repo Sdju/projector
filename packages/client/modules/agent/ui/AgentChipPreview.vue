@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import UiPopupSurface from "../../../common/ui/UiPopupSurface.vue";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { isLocalPath } from "../../../common/utilities/file-path.ts";
 import { workspaceAssetUrl } from "../../workspace-api/index.ts";
 import type { MessageChip } from "../model/types.ts";
 
@@ -20,7 +21,7 @@ function sourceOf(value: MessageChip | undefined): string {
   if (!value) return "";
   if (value.type === "image") return `/api/agent/attachments/${encodeURIComponent(value.id)}`;
   if (value.type === "file" && !value.directory && IMAGE_PATH.test(value.path))
-    return workspaceAssetUrl(props.projectId, value.path, value.path.startsWith("/"));
+    return workspaceAssetUrl(props.projectId, value.path, isLocalPath(value.path));
   return "";
 }
 const source = computed(() => sourceOf(chip.value));

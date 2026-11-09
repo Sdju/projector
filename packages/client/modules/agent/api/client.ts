@@ -16,20 +16,33 @@ import type {
   AgentHistoryTurn,
   AgentCommandRequest,
   AgentPermissionMode,
+  MessageChip,
 } from "../model/types.ts";
 
-/** Stores a pasted or dropped image on the server; messages refer to it by the returned id. */
-export async function uploadAttachment(
-  file: File,
-): Promise<Extract<MessagePart, { type: "image" }>> {
+/**
+ * Stores a pasted or dropped file on the server. A picture comes back as an inline chip;
+ * any other file keeps its place on disk and the chat points at it by absolute path.
+ */
+export async function uploadAttachment(file: File): Promise<MessageChip> {
   const response = await fetch(`/api/agent/attachments?name=${encodeURIComponent(file.name)}`, {
     method: "POST",
     headers: { "Content-Type": file.type },
     body: file,
   });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || "Не удалось загрузить изображение");
-  return { type: "image", id: data.id, name: data.name, mime: data.mime };
+  const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!response.ok)
+    throw new Error(typeof data.error === "string" ? data.error : "Не удалось загрузить файл");
+  const path = typeof data.path === "string" ? data.path : "";
+  if (!path) throw new Error("Сервер не вернул путь к файлу");
+  const mime = typeof data.mime === "string" ? data.mime : "";
+  if (mime.startsWith("image/") && typeof data.id === "string")
+    return {
+      type: "image",
+      id: data.id,
+      name: typeof data.name === "string" ? data.name : file.name,
+      mime,
+    };
+  return { type: "file", path };
 }
 
 /** The run to rejoin no longer exists on the server (finished and collected, or pruned). */

@@ -25,7 +25,7 @@ function profile(uploads, conflicts = []) {
   };
 }
 
-test("desktop files dropped into the chat are uploaded into the project with free names", async () => {
+test("a dropped folder is uploaded into the project with free names", async () => {
   const uploads = [];
   const disconnect = registerWorkspaceProfile(
     "drop-project",

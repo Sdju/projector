@@ -35,7 +35,11 @@ function iconSvg(chip: MessageChip): string {
 /** The short name a chip shows: the file name, the command, the image name. */
 export function chipLabel(chip: MessageChip): string {
   if (chip.type === "file") {
-    const name = chip.path.replace(/\/$/, "").split("/").pop() || chip.path;
+    const name =
+      chip.path
+        .replace(/[\\/]+$/, "")
+        .split(/[\\/]/)
+        .pop() || chip.path;
     if (!chip.range) return name;
     const lines =
       chip.range.from === chip.range.to

@@ -201,8 +201,8 @@ function insertDropped(target: EditorView, chips: MessageChip[], at: number) {
   }
 }
 
-/** Uploads pasted or dropped images and puts each in as a chip where the cursor or drop was. */
-async function attachImages(files: File[], at?: number) {
+/** Uploads pasted or dropped files and puts each in as a chip where the cursor or drop was. */
+async function attachFiles(files: File[], at?: number) {
   const target = view.value;
   if (!target) return;
   let position = at;
@@ -213,7 +213,7 @@ async function attachImages(files: File[], at?: number) {
       insertChip(target, head, head, chip);
       position = head + chipText(chip).length + 1;
     } catch (error) {
-      emit("fail", error instanceof Error ? error.message : "Не удалось загрузить изображение");
+      emit("fail", error instanceof Error ? error.message : "Не удалось загрузить файл");
     }
   }
   target.focus();
@@ -221,13 +221,13 @@ async function attachImages(files: File[], at?: number) {
 const imagesOf = (data: DataTransfer | null) =>
   [...(data?.files ?? [])].filter((file) => file.type.startsWith("image/"));
 
-/** Файлы с диска браузер отдаёт без пути: кладём их в проект и ссылаемся как на `@path`. */
+/** Папку нельзя вложить одним файлом: кладём её дерево в проект и ссылаемся как на `@path`. */
 async function importDropped(source: DropSource, at: number) {
   const target = view.value;
   const projectId = props.projectId;
   if (!target) return;
   if (!projectId) {
-    emit("fail", "Файл можно добавить только в проект");
+    emit("fail", "Папку можно добавить только в проект");
     return;
   }
   try {
@@ -317,7 +317,7 @@ onMounted(() => {
             const images = imagesOf(event.clipboardData);
             if (!images.length) return false;
             event.preventDefault();
-            void attachImages(images);
+            void attachFiles(images);
             return true;
           },
           mousedown(event) {
@@ -377,15 +377,14 @@ function dropData(data: DataTransfer, at?: number): boolean {
   const files = [...data.files];
   const roots = [...data.items].filter((item) => item.kind === "file");
   const directories = roots.some((item) => item.webkitGetAsEntry?.()?.isDirectory);
-  const images = files.filter((file) => file.type.startsWith("image/"));
-  // A dragged image, not a file with a path: send the image itself.
-  if (files.length && !directories && images.length === files.length) {
-    void attachImages(images, position);
+  // A folder is not one attachment: it is imported into the project as a tree.
+  if (directories) {
+    void importDropped(readDrop(data), position);
     return true;
   }
-  if (!files.length && !roots.length) return false;
-  // The browser gave no path for a desktop file or folder: upload it into the project.
-  void importDropped(readDrop(data), position);
+  if (!files.length) return false;
+  // The browser gave no path to a desktop file: attach its contents to the chat.
+  void attachFiles(files, position);
   return true;
 }
 function insertChips(chips: MessageChip[]) {
