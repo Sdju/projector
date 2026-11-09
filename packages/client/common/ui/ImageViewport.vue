@@ -9,7 +9,8 @@ import IconRatio from "~icons/lucide/ratio";
 import IconMaximize from "~icons/lucide/maximize";
 const props = withDefaults(
   defineProps<{
-    src: string;
+    src?: string;
+    svg?: string;
     alt: string;
     width?: number;
     height?: number;
@@ -238,6 +239,14 @@ defineExpose({ reset });
       <p v-if="error || failed" class="error" role="alert">
         {{ error || "Браузер не смог отобразить это изображение." }}
       </p>
+      <div
+        v-if="svg"
+        class="image-svg"
+        :style="imageStyle"
+        role="img"
+        :aria-label="alt"
+        v-html="svg"
+      />
       <img
         v-else
         :src="src"
@@ -319,7 +328,8 @@ defineExpose({ reset });
 .image-canvas:focus-visible {
   outline-offset: -2px;
 }
-.image-canvas img {
+.image-canvas img,
+.image-canvas .image-svg {
   position: absolute;
   left: 50%;
   top: 50%;
@@ -327,6 +337,11 @@ defineExpose({ reset });
   max-height: none;
   transform-origin: center;
   pointer-events: none;
+}
+.image-canvas .image-svg svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 .view-controls {
   display: flex;

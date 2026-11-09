@@ -203,5 +203,24 @@ test.concurrent(
     expect(landscape.overflow).toBeLessThanOrEqual(0);
     await browser.key("Escape");
     await wait('!document.querySelector("dialog[open]")');
+
+    await browser.evaluate(
+      `window.fixture.set(${JSON.stringify("```mermaid\nflowchart LR\n  A[Ответ] --> B[Готово]\n```")})`,
+    );
+    await wait('!!document.querySelector(".md .mermaid-diagram svg.pele")');
+    expect(
+      await browser.evaluate(
+        'document.querySelector(".mermaid-diagram").textContent.includes("Ответ")',
+      ),
+    ).toBe(true);
+    await browser.evaluate(
+      `document.querySelector('.mermaid-diagram .mermaid-canvas svg').dispatchEvent(new MouseEvent('click', {bubbles:true}))`,
+    );
+    await wait('!!document.querySelector("dialog[open] .image-viewport .image-svg svg.pele")');
+    expect(
+      await browser.evaluate('!!document.querySelector("dialog[open] .view-controls select")'),
+    ).toBe(true);
+    await browser.key("Escape");
+    await wait('!document.querySelector("dialog[open]")');
   },
 );

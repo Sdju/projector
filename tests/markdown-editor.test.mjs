@@ -17,13 +17,13 @@ test.concurrent(
     import { DockView } from '/packages/client/modules/dock/index.ts';
     import { commandHostKey } from '/packages/client/common/utilities/commands.ts';
     import {createCommandService, defaultKeybindings} from '/packages/core/modules/ide/index.ts';
-    const initial = "# Title\\r\\n\\r\\nA **bold** paragraph.\\r\\n\\r\\n![Alt text](../image.png)\\r\\n\\r\\n| A | B |\\r\\n| - | - |\\r\\n| One | Two |\\r\\n\\r\\n~~~js\\r\\nconst value = 1;\\r\\n~~~\\r\\n\\r\\n\\u003cdetails>\\u003csummary>More\\u003c/summary>Raw HTML\\u003c/details>\\r\\n\\r\\n\\u003cscript>window.unsafeMarkdown = true\\u003c/script>\\r\\n";
-    const editable = ref(true); const content = ref(initial); let changes = 0; let failure = ''; let saves = 0; let saved = ''; const opened = [];
+    const initial = "# Title\\r\\n\\r\\nA **bold** paragraph.\\r\\n\\r\\n![Alt text](../image.png)\\r\\n\\r\\n| A | B |\\r\\n| - | - |\\r\\n| One | Two |\\r\\n\\r\\n~~~js\\r\\nconst value = 1;\\r\\n~~~\\r\\n\\r\\n~~~mermaid\\r\\nflowchart LR\\r\\n  A[Начало] --> B[Готово]\\r\\n~~~\\r\\n\\r\\n\\u003cdetails>\\u003csummary>More\\u003c/summary>Raw HTML\\u003c/details>\\r\\n\\r\\n\\u003cscript>window.unsafeMarkdown = true\\u003c/script>\\r\\n";
+    const editable = ref(true); const content = ref(initial); let changes = 0; let failure = ''; let saves = 0; let saved = ''; let sourceRequests = 0; const opened = [];
     const layout = ref({root:{type:'group',id:'g1',panels:['file'],active:'file'},focused:'g1'});
     const app = createApp({ render: () => {
       const draft = content.value;
       return h(DockView, {layout:layout.value,projectId:'test',commandNamespace:'ide.test.tabs',describe:id=>({id,label:'test.md',dirty:draft!==initial}),'onUpdate:layout':value=>layout.value=value}, {
-        panel: () => h(MarkdownViewer, { mode: 'document', editable: editable.value, path: 'docs/test.md', projectId: 'test', content: draft, onSave: () => { saves++; saved = content.value; }, onChange: value => { changes++; content.value = value; }, onOpen: path => opened.push(path), onError: message => failure = message })
+        panel: () => h(MarkdownViewer, { mode: 'document', editable: editable.value, path: 'docs/test.md', projectId: 'test', content: draft, onSave: () => { saves++; saved = content.value; }, onChange: value => { changes++; content.value = value; }, onOpen: path => opened.push(path), onMode: mode => { if (mode === 'source') sourceRequests++ }, onError: message => failure = message })
       });
     } });
     const sdk = createCommandService(defaultKeybindings);
@@ -44,6 +44,21 @@ test.concurrent(
       check(!document.querySelector('.markdown-toolbar'), 'There must be no upper toolbar');
       check(editor.contentEditable === 'true', 'The formatted document must be editable');
       check(editor.querySelector('strong').textContent === 'bold', 'Bold must render visually');
+      await wait(() => editor.querySelector('.mermaid-diagram svg.pele'));
+      const diagram = editor.querySelector('.mermaid-diagram');
+      check(getComputedStyle(diagram).getPropertyValue('--pele-fg').trim() === getComputedStyle(document.documentElement).getPropertyValue('--text').trim(), 'Mermaid must inherit the application theme');
+      editor.querySelector('.mermaid-diagram .mermaid-canvas svg').dispatchEvent(new MouseEvent('click', {bubbles:true}));
+      await wait(() => document.querySelector('dialog[open] .image-viewport .image-svg svg.pele'));
+      const inlineFill = getComputedStyle(diagram.querySelector('.pele-node rect')).fill;
+      const modalFill = getComputedStyle(document.querySelector('dialog[open] .pele-node rect')).fill;
+      check(modalFill === inlineFill, 'Mermaid modal must keep the inline diagram theme');
+      check(document.querySelector('dialog[open] .view-controls select'), 'Mermaid viewer must have the standard background control');
+      check(document.querySelector('dialog[open] [aria-label="Вписать"]'), 'Mermaid viewer must have the standard fit control');
+      document.querySelector('dialog[open] [aria-label="Закрыть"]').click();
+      await wait(() => !document.querySelector('dialog[open]'));
+      editor.querySelector('.mermaid-diagram [aria-label="Редактировать исходный код"]').click();
+      check(sourceRequests === 1, 'The Mermaid source button must open Markdown source mode');
+      saves = 0;
       content.value = ${JSON.stringify("| Область | Реализация | Ограничение |\n| --- | --- | --- |\n| GitHub | `server/modules/integrations/github.ts`: PAT и OAuth Device Flow | Проверка пользователя |\n| Workspace | `$XDG_DATA_HOME/projector/workspaces/<workspaceId>/repo` | Рабочие файлы на диске хоста |\n")};
       await nextTick();
       const host = document.getElementById('editor');

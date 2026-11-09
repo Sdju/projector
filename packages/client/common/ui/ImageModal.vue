@@ -5,7 +5,13 @@ import UiDialog from "./UiDialog.vue";
 import ImageViewport from "./ImageViewport.vue";
 import IconX from "~icons/lucide/x";
 
-const props = defineProps<{ src: string; alt: string }>();
+const props = defineProps<{
+  src?: string;
+  svg?: string;
+  width?: number;
+  height?: number;
+  alt: string;
+}>();
 const emit = defineEmits<{ close: [] }>();
 const dialog = ref<InstanceType<typeof UiDialog>>();
 const title = computed(() => props.alt || "Изображение");
@@ -59,7 +65,15 @@ onMounted(() => dialog.value?.open());
         </UiButton>
       </header>
       <div class="stage">
-        <ImageViewport :src="src" :alt="alt" :identity="src" background="transparent" />
+        <ImageViewport
+          :src="src"
+          :svg="svg"
+          :width="width"
+          :height="height"
+          :alt="alt"
+          :identity="src"
+          background="transparent"
+        />
       </div>
     </div>
   </UiDialog>

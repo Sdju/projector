@@ -293,6 +293,9 @@ catalogs:
     node-pty:
       specifier: ^1.1.0
       version: 1.1.0
+    pele:
+      specifier: ^1.13.0
+      version: 1.13.0
     rou3:
       specifier: ^1.0.0
       version: 1.0.0
@@ -496,6 +499,9 @@ importers:
       markdown-it-task-lists:
         specifier: 'catalog:'
         version: 2.1.1
+      pele:
+        specifier: 'catalog:'
+        version: 1.13.0
       vue:
         specifier: 'catalog:'
         version: 3.5.43(typescript@6.0.3)
@@ -3370,6 +3376,10 @@ packages:
 
   pause-stream@0.0.11:
     resolution: {integrity: sha512-e3FBlXLmN/D1S+zHzanP4E/4Z60oFAa3O051qt1pxa7DEJWKAyil6upYVXCWadEnuoqa4Pkc9oUx9zsxYeRv8A==}
+
+  pele@1.13.0:
+    resolution: {integrity: sha512-Ie8UKY9x00MsuR3jO6AzUwzK2Z6MIV3Tf4EDdITiuk8Uaz8K7g0R082WqsqNaSU8DdgkrRvZThzhit83mi/uiw==}
+    engines: {node: '>=20'}
 
   perfect-debounce@2.1.0:
     resolution: {integrity: sha512-LjgdTytVFXeUgtHZr9WYViYSM/g8MkcTPYDlPa3cDqMirHjKiSZPYd6DoL7pK8AJQr+uWkQvCjHNdiMqsrJs+g==}
@@ -7588,6 +7598,8 @@ snapshots:
   pause-stream@0.0.11:
     dependencies:
       through: 2.3.8
+
+  pele@1.13.0: {}
 
   perfect-debounce@2.1.0: {}
 

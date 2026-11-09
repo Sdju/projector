@@ -46,6 +46,16 @@ function chatLinkAttributes(href: string, title?: string | null): Record<string,
   return attributes;
 }
 
+const defaultFence = markdown.renderer.rules.fence;
+markdown.renderer.rules.fence = (tokens, index, options, env, self) => {
+  const token = tokens[index]!;
+  if (token.info.trim().toLowerCase() === "mermaid")
+    return `<div class="md-mermaid">${markdown.utils.escapeHtml(token.content)}</div>`;
+  return defaultFence
+    ? defaultFence(tokens, index, options, env, self)
+    : self.renderToken(tokens, index, options);
+};
+
 const defaultLink = markdown.renderer.rules.link_open;
 markdown.renderer.rules.link_open = (tokens, index, options, env, self) => {
   const token = tokens[index]!;
@@ -121,7 +131,7 @@ export const parseMarkdown = (content: string) => markdown.parse(content, {});
 export function renderChatMarkdown(content: string, env: MarkdownEnv = {}): string {
   const root = DOMPurify.sanitize(renderMarkdown(content, env), {
     USE_PROFILES: { html: true },
-    ADD_ATTR: ["target", "loading", "decoding", "referrerpolicy", "class"],
+    ADD_ATTR: ["target", "loading", "decoding", "referrerpolicy", "class", "data-mermaid-source"],
     RETURN_DOM: true,
   }) as HTMLElement;
   decorateHtml(root, env.resolveImage);

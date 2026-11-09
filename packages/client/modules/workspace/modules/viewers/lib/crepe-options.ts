@@ -3,6 +3,7 @@ import { editorViewCtx } from "@milkdown/kit/core";
 import { $remark } from "@milkdown/kit/utils";
 import { languages } from "@codemirror/language-data";
 import { oneDark } from "@codemirror/theme-one-dark";
+import { createMermaidBlock } from "../../../../markdown/index.ts";
 
 /** A filled comment bubble, like the built-in toolbar icons. */
 const chatIcon = `
@@ -79,6 +80,10 @@ export function createCrepe(options: {
         searchPlaceholder: "Язык кода",
         copyText: "Копировать",
         noResultText: "Не найдено",
+        renderPreview: (language, content) =>
+          language.trim().toLowerCase() === "mermaid"
+            ? createMermaidBlock(content, { expand: () => {}, source: () => {} }).element
+            : null,
       },
     },
   });

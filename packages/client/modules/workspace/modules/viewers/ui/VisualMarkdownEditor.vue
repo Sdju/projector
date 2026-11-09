@@ -24,6 +24,7 @@ import { githubEmojiDecorations } from "../lib/markdown-emoji.ts";
 import { createCrepe, normalizeImageAttributes } from "../lib/crepe-options.ts";
 import type { EmojiMap } from "../../../../../common/utilities/github-emoji.ts";
 import { useMarkdownInteractions } from "../lib/markdown-links.ts";
+import { MermaidModal } from "../../../../markdown/index.ts";
 import "@milkdown/crepe/theme/common/style.css";
 import "@milkdown/crepe/theme/classic-dark.css";
 
@@ -47,6 +48,7 @@ const emit = defineEmits<{
   command: [id: string, args?: unknown];
 }>();
 const root = ref<HTMLElement>();
+const mermaidPreview = ref<string>();
 const loading = ref(true);
 let crepe: Crepe | undefined;
 let prose: EditorView | undefined;
@@ -82,6 +84,28 @@ const { linkMouseDown, followLink } = useMarkdownInteractions({
   editor: () => crepe,
   open: (path) => emit("open", path),
 });
+
+function mermaidClick(event: MouseEvent) {
+  if (!(event.target instanceof Element)) return;
+  const action = event.target.closest(".mermaid-action");
+  const diagram = event.target.closest<HTMLElement>(".mermaid-diagram");
+  const canvas = event.target.closest(".mermaid-canvas");
+  if (!diagram || (!action && !canvas) || (!action && event.target.closest("a, button, input")))
+    return;
+  event.preventDefault();
+  event.stopPropagation();
+  if (action?.getAttribute("aria-label") === "Редактировать исходный код") emit("source");
+  else {
+    const block = diagram.closest(".milkdown-code-block");
+    const position = block && prose ? prose.posAtDOM(block, 0) : -1;
+    mermaidPreview.value = prose?.state.doc.resolve(position).nodeAfter?.textContent ?? "";
+  }
+}
+
+function editorClick(event: MouseEvent) {
+  mermaidClick(event);
+  if (!event.defaultPrevented) followLink(event);
+}
 
 function split(content: string) {
   const parts = props.compact ? { body: content } : splitFrontmatter(content);
@@ -303,7 +327,7 @@ onBeforeUnmount(() => {
     class="visual-markdown"
     :class="{ compact, readonly: !editable }"
     @mousedown.capture="linkMouseDown"
-    @click.capture="followLink"
+    @click.capture="editorClick"
   >
     <p v-if="loading" class="editor-loading" role="status">Открываю документ…</p>
     <details v-if="frontmatter" class="frontmatter" open>
@@ -362,6 +386,11 @@ onBeforeUnmount(() => {
     </details>
     <div ref="root" class="visual-markdown-root" />
   </div>
+  <MermaidModal
+    v-if="mermaidPreview !== undefined"
+    :source="mermaidPreview"
+    @close="mermaidPreview = undefined"
+  />
 </template>
 
 <style scoped>
@@ -628,6 +657,12 @@ onBeforeUnmount(() => {
   border-radius: var(--r-md);
   background: var(--bg-sunken);
   transition: border-color var(--t-fast);
+}
+.visual-markdown :deep(.milkdown-code-block:has(.mermaid-diagram) .codemirror-host),
+.visual-markdown :deep(.milkdown-code-block:has(.mermaid-diagram) .preview-toggle-button),
+.visual-markdown :deep(.milkdown-code-block:has(.mermaid-diagram) .preview-divider),
+.visual-markdown :deep(.milkdown-code-block:has(.mermaid-diagram) .preview-label) {
+  display: none;
 }
 .visual-markdown :deep(.milkdown .milkdown-code-block:hover) {
   border-color: var(--line-strong);

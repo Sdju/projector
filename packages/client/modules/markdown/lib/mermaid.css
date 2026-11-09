@@ -1,0 +1,92 @@
+.mermaid-diagram {
+  --pele-bg: var(--bg);
+  --pele-fg: var(--text);
+  --pele-fg-on-light: #1f1f1f;
+  --pele-fg-on-dark: #ffffff;
+  --pele-muted: var(--muted);
+  --pele-line: var(--text-2);
+  --pele-surface: var(--bg-2);
+  --pele-surface-alt: var(--bg-3);
+  --pele-border: var(--line-strong);
+  --pele-accent: var(--info);
+  --pele-critical: var(--err);
+  --pele-error: var(--err);
+  --pele-font: var(--sans);
+  --pele-font-mono: var(--mono);
+  --pele-radius: var(--r-sm);
+  --pele-series-1: var(--info);
+  --pele-series-2: var(--warn);
+  --pele-series-3: var(--run);
+  --pele-series-4: var(--err);
+  --pele-series-5: var(--text-2);
+  --pele-series-6: var(--muted);
+  --pele-series-7: var(--info);
+  --pele-series-8: var(--warn);
+  position: relative;
+  max-width: 100%;
+  margin: 14px 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg);
+  overflow: hidden;
+}
+.mermaid-toolbar {
+  position: absolute;
+  z-index: 1;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  opacity: 0;
+  transition: opacity var(--t-fast);
+}
+.mermaid-toolbar > span {
+  margin-right: var(--sp-1);
+  color: var(--muted);
+  font: var(--fs-2xs) var(--mono);
+}
+.mermaid-diagram:hover .mermaid-toolbar,
+.mermaid-diagram:focus-within .mermaid-toolbar {
+  opacity: 1;
+}
+.mermaid-action {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--bg-2) 92%, transparent);
+  color: var(--muted);
+}
+.mermaid-action:hover {
+  color: var(--text);
+  background: var(--bg-3);
+}
+.mermaid-action svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.mermaid-canvas {
+  min-height: 80px;
+  padding: var(--sp-5) var(--sp-3) var(--sp-3);
+  overflow: auto;
+  cursor: zoom-in;
+}
+.mermaid-canvas > .pele {
+  display: block;
+  max-width: 100%;
+  margin: auto;
+}
+@media (pointer: coarse) {
+  .mermaid-toolbar {
+    opacity: 1;
+  }
+}

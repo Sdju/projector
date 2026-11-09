@@ -10,6 +10,7 @@ import ContextMenu from "../../../common/ui/ContextMenu.vue";
 import "./agent-markdown.css";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import ImageModal from "../../../common/ui/ImageModal.vue";
+import { MermaidModal, createMermaidBlock, type MermaidBlock } from "../../markdown/index.ts";
 import IconCopy from "~icons/lucide/copy";
 import IconExternal from "~icons/lucide/external-link";
 import IconFile from "~icons/lucide/file-text";
@@ -25,8 +26,11 @@ const linkActions = inject(chatLinkActionsKey, undefined);
 const stream = createMarkdownStream((markdown) =>
   renderChatMarkdown(markdown, { resolveImage: (src) => chatImageSource(src, projectId) }),
 );
+const root = ref<HTMLElement>();
 const blocks = shallowRef(stream.update(props.text));
 const preview = ref<{ src: string; alt: string }>();
+const mermaidPreview = ref<string>();
+const diagrams = new Set<MermaidBlock>();
 const linkMenu = ref<InstanceType<typeof ContextMenu>>();
 const linkMenuItems = ref<ContextMenuItem[]>([]);
 let timer: ReturnType<typeof setTimeout> | undefined;
@@ -48,7 +52,28 @@ watch(
     else timer ??= setTimeout(render, wait);
   },
 );
-onBeforeUnmount(() => clearTimeout(timer));
+function destroyDiagrams() {
+  for (const diagram of diagrams) diagram.destroy();
+  diagrams.clear();
+}
+watch(
+  blocks,
+  async () => {
+    destroyDiagrams();
+    await nextTick();
+    for (const placeholder of root.value?.querySelectorAll<HTMLElement>(".md-mermaid") ?? []) {
+      const source = placeholder.textContent ?? "";
+      const diagram = createMermaidBlock(source, { expand: () => (mermaidPreview.value = source) });
+      diagrams.add(diagram);
+      placeholder.replaceWith(diagram.element);
+    }
+  },
+  { flush: "post", immediate: true },
+);
+onBeforeUnmount(() => {
+  clearTimeout(timer);
+  destroyDiagrams();
+});
 
 /** A click on a picture opens the modal viewer; a picture inside a link keeps the link's job. */
 function openImage(event: MouseEvent) {
@@ -152,6 +177,7 @@ function openLinkMenu(event: MouseEvent) {
 
 <template>
   <div
+    ref="root"
     class="md"
     @click="handleClick"
     @contextmenu="openLinkMenu"
@@ -160,6 +186,11 @@ function openLinkMenu(event: MouseEvent) {
     <div v-for="block in blocks" :key="block.key" class="md-block" v-html="block.html" />
   </div>
   <ImageModal v-if="preview" :src="preview.src" :alt="preview.alt" @close="preview = undefined" />
+  <MermaidModal
+    v-if="mermaidPreview !== undefined"
+    :source="mermaidPreview"
+    @close="mermaidPreview = undefined"
+  />
   <ContextMenu v-if="linkMenuItems.length" ref="linkMenu" :items="linkMenuItems" label="Ссылка" />
 </template>
 

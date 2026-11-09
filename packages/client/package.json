@@ -29,6 +29,7 @@
     "highlight.js": "catalog:",
     "markdown-it": "catalog:",
     "markdown-it-task-lists": "catalog:",
+    "pele": "catalog:",
     "vue": "catalog:",
     "vue-router": "catalog:",
     "zod": "catalog:"
