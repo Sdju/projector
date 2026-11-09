@@ -13,6 +13,7 @@ const props = defineProps<{
   projectId?: string;
   backend?: AgentBackendId;
   selection?: AgentSelection;
+  embedded?: boolean;
 }>();
 const emit = defineEmits<{ view: [id: string]; tab: [id: string] }>();
 
@@ -42,6 +43,7 @@ const showFinished = computed(() => !active.value.length);
   <details
     v-if="tasks.length"
     class="task-bar"
+    :class="{ embedded }"
     :open="open"
     @toggle="folded = !($event.target as HTMLDetailsElement).open"
   >
@@ -99,6 +101,16 @@ const showFinished = computed(() => !active.value.length);
   background: var(--bg-2);
   color: var(--muted);
   font-size: var(--fs-2xs);
+}
+.task-bar.embedded {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.task-bar.embedded .scroll {
+  max-height: none;
+  overflow: visible;
 }
 svg {
   width: 13px;

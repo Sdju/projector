@@ -480,16 +480,12 @@ onBeforeUnmount(() => {
         >{{ roleSnapshot.name }}</UiBadge
       >
       <AgentSessions
-        :sessions="sessions"
-        :loading="sessionsLoading"
-        :error="sessionsError"
+        :native="{ sessions, loading: sessionsLoading, error: sessionsError }"
         :disabled="busy"
         :active="turns.findLast((turn) => turn.role === 'assistant')?.session?.id"
         :editable="!plain || capabilities.editSessions"
         :deletable="!plain || capabilities.deleteSessions"
-        :recent="recentChats"
-        :recent-loading="recentLoading"
-        :recent-error="recentError"
+        :recent="{ items: recentChats, loading: recentLoading, error: recentError }"
         @open="openHistory"
         @change="changeSession"
         @remove="(target) => void removeSession(target).catch(() => {})"
@@ -577,7 +573,6 @@ onBeforeUnmount(() => {
           :chat-usage="chatUsage.get(turn.id)"
           :faded="editFrom >= 0 && firstShown + offset >= editFrom"
           :root="projectRoot"
-          :project-id="projectId"
           :can-revert="canRevert(turn.id)"
           :promoted-form="answerFormFor(turn).promotedForm"
           :form-answered="answerFormFor(turn).formAnswered"

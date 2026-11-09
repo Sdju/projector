@@ -98,13 +98,14 @@ const summary = computed(() => {
         :recent="recentJobs"
         @open="emit('open', $event)"
       />
-      <AgentPlan :items="plan" :busy="busy" />
+      <AgentPlan :items="plan" :busy="busy" embedded />
       <AgentTaskBar
         :tasks="tasks"
         :viewing="viewingTask"
         :project-id="projectId"
         :backend="backend"
         :selection="selection"
+        embedded
         @view="emit('view', $event)"
         @tab="emit('tab', $event)"
       />
@@ -112,6 +113,7 @@ const summary = computed(() => {
         :items="queue"
         :busy="busy"
         :can-inject="canInject"
+        embedded
         @now="emit('now', $event)"
         @inject="emit('inject', $event)"
         @remove="emit('remove', $event)"
@@ -181,48 +183,6 @@ const summary = computed(() => {
   max-height: min(32vh, 300px);
   overflow-y: auto;
   scrollbar-width: thin;
-}
-.body :deep(.jobs) {
-  margin: 0;
-  gap: 2px;
-}
-.body :deep(.job) {
-  padding: 4px 6px;
-  border: 0;
-  border-radius: var(--r-md);
-  background: none;
-}
-.body :deep(.job:hover) {
-  background: var(--hover);
-}
-.body :deep(.job.needs-user) {
-  background: color-mix(in srgb, var(--warn) 8%, transparent);
-}
-.body :deep(.task-bar) {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-}
-.body :deep(.task-bar .scroll) {
-  max-height: none;
-  overflow: visible;
-}
-.body :deep(.plan) {
-  margin: 0;
-  padding: 0;
-}
-.body :deep(.queue) {
-  margin: 0;
-}
-.body :deep(.queue li) {
-  padding: 5px 6px;
-  border: 0;
-  border-top: 1px solid var(--line);
-  border-radius: 0;
-}
-.body :deep(.queue li:first-child) {
-  border-top: 0;
 }
 @media (prefers-reduced-motion: reduce) {
   .summary,

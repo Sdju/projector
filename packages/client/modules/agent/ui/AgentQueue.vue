@@ -5,12 +5,17 @@ import IconX from "~icons/lucide/x";
 import IconSend from "~icons/lucide/corner-down-right";
 import IconInject from "~icons/lucide/message-square-plus";
 
-defineProps<{ items: QueuedMessage[]; busy: boolean; canInject?: boolean }>();
+defineProps<{
+  items: QueuedMessage[];
+  busy: boolean;
+  canInject?: boolean;
+  embedded?: boolean;
+}>();
 const emit = defineEmits<{ now: [id: string]; inject: [id: string]; remove: [id: string] }>();
 </script>
 
 <template>
-  <ul v-if="items.length" class="queue" aria-label="Сообщения в очереди">
+  <ul v-if="items.length" class="queue" :class="{ embedded }" aria-label="Сообщения в очереди">
     <li v-for="item in items" :key="item.id">
       <span class="label">{{ item.delivering ? "Передаётся агенту" : "В очереди" }}</span>
       <span class="text u-truncate" :title="item.text">{{ item.text }}</span>
@@ -55,6 +60,18 @@ const emit = defineEmits<{ now: [id: string]; inject: [id: string]; remove: [id:
   margin: 0 0 var(--sp-2);
   padding: 0;
   list-style: none;
+}
+.queue.embedded {
+  margin: 0;
+}
+.queue.embedded li {
+  padding: 5px 6px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+}
+.queue.embedded li:first-child {
+  border-top: 0;
 }
 li {
   display: flex;

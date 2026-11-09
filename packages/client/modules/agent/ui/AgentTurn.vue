@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import UiInline from "../../../common/ui/UiInline.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
-import { computed, ref } from "vue";
+import { computed, inject, ref } from "vue";
+import { chatProjectKey } from "../../chat-images/index.ts";
 import { chipIcon, chipLabel, chipTitle } from "../lib/composer/chips.ts";
 import { versionsOf, type ForkMode } from "../model/branches.ts";
 import { legacyParts } from "../model/turn-events.ts";
@@ -24,6 +25,7 @@ import IconGitFork from "~icons/lucide/git-fork";
 import IconPrev from "~icons/lucide/chevron-left";
 import IconNext from "~icons/lucide/chevron-right";
 
+const projectId = inject(chatProjectKey, "");
 const props = defineProps<{
   turn: AgentTurn;
   /** Tokens and cost of the chat up to this answer. */
@@ -35,8 +37,6 @@ const props = defineProps<{
   faded?: boolean;
   /** The project folder, to show edited files relative to it. */
   root?: string;
-  /** The project whose trusted widgets answers may use. */
-  projectId?: string;
   /** Files can be taken back to before the request this answer belongs to. */
   canRevert?: boolean;
   /** A conversation only to read (a subagent's): no editing, retrying or rolling back. */

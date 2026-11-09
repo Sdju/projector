@@ -7,13 +7,13 @@ import IconCheck from "~icons/lucide/check";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import IconCircle from "~icons/lucide/circle";
 
-const props = defineProps<{ items: PlanItem[]; busy: boolean }>();
+const props = defineProps<{ items: PlanItem[]; busy: boolean; embedded?: boolean }>();
 const done = computed(() => props.items.filter((item) => item.status === "completed").length);
 const current = computed(() => props.items.find((item) => item.status === "in_progress"));
 </script>
 
 <template>
-  <details v-if="items.length" class="plan" :open="busy">
+  <details v-if="items.length" class="plan" :class="{ embedded }" :open="busy">
     <UiDisclosureSummary :highlight="false">
       <IconListChecks aria-hidden="true" />
       <span class="plan-title">План</span>
@@ -45,6 +45,10 @@ const current = computed(() => props.items.find((item) => item.status === "in_pr
 }
 .plan:hover {
   color: var(--text-2);
+}
+.plan.embedded {
+  margin: 0;
+  padding: 0;
 }
 .plan-bar {
   flex: 0 0 48px;

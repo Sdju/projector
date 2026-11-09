@@ -132,7 +132,6 @@ const outcome = computed(() => {
         :busy="task.status === 'running'"
         :last="index === turns.length - 1"
         :copied="false"
-        :project-id="projectId"
         readonly
       />
     </div>

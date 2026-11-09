@@ -21,13 +21,11 @@
     setup: () => () =>
       h("div", { style: "padding: 30px" }, [
         h(AgentSessions, {
-          sessions: sessions.value,
-          recent: recent.value,
-          loading: loading.value,
+          native: { sessions: sessions.value, loading: loading.value, error: "" },
+          recent: { items: recent.value, loading: false, error: "" },
           onOpen: () => {
             if (loadOnOpen) loading.value = true;
           },
-          error: "",
           disabled: false,
           editable: true,
           onChange: (id, change) => changes.push({ id, change }),

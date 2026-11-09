@@ -32,6 +32,7 @@
 - `agent/lib/composer/suggestions.ts` и `editing.ts` — завершение `@`/`/` и вставка/добавление чипов, текста и цитат; `AgentInput` больше не держит эту логику.
 - `agent/lib/composer/drop.ts` — drop/paste, пути из дерева, загрузка картинок и root проекта; `AgentInput` оставил только CodeMirror-хост, команды и expose.
 - `agent/ui/agent-markdown.css` — тема markdown рядом с `AgentMarkdown`. Стили больше не заперты в `AgentMessage`, поэтому `AgentSideQuestion` и другие прямые потребители получают то же оформление.
+- `AgentActivityDock` больше не перекрашивает детей через `:deep`: `AgentPlan`, `AgentTaskBar` и `AgentQueue` получили вариант `embedded`. `AgentSessions` принимает `native` и `recent` объектами вместо пяти плоских пропсов, `AgentTurn` берёт `projectId` из `provideChatContext`.
 - Решение: `ChatController` остаётся в `AgentChat` как композиционный корень. Фабрика с ~40 опциями перенесла бы строки, но не уменьшила бы связанность.
 - Удалены мёртвые `resize`-заглушка, несовпадающие `prefers-reduced-motion`, неиспользуемый `const props`, локальные `.sr-only`, мёртвые `.muted`/`.hint`/`.field`/`.link`.
 - `ReleaseView` переведён на `UiMessage tone="danger"`; `ArchiveViewer` — на `sizeLabel` и `UiEmpty`; `999px` заменены на `var(--r-full)`.
@@ -39,7 +40,7 @@
 
 ## Приоритет P2
 
-- [ ] **AgentChat — остаточные компоненты.** Скролл, подсказки, drop/paste и upload вынесены; markdown-тема переехала в `AgentMarkdown`. Осталось: `AgentTurn` (14 props, 7 boolean, 11 emits), `AgentSessions` (10 props), `AgentActivityDock` (9 `:deep`).
+- [ ] **AgentTurn — булевы и события.** 13 props, из них 7 boolean, и 11 emits; сгруппировать флаги (`busy/last/copied/faded/canRevert/readonly/formAnswered`) и действия в объекты. Остальные компоненты чата уже разгружены.
 - [ ] **Виджеты и графики.** `Line` (485, chart-движок, clamp продублирован 3×), `UsageLine ↔ UsageBarChart` (style 0.59), `UsageDonut ↔ Donut`, `Field` (15 props, дублирует `Checks/Tabs/Slider/Input` и `UiField`), `Form ↔ IntelligentForm`, 5 `*UsageIndicator`, 5 копий прогресс-бара. Вынести `ChartFrame`, `UiMeter`, `Field`-диспетчер, общий `Form`.
 - [ ] **`common/ui`.** Четыре реализации «поверхности» (`UiCard`, `UiPopupSurface`, `UiDialog`, тост `UiNoticeHost`); `ContextMenu` рендерит строку меню дважды; несовместимые API раскладок (`UiInline` считает `gap * 4` px, `UiActionRow` мапит `1.5 → 6px`); текстовые примитивы повторяют `size/space` inline-стилями; `ImageModal` — 9 `!important`; `UiStringList` — 10 props на одного потребителя; `FileIcon` — размеры захардкожены 6 раз.
 
@@ -55,7 +56,7 @@
 
 ## Порядок работ
 
-1. Декомпозиция `AgentChat` и `AgentInput`.
+1. `AgentTurn` — флаги и события.
 2. Виджеты, графики и `common/ui`.
 
 ## Замечания

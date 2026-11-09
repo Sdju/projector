@@ -13,9 +13,7 @@ import IconPencil from "~icons/lucide/pencil";
 import IconTrash from "~icons/lucide/trash-2";
 
 const props = defineProps<{
-  sessions: AgentSessionInfo[];
-  loading: boolean;
-  error: string;
+  native: { sessions: AgentSessionInfo[]; loading: boolean; error: string };
   disabled: boolean;
   /** The native session this chat continues, marked in the list. */
   active?: string;
@@ -24,9 +22,7 @@ const props = defineProps<{
   /** A session can be removed from the list for good. */
   deletable?: boolean;
   /** Chats of the project kept on disk, including closed tabs. */
-  recent?: AgentRecentChat[];
-  recentLoading?: boolean;
-  recentError?: string;
+  recent: { items: AgentRecentChat[]; loading: boolean; error: string };
 }>();
 const emit = defineEmits<{
   open: [];
@@ -57,10 +53,13 @@ interface HistoryEntry extends AgentSessionInfo {
   native?: boolean;
 }
 const history = computed<HistoryEntry[]>(() => {
-  const entries = props.sessions.map((session): HistoryEntry => ({ ...session, native: true }));
+  const entries = props.native.sessions.map((session): HistoryEntry => ({
+    ...session,
+    native: true,
+  }));
   const bySession = new Map(entries.map((entry) => [entry.id, entry]));
   const seen = new Set<string>();
-  for (const chat of props.recent ?? []) {
+  for (const chat of props.recent.items) {
     if (chat.session) {
       const known = bySession.get(chat.session);
       // The same conversation: keep one row, openable as its tab.
@@ -151,7 +150,7 @@ function finishRename(save: boolean, restoreFocus = false) {
   const id = renaming.value;
   renaming.value = "";
   const title = draft.value.trim();
-  if (save && id && title && title !== props.sessions.find((item) => item.id === id)?.title)
+  if (save && id && title && title !== props.native.sessions.find((item) => item.id === id)?.title)
     emit("change", id, { title });
   if (restoreFocus)
     void nextTick(() => {
@@ -196,7 +195,7 @@ watch(shown, (open) => {
 });
 // Sessions arrive asynchronously on first open. Give the list its initial focus when ready.
 watch(
-  () => props.loading,
+  () => props.native.loading,
   async (loading) => {
     if (loading || !shown.value) return;
     await nextTick();
@@ -240,11 +239,11 @@ function age(value?: string): string {
         placeholder="Найти чат"
         aria-label="Найти чат"
       />
-      <p v-if="loading && !history.length" class="note">Загружаю…</p>
-      <p v-else-if="error" class="note error" role="alert">{{ error }}</p>
-      <p v-else-if="!history.length && !recentLoading" class="note">В истории пока пусто</p>
-      <p v-else-if="!visible.length && !recentLoading" class="note">Ничего не найдено</p>
-      <p v-else-if="!rows.length && !recentLoading && branchCount && !branchesShown" class="note">
+      <p v-if="native.loading && !history.length" class="note">Загружаю…</p>
+      <p v-else-if="native.error" class="note error" role="alert">{{ native.error }}</p>
+      <p v-else-if="!history.length && !recent.loading" class="note">В истории пока пусто</p>
+      <p v-else-if="!visible.length && !recent.loading" class="note">Ничего не найдено</p>
+      <p v-else-if="!rows.length && !recent.loading && branchCount && !branchesShown" class="note">
         Основных чатов нет — только ветки субагентов
       </p>
       <UiInline v-for="row in rows" :key="row.session.id" class="row" :gap="0.5" justify="normal">
@@ -340,8 +339,10 @@ function age(value?: string): string {
         <span v-else-if="branchesShown">Скрыть ветки субагентов</span>
         <span v-else>Показать ветки субагентов · {{ branchCount }}</span>
       </button>
-      <p v-if="recentLoading && !history.length && !loading" class="note">Загружаю историю…</p>
-      <p v-else-if="recentError" class="note error" role="alert">{{ recentError }}</p>
+      <p v-if="recent.loading && !history.length && !native.loading" class="note">
+        Загружаю историю…
+      </p>
+      <p v-else-if="recent.error" class="note error" role="alert">{{ recent.error }}</p>
     </UiIsland>
   </div>
 </template>

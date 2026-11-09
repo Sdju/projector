@@ -174,7 +174,6 @@ useTabReadout(() => ({
         last
         :copied="false"
         :root="job?.cwd"
-        :project-id="projectId"
         readonly
       />
       <p v-else-if="job && !finished" class="note">
