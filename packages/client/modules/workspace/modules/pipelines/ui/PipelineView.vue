@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import UiArticle from "../../../../../common/ui/UiArticle.vue";
 import UiHeading from "../../../../../common/ui/UiHeading.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
+import UiViewerPage from "../../../../../common/ui/UiViewerPage.vue";
 import UiInline from "../../../../../common/ui/UiInline.vue";
 import UiStatusDot from "../../../../../common/ui/UiStatusDot.vue";
 import { computed, ref } from "vue";
@@ -100,14 +102,14 @@ useTabReadout(() => {
 </script>
 
 <template>
-  <div class="pipeline-view">
+  <UiViewerPage>
     <UiHint v-if="loading" size="xs" leading="inherit" class="note" role="status"
       >загрузка: pipeline…</UiHint
     >
     <UiHint v-else-if="error" size="xs" leading="inherit" class="note error" role="alert">{{
       error
     }}</UiHint>
-    <article v-else-if="detail" class="article">
+    <UiArticle v-else-if="detail">
       <UiInline as="header" class="head" align="baseline" wrap justify="normal">
         <span class="state" :class="detail.pipeline.status">{{
           PIPELINE_STATUS_LABEL[detail.pipeline.status]
@@ -216,20 +218,11 @@ useTabReadout(() => {
       >
         Показано {{ detail.jobs.length }} джобов. Остальные — на {{ host }}.
       </UiHint>
-    </article>
-  </div>
+    </UiArticle>
+  </UiViewerPage>
 </template>
 
 <style scoped>
-.pipeline-view {
-  height: 100%;
-  overflow: auto;
-  padding: var(--sp-4);
-}
-.article {
-  max-width: 880px;
-  margin: 0 auto;
-}
 .state {
   padding: 1px var(--sp-2);
   border-radius: var(--r-full);

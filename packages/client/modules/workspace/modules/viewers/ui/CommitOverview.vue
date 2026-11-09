@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import UiArticle from "../../../../../common/ui/UiArticle.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
+import UiViewerPage from "../../../../../common/ui/UiViewerPage.vue";
 import { computed, ref, watch } from "vue";
 import type { GitCommitDetail } from "@projector/core/modules/workspace/index.ts";
 import { commandArgs, useCommandScope } from "../../../../../common/utilities/commands.ts";
@@ -138,7 +140,7 @@ watch(() => [props.projectId, props.hash], load, { immediate: true });
 </script>
 
 <template>
-  <div class="overview">
+  <UiViewerPage>
     <UiHint size="xs" leading="inherit" :space-after="2" v-if="loading" class="note" role="status"
       >загрузка коммита…</UiHint
     >
@@ -151,7 +153,7 @@ watch(() => [props.projectId, props.hash], load, { immediate: true });
       role="alert"
       >{{ error }}</UiHint
     >
-    <article v-else-if="detail">
+    <UiArticle v-else-if="detail">
       <CommitMeta :detail="detail" @open-commit="emit('openCommit', $event)" />
       <div v-if="canOpenTree || canCompare" class="commit-actions">
         <UiButton
@@ -181,19 +183,11 @@ watch(() => [props.projectId, props.hash], load, { immediate: true });
         @open-diff="(path) => emit('openDiff', detail!.hash, path)"
         @resize="(path, height) => (heights[path] = height)"
       />
-    </article>
-  </div>
+    </UiArticle>
+  </UiViewerPage>
 </template>
 
 <style scoped>
-.overview {
-  height: 100%;
-  overflow: auto;
-  padding: var(--sp-4);
-}
-article {
-  max-width: 880px;
-}
 .commit-actions {
   display: flex;
   justify-content: flex-end;

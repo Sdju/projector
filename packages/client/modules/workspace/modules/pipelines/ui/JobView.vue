@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import UiArticle from "../../../../../common/ui/UiArticle.vue";
 import UiHeading from "../../../../../common/ui/UiHeading.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
+import UiViewerPage from "../../../../../common/ui/UiViewerPage.vue";
 import UiInline from "../../../../../common/ui/UiInline.vue";
 import { relativeTime } from "../../../../../common/utilities/commit-format.ts";
 import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab-readout.ts";
@@ -56,14 +58,14 @@ useTabReadout(() => {
 </script>
 
 <template>
-  <div class="job-view">
+  <UiViewerPage>
     <UiHint v-if="loading" size="xs" leading="inherit" class="note" role="status"
       >загрузка: джоб…</UiHint
     >
     <UiHint v-else-if="error" size="xs" leading="inherit" class="note error" role="alert">{{
       error
     }}</UiHint>
-    <article v-else-if="detail" class="article">
+    <UiArticle v-else-if="detail" :width="1100">
       <UiInline as="header" class="head" align="baseline" wrap justify="normal">
         <span class="state" :class="detail.job.status">{{
           PIPELINE_STATUS_LABEL[detail.job.status]
@@ -115,20 +117,11 @@ useTabReadout(() => {
       <UiHint v-if="detail.logTruncated" size="xs" leading="inherit" :space-before="2" class="note">
         Показаны первые 2 MiB лога. Полный лог — на {{ host }}.
       </UiHint>
-    </article>
-  </div>
+    </UiArticle>
+  </UiViewerPage>
 </template>
 
 <style scoped>
-.job-view {
-  height: 100%;
-  overflow: auto;
-  padding: var(--sp-4);
-}
-.article {
-  max-width: 1100px;
-  margin: 0 auto;
-}
 .state {
   padding: 1px var(--sp-2);
   border-radius: var(--r-full);

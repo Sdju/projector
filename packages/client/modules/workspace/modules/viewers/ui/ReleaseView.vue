@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import UiArticle from "../../../../../common/ui/UiArticle.vue";
 import UiAvatar from "../../../../../common/ui/UiAvatar.vue";
 import UiHeading from "../../../../../common/ui/UiHeading.vue";
+import UiViewerPage from "../../../../../common/ui/UiViewerPage.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
 import UiInline from "../../../../../common/ui/UiInline.vue";
 import UiMessage from "../../../../../common/ui/UiMessage.vue";
@@ -84,12 +86,12 @@ useTabReadout(() => {
 </script>
 
 <template>
-  <div class="release-view">
+  <UiViewerPage>
     <UiHint v-if="loading" size="xs" leading="inherit" role="status">загрузка: релиз…</UiHint>
     <UiMessage v-else-if="error" variant="note" tone="danger" size="xs" role="alert">{{
       error
     }}</UiMessage>
-    <article v-else-if="detail" class="article">
+    <UiArticle v-else-if="detail">
       <UiInline as="header" class="head" align="baseline" wrap justify="normal">
         <span v-if="detail.release.draft" class="state">черновик</span>
         <span v-else-if="detail.release.prerelease" class="state">пререлиз</span>
@@ -144,20 +146,11 @@ useTabReadout(() => {
       />
       <UiHint v-else size="xs" leading="inherit" :space-before="2">Без описания</UiHint>
       <ReleaseAssets :assets="detail.assets" />
-    </article>
-  </div>
+    </UiArticle>
+  </UiViewerPage>
 </template>
 
 <style scoped>
-.release-view {
-  height: 100%;
-  overflow: auto;
-  padding: var(--sp-4);
-}
-.article {
-  max-width: 880px;
-  margin: 0 auto;
-}
 .state {
   padding: 1px var(--sp-2);
   border-radius: var(--r-full);

@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import UiArticle from "../../../../../common/ui/UiArticle.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
 import UiHeading from "../../../../../common/ui/UiHeading.vue";
+import UiViewerPage from "../../../../../common/ui/UiViewerPage.vue";
 import type { IssueLabel, IssueUser, Reaction } from "@projector/core/modules/workspace/index.ts";
 import { absoluteTime, relativeTime } from "../../../../../common/utilities/commit-format.ts";
 import TrackerAuthor from "./TrackerAuthor.vue";
@@ -41,7 +43,7 @@ const emit = defineEmits<{ open: [path: string] }>();
 </script>
 
 <template>
-  <div class="tracker-detail">
+  <UiViewerPage>
     <UiHint size="xs" leading="inherit" :space-before="2" v-if="loading" class="note" role="status"
       >загрузка: {{ noun }}…</UiHint
     >
@@ -54,7 +56,7 @@ const emit = defineEmits<{ open: [path: string] }>();
       role="alert"
       >{{ error }}</UiHint
     >
-    <article v-else-if="ready" class="article">
+    <UiArticle v-else-if="ready">
       <UiInline as="header" class="head" align="baseline" wrap justify="normal">
         <span class="state" :class="state">{{ stateLabel }}</span>
         <UiHeading as="h2" size="lg" weight="semibold" :space-after="0">
@@ -105,20 +107,11 @@ const emit = defineEmits<{ open: [path: string] }>();
       >
       <TrackerReactions :reactions="reactions" />
       <slot />
-    </article>
-  </div>
+    </UiArticle>
+  </UiViewerPage>
 </template>
 
 <style scoped>
-.tracker-detail {
-  height: 100%;
-  overflow: auto;
-  padding: var(--sp-4);
-}
-.article {
-  max-width: 880px;
-  margin: 0 auto;
-}
 .state {
   padding: 1px var(--sp-2);
   border-radius: var(--r-full);
