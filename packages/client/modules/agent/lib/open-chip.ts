@@ -1,3 +1,4 @@
+import { deviceUrl } from "../../../common/utilities/device-url.ts";
 import type { FileRange, MessageChip } from "../../agent-core/index.ts";
 
 export interface ChipActions {
@@ -9,7 +10,10 @@ export interface ChipActions {
 /** An image chip opens the picture in the chat viewer; a file chip opens its file in the editor. */
 export function openChatChip(chip: MessageChip, actions: ChipActions) {
   if (chip.type === "image") {
-    actions.openImage(`/api/agent/attachments/${encodeURIComponent(chip.id)}`, chip.name);
+    actions.openImage(
+      deviceUrl(`/api/agent/attachments/${encodeURIComponent(chip.id)}`),
+      chip.name,
+    );
     return;
   }
   if (chip.type !== "file") return;

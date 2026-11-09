@@ -1,3 +1,4 @@
+import { isHubRequest } from "./hub.ts";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { randomBytes } from "node:crypto";
 import { readNetworkMode } from "@projector/core/modules/app-paths/index.ts";
@@ -30,7 +31,7 @@ export function authorizeHttp(
   if (accessAllowed(req, false)) {
     try {
       // A gateway key must never be turned into a session for the rest of the API.
-      if (!gateway && !isLocalRequest(req)) rememberLanSession(req, res);
+      if (!gateway && !isLocalRequest(req) && !isHubRequest(req)) rememberLanSession(req, res);
     } catch {
       res.writeHead(503).end();
       return false;

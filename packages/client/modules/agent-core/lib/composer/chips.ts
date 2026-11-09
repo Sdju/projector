@@ -1,3 +1,4 @@
+import { deviceUrl } from "../../../../common/utilities/device-url.ts";
 import {
   EditorSelection,
   EditorState,
@@ -23,7 +24,7 @@ const icons: Record<MessageChip["type"] | "directory", string> = {
 /** An image chip shows the image itself; ids are hex, anything else gets the generic icon. */
 export function chipIcon(chip: MessageChip): string {
   if (chip.type === "image" && /^[0-9a-f]{16}$/.test(chip.id))
-    return `<img class="chip-thumb" src="/api/agent/attachments/${chip.id}" alt="" width="14" height="14">`;
+    return `<img class="chip-thumb" src="${deviceUrl(`/api/agent/attachments/${chip.id}`)}" alt="" width="14" height="14">`;
   return iconSvg(chip);
 }
 

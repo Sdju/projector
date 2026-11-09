@@ -1,3 +1,4 @@
+import { deviceUrl, deviceApiPrefix } from "../../../common/utilities/device-url.ts";
 /** WebSocket-compatible surface used by both the legacy and shared transports. */
 export interface TerminalSocket {
   readonly readyState: number;
@@ -18,7 +19,7 @@ function port(): MessagePort {
   if (!worker) {
     worker = new SharedWorker(new URL("./shared.worker.ts", import.meta.url), {
       type: "module",
-      name: "projector-terminals-v1",
+      name: "projector-terminals-v1" + deviceApiPrefix(),
     });
     const current = worker;
     worker.port.onmessage = (event) => {
@@ -133,6 +134,7 @@ const shared =
   typeof SharedWorker !== "undefined" &&
   new URLSearchParams(location.search).get("terminalTransport") !== "legacy";
 export function openTerminalSocket(url: URL): TerminalSocket {
+  url = new URL(deviceUrl(url));
   return shared ? new SharedSocket(url) : new WebSocket(url);
 }
 // pagehide also runs for bfcache: reconnect through existing owners when the page resumes.

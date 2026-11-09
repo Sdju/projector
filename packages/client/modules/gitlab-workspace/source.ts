@@ -1,3 +1,4 @@
+import { deviceUrl } from "../../common/utilities/device-url.ts";
 import type { GitlabEntry, GitlabRepository } from "@projector/core/modules/gitlab/index.ts";
 import type { FileContent, FileEntry } from "@projector/core/modules/workspace/index.ts";
 import { treePageRange } from "@projector/core/modules/workspace/index.ts";
@@ -286,19 +287,23 @@ export function createGitlabWorkspaceProfile(
       changed(next);
     },
     assetUrl(file) {
-      return `/api/integrations/gitlab/browse/asset?${new URLSearchParams({
-        repository,
-        sha: metadata.commit,
-        path: file,
-      })}`;
+      return deviceUrl(
+        `/api/integrations/gitlab/browse/asset?${new URLSearchParams({
+          repository,
+          sha: metadata.commit,
+          path: file,
+        })}`,
+      );
     },
     scopeAssetUrl(scope, file) {
       return scope.kind === "commit"
-        ? `/api/integrations/gitlab/browse/asset?${new URLSearchParams({
-            repository,
-            sha: scope.rev,
-            path: file,
-          })}`
+        ? deviceUrl(
+            `/api/integrations/gitlab/browse/asset?${new URLSearchParams({
+              repository,
+              sha: scope.rev,
+              path: file,
+            })}`,
+          )
         : "";
     },
     async read(action, params, signal) {

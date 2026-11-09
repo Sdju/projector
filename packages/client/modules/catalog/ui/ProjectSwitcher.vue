@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { deviceUrl } from "../../../common/utilities/device-url.ts";
 import UiActionCopy from "../../../common/ui/UiActionCopy.vue";
 import UiBadge from "../../../common/ui/UiBadge.vue";
 import ContextMenu from "../../../common/ui/ContextMenu.vue";
@@ -275,7 +276,13 @@ function keydown(event: KeyboardEvent) {
             @click="activate($event, row.item)"
             @contextmenu.stop="showContext($event, row.item)"
           >
-            <img v-if="row.item.icon" :src="row.item.icon" alt="" width="28" height="28" />
+            <img
+              v-if="row.item.icon"
+              :src="deviceUrl(row.item.icon)"
+              alt=""
+              width="28"
+              height="28"
+            />
             <UiActionCopy
               :title="row.item.name"
               :description="row.item.description"

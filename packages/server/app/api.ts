@@ -1,3 +1,4 @@
+import { routes as hubRoutes } from "../routes/api/hub.ts";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { HttpError } from "../modules/http/index.ts";
 import { createRouteDispatcher, json } from "../modules/transport/index.ts";
@@ -64,6 +65,7 @@ import { routes as analyticsRoutes } from "../routes/api/analytics.ts";
 import { routes as openAiRoutes } from "../routes/api/openai.ts";
 import { routes as browserRoutes } from "../routes/api/browser.ts";
 const dispatch = createRouteDispatcher([
+  ...hubRoutes,
   ...openAiRoutes,
   ...browserRoutes,
   ...claudeRoutes,

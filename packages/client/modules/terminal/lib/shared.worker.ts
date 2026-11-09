@@ -28,7 +28,7 @@ function open(port: MessagePort, message: Open) {
   if (consumers.has(message.channel)) return;
   const original = new URL(message.url);
   const kind = original.pathname.endsWith("/control") ? "control" : "data";
-  const url = new URL("/api/terminal/shared", original);
+  const url = new URL(original.pathname.replace(/\/(control|socket)$/, "/shared"), original);
   url.searchParams.set("kind", kind);
   const token = original.searchParams.get("token");
   if (token) url.searchParams.set("token", token);

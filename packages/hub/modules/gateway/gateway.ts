@@ -1,0 +1,146 @@
+import { createServer } from "node:http";
+import { HubAccess } from "../access/index.ts";
+import { serveStatic } from "../static/index.ts";
+import { Tunnels } from "./tunnels.ts";
+import { forward } from "./forward.ts";
+
+export interface HubOptions {
+  origin: string;
+  password: string;
+  deviceToken: string;
+  staticRoot: string;
+}
+const route = (path: string) => /^\/api\/devices\/([a-z0-9][a-z0-9-]{0,62})(\/.*)$/.exec(path);
+export function createHub(options: HubOptions) {
+  const publicUrl = new URL(options.origin);
+  const local = ["localhost", "127.0.0.1", "[::1]"].includes(publicUrl.hostname);
+  if (
+    publicUrl.origin !== options.origin ||
+    (publicUrl.protocol !== "https:" && !(publicUrl.protocol === "http:" && local))
+  )
+    throw new Error("Для удалённого Hub требуется HTTPS origin");
+  if (!options.password || !options.deviceToken || options.password === options.deviceToken)
+    throw new Error("Hub требует разные credentials браузера и устройств");
+  const access = new HubAccess(options.origin, options.password);
+  const tunnels = new Tunnels(options.deviceToken);
+  const server = createServer((req, res) => {
+    void (async () => {
+      const url = new URL(req.url ?? "/", options.origin);
+      if (!access.trusted(req)) {
+        res.writeHead(403).end();
+        return;
+      }
+      if (url.pathname === "/api/hub/health") {
+        res
+          .writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" })
+          .end(JSON.stringify({ ok: true, app: "projector-hub" }));
+        return;
+      }
+      if (
+        /^\/(?:assets\/|icons\/|file-icons\/|favicon\.svg$|manifest\.webmanifest$|sw\.js$)/.test(
+          url.pathname,
+        )
+      ) {
+        await serveStatic(options.staticRoot, req, res);
+        return;
+      }
+      if (url.pathname === "/login") {
+        await access.login(req, res);
+        return;
+      }
+      if (!access.allowed(req)) {
+        if (url.pathname.startsWith("/api/"))
+          res
+            .writeHead(401, { "Content-Type": "application/json" })
+            .end(JSON.stringify({ error: "Войдите в Projector Hub" }));
+        else res.writeHead(303, { Location: "/login" }).end();
+        return;
+      }
+      const match = route(url.pathname);
+      if (match) {
+        if (!tunnels.devices.has(match[1])) {
+          res
+            .writeHead(503, { "Content-Type": "application/json" })
+            .end(JSON.stringify({ error: "Устройство недоступно" }));
+          return;
+        }
+        const stream = await tunnels.open(match[1]);
+        if (res.destroyed) {
+          stream.destroy();
+          return;
+        }
+        forward(req, res, stream, `/api${match[2]}${url.search}`, options.origin);
+        return;
+      }
+      if (url.pathname === "/api/hub/devices") {
+        res
+          .writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" })
+          .end(
+            JSON.stringify({ devices: [...tunnels.devices.values()].map((device) => device.info) }),
+          );
+        return;
+      }
+      if (url.pathname.startsWith("/api/")) {
+        res.writeHead(404).end();
+        return;
+      }
+      if (url.pathname === "/") {
+        const devices = [...tunnels.devices.keys()];
+        if (devices.length === 1) {
+          res.writeHead(303, { Location: `/devices/${devices[0]}/` }).end();
+          return;
+        }
+        res.writeHead(200, {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+        });
+        res.end(
+          `<!doctype html><html lang="ru"><meta charset="utf-8"><title>Projector Hub</title><h1>Projector Hub</h1>${devices.length ? devices.map((id) => `<p><a href="/devices/${id}/">${id}</a></p>`).join("") : "<p>Нет подключённых устройств. Подключите локальный Projector и обновите страницу.</p>"}</html>`,
+        );
+        return;
+      }
+      await serveStatic(options.staticRoot, req, res);
+    })().catch(() => {
+      if (!res.headersSent) res.writeHead(502, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Не удалось связаться с устройством" }));
+    });
+  });
+  server.on("upgrade", (req, socket, head) => {
+    let url: URL;
+    try {
+      url = new URL(req.url ?? "/", options.origin);
+    } catch {
+      socket.end("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
+      return;
+    }
+    socket.on("error", () => socket.destroy());
+    if (url.pathname === "/api/hub/connect" && req.headers.host === new URL(options.origin).host) {
+      tunnels.upgrade(req, socket, head);
+      return;
+    }
+    const match = route(url.pathname);
+    if (!match || !access.allowed(req) || req.headers.origin !== options.origin) {
+      socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
+      return;
+    }
+    void tunnels
+      .open(match[1])
+      .then((stream) => {
+        if (socket.destroyed) {
+          stream.destroy();
+          return;
+        }
+        forward(req, socket, stream, `/api${match[2]}${url.search}`, options.origin, head);
+      })
+      .catch(() => socket.end("HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n"));
+  });
+  tunnels.bind(server);
+  return {
+    server,
+    close: () => {
+      tunnels.close();
+      server.closeAllConnections();
+      server.close();
+    },
+  };
+}

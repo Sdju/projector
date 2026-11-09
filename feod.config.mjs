@@ -76,6 +76,7 @@ export default {
       "@projector/native": "packages/native",
       "@projector/core": "packages/core",
       "@projector/cli": "packages/cli",
+      "@projector/hub": "packages/hub",
     },
     imports: { computed: "forbid", unresolved: "forbid" },
     cycles: { modules: true, types: "include" },
@@ -114,6 +115,7 @@ export default {
       transitModules: ["agents-integration", "agent-widgets"],
       extra: { confine: [...nodeOnly, ...adapters] },
     },
+    "packages/hub": { layers: backendLayers, dependencies: ["packages/core"] },
     "packages/server": {
       layers: backendLayers,
       dependencies: ["packages/core"],

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { deviceUrl } from "../../../common/utilities/device-url.ts";
 import UiPopupSurface from "../../../common/ui/UiPopupSurface.vue";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { workspaceAssetUrl } from "../../workspace-api/index.ts";
@@ -18,7 +19,8 @@ let current: HTMLElement | undefined;
 /** The image a chip stands for: an attachment, or a project file that is a picture. */
 function sourceOf(value: MessageChip | undefined): string {
   if (!value) return "";
-  if (value.type === "image") return `/api/agent/attachments/${encodeURIComponent(value.id)}`;
+  if (value.type === "image")
+    return deviceUrl(`/api/agent/attachments/${encodeURIComponent(value.id)}`);
   if (value.type === "file" && !value.directory && IMAGE_PATH.test(value.path))
     return workspaceAssetUrl(props.projectId, value.path, value.path.startsWith("/"));
   return "";

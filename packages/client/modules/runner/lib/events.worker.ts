@@ -9,6 +9,7 @@ interface Page {
   seen: number;
   live: boolean;
 }
+let prefix = "/api";
 const pages = new Map<MessagePort, Page>();
 const stream = crypto.getRandomValues(new Uint32Array(4)).join("-");
 let source: EventSource | undefined;
@@ -16,7 +17,7 @@ let opened = false;
 
 function sync(add: string[], remove: string[]): Promise<boolean> {
   if (!add.length && !remove.length) return Promise.resolve(true);
-  return fetch("/api/events/pages", {
+  return fetch(`${prefix}/events/pages`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ stream, add, remove }),
@@ -33,7 +34,7 @@ const broadcast = (message: unknown) => {
 
 function start() {
   if (source) return;
-  const current = (source = new EventSource(`/api/events?client=${stream}`));
+  const current = (source = new EventSource(`${prefix}/events?client=${stream}`));
   for (const name of EVENT_NAMES)
     current.addEventListener(name, (event) =>
       broadcast({ type: "event", name, data: (event as MessageEvent).data }),
@@ -77,6 +78,12 @@ scope.onconnect = (event) => {
     const page = pages.get(port);
     if (message.type === "join" && typeof message.page === "string") {
       if (page) return;
+      const candidate = message.apiPrefix ?? "";
+      const requested = /^\/api\/devices\/[a-z0-9][a-z0-9-]{0,62}$/.test(candidate)
+        ? candidate
+        : "/api";
+      if (pages.size && requested !== prefix) return;
+      prefix = requested;
       const joined = { id: message.page, seen: Date.now(), live: false };
       pages.set(port, joined);
       revive(port, joined);

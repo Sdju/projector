@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { deviceUrl } from "../common/utilities/device-url.ts";
 import UiPopupSurface from "../common/ui/UiPopupSurface.vue";
 import UiActionRow from "../common/ui/UiActionRow.vue";
 import UiControl, { type UiControlHandle } from "../common/ui/UiControl.vue";
@@ -241,7 +242,7 @@ onUnmounted(() => {
             @mousemove="selected = index"
             @click="launch(item)"
           >
-            <img v-if="item.icon" :src="item.icon" alt="" width="36" height="36" />
+            <img v-if="item.icon" :src="deviceUrl(item.icon)" alt="" width="36" height="36" />
             <span class="result-copy"
               ><span class="name"
                 ><span v-if="item.favorite" class="star" title="В избранном" aria-hidden="true"

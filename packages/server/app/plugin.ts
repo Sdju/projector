@@ -1,3 +1,4 @@
+import { bindHub } from "../modules/hub/index.ts";
 import { findProject, loadProjects } from "../modules/projects/index.ts";
 import { bindWorkspaceEvents } from "../modules/workspace/index.ts";
 import type { RuntimeHandlers } from "./runtime-contract.ts";
@@ -85,6 +86,27 @@ export function bindRuntime(
     attachTerminalControlServer(httpServer, operations),
     attachSharedTerminalServer(httpServer, operations),
   ];
+  const stopHub = bindHub({
+    handle(req, res) {
+      void handlers()
+        .handleHttp(req, res, () => res.writeHead(404).end())
+        .catch(() => {
+          if (!res.headersSent) res.writeHead(500);
+          res.end();
+        });
+    },
+    attach(server) {
+      const disposers = [
+        attachTerminalServer(server, {
+          allowed,
+          projects: (...args) => handlers().loadProjects(...args),
+        }),
+        attachTerminalControlServer(server, operations),
+        attachSharedTerminalServer(server, operations),
+      ];
+      return () => disposers.forEach((dispose) => dispose?.());
+    },
+  });
   const listening = () => {
     const address = httpServer.address();
     const port = address && typeof address === "object" ? address.port : APP_PORT;
@@ -114,6 +136,7 @@ export function bindRuntime(
   else httpServer.once("listening", listening);
   return () => {
     httpServer.off("listening", listening);
+    stopHub();
     for (const dispose of transports) dispose?.();
     deactivate();
   };

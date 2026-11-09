@@ -1,3 +1,4 @@
+import { deviceUrl } from "../../../common/utilities/device-url.ts";
 import { parseProjectRef } from "@projector/core/modules/project/index.ts";
 import type { Project, ProjectDraft, ProjectCommand, ProjectLocation } from "../model/types.ts";
 
@@ -69,17 +70,17 @@ export function pickFolder(): Promise<{ path: string | null; cancelled: boolean 
 }
 
 export function previewIconUrl(path: string): string {
-  return `/api/preview-icon?path=${encodeURIComponent(path)}`;
+  return deviceUrl(`/api/preview-icon?path=${encodeURIComponent(path)}`);
 }
 
 export function projectIconUrl(project: ProjectLocation): string {
-  if (project.iconUrl) return project.iconUrl;
+  if (project.iconUrl) return deviceUrl(project.iconUrl);
   const revision = new URLSearchParams({
     path: project.path,
     name: project.name,
     icon: project.icon ?? "",
   });
-  return `/api/projects/${encodeURIComponent(project.id)}/icon?${revision}`;
+  return deviceUrl(`/api/projects/${encodeURIComponent(project.id)}/icon?${revision}`);
 }
 
 /** Project logo read from the repository at `ref`; falls back to a letter icon server-side. */
@@ -91,7 +92,7 @@ export function hostedProjectIconUrl(
   // Bumped when icon resolution changes so browsers do not keep an old fallback letter.
   const query = new URLSearchParams({ repository, version: "2" });
   if (ref) query.set("ref", ref);
-  return `/api/integrations/${host}/browse/icon?${query}`;
+  return deviceUrl(`/api/integrations/${host}/browse/icon?${query}`);
 }
 
 export async function fetchDirectories(

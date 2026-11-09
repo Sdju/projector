@@ -1,3 +1,4 @@
+import { isHubRequest, hubAccessAllowed } from "./hub.ts";
 import type { IncomingMessage } from "node:http";
 import { BlockList, isIP } from "node:net";
 import { readNetworkMode } from "@projector/core/modules/app-paths/index.ts";
@@ -79,6 +80,7 @@ export function lanPassword(req: IncomingMessage, queryToken?: string): string |
 
 /** Запрос пришёл с loopback-интерфейса этой машины. */
 export function isLocalRequest(req: IncomingMessage): boolean {
+  if (isHubRequest(req)) return false;
   const address = req.socket.remoteAddress;
   if (!address) return false;
   const family = isIP(address);
@@ -95,6 +97,7 @@ export function accessAllowed(
   requireOrigin = true,
   queryToken?: string,
 ): boolean {
+  if (isHubRequest(req)) return hubAccessAllowed(req, requireOrigin);
   const host = hostname(req);
   const local = isLocalRequest(req);
   if (!isTrustedHost(req)) return false;

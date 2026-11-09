@@ -1,0 +1,13 @@
+{
+  "name": "@projector/hub",
+  "version": "0.10.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node app/main.ts"
+  },
+  "dependencies": {
+    "@projector/core": "workspace:*",
+    "ws": "catalog:"
+  }
+}

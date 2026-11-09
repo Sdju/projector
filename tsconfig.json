@@ -31,6 +31,7 @@
     "packages/native",
     "packages/core",
     "packages/cli",
-    "node_modules/.node-gtk-types/node-gtk.d.ts"
+    "node_modules/.node-gtk-types/node-gtk.d.ts",
+    "packages/hub"
   ]
 }

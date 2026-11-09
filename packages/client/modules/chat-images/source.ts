@@ -1,3 +1,4 @@
+import { deviceUrl } from "../../common/utilities/device-url.ts";
 import { fileUrlPath } from "../../common/utilities/file-path.ts";
 import { markdownPath } from "../../common/utilities/markdown-path.ts";
 import { workspaceAssetUrl } from "../workspace-api/index.ts";
@@ -45,7 +46,7 @@ export function chatImageSource(src: string, projectId: string): string | undefi
     return path ? externalAsset(projectId, path) : undefined;
   }
   if (value.startsWith("/")) {
-    if (APP_ASSET.test(value)) return value;
+    if (APP_ASSET.test(value)) return deviceUrl(value);
     const path = localPath(value);
     return path ? externalAsset(projectId, path) : undefined;
   }

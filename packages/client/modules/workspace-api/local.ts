@@ -1,3 +1,4 @@
+import { deviceUrl } from "../../common/utilities/device-url.ts";
 import { newId } from "../../common/utilities/new-id.ts";
 import type { ClientAgent } from "../agents-integration/catalog/index.ts";
 import { clientAgents } from "../agents-integration/catalog/index.ts";
@@ -5,7 +6,8 @@ import type { FileWrite, GitWrite, WorkspaceProfile } from "./profile.ts";
 import { defineTab, singletonTab } from "./tabs.ts";
 import { localWorkspaceWatch } from "./local-watch.ts";
 
-const base = (projectId: string) => `/api/projects/${encodeURIComponent(projectId)}/workspace`;
+const base = (projectId: string) =>
+  deviceUrl(`/api/projects/${encodeURIComponent(projectId)}/workspace`);
 
 async function send(url: string, method: string, body: unknown, failure: string) {
   const response = await fetch(url, {
@@ -153,7 +155,9 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
             ? `${base(projectId)}/asset?${new URLSearchParams({ path, rev: scope.rev })}`
             : "",
         siteUrl: (path) =>
-          `/api/projects/${encodeURIComponent(projectId)}/site/${path.split("/").map(encodeURIComponent).join("/")}`,
+          deviceUrl(
+            `/api/projects/${encodeURIComponent(projectId)}/site/${path.split("/").map(encodeURIComponent).join("/")}`,
+          ),
         upload: async (directory, path, body, signal) => {
           const response = await fetch(
             `${base(projectId)}/upload?${new URLSearchParams({ directory, path, ...(body ? {} : { kind: "directory" }) })}`,

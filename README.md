@@ -240,3 +240,5 @@ projector-install-desktop     # пункт меню и команда из npm-�
 Projector распространяется по лицензии [MIT](LICENSE). Лицензии включённых
 иконок приведены в [NOTICE](public/file-icons/NOTICE.md); внешний пакет `@zede/vio` распространяется
 по собственной [лицензии MIT](https://github.com/Sdju/vio/blob/main/packages/vio/LICENSE).
+
+Доступ к устройствам через центральный интерфейс: [Projector Hub](docs/hub.md).

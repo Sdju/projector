@@ -1,3 +1,4 @@
+import { deviceUrl } from "./device-url.ts";
 let currentPassword: string | null = null;
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -50,6 +51,10 @@ function requestPassword(): Promise<string | null> {
  * запрашивает пароль; 401 от GitHub/провайдеров возвращаются вызывающему коду.
  */
 export async function authedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const original =
+    typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  const scoped = deviceUrl(original);
+  if (scoped !== original) input = input instanceof Request ? new Request(scoped, input) : scoped;
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
   if (!isSameOrigin(url)) return nativeFetch(input, init);
 

@@ -521,6 +521,15 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
 
+  packages/hub:
+    dependencies:
+      '@projector/core':
+        specifier: workspace:*
+        version: link:../core
+      ws:
+        specifier: 'catalog:'
+        version: 8.22.0
+
   packages/native:
     dependencies:
       '@projector/core':

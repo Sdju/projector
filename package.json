@@ -36,7 +36,8 @@
     "test:gtk": "node --import @zede/vio/register tests/native-palette.gtk.mjs",
     "bench:chat": "node scripts/bench-chat/run.mjs",
     "build:distribution": "vp run build && node scripts/build-distribution.mjs",
-    "verify:distribution": "node scripts/verify-distribution.mjs"
+    "verify:distribution": "node scripts/verify-distribution.mjs",
+    "hub": "node packages/hub/app/main.ts"
   },
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "catalog:",

@@ -46,7 +46,9 @@ export class DevRuntime {
     this.revision++;
     if (
       /\/server\/modules\/(terminal|terminal-control)\/(socket|shared-socket)\.ts$/.test(file) ||
-      file.endsWith("/server/modules/access/connections.ts")
+      file.endsWith("/server/modules/access/connections.ts") ||
+      file.includes("/server/modules/hub/") ||
+      file.endsWith("/server/app/plugin.ts")
     )
       this.replaceTransports = true;
     await this.load();

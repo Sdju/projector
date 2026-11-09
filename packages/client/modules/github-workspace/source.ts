@@ -1,3 +1,4 @@
+import { deviceUrl } from "../../common/utilities/device-url.ts";
 import type { GithubRepository, GithubEntry } from "@projector/core/modules/github/index.ts";
 import type { FileContent, FileEntry } from "@projector/core/modules/workspace/index.ts";
 import { treePageRange } from "@projector/core/modules/workspace/index.ts";
@@ -257,11 +258,15 @@ export function createGithubWorkspaceProfile(
       changed(next);
     },
     assetUrl(path) {
-      return `/api/integrations/github/browse/asset?${new URLSearchParams({ repository, sha: metadata.tree, path })}`;
+      return deviceUrl(
+        `/api/integrations/github/browse/asset?${new URLSearchParams({ repository, sha: metadata.tree, path })}`,
+      );
     },
     scopeAssetUrl(scope, path) {
       return scope.kind === "commit"
-        ? `/api/integrations/github/browse/asset?${new URLSearchParams({ repository, commit: scope.rev, path })}`
+        ? deviceUrl(
+            `/api/integrations/github/browse/asset?${new URLSearchParams({ repository, commit: scope.rev, path })}`,
+          )
         : "";
     },
     async read(action, params, signal) {

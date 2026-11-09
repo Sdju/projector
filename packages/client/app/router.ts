@@ -1,3 +1,4 @@
+import { deviceBase } from "../common/utilities/device-url.ts";
 import { createRouter, createWebHistory } from "vue-router";
 import GithubProjectPage from "../pages/gh/projects/[...githubPath].vue";
 import GitlabProjectPage from "../pages/gl/projects/[...gitlabPath].vue";
@@ -6,7 +7,7 @@ import SettingsPage from "../pages/settings.vue";
 import LauncherPage from "../pages/index.vue";
 
 export const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(deviceBase() || "/"),
   routes: [
     { path: "/", name: "launcher", component: LauncherPage },
     { path: "/projects", redirect: "/" },

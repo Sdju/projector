@@ -1,3 +1,4 @@
+import { deviceUrl, deviceApiPrefix } from "../../../common/utilities/device-url.ts";
 import { EVENT_NAMES } from "./event-names.ts";
 
 export type EventHandler = (name: string, data: string) => void;
@@ -11,7 +12,7 @@ interface PageConnection {
 const page = globalThis as typeof globalThis & { [CONNECTION]?: PageConnection };
 
 function direct(clientId: string, handler: EventHandler): void {
-  const source = new EventSource(`/api/events?client=${clientId}`);
+  const source = new EventSource(deviceUrl(`/api/events?client=${clientId}`));
   for (const name of EVENT_NAMES)
     source.addEventListener(name, (event) => handler(name, (event as MessageEvent).data));
   // After a reconnect the server has dropped this page's watchers and files may have changed meanwhile.
@@ -51,7 +52,7 @@ function openEvents(clientId: string, handler: EventHandler): void {
   try {
     worker = new SharedWorker(new URL("./events.worker.ts", import.meta.url), {
       type: "module",
-      name: "projector-events-v1",
+      name: "projector-events-v1" + deviceApiPrefix(),
     });
   } catch {
     return direct(clientId, handler);
@@ -67,7 +68,7 @@ function openEvents(clientId: string, handler: EventHandler): void {
     if (message.type === "ready") {
       ready = true;
       clearTimeout(timer);
-      worker.port.postMessage({ type: "join", page: clientId });
+      worker.port.postMessage({ type: "join", page: clientId, apiPrefix: deviceApiPrefix() });
     } else if (message.type === "ping") worker.port.postMessage({ type: "pong" });
     else if (message.type === "event") handler(message.name, message.data);
   };
@@ -76,6 +77,6 @@ function openEvents(clientId: string, handler: EventHandler): void {
   globalThis.addEventListener("pagehide", () => worker.port.postMessage({ type: "leave" }));
   globalThis.addEventListener("pageshow", (event) => {
     if ((event as PageTransitionEvent).persisted && !fallback)
-      worker.port.postMessage({ type: "join", page: clientId });
+      worker.port.postMessage({ type: "join", page: clientId, apiPrefix: deviceApiPrefix() });
   });
 }
