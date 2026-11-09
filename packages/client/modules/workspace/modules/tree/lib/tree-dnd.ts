@@ -1,6 +1,6 @@
 import { moveWorkspaceEntry, workspaceCapabilities } from "../../../../workspace-api/index.ts";
+import { readDrop } from "../../../../path-drop/index.ts";
 import { autoScrollDuringDrag, treeDragType } from "./tree-drag.ts";
-import { readDrop } from "./drop-entries.ts";
 import type { useTreeImport } from "./tree-import.ts";
 import { topLevelTreePaths } from "./tree-selection.ts";
 import {

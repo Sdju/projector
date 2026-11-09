@@ -4,8 +4,14 @@ import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vu
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { EditorSelection, EditorState, Prec } from "@codemirror/state";
 import { EditorView, keymap, placeholder as placeholderText } from "@codemirror/view";
-import { isFileDrag, pathsFromDataTransfer } from "../../path-drop/index.ts";
+import {
+  isFileDrag,
+  pathsFromDataTransfer,
+  readDrop,
+  type DropSource,
+} from "../../path-drop/index.ts";
 import { uploadAttachment } from "../api/client.ts";
+import { importDroppedEntries } from "../lib/drop-import.ts";
 import { findWorkspacePaths, workspaceRequest } from "../../workspace-api/index.ts";
 import {
   chipExtensions,
@@ -215,6 +221,26 @@ async function attachImages(files: File[], at?: number) {
 const imagesOf = (data: DataTransfer | null) =>
   [...(data?.files ?? [])].filter((file) => file.type.startsWith("image/"));
 
+/** Файлы с диска браузер отдаёт без пути: кладём их в проект и ссылаемся как на `@path`. */
+async function importDropped(source: DropSource, at: number) {
+  const target = view.value;
+  const projectId = props.projectId;
+  if (!target) return;
+  if (!projectId) {
+    emit("fail", "Файл можно добавить только в проект");
+    return;
+  }
+  try {
+    const entries = source.kind === "files" ? await source.entries : [];
+    const chips = await importDroppedEntries(projectId, entries);
+    if (view.value !== target || projectId !== props.projectId || !chips.length) return;
+    insertDropped(target, chips, Math.min(at, target.state.doc.length));
+    target.focus();
+  } catch (error) {
+    emit("fail", error instanceof Error ? error.message : "Не удалось добавить файлы");
+  }
+}
+
 function commit(state: EditorState) {
   const next = contentOf(state);
   const text = messageText(next);
@@ -348,10 +374,18 @@ function dropData(data: DataTransfer, at?: number): boolean {
     target.focus();
     return true;
   }
-  // The browser gave no path (a dragged image, not a file): send the image itself.
-  const images = imagesOf(data);
-  if (!images.length) return false;
-  void attachImages(images, position);
+  const files = [...data.files];
+  const roots = [...data.items].filter((item) => item.kind === "file");
+  const directories = roots.some((item) => item.webkitGetAsEntry?.()?.isDirectory);
+  const images = files.filter((file) => file.type.startsWith("image/"));
+  // A dragged image, not a file with a path: send the image itself.
+  if (files.length && !directories && images.length === files.length) {
+    void attachImages(images, position);
+    return true;
+  }
+  if (!files.length && !roots.length) return false;
+  // The browser gave no path for a desktop file or folder: upload it into the project.
+  void importDropped(readDrop(data), position);
   return true;
 }
 function insertChips(chips: MessageChip[]) {
