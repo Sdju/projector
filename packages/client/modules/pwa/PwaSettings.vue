@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { ref } from "vue";
 import UiBadge from "../../common/ui/UiBadge.vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import UiHeading from "../../common/ui/UiHeading.vue";
@@ -13,45 +12,36 @@ import {
   toggleFullscreen,
   usePwa,
 } from "./model.ts";
+import { useSectionAction } from "../../common/utilities/use-section-action.ts";
 
 const { canInstall, installed, standalone, fullscreen, worker, mode, error } = usePwa();
-const busy = ref(false);
-const status = ref("");
+const { busy, status, perform } = useSectionAction({ error });
 const fullscreenSupported = fullscreenAvailable();
 const secure = isSecurePwaOrigin();
 const iphone = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 async function install() {
-  busy.value = true;
-  status.value = "";
-  error.value = "";
-  try {
-    const outcome = await installApp();
-    status.value =
-      outcome === "accepted"
+  await perform(
+    async () => {
+      const outcome = await installApp();
+      return outcome === "accepted"
         ? "Установка принята: Projector появится среди приложений."
         : outcome === "installed"
           ? "Projector уже открыт как приложение."
           : "Установка отменена.";
-  } catch (value) {
-    error.value = value instanceof Error ? value.message : "Не удалось установить приложение";
-  } finally {
-    busy.value = false;
-  }
+    },
+    { errorFallback: "Не удалось установить приложение" },
+  );
 }
 
 async function toggle() {
-  busy.value = true;
-  status.value = "";
-  error.value = "";
-  try {
-    const active = await toggleFullscreen();
-    status.value = active ? "Полноэкранный режим включён." : "Полноэкранный режим выключен.";
-  } catch (value) {
-    error.value = value instanceof Error ? value.message : "Не удалось переключить режим";
-  } finally {
-    busy.value = false;
-  }
+  await perform(
+    async () => {
+      const active = await toggleFullscreen();
+      return active ? "Полноэкранный режим включён." : "Полноэкранный режим выключен.";
+    },
+    { errorFallback: "Не удалось переключить режим" },
+  );
 }
 </script>
 

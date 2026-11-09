@@ -25,13 +25,13 @@
 - `viewers/ui/ChangedFileRow.vue` и `viewers/lib/file-diffs.ts` — общий ряд изменённого файла с diff-панелью и общий кэш diff; `CommitFiles` и `PullRequestFiles` маппят только свои данные.
 - `issues/lib/change-tree.ts` — построение, фолдинг и флаттен дерева снимка с тестами. Решение: `ChangesTree` и `GitChangesTree` остаются раздельными — у них разные модели данных и взаимодействия; общий компонент потребовал бы булевый набор режимов.
 - `common/utilities/use-async-data.ts` и `common/ui/UiLoadablePanel.vue` — загрузка с защитой от устаревших ответов и общая панель loading/error; `PullRequestFilesSection` и `CompareTreeSection` больше не дублируют `generation`, `watch` и оболочку.
+- `common/utilities/use-section-action.ts` — `ready/busy/error/status`, загрузка, действие и rollback. Переведены `EditorSettings`, `FilesExcludeSettings`, `FavoriteFolders`, `InterfaceSettings` и `PwaSettings`; `NetworkSettings` и `OpenAiGatewaySettings` уже держат lifecycle в своих моделях.
 - Удалены мёртвые `resize`-заглушка, несовпадающие `prefers-reduced-motion`, неиспользуемый `const props`, локальные `.sr-only`, мёртвые `.muted`/`.hint`/`.field`/`.link`.
 - `ReleaseView` переведён на `UiMessage tone="danger"`; `ArchiveViewer` — на `sizeLabel` и `UiEmpty`; `999px` заменены на `var(--r-full)`.
 - Реестр больших файлов синхронизирован: `AgentChat.vue` — 502, `projector-backend.ts` — 409, `gitlab/browser.ts` — 402.
 
 ## Приоритет P2
 
-- [ ] **Scaffold настроек вне агента.** `ready/busy/error/status + save/rollback` повторён в `InterfaceSettings`, `FavoriteFolders`, `EditorSettings`, `FilesExcludeSettings`, `PwaSettings`, `NetworkSettings`, `OpenAiGatewaySettings`. Общий lifecycle уже есть в `integration-api/operation.ts`. Вынести `useSectionAction` и перевести секции на `UiSettingsSection`.
 - [ ] **AgentChat.** 924 строки, 502 непустых строк script при потолке 502; 15 ответственностей; свой `.chat-log` вместо `UiScrollArea`. Вынести сборку `ChatController`, скролл, drop, подсказки. Рядом: `AgentInput` (587/444), `AgentTurn` (14 props, 7 boolean, 11 emits), `AgentSessions` (10 props), `AgentActivityDock` (9 `:deep`), markdown-тема заперта в `AgentMessage` (38 `:deep`).
 - [ ] **Задачи.** `AgentJobTab ↔ AgentTaskView` — общий каркас read-only вкладки; `AgentTaskRow ↔ AgentTaskView` — общая обвязка `useAgentLens`. Вынести `AgentTaskFrame`, `useTaskLens`, `useJobFollow`, `AgentStatusIcon`.
 - [ ] **Виджеты и графики.** `Line` (485, chart-движок, clamp продублирован 3×), `UsageLine ↔ UsageBarChart` (style 0.59), `UsageDonut ↔ Donut`, `Field` (15 props, дублирует `Checks/Tabs/Slider/Input` и `UiField`), `Form ↔ IntelligentForm`, 5 `*UsageIndicator`, 5 копий прогресс-бара. Вынести `ChartFrame`, `UiMeter`, `Field`-диспетчер, общий `Form`.
@@ -49,9 +49,8 @@
 
 ## Порядок работ
 
-1. Scaffold настроек вне агента.
-2. Декомпозиция `AgentChat`/`AgentInput`/задач.
-3. Виджеты, графики и `common/ui`.
+1. Декомпозиция `AgentChat`/`AgentInput`/задач.
+2. Виджеты, графики и `common/ui`.
 
 ## Замечания
 

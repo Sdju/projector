@@ -14,15 +14,13 @@ import {
   migratePattern,
   type FilesExcludeMap,
 } from "@projector/core/modules/workspace/index.ts";
+import { useSectionAction } from "../../../../../common/utilities/use-section-action.ts";
 
 defineProps<{ embedded?: boolean }>();
 const titleId = useId();
 
 const exclude = ref<FilesExcludeMap>(defaultFilesExclude());
-const ready = ref(false);
-const busy = ref(false);
-const error = ref("");
-const status = ref("");
+const { ready, busy, error, status, load: loadSection, perform } = useSectionAction();
 const patterns = computed(() => enabledExcludePatterns(exclude.value));
 
 async function request(method: string, body?: object) {
@@ -36,32 +34,28 @@ async function request(method: string, body?: object) {
   return data as { exclude: FilesExcludeMap };
 }
 
-async function load() {
-  error.value = "";
-  try {
+function load() {
+  return loadSection(async () => {
     exclude.value = (await request("GET")).exclude;
-    ready.value = true;
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : "Не удалось загрузить исключения";
-  }
+  }, "Не удалось загрузить исключения");
 }
 
 async function save(next: FilesExcludeMap) {
-  busy.value = true;
-  error.value = "";
-  status.value = "";
   const previous = exclude.value;
   exclude.value = next;
-  try {
-    exclude.value = (await request("PUT", { exclude: next })).exclude;
-    bumpFilesExcludeRevision();
-    status.value = "Сохранено";
-  } catch (err) {
-    exclude.value = previous;
-    error.value = err instanceof Error ? err.message : "Не удалось сохранить исключения";
-  } finally {
-    busy.value = false;
-  }
+  await perform(
+    async () => {
+      exclude.value = (await request("PUT", { exclude: next })).exclude;
+      bumpFilesExcludeRevision();
+    },
+    {
+      errorFallback: "Не удалось сохранить исключения",
+      success: "Сохранено",
+      rollback: () => {
+        exclude.value = previous;
+      },
+    },
+  );
 }
 
 function validate(pattern: string) {

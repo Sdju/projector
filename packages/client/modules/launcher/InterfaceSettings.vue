@@ -16,6 +16,7 @@ import {
   type AppearanceChoice,
 } from "@projector/core/modules/appearance/index.ts";
 import { applyAppearance, currentAppearance } from "../appearance/index.ts";
+import { useSectionAction } from "../../common/utilities/use-section-action.ts";
 const shortcutId = useId();
 const appearanceId = useId();
 const mode = ref("native");
@@ -25,16 +26,19 @@ const savedShortcut = ref("Ctrl+Alt+Space");
 const hotkey = ref<{ supported: boolean; active: boolean; shortcut: string }>();
 const appearance = ref<AppearanceChoice>(currentAppearance());
 const savedAppearance = ref<AppearanceChoice>(appearance.value);
-const appearanceBusy = ref(true);
-const appearanceError = ref("");
-const appearanceStatus = ref("");
+const { ready, busy, error, status, load: loadLauncherSection, perform } = useSectionAction();
+const appearanceState = useSectionAction();
+const {
+  busy: appearanceBusy,
+  error: appearanceError,
+  status: appearanceStatus,
+  load: loadAppearanceSection,
+  perform: performAppearance,
+} = appearanceState;
+appearanceBusy.value = true;
 const appearanceDescription = computed(
   () => appearanceOptions.find((option) => option.id === appearance.value)?.description ?? "",
 );
-const error = ref("");
-const status = ref("");
-const ready = ref(false);
-const busy = ref(false);
 const modes = [
   {
     id: "native",
@@ -58,90 +62,78 @@ async function request(method: string, body?: object) {
   if (!response.ok) throw new Error(data.error);
   return data;
 }
-onMounted(async () => {
+onMounted(() => {
   void loadAppearance();
-  try {
+  void loadLauncher();
+});
+async function loadLauncher() {
+  await loadLauncherSection(async () => {
     const data = await request("GET");
     mode.value = saved.value = data.mode;
     shortcut.value = savedShortcut.value = data.shortcut;
     hotkey.value = data.hotkey;
-    ready.value = true;
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : "Не удалось загрузить настройки";
-  }
-});
+  }, "Не удалось загрузить настройки");
+}
 async function loadAppearance() {
-  try {
+  await loadAppearanceSection(async () => {
     const response = await fetch("/api/appearance");
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Не удалось загрузить схему");
     if (isAppearanceChoice(data.choice)) appearance.value = data.choice;
     savedAppearance.value = appearance.value;
     applyAppearance(appearance.value);
-  } catch (err) {
-    appearanceError.value = err instanceof Error ? err.message : "Не удалось загрузить схему";
-  } finally {
-    appearanceBusy.value = false;
-  }
+  }, "Не удалось загрузить схему");
 }
 async function saveAppearance() {
   const next = appearance.value;
   if (next === savedAppearance.value) return;
   const previous = savedAppearance.value;
-  appearanceBusy.value = true;
-  appearanceError.value = "";
-  appearanceStatus.value = "";
   applyAppearance(next);
-  try {
-    const response = await fetch("/api/appearance", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ choice: next }),
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Не удалось сохранить схему");
-    savedAppearance.value = next;
-    appearanceStatus.value = "Схема сохранена";
-  } catch (err) {
-    appearance.value = previous;
-    applyAppearance(previous);
-    appearanceError.value = err instanceof Error ? err.message : "Не удалось сохранить схему";
-  } finally {
-    appearanceBusy.value = false;
-  }
+  await performAppearance(
+    async () => {
+      const response = await fetch("/api/appearance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ choice: next }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Не удалось сохранить схему");
+      savedAppearance.value = next;
+    },
+    {
+      errorFallback: "Не удалось сохранить схему",
+      success: "Схема сохранена",
+      rollback: () => {
+        appearance.value = previous;
+        applyAppearance(previous);
+      },
+    },
+  );
 }
 async function save() {
-  busy.value = true;
-  error.value = "";
-  status.value = "";
-  try {
-    const data = await request("PUT", { mode: mode.value, shortcut: shortcut.value });
-    saved.value = mode.value;
-    savedShortcut.value = shortcut.value;
-    hotkey.value = data.hotkey;
-    status.value = "Сохранено";
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : "Не удалось сохранить";
-  } finally {
-    busy.value = false;
-  }
+  await perform(
+    async () => {
+      const data = await request("PUT", { mode: mode.value, shortcut: shortcut.value });
+      saved.value = mode.value;
+      savedShortcut.value = shortcut.value;
+      hotkey.value = data.hotkey;
+    },
+    { errorFallback: "Не удалось сохранить", success: "Сохранено" },
+  );
 }
 async function open() {
-  busy.value = true;
-  error.value = "";
-  try {
-    const response = await fetch("/api/app/open", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: mode.value }),
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error);
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : "Не удалось открыть";
-  } finally {
-    busy.value = false;
-  }
+  await perform(
+    async () => {
+      const response = await fetch("/api/app/open", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: mode.value }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+    },
+    { errorFallback: "Не удалось открыть" },
+  );
 }
 </script>
 

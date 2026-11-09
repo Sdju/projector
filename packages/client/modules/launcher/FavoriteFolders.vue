@@ -5,42 +5,30 @@ import { onMounted, ref } from "vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import UiHint from "../../common/ui/UiHint.vue";
 import { commandArgs, useCommandScope } from "../../common/utilities/commands.ts";
+import { useSectionAction } from "../../common/utilities/use-section-action.ts";
 
 const folders = ref<string[]>([]);
 const path = ref("");
 const folder = ref("");
 const name = ref("");
-const error = ref("");
-const status = ref("");
-const busy = ref(false);
+const { busy, error, status, run } = useSectionAction();
 
 async function request<T>(url: string, method = "GET", body?: object): Promise<T> {
-  const response = await fetch(url, {
-    method,
-    headers: { "Content-Type": "application/json" },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const init: RequestInit = { method };
+  if (body) {
+    init.headers = { "Content-Type": "application/json" };
+    init.body = JSON.stringify(body);
+  }
+  const response = await fetch(url, init);
   const data = await response.json();
   if (!response.ok) throw new Error(data.error);
   return data as T;
-}
-async function action(task: () => Promise<string | void>) {
-  busy.value = true;
-  error.value = "";
-  status.value = "";
-  try {
-    status.value = (await task()) ?? "";
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : "Не удалось выполнить";
-  } finally {
-    busy.value = false;
-  }
 }
 async function load() {
   folders.value = (await request<{ folders: string[] }>("/api/launcher/folders")).folders;
   folder.value ||= folders.value[0] ?? "";
 }
-onMounted(() => action(load));
+onMounted(() => run(load));
 
 async function add(value: string) {
   const data = await request<{ folders: string[] }>("/api/launcher/folders", "POST", {
@@ -76,7 +64,7 @@ commands.scope.registerCommand({
     "Делает папку избранной: её проекты идут в списке запуска первыми, в ней ищутся ещё не открытые папки, и в ней можно создавать новые проекты.",
   arguments: { path: "абсолютный путь или ~/…" },
   enabled: () => !busy.value,
-  run: (value) => action(() => add(String(commandArgs(value).path ?? path.value))),
+  run: (value) => run(() => add(String(commandArgs(value).path ?? path.value))),
 });
 commands.scope.registerCommand({
   id: "ide.folders.favorite.remove",
@@ -84,7 +72,7 @@ commands.scope.registerCommand({
   description: "Убирает папку из избранных; сама папка и её проекты не удаляются.",
   arguments: { path: "путь избранной папки" },
   enabled: () => !busy.value && folders.value.length > 0,
-  run: (value) => action(() => remove(String(commandArgs(value).path ?? ""))),
+  run: (value) => run(() => remove(String(commandArgs(value).path ?? ""))),
 });
 commands.scope.registerCommand({
   id: "ide.folders.project.create",
@@ -95,9 +83,7 @@ commands.scope.registerCommand({
   enabled: () => !busy.value && folders.value.length > 0,
   run: (value) => {
     const args = commandArgs(value);
-    return action(() =>
-      create(String(args.folder ?? folder.value), String(args.name ?? name.value)),
-    );
+    return run(() => create(String(args.folder ?? folder.value), String(args.name ?? name.value)));
   },
 });
 </script>
@@ -113,10 +99,10 @@ commands.scope.registerCommand({
     <ul v-if="folders.length">
       <li v-for="item in folders" :key="item">
         <code>{{ item }}</code>
-        <UiButton :disabled="busy" @click="action(() => remove(item))">Убрать</UiButton>
+        <UiButton :disabled="busy" @click="run(() => remove(item))">Убрать</UiButton>
       </li>
     </ul>
-    <form class="row" @submit.prevent="action(() => add(path))">
+    <form class="row" @submit.prevent="run(() => add(path))">
       <UiControl
         grow
         v-model="path"
@@ -126,7 +112,7 @@ commands.scope.registerCommand({
       />
       <UiButton type="submit" :disabled="busy || !path.trim()">Добавить</UiButton>
     </form>
-    <form v-if="folders.length" class="row" @submit.prevent="action(() => create(folder, name))">
+    <form v-if="folders.length" class="row" @submit.prevent="run(() => create(folder, name))">
       <UiControl
         grow
         as="select"

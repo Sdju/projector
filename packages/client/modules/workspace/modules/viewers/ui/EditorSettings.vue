@@ -7,15 +7,13 @@ import UiHeading from "../../../../../common/ui/UiHeading.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import { editorThemes, type EditorTheme } from "@projector/core/modules/editor-themes/index.ts";
 import { editorTheme, applyEditorTheme, loadEditorTheme } from "../lib/editor-theme.ts";
+import { useSectionAction } from "../../../../../common/utilities/use-section-action.ts";
 defineProps<{ embedded?: boolean }>();
 const titleId = useId();
 const themeId = useId();
 const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
 const selected = ref<EditorTheme>(editorTheme.value);
-const ready = ref(false);
-const busy = ref(false);
-const error = ref("");
-const status = ref("");
+const { ready, busy, error, status, load: loadSection, perform } = useSectionAction();
 const description = computed(
   () => editorThemes.find((theme) => theme.id === selected.value)?.description,
 );
@@ -31,37 +29,33 @@ export function recentProjects(projects: Project[], limit = 5) {
     .slice(0, limit)
     .map((project) => \`Открыть \${project.name}\`);
 }`;
-async function load() {
-  error.value = "";
-  try {
+function load() {
+  return loadSection(async () => {
     await loadEditorTheme();
     selected.value = editorTheme.value;
-    ready.value = true;
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : "Не удалось загрузить настройки";
-  }
+  }, "Не удалось загрузить настройки");
 }
 onMounted(load);
 async function save() {
-  busy.value = true;
-  error.value = "";
-  status.value = "";
-  try {
-    const response = await fetch("/api/ide/editor", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ theme: selected.value }),
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Не удалось сохранить тему");
-    applyEditorTheme(selected.value);
-    status.value = "Тема сохранена";
-  } catch (err) {
-    selected.value = editorTheme.value;
-    error.value = err instanceof Error ? err.message : "Не удалось сохранить тему";
-  } finally {
-    busy.value = false;
-  }
+  await perform(
+    async () => {
+      const response = await fetch("/api/ide/editor", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ theme: selected.value }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Не удалось сохранить тему");
+      applyEditorTheme(selected.value);
+    },
+    {
+      errorFallback: "Не удалось сохранить тему",
+      success: "Тема сохранена",
+      rollback: () => {
+        selected.value = editorTheme.value;
+      },
+    },
+  );
 }
 </script>
 
