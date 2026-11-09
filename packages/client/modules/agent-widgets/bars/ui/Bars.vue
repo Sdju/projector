@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiMeter from "../../../../common/ui/UiMeter.vue";
 import { computed } from "vue";
 
 const props = defineProps<{ items: { label: string; value: number }[]; unit?: string }>();
@@ -9,9 +10,7 @@ const max = computed(() => Math.max(1, ...props.items.map((item) => item.value))
   <ul class="bars">
     <li v-for="item in items" :key="item.label">
       <span class="label">{{ item.label }}</span>
-      <span class="track"
-        ><span class="fill" :style="{ width: `${(item.value / max) * 100}%` }"
-      /></span>
+      <UiMeter :value="(item.value / max) * 100" :height="8" tone="info" />
       <span class="value">{{ item.value }}{{ unit ?? "" }}</span>
     </li>
   </ul>
@@ -31,18 +30,6 @@ li {
   gap: var(--sp-2);
   align-items: center;
   font-size: var(--fs-xs);
-}
-.track {
-  height: 8px;
-  border-radius: var(--r-sm);
-  background: var(--bg-3);
-  overflow: hidden;
-}
-.fill {
-  display: block;
-  height: 100%;
-  background: var(--info);
-  transition: width 0.2s;
 }
 .value {
   color: var(--muted);

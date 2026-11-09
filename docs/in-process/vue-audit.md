@@ -28,6 +28,7 @@
 - `common/utilities/use-section-action.ts` — `ready/busy/error/status`, загрузка, действие и rollback. Переведены `EditorSettings`, `FilesExcludeSettings`, `FavoriteFolders`, `InterfaceSettings` и `PwaSettings`; `NetworkSettings` и `OpenAiGatewaySettings` уже держат lifecycle в своих моделях.
 - `agent/model/task-lens.ts` и `agent/model/job-follow.ts` — общий Lens/transcript для строки и вкладки задачи, long-polling и действия фонового задания; `AgentTaskRow`, `AgentTaskView` и `AgentJobTab` стали тоньше.
 - `agent/ui/AgentTaskFrame.vue` и `AgentStatusIcon.vue` — общий каркас read-only задачи и один статус-глиф для заданий, задач и активности.
+- `common/ui/UiMeter.vue` — один прогресс-бар с тонами, высотой, мягкой заливкой и сегментами; заменил копии в `Bars`, `UsageBreakdown`, `LimitCard` и двухцветный diff в `GitInfo`.
 - `agent/model/chat-scroll.ts` — pin/away, ResizeObserver и подгрузка старых ходов; `AgentChat` сократился ниже 500 строк и удалён из реестра больших файлов.
 - `agent/lib/composer/suggestions.ts` и `editing.ts` — завершение `@`/`/` и вставка/добавление чипов, текста и цитат; `AgentInput` больше не держит эту логику.
 - `agent/lib/composer/drop.ts` — drop/paste, пути из дерева, загрузка картинок и root проекта; `AgentInput` оставил только CodeMirror-хост, команды и expose.
@@ -41,7 +42,7 @@
 ## Приоритет P2
 
 - [ ] **AgentTurn — булевы и события.** 13 props, из них 7 boolean, и 11 emits; сгруппировать флаги (`busy/last/copied/faded/canRevert/readonly/formAnswered`) и действия в объекты. Остальные компоненты чата уже разгружены.
-- [ ] **Виджеты и графики.** `Line` (485, chart-движок, clamp продублирован 3×), `UsageLine ↔ UsageBarChart` (style 0.59), `UsageDonut ↔ Donut`, `Field` (15 props, дублирует `Checks/Tabs/Slider/Input` и `UiField`), `Form ↔ IntelligentForm`, 5 `*UsageIndicator`, 5 копий прогресс-бара. Вынести `ChartFrame`, `UiMeter`, `Field`-диспетчер, общий `Form`.
+- [ ] **Виджеты и графики.** Прогресс-бары уже сведены в `UiMeter`, кроме `UsageMeter` с подписями. Осталось: `Line` (485, chart-движок, clamp продублирован 3×), `UsageLine ↔ UsageBarChart` (style 0.59), `UsageDonut ↔ Donut`, `Field` (15 props, дублирует `Checks/Tabs/Slider/Input` и `UiField`), `Form ↔ IntelligentForm`, 5 `*UsageIndicator`. Вынести `ChartFrame`, `Field`-диспетчер, общий `Form`.
 - [ ] **`common/ui`.** Четыре реализации «поверхности» (`UiCard`, `UiPopupSurface`, `UiDialog`, тост `UiNoticeHost`); `ContextMenu` рендерит строку меню дважды; несовместимые API раскладок (`UiInline` считает `gap * 4` px, `UiActionRow` мапит `1.5 → 6px`); текстовые примитивы повторяют `size/space` inline-стилями; `ImageModal` — 9 `!important`; `UiStringList` — 10 props на одного потребителя; `FileIcon` — размеры захардкожены 6 раз.
 
 ## P3

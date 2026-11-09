@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import UiMeter from "../../../common/ui/UiMeter.vue";
+
 const props = defineProps<{
   items: { label: string; value: number; share: number }[];
   format?: (value: number) => string;
@@ -6,7 +8,6 @@ const props = defineProps<{
 }>();
 
 const format = (value: number) => props.format?.(value) ?? String(value);
-const width = (share: number) => `${Math.max(1, Math.min(100, share * 100))}%`;
 </script>
 
 <template>
@@ -16,7 +17,7 @@ const width = (share: number) => `${Math.max(1, Math.min(100, share * 100))}%`;
         <span class="label">{{ item.label }}</span>
         <span class="value">{{ format(item.value) }}</span>
       </div>
-      <div class="track"><i :style="{ width: width(item.share) }" /></div>
+      <UiMeter :value="Math.max(1, Math.min(100, item.share * 100))" :height="5" tone="info" soft />
     </li>
   </ul>
 </template>
@@ -51,17 +52,5 @@ li {
 .value {
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
-}
-.track {
-  height: 5px;
-  overflow: hidden;
-  border-radius: 3px;
-  background: var(--bg-sunken);
-}
-.track i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: color-mix(in srgb, var(--info) 72%, var(--line));
 }
 </style>

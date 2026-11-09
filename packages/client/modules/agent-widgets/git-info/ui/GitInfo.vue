@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import IconGitBranch from "~icons/lucide/git-branch";
 import UiBadge from "../../../../common/ui/UiBadge.vue";
+import UiMeter from "../../../../common/ui/UiMeter.vue";
 
 interface GitCommit {
   hash: string;
@@ -45,6 +46,16 @@ const changeCount = computed(() => changes.value.reduce((sum, item) => sum + ite
 const hasChanges = computed(() => changes.value.length > 0);
 const diffTotal = computed(() => (props.additions ?? 0) + (props.deletions ?? 0));
 const hasDiff = computed(() => props.additions !== undefined || props.deletions !== undefined);
+const diffSegments = computed<Array<{ value: number; tone: "success" | "danger" }>>(() => [
+  {
+    value: diffTotal.value ? ((props.additions ?? 0) / diffTotal.value) * 100 : 0,
+    tone: "success",
+  },
+  {
+    value: diffTotal.value ? ((props.deletions ?? 0) / diffTotal.value) * 100 : 0,
+    tone: "danger",
+  },
+]);
 const empty = computed(
   () =>
     !props.branch &&
@@ -94,18 +105,7 @@ const short = (hash: string) => hash.slice(0, 7);
       <div v-if="hasDiff" class="diff">
         <span class="add">+{{ additions ?? 0 }}</span>
         <span class="del">−{{ deletions ?? 0 }}</span>
-        <span class="track" aria-hidden="true">
-          <span
-            v-if="diffTotal"
-            class="added"
-            :style="{ width: `${((additions ?? 0) / diffTotal) * 100}%` }"
-          />
-          <span
-            v-if="diffTotal"
-            class="deleted"
-            :style="{ width: `${((deletions ?? 0) / diffTotal) * 100}%` }"
-          />
-        </span>
+        <UiMeter :height="6" :segments="diffSegments" aria-hidden="true" />
       </div>
 
       <ol v-if="commits?.length" class="commits">
@@ -187,28 +187,11 @@ header {
   align-items: center;
   font-variant-numeric: tabular-nums;
 }
-.track {
-  display: flex;
-  height: 6px;
-  overflow: hidden;
-  border-radius: var(--r-sm);
-  background: var(--bg-3);
-}
-.track span {
-  display: block;
-  height: 100%;
-}
 .add {
   color: var(--run);
 }
 .del {
   color: var(--err);
-}
-.added {
-  background: var(--run);
-}
-.deleted {
-  background: var(--err);
 }
 .commits,
 .files {

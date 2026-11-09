@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiMeter from "../../../common/ui/UiMeter.vue";
 import { computed } from "vue";
 import type { LimitSeries, UsagePaceTone } from "@projector/core/modules/usage-analytics/index.ts";
 import { resetCountdown, resetTimestamp } from "../../../common/utilities/reset-time.ts";
@@ -19,6 +20,12 @@ const resetAt = computed(() => resetTimestamp(props.series.resetsAt));
 const expected = computed(() => props.series.expectedPercent);
 const projected = computed(() => props.series.projectedPercent);
 const exhausted = computed(() => props.series.limited || (used.value ?? 0) >= 100);
+const meterTone = computed(() => {
+  if (props.tone === "spare") return "info" as const;
+  if (props.tone === "hot") return "warning" as const;
+  if (props.tone === "over") return "danger" as const;
+  return "neutral" as const;
+});
 
 const pace = computed(() => {
   if (exhausted.value) return { text: "Лимит исчерпан", hint: "" };
@@ -77,16 +84,12 @@ const spark = computed(() => {
       <span class="spacer" />
       <span class="countdown" :title="resetAt">сброс через {{ countdown }}</span>
     </div>
-    <div
-      class="meter"
-      role="meter"
-      :aria-valuemin="0"
-      :aria-valuemax="100"
-      :aria-valuenow="used ?? undefined"
+    <UiMeter
+      :value="used ?? 0"
+      :height="6"
+      :tone="meterTone"
       :aria-label="`Лимит ${title}, ${label}: израсходовано ${formatPercent(used)}`"
-    >
-      <i :style="{ width: `${used ?? 0}%` }" />
-    </div>
+    />
     <div class="meta">
       <span>израсходовано {{ formatPercent(used) }}</span>
       <span>{{ pace.text }}</span>
@@ -171,28 +174,6 @@ header strong {
 .countdown {
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
-}
-.meter {
-  height: 6px;
-  overflow: hidden;
-  border-radius: 3px;
-  background: var(--bg-sunken);
-}
-.meter i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: color-mix(in srgb, currentColor 55%, var(--line));
-  transition: width var(--t-fast);
-}
-.tone-spare .meter i {
-  background: var(--info);
-}
-.tone-hot .meter i {
-  background: var(--warn);
-}
-.tone-over .meter i {
-  background: var(--err);
 }
 .meta {
   display: flex;
