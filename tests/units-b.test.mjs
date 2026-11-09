@@ -31,6 +31,7 @@ import "./sidebar-sections.cases.mjs";
 import "./tab-registry.cases.mjs";
 import "./terminal-touch.cases.mjs";
 import "./tracker-detail.cases.mjs";
+import "./tree-keyboard.cases.mjs";
 import "./tree-selection.cases.mjs";
 import "./workspace-import.cases.mjs";
 import "./workspace-watch.cases.mjs";

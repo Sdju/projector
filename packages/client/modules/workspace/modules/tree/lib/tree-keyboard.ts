@@ -113,6 +113,9 @@ export function useTreeKeyboard({
           });
         row.focus();
         row.scrollIntoView({ block: "nearest" });
+        // Focus moves through files like a pointer hover: show the file in a preview tab.
+        if (row !== event.target && row.dataset.path && row.getAttribute("aria-expanded") === null)
+          treeCommands.run("ide.fileTree.file.open", { path: row.dataset.path });
       }
       return;
     }
