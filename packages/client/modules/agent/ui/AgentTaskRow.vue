@@ -1,18 +1,15 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
-import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import { useElapsedClock } from "../lib/elapsed.ts";
 import { taskElapsed, taskSummaryLine } from "../lib/task-detail.ts";
 import { toolLabel } from "../lib/tool-labels.ts";
 import { useTaskLens } from "../model/task-lens.ts";
 import type { AgentBackendId, AgentSelection, AgentTask } from "../model/types.ts";
-import IconAlert from "~icons/lucide/circle-alert";
+import AgentStatusIcon from "./AgentStatusIcon.vue";
 import IconBot from "~icons/lucide/bot";
-import IconCheck from "~icons/lucide/check";
 import IconRefresh from "~icons/lucide/refresh-cw";
 import IconScanEye from "~icons/lucide/scan-eye";
-import IconSquare from "~icons/lucide/square";
 import IconTerminal from "~icons/lucide/terminal";
 import IconTab from "~icons/lucide/square-arrow-out-up-right";
 
@@ -67,10 +64,7 @@ const { lens, lensNote, toggleLens } = useTaskLens({
       :aria-pressed="current"
       @click="emit('view', task.id)"
     >
-      <UiSpinner v-if="task.status === 'running'" />
-      <IconAlert v-else-if="task.status === 'error'" class="error-icon" aria-hidden="true" />
-      <IconSquare v-else-if="task.status === 'stopped'" class="faint-icon" aria-hidden="true" />
-      <IconCheck v-else class="done-icon" aria-hidden="true" />
+      <AgentStatusIcon :status="task.status" />
       <component
         :is="task.kind === 'shell' ? IconTerminal : IconBot"
         class="faint-icon"
@@ -175,12 +169,6 @@ li.current {
   font-size: var(--fs-2xs);
   letter-spacing: 0.02em;
   text-transform: uppercase;
-}
-.done-icon {
-  color: var(--run);
-}
-.error-icon {
-  color: var(--err);
 }
 .faint-icon {
   color: var(--faint);

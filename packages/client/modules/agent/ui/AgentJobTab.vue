@@ -18,8 +18,8 @@ import type { AgentPermission, AgentQuestionRequest } from "../model/types.ts";
 import AgentCodeBlock from "./AgentCodeBlock.vue";
 import AgentPermissions from "./AgentPermissions.vue";
 import AgentQuestions from "./AgentQuestions.vue";
+import AgentTaskFrame from "./AgentTaskFrame.vue";
 import AgentTurn from "./AgentTurn.vue";
-import IconBot from "~icons/lucide/bot";
 import IconSquare from "~icons/lucide/square";
 import IconChat from "~icons/lucide/message-square-share";
 import IconChevron from "~icons/lucide/chevron-right";
@@ -118,19 +118,19 @@ useTabReadout(() => ({
 </script>
 
 <template>
-  <section v-if="missing" class="job" aria-label="Фоновое задание">
+  <section v-if="missing" class="missing" aria-label="Фоновое задание">
     <p class="note" role="status">Задание не найдено: его могли убрать.</p>
   </section>
-  <section v-else class="job" aria-label="Фоновое задание">
-    <header class="head">
-      <IconBot class="kind" aria-hidden="true" />
-      <div class="titles">
-        <div class="title u-truncate" :title="job?.task">{{ name }}</div>
-        <div class="meta">
-          <UiSpinner v-if="job && !finished" />
-          {{ meta }}
-        </div>
-      </div>
+  <AgentTaskFrame
+    v-else
+    label="Фоновое задание"
+    kind="agent"
+    :title="name"
+    :hint="job?.task"
+    :meta="meta"
+    :running="!!job && !finished"
+  >
+    <template #actions>
       <UiButton
         v-if="job && !finished"
         size="sm"
@@ -149,7 +149,7 @@ useTabReadout(() => ({
       >
         <IconChat aria-hidden="true" /> Продолжить в чате
       </UiButton>
-    </header>
+    </template>
     <div class="body" role="log" aria-label="Журнал задания">
       <details v-if="job?.task" class="assignment">
         <UiDisclosureSummary variant="fit" class="assignment-summary">
@@ -203,47 +203,17 @@ useTabReadout(() => ({
         </ul>
       </template>
     </div>
-  </section>
+  </AgentTaskFrame>
 </template>
 
 <style scoped>
-.job {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  flex: 1;
-  color: var(--muted);
-  font-size: var(--fs-2xs);
-}
 svg {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
 }
-.head {
-  display: flex;
-  gap: var(--sp-2);
-  align-items: center;
-  padding: var(--sp-2) var(--sp-3);
-  border-bottom: 1px solid var(--line);
-}
-.kind {
-  color: var(--faint);
-}
-.titles {
-  display: grid;
-  min-width: 0;
-  flex: 1;
-}
-.title {
-  color: var(--text);
-  font-size: var(--fs-sm);
-}
-.meta {
-  display: flex;
-  gap: var(--sp-1);
-  align-items: center;
-  color: var(--faint);
+.missing {
+  padding: var(--sp-3);
 }
 .body {
   display: grid;

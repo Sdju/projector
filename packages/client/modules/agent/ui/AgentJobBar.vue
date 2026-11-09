@@ -7,12 +7,8 @@ import { jobShortTitle } from "../lib/job-name.ts";
 import { useJobTitles } from "../model/job-titles.ts";
 import { useElapsedClock } from "../lib/elapsed.ts";
 import { agentLabel } from "../model/modes.ts";
-import IconAlert from "~icons/lucide/circle-alert";
-import IconCheck from "~icons/lucide/check";
+import AgentStatusIcon from "./AgentStatusIcon.vue";
 import IconChevron from "~icons/lucide/chevron-right";
-import IconSpinner from "~icons/lucide/loader-circle";
-import IconShield from "~icons/lucide/shield-question";
-import IconSquare from "~icons/lucide/square";
 
 /** Background jobs above the composer: what runs now, and what this chat just finished. */
 const props = defineProps<{ projectId?: string; active: AgentJobView[]; recent: AgentJobView[] }>();
@@ -49,8 +45,7 @@ const outcome = (job: AgentJobView) =>
       :class="job.status"
       @click="emit('open', job.id)"
     >
-      <IconShield v-if="job.status === 'needs-user'" class="mark" aria-hidden="true" />
-      <IconSpinner v-else class="mark spin" aria-hidden="true" />
+      <AgentStatusIcon :status="job.status" class="mark" />
       <span class="agent">{{ agentLabel(job.backend) }}</span>
       <span class="task" :title="job.task">{{ title(job) }}</span>
       <span class="end">
@@ -72,13 +67,7 @@ const outcome = (job: AgentJobView) =>
           :class="job.status"
           @click="emit('open', job.id)"
         >
-          <IconAlert v-if="job.status === 'error'" class="mark error-icon" aria-hidden="true" />
-          <IconSquare
-            v-else-if="job.status === 'stopped'"
-            class="mark faint-icon"
-            aria-hidden="true"
-          />
-          <IconCheck v-else class="mark done-icon" aria-hidden="true" />
+          <AgentStatusIcon :status="job.status" class="mark" />
           <span class="agent">{{ agentLabel(job.backend) }}</span>
           <span class="task" :title="job.task">{{ title(job) }}</span>
           <span class="end">
@@ -122,22 +111,6 @@ const outcome = (job: AgentJobView) =>
   width: 14px;
   height: 14px;
   flex-shrink: 0;
-  color: var(--muted);
-}
-.needs-user .mark {
-  color: var(--warn);
-}
-.error-icon {
-  color: var(--err);
-}
-.done-icon {
-  color: var(--run);
-}
-.faint-icon {
-  color: var(--faint);
-}
-.spin {
-  animation: spin 1.6s linear infinite;
 }
 .agent {
   flex-shrink: 0;
@@ -189,15 +162,8 @@ const outcome = (job: AgentJobView) =>
   margin-top: var(--sp-1);
 }
 @media (prefers-reduced-motion: reduce) {
-  .chevron,
-  .spin {
+  .chevron {
     transition: none;
-    animation: none;
-  }
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
   }
 }
 </style>

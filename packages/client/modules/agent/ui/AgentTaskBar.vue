@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import UiDisclosureSummary from "../../../common/ui/UiDisclosureSummary.vue";
-import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import type { AgentBackendId, AgentSelection, AgentTask } from "../model/types.ts";
+import AgentStatusIcon from "./AgentStatusIcon.vue";
 import AgentTaskRow from "./AgentTaskRow.vue";
-import IconAlert from "~icons/lucide/circle-alert";
-import IconCheck from "~icons/lucide/check";
 import IconChevron from "~icons/lucide/chevron-right";
 
 /** Subagents and background commands as a strip above the input: open one to read, or in a tab. */
@@ -48,9 +46,10 @@ const showFinished = computed(() => !active.value.length);
     @toggle="folded = !($event.target as HTMLDetailsElement).open"
   >
     <UiDisclosureSummary variant="fit" class="bar-summary">
-      <UiSpinner v-if="running" />
-      <IconAlert v-else-if="failed" class="error-icon" aria-label="Есть ошибки" />
-      <IconCheck v-else class="done-icon" aria-hidden="true" />
+      <AgentStatusIcon
+        :status="running ? 'running' : failed ? 'error' : 'done'"
+        label="Есть ошибки"
+      />
       <span>{{ title }}</span>
       <IconChevron class="chevron" aria-hidden="true" />
     </UiDisclosureSummary>
@@ -136,12 +135,6 @@ svg {
 }
 .finished > .list {
   margin-top: var(--sp-1);
-}
-.error-icon {
-  color: var(--err);
-}
-.done-icon {
-  color: var(--run);
 }
 @media (prefers-reduced-motion: reduce) {
   .chevron {

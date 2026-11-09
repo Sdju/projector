@@ -9,13 +9,12 @@ import { provideChatContext } from "../model/chat-link-actions.ts";
 import { useTaskLens } from "../model/task-lens.ts";
 import type { AgentBackendId, AgentSelection } from "../model/types.ts";
 import AgentLensPanel from "./AgentLens.vue";
+import AgentTaskFrame from "./AgentTaskFrame.vue";
 import AgentTurn from "./AgentTurn.vue";
 import AgentCodeBlock from "./AgentCodeBlock.vue";
 import AgentToolCall from "./AgentToolCall.vue";
 import IconBack from "~icons/lucide/arrow-left";
-import IconBot from "~icons/lucide/bot";
 import IconScanEye from "~icons/lucide/scan-eye";
-import IconTerminal from "~icons/lucide/terminal";
 import IconTab from "~icons/lucide/square-arrow-out-up-right";
 
 /** A task as a read-only chat: the assignment, what the subagent did and how it ended. */
@@ -77,8 +76,16 @@ const outcome = computed(() => {
 </script>
 
 <template>
-  <section class="task-view" aria-label="Задача агента" @keydown.esc="emit('back')">
-    <header class="head">
+  <AgentTaskFrame
+    class="task-view"
+    label="Задача агента"
+    :title="task.title || 'Задача'"
+    :meta="meta"
+    :running="task.status === 'running'"
+    :kind="task.kind"
+    @keydown.esc="emit('back')"
+  >
+    <template #leading>
       <UiButton
         v-if="embedded"
         shape="icon"
@@ -89,18 +96,8 @@ const outcome = computed(() => {
       >
         <IconBack aria-hidden="true" />
       </UiButton>
-      <component
-        :is="task.kind === 'shell' ? IconTerminal : IconBot"
-        class="kind"
-        aria-hidden="true"
-      />
-      <div class="titles">
-        <div class="title u-truncate" :title="task.title">{{ task.title || "Задача" }}</div>
-        <div class="meta">
-          <UiSpinner v-if="task.status === 'running'" />
-          {{ meta }}
-        </div>
-      </div>
+    </template>
+    <template #actions>
       <UiButton
         v-if="task.kind === 'agent'"
         shape="icon"
@@ -123,7 +120,7 @@ const outcome = computed(() => {
       >
         <IconTab aria-hidden="true" />
       </UiButton>
-    </header>
+    </template>
     <div v-if="lens.state.open" class="task-lens">
       <AgentLensPanel :lens="lens" />
     </div>
@@ -164,47 +161,14 @@ const outcome = computed(() => {
       </template>
       <p v-else-if="task.status !== 'running'" class="note">Агент не сообщил итог</p>
     </div>
-  </section>
+  </AgentTaskFrame>
 </template>
 
 <style scoped>
-.task-view {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  flex: 1;
-  color: var(--muted);
-  font-size: var(--fs-2xs);
-}
 svg {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
-}
-.head {
-  display: flex;
-  gap: var(--sp-2);
-  align-items: center;
-  padding: var(--sp-2) var(--sp-3);
-  border-bottom: 1px solid var(--line);
-}
-.kind {
-  color: var(--faint);
-}
-.titles {
-  display: grid;
-  min-width: 0;
-  flex: 1;
-}
-.title {
-  color: var(--text);
-  font-size: var(--fs-sm);
-}
-.meta {
-  display: flex;
-  gap: var(--sp-1);
-  align-items: center;
-  color: var(--faint);
 }
 .task-lens {
   padding: var(--sp-1) var(--sp-3);

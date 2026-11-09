@@ -6,11 +6,9 @@ import { inputHint } from "../lib/tool-input.ts";
 import { skillCallName, toolLabel } from "../lib/tool-labels.ts";
 import type { AgentToolView } from "../model/types.ts";
 import AgentCodeBlock from "./AgentCodeBlock.vue";
+import AgentStatusIcon from "./AgentStatusIcon.vue";
 import AgentToolCall from "./AgentToolCall.vue";
 import IconChevron from "~icons/lucide/chevron-right";
-import IconCheck from "~icons/lucide/check";
-import UiSpinner from "../../../common/ui/UiSpinner.vue";
-import IconAlert from "~icons/lucide/circle-alert";
 
 const props = defineProps<{ tools: AgentToolView[]; root?: string }>();
 const emit = defineEmits<{ open: [path: string] }>();
@@ -55,9 +53,7 @@ const title = computed(() => {
   </div>
   <details v-else class="activity" :class="{ working: current, failed }">
     <UiDisclosureSummary variant="fit" class="activity-summary">
-      <UiSpinner v-if="current" />
-      <IconAlert v-else-if="failed" class="error-icon" aria-hidden="true" />
-      <IconCheck v-else class="done-icon" aria-hidden="true" />
+      <AgentStatusIcon :status="current ? 'running' : failed ? 'error' : 'done'" />
       <span class="activity-title u-truncate" :title="title">{{ title }}</span>
       <span v-if="current" class="tool-hint u-truncate" :title="hint">{{ hint }}</span>
       <span v-if="currentTime" class="tool-time" :title="`Выполняется ${currentTime}`">{{
@@ -123,12 +119,6 @@ svg {
   margin-top: var(--sp-1);
   padding-left: var(--sp-3);
   border-left: 1px solid var(--line);
-}
-.done-icon {
-  color: var(--run);
-}
-.error-icon {
-  color: var(--err);
 }
 @media (prefers-reduced-motion: reduce) {
   .group-chevron {
