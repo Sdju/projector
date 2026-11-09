@@ -99,10 +99,6 @@ export default {
             ceiling: 402,
             plan: "Вынести чтение файлов и ассетов GitLab в отдельный files.ts",
           },
-          "packages/client/modules/agent/ui/AgentChat.vue": {
-            ceiling: 502,
-            plan: "Вынести панель инструментов чата и действия с сообщениями в отдельные composables; чат оставить композицией.",
-          },
           "packages/server/modules/agents/projector/projector-backend.ts": {
             ceiling: 409,
             plan: "Вынести настройку инструментов хода (guard, review, task runner) в projector-turn-setup.ts.",

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref } from "vue";
 import { widgetReplyKey } from "../../widget-runtime/index.ts";
 import { useIdeCommands } from "../../ide/index.ts";
 import { workspaceRequest } from "../../workspace-api/index.ts";
@@ -53,6 +53,7 @@ import { previousUser } from "../lib/previous-user.ts";
 import { fetchMcpServers } from "../api/client.ts";
 import { useMcpServers } from "../model/mcp-panel.ts";
 import { activateChat, registerChat, type ChatController } from "../model/chat-registry.ts";
+import { useChatScroll } from "../model/chat-scroll.ts";
 import { useChatWindow } from "../model/chat-window.ts";
 import { useAgentChatTabTitle } from "../model/chat-titles.ts";
 import { useRewindPanel } from "../model/rewind-panel.ts";
@@ -242,6 +243,42 @@ const composer = ref<InstanceType<typeof AgentComposer>>();
 const chatDrop = chatDropHandlers(() => composer.value);
 const panel = ref<InstanceType<typeof UiPanel>>();
 const root = computed(() => panel.value?.element);
+let rememberScroll = () => {};
+const { PRELOAD_PX, firstShown, shown, hidden, loadEarlier, topUp } = useChatWindow(
+  turns,
+  log,
+  () => rememberScroll(),
+  loading,
+);
+let tabShown = false;
+const {
+  away,
+  trackScroll,
+  toBottom,
+  rememberScroll: rememberChatScroll,
+} = useChatScroll({
+  turns,
+  log,
+  topUp,
+  preloadPx: PRELOAD_PX,
+  watchSource: () => [
+    turns.value.length,
+    turns.value.at(-1)?.text,
+    permissions.value.length,
+    questions.value.length,
+    secrets.value.length,
+    turns.value
+      .at(-1)
+      ?.tools.map((tool) => `${tool.id}:${tool.status}:${tool.detail}`)
+      .join("|"),
+  ],
+  onShown: () => {
+    const nowShown = !!root.value && root.value.getClientRects().length > 0;
+    if (nowShown && !tabShown) composer.value?.focus();
+    tabShown = nowShown;
+  },
+});
+rememberScroll = rememberChatScroll;
 // The project folder: edited files and dropped paths are shown relative to it.
 const projectRoot = ref("");
 void workspaceRequest<{ root: string }>(props.projectId, "root")
@@ -375,16 +412,6 @@ onBeforeUnmount(registerChat(controller));
 const { open: openChip, image: chipPreview } = useChipActions(props.projectId, api, (message) => {
   error.value = message;
 });
-const away = ref(false);
-const { PRELOAD_PX, firstShown, shown, hidden, loadEarlier, topUp } = useChatWindow(
-  turns,
-  log,
-  () => {
-    lastTop = log.value!.scrollTop;
-    lastHeight = log.value!.scrollHeight;
-  },
-  loading,
-);
 const copied = ref("");
 const copyError = ref("");
 function dismissError() {
@@ -393,39 +420,6 @@ function dismissError() {
 }
 const { retryableError, retryFailed } = useChatRetry(turns, busy, error, copyError, retryMessage);
 let copyTimer: ReturnType<typeof setTimeout> | undefined;
-let observer: ResizeObserver | undefined;
-// Content growth never changes scrollTop, so only a decrease is a user scrolling up.
-// Shrinking content (a collapsing thought block) clamps scrollTop by itself: that is not the user.
-let lastTop = 0;
-let lastHeight = 0;
-function trackScroll() {
-  const element = log.value;
-  if (!element || !element.clientHeight) return;
-  const top = element.scrollTop;
-  const shrunk = element.scrollHeight < lastHeight;
-  lastHeight = element.scrollHeight;
-  if (element.scrollHeight - top - element.clientHeight <= 72) away.value = false;
-  else if (top < lastTop && !shrunk) away.value = true;
-  lastTop = top;
-  if (top < PRELOAD_PX) void topUp();
-}
-let frame = 0;
-function pin() {
-  if (frame) return;
-  frame = requestAnimationFrame(() => {
-    frame = 0;
-    const element = log.value;
-    if (!element || away.value) return;
-    element.scrollTop = turns.value.length ? element.scrollHeight : 0;
-    lastTop = element.scrollTop;
-    lastHeight = element.scrollHeight;
-  });
-}
-async function toBottom() {
-  away.value = false;
-  await nextTick();
-  pin();
-}
 // Components in the answers write back into this chat; a busy agent queues the message.
 provide(widgetReplyKey, (text) => {
   void toBottom();
@@ -456,49 +450,8 @@ async function copyMessage(id: string, text: string) {
     copied.value = "";
   }, 2000);
 }
-watch(
-  () => [
-    turns.value.length,
-    turns.value.at(-1)?.text,
-    permissions.value.length,
-    questions.value.length,
-    secrets.value.length,
-    turns.value
-      .at(-1)
-      ?.tools.map((tool) => `${tool.id}:${tool.status}:${tool.detail}`)
-      .join("|"),
-  ],
-  async () => {
-    pin();
-    await nextTick();
-    observeContent();
-    // A short window leaves no room to scroll: fill it from above.
-    void topUp(true);
-  },
-);
-let tabShown = false;
-onMounted(() => {
-  observer = new ResizeObserver(() => {
-    pin();
-    const nowShown = !!root.value && root.value.getClientRects().length > 0;
-    if (nowShown && !tabShown) composer.value?.focus();
-    tabShown = nowShown;
-  });
-  if (log.value) observer.observe(log.value);
-  observeContent();
-});
-function observeContent() {
-  const content = log.value?.firstElementChild;
-  if (!observer || !content || content === observed) return;
-  if (observed) observer.unobserve(observed);
-  observer.observe(content);
-  observed = content;
-}
-let observed: Element | undefined;
 onBeforeUnmount(() => {
   release();
-  observer?.disconnect();
-  cancelAnimationFrame(frame);
   clearTimeout(copyTimer);
 });
 </script>

@@ -6,16 +6,27 @@ import { EditorSelection, EditorState, Prec } from "@codemirror/state";
 import { EditorView, keymap, placeholder as placeholderText } from "@codemirror/view";
 import { isFileDrag, pathsFromDataTransfer } from "../../path-drop/index.ts";
 import { uploadAttachment } from "../api/client.ts";
-import { findWorkspacePaths, workspaceRequest } from "../../workspace-api/index.ts";
+import { workspaceRequest } from "../../workspace-api/index.ts";
 import {
   chipExtensions,
-  chipIcon,
   contentOf,
   deleteChipBackward,
   deleteChipForward,
   insertChip,
   setContent,
 } from "../lib/composer/chips.ts";
+import {
+  appendChips as appendEditorChips,
+  appendText as appendEditorText,
+  insertChips as insertEditorChips,
+  insertDropped,
+  insertQuote as insertEditorQuote,
+} from "../lib/composer/editing.ts";
+import {
+  triggerAt,
+  useComposerSuggestions,
+  type ComposerTrigger,
+} from "../lib/composer/suggestions.ts";
 import { chipText, messageText } from "../lib/message-parts.ts";
 import type { MessageChip, MessagePart } from "../model/types.ts";
 
@@ -32,104 +43,14 @@ const emit = defineEmits<{ submit: []; open: [chip: MessageChip]; fail: [message
 const host = ref<HTMLElement>();
 const view = shallowRef<EditorView>();
 
-/** The word being completed: `@query` anywhere, `/query` only as the first thing written. */
-interface Trigger {
-  kind: "file" | "command";
-  query: string;
-  from: number;
-  to: number;
-}
-interface Suggestion {
-  key: string;
-  label: string;
-  detail?: string;
-  /** The detail is a path: its end matters, so a long one is cut at the start. */
-  path?: boolean;
-  chip: MessageChip;
-  icon: string;
-}
-const trigger = ref<Trigger>();
-const suggestions = ref<Suggestion[]>([]);
-const active = ref(0);
+const trigger = ref<ComposerTrigger>();
 const dismissed = ref("");
-
-function triggerAt(state: EditorState): Trigger | undefined {
-  const { main } = state.selection;
-  if (!main.empty) return undefined;
-  const line = state.doc.lineAt(main.head);
-  const before = line.text.slice(0, main.head - line.from);
-  const file = /(?:^|\s)@([^\s@"]*)$/.exec(before);
-  if (file) {
-    const query = file[1]!;
-    return { kind: "file", query, from: main.head - query.length - 1, to: main.head };
-  }
-  const command = /^\/([^\s/]*)$/.exec(before);
-  if (command && line.number === 1)
-    return { kind: "command", query: command[1]!, from: line.from, to: main.head };
-  return undefined;
-}
-
-let search: AbortController | undefined;
-let timer: ReturnType<typeof setTimeout> | undefined;
-async function refresh() {
-  const current = trigger.value;
-  search?.abort();
-  clearTimeout(timer);
-  if (!current || dismissed.value === `${current.from}:${current.query}`) {
-    suggestions.value = [];
-    return;
-  }
-  if (current.kind === "command") {
-    const query = current.query.toLowerCase();
-    suggestions.value = (props.commands ?? [])
-      .map((command) => ({ command, at: command.name.toLowerCase().indexOf(query) }))
-      .filter((item) => item.at >= 0)
-      // Names starting with the query first, then by how early it appears.
-      .sort((a, b) => a.at - b.at || a.command.name.localeCompare(b.command.name))
-      .map((item) => item.command)
-      .slice(0, 30)
-      .map((command) => ({
-        key: command.name,
-        label: `/${command.name}`,
-        detail: command.description,
-        chip: { type: "command", name: command.name },
-        icon: chipIcon({ type: "command", name: command.name }),
-      }));
-    active.value = 0;
-    return;
-  }
-  if (!props.projectId) return;
-  const controller = (search = new AbortController());
-  timer = setTimeout(async () => {
-    try {
-      const found = await findWorkspacePaths(props.projectId!, current.query, controller.signal);
-      if (controller.signal.aborted) return;
-      suggestions.value = found.map((item) => {
-        const chip: MessageChip = { type: "file", path: item.path, directory: item.directory };
-        return {
-          key: item.path,
-          label: item.path.split("/").pop() || item.path,
-          detail: item.path.includes("/") ? item.path.slice(0, item.path.lastIndexOf("/")) : "",
-          path: true,
-          chip,
-          icon: chipIcon(chip),
-        };
-      });
-      active.value = 0;
-    } catch {
-      if (!controller.signal.aborted) suggestions.value = [];
-    }
-  }, 60);
-}
-watch(trigger, refresh, { deep: true });
-// The agent's commands are loaded asynchronously: a list that arrives mid-typing should complete.
-watch(
-  () => props.commands,
-  () => {
-    if (trigger.value?.kind === "command") void refresh();
-  },
-  { deep: true },
-);
+const { suggestions, active } = useComposerSuggestions({
+  projectId: () => props.projectId,
+  commands: () => props.commands,
+  trigger,
+  dismissed,
+});
 const open = computed(() => !!trigger.value && suggestions.value.length > 0);
 
 function accept(index = active.value): boolean {
@@ -187,14 +108,6 @@ function droppedChips(data: DataTransfer): MessageChip[] {
   }
   return pathsFromDataTransfer(data).map(chipForPath);
 }
-function insertDropped(target: EditorView, chips: MessageChip[], at: number) {
-  let position = at;
-  for (const chip of chips) {
-    insertChip(target, position, position, chip);
-    position += chipText(chip).length + 1;
-  }
-}
-
 /** Uploads pasted or dropped images and puts each in as a chip where the cursor or drop was. */
 async function attachImages(files: File[], at?: number) {
   const target = view.value;
@@ -321,8 +234,6 @@ onMounted(() => {
   if (draft.value || parts.value.length) setContent(editor, draftContent(draft.value));
 });
 onBeforeUnmount(() => {
-  search?.abort();
-  clearTimeout(timer);
   view.value?.destroy();
 });
 
@@ -354,85 +265,20 @@ function dropData(data: DataTransfer, at?: number): boolean {
   void attachImages(images, position);
   return true;
 }
-function insertChips(chips: MessageChip[]) {
-  const target = view.value;
-  if (!target) return;
-  insertDropped(target, chips, target.state.selection.main.head);
-  target.focus();
-}
-/** Appends chips after the whole draft, with a separating space when the text ends with a word. */
-function appendChips(chips: MessageChip[]) {
-  const target = view.value;
-  if (!target) return;
-  let position = target.state.doc.length;
-  const text = target.state.doc.toString();
-  if (text && !/\s$/.test(text)) {
-    target.dispatch({
-      changes: { from: position, insert: " " },
-      selection: EditorSelection.cursor(position + 1),
-    });
-    position += 1;
-  }
-  insertDropped(target, chips, position);
-  target.focus();
-}
-/** Appends selected text after the whole draft, separated by a blank line. */
-function appendText(value: string) {
-  const target = view.value;
-  const text = value.trim();
-  if (!target || !text) return;
-  const current = target.state.doc.toString();
-  const separator = !current
-    ? ""
-    : current.endsWith("\n\n")
-      ? ""
-      : current.endsWith("\n")
-        ? "\n"
-        : "\n\n";
-  const at = target.state.doc.length;
-  target.dispatch({
-    changes: { from: at, insert: separator + text },
-    selection: EditorSelection.cursor(at + separator.length + text.length),
-    userEvent: "input.paste",
-  });
-  target.focus();
-}
-/** Inserts a quote at the cursor, separated from the text around it by a blank line. */
-function insertQuote(value: string) {
-  const target = view.value;
-  const text = value.trim();
-  if (!target || !text) return;
-  const { from, to } = target.state.selection.main;
-  const before = target.state.doc.sliceString(0, from);
-  const after = target.state.doc.sliceString(to);
-  const prefix = !before
-    ? ""
-    : before.endsWith("\n\n")
-      ? ""
-      : before.endsWith("\n")
-        ? "\n"
-        : "\n\n";
-  const suffix = !after
-    ? "\n\n"
-    : after.startsWith("\n\n")
-      ? ""
-      : after.startsWith("\n")
-        ? "\n"
-        : "\n\n";
-  const insert = prefix + text + suffix;
-  target.dispatch({
-    changes: { from, to, insert },
-    selection: EditorSelection.cursor(from + prefix.length + text.length + suffix.length),
-    userEvent: "input.paste",
-  });
-  target.focus();
-}
 defineExpose({
   focus: () => view.value?.focus(),
-  insertChips,
-  appendChips,
-  appendText,
-  insertQuote,
+  insertChips: (chips: MessageChip[]) => {
+    if (view.value) insertEditorChips(view.value, chips);
+  },
+  appendChips: (chips: MessageChip[]) => {
+    if (view.value) appendEditorChips(view.value, chips);
+  },
+  appendText: (value: string) => {
+    if (view.value) appendEditorText(view.value, value);
+  },
+  insertQuote: (value: string) => {
+    if (view.value) insertEditorQuote(view.value, value);
+  },
   acceptsDrag,
   dropData,
   /** Puts the cursor behind everything written. */
