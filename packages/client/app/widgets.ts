@@ -15,6 +15,7 @@ import { input } from "../modules/agent-widgets/input/index.ts";
 import { intelligentForm } from "../modules/agent-widgets/intelligent-form/index.ts";
 import { line } from "../modules/agent-widgets/line/index.ts";
 import { row } from "../modules/agent-widgets/row/index.ts";
+import { safeSecretShow } from "../modules/agent-widgets/safe-secret-show/index.ts";
 import { slider } from "../modules/agent-widgets/slider/index.ts";
 import { stat } from "../modules/agent-widgets/stat/index.ts";
 import { steps } from "../modules/agent-widgets/steps/index.ts";
@@ -43,6 +44,7 @@ export function registerBuiltinWidgets(): void {
     intelligentForm,
     line,
     row,
+    safeSecretShow,
     slider,
     stat,
     steps,

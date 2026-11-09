@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { SecretRequest } from "../../../agent/index.ts";
+import type { SecretRequest, SecretShowRequest, SecretShowResult } from "../../../agent/index.ts";
 import {
   destinationOf,
   gitIgnores,
@@ -15,6 +15,11 @@ export interface SecretToolContext {
   cwd?: string;
   /** Shows the secret form and resolves the typed value, `null` when the user declines. */
   secret: (request: SecretRequest) => Promise<string | null>;
+}
+
+export interface SecretShowToolContext {
+  /** Runs the agent's script and shows its output in the user's panel; the value never returns. */
+  showSecret: (request: SecretShowRequest) => Promise<SecretShowResult>;
 }
 
 /** One tool for every kind of secret: the model names the destination, the user types the value. */
@@ -104,6 +109,35 @@ export function createSecretToolSpecs(context: SecretToolContext): ToolSpec[] {
           replaced: target.replaces,
         };
       },
+    }),
+  ];
+}
+
+/**
+ * Shows an existing secret to the person at the screen. The script's stdout goes to the browser
+ * panel, while the tool result says only that it was delivered; the model never receives the value.
+ */
+export function createSecretShowToolSpec(context: SecretShowToolContext): ToolSpec[] {
+  return [
+    defineSpec({
+      name: "show_secret",
+      description:
+        "Показать пользователю секрет, который вернёт скрипт, не получая значение в ответ. Запускает shell-команду на машине пользователя, берёт её stdout и открывает панель только в окне Projector; тебе возвращается лишь факт показа. Используй, когда просят показать ключ, токен или пароль, а не записать его. script — команда, чей stdout и есть секрет (например, cat ~/.ssh/id_ed25519); comment — короткое пояснение пользователю. Значение не печатай в ответе и не угадывай.",
+      shape: {
+        script: z
+          .string()
+          .min(1)
+          .max(8_000)
+          .describe("Shell-команда, чей stdout — секрет; выполняется на машине пользователя"),
+        label: z.string().max(200).optional().describe("Название секрета в панели"),
+        comment: z.string().max(1_000).optional().describe("Пояснение агента пользователю"),
+      },
+      run: async (input) =>
+        context.showSecret({
+          script: input.script,
+          ...(input.label?.trim() ? { label: input.label.trim() } : {}),
+          ...(input.comment?.trim() ? { comment: input.comment.trim() } : {}),
+        }),
     }),
   ];
 }

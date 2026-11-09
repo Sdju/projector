@@ -1,7 +1,12 @@
-import type { CommandRequest, SecretRequest } from "../../agent/index.ts";
+import type {
+  CommandRequest,
+  SecretRequest,
+  SecretShowRequest,
+  SecretShowResult,
+} from "../../agent/index.ts";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { createSecretToolSpecs } from "./secrets/secret-tools.ts";
+import { createSecretShowToolSpec, createSecretToolSpecs } from "./secrets/secret-tools.ts";
 import { listSecretDestinations } from "./secrets/secret-destination.ts";
 import {
   findProjects,
@@ -18,6 +23,8 @@ export interface ToolSpecContext {
   cwd?: string;
   /** Asks the user for a secret; absent when the client cannot show the prompt. */
   secret?: (request: SecretRequest) => Promise<string | null>;
+  /** Shows a script's output in the user's panel without returning it to the model. */
+  showSecret?: (request: SecretShowRequest) => Promise<SecretShowResult>;
   onProject: (project: Project) => void;
   commands?: (request: CommandRequest) => Promise<unknown>;
 }
@@ -88,6 +95,7 @@ export function createToolSpecs(context: ToolSpecContext): ToolSpec[] {
       },
     }),
     ...(context.secret ? createSecretToolSpecs({ cwd: context.cwd, secret: context.secret }) : []),
+    ...(context.showSecret ? createSecretShowToolSpec({ showSecret: context.showSecret }) : []),
     defineSpec({
       name: "list_secret_destinations",
       description:

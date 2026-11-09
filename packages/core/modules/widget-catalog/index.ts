@@ -98,6 +98,7 @@ export const BUILTIN_WIDGET_NAMES = [
   "IntelligentForm",
   "Line",
   "Row",
+  "SafeSecretShow",
   "Slider",
   "Stat",
   "Steps",

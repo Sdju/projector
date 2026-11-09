@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import { isLocalRequest } from "../access/index.ts";
 import { onProcessEvent } from "../processes/index.ts";
 
 interface SseClient {
@@ -7,6 +8,8 @@ interface SseClient {
   id: string;
   /** Pages served by this stream besides `id`: a shared worker keeps one stream for all of them. */
   pages?: Set<string>;
+  /** Loopback pages may receive values that must not travel over LAN, such as a shown secret. */
+  local: boolean;
 }
 
 type CloseListener = (clientId: string) => void;
@@ -28,12 +31,27 @@ export function bindEvents(): void {
   onProcessEvent((event, data) => broadcastEvent(event, data));
 }
 
-/** Sends an event to every open stream; with `clientId` only to that page. */
-export function broadcastEvent(event: string, data: unknown, clientId?: string): void {
+/**
+ * Sends an event to every open stream; with `clientId` only to that page and `localOnly` to
+ * loopback pages. Returns how many streams it wrote to.
+ */
+export function broadcastEvent(
+  event: string,
+  data: unknown,
+  clientId?: string,
+  localOnly = false,
+): number {
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  let sent = 0;
   for (const client of sseClients)
-    if (!clientId || client.id === clientId || client.pages?.has(clientId))
+    if (
+      (!localOnly || client.local) &&
+      (!clientId || client.id === clientId || client.pages?.has(clientId))
+    ) {
       client.res.write(payload);
+      sent++;
+    }
+  return sent;
 }
 
 /** Called when a page's stream closes: owners of per-page resources release them. */
@@ -55,6 +73,7 @@ export function attachSse(req: IncomingMessage, res: ServerResponse): void {
   const client: SseClient = {
     res,
     id: new URL(req.url ?? "/", "http://localhost").searchParams.get("client") ?? "",
+    local: isLocalRequest(req),
   };
   sseClients.add(client);
   req.on("close", () => {

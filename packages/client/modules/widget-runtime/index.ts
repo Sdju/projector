@@ -20,7 +20,7 @@ export {
 } from "./project-api.ts";
 export { useWidgetReply, widgetReplyKey, formatWidgetReply, type WidgetReply } from "./bridge.ts";
 export { formPresetKey, formChromeKey, type FormPreset, type FormChrome } from "./form.ts";
-export { useMessageScope, messageScopeKey, type MessageScope } from "./scope.ts";
+export { useMessageScope, messageScopeKey, widgetProjectKey, type MessageScope } from "./scope.ts";
 export { autoClose, parseWidgetSource } from "./autoclose.ts";
 export {
   answerProblem,

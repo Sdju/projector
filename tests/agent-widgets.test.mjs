@@ -337,12 +337,20 @@ test("the definitions, the client components and both composition lists stay one
     new URL("../packages/client/app/widgets.ts", import.meta.url),
     "utf8",
   );
+  // Globs, not variable imports: a widget added since the Vite cache was written still resolves.
+  const clientModules = import.meta.glob("../packages/client/modules/agent-widgets/*/index.ts", {
+    eager: true,
+  });
+  const coreModules = import.meta.glob("../packages/core/modules/agent-widgets/*/index.ts", {
+    eager: true,
+  });
   for (const name of names) {
     const id = name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
-    const entry = (await import(`../packages/client/modules/agent-widgets/${name}/index.ts`))[id];
-    const definition = (await import(`../packages/core/modules/agent-widgets/${name}/index.ts`))[
-      `${id}Widget`
-    ];
+    const entry = clientModules[`../packages/client/modules/agent-widgets/${name}/index.ts`]?.[id];
+    const definition =
+      coreModules[`../packages/core/modules/agent-widgets/${name}/index.ts`]?.[`${id}Widget`];
+    expect(entry, name).toBeDefined();
+    expect(definition, name).toBeDefined();
     expect(entry.definition, name).toBe(definition);
     expect(server, name).toContain(`${id}Widget`);
     expect(client, name).toContain(`modules/agent-widgets/${name}/index.ts`);

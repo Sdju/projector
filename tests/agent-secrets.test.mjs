@@ -23,6 +23,7 @@ import {
   resolveEnvTarget,
   writeEnvSecret,
 } from "../packages/server/modules/agents/projector/secrets/secret-destination.ts";
+import { runSecretScript } from "../packages/server/modules/agent/secret-show.ts";
 
 async function project() {
   const root = await mkdtemp(join(tmpdir(), "projector-secret-"));
@@ -135,6 +136,53 @@ test("request_secret returns only the fact of storing, never the value", async (
   expect(createToolSpecs({ onProject: () => {} }).map((item) => item.name)).not.toContain(
     "request_secret",
   );
+});
+
+test("show_secret returns only the fact of delivery, never the script's value", async () => {
+  const cwd = await project();
+  const asked = [];
+  const spec = createToolSpecs({
+    cwd,
+    onProject: () => {},
+    showSecret: async (request) => {
+      asked.push(request);
+      return { shown: true, delivered: true, label: request.label };
+    },
+  }).find((item) => item.name === "show_secret");
+  const result = await spec.run({
+    script: "printf 'sk-shown-value'",
+    label: "Ключ SSH",
+    comment: "Скопируйте его в сервис.",
+  });
+  expect(result).toEqual({ shown: true, delivered: true, label: "Ключ SSH" });
+  expect(asked[0]).toEqual({
+    script: "printf 'sk-shown-value'",
+    label: "Ключ SSH",
+    comment: "Скопируйте его в сервис.",
+  });
+  expect(JSON.stringify(result)).not.toContain("sk-shown-value");
+
+  // Without a page that can show the panel the tool is not offered at all.
+  expect(createToolSpecs({ onProject: () => {} }).map((item) => item.name)).not.toContain(
+    "show_secret",
+  );
+});
+
+test("runSecretScript returns stdout and never puts stderr into the error", async () => {
+  if (process.platform === "win32") return;
+  const cwd = await project();
+  await expect(runSecretScript("printf 'sk-from-script\\n'", { cwd })).resolves.toBe(
+    "sk-from-script",
+  );
+  await expect(runSecretScript("printf '  \\n'", { cwd })).rejects.toThrow(/ничего не вернул/);
+  let failure = "";
+  try {
+    await runSecretScript("printf 'sk-leaked-to-stderr' >&2; exit 2", { cwd });
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error);
+  }
+  expect(failure).toMatch(/завершился/);
+  expect(failure).not.toContain("sk-leaked-to-stderr");
 });
 
 test("gitIgnored says whether the project's rules keep the written .env out of commits", async () => {

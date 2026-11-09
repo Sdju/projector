@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import { inject, onBeforeUnmount, onErrorCaptured, ref, shallowRef, toRef, watch } from "vue";
+import {
+  inject,
+  onBeforeUnmount,
+  onErrorCaptured,
+  provide,
+  ref,
+  shallowRef,
+  toRef,
+  watch,
+} from "vue";
 import { autoClose, parseWidgetSource } from "../autoclose.ts";
 import {
   compileScript,
@@ -10,9 +19,10 @@ import {
 } from "../compile.ts";
 import { createWidgetHost } from "../host.ts";
 import { registeredWidgets } from "../registry.ts";
-import { messageScopeKey } from "../scope.ts";
+import { messageScopeKey, widgetProjectKey } from "../scope.ts";
 
 const props = defineProps<{ source: string; complete: boolean; projectId?: string }>();
+provide(widgetProjectKey, toRef(props, "projectId"));
 const render = shallowRef<RenderFn>();
 const script = shallowRef<ScriptFn>();
 const failure = shallowRef("");

@@ -7,5 +7,6 @@ export {
   ensureIdeMcpToken,
   ideMcpTokenFile,
   ideMcpTokenMatches,
+  ideOwnerPage,
   requestIdeCommand,
 } from "./mcp-bridge.ts";

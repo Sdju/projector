@@ -19,6 +19,7 @@ import { findSkill, listSkills, type Skill } from "./projector-skills.ts";
 import { webSearch } from "./projector-web-search.ts";
 import { widgetCatalog } from "./widgets.ts";
 import { trustedProjectWidgets } from "../../project-widgets/index.ts";
+import { showSecretOnPage } from "./secrets/secret-show.ts";
 
 export interface AgentToolContext extends ToolSpecContext {
   cwd?: string;
@@ -80,6 +81,7 @@ function specTool(spec: ToolSpec, guard: GuardOptions) {
           scope: String(call.scope),
           args: call.args as Record<string, unknown> | undefined,
         });
+      if (spec.name === "show_secret") await guardBash(guard, String(call.script));
       return spec.run(call);
     },
   });
@@ -87,7 +89,15 @@ function specTool(spec: ToolSpec, guard: GuardOptions) {
 
 export function createAgentTools(context: AgentToolContext) {
   const specTools = Object.fromEntries(
-    createToolSpecs(context).map((spec) => [spec.name, specTool(spec, context.guard)]),
+    createToolSpecs({
+      ...context,
+      showSecret: (request) =>
+        showSecretOnPage(request, {
+          cwd: context.cwd,
+          projectId: context.projectId,
+          signal: context.signal,
+        }),
+    }).map((spec) => [spec.name, specTool(spec, context.guard)]),
   );
   return {
     ...specTools,

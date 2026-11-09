@@ -102,7 +102,7 @@ describe("IDE MCP bridge", () => {
 });
 
 describe("IDE MCP server", () => {
-  it("offers three tools and refuses an execution that was not described", async () => {
+  it("offers the command and secret tools and refuses an execution that was not described", async () => {
     const tokenFile = join(directory, "token");
     await writeFile(tokenFile, "secret\n");
     const calls = [];
@@ -111,7 +111,13 @@ describe("IDE MCP server", () => {
       for await (const chunk of req) body += chunk;
       calls.push({ url: req.url, auth: req.headers.authorization, body: JSON.parse(body) });
       res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ output: { ok: true } }));
+      res.end(
+        JSON.stringify(
+          req.url === "/api/agent/secret-show/push"
+            ? { shown: true, delivered: true, label: "Ключ" }
+            : { output: { ok: true } },
+        ),
+      );
     });
     await new Promise((resolve) => bridge.listen(0, "127.0.0.1", resolve));
     const port = bridge.address().port;
@@ -134,6 +140,7 @@ describe("IDE MCP server", () => {
         "describe_command",
         "execute_command",
         "list_commands",
+        "show_secret",
       ]);
 
       const refused = await client.callTool({
@@ -169,6 +176,27 @@ describe("IDE MCP server", () => {
         operation: "execute",
         args: { path: "old.md", name: "new.md" },
       });
+
+      if (process.platform !== "win32") {
+        const shown = await client.callTool({
+          name: "show_secret",
+          arguments: {
+            script: "printf 'sk-shown-secret'",
+            label: "Ключ",
+            comment: "Скопируйте значение",
+          },
+        });
+        expect(shown.isError).toBeUndefined();
+        expect(shown.content[0].text).not.toContain("sk-shown-secret");
+        const pushed = calls.find((call) => call.url === "/api/agent/secret-show/push");
+        expect(pushed.body).toMatchObject({
+          secret: "sk-shown-secret",
+          label: "Ключ",
+          comment: "Скопируйте значение",
+          projectId: "project-1",
+          session: calls[0].body.session,
+        });
+      }
     } finally {
       await client.close();
       bridge.close();

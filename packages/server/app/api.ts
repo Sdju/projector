@@ -26,6 +26,7 @@ import { routes as providersModelsRoutes } from "../routes/api/providers/models.
 import { routes as agentRoutes } from "../routes/api/agent.ts";
 import { routes as agentFormRepairRoutes } from "../routes/api/agent-form-repair.ts";
 import { routes as agentAnswerRepairRoutes } from "../routes/api/agent-answer-repair.ts";
+import { routes as agentSecretShowRoutes } from "../routes/api/agent-secret-show.ts";
 import { routes as agentLensRoutes } from "../routes/api/agent-lens.ts";
 import { routes as agentSideRoutes } from "../routes/api/agent-side.ts";
 import { routes as agentSkillsRoutes } from "../routes/api/agent-skills.ts";
@@ -113,6 +114,7 @@ const dispatch = createRouteDispatcher([
   ...agentRoutes,
   ...agentFormRepairRoutes,
   ...agentAnswerRepairRoutes,
+  ...agentSecretShowRoutes,
   ...agentLensRoutes,
   ...agentSideRoutes,
   ...agentJobsRoutes,

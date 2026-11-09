@@ -88,6 +88,16 @@ export {
   type SecretDestination,
   type SecretRequest,
 } from "./command-bridge.ts";
+export {
+  projectDirectory,
+  pushSecretToPage,
+  runSecretScript,
+  SECRET_SHOW_LIMITS,
+  SecretScriptError,
+  type SecretShowPush,
+  type SecretShowRequest,
+  type SecretShowResult,
+} from "./secret-show.ts";
 export { readAttachment, saveAttachment } from "./attachments.ts";
 export { readAgentHistory, writeAgentHistory } from "./history.ts";
 export { readAgentUsage, type AgentUsageRecord } from "./usage-history.ts";

@@ -301,6 +301,11 @@ test.concurrent(
           type: "image/svg+xml",
           body: "<svg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/>",
         },
+        {
+          startsWith: "/api/agent/secret-show/reveal",
+          type: "application/json",
+          body: JSON.stringify({ secret: "sk-browser-secret" }),
+        },
       ],
     });
     onTestFinished(() => fixture.close());
@@ -511,6 +516,28 @@ test.concurrent(
     expect(gitText).toContain("a1b2c3d");
     expect(gitText).toContain("Добавить GitInfo");
     expect(gitText).toContain("core/modules/agent-widgets/git-info/index.ts");
+
+    // A secret reaches the page only after the user asks for it, and its value never enters the answer.
+    await set(
+      '<SafeSecretShow script="cat secret" label="Ключ" comment="Скопируйте значение" />',
+      false,
+    );
+    await wait('document.querySelector(".secret-widget") !== null');
+    expect(
+      await browser.evaluate("document.querySelector('.secret-widget').innerText"),
+    ).not.toContain("sk-browser-secret");
+    expect(await browser.evaluate("document.querySelector('.secret-widget details').open")).toBe(
+      false,
+    );
+    await browser.click(".secret-widget > button");
+    await wait('document.querySelector(".secret-widget .actions") !== null');
+    expect(
+      await browser.evaluate("document.querySelector('.secret-widget textarea').value"),
+    ).not.toContain("sk-browser-secret");
+    await browser.click(".secret-widget .actions button");
+    await wait(
+      'document.querySelector(".secret-widget textarea").value.includes("sk-browser-secret")',
+    );
 
     // A form needs no script: named controls, preset / reset / submit buttons.
     await set(

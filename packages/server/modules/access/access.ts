@@ -81,7 +81,8 @@ export function lanPassword(req: IncomingMessage, queryToken?: string): string |
 /** Запрос пришёл с loopback-интерфейса этой машины. */
 export function isLocalRequest(req: IncomingMessage): boolean {
   if (isHubRequest(req)) return false;
-  const address = req.socket.remoteAddress;
+  // Test streams and embedded transports may omit the socket.
+  const address = req.socket?.remoteAddress;
   if (!address) return false;
   const family = isIP(address);
   return !!family && loopbackAddresses.check(address, family === 6 ? "ipv6" : "ipv4");

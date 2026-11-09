@@ -52,7 +52,13 @@ import { shownPlan } from "../../agent-core/index.ts";
 import { previousUser } from "../lib/previous-user.ts";
 import { fetchMcpServers } from "../../agent-core/index.ts";
 import { useMcpServers } from "../modules/panels/index.ts";
-import { activateChat, registerChat, type ChatController } from "../../agent-core/index.ts";
+import {
+  activateChat,
+  chatsOf,
+  registerChat,
+  type ChatController,
+} from "../../agent-core/index.ts";
+import { AgentSecretShow, useSecretShows } from "../../agent-secret-show/index.ts";
 import { useChatScroll } from "../model/chat-scroll.ts";
 import { useChatWindow } from "../model/chat-window.ts";
 import { useAgentChatTabTitle } from "../model/chat-titles.ts";
@@ -146,6 +152,10 @@ const {
   role: props.role,
 });
 const emit = defineEmits<{ title: [title: string] }>();
+const { shows: secretShows, dismiss: dismissSecretShow } = useSecretShows(
+  props.projectId,
+  () => chatsOf(props.projectId)[0]?.key === chatKey,
+);
 useAgentChatTabTitle(emit, props, turns, busy, sessions, agentName);
 const jobsState = useChatJobs({
   projectId: props.projectId,
@@ -613,10 +623,11 @@ onBeforeUnmount(() => {
       <button v-if="away" type="button" class="latest-button" @click="toBottom">
         <IconArrowDown aria-hidden="true" />К последнему сообщению
       </button>
-      <div v-if="jobsState.hasRequests" class="requests">
+      <div v-if="jobsState.hasRequests || secretShows.length" class="requests">
         <AgentPermissions :permissions="permissions" @decide="decide" />
         <AgentQuestions :requests="questions" @answer="answer" />
         <AgentSecrets :requests="secrets" @answer="answerSecret" />
+        <AgentSecretShow :items="secretShows" @dismiss="dismissSecretShow" />
         <AgentJobRequests v-if="!plain" :jobs="jobsState.jobs" @answered="jobsState.refresh" />
       </div>
       <AgentRewind

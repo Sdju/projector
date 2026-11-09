@@ -84,10 +84,10 @@ function broadcast(entry: Pending): void {
 export function bindIdeCommandEvents(): () => void {
   state.off?.();
   const off = onEventClientClose((page) => {
-    for (const [session, owner] of [...state.owners]) {
+    for (const [session, owner] of state.owners) {
       if (owner !== page) continue;
       state.owners.delete(session);
-      for (const entry of [...state.pending.values()]) {
+      for (const entry of state.pending.values()) {
         if (entry.session !== session) continue;
         if (entry.claimedBy) entry.finish({ error: "Страница Projector закрыта" });
         else {
@@ -145,6 +145,11 @@ export function requestIdeCommand(
     state.pending.set(id, entry);
     broadcast(entry);
   });
+}
+
+/** The page that answered this MCP session, when it has one. */
+export function ideOwnerPage(session: string): string | undefined {
+  return state.owners.get(session);
 }
 
 /** The owner takes a request at once; another page may take it after the grace period. */

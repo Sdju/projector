@@ -15,6 +15,7 @@ import { inputWidget } from "@projector/core/modules/agent-widgets/input/index.t
 import { intelligentFormWidget } from "@projector/core/modules/agent-widgets/intelligent-form/index.ts";
 import { lineWidget } from "@projector/core/modules/agent-widgets/line/index.ts";
 import { rowWidget } from "@projector/core/modules/agent-widgets/row/index.ts";
+import { safeSecretShowWidget } from "@projector/core/modules/agent-widgets/safe-secret-show/index.ts";
 import { sliderWidget } from "@projector/core/modules/agent-widgets/slider/index.ts";
 import { statWidget } from "@projector/core/modules/agent-widgets/stat/index.ts";
 import { stepsWidget } from "@projector/core/modules/agent-widgets/steps/index.ts";
@@ -43,6 +44,7 @@ export function registerBuiltinWidgetDefinitions(): void {
     intelligentFormWidget,
     lineWidget,
     rowWidget,
+    safeSecretShowWidget,
     sliderWidget,
     statWidget,
     stepsWidget,

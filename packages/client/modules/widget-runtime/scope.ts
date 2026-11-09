@@ -26,6 +26,10 @@ export interface MessageScope {
 }
 export const messageScopeKey: InjectionKey<MessageScope> = Symbol("agent-message-scope");
 
+/** The project whose answer is rendering: widgets that ask the server for data pass it on. */
+export const widgetProjectKey: InjectionKey<Readonly<Ref<string | undefined>>> =
+  Symbol("agent-widget-project");
+
 /** Runs each finished `<script>` part once (again only if its text changes) into the shared scope. */
 export function useMessageScope(
   parts: Ref<MessagePart[]>,
