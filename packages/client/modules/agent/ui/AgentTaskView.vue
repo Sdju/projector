@@ -129,10 +129,12 @@ const outcome = computed(() => {
         v-for="(turn, index) in turns"
         :key="turn.id"
         :turn="turn"
-        :busy="task.status === 'running'"
-        :last="index === turns.length - 1"
-        :copied="false"
-        readonly
+        :flags="{
+          busy: task.status === 'running',
+          last: index === turns.length - 1,
+          copied: false,
+          readonly: true,
+        }"
       />
     </div>
     <div v-else class="body">

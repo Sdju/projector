@@ -62,9 +62,7 @@ const html = `<!doctype html>
       h("div", { style: "padding: 24px; max-width: 760px" }, [
         h(AgentTurn, {
           turn,
-          busy: busy.value,
-          last: true,
-          copied: false,
+          flags: { busy: busy.value, last: true, copied: false },
           root: "/project",
           lens,
           onOpenFile: () => {},

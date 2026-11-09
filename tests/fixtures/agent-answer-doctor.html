@@ -32,9 +32,7 @@
     setup: () => () =>
       h(AgentTurn, {
         turn: turns.value[0],
-        busy: false,
-        last: true,
-        copied: false,
+        flags: { busy: false, last: true, copied: false },
       }),
   }).mount("#fixture");
   window.fixture = { ready: true };

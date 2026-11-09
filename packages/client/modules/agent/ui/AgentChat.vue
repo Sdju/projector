@@ -567,17 +567,19 @@ onBeforeUnmount(() => {
           v-for="(turn, offset) in shown"
           :key="turn.id"
           :turn="turn"
-          :busy="busy"
-          :last="firstShown + offset === turns.length - 1"
-          :copied="copied === turn.id"
           :chat-usage="chatUsage.get(turn.id)"
-          :faded="editFrom >= 0 && firstShown + offset >= editFrom"
           :root="projectRoot"
-          :can-revert="canRevert(turn.id)"
           :promoted-form="answerFormFor(turn).promotedForm"
-          :form-answered="answerFormFor(turn).formAnswered"
           :lens="turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? lens : undefined"
-          :phase="turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? phase : undefined"
+          :flags="{
+            busy,
+            last: firstShown + offset === turns.length - 1,
+            copied: copied === turn.id,
+            faded: editFrom >= 0 && firstShown + offset >= editFrom,
+            canRevert: canRevert(turn.id),
+            formAnswered: answerFormFor(turn).formAnswered,
+            phase: turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? phase : undefined,
+          }"
           @copy="copyMessage"
           @open="openChip"
           @edit="editMessage"

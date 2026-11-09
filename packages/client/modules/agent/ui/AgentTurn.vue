@@ -30,25 +30,28 @@ const props = defineProps<{
   turn: AgentTurn;
   /** Tokens and cost of the chat up to this answer. */
   chatUsage?: ChatUsage;
-  busy: boolean;
-  last: boolean;
-  copied: boolean;
-  /** What an edit in progress is about to replace. */
-  faded?: boolean;
   /** The project folder, to show edited files relative to it. */
   root?: string;
-  /** Files can be taken back to before the request this answer belongs to. */
-  canRevert?: boolean;
-  /** A conversation only to read (a subagent's): no editing, retrying or rolling back. */
-  readonly?: boolean;
   /** The form block the chat owns: the composer shows the active one, the user's snapshot the sent one. */
   promotedForm?: string;
-  /** The form was already sent: the user's snapshot shows it, so this copy is hidden. */
-  formAnswered?: boolean;
   /** The chat's Lens: only the last work group of the last answer shows it. */
   lens?: AgentLens;
-  /** What the chat is doing now: `compacting` is shown while the context is summarized. */
-  phase?: string;
+  /** Per-render state of the turn; `busy`, `last` and `copied` default to false. */
+  flags?: {
+    busy?: boolean;
+    last?: boolean;
+    copied?: boolean;
+    /** What an edit in progress is about to replace. */
+    faded?: boolean;
+    /** Files can be taken back to before the request this answer belongs to. */
+    canRevert?: boolean;
+    /** A conversation only to read (a subagent's): no editing, retrying or rolling back. */
+    readonly?: boolean;
+    /** The form was already sent: the user's snapshot shows it, so this copy is hidden. */
+    formAnswered?: boolean;
+    /** What the chat is doing now: `compacting` is shown while the context is summarized. */
+    phase?: string;
+  };
 }>();
 const emit = defineEmits<{
   copy: [id: string, text: string];
@@ -65,6 +68,17 @@ const emit = defineEmits<{
   revert: [id: string];
 }>();
 
+const flags = computed(() => ({
+  busy: false,
+  last: false,
+  copied: false,
+  faded: false,
+  canRevert: false,
+  readonly: false,
+  formAnswered: false,
+  phase: "",
+  ...props.flags,
+}));
 const versions = computed(() => versionsOf(props.turn));
 const formAnswer = ref<InstanceType<typeof AgentFormAnswer>>();
 const editTitle = computed(() =>
@@ -173,10 +187,10 @@ const lastWork = computed(
 </script>
 
 <template>
-  <article class="turn" :class="[turn.role, { faded }]">
+  <article class="turn" :class="[turn.role, { faded: flags.faded }]">
     <div v-if="turn.role === 'user'" class="user-row">
       <UiInline
-        v-if="!readonly"
+        v-if="!flags.readonly"
         :gap="0.5"
         justify="normal"
         class="turn-actions"
@@ -203,7 +217,7 @@ const lastWork = computed(
             size="sm"
             title="Предыдущая версия"
             aria-label="Предыдущая версия"
-            :disabled="busy || versions.position === 0"
+            :disabled="flags.busy || versions.position === 0"
             @click="emit('version', turn.id, versions.position - 1)"
           >
             <IconPrev aria-hidden="true" />
@@ -214,7 +228,7 @@ const lastWork = computed(
             size="sm"
             title="Следующая версия"
             aria-label="Следующая версия"
-            :disabled="busy || versions.position === versions.count - 1"
+            :disabled="flags.busy || versions.position === versions.count - 1"
             @click="emit('version', turn.id, versions.position + 1)"
           >
             <IconNext aria-hidden="true" />
@@ -226,7 +240,7 @@ const lastWork = computed(
           class="turn-action"
           :title="editTitle"
           aria-label="Править сообщение"
-          :disabled="busy"
+          :disabled="flags.busy"
           @click="editMessage"
         >
           <IconPencil aria-hidden="true" />
@@ -237,7 +251,7 @@ const lastWork = computed(
           class="turn-action"
           title="Откатить к этому сообщению"
           aria-label="Откатить к этому сообщению"
-          :disabled="busy"
+          :disabled="flags.busy"
           @click="emit('rewind', turn.id)"
         >
           <IconUndo aria-hidden="true" />
@@ -258,7 +272,7 @@ const lastWork = computed(
           ref="formAnswer"
           :source="turn.form.source"
           :values="turn.form.values"
-          :busy="busy"
+          :busy="flags.busy"
           :project-id="projectId"
           @submit="submitForm"
         />
@@ -300,17 +314,17 @@ const lastWork = computed(
         <AgentMessage
           v-if="segment.type === 'text'"
           :text="segment.text"
-          :streaming="busy && last && segment === segments.at(-1)"
+          :streaming="flags.busy && flags.last && segment === segments.at(-1)"
           :promoted="promotedForm"
-          :answered="formAnswered"
+          :answered="flags.formAnswered"
           :project-id="projectId"
         />
         <p v-else-if="segment.type === 'note'" class="user-message note">{{ segment.text }}</p>
         <AgentWork
           v-else
           :items="segment.items"
-          :busy="busy"
-          :last="last"
+          :busy="flags.busy"
+          :last="flags.last"
           :current="segment.key === currentWork"
           :any-running="anyRunning"
           :root="root"
@@ -320,12 +334,12 @@ const lastWork = computed(
       </template>
       <!-- Until the first thought or call there is no work block: Lens sits by the thinking dots. -->
       <AgentLensView
-        v-if="waiting && busy && last && lens && lens.state.open"
+        v-if="waiting && flags.busy && flags.last && lens && lens.state.open"
         :lens="lens"
         class="early"
       />
       <UiInline
-        v-if="busy && last && (waiting || phase === 'compacting')"
+        v-if="flags.busy && flags.last && (waiting || flags.phase === 'compacting')"
         :gap="2"
         justify="normal"
         class="thinking"
@@ -341,7 +355,7 @@ const lastWork = computed(
           ><i /><i /><i
         /></UiInline>
         {{
-          phase === "compacting"
+          flags.phase === "compacting"
             ? "Сжимаю историю"
             : turn.tools.some((t) => t.status === "running")
               ? "Выполняет задачу"
@@ -349,10 +363,10 @@ const lastWork = computed(
         }}
       </UiInline>
       <AgentChanges
-        v-if="!busy || !last"
+        v-if="!flags.busy || !flags.last"
         :tools="turn.tools"
         :root="root ?? ''"
-        :can-revert="canRevert === true && !busy && !readonly"
+        :can-revert="flags.canRevert === true && !flags.busy && !flags.readonly"
         @open="(path) => emit('openFile', path)"
         @revert="emit('revert', turn.id)"
       />
@@ -360,7 +374,7 @@ const lastWork = computed(
         <IconAlert aria-hidden="true" />
         <p class="turn-failure-text">{{ turn.failure }}</p>
         <UiButton
-          v-if="last && !busy && !readonly"
+          v-if="flags.last && !flags.busy && !flags.readonly"
           size="sm"
           title="Повторить запрос с начала; изменённые файлы не откатываются"
           @click="emit('retry', turn.id)"
@@ -369,7 +383,7 @@ const lastWork = computed(
         </UiButton>
       </div>
       <UiInline
-        v-if="turn.text && !(busy && last) && !readonly"
+        v-if="turn.text && !(flags.busy && flags.last) && !flags.readonly"
         :gap="0.5"
         align="normal"
         justify="normal"
@@ -389,30 +403,30 @@ const lastWork = computed(
           shape="icon"
           size="sm"
           class="copy-button"
-          :class="{ copied: copied }"
-          :aria-label="copied ? 'Ответ скопирован' : 'Копировать ответ'"
-          :title="copied ? 'Скопировано' : 'Копировать ответ'"
+          :class="{ copied: flags.copied }"
+          :aria-label="flags.copied ? 'Ответ скопирован' : 'Копировать ответ'"
+          :title="flags.copied ? 'Скопировано' : 'Копировать ответ'"
           @click="emit('copy', turn.id, turn.text)"
         >
-          <IconCheck v-if="copied" aria-hidden="true" /><IconCopy v-else aria-hidden="true" />
+          <IconCheck v-if="flags.copied" aria-hidden="true" /><IconCopy v-else aria-hidden="true" />
         </UiButton>
         <UiButton
-          v-if="last && !turn.failure"
+          v-if="flags.last && !turn.failure"
           shape="icon"
           size="sm"
           class="copy-button"
           title="Повторить: получить другой ответ"
           aria-label="Повторить ответ"
-          :disabled="busy"
+          :disabled="flags.busy"
           @click="emit('retry', turn.id)"
         >
           <IconRefresh aria-hidden="true" />
         </UiButton>
         <UiButton
-          v-if="last && turn.stopped"
+          v-if="flags.last && turn.stopped"
           size="sm"
           title="Ход остановлен на лимите: продолжить с того же места"
-          :disabled="busy"
+          :disabled="flags.busy"
           @click="emit('continue')"
         >
           Продолжить

@@ -30,7 +30,7 @@
     setup: () => () =>
       h("div", { style: "padding:20px;width:min(700px,100%);box-sizing:border-box" }, [
         ...turns.value.map((turn) =>
-          h(AgentTurn, { turn, busy: true, last: true, copied: false, readonly: true }),
+          h(AgentTurn, { turn, flags: { busy: true, last: true, copied: false, readonly: true } }),
         ),
         h(AgentTaskBar, {
           tasks: tasks.value,

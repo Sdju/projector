@@ -170,11 +170,8 @@ useTabReadout(() => ({
       <AgentTurn
         v-if="journal.length"
         :turn="turn"
-        :busy="!!job && !finished"
-        last
-        :copied="false"
         :root="job?.cwd"
-        readonly
+        :flags="{ busy: !!job && !finished, last: true, copied: false, readonly: true }"
       />
       <p v-else-if="job && !finished" class="note">
         <UiSpinner /> Агент работает, событий пока нет
