@@ -127,7 +127,4 @@ const emit = defineEmits<{ open: [path: string] }>();
   border: 1px solid var(--line);
   border-radius: var(--r-md);
 }
-.note.error {
-  color: var(--err);
-}
 </style>

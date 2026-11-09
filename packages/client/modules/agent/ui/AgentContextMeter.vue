@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import UiIsland from "../../../common/ui/UiIsland.vue";
 import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
+import { contextCategoryColors, contextCategoryNames } from "../lib/context-palette.ts";
 import type { AgentContext } from "../model/types.ts";
 
 const props = defineProps<{ context: AgentContext }>();
@@ -32,33 +33,14 @@ const label = computed(
     `Контекст заполнен на ${Math.round(percent.value)}%: ${short(props.context.used)} из ${short(props.context.size)}`,
 );
 
-const names: Record<string, string> = {
-  "System prompt": "Системный промпт",
-  "System tools": "Инструменты",
-  "MCP tools": "MCP-инструменты",
-  "Custom agents": "Агенты",
-  "Memory files": "Файлы памяти",
-  Skills: "Навыки",
-  Messages: "Сообщения",
-};
-// Each kind of content keeps its colour, so a segment of the bar is recognised by it, not by order.
-const colors: Record<string, string> = {
-  "System prompt": "var(--info)",
-  "System tools": "#a99bd4",
-  "MCP tools": "#d49bb8",
-  "Custom agents": "#7fc4c0",
-  "Memory files": "var(--accent)",
-  Skills: "#d4a574",
-  Messages: "var(--run)",
-};
 const categories = computed(() =>
   (props.context.categories ?? [])
     .filter((item) => item.tokens > 0 && !/^free space$/i.test(item.name))
     .sort((a, b) => b.tokens - a.tokens)
     .map((item) => ({
-      name: names[item.name] ?? item.name,
+      name: contextCategoryNames[item.name] ?? item.name,
       tokens: item.tokens,
-      color: colors[item.name] ?? "var(--muted)",
+      color: contextCategoryColors[item.name] ?? "var(--muted)",
       width: Math.min(100, (item.tokens / Math.max(1, props.context.size)) * 100),
     })),
 );

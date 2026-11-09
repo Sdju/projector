@@ -134,7 +134,4 @@ useTabReadout(() => {
   overflow-wrap: anywhere;
   tab-size: 2;
 }
-.note.error {
-  color: var(--err);
-}
 </style>

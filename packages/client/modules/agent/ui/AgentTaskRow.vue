@@ -160,9 +160,6 @@ li.current {
   flex: 1;
   color: var(--faint);
 }
-.note.error {
-  color: var(--err);
-}
 .lens-label {
   margin-right: 2px;
   color: var(--faint);

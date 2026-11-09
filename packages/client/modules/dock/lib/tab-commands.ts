@@ -20,14 +20,18 @@ export interface TabCommandProps {
   disabled?: boolean;
   closeSaved?: boolean;
   commandNamespace: string;
-  commandHandlers: {
-    select: (id: string) => unknown;
-    close: (id: string) => unknown;
-    closeMany: (ids: string[]) => unknown;
-    reorder: (ids: string[]) => unknown;
-    rename?: (id: string, label: string) => unknown;
-    pin?: (id: string) => unknown;
-  };
+  commandHandlers: DockCommandHandlers;
+}
+
+export interface DockCommandHandlers {
+  select: (id: string) => unknown;
+  close: (id: string) => unknown;
+  closeMany: (ids: string[]) => unknown;
+  reorder: (ids: string[]) => unknown;
+  rename?: (id: string, label: string) => unknown;
+  pin?: (id: string) => unknown;
+  /** Вкладка из другой полосы брошена сюда; `index` — позиция среди текущих вкладок. */
+  move?: (id: string, index: number) => unknown;
 }
 interface TabCommandContext {
   props: TabCommandProps;

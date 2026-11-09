@@ -193,7 +193,4 @@ watch(() => [props.projectId, props.hash], load, { immediate: true });
   justify-content: flex-end;
   margin: 0 0 var(--sp-2);
 }
-.note.error {
-  color: var(--err);
-}
 </style>

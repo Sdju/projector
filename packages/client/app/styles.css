@@ -340,3 +340,8 @@ body .mobile-sheet.mobile-sheet {
     opacity: 0;
   }
 }
+
+/* Compact inline note used by panels; the error tone is shared instead of copied into every SFC. */
+.note.error {
+  color: var(--err);
+}

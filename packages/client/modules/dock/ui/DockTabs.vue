@@ -6,14 +6,18 @@ import { tabDrag } from "../../../common/utilities/tab-drag.ts";
 import ContextMenu from "../../../common/ui/ContextMenu.vue";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import IconClose from "~icons/lucide/x";
-import { registerTabCommands, tabCommandId, type DockTab } from "../lib/tab-commands.ts";
+import {
+  registerTabCommands,
+  tabCommandId,
+  type DockCommandHandlers,
+  type DockTab,
+} from "../lib/tab-commands.ts";
 
 type Tab = DockTab;
 const props = defineProps<{
   tabs: Tab[];
   activeId: string;
   label: string;
-  renameable?: boolean;
   disabled?: boolean;
   /** Идентификатор полосы: по нему вкладки отличают перестановку от переноса из другой полосы. */
   group?: string;
@@ -23,16 +27,7 @@ const props = defineProps<{
   closeSaved?: boolean;
   commandNamespace: string;
   projectId: string;
-  commandHandlers: {
-    select: (id: string) => unknown;
-    close: (id: string) => unknown;
-    closeMany: (ids: string[]) => unknown;
-    reorder: (ids: string[]) => unknown;
-    rename?: (id: string, label: string) => unknown;
-    pin?: (id: string) => unknown;
-    /** Вкладка из другой полосы брошена сюда; `index` — позиция среди текущих вкладок. */
-    move?: (id: string, index: number) => unknown;
-  };
+  commandHandlers: DockCommandHandlers;
 }>();
 const menu = ref<InstanceType<typeof ContextMenu>>();
 const contextId = ref("");
@@ -72,7 +67,7 @@ const menuItems = computed<ContextMenuItem[]>(() => {
     "closeAll",
   ].map((action) => item(action));
   if (props.closeSaved) items.push(item("closeSaved"));
-  if (props.renameable || tab.renameable) items.push(item("rename", { separator: true }));
+  if (tab.renameable) items.push(item("rename", { separator: true }));
   items.push(...(props.actions?.(tab.id) ?? []));
   return items.map((item) => ({ ...item, disabled: props.disabled || item.disabled }));
 });
@@ -90,7 +85,7 @@ const target = ref("");
 const after = ref(false);
 
 async function startRename(tab: Tab) {
-  if (!(props.renameable || tab.renameable) || props.disabled) return;
+  if (!tab.renameable || props.disabled) return;
   editing.value = tab.id;
   draft.value = tab.label;
   await nextTick();
@@ -175,7 +170,7 @@ function activateTab(id: string) {
 }
 function dblclickTab(tab: Tab) {
   if (tab.preview) commands.run(commandId("pin"), { id: tab.id });
-  else if (props.renameable || tab.renameable) commands.run(commandId("rename"), { id: tab.id });
+  else if (tab.renameable) commands.run(commandId("rename"), { id: tab.id });
 }
 watch(
   () => props.activeId,

@@ -126,7 +126,4 @@ const groups = computed(() => groupPipelineStages(detail.value?.jobs ?? []));
 .note {
   margin: var(--sp-1) 0 0;
 }
-.note.error {
-  color: var(--err);
-}
 </style>

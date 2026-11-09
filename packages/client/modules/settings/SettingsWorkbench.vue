@@ -526,60 +526,8 @@ svg {
   }
 }
 @media (max-width: 700px) {
-  .toolbar {
-    flex-wrap: wrap;
-    gap: var(--sp-2);
-  }
-  .search {
-    width: 100%;
-  }
   .search input {
     font-size: var(--fs-input);
-  }
-  .layout {
-    display: block;
-    min-height: 0;
-  }
-  .sidebar {
-    display: flex;
-    gap: var(--sp-2);
-    overflow-x: auto;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-  }
-  .group {
-    display: flex;
-    gap: var(--sp-1);
-    flex-shrink: 0;
-  }
-  .group + .group {
-    margin-top: 0;
-  }
-  .group h2 {
-    display: none;
-  }
-  .group button {
-    width: auto;
-    white-space: nowrap;
-  }
-  .content {
-    padding: var(--sp-4);
-  }
-  .section-heading {
-    margin-bottom: var(--sp-4);
-  }
-  .embedded .layout {
-    display: flex;
-    flex-direction: column;
-  }
-  .embedded .sidebar {
-    flex-shrink: 0;
-    overflow-y: hidden;
-  }
-  .embedded .content {
-    flex: 1;
-    min-height: 0;
-    overflow: auto;
   }
 }
 @container (max-width: 650px) {

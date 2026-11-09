@@ -33,6 +33,7 @@
 - `common/ui/UiDonut.vue` — одно кольцо с внутренним расчётом доли; `Donut` и `UsageDonut` стали обёртками.
 - `agents-integration/_/use-agent-usage-indicator.ts` — polling, часы, окна, команда и публикация остатка; Claude, Cursor, Kimi и OpenCode оставили только определения окон и тексты.
 - `ContextMenu` использует `UiActionRow` и на десктопе, а не только в мобильном листе. `ImageModal` переведён на `UiDialog fullscreen flush` без девяти `!important`. `FileIcon` получил `size` и `--file-icon-size`.
+- P3: hex-палитра `AgentContextMeter` переехала в `lib/context-palette.ts` на токенах; `SettingsWorkbench` больше не дублирует media/container-блок; `DockTabs` использует общий `DockCommandHandlers`, удалён мёртвый `renameable`; тон `.note.error` вынесен в общий CSS, восемь локальных копий удалены.
 - `agent/model/chat-scroll.ts` — pin/away, ResizeObserver и подгрузка старых ходов; `AgentChat` сократился ниже 500 строк и удалён из реестра больших файлов.
 - `agent/lib/composer/suggestions.ts` и `editing.ts` — завершение `@`/`/` и вставка/добавление чипов, текста и цитат; `AgentInput` больше не держит эту логику.
 - `agent/lib/composer/drop.ts` — drop/paste, пути из дерева, загрузка картинок и root проекта; `AgentInput` оставил только CodeMirror-хост, команды и expose.
@@ -49,18 +50,14 @@
 - [x] **Виджеты и графики — решения.** `UiMeter`/`UiDonut`, раскладка `UsageLine`/`UsageBarChart` и 4 индикатора агентов общие. `Line`, `Field`, `Form/IntelligentForm`, `UsageMeter` и `CodexUsageIndicator` не выносим: у них нет второго потребителя или разные контракты; общий компонент добавил бы режимы и булевы флаги.
 - [x] **`common/ui` — решения.** `UiCard`, `UiPopupSurface`, `UiDialog` и тост не сводим в один surface: у них разная семантика (карточка, поповер, модалка, тост). Раскладки и текстовые примитивы объединяем при появлении третьего потребителя каждого варианта.
 
-## P3
+## P3 — решения
 
-- [ ] Вынести hex-палитру `AgentContextMeter` в `lib/context-palette.ts` на токенах.
-- [ ] Свести `.note` (26 файлов) к `UiMessage`/`UiHint`; убрать дубли `.note.error`.
-- [ ] Мобильный breakpoint `(max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse)` скопирован в 9 файлов — вынести в общий слой.
-- [ ] `SettingsWorkbench`: дубли `@media (max-width: 700px)` и `@container (max-width: 650px)` на ~54 строки.
-- [ ] `DockTabs`: 19 props, тип `commandHandlers` разошёлся с `lib/tab-commands.ts`; проверить `renameable` и `closeSaved`.
+- `.note` остаётся компактной утилитой: у неё разные отступы внутри панелей, и замена всех вхождений на `UiHint` потеряла бы эту геометрию. Общий тон ошибки уже в CSS.
+- Мобильный breakpoint остаётся обычным media query: пользовательских media в CSS нет, а общий слой потребовал бы build-plugin.
 
 ## Порядок работ
 
 1. `AgentTurn` — сгруппировать флаги и события.
-2. P3-чистка: `.note`, общий breakpoint, дубли `SettingsWorkbench`, `DockTabs`, палитра `AgentContextMeter`.
 
 ## Замечания
 

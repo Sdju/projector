@@ -28,7 +28,4 @@ defineProps<{ loading: boolean; error: string; loadingText?: string }>();
   margin: 0;
   padding: var(--sp-2) var(--sp-3);
 }
-.note.error {
-  color: var(--err);
-}
 </style>

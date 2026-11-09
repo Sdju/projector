@@ -324,7 +324,4 @@ useTabReadout(() => {
 .job-number {
   font-family: var(--mono);
 }
-.note.error {
-  color: var(--err);
-}
 </style>
