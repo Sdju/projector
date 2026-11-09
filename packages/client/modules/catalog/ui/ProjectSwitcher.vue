@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import UiActionCopy from "../../../common/ui/UiActionCopy.vue";
 import UiBadge from "../../../common/ui/UiBadge.vue";
+import ContextMenu from "../../../common/ui/ContextMenu.vue";
+import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import UiControl, { type UiControlHandle } from "../../../common/ui/UiControl.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 import UiPopupSurface from "../../../common/ui/UiPopupSurface.vue";
@@ -9,17 +11,18 @@ import UiIslandFooter from "../../../common/ui/UiIslandFooter.vue";
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, useId, watch } from "vue";
 import { onClickOutside } from "@vueuse/core";
 import { useRouter } from "vue-router";
-import { useCommandScope } from "../../../common/utilities/commands.ts";
+import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import {
   createLauncherClient,
   createLauncherModel,
   launchSectionTitles,
   type LaunchItem,
 } from "@projector/core/modules/launcher/index.ts";
-import { projectIconUrl, type ProjectLocation } from "../../project/index.ts";
+import { projectIconUrl, useProjects, type ProjectLocation } from "../../project/index.ts";
 import PathBar from "./PathBar.vue";
 import IconChevron from "~icons/lucide/chevron-down";
 import IconSearch from "~icons/lucide/search";
+import IconTrash from "~icons/lucide/trash-2";
 
 /**
  * Переключатель проекта: кнопка с текущим проектом открывает остров с путём к папке
@@ -30,12 +33,16 @@ const props = defineProps<{
   navigate: (path: string) => Promise<void>;
 }>();
 const router = useRouter();
+const catalog = useProjects();
 const root = ref<HTMLElement>();
 const input = ref<UiControlHandle>();
 const open = ref(false);
 const text = ref("");
 const listId = useId();
 const state = shallowRef<ReturnType<typeof createLauncherModel>["state"]>();
+const menu = ref<InstanceType<typeof ContextMenu>>();
+const contextItem = ref<LaunchItem>();
+const removing = ref(false);
 let model: ReturnType<typeof createLauncherModel> | undefined;
 let unsubscribe: (() => void) | undefined;
 
@@ -49,6 +56,18 @@ commands.scope.registerCommand({
   description:
     "Показывает остров с путём текущего проекта, поиском других проектов и списком недавних.",
   run: () => toggle(),
+});
+commands.scope.registerCommand({
+  id: "ide.project.switcher.remove",
+  title: "Убрать проект из Projector",
+  description:
+    "После подтверждения убирает проект из каталога Projector, завершает его терминалы и процессы. Файлы на диске остаются.",
+  arguments: {
+    id: "string (необязательно): id проекта",
+    path: "string (необязательно): абсолютный путь проекта",
+  },
+  enabled: () => !removing.value,
+  run: (value) => removeProject(commandArgs(value)),
 });
 
 /** Поиск в переключателе — по проектам; ссылки и gh/, gl/ остаются как есть. */
@@ -71,6 +90,57 @@ const rows = computed(() =>
         : "",
   })),
 );
+const contextProject = computed(() => {
+  const item = contextItem.value;
+  return item?.kind === "project" && item.id.startsWith("project:")
+    ? { id: item.id.slice("project:".length), name: item.name }
+    : undefined;
+});
+const menuItems = computed<ContextMenuItem[]>(() => {
+  const project = contextProject.value;
+  if (!project) return [];
+  return [
+    {
+      id: "ide.project.switcher.remove",
+      label: "Убрать из Projector",
+      icon: IconTrash,
+      danger: true,
+      command: "ide.project.switcher.remove",
+      disabled: removing.value,
+      run: () => commands.run("ide.project.switcher.remove", { id: project.id }),
+    },
+  ];
+});
+function showContext(event: MouseEvent, item: LaunchItem) {
+  if (item.kind !== "project") return;
+  contextItem.value = item;
+  void menu.value?.open(event, event.currentTarget as HTMLElement);
+}
+async function removeProject(args: Record<string, unknown>) {
+  if (removing.value) return;
+  const id = typeof args.id === "string" ? args.id : undefined;
+  const path = typeof args.path === "string" ? args.path : undefined;
+  if (!id && !path) throw new Error("Укажите id или path проекта");
+  const project =
+    catalog.projects.value.find((item) => (id ? item.id === id : item.path === path)) ??
+    (id ? await catalog.getOne(id) : undefined);
+  if (!project) throw new Error("Проект не найден");
+  if (project.id === props.project.id) throw new Error("Нельзя убрать открытый проект");
+  if (
+    !window.confirm(
+      `Убрать «${project.name}» из Projector? Терминалы и запущенные процессы проекта будут завершены. Файлы останутся на диске.`,
+    )
+  )
+    return;
+  removing.value = true;
+  try {
+    await catalog.remove(project.id);
+    if (contextItem.value?.id === `project:${project.id}`) contextItem.value = undefined;
+    await model?.refresh();
+  } finally {
+    removing.value = false;
+  }
+}
 
 function start() {
   const launcher = createLauncherClient();
@@ -87,6 +157,8 @@ function start() {
   model.live(true);
 }
 function stop() {
+  menu.value?.close(false);
+  contextItem.value = undefined;
   unsubscribe?.();
   model?.dispose();
   model = undefined;
@@ -106,7 +178,11 @@ async function toggle(force = !open.value) {
     root.value?.querySelector<HTMLElement>(".trigger")?.focus();
   }
 }
-onClickOutside(root, () => open.value && void toggle(false));
+onClickOutside(root, (event) => {
+  // The menu is teleported to <body>: clicking it must not close the island under it.
+  if (event.target instanceof Element && event.target.closest('[role="menu"]')) return;
+  if (open.value) void toggle(false);
+});
 onBeforeUnmount(stop);
 
 async function pick(item: LaunchItem | undefined, secondary = false) {
@@ -197,6 +273,7 @@ function keydown(event: KeyboardEvent) {
             :disabled="row.item.route ? undefined : state?.busy"
             @mousemove="model?.select(row.index)"
             @click="activate($event, row.item)"
+            @contextmenu.stop="showContext($event, row.item)"
           >
             <img v-if="row.item.icon" :src="row.item.icon" alt="" width="28" height="28" />
             <UiActionCopy
@@ -210,8 +287,11 @@ function keydown(event: KeyboardEvent) {
         <p v-if="state && !state.loading && !items.length" class="empty">Ничего не найдено</p>
         <p v-if="state?.error" class="empty error" role="alert">{{ state.error }}</p>
       </div>
-      <UiIslandFooter variant="plain">↑↓ выбрать · Enter открыть · Esc закрыть</UiIslandFooter>
+      <UiIslandFooter variant="plain"
+        >↑↓ выбрать · Enter открыть · ПКМ убрать · Esc закрыть</UiIslandFooter
+      >
     </UiPopupSurface>
+    <ContextMenu ref="menu" :items="menuItems" label="Действия с проектом" />
   </div>
 </template>
 
