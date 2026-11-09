@@ -1,20 +1,14 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, watch } from "vue";
 import { useIdeCommands } from "../../ide/index.ts";
 import { readoutLines, useTabReadout } from "../../../common/utilities/tab-readout.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiDisclosureSummary from "../../../common/ui/UiDisclosureSummary.vue";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
-import {
-  answerJob,
-  fetchJob,
-  jobFinished,
-  stopJob,
-  type AgentJobEntry,
-  type AgentJobView,
-} from "../api/jobs.ts";
+import { jobFinished } from "../api/jobs.ts";
 import { jobDuration, jobStatusLabel } from "../lib/job-labels.ts";
 import { useElapsedClock } from "../lib/elapsed.ts";
+import { useJobFollow } from "../model/job-follow.ts";
 import { useJobTitle } from "../model/job-titles.ts";
 import { agentLabel } from "../model/modes.ts";
 import { provideChatContext } from "../model/chat-link-actions.ts";
@@ -37,11 +31,9 @@ const emit = defineEmits<{ openFile: [path: string]; title: [title: string] }>()
 const { api } = useIdeCommands();
 provideChatContext(props.projectId, api);
 
-const job = ref<AgentJobView>();
-const journal = ref<AgentJobEntry[]>([]);
-const error = ref("");
-const actionError = ref("");
-const missing = ref(false);
+const { job, journal, error, actionError, missing, stop, decide, answer } = useJobFollow(
+  () => props.job,
+);
 // The agent names its session while it works: the header and tab title follow that name.
 const name = useJobTitle(
   () => props.projectId,
@@ -98,71 +90,6 @@ const meta = computed(() =>
     .join(" · "),
 );
 
-let alive = true;
-let controller: AbortController | undefined;
-let generation = 0;
-const POLL_GAP_MS = 100;
-
-function apply(data: { job: AgentJobView; journal: AgentJobEntry[] }): void {
-  job.value = data.job;
-  journal.value = data.journal;
-  error.value = "";
-}
-
-async function follow(): Promise<void> {
-  const mine = ++generation;
-  let rev = 0;
-  while (alive && mine === generation) {
-    controller = new AbortController();
-    try {
-      // The first read is at once, later ones wait for the server to report a change.
-      const data = await fetchJob(props.job, rev ? 25 : 0, rev, controller.signal);
-      if (!alive || mine !== generation) return;
-      apply(data);
-      rev = data.job.rev;
-      if (jobFinished(data.job.status)) return;
-      await new Promise((resolve) => setTimeout(resolve, POLL_GAP_MS));
-    } catch (cause) {
-      if (!alive || mine !== generation) return;
-      const message = cause instanceof Error ? cause.message : "Не удалось прочитать задание";
-      if (/не найдено/.test(message)) {
-        missing.value = true;
-        return;
-      }
-      error.value = message;
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-    }
-  }
-}
-watch(
-  () => props.job,
-  () => {
-    generation++;
-    controller?.abort();
-    void follow();
-  },
-  { immediate: true },
-);
-onBeforeUnmount(() => {
-  alive = false;
-  controller?.abort();
-});
-
-async function act(run: () => Promise<unknown>): Promise<void> {
-  actionError.value = "";
-  try {
-    await run();
-    // The long poll brings the change; read once more now so the card goes at once.
-    apply(await fetchJob(props.job));
-  } catch (cause) {
-    actionError.value = cause instanceof Error ? cause.message : "Не удалось выполнить действие";
-  }
-}
-const stop = () => act(() => stopJob(props.job));
-const decide = (id: string, allow: boolean, always = false) =>
-  act(() => answerJob(props.job, { request: id, allow, always }));
-const answer = (id: string, answers: Record<string, string[]> | null) =>
-  act(() => answerJob(props.job, { request: id, answers }));
 const proceed = async () => {
   actionError.value = "";
   try {

@@ -1,16 +1,13 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import { useElapsedClock } from "../lib/elapsed.ts";
-import type { PlanItem } from "../lib/plan.ts";
 import { taskElapsed, taskStatusLabel, type AgentTaskDetail } from "../lib/task-detail.ts";
-import { toolLabel } from "../lib/tool-labels.ts";
 import { useOptionalIdeCommands } from "../../ide/index.ts";
 import { provideChatContext } from "../model/chat-link-actions.ts";
-import { useAgentLens } from "../model/lens.ts";
-import { useTaskTurns } from "../model/task-turns.ts";
-import type { AgentBackendId, AgentSelection, QueuedMessage } from "../model/types.ts";
+import { useTaskLens } from "../model/task-lens.ts";
+import type { AgentBackendId, AgentSelection } from "../model/types.ts";
 import AgentLensPanel from "./AgentLens.vue";
 import AgentTurn from "./AgentTurn.vue";
 import AgentCodeBlock from "./AgentCodeBlock.vue";
@@ -60,37 +57,15 @@ const sessionId = computed(
     task.value.session ?? /"sessionID"\s*:\s*"([^"]+)"/.exec(props.detail.call?.detail ?? "")?.[1],
 );
 // The conversation of the subagent's own session, read from the agent; refreshed while it works.
-const {
-  turns,
-  error: loadError,
-  load,
-} = useTaskTurns({
+const { lens, turns, loadError, toggleLens } = useTaskLens({
   backend: () => props.backend,
   projectId: () => props.projectId,
   session: () => sessionId.value,
   running: () => task.value.status === "running",
+  lastTool: () => task.value.lastTool,
+  selection: () => props.selection,
   auto: true,
 });
-const phase = computed(() => {
-  if (task.value.status !== "running") return "";
-  return task.value.lastTool ? `выполняет ${toolLabel(task.value.lastTool)}` : "";
-});
-const lens = useAgentLens({
-  turns,
-  busy: computed(() => task.value.status === "running"),
-  phase,
-  queue: ref<QueuedMessage[]>([]),
-  plan: ref<PlanItem[]>([]),
-  selection: computed(() => props.selection ?? {}),
-});
-async function toggleLens() {
-  if (lens.state.open) {
-    lens.close();
-    return;
-  }
-  if (!turns.value.length) await load();
-  await lens.open();
-}
 
 // A background task's own call only reports that it started: its result is not the outcome.
 const outcome = computed(() => {

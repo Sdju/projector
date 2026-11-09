@@ -1,20 +1,12 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import { useElapsedClock } from "../lib/elapsed.ts";
-import type { PlanItem } from "../lib/plan.ts";
 import { taskElapsed, taskSummaryLine } from "../lib/task-detail.ts";
 import { toolLabel } from "../lib/tool-labels.ts";
-import { useAgentLens } from "../model/lens.ts";
-import { useTaskTurns } from "../model/task-turns.ts";
-import type {
-  AgentBackendId,
-  AgentSelection,
-  AgentTask,
-  AgentTurn,
-  QueuedMessage,
-} from "../model/types.ts";
+import { useTaskLens } from "../model/task-lens.ts";
+import type { AgentBackendId, AgentSelection, AgentTask } from "../model/types.ts";
 import IconAlert from "~icons/lucide/circle-alert";
 import IconBot from "~icons/lucide/bot";
 import IconCheck from "~icons/lucide/check";
@@ -50,41 +42,20 @@ function note() {
 }
 
 // Lens of one subagent: the row stays closed until asked, then reads the task's own session.
-const transcript = useTaskTurns({
+const { lens, lensNote, toggleLens } = useTaskLens({
   backend: () => props.backend,
   projectId: () => props.projectId,
   session: () => props.task.session,
   running: () => props.task.status === "running",
+  lastTool: () => props.task.lastTool,
+  selection: () => props.selection,
+  fallback: () => {
+    const prompt = props.task.prompt?.trim();
+    return prompt ? { id: props.task.id, text: prompt } : undefined;
+  },
+  startOnOpen: true,
+  stopOnClose: true,
 });
-const turns = computed((): AgentTurn[] => {
-  if (transcript.turns.value.length) return transcript.turns.value;
-  const prompt = props.task.prompt?.trim();
-  return prompt ? [{ id: props.task.id, role: "user", text: prompt, tools: [] }] : [];
-});
-const phase = computed(() => {
-  if (props.task.status !== "running") return "";
-  return props.task.lastTool ? `выполняет ${toolLabel(props.task.lastTool)}` : "";
-});
-const lens = useAgentLens({
-  turns,
-  busy: computed(() => props.task.status === "running"),
-  phase,
-  queue: ref<QueuedMessage[]>([]),
-  plan: ref<PlanItem[]>([]),
-  selection: computed(() => props.selection ?? {}),
-});
-const lensNote = computed(
-  () => lens.state.error || lens.state.text || (lens.state.busy ? "Смотрю, чем занят…" : ""),
-);
-async function toggleLens() {
-  if (lens.state.open) {
-    lens.close();
-    transcript.stop();
-    return;
-  }
-  await transcript.start();
-  await lens.open();
-}
 </script>
 
 <template>
