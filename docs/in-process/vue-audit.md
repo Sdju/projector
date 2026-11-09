@@ -16,14 +16,19 @@
 - `agent/ui/AgentJsonSettings.vue` — JSON-редактор MCP и хуков; `AgentMcpSettings` и `AgentHooksSettings` сократились примерно вдвое.
 - `common/ui/UiListSection.vue` — оболочка сайдбар-списка: заголовок со счётчиком, фильтр, loading/error/empty, «ещё». Используется в `TrackerPanel`, `PipelinesPanel`, `ReleasesPanel`; три панели больше не держат свои копии CSS.
 - `common/ui/UiListRow.vue` — строка списка; используется в `TrackerRow`, `ReleaseRow`, `PipelineRow`.
+- `common/ui/UiAsyncContent.vue` — загрузка с защитой от устаревших ответов; `common/ui/UiViewerPage.vue` и `UiArticle.vue` — общий scroll-контейнер и ширина detail-вью.
+- `integration-api/RepositoryOverview.vue` + `repository-overview.ts` — нейтральная модель «О репозитории»; GitHub и GitLab только маппят свои payload'ы.
+- `integration-api/TokenConnectionForm.vue` — форма токена, команда и readout; `CloneRepositoryDialog.vue` — общий клон-диалог; `useDeviceLogin` + `DeviceLoginPanel.vue` — Device Flow.
+- `gitlab-workspace/ui/GitlabWorkspaceGate.vue` — проверка инстанса и статус интеграции; `pages/gl/...` сокращена до маршрутной обёртки.
+- `workspace-api/pipeline-stages.ts` — `groupPipelineStages` для `PipelineView` и `PullRequestPipelineStages`.
 - Удалены мёртвые `resize`-заглушка, несовпадающие `prefers-reduced-motion`, неиспользуемый `const props`, локальные `.sr-only`, мёртвые `.muted`/`.hint`/`.field`/`.link`.
 - `ReleaseView` переведён на `UiMessage tone="danger"`; `ArchiveViewer` — на `sizeLabel` и `UiEmpty`; `999px` заменены на `var(--r-full)`.
 - Реестр больших файлов синхронизирован: `AgentChat.vue` — 502, `projector-backend.ts` — 409, `gitlab/browser.ts` — 402.
 
 ## Приоритет P1
 
-- [ ] **GitHub/GitLab — презентационный слой.** `GithubClone ↔ GitlabClone` (CSS идентичен, различаются API-база и тексты), `GithubWorkspace:109 ↔ GitlabWorkspace:146`, `GithubSettings ↔ GitlabSettings` (6 методов Device Flow), `GithubRepositoryInfo ↔ GitlabRepositoryInfo` (116 одинаковых строк CSS), `GithubConnection ↔ GitlabConnection`, оба `RepositoryInfoLoader`. `pages/gl/projects/[...gitlabPath].vue` — 366 строк против 13 у gh-страницы. Вынести `RepositoryOverview`, `RepositoryInfoLoader`, `TokenConnectionForm`, `DeviceLoginPanel`, `CloneRepositoryDialog`; маппинг API оставить в модулях.
-- [ ] **Detail-вью и стадии.** `TrackerDetail ↔ ReleaseView ↔ PipelineView ↔ JobView` (общий `.article` 880px, `.state`, `.meta`, `.external`); `PipelineView:37-49 ↔ PullRequestPipelineStages:25-42` (~70 строк логики стадий). Вынести `UiDetailShell` и `lib/stages.ts`.
+- [ ] **GitHub/GitLab — оркестрация workspace.** `GithubWorkspace:109 ↔ GitlabWorkspace:146` всё ещё повторяют загрузку, регистрацию профиля, 401/403-ветку, открытие README и жизненный цикл. Вынести `useRemoteWorkspace` (профиль, ошибка авторизации, начальный файл, cleanup) и оставить в модулях только API-адаптеры.
+- [ ] **Detail-вью — шапка.** `TrackerDetail ↔ ReleaseView ↔ PipelineView ↔ JobView` всё ещё дублируют `.state`, `.meta`, `.external` и заголовок; общий scroll и ширина уже вынесены в `UiViewerPage`/`UiArticle`. Вынести `UiDetailHeader`.
 - [ ] **Изменённые файлы.** `CommitFiles:161-267 ↔ PullRequestFiles:266-369` (~86% CSS), `commit-diffs.ts ≈ pull-diffs.ts`, `ChangesTree` (490) + `GitChangesTree` (279) — две реализации дерева, `PullRequestFilesSection ↔ CompareTreeSection` (style 0.91). Вынести `ChangedFileList`, `ChangedFileTree`, `useFileDiffs`.
 
 ## Приоритет P2
@@ -46,8 +51,8 @@
 
 ## Порядок работ
 
-1. GitHub/GitLab презентационный слой.
-2. Detail-вью и стадии.
+1. GitHub/GitLab: осталась оркестрация workspace.
+2. Detail-вью: осталась общая шапка.
 3. Изменённые файлы и деревья.
 4. Scaffold настроек вне агента.
 5. Декомпозиция `AgentChat`/`AgentInput`/задач.
