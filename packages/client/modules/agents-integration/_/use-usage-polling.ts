@@ -1,6 +1,6 @@
 import { onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
 
-interface UsagePollingOptions<T> {
+export interface UsagePollingOptions<T> {
   intervalMs?: number;
   nextCheckAt?: (value: T) => number;
 }

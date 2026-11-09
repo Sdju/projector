@@ -30,6 +30,8 @@
 - `agent/ui/AgentTaskFrame.vue` и `AgentStatusIcon.vue` — общий каркас read-only задачи и один статус-глиф для заданий, задач и активности.
 - `common/ui/UiMeter.vue` — один прогресс-бар с тонами, высотой, мягкой заливкой и сегментами; заменил копии в `Bars`, `UsageBreakdown`, `LimitCard` и двухцветный diff в `GitInfo`.
 - `analytics/lib/chart-layout.ts` — общий ResizeObserver, `niceMax`, масштаб, тики и прореживание подписей для `UsageBarChart` и `UsageLine`.
+- `common/ui/UiDonut.vue` — одно кольцо с внутренним расчётом доли; `Donut` и `UsageDonut` стали обёртками.
+- `agents-integration/_/use-agent-usage-indicator.ts` — polling, часы, окна, команда и публикация остатка; Claude, Cursor, Kimi и OpenCode оставили только определения окон и тексты.
 - `agent/model/chat-scroll.ts` — pin/away, ResizeObserver и подгрузка старых ходов; `AgentChat` сократился ниже 500 строк и удалён из реестра больших файлов.
 - `agent/lib/composer/suggestions.ts` и `editing.ts` — завершение `@`/`/` и вставка/добавление чипов, текста и цитат; `AgentInput` больше не держит эту логику.
 - `agent/lib/composer/drop.ts` — drop/paste, пути из дерева, загрузка картинок и root проекта; `AgentInput` оставил только CodeMirror-хост, команды и expose.
@@ -43,7 +45,7 @@
 ## Приоритет P2
 
 - [ ] **AgentTurn — булевы и события.** 13 props, из них 7 boolean, и 11 emits; сгруппировать флаги (`busy/last/copied/faded/canRevert/readonly/formAnswered`) и действия в объекты. Остальные компоненты чата уже разгружены.
-- [ ] **Виджеты и графики.** Прогресс-бары сведены в `UiMeter` (кроме `UsageMeter` с подписями), общая раскладка `UsageLine`/`UsageBarChart` вынесена. Осталось: `Line` (485, chart-движок, clamp продублирован 3×), `UsageDonut ↔ Donut`, `Field` (15 props, дублирует `Checks/Tabs/Slider/Input` и `UiField`), `Form ↔ IntelligentForm`, 5 `*UsageIndicator`. Вынести `ChartFrame`, `Field`-диспетчер, общий `Form`.
+- [ ] **Виджеты и графики.** Прогресс-бары и кольца сведены в `UiMeter`/`UiDonut` (кроме `UsageMeter` с подписями), раскладка `UsageLine`/`UsageBarChart` и 4 индикатора агентов общие. Осталось: `Line` (485, chart-движок, clamp продублирован 3×), `Field` (15 props, дублирует `Checks/Tabs/Slider/Input` и `UiField`), `Form ↔ IntelligentForm` (разные контракты: контекст формы против готовой формы ответа), `UsageMeter` и `CodexUsageIndicator`.
 - [ ] **`common/ui`.** Четыре реализации «поверхности» (`UiCard`, `UiPopupSurface`, `UiDialog`, тост `UiNoticeHost`); `ContextMenu` рендерит строку меню дважды; несовместимые API раскладок (`UiInline` считает `gap * 4` px, `UiActionRow` мапит `1.5 → 6px`); текстовые примитивы повторяют `size/space` inline-стилями; `ImageModal` — 9 `!important`; `UiStringList` — 10 props на одного потребителя; `FileIcon` — размеры захардкожены 6 раз.
 
 ## P3
