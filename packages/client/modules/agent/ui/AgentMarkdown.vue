@@ -7,6 +7,7 @@ import { chatImageSource, chatProjectKey } from "../../chat-images/index.ts";
 import { chatLinkActionsKey } from "../model/chat-link-actions.ts";
 import { openExternalLink } from "../../../common/utilities/open-external-link.ts";
 import ContextMenu from "../../../common/ui/ContextMenu.vue";
+import "./agent-markdown.css";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import ImageModal from "../../../common/ui/ImageModal.vue";
 import IconCopy from "~icons/lucide/copy";
