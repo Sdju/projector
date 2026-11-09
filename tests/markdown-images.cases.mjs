@@ -106,3 +106,9 @@ test("without a resolver an image is ordinary markdown", () => {
   expect(html).toContain('<img src="x.png"');
   expect(html).toContain('alt="a"');
 });
+
+test("an answer may be written as HTML instead of markdown", () => {
+  const html = renderMarkdown("<p>P1: <code>src/mcp.ts:53</code> — <b>фикс</b></p>");
+  expect(html).toContain("<p>P1: <code>src/mcp.ts:53</code> — <b>фикс</b></p>");
+  expect(html).not.toContain("&lt;p&gt;");
+});

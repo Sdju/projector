@@ -10,7 +10,8 @@ export type MarkdownEnv = Env & {
 };
 
 const markdown = new MarkdownIt({
-  html: false,
+  // An answer may be written as HTML: DOMPurify still decides what reaches the page.
+  html: true,
   linkify: true,
   breaks: true,
   highlight(code, language) {
@@ -24,24 +25,38 @@ const markdown = new MarkdownIt({
     return "";
   },
 });
-const defaultLink = markdown.renderer.rules.link_open;
-markdown.renderer.rules.link_open = (tokens, index, options, env, self) => {
-  const token = tokens[index]!;
-  token.attrSet("target", "_blank");
-  token.attrSet("rel", "noopener noreferrer");
-  // A file link's click is handled in the chat; the hint says so before the click.
-  const link = parseChatLink(String(token.attrGet("href") ?? ""));
+/** What a chat link needs on its element: a new tab, and a file hint before the click. */
+function chatLinkAttributes(href: string, title?: string | null): Record<string, string> {
+  const attributes: Record<string, string> = {
+    target: "_blank",
+    rel: "noopener noreferrer",
+  };
+  const link = parseChatLink(href);
   if (link.kind === "file") {
-    token.attrSet("data-chat-file", "");
-    if (!token.attrGet("title")) {
+    attributes["data-chat-file"] = "";
+    if (!title) {
       const range = link.line
         ? link.endLine
           ? `:${link.line}–${link.endLine}`
           : `:${link.line}${link.column ? `:${link.column}` : ""}`
         : "";
-      token.attrSet("title", range ? `Открыть ${link.path}${range}` : "Открыть файл в Projector");
+      attributes.title = range ? `Открыть ${link.path}${range}` : "Открыть файл в Projector";
     }
   }
+  return attributes;
+}
+
+const defaultLink = markdown.renderer.rules.link_open;
+markdown.renderer.rules.link_open = (tokens, index, options, env, self) => {
+  const token = tokens[index]!;
+  const title = token.attrGet("title");
+  for (const [name, value] of Object.entries(
+    chatLinkAttributes(
+      String(token.attrGet("href") ?? ""),
+      title === null || title === undefined ? undefined : String(title),
+    ),
+  ))
+    token.attrSet(name, value);
   return defaultLink
     ? defaultLink(tokens, index, options, env, self)
     : self.renderToken(tokens, index, options);
@@ -63,14 +78,52 @@ markdown.renderer.rules.image = (tokens, index, options, env, self) => {
   token.attrSet("class", "md-image");
   return self.renderToken(tokens, index, options);
 };
+/**
+ * Raw HTML never reaches the markdown renderer's rules, so its links and pictures are finished
+ * on the sanitized DOM: the same new tab, file hint and safe image source as their markdown forms.
+ */
+function decorateHtml(root: HTMLElement, resolve?: (src: string) => string | undefined) {
+  for (const anchor of root.querySelectorAll("a")) {
+    for (const [name, value] of Object.entries(
+      chatLinkAttributes(anchor.getAttribute("href") ?? "", anchor.getAttribute("title")),
+    ))
+      anchor.setAttribute(name, value);
+  }
+  for (const image of root.querySelectorAll("img")) {
+    const alt = image.getAttribute("alt") ?? "";
+    // A source set is a second address the chat resolver never saw.
+    image.removeAttribute("srcset");
+    if (resolve) {
+      const source = resolve(image.getAttribute("src") ?? "");
+      if (!source) {
+        const fallback = image.ownerDocument.createElement("span");
+        fallback.className = "md-image-text";
+        fallback.textContent = alt || "Изображение";
+        image.replaceWith(fallback);
+        continue;
+      }
+      image.setAttribute("src", source);
+    }
+    image.setAttribute("alt", alt);
+    image.setAttribute("loading", "lazy");
+    image.setAttribute("decoding", "async");
+    image.setAttribute("referrerpolicy", "no-referrer");
+    image.setAttribute("class", "md-image");
+  }
+  for (const source of root.querySelectorAll("source[srcset]")) source.removeAttribute("srcset");
+}
+
 /** Markdown as HTML, not yet sanitized. */
 export const renderMarkdown = (content: string, env: MarkdownEnv = {}): string =>
   markdown.render(content, env);
 /** The block structure of `content`: the tokens, with the source lines each top-level block spans. */
 export const parseMarkdown = (content: string) => markdown.parse(content, {});
 export function renderChatMarkdown(content: string, env: MarkdownEnv = {}): string {
-  return DOMPurify.sanitize(renderMarkdown(content, env), {
+  const root = DOMPurify.sanitize(renderMarkdown(content, env), {
     USE_PROFILES: { html: true },
     ADD_ATTR: ["target", "loading", "decoding", "referrerpolicy", "class"],
-  });
+    RETURN_DOM: true,
+  }) as HTMLElement;
+  decorateHtml(root, env.resolveImage);
+  return root.innerHTML;
 }
