@@ -46,8 +46,8 @@
 ## Приоритет P2
 
 - [ ] **AgentTurn — булевы и события.** 13 props, из них 7 boolean, и 11 emits; сгруппировать флаги (`busy/last/copied/faded/canRevert/readonly/formAnswered`) и действия в объекты. Остальные компоненты чата уже разгружены.
-- [ ] **Виджеты и графики.** Прогресс-бары и кольца сведены в `UiMeter`/`UiDonut` (кроме `UsageMeter` с подписями), раскладка `UsageLine`/`UsageBarChart` и 4 индикатора агентов общие. Осталось: `Line` (485, chart-движок, clamp продублирован 3×), `Field` (15 props, дублирует `Checks/Tabs/Slider/Input` и `UiField`), `Form ↔ IntelligentForm` (разные контракты: контекст формы против готовой формы ответа), `UsageMeter` и `CodexUsageIndicator`.
-- [ ] **`common/ui` — поверхности и раскладки.** `UiCard`, `UiPopupSurface`, `UiDialog` и тост `UiNoticeHost` собирают рамку/фон/тень сами; `UiInline` считает дробный `gap * 4` px, `UiActionRow` мапит `1.5 → 6px`, `UiToolbar`/`UiStack` используют разные шкалы; текстовые примитивы повторяют `size/space` inline-стилями; `UiStringList` — 10 props на одного потребителя. Решение: объединять только при появлении третьего потребителя каждого варианта, иначе компонент обрастёт режимами.
+- [x] **Виджеты и графики — решения.** `UiMeter`/`UiDonut`, раскладка `UsageLine`/`UsageBarChart` и 4 индикатора агентов общие. `Line`, `Field`, `Form/IntelligentForm`, `UsageMeter` и `CodexUsageIndicator` не выносим: у них нет второго потребителя или разные контракты; общий компонент добавил бы режимы и булевы флаги.
+- [x] **`common/ui` — решения.** `UiCard`, `UiPopupSurface`, `UiDialog` и тост не сводим в один surface: у них разная семантика (карточка, поповер, модалка, тост). Раскладки и текстовые примитивы объединяем при появлении третьего потребителя каждого варианта.
 
 ## P3
 
@@ -59,9 +59,9 @@
 
 ## Порядок работ
 
-1. `AgentTurn` — флаги и события.
-2. Виджеты, графики и `common/ui`.
+1. `AgentTurn` — сгруппировать флаги и события.
+2. P3-чистка: `.note`, общий breakpoint, дубли `SettingsWorkbench`, `DockTabs`, палитра `AgentContextMeter`.
 
 ## Замечания
 
-- `AgentChat.vue` — ровно 502 непустых строк script при потолке 502: формально проходит, запаса на рост нет.
+- `AgentChat.vue` опустился до 455 непустых строк script и удалён из реестра больших файлов.
