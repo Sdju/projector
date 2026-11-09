@@ -4,6 +4,8 @@ import UiTable from "../../../../../common/ui/UiTable.vue";
 import UiControl from "../../../../../common/ui/UiControl.vue";
 import UiStack from "../../../../../common/ui/UiStack.vue";
 import UiMessage from "../../../../../common/ui/UiMessage.vue";
+import UiEmpty from "../../../../../common/ui/UiEmpty.vue";
+import { sizeLabel } from "../../../../../common/utilities/release-format.ts";
 import { computed, ref } from "vue";
 import type { ArchiveContent, ArchiveEntry } from "@projector/core/modules/workspace/index.ts";
 const props = defineProps<{ archive: ArchiveContent }>();
@@ -20,12 +22,6 @@ const types: Record<ArchiveEntry["type"], string> = {
   hardlink: "Жёсткая ссылка",
   other: "Другая запись",
 };
-function bytes(value: number) {
-  if (value < 1024) return `${value} Б`;
-  if (value < 1024 * 1024)
-    return `${(value / 1024).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} КБ`;
-  return `${(value / 1024 / 1024).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} МБ`;
-}
 function date(value?: string) {
   if (!value) return "—";
   const parsed = new Date(value);
@@ -37,11 +33,11 @@ function date(value?: string) {
   <UiStack as="section" flow="flex" class="archive-viewer" aria-label="Содержимое архива">
     <div class="archive-summary">
       <strong>{{ archive.format }}</strong>
-      <span>Архив: {{ bytes(archive.size) }}</span>
+      <span>Архив: {{ sizeLabel(archive.size) }}</span>
       <span>{{ archive.entries.length }}{{ archive.truncated ? "+" : "" }} записей</span>
       <span
         >{{ archive.truncated ? "Размер показанных записей" : "Размер содержимого" }}:
-        {{ bytes(totalSize) }}</span
+        {{ sizeLabel(totalSize) }}</span
       >
     </div>
     <UiControl
@@ -70,12 +66,14 @@ function date(value?: string) {
               ><small v-if="entry.link">→ {{ entry.link }}</small>
             </td>
             <td>{{ types[entry.type] }}</td>
-            <td class="entry-size">{{ entry.type === "file" ? bytes(entry.size) : "—" }}</td>
+            <td class="entry-size">
+              {{ entry.type === "file" ? sizeLabel(entry.size) : "—" }}
+            </td>
             <td>{{ date(entry.modified) }}</td>
           </tr>
         </tbody>
       </UiTable>
-      <p v-else class="empty">
+      <UiEmpty v-else density="compact" align="start">
         {{
           archive.entries.length
             ? "Совпадений нет"
@@ -83,7 +81,7 @@ function date(value?: string) {
               ? "Записи недоступны в пределах лимита просмотра"
               : "Архив пуст"
         }}
-      </p>
+      </UiEmpty>
     </UiScrollArea>
   </UiStack>
 </template>

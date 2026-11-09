@@ -3,6 +3,7 @@ import UiAvatar from "../../../../../common/ui/UiAvatar.vue";
 import UiHeading from "../../../../../common/ui/UiHeading.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
 import UiInline from "../../../../../common/ui/UiInline.vue";
+import UiMessage from "../../../../../common/ui/UiMessage.vue";
 import { relativeTime, absoluteTime } from "../../../../../common/utilities/commit-format.ts";
 import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab-readout.ts";
 import { downloadsLabel, sizeLabel } from "../../../../../common/utilities/release-format.ts";
@@ -84,12 +85,10 @@ useTabReadout(() => {
 
 <template>
   <div class="release-view">
-    <UiHint v-if="loading" size="xs" leading="inherit" class="note" role="status"
-      >загрузка: релиз…</UiHint
-    >
-    <UiHint v-else-if="error" size="xs" leading="inherit" class="note error" role="alert">{{
+    <UiHint v-if="loading" size="xs" leading="inherit" role="status">загрузка: релиз…</UiHint>
+    <UiMessage v-else-if="error" variant="note" tone="danger" size="xs" role="alert">{{
       error
-    }}</UiHint>
+    }}</UiMessage>
     <article v-else-if="detail" class="article">
       <UiInline as="header" class="head" align="baseline" wrap justify="normal">
         <span v-if="detail.release.draft" class="state">черновик</span>
@@ -143,9 +142,7 @@ useTabReadout(() => {
         :editable="false"
         compact
       />
-      <UiHint v-else size="xs" leading="inherit" :space-before="2" class="note"
-        >Без описания</UiHint
-      >
+      <UiHint v-else size="xs" leading="inherit" :space-before="2">Без описания</UiHint>
       <ReleaseAssets :assets="detail.assets" />
     </article>
   </div>

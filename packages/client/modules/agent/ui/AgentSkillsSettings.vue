@@ -1,19 +1,14 @@
 <script setup lang="ts">
 import UiHint from "../../../common/ui/UiHint.vue";
-import UiMessage from "../../../common/ui/UiMessage.vue";
-import UiStack from "../../../common/ui/UiStack.vue";
+import UiSettingsSection from "../../../common/ui/UiSettingsSection.vue";
 import { useAgentSkillsSettings } from "../model/skills-settings.ts";
 
 const { data, error, commands } = useAgentSkillsSettings();
+const activate = () => commands.scope.activate();
 </script>
 
 <template>
-  <UiStack
-    as="section"
-    :gap="4"
-    @focusin="commands.scope.activate()"
-    @pointerdown="commands.scope.activate()"
-  >
+  <UiSettingsSection :activate="activate" :error="error">
     <UiHint v-if="!data.skills.length">Своих навыков и команд пока нет.</UiHint>
     <ul v-else class="skills">
       <li v-for="item in data.skills" :key="`${item.kind}:${item.name}`">
@@ -30,6 +25,5 @@ const { data, error, commands } = useAgentSkillsSettings();
       >; в проекте — <code>.projector/</code> с такими же подпапками; агенты со своей папкой навыков
       читают и её. Навык пользователя главнее одноимённого навыка проекта.
     </UiHint>
-    <UiMessage v-if="error" tone="danger" size="xs" flush role="alert">{{ error }}</UiMessage>
-  </UiStack>
+  </UiSettingsSection>
 </template>

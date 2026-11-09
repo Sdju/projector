@@ -372,11 +372,6 @@ form > p {
 label {
   font-size: var(--fs-sm);
 }
-.field {
-  color: inherit;
-  min-width: auto;
-}
-
 .help {
   margin: 0;
 }

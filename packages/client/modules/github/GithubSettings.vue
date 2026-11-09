@@ -325,11 +325,6 @@ form > p {
 label {
   font-size: var(--fs-sm);
 }
-.field {
-  color: inherit;
-  min-width: auto;
-}
-
 .help {
   margin: 0;
 }
@@ -346,11 +341,6 @@ summary {
 }
 a {
   text-decoration: underline;
-}
-.link {
-  display: inline-block;
-  margin-top: var(--sp-4);
-  font-size: var(--fs-sm);
 }
 .device {
   padding: var(--sp-3);

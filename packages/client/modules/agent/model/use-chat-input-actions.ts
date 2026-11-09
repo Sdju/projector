@@ -13,7 +13,6 @@ export function useChatInputActions(options: {
   clear: () => Promise<void>;
   toBottom: () => Promise<void>;
   resetAway: () => void;
-  resize: () => void;
   focus: () => void;
 }) {
   async function submit() {
@@ -37,7 +36,6 @@ export function useChatInputActions(options: {
   async function suggest(text: string) {
     options.draft.value = text;
     await nextTick();
-    options.resize();
     options.focus();
   }
   async function newChat() {

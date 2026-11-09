@@ -3,11 +3,11 @@ import UiButton from "../../../common/ui/UiButton.vue";
 import UiControl from "../../../common/ui/UiControl.vue";
 import UiField from "../../../common/ui/UiField.vue";
 import UiHint from "../../../common/ui/UiHint.vue";
-import UiMessage from "../../../common/ui/UiMessage.vue";
-import UiStack from "../../../common/ui/UiStack.vue";
+import UiSettingsSection from "../../../common/ui/UiSettingsSection.vue";
 import { useAgentMemorySettings } from "../model/memory-settings.ts";
 
 const { memory, drafts, textOf, busy, error, commands } = useAgentMemorySettings();
+const activate = () => commands.scope.activate();
 
 function edit(key: string, event: Event): void {
   drafts.value[key] = (event.target as HTMLTextAreaElement).value;
@@ -15,12 +15,7 @@ function edit(key: string, event: Event): void {
 </script>
 
 <template>
-  <UiStack
-    as="section"
-    :gap="4"
-    @focusin="commands.scope.activate()"
-    @pointerdown="commands.scope.activate()"
-  >
+  <UiSettingsSection :activate="activate" :error="error">
     <UiField v-slot="{ control }" label="общие заметки">
       <UiControl
         v-bind="control"
@@ -74,6 +69,5 @@ function edit(key: string, event: Event): void {
       Заметки идут в каждый его запрос, поэтому держите их короткими; секреты здесь хранить не
       нужно. Заметки проекта привязаны к его пути.
     </UiHint>
-    <UiMessage v-if="error" tone="danger" size="xs" flush role="alert">{{ error }}</UiMessage>
-  </UiStack>
+  </UiSettingsSection>
 </template>

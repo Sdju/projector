@@ -441,7 +441,7 @@ function age(value?: string): string {
 .branch-agent {
   flex-shrink: 0;
   padding: 1px 5px;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   background: var(--bg-4);
   color: var(--muted);
   font-size: var(--fs-2xs);

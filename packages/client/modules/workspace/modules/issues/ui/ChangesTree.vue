@@ -234,7 +234,7 @@ defineExpose({ reveal });
       </button>
     </div>
     <label class="search">
-      <span class="sr-only">Фильтр изменённых файлов</span>
+      <span class="u-sr-only">Фильтр изменённых файлов</span>
       <input
         :id="inputId"
         :name="inputId"
@@ -475,16 +475,5 @@ defineExpose({ reveal });
 }
 .truncation {
   color: var(--muted);
-}
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }
 </style>

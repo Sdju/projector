@@ -117,7 +117,6 @@ async function quote(text: string) {
   input.value?.insertQuote(text);
 }
 defineExpose({
-  resize: () => {},
   focus: () => {
     if (!formOpen.value) input.value?.focus();
   },
@@ -245,7 +244,7 @@ defineExpose({
         </UiInline>
       </UiInline>
     </form>
-    <span class="sr-only" role="status">{{ copied ? "Ответ скопирован" : "" }}</span>
+    <span class="u-sr-only" role="status">{{ copied ? "Ответ скопирован" : "" }}</span>
   </div>
 </template>
 
@@ -398,27 +397,9 @@ defineExpose({
   display: grid;
   place-items: center;
 }
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
 @container (max-width: 500px) {
   .composer-area {
     padding: var(--sp-2) var(--sp-3) var(--sp-3);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .agent-chat *,
-  .agent-chat *::before {
-    animation: none;
-    transition: none;
   }
 }
 </style>

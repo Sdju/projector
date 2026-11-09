@@ -442,7 +442,6 @@ const { submit, continueTurn, suggest, newChat } = useChatInputActions({
   resetAway: () => {
     away.value = false;
   },
-  resize: () => composer.value?.resize(),
   focus: () => composer.value?.focus(),
 });
 async function copyMessage(id: string, text: string) {
@@ -479,10 +478,8 @@ watch(
 );
 let tabShown = false;
 onMounted(() => {
-  composer.value?.resize();
   observer = new ResizeObserver(() => {
     pin();
-    composer.value?.resize();
     const nowShown = !!root.value && root.value.getClientRects().length > 0;
     if (nowShown && !tabShown) composer.value?.focus();
     tabShown = nowShown;

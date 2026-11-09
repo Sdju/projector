@@ -652,11 +652,4 @@ const lastWork = computed(
     width: 100%;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .agent-chat *,
-  .agent-chat *::before {
-    animation: none;
-    transition: none;
-  }
-}
 </style>

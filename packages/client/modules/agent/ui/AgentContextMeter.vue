@@ -251,9 +251,6 @@ circle {
   margin: 0;
   font-size: var(--fs-2xs);
   font-variant-numeric: tabular-nums;
-}
-.muted,
-.note {
   color: var(--muted);
 }
 .categories {

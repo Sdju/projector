@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import UiControl from "../../../common/ui/UiControl.vue";
 import UiHint from "../../../common/ui/UiHint.vue";
-import UiMessage from "../../../common/ui/UiMessage.vue";
-import UiStack from "../../../common/ui/UiStack.vue";
+import UiSettingsSection from "../../../common/ui/UiSettingsSection.vue";
 import { computed } from "vue";
 import { useAgentFeatureDefaults } from "../model/defaults.ts";
 
@@ -12,6 +11,7 @@ import { useAgentFeatureDefaults } from "../model/defaults.ts";
  */
 const props = defineProps<{ agent?: string }>();
 const { data, busy, error, set, commands } = useAgentFeatureDefaults();
+const activate = () => commands.scope.activate();
 const shown = computed(() =>
   data.value.features
     .map((feature) => ({
@@ -30,12 +30,7 @@ function toggle(feature: string, agent: string, event: Event) {
 </script>
 
 <template>
-  <UiStack
-    as="section"
-    :gap="4"
-    @focusin="commands.scope.activate()"
-    @pointerdown="commands.scope.activate()"
-  >
+  <UiSettingsSection :activate="activate" :error="error">
     <section v-for="feature in shown" :key="feature.id" class="feature">
       <h3>{{ feature.title }}</h3>
       <p class="summary">{{ feature.summary }}</p>
@@ -60,8 +55,7 @@ function toggle(feature: string, agent: string, event: Event) {
       текущего чата; кнопка «Как по умолчанию» возвращает к этим значениям. Файл:
       <code>{{ data.file }}</code>
     </UiHint>
-    <UiMessage v-if="error" tone="danger" size="xs" flush role="alert">{{ error }}</UiMessage>
-  </UiStack>
+  </UiSettingsSection>
 </template>
 
 <style scoped>

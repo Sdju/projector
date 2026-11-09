@@ -5,8 +5,7 @@ import UiControl from "../../../common/ui/UiControl.vue";
 import UiField from "../../../common/ui/UiField.vue";
 import UiHint from "../../../common/ui/UiHint.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
-import UiMessage from "../../../common/ui/UiMessage.vue";
-import UiStack from "../../../common/ui/UiStack.vue";
+import UiSettingsSection from "../../../common/ui/UiSettingsSection.vue";
 import AgentChatRoleCard from "./AgentChatRoleCard.vue";
 import { onMounted, ref, watch } from "vue";
 import { useAgentRoleSettings } from "../model/roles.ts";
@@ -29,6 +28,7 @@ const {
   removeChat,
   commands,
 } = useAgentRoleSettings();
+const activate = () => commands.scope.activate();
 const drafts = ref<Record<string, string>>({});
 
 const providerOf = (role: { id: string; selection?: Record<string, string> }) =>
@@ -89,12 +89,7 @@ onMounted(() => void load().catch(() => undefined));
 </script>
 
 <template>
-  <UiStack
-    as="section"
-    :gap="4"
-    @focusin="commands.scope.activate()"
-    @pointerdown="commands.scope.activate()"
-  >
+  <UiSettingsSection :activate="activate" :error="error">
     <div class="section-head">
       <h3>Служебные роли</h3>
       <p>
@@ -182,8 +177,7 @@ onMounted(() => void load().catch(() => undefined));
     <UiHint>
       Служебные роли не меняют модель чатов. Файл настроек: <code>{{ file }}</code>
     </UiHint>
-    <UiMessage v-if="error" tone="danger" size="xs" flush role="alert">{{ error }}</UiMessage>
-  </UiStack>
+  </UiSettingsSection>
 </template>
 
 <style scoped>

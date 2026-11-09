@@ -269,10 +269,4 @@ onMounted(() => void loadAgentFeatures().catch(() => undefined));
   display: flex;
   padding: var(--sp-1) var(--sp-2);
 }
-.hint {
-  margin: 0;
-  padding: 0 var(--sp-2) var(--sp-1);
-  color: var(--faint);
-  font-size: var(--fs-2xs);
-}
 </style>

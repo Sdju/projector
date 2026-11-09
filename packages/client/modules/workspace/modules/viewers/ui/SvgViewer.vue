@@ -312,7 +312,7 @@ commands.scope.registerCommand({
   top: var(--sp-3);
   left: var(--sp-3);
   padding: 2px var(--sp-2);
-  border-radius: 999px;
+  border-radius: var(--r-full);
   background: color-mix(in srgb, var(--bg-2) 90%, transparent);
   color: var(--text);
   font: var(--fs-2xs) var(--mono);
@@ -328,7 +328,7 @@ commands.scope.registerCommand({
 }
 .float {
   border-color: transparent;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   background: color-mix(in srgb, var(--bg-2) 88%, transparent);
   backdrop-filter: blur(8px);
 }

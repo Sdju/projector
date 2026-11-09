@@ -3,7 +3,7 @@ import UiButton from "../../../common/ui/UiButton.vue";
 import UiHint from "../../../common/ui/UiHint.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 import UiMessage from "../../../common/ui/UiMessage.vue";
-import UiStack from "../../../common/ui/UiStack.vue";
+import UiSettingsSection from "../../../common/ui/UiSettingsSection.vue";
 import AgentChatRoleCard from "./AgentChatRoleCard.vue";
 import { watch } from "vue";
 import { clientAgents } from "../../agents-integration/catalog/index.ts";
@@ -29,6 +29,7 @@ const {
   remove,
   commands,
 } = useProjectRoleSettings(() => props.project.id);
+const activate = () => commands.scope.activate();
 const agents = clientAgents();
 const projectResources = () => roleResources(props.project.id);
 
@@ -56,13 +57,7 @@ async function setTrust(value: boolean) {
 </script>
 
 <template>
-  <UiStack
-    as="section"
-    :gap="4"
-    class="project-roles"
-    @focusin="commands.scope.activate()"
-    @pointerdown="commands.scope.activate()"
-  >
+  <UiSettingsSection :activate="activate" :error="error" class="project-roles">
     <div class="head">
       <UiInline wrap :gap="2">
         <span class="file">{{ file || ".projector/roles.json" }}</span>
@@ -120,8 +115,7 @@ async function setTrust(value: boolean) {
       Роли проекта действуют только в этом проекте. Доверие привязано к хешу файла; после изменения
       файла его нужно выдать заново.
     </UiHint>
-    <UiMessage v-if="error" tone="danger" size="xs" flush role="alert">{{ error }}</UiMessage>
-  </UiStack>
+  </UiSettingsSection>
 </template>
 
 <style scoped>

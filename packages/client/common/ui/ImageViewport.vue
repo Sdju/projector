@@ -299,6 +299,7 @@ defineExpose({ reset });
 
 <style scoped>
 .image-viewport {
+  position: relative;
   flex: 1;
   min-width: 0;
 }
@@ -397,9 +398,6 @@ defineExpose({ reset });
   font-size: var(--fs-sm);
   cursor: default;
 }
-.image-viewport {
-  position: relative;
-}
 .floating .view-controls {
   position: absolute;
   left: 50%;
@@ -409,7 +407,7 @@ defineExpose({ reset });
   gap: var(--sp-1);
   padding: var(--sp-1) var(--sp-1) var(--sp-1) var(--sp-3);
   border: 1px solid var(--line-strong);
-  border-radius: 999px;
+  border-radius: var(--r-full);
   background: color-mix(in srgb, var(--bg-2) 88%, transparent);
   backdrop-filter: blur(8px);
   box-shadow: var(--shadow-popover);
@@ -420,6 +418,6 @@ defineExpose({ reset });
 }
 .floating .view-controls :deep(.btn) {
   border-color: transparent;
-  border-radius: 999px;
+  border-radius: var(--r-full);
 }
 </style>

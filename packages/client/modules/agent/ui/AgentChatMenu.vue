@@ -13,7 +13,7 @@ import IconScale from "~icons/lucide/scale";
 import IconSparkles from "~icons/lucide/sparkles";
 
 /** Secondary chat actions, kept out of the header so it stays a short row of durable controls. */
-const props = defineProps<{
+defineProps<{
   lens: boolean;
   side: boolean;
   /** The chat has messages, so it can be saved. */

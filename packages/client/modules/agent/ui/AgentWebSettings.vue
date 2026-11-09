@@ -4,20 +4,15 @@ import UiControl from "../../../common/ui/UiControl.vue";
 import UiField from "../../../common/ui/UiField.vue";
 import UiHint from "../../../common/ui/UiHint.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
-import UiMessage from "../../../common/ui/UiMessage.vue";
-import UiStack from "../../../common/ui/UiStack.vue";
+import UiSettingsSection from "../../../common/ui/UiSettingsSection.vue";
 import { useAgentWebSettings } from "../model/web-settings.ts";
 
 const { web, provider, url, apiKey, busy, error, commands } = useAgentWebSettings();
+const activate = () => commands.scope.activate();
 </script>
 
 <template>
-  <UiStack
-    as="section"
-    :gap="4"
-    @focusin="commands.scope.activate()"
-    @pointerdown="commands.scope.activate()"
-  >
+  <UiSettingsSection :activate="activate" :error="error">
     <UiField v-slot="{ control }" label="поисковый сервис">
       <UiControl
         as="select"
@@ -70,6 +65,5 @@ const { web, provider, url, apiKey, busy, error, commands } = useAgentWebSetting
       указаниями. Ключ хранится в системном хранилище секретов; агент может сам попросить его
       отдельным закрытым полем.
     </UiHint>
-    <UiMessage v-if="error" tone="danger" size="xs" flush role="alert">{{ error }}</UiMessage>
-  </UiStack>
+  </UiSettingsSection>
 </template>
