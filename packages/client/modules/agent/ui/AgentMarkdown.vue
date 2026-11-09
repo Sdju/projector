@@ -75,7 +75,12 @@ function replaceBrokenImage(event: Event) {
 
 function linkAt(target: EventTarget | null): HTMLAnchorElement | undefined {
   if (!(target instanceof Element)) return;
-  return target.closest<HTMLAnchorElement>(".md a[href]") ?? undefined;
+  return target.closest<HTMLAnchorElement>(".md a[href], .md a[data-chat-file]") ?? undefined;
+}
+
+/** The markdown target: the sanitizer may have removed `href`, but the file path stays in data. */
+function linkHref(anchor: HTMLAnchorElement): string {
+  return anchor.dataset.chatFile || anchor.getAttribute("href") || "";
 }
 
 /** A click on a file link opens the file; web links keep the browser's new-tab action. */
@@ -83,7 +88,7 @@ function followLink(event: MouseEvent) {
   if (event.button !== 0 || event.defaultPrevented) return;
   const anchor = linkAt(event.target);
   if (!anchor) return;
-  const link = parseChatLink(anchor.getAttribute("href") ?? "");
+  const link = parseChatLink(linkHref(anchor));
   if (link.kind !== "file") return;
   event.preventDefault();
   if (linkActions) void linkActions.openFile(link, anchor);
@@ -140,7 +145,7 @@ function menuItems(link: ReturnType<typeof parseChatLink>, source: Element): Con
 function openLinkMenu(event: MouseEvent) {
   const anchor = linkAt(event.target);
   if (!anchor) return;
-  const link = parseChatLink(anchor.getAttribute("href") ?? "");
+  const link = parseChatLink(linkHref(anchor));
   const items = menuItems(link, anchor);
   if (!items.length) return;
   event.preventDefault();
@@ -166,5 +171,9 @@ function openLinkMenu(event: MouseEvent) {
 /* The blocks are only the unit of rendering: their content lays out as direct children of `.md`. */
 .md-block {
   display: contents;
+}
+/* The sanitizer may drop href from a Windows path: the link still opens on click. */
+.md :deep(a[data-chat-file]) {
+  cursor: pointer;
 }
 </style>

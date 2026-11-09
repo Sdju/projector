@@ -1,6 +1,8 @@
 import { expect, test } from "vite-plus/test";
+import { chatLinkActions } from "../packages/client/modules/agent/model/chat-link-actions.ts";
 import { parseChatLink } from "../packages/client/modules/agent/lib/chat-links.ts";
 import { renderMarkdown } from "../packages/client/modules/agent/lib/markdown.ts";
+import { registerWorkspaceProfile } from "../packages/client/modules/workspace-api/index.ts";
 import {
   absoluteLocalPath,
   fileUrlPath,
@@ -62,6 +64,11 @@ test("absolute paths and file URLs are file links outside the project", () => {
     path: "C:\\work\\app.ts",
     external: true,
   });
+  expect(parseChatLink("C:/work/report.html")).toMatchObject({
+    kind: "file",
+    path: "C:/work/report.html",
+    external: true,
+  });
 });
 
 test("project paths become absolute without touching local paths", () => {
@@ -76,8 +83,58 @@ test("project paths become absolute without touching local paths", () => {
 
 test("a chat file link is marked for the click handler and keeps its new-tab fallback", () => {
   const html = renderMarkdown("[usage](docs/usage.md) and [site](https://example.com)");
-  expect(html).toContain('data-chat-file=""');
+  expect(html).toContain('data-chat-file="docs/usage.md"');
   expect(html).toContain('title="Открыть файл в Projector"');
   expect(html).toContain('target="_blank"');
   expect(html).toContain('rel="noopener noreferrer"');
+});
+
+test("the sanitizer may drop href, so a Windows path keeps its target in data", () => {
+  const html = renderMarkdown("[report](C:/Users/me/report.html)");
+  expect(html).toContain('data-chat-file="C:/Users/me/report.html"');
+});
+
+test("an absolute Windows link inside the project opens as a project file", async () => {
+  const unregister = registerWorkspaceProfile("chat-links-project", {
+    id: "test",
+    layout: "full",
+    features: {
+      terminals: false,
+      docker: false,
+      agent: false,
+      settings: false,
+      persist: false,
+      externalFiles: true,
+    },
+    providers: {
+      files: {
+        assetUrl: () => "",
+        async read(action) {
+          if (action === "root") return { root: "C:\\work\\app" };
+          throw new Error(`unexpected ${action}`);
+        },
+      },
+    },
+  });
+  try {
+    const calls = [];
+    const actions = chatLinkActions("chat-links-project", {
+      executeCommand: async (...args) => calls.push(args),
+    });
+    await actions.openFile({
+      href: "C:/work/app/docs/report.html",
+      kind: "file",
+      path: "C:/work/app/docs/report.html",
+      external: true,
+    });
+    expect(calls).toStrictEqual([
+      [
+        "ide.editor.path.open",
+        { path: "docs/report.html" },
+        { scope: "editor:chat-links-project" },
+      ],
+    ]);
+  } finally {
+    unregister();
+  }
 });

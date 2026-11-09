@@ -32,7 +32,9 @@ markdown.renderer.rules.link_open = (tokens, index, options, env, self) => {
   // A file link's click is handled in the chat; the hint says so before the click.
   const link = parseChatLink(String(token.attrGet("href") ?? ""));
   if (link.kind === "file") {
-    token.attrSet("data-chat-file", "");
+    // The sanitizer drops an `href` whose scheme it does not know (a Windows drive letter or
+    // `file:`), so the original target also lives in a data attribute the click handler reads.
+    token.attrSet("data-chat-file", link.href);
     if (!token.attrGet("title")) {
       const range = link.line
         ? link.endLine
