@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import UiHint from "../../../common/ui/UiHint.vue";
-import { computed, ref, watch } from "vue";
+import UiLoadablePanel from "../../../common/ui/UiLoadablePanel.vue";
+import { computed, ref } from "vue";
 import { ChangesTree } from "../modules/issues/index.ts";
 import {
   fileScopeKey,
@@ -8,6 +8,7 @@ import {
   type FileScope,
 } from "@projector/core/modules/workspace/index.ts";
 import { workspaceScopeRequest } from "../../workspace-api/index.ts";
+import { useAsyncData } from "../../../common/utilities/use-async-data.ts";
 
 /** Изменённые файлы двух снимков в боковой панели; строки открывают diff. */
 const props = defineProps<{
@@ -17,11 +18,14 @@ const props = defineProps<{
   selected?: string;
   onOpen?: (path: string, pinned?: boolean, originalPath?: string) => void;
 }>();
-const data = ref<FileChangeList>();
-const loading = ref(false);
-const error = ref("");
+const { data, loading, error, reload } = useAsyncData<FileChangeList>({
+  load: () => workspaceScopeRequest<FileChangeList>(props.projectId, props.scope, "changes"),
+  keys: () => [props.projectId, fileScopeKey(props.scope), props.revision],
+  enabled: () => props.scope.kind === "compare",
+  disabledError: "Раздел ждёт сравнение двух снимков",
+  errorFallback: "Не удалось сравнить снимки",
+});
 const tree = ref<InstanceType<typeof ChangesTree>>();
-let generation = 0;
 
 const files = computed(() => data.value?.changes ?? []);
 const summary = computed(() => {
@@ -34,46 +38,12 @@ const summary = computed(() => {
   };
 });
 
-async function load() {
-  if (props.scope.kind !== "compare") {
-    data.value = undefined;
-    error.value = "Раздел ждёт сравнение двух снимков";
-    return;
-  }
-  const current = ++generation;
-  loading.value = true;
-  error.value = "";
-  try {
-    const next = await workspaceScopeRequest<FileChangeList>(
-      props.projectId,
-      props.scope,
-      "changes",
-    );
-    if (current === generation) data.value = next;
-  } catch (err) {
-    if (current === generation)
-      error.value = err instanceof Error ? err.message : "Не удалось сравнить снимки";
-  } finally {
-    if (current === generation) loading.value = false;
-  }
-}
-
-watch(() => [props.projectId, fileScopeKey(props.scope), props.revision], load, {
-  immediate: true,
-});
-defineExpose({ reveal: (path: string) => tree.value?.reveal(path), refresh: load });
+defineExpose({ reveal: (path: string) => tree.value?.reveal(path), refresh: reload });
 </script>
 
 <template>
-  <div class="compare-tree">
-    <UiHint v-if="loading" size="xs" leading="inherit" class="note" role="status"
-      >загрузка: изменения…</UiHint
-    >
-    <UiHint v-else-if="error" size="xs" leading="inherit" class="note error" role="alert">{{
-      error
-    }}</UiHint>
+  <UiLoadablePanel :loading="loading" :error="error" loading-text="загрузка: изменения…">
     <ChangesTree
-      v-else
       ref="tree"
       :changes="files"
       :totals="summary"
@@ -81,21 +51,5 @@ defineExpose({ reveal: (path: string) => tree.value?.reveal(path), refresh: load
       empty-text="Изменений нет"
       @open="(path, pinned, originalPath) => onOpen?.(path, pinned, originalPath)"
     />
-  </div>
+  </UiLoadablePanel>
 </template>
-
-<style scoped>
-.compare-tree {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-height: 0;
-}
-.note {
-  margin: 0;
-  padding: var(--sp-2) var(--sp-3);
-}
-.note.error {
-  color: var(--err);
-}
-</style>
