@@ -23,4 +23,3 @@
 - [gitlab-client-roadmap.md](gitlab-client-roadmap.md) — что осталось у GitLab после паритета с GitHub: Snippets, Wiki, несколько инстансов и проверки.
 - [npm-release.md](npm-release.md) — первый выпуск `@projector-ai/*`: ручной publish, trusted publisher, ограничения установки native и проверка OIDC.
 - [opencode-background-subagents.md](opencode-background-subagents.md) — фоновый `subagent` OpenCode не виден как живая задача, поэтому Lens не читает его рассуждения.
-- [vue-audit.md](vue-audit.md) — избыточность и переиспользование в 270 SFC: копипаста GitHub/GitLab, панели и viewer'ы, перегруженные компоненты, мёртвый CSS и план разбора.
