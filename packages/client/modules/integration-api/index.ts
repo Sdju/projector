@@ -4,6 +4,7 @@ export { default as TokenReveal } from "./TokenReveal.vue";
 export { default as CloneRepositoryDialog } from "./CloneRepositoryDialog.vue";
 export { default as DeviceLoginPanel } from "./DeviceLoginPanel.vue";
 export { useDeviceLogin } from "./device-login.ts";
+export { useRemoteWorkspace, type RemoteWorkspaceHandle } from "./remote-workspace.ts";
 export { default as RepositoryOverview } from "./RepositoryOverview.vue";
 export { default as TokenConnectionForm } from "./TokenConnectionForm.vue";
 export type {
