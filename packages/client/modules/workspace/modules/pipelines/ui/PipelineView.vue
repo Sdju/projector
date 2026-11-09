@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import UiArticle from "../../../../../common/ui/UiArticle.vue";
+import UiDetailHeader from "../../../../../common/ui/UiDetailHeader.vue";
 import UiHeading from "../../../../../common/ui/UiHeading.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
 import UiViewerPage from "../../../../../common/ui/UiViewerPage.vue";
-import UiInline from "../../../../../common/ui/UiInline.vue";
 import UiStatusDot from "../../../../../common/ui/UiStatusDot.vue";
 import { computed, ref } from "vue";
 import { countRu } from "../../../../../common/utilities/plural.ts";
@@ -23,8 +23,6 @@ import {
   refLabel,
   sourceLabel,
 } from "@projector/core/modules/workspace/index.ts";
-import IconExternal from "~icons/lucide/external-link";
-
 /** Pipeline tab: status, ref and commit, then the jobs of the run grouped by stage. */
 const props = withDefaults(defineProps<{ projectId: string; id: number; host?: string }>(), {
   host: "GitLab",
@@ -42,6 +40,10 @@ const failing = computed(
   () =>
     (detail.value?.jobs ?? []).filter((job) => PIPELINE_PROBLEM_STATUSES.has(job.status)).length,
 );
+const stateTone = computed(() => {
+  const tone = detail.value ? PIPELINE_STATUS_TONE[detail.value.pipeline.status] : "muted";
+  return tone === "warning" || tone === "success" || tone === "danger" ? tone : "neutral";
+});
 const commands = useCommandScope(`pipeline:${props.projectId}:${props.id}`, () => ({
   surface: "pipeline",
   projectId: props.projectId,
@@ -110,41 +112,27 @@ useTabReadout(() => {
       error
     }}</UiHint>
     <UiArticle v-else-if="detail">
-      <UiInline as="header" class="head" align="baseline" wrap justify="normal">
-        <span class="state" :class="detail.pipeline.status">{{
-          PIPELINE_STATUS_LABEL[detail.pipeline.status]
-        }}</span>
-        <UiHeading as="h2" size="lg" weight="semibold" :space-after="0">
-          Pipeline <span class="number">#{{ detail.pipeline.id }}</span>
-        </UiHeading>
-      </UiInline>
-      <p v-if="detail.pipeline.name" class="workflow" :title="detail.pipeline.name">
-        {{ detail.pipeline.name }}
-      </p>
-      <UiInline as="p" class="meta" wrap>
-        <span v-if="detail.pipeline.ref" class="mono">{{ refLabel(detail.pipeline.ref) }}</span>
-        <span v-if="detail.pipeline.source">{{ sourceLabel(detail.pipeline.source) }}</span>
-        <span v-if="detail.pipeline.sha" class="mono">{{ shortHash(detail.pipeline.sha) }}</span>
-        <span v-if="detail.pipeline.createdAt" :title="detail.pipeline.createdAt"
-          >создан {{ relativeTime(detail.pipeline.createdAt) }}</span
-        >
-        <span v-if="durationLabel(detail.pipeline.duration)"
-          >за {{ durationLabel(detail.pipeline.duration) }}</span
-        >
-        <UiInline
-          as="a"
-          inline
-          :gap="1"
-          justify="normal"
-          v-if="detail.pipeline.webUrl"
-          class="external"
-          :href="detail.pipeline.webUrl"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <IconExternal aria-hidden="true" />на {{ host }}
-        </UiInline>
-      </UiInline>
+      <UiDetailHeader
+        :state="PIPELINE_STATUS_LABEL[detail.pipeline.status]"
+        :tone="stateTone"
+        title="Pipeline"
+        :number="detail.pipeline.id"
+        :subtitle="detail.pipeline.name"
+        :external-href="detail.pipeline.webUrl"
+        :host="host"
+      >
+        <template #meta>
+          <span v-if="detail.pipeline.ref" class="mono">{{ refLabel(detail.pipeline.ref) }}</span>
+          <span v-if="detail.pipeline.source">{{ sourceLabel(detail.pipeline.source) }}</span>
+          <span v-if="detail.pipeline.sha" class="mono">{{ shortHash(detail.pipeline.sha) }}</span>
+          <span v-if="detail.pipeline.createdAt" :title="detail.pipeline.createdAt"
+            >создан {{ relativeTime(detail.pipeline.createdAt) }}</span
+          >
+          <span v-if="durationLabel(detail.pipeline.duration)"
+            >за {{ durationLabel(detail.pipeline.duration) }}</span
+          >
+        </template>
+      </UiDetailHeader>
 
       <div class="jobs-head">
         <UiHeading as="h3" size="sm" tone="secondary" :space-before="4" :space-after="0"
@@ -223,51 +211,10 @@ useTabReadout(() => {
 </template>
 
 <style scoped>
-.state {
-  padding: 1px var(--sp-2);
-  border-radius: var(--r-full);
-  background: var(--active);
-  color: var(--muted);
-  font-size: var(--fs-2xs);
-}
-.state.running,
-.state.manual {
-  background: color-mix(in srgb, var(--warn) 22%, transparent);
-  color: var(--warn);
-}
-.state.success {
-  background: color-mix(in srgb, var(--run) 22%, transparent);
-  color: var(--run);
-}
-.state.failed {
-  background: color-mix(in srgb, var(--err) 22%, transparent);
-  color: var(--err);
-}
-.number,
 .mono {
   color: var(--muted);
   font-family: var(--mono);
   font-size: var(--fs-xs);
-}
-.workflow {
-  margin: var(--sp-1) 0 0;
-  color: var(--muted);
-  font: var(--fs-2xs) var(--mono);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.meta {
-  margin: var(--sp-2) 0 0;
-  color: var(--muted);
-  font-size: var(--fs-xs);
-}
-.external {
-  color: var(--text-2);
-}
-.external svg {
-  width: 13px;
-  height: 13px;
 }
 .jobs-head {
   display: flex;

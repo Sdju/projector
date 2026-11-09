@@ -16,7 +16,7 @@
 - `agent/ui/AgentJsonSettings.vue` — JSON-редактор MCP и хуков; `AgentMcpSettings` и `AgentHooksSettings` сократились примерно вдвое.
 - `common/ui/UiListSection.vue` — оболочка сайдбар-списка: заголовок со счётчиком, фильтр, loading/error/empty, «ещё». Используется в `TrackerPanel`, `PipelinesPanel`, `ReleasesPanel`; три панели больше не держат свои копии CSS.
 - `common/ui/UiListRow.vue` — строка списка; используется в `TrackerRow`, `ReleaseRow`, `PipelineRow`.
-- `common/ui/UiAsyncContent.vue` — загрузка с защитой от устаревших ответов; `common/ui/UiViewerPage.vue` и `UiArticle.vue` — общий scroll-контейнер и ширина detail-вью.
+- `common/ui/UiAsyncContent.vue` — загрузка с защитой от устаревших ответов; `common/ui/UiViewerPage.vue` и `UiArticle.vue` — общий scroll-контейнер и ширина detail-вью; `UiDetailHeader.vue` — состояние, заголовок, мета-строка и ссылка на хост.
 - `integration-api/RepositoryOverview.vue` + `repository-overview.ts` — нейтральная модель «О репозитории»; GitHub и GitLab только маппят свои payload'ы.
 - `integration-api/TokenConnectionForm.vue` — форма токена, команда и readout; `CloneRepositoryDialog.vue` — общий клон-диалог; `useDeviceLogin` + `DeviceLoginPanel.vue` — Device Flow.
 - `gitlab-workspace/ui/GitlabWorkspaceGate.vue` — проверка инстанса и статус интеграции; `pages/gl/...` сокращена до маршрутной обёртки.
@@ -28,7 +28,6 @@
 
 ## Приоритет P1
 
-- [ ] **Detail-вью — шапка.** `TrackerDetail ↔ ReleaseView ↔ PipelineView ↔ JobView` всё ещё дублируют `.state`, `.meta`, `.external` и заголовок; общий scroll и ширина уже вынесены в `UiViewerPage`/`UiArticle`. Вынести `UiDetailHeader`.
 - [ ] **Изменённые файлы.** `CommitFiles:161-267 ↔ PullRequestFiles:266-369` (~86% CSS), `commit-diffs.ts ≈ pull-diffs.ts`, `ChangesTree` (490) + `GitChangesTree` (279) — две реализации дерева, `PullRequestFilesSection ↔ CompareTreeSection` (style 0.91). Вынести `ChangedFileList`, `ChangedFileTree`, `useFileDiffs`.
 
 ## Приоритет P2
@@ -51,11 +50,10 @@
 
 ## Порядок работ
 
-1. Detail-вью: осталась общая шапка.
-2. Изменённые файлы и деревья.
-3. Scaffold настроек вне агента.
-4. Декомпозиция `AgentChat`/`AgentInput`/задач.
-5. Виджеты, графики и `common/ui`.
+1. Изменённые файлы и деревья.
+2. Scaffold настроек вне агента.
+3. Декомпозиция `AgentChat`/`AgentInput`/задач.
+4. Виджеты, графики и `common/ui`.
 
 ## Замечания
 

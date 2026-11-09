@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import UiArticle from "../../../../../common/ui/UiArticle.vue";
+import UiDetailHeader from "../../../../../common/ui/UiDetailHeader.vue";
 import UiHeading from "../../../../../common/ui/UiHeading.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
 import UiViewerPage from "../../../../../common/ui/UiViewerPage.vue";
-import UiInline from "../../../../../common/ui/UiInline.vue";
+import { computed } from "vue";
 import { relativeTime } from "../../../../../common/utilities/commit-format.ts";
 import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab-readout.ts";
 import { useCommandRegistrar, useCommandScope } from "../../../../../common/utilities/commands.ts";
@@ -11,9 +12,9 @@ import { useJobDetail } from "../lib/detail.ts";
 import {
   durationLabel,
   PIPELINE_STATUS_LABEL,
+  PIPELINE_STATUS_TONE,
   refLabel,
 } from "@projector/core/modules/workspace/index.ts";
-import IconExternal from "~icons/lucide/external-link";
 
 /** Job tab: status, stage and the readonly trace of one CI job. */
 const props = withDefaults(defineProps<{ projectId: string; id: number; host?: string }>(), {
@@ -23,6 +24,12 @@ const { detail, loading, error, reload } = useJobDetail(
   () => props.projectId,
   () => props.id,
 );
+const stateTone = computed(() => {
+  const status = detail.value?.job.status;
+  if (!status) return "neutral";
+  const tone = PIPELINE_STATUS_TONE[status];
+  return tone === "warning" || tone === "success" || tone === "danger" ? tone : "neutral";
+});
 const commands = useCommandScope(`job:${props.projectId}:${props.id}`, () => ({
   surface: "job",
   projectId: props.projectId,
@@ -66,38 +73,26 @@ useTabReadout(() => {
       error
     }}</UiHint>
     <UiArticle v-else-if="detail" :width="1100">
-      <UiInline as="header" class="head" align="baseline" wrap justify="normal">
-        <span class="state" :class="detail.job.status">{{
-          PIPELINE_STATUS_LABEL[detail.job.status]
-        }}</span>
-        <UiHeading as="h2" size="lg" weight="semibold" :space-after="0">
-          {{ detail.job.name || "Job" }} <span class="number">#{{ detail.job.id }}</span>
-        </UiHeading>
-      </UiInline>
-      <UiInline as="p" class="meta" wrap>
-        <span v-if="detail.job.stage">{{ detail.job.stage }}</span>
-        <span v-if="detail.job.ref" class="mono">{{ refLabel(detail.job.ref) }}</span>
-        <span v-if="detail.job.createdAt" :title="detail.job.createdAt"
-          >создан {{ relativeTime(detail.job.createdAt) }}</span
-        >
-        <span v-if="durationLabel(detail.job.duration)"
-          >за {{ durationLabel(detail.job.duration) }}</span
-        >
-        <span v-if="detail.job.allowFailure">падение разрешено</span>
-        <UiInline
-          as="a"
-          inline
-          :gap="1"
-          justify="normal"
-          v-if="detail.job.webUrl"
-          class="external"
-          :href="detail.job.webUrl"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <IconExternal aria-hidden="true" />на {{ host }}
-        </UiInline>
-      </UiInline>
+      <UiDetailHeader
+        :state="PIPELINE_STATUS_LABEL[detail.job.status]"
+        :tone="stateTone"
+        :title="detail.job.name || 'Job'"
+        :number="detail.job.id"
+        :external-href="detail.job.webUrl"
+        :host="host"
+      >
+        <template #meta>
+          <span v-if="detail.job.stage">{{ detail.job.stage }}</span>
+          <span v-if="detail.job.ref" class="mono">{{ refLabel(detail.job.ref) }}</span>
+          <span v-if="detail.job.createdAt" :title="detail.job.createdAt"
+            >создан {{ relativeTime(detail.job.createdAt) }}</span
+          >
+          <span v-if="durationLabel(detail.job.duration)"
+            >за {{ durationLabel(detail.job.duration) }}</span
+          >
+          <span v-if="detail.job.allowFailure">падение разрешено</span>
+        </template>
+      </UiDetailHeader>
       <UiHint
         v-if="detail.job.failureReason"
         size="xs"
@@ -122,43 +117,10 @@ useTabReadout(() => {
 </template>
 
 <style scoped>
-.state {
-  padding: 1px var(--sp-2);
-  border-radius: var(--r-full);
-  background: var(--active);
-  color: var(--muted);
-  font-size: var(--fs-2xs);
-}
-.state.running,
-.state.manual {
-  background: color-mix(in srgb, var(--warn) 22%, transparent);
-  color: var(--warn);
-}
-.state.success {
-  background: color-mix(in srgb, var(--run) 22%, transparent);
-  color: var(--run);
-}
-.state.failed {
-  background: color-mix(in srgb, var(--err) 22%, transparent);
-  color: var(--err);
-}
-.number,
 .mono {
   color: var(--muted);
   font-family: var(--mono);
   font-size: var(--fs-xs);
-}
-.meta {
-  margin: var(--sp-2) 0 0;
-  color: var(--muted);
-  font-size: var(--fs-xs);
-}
-.external {
-  color: var(--text-2);
-}
-.external svg {
-  width: 13px;
-  height: 13px;
 }
 .trace {
   margin: 0;

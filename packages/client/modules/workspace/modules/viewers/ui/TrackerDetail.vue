@@ -1,22 +1,21 @@
 <script setup lang="ts">
 import UiArticle from "../../../../../common/ui/UiArticle.vue";
+import UiDetailHeader from "../../../../../common/ui/UiDetailHeader.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
-import UiHeading from "../../../../../common/ui/UiHeading.vue";
 import UiViewerPage from "../../../../../common/ui/UiViewerPage.vue";
 import type { IssueLabel, IssueUser, Reaction } from "@projector/core/modules/workspace/index.ts";
+import { computed } from "vue";
 import { absoluteTime, relativeTime } from "../../../../../common/utilities/commit-format.ts";
 import TrackerAuthor from "./TrackerAuthor.vue";
-import UiInline from "../../../../../common/ui/UiInline.vue";
 import EmojiText from "../../../../../common/ui/EmojiText.vue";
 import TrackerReactions from "./TrackerReactions.vue";
 import VisualMarkdownEditor from "./VisualMarkdownEditor.vue";
-import IconExternal from "~icons/lucide/external-link";
 
 /**
  * Каркас вкладки issue / pull request: состояние, заголовок, автор, метки и Markdown-тело;
  * разделы вкладки (ревью, файлы, комментарии) приходят слотом.
  */
-withDefaults(
+const props = withDefaults(
   defineProps<{
     projectId: string;
     loading: boolean;
@@ -39,6 +38,11 @@ withDefaults(
   }>(),
   { host: "GitHub" },
 );
+const stateTone = computed(() => {
+  if (props.state === "open") return "success" as const;
+  if (props.state === "merged" || props.state === "answered") return "accent" as const;
+  return "neutral" as const;
+});
 const emit = defineEmits<{ open: [path: string] }>();
 </script>
 
@@ -57,30 +61,20 @@ const emit = defineEmits<{ open: [path: string] }>();
       >{{ error }}</UiHint
     >
     <UiArticle v-else-if="ready">
-      <UiInline as="header" class="head" align="baseline" wrap justify="normal">
-        <span class="state" :class="state">{{ stateLabel }}</span>
-        <UiHeading as="h2" size="lg" weight="semibold" :space-after="0">
-          <EmojiText :text="title" /> <span class="number">#{{ number }}</span>
-        </UiHeading>
-      </UiInline>
-      <UiInline as="p" class="meta" wrap>
-        <TrackerAuthor :author="author" :size="18" />
-        <slot name="meta" />
-        <span :title="absoluteTime(createdAt)">открыт {{ relativeTime(createdAt) }}</span>
-        <UiInline
-          as="a"
-          inline
-          :gap="1"
-          justify="normal"
-          v-if="htmlUrl"
-          class="external"
-          :href="htmlUrl"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <IconExternal aria-hidden="true" />на {{ host }}
-        </UiInline>
-      </UiInline>
+      <UiDetailHeader
+        :state="stateLabel"
+        :tone="stateTone"
+        :number="number"
+        :external-href="htmlUrl"
+        :host="host"
+      >
+        <template #title><EmojiText :text="title" /></template>
+        <template #meta>
+          <TrackerAuthor :author="author" :size="18" />
+          <slot name="meta" />
+          <span :title="absoluteTime(createdAt)">открыт {{ relativeTime(createdAt) }}</span>
+        </template>
+      </UiDetailHeader>
       <slot name="stats" />
       <slot name="summary" />
       <ul v-if="labels.length" class="labels">
@@ -112,38 +106,6 @@ const emit = defineEmits<{ open: [path: string] }>();
 </template>
 
 <style scoped>
-.state {
-  padding: 1px var(--sp-2);
-  border-radius: var(--r-full);
-  background: var(--active);
-  color: var(--muted);
-  font-size: var(--fs-2xs);
-}
-.state.open {
-  background: color-mix(in srgb, var(--run) 22%, transparent);
-  color: var(--run);
-}
-.state.merged,
-.state.answered {
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
-  color: var(--accent);
-}
-.number {
-  color: var(--muted);
-  font: var(--fs-xs) var(--mono);
-}
-.meta {
-  margin: var(--sp-2) 0 0;
-  color: var(--muted);
-  font-size: var(--fs-xs);
-}
-.external {
-  color: var(--text-2);
-}
-.external svg {
-  width: 13px;
-  height: 13px;
-}
 .labels {
   display: flex;
   flex-wrap: wrap;

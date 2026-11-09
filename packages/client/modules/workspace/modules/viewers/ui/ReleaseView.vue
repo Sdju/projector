@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import UiArticle from "../../../../../common/ui/UiArticle.vue";
 import UiAvatar from "../../../../../common/ui/UiAvatar.vue";
-import UiHeading from "../../../../../common/ui/UiHeading.vue";
+import UiDetailHeader from "../../../../../common/ui/UiDetailHeader.vue";
 import UiViewerPage from "../../../../../common/ui/UiViewerPage.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
 import UiInline from "../../../../../common/ui/UiInline.vue";
 import UiMessage from "../../../../../common/ui/UiMessage.vue";
+import { computed } from "vue";
 import { relativeTime, absoluteTime } from "../../../../../common/utilities/commit-format.ts";
 import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab-readout.ts";
 import { downloadsLabel, sizeLabel } from "../../../../../common/utilities/release-format.ts";
@@ -17,7 +18,6 @@ import {
 import { useReleaseDetail } from "../lib/release-detail.ts";
 import VisualMarkdownEditor from "./VisualMarkdownEditor.vue";
 import ReleaseAssets from "./ReleaseAssets.vue";
-import IconExternal from "~icons/lucide/external-link";
 
 /** Release tab: tag, author, Markdown notes and downloadable files. */
 const props = withDefaults(defineProps<{ projectId: string; tag: string; host?: string }>(), {
@@ -27,6 +27,14 @@ const { detail, loading, error, reload } = useReleaseDetail(
   () => props.projectId,
   () => props.tag,
 );
+const releaseState = computed(() => {
+  const release = detail.value?.release;
+  if (!release) return "";
+  if (release.draft) return "черновик";
+  if (release.prerelease) return "пререлиз";
+  if (release.upcoming) return "скоро";
+  return "";
+});
 const commands = useCommandScope(`release:${props.projectId}:${props.tag}`, () => ({
   surface: "release",
   projectId: props.projectId,
@@ -92,49 +100,40 @@ useTabReadout(() => {
       error
     }}</UiMessage>
     <UiArticle v-else-if="detail">
-      <UiInline as="header" class="head" align="baseline" wrap justify="normal">
-        <span v-if="detail.release.draft" class="state">черновик</span>
-        <span v-else-if="detail.release.prerelease" class="state">пререлиз</span>
-        <span v-else-if="detail.release.upcoming" class="state">скоро</span>
-        <UiHeading as="h2" size="lg" weight="semibold" :space-after="0">
+      <UiDetailHeader
+        :state="releaseState"
+        :tone="releaseState ? 'warning' : 'neutral'"
+        :external-href="detail.release.htmlUrl"
+        :host="host"
+      >
+        <template #title>
           {{
             detail.release.name && detail.release.name !== detail.release.tag
               ? detail.release.name
               : "Релиз"
           }}
           <span class="tag mono">{{ detail.release.tag }}</span>
-        </UiHeading>
-      </UiInline>
-      <UiInline as="p" class="meta" wrap>
-        <UiInline as="span" inline :gap="1.25" justify="normal" class="author">
-          <UiAvatar
-            :src="detail.release.author.avatarUrl"
-            :alt="detail.release.author.login"
-            :size="18"
-          />
-          {{ detail.release.author.login }}
-        </UiInline>
-        <span
-          v-if="detail.release.releasedAt || detail.release.createdAt"
-          :title="absoluteTime(detail.release.releasedAt || detail.release.createdAt)"
-          >опубликован
-          {{ relativeTime(detail.release.releasedAt || detail.release.createdAt) }}</span
-        >
-        <span v-if="detail.release.downloads">{{ downloadsLabel(detail.release.downloads) }}</span>
-        <UiInline
-          as="a"
-          inline
-          :gap="1"
-          justify="normal"
-          v-if="detail.release.htmlUrl"
-          class="external"
-          :href="detail.release.htmlUrl"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <IconExternal aria-hidden="true" />на {{ host }}
-        </UiInline>
-      </UiInline>
+        </template>
+        <template #meta>
+          <UiInline as="span" inline :gap="1.25" justify="normal" class="author">
+            <UiAvatar
+              :src="detail.release.author.avatarUrl"
+              :alt="detail.release.author.login"
+              :size="18"
+            />
+            {{ detail.release.author.login }}
+          </UiInline>
+          <span
+            v-if="detail.release.releasedAt || detail.release.createdAt"
+            :title="absoluteTime(detail.release.releasedAt || detail.release.createdAt)"
+            >опубликован
+            {{ relativeTime(detail.release.releasedAt || detail.release.createdAt) }}</span
+          >
+          <span v-if="detail.release.downloads">{{
+            downloadsLabel(detail.release.downloads)
+          }}</span>
+        </template>
+      </UiDetailHeader>
       <VisualMarkdownEditor
         v-if="detail.body"
         class="body"
@@ -151,13 +150,6 @@ useTabReadout(() => {
 </template>
 
 <style scoped>
-.state {
-  padding: 1px var(--sp-2);
-  border-radius: var(--r-full);
-  background: color-mix(in srgb, var(--warn) 22%, transparent);
-  color: var(--warn);
-  font-size: var(--fs-2xs);
-}
 .tag {
   color: var(--muted);
   font-size: var(--fs-xs);
@@ -165,21 +157,9 @@ useTabReadout(() => {
 .mono {
   font-family: var(--mono);
 }
-.meta {
-  margin: var(--sp-2) 0 0;
-  color: var(--muted);
-  font-size: var(--fs-xs);
-}
 .author {
   font-family: var(--mono);
   color: var(--text-2);
-}
-.external {
-  color: var(--text-2);
-}
-.external svg {
-  width: 13px;
-  height: 13px;
 }
 .body {
   margin-top: var(--sp-3);
