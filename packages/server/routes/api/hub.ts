@@ -19,7 +19,7 @@ export const routes: RouteDefinition[] = [
       if (!isLocalRequest(req))
         throw new HttpError(403, "Подключение Hub доступно только локально");
       const body = await readBody(req);
-      configureHub(body.enabled === false ? null : body);
+      configureHub(body);
       json(res, 200, hubStatus());
     },
   },
