@@ -59,6 +59,14 @@ const feodLint = createFeodConfig(feod, { rootDir: fileURLToPath(new URL(".", im
 
 export default defineConfig({
   ssr: { external: ssrExternal },
+  build: {
+    rolldownOptions: {
+      input: {
+        main: fileURLToPath(new URL("./index.html", import.meta.url)),
+        hub: fileURLToPath(new URL("./hub.html", import.meta.url)),
+      },
+    },
+  },
   plugins: [architecturePlugin(), vue(), Icons({ compiler: "vue3" }), projectorPlugin()],
   resolve: {
     alias: {

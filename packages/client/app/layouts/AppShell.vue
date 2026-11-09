@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { HubNavigation } from "../../modules/hub/index.ts";
 import { ActivityIsland } from "../../modules/agent/index.ts";
 import { useCommandScope, commandArgs } from "../../common/utilities/commands.ts";
 import { useCompactViewport } from "../../common/utilities/compact-viewport.ts";
@@ -150,6 +151,7 @@ const navigatePath = (path: string) =>
         <span class="u-truncate">projector</span>
       </router-link>
       <nav class="nav">
+        <HubNavigation />
         <router-link v-if="!currentProject" to="/settings">настройки</router-link>
         <ActivityIsland v-if="!currentProject || !compact" />
       </nav>

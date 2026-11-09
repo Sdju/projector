@@ -1,3 +1,4 @@
+import { HubSettings } from "../hub/index.ts";
 import { FavoriteFolders, InterfaceSettings } from "../launcher/index.ts";
 import { EditorSettings, FilesExcludeSettings } from "../workspace/index.ts";
 import { KeybindingsEditor } from "../ide/index.ts";
@@ -83,6 +84,14 @@ export const settingsSections: SettingsSection[] = [
     description: "Доступ с других устройств и пароль локальной сети.",
     keywords: "LAN localhost телефон пароль доступ сервер",
     component: NetworkSettings,
+  },
+  {
+    id: "hub",
+    title: "Hub",
+    group: "Подключения",
+    description: "Подключение этой машины к общему веб-интерфейсу Projector.",
+    keywords: "hub устройства удалённый доступ туннель токен сервер",
+    component: HubSettings,
   },
   {
     id: "openai-api",

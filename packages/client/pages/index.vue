@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { HubNavigation } from "../modules/hub/index.ts";
 import { deviceUrl } from "../common/utilities/device-url.ts";
 import UiPopupSurface from "../common/ui/UiPopupSurface.vue";
 import UiActionRow from "../common/ui/UiActionRow.vue";
@@ -182,6 +183,7 @@ onUnmounted(() => {
   <main class="launcher" :class="{ 'in-window': webWindow }">
     <div class="launcher-heading">
       <router-link to="/">projector</router-link>
+      <HubNavigation />
     </div>
     <UiPopupSurface
       as="section"

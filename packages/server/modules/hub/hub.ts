@@ -8,6 +8,7 @@ const path = () => join(dataDir(), "hub.json");
 interface State {
   config?: HubConnection;
   online: boolean;
+  error?: string;
   apply?: (config?: HubConnection) => void;
 }
 const root = globalThis as typeof globalThis & { projectorHub?: State };
@@ -19,6 +20,7 @@ export function hubStatus() {
     online: state.online,
     url: state.config?.url,
     deviceId: state.config?.deviceId,
+    error: state.error,
   };
 }
 function connectionConfig(value: unknown): HubConnection | undefined {
@@ -45,7 +47,18 @@ function connectionConfig(value: unknown): HubConnection | undefined {
   return config;
 }
 export function configureHub(value: unknown): void {
-  const config = connectionConfig(value);
+  let input = value;
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const candidate = value as Partial<HubConnection>;
+    if (
+      (candidate.token === "" || candidate.token === undefined) &&
+      candidate.url &&
+      state.config &&
+      new URL(candidate.url).origin === state.config.url
+    )
+      input = { ...candidate, token: state.config.token };
+  }
+  const config = connectionConfig(input);
   mkdirSync(dataDir(), { recursive: true });
   const temporary = path() + ".tmp";
   writeFileSync(temporary, JSON.stringify(config ?? null), { mode: 0o600 });
@@ -62,9 +75,13 @@ export function bindHub(handlers: HubHandlers): () => void {
     stop?.();
     stop = undefined;
     state.online = false;
+    state.error = undefined;
     if (config)
-      stop = connectHub(config, handlers, (online) => {
-        if (epoch === current) state.online = online;
+      stop = connectHub(config, handlers, (online, error) => {
+        if (epoch === current) {
+          state.online = online;
+          state.error = error;
+        }
       });
   };
   // Runtime rebind must dispose the previous connector before installing a replacement.

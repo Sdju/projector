@@ -276,3 +276,18 @@ The chat input (`AgentInput.vue`) is a CodeMirror editor with atomic chips (`Mes
 **Chat history, branches and rewind.** An answer ends with `checkpoint` (`{ tail }`). The user message carries its own UUID (`messageId`), Claude Code runs with `enableFileCheckpointing`, so `POST /api/agent/rewind-files` (`{ backend, projectId, sessionId, messageId, dryRun }`, page-only) resumes the session and calls `rewindFiles(messageId)`. A session grows only at its end: if the transcript moved past `tail`, `sessionAt` forks with `forkSession(upToMessageId)` and continues the fork; the old session stays untouched. Only Claude Code restores files. Editing a message keeps the replaced turns as `variants` (`slot`, up to 20), stored in SQLite (`history-store.ts`, `history.sqlite`): one row per turn, a fork is rows with one `parent`, a save rewrites only changed rows; old per-chat JSON is imported once (kept as `.bak`).
 
 All chat commands are registered once per workspace (`registerAgentCommands` in `model/agent-commands.ts`, called from `ProjectWorkspace`) in the project's editor scope; each finds an open chat through `model/chat-registry.ts` (`chat` names one, otherwise the last): `ide.agent.chats.list|recent`, `ide.agent.turns.list`, `ide.agent.controls.menu.toggle`, `ide.agent.controls.list`, `ide.agent.control.set`, `ide.agent.sessions.list`, `ide.agent.session.resume|delete`, `ide.agent.chat.send|stop|edit|retry|fork|rewind|version.show|queue.list|queue.remove|export|inject|compact|isolate`, `ide.agent.form.show|text`, `ide.agent.worktree.status|merge|discard`, `ide.agent.mcp.list`. Open questions for isolated copies: show their files in the tree/editor, choose merge strategy, handle copies whose chat was closed, and switch isolation on automatically when another answer is running.
+
+## Hub
+
+- `ide.hub.login` — войти в Hub и вернуться к запрошенному устройству.
+- `ide.hub.logout` — отозвать сессию браузера, включая открытые потоки и WebSocket.
+- `ide.hub.devices.refresh` — перечитать устройства и их доступность.
+- `ide.hub.device.open` с `deviceId` — открыть подключённую машину.
+- `ide.hub.devices.open` — вернуться из устройства к списку Hub.
+- `ide.hub.connection.save` — сохранить поля локальной формы подключения и обновить туннель.
+- `ide.hub.connection.disconnect` — отключить туннель и удалить credentials.
+- `ide.hub.open` — открыть настроенный Hub в новой вкладке.
+
+Публичная оболочка Hub использует отдельный реестр команд без запуска runner устройства.
+Подключение меняется только на самой машине, из **Настройки → Hub**; через туннель
+раздел поясняет это ограничение. [Запуск и контракт](hub.md).

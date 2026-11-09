@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { once } from "node:events";
 import { WebSocketServer, WebSocket } from "ws";
+import { hubReturnPath } from "../packages/core/modules/hub/index.ts";
+import { HubAccess } from "../packages/hub/modules/access/index.ts";
 import { createHub } from "../packages/hub/modules/gateway/index.ts";
 import { connectHub } from "../packages/server/modules/hub/connector.ts";
 import { accessAllowed, isLocalRequest } from "../packages/server/modules/access/index.ts";
@@ -18,6 +20,7 @@ async function setup() {
   const root = await mkdtemp(join(tmpdir(), "projector-hub-"));
   cleanups.push(() => rm(root, { recursive: true, force: true }));
   await writeFile(join(root, "index.html"), "<title>Hub owns this interface</title>");
+  await writeFile(join(root, "hub.html"), '<title>Projector Hub shell</title><div id="app"></div>');
   // Reserve the final origin before accepting device connections.
   const hub = createHub({
     origin: "http://localhost:1",
@@ -190,7 +193,7 @@ describe("Hub reverse connection", () => {
       const list = await fetch(`${origin}/api/hub/devices`, { headers: { Cookie: cookie } }).then(
         (res) => res.json(),
       );
-      if (!list.devices.length) break;
+      if (list.devices.every((device) => !device.online)) break;
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
     expect(
@@ -212,4 +215,91 @@ test("device transport isolates page URLs and preserves local/external requests"
   );
   vi.stubGlobal("location", new URL("http://localhost:4177/"));
   expect(deviceUrl("/api/projects")).toBe("/api/projects");
+});
+
+test("Hub serves a public Vue shell, returns JSON login errors and revokes live sockets on logout", async () => {
+  const { origin, cookie } = await setup();
+  const shell = await fetch(`${origin}/login`).then((response) => response.text());
+  expect(shell).toContain("Projector Hub shell");
+  expect(shell).not.toContain("<form");
+  expect(await fetch(`${origin}/api/hub/session`).then((r) => r.json())).toEqual({
+    authenticated: false,
+  });
+  const bad = await fetch(`${origin}/api/hub/session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password: "wrong" }),
+  });
+  expect(bad.status).toBe(401);
+  expect(await bad.json()).toEqual({ error: "Неверный пароль" });
+  const protectedPage = await fetch(`${origin}/devices/desk/projects/demo?ref=main`, {
+    redirect: "manual",
+  });
+  expect(protectedPage.headers.get("location")).toBe(
+    "/login?next=%2Fdevices%2Fdesk%2Fprojects%2Fdemo%3Fref%3Dmain",
+  );
+  const ws = new WebSocket(`${origin.replace("http", "ws")}/api/devices/desk/terminal/socket`, {
+    headers: { Cookie: cookie, Origin: origin },
+  });
+  cleanups.push(() => ws.terminate());
+  await once(ws, "open");
+  const closed = once(ws, "close");
+  const response = await fetch(`${origin}/api/hub/session`, {
+    method: "DELETE",
+    headers: { Cookie: cookie },
+  });
+  expect(response.status).toBe(200);
+  await closed;
+  const refused = await fetch(`${origin}/api/devices/desk/projects`, {
+    headers: { Cookie: cookie },
+  });
+  expect(refused.status).toBe(401);
+  expect(refused.headers.get("www-authenticate")).toBe('Session realm="Projector Hub"');
+});
+
+test("session expiry closes its live connections and never grants access to other sessions", async () => {
+  vi.useFakeTimers();
+  const access = new HubAccess("http://localhost:4180", "secret");
+  const response = {
+    headers: {},
+    setHeader(name, value) {
+      this.headers[name] = value;
+    },
+    writeHead() {
+      return this;
+    },
+    end() {},
+  };
+  const req = {
+    headers: { host: "localhost:4180", "content-type": "application/json" },
+    socket: { remoteAddress: "127.0.0.1" },
+    async *[Symbol.asyncIterator]() {
+      yield JSON.stringify({ password: "secret" });
+    },
+  };
+  await access.login(req, response);
+  req.headers.cookie = response.headers["Set-Cookie"].split(";")[0];
+  const destroy = vi.fn();
+  const connection = { destroy, once() {} };
+  expect(access.track(req, connection)).toBe(true);
+  expect(access.allowed(req)).toBe(true);
+  await vi.advanceTimersByTimeAsync(8 * 60 * 60 * 1000 + 1);
+  expect(access.allowed(req)).toBe(false);
+  access.close();
+  expect(destroy).toHaveBeenCalledOnce();
+});
+
+test.each([
+  "https://evil.example",
+  "//evil.example",
+  "/devices/desk/../../login",
+  "/devices/desk/..\\evil",
+  "/login",
+])("post-login return path rejects %s", (value) => {
+  expect(hubReturnPath(value)).toBe("/");
+});
+test("post-login return path preserves device, query and fragment", () => {
+  expect(hubReturnPath("/devices/desk/projects/demo?ref=main#file")).toBe(
+    "/devices/desk/projects/demo?ref=main#file",
+  );
 });

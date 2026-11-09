@@ -44,16 +44,39 @@ export function createHub(options: HubOptions) {
         await serveStatic(options.staticRoot, req, res);
         return;
       }
+      if (url.pathname === "/api/hub/session") {
+        if (req.method === "GET")
+          res
+            .writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" })
+            .end(JSON.stringify({ authenticated: access.allowed(req) }));
+        else if (req.method === "POST") await access.login(req, res);
+        else if (req.method === "DELETE") access.logout(req, res);
+        else res.writeHead(405, { Allow: "GET, POST, DELETE" }).end();
+        return;
+      }
       if (url.pathname === "/login") {
-        await access.login(req, res);
+        if (req.method === "POST") await access.login(req, res, true);
+        else if (req.method === "GET" || req.method === "HEAD")
+          await serveStatic(options.staticRoot, req, res, "hub.html");
+        else res.writeHead(405, { Allow: "GET, HEAD, POST" }).end();
         return;
       }
       if (!access.allowed(req)) {
         if (url.pathname.startsWith("/api/"))
           res
-            .writeHead(401, { "Content-Type": "application/json" })
+            .writeHead(401, {
+              "Content-Type": "application/json",
+              "Cache-Control": "no-store",
+              "WWW-Authenticate": 'Session realm="Projector Hub"',
+            })
             .end(JSON.stringify({ error: "Войдите в Projector Hub" }));
-        else res.writeHead(303, { Location: "/login" }).end();
+        else
+          res
+            .writeHead(303, {
+              Location: `/login?next=${encodeURIComponent(url.pathname + url.search)}`,
+              "Cache-Control": "no-store",
+            })
+            .end();
         return;
       }
       const match = route(url.pathname);
@@ -69,15 +92,17 @@ export function createHub(options: HubOptions) {
           stream.destroy();
           return;
         }
+        if (!access.track(req, res)) {
+          stream.destroy();
+          return;
+        }
         forward(req, res, stream, `/api${match[2]}${url.search}`, options.origin);
         return;
       }
       if (url.pathname === "/api/hub/devices") {
         res
           .writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" })
-          .end(
-            JSON.stringify({ devices: [...tunnels.devices.values()].map((device) => device.info) }),
-          );
+          .end(JSON.stringify({ devices: tunnels.list() }));
         return;
       }
       if (url.pathname.startsWith("/api/")) {
@@ -85,18 +110,7 @@ export function createHub(options: HubOptions) {
         return;
       }
       if (url.pathname === "/") {
-        const devices = [...tunnels.devices.keys()];
-        if (devices.length === 1) {
-          res.writeHead(303, { Location: `/devices/${devices[0]}/` }).end();
-          return;
-        }
-        res.writeHead(200, {
-          "Content-Type": "text/html; charset=utf-8",
-          "Cache-Control": "no-store",
-        });
-        res.end(
-          `<!doctype html><html lang="ru"><meta charset="utf-8"><title>Projector Hub</title><h1>Projector Hub</h1>${devices.length ? devices.map((id) => `<p><a href="/devices/${id}/">${id}</a></p>`).join("") : "<p>Нет подключённых устройств. Подключите локальный Projector и обновите страницу.</p>"}</html>`,
-        );
+        await serveStatic(options.staticRoot, req, res, "hub.html");
         return;
       }
       await serveStatic(options.staticRoot, req, res);
@@ -130,6 +144,10 @@ export function createHub(options: HubOptions) {
           stream.destroy();
           return;
         }
+        if (!access.track(req, socket)) {
+          stream.destroy();
+          return;
+        }
         forward(req, socket, stream, `/api${match[2]}${url.search}`, options.origin, head);
       })
       .catch(() => socket.end("HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n"));
@@ -138,6 +156,7 @@ export function createHub(options: HubOptions) {
   return {
     server,
     close: () => {
+      access.close();
       tunnels.close();
       server.closeAllConnections();
       server.close();

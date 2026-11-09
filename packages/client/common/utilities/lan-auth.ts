@@ -1,4 +1,4 @@
-import { deviceUrl } from "./device-url.ts";
+import { deviceBase, deviceUrl } from "./device-url.ts";
 let currentPassword: string | null = null;
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -34,6 +34,7 @@ function isSameOrigin(url: string): boolean {
   }
 }
 
+let hubRedirecting = false;
 let promptPending: Promise<string | null> | null = null;
 
 function requestPassword(): Promise<string | null> {
@@ -79,6 +80,17 @@ export async function authedFetch(input: RequestInfo | URL, init?: RequestInit):
       retry.set("Authorization", `Bearer ${password}`);
       response = await nativeFetch(input, { ...init, headers: retry });
     }
+  }
+  if (
+    deviceBase() &&
+    !hubRedirecting &&
+    response.status === 401 &&
+    response.headers.get("WWW-Authenticate") === 'Session realm="Projector Hub"'
+  ) {
+    hubRedirecting = true;
+    location.assign(
+      `/login?next=${encodeURIComponent(location.pathname + location.search + location.hash)}`,
+    );
   }
   return response;
 }

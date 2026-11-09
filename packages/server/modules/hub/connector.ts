@@ -10,7 +10,7 @@ export interface HubHandlers {
 export function connectHub(
   config: HubConnection,
   handlers: HubHandlers,
-  status: (online: boolean) => void,
+  status: (online: boolean, error?: string) => void,
 ): () => void {
   const ingress = createServer((req, res) => handlers.handle(req, res));
   const detach = handlers.attach(ingress);
@@ -47,7 +47,21 @@ export function connectHub(
     };
     ws.on("open", arm);
     ws.on("ping", arm);
-    ws.on("error", () => ws.terminate());
+    let failure: string | undefined;
+    ws.on("unexpected-response", (_req, res) => {
+      failure =
+        res.statusCode === 401
+          ? "Hub отклонил токен подключения"
+          : res.statusCode === 409
+            ? "ID устройства занят или версия протокола несовместима"
+            : "Hub отклонил подключение";
+      res.resume();
+      ws.terminate();
+    });
+    ws.on("error", () => {
+      failure ??= "Не удалось соединиться с Hub";
+      ws.terminate();
+    });
     ws.on("message", (data) => {
       if (!Buffer.isBuffer(data)) {
         ws.terminate();
@@ -83,7 +97,10 @@ export function connectHub(
     });
     ws.once("close", () => {
       clearTimeout(heartbeat);
-      status(false);
+      status(
+        false,
+        disposed ? undefined : (failure ?? "Соединение с Hub потеряно, повторяем подключение"),
+      );
       for (const peer of peers) peer.terminate();
       if (!disposed) {
         retry = setTimeout(open, delay + Math.random() * 500);

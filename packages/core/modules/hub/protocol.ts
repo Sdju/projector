@@ -21,3 +21,20 @@ export interface HubOpen {
   type: "open";
   id: string;
 }
+
+/** Only a same-origin device page can be resumed after signing in. */
+export function hubReturnPath(value: unknown): string {
+  if (typeof value !== "string" || !value.startsWith("/devices/") || value.includes("\\"))
+    return "/";
+  try {
+    const url = new URL(value, "https://hub.invalid");
+    if (
+      url.origin !== "https://hub.invalid" ||
+      !/^\/devices\/[a-z0-9][a-z0-9-]{0,62}(?:\/|$)/.test(url.pathname)
+    )
+      return "/";
+    return url.pathname + url.search + url.hash;
+  } catch {
+    return "/";
+  }
+}

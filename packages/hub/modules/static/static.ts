@@ -34,6 +34,7 @@ export async function serveStatic(
   root: string,
   req: IncomingMessage,
   res: ServerResponse,
+  shell = "index.html",
 ): Promise<void> {
   if (req.method !== "GET" && req.method !== "HEAD") {
     res.writeHead(405, { Allow: "GET, HEAD" }).end();
@@ -53,7 +54,11 @@ export async function serveStatic(
       res.writeHead(404).end();
       return;
     }
-    file = join(root, "index.html");
+    file = join(root, shell);
+  }
+  if (!(await isFile(file))) {
+    res.writeHead(503).end("Сначала выполните vp run build");
+    return;
   }
   const immutable = file.startsWith(join(root, "assets") + sep);
   res.writeHead(200, {

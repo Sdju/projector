@@ -18,6 +18,10 @@ interface Pending {
 const hash = (value: string) => createHash("sha256").update(value).digest();
 export class Tunnels {
   readonly devices = new Map<string, Device>();
+  private known = new Map<string, HubDevice>();
+  list(): HubDevice[] {
+    return [...this.known.values()];
+  }
   private pending = new Map<string, Pending>();
   private sockets = new WebSocketServer({
     noServer: true,
@@ -56,7 +60,7 @@ export class Tunnels {
         ? !pending
         : !isDeviceId(id) ||
           this.devices.has(id) ||
-          this.devices.size >= 128 ||
+          (!this.known.has(id!) && this.known.size >= 128) ||
           url.searchParams.get("protocol") !== String(HUB_PROTOCOL)
     ) {
       socket.end("HTTP/1.1 409 Conflict\r\nConnection: close\r\n\r\n");
@@ -82,9 +86,11 @@ export class Tunnels {
         streams: new Set(),
       };
       this.devices.set(id!, device);
+      this.known.set(id!, device.info);
       ws.once("close", () => {
         if (this.devices.get(id!) !== device) return;
         this.devices.delete(id!);
+        device.info.online = false;
         for (const stream of device.streams) stream.destroy();
         for (const [key, item] of this.pending)
           if (item.device === device) {
