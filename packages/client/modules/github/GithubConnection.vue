@@ -1,103 +1,33 @@
 <script setup lang="ts">
-import UiLabel from "../../common/ui/UiLabel.vue";
-import UiMessage from "../../common/ui/UiMessage.vue";
-import UiHeading from "../../common/ui/UiHeading.vue";
-import { ref, useId } from "vue";
-import UiControl from "../../common/ui/UiControl.vue";
-import UiStack from "../../common/ui/UiStack.vue";
-import UiButton from "../../common/ui/UiButton.vue";
-import { useCommandScope } from "../../common/utilities/commands.ts";
-import { readoutLines, useTabReadout } from "../../common/utilities/tab-readout.ts";
-import { useIntegrationOperation } from "../integration-api/index.ts";
+import { computed } from "vue";
+import { TokenConnectionForm } from "../integration-api/index.ts";
 import { formatProjectRef } from "../project/index.ts";
 import { connectGithubToken } from "./connect.ts";
+
 const props = defineProps<{ repository: string }>();
 const emit = defineEmits<{ connected: [] }>();
-const token = ref("");
-const tokenId = useId();
-const { busy, error, action } = useIntegrationOperation();
-const commands = useCommandScope(`github-connection:${props.repository}`, () => ({
-  surface: "github-integration",
-  projectId: formatProjectRef({ kind: "github", repository: props.repository }),
-  repository: props.repository,
-}));
-commands.scope.registerCommand({
-  id: "ide.github.integration.connect",
-  title: "Подключить GitHub",
-  description:
-    "Подключает GitHub с токеном, введённым в форме интеграции, и открывает репозиторий.",
-  enabled: () => !busy.value && !!token.value.trim(),
-  run: () =>
-    action(async () => {
-      await connectGithubToken(token.value);
-      token.value = "";
-      emit("connected");
-    }),
-});
-// Что штатный агент видит на вкладке подключения GitHub: репозиторий и состояние формы без токена.
-useTabReadout(() => ({
-  note: "Подключение к GitHub",
-  text: readoutLines(
-    `Репозиторий: ${props.repository}`,
-    busy.value ? "Состояние: подключение…" : "Состояние: не подключено",
-    token.value.trim() ? "Токен: введён" : "Токен: не введён",
-    error.value ? `Ошибка: ${error.value}` : "",
-  ),
-}));
+const projectId = computed(() =>
+  formatProjectRef({ kind: "github", repository: props.repository }),
+);
+async function connect(token: string) {
+  await connectGithubToken(token);
+}
 </script>
 
 <template>
-  <section class="connection">
-    <UiHeading>Подключить GitHub</UiHeading>
-    <p>Установите токен, чтобы открыть {{ repository }}.</p>
-    <UiStack as="form" @submit.prevent="commands.run('ide.github.integration.connect')">
-      <UiLabel :for="tokenId" size="sm">Токен GitHub</UiLabel>
-      <UiControl
-        :id="tokenId"
-        v-model="token"
-        type="password"
-        autocomplete="off"
-        placeholder="github_pat_…"
-        :disabled="busy"
-        required
-      />
-      <UiButton
-        type="submit"
-        data-command="ide.github.integration.connect"
-        :disabled="busy || !token.trim()"
-        >{{ busy ? "Подключаю…" : "Подключить GitHub" }}</UiButton
-      >
-    </UiStack>
-    <UiMessage v-if="error" tone="danger" role="alert">{{ error }}</UiMessage>
-    <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer"
-      >Создать токен в GitHub ↗</a
-    >
-  </section>
+  <TokenConnectionForm
+    host="GitHub"
+    subject-label="Репозиторий"
+    :subject="repository"
+    :project-id="projectId"
+    :scope-key="`github-connection:${repository}`"
+    surface="github-integration"
+    placeholder="github_pat_…"
+    token-url="https://github.com/settings/tokens"
+    command-id="ide.github.integration.connect"
+    command-description="Подключает GitHub с токеном, введённым в форме интеграции, и открывает репозиторий."
+    readout-note="Подключение к GitHub"
+    :connect="connect"
+    @connected="emit('connected')"
+  />
 </template>
-
-<style scoped>
-.connection {
-  max-width: 460px;
-  padding: var(--sp-5);
-}
-p,
-a {
-  font-size: var(--fs-sm);
-}
-p,
-a {
-  color: var(--muted);
-}
-form {
-  margin: var(--sp-4) 0;
-}
-input {
-  min-width: 0;
-}
-form :deep(button) {
-  justify-self: start;
-}
-a {
-  text-decoration: underline;
-}
-</style>
