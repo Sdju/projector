@@ -29,7 +29,7 @@ import { isBuiltinAgent } from "./modes.ts";
 import { watchChat } from "./chat-sync.ts";
 import { saveChat } from "./save-chat.ts";
 import { useExternalAgent } from "./external.ts";
-import { applyAgentEvent, markAnswerFailed, resetAnswer } from "./turn-events.ts";
+import { applyAgentEvent, closeAnswer, markAnswerFailed, resetAnswer } from "./turn-events.ts";
 import { hasChips, messageText, normalizeParts } from "../lib/message-parts.ts";
 import { restoreFormSnapshot } from "./form-reply.ts";
 import { userTurnOf } from "./user-turn.ts";
@@ -192,12 +192,7 @@ export function useAgent(
     } finally {
       const stopped = signal.aborted;
       state.abort?.abort();
-      for (const chip of assistant.tools)
-        if (chip.status === "running") {
-          chip.status = "error";
-          Object.assign(chip, { detail: "Выполнение прервано", endedAt: Date.now() });
-          delete chip.output;
-        }
+      closeAnswer(state, assistant, Date.now());
       state.busy = false;
       state.phase = "";
       state.permissions = [];

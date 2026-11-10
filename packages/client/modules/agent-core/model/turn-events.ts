@@ -12,6 +12,37 @@ export function legacyParts(turn: AgentTurn): AgentPart[] {
   ];
 }
 
+/**
+ * Tasks that cannot outlive the answer must not keep running in the chat: a foreground task
+ * ends with it, and a background one whose end the agent never reports (`untracked`) is
+ * unknown once the answer is over. The turn that started them may be long finished, so every
+ * turn is checked — an interrupted answer sends no `done` and leaves its rows spinning.
+ */
+export function settleAnswerTasks(turns: readonly AgentTurn[], at: number): void {
+  for (const turn of turns)
+    for (const task of turn.tasks ?? [])
+      if (task.status === "running" && (!task.background || task.untracked)) {
+        task.status = "stopped";
+        task.endedAt = at;
+        if (task.untracked) task.summary ??= "Состояние после ответа неизвестно";
+      }
+}
+
+/**
+ * The stream of an answer is over: its calls cannot still run, and without a live run behind
+ * the turn, the tasks left open are closed too (a stop or a broken stream sends no `done`).
+ */
+export function closeAnswer(state: ChatState, assistant: AgentTurn, at: number): void {
+  for (const chip of assistant.tools)
+    if (chip.status === "running") {
+      chip.status = "error";
+      chip.detail = "Выполнение прервано";
+      chip.endedAt = at;
+      delete chip.output;
+    }
+  if (!assistant.run) settleAnswerTasks(state.turns, at);
+}
+
 type ToolTimes = { startedAt?: number; endedAt?: number };
 /**
  * Times of the calls of each answer. A rejoin replays the answer into a cleared turn, and the
@@ -272,12 +303,8 @@ export function applyAgentEvent(
       assistant.stopped = event.data.stopped;
       // A foreground task cannot outlive the answer; a background one may and reports later,
       // unless the agent never reports (then its state is unknown once the answer is over).
-      for (const task of assistant.tasks ?? [])
-        if (task.status === "running" && (!task.background || task.untracked)) {
-          task.status = "stopped";
-          task.endedAt = at;
-          if (task.untracked) task.summary ??= "Состояние после ответа неизвестно";
-        }
+      // Settle every turn: an earlier interrupted answer leaves rows this one must close.
+      settleAnswerTasks([assistant, ...state.turns], at);
       return false;
     default:
       return false;

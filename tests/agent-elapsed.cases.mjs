@@ -42,3 +42,45 @@ test("a task is timed from the first patch and ends when it stops", () => {
     endedAt: 12_000,
   });
 });
+
+test("an interrupted answer does not leave its untracked tasks running forever", () => {
+  const state = { permissions: [], questions: [], secrets: [], turns: [] };
+  const earlier = {
+    id: "a0",
+    role: "assistant",
+    text: "",
+    tools: [],
+    tasks: [
+      {
+        id: "shell",
+        kind: "shell",
+        title: "gh run watch",
+        status: "running",
+        background: true,
+        untracked: true,
+        startedAt: 1_000,
+      },
+      {
+        id: "subagent",
+        kind: "agent",
+        title: "Разбор",
+        status: "running",
+        background: true,
+        startedAt: 1_000,
+      },
+    ],
+  };
+  const assistant = { id: "a1", role: "assistant", text: "", tools: [], tasks: [], parts: [] };
+  state.turns = [earlier, assistant];
+
+  // The earlier answer was stopped before `done`: this answer's end settles its leftovers too.
+  applyAgentEvent(state, assistant, { event: "done", data: { text: "" } }, () => {}, 5_000);
+
+  expect(earlier.tasks[0]).toMatchObject({
+    status: "stopped",
+    summary: "Состояние после ответа неизвестно",
+    endedAt: 5_000,
+  });
+  // A tracked background subagent still reports its own end: it is not touched.
+  expect(earlier.tasks[1]).toMatchObject({ status: "running" });
+});
