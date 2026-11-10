@@ -52,13 +52,13 @@ vp -C artifacts/distribution/ide pm pack --pack-destination ..
 vp -C artifacts/distribution/native pm pack --pack-destination ..
 vp -C artifacts/distribution/hub pm pack --pack-destination ..
 
-npm install -g ./artifacts/distribution/projector-ai-ide-0.11.0.tgz
+npm install -g ./artifacts/distribution/projector-ai-ide-0.11.1.tgz
 projector --browser
 
-npm install -g ./artifacts/distribution/projector-ai-native-0.11.0.tgz
+npm install -g ./artifacts/distribution/projector-ai-native-0.11.1.tgz
 projector --native
 
-npm install -g ./artifacts/distribution/projector-ai-hub-0.11.0.tgz
+npm install -g ./artifacts/distribution/projector-ai-hub-0.11.1.tgz
 projector-hub
 ```
 
