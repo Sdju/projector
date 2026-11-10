@@ -15,7 +15,12 @@ import {
   isAppearanceChoice,
   type AppearanceChoice,
 } from "@ai-projector/core/modules/appearance/index.ts";
-import { applyAppearance, currentAppearance } from "../appearance/index.ts";
+import {
+  appearanceThemes,
+  applyAppearance,
+  currentAppearance,
+  setAppearanceThemes,
+} from "../appearance/index.ts";
 import { useSectionAction } from "../../common/utilities/use-section-action.ts";
 const shortcutId = useId();
 const appearanceId = useId();
@@ -36,8 +41,10 @@ const {
   perform: performAppearance,
 } = appearanceState;
 appearanceBusy.value = true;
+const availableAppearances = computed(() => [...appearanceOptions, ...appearanceThemes().value]);
 const appearanceDescription = computed(
-  () => appearanceOptions.find((option) => option.id === appearance.value)?.description ?? "",
+  () =>
+    availableAppearances.value.find((option) => option.id === appearance.value)?.description ?? "",
 );
 const modes = [
   {
@@ -79,6 +86,7 @@ async function loadAppearance() {
     const response = await fetch("/api/appearance");
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Не удалось загрузить схему");
+    setAppearanceThemes(data.themes ?? []);
     if (isAppearanceChoice(data.choice)) appearance.value = data.choice;
     savedAppearance.value = appearance.value;
     applyAppearance(appearance.value);
@@ -200,7 +208,7 @@ async function open() {
       :disabled="appearanceBusy"
       @change="saveAppearance"
     >
-      <option v-for="option in appearanceOptions" :key="option.id" :value="option.id">
+      <option v-for="option in availableAppearances" :key="option.id" :value="option.id">
         {{ option.title }}
       </option>
     </UiControl>

@@ -13,12 +13,13 @@ const html = `<!doctype html>
     <pre id="result">WAITING</pre>
     <script type="module">
       import "/packages/client/app/styles.css";
-      import { applyAppearance, initAppearance } from "/packages/client/modules/appearance/index.ts";
+      import { applyAppearance, initAppearance, setAppearanceThemes } from "/packages/client/modules/appearance/index.ts";
       try {
         initAppearance();
         window.fixture = {
           ready: true,
           apply: applyAppearance,
+          themes: setAppearanceThemes,
           read: () => ({
             appearance: document.documentElement.dataset.appearance,
             theme: document.documentElement.dataset.theme,
@@ -87,6 +88,60 @@ test(
           "new Promise(resolve => setTimeout(() => resolve(window.fixture.read().theme), 100))",
         ),
       ).toBe("dark");
+
+      await browser.evaluate(`window.fixture.themes([{
+        id: 'example/ocean', packageName: 'example', title: 'Ocean', mode: 'light',
+        tokens: { bg: '#010203', 'bg-2': '#040506', text: '#fafafa', accent: '#ff0000', hover: '#111111' }
+      }]); window.fixture.apply('example/ocean')`);
+      expect(await browser.evaluate("window.fixture.read()")).toStrictEqual({
+        appearance: "example/ocean",
+        theme: "example/ocean",
+        scheme: "light",
+        background: "rgb(1, 2, 3)",
+        colorSchemeMeta: "light",
+        themeColorMeta: "#010203",
+      });
+      expect(
+        await browser.evaluate("document.documentElement.style.getPropertyValue('--accent')"),
+      ).toBe("#ff0000");
+
+      await browser.evaluate("window.fixture.apply('dark')");
+      expect((await browser.evaluate("window.fixture.read()")).background).toBe("rgb(16, 16, 15)");
+      expect(
+        await browser.evaluate("document.documentElement.style.getPropertyValue('--accent')"),
+      ).toBe("");
+      expect(
+        await browser.evaluate("document.documentElement.style.getPropertyValue('--hover')"),
+      ).toBe("");
+    } finally {
+      await browser.close();
+      await fixture.close();
+    }
+  },
+);
+
+const bootstrapHtml = `<!doctype html>
+<html data-appearance="example/ocean" data-theme="example/ocean" style="--bg:#010203;--accent:#ff0000">
+<head><meta name="color-scheme" content="light"><meta name="theme-color" content="#010203"></head>
+<body><pre id="result">WAITING</pre><script type="module">
+import { initAppearance, currentAppearance } from '/packages/client/modules/appearance/index.ts';
+initAppearance();
+const root = document.documentElement;
+document.getElementById('result').textContent = currentAppearance() === 'example/ocean' &&
+  root.style.getPropertyValue('--bg') === '#010203' &&
+  root.style.getPropertyValue('--accent') === '#ff0000' ? 'PASS' : 'FAIL';
+</script></body></html>`;
+
+test(
+  "appearance init preserves external bootstrap tokens until the catalog arrives",
+  { skip: !chromium, timeout: 45000 },
+  async () => {
+    const fixture = await createBrowserFixture({
+      pages: { "/__appearance_bootstrap": bootstrapHtml },
+    });
+    const browser = await createChromium(fixture.directory);
+    try {
+      expect(await browser.result(fixture.url("/__appearance_bootstrap"))).toBe("PASS");
     } finally {
       await browser.close();
       await fixture.close();

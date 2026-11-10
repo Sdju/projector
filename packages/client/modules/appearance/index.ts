@@ -5,10 +5,16 @@ import {
   resolveScheme,
   schemeMode,
   type AppearanceChoice,
-  type ColorScheme,
+  type ThemeId,
 } from "@ai-projector/core/modules/appearance/index.ts";
+import {
+  themeStyleProperties,
+  themeTokenNames,
+  type AvailableTheme,
+} from "@ai-projector/core/modules/plugins/index.ts";
 
 const choice = shallowRef<AppearanceChoice>(defaultAppearance);
+const themes = shallowRef<AvailableTheme[]>([]);
 let media: MediaQueryList | undefined;
 let initialized = false;
 
@@ -18,28 +24,62 @@ export function currentAppearance(): AppearanceChoice {
   return isAppearanceChoice(value) ? value : defaultAppearance;
 }
 
-function updateMeta(scheme: ColorScheme) {
-  document.querySelector('meta[name="color-scheme"]')?.setAttribute("content", schemeMode(scheme));
-  const background = getComputedStyle(document.documentElement).getPropertyValue("--bg-2").trim();
+export function appearanceThemes() {
+  return themes;
+}
+
+export function setAppearanceThemes(value: AvailableTheme[]): AvailableTheme[] {
+  themes.value = [...value];
+  return themes.value;
+}
+
+function clearExternalTokens(root: HTMLElement) {
+  for (const name of themeTokenNames) root.style.removeProperty(`--${name}`);
+}
+
+function updateMeta(scheme: ThemeId, mode?: "dark" | "light") {
+  document
+    .querySelector('meta[name="color-scheme"]')
+    ?.setAttribute("content", schemeMode(scheme, mode));
+  const root = document.documentElement;
+  const background = getComputedStyle(root)
+    .getPropertyValue(mode ? "--bg" : "--bg-2")
+    .trim();
   if (background)
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", background);
 }
 
 /** Applies immediately: every component reads colours from the tokens on <html>. */
-export function applyAppearance(value: AppearanceChoice): ColorScheme {
+export function applyAppearance(value: AppearanceChoice): ThemeId {
   choice.value = value;
-  const scheme = resolveScheme(value, media?.matches ?? false);
+  const resolved = resolveScheme(value, media?.matches ?? false);
+  const theme = themes.value.find((item) => item.id === resolved);
+  const scheme = !theme && !["dark", "light", "contrast"].includes(resolved) ? "dark" : resolved;
   const root = document.documentElement;
+  clearExternalTokens(root);
   root.dataset.appearance = value;
   root.dataset.theme = scheme;
-  updateMeta(scheme);
+  if (theme) {
+    for (const [name, token] of Object.entries(themeStyleProperties(theme.tokens)))
+      root.style.setProperty(name, token);
+    root.style.colorScheme = theme.mode;
+  } else {
+    root.style.removeProperty("color-scheme");
+  }
+  updateMeta(scheme, theme?.mode);
   return scheme;
 }
 
 export function initAppearance() {
   if (initialized) return;
   initialized = true;
-  applyAppearance(currentAppearance());
+  choice.value = currentAppearance();
+  const root = document.documentElement;
+  root.dataset.appearance = choice.value;
+  root.dataset.theme ??= resolveScheme(
+    choice.value,
+    window.matchMedia("(prefers-color-scheme: light)").matches,
+  );
   media = window.matchMedia("(prefers-color-scheme: light)");
   media.addEventListener("change", () => {
     if (choice.value === "auto") applyAppearance("auto");

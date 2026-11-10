@@ -1,0 +1,21 @@
+{
+  "name": "@projector-tests/sepia",
+  "version": "1.0.0",
+  "description": "Тестовая тема",
+  "engines": {
+    "projector": ">=0.11.0"
+  },
+  "projector": {
+    "apiVersion": 1,
+    "contributes": {
+      "themes": [
+        {
+          "id": "paper",
+          "title": "Sepia Paper",
+          "mode": "light",
+          "tokens": "themes/paper.json"
+        }
+      ]
+    }
+  }
+}

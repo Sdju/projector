@@ -54,7 +54,9 @@ test("appearance API reads and writes the saved choice", async () => {
 
   const initial = await fetch(`${base}/api/appearance`);
   expect(initial.status).toBe(200);
-  expect(await initial.json()).toStrictEqual({ choice: "dark" });
+  const initialBody = await initial.json();
+  expect(initialBody.choice).toBe("dark");
+  expect(initialBody.themes.map((theme) => theme.id)).toStrictEqual(["dark", "light", "contrast"]);
 
   const saved = await fetch(`${base}/api/appearance`, {
     method: "PUT",

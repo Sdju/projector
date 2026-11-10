@@ -22,8 +22,17 @@ export async function readAppearanceChoice(): Promise<AppearanceChoice> {
   }
 }
 
-export async function writeAppearanceChoice(value: unknown): Promise<{ choice: AppearanceChoice }> {
+export async function writeAppearanceChoice(
+  value: unknown,
+  availableThemeIds?: readonly string[],
+): Promise<{ choice: AppearanceChoice }> {
   if (!isAppearanceChoice(value)) throw new Error("Неизвестная цветовая схема");
+  if (
+    !["dark", "light", "contrast", "auto"].includes(value) &&
+    availableThemeIds &&
+    !availableThemeIds.includes(value)
+  )
+    throw new Error("Внешняя цветовая схема недоступна");
   const task = pending.then(async () => {
     await mkdir(dataDir(), { recursive: true });
     const file = appearancePath();

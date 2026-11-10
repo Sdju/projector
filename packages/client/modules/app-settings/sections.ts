@@ -8,6 +8,7 @@ import { GitlabSettings } from "../gitlab/index.ts";
 import { DockerSettings } from "../docker/index.ts";
 import { ProviderPanel } from "../provider/index.ts";
 import { PwaSettings } from "../pwa/index.ts";
+import { PluginSettings } from "../plugins/index.ts";
 import {
   AgentHooksSettings,
   AgentMcpSettings,
@@ -29,6 +30,14 @@ export const settingsSections: SettingsSection[] = [
     keywords:
       "окно браузер GTK трей хоткей shortcut запуск цвет тема схема светлая тёмная appearance",
     component: InterfaceSettings,
+  },
+  {
+    id: "plugins",
+    title: "Плагины",
+    group: "Среда",
+    description: "Локальные theme-only пакеты, их состояние и цветовые схемы.",
+    keywords: "плагины расширения темы цвета схемы локальная папка plugins themes",
+    component: PluginSettings,
   },
   {
     id: "pwa",

@@ -93,6 +93,18 @@ Keys support `Mod`, `Ctrl`, `Meta`, `Alt`, `Shift` and a key name. `Mod` matches
 
 The settings endpoint is `GET /api/ide/keybindings` and same-origin `PUT /api/ide/keybindings` with `{ bindings: [...] }`. GET also returns the settings path. No localStorage is used.
 
+## Theme-only плагины
+
+Раздел **Настройки → Плагины** создаёт scope `plugins:settings:<uid>` с `{ surface: "plugins", view: "settings", plugin, query, mode, ready, busy }`. Команды действуют только пока раздел смонтирован; изменяющие операции недоступны во время другой операции. Формат пакета и HTTP API описаны в [plugins](plugins.md).
+
+- `ide.plugins.list` — возвращает элементы текущего каталога со статусами, диагностикой и темами.
+- `ide.plugins.refresh` — заново читает пакеты и обновляет доступные темы.
+- `ide.plugin.open` `{ id }` — выбирает пакет и открывает его карточку.
+- `ide.plugin.enable` / `ide.plugin.disable` `{ id }` — включает или выключает пакет. После выключения его темы недоступны, активная внешняя тема временно заменяется тёмной.
+- `ide.plugin.theme.apply` `{ id }` либо `{ pluginId, themeId }` — применяет и сохраняет тему включённого пакета; при ошибке сохранения возвращает прежнее оформление.
+- `ide.plugins.install` `{ path? }` — устанавливает и включает проверенный пакет из локальной папки; без `path` использует поле экрана.
+- `ide.plugins.folder.open` — открывает системный выбор папки и устанавливает выбранный пакет.
+
 ## Limits and tests
 
 The SDK is in-process: there is no arbitrary command-execution HTTP endpoint, and a remote automation transport would need its own authorization and argument validation. Command arguments and results are untyped (`description` and `arguments` are documentation for the agent). Native and CLI hosts do not reuse the registry yet.

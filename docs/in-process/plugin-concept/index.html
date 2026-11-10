@@ -1,0 +1,2170 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Projector — Плагины</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #10100f;
+        --bg-2: #171716;
+        --bg-3: #20201c;
+        --bg-4: #2a2a26;
+        --sunken: #0c0c0b;
+        --canvas: #080807;
+        --line: #2c2c28;
+        --line-strong: #46463f;
+        --text: #ecece6;
+        --text-2: #c9c9bf;
+        --muted: #9a9a92;
+        --faint: #80807a;
+        --accent: #b8ab77;
+        --run: #8fbf8a;
+        --warn: #c4b386;
+        --info: #7fb0d6;
+        --selection: #3a3934;
+        --hover: #ffffff09;
+        --sans: "Noto Sans", "DejaVu Sans", "Liberation Sans", system-ui, sans-serif;
+        --mono: "Noto Sans Mono", "DejaVu Sans Mono", ui-monospace, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+      body {
+        background: var(--canvas);
+        color: var(--text);
+        font: 13px/1.45 var(--sans);
+      }
+      button,
+      input,
+      select {
+        font: inherit;
+        color: inherit;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      button,
+      a,
+      input,
+      select {
+        outline: none;
+      }
+      svg.icon {
+        width: 16px;
+        height: 16px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.65;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        flex: none;
+      }
+      .app {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+      }
+      .titlebar {
+        height: 47px;
+        flex: none;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 15px;
+        background: var(--bg-2);
+        border-bottom: 1px solid var(--line);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+      }
+      .brand-mark {
+        width: 22px;
+        height: 22px;
+        border: 1px solid #555246;
+        border-radius: 5px;
+        display: grid;
+        place-items: center;
+        color: var(--accent);
+        background: #22211c;
+      }
+      .brand-mark svg {
+        width: 14px;
+        height: 14px;
+      }
+      .project {
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+      }
+      .project b {
+        font-weight: 400;
+        color: var(--text-2);
+      }
+      .window-actions {
+        margin-left: auto;
+        display: flex;
+        gap: 18px;
+        color: var(--faint);
+      }
+      .window-actions span {
+        display: block;
+        width: 10px;
+        height: 10px;
+        border-bottom: 1px solid currentColor;
+      }
+      .window-actions span:nth-child(2) {
+        border: 1px solid currentColor;
+      }
+      .window-actions span:last-child {
+        border: 0;
+        position: relative;
+      }
+      .window-actions span:last-child:before,
+      .window-actions span:last-child:after {
+        content: "";
+        position: absolute;
+        width: 12px;
+        height: 1px;
+        background: currentColor;
+        left: -1px;
+        top: 5px;
+        transform: rotate(45deg);
+      }
+      .window-actions span:last-child:after {
+        transform: rotate(-45deg);
+      }
+      .tabs {
+        height: 39px;
+        flex: none;
+        display: flex;
+        align-items: stretch;
+        padding: 0 12px;
+        background: var(--bg);
+        border-bottom: 1px solid var(--line);
+      }
+      .tab {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 14px;
+        color: var(--muted);
+        font-size: 12px;
+        border-right: 1px solid var(--line);
+      }
+      .tab.active {
+        color: var(--text);
+        background: var(--bg-2);
+        box-shadow: inset 0 2px var(--accent);
+      }
+      .tab .icon {
+        width: 14px;
+        height: 14px;
+      }
+      .tab.plus {
+        padding: 0 11px;
+        border: 0;
+        color: var(--faint);
+      }
+      .workspace {
+        flex: 1;
+        min-height: 0;
+        padding: 8px;
+      }
+      .workbench {
+        height: 100%;
+        display: grid;
+        grid-template-columns: 208px minmax(0, 1fr);
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        overflow: hidden;
+        background: var(--bg);
+      }
+      .sidebar {
+        background: var(--bg-2);
+        border-right: 1px solid var(--line);
+        padding: 13px 9px;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .side-search {
+        height: 30px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 0 9px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        background: var(--bg);
+        color: var(--faint);
+        font-size: 12px;
+        margin: 0 1px 17px;
+      }
+      .side-search .icon {
+        width: 14px;
+        height: 14px;
+      }
+      .side-group {
+        margin: 0 0 16px;
+      }
+      .side-label {
+        padding: 0 9px;
+        margin-bottom: 5px;
+        color: var(--faint);
+        font-size: 10px;
+        font-weight: 500;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .side-item {
+        min-height: 32px;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 5px 9px;
+        border-radius: 4px;
+        color: var(--text-2);
+        font-size: 12px;
+      }
+      .side-item .icon {
+        width: 15px;
+        height: 15px;
+        color: var(--muted);
+      }
+      .side-item.selected {
+        background: var(--selection);
+        color: var(--text);
+      }
+      .side-item.selected .icon {
+        color: var(--accent);
+      }
+      .side-item .count {
+        margin-left: auto;
+        color: var(--faint);
+        font-size: 11px;
+      }
+      .side-bottom {
+        margin-top: auto;
+        border-top: 1px solid var(--line);
+        padding-top: 12px;
+      }
+      .version {
+        padding: 12px 9px 0;
+        color: var(--faint);
+        font-size: 10px;
+      }
+      .content {
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .screen {
+        display: none;
+        height: 100%;
+        overflow: hidden;
+      }
+      .screen:target {
+        display: block;
+      }
+      body:not(:has(.screen:target)) #catalog {
+        display: block;
+      }
+      .page {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .page-header {
+        padding: 22px 28px 17px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        align-items: flex-start;
+        gap: 20px;
+      }
+      .page-heading h1 {
+        font-size: 20px;
+        line-height: 1.25;
+        font-weight: 500;
+        letter-spacing: -0.02em;
+        margin: 0 0 5px;
+      }
+      .page-heading p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .page-actions {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding-top: 2px;
+      }
+      .btn {
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        padding: 0 12px;
+        border: 1px solid var(--line-strong);
+        border-radius: 4px;
+        background: var(--bg-2);
+        font-size: 12px;
+        color: var(--text-2);
+        white-space: nowrap;
+      }
+      .btn:hover {
+        background: var(--bg-3);
+        color: var(--text);
+      }
+      .btn.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #191812;
+        font-weight: 500;
+      }
+      .btn.quiet {
+        background: transparent;
+        border-color: var(--line);
+      }
+      .btn .icon {
+        width: 14px;
+        height: 14px;
+      }
+      .btn.small {
+        height: 28px;
+        padding: 0 10px;
+        font-size: 11px;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        height: 22px;
+        padding: 0 8px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--muted);
+        background: var(--bg-2);
+        font-size: 10px;
+        white-space: nowrap;
+      }
+      .badge.safe {
+        color: var(--run);
+        border-color: #8fbf8a30;
+        background: #8fbf8a09;
+      }
+      .badge.installed {
+        color: var(--text-2);
+      }
+      .badge .icon {
+        width: 12px;
+        height: 12px;
+      }
+      .dot {
+        width: 6px;
+        height: 6px;
+        background: var(--run);
+        border-radius: 50%;
+        display: inline-block;
+        flex: none;
+      }
+      .dot.off {
+        background: var(--faint);
+      }
+      .catalog-tools {
+        padding: 16px 28px 13px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .search {
+        height: 34px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--bg-2);
+        border: 1px solid var(--line-strong);
+        border-radius: 4px;
+        padding: 0 10px;
+        width: 330px;
+        color: var(--faint);
+      }
+      .search input {
+        width: 100%;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        font-size: 12px;
+        color: var(--text);
+      }
+      .search input::placeholder {
+        color: var(--faint);
+      }
+      .search .icon {
+        width: 15px;
+        height: 15px;
+      }
+      .filters {
+        display: flex;
+        gap: 3px;
+        padding: 3px;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        background: var(--bg-2);
+      }
+      .filter {
+        padding: 4px 11px;
+        border-radius: 3px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .filter.active {
+        background: var(--bg-4);
+        color: var(--text);
+      }
+      .result-count {
+        margin-left: auto;
+        color: var(--faint);
+        font-size: 11px;
+      }
+      .catalog-grid {
+        padding: 0 28px 25px;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+      }
+      .plugin-card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        overflow: hidden;
+        background: var(--bg-2);
+        transition: border-color 0.15s;
+      }
+      .plugin-card:hover {
+        border-color: var(--line-strong);
+      }
+      .card-preview {
+        height: 156px;
+        position: relative;
+        padding: 14px;
+        background: var(--preview);
+        overflow: hidden;
+      }
+      .card-preview:after {
+        content: "";
+        position: absolute;
+        inset: auto 0 0;
+        height: 35px;
+        background: linear-gradient(transparent, #0003);
+      }
+      .mini-window {
+        height: 100%;
+        border: 1px solid var(--preview-line);
+        border-radius: 5px;
+        background: var(--preview-bg);
+        box-shadow: 0 8px 20px #0002;
+        overflow: hidden;
+      }
+      .mini-top {
+        height: 23px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 0 8px;
+        border-bottom: 1px solid var(--preview-line);
+        background: var(--preview-panel);
+      }
+      .mini-top i {
+        display: block;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--preview-muted);
+        opacity: 0.65;
+      }
+      .mini-tab {
+        margin-left: 8px;
+        width: 54px;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        padding: 0 7px;
+        color: var(--preview-text);
+        font: 7px var(--mono);
+        border-left: 1px solid var(--preview-line);
+        border-right: 1px solid var(--preview-line);
+      }
+      .mini-body {
+        height: calc(100% - 23px);
+        display: grid;
+        grid-template-columns: 43px 1fr;
+      }
+      .mini-side {
+        padding: 8px 6px;
+        border-right: 1px solid var(--preview-line);
+        background: var(--preview-panel);
+      }
+      .mini-side span {
+        display: block;
+        width: 25px;
+        height: 3px;
+        border-radius: 2px;
+        background: var(--preview-muted);
+        opacity: 0.5;
+        margin-bottom: 7px;
+      }
+      .mini-side span:nth-child(2) {
+        background: var(--preview-accent);
+        opacity: 1;
+        width: 29px;
+      }
+      .mini-code {
+        padding: 9px 10px;
+        font: 7px/1.9 var(--mono);
+        color: var(--preview-text);
+        white-space: pre;
+      }
+      .mini-code .a {
+        color: var(--preview-accent);
+      }
+      .mini-code .b {
+        color: var(--preview-second);
+      }
+      .mini-code .c {
+        color: var(--preview-third);
+      }
+      .palette {
+        position: absolute;
+        right: 12px;
+        bottom: 10px;
+        display: flex;
+        gap: 3px;
+        z-index: 2;
+      }
+      .palette i {
+        width: 13px;
+        height: 13px;
+        border-radius: 3px;
+        border: 1px solid #ffffff20;
+      }
+      .card-info {
+        padding: 13px 14px 14px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+      .card-title-row {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .card-title {
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .card-title-row .badge {
+        margin-left: auto;
+      }
+      .card-author {
+        font-size: 10px;
+        color: var(--faint);
+        margin-top: 3px;
+      }
+      .card-description {
+        font-size: 11px;
+        line-height: 1.55;
+        color: var(--muted);
+        margin: 9px 0 12px;
+        min-height: 34px;
+      }
+      .card-bottom {
+        margin-top: auto;
+        display: flex;
+        align-items: center;
+        color: var(--faint);
+        font-size: 10px;
+      }
+      .card-bottom .schemes {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .card-bottom .schemes .icon {
+        width: 12px;
+        height: 12px;
+      }
+      .card-bottom .open {
+        margin-left: auto;
+        color: var(--text-2);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .card-bottom .open .icon {
+        width: 12px;
+        height: 12px;
+      }
+      .detail-header {
+        padding: 19px 28px 17px;
+        border-bottom: 1px solid var(--line);
+      }
+      .breadcrumbs {
+        display: flex;
+        gap: 7px;
+        align-items: center;
+        color: var(--faint);
+        font-size: 11px;
+        margin-bottom: 15px;
+      }
+      .breadcrumbs a {
+        color: var(--muted);
+      }
+      .breadcrumbs .icon {
+        width: 12px;
+        height: 12px;
+      }
+      .detail-title {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+      }
+      .theme-logo {
+        width: 48px;
+        height: 48px;
+        border-radius: 9px;
+        background: #282828;
+        border: 1px solid #504945;
+        display: grid;
+        place-items: center;
+        color: #d4be98;
+      }
+      .theme-logo svg {
+        width: 27px;
+        height: 27px;
+      }
+      .detail-title h1 {
+        margin: 0 0 4px;
+        font-size: 22px;
+        line-height: 1.2;
+        font-weight: 500;
+        letter-spacing: -0.02em;
+      }
+      .detail-sub {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .detail-sub .sep {
+        color: var(--line-strong);
+      }
+      .detail-actions {
+        margin-left: auto;
+        display: flex;
+        gap: 8px;
+        padding-top: 7px;
+      }
+      .detail-body {
+        flex: 1;
+        min-height: 0;
+        padding: 20px 28px 22px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 276px;
+        gap: 22px;
+      }
+      .preview-column {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .preview-heading {
+        display: flex;
+        align-items: center;
+        margin-bottom: 11px;
+      }
+      .preview-heading h2 {
+        font-size: 12px;
+        font-weight: 500;
+        margin: 0;
+      }
+      .segmented {
+        margin-left: auto;
+        display: flex;
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+        padding: 2px;
+        border-radius: 4px;
+      }
+      .segmented span {
+        font-size: 10px;
+        padding: 3px 10px;
+        color: var(--muted);
+        border-radius: 3px;
+      }
+      .segmented .on {
+        color: var(--text);
+        background: var(--bg-4);
+      }
+      .previews {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        flex: 1;
+        min-height: 0;
+      }
+      .theme-preview {
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        overflow: hidden;
+        background: var(--pv-bg);
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        box-shadow: 0 10px 30px #0002;
+      }
+      .pv-caption {
+        height: 34px;
+        display: flex;
+        align-items: center;
+        padding: 0 11px;
+        background: var(--bg-2);
+        border-bottom: 1px solid var(--line);
+        font-size: 11px;
+        color: var(--text-2);
+      }
+      .pv-caption .dot {
+        margin-right: 7px;
+      }
+      .pv-caption span:last-child {
+        margin-left: auto;
+        color: var(--faint);
+        font: 9px var(--mono);
+      }
+      .pv-top {
+        height: 30px;
+        flex: none;
+        background: var(--pv-panel);
+        border-bottom: 1px solid var(--pv-line);
+        display: flex;
+        align-items: center;
+        padding: 0 9px;
+        gap: 5px;
+      }
+      .pv-top i {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--pv-muted);
+        opacity: 0.6;
+      }
+      .pv-file {
+        margin-left: 8px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        padding: 0 10px;
+        border-left: 1px solid var(--pv-line);
+        border-right: 1px solid var(--pv-line);
+        font: 8px var(--mono);
+        color: var(--pv-text);
+        background: var(--pv-bg);
+      }
+      .pv-main {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 74px minmax(0, 1fr);
+        min-height: 0;
+      }
+      .pv-tree {
+        padding: 11px 8px;
+        background: var(--pv-panel);
+        border-right: 1px solid var(--pv-line);
+        font: 9px/2 var(--mono);
+        color: var(--pv-muted);
+      }
+      .pv-tree .folder {
+        color: var(--pv-text);
+        margin-bottom: 3px;
+      }
+      .pv-tree .active {
+        color: var(--pv-accent);
+        background: var(--pv-sel);
+        margin: 0 -8px;
+        padding: 0 8px;
+      }
+      .pv-tree .indent {
+        padding-left: 9px;
+      }
+      .pv-editor {
+        position: relative;
+        padding: 12px 0 8px;
+        font: 10px/1.9 var(--mono);
+        color: var(--pv-text);
+        white-space: pre;
+        overflow: hidden;
+      }
+      .pv-editor .line {
+        display: block;
+        padding-left: 30px;
+        position: relative;
+      }
+      .pv-editor .line:before {
+        content: attr(data-n);
+        position: absolute;
+        left: 9px;
+        color: var(--pv-muted);
+        opacity: 0.55;
+      }
+      .pv-editor .sel {
+        background: var(--pv-sel);
+      }
+      .k {
+        color: var(--pv-accent);
+      }
+      .s {
+        color: var(--pv-second);
+      }
+      .f {
+        color: var(--pv-third);
+      }
+      .cm {
+        color: var(--pv-muted);
+      }
+      .pv-status {
+        height: 21px;
+        background: var(--pv-panel);
+        border-top: 1px solid var(--pv-line);
+        display: flex;
+        align-items: center;
+        padding: 0 8px;
+        font: 7px var(--mono);
+        color: var(--pv-muted);
+      }
+      .pv-status span:last-child {
+        margin-left: auto;
+      }
+      .pv-dark {
+        --pv-bg: #282828;
+        --pv-panel: #1d2021;
+        --pv-line: #3c3836;
+        --pv-text: #d4be98;
+        --pv-muted: #928374;
+        --pv-accent: #d8a657;
+        --pv-second: #a9b665;
+        --pv-third: #89b482;
+        --pv-sel: #d4be9812;
+      }
+      .pv-light {
+        --pv-bg: #fbf1c7;
+        --pv-panel: #f2e5bc;
+        --pv-line: #d5c4a1;
+        --pv-text: #654735;
+        --pv-muted: #a89984;
+        --pv-accent: #af5200;
+        --pv-second: #6c7826;
+        --pv-third: #477a5b;
+        --pv-sel: #65473510;
+      }
+      .preview-note {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin-top: 10px;
+        color: var(--faint);
+        font-size: 10px;
+      }
+      .preview-note .icon {
+        width: 13px;
+        height: 13px;
+      }
+      .info-column {
+        display: flex;
+        flex-direction: column;
+        gap: 13px;
+      }
+      .info-card {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--bg-2);
+        padding: 14px;
+      }
+      .info-card h2 {
+        font-size: 12px;
+        font-weight: 500;
+        margin: 0 0 11px;
+      }
+      .meta {
+        display: grid;
+        grid-template-columns: 92px 1fr;
+        gap: 8px 5px;
+        font-size: 11px;
+      }
+      .meta dt {
+        color: var(--faint);
+      }
+      .meta dd {
+        margin: 0;
+        color: var(--text-2);
+      }
+      .meta dd.ok {
+        color: var(--run);
+      }
+      .description {
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.6;
+        margin: 0;
+      }
+      .scheme-options {
+        display: grid;
+        gap: 7px;
+      }
+      .scheme-option {
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 8px 9px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 11px;
+        color: var(--text-2);
+      }
+      .scheme-option.selected {
+        border-color: #b8ab7766;
+        background: #b8ab770b;
+      }
+      .radio {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        border: 1px solid var(--line-strong);
+        display: grid;
+        place-items: center;
+      }
+      .selected .radio {
+        border-color: var(--accent);
+      }
+      .selected .radio:after {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--accent);
+      }
+      .swatches {
+        display: flex;
+        gap: 3px;
+        margin-left: auto;
+      }
+      .swatches i {
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+      }
+      .safe-note {
+        display: flex;
+        gap: 9px;
+        padding: 11px 12px;
+        border: 1px solid #8fbf8a26;
+        background: #8fbf8a08;
+        border-radius: 5px;
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.55;
+      }
+      .safe-note .icon {
+        color: var(--run);
+        width: 15px;
+        height: 15px;
+        margin-top: 1px;
+      }
+      .safe-note b {
+        display: block;
+        color: var(--run);
+        font-weight: 500;
+        margin-bottom: 2px;
+      }
+      .installed-layout {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 315px;
+      }
+      .installed-main {
+        padding: 20px 24px;
+        min-width: 0;
+      }
+      .section-row {
+        display: flex;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+      .section-row h2 {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .section-row span {
+        margin-left: auto;
+        color: var(--faint);
+        font-size: 10px;
+      }
+      .plugin-list {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        overflow: hidden;
+        background: var(--bg-2);
+      }
+      .installed-item {
+        display: grid;
+        grid-template-columns: 42px minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        padding: 14px 15px;
+        border-bottom: 1px solid var(--line);
+      }
+      .installed-item:last-child {
+        border-bottom: 0;
+      }
+      .installed-item.disabled {
+        background: #10100f66;
+      }
+      .plugin-icon {
+        width: 42px;
+        height: 42px;
+        border: 1px solid var(--plugin-border);
+        border-radius: 7px;
+        background: var(--plugin-bg);
+        display: grid;
+        place-items: center;
+        color: var(--plugin-color);
+        font: 500 14px var(--mono);
+      }
+      .installed-name {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .installed-name strong {
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .installed-name .badge {
+        height: 18px;
+        font-size: 9px;
+        padding: 0 6px;
+      }
+      .installed-desc {
+        font-size: 10px;
+        color: var(--muted);
+        margin-top: 4px;
+      }
+      .installed-meta {
+        font-size: 9px;
+        color: var(--faint);
+        margin-top: 5px;
+        display: flex;
+        gap: 7px;
+      }
+      .installed-controls {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .toggle {
+        width: 32px;
+        height: 18px;
+        border-radius: 999px;
+        background: var(--accent);
+        padding: 2px;
+        display: flex;
+        align-items: center;
+      }
+      .toggle:after {
+        content: "";
+        width: 14px;
+        height: 14px;
+        background: #171712;
+        border-radius: 50%;
+        margin-left: auto;
+      }
+      .toggle.off {
+        background: var(--bg-4);
+        border: 1px solid var(--line-strong);
+        padding: 1px;
+      }
+      .toggle.off:after {
+        margin-left: 0;
+        background: var(--muted);
+        width: 13px;
+        height: 13px;
+      }
+      .selected-theme {
+        margin-top: 20px;
+      }
+      .theme-select {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--bg-2);
+        padding: 15px;
+      }
+      .theme-select-head {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+      }
+      .theme-select-head h3 {
+        font-size: 12px;
+        font-weight: 500;
+        margin: 0 0 4px;
+      }
+      .theme-select-head p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 10px;
+      }
+      .theme-select-head .badge {
+        margin-left: auto;
+      }
+      .theme-choice {
+        margin-top: 13px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .select-box {
+        height: 32px;
+        flex: 1;
+        display: flex;
+        align-items: center;
+        padding: 0 10px;
+        border: 1px solid var(--line-strong);
+        border-radius: 4px;
+        background: var(--bg);
+        font-size: 11px;
+        color: var(--text-2);
+      }
+      .select-box .swatches {
+        margin-left: 10px;
+      }
+      .select-box .icon {
+        margin-left: auto;
+        width: 13px;
+        height: 13px;
+        color: var(--muted);
+      }
+      .auto-check {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        color: var(--muted);
+        font-size: 10px;
+        margin-top: 10px;
+      }
+      .checkbox {
+        width: 13px;
+        height: 13px;
+        border: 1px solid var(--accent);
+        background: var(--accent);
+        border-radius: 3px;
+        display: grid;
+        place-items: center;
+        color: #181711;
+      }
+      .checkbox .icon {
+        width: 10px;
+        height: 10px;
+        stroke-width: 2.3;
+      }
+      .installed-side {
+        border-left: 1px solid var(--line);
+        background: var(--bg-2);
+        padding: 20px;
+      }
+      .local-card {
+        border: 1px dashed var(--line-strong);
+        border-radius: 6px;
+        padding: 15px;
+        background: var(--bg);
+      }
+      .local-card h2 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        font-weight: 500;
+        margin: 0 0 8px;
+      }
+      .local-card h2 .icon {
+        color: var(--muted);
+      }
+      .local-card p {
+        font-size: 10px;
+        line-height: 1.6;
+        color: var(--muted);
+        margin: 0 0 12px;
+      }
+      .local-card .btn {
+        width: 100%;
+      }
+      .local-card .hint {
+        margin: 9px 0 0;
+        color: var(--faint);
+        font-size: 9px;
+        text-align: center;
+      }
+      .trust-card {
+        margin-top: 18px;
+      }
+      .trust-card h2 {
+        font-size: 12px;
+        font-weight: 500;
+        margin: 0 0 9px;
+      }
+      .trust-list {
+        list-style: none;
+        padding: 0;
+        margin: 12px 0 0;
+        display: grid;
+        gap: 10px;
+      }
+      .trust-list li {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.5;
+      }
+      .trust-list .icon {
+        width: 13px;
+        height: 13px;
+        color: var(--run);
+        margin-top: 1px;
+      }
+      .manifest {
+        margin-top: 14px;
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        background: var(--sunken);
+        font: 9px/1.65 var(--mono);
+        color: var(--muted);
+      }
+      .manifest b {
+        color: var(--accent);
+        font-weight: 400;
+      }
+      .storage {
+        margin-top: 17px;
+        padding-top: 14px;
+        border-top: 1px solid var(--line);
+        font-size: 10px;
+        color: var(--faint);
+        line-height: 1.6;
+      }
+      .storage code {
+        font: 9px var(--mono);
+        color: var(--muted);
+      }
+      .statusbar {
+        height: 24px;
+        flex: none;
+        background: var(--bg-2);
+        border-top: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        gap: 14px;
+        color: var(--faint);
+        font-size: 10px;
+      }
+      .statusbar .status-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .statusbar .icon {
+        width: 12px;
+        height: 12px;
+      }
+      .statusbar .right {
+        margin-left: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" style="position: absolute">
+      <defs>
+        <symbol id="i-search" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.7-3.7" />
+        </symbol>
+        <symbol id="i-grid" viewBox="0 0 24 24">
+          <rect x="3" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="3" width="7" height="7" rx="1" />
+          <rect x="3" y="14" width="7" height="7" rx="1" />
+          <rect x="14" y="14" width="7" height="7" rx="1" />
+        </symbol>
+        <symbol id="i-box" viewBox="0 0 24 24">
+          <path d="m12 3 9 5-9 5-9-5 9-5Z" />
+          <path d="m3 8 9 5 9-5M3 8v8l9 5 9-5V8M12 13v8" />
+        </symbol>
+        <symbol id="i-palette" viewBox="0 0 24 24">
+          <path
+            d="M12 3a9 9 0 0 0 0 18h1.5a1.5 1.5 0 0 0 0-3H12a2 2 0 0 1 0-4h2a7 7 0 0 0 7-7c0-2.2-4-4-9-4Z"
+          />
+          <circle cx="7.5" cy="10" r=".8" />
+          <circle cx="9" cy="6.8" r=".8" />
+          <circle cx="14" cy="6.8" r=".8" />
+        </symbol>
+        <symbol id="i-settings" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="3" />
+          <path
+            d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"
+          />
+        </symbol>
+        <symbol id="i-shield" viewBox="0 0 24 24">
+          <path d="M12 3 20 6v5c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6l8-3Z" />
+          <path d="m8.5 12 2.2 2.2 4.8-5" />
+        </symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></symbol>
+        <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5" /></symbol>
+        <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7" /></symbol>
+        <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></symbol>
+        <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6" /></symbol>
+        <symbol id="i-folder" viewBox="0 0 24 24">
+          <path d="M3 6a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Z" />
+        </symbol>
+        <symbol id="i-upload" viewBox="0 0 24 24">
+          <path d="M12 16V4m-5 5 5-5 5 5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4" />
+        </symbol>
+        <symbol id="i-refresh" viewBox="0 0 24 24">
+          <path d="M20 7v5h-5M4 17v-5h5" />
+          <path d="M18.5 9A7 7 0 0 0 6 6.5L4 9m2 6a7 7 0 0 0 12 2.5l2-2.5" />
+        </symbol>
+        <symbol id="i-code" viewBox="0 0 24 24">
+          <path d="m8 8-4 4 4 4m8-8 4 4-4 4m-3-11-2 14" />
+        </symbol>
+        <symbol id="i-info" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 11v6M12 7h.01" />
+        </symbol>
+        <symbol id="i-layers" viewBox="0 0 24 24">
+          <path d="m12 3 9 5-9 5-9-5 9-5Z" />
+          <path d="m3 12 9 5 9-5M3 16l9 5 9-5" />
+        </symbol>
+        <symbol id="i-sun" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5" />
+        </symbol>
+      </defs>
+    </svg>
+    <div class="app">
+      <header class="titlebar">
+        <div class="brand">
+          <span class="brand-mark"
+            ><svg class="icon"><use href="#i-layers" /></svg></span
+          >Projector
+        </div>
+        <div class="project"><span>/</span><b>projector</b><span>— настройки</span></div>
+        <div class="window-actions"><span></span><span></span><span></span></div>
+      </header>
+      <div class="tabs">
+        <div class="tab active">
+          <svg class="icon"><use href="#i-settings" /></svg>Настройки<span
+            style="margin-left: 18px; color: var(--faint)"
+            >×</span
+          >
+        </div>
+        <div class="tab plus">
+          <svg class="icon"><use href="#i-plus" /></svg>
+        </div>
+      </div>
+      <main class="workspace">
+        <div class="workbench">
+          <aside class="sidebar">
+            <div class="side-search">
+              <svg class="icon"><use href="#i-search" /></svg>Поиск настроек…
+            </div>
+            <div class="side-group">
+              <div class="side-label">Общие</div>
+              <div class="side-item">
+                <svg class="icon"><use href="#i-settings" /></svg>Интерфейс
+              </div>
+              <div class="side-item">
+                <svg class="icon"><use href="#i-palette" /></svg>Оформление
+              </div>
+            </div>
+            <div class="side-group">
+              <div class="side-label">Расширения</div>
+              <a class="side-item selected" href="#catalog"
+                ><svg class="icon"><use href="#i-box" /></svg>Плагины<span class="count">3</span></a
+              ><a class="side-item" href="#installed" style="padding-left: 27px">Установленные</a
+              ><a class="side-item" href="#catalog" style="padding-left: 27px">Каталог</a>
+            </div>
+            <div class="side-group">
+              <div class="side-label">Рабочая область</div>
+              <div class="side-item">
+                <svg class="icon"><use href="#i-folder" /></svg>Проекты
+              </div>
+              <div class="side-item">
+                <svg class="icon"><use href="#i-code" /></svg>Редактор
+              </div>
+              <div class="side-item">
+                <svg class="icon"><use href="#i-grid" /></svg>Агенты
+              </div>
+            </div>
+            <div class="side-bottom">
+              <div class="side-item">
+                <svg class="icon"><use href="#i-info" /></svg>О Projector
+              </div>
+              <div class="version">Projector 0.9.4 · локальный профиль</div>
+            </div>
+          </aside>
+          <div class="content">
+            <section class="screen" id="catalog">
+              <div class="page">
+                <header class="page-header">
+                  <div class="page-heading">
+                    <h1>Плагины</h1>
+                    <p>Цветовые схемы для редактора, терминала и интерфейса Projector.</p>
+                  </div>
+                  <div class="page-actions">
+                    <a class="btn quiet" href="#installed"
+                      ><svg class="icon"><use href="#i-upload" /></svg>Установить из папки</a
+                    ><button class="btn">
+                      <svg class="icon"><use href="#i-refresh" /></svg>Обновить каталог
+                    </button>
+                  </div>
+                </header>
+                <div class="catalog-tools">
+                  <div class="search">
+                    <svg class="icon"><use href="#i-search" /></svg
+                    ><input aria-label="Поиск плагинов" placeholder="Найти набор тем…" />
+                  </div>
+                  <div class="filters">
+                    <span class="filter active">Все</span><span class="filter">Тёмные</span
+                    ><span class="filter">Светлые</span><span class="filter">Установленные</span>
+                  </div>
+                  <span class="result-count">6 наборов · только темы</span>
+                </div>
+                <div class="catalog-grid">
+                  <a
+                    class="plugin-card"
+                    href="#gruvbox"
+                    style="
+                      --preview: #222422;
+                      --preview-bg: #282828;
+                      --preview-panel: #1d2021;
+                      --preview-line: #3c3836;
+                      --preview-text: #d4be98;
+                      --preview-muted: #928374;
+                      --preview-accent: #d8a657;
+                      --preview-second: #a9b665;
+                      --preview-third: #89b482;
+                    "
+                  >
+                    <div class="card-preview">
+                      <div class="mini-window">
+                        <div class="mini-top">
+                          <i></i><i></i><i></i><span class="mini-tab">editor.ts</span>
+                        </div>
+                        <div class="mini-body">
+                          <div class="mini-side">
+                            <span></span><span></span><span></span><span></span>
+                          </div>
+                          <div class="mini-code">
+                            <span class="a">export function</span> <span class="f">theme</span>() {
+                            <span class="a">const</span> mode = <span class="s">'gruvbox'</span>
+                            <span class="b">return</span> { mode } }
+                          </div>
+                        </div>
+                      </div>
+                      <div class="palette">
+                        <i style="background: #d8a657"></i><i style="background: #a9b665"></i
+                        ><i style="background: #89b482"></i><i style="background: #d3869b"></i>
+                      </div>
+                    </div>
+                    <div class="card-info">
+                      <div class="card-title-row">
+                        <span class="card-title">Gruvbox Material</span
+                        ><span class="badge installed"
+                          ><svg class="icon"><use href="#i-check" /></svg>Установлен</span
+                        >
+                      </div>
+                      <div class="card-author">sainnhe · 2 схемы</div>
+                      <p class="card-description">
+                        Тёплая палитра с мягким контрастом. Тёмная и светлая версии Material.
+                      </p>
+                      <div class="card-bottom">
+                        <span class="schemes"
+                          ><svg class="icon"><use href="#i-shield" /></svg>Без кода</span
+                        ><span class="open"
+                          >Подробнее<svg class="icon"><use href="#i-arrow" /></svg
+                        ></span>
+                      </div>
+                    </div>
+                  </a>
+                  <a
+                    class="plugin-card"
+                    href="#gruvbox"
+                    style="
+                      --preview: #182027;
+                      --preview-bg: #2e3440;
+                      --preview-panel: #242933;
+                      --preview-line: #434c5e;
+                      --preview-text: #d8dee9;
+                      --preview-muted: #7b88a1;
+                      --preview-accent: #88c0d0;
+                      --preview-second: #a3be8c;
+                      --preview-third: #81a1c1;
+                    "
+                  >
+                    <div class="card-preview">
+                      <div class="mini-window">
+                        <div class="mini-top">
+                          <i></i><i></i><i></i><span class="mini-tab">server.ts</span>
+                        </div>
+                        <div class="mini-body">
+                          <div class="mini-side">
+                            <span></span><span></span><span></span><span></span>
+                          </div>
+                          <div class="mini-code">
+                            <span class="a">import</span> { listen } <span class="a">from</span>
+                            <span class="s">'api'</span> <span class="a">const</span> port =
+                            <span class="f">4177</span> <span class="b">await</span>
+                            <span class="f">listen</span>(port)
+                          </div>
+                        </div>
+                      </div>
+                      <div class="palette">
+                        <i style="background: #88c0d0"></i><i style="background: #81a1c1"></i
+                        ><i style="background: #a3be8c"></i><i style="background: #b48ead"></i>
+                      </div>
+                    </div>
+                    <div class="card-info">
+                      <div class="card-title-row"><span class="card-title">Nord</span></div>
+                      <div class="card-author">Arctic Ice Studio · 1 схема</div>
+                      <p class="card-description">
+                        Холодные северные цвета, спокойная синяя подсветка и ровный контраст.
+                      </p>
+                      <div class="card-bottom">
+                        <span class="schemes"
+                          ><svg class="icon"><use href="#i-shield" /></svg>Без кода</span
+                        ><span class="open"
+                          >Подробнее<svg class="icon"><use href="#i-arrow" /></svg
+                        ></span>
+                      </div>
+                    </div>
+                  </a>
+                  <a
+                    class="plugin-card"
+                    href="#gruvbox"
+                    style="
+                      --preview: #e8e2d3;
+                      --preview-bg: #fdf6e3;
+                      --preview-panel: #eee8d5;
+                      --preview-line: #d8d0bc;
+                      --preview-text: #586e75;
+                      --preview-muted: #93a1a1;
+                      --preview-accent: #b58900;
+                      --preview-second: #859900;
+                      --preview-third: #268bd2;
+                    "
+                  >
+                    <div class="card-preview">
+                      <div class="mini-window">
+                        <div class="mini-top">
+                          <i></i><i></i><i></i><span class="mini-tab">notes.md</span>
+                        </div>
+                        <div class="mini-body">
+                          <div class="mini-side">
+                            <span></span><span></span><span></span><span></span>
+                          </div>
+                          <div class="mini-code">
+                            <span class="a"># Projector</span>
+                            <span class="s">Локальная рабочая среда</span>
+                            <span class="f">- редактор</span>
+                            <span class="b">- терминал</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="palette">
+                        <i style="background: #b58900"></i><i style="background: #859900"></i
+                        ><i style="background: #268bd2"></i><i style="background: #dc322f"></i>
+                      </div>
+                    </div>
+                    <div class="card-info">
+                      <div class="card-title-row"><span class="card-title">Solarized</span></div>
+                      <div class="card-author">Ethan Schoonover · 2 схемы</div>
+                      <p class="card-description">
+                        Классическая светлая и тёмная палитры с точно подобранными тонами.
+                      </p>
+                      <div class="card-bottom">
+                        <span class="schemes"
+                          ><svg class="icon"><use href="#i-shield" /></svg>Без кода</span
+                        ><span class="open"
+                          >Подробнее<svg class="icon"><use href="#i-arrow" /></svg
+                        ></span>
+                      </div>
+                    </div>
+                  </a>
+                  <a
+                    class="plugin-card"
+                    href="#gruvbox"
+                    style="
+                      --preview: #242126;
+                      --preview-bg: #282a36;
+                      --preview-panel: #21222c;
+                      --preview-line: #44475a;
+                      --preview-text: #f8f8f2;
+                      --preview-muted: #6272a4;
+                      --preview-accent: #bd93f9;
+                      --preview-second: #50fa7b;
+                      --preview-third: #8be9fd;
+                    "
+                  >
+                    <div class="card-preview">
+                      <div class="mini-window">
+                        <div class="mini-top">
+                          <i></i><i></i><i></i><span class="mini-tab">palette.json</span>
+                        </div>
+                        <div class="mini-body">
+                          <div class="mini-side">
+                            <span></span><span></span><span></span><span></span>
+                          </div>
+                          <div class="mini-code">
+                            { <span class="s">"background"</span>: <span class="s">"#282a36"</span>,
+                            <span class="s">"foreground"</span>: <span class="s">"#f8f8f2"</span> }
+                          </div>
+                        </div>
+                      </div>
+                      <div class="palette">
+                        <i style="background: #bd93f9"></i><i style="background: #ff79c6"></i
+                        ><i style="background: #8be9fd"></i><i style="background: #50fa7b"></i>
+                      </div>
+                    </div>
+                    <div class="card-info">
+                      <div class="card-title-row"><span class="card-title">Dracula</span></div>
+                      <div class="card-author">Dracula Theme · 1 схема</div>
+                      <p class="card-description">
+                        Глубокий фиолетовый фон и яркие акценты для поздней работы.
+                      </p>
+                      <div class="card-bottom">
+                        <span class="schemes"
+                          ><svg class="icon"><use href="#i-shield" /></svg>Без кода</span
+                        ><span class="open"
+                          >Подробнее<svg class="icon"><use href="#i-arrow" /></svg
+                        ></span>
+                      </div>
+                    </div>
+                  </a>
+                  <a
+                    class="plugin-card"
+                    href="#gruvbox"
+                    style="
+                      --preview: #282321;
+                      --preview-bg: #282828;
+                      --preview-panel: #1d2021;
+                      --preview-line: #3c3836;
+                      --preview-text: #ebdbb2;
+                      --preview-muted: #928374;
+                      --preview-accent: #fabd2f;
+                      --preview-second: #b8bb26;
+                      --preview-third: #8ec07c;
+                    "
+                  >
+                    <div class="card-preview">
+                      <div class="mini-window">
+                        <div class="mini-top">
+                          <i></i><i></i><i></i><span class="mini-tab">main.rs</span>
+                        </div>
+                        <div class="mini-body">
+                          <div class="mini-side">
+                            <span></span><span></span><span></span><span></span>
+                          </div>
+                          <div class="mini-code">
+                            <span class="a">fn</span> <span class="f">main</span>() {
+                            <span class="f">println!</span>(<span class="s">"Hello"</span>); }
+                          </div>
+                        </div>
+                      </div>
+                      <div class="palette">
+                        <i style="background: #fabd2f"></i><i style="background: #b8bb26"></i
+                        ><i style="background: #8ec07c"></i><i style="background: #fe8019"></i>
+                      </div>
+                    </div>
+                    <div class="card-info">
+                      <div class="card-title-row">
+                        <span class="card-title">Gruvbox Original</span>
+                      </div>
+                      <div class="card-author">Pavel Pertsev · 2 схемы</div>
+                      <p class="card-description">
+                        Исходная ретро-палитра: насыщенные цвета и тёплый нейтральный фон.
+                      </p>
+                      <div class="card-bottom">
+                        <span class="schemes"
+                          ><svg class="icon"><use href="#i-shield" /></svg>Без кода</span
+                        ><span class="open"
+                          >Подробнее<svg class="icon"><use href="#i-arrow" /></svg
+                        ></span>
+                      </div>
+                    </div>
+                  </a>
+                  <a
+                    class="plugin-card"
+                    href="#gruvbox"
+                    style="
+                      --preview: #25211f;
+                      --preview-bg: #282828;
+                      --preview-panel: #32302f;
+                      --preview-line: #504945;
+                      --preview-text: #fbf1c7;
+                      --preview-muted: #a89984;
+                      --preview-accent: #fe8019;
+                      --preview-second: #b8bb26;
+                      --preview-third: #83a598;
+                    "
+                  >
+                    <div class="card-preview">
+                      <div class="mini-window">
+                        <div class="mini-top">
+                          <i></i><i></i><i></i><span class="mini-tab">terminal</span>
+                        </div>
+                        <div class="mini-body">
+                          <div class="mini-side">
+                            <span></span><span></span><span></span><span></span>
+                          </div>
+                          <div class="mini-code">
+                            <span class="c">➜</span> projector <span class="a">vp</span> run check
+                            <span class="s">✓ types</span> <span class="s">✓ tests</span>
+                            <span class="f">Готово за 12.4s</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="palette">
+                        <i style="background: #fe8019"></i><i style="background: #b8bb26"></i
+                        ><i style="background: #83a598"></i><i style="background: #d3869b"></i>
+                      </div>
+                    </div>
+                    <div class="card-info">
+                      <div class="card-title-row">
+                        <span class="card-title">Gruvbox High Contrast</span>
+                      </div>
+                      <div class="card-author">Projector Community · 1 схема</div>
+                      <p class="card-description">
+                        Усиленный контраст текста и границ для яркого внешнего освещения.
+                      </p>
+                      <div class="card-bottom">
+                        <span class="schemes"
+                          ><svg class="icon"><use href="#i-shield" /></svg>Без кода</span
+                        ><span class="open"
+                          >Подробнее<svg class="icon"><use href="#i-arrow" /></svg
+                        ></span>
+                      </div>
+                    </div>
+                  </a>
+                </div>
+              </div>
+            </section>
+
+            <section class="screen" id="gruvbox">
+              <div class="page">
+                <header class="detail-header">
+                  <div class="breadcrumbs">
+                    <a href="#catalog">Плагины</a><svg class="icon"><use href="#i-chevron" /></svg
+                    ><span>Gruvbox Material</span>
+                  </div>
+                  <div class="detail-title">
+                    <div class="theme-logo">
+                      <svg class="icon"><use href="#i-palette" /></svg>
+                    </div>
+                    <div>
+                      <h1>Gruvbox Material</h1>
+                      <div class="detail-sub">
+                        <span>sainnhe</span><span class="sep">·</span
+                        ><span>Набор цветовых схем</span
+                        ><span class="badge safe"
+                          ><svg class="icon"><use href="#i-shield" /></svg>Только данные</span
+                        >
+                      </div>
+                    </div>
+                    <div class="detail-actions">
+                      <button class="btn">Удалить</button
+                      ><a class="btn primary" href="#installed"
+                        ><svg class="icon"><use href="#i-check" /></svg>Выбрать схему</a
+                      >
+                    </div>
+                  </div>
+                </header>
+                <div class="detail-body">
+                  <div class="preview-column">
+                    <div class="preview-heading">
+                      <h2>Предпросмотр</h2>
+                      <div class="segmented">
+                        <span class="on">Редактор</span><span>Терминал</span><span>Интерфейс</span>
+                      </div>
+                    </div>
+                    <div class="previews">
+                      <div class="theme-preview pv-dark">
+                        <div class="pv-caption">
+                          <span class="dot"></span>Material Dark<span>Medium</span>
+                        </div>
+                        <div class="pv-top">
+                          <i></i><i></i><i></i><span class="pv-file">appearance.ts</span>
+                        </div>
+                        <div class="pv-main">
+                          <div class="pv-tree">
+                            <div class="folder">⌄ packages</div>
+                            <div class="indent">⌄ client</div>
+                            <div class="indent active">appearance.ts</div>
+                            <div class="indent">commands.ts</div>
+                            <div class="folder">⌄ core</div>
+                            <div class="indent">theme.json</div>
+                            <div class="folder">› docs</div>
+                            <div class="folder">› tests</div>
+                          </div>
+                          <div class="pv-editor">
+                            <span class="line" data-n="1"
+                              ><span class="cm">// Настройки схемы</span></span
+                            ><span class="line sel" data-n="2"
+                              ><span class="k">export interface</span>
+                              <span class="f">Theme</span> {</span
+                            ><span class="line" data-n="3">
+                              name: <span class="s">string</span></span
+                            ><span class="line" data-n="4">
+                              colors: <span class="f">Record</span>&lt;<span class="s">string</span
+                              >&gt;</span
+                            ><span class="line" data-n="5">}</span
+                            ><span class="line" data-n="6"> </span
+                            ><span class="line" data-n="7"
+                              ><span class="k">export const</span> dark = {</span
+                            ><span class="line" data-n="8">
+                              name: <span class="s">'gruvbox-material'</span>,</span
+                            ><span class="line" data-n="9">
+                              contrast: <span class="s">'medium'</span></span
+                            ><span class="line" data-n="10"
+                              >} <span class="k">satisfies</span> <span class="f">Theme</span></span
+                            >
+                          </div>
+                        </div>
+                        <div class="pv-status">
+                          <span>⌁ main*</span><span>TypeScript · UTF-8 · Ln 2, Col 18</span>
+                        </div>
+                      </div>
+                      <div class="theme-preview pv-light">
+                        <div class="pv-caption">
+                          <span class="dot"></span>Material Light<span>Medium</span>
+                        </div>
+                        <div class="pv-top">
+                          <i></i><i></i><i></i><span class="pv-file">appearance.ts</span>
+                        </div>
+                        <div class="pv-main">
+                          <div class="pv-tree">
+                            <div class="folder">⌄ packages</div>
+                            <div class="indent">⌄ client</div>
+                            <div class="indent active">appearance.ts</div>
+                            <div class="indent">commands.ts</div>
+                            <div class="folder">⌄ core</div>
+                            <div class="indent">theme.json</div>
+                            <div class="folder">› docs</div>
+                            <div class="folder">› tests</div>
+                          </div>
+                          <div class="pv-editor">
+                            <span class="line" data-n="1"
+                              ><span class="cm">// Настройки схемы</span></span
+                            ><span class="line sel" data-n="2"
+                              ><span class="k">export interface</span>
+                              <span class="f">Theme</span> {</span
+                            ><span class="line" data-n="3">
+                              name: <span class="s">string</span></span
+                            ><span class="line" data-n="4">
+                              colors: <span class="f">Record</span>&lt;<span class="s">string</span
+                              >&gt;</span
+                            ><span class="line" data-n="5">}</span
+                            ><span class="line" data-n="6"> </span
+                            ><span class="line" data-n="7"
+                              ><span class="k">export const</span> dark = {</span
+                            ><span class="line" data-n="8">
+                              name: <span class="s">'gruvbox-material'</span>,</span
+                            ><span class="line" data-n="9">
+                              contrast: <span class="s">'medium'</span></span
+                            ><span class="line" data-n="10"
+                              >} <span class="k">satisfies</span> <span class="f">Theme</span></span
+                            >
+                          </div>
+                        </div>
+                        <div class="pv-status">
+                          <span>⌁ main*</span><span>TypeScript · UTF-8 · Ln 2, Col 18</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="preview-note">
+                      <svg class="icon"><use href="#i-info" /></svg>Предпросмотр не меняет текущую
+                      схему. Выбор применяется только после подтверждения.
+                    </div>
+                  </div>
+                  <aside class="info-column">
+                    <div class="info-card">
+                      <h2>О наборе</h2>
+                      <p class="description">
+                        Gruvbox Material сохраняет тёплый характер оригинальной палитры и смягчает
+                        контраст для долгой работы с кодом. В наборе — тёмная и светлая схемы.
+                      </p>
+                    </div>
+                    <div class="info-card">
+                      <h2>Сведения</h2>
+                      <dl class="meta">
+                        <dt>Версия</dt>
+                        <dd>1.4.2</dd>
+                        <dt>Автор</dt>
+                        <dd>sainnhe</dd>
+                        <dt>Совместимость</dt>
+                        <dd class="ok">Projector ≥ 0.9</dd>
+                        <dt>Обновлено</dt>
+                        <dd>4 ноября 2026</dd>
+                        <dt>Размер</dt>
+                        <dd>18 КБ</dd>
+                        <dt>Лицензия</dt>
+                        <dd>MIT</dd>
+                      </dl>
+                    </div>
+                    <div class="info-card">
+                      <h2>Доступные схемы</h2>
+                      <div class="scheme-options">
+                        <div class="scheme-option selected">
+                          <span class="radio"></span>Material Dark<span class="swatches"
+                            ><i style="background: #282828"></i><i style="background: #d8a657"></i
+                            ><i style="background: #a9b665"></i
+                          ></span>
+                        </div>
+                        <div class="scheme-option">
+                          <span class="radio"></span>Material Light<span class="swatches"
+                            ><i style="background: #fbf1c7"></i><i style="background: #af5200"></i
+                            ><i style="background: #6c7826"></i
+                          ></span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="safe-note">
+                      <svg class="icon"><use href="#i-shield" /></svg>
+                      <div>
+                        <b>Только данные, без кода</b>Плагин содержит палитры в JSON. Он не
+                        запускает JavaScript и не получает доступ к файлам или сети.
+                      </div>
+                    </div>
+                  </aside>
+                </div>
+              </div>
+            </section>
+
+            <section class="screen" id="installed">
+              <div class="page">
+                <header class="page-header">
+                  <div class="page-heading">
+                    <h1>Установленные</h1>
+                    <p>Управляйте наборами тем и оформлением рабочей области.</p>
+                  </div>
+                  <div class="page-actions">
+                    <a class="btn quiet" href="#catalog"
+                      ><svg class="icon"><use href="#i-grid" /></svg>Открыть каталог</a
+                    >
+                  </div>
+                </header>
+                <div class="installed-layout">
+                  <div class="installed-main">
+                    <div class="section-row">
+                      <h2>Наборы тем</h2>
+                      <span>2 включено · 1 выключен</span>
+                    </div>
+                    <div class="plugin-list">
+                      <div
+                        class="installed-item"
+                        style="
+                          --plugin-bg: #282828;
+                          --plugin-border: #504945;
+                          --plugin-color: #d4be98;
+                        "
+                      >
+                        <div class="plugin-icon">Gr</div>
+                        <div>
+                          <div class="installed-name">
+                            <strong>Gruvbox Material</strong><span class="badge">Выбран</span>
+                          </div>
+                          <div class="installed-desc">Material Dark и Material Light</div>
+                          <div class="installed-meta">
+                            <span>v1.4.2</span><span>·</span><span>sainnhe</span><span>·</span
+                            ><span style="color: var(--run)">Только данные</span>
+                          </div>
+                        </div>
+                        <div class="installed-controls">
+                          <button class="btn small">Настроить</button
+                          ><span class="toggle" aria-label="Включен"></span>
+                        </div>
+                      </div>
+                      <div
+                        class="installed-item"
+                        style="
+                          --plugin-bg: #2e3440;
+                          --plugin-border: #434c5e;
+                          --plugin-color: #88c0d0;
+                        "
+                      >
+                        <div class="plugin-icon">No</div>
+                        <div>
+                          <div class="installed-name"><strong>Nord</strong></div>
+                          <div class="installed-desc">Nord Dark</div>
+                          <div class="installed-meta">
+                            <span>v1.1.0</span><span>·</span><span>Arctic Ice Studio</span
+                            ><span>·</span><span style="color: var(--run)">Только данные</span>
+                          </div>
+                        </div>
+                        <div class="installed-controls">
+                          <button class="btn small">Настроить</button
+                          ><span class="toggle" aria-label="Включен"></span>
+                        </div>
+                      </div>
+                      <div
+                        class="installed-item disabled"
+                        style="
+                          --plugin-bg: #242322;
+                          --plugin-border: #3b3a36;
+                          --plugin-color: #80807a;
+                        "
+                      >
+                        <div class="plugin-icon">So</div>
+                        <div>
+                          <div class="installed-name">
+                            <strong style="color: var(--muted)">Solarized</strong
+                            ><span class="badge">Выключен</span>
+                          </div>
+                          <div class="installed-desc">Solarized Dark и Solarized Light</div>
+                          <div class="installed-meta">
+                            <span>v2.0.3</span><span>·</span><span>Ethan Schoonover</span
+                            ><span>·</span><span>Только данные</span>
+                          </div>
+                        </div>
+                        <div class="installed-controls">
+                          <button class="btn small">Настроить</button
+                          ><span class="toggle off" aria-label="Выключен"></span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="selected-theme">
+                      <div class="section-row">
+                        <h2>Текущая тема</h2>
+                        <span>Применяется ко всему интерфейсу</span>
+                      </div>
+                      <div class="theme-select">
+                        <div class="theme-select-head">
+                          <div>
+                            <h3>Gruvbox Material</h3>
+                            <p>Активная схема сохраняется в настройках Projector.</p>
+                          </div>
+                          <span class="badge safe"><span class="dot"></span>Активна</span>
+                        </div>
+                        <div class="theme-choice">
+                          <div class="select-box">
+                            Material Dark<span class="swatches"
+                              ><i style="background: #282828"></i><i style="background: #d8a657"></i
+                              ><i style="background: #a9b665"></i
+                              ><i style="background: #89b482"></i></span
+                            ><svg class="icon"><use href="#i-down" /></svg>
+                          </div>
+                          <button class="btn primary">Применить</button>
+                        </div>
+                        <div class="auto-check">
+                          <span class="checkbox"
+                            ><svg class="icon"><use href="#i-check" /></svg></span
+                          >Следовать системной теме: светлая днём, тёмная ночью
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <aside class="installed-side">
+                    <div class="local-card">
+                      <h2>
+                        <svg class="icon"><use href="#i-folder" /></svg>Локальный плагин
+                      </h2>
+                      <p>
+                        Установите набор тем из папки на этом компьютере. Projector проверит
+                        manifest.json и палитры перед добавлением.
+                      </p>
+                      <button class="btn">
+                        <svg class="icon"><use href="#i-upload" /></svg>Выбрать папку…
+                      </button>
+                      <p class="hint">Без архивов и установки зависимостей</p>
+                    </div>
+                    <div class="trust-card">
+                      <div class="safe-note">
+                        <svg class="icon"><use href="#i-shield" /></svg>
+                        <div>
+                          <b>Только данные, без кода</b>Все установленные плагины декларативны.
+                        </div>
+                      </div>
+                      <ul class="trust-list">
+                        <li>
+                          <svg class="icon"><use href="#i-check" /></svg
+                          ><span>Только цветовые токены и метаданные</span>
+                        </li>
+                        <li>
+                          <svg class="icon"><use href="#i-check" /></svg
+                          ><span>Нет JavaScript, сети и доступа к файлам</span>
+                        </li>
+                        <li>
+                          <svg class="icon"><use href="#i-check" /></svg
+                          ><span>Отключение сразу убирает темы из выбора</span>
+                        </li>
+                      </ul>
+                      <div class="manifest">
+                        {<br />&nbsp;&nbsp;<b>"type"</b>: "theme",<br />&nbsp;&nbsp;<b>"version"</b>:
+                        "1.4.2",<br />&nbsp;&nbsp;<b>"themes"</b>: ["dark", "light"]<br />}
+                      </div>
+                    </div>
+                    <div class="storage">
+                      Плагины хранятся локально:<br /><code>~/.local/share/projector/plugins</code>
+                    </div>
+                  </aside>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+      <footer class="statusbar">
+        <div class="status-item"><span class="dot"></span>Готов</div>
+        <div class="status-item">
+          <svg class="icon"><use href="#i-shield" /></svg>Плагины изолированы: только декларативные
+          темы
+        </div>
+        <div class="status-item right">Настройки сохраняются автоматически</div>
+      </footer>
+    </div>
+  </body>
+</html>
