@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
-import { mkdir, mkdtemp, rm, stat } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vite-plus/test";
@@ -10,6 +11,7 @@ import {
   runLens,
 } from "../packages/server/modules/agents/projector/index.ts";
 import { scriptedModel } from "./helpers/scripted-model.mjs";
+import { closeSpendStore } from "../packages/server/modules/spend/store.ts";
 
 test("Lens cleans its caption into one line", () => {
   expect(lensLine("Lens: **Собирает** проект.")).toBe("Собирает проект.");
@@ -117,8 +119,8 @@ test(
       expect(prompt).toContain("Очередь: 1");
 
       // The caption is a view: no run records and no chat history are written.
-      await expect(stat(join(directory, "projector/agent/runs"))).rejects.toThrow();
-      await expect(stat(join(directory, "projector/agent/history.sqlite"))).rejects.toThrow();
+      expect(existsSync(join(directory, "projector/agent/runs")), "runs").toBe(false);
+      expect(existsSync(join(directory, "projector/agent/history.sqlite")), "history").toBe(false);
     } finally {
       server.closeAllConnections();
       await new Promise((resolve) => server.close(resolve));
@@ -128,6 +130,8 @@ test(
         else process.env[key] = value;
       }
       await model.close();
+      // SQLite keeps the file open on Windows; release it before deleting the data directory.
+      closeSpendStore();
       await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
   },

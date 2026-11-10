@@ -6,6 +6,7 @@ import { providersPath } from "../packages/core/modules/app-paths/index.ts";
 import { resetServiceRole, saveServiceRole } from "../packages/server/modules/agent-roles/index.ts";
 import { runLens } from "../packages/server/modules/agents/projector/index.ts";
 import { scriptedModel } from "./helpers/scripted-model.mjs";
+import { closeSpendStore } from "../packages/server/modules/spend/store.ts";
 
 test("service roles use their own model over the chat's model", { timeout: 120_000 }, async () => {
   const directory = await mkdtemp(join(tmpdir(), "projector-roles-service-"));
@@ -72,6 +73,7 @@ test("service roles use their own model over the chat's model", { timeout: 120_0
     if (previous === undefined) delete process.env.XDG_DATA_HOME;
     else process.env.XDG_DATA_HOME = previous;
     await model.close();
+    closeSpendStore();
     await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
