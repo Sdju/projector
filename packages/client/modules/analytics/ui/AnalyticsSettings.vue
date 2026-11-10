@@ -10,11 +10,14 @@ import UiStack from "../../../common/ui/UiStack.vue";
 import { countRu } from "../../../common/utilities/plural.ts";
 import { useUsageAnalytics } from "../model/analytics.ts";
 import { formatCost, formatMoney, formatPercent, formatRange } from "../model/format.ts";
+import { usageTokenSeries } from "../model/rows.ts";
+import DayUsageCard from "./DayUsageCard.vue";
 import LimitCard from "./LimitCard.vue";
 import ProviderBalanceCard from "./ProviderBalanceCard.vue";
 import UsageBarChart from "./UsageBarChart.vue";
 import UsageBreakdown from "./UsageBreakdown.vue";
 import UsageDonut from "./UsageDonut.vue";
+import UsageHeatmap from "./UsageHeatmap.vue";
 import UsageLine from "./UsageLine.vue";
 
 const {
@@ -29,9 +32,23 @@ const {
   totals,
   dailyPoints,
   costPoints,
+  heatmapDays,
   agentRows,
   modelRows,
   projectRows,
+  selectedDay,
+  dayData,
+  dayLoading,
+  dayError,
+  dayAgentRows,
+  dayModelRows,
+  dayProjectRows,
+  dayTaskItems,
+  dayHourlyPoints,
+  dayPriced,
+  dayCacheShare,
+  dayHasUsage,
+  canShiftForward,
   taskItems,
   taskTotalTokens,
   taskTotalCost,
@@ -53,12 +70,7 @@ const {
   formatTokens: tokens,
 } = useUsageAnalytics();
 
-const tokenSeries = [
-  { key: "cacheRead", label: "Из кэша", color: "var(--info)" },
-  { key: "input", label: "Без кэша", color: "var(--run)" },
-  { key: "cacheWrite", label: "Запись в кэш", color: "var(--warn)" },
-  { key: "output", label: "Ответ", color: "var(--err)" },
-];
+const tokenSeries = usageTokenSeries;
 
 const stats = computed(() => {
   const value = totals.value;
@@ -160,6 +172,37 @@ const stats = computed(() => {
       </div>
 
       <div class="grid">
+        <UiCard appearance="frame" class="wide" as="section">
+          <header class="card-head">
+            <h4>Активность за год</h4>
+            <span>токены по дням · последний год</span>
+          </header>
+          <UsageHeatmap
+            :days="heatmapDays"
+            :selected="selectedDay"
+            @select="commands.run('ide.analytics.day.set', { day: $event })"
+          />
+        </UiCard>
+
+        <DayUsageCard
+          class="wide"
+          :day="selectedDay"
+          :data="dayData"
+          :loading="dayLoading"
+          :error="dayError"
+          :agent-rows="dayAgentRows"
+          :model-rows="dayModelRows"
+          :project-rows="dayProjectRows"
+          :task-items="dayTaskItems"
+          :hourly-points="dayHourlyPoints"
+          :priced="dayPriced"
+          :cache-share="dayCacheShare"
+          :has-usage="dayHasUsage"
+          :can-forward="canShiftForward"
+          @shift="commands.run('ide.analytics.day.shift', { offset: $event })"
+          @today="commands.run('ide.analytics.day.today')"
+        />
+
         <UiCard appearance="frame" class="wide" as="section">
           <header class="card-head">
             <h4>Токены по дням</h4>

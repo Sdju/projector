@@ -158,10 +158,10 @@ export function forgetUsageFile(path: string): void {
 }
 
 /** Native journal events in the range, oldest first. */
-export function readUsageEvents(since: number): UsageEventRow[] {
+export function readUsageEvents(since: number, until = Number.POSITIVE_INFINITY): UsageEventRow[] {
   const rows = analyticsDatabase()
-    .prepare("SELECT * FROM usage_events WHERE at >= ? ORDER BY at")
-    .all(since) as unknown as {
+    .prepare("SELECT * FROM usage_events WHERE at >= ? AND at < ? ORDER BY at")
+    .all(since, until) as unknown as {
     agent: string;
     session: string;
     event: string;

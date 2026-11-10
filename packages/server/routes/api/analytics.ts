@@ -1,4 +1,8 @@
-import { usageAnalytics } from "../../modules/usage-analytics/index.ts";
+import {
+  dayUsageAnalytics,
+  isDayKey,
+  usageAnalytics,
+} from "../../modules/usage-analytics/index.ts";
 import { json, type RouteDefinition } from "../../modules/transport/index.ts";
 
 const MAX_DAYS = 365;
@@ -18,6 +22,19 @@ export const routes: RouteDefinition[] = [
       res.setHeader("Cache-Control", "no-store");
       const days = daysOf(url.searchParams.get("days"));
       json(res, 200, await usageAnalytics(days));
+    },
+  },
+  {
+    method: "GET",
+    path: "/api/analytics/day",
+    handler: async ({ res, url }) => {
+      res.setHeader("Cache-Control", "no-store");
+      const day = url.searchParams.get("day") ?? "";
+      if (!isDayKey(day)) {
+        json(res, 400, { error: "День должен быть реальной датой в формате YYYY-MM-DD" });
+        return;
+      }
+      json(res, 200, await dayUsageAnalytics(day));
     },
   },
 ];

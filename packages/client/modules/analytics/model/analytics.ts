@@ -5,72 +5,17 @@ import {
   usagePaceTone,
   type AnalyticsRange,
   type UsageAnalytics,
-  type UsageBreakdown,
 } from "@ai-projector/core/modules/usage-analytics/index.ts";
 import { clientAgents } from "../../agents-integration/catalog/index.ts";
 import { useAgentModes } from "../../agent/index.ts";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import { countRu } from "../../../common/utilities/plural.ts";
 import { readUsageAnalytics } from "../api/analytics.ts";
+import { isDayKey, useUsageDay } from "./day.ts";
 import { formatCost, formatDay, formatRange, formatTokens, windowLabel } from "./format.ts";
+import { agentTitle, breakdownRows, taskLabel } from "./rows.ts";
 
-export interface BreakdownRow {
-  label: string;
-  value: number;
-  share: number;
-}
-
-const TOP = 6;
-
-/** The agent's own title from the catalog; an id from an unknown backend stays as it is. */
-function agentTitle(id: string): string {
-  const agent = clientAgents().find((item) => item.backend === id || item.program === id);
-  return agent?.title ?? (id === "неизвестный" ? "Без агента" : id);
-}
-
-/** Where a token went: a chat answer or one of Projector's short service calls. */
-function taskLabel(key: string): string {
-  switch (key) {
-    case "chat":
-      return "Чат Projector";
-    case "lens":
-      return "Lens";
-    case "judge":
-      return "Судья";
-    case "doctor-form":
-      return "Доктор форм";
-    case "doctor-answer":
-      return "Доктор ответов";
-    case "compaction":
-      return "Сжатие истории";
-    case "review":
-      return "Проверка команд";
-    case "task":
-      return "Task · исследование";
-    default:
-      return key.startsWith("agent:")
-        ? `${key === "agent:unknown" ? "Без агента" : agentTitle(key.slice(6))} · чат`
-        : key;
-  }
-}
-
-/** Biggest rows first, with everything past the top folded into one honest row. */
-function breakdownRows(
-  items: readonly UsageBreakdown[],
-  total: number,
-  label: (key: string) => string,
-): BreakdownRow[] {
-  const rows = items.map((item) => ({
-    label: label(item.key),
-    value: item.tokens,
-    share: total ? item.tokens / total : 0,
-  }));
-  if (rows.length <= TOP) return rows;
-  const head = rows.slice(0, TOP);
-  const rest = rows.slice(TOP).reduce((sum, row) => sum + row.value, 0);
-  if (rest) head.push({ label: "Другие", value: rest, share: total ? rest / total : 0 });
-  return head;
-}
+export type { BreakdownRow } from "./rows.ts";
 
 const limitTitle = (window: string) => windowLabel(window);
 
@@ -84,6 +29,7 @@ export function useUsageAnalytics() {
   const now = useNow({ scheduler: (update) => useIntervalFn(update, 30000) });
   // Disabled agents do not answer limits requests, as in the status bar; wait for the settings.
   const { isEnabled, loaded } = useAgentModes();
+  const day = useUsageDay(now);
 
   async function load(): Promise<void> {
     const current = ++generation;
@@ -122,7 +68,7 @@ export function useUsageAnalytics() {
 
   async function refresh(): Promise<void> {
     await probeLimits();
-    await load();
+    await Promise.all([load(), day.loadDay()]);
   }
 
   function setDays(range: number): void {
@@ -134,6 +80,7 @@ export function useUsageAnalytics() {
 
   onMounted(() => {
     void load();
+    void day.loadDay();
     if (loaded.value) void probeLimits().then(load);
   });
   watch(
@@ -180,6 +127,44 @@ export function useUsageAnalytics() {
     },
   });
 
+  commands.scope.registerCommand({
+    id: "ide.analytics.day.set",
+    title: "Открыть аналитику дня",
+    description:
+      "Показывает расход токенов, агентов, модели, проекты и задачи одного локального дня. День задаётся датой YYYY-MM-DD; так же открывается клик по клетке календаря активности.",
+    arguments: { day: "YYYY-MM-DD" },
+    run: (value) => {
+      const raw = commandArgs(value).day;
+      const key = typeof raw === "string" ? raw : "";
+      if (!isDayKey(key)) throw new Error("День должен быть реальной датой в формате YYYY-MM-DD");
+      day.selectDay(key);
+      return { day: day.selectedDay.value };
+    },
+  });
+  commands.scope.registerCommand({
+    id: "ide.analytics.day.shift",
+    title: "Перелистнуть день аналитики",
+    description:
+      "Переключает карточку дня на предыдущий или следующий день. Вперёд дальше сегодняшнего дня не уходит.",
+    arguments: { offset: "-1 | 1 | …" },
+    run: (value) => {
+      const offset = Number(commandArgs(value).offset);
+      if (!Number.isFinite(offset) || !Number.isInteger(offset) || offset === 0)
+        throw new Error("Сдвиг дня должен быть целым числом");
+      day.shiftDay(offset);
+      return { day: day.selectedDay.value };
+    },
+  });
+  commands.scope.registerCommand({
+    id: "ide.analytics.day.today",
+    title: "Вернуть аналитику на сегодня",
+    description: "Открывает карточку дня для текущих локальных суток.",
+    run: () => {
+      day.selectToday();
+      return { day: day.selectedDay.value };
+    },
+  });
+
   const totals = computed(() => data.value?.totals);
   const dailyPoints = computed(() =>
     (data.value?.daily ?? []).map((day) => ({
@@ -210,6 +195,7 @@ export function useUsageAnalytics() {
     if (!usage) return [];
     return breakdownRows(usage.byProject, usage.totals.tokens, (key) => key);
   });
+  const heatmapDays = computed(() => data.value?.heatmap ?? []);
   const taskRows = computed(() => {
     const usage = data.value;
     if (!usage) return [];
@@ -334,9 +320,11 @@ export function useUsageAnalytics() {
     totals,
     dailyPoints,
     costPoints,
+    heatmapDays,
     agentRows,
     modelRows,
     projectRows,
+    ...day,
     taskRows,
     taskItems,
     taskTotalTokens,

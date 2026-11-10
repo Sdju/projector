@@ -281,7 +281,7 @@ The optional `ide` feature gives Claude Code and ACP agents three tools (`list_c
 
 Внутри вкладки scope `settings` предоставляет `ide.settings.sections.list`, `ide.settings.section.open` (`{ id }`) и `ide.settings.search` (`{ query? }`). Эти команды доступны встроенному агенту; формы используют прежние серверные API хранения настроек.
 
-`ide.workbench.analytics.open` (**Открыть аналитику расхода**) открывает вкладку `analytics:usage`; её кнопка стоит в правом верхнем блоке шапки рядом с настройками. Внутри вкладки scope `analytics-settings` предоставляет `ide.analytics.refresh` (запросить лимиты и перечитать расход), `ide.analytics.range.set` (`{ days: 7 | 30 | 90 }`) и `ide.analytics.tasks.mode.set` (`{ mode: "tokens" | "cost" }`) для карточки «Куда ушли деньги»; команды действуют, пока вкладка открыта.
+`ide.workbench.analytics.open` (**Открыть аналитику расхода**) открывает вкладку `analytics:usage`; её кнопка стоит в правом верхнем блоке шапки рядом с настройками. Внутри вкладки scope `analytics-settings` предоставляет `ide.analytics.refresh` (запросить лимиты и перечитать расход), `ide.analytics.range.set` (`{ days: 7 | 30 | 90 }`), `ide.analytics.tasks.mode.set` (`{ mode: "tokens" | "cost" }`) для карточки «Куда ушли деньги», а также `ide.analytics.day.set` (`{ day: "YYYY-MM-DD" }`), `ide.analytics.day.shift` (`{ offset: -1 | 1 }`) и `ide.analytics.day.today` для карточки дня и календаря активности; команды действуют, пока вкладка открыта.
 
 ## HTML-страницы
 

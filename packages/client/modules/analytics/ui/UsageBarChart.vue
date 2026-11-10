@@ -9,6 +9,8 @@ const props = withDefaults(
     height?: number;
     format?: (value: number) => string;
     ariaLabel?: string;
+    /** Labels of the slot edges instead of the bars; a day chart ends with the next `00:00`. */
+    axisEdges?: string[];
   }>(),
   { height: 180 },
 );
@@ -57,6 +59,22 @@ const bars = computed(() =>
 );
 
 const xLabel = (index: number) => props.points[index]?.label ?? "";
+const edgeMarks = computed(() => {
+  const edges = props.axisEdges;
+  const count = (edges?.length ?? 0) - 1;
+  if (!edges || count <= 0) return [];
+  const every = Math.max(1, Math.ceil(count / 6));
+  const indexes = new Set<number>([0, count]);
+  for (let index = every; index < count; index += every) indexes.add(index);
+  return [...indexes]
+    .sort((a, b) => a - b)
+    .map((index) => ({
+      index,
+      label: edges[index] ?? "",
+      x: pad.value.l + (index / count) * innerWidth.value,
+      anchor: index === 0 ? "start" : index === count ? "end" : "middle",
+    }));
+});
 const empty = computed(() => totals.value.every((value) => value === 0));
 </script>
 
@@ -100,7 +118,18 @@ const empty = computed(() => totals.value.every((value) => value === 0));
             </rect>
           </g>
         </g>
-        <g class="x-labels">
+        <g v-if="edgeMarks.length" class="x-labels">
+          <text
+            v-for="mark in edgeMarks"
+            :key="mark.index"
+            :x="mark.x"
+            :y="height - 5"
+            :text-anchor="mark.anchor"
+          >
+            {{ mark.label }}
+          </text>
+        </g>
+        <g v-else class="x-labels">
           <text
             v-for="index in labelIndexes"
             :key="index"

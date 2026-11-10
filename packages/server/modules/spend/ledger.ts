@@ -72,8 +72,8 @@ export interface TaskSpendResult {
 }
 
 /** What the service calls spent in the range, by task; chat answers are added by the caller. */
-export function taskSpend(since: number): TaskSpendResult {
-  const samples = readTaskSamples(since);
+export function taskSpend(since: number, until = Number.POSITIVE_INFINITY): TaskSpendResult {
+  const samples = readTaskSamples(since).filter((sample) => sample.minute < until);
   const totals = emptyTotals();
   const groups = new Map<string, UsageBreakdown>();
   let calls = 0;

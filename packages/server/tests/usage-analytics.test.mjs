@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { archiveLiveChat, closeHistoryStore, writeAgentHistory } from "../modules/agent/index.ts";
 import {
   closeAnalyticsStore,
+  dayUsageAnalytics,
+  isDayKey,
   readLimitSamples,
   readLimitSeries,
   readProviderSamples,
@@ -105,6 +107,13 @@ test("chat analytics counts live and archived answers by agent, model and projec
   });
   expect(result.daily).toHaveLength(7);
   expect(result.daily.at(-1)).toMatchObject({ tokens: 1100, answers: 2 });
+  expect(result.heatmap).toHaveLength(365);
+  expect(result.heatmap.at(-1)).toMatchObject({
+    day: "2026-11-09",
+    tokens: 1100,
+    answers: 2,
+    cost: 0.25,
+  });
   expect(result.byAgent.map((item) => [item.key, item.tokens])).toEqual(
     expect.arrayContaining([
       ["codex", 1000],
@@ -117,6 +126,49 @@ test("chat analytics counts live and archived answers by agent, model and projec
   expect(result.byProject.map((item) => item.key)).toEqual(
     expect.arrayContaining(["другой проект", "Проект два"]),
   );
+});
+
+test("one day keeps the same breakdowns as the range and rejects impossible dates", async () => {
+  const now = new Date(2026, 10, 9, 18, 0, 0).getTime();
+  const day = await dayUsageAnalytics("2026-11-09", now);
+  expect(day.totals).toMatchObject({
+    input: 110,
+    output: 70,
+    cacheRead: 920,
+    tokens: 1100,
+    answers: 2,
+    cost: 0.25,
+    pricedAnswers: 1,
+  });
+  expect(day.byAgent.map((item) => [item.key, item.tokens])).toEqual(
+    expect.arrayContaining([
+      ["codex", 1000],
+      ["claude-code", 100],
+    ]),
+  );
+  expect(day.byTask.find((item) => item.key === "agent:codex")).toMatchObject({ tokens: 1000 });
+  expect(day.serviceCalls).toBe(0);
+  expect(day.hourly).toHaveLength(24);
+  expect(day.hourly[10]).toMatchObject({
+    hour: 10,
+    input: 110,
+    output: 70,
+    cacheRead: 920,
+    tokens: 1100,
+    answers: 2,
+    cost: 0.25,
+  });
+  expect(day.hourly.reduce((sum, hour) => sum + hour.tokens, 0)).toBe(1100);
+
+  const empty = await dayUsageAnalytics("2026-11-08", now);
+  expect(empty.totals.answers).toBe(0);
+  expect(empty.byAgent).toEqual([]);
+  expect(empty.hourly).toHaveLength(24);
+  expect(empty.hourly.every((hour) => hour.tokens === 0 && hour.answers === 0)).toBe(true);
+
+  expect(isDayKey("2026-11-09")).toBe(true);
+  expect(isDayKey("2026-02-31")).toBe(false);
+  expect(isDayKey("9 ноября")).toBe(false);
 });
 
 test("limit samples dedupe a cached answer and build a paced series", () => {
@@ -194,6 +246,7 @@ test("service calls combine into task shares and appear in the analytics answer"
 
   const spend = taskSpend(0);
   expect(spend.calls).toBe(3);
+  expect(taskSpend(0, 1).calls).toBe(0);
   expect(spend.byTask.map((item) => [item.key, item.answers, item.tokens])).toEqual(
     expect.arrayContaining([
       ["lens", 2, 300],

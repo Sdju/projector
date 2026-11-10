@@ -8,6 +8,9 @@
 export const ANALYTICS_RANGES = [7, 30, 90] as const;
 export type AnalyticsRange = (typeof ANALYTICS_RANGES)[number];
 
+/** The activity heatmap always covers a year, even when the charts show a week. */
+export const ANALYTICS_HEATMAP_DAYS = 365;
+
 /** Tokens an answer used, split by how the prompt cache served them. */
 export interface UsageTokens {
   input: number;
@@ -154,6 +157,51 @@ export interface UsageBreakdown extends UsageTotals {
   key: string;
 }
 
+/** One day of the year heatmap: just enough for a GitHub-style grid. */
+export interface UsageHeatDay {
+  /** `YYYY-MM-DD`, in the server's local time. */
+  day: string;
+  /** Midnight of that day, ms since the epoch. */
+  at: number;
+  tokens: number;
+  answers: number;
+  /** Cost of the priced answers of that day. */
+  cost: number;
+}
+
+/** One local hour of a day, for the day timeline. */
+export interface UsageHour extends UsageTokens {
+  /** Local hour, `0`–`23`. A repeated hour of a DST day is merged into its first pass. */
+  hour: number;
+  /** Start of the hour, ms since the epoch. */
+  at: number;
+  /** All four token kinds of the hour. */
+  tokens: number;
+  /** Chat answers and native journal events of the hour. */
+  answers: number;
+  /** Cost of the priced answers of the hour. */
+  cost: number;
+}
+
+/** One local day opened from the heatmap: the range breakdowns, but for a single day. */
+export interface UsageDayAnalytics {
+  /** `YYYY-MM-DD`, in the server's local time. */
+  day: string;
+  /** Midnight of the day, ms since the epoch. */
+  at: number;
+  /** Midnight of the next day, ms since the epoch. */
+  until: number;
+  totals: UsageTotals;
+  /** All 24 local hours, oldest first; hours without usage stay as zeros. */
+  hourly: UsageHour[];
+  byAgent: UsageBreakdown[];
+  byModel: UsageBreakdown[];
+  byProject: UsageBreakdown[];
+  byTask: UsageBreakdown[];
+  /** Number of Projector service calls in the day, not chat answers. */
+  serviceCalls: number;
+}
+
 /** One recorded look at a limit window. */
 export interface LimitPoint {
   /** When the upstream service answered, ms since the epoch. */
@@ -222,6 +270,8 @@ export interface UsageAnalytics {
   until: number;
   totals: UsageTotals;
   daily: UsageDay[];
+  /** Daily tokens of the last year, oldest first, for the GitHub-style activity grid. */
+  heatmap: UsageHeatDay[];
   byAgent: UsageBreakdown[];
   byModel: UsageBreakdown[];
   byProject: UsageBreakdown[];

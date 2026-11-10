@@ -47,6 +47,80 @@ export function formatDay(day: string): string {
   return month && date ? `${date}.${month}` : day;
 }
 
+const MONTHS = [
+  "января",
+  "февраля",
+  "марта",
+  "апреля",
+  "мая",
+  "июня",
+  "июля",
+  "августа",
+  "сентября",
+  "октября",
+  "ноября",
+  "декабря",
+] as const;
+
+const MONTHS_SHORT = [
+  "янв",
+  "фев",
+  "мар",
+  "апр",
+  "май",
+  "июн",
+  "июл",
+  "авг",
+  "сен",
+  "окт",
+  "ноя",
+  "дек",
+] as const;
+
+const WEEKDAYS = [
+  "воскресенье",
+  "понедельник",
+  "вторник",
+  "среда",
+  "четверг",
+  "пятница",
+  "суббота",
+] as const;
+
+/** Local `YYYY-MM-DD` of a moment, the key the analytics API uses. */
+export function formatDayKey(date = new Date()): string {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/** `2026-11-09` as `9 ноября 2026`. */
+export function formatDayLong(day: string): string {
+  const [year, month, date] = day.split("-").map(Number);
+  if (!year || !month || !date) return day;
+  return `${date} ${MONTHS[month - 1] ?? ""} ${year}`.trim();
+}
+
+/** `2026-11-09` as `ноя`, for the month row above the heatmap. */
+export function formatMonthShort(day: string): string {
+  const [, month] = day.split("-").map(Number);
+  return month ? (MONTHS_SHORT[month - 1] ?? "") : "";
+}
+
+/** Local weekday name of `YYYY-MM-DD`, without parsing it as UTC. */
+export function formatDayWeekday(day: string): string {
+  const [year, month, date] = day.split("-").map(Number);
+  if (!year || !month || !date) return "";
+  return WEEKDAYS[new Date(year, month - 1, date).getDay()] ?? "";
+}
+
+/** Steps a local `YYYY-MM-DD` by whole days; a calendar step survives DST changes. */
+export function shiftDayKey(day: string, offset: number): string {
+  const [year, month, date] = day.split("-").map(Number);
+  if (!year || !month || !date) return day;
+  return formatDayKey(new Date(year, month - 1, date + offset));
+}
+
 /** A timestamp as the local `дд.мм` label of a chart point. */
 export function formatDayAt(at: number): string {
   const date = new Date(at);
