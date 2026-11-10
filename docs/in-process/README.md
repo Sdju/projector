@@ -18,8 +18,9 @@
 - [delivery.md](delivery.md) — установка без сборочного окружения и доступ с телефона: бинарная поставка, автообновление, HTTPS, QR и Web Push.
 - [cursor-acp.md](cursor-acp.md) — оставшиеся пункты ACP Cursor: форк и подпись модели; ограничения CLI (`--trust`, Team MCP) описаны в [usage](../usage.md).
 - [agent-roadmap.md](agent-roadmap.md) — открытые пункты штатного агента Projector и проверки Судьи в браузере.
+- [analytics-agent-logs.md](analytics-agent-logs.md) — расход по нативным журналам Codex, OpenCode и Kimi: читатели журналов, нормализация, дедупликация, цена и покрытие.
 - [color-schemes.md](color-schemes.md) — цветовые схемы интерфейса: остались потребители вне CSS (редактор, Markdown, терминал, статика), доводка светлой и контрастной схем и проверки.
 - [file-views.md](file-views.md) — что осталось у файловых снимков: произвольные папки, union-дерево, индекс, поиск по снимку и переименования.
 - [gitlab-client-roadmap.md](gitlab-client-roadmap.md) — что осталось у GitLab после паритета с GitHub: Snippets, Wiki, несколько инстансов и проверки.
-- [npm-release.md](npm-release.md) — первый выпуск `@projector-ai/*`: ручной publish, trusted publisher, ограничения установки native и проверка OIDC.
+- [npm-release.md](npm-release.md) — первый выпуск `@ai-projector/*`: ручной publish, trusted publisher, ограничения установки native и проверка OIDC.
 - [opencode-background-subagents.md](opencode-background-subagents.md) — фоновый `subagent` OpenCode не виден как живая задача, поэтому Lens не читает его рассуждения.

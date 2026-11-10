@@ -60,6 +60,73 @@ export function modelCost(tokens: UsageTokens, price: ModelPrice): number {
   );
 }
 
+/** Where a cost came from: the agent's own journal, Projector's tariff, or nowhere. */
+export type UsageCostSource = "recorded" | "computed" | "none";
+
+/** One model request as an agent writes it into its native journal. */
+export interface UsageLogEvent {
+  /** Native session id the request belongs to. */
+  session: string;
+  /** Stable id inside the session: a log line or a message id. */
+  event: string;
+  /** When the request finished, ms since the epoch. */
+  at: number;
+  model?: string;
+  /** Working directory of the native session, used to place it into a Projector project. */
+  cwd?: string;
+  tokens: UsageTokens;
+  /** Money the agent itself recorded, in the currency of its own report. */
+  cost?: number;
+  costSource: UsageCostSource;
+}
+
+/** Result of one journal read: all events, or an incremental slice with a new cursor. */
+export interface UsageLogRead {
+  events: UsageLogEvent[];
+  /** Opaque cursor for the next read; `append` readers use it to skip old rows. */
+  state?: string;
+}
+
+/** A reader of one agent's native journals; every agent module ships its own. */
+export interface UsageLogReader {
+  /** Backend id of the agent (`codex`, `opencode`, `kimi`). */
+  agent: string;
+  /** Human title for the sources card. */
+  label: string;
+  /** Directories the reader watches; missing ones mean the agent was never used. */
+  roots(): string[];
+  /** Files that can hold usage; a missing root is not an error. */
+  files(): Promise<string[]>;
+  /** Largest file worth reading; a database journal is bigger than a JSONL rollout. */
+  maxBytes?: number;
+  /** True when `read` returns only changes for this file: old events must be kept. */
+  append?: (file: string) => boolean;
+  /** Events of one journal from `state` on; may throw when the file cannot be parsed. */
+  read(file: string, state?: string): Promise<UsageLogEvent[] | UsageLogRead>;
+}
+
+/** How a native journal source is doing, so an unreadable log is not shown as zero tokens. */
+export type UsageSourceStatus = "ok" | "empty" | "unavailable" | "error";
+
+/** One native journal source as the analytics page reports it. */
+export interface UsageSource {
+  agent: string;
+  label: string;
+  status: UsageSourceStatus;
+  /** Journal files discovered for the agent. */
+  files: number;
+  /** Usage events in the selected range, from those files. */
+  events: number;
+  /** Events whose cost the agent recorded itself. */
+  recordedEvents: number;
+  /** Events with no recorded or computed price. */
+  unpricedEvents: number;
+  /** When the last successful scan happened, ms since the epoch. */
+  lastReadAt: number | null;
+  /** Why the source is unavailable or broken, when it is. */
+  message?: string;
+}
+
 /** Tokens, answers and the cost of the answers that had a price. */
 export interface UsageTotals extends UsageTokens {
   /** All four token kinds together. */
@@ -68,6 +135,10 @@ export interface UsageTotals extends UsageTokens {
   /** Cost in the currency of the model's tariff; only priced answers contribute. */
   cost: number;
   pricedAnswers: number;
+  /** Cost the agent wrote into its journal, not an estimate. */
+  recordedCost: number;
+  /** Cost Projector computed from the model's tariff. */
+  computedCost: number;
 }
 
 /** One calendar day of the selected range; days without answers stay in the list as zeros. */
@@ -163,6 +234,8 @@ export interface UsageAnalytics {
   limits: LimitSeries[];
   /** Money balances of providers whose API reports them (DeepSeek). */
   providers: ProviderSpend[];
+  /** Native journals that contributed or failed; an empty list means no readers are registered. */
+  sources: UsageSource[];
 }
 
 /** Full cycle lengths: pace compares spent % to elapsed fraction of this maximum. */

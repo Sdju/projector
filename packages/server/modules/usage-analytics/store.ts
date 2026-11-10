@@ -51,10 +51,80 @@ const SCHEMA = `
     PRIMARY KEY (provider, currency, at)
   );
   CREATE INDEX IF NOT EXISTS provider_samples_time ON provider_samples (at);
+  CREATE TABLE IF NOT EXISTS usage_events (
+    agent TEXT NOT NULL,
+    session TEXT NOT NULL,
+    event TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    model TEXT NOT NULL DEFAULT '',
+    cwd TEXT NOT NULL DEFAULT '',
+    input INTEGER NOT NULL DEFAULT 0,
+    output INTEGER NOT NULL DEFAULT 0,
+    cache_read INTEGER NOT NULL DEFAULT 0,
+    cache_write INTEGER NOT NULL DEFAULT 0,
+    cost REAL,
+    cost_source TEXT NOT NULL DEFAULT 'none',
+    file TEXT NOT NULL,
+    PRIMARY KEY (agent, session, event)
+  );
+  CREATE INDEX IF NOT EXISTS usage_events_time ON usage_events (at);
+  CREATE TABLE IF NOT EXISTS usage_files (
+    path TEXT PRIMARY KEY,
+    agent TEXT NOT NULL,
+    mtime REAL NOT NULL,
+    size INTEGER NOT NULL,
+    events INTEGER NOT NULL DEFAULT 0,
+    read_at INTEGER NOT NULL,
+    error TEXT,
+    state TEXT
+  );
+  CREATE TABLE IF NOT EXISTS usage_sources (
+    agent TEXT PRIMARY KEY,
+    label TEXT NOT NULL,
+    status TEXT NOT NULL,
+    files INTEGER NOT NULL DEFAULT 0,
+    events INTEGER NOT NULL DEFAULT 0,
+    recorded_events INTEGER NOT NULL DEFAULT 0,
+    unpriced_events INTEGER NOT NULL DEFAULT 0,
+    last_read_at INTEGER,
+    message TEXT
+  );
+  CREATE TABLE IF NOT EXISTS usage_day_totals (
+    day TEXT NOT NULL,
+    backend TEXT NOT NULL,
+    model TEXT NOT NULL DEFAULT '',
+    place TEXT NOT NULL DEFAULT '',
+    task TEXT NOT NULL,
+    input INTEGER NOT NULL DEFAULT 0,
+    output INTEGER NOT NULL DEFAULT 0,
+    cache_read INTEGER NOT NULL DEFAULT 0,
+    cache_write INTEGER NOT NULL DEFAULT 0,
+    answers INTEGER NOT NULL DEFAULT 0,
+    cost REAL NOT NULL DEFAULT 0,
+    priced_answers INTEGER NOT NULL DEFAULT 0,
+    recorded_cost REAL NOT NULL DEFAULT 0,
+    computed_cost REAL NOT NULL DEFAULT 0,
+    PRIMARY KEY (day, backend, model, place, task)
+  );
+  CREATE INDEX IF NOT EXISTS usage_day_totals_day ON usage_day_totals (day);
+  CREATE TABLE IF NOT EXISTS usage_dirty_days (
+    day TEXT PRIMARY KEY
+  );
+  CREATE TABLE IF NOT EXISTS usage_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
 `;
 
 const databases = new Map<string, DatabaseSync>();
 let lastCompact = 0;
+
+/** A column added after a table was first created; SQLite has no `ADD COLUMN IF NOT EXISTS`. */
+function ensureColumn(db: DatabaseSync, table: string, column: string, declaration: string) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as unknown as { name: string }[];
+  if (!columns.some((item) => item.name === column))
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${declaration}`);
+}
 
 export function analyticsDatabase(): DatabaseSync {
   const directory = join(dataDir(), "agent");
@@ -65,6 +135,7 @@ export function analyticsDatabase(): DatabaseSync {
   const db = new DatabaseSync(file);
   db.exec("PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000; PRAGMA synchronous = NORMAL;");
   db.exec(SCHEMA);
+  ensureColumn(db, "usage_files", "state", "TEXT");
   void chmod(file, 0o600).catch(() => {});
   databases.set(file, db);
   return db;
@@ -77,11 +148,17 @@ export function closeAnalyticsStore(): void {
   lastCompact = 0;
 }
 
+/** Drops samples and journal events that fell out of the widest range; at most once an hour. */
+export function compactAnalyticsStore(now = Date.now()): void {
+  compact(analyticsDatabase(), now);
+}
+
 function compact(db: DatabaseSync, now: number): void {
   if (now - lastCompact < 3600000) return;
   lastCompact = now;
   db.prepare("DELETE FROM limit_samples WHERE at < ?").run(now - 365 * 86400000);
   db.prepare("DELETE FROM provider_samples WHERE at < ?").run(now - 365 * 86400000);
+  db.prepare("DELETE FROM usage_events WHERE at < ?").run(now - 400 * 86400000);
   const cutoff = now - 48 * 3600000;
   db.prepare(
     `DELETE FROM limit_samples WHERE at < ? AND rowid NOT IN (

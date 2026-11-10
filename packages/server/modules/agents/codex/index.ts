@@ -17,3 +17,4 @@ export const codexProgram = {
 };
 
 export const codexBackend = createAcpBackend(codexProgram);
+export { codexUsageLog } from "./usage-log.ts";

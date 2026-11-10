@@ -11,3 +11,4 @@ export const kimiProgram = {
 };
 
 export const kimiBackend = createAcpBackend(kimiProgram);
+export { kimiUsageLog } from "./usage-log.ts";

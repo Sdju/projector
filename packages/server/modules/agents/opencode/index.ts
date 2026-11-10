@@ -22,3 +22,4 @@ export const opencodeBackend: AgentBackend = {
   ...createAcpBackend(opencodeProgram),
   sessions: (cwd) => acpSessions("opencode", cwd, withOpenCodeBranches),
 };
+export { opencodeUsageLog } from "./usage-log.ts";

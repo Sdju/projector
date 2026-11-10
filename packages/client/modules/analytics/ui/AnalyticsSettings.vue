@@ -47,6 +47,8 @@ const {
   cacheShare,
   priced,
   rangeLabel,
+  costNote,
+  sourceRows,
   formatTokens: tokens,
 } = useUsageAnalytics();
 
@@ -81,7 +83,7 @@ const stats = computed(() => {
       label: "Стоимость Projector",
       value: priced.value ? formatCost(value.cost) : "—",
       hint: priced.value
-        ? `${countRu(value.pricedAnswers, "ответ", "ответа", "ответов")} с ценой`
+        ? costNote.value || `${countRu(value.pricedAnswers, "ответ", "ответа", "ответов")} с ценой`
         : primaryProvider.value
           ? "цена не задана · ниже баланс"
           : "цена моделей не задана",
@@ -280,6 +282,31 @@ const stats = computed(() => {
         </UiCard>
       </div>
 
+      <UiCard v-if="sourceRows.length" appearance="frame" as="section">
+        <header class="card-head">
+          <h4>Источники журналов</h4>
+          <span>нативные логи агентов</span>
+        </header>
+        <div class="sources">
+          <div
+            v-for="source in sourceRows"
+            :key="source.agent"
+            class="source"
+            :class="`source-${source.status}`"
+          >
+            <UiInline :gap="2" justify="between" wrap>
+              <strong>{{ source.label }}</strong>
+              <span class="source-status">{{ source.statusLabel }}</span>
+            </UiInline>
+            <span class="source-note">{{ source.note }}</span>
+          </div>
+        </div>
+        <p class="task-note">
+          Codex, OpenCode и Kimi читаются из своих журналов, поэтому в расход попадают и запуски в
+          терминале. Ошибка чтения показана отдельно и не превращается в ноль токенов.
+        </p>
+      </UiCard>
+
       <UiCard appearance="frame" as="section">
         <header class="card-head">
           <h4>Лимиты подписок</h4>
@@ -367,6 +394,35 @@ const stats = computed(() => {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: var(--sp-4);
+}
+.sources {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--sp-2);
+}
+.source {
+  display: grid;
+  gap: 2px;
+  padding: var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+.source strong {
+  color: var(--text);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+.source-status,
+.source-note {
+  color: var(--muted);
+  font-size: var(--fs-2xs);
+  line-height: 1.35;
+}
+.source-error {
+  border-color: var(--err);
+}
+.source-unavailable {
+  opacity: 0.75;
 }
 .task-total {
   color: var(--text-2);

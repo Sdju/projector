@@ -17,6 +17,8 @@ const emptyTotals = (): UsageTotals => ({
   answers: 0,
   cost: 0,
   pricedAnswers: 0,
+  recordedCost: 0,
+  computedCost: 0,
 });
 
 /**
@@ -57,6 +59,7 @@ function addSample(totals: UsageTotals, sample: StoredTaskSample): void {
   totals.answers += sample.calls;
   totals.cost += sample.cost;
   totals.pricedAnswers += sample.pricedCalls;
+  totals.computedCost += sample.cost;
 }
 
 export interface TaskSpendResult {
@@ -100,5 +103,7 @@ function bucketOf(sample: StoredTaskSample): UsageBreakdown {
     answers: sample.calls,
     cost: sample.cost,
     pricedAnswers: sample.pricedCalls,
+    recordedCost: 0,
+    computedCost: sample.cost,
   };
 }

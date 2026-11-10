@@ -1,6 +1,8 @@
+import { isAbsolute, relative, resolve } from "node:path";
 import type {
   UsageAnalytics,
   UsageBreakdown,
+  UsageCostSource,
   UsageDay,
   UsageTotals,
 } from "@ai-projector/core/modules/usage-analytics/index.ts";
@@ -8,7 +10,29 @@ import { readAgentUsage, type AgentUsageRecord } from "../agent/index.ts";
 import { loadProjects } from "../projects/index.ts";
 import { readLimitSeries } from "./limits.ts";
 import { readProviderSpend } from "./providers.ts";
+import { refreshUsageLogs } from "./logs.ts";
+import { dayKey, dayStart, readUsageDayTotals } from "./log-days.ts";
+import { readUsageSources } from "./log-store.ts";
 import { taskSpend } from "../spend/index.ts";
+
+/** One event in the analytics scale, whether it came from a chat answer or a native journal. */
+interface UsageRecord {
+  backend: string;
+  project: string;
+  at: number;
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  cost?: number;
+  costSource: UsageCostSource;
+  model?: string;
+  /** One chat answer has one; a precomputed day bucket has the number it summed. */
+  answers?: number;
+  pricedAnswers?: number;
+  recordedCost?: number;
+  computedCost?: number;
+}
 
 const emptyTotals = (): UsageTotals => ({
   input: 0,
@@ -19,27 +43,27 @@ const emptyTotals = (): UsageTotals => ({
   answers: 0,
   cost: 0,
   pricedAnswers: 0,
+  recordedCost: 0,
+  computedCost: 0,
 });
 
-function add(totals: UsageTotals, record: AgentUsageRecord): void {
+function add(totals: UsageTotals, record: UsageRecord): void {
   totals.input += record.input;
   totals.output += record.output;
   totals.cacheRead += record.cacheRead;
   totals.cacheWrite += record.cacheWrite;
   totals.tokens += record.input + record.output + record.cacheRead + record.cacheWrite;
-  totals.answers += 1;
-  if (record.cost !== undefined) {
+  totals.answers += record.answers ?? 1;
+  const priced = record.pricedAnswers ?? (record.cost !== undefined ? 1 : 0);
+  if (record.cost !== undefined && priced > 0) {
     totals.cost += record.cost;
-    totals.pricedAnswers += 1;
+    totals.pricedAnswers += priced;
+    if (record.recordedCost !== undefined || record.computedCost !== undefined) {
+      totals.recordedCost += record.recordedCost ?? 0;
+      totals.computedCost += record.computedCost ?? 0;
+    } else if (record.costSource === "recorded") totals.recordedCost += record.cost;
+    else totals.computedCost += record.cost;
   }
-}
-
-/** Local calendar day of a timestamp, `YYYY-MM-DD`. */
-function dayKey(ms: number): string {
-  const date = new Date(ms);
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
 }
 
 /** Midnight of the day `days - 1` days ago: the range the charts show, today included. */
@@ -61,8 +85,8 @@ function daysOf(start: number, count: number): UsageDay[] {
 }
 
 function breakdown(
-  records: readonly AgentUsageRecord[],
-  keyOf: (record: AgentUsageRecord) => string,
+  records: readonly UsageRecord[],
+  keyOf: (record: UsageRecord) => string,
 ): UsageBreakdown[] {
   const groups = new Map<string, UsageBreakdown>();
   for (const record of records) {
@@ -76,7 +100,7 @@ function breakdown(
 
 /** Chat answers and Projector's service calls on one scale: where the tokens actually went. */
 function taskBreakdown(
-  records: readonly AgentUsageRecord[],
+  records: readonly UsageRecord[],
   service: readonly UsageBreakdown[],
 ): UsageBreakdown[] {
   const groups = new Map<string, UsageBreakdown>();
@@ -96,20 +120,75 @@ function taskBreakdown(
     group.answers += item.answers;
     group.cost += item.cost;
     group.pricedAnswers += item.pricedAnswers;
+    group.recordedCost += item.recordedCost;
+    group.computedCost += item.computedCost;
     groups.set(item.key, group);
   }
   return [...groups.values()].sort((a, b) => b.tokens - a.tokens);
 }
 
+/** A chat answer's cost, when present, was computed by Projector from the model's tariff. */
+function chatRecord(record: AgentUsageRecord): UsageRecord {
+  return { ...record, costSource: record.cost !== undefined ? "computed" : "none" };
+}
+
+/** The longest matching project path wins, so nested projects do not steal each other's logs. */
+function projectLocator(
+  projects: Awaited<ReturnType<typeof loadProjects>>,
+): (cwd: string) => string {
+  const known = projects
+    .filter((project) => project.path)
+    .map((project) => ({ id: project.id, path: resolve(project.path) }))
+    .sort((a, b) => b.path.length - a.path.length);
+  return (cwd) => {
+    if (!cwd) return "";
+    const full = resolve(cwd);
+    for (const project of known) {
+      const rest = relative(project.path, full);
+      if (!rest || (!rest.startsWith("..") && !isAbsolute(rest))) return project.id;
+    }
+    return "";
+  };
+}
+
 /**
- * What the chats spent in the range and how full the subscription windows are. Chat usage comes
- * from the saved answers; limit samples are written when an adapter answers a usage request.
+ * What the chats spent in the range and how full the subscription windows are. Usage comes from
+ * the saved answers and the agents' native journals; journals are scanned incrementally, so a
+ * second look at the same range reads only files that changed.
  */
 export async function usageAnalytics(days: number, now = Date.now()): Promise<UsageAnalytics> {
   const since = rangeStart(now, days);
   const projects = await loadProjects();
   const projectNames = new Map(projects.map((project) => [project.id, project.name]));
-  const records = readAgentUsage(since).filter((record) => record.at >= since);
+  const locate = projectLocator(projects);
+  await refreshUsageLogs(since, now);
+  const records: UsageRecord[] = readAgentUsage(since)
+    .filter((record) => record.at >= since)
+    .map(chatRecord);
+  const nativeCounts = new Map<string, { events: number; recorded: number; unpriced: number }>();
+  for (const row of readUsageDayTotals(dayKey(since))) {
+    const counts = nativeCounts.get(row.backend) ?? { events: 0, recorded: 0, unpriced: 0 };
+    counts.events += row.answers;
+    counts.recorded += row.pricedAnswers;
+    counts.unpriced += Math.max(0, row.answers - row.pricedAnswers);
+    nativeCounts.set(row.backend, counts);
+    records.push({
+      backend: row.backend,
+      project: locate(row.place),
+      at: dayStart(row.day),
+      input: row.input,
+      output: row.output,
+      cacheRead: row.cacheRead,
+      cacheWrite: row.cacheWrite,
+      ...(row.pricedAnswers > 0 ? { cost: row.cost } : {}),
+      costSource: row.pricedAnswers === 0 ? "none" : row.recordedCost > 0 ? "recorded" : "computed",
+      ...(row.model ? { model: row.model } : {}),
+      answers: row.answers,
+      pricedAnswers: row.pricedAnswers,
+      recordedCost: row.recordedCost,
+      computedCost: row.computedCost,
+    });
+  }
   const service = taskSpend(since);
 
   const totals = emptyTotals();
@@ -138,5 +217,14 @@ export async function usageAnalytics(days: number, now = Date.now()): Promise<Us
     serviceCalls: service.calls,
     limits: readLimitSeries(since, now),
     providers: readProviderSpend(since),
+    sources: readUsageSources().map((source) => {
+      const counts = nativeCounts.get(source.agent);
+      return {
+        ...source,
+        events: counts?.events ?? 0,
+        recordedEvents: counts?.recorded ?? 0,
+        unpricedEvents: counts?.unpriced ?? 0,
+      };
+    }),
   };
 }

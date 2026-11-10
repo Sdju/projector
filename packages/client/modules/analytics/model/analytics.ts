@@ -10,8 +10,9 @@ import {
 import { clientAgents } from "../../agents-integration/catalog/index.ts";
 import { useAgentModes } from "../../agent/index.ts";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
+import { countRu } from "../../../common/utilities/plural.ts";
 import { readUsageAnalytics } from "../api/analytics.ts";
-import { formatDay, formatRange, formatTokens, windowLabel } from "./format.ts";
+import { formatCost, formatDay, formatRange, formatTokens, windowLabel } from "./format.ts";
 
 export interface BreakdownRow {
   label: string;
@@ -292,6 +293,34 @@ export function useUsageAnalytics() {
   const hasUsage = computed(() => (totals.value?.answers ?? 0) > 0);
   const rangeLabel = computed(() => formatRange(days.value));
   const todayLabel = computed(() => formatTokens(today.value?.tokens ?? 0));
+  /** Provenance of the cost total: an agent's own report and Projector's tariff are not the same. */
+  const costNote = computed(() => {
+    const value = totals.value;
+    if (!value) return "";
+    const parts: string[] = [];
+    if (value.recordedCost > 0) parts.push(`записано агентом ${formatCost(value.recordedCost)}`);
+    if (value.computedCost > 0) parts.push(`по тарифу ${formatCost(value.computedCost)}`);
+    return parts.join(" · ");
+  });
+  const sourceRows = computed(() =>
+    (data.value?.sources ?? []).map((source) => ({
+      ...source,
+      statusLabel:
+        source.status === "ok"
+          ? "читается"
+          : source.status === "empty"
+            ? "нет событий"
+            : source.status === "unavailable"
+              ? "не найден"
+              : "ошибка",
+      note:
+        source.status === "error"
+          ? (source.message ?? "журнал не прочитан")
+          : source.status === "unavailable"
+            ? "каталог журналов отсутствует"
+            : `${countRu(source.files, "файл", "файла", "файлов")} · ${countRu(source.events, "событие", "события", "событий")}`,
+    })),
+  );
 
   return {
     ranges: ANALYTICS_RANGES,
@@ -326,6 +355,8 @@ export function useUsageAnalytics() {
     priced,
     hasUsage,
     rangeLabel,
+    costNote,
+    sourceRows,
     formatTokens,
     refresh,
     setDays,
