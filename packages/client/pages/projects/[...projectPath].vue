@@ -35,11 +35,9 @@ import {
   GitlabRepositoryInfoLoader,
 } from "../../modules/gitlab-workspace/index.ts";
 import { useCommandScope } from "../../common/utilities/commands.ts";
-import { useIdeCommands } from "../../modules/ide/index.ts";
 import UiButton from "../../common/ui/UiButton.vue";
 import IconGithub from "~icons/simple-icons/github";
 import IconGitlab from "~icons/simple-icons/gitlab";
-import IconProjectSettings from "~icons/lucide/sliders-horizontal";
 import { projectInitPrompt, useAgent } from "../../modules/agent/index.ts";
 import { settingsTabViews } from "../../modules/app-settings/index.ts";
 
@@ -47,7 +45,6 @@ const route = useRoute();
 const router = useRouter();
 const { projects, openPath } = useProjects();
 const { error } = useRunner();
-const { api } = useIdeCommands();
 
 const settings = ref<InstanceType<typeof ProjectSettings>>();
 const settingsDirty = ref(false);
@@ -290,20 +287,6 @@ watch(
     >
       <template #terminal-actions>
         <RunMenu :project="project" />
-        <UiButton
-          shape="icon"
-          size="sm"
-          title="Настройки проекта"
-          aria-label="Настройки проекта"
-          data-command="ide.workbench.project.settings.open"
-          @click="
-            api.executeCommand('ide.workbench.project.settings.open', undefined, {
-              scope: `editor:${project.id}`,
-            })
-          "
-        >
-          <IconProjectSettings aria-hidden="true" />
-        </UiButton>
         <UiButton
           v-if="gitlabRepository"
           shape="icon"

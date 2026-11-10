@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import type { WorkspaceCapabilities } from "../../workspace-api/index.ts";
+import UiButton from "../../../common/ui/UiButton.vue";
 import LayoutMenu from "./LayoutMenu.vue";
 import type { LayoutPreset } from "../lib/workbench-layout.ts";
+import IconAnalytics from "~icons/lucide/chart-no-axes-column";
+import IconSettings from "~icons/lucide/settings-2";
 
 defineProps<{
   capabilities: Readonly<WorkspaceCapabilities>;
@@ -28,6 +31,26 @@ const emit = defineEmits<{
     </p>
     <div class="toolbar-spacer" />
     <slot name="terminal-actions" />
+    <UiButton
+      shape="icon"
+      size="sm"
+      title="Аналитика расхода"
+      aria-label="Аналитика расхода"
+      data-command="ide.workbench.analytics.open"
+      @click="emit('command', 'ide.workbench.analytics.open')"
+    >
+      <IconAnalytics aria-hidden="true" />
+    </UiButton>
+    <UiButton
+      shape="icon"
+      size="sm"
+      title="Настройки Projector"
+      aria-label="Настройки Projector"
+      data-command="ide.workbench.settings.open"
+      @click="emit('command', 'ide.workbench.settings.open')"
+    >
+      <IconSettings aria-hidden="true" />
+    </UiButton>
     <LayoutMenu
       v-if="!mobile"
       :groups="layoutGroups"

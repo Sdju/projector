@@ -7,7 +7,6 @@ import { GithubSettings } from "../github/index.ts";
 import { GitlabSettings } from "../gitlab/index.ts";
 import { DockerSettings } from "../docker/index.ts";
 import { ProviderPanel } from "../provider/index.ts";
-import { AnalyticsSettings } from "../analytics/index.ts";
 import { PwaSettings } from "../pwa/index.ts";
 import {
   AgentHooksSettings,
@@ -124,16 +123,6 @@ export const settingsSections: SettingsSection[] = [
     description: "Локальное окружение Docker и состояние подключения.",
     keywords: "интеграции контейнер context daemon compose окружение",
     component: DockerSettings,
-  },
-  {
-    id: "analytics",
-    title: "Аналитика расхода",
-    group: "Агент",
-    description:
-      "Токены и стоимость по ответам агентов, доли моделей и проектов, остаток и темп лимитов подписок. Считается локально по истории чатов.",
-    keywords:
-      "аналитика расход токены стоимость цена лимиты квоты графики период день модели проекты кэш остаток темп usage analytics charts",
-    component: AnalyticsSettings,
   },
   {
     id: "providers",

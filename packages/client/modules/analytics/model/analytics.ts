@@ -145,7 +145,7 @@ export function useUsageAnalytics() {
   );
 
   const commands = useCommandScope("analytics-settings", () => ({
-    surface: "settings",
+    surface: "analytics",
     days: days.value,
   }));
   commands.scope.registerCommand({

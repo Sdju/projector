@@ -162,6 +162,7 @@ defineExpose({
       :items="items"
       :vertical="rail"
       :collapsed="rail && hidden"
+      :project-settings="capabilities.settings"
       @update:section="select"
       @command="(id, args) => emit('command', id, args)"
     />

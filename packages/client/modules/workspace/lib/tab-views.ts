@@ -10,6 +10,7 @@ import {
 import { baseTabTypes } from "./virtual-tabs.ts";
 import type { OpenFile } from "../open-file.ts";
 import { KeybindingsEditor } from "../../ide/index.ts";
+import { AnalyticsSettings } from "../../analytics/index.ts";
 import { LanInfoPanel } from "../../network/index.ts";
 import { DockerPanel } from "../../docker/index.ts";
 import { AgentChat, AgentJobTab, AgentTaskTab, roleFromParam } from "../../agent/index.ts";
@@ -75,6 +76,7 @@ export interface TabHost {
 export function baseTabViews(): TabViews {
   return {
     keybindings: { component: KeybindingsEditor, ownKeys: true, keepAlive: true },
+    analytics: { component: AnalyticsSettings, keepAlive: true, scroll: true },
     network: { component: LanInfoPanel, ownKeys: true, keepAlive: true },
     docker: { component: DockerPanel, keepAlive: true },
     browser: {

@@ -8,7 +8,7 @@ import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import { useCommandScope } from "../../../common/utilities/commands.ts";
 import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
 import IconRefresh from "~icons/lucide/rotate-cw";
-import IconSettings from "~icons/lucide/settings-2";
+import IconProjectSettings from "~icons/lucide/sliders-horizontal";
 import IconChevron from "~icons/lucide/chevron-down";
 import IconCheck from "~icons/lucide/check";
 import IconX from "~icons/lucide/x";
@@ -34,6 +34,8 @@ const props = defineProps<{
   vertical?: boolean;
   /** Панель раздела свёрнута: активный раздел не подсвечивается. */
   collapsed?: boolean;
+  /** У проекта есть свои настройки: кнопка стоит на полосе разделов. */
+  projectSettings?: boolean;
 }>();
 const emit = defineEmits<{
   "update:section": [section: string];
@@ -145,15 +147,16 @@ function choose(item: SidebarItem) {
       <IconCheck v-if="section === item.id" class="check" aria-hidden="true" />
     </button>
     <button
+      v-if="projectSettings"
       class="section-item"
-      data-command="ide.workbench.settings.open"
+      data-command="ide.workbench.project.settings.open"
       @click="
         picker.close();
-        emit('command', 'ide.workbench.settings.open');
+        emit('command', 'ide.workbench.project.settings.open');
       "
     >
-      <IconSettings aria-hidden="true" />
-      <span class="label">Настройки Projector</span>
+      <IconProjectSettings aria-hidden="true" />
+      <span class="label">Настройки проекта</span>
     </button>
   </UiIsland>
   <nav v-else class="side-tabs vertical" aria-label="Разделы проекта">
@@ -183,16 +186,16 @@ function choose(item: SidebarItem) {
         </button>
       </template>
     </div>
-    <div class="side-actions">
+    <div v-if="projectSettings" class="side-actions">
       <UiButton
         shape="icon"
         size="sm"
-        title="Настройки Projector"
-        aria-label="Настройки Projector"
-        data-command="ide.workbench.settings.open"
-        @click="emit('command', 'ide.workbench.settings.open')"
+        title="Настройки проекта"
+        aria-label="Настройки проекта"
+        data-command="ide.workbench.project.settings.open"
+        @click="emit('command', 'ide.workbench.project.settings.open')"
       >
-        <IconSettings aria-hidden="true" />
+        <IconProjectSettings aria-hidden="true" />
       </UiButton>
     </div>
   </nav>
