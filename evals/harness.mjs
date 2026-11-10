@@ -2,7 +2,12 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { projectorBackend } from "../packages/server/modules/agents/projector/index.ts";
+import {
+  projectorBackend,
+  widgetCatalog,
+} from "../packages/server/modules/agents/projector/index.ts";
+import { registerWidget } from "../packages/client/modules/widget-runtime/registry.ts";
+import { answerProblem } from "../packages/client/modules/widget-runtime/repair.ts";
 
 /** The IDE the agent sees in the evals: a few commands, every call recorded, nothing really done. */
 /** What a shell command may not do in the evals: it would change the machine the evals run on. */
@@ -202,6 +207,22 @@ export async function runScenario(scenario, connection) {
 }
 
 const names = (run) => run.tools.map((item) => item.name);
+
+/** Give the client's answer checker the same widget names the server prompt offered. */
+export function prepareWidgetChecks() {
+  for (const definition of widgetCatalog.list())
+    registerWidget({ definition, component: { render: () => null } });
+}
+
+/** The synchronous checks plus the client's real widget markup check for answers that use widgets. */
+export async function judgeWithWidgets(scenario, run) {
+  const failures = judge(scenario, run);
+  if (scenario.expect?.validWidgets) {
+    const problem = await answerProblem(run.answer);
+    if (problem) failures.push(`виджеты: ${problem}`);
+  }
+  return failures;
+}
 
 /** Checks a run against what the scenario expects; returns the list of failures (empty = passed). */
 export function judge(scenario, run) {

@@ -1,11 +1,16 @@
 // Runs the evals against a provider saved in Projector (its key comes from the system keyring):
 //   node evals/run.mjs <provider id> [model alias] [scenario id…]
 // It is a script, not a test: tests must never reach the real keyring (see secrets/vault.ts).
+import { registerBuiltinAgents } from "../packages/server/app/agents.ts";
+import { registerBuiltinAgentFeatures } from "../packages/server/app/features.ts";
 import { registerBuiltinWidgetDefinitions } from "../packages/server/app/widgets.ts";
-import { judge, runScenario } from "./harness.mjs";
+import { judgeWithWidgets, prepareWidgetChecks, runScenario } from "./harness.mjs";
 import { scenarios } from "./scenarios.mjs";
 
 registerBuiltinWidgetDefinitions();
+registerBuiltinAgents();
+registerBuiltinAgentFeatures();
+prepareWidgetChecks();
 const [providerId, model, ...only] = process.argv.slice(2);
 if (!providerId) {
   console.error("Usage: node evals/run.mjs <provider id> [model alias] [scenario id…]");
@@ -16,8 +21,8 @@ let failed = 0;
 for (const scenario of scenarios.filter((item) => !only.length || only.includes(item.id))) {
   for (let attempt = 1; attempt <= runs; attempt++) {
     const started = Date.now();
-    const run = await runScenario(scenario, { providerId, model });
-    const failures = judge(scenario, run);
+    const run = await runScenario(scenario, { providerId, model, features: scenario.features });
+    const failures = await judgeWithWidgets(scenario, run);
     if (failures.length) failed++;
     const calls = run.tools.map((item) => item.name).join(" → ") || "—";
     console.log(

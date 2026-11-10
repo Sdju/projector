@@ -5,10 +5,11 @@ import { registerBuiltinAgents } from "../packages/server/app/agents.ts";
 import { registerBuiltinAgentFeatures } from "../packages/server/app/features.ts";
 import { registerBuiltinWidgetDefinitions } from "../packages/server/app/widgets.ts";
 import { opencodeBackend } from "../packages/server/modules/agents/opencode/index.ts";
-import { judge, runScenario } from "./harness.mjs";
+import { judgeWithWidgets, prepareWidgetChecks, runScenario } from "./harness.mjs";
 import { widgetScenarios } from "./widget-scenarios.mjs";
 
 registerBuiltinWidgetDefinitions();
+prepareWidgetChecks();
 registerBuiltinAgents();
 registerBuiltinAgentFeatures();
 
@@ -28,7 +29,7 @@ for (const scenario of widgetScenarios.filter((item) => !only.length || only.inc
       keepDataHome: true,
       selection,
     });
-    const failures = judge(scenario, run);
+    const failures = await judgeWithWidgets(scenario, run);
     if (failures.length) failed++;
     const calls = run.tools.map((item) => item.name).join(" → ") || "—";
     console.log(

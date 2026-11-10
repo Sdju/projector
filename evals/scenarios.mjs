@@ -110,4 +110,16 @@ export const scenarios = [
       formFields: 4,
     },
   },
+  {
+    id: "widget-html-content",
+    title: "Содержимое виджета пишет валидным HTML",
+    message:
+      "Сделай в одной карточке Projector отчёт о проверке релиза: HTML-заголовок, вводный абзац, список из трёх шагов с жирными названиями и inline code, и таблицу из трёх строк «Проверка / Команда / Ожидание». Ничего не выполняй.",
+    expect: {
+      answer: /<Card\b/,
+      answerAll: [/<h[1-6]\b/, /<strong\b/, /<(ul|ol)\b/, /<code\b/, /<table\b/, /<tr\b/],
+      validWidgets: true,
+    },
+    features: ["widgets"],
+  },
 ];
