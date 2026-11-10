@@ -5,7 +5,7 @@ import {
   workspaceRequest,
   workspaceWatchable,
 } from "../../workspace-api/index.ts";
-import type { FileContent } from "@projector-ai/core/modules/workspace/index.ts";
+import type { FileContent } from "@ai-projector/core/modules/workspace/index.ts";
 import { isLiveFile, type OpenFile } from "../open-file.ts";
 
 export interface FileSyncContext {

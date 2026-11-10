@@ -14,7 +14,7 @@ import type {
   AgentRole,
   AgentRoleSelection,
   AgentRoleView,
-} from "@projector-ai/core/modules/agent-role/index.ts";
+} from "@ai-projector/core/modules/agent-role/index.ts";
 
 const props = defineProps<{
   role: AgentRoleView;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import UiAsyncContent from "../../../common/ui/UiAsyncContent.vue";
-import type { GitlabRepository } from "@projector-ai/core/modules/gitlab/index.ts";
+import type { GitlabRepository } from "@ai-projector/core/modules/gitlab/index.ts";
 import { readRepository } from "../client.ts";
 import GitlabRepositoryInfo from "./GitlabRepositoryInfo.vue";
 

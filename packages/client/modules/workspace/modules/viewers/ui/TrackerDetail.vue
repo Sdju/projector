@@ -7,7 +7,7 @@ import type {
   IssueLabel,
   IssueUser,
   Reaction,
-} from "@projector-ai/core/modules/workspace/index.ts";
+} from "@ai-projector/core/modules/workspace/index.ts";
 import { computed } from "vue";
 import { absoluteTime, relativeTime } from "../../../../../common/utilities/commit-format.ts";
 import TrackerAuthor from "./TrackerAuthor.vue";

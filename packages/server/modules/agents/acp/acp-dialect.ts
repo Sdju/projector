@@ -1,4 +1,4 @@
-import type { AgentTaskPatch } from "@projector-ai/core/modules/agent-task/index.ts";
+import type { AgentTaskPatch } from "@ai-projector/core/modules/agent-task/index.ts";
 
 export type AcpTaskPatch = AgentTaskPatch;
 

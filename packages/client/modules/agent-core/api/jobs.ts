@@ -1,5 +1,5 @@
 import type { AgentBackendId } from "../model/types.ts";
-import type { AgentRoleSnapshot } from "@projector-ai/core/modules/agent-role/index.ts";
+import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 
 export type AgentJobStatus = "queued" | "running" | "needs-user" | "done" | "error" | "stopped";
 

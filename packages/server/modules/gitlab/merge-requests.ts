@@ -11,7 +11,7 @@ import type {
   PullRequestState,
   PullRequestReview,
   Reaction,
-} from "@projector-ai/core/modules/workspace/index.ts";
+} from "@ai-projector/core/modules/workspace/index.ts";
 import { gitlabReader, type GitlabReader } from "./api.ts";
 import {
   DIFF_LIMIT,

@@ -8,8 +8,8 @@ import { compileSfc } from "@zede/vio/compiler";
 const root = fileURLToPath(new URL("..", import.meta.url));
 const output = resolve(root, "artifacts/distribution");
 const manifest = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
-// Internal workspace packages stay private under @projector-ai/*; only these three go to npm.
-const PUBLISHED_SCOPE = "@projector-ai";
+// Internal workspace packages stay private under @ai-projector/*; only these three go to npm.
+const PUBLISHED_SCOPE = "@ai-projector";
 const IDE_PACKAGE = `${PUBLISHED_SCOPE}/ide`;
 const NATIVE_PACKAGE = `${PUBLISHED_SCOPE}/native`;
 const HUB_PACKAGE = `${PUBLISHED_SCOPE}/hub`;
@@ -26,7 +26,7 @@ async function dependencies(names, exclude = []) {
   for (const name of names) {
     const pkg = JSON.parse(await readFile(join(root, "packages", name, "package.json"), "utf8"));
     for (const dependency of Object.keys(pkg.dependencies)) {
-      if (dependency.startsWith("@projector-ai/") || exclude.includes(dependency)) continue;
+      if (dependency.startsWith("@ai-projector/") || exclude.includes(dependency)) continue;
       const version = catalog.get(dependency);
       if (!version) throw new Error(`No locked catalog version for ${dependency}`);
       result[dependency] = version;
@@ -41,8 +41,8 @@ function rewrite(file, externalCore) {
     const visit = (node) => {
       if (ts.isStringLiteral(node)) {
         let path = node.text;
-        if (path.startsWith("@projector-ai/core/")) {
-          const suffix = path.slice("@projector-ai/core/".length);
+        if (path.startsWith("@ai-projector/core/")) {
+          const suffix = path.slice("@ai-projector/core/".length);
           if (externalCore) path = `${IDE_PACKAGE}/core/${suffix}`;
           else {
             path = relative(dirname(file), join(root, "packages/core", suffix))
@@ -52,7 +52,7 @@ function rewrite(file, externalCore) {
           }
         }
         // Only module/helper paths. A file filter such as [".ts", ".vue"] must stay intact.
-        if (/^(\.\.?\/|@projector-ai\/)/.test(path))
+        if (/^(\.\.?\/|@ai-projector\/)/.test(path))
           path = path.replace(/\.ts(?=\?|$)/, ".js").replace(/\.vue$/, ".vue.js");
         if (path !== node.text) return context.factory.createStringLiteral(path);
       }

@@ -2,7 +2,7 @@ import { createUsageCache } from "../_/usage-cache.ts";
 import type {
   CodexUsage,
   CodexUsageWindow,
-} from "@projector-ai/core/modules/agents-integration/codex/index.ts";
+} from "@ai-projector/core/modules/agents-integration/codex/index.ts";
 import { readCodexRateLimits } from "./cli.ts";
 
 const record = (value: unknown): Record<string, unknown> | null =>

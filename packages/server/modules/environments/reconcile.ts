@@ -1,4 +1,4 @@
-import { os } from "@projector-ai/core/modules/os/index.ts";
+import { os } from "@ai-projector/core/modules/os/index.ts";
 import { loadProjects } from "../projects/index.ts";
 
 const host = globalThis as typeof globalThis & { projectorReconciled?: boolean };

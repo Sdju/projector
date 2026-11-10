@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { providersPath } from "@projector-ai/core/modules/app-paths/index.ts";
+import { providersPath } from "@ai-projector/core/modules/app-paths/index.ts";
 import { setAsideBroken, writeFileAtomic } from "./atomic-file.ts";
 import { HttpError } from "../http/index.ts";
 import { vault as systemVault } from "../secrets/index.ts";

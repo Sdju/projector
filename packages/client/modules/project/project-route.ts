@@ -1,16 +1,16 @@
-import { githubProjectRoute } from "@projector-ai/core/modules/github/index.ts";
+import { githubProjectRoute } from "@ai-projector/core/modules/github/index.ts";
 import {
   GITLAB_DEFAULT_INSTANCE,
   GITLAB_PREFIX,
   gitlabProjectRoute,
   normalizeGitlabInstance,
   normalizeGitlabProjectPath,
-} from "@projector-ai/core/modules/gitlab/index.ts";
+} from "@ai-projector/core/modules/gitlab/index.ts";
 import {
   parseProjectRef,
   pathFromUrlSegments,
   pathToUrlSegments,
-} from "@projector-ai/core/modules/project/index.ts";
+} from "@ai-projector/core/modules/project/index.ts";
 /** Route params are already decoded by Vue Router. */
 export function projectPathFromParams(value: string | string[] | undefined): string {
   const parts = Array.isArray(value) ? value : (value ?? "").split("/");

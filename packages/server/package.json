@@ -1,5 +1,5 @@
 {
-  "name": "@projector-ai/server",
+  "name": "@ai-projector/server",
   "version": "0.11.0",
   "private": true,
   "type": "module",
@@ -7,11 +7,11 @@
     "./*": "./*"
   },
   "dependencies": {
+    "@ai-projector/core": "workspace:*",
     "@ai-sdk/openai-compatible": "catalog:",
     "@anthropic-ai/claude-agent-sdk": "catalog:",
     "@devcontainers/cli": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
-    "@projector-ai/core": "workspace:*",
     "@xterm/addon-serialize": "catalog:",
     "@xterm/headless": "catalog:",
     "ai": "catalog:",

@@ -2,7 +2,7 @@
 import UiResizeHandle from "../../../../../common/ui/UiResizeHandle.vue";
 import { computed, defineAsyncComponent, ref } from "vue";
 import { usePointerDrag } from "../../../../../common/utilities/pointer-drag.ts";
-import type { CommitComparison } from "@projector-ai/core/modules/workspace/index.ts";
+import type { CommitComparison } from "@ai-projector/core/modules/workspace/index.ts";
 import { shortHash } from "../../../../../common/utilities/commit-format.ts";
 
 const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));

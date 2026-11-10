@@ -2,13 +2,13 @@ import { randomBytes } from "node:crypto";
 import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
-import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
-import { os } from "@projector-ai/core/modules/os/index.ts";
-import type { JudgeOverride } from "@projector-ai/core/modules/agent-judge/index.ts";
+import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
+import { os } from "@ai-projector/core/modules/os/index.ts";
+import type { JudgeOverride } from "@ai-projector/core/modules/agent-judge/index.ts";
 import type { AgentHistoryTurn } from "../providers/index.ts";
 import type { AgentBackendId, AgentPermissionMode, MessagePart } from "./backend.ts";
 import type { AgentSelection } from "./controls.ts";
-import type { AgentRoleSnapshot } from "@projector-ai/core/modules/agent-role/index.ts";
+import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 
 /** What a restarted server needs to repeat a run and so rejoin its answer in progress. */
 export interface AgentRunRecord {

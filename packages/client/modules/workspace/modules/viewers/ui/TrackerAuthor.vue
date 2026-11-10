@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import UiInline from "../../../../../common/ui/UiInline.vue";
-import type { IssueUser } from "@projector-ai/core/modules/workspace/index.ts";
+import type { IssueUser } from "@ai-projector/core/modules/workspace/index.ts";
 import UiAvatar from "../../../../../common/ui/UiAvatar.vue";
 defineProps<{ author: IssueUser; size: 16 | 18 }>();
 </script>

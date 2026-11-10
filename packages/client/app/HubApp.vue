@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { provide, ref } from "vue";
-import { createCommandService } from "@projector-ai/core/modules/ide/index.ts";
+import { createCommandService } from "@ai-projector/core/modules/ide/index.ts";
 import { commandHostKey } from "../common/utilities/commands.ts";
 import { HubConsole } from "../modules/hub/index.ts";
 // The public shell has commands but never starts a device runner, keybindings or event streams.

@@ -1,4 +1,4 @@
-import { sliderWidget } from "@projector-ai/core/modules/agent-widgets/slider/index.ts";
+import { sliderWidget } from "@ai-projector/core/modules/agent-widgets/slider/index.ts";
 import type { WidgetEntry } from "../../widget-runtime/index.ts";
 import Slider from "./ui/Slider.vue";
 

@@ -8,7 +8,7 @@ import type {
   GitCommitDetail,
   GitLog,
   CommitComparison,
-} from "@projector-ai/core/modules/workspace/index.ts";
+} from "@ai-projector/core/modules/workspace/index.ts";
 
 interface RemoteCommit {
   sha: string;

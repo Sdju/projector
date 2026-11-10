@@ -8,7 +8,7 @@ import {
   updateProjects,
   resolveProjectIcon,
 } from "../../../../modules/projects/index.ts";
-import { projectAppUrl } from "@projector-ai/core/modules/app-paths/index.ts";
+import { projectAppUrl } from "@ai-projector/core/modules/app-paths/index.ts";
 import { HttpError } from "../../../../modules/http/index.ts";
 import { isLocalRequest } from "../../../../modules/access/index.ts";
 import {

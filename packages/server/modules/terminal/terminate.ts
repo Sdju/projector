@@ -1,5 +1,5 @@
 import type { IPty } from "node-pty";
-import { os } from "@projector-ai/core/modules/os/index.ts";
+import { os } from "@ai-projector/core/modules/os/index.ts";
 
 // Only the POSIX branch below uses these: it must list the family before the shell exits.
 const descendants = (pid: number) => os.processes.descendantsSync(pid);

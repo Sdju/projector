@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { os } from "@projector-ai/core/modules/os/index.ts";
+import { os } from "@ai-projector/core/modules/os/index.ts";
 
 const UNAVAILABLE = "Авторизация Cursor недоступна; выполните agent login";
 

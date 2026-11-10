@@ -1,7 +1,7 @@
 import { readFileSync, unlinkSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { APP_PORT, appUrl, instancePath } from "@projector-ai/core/modules/app-paths/index.ts";
+import { APP_PORT, appUrl, instancePath } from "@ai-projector/core/modules/app-paths/index.ts";
 
 export interface InstanceInfo {
   pid: number;

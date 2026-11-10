@@ -9,7 +9,7 @@ import {
   GITLAB_PREFIX,
   normalizeGitlabInstance,
   normalizeGitlabProjectPath,
-} from "@projector-ai/core/modules/gitlab/index.ts";
+} from "@ai-projector/core/modules/gitlab/index.ts";
 import { GITLAB_URL, gitlabBaseUrl } from "./base.ts";
 import { gitlabStatus } from "./connection.ts";
 import { clearGitlabSessions, gitlabTokenExpiring, refreshGitlabToken } from "./oauth.ts";

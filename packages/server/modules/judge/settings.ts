@@ -1,11 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
+import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import {
   JUDGE_DEFAULTS,
   normalizeJudgeSettings,
   type JudgeSettings,
-} from "@projector-ai/core/modules/agent-judge/index.ts";
+} from "@ai-projector/core/modules/agent-judge/index.ts";
 import { writeFileAtomic } from "../providers/index.ts";
 
 const file = () => join(dataDir(), "agent", "judge.json");

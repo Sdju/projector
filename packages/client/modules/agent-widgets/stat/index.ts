@@ -1,4 +1,4 @@
-import { statWidget } from "@projector-ai/core/modules/agent-widgets/stat/index.ts";
+import { statWidget } from "@ai-projector/core/modules/agent-widgets/stat/index.ts";
 import type { WidgetEntry } from "../../widget-runtime/index.ts";
 import Stat from "./ui/Stat.vue";
 

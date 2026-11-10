@@ -1,5 +1,5 @@
 import { ref, shallowRef, watch } from "vue";
-import type { PipelineDetail, PipelineStatus } from "@projector-ai/core/modules/workspace/index.ts";
+import type { PipelineDetail, PipelineStatus } from "@ai-projector/core/modules/workspace/index.ts";
 import { workspaceRequest } from "../../../../workspace-api/index.ts";
 
 const ACTIVE = new Set<PipelineStatus>(["queued", "running"]);

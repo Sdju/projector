@@ -5,7 +5,7 @@ import {
   watchWorkspace,
   workspaceWatchable,
 } from "../../../../workspace-api/index.ts";
-import { isLiveScope, type FileScope } from "@projector-ai/core/modules/workspace/index.ts";
+import { isLiveScope, type FileScope } from "@ai-projector/core/modules/workspace/index.ts";
 
 /** Раскрытые папки всех деревьев страницы: сколько списков показывает каждую. */
 const shown = new Map<string, Map<string, number>>();

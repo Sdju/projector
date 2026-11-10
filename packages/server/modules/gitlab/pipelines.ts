@@ -6,7 +6,7 @@ import type {
   PipelineJobDetail,
   PipelineList,
   PipelineStatus,
-} from "@projector-ai/core/modules/workspace/index.ts";
+} from "@ai-projector/core/modules/workspace/index.ts";
 import { gitlabReader, type GitlabReader } from "./api.ts";
 import { nextPage, projectId } from "./browser.ts";
 import { gitlabUser, trackerPage, type GitlabUser } from "./trackers.ts";

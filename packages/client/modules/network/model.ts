@@ -1,5 +1,5 @@
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, useId } from "vue";
-import { isNetworkMode, type NetworkMode } from "@projector-ai/core/modules/network-mode/index.ts";
+import { isNetworkMode, type NetworkMode } from "@ai-projector/core/modules/network-mode/index.ts";
 import {
   commandArgs,
   optionalStringArg,

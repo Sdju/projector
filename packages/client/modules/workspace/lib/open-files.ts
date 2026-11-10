@@ -12,7 +12,7 @@ import {
   type TabRegistry,
 } from "../../workspace-api/index.ts";
 import { projectRelativePath, previewBrowserFile } from "../file-drop.ts";
-import { isLiveScope } from "@projector-ai/core/modules/workspace/index.ts";
+import { isLiveScope } from "@ai-projector/core/modules/workspace/index.ts";
 import {
   fileTabKey,
   isEditable,

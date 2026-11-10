@@ -1,5 +1,5 @@
-import { os } from "@projector-ai/core/modules/os/index.ts";
-import type { SecretKey } from "@projector-ai/core/modules/os/index.ts";
+import { os } from "@ai-projector/core/modules/os/index.ts";
+import type { SecretKey } from "@ai-projector/core/modules/os/index.ts";
 
 export interface SecretBackend {
   available(): Promise<boolean>;

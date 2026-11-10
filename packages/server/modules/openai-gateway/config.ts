@@ -2,7 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { BlockList, isIP } from "node:net";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
+import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 
 export function gatewayConfigPath(): string {
   return join(dataDir(), "openai-gateway.json");

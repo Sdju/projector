@@ -4,7 +4,7 @@ import { nextTick, useId, ref, watch } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiDialog from "../../../common/ui/UiDialog.vue";
 import UiDialogActions from "../../../common/ui/UiDialogActions.vue";
-import type { TerminalSession } from "@projector-ai/core/modules/terminal/index.ts";
+import type { TerminalSession } from "@ai-projector/core/modules/terminal/index.ts";
 
 const props = defineProps<{ session: TerminalSession | null; busy: boolean }>();
 defineEmits<{ cancel: []; confirm: [] }>();

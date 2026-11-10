@@ -3,7 +3,7 @@ import type {
   GitCommit,
   GitCommitDetail,
   GitLog,
-} from "@projector-ai/core/modules/workspace/index.ts";
+} from "@ai-projector/core/modules/workspace/index.ts";
 import { workspaceRequest } from "../../../../workspace-api/index.ts";
 
 const PAGE = 50;

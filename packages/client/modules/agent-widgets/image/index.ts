@@ -1,4 +1,4 @@
-import { imageWidget } from "@projector-ai/core/modules/agent-widgets/image/index.ts";
+import { imageWidget } from "@ai-projector/core/modules/agent-widgets/image/index.ts";
 import type { WidgetEntry } from "../../widget-runtime/index.ts";
 import Image from "./ui/Image.vue";
 

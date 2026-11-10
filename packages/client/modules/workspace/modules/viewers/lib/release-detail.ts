@@ -1,5 +1,5 @@
 import { ref, shallowRef, watch } from "vue";
-import type { ReleaseDetail } from "@projector-ai/core/modules/workspace/index.ts";
+import type { ReleaseDetail } from "@ai-projector/core/modules/workspace/index.ts";
 import { workspaceRequest } from "../../../../workspace-api/index.ts";
 
 /** One release; unlike CI runs it does not change while it is open. */

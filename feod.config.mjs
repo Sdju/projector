@@ -36,10 +36,10 @@ const nodeOnly = [
   {
     name: "node-infrastructure-modules",
     imports: [
-      "@projector-ai/core/modules/os",
-      "@projector-ai/core/modules/os/**",
-      "@projector-ai/core/modules/app-paths",
-      "@projector-ai/core/modules/app-paths/**",
+      "@ai-projector/core/modules/os",
+      "@ai-projector/core/modules/os/**",
+      "@ai-projector/core/modules/app-paths",
+      "@ai-projector/core/modules/app-paths/**",
     ],
     allowedIn: [
       "packages/core/modules/app-paths/**",
@@ -71,12 +71,12 @@ export default {
     ],
     layerDirs: { global: "globals" },
     layerAliases: {
-      "@projector-ai/client": "packages/client",
-      "@projector-ai/server": "packages/server",
-      "@projector-ai/native": "packages/native",
-      "@projector-ai/core": "packages/core",
-      "@projector-ai/cli": "packages/cli",
-      "@projector-ai/hub": "packages/hub",
+      "@ai-projector/client": "packages/client",
+      "@ai-projector/server": "packages/server",
+      "@ai-projector/native": "packages/native",
+      "@ai-projector/core": "packages/core",
+      "@ai-projector/cli": "packages/cli",
+      "@ai-projector/hub": "packages/hub",
     },
     imports: { computed: "forbid", unresolved: "forbid" },
     cycles: { modules: true, types: "include" },

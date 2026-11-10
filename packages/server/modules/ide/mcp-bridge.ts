@@ -1,8 +1,8 @@
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
-import type { AgentCommandCall } from "@projector-ai/core/modules/ide/index.ts";
+import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
+import type { AgentCommandCall } from "@ai-projector/core/modules/ide/index.ts";
 import { broadcastEvent, onEventClientClose } from "../events/index.ts";
 
 interface Pending {

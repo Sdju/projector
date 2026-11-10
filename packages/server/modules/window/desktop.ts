@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { os } from "@projector-ai/core/modules/os/index.ts";
+import { os } from "@ai-projector/core/modules/os/index.ts";
 
 const require = createRequire(import.meta.url);
 const shellHelper = fileURLToPath(new URL("../../../cli/app/desktop.ts", import.meta.url));
@@ -9,7 +9,7 @@ const shellHelper = fileURLToPath(new URL("../../../cli/app/desktop.ts", import.
 function nativeHelper(): string[] | undefined {
   let entry: string;
   try {
-    entry = require.resolve("@projector-ai/native/entry");
+    entry = require.resolve("@ai-projector/native/entry");
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "MODULE_NOT_FOUND") return;
     throw error;

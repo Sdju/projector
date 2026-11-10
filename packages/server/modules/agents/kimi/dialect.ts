@@ -1,5 +1,5 @@
 import { extendPlainDialect, type AcpDialect, type AcpUpdate } from "../acp/index.ts";
-import { stripReadLineNumbers } from "@projector-ai/core/modules/agent-read/index.ts";
+import { stripReadLineNumbers } from "@ai-projector/core/modules/agent-read/index.ts";
 
 /** A call that reads a file: its result is a numbered file body, not raw tool text. */
 const readsFile = (update: AcpUpdate) =>

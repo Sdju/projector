@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import UiListSection from "../../../../../common/ui/UiListSection.vue";
-import type { Pipeline } from "@projector-ai/core/modules/workspace/index.ts";
+import type { Pipeline } from "@ai-projector/core/modules/workspace/index.ts";
 import { PIPELINE_FILTERS, usePipelines } from "../lib/pipelines.ts";
 import { usePipelinesPanel } from "../lib/pipeline-panel.ts";
 import PipelineRow from "./PipelineRow.vue";

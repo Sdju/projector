@@ -6,7 +6,7 @@ import type {
 } from "../../workspace-api/index.ts";
 import { computed, ref, watch, type Ref } from "vue";
 import { commandArgs } from "../../../common/utilities/commands.ts";
-import { isLiveScope } from "@projector-ai/core/modules/workspace/index.ts";
+import { isLiveScope } from "@ai-projector/core/modules/workspace/index.ts";
 import {
   activatePanel,
   addPanel,
@@ -24,7 +24,7 @@ import {
   type DockTarget,
 } from "../../dock/index.ts";
 import { useTerminalSessions } from "../../terminal/index.ts";
-import type { TerminalProgram } from "@projector-ai/core/modules/terminal/index.ts";
+import type { TerminalProgram } from "@ai-projector/core/modules/terminal/index.ts";
 import type { OpenFile } from "../open-file.ts";
 import { registerTabNavigation } from "./tab-navigation.ts";
 import { registerTabReader } from "./tab-reader.ts";

@@ -4,8 +4,8 @@ import {
   stopTerminalSession,
   terminalSessionText,
 } from "../terminal/index.ts";
-import type { TerminalSession } from "@projector-ai/core/modules/terminal/index.ts";
-import { projectAppUrl } from "@projector-ai/core/modules/app-paths/index.ts";
+import type { TerminalSession } from "@ai-projector/core/modules/terminal/index.ts";
+import { projectAppUrl } from "@ai-projector/core/modules/app-paths/index.ts";
 import type { LaunchMode, ProcessSnapshot, ProcessStatus, Project } from "../projects/index.ts";
 import { openWindow } from "../window/index.ts";
 

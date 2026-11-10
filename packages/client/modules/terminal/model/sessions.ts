@@ -2,7 +2,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type {
   TerminalProgram,
   TerminalSession,
-} from "@projector-ai/core/modules/terminal/index.ts";
+} from "@ai-projector/core/modules/terminal/index.ts";
 import { TerminalRequestError, terminalRequest, subscribeTerminalSessions } from "../lib/api.ts";
 
 export interface TerminalSessionHooks {

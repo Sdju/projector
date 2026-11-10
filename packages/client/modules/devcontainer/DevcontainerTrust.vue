@@ -6,7 +6,7 @@ import { nextTick, useId, ref, watch } from "vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import UiDialog from "../../common/ui/UiDialog.vue";
 import UiDialogActions from "../../common/ui/UiDialogActions.vue";
-import type { DevcontainerRisk } from "@projector-ai/core/modules/devcontainer/index.ts";
+import type { DevcontainerRisk } from "@ai-projector/core/modules/devcontainer/index.ts";
 import { useDevcontainer } from "./model.ts";
 
 const props = defineProps<{ projectId: string }>();

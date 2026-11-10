@@ -10,7 +10,7 @@ import {
   editKeybinding,
   recordedKey,
   type Keybinding,
-} from "@projector-ai/core/modules/ide/index.ts";
+} from "@ai-projector/core/modules/ide/index.ts";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import { readoutLines, useTabReadout } from "../../../common/utilities/tab-readout.ts";
 import UiButton from "../../../common/ui/UiButton.vue";

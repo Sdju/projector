@@ -5,4 +5,4 @@ export type {
   Project,
   ProcessSnapshot,
   InspectResult,
-} from "@projector-ai/core/modules/project/index.ts";
+} from "@ai-projector/core/modules/project/index.ts";

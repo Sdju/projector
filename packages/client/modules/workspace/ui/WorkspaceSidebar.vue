@@ -5,7 +5,7 @@ import type { GitBranchesState, GitHistoryState, GitOverviewState } from "../mod
 import type { useGitChangeSync } from "../lib/git-change-sync.ts";
 import type { useOpenFiles } from "../lib/open-files.ts";
 import type { OpenFile } from "../open-file.ts";
-import type { FileScope } from "@projector-ai/core/modules/workspace/index.ts";
+import type { FileScope } from "@ai-projector/core/modules/workspace/index.ts";
 import { baseSidebarViews, type SidebarHost, type SidebarViews } from "../lib/sidebar-views.ts";
 import SidebarTabs from "./SidebarTabs.vue";
 import IconRefresh from "~icons/lucide/rotate-cw";

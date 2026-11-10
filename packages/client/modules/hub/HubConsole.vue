@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref, nextTick } from "vue";
-import { isDeviceId, hubReturnPath, type HubDevice } from "@projector-ai/core/modules/hub/index.ts";
+import { isDeviceId, hubReturnPath, type HubDevice } from "@ai-projector/core/modules/hub/index.ts";
 import { useCommandScope, commandArgs } from "../../common/utilities/commands.ts";
 import UiHeading from "../../common/ui/UiHeading.vue";
 import UiCard from "../../common/ui/UiCard.vue";

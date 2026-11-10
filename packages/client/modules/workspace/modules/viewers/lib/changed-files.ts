@@ -1,5 +1,5 @@
-import type { CommitComparison } from "@projector-ai/core/modules/workspace/index.ts";
-import type { ResolvedFileIcon } from "@projector-ai/core/modules/file-icons/index.ts";
+import type { CommitComparison } from "@ai-projector/core/modules/workspace/index.ts";
+import type { ResolvedFileIcon } from "@ai-projector/core/modules/file-icons/index.ts";
 
 /** One row of a changed-files list, independent of the host that produced it. */
 export interface ChangedFileItem {

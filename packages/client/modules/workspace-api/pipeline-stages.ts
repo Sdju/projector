@@ -1,5 +1,5 @@
-import type { PipelineJob, PipelineStatus } from "@projector-ai/core/modules/workspace/index.ts";
-import { PIPELINE_STATUS_LABEL } from "@projector-ai/core/modules/workspace/index.ts";
+import type { PipelineJob, PipelineStatus } from "@ai-projector/core/modules/workspace/index.ts";
+import { PIPELINE_STATUS_LABEL } from "@ai-projector/core/modules/workspace/index.ts";
 import { countRu } from "../../common/utilities/plural.ts";
 
 /** Jobs that make a stage (and the whole pipeline) look broken. */

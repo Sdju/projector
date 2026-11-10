@@ -1,4 +1,4 @@
-import type { JudgeVerdict } from "@projector-ai/core/modules/agent-judge/index.ts";
+import type { JudgeVerdict } from "@ai-projector/core/modules/agent-judge/index.ts";
 
 /** A CSS suffix for the risk tint, shared by the card and its large score box. */
 export function permissionRiskClass(judge?: JudgeVerdict): string {

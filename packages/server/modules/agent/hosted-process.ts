@@ -10,7 +10,7 @@ import {
   os,
   type AgentProcess,
   type AgentProcessSpec,
-} from "@projector-ai/core/modules/os/index.ts";
+} from "@ai-projector/core/modules/os/index.ts";
 import { rememberHost, runDirectory } from "./agent-runs.ts";
 
 const HOST_SCRIPT = fileURLToPath(new URL("../../../cli/app/agent-host.ts", import.meta.url));

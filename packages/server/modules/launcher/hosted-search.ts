@@ -1,6 +1,6 @@
-import type { LaunchAction, LaunchItem } from "@projector-ai/core/modules/launcher/index.ts";
-import { githubProjectRoute } from "@projector-ai/core/modules/github/index.ts";
-import { gitlabProjectRoute } from "@projector-ai/core/modules/gitlab/index.ts";
+import type { LaunchAction, LaunchItem } from "@ai-projector/core/modules/launcher/index.ts";
+import { githubProjectRoute } from "@ai-projector/core/modules/github/index.ts";
+import { gitlabProjectRoute } from "@ai-projector/core/modules/gitlab/index.ts";
 import { searchGithubRepositories } from "../github/index.ts";
 import { searchGitlabProjects } from "../gitlab/index.ts";
 

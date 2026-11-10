@@ -11,7 +11,7 @@ import {
 import type { Project } from "../projects/index.ts";
 import { normalizeProject } from "../project-presentation/index.ts";
 import { preferences, setFavoriteDirectory } from "../preferences/index.ts";
-import type { LaunchItem } from "@projector-ai/core/modules/launcher/index.ts";
+import type { LaunchItem } from "@ai-projector/core/modules/launcher/index.ts";
 import { tildePath, workspaceRoute } from "./project-entries.ts";
 
 export { workspaceRoute };

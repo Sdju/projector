@@ -1,6 +1,6 @@
 # Выпуск в npm
 
-Подготовка поставки `@projector-ai/ide`, `@projector-ai/native` и `@projector-ai/hub` закончена: имена, манифесты, `projector-install-desktop`, `projector-hub`, `verify:distribution` и OIDC-workflow уже в коде. В registry пакетов ещё нет, публикаций не было. Устройство поставки и порядок публикации — в [distribution](../distribution.md); здесь только незакрытые пункты.
+Подготовка поставки `@ai-projector/ide`, `@ai-projector/native` и `@ai-projector/hub` закончена: имена, манифесты, `projector-install-desktop`, `projector-hub`, `verify:distribution` и OIDC-workflow уже в коде. В registry пакетов ещё нет, публикаций не было. Устройство поставки и порядок публикации — в [distribution](../distribution.md); здесь только незакрытые пункты.
 
 ## Первый выпуск
 
@@ -11,11 +11,11 @@
 
 ## Открытые ограничения
 
-- [ ] Глобальная установка `@projector-ai/native` на npm 11/12 падает в install-скрипте `node-gtk` (`npx node-pre-gyp`). Workaround описан в [distribution](../distribution.md#известные-ограничения-установки), причина не устранена: нужен либо надёжный install-скрипт, либо отказ от сборки при установке.
+- [ ] Глобальная установка `@ai-projector/native` на npm 11/12 падает в install-скрипте `node-gtk` (`npx node-pre-gyp`). Workaround описан в [distribution](../distribution.md#известные-ограничения-установки), причина не устранена: нужен либо надёжный install-скрипт, либо отказ от сборки при установке.
 - [ ] `engines` допускает только Node `>=24.11.0 <25`. На Node 26 npm выдаёт `EBADENGINE`; расширять диапазон можно после проверки PTY и сервера на новой версии.
 - [ ] Установка на Windows и macOS не проверялась в этой работе: тесты поставки шли на Linux. Для `node-pty` там нужны свои build tools или prebuilt-бинарники.
 - [ ] `projector-install-desktop` из глобального npm-пакета не запускался вручную: проверено только наличие bin и путей к `bin/projector`, ресурсам и иконкам в артефакте.
-- [ ] Установка `@projector-ai/hub` в чистый prefix и запуск `projector-hub` с реальным устройством ещё не проверялись.
+- [ ] Установка `@ai-projector/hub` в чистый prefix и запуск `projector-hub` с реальным устройством ещё не проверялись.
 
 ## Проверить после публикации
 

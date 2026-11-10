@@ -3,7 +3,7 @@ import {
   commandIsSafe,
   type AgentCommandCall,
   type createCommandService,
-} from "@projector-ai/core/modules/ide/index.ts";
+} from "@ai-projector/core/modules/ide/index.ts";
 import { pageClientId } from "../../common/utilities/page-client.ts";
 
 interface IdeCommandEvent {

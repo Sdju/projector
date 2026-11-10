@@ -1,7 +1,7 @@
 import { selectTreeRange, type createTreeSelection } from "./tree-selection.ts";
-import { shortcutKey } from "@projector-ai/core/modules/ide/index.ts";
-import { parentPath } from "@projector-ai/core/modules/workspace/index.ts";
-import type { FileEntry } from "@projector-ai/core/modules/workspace/index.ts";
+import { shortcutKey } from "@ai-projector/core/modules/ide/index.ts";
+import { parentPath } from "@ai-projector/core/modules/workspace/index.ts";
+import type { FileEntry } from "@ai-projector/core/modules/workspace/index.ts";
 import type { Ref } from "vue";
 import type { useTreeOperations } from "./tree-operations.ts";
 

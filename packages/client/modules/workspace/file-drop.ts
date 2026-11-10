@@ -1,4 +1,4 @@
-import { MAX_TEXT_BYTES, type FileContent } from "@projector-ai/core/modules/workspace/index.ts";
+import { MAX_TEXT_BYTES, type FileContent } from "@ai-projector/core/modules/workspace/index.ts";
 
 export function projectRelativePath(root: string, path: string): string | undefined {
   const prefix = root.replace(/\/+$/, "") + "/";

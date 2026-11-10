@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { mkdir, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { promisify } from "node:util";
-import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
+import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 
 const run = promisify(execFile);
 const WORKTREE_ID = /^[0-9a-f]{8}$/;

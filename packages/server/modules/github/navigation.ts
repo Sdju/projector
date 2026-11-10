@@ -1,7 +1,7 @@
 import { github } from "./api.ts";
 import { integrationConfig } from "../integration-store/index.ts";
 import { HttpError } from "../http/index.ts";
-import type { DirectoryListing } from "@projector-ai/core/modules/directories/index.ts";
+import type { DirectoryListing } from "@ai-projector/core/modules/directories/index.ts";
 
 /** Repository siblings for breadcrumbs and typed gh:/owner/repository prefixes. */
 export async function browseGithubDirectories(

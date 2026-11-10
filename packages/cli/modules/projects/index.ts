@@ -2,8 +2,8 @@ import { existsSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
-import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
-import type { Project } from "@projector-ai/core/modules/project/index.ts";
+import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
+import type { Project } from "@ai-projector/core/modules/project/index.ts";
 import type { ProjectorApi } from "../api/index.ts";
 
 const PROJECTS_FILE = () => join(dataDir(), "projects.json");

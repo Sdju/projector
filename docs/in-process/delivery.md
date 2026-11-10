@@ -13,7 +13,7 @@
 - [ ] Prebuilt `node-pty` и `node-gtk` или отказ от сборки при установке; понятная ошибка,
       если build tools нет.
 - [ ] Автообновление и канал stable/beta; проверка подписи или checksum перед запуском.
-- [ ] Не ломать текущие пути: checkout, `@projector-ai/ide`, `@projector-ai/native` и
+- [ ] Не ломать текущие пути: checkout, `@ai-projector/ide`, `@ai-projector/native` и
       `projector-install-desktop` остаются рабочими.
 - [ ] Документировать первый запуск без Node и без GTK: что именно нужно и что необязательно.
 

@@ -1,5 +1,5 @@
 import type { ApprovalAnswer, ApprovalRequest } from "../../agent/index.ts";
-import { commandIsSafe } from "@projector-ai/core/modules/ide/index.ts";
+import { commandIsSafe } from "@ai-projector/core/modules/ide/index.ts";
 import * as path from "node:path";
 import * as os from "node:os";
 

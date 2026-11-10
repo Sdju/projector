@@ -5,7 +5,7 @@ import { acpIdeMcpServer } from "../ide-mcp/index.ts";
 import { acpWidgetsMcpServer } from "../widgets-mcp/index.ts";
 import { roleContext } from "../../agent-roles/index.ts";
 import { trustedProjectWidgets } from "../../project-widgets/index.ts";
-import { renderWidgetGuide } from "@projector-ai/core/modules/widget-catalog/index.ts";
+import { renderWidgetGuide } from "@ai-projector/core/modules/widget-catalog/index.ts";
 import type {
   AgentBackend,
   AgentBackendId,
@@ -34,7 +34,7 @@ import {
   acpSessions,
 } from "./acp-tools.ts";
 import { basename, resolve } from "node:path";
-import { os } from "@projector-ai/core/modules/os/index.ts";
+import { os } from "@ai-projector/core/modules/os/index.ts";
 import { pathToFileURL } from "node:url";
 
 interface PermissionOption {

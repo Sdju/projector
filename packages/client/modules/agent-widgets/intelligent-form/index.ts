@@ -1,4 +1,4 @@
-import { intelligentFormWidget } from "@projector-ai/core/modules/agent-widgets/intelligent-form/index.ts";
+import { intelligentFormWidget } from "@ai-projector/core/modules/agent-widgets/intelligent-form/index.ts";
 import type { WidgetEntry } from "../../widget-runtime/index.ts";
 import IntelligentForm from "./ui/IntelligentForm.vue";
 

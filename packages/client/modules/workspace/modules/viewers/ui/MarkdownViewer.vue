@@ -6,7 +6,7 @@ import IconCode from "~icons/lucide/code-xml";
 import IconDocument from "~icons/lucide/file-text";
 import EditorTopbarActions from "./EditorTopbarActions.vue";
 import VisualMarkdownEditor from "./VisualMarkdownEditor.vue";
-import type { FileScope } from "@projector-ai/core/modules/workspace/index.ts";
+import type { FileScope } from "@ai-projector/core/modules/workspace/index.ts";
 const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
 withDefaults(
   defineProps<{

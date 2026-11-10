@@ -14,7 +14,7 @@ import {
   appearanceOptions,
   isAppearanceChoice,
   type AppearanceChoice,
-} from "@projector-ai/core/modules/appearance/index.ts";
+} from "@ai-projector/core/modules/appearance/index.ts";
 import { applyAppearance, currentAppearance } from "../appearance/index.ts";
 import { useSectionAction } from "../../common/utilities/use-section-action.ts";
 const shortcutId = useId();

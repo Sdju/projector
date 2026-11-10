@@ -1,7 +1,7 @@
 import { isHubRequest, hubAccessAllowed } from "./hub.ts";
 import type { IncomingMessage } from "node:http";
 import { BlockList, isIP } from "node:net";
-import { readNetworkMode } from "@projector-ai/core/modules/app-paths/index.ts";
+import { readNetworkMode } from "@ai-projector/core/modules/app-paths/index.ts";
 import { hasLanPassword, verifyLanPassword } from "./password.ts";
 import { validLanSession } from "./session.ts";
 

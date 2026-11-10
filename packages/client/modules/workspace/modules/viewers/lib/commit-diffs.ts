@@ -1,4 +1,4 @@
-import type { CommitComparison } from "@projector-ai/core/modules/workspace/index.ts";
+import type { CommitComparison } from "@ai-projector/core/modules/workspace/index.ts";
 import { useFileDiffs } from "./file-diffs.ts";
 
 /** Раскрытые файлы коммита: код читается при первом раскрытии и кэшируется до смены коммита. */

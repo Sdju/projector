@@ -2,7 +2,7 @@ import type {
   GithubRepository,
   GithubEntry,
   GithubFile,
-} from "@projector-ai/core/modules/github/index.ts";
+} from "@ai-projector/core/modules/github/index.ts";
 import type {
   DiscussionDetail,
   DiscussionList,
@@ -15,7 +15,7 @@ import type {
   PullRequestList,
   ReleaseDetail,
   ReleaseList,
-} from "@projector-ai/core/modules/workspace/index.ts";
+} from "@ai-projector/core/modules/workspace/index.ts";
 export class GithubRequestError extends Error {
   readonly status: number;
   constructor(message: string, status: number) {

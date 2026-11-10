@@ -1,4 +1,4 @@
-import { inlineIconWidget } from "@projector-ai/core/modules/agent-widgets/inline-icon/index.ts";
+import { inlineIconWidget } from "@ai-projector/core/modules/agent-widgets/inline-icon/index.ts";
 import type { WidgetEntry } from "../../widget-runtime/index.ts";
 import InlineIcon from "./ui/InlineIcon.vue";
 

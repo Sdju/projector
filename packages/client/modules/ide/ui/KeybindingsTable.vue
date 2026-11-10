@@ -10,7 +10,7 @@ import UiKbd from "../../../common/ui/UiKbd.vue";
 import IconEdit from "~icons/lucide/pencil";
 import IconReset from "~icons/lucide/rotate-ccw";
 import IconRemove from "~icons/lucide/x";
-import type { Keybinding } from "@projector-ai/core/modules/ide/index.ts";
+import type { Keybinding } from "@ai-projector/core/modules/ide/index.ts";
 import type { KeybindingRow } from "./keybinding-row.ts";
 defineProps<{
   rows: KeybindingRow[];

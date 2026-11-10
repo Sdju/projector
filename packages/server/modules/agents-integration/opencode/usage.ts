@@ -2,7 +2,7 @@ import { createUsageCache } from "../_/usage-cache.ts";
 import type {
   OpenCodeUsage,
   OpenCodeUsageWindow,
-} from "@projector-ai/core/modules/agents-integration/opencode/index.ts";
+} from "@ai-projector/core/modules/agents-integration/opencode/index.ts";
 import { readGoUsage } from "./client.ts";
 
 const record = (value: unknown): Record<string, unknown> | null =>

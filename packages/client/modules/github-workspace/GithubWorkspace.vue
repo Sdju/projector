@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import UiMessage from "../../common/ui/UiMessage.vue";
 import { useRoute, useRouter } from "vue-router";
-import type { GithubRepository } from "@projector-ai/core/modules/github/index.ts";
+import type { GithubRepository } from "@ai-projector/core/modules/github/index.ts";
 import {
   ProjectWorkspace,
   PipelineView,

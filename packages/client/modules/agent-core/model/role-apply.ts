@@ -1,4 +1,4 @@
-import type { AgentRoleSnapshot } from "@projector-ai/core/modules/agent-role/index.ts";
+import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 import type { ChatState } from "./chat-state.ts";
 
 /**

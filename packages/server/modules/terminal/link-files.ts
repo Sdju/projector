@@ -1,5 +1,5 @@
 import { realpath, stat } from "node:fs/promises";
-import { os } from "@projector-ai/core/modules/os/index.ts";
+import { os } from "@ai-projector/core/modules/os/index.ts";
 import { isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
 import { HttpError } from "../http/index.ts";
 

@@ -1,6 +1,6 @@
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { stat } from "node:fs/promises";
-import { os } from "@projector-ai/core/modules/os/index.ts";
+import { os } from "@ai-projector/core/modules/os/index.ts";
 import { loadProjects } from "../projects/index.ts";
 import { getSnapshot, processOutput } from "../processes/index.ts";
 import { preferences } from "../preferences/index.ts";
@@ -9,10 +9,10 @@ import type {
   LaunchDetail,
   LaunchInfo,
   LaunchItem,
-} from "@projector-ai/core/modules/launcher/index.ts";
-import { githubProjectRoute } from "@projector-ai/core/modules/github/index.ts";
-import { parseProjectRef, pathToUrlSegments } from "@projector-ai/core/modules/project/index.ts";
-import type { Project } from "@projector-ai/core/modules/project/index.ts";
+} from "@ai-projector/core/modules/launcher/index.ts";
+import { githubProjectRoute } from "@ai-projector/core/modules/github/index.ts";
+import { parseProjectRef, pathToUrlSegments } from "@ai-projector/core/modules/project/index.ts";
+import type { Project } from "@ai-projector/core/modules/project/index.ts";
 
 /** Mirrors the client `projectRoute`: the workspace URL of a project path. */
 export function workspaceRoute(path: string): string {

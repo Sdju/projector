@@ -6,14 +6,14 @@ import type {
   PullRequestDetail,
   PullRequestFile,
   PullRequestReview,
-} from "@projector-ai/core/modules/workspace/index.ts";
+} from "@ai-projector/core/modules/workspace/index.ts";
 import { countRu } from "../../../../../common/utilities/plural.ts";
 import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab-readout.ts";
 import {
   mergeStatusLabel,
   mergeStatusTone,
   PIPELINE_STATUS_LABEL,
-} from "@projector-ai/core/modules/workspace/index.ts";
+} from "@ai-projector/core/modules/workspace/index.ts";
 import {
   commandArgs,
   useCommandRegistrar,

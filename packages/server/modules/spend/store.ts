@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { chmod } from "node:fs/promises";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
+import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 
 /** One minute of one task's model calls; calls inside the minute are summed. */
 export interface TaskSample {

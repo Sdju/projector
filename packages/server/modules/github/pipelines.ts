@@ -7,7 +7,7 @@ import type {
   PipelineJobDetail,
   PipelineList,
   PipelineStatus,
-} from "@projector-ai/core/modules/workspace/index.ts";
+} from "@ai-projector/core/modules/workspace/index.ts";
 import { githubResponse, repositoryName } from "./api.ts";
 import { githubReader } from "./browser.ts";
 import { user, type RemoteUser } from "./issues.ts";

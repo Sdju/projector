@@ -1,7 +1,7 @@
 import { commandArgs } from "../../../common/utilities/commands.ts";
 import { readTabReadout } from "../../../common/utilities/tab-readout.ts";
 import type { DockGroup, DockLayout } from "../../dock/index.ts";
-import type { TerminalSession } from "@projector-ai/core/modules/terminal/index.ts";
+import type { TerminalSession } from "@ai-projector/core/modules/terminal/index.ts";
 import type { TabRegistry } from "../../workspace-api/index.ts";
 import type { OpenFile } from "../open-file.ts";
 

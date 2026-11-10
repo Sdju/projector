@@ -5,7 +5,7 @@ import IconPlus from "~icons/lucide/plus";
 import IconMinus from "~icons/lucide/minus";
 import IconChevronRight from "~icons/lucide/chevron-right";
 import { FileIcon, useFileIconTheme } from "../../../../file-icons/index.ts";
-import type { GitOverview } from "@projector-ai/core/modules/workspace/index.ts";
+import type { GitOverview } from "@ai-projector/core/modules/workspace/index.ts";
 
 type Change = GitOverview["changes"][number];
 const props = withDefaults(

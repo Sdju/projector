@@ -1,9 +1,9 @@
-import { os, type DesktopAction } from "@projector-ai/core/modules/os/index.ts";
-import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
+import { os, type DesktopAction } from "@ai-projector/core/modules/os/index.ts";
+import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import {
   createLauncherClient,
   type InterfaceMode,
-} from "@projector-ai/core/modules/launcher/index.ts";
+} from "@ai-projector/core/modules/launcher/index.ts";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -54,7 +54,7 @@ async function main(): Promise<void> {
   } else if (command === "shortcut-status") console.log(JSON.stringify(await os.shortcutStatus()));
   else {
     if (os.capabilities.giLoader)
-      throw new Error("Системные приложения требуют дополнения @projector-ai/native (GIO).");
+      throw new Error("Системные приложения требуют дополнения @ai-projector/native (GIO).");
     const catalog = await os.catalog();
     if (command === "list") console.log(JSON.stringify(await catalog.listApplications()));
     else if (command === "launch") {

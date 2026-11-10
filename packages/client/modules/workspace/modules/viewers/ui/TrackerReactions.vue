@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import UiInline from "../../../../../common/ui/UiInline.vue";
-import type { Reaction } from "@projector-ai/core/modules/workspace/index.ts";
+import type { Reaction } from "@ai-projector/core/modules/workspace/index.ts";
 import {
   REACTION_EMOJI,
   REACTION_LABEL,

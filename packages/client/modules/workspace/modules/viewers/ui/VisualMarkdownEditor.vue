@@ -9,7 +9,7 @@ import type { Node } from "@milkdown/kit/prose/model";
 import type { EditorView } from "@milkdown/kit/prose/view";
 import { $prose, $view, replaceAll } from "@milkdown/kit/utils";
 import { workspaceAssetUrl, workspaceScopeAssetUrl } from "../../../../workspace-api/index.ts";
-import type { FileScope } from "@projector-ai/core/modules/workspace/index.ts";
+import type { FileScope } from "@ai-projector/core/modules/workspace/index.ts";
 import { loadGithubEmojis } from "../../../../../common/utilities/github-emoji.ts";
 import {
   addFrontmatterEntry,

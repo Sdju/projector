@@ -1,8 +1,8 @@
-import { os } from "@projector-ai/core/modules/os/index.ts";
+import { os } from "@ai-projector/core/modules/os/index.ts";
 import { mkdirSync, readFileSync, writeFileSync, renameSync, rmSync } from "node:fs";
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { dirname } from "node:path";
-import { lanPasswordPath } from "@projector-ai/core/modules/app-paths/index.ts";
+import { lanPasswordPath } from "@ai-projector/core/modules/app-paths/index.ts";
 
 interface Stored {
   salt: Buffer;

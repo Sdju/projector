@@ -1,4 +1,4 @@
-import { stepsWidget } from "@projector-ai/core/modules/agent-widgets/steps/index.ts";
+import { stepsWidget } from "@ai-projector/core/modules/agent-widgets/steps/index.ts";
 import type { WidgetEntry } from "../../widget-runtime/index.ts";
 import Steps from "./ui/Steps.vue";
 

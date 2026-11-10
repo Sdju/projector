@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
-import { shortcuts, type InterfaceMode } from "@projector-ai/core/modules/launcher/index.ts";
+import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
+import { shortcuts, type InterfaceMode } from "@ai-projector/core/modules/launcher/index.ts";
 interface Usage {
   count: number;
   last: number;

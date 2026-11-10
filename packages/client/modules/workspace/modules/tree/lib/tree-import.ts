@@ -15,7 +15,7 @@ import {
   workspaceCapabilities,
   type ImportConflict,
 } from "../../../../workspace-api/index.ts";
-import { isLiveScope } from "@projector-ai/core/modules/workspace/index.ts";
+import { isLiveScope } from "@ai-projector/core/modules/workspace/index.ts";
 import { treeDragType } from "./tree-drag.ts";
 import type { TreeContext } from "./tree-operations.ts";
 

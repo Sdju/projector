@@ -1,4 +1,4 @@
-import { appUrl, readNetworkMode } from "@projector-ai/core/modules/app-paths/index.ts";
+import { appUrl, readNetworkMode } from "@ai-projector/core/modules/app-paths/index.ts";
 
 import { hasLanPassword, lanUrl } from "../../modules/access/index.ts";
 

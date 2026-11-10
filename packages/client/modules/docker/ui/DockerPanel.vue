@@ -5,7 +5,7 @@ import UiControl from "../../../common/ui/UiControl.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 import UiMessage from "../../../common/ui/UiMessage.vue";
 import { ref } from "vue";
-import type { DockerContainer } from "@projector-ai/core/modules/docker/index.ts";
+import type { DockerContainer } from "@ai-projector/core/modules/docker/index.ts";
 import DockerBinding from "./DockerBinding.vue";
 import { absoluteTime } from "../../../common/utilities/commit-format.ts";
 import { readoutLines, useTabReadout } from "../../../common/utilities/tab-readout.ts";

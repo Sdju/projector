@@ -11,9 +11,9 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const output = join(root, "artifacts/distribution");
-const IDE_PACKAGE = "@projector-ai/ide";
-const NATIVE_PACKAGE = "@projector-ai/native";
-const HUB_PACKAGE = "@projector-ai/hub";
+const IDE_PACKAGE = "@ai-projector/ide";
+const NATIVE_PACKAGE = "@ai-projector/native";
+const HUB_PACKAGE = "@ai-projector/hub";
 const failures = [];
 
 const check = (condition, message) => {
@@ -130,7 +130,7 @@ for (const file of await walk(output)) {
   if (text.includes("@projector/")) {
     failures.push(`${relative(output, file)} still references private scope @projector/`);
   }
-  if (/@projector-ai\/(?:client|server|cli)\//.test(text)) {
+  if (/@ai-projector\/(?:client|server|cli)\//.test(text)) {
     failures.push(`${relative(output, file)} references an unpublished workspace package`);
   }
 }

@@ -1,5 +1,5 @@
 import type { ContextMenuItem } from "../../../../../common/ui/context-menu.ts";
-import type { FileEntry } from "@projector-ai/core/modules/workspace/index.ts";
+import type { FileEntry } from "@ai-projector/core/modules/workspace/index.ts";
 
 export interface TreeMenuOptions {
   entry?: FileEntry;

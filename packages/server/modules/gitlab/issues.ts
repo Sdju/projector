@@ -4,7 +4,7 @@ import type {
   IssueDetail,
   IssueList,
   Reaction,
-} from "@projector-ai/core/modules/workspace/index.ts";
+} from "@ai-projector/core/modules/workspace/index.ts";
 import { gitlabReader } from "./api.ts";
 import { nextPage, projectId } from "./browser.ts";
 import {

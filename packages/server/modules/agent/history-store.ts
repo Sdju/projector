@@ -3,7 +3,7 @@ import { mkdirSync } from "node:fs";
 import { chmod, readFile, rename } from "node:fs/promises";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
+import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 
 /** A turn as the chat shows it: the versions of the conversation hang off the user turn that starts them. */
 export interface HistoryTurn {

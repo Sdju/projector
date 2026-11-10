@@ -3,7 +3,7 @@ import type {
   UsageBreakdown,
   UsageDay,
   UsageTotals,
-} from "@projector-ai/core/modules/usage-analytics/index.ts";
+} from "@ai-projector/core/modules/usage-analytics/index.ts";
 import { readAgentUsage, type AgentUsageRecord } from "../agent/index.ts";
 import { loadProjects } from "../projects/index.ts";
 import { readLimitSeries } from "./limits.ts";

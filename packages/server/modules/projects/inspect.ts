@@ -1,5 +1,5 @@
 import { readdir, readFile, stat } from "node:fs/promises";
-import { os } from "@projector-ai/core/modules/os/index.ts";
+import { os } from "@ai-projector/core/modules/os/index.ts";
 import { basename, join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { findFavicon } from "./favicon.ts";

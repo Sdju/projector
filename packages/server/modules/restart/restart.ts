@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 import { closeSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { os } from "@projector-ai/core/modules/os/index.ts";
-import { dataDir, openLog, serverLogPath } from "@projector-ai/core/modules/app-paths/index.ts";
+import { os } from "@ai-projector/core/modules/os/index.ts";
+import { dataDir, openLog, serverLogPath } from "@ai-projector/core/modules/app-paths/index.ts";
 import { quitDesktop } from "../window/index.ts";
 
 const host = globalThis as typeof globalThis & { projectorRestart?: Promise<void> };

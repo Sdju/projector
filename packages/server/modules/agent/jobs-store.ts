@@ -1,10 +1,10 @@
 import { randomBytes } from "node:crypto";
 import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
+import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import type { AgentBackendId, AgentPermissionMode } from "./backend.ts";
 import type { AgentSelection } from "./controls.ts";
-import type { AgentRoleSnapshot } from "@projector-ai/core/modules/agent-role/index.ts";
+import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 import type { AgentHistoryTurn } from "../providers/index.ts";
 
 export type AgentJobStatus = "queued" | "running" | "needs-user" | "done" | "error" | "stopped";

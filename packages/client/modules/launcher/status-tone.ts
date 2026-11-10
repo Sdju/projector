@@ -1,4 +1,4 @@
-import type { LaunchInfo } from "@projector-ai/core/modules/launcher/index.ts";
+import type { LaunchInfo } from "@ai-projector/core/modules/launcher/index.ts";
 
 /** Visual state mapping shared by the launcher list and its detail panel. */
 export function launcherStatusTone(state: LaunchInfo["state"]) {

@@ -1,5 +1,5 @@
 {
-  "name": "@projector-ai/native",
+  "name": "@ai-projector/native",
   "version": "0.11.0",
   "private": true,
   "type": "module",
@@ -8,7 +8,7 @@
     "./entry": "./app/entry.ts"
   },
   "dependencies": {
-    "@projector-ai/core": "workspace:*",
+    "@ai-projector/core": "workspace:*",
     "@zede/vio": "catalog:",
     "node-gtk": "catalog:"
   }

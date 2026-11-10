@@ -2,7 +2,7 @@ import { createUsageCache } from "../_/usage-cache.ts";
 import type {
   CursorUsage,
   CursorUsageWindow,
-} from "@projector-ai/core/modules/agents-integration/cursor/index.ts";
+} from "@ai-projector/core/modules/agents-integration/cursor/index.ts";
 import { readCursorUsage } from "./client.ts";
 
 const record = (value: unknown): Record<string, unknown> | null =>

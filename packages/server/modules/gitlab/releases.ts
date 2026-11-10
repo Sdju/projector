@@ -4,7 +4,7 @@ import type {
   ReleaseAsset,
   ReleaseDetail,
   ReleaseList,
-} from "@projector-ai/core/modules/workspace/index.ts";
+} from "@ai-projector/core/modules/workspace/index.ts";
 import { gitlabReader, type GitlabTarget } from "./api.ts";
 import { nextPage, projectId } from "./browser.ts";
 import { gitlabUser, type GitlabUser } from "./trackers.ts";

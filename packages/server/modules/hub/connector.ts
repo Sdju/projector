@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from "node:http";
 import { WebSocket, createWebSocketStream } from "ws";
-import { HUB_PROTOCOL, type HubConnection } from "@projector-ai/core/modules/hub/index.ts";
+import { HUB_PROTOCOL, type HubConnection } from "@ai-projector/core/modules/hub/index.ts";
 import { markHubSocket } from "../access/index.ts";
 
 export interface HubHandlers {

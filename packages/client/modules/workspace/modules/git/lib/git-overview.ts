@@ -1,5 +1,5 @@
 import { ref } from "vue";
-import type { GitOverview } from "@projector-ai/core/modules/workspace/index.ts";
+import type { GitOverview } from "@ai-projector/core/modules/workspace/index.ts";
 import { mutateWorkspaceGit, workspaceRequest } from "../../../../workspace-api/index.ts";
 
 const emptyOverview = (): GitOverview => ({ available: false, branch: "", changes: [] });

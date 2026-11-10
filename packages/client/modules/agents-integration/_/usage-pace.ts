@@ -3,4 +3,4 @@ export {
   USAGE_PERIOD_SECONDS,
   usagePaceTone,
   type UsagePaceTone,
-} from "@projector-ai/core/modules/usage-analytics/index.ts";
+} from "@ai-projector/core/modules/usage-analytics/index.ts";

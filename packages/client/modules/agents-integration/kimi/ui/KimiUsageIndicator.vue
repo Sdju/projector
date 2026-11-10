@@ -3,7 +3,7 @@ import UsageIndicator from "../../_/UsageIndicator.vue";
 import { useAgentUsageIndicator } from "../../_/use-agent-usage-indicator.ts";
 import { USAGE_PERIOD_SECONDS } from "../../_/usage-pace.ts";
 import IconKimi from "~icons/simple-icons/kimi";
-import type { KimiUsage } from "@projector-ai/core/modules/agents-integration/kimi/index.ts";
+import type { KimiUsage } from "@ai-projector/core/modules/agents-integration/kimi/index.ts";
 
 type WindowName = keyof NonNullable<KimiUsage["windows"]>;
 const weekTicks = Array.from({ length: 6 }, (_, day) => ((day + 1) / 7) * 100);

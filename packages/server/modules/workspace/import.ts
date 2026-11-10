@@ -6,7 +6,7 @@ import { basename, isAbsolute, resolve, sep } from "node:path";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { Readable } from "node:stream";
-import { os } from "@projector-ai/core/modules/os/index.ts";
+import { os } from "@ai-projector/core/modules/os/index.ts";
 import { HttpError } from "../http/index.ts";
 import { mutationLocation, trashProjectEntry, validateEntryName } from "./files.ts";
 

@@ -3,7 +3,7 @@ import { commandArgs, useCommandScope } from "../../../common/utilities/commands
 import type {
   AgentProjectRoleState,
   AgentRole,
-} from "@projector-ai/core/modules/agent-role/index.ts";
+} from "@ai-projector/core/modules/agent-role/index.ts";
 import {
   createProjectRole,
   readProjectRoles,

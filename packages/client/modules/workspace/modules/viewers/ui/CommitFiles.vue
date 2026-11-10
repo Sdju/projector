@@ -4,7 +4,7 @@ import { computed } from "vue";
 import type {
   CommitComparison,
   GitCommitDetail,
-} from "@projector-ai/core/modules/workspace/index.ts";
+} from "@ai-projector/core/modules/workspace/index.ts";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import { useFileIconTheme } from "../../../../file-icons/index.ts";
 import ChangedFileRow from "./ChangedFileRow.vue";

@@ -53,7 +53,7 @@ const ssrExternal = [
   ...new Set(
     ["server", "core"].flatMap((name) => Object.keys(packageManifest(name).dependencies ?? {})),
   ),
-].filter((name) => !name.startsWith("@projector-ai/"));
+].filter((name) => !name.startsWith("@ai-projector/"));
 
 const feodLint = createFeodConfig(feod, { rootDir: fileURLToPath(new URL(".", import.meta.url)) });
 

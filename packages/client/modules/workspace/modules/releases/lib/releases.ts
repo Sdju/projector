@@ -1,5 +1,5 @@
 import { ref, type Ref } from "vue";
-import type { Release, ReleaseList } from "@projector-ai/core/modules/workspace/index.ts";
+import type { Release, ReleaseList } from "@ai-projector/core/modules/workspace/index.ts";
 import { workspaceRequest } from "../../../../workspace-api/index.ts";
 
 /** Release list of one repository with numbered pages, newest first. */

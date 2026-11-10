@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { HttpError } from "../http/index.ts";
 import { fieldText as text } from "../integration-store/index.ts";
-import { os } from "@projector-ai/core/modules/os/index.ts";
+import { os } from "@ai-projector/core/modules/os/index.ts";
 
 export const GITLAB_URL = "https://gitlab.com";
 export const GITLAB_DIRECTORY = join(os.homeDirectory(), "Projects");

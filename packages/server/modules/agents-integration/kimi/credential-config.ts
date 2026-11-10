@@ -1,6 +1,6 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { os } from "@projector-ai/core/modules/os/index.ts";
+import { os } from "@ai-projector/core/modules/os/index.ts";
 
 const DEFAULT_OAUTH_HOST = "https://auth.kimi.com";
 const UNAVAILABLE = "Авторизация Kimi Code недоступна; выполните kimi login";

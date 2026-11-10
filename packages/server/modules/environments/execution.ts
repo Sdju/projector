@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { resolve, relative, isAbsolute, sep } from "node:path";
-import { os } from "@projector-ai/core/modules/os/index.ts";
-import type { Project } from "@projector-ai/core/modules/project/index.ts";
+import { os } from "@ai-projector/core/modules/os/index.ts";
+import type { Project } from "@ai-projector/core/modules/project/index.ts";
 import { loadProjects } from "../projects/index.ts";
 import { serverId } from "./reconcile.ts";
 import { HttpError } from "../http/index.ts";

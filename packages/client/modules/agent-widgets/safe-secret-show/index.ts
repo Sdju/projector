@@ -1,4 +1,4 @@
-import { safeSecretShowWidget } from "@projector-ai/core/modules/agent-widgets/safe-secret-show/index.ts";
+import { safeSecretShowWidget } from "@ai-projector/core/modules/agent-widgets/safe-secret-show/index.ts";
 import type { WidgetEntry } from "../../widget-runtime/index.ts";
 import SafeSecretShow from "./ui/SafeSecretShow.vue";
 

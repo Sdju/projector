@@ -1,8 +1,8 @@
 import type {
   DirectoryEntry,
   DirectoryListing,
-} from "@projector-ai/core/modules/directories/index.ts";
-import { GITLAB_PREFIX } from "@projector-ai/core/modules/gitlab/index.ts";
+} from "@ai-projector/core/modules/directories/index.ts";
+import { GITLAB_PREFIX } from "@ai-projector/core/modules/gitlab/index.ts";
 import { HttpError } from "../http/index.ts";
 import { gitlabRequest, gitlabTarget, type GitlabPage, type GitlabTarget } from "./api.ts";
 

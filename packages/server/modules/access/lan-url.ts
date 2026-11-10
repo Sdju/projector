@@ -1,5 +1,5 @@
 import { networkInterfaces } from "node:os";
-import { APP_PORT } from "@projector-ai/core/modules/app-paths/index.ts";
+import { APP_PORT } from "@ai-projector/core/modules/app-paths/index.ts";
 
 function privateAddresses(): string[] {
   const result: string[] = [];

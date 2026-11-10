@@ -2,7 +2,7 @@
 import UiInline from "../../../../../common/ui/UiInline.vue";
 import UiListRow from "../../../../../common/ui/UiListRow.vue";
 import UiStatusDot from "../../../../../common/ui/UiStatusDot.vue";
-import type { IssueLabel, IssueUser } from "@projector-ai/core/modules/workspace/index.ts";
+import type { IssueLabel, IssueUser } from "@ai-projector/core/modules/workspace/index.ts";
 import EmojiText from "../../../../../common/ui/EmojiText.vue";
 import UiAvatar from "../../../../../common/ui/UiAvatar.vue";
 

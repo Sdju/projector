@@ -1,4 +1,4 @@
-import type { Project } from "@projector-ai/core/modules/project/index.ts";
+import type { Project } from "@ai-projector/core/modules/project/index.ts";
 import type { HealthInfo, ProjectorApi, RuntimeResponse } from "../api/index.ts";
 
 export interface ProjectRunResult {

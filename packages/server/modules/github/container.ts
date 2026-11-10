@@ -1,4 +1,4 @@
-import type { DockerEnvironment } from "@projector-ai/core/modules/environment/index.ts";
+import type { DockerEnvironment } from "@ai-projector/core/modules/environment/index.ts";
 import { cloneInContainer } from "../git-import/index.ts";
 
 /** HTTPS clone is the only container receiving the scoped GitHub credential. */

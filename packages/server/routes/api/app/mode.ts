@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 import { closeSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dataDir, openLog, serverLogPath } from "@projector-ai/core/modules/app-paths/index.ts";
-import { isServerMode } from "@projector-ai/core/modules/server-mode/index.ts";
+import { dataDir, openLog, serverLogPath } from "@ai-projector/core/modules/app-paths/index.ts";
+import { isServerMode } from "@ai-projector/core/modules/server-mode/index.ts";
 import { HttpError } from "../../../modules/http/index.ts";
 import { isLocalRequest } from "../../../modules/access/index.ts";
 import { json, readBody, type RouteDefinition } from "../../../modules/transport/index.ts";

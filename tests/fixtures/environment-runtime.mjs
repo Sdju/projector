@@ -42,11 +42,11 @@ try {
   const workspace = await readdir(join(source, "packages"));
   for (const name of workspace) {
     const modules = join(root, "packages", name, "node_modules");
-    await mkdir(join(modules, "@projector-ai"), { recursive: true });
+    await mkdir(join(modules, "@ai-projector"), { recursive: true });
     for (const entry of await readdir(join(source, "packages", name, "node_modules")).catch(
       () => [],
     )) {
-      if (entry === "@projector-ai") continue;
+      if (entry === "@ai-projector") continue;
       await symlink(
         join(source, "packages", name, "node_modules", entry),
         join(modules, entry),
@@ -56,7 +56,7 @@ try {
     for (const dependency of workspace)
       await symlink(
         join(root, "packages", dependency),
-        join(modules, "@projector-ai", dependency),
+        join(modules, "@ai-projector", dependency),
         "junction",
       );
   }
@@ -91,7 +91,7 @@ try {
     import { projectorPlugin } from './packages/server/app/dev-plugin.ts';
     export default {
       plugins: [projectorPlugin()],
-      ssr: { external: ${JSON.stringify([...external].filter((name) => !name.startsWith("@projector-ai/")))} },
+      ssr: { external: ${JSON.stringify([...external].filter((name) => !name.startsWith("@ai-projector/")))} },
       optimizeDeps: { noDiscovery: true, entries: [] },
       server: { host: '127.0.0.1', port: 0 },
       preview: { host: '127.0.0.1', port: 0 }

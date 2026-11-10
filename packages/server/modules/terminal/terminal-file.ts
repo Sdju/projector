@@ -1,4 +1,4 @@
-import { os } from "@projector-ai/core/modules/os/index.ts";
+import { os } from "@ai-projector/core/modules/os/index.ts";
 import { HttpError } from "../http/index.ts";
 import type { Project } from "../projects/index.ts";
 import { containerToHost, resolveTerminalPath } from "./link-files.ts";

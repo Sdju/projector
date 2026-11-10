@@ -1,5 +1,5 @@
-import { os } from "@projector-ai/core/modules/os/index.ts";
-import type { DockerAction } from "@projector-ai/core/modules/docker/index.ts";
+import { os } from "@ai-projector/core/modules/os/index.ts";
+import type { DockerAction } from "@ai-projector/core/modules/docker/index.ts";
 import type { Project } from "../projects/index.ts";
 import { createTerminalSession, listTerminalSessions } from "../terminal/index.ts";
 import { HttpError } from "../http/index.ts";

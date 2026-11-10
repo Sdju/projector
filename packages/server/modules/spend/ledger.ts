@@ -5,7 +5,7 @@ import {
   type ModelUsage,
   type UsageBreakdown,
   type UsageTotals,
-} from "@projector-ai/core/modules/usage-analytics/index.ts";
+} from "@ai-projector/core/modules/usage-analytics/index.ts";
 import { addTaskSample, readTaskSamples, type StoredTaskSample } from "./store.ts";
 
 const emptyTotals = (): UsageTotals => ({

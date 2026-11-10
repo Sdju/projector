@@ -4,25 +4,25 @@
 
 | Артефакт               | Содержимое                                             | Требования                                                                     |
 | ---------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| `@projector-ai/ide`    | Сервер, готовый веб-интерфейс, CLI, терминалы и агенты | Node.js 24.11–24.x; Python, make и C++ compiler для сборки `node-pty` на Linux |
-| `@projector-ai/native` | GTK-палитра и каталог приложений GIO                   | IDE той же версии, GTK4, GObject Introspection и зависимости сборки `node-gtk` |
-| `@projector-ai/hub`    | Общий веб-origin Hub и туннели к устройствам с IDE     | Node.js 24.11–24.x; не требует GTK или сборочного окружения                    |
+| `@ai-projector/ide`    | Сервер, готовый веб-интерфейс, CLI, терминалы и агенты | Node.js 24.11–24.x; Python, make и C++ compiler для сборки `node-pty` на Linux |
+| `@ai-projector/native` | GTK-палитра и каталог приложений GIO                   | IDE той же версии, GTK4, GObject Introspection и зависимости сборки `node-gtk` |
+| `@ai-projector/hub`    | Общий веб-origin Hub и туннели к устройствам с IDE     | Node.js 24.11–24.x; не требует GTK или сборочного окружения                    |
 
-Внутренние workspace-пакеты `@projector-ai/client`, `@projector-ai/server`, `@projector-ai/native`, `@projector-ai/core`, `@projector-ai/cli` и `@projector-ai/hub` остаются `private`; публикуются только собранные артефакты из `artifacts/distribution`. Имена, `bin` и зависимости артефактов задаёт `scripts/build-distribution.mjs`.
+Внутренние workspace-пакеты `@ai-projector/client`, `@ai-projector/server`, `@ai-projector/native`, `@ai-projector/core`, `@ai-projector/cli` и `@ai-projector/hub` остаются `private`; публикуются только собранные артефакты из `artifacts/distribution`. Имена, `bin` и зависимости артефактов задаёт `scripts/build-distribution.mjs`.
 
 ## Установка из npm
 
 ```bash
 # Только IDE — GTK, vio и Vite не устанавливаются.
-npm install -g @projector-ai/ide
+npm install -g @ai-projector/ide
 projector --browser
 
 # Необязательное дополнение — в тот же npm prefix.
-npm install -g @projector-ai/native
+npm install -g @ai-projector/native
 projector --native
 
 # Отдельный Hub — можно поставить на другую машину или VPS.
-npm install -g @projector-ai/hub
+npm install -g @ai-projector/hub
 PROJECTOR_HUB_PASSWORD='<пароль браузера>' \
 PROJECTOR_HUB_DEVICE_TOKEN='<токен устройств>' \
 projector-hub
@@ -92,9 +92,9 @@ vp run verify:distribution
 То же можно сделать из CLI (npm >= 11.15 и 2FA):
 
 ```bash
-npm trust github @projector-ai/ide --file publish.yml --repo Sdju/projector --allow-publish
-npm trust github @projector-ai/native --file publish.yml --repo Sdju/projector --allow-publish
-npm trust github @projector-ai/hub --file publish.yml --repo Sdju/projector --allow-publish
+npm trust github @ai-projector/ide --file publish.yml --repo Sdju/projector --allow-publish
+npm trust github @ai-projector/native --file publish.yml --repo Sdju/projector --allow-publish
+npm trust github @ai-projector/hub --file publish.yml --repo Sdju/projector --allow-publish
 ```
 
 Конфигурация должна подтвердиться первым успешным publish в течение двух дней. После проверки OIDC можно включить **Settings → Publishing access → Require two-factor authentication and disallow tokens**.
@@ -105,7 +105,7 @@ Workflow `.github/workflows/publish.yml` запускается на `release: p
 
 - Проверяет, что тег `vX.Y.Z` совпадает с `version` в корневом `package.json`.
 - Собирает и проверяет все три пакета.
-- Публикует `@projector-ai/ide`, затем `@projector-ai/native` и `@projector-ai/hub`.
+- Публикует `@ai-projector/ide`, затем `@ai-projector/native` и `@ai-projector/hub`.
 - Пропускает уже опубликованную версию, поэтому повторный запуск безопасен.
 - Требует `permissions: id-token: write`; provenance создаётся автоматически.
 
@@ -113,7 +113,7 @@ Workflow `.github/workflows/publish.yml` запускается на `release: p
 
 ## Поведение без дополнения
 
-Без `@projector-ai/native` обычный запуск с режимом `native` открывает браузер. Явные `--browser` и `--window` сохраняют своё поведение. Сохранённый выбор интерфейса не перезаписывается. Если дополнение установлено при работающем web-резиденте, перезапустите Projector, чтобы заменить его нативным; restart завершает терминалы и дочерние процессы.
+Без `@ai-projector/native` обычный запуск с режимом `native` открывает браузер. Явные `--browser` и `--window` сохраняют своё поведение. Сохранённый выбор интерфейса не перезаписывается. Если дополнение установлено при работающем web-резиденте, перезапустите Projector, чтобы заменить его нативным; restart завершает терминалы и дочерние процессы.
 
 Файлы, Git, поиск, терминалы, агенты, фоновые задания, Docker, Dev Container, LAN и PWA используют тот же сервер. Трей и глобальный хоткей работают через OS-резидент без GTK; для них нужна поддерживаемая desktop-сессия. В Linux без дополнения недоступен каталог системных приложений GIO; поиск проектов работает. Каталоги приложений Windows и macOS не требуют GTK.
 
@@ -127,7 +127,7 @@ Hub не содержит локального API Projector и не требу�
 
 `scripts/build-distribution.mjs` сохраняет структуру `packages/core`, `packages/server`, `packages/cli`, ресурсы и готовый `dist` внутри IDE. TypeScript преобразуется в JavaScript, импорты и пути helper-процессов переписываются для собранных файлов. Node не пытается снимать типы внутри `node_modules`; запускаются также скомпилированные agent-host, раннеры и MCP-серверы.
 
-Native содержит скомпилированный Vue-компонент и зависит от IDE той же версии. Общие модули берёт из экспортов `@projector-ai/ide/core/*`; сервер разрешает entrypoint по package exports, а загрузчик GI — относительно самого дополнения. Корневые devDependencies checkout для этого не нужны.
+Native содержит скомпилированный Vue-компонент и зависит от IDE той же версии. Общие модули берёт из экспортов `@ai-projector/ide/core/*`; сервер разрешает entrypoint по package exports, а загрузчик GI — относительно самого дополнения. Корневые devDependencies checkout для этого не нужны.
 
 Hub собирается отдельным пакетом со своей копией `core` и общего `dist`, поэтому публичный `projector-hub` работает без установленного IDE. Остальные части `core` не загружаются: Hub импортирует только протокол туннеля. Внутренние импорты между workspace-пакетами в собранном виде заменяются на относительные пути или на публичный entrypoint IDE.
 
@@ -139,5 +139,5 @@ Hub собирается отдельным пакетом со своей ко�
 
 ## Известные ограничения установки
 
-- npm 12 по умолчанию не запускает install-скрипты. Для IDE разрешите `node-pty`, для native — ещё и `node-gtk`: `npm install -g --allow-scripts=node-pty @projector-ai/ide` и `npm install -g --allow-scripts=node-pty,node-gtk @projector-ai/native`. Hub не требует install-скриптов.
-- Глобальная установка `@projector-ai/native` на npm 11/12 может упасть в install-скрипте `node-gtk` (`npx node-pre-gyp`). Если это произошло, установите native с `--ignore-scripts` и соберите `node-gtk` вручную из его каталога через `@mapbox/node-pre-gyp install --fallback-to-build`; установка native в проект вместо глобальной также обходит это ограничение.
+- npm 12 по умолчанию не запускает install-скрипты. Для IDE разрешите `node-pty`, для native — ещё и `node-gtk`: `npm install -g --allow-scripts=node-pty @ai-projector/ide` и `npm install -g --allow-scripts=node-pty,node-gtk @ai-projector/native`. Hub не требует install-скриптов.
+- Глобальная установка `@ai-projector/native` на npm 11/12 может упасть в install-скрипте `node-gtk` (`npx node-pre-gyp`). Если это произошло, установите native с `--ignore-scripts` и соберите `node-gtk` вручную из его каталога через `@mapbox/node-pre-gyp install --fallback-to-build`; установка native в проект вместо глобальной также обходит это ограничение.

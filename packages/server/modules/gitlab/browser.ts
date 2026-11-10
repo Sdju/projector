@@ -3,8 +3,8 @@ import type {
   GitlabEntry,
   GitlabFile,
   GitlabRepository,
-} from "@projector-ai/core/modules/gitlab/index.ts";
-import type { GitCommit } from "@projector-ai/core/modules/workspace/index.ts";
+} from "@ai-projector/core/modules/gitlab/index.ts";
+import type { GitCommit } from "@ai-projector/core/modules/workspace/index.ts";
 import { gitlabBytes, gitlabReader, type GitlabReader } from "./api.ts";
 
 const FILE_LIMIT = 5 * 1024 * 1024;

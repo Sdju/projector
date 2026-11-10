@@ -2,7 +2,7 @@
 import UiMessage from "../../common/ui/UiMessage.vue";
 import UiButton from "../../common/ui/UiButton.vue";
 import { useRoute, useRouter } from "vue-router";
-import type { GitlabRepository } from "@projector-ai/core/modules/gitlab/index.ts";
+import type { GitlabRepository } from "@ai-projector/core/modules/gitlab/index.ts";
 import {
   ProjectWorkspace,
   IssueView,

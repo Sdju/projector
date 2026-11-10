@@ -2,7 +2,7 @@
 import UiHint from "../../../../../common/ui/UiHint.vue";
 import UiStatusDot from "../../../../../common/ui/UiStatusDot.vue";
 import { computed } from "vue";
-import { durationLabel, PIPELINE_STATUS_TONE } from "@projector-ai/core/modules/workspace/index.ts";
+import { durationLabel, PIPELINE_STATUS_TONE } from "@ai-projector/core/modules/workspace/index.ts";
 import { groupPipelineStages } from "../../../../workspace-api/index.ts";
 import { usePullPipeline } from "../lib/pull-pipeline.ts";
 

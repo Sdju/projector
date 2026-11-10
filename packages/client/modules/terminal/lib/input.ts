@@ -1,5 +1,5 @@
 import type { Terminal } from "@xterm/xterm";
-import type { TerminalClientMessage } from "@projector-ai/core/modules/terminal/index.ts";
+import type { TerminalClientMessage } from "@ai-projector/core/modules/terminal/index.ts";
 
 /** Keep IME/text in UTF-8 and legacy mouse reports in their original bytes. */
 export function bindTerminalInput(

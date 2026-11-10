@@ -7,7 +7,7 @@ import {
   type FileContent,
   type FileScope,
   type FileSides,
-} from "@projector-ai/core/modules/workspace/index.ts";
+} from "@ai-projector/core/modules/workspace/index.ts";
 import { workspaceRequest, workspaceScopeRequest } from "../../workspace-api/index.ts";
 
 /**

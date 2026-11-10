@@ -2,8 +2,8 @@ import {
   appUrl,
   readNetworkMode,
   writeNetworkMode,
-} from "@projector-ai/core/modules/app-paths/index.ts";
-import { isNetworkMode } from "@projector-ai/core/modules/network-mode/index.ts";
+} from "@ai-projector/core/modules/app-paths/index.ts";
+import { isNetworkMode } from "@ai-projector/core/modules/network-mode/index.ts";
 import { HttpError } from "../../../modules/http/index.ts";
 import { restartProjector } from "../../../modules/restart/index.ts";
 import {

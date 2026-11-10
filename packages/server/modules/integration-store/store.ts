@@ -1,8 +1,8 @@
 import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
-import { os } from "@projector-ai/core/modules/os/index.ts";
+import { os } from "@ai-projector/core/modules/os/index.ts";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
+import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import { vault as systemVault } from "../secrets/index.ts";
 import { HttpError } from "../http/index.ts";
 

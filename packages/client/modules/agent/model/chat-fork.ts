@@ -4,7 +4,7 @@ import { chatKeyOf } from "../../agent-core/index.ts";
 import { holdDraft } from "../../agent-core/index.ts";
 import { isBuiltinAgent } from "../../agent-core/index.ts";
 import type { AgentBackendId, AgentTurn } from "../../agent-core/index.ts";
-import type { AgentRoleSnapshot } from "@projector-ai/core/modules/agent-role/index.ts";
+import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 
 export interface ForkRequest {
   backend: AgentBackendId;

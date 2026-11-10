@@ -1,4 +1,4 @@
-import type { UsageAnalytics } from "@projector-ai/core/modules/usage-analytics/index.ts";
+import type { UsageAnalytics } from "@ai-projector/core/modules/usage-analytics/index.ts";
 
 /** The whole analytics answer: chat usage of the range and the newest limit windows. */
 export async function readUsageAnalytics(days: number): Promise<UsageAnalytics> {

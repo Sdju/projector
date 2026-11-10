@@ -3,7 +3,7 @@ import {
   JUDGE_DEFAULTS,
   normalizeJudgeSettings,
   type JudgeSettings,
-} from "@projector-ai/core/modules/agent-judge/index.ts";
+} from "@ai-projector/core/modules/agent-judge/index.ts";
 import { commandArgs, useCommandScope } from "../../../../../common/utilities/commands.ts";
 import { readJudgeSettings, writeJudgeSettings } from "../api/judge.ts";
 

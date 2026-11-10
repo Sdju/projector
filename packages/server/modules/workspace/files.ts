@@ -1,4 +1,4 @@
-import { os } from "@projector-ai/core/modules/os/index.ts";
+import { os } from "@ai-projector/core/modules/os/index.ts";
 import { lstat, open, readdir, realpath, rename, unlink, mkdir, cp, rm } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -9,7 +9,7 @@ import {
   MAX_TEXT_BYTES,
   moveDestination,
   treePageRange,
-} from "@projector-ai/core/modules/workspace/index.ts";
+} from "@ai-projector/core/modules/workspace/index.ts";
 import { ignoredPaths } from "./ignored.ts";
 import {
   MAX_BYTES,
@@ -20,10 +20,10 @@ import {
   pathExcluded,
   validatePath,
 } from "./paths.ts";
-import { isExcludedPath } from "@projector-ai/core/modules/workspace/index.ts";
+import { isExcludedPath } from "@ai-projector/core/modules/workspace/index.ts";
 
 const archiveHelper = fileURLToPath(new URL("./archive.py", import.meta.url));
-import type { FileContent, ArchiveContent } from "@projector-ai/core/modules/workspace/index.ts";
+import type { FileContent, ArchiveContent } from "@ai-projector/core/modules/workspace/index.ts";
 
 const IMAGE_TYPES: Record<string, string> = {
   png: "image/png",

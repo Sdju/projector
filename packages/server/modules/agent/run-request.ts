@@ -20,7 +20,7 @@ import { isHostedAgent, runAgent } from "./registry.ts";
 import { driveRun, isRunDriven, joinRun, type RunViewer } from "./run-hub.ts";
 import { broadcastEvent, hasEventClient } from "../events/index.ts";
 import { asString, json } from "../transport/index.ts";
-import { resolveJudgeSettings } from "@projector-ai/core/modules/agent-judge/index.ts";
+import { resolveJudgeSettings } from "@ai-projector/core/modules/agent-judge/index.ts";
 import { createJudgedApproval, readJudgeSettings } from "../judge/index.ts";
 
 /**

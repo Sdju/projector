@@ -19,9 +19,9 @@ import {
   launchSectionTitles,
   parseLaunchQuery,
   resolveLauncherAction,
-} from "@projector-ai/core/modules/launcher/index.ts";
-import type { LaunchAction } from "@projector-ai/core/modules/launcher/index.ts";
-import { createLauncherModel } from "@projector-ai/core/modules/launcher/index.ts";
+} from "@ai-projector/core/modules/launcher/index.ts";
+import type { LaunchAction } from "@ai-projector/core/modules/launcher/index.ts";
+import { createLauncherModel } from "@ai-projector/core/modules/launcher/index.ts";
 
 const router = useRouter();
 const client = createLauncherClient();

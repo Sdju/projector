@@ -1,8 +1,8 @@
 import { join } from "node:path";
 import { realpath, writeFile, rm } from "node:fs/promises";
-import { os } from "@projector-ai/core/modules/os/index.ts";
-import type { Project } from "@projector-ai/core/modules/project/index.ts";
-import type { DockerEnvironment } from "@projector-ai/core/modules/environment/index.ts";
+import { os } from "@ai-projector/core/modules/os/index.ts";
+import type { Project } from "@ai-projector/core/modules/project/index.ts";
+import type { DockerEnvironment } from "@ai-projector/core/modules/environment/index.ts";
 import { runEnvironmentCommand } from "../environments/index.ts";
 import { HttpError } from "../http/index.ts";
 

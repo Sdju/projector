@@ -5,7 +5,7 @@ import {
   fileScopeKey,
   isLiveScope,
   type FileScope,
-} from "@projector-ai/core/modules/workspace/index.ts";
+} from "@ai-projector/core/modules/workspace/index.ts";
 import { isLiveFile, type OpenFile, type OpenFileOptions } from "../open-file.ts";
 import { useSessionSnapshot } from "../../../common/utilities/session-snapshot.ts";
 import { workspaceSessionSchema, type WorkspaceSession } from "../session.ts";

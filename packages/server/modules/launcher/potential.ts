@@ -1,7 +1,7 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { sameLocalPath, type Project } from "../projects/index.ts";
-import type { LaunchItem } from "@projector-ai/core/modules/launcher/index.ts";
+import type { LaunchItem } from "@ai-projector/core/modules/launcher/index.ts";
 import { isDirectory } from "./folders.ts";
 import { tildePath, workspaceRoute } from "./project-entries.ts";
 

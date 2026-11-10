@@ -2,14 +2,14 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
+import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import {
   activeExcludePatterns,
   defaultFilesExclude,
   isExcludedPath,
   normalizeFilesExclude,
   type FilesExcludeMap,
-} from "@projector-ai/core/modules/workspace/index.ts";
+} from "@ai-projector/core/modules/workspace/index.ts";
 
 const settingsPath = () => join(dataDir(), "files-exclude.json");
 const override = new AsyncLocalStorage<FilesExcludeMap>();

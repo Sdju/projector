@@ -3,7 +3,7 @@ import UiArticle from "../../../../../common/ui/UiArticle.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
 import UiViewerPage from "../../../../../common/ui/UiViewerPage.vue";
 import { computed, ref, watch } from "vue";
-import type { GitCommitDetail } from "@projector-ai/core/modules/workspace/index.ts";
+import type { GitCommitDetail } from "@ai-projector/core/modules/workspace/index.ts";
 import { commandArgs, useCommandScope } from "../../../../../common/utilities/commands.ts";
 import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab-readout.ts";
 import CommitFiles from "./CommitFiles.vue";

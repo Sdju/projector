@@ -8,7 +8,7 @@ import type {
   ReleaseAsset,
   ReleaseDetail,
   ReleaseList,
-} from "@projector-ai/core/modules/workspace/index.ts";
+} from "@ai-projector/core/modules/workspace/index.ts";
 
 const RELEASE_PAGE = 30;
 const SOURCE_FORMAT = new Set(["zip", "tar.gz"]);

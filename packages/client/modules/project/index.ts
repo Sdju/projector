@@ -38,8 +38,8 @@ export {
   formatProjectRef,
   projectRefSegments,
   isAbsoluteLocalPath,
-} from "@projector-ai/core/modules/project/index.ts";
-export type { ProjectRef } from "@projector-ai/core/modules/project/index.ts";
+} from "@ai-projector/core/modules/project/index.ts";
+export type { ProjectRef } from "@ai-projector/core/modules/project/index.ts";
 export {
   GITLAB_DEFAULT_INSTANCE,
   GITLAB_PREFIX,
@@ -47,11 +47,11 @@ export {
   normalizeGitlabProjectPath,
   gitlabProjectRoute,
   gitlabProjectKey,
-} from "@projector-ai/core/modules/gitlab/index.ts";
+} from "@ai-projector/core/modules/gitlab/index.ts";
 export type {
   GitlabRepository,
   GitlabEntry,
   GitlabFile,
-} from "@projector-ai/core/modules/gitlab/index.ts";
+} from "@ai-projector/core/modules/gitlab/index.ts";
 export type { ProjectLocation } from "./model/types.ts";
 export { default as ProjectOpening } from "./ui/ProjectOpening.vue";

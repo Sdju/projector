@@ -9,9 +9,9 @@ import type { AgentRunRecord } from "./agent-runs.ts";
 import type { AgentBackendId, AgentEventName, AgentPermissionMode } from "./backend.ts";
 import type { AgentHistoryTurn } from "../providers/index.ts";
 import type { AgentSelection } from "./controls.ts";
-import type { AgentRoleSnapshot } from "@projector-ai/core/modules/agent-role/index.ts";
+import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 import { changedSince, snapshotGit } from "./jobs-files.ts";
-import { resolveJudgeSettings } from "@projector-ai/core/modules/agent-judge/index.ts";
+import { resolveJudgeSettings } from "@ai-projector/core/modules/agent-judge/index.ts";
 import { createJudgedApproval, readJudgeSettings } from "../judge/index.ts";
 import { readChatJudge } from "./judge-store.ts";
 import {

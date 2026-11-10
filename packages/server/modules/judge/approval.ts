@@ -2,7 +2,7 @@ import {
   judgeAllows,
   type JudgeSettings,
   type JudgeVerdict,
-} from "@projector-ai/core/modules/agent-judge/index.ts";
+} from "@ai-projector/core/modules/agent-judge/index.ts";
 import { judgeAction, type JudgeAction } from "./verdict.ts";
 
 /** The part of an approval request the judge reads; the backend may add more. */

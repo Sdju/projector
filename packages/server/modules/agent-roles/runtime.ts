@@ -1,7 +1,7 @@
 import { access } from "node:fs/promises";
 import { join } from "node:path";
-import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
-import type { AgentRoleSnapshot } from "@projector-ai/core/modules/agent-role/index.ts";
+import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
+import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 
 /** The same spelling the Projector skill loader accepts; a role name must not escape its folder. */
 const RESOURCE_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;

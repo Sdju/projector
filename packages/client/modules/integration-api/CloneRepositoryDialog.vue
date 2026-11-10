@@ -7,7 +7,7 @@ import UiHeading from "../../common/ui/UiHeading.vue";
 import UiInline from "../../common/ui/UiInline.vue";
 import UiLabel from "../../common/ui/UiLabel.vue";
 import UiMessage from "../../common/ui/UiMessage.vue";
-import { DEFAULT_ENVIRONMENT_IMAGE } from "@projector-ai/core/modules/environment/index.ts";
+import { DEFAULT_ENVIRONMENT_IMAGE } from "@ai-projector/core/modules/environment/index.ts";
 import { computed, nextTick, onBeforeUnmount, ref, useId } from "vue";
 import { commandArgs, useCommandScope } from "../../common/utilities/commands.ts";
 import { pickFolder, useProjects, type Project } from "../project/index.ts";

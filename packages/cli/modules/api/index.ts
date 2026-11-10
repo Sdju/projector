@@ -3,8 +3,8 @@ import type {
   LaunchActionId,
   LaunchItem,
   LaunchResult,
-} from "@projector-ai/core/modules/launcher/index.ts";
-import type { ProcessSnapshot, Project } from "@projector-ai/core/modules/project/index.ts";
+} from "@ai-projector/core/modules/launcher/index.ts";
+import type { ProcessSnapshot, Project } from "@ai-projector/core/modules/project/index.ts";
 
 export interface HealthInfo {
   ok: true;

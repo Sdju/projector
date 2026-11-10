@@ -14,7 +14,7 @@ import {
   PIPELINE_STATUS_LABEL,
   PIPELINE_STATUS_TONE,
   refLabel,
-} from "@projector-ai/core/modules/workspace/index.ts";
+} from "@ai-projector/core/modules/workspace/index.ts";
 
 /** Job tab: status, stage and the readonly trace of one CI job. */
 const props = withDefaults(defineProps<{ projectId: string; id: number; host?: string }>(), {

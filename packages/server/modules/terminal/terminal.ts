@@ -7,7 +7,7 @@ import {
 import { readTerminalProcesses, terminalActivity } from "./terminal-activity.ts";
 import { randomUUID } from "node:crypto";
 import { rmSync } from "node:fs";
-import { os, bashShellLaunch, type ShellLaunch } from "@projector-ai/core/modules/os/index.ts";
+import { os, bashShellLaunch, type ShellLaunch } from "@ai-projector/core/modules/os/index.ts";
 import { terminateProcessTree } from "./terminate.ts";
 import { saveDroppedFile } from "./drop-files.ts";
 import { scenarioDirectory } from "./scenario-folder.ts";
@@ -21,7 +21,7 @@ import serialization from "@xterm/addon-serialize";
 import type {
   TerminalProgram,
   TerminalSession,
-} from "@projector-ai/core/modules/terminal/index.ts";
+} from "@ai-projector/core/modules/terminal/index.ts";
 import { trackMouseEncoding } from "./terminal-mouse.ts";
 import {
   MAX_SESSIONS,

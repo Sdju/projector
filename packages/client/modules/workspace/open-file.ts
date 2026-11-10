@@ -3,7 +3,7 @@ import {
   isLiveScope,
   type FileContent,
   type FileScope,
-} from "@projector-ai/core/modules/workspace/index.ts";
+} from "@ai-projector/core/modules/workspace/index.ts";
 import type { TabParams } from "../workspace-api/index.ts";
 
 export interface OpenFile extends FileContent {

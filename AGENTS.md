@@ -17,7 +17,7 @@ vp run build
 
 ## Критично для разработки
 
-- **Код — в pnpm workspace `packages/`**: `@projector-ai/client`, `server`, `native`, `core` и `cli`. Между пакетами импортируйте по имени (`@projector-ai/core/...`), внутри — относительными путями. Оболочка приложения, тесты и конфиги остаются в корне. Внешние зависимости задаются через `catalog` в `pnpm-workspace.yaml`, в манифестах — только `catalog:`.
+- **Код — в pnpm workspace `packages/`**: `@ai-projector/client`, `server`, `native`, `core` и `cli`. Между пакетами импортируйте по имени (`@ai-projector/core/...`), внутри — относительными путями. Оболочка приложения, тесты и конфиги остаются в корне. Внешние зависимости задаются через `catalog` в `pnpm-workspace.yaml`, в манифестах — только `catalog:`.
 - **FEOD обязателен:** импортируйте модули через публичные `index.ts`, сохраняйте границы платформ и отсутствие циклов. См. [архитектуру](docs/architecture.md).
 - **Форматируйте только через `vp fmt` (Oxfmt).** Не используйте Prettier, Biome или форматирование Volar. Hooks устанавливает `vp install`; в существующем checkout — `vp hooks enable`. Pre-commit форматирует staged-файлы, сохраняя остальные правки.
 - **Проверяйте точечно, полный gate — перед коммитом/PR.** После падения полного gate воспроизведите ошибку точечно, исправьте и повторите gate. Команды — ниже.
@@ -25,7 +25,7 @@ vp run build
 - **Каждое действие UI регистрируйте как команду `ide.*`**; кнопки, меню и хоткеи вызывают её. Агент видит только зарегистрированные команды, поэтому заполняйте понятные `title` и `description`. См. [SDK команд](docs/ide-commands.md).
 - **Перед проверками сервера смотрите `/api/health` и `/api/status`.** Полный restart и `projector quit` завершают терминалы и дочерние процессы. HMR не должен дублировать процессы и подписки; native обновляется отдельно от сервера.
 - **Настройки хранятся на диске** в `$XDG_DATA_HOME/projector` (по умолчанию `~/.local/share/projector`), не в `localStorage`. Файлы с ключами не включайте в Git и отчёты.
-- **Релиз в npm — только через OIDC.** `.github/workflows/publish.yml` публикует `@projector-ai/ide` и `@projector-ai/native` из GitHub Release; не добавляйте `NPM_TOKEN`. Первый выпуск каждого имени до настройки trusted publisher делается вручную, детали — в [docs/distribution.md](docs/distribution.md).
+- **Релиз в npm — только через OIDC.** `.github/workflows/publish.yml` публикует `@ai-projector/ide` и `@ai-projector/native` из GitHub Release; не добавляйте `NPM_TOKEN`. Первый выпуск каждого имени до настройки trusted publisher делается вручную, детали — в [docs/distribution.md](docs/distribution.md).
 - **Системные операции — через `packages/core/modules/os`**; общее поведение поиска — в `packages/core/modules/launcher`. См. [OS](docs/os.md).
 - **При изменении UI проверяйте реальное взаимодействие:** фокус окна, drag на границах, контекстное меню, IME и восстановление терминала. В браузерных инструментах указывайте `pageId` и обновляйте snapshot/UID после навигации или HMR.
 - **API/PTY/GTK-проверкам нужны сокеты и desktop.** `EPERM` или недоступный display сначала проверяйте как ограничение среды.

@@ -1,8 +1,8 @@
 import { mkdir, readFile, writeFile, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
-import { parseKeybindings } from "@projector-ai/core/modules/ide/index.ts";
+import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
+import { parseKeybindings } from "@ai-projector/core/modules/ide/index.ts";
 const settingsPath = () => join(dataDir(), "keybindings.json");
 let pending: Promise<unknown> = Promise.resolve();
 export async function readKeybindings() {

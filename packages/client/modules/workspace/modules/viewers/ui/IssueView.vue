@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import UiHint from "../../../../../common/ui/UiHint.vue";
 import { computed } from "vue";
-import type { IssueDetail } from "@projector-ai/core/modules/workspace/index.ts";
+import type { IssueDetail } from "@ai-projector/core/modules/workspace/index.ts";
 import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab-readout.ts";
 import { useTrackerDetail } from "../lib/tracker-detail.ts";
 import TrackerComments from "./TrackerComments.vue";

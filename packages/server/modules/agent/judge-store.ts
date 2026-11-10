@@ -1,7 +1,7 @@
 import {
   normalizeJudgeOverride,
   type JudgeOverride,
-} from "@projector-ai/core/modules/agent-judge/index.ts";
+} from "@ai-projector/core/modules/agent-judge/index.ts";
 import { historyDatabase } from "./history-store.ts";
 
 /** The chat's own Judge settings; absent means the global ones apply. */

@@ -2,7 +2,7 @@ import { clientAgents } from "../../agents-integration/catalog/index.ts";
 import {
   normalizeRoleSnapshot,
   type AgentRoleSnapshot,
-} from "@projector-ai/core/modules/agent-role/index.ts";
+} from "@ai-projector/core/modules/agent-role/index.ts";
 
 /** A tab parameter is a string; the snapshot travels as JSON and is parsed by the view. */
 export function roleParam(role: AgentRoleSnapshot): string {

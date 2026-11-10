@@ -1,5 +1,5 @@
 {
-  "name": "@projector-ai/cli",
+  "name": "@ai-projector/cli",
   "version": "0.11.0",
   "private": true,
   "type": "module",
@@ -7,6 +7,6 @@
     "./*": "./*"
   },
   "dependencies": {
-    "@projector-ai/core": "workspace:*"
+    "@ai-projector/core": "workspace:*"
   }
 }

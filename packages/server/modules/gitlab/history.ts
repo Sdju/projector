@@ -3,7 +3,7 @@ import type {
   CommitComparison,
   GitCommitDetail,
   GitLog,
-} from "@projector-ai/core/modules/workspace/index.ts";
+} from "@ai-projector/core/modules/workspace/index.ts";
 import { gitlabReader, type GitlabPage, type GitlabReader } from "./api.ts";
 import {
   browseGitlabFile,

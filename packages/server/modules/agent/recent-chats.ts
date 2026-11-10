@@ -1,6 +1,6 @@
 import { currentSession, deleteHistory, historyDatabase, loadHistory } from "./history-store.ts";
 import { readChatRole } from "./role-store.ts";
-import type { AgentRoleSnapshot } from "@projector-ai/core/modules/agent-role/index.ts";
+import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 
 /** A chat of the project, open in a tab or closed but still on disk. */
 export interface RecentChat {

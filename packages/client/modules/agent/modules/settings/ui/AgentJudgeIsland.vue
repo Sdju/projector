@@ -14,7 +14,7 @@ import {
   resolveJudgeSettings,
   type JudgeOverride,
   type JudgeSettings,
-} from "@projector-ai/core/modules/agent-judge/index.ts";
+} from "@ai-projector/core/modules/agent-judge/index.ts";
 import { readJudgeSettings } from "../api/judge.ts";
 import AgentJudgeFields from "./AgentJudgeFields.vue";
 

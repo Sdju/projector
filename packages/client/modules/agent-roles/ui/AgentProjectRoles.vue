@@ -10,7 +10,7 @@ import { clientAgents } from "../../agents-integration/catalog/index.ts";
 import { roleControls } from "../model/roles.ts";
 import { roleResources } from "../model/resources.ts";
 import { useProjectRoleSettings } from "../model/project-roles.ts";
-import type { AgentRole } from "@projector-ai/core/modules/agent-role/index.ts";
+import type { AgentRole } from "@ai-projector/core/modules/agent-role/index.ts";
 import type { Project } from "../../project/index.ts";
 
 const props = defineProps<{ project: Project }>();

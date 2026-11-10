@@ -7,7 +7,7 @@ import { publishAgentUsage } from "../../_/usage-summary.ts";
 import { useUsagePolling } from "../../_/use-usage-polling.ts";
 import { USAGE_PERIOD_SECONDS } from "../../_/usage-pace.ts";
 import IconCodex from "~icons/simple-icons/openai";
-import type { CodexUsage } from "@projector-ai/core/modules/agents-integration/codex/index.ts";
+import type { CodexUsage } from "@ai-projector/core/modules/agents-integration/codex/index.ts";
 import { resetTimestamp } from "../../../../common/utilities/reset-time.ts";
 
 const { usage, failed } = useUsagePolling<CodexUsage>("/api/codex/usage");

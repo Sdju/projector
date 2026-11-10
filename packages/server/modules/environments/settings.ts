@@ -1,8 +1,8 @@
-import { os } from "@projector-ai/core/modules/os/index.ts";
+import { os } from "@ai-projector/core/modules/os/index.ts";
 import {
   DEFAULT_ENVIRONMENT_IMAGE,
   type DockerEnvironment,
-} from "@projector-ai/core/modules/environment/index.ts";
+} from "@ai-projector/core/modules/environment/index.ts";
 import { HttpError } from "../http/index.ts";
 
 export function parseDockerEnvironment(

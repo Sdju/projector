@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import UiListSection from "../../../../../common/ui/UiListSection.vue";
-import type { Release } from "@projector-ai/core/modules/workspace/index.ts";
+import type { Release } from "@ai-projector/core/modules/workspace/index.ts";
 import { useReleases } from "../lib/releases.ts";
 import { useReleasesPanel } from "../lib/release-panel.ts";
 import ReleaseRow from "./ReleaseRow.vue";

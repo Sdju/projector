@@ -4,7 +4,7 @@ import type {
   GitCommit,
   GitOverview,
   GraphRow,
-} from "@projector-ai/core/modules/workspace/index.ts";
+} from "@ai-projector/core/modules/workspace/index.ts";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import {
   absoluteTime,

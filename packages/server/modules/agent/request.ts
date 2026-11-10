@@ -3,8 +3,8 @@ import { resolveAgentBackend } from "./registry.ts";
 import { selectionFrom } from "./controls.ts";
 import { worktreeCwd, createWorktree } from "./worktrees.ts";
 import { asString } from "../transport/index.ts";
-import { normalizeJudgeOverride } from "@projector-ai/core/modules/agent-judge/index.ts";
-import { normalizeRoleSnapshot } from "@projector-ai/core/modules/agent-role/index.ts";
+import { normalizeJudgeOverride } from "@ai-projector/core/modules/agent-judge/index.ts";
+import { normalizeRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 
 import type { MessagePart } from "./index.ts";
 import type { AgentHistoryTool, AgentHistoryTurn } from "../providers/index.ts";

@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { os } from "@projector-ai/core/modules/os/index.ts";
+import { os } from "@ai-projector/core/modules/os/index.ts";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 
 const PREFIX = "enc:v1:";

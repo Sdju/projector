@@ -6,7 +6,7 @@ import {
   type FileChange,
   type FileChangeList,
   type FileSides,
-} from "@projector-ai/core/modules/workspace/index.ts";
+} from "@ai-projector/core/modules/workspace/index.ts";
 import { git, gitText } from "./git.ts";
 import { excludePatterns } from "./files-exclude.ts";
 import { resolveRevision, validateRelativePath } from "./git-tree.ts";

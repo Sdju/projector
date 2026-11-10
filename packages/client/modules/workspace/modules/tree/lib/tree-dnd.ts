@@ -9,7 +9,7 @@ import {
   parentPath,
   relocatedPath,
   type FileEntry,
-} from "@projector-ai/core/modules/workspace/index.ts";
+} from "@ai-projector/core/modules/workspace/index.ts";
 import type { TreeContext } from "./tree-operations.ts";
 
 /** Перетаскивание записей дерева: выбор цели, подсветка и перенос. */

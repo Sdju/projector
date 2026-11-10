@@ -66,7 +66,7 @@ import { useRewindPanel } from "../modules/panels/index.ts";
 import { useWorktreePanel } from "../modules/panels/index.ts";
 import { chatUsageByTurn } from "../model/chat-usage.ts";
 import type { AgentBackendId, ChatUsage, RewindScope } from "../../agent-core/index.ts";
-import type { AgentRoleSnapshot } from "@projector-ai/core/modules/agent-role/index.ts";
+import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 import IconArrowDown from "~icons/lucide/arrow-down";
 import IconSquarePen from "~icons/lucide/square-pen";
 const props = withDefaults(

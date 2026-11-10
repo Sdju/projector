@@ -4,7 +4,7 @@ import { computed } from "vue";
 import type {
   LimitSeries,
   UsagePaceTone,
-} from "@projector-ai/core/modules/usage-analytics/index.ts";
+} from "@ai-projector/core/modules/usage-analytics/index.ts";
 import { resetCountdown, resetTimestamp } from "../../../common/utilities/reset-time.ts";
 import { formatPercent } from "../model/format.ts";
 

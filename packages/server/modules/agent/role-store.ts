@@ -1,7 +1,7 @@
 import {
   normalizeRoleSnapshot,
   type AgentRoleSnapshot,
-} from "@projector-ai/core/modules/agent-role/index.ts";
+} from "@ai-projector/core/modules/agent-role/index.ts";
 import { historyDatabase } from "./history-store.ts";
 
 /** The role a chat was started with; absent means it has no role of its own. */

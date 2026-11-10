@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { ProviderSpend } from "@projector-ai/core/modules/usage-analytics/index.ts";
+import type { ProviderSpend } from "@ai-projector/core/modules/usage-analytics/index.ts";
 import { formatDayAt, formatMoney, formatTimeAt } from "../model/format.ts";
 import UsageLine from "./UsageLine.vue";
 

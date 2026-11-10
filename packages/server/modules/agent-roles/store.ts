@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
+import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import {
   BUILTIN_SERVICE_ROLES,
   SERVICE_ROLE_IDS,
@@ -13,7 +13,7 @@ import {
   type AgentRoleSelection,
   type AgentRoleView,
   type ServiceRoleId,
-} from "@projector-ai/core/modules/agent-role/index.ts";
+} from "@ai-projector/core/modules/agent-role/index.ts";
 import { projectRoleState } from "./project.ts";
 
 /** The user's choices for the built-in service roles: `$XDG_DATA_HOME/projector/agent/roles.json`. */

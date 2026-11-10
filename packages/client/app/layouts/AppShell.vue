@@ -4,7 +4,7 @@ import { ActivityIsland } from "../../modules/agent/index.ts";
 import { useCommandScope, commandArgs } from "../../common/utilities/commands.ts";
 import { useCompactViewport } from "../../common/utilities/compact-viewport.ts";
 import { computed, ref } from "vue";
-import { githubProjectRoute } from "@projector-ai/core/modules/github/index.ts";
+import { githubProjectRoute } from "@ai-projector/core/modules/github/index.ts";
 import { useRoute, useRouter } from "vue-router";
 import {
   useProjects,

@@ -5,7 +5,7 @@ import UiMessage from "../../../../../common/ui/UiMessage.vue";
 import { copyWithNotice, toastErrors } from "../../../../../common/utilities/notice.ts";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useDebounceFn } from "@vueuse/core";
-import { layoutGraph } from "@projector-ai/core/modules/workspace/index.ts";
+import { layoutGraph } from "@ai-projector/core/modules/workspace/index.ts";
 import ContextMenu from "../../../../../common/ui/ContextMenu.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import type { ContextMenuItem } from "../../../../../common/ui/context-menu.ts";

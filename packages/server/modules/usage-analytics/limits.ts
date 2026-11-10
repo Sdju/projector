@@ -3,7 +3,7 @@ import {
   limitPeriodSeconds,
   type LimitPoint,
   type LimitSeries,
-} from "@projector-ai/core/modules/usage-analytics/index.ts";
+} from "@ai-projector/core/modules/usage-analytics/index.ts";
 import {
   insertLimitSample,
   readLatestLimitSamples,

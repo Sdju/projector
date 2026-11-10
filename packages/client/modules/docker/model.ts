@@ -3,8 +3,8 @@ import type {
   DockerSnapshot,
   DockerBinding,
   DockerAction,
-} from "@projector-ai/core/modules/docker/index.ts";
-import type { TerminalSession } from "@projector-ai/core/modules/terminal/index.ts";
+} from "@ai-projector/core/modules/docker/index.ts";
+import type { TerminalSession } from "@ai-projector/core/modules/terminal/index.ts";
 import { commandArgs, useCommandScope } from "../../common/utilities/commands.ts";
 import { openExternalLink } from "../../common/utilities/open-external-link.ts";
 import { dockerRequest } from "./client.ts";

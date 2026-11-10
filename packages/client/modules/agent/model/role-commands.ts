@@ -5,7 +5,7 @@ import { clientAgentByBackend } from "../../agents-integration/catalog/index.ts"
 import { loadChatRoles } from "../../agent-roles/index.ts";
 import { roleParam } from "../../agent-core/index.ts";
 import { useIdeCommands } from "../../ide/index.ts";
-import { snapshotOfRole } from "@projector-ai/core/modules/agent-role/index.ts";
+import { snapshotOfRole } from "@ai-projector/core/modules/agent-role/index.ts";
 import type { RegisterCommand } from "../../agent-core/index.ts";
 
 /** The part of the IDE command service a role launch needs: opening the chat tab. */

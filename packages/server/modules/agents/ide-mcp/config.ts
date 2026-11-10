@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { appUrl } from "@projector-ai/core/modules/app-paths/index.ts";
+import { appUrl } from "@ai-projector/core/modules/app-paths/index.ts";
 import { ideMcpTokenFile } from "../../ide/index.ts";
 
 /** Name of the built-in server; a project's own `.mcp.json` must not silently replace it. */

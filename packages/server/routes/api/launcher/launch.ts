@@ -7,7 +7,7 @@ import {
   type RouteDefinition,
 } from "../../../modules/transport/index.ts";
 
-import type { LaunchActionId } from "@projector-ai/core/modules/launcher/index.ts";
+import type { LaunchActionId } from "@ai-projector/core/modules/launcher/index.ts";
 
 export const routes: RouteDefinition[] = [
   {

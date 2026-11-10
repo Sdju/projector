@@ -4,8 +4,8 @@ import { fileURLToPath } from "node:url";
 import { handleApi } from "./api.ts";
 import { bindRuntime } from "./plugin.ts";
 import { serveStatic } from "./static.ts";
-import { APP_PORT, readNetworkMode } from "@projector-ai/core/modules/app-paths/index.ts";
-import { networkHost } from "@projector-ai/core/modules/network-mode/index.ts";
+import { APP_PORT, readNetworkMode } from "@ai-projector/core/modules/app-paths/index.ts";
+import { networkHost } from "@ai-projector/core/modules/network-mode/index.ts";
 import { authorizeHttp } from "../modules/access/index.ts";
 import { handleProxyHost, isProxyHost } from "../modules/browser/index.ts";
 

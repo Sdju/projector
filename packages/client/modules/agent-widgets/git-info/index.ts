@@ -1,4 +1,4 @@
-import { gitInfoWidget } from "@projector-ai/core/modules/agent-widgets/git-info/index.ts";
+import { gitInfoWidget } from "@ai-projector/core/modules/agent-widgets/git-info/index.ts";
 import type { WidgetEntry } from "../../widget-runtime/index.ts";
 import GitInfo from "./ui/GitInfo.vue";
 

@@ -12,7 +12,7 @@ import {
   proxyAvailableFor,
   proxySuffix,
   proxyUrl,
-} from "@projector-ai/core/modules/browser/index.ts";
+} from "@ai-projector/core/modules/browser/index.ts";
 import { browserProxyKey } from "./proxy-key.ts";
 import { useProjects } from "../project/index.ts";
 import IconBack from "~icons/lucide/arrow-left";

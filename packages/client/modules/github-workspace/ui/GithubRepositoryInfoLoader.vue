@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import UiAsyncContent from "../../../common/ui/UiAsyncContent.vue";
-import type { GithubRepository } from "@projector-ai/core/modules/github/index.ts";
+import type { GithubRepository } from "@ai-projector/core/modules/github/index.ts";
 import { readRepository } from "../client.ts";
 import GithubRepositoryInfo from "./GithubRepositoryInfo.vue";
 

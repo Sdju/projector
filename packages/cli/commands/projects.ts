@@ -1,4 +1,4 @@
-import type { Project } from "@projector-ai/core/modules/project/index.ts";
+import type { Project } from "@ai-projector/core/modules/project/index.ts";
 import { writeJson, printTable, type Output } from "../common/output.ts";
 import type { CliOptions } from "../modules/arguments/index.ts";
 import type { ProjectorApi } from "../modules/api/index.ts";

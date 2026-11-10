@@ -2,7 +2,7 @@
 import UiCard from "../../../../../common/ui/UiCard.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
 import UiHeading from "../../../../../common/ui/UiHeading.vue";
-import type { IssueUser, Reaction } from "@projector-ai/core/modules/workspace/index.ts";
+import type { IssueUser, Reaction } from "@ai-projector/core/modules/workspace/index.ts";
 import { absoluteTime, relativeTime } from "../../../../../common/utilities/commit-format.ts";
 import TrackerAuthor from "./TrackerAuthor.vue";
 import UiInline from "../../../../../common/ui/UiInline.vue";

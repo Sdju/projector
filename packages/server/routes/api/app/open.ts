@@ -1,4 +1,4 @@
-import { appUrl } from "@projector-ai/core/modules/app-paths/index.ts";
+import { appUrl } from "@ai-projector/core/modules/app-paths/index.ts";
 
 import { openLauncher, openRoute, startTray } from "../../../modules/window/index.ts";
 import { interfaceMode } from "../../../modules/launcher/index.ts";

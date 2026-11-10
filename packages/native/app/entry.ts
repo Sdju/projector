@@ -1,5 +1,5 @@
-import { os } from "@projector-ai/core/modules/os/index.ts";
-import type { DesktopAction } from "@projector-ai/core/modules/os/index.ts";
+import { os } from "@ai-projector/core/modules/os/index.ts";
+import type { DesktopAction } from "@ai-projector/core/modules/os/index.ts";
 
 async function main() {
   const [command, value, action] = process.argv.slice(2);

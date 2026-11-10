@@ -1,13 +1,13 @@
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
+import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import {
   appearanceFile,
   defaultAppearance,
   isAppearanceChoice,
   type AppearanceChoice,
-} from "@projector-ai/core/modules/appearance/index.ts";
+} from "@ai-projector/core/modules/appearance/index.ts";
 
 const appearancePath = () => join(dataDir(), appearanceFile);
 let pending: Promise<unknown> = Promise.resolve();

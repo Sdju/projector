@@ -1,5 +1,5 @@
 import { ref } from "vue";
-import type { GitBranches, GitSyncAction } from "@projector-ai/core/modules/workspace/index.ts";
+import type { GitBranches, GitSyncAction } from "@ai-projector/core/modules/workspace/index.ts";
 import {
   mutateWorkspaceBranch,
   mutateWorkspaceSync,
