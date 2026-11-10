@@ -171,7 +171,7 @@ defineExpose({
       :items="items"
       :vertical="rail"
       :collapsed="rail && hidden"
-      :project-settings="capabilities.settings"
+      :project-settings="side !== 'right' && capabilities.settings"
       :label="side === 'right' ? 'Дополнительные панели' : 'Разделы проекта'"
       :scope-id="side === 'right' ? 'aside-sections' : 'sidebar-sections'"
       @update:section="select"
