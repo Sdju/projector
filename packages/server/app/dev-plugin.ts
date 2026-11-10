@@ -47,7 +47,16 @@ export function projectorPlugin(): Plugin {
         () => server.environments.client.hot.send({ type: "update", updates: [] }),
       );
       const owner = runtime;
-      await owner.start(server.httpServer);
+      try {
+        await owner.start(server.httpServer);
+      } catch (error) {
+        // Vite retains the previous server after a failed config reload, but does not close
+        // the new server whose configureServer hook rejected. Dispose its watcher and runner.
+        owner.close();
+        if (runtime === owner) runtime = undefined;
+        await server.close();
+        throw error;
+      }
       server.middlewares.use((req, res, next) => owner.handle(req, res, next));
       server.httpServer?.once("close", () => {
         owner.close();
