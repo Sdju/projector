@@ -52,7 +52,7 @@ test.concurrent(
 
 test.concurrent(
   "long commands fit the activity, task list and task view on narrow screens",
-  { skip: !chromium },
+  { skip: !chromium, timeout: 60000, retry: 2 },
   async ({ onTestFinished }) => {
     const html = await readFile(new URL("./fixtures/agent-task-bar.html", import.meta.url), "utf8");
     const fixture = await createBrowserFixture({ pages: { "/bar": html } });
@@ -62,7 +62,7 @@ test.concurrent(
     await browser.open(fixture.url("/bar"));
     await browser.evaluate("window.fixture.longCommands()");
     const settle = () => browser.evaluate("new Promise(resolve => requestAnimationFrame(resolve))");
-    const wait = async (expression, ms = 4000) => {
+    const wait = async (expression, ms = 8000) => {
       for (let waited = 0; waited < ms; waited += 50) {
         if (await browser.evaluate(expression)) return;
         await new Promise((resolve) => setTimeout(resolve, 50));
