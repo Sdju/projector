@@ -35,7 +35,7 @@ const tone = computed(
       ><slot
     /></span>
     <slot v-else />
-    <UiSpinner v-if="busy" independent class="button-spinner" />
+    <UiSpinner v-if="busy" class="button-spinner" />
   </button>
 </template>
 
@@ -173,11 +173,11 @@ const tone = computed(
 .button-content.pending {
   opacity: 0;
 }
+/* Auto margins centre the spinner without a transform the rotation would replace. */
 .button-spinner {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  inset: 0;
+  margin: auto;
 }
 @media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {
   .btn.chip {
