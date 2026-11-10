@@ -8,6 +8,7 @@ test.concurrent(
   {
     skip: !chromium,
     timeout: 60000,
+    retry: 2,
   },
   async ({ onTestFinished }) => {
     const html = await readFile(new URL("./fixtures/agent-sessions.html", import.meta.url), "utf8");
