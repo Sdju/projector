@@ -59,9 +59,8 @@ jobs:
       - name: Publish packages
         run: |
           set -euo pipefail
-          npm config set registry https://registry.npmjs.org/
           # Run npm inside the artifact: the checkout root declares pnpm in devEngines,
-          # and npm refuses every command there.
+          # and npm refuses every command there. publishConfig sets the registry.
           publish_if_missing() {
             local directory="$1"
             local name="$2"
