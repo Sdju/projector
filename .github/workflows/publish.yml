@@ -60,16 +60,18 @@ jobs:
         run: |
           set -euo pipefail
           npm config set registry https://registry.npmjs.org/
+          # Run npm inside the artifact: the checkout root declares pnpm in devEngines,
+          # and npm refuses every command there.
           publish_if_missing() {
             local directory="$1"
             local name="$2"
             local version
             version="$(node -p "require('./${directory}/package.json').version")"
-            if npm view "${name}@${version}" version >/dev/null 2>&1; then
+            if (cd "${directory}" && npm view "${name}@${version}" version >/dev/null 2>&1); then
               echo "${name}@${version} is already published, skipping"
               return
             fi
-            npm publish "./${directory}" --access public --provenance
+            (cd "${directory}" && npm publish --access public --provenance)
           }
           publish_if_missing artifacts/distribution/ide "@projector-ai/ide"
           publish_if_missing artifacts/distribution/native "@projector-ai/native"

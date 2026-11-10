@@ -76,9 +76,9 @@ Trusted publisher настраивается только для уже суще
 vp install
 vp run build:distribution
 vp run verify:distribution
-npm publish ./artifacts/distribution/ide --access public
-npm publish ./artifacts/distribution/native --access public
-npm publish ./artifacts/distribution/hub --access public
+(cd artifacts/distribution/ide && npm publish --access public)
+(cd artifacts/distribution/native && npm publish --access public)
+(cd artifacts/distribution/hub && npm publish --access public)
 ```
 
 После этого на npmjs.com для каждого пакета откройте **Settings → Trusted publishing → GitHub Actions** и укажите:
