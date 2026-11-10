@@ -53,12 +53,22 @@ const filePage = page(`
         view().dispatch({selection: {anchor: view().state.doc.line(2).from + 4}});
         await wait(() => line().includes('Строка 2, столбец 5'), 'cursor follows selection');
         await wait(() => document.querySelector('.cm-line span'), 'TypeScript highlighting');
-        props.value = {path: 'probe.ts', content: 'const alive = true;', original: 'const alive = false;', editable: false};
+        const original = Array.from({length: 20}, (_, i) => 'const line' + (i + 1) + ' = false;').join(nl);
+        const content = original.replace('line10 = false', 'line10 = true');
+        props.value = {path: 'probe.ts', content, original, editable: false};
         await nextTick();
         await wait(() => document.querySelector('.cm-deletedChunk'), 'inline diff');
+        await wait(() => document.querySelectorAll('.cm-collapsedLines').length === 2, 'collapsed unchanged lines');
+        check([...document.querySelectorAll('.cm-collapsedLines')].every((node) => node.textContent.includes('строк без изменений')), 'Collapsed lines label');
+        document.querySelector('.diff-layout button[title="Развернуть неизменённые строки"]').click();
+        await wait(() => !document.querySelector('.cm-collapsedLines'), 'expand unchanged lines');
+        document.querySelector('.diff-layout button[title="Свернуть неизменённые строки"]').click();
+        await wait(() => document.querySelectorAll('.cm-collapsedLines').length === 2, 'collapse unchanged lines');
         document.querySelector('.diff-layout button[title="Две колонки"]').click();
         await wait(() => document.querySelectorAll('.cm-mergeView .cm-editor').length === 2, 'side-by-side diff');
         check(document.querySelector('.diff-side') !== null, 'Diff header');
+        document.querySelector('.diff-layout button[title="Развернуть неизменённые строки"]').click();
+        await wait(() => !document.querySelector('.cm-collapsedLines'), 'expand side-by-side unchanged lines');
         document.getElementById('result').textContent = 'PASS';
       } catch(error) {document.getElementById('result').textContent = 'FAIL: ' + error.stack;}
     })();`);

@@ -2,6 +2,8 @@
 import UiPanel from "../../../../../common/ui/UiPanel.vue";
 import IconRows from "~icons/lucide/rows-2";
 import IconColumns from "~icons/lucide/columns-2";
+import IconFoldVertical from "~icons/lucide/fold-vertical";
+import IconUnfoldVertical from "~icons/lucide/unfold-vertical";
 import { inject, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import {
   EditorView,
@@ -50,6 +52,7 @@ const container = ref<HTMLElement>();
 let view: EditorView | undefined;
 let merge: MergeView | undefined;
 const sideBySide = ref(false);
+const collapseUnchanged = ref(true);
 let gutterToken = 0;
 const states = new Map<string, EditorState>();
 let activePath = "";
@@ -260,6 +263,7 @@ function extensions(mode: "inline" | "side" = "inline") {
             original: props.original,
             gutter: true,
             mergeControls: props.editable ? revertButton : false,
+            collapseUnchanged: collapseUnchanged.value ? { margin: 3, minSize: 6 } : undefined,
           })
         : [],
     EditorView.updateListener.of((update) => {
@@ -301,7 +305,7 @@ function render() {
       gutter: true,
       revertControls: props.editable ? "a-to-b" : undefined,
       highlightChanges: true,
-      collapseUnchanged: { margin: 3, minSize: 6 },
+      collapseUnchanged: collapseUnchanged.value ? { margin: 3, minSize: 6 } : undefined,
     });
     view = merge.b;
   } else {
@@ -350,7 +354,10 @@ onMounted(() => {
   render();
   void loadEditorTheme().catch(() => undefined);
 });
-watch(() => [props.path, props.original, props.editable, sideBySide.value], render);
+watch(
+  () => [props.path, props.original, props.editable, sideBySide.value, collapseUnchanged.value],
+  render,
+);
 watch(editorTheme, (theme) => {
   const effects = { effects: themeCompartment.reconfigure(themeExtension(theme)) };
   merge?.a.dispatch(effects);
@@ -382,21 +389,27 @@ onBeforeUnmount(() => {
     <div v-if="original !== undefined" class="diff-layout" role="group" aria-label="Вид сравнения">
       <button
         type="button"
-        title="В одну колонку"
-        :aria-pressed="!sideBySide"
-        :class="{ active: !sideBySide }"
-        @click="sideBySide = false"
+        :title="sideBySide ? 'В одну колонку' : 'Две колонки'"
+        :aria-label="sideBySide ? 'В одну колонку' : 'Две колонки'"
+        :aria-pressed="sideBySide"
+        @click="sideBySide = !sideBySide"
       >
-        <IconRows />
+        <IconRows v-if="sideBySide" />
+        <IconColumns v-else />
       </button>
       <button
         type="button"
-        title="Две колонки"
-        :aria-pressed="sideBySide"
-        :class="{ active: sideBySide }"
-        @click="sideBySide = true"
+        :title="
+          collapseUnchanged ? 'Развернуть неизменённые строки' : 'Свернуть неизменённые строки'
+        "
+        :aria-label="
+          collapseUnchanged ? 'Развернуть неизменённые строки' : 'Свернуть неизменённые строки'
+        "
+        :aria-pressed="collapseUnchanged"
+        @click="collapseUnchanged = !collapseUnchanged"
       >
-        <IconColumns />
+        <IconUnfoldVertical v-if="collapseUnchanged" />
+        <IconFoldVertical v-else />
       </button>
     </div>
     <div v-if="original !== undefined" class="diff-header">
