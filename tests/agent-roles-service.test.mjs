@@ -9,9 +9,11 @@ import { scriptedModel } from "./helpers/scripted-model.mjs";
 
 test("service roles use their own model over the chat's model", { timeout: 120_000 }, async () => {
   const directory = await mkdtemp(join(tmpdir(), "projector-roles-service-"));
+  console.log("ROLES step: temp");
   const previous = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = directory;
   const model = await scriptedModel([{ text: "Собирает проект." }, { text: "Пишет тесты." }]);
+  console.log("ROLES step: model");
   const requests = [];
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url, init) => {
@@ -60,18 +62,26 @@ test("service roles use their own model over the chat's model", { timeout: 120_0
       selection: { provider: "test:chat-model" },
     };
 
+    console.log("ROLES step: save");
     await saveServiceRole("lens", { provider: "test:role-model" });
+    console.log("ROLES step: saved");
+    console.log("ROLES step: run1");
     expect(await runLens(request)).toBe("Собирает проект.");
+    console.log("ROLES step: run1 done");
     expect(requests[0].model).toBe("role-model");
 
     await resetServiceRole("lens");
+    console.log("ROLES step: run2");
     expect(await runLens(request)).toBe("Пишет тесты.");
+    console.log("ROLES step: run2 done");
     expect(requests[1].model).toBe("chat-model");
   } finally {
     globalThis.fetch = originalFetch;
     if (previous === undefined) delete process.env.XDG_DATA_HOME;
     else process.env.XDG_DATA_HOME = previous;
+    console.log("ROLES step: close");
     await model.close();
+    console.log("ROLES step: closed");
     await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });

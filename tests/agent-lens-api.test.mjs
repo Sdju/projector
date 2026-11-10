@@ -46,8 +46,10 @@ test(
   { timeout: 120_000 },
   async () => {
     const directory = await mkdtemp(join(tmpdir(), "projector-lens-api-"));
+    console.log("LENS step: temp");
     await mkdir(join(directory, "projector"), { recursive: true });
     const model = await scriptedModel([{ text: "Собирает проект после правки сборки." }]);
+    console.log("LENS step: model");
     const old = Object.fromEntries(
       ["XDG_DATA_HOME", "OPENAI_URL", "OPENAI_API_KEY", "OPENAI_MODEL"].map((key) => [
         key,
@@ -72,6 +74,7 @@ test(
       });
     });
     await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+    console.log("LENS step: listen");
     const origin = `http://127.0.0.1:${server.address().port}`;
     const body = {
       history: [
@@ -92,13 +95,16 @@ test(
       selection: { provider: "env:test" },
     };
     try {
+      console.log("LENS step: fetch");
       const response = await fetch(`${origin}/api/agent/lens`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Origin: origin },
         body: JSON.stringify(body),
       });
       expect(response.status).toBe(200);
+      console.log("LENS step: response", response.status);
       const answer = await response.json();
+      console.log("LENS step: json");
       expect(answer.text).toBe("Собирает проект после правки сборки.");
       expect(typeof answer.at).toBe("number");
       expect(requests).toHaveLength(1);
@@ -117,6 +123,7 @@ test(
       expect(prompt).toContain("Очередь: 1");
 
       // The caption is a view: no run records and no chat history are written.
+      console.log("LENS step: asserts");
       await expect(stat(join(directory, "projector/agent/runs"))).rejects.toThrow();
       await expect(stat(join(directory, "projector/agent/history.sqlite"))).rejects.toThrow();
     } finally {
@@ -164,8 +171,10 @@ test("POST /api/agent/lens is open only to the Projector page and needs somethin
     expect(empty.status).toBe(400);
     expect((await empty.json()).error).toContain("нечего показывать");
   } finally {
+    console.log("LENS step: close");
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
+    console.log("LENS step: closed");
     for (const [key, value] of Object.entries(old)) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
