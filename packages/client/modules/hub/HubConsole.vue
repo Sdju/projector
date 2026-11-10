@@ -13,6 +13,7 @@ import UiInline from "../../common/ui/UiInline.vue";
 import UiStatusDot from "../../common/ui/UiStatusDot.vue";
 import UiSpinner from "../../common/ui/UiSpinner.vue";
 import { hubRequest, logoutHub } from "./client.ts";
+import HubToken from "./HubToken.vue";
 
 const authenticated = ref(false);
 const loading = ref(true);
@@ -108,6 +109,7 @@ commands.scope.registerCommand({
   run: async () => {
     try {
       await logoutHub();
+      authenticated.value = false;
     } catch {
       error.value = "Не удалось выйти. Повторите попытку.";
     }
@@ -196,6 +198,7 @@ onBeforeUnmount(() => {
           <UiButton size="sm" :busy="refreshing" @click="commands.run('ide.hub.devices.refresh')"
             >Обновить</UiButton
           >
+          <HubToken />
         </template>
       </UiCard>
       <UiHint class="footer">Ваши проекты и задания остаются на ваших устройствах.</UiHint>

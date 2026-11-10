@@ -217,6 +217,34 @@ test("device transport isolates page URLs and preserves local/external requests"
   expect(deviceUrl("/api/projects")).toBe("/api/projects");
 });
 
+test("only signed-in Hub sessions can explicitly reveal the device token", async () => {
+  const { origin, cookie } = await setup();
+  const endpoint = `${origin}/api/hub/device-token`;
+  const reveal = (headers = {}) => fetch(endpoint, { method: "POST", headers });
+  expect((await reveal({ Origin: origin })).status).toBe(401);
+  expect((await reveal({ Origin: origin, Authorization: "Bearer device-secret" })).status).toBe(
+    401,
+  );
+  expect((await reveal({ Origin: origin, Cookie: "projector_hub=" + "0".repeat(64) })).status).toBe(
+    401,
+  );
+  expect((await reveal({ Cookie: cookie })).status).toBe(403);
+  expect((await reveal({ Cookie: cookie, Origin: "https://other.example" })).status).toBe(403);
+  const get = await fetch(endpoint, { headers: { Cookie: cookie } });
+  expect(get.status).toBe(405);
+  expect(get.headers.get("allow")).toBe("POST");
+  const response = await reveal({ Cookie: cookie, Origin: origin });
+  expect(response.status).toBe(200);
+  expect(response.headers.get("cache-control")).toBe("no-store");
+  expect(await response.json()).toEqual({ token: "device-secret" });
+  for (const path of ["/api/hub/session", "/api/hub/devices", "/api/hub/health", "/"]) {
+    const regular = await fetch(origin + path, { headers: { Cookie: cookie } });
+    expect(await regular.text()).not.toContain("device-secret");
+  }
+  await fetch(`${origin}/api/hub/session`, { method: "DELETE", headers: { Cookie: cookie } });
+  expect((await reveal({ Cookie: cookie, Origin: origin })).status).toBe(401);
+});
+
 test("Hub serves a public Vue shell, returns JSON login errors and revokes live sockets on logout", async () => {
   const { origin, cookie } = await setup();
   const shell = await fetch(`${origin}/login`).then((response) => response.text());

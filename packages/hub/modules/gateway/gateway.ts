@@ -79,6 +79,21 @@ export function createHub(options: HubOptions) {
             .end();
         return;
       }
+      if (url.pathname === "/api/hub/device-token") {
+        res.setHeader("Cache-Control", "no-store");
+        if (req.method !== "POST") {
+          res.writeHead(405, { Allow: "POST" }).end();
+          return;
+        }
+        if (req.headers.origin !== options.origin) {
+          res.writeHead(403).end();
+          return;
+        }
+        res
+          .writeHead(200, { "Content-Type": "application/json" })
+          .end(JSON.stringify({ token: options.deviceToken }));
+        return;
+      }
       const match = route(url.pathname);
       if (match) {
         if (!tunnels.devices.has(match[1])) {
