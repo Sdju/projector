@@ -2,7 +2,7 @@
 import UiControl from "../../../../../common/ui/UiControl.vue";
 import UiMessage from "../../../../../common/ui/UiMessage.vue";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import type { GitBranch } from "@projector/core/modules/workspace/index.ts";
+import type { GitBranch } from "@projector-ai/core/modules/workspace/index.ts";
 import ContextMenu from "../../../../../common/ui/ContextMenu.vue";
 import EntryDialog from "../../../../../common/ui/EntryDialog.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { PullRequest } from "@projector/core/modules/workspace/index.ts";
+import type { PullRequest } from "@projector-ai/core/modules/workspace/index.ts";
 import {
   PIPELINE_STATUS_LABEL,
   PIPELINE_STATUS_TONE,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 import UiStatusDot from "../../../../../common/ui/UiStatusDot.vue";
 import { computed } from "vue";
 import { usePagedList } from "../lib/paged-list.ts";

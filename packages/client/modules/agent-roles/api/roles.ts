@@ -2,7 +2,7 @@ import type {
   AgentRole,
   AgentRoleSelection,
   AgentRoleView,
-} from "@projector/core/modules/agent-role/index.ts";
+} from "@projector-ai/core/modules/agent-role/index.ts";
 
 export interface AgentRoleSettings {
   roles: AgentRoleView[];

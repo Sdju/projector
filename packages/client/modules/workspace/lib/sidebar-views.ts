@@ -13,7 +13,7 @@ import {
   gitChangesToFileChanges,
   type FileScope,
   type PullRequestChanges,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 import { GitPanel } from "../modules/git/index.ts";
 import {
   DiscussionsPanel,

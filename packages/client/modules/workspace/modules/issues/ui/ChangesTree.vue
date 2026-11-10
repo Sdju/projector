@@ -13,7 +13,7 @@ import UiHint from "../../../../../common/ui/UiHint.vue";
 import UiActionRow from "../../../../../common/ui/UiActionRow.vue";
 import MiddleTruncate from "../../../../../common/ui/MiddleTruncate.vue";
 import { computed, ref, useId, watch } from "vue";
-import type { FileChange } from "@projector/core/modules/workspace/index.ts";
+import type { FileChange } from "@projector-ai/core/modules/workspace/index.ts";
 import {
   CHANGE_MARK,
   buildChangeTree,

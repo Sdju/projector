@@ -2,7 +2,7 @@ import { createUsageCache } from "../_/usage-cache.ts";
 import type {
   ClaudeUsage,
   ClaudeUsageWindow,
-} from "@projector/core/modules/agents-integration/claude/index.ts";
+} from "@projector-ai/core/modules/agents-integration/claude/index.ts";
 import { readClaudeUsage } from "./client.ts";
 
 const record = (value: unknown): Record<string, unknown> | null =>

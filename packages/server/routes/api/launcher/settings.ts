@@ -1,4 +1,4 @@
-import { appUrl } from "@projector/core/modules/app-paths/index.ts";
+import { appUrl } from "@projector-ai/core/modules/app-paths/index.ts";
 
 import { startTray } from "../../../modules/window/index.ts";
 import {

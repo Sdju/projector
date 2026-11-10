@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import UiControl from "../../../../../common/ui/UiControl.vue";
 import UiField from "../../../../../common/ui/UiField.vue";
-import type { JudgeSettings } from "@projector/core/modules/agent-judge/index.ts";
+import type { JudgeSettings } from "@projector-ai/core/modules/agent-judge/index.ts";
 
 defineProps<{ disabled?: boolean }>();
 const settings = defineModel<JudgeSettings>({ required: true });

@@ -6,7 +6,7 @@ import {
   fileScopeKey,
   type FileChangeList,
   type FileScope,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 import { workspaceScopeRequest } from "../../workspace-api/index.ts";
 import { useAsyncData } from "../../../common/utilities/use-async-data.ts";
 

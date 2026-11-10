@@ -1,4 +1,4 @@
-import { os } from "@projector/core/modules/os/index.ts";
+import { os } from "@projector-ai/core/modules/os/index.ts";
 import { HttpError } from "../http/index.ts";
 import { location } from "./paths.ts";
 

@@ -1,5 +1,5 @@
-import type { AgentTaskPatch } from "@projector/core/modules/agent-task/index.ts";
-import type { JudgeVerdict } from "@projector/core/modules/agent-judge/index.ts";
+import type { AgentTaskPatch } from "@projector-ai/core/modules/agent-task/index.ts";
+import type { JudgeVerdict } from "@projector-ai/core/modules/agent-judge/index.ts";
 import type { Project } from "../../project/index.ts";
 import type { JudgeNote } from "./judge-note.ts";
 import type {

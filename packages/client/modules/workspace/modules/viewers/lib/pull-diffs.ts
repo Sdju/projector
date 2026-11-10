@@ -1,4 +1,4 @@
-import type { PullRequestComparison } from "@projector/core/modules/workspace/index.ts";
+import type { PullRequestComparison } from "@projector-ai/core/modules/workspace/index.ts";
 import { useFileDiffs } from "./file-diffs.ts";
 
 /** Раскрытые файлы merge request: стороны читаются при первом раскрытии и кешируются до смены head. */

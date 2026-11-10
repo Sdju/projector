@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
-import type { ReleaseAsset } from "@projector/core/modules/workspace/index.ts";
+import type { ReleaseAsset } from "@projector-ai/core/modules/workspace/index.ts";
 import { countRu } from "../../../../../common/utilities/plural.ts";
 import { downloadsLabel, sizeLabel } from "../../../../../common/utilities/release-format.ts";
 

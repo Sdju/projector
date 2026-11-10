@@ -5,7 +5,7 @@ import {
   parseProxyHost,
   proxyUrl,
   type ProxyHost,
-} from "@projector/core/modules/browser/index.ts";
+} from "@projector-ai/core/modules/browser/index.ts";
 import { isLocalRequest } from "../access/index.ts";
 import { INTERNAL_MESSAGE, guardedLookup, isInternalLiteral } from "./guard.ts";
 import { cookieHeader, siteOf, storeCookie } from "./cookies.ts";

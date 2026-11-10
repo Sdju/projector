@@ -18,7 +18,7 @@ import type {
   PullRequestFile,
   PullRequestList,
   PullRequestReview,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 
 const PAGE = 30;
 const FILE_PAGE = 100;

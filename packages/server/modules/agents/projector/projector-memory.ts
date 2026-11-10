@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { dataDir } from "@projector/core/modules/app-paths/index.ts";
+import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
 
 export type MemoryScope = "user" | "project";
 

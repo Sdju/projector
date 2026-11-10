@@ -6,7 +6,7 @@ import {
   type Keybinding,
   paletteCommands,
   type PaletteCommand,
-} from "@projector/core/modules/ide/index.ts";
+} from "@projector-ai/core/modules/ide/index.ts";
 import { commandHostKey } from "../../common/utilities/commands.ts";
 import { fullscreenAvailable, installApp, toggleFullscreen, usePwa } from "../pwa/index.ts";
 import { listenIdeCommands } from "./command-bridge.ts";

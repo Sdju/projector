@@ -1,5 +1,5 @@
 import { computed, type Ref } from "vue";
-import type { GitOverview } from "@projector/core/modules/workspace/index.ts";
+import type { GitOverview } from "@projector-ai/core/modules/workspace/index.ts";
 import { commandArgs, type useCommandScope } from "../../../../../common/utilities/commands.ts";
 import type { GitOverviewState } from "./git-overview.ts";
 

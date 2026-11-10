@@ -1,12 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.11.0
+
+Выпуск добавляет Hub для удалённого доступа к нескольким машинам, Git-синхронизацию, аналитику расхода, цветовые схемы и новые возможности агента. Все пакеты workspace переведены на scope `@projector-ai`, а Hub публикуется в npm вместе с IDE и GTK-палитрой.
 
 ### Hub
 
 - Вход и список устройств Hub переведены на Vue и общие компоненты Projector. Добавлены возврат на страницу устройства после входа, выход и отзыв живых HTTP/SSE/WebSocket при завершении сессии. Настройки подключения доступны в локальном интерфейсе; пустой токен сохраняет прежний секрет только для того же Hub. Отключённые устройства помечаются в списке, в интерфейсе машины есть переход к Hub и выход.
 
-- Добавлен `@projector/hub`: общий веб-интерфейс, вход по паролю, список устройств и маршрутизация HTTP/SSE/WebSocket через исходящее подключение локального server. API и терминальные worker изолированы по устройству; туннель не получает локальные права. Первый запуск из checkout — `vp run hub`, настройка server через локальный `/api/hub` ([подробно](docs/hub.md)).
+- Добавлен `@projector-ai/hub`: общий веб-интерфейс, вход по паролю, список устройств и маршрутизация HTTP/SSE/WebSocket через исходящее подключение локального server. API и терминальные worker изолированы по устройству; туннель не получает локальные права. Первый запуск из checkout — `vp run hub`, настройка server через локальный `/api/hub` ([подробно](docs/hub.md)).
 
 ### Интерфейс
 
@@ -42,8 +44,9 @@
 
 ### Установка
 
-- Публичные npm-пакеты переименованы в `@projector-ai/ide` и `@projector-ai/native`; внутренние workspace-пакеты остаются `@projector/*` и не публикуются. В манифестах появились `publishConfig`, `files`, README и `projector-install-desktop`; `vp run verify:distribution` проверяет поставку перед публикацией.
-- Добавлен `.github/workflows/publish.yml` для публикации из GitHub Release через OIDC trusted publishing, без `NPM_TOKEN`. Первый выпуск каждого имени до настройки trusted publisher выполняется вручную; порядок описан в `docs/distribution.md`.
+- Все пакеты pnpm workspace переведены на scope `@projector-ai`: `client`, `server`, `native`, `core`, `cli` и `hub`. Внутренние пакеты остаются `private`, публикуются собранные артефакты `@projector-ai/ide`, `@projector-ai/native` и `@projector-ai/hub`. В манифестах появились `publishConfig`, `files`, README и `projector-install-desktop`; `vp run verify:distribution` проверяет все три поставки перед публикацией.
+- Hub публикуется отдельным пакетом с командой `projector-hub`: в него входят собранный интерфейс и копия общего протокола, поэтому он работает без локального IDE и сборочного окружения. Версия совпадает с IDE, а установка описана в `docs/distribution.md`.
+- Добавлен `.github/workflows/publish.yml` для публикации из GitHub Release через OIDC trusted publishing, без `NPM_TOKEN`. Workflow публикует IDE, native и Hub, пропускает уже выпущенные версии. Первый выпуск каждого имени до настройки trusted publisher выполняется вручную; порядок описан в `docs/distribution.md`.
 
 ## 0.10.0
 

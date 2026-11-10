@@ -2,7 +2,7 @@
 import UiMessage from "../../../common/ui/UiMessage.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiSpinner from "../../../common/ui/UiSpinner.vue";
-import type { DockerDaemonState } from "@projector/core/modules/docker/index.ts";
+import type { DockerDaemonState } from "@projector-ai/core/modules/docker/index.ts";
 
 /** Docker error with the way out: start the daemon here, or the steps to do it by hand. */
 defineProps<{

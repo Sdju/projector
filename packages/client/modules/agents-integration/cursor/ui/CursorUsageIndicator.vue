@@ -3,7 +3,7 @@ import UsageIndicator from "../../_/UsageIndicator.vue";
 import { useAgentUsageIndicator } from "../../_/use-agent-usage-indicator.ts";
 import { USAGE_PERIOD_SECONDS } from "../../_/usage-pace.ts";
 import IconCursor from "~icons/simple-icons/cursor";
-import type { CursorUsage } from "@projector/core/modules/agents-integration/cursor/index.ts";
+import type { CursorUsage } from "@projector-ai/core/modules/agents-integration/cursor/index.ts";
 
 type WindowName = keyof NonNullable<CursorUsage["windows"]>;
 const monthTicks = [7, 14, 21, 28].map((day) => (day / 30) * 100);

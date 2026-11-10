@@ -18,7 +18,7 @@ import {
   relocatedPath,
   type FileEntry,
   type FileScope,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 import { ref } from "vue";
 import { registerTreePagingCommand, type createTreePaging } from "./tree-listing.ts";
 

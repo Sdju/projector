@@ -1,7 +1,7 @@
 import type { Ref } from "vue";
 import type { CommandScope } from "../../../../../common/utilities/commands.ts";
-import { isLiveScope } from "@projector/core/modules/workspace/index.ts";
-import type { FileEntry, FileScope } from "@projector/core/modules/workspace/index.ts";
+import { isLiveScope } from "@projector-ai/core/modules/workspace/index.ts";
+import type { FileEntry, FileScope } from "@projector-ai/core/modules/workspace/index.ts";
 import { revealWorkspaceEntry, workspaceCapabilities } from "../../../../workspace-api/index.ts";
 
 /**

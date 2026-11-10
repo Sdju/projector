@@ -1,4 +1,4 @@
-import { os } from "@projector/core/modules/os/index.ts";
+import { os } from "@projector-ai/core/modules/os/index.ts";
 import { assertEuNetworkContext } from "../../network/index.ts";
 
 /** One bounded JSON-RPC request over the authenticated local Codex CLI. */

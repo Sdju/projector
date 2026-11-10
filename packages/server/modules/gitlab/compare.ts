@@ -3,7 +3,7 @@ import type {
   FileChange,
   FileChangeList,
   FileSides,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 import { gitlabReader } from "./api.ts";
 import {
   diffCounts,

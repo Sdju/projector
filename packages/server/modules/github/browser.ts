@@ -6,7 +6,7 @@ import type {
   GithubRepository,
   GithubEntry,
   GithubFile,
-} from "@projector/core/modules/github/index.ts";
+} from "@projector-ai/core/modules/github/index.ts";
 
 export async function githubReader(repository: string) {
   const name = repositoryName(repository);

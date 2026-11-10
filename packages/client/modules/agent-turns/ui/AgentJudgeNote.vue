@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import UiBadge from "../../../common/ui/UiBadge.vue";
-import { judgeScoreTone, type JudgeVerdict } from "@projector/core/modules/agent-judge/index.ts";
+import { judgeScoreTone, type JudgeVerdict } from "@projector-ai/core/modules/agent-judge/index.ts";
 
 const props = defineProps<{
   tool: string;

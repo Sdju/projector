@@ -20,7 +20,7 @@ import {
   isLiveScope,
   type FileDecoration,
   type FileScope,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 import { treeSessionSchema } from "../lib/tree-session.ts";
 import { useTreeOperations } from "../lib/tree-operations.ts";
 import { useTreeKeyboard } from "../lib/tree-keyboard.ts";
@@ -35,7 +35,7 @@ import { useFileIconTheme } from "../../../../file-icons/index.ts";
 import { workspaceCapabilities } from "../../../../workspace-api/index.ts";
 import { createTreeDrag, treeDragKey } from "../lib/tree-drag.ts";
 import { createTreeSelection, treeSelectionKey } from "../lib/tree-selection.ts";
-import type { FileEntry } from "@projector/core/modules/workspace/index.ts";
+import type { FileEntry } from "@projector-ai/core/modules/workspace/index.ts";
 const props = withDefaults(
   defineProps<{
     projectId: string;

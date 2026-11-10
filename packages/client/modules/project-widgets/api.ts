@@ -1,4 +1,4 @@
-import type { ProjectWidgetState } from "@projector/core/modules/widget-catalog/index.ts";
+import type { ProjectWidgetState } from "@projector-ai/core/modules/widget-catalog/index.ts";
 import {
   readProjectWidgets,
   refreshProjectWidgets,

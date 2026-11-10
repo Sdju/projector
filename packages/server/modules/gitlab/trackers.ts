@@ -5,7 +5,7 @@ import type {
   IssueUser,
   Reaction,
   ReactionKind,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 import type { GitlabReader } from "./api.ts";
 import { nextPage } from "./browser.ts";
 

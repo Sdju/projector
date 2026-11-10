@@ -1,10 +1,10 @@
 import { realpathSync } from "node:fs";
-import { classifyDevcontainer } from "@projector/core/modules/devcontainer/index.ts";
+import { classifyDevcontainer } from "@projector-ai/core/modules/devcontainer/index.ts";
 import type {
   DevcontainerDecision,
   DevcontainerState,
-} from "@projector/core/modules/devcontainer/index.ts";
-import type { Project } from "@projector/core/modules/project/index.ts";
+} from "@projector-ai/core/modules/devcontainer/index.ts";
+import type { Project } from "@projector-ai/core/modules/project/index.ts";
 import { HttpError } from "../http/index.ts";
 import { findDevcontainer } from "./discovery.ts";
 import { saveTrust, trustEntry } from "./trust.ts";

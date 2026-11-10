@@ -1,26 +1,26 @@
-import { os } from "@projector/core/modules/os/index.ts";
+import { os } from "@projector-ai/core/modules/os/index.ts";
 import { environmentForPath, runEnvironmentCommand } from "../environments/index.ts";
 import { lstat, realpath } from "node:fs/promises";
 import { HttpError } from "../http/index.ts";
-import { githubRepositoryFromRemote } from "@projector/core/modules/github/index.ts";
+import { githubRepositoryFromRemote } from "@projector-ai/core/modules/github/index.ts";
 import {
   GITLAB_DEFAULT_INSTANCE,
   gitlabRepositoryFromRemote,
   normalizeGitlabInstance,
   normalizeGitlabProjectPath,
-} from "@projector/core/modules/gitlab/index.ts";
+} from "@projector-ai/core/modules/gitlab/index.ts";
 import { integrationConfig } from "../integration-store/index.ts";
 import { gitlabBaseUrl } from "../gitlab/index.ts";
 import { MAX_BYTES, decode, exec, location, pathExcluded, validatePath } from "./paths.ts";
-import { isExcludedPath } from "@projector/core/modules/workspace/index.ts";
+import { isExcludedPath } from "@projector-ai/core/modules/workspace/index.ts";
 import { excludePatterns } from "./files-exclude.ts";
 import { mutateProjectEntry, mutationLocation, readProjectFile } from "./files.ts";
-import { MAX_TEXT_BYTES } from "@projector/core/modules/workspace/index.ts";
+import { MAX_TEXT_BYTES } from "@projector-ai/core/modules/workspace/index.ts";
 import type {
   FileComparison,
   GitGutter,
   GitOverview,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 
 export interface GitOptions {
   maxBuffer?: number;

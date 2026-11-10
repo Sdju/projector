@@ -3,7 +3,7 @@ import UsageIndicator from "../../_/UsageIndicator.vue";
 import { useAgentUsageIndicator } from "../../_/use-agent-usage-indicator.ts";
 import { USAGE_PERIOD_SECONDS } from "../../_/usage-pace.ts";
 import IconOpenCode from "~icons/simple-icons/opencode";
-import type { OpenCodeUsage } from "@projector/core/modules/agents-integration/opencode/index.ts";
+import type { OpenCodeUsage } from "@projector-ai/core/modules/agents-integration/opencode/index.ts";
 
 type WindowName = keyof NonNullable<OpenCodeUsage["windows"]>;
 const weekTicks = Array.from({ length: 6 }, (_, day) => ((day + 1) / 7) * 100);

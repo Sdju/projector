@@ -1,5 +1,5 @@
 import { restoredQueue, savedQueue, type ChatState } from "./chat-state.ts";
-import { normalizeRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
+import { normalizeRoleSnapshot } from "@projector-ai/core/modules/agent-role/index.ts";
 import { applyRoleSnapshot } from "./role-apply.ts";
 
 export const INTERRUPTED =

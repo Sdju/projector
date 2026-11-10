@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import UiHint from "../../../../../common/ui/UiHint.vue";
 import { computed } from "vue";
-import type { CommitComparison, GitCommitDetail } from "@projector/core/modules/workspace/index.ts";
+import type {
+  CommitComparison,
+  GitCommitDetail,
+} from "@projector-ai/core/modules/workspace/index.ts";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import { useFileIconTheme } from "../../../../file-icons/index.ts";
 import ChangedFileRow from "./ChangedFileRow.vue";

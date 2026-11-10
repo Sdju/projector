@@ -1,7 +1,7 @@
 import {
   createAgentFeatureCatalog,
   type AgentFeature,
-} from "@projector/core/modules/agent-features/index.ts";
+} from "@projector-ai/core/modules/agent-features/index.ts";
 
 /**
  * The features this server offers and the agents it can give them to. Both are filled by the

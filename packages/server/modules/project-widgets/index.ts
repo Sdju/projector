@@ -1,15 +1,15 @@
 import { createHash, randomBytes } from "node:crypto";
 import { mkdir, readFile, realpath, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
-import { dataDir } from "@projector/core/modules/app-paths/index.ts";
-import { os } from "@projector/core/modules/os/index.ts";
+import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
+import { os } from "@projector-ai/core/modules/os/index.ts";
 import {
   normalizeProjectWidget,
   PROJECT_WIDGET_LIMITS,
   type ProjectWidgetData,
   type ProjectWidgetDefinition,
   type ProjectWidgetState,
-} from "@projector/core/modules/widget-catalog/index.ts";
+} from "@projector-ai/core/modules/widget-catalog/index.ts";
 import { loadProjects } from "../projects/index.ts";
 
 /** Widgets a project keeps in its repository; inert until the user trusts this exact file. */

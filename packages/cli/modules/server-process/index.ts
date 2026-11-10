@@ -1,9 +1,9 @@
 import { spawn, spawnSync, type SpawnOptions } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, writeSync } from "node:fs";
 import { delimiter, isAbsolute, join } from "node:path";
-import { os } from "@projector/core/modules/os/index.ts";
-import { serverCommand, type ServerMode } from "@projector/core/modules/server-mode/index.ts";
-import { openLog, serverLogPath } from "@projector/core/modules/app-paths/index.ts";
+import { os } from "@projector-ai/core/modules/os/index.ts";
+import { serverCommand, type ServerMode } from "@projector-ai/core/modules/server-mode/index.ts";
+import { openLog, serverLogPath } from "@projector-ai/core/modules/app-paths/index.ts";
 import type { CliOptions } from "../arguments/index.ts";
 
 export interface ServerProcessConfig {

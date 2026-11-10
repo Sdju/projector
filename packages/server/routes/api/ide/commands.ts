@@ -6,7 +6,7 @@ import {
   ideMcpTokenMatches,
   requestIdeCommand,
 } from "../../../modules/ide/index.ts";
-import type { AgentCommandCall } from "@projector/core/modules/ide/index.ts";
+import type { AgentCommandCall } from "@projector-ai/core/modules/ide/index.ts";
 import {
   asString,
   json,

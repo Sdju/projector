@@ -1,4 +1,4 @@
-import type { LaunchItem, LaunchSection } from "@projector/core/modules/launcher/index.ts";
+import type { LaunchItem, LaunchSection } from "@projector-ai/core/modules/launcher/index.ts";
 
 const RECENT_LIMIT = 5;
 const PROJECT_LIMIT = 30;

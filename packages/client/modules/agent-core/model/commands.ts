@@ -1,1 +1,1 @@
-export { agentCommandHandler } from "@projector/core/modules/ide/index.ts";
+export { agentCommandHandler } from "@projector-ai/core/modules/ide/index.ts";

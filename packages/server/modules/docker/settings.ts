@@ -1,7 +1,7 @@
 import { realpath, stat } from "node:fs/promises";
 import { resolve, relative, isAbsolute, sep } from "node:path";
-import { os } from "@projector/core/modules/os/index.ts";
-import type { DockerBinding, DockerContext } from "@projector/core/modules/docker/index.ts";
+import { os } from "@projector-ai/core/modules/os/index.ts";
+import type { DockerBinding, DockerContext } from "@projector-ai/core/modules/docker/index.ts";
 import { integrationConfig, updateIntegration } from "../integration-store/index.ts";
 import { HttpError } from "../http/index.ts";
 

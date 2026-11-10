@@ -1,4 +1,4 @@
-import type { AppearanceChoice } from "@projector/core/modules/appearance/index.ts";
+import type { AppearanceChoice } from "@projector-ai/core/modules/appearance/index.ts";
 import { readAppearanceChoice, writeAppearanceChoice } from "../../modules/appearance/index.ts";
 import { json, readBody, type RouteDefinition } from "../../modules/transport/index.ts";
 import { accessAllowed } from "../../modules/access/index.ts";

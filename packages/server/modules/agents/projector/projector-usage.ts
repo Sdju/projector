@@ -4,7 +4,7 @@ import {
   type ModelPrice,
   type ModelUsage,
   type UsageTokens,
-} from "@projector/core/modules/usage-analytics/index.ts";
+} from "@projector-ai/core/modules/usage-analytics/index.ts";
 import { recordTaskSpend } from "../../spend/index.ts";
 
 /** Token counts of one model request as the SDK reports them. */

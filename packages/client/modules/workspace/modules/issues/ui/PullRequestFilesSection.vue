@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import UiLoadablePanel from "../../../../../common/ui/UiLoadablePanel.vue";
 import { computed, ref } from "vue";
-import type { PullRequestChanges } from "@projector/core/modules/workspace/index.ts";
-import { pullRequestFilesToFileChanges } from "@projector/core/modules/workspace/index.ts";
+import type { PullRequestChanges } from "@projector-ai/core/modules/workspace/index.ts";
+import { pullRequestFilesToFileChanges } from "@projector-ai/core/modules/workspace/index.ts";
 import { workspaceRequest } from "../../../../workspace-api/index.ts";
 import { useAsyncData } from "../../../../../common/utilities/use-async-data.ts";
 import ChangesTree from "./ChangesTree.vue";

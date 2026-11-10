@@ -3,7 +3,11 @@ import UiArticle from "../../../../../common/ui/UiArticle.vue";
 import UiDetailHeader from "../../../../../common/ui/UiDetailHeader.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
 import UiViewerPage from "../../../../../common/ui/UiViewerPage.vue";
-import type { IssueLabel, IssueUser, Reaction } from "@projector/core/modules/workspace/index.ts";
+import type {
+  IssueLabel,
+  IssueUser,
+  Reaction,
+} from "@projector-ai/core/modules/workspace/index.ts";
 import { computed } from "vue";
 import { absoluteTime, relativeTime } from "../../../../../common/utilities/commit-format.ts";
 import TrackerAuthor from "./TrackerAuthor.vue";

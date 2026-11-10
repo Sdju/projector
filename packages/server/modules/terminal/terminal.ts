@@ -8,7 +8,7 @@ import { readTerminalProcesses, terminalActivity } from "./terminal-activity.ts"
 import { randomUUID } from "node:crypto";
 import { containerToHost, resolveTerminalPath } from "./link-files.ts";
 import { rmSync } from "node:fs";
-import { os, bashShellLaunch, type ShellLaunch } from "@projector/core/modules/os/index.ts";
+import { os, bashShellLaunch, type ShellLaunch } from "@projector-ai/core/modules/os/index.ts";
 import { terminateProcessTree } from "./terminate.ts";
 import { saveDroppedFile } from "./drop-files.ts";
 import { scenarioDirectory } from "./scenario-folder.ts";
@@ -18,7 +18,10 @@ import type { IncomingMessage } from "node:http";
 import { spawn, type IPty } from "node-pty";
 import headless from "@xterm/headless";
 import serialization from "@xterm/addon-serialize";
-import type { TerminalProgram, TerminalSession } from "@projector/core/modules/terminal/index.ts";
+import type {
+  TerminalProgram,
+  TerminalSession,
+} from "@projector-ai/core/modules/terminal/index.ts";
 import type { Project } from "../projects/index.ts";
 import { trackMouseEncoding } from "./terminal-mouse.ts";
 import {

@@ -7,7 +7,7 @@ import UiMessage from "../../../../../common/ui/UiMessage.vue";
 import UiEmpty from "../../../../../common/ui/UiEmpty.vue";
 import { sizeLabel } from "../../../../../common/utilities/release-format.ts";
 import { computed, ref } from "vue";
-import type { ArchiveContent, ArchiveEntry } from "@projector/core/modules/workspace/index.ts";
+import type { ArchiveContent, ArchiveEntry } from "@projector-ai/core/modules/workspace/index.ts";
 const props = defineProps<{ archive: ArchiveContent }>();
 const query = ref("");
 const entries = computed(() => {

@@ -11,7 +11,7 @@ import {
   fileScopeQuery,
   isLiveScope,
   type FileScope,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 import { createLocalWorkspaceProfile } from "./local.ts";
 export {
   createWorkspaceProfiles,
@@ -141,7 +141,7 @@ export function workspaceScopeRequest<T>(
 export function searchWorkspace(
   projectId: string,
   query: string,
-  options: import("@projector/core/modules/workspace/index.ts").SearchOptions,
+  options: import("@projector-ai/core/modules/workspace/index.ts").SearchOptions,
   signal?: AbortSignal,
   scope?: FileScope,
 ) {
@@ -153,11 +153,11 @@ export function searchWorkspace(
   };
   if (scope)
     return workspaceScopeRequest<{
-      hits: import("@projector/core/modules/workspace/index.ts").SearchHit[];
+      hits: import("@projector-ai/core/modules/workspace/index.ts").SearchHit[];
       truncated: boolean;
     }>(projectId, scope, "search", params, signal);
   return workspaceRequest<{
-    hits: import("@projector/core/modules/workspace/index.ts").SearchHit[];
+    hits: import("@projector-ai/core/modules/workspace/index.ts").SearchHit[];
     truncated: boolean;
   }>(projectId, "search", params, signal);
 }
@@ -174,7 +174,7 @@ export async function findWorkspacePaths(projectId: string, query: string, signa
 }
 
 export function gutterRequest(projectId: string, path: string, signal?: AbortSignal) {
-  return workspaceRequest<import("@projector/core/modules/workspace/index.ts").GitGutter>(
+  return workspaceRequest<import("@projector-ai/core/modules/workspace/index.ts").GitGutter>(
     projectId,
     "gutter",
     { path },
@@ -274,7 +274,7 @@ export async function mutateWorkspaceGit(
     "git",
     { action, ...(Array.isArray(path) ? { paths: path } : { path }) },
     "Не удалось выполнить действие Git",
-  )) as import("@projector/core/modules/workspace/index.ts").GitOverview;
+  )) as import("@projector-ai/core/modules/workspace/index.ts").GitOverview;
 }
 
 export async function mutateWorkspaceBranch(
@@ -286,16 +286,16 @@ export async function mutateWorkspaceBranch(
     "branch",
     { action, ...input },
     "Не удалось выполнить действие с веткой",
-  )) as import("@projector/core/modules/workspace/index.ts").GitBranches;
+  )) as import("@projector-ai/core/modules/workspace/index.ts").GitBranches;
 }
 
 export async function mutateWorkspaceSync(
   projectId: string,
-  action: import("@projector/core/modules/workspace/index.ts").GitSyncAction,
+  action: import("@projector-ai/core/modules/workspace/index.ts").GitSyncAction,
 ) {
   return (await gitWriter(projectId)(
     "sync",
     { action },
     "Не удалось синхронизировать репозиторий",
-  )) as import("@projector/core/modules/workspace/index.ts").GitSync;
+  )) as import("@projector-ai/core/modules/workspace/index.ts").GitSync;
 }

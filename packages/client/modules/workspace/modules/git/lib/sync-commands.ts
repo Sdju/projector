@@ -1,6 +1,6 @@
 import type { Ref } from "vue";
 import { ref } from "vue";
-import type { GitSyncAction } from "@projector/core/modules/workspace/index.ts";
+import type { GitSyncAction } from "@projector-ai/core/modules/workspace/index.ts";
 import {
   useCommandRegistrar,
   type useCommandScope,

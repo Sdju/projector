@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline";
-import type { AgentProcessSpec } from "@projector/core/modules/os/index.ts";
+import type { AgentProcessSpec } from "@projector-ai/core/modules/os/index.ts";
 import type { AgentEventName, AgentRunHandle, AgentRunOptions } from "./backend.ts";
 import { relayRequest, unrelayRequests } from "./command-bridge.ts";
 import { runDirectory } from "./agent-runs.ts";

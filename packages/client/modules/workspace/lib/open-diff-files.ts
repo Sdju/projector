@@ -2,7 +2,7 @@ import type { Ref } from "vue";
 import type {
   CommitComparison,
   PullRequestComparison,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 import { workspaceRequest } from "../../workspace-api/index.ts";
 import type { OpenFile } from "../open-file.ts";
 

@@ -1,5 +1,5 @@
 import { ref, type Ref } from "vue";
-import type { Pipeline, PipelineList } from "@projector/core/modules/workspace/index.ts";
+import type { Pipeline, PipelineList } from "@projector-ai/core/modules/workspace/index.ts";
 import { workspaceRequest } from "../../../../workspace-api/index.ts";
 
 export type PipelineFilter = "all" | "running" | "success" | "failed" | "canceled";

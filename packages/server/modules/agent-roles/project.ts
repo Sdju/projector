@@ -1,15 +1,15 @@
 import { createHash, randomBytes } from "node:crypto";
 import { mkdir, readFile, realpath, rename, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative } from "node:path";
-import { dataDir } from "@projector/core/modules/app-paths/index.ts";
-import { os } from "@projector/core/modules/os/index.ts";
+import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
+import { os } from "@projector-ai/core/modules/os/index.ts";
 import {
   isServiceRoleId,
   normalizeAgentRole,
   type AgentProjectRoleState,
   type AgentRole,
   type AgentRoleView,
-} from "@projector/core/modules/agent-role/index.ts";
+} from "@projector-ai/core/modules/agent-role/index.ts";
 import { loadProjects } from "../projects/index.ts";
 
 /** Roles a project keeps in its repository; inert until the user trusts this exact file. */

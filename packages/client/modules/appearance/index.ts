@@ -6,7 +6,7 @@ import {
   schemeMode,
   type AppearanceChoice,
   type ColorScheme,
-} from "@projector/core/modules/appearance/index.ts";
+} from "@projector-ai/core/modules/appearance/index.ts";
 
 const choice = shallowRef<AppearanceChoice>(defaultAppearance);
 let media: MediaQueryList | undefined;

@@ -6,7 +6,7 @@ import {
   type AnalyticsRange,
   type UsageAnalytics,
   type UsageBreakdown,
-} from "@projector/core/modules/usage-analytics/index.ts";
+} from "@projector-ai/core/modules/usage-analytics/index.ts";
 import { clientAgents } from "../../agents-integration/catalog/index.ts";
 import { useAgentModes } from "../../agent/index.ts";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";

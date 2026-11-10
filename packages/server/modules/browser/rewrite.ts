@@ -1,4 +1,4 @@
-import { proxyUrl } from "@projector/core/modules/browser/index.ts";
+import { proxyUrl } from "@projector-ai/core/modules/browser/index.ts";
 
 /** Страница, ответ которой переписывается: её адрес и окончание хоста прокси. */
 export interface RewriteContext {

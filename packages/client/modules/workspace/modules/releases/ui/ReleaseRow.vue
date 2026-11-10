@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import UiBadge from "../../../../../common/ui/UiBadge.vue";
 import UiListRow from "../../../../../common/ui/UiListRow.vue";
-import type { Release } from "@projector/core/modules/workspace/index.ts";
+import type { Release } from "@projector-ai/core/modules/workspace/index.ts";
 import { relativeTime } from "../../../../../common/utilities/commit-format.ts";
 import { countRu } from "../../../../../common/utilities/plural.ts";
 import { downloadsLabel } from "../../../../../common/utilities/release-format.ts";

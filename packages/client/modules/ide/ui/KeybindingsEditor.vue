@@ -6,7 +6,11 @@ import { computed, nextTick, onMounted, ref, useId } from "vue";
 import KeybindingsTable from "./KeybindingsTable.vue";
 import type { KeybindingRow as Row } from "./keybinding-row.ts";
 import { useIdeCommands } from "../ide.ts";
-import { editKeybinding, recordedKey, type Keybinding } from "@projector/core/modules/ide/index.ts";
+import {
+  editKeybinding,
+  recordedKey,
+  type Keybinding,
+} from "@projector-ai/core/modules/ide/index.ts";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import { readoutLines, useTabReadout } from "../../../common/utilities/tab-readout.ts";
 import UiButton from "../../../common/ui/UiButton.vue";

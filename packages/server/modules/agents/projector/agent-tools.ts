@@ -1,7 +1,7 @@
 import type { QuestionAnswer, QuestionRequest } from "../../agent/index.ts";
 import { environmentForPath, runEnvironmentCommand } from "../../environments/index.ts";
 import { devcontainerForPath, runDevcontainerCommand } from "../../devcontainer/index.ts";
-import { os } from "@projector/core/modules/os/index.ts";
+import { os } from "@projector-ai/core/modules/os/index.ts";
 import { tool } from "ai";
 import { z } from "zod";
 import { expandPath, inspectProject, listDirectory } from "../../projects/index.ts";

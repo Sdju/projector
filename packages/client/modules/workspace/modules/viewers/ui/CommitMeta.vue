@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import UiHeading from "../../../../../common/ui/UiHeading.vue";
 import { computed } from "vue";
-import type { GitCommitDetail } from "@projector/core/modules/workspace/index.ts";
+import type { GitCommitDetail } from "@projector-ai/core/modules/workspace/index.ts";
 import { copyWithNotice } from "../../../../../common/utilities/notice.ts";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import {

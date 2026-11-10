@@ -5,7 +5,7 @@ import { computed } from "vue";
 import type {
   DiscussionComment,
   DiscussionDetail,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab-readout.ts";
 import { useTrackerDetail } from "../lib/tracker-detail.ts";
 import TrackerComments, { type TrackerComment } from "./TrackerComments.vue";

@@ -131,6 +131,17 @@ projector --native
 
 `@projector-ai/ide` не требует GTK, Vite+ или `@zede/vio`. Ему нужны Node.js 24.11–24.x и на Linux Python 3, `make` и компилятор C++ для сборки `node-pty`. `@projector-ai/native` требует GTK4, GObject Introspection, `pkg-config` и компилятор C++ для `node-gtk`. Пакеты публикуются из GitHub Releases; если нужной версии ещё нет в registry, используйте установку из исходников.
 
+Hub для доступа к нескольким машинам через один origin ставится отдельно:
+
+```bash
+npm install -g @projector-ai/hub
+PROJECTOR_HUB_PASSWORD='<пароль браузера>' \
+PROJECTOR_HUB_DEVICE_TOKEN='<токен устройств>' \
+projector-hub
+```
+
+Подробности — [Hub](docs/hub.md).
+
 Чтобы добавить пункт меню и команду `projector` после npm-установки:
 
 ```bash

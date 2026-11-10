@@ -3,7 +3,7 @@ import { parseDockerEnvironment, prepareDockerEnvironment } from "../environment
 import { cloneGithubContainer } from "./container.ts";
 import { integrationConfig } from "../integration-store/index.ts";
 import { HttpError } from "../http/index.ts";
-import type { DockerEnvironment } from "@projector/core/modules/environment/index.ts";
+import type { DockerEnvironment } from "@projector-ai/core/modules/environment/index.ts";
 import { cloneOverHttps, importRepository } from "../git-import/index.ts";
 import type { CloneHooks } from "../git-import/index.ts";
 import { DEFAULT_DIRECTORY, authorized, github, repositoryName } from "./api.ts";

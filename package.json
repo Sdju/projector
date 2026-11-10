@@ -1,6 +1,6 @@
 {
   "name": "projector",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "private": true,
   "description": "Local application and project launcher with a GTK palette, web workspace and terminals",
   "homepage": "https://github.com/Sdju/projector#readme",
@@ -48,7 +48,7 @@
     "@modelcontextprotocol/sdk": "catalog:",
     "@o-feod/eslint-structure-plugin": "catalog:",
     "@o-feod/oxlint-structure-plugin": "catalog:",
-    "@projector/native": "workspace:*",
+    "@projector-ai/native": "workspace:*",
     "@types/markdown-it": "catalog:",
     "@types/node": "catalog:",
     "@types/ws": "catalog:",

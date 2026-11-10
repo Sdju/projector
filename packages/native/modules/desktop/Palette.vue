@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import Gdk from "gi:Gdk-4.0";
 import GLib from "gi:GLib-2.0";
-import { os } from "@projector/core/modules/os/index.ts";
+import { os } from "@projector-ai/core/modules/os/index.ts";
 import {
   computed,
   shallowRef,
@@ -36,7 +36,7 @@ import {
   resolveLauncherAction,
   type LaunchAction,
   type LaunchItem,
-} from "@projector/core/modules/launcher/index.ts";
+} from "@projector-ai/core/modules/launcher/index.ts";
 
 const props = defineProps<{ baseUrl: string; applicationIcon: (id: string) => object | null }>();
 GLib.setPrgname("projector-launcher");

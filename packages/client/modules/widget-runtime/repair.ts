@@ -3,7 +3,7 @@ import { autoClose, parseWidgetSource } from "./autoclose.ts";
 import { compileScript, compileTemplate, loadCompiler } from "./compile.ts";
 import { isWidgetName, projectWidgetEntries } from "./registry.ts";
 import { splitMessage } from "./split.ts";
-import type { ProjectWidgetDefinition } from "@projector/core/modules/widget-catalog/index.ts";
+import type { ProjectWidgetDefinition } from "@projector-ai/core/modules/widget-catalog/index.ts";
 
 /** Nothing here executes the widget: valid template and script syntax is enough to show it. */
 async function widgetProblem(

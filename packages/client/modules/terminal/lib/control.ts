@@ -2,7 +2,7 @@ import type {
   TerminalSession,
   TerminalControlMessage,
   TerminalControlRequest,
-} from "@projector/core/modules/terminal/index.ts";
+} from "@projector-ai/core/modules/terminal/index.ts";
 import { lanPassword } from "../../../common/utilities/lan-auth.ts";
 import { openTerminalSocket, type TerminalSocket } from "./socket.ts";
 

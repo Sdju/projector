@@ -1,4 +1,4 @@
-import type { AgentTask } from "@projector/core/modules/agent-task/index.ts";
+import type { AgentTask } from "@projector-ai/core/modules/agent-task/index.ts";
 import type {
   AgentContext,
   AgentFormAnswer,

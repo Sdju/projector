@@ -1,4 +1,4 @@
-import { buttonWidget } from "@projector/core/modules/agent-widgets/button/index.ts";
+import { buttonWidget } from "@projector-ai/core/modules/agent-widgets/button/index.ts";
 import type { WidgetEntry } from "../../widget-runtime/index.ts";
 import Button from "./ui/Button.vue";
 

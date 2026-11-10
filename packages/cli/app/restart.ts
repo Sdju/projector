@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { os } from "@projector/core/modules/os/index.ts";
+import { os } from "@projector-ai/core/modules/os/index.ts";
 
 export const waitForProcessExit = (pid: number, timeoutMs = 15000): Promise<void> =>
   os.processes.waitForExit(pid, timeoutMs);

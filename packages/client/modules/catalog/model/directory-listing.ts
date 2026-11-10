@@ -1,6 +1,6 @@
 import { onBeforeUnmount, ref } from "vue";
 import { fetchPathSuggestions } from "../../project/index.ts";
-import type { DirectoryEntry } from "@projector/core/modules/directories/index.ts";
+import type { DirectoryEntry } from "@projector-ai/core/modules/directories/index.ts";
 
 /** Directory suggestions with cancellation: a newer request invalidates any pending one. */
 export function useDirectoryListing() {

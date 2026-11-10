@@ -1,5 +1,5 @@
 import type { Ref } from "vue";
-import type { GitBranch } from "@projector/core/modules/workspace/index.ts";
+import type { GitBranch } from "@projector-ai/core/modules/workspace/index.ts";
 import {
   commandArgs,
   optionalStringArg,

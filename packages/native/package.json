@@ -1,6 +1,6 @@
 {
-  "name": "@projector/native",
-  "version": "0.10.0",
+  "name": "@projector-ai/native",
+  "version": "0.11.0",
   "private": true,
   "type": "module",
   "exports": {
@@ -8,7 +8,7 @@
     "./entry": "./app/entry.ts"
   },
   "dependencies": {
-    "@projector/core": "workspace:*",
+    "@projector-ai/core": "workspace:*",
     "@zede/vio": "catalog:",
     "node-gtk": "catalog:"
   }

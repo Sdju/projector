@@ -3,7 +3,7 @@ import type {
   PipelineDetail,
   PipelineJobDetail,
   PipelineStatus,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 import { workspaceRequest } from "../../../../workspace-api/index.ts";
 
 function useCiDetail<T>(

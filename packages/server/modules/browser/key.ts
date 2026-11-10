@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { dataDir } from "@projector/core/modules/app-paths/index.ts";
+import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
 
 const store = globalThis as typeof globalThis & { projectorBrowserKey?: string };
 

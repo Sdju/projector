@@ -1,4 +1,4 @@
-import type { FileScope } from "@projector/core/modules/workspace/index.ts";
+import type { FileScope } from "@projector-ai/core/modules/workspace/index.ts";
 import type { SidebarType } from "./sidebar.ts";
 import type { TabType } from "./tabs.ts";
 

@@ -1,4 +1,4 @@
-import type { InterfaceMode } from "@projector/core/modules/launcher/index.ts";
+import type { InterfaceMode } from "@projector-ai/core/modules/launcher/index.ts";
 
 export type CliCommand =
   | "open"

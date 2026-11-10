@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Project } from "@projector/core/modules/project/index.ts";
+import type { Project } from "@projector-ai/core/modules/project/index.ts";
 import { HttpError } from "../http/index.ts";
 
 /** What a clone run may report and obey; hosts add phases of their own before `cloning`. */

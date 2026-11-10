@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { HttpServer } from "vite";
-import type { ServerMode } from "@projector/core/modules/server-mode/index.ts";
+import type { ServerMode } from "@projector-ai/core/modules/server-mode/index.ts";
 import type { accessAllowed } from "../modules/access/index.ts";
 import type { terminalControl } from "../modules/terminal-control/index.ts";
 import type { findProject, loadProjects } from "../modules/projects/index.ts";

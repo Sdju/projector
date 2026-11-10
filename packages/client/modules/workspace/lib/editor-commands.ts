@@ -1,12 +1,12 @@
 import type { Ref } from "vue";
-import { shortcutKey } from "@projector/core/modules/ide/index.ts";
+import { shortcutKey } from "@projector-ai/core/modules/ide/index.ts";
 import type { ContextMenuItem } from "../../../common/ui/context-menu.ts";
 import { commandArgs, type useCommandScope } from "../../../common/utilities/commands.ts";
 import { copyWithNotice } from "../../../common/utilities/notice.ts";
 import type { TabRegistry, WorkspaceCapability } from "../../workspace-api/index.ts";
-import type { FileScope } from "@projector/core/modules/workspace/index.ts";
+import type { FileScope } from "@projector-ai/core/modules/workspace/index.ts";
 import { workspaceSiteUrl } from "../../workspace-api/index.ts";
-import { normalizeBrowserInput } from "@projector/core/modules/browser/index.ts";
+import { normalizeBrowserInput } from "@projector-ai/core/modules/browser/index.ts";
 import { isEditable, isHtml, isMarkdown, type OpenFile } from "../open-file.ts";
 import { registerSelectionCommands } from "./selection-commands.ts";
 import { createEditorSelection, provideEditorSelection } from "./editor-selection.ts";

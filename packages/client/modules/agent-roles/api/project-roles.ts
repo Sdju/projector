@@ -1,4 +1,7 @@
-import type { AgentProjectRoleState, AgentRole } from "@projector/core/modules/agent-role/index.ts";
+import type {
+  AgentProjectRoleState,
+  AgentRole,
+} from "@projector-ai/core/modules/agent-role/index.ts";
 
 async function call<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {

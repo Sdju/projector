@@ -1,6 +1,6 @@
 {
-  "name": "@projector/server",
-  "version": "0.10.0",
+  "name": "@projector-ai/server",
+  "version": "0.11.0",
   "private": true,
   "type": "module",
   "exports": {
@@ -11,7 +11,7 @@
     "@anthropic-ai/claude-agent-sdk": "catalog:",
     "@devcontainers/cli": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
-    "@projector/core": "workspace:*",
+    "@projector-ai/core": "workspace:*",
     "@xterm/addon-serialize": "catalog:",
     "@xterm/headless": "catalog:",
     "ai": "catalog:",

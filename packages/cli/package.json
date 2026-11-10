@@ -1,12 +1,12 @@
 {
-  "name": "@projector/cli",
-  "version": "0.10.0",
+  "name": "@projector-ai/cli",
+  "version": "0.11.0",
   "private": true,
   "type": "module",
   "exports": {
     "./*": "./*"
   },
   "dependencies": {
-    "@projector/core": "workspace:*"
+    "@projector-ai/core": "workspace:*"
   }
 }

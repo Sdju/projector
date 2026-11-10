@@ -1,7 +1,7 @@
 import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { dataDir } from "@projector/core/modules/app-paths/index.ts";
-import { isDeviceId, type HubConnection } from "@projector/core/modules/hub/index.ts";
+import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
+import { isDeviceId, type HubConnection } from "@projector-ai/core/modules/hub/index.ts";
 import { connectHub, type HubHandlers } from "./connector.ts";
 
 const path = () => join(dataDir(), "hub.json");

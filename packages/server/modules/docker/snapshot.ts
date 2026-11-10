@@ -1,5 +1,5 @@
-import { os } from "@projector/core/modules/os/index.ts";
-import type { DockerContainer, DockerSnapshot } from "@projector/core/modules/docker/index.ts";
+import { os } from "@projector-ai/core/modules/os/index.ts";
+import type { DockerContainer, DockerSnapshot } from "@projector-ai/core/modules/docker/index.ts";
 import { daemonState } from "./daemon.ts";
 import { dockerSettings, dockerContexts, readBinding, detectedComposeFiles } from "./settings.ts";
 

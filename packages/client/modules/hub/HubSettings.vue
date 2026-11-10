@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, shallowRef, onMounted, onBeforeUnmount, computed } from "vue";
-import { isDeviceId } from "@projector/core/modules/hub/index.ts";
+import { isDeviceId } from "@projector-ai/core/modules/hub/index.ts";
 import { deviceBase } from "../../common/utilities/device-url.ts";
 import { useCommandScope, commandArgs } from "../../common/utilities/commands.ts";
 import { useSectionAction } from "../../common/utilities/use-section-action.ts";

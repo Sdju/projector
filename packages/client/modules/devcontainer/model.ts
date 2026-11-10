@@ -2,7 +2,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import type {
   DevcontainerDecision,
   DevcontainerState,
-} from "@projector/core/modules/devcontainer/index.ts";
+} from "@projector-ai/core/modules/devcontainer/index.ts";
 import { useCommandScope } from "../../common/utilities/commands.ts";
 import { decideDevcontainer, fetchDevcontainer, stopDevcontainer } from "./client.ts";
 

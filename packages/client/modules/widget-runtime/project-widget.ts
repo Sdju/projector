@@ -12,7 +12,7 @@ import {
   type EffectScope,
   type PropType,
 } from "vue";
-import type { ProjectWidgetDefinition } from "@projector/core/modules/widget-catalog/index.ts";
+import type { ProjectWidgetDefinition } from "@projector-ai/core/modules/widget-catalog/index.ts";
 import { useWidgetReply } from "./bridge.ts";
 import {
   compileScript,

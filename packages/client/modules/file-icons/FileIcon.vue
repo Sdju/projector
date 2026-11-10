@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ResolvedFileIcon } from "@projector/core/modules/file-icons/index.ts";
+import type { ResolvedFileIcon } from "@projector-ai/core/modules/file-icons/index.ts";
 withDefaults(defineProps<{ icon: ResolvedFileIcon; size?: number }>(), { size: 16 });
 </script>
 

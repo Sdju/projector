@@ -1,8 +1,8 @@
 import { mkdir, mkdtemp, rm, lstat, realpath } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import type { DockerEnvironment } from "@projector/core/modules/environment/index.ts";
-import { os } from "@projector/core/modules/os/index.ts";
+import type { DockerEnvironment } from "@projector-ai/core/modules/environment/index.ts";
+import { os } from "@projector-ai/core/modules/os/index.ts";
 import { HttpError } from "../http/index.ts";
 import { expandPath, inspectProject, loadProjects, updateProjects } from "../projects/index.ts";
 import type { Project } from "../projects/index.ts";

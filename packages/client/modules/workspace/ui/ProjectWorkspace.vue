@@ -32,7 +32,7 @@ import {
   fileScopeTitle,
   isLiveScope,
   type FileScope,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 import { createPanelHosts } from "../panel-hosts.ts";
 import { TerminalCloseDialog } from "../../terminal/index.ts";
 import { useDocker } from "../../docker/index.ts";

@@ -1,4 +1,4 @@
-import type { Issue } from "@projector/core/modules/workspace/index.ts";
+import type { Issue } from "@projector-ai/core/modules/workspace/index.ts";
 import { usePagedList, type TrackerState } from "./paged-list.ts";
 
 export type IssueState = TrackerState;

@@ -1,8 +1,8 @@
 import { createRequire } from "node:module";
 import { realpathSync } from "node:fs";
 import { basename } from "node:path";
-import type { Project } from "@projector/core/modules/project/index.ts";
-import { os, bashShellLaunch, type ShellLaunch } from "@projector/core/modules/os/index.ts";
+import type { Project } from "@projector-ai/core/modules/project/index.ts";
+import { os, bashShellLaunch, type ShellLaunch } from "@projector-ai/core/modules/os/index.ts";
 import { trustedDevcontainer } from "./state.ts";
 
 const SCRIPT = `

@@ -2,7 +2,7 @@ import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, Server } from "node:http";
 import { Duplex } from "node:stream";
 import { WebSocket, WebSocketServer, createWebSocketStream } from "ws";
-import { HUB_PROTOCOL, isDeviceId, type HubDevice } from "@projector/core/modules/hub/index.ts";
+import { HUB_PROTOCOL, isDeviceId, type HubDevice } from "@projector-ai/core/modules/hub/index.ts";
 
 interface Device {
   info: HubDevice;

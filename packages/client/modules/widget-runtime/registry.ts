@@ -3,7 +3,7 @@ import type { Component } from "vue";
 import {
   createWidgetCatalog,
   type WidgetDefinition,
-} from "@projector/core/modules/widget-catalog/index.ts";
+} from "@projector-ai/core/modules/widget-catalog/index.ts";
 
 /** A component the chat can render: its definition (what the agent is told) and its implementation. */
 export interface WidgetEntry {

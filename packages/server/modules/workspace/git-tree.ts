@@ -7,7 +7,7 @@ import {
   type FileContent,
   type FileEntry,
   type TreePage,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 import { git, gitBytes, gitText } from "./git.ts";
 import { excludePatterns } from "./files-exclude.ts";
 import { imageType, isRasterImage } from "./files.ts";

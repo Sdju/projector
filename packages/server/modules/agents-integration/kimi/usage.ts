@@ -2,7 +2,7 @@ import { createUsageCache } from "../_/usage-cache.ts";
 import type {
   KimiUsage,
   KimiUsageWindow,
-} from "@projector/core/modules/agents-integration/kimi/index.ts";
+} from "@projector-ai/core/modules/agents-integration/kimi/index.ts";
 import { readKimiUsage } from "./client.ts";
 
 const record = (value: unknown): Record<string, unknown> | null =>

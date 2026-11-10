@@ -1,4 +1,4 @@
-import { serverLogPath } from "@projector/core/modules/app-paths/index.ts";
+import { serverLogPath } from "@projector-ai/core/modules/app-paths/index.ts";
 import { writeJson, type Output } from "../common/output.ts";
 import type { CliOptions } from "../modules/arguments/index.ts";
 

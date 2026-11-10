@@ -1,13 +1,13 @@
 {
-  "name": "@projector/hub",
-  "version": "0.10.0",
+  "name": "@projector-ai/hub",
+  "version": "0.11.0",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node app/main.ts"
   },
   "dependencies": {
-    "@projector/core": "workspace:*",
+    "@projector-ai/core": "workspace:*",
     "ws": "catalog:"
   }
 }

@@ -1,6 +1,6 @@
 import { readonly, shallowRef, ref } from "vue";
 import defaults from "./fallback-theme.json";
-import { createFileIconResolver } from "@projector/core/modules/file-icons/index.ts";
+import { createFileIconResolver } from "@projector-ai/core/modules/file-icons/index.ts";
 
 const resolver = shallowRef(createFileIconResolver(defaults));
 const error = ref("");

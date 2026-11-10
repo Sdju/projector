@@ -361,7 +361,7 @@ importers:
       '@o-feod/oxlint-structure-plugin':
         specifier: 'catalog:'
         version: 0.1.7(oxlint@1.89.0(oxlint-tsgolint@7.0.2004)(vite-plus@1.4.0(@types/node@26.6.2)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.11)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.11(typescript@6.0.3))))
-      '@projector/native':
+      '@projector-ai/native':
         specifier: workspace:*
         version: link:packages/native
       '@types/markdown-it':
@@ -427,7 +427,7 @@ importers:
 
   packages/cli:
     dependencies:
-      '@projector/core':
+      '@projector-ai/core':
         specifier: workspace:*
         version: link:../core
 
@@ -466,7 +466,7 @@ importers:
       '@milkdown/kit':
         specifier: 'catalog:'
         version: 7.22.2(@codemirror/language@6.12.4)(@codemirror/state@6.7.6)(@codemirror/view@6.43.13)(typescript@6.0.3)
-      '@projector/core':
+      '@projector-ai/core':
         specifier: workspace:*
         version: link:../core
       '@tanstack/vue-virtual':
@@ -523,7 +523,7 @@ importers:
 
   packages/hub:
     dependencies:
-      '@projector/core':
+      '@projector-ai/core':
         specifier: workspace:*
         version: link:../core
       ws:
@@ -532,7 +532,7 @@ importers:
 
   packages/native:
     dependencies:
-      '@projector/core':
+      '@projector-ai/core':
         specifier: workspace:*
         version: link:../core
       '@zede/vio':
@@ -556,7 +556,7 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
         version: 1.32.1(zod@4.6.5)
-      '@projector/core':
+      '@projector-ai/core':
         specifier: workspace:*
         version: link:../core
       '@xterm/addon-serialize':

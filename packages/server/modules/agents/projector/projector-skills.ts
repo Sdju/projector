@@ -1,6 +1,6 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { dataDir } from "@projector/core/modules/app-paths/index.ts";
+import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
 
 export type SkillSource = "user" | "project";
 

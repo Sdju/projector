@@ -1,13 +1,13 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { open, readFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
-import { os } from "@projector/core/modules/os/index.ts";
+import { os } from "@projector-ai/core/modules/os/index.ts";
 import {
   SERVER_MODES,
   isServerMode,
   type ServerMode,
-} from "@projector/core/modules/server-mode/index.ts";
-import { serverLogPath, writeServerMode } from "@projector/core/modules/app-paths/index.ts";
+} from "@projector-ai/core/modules/server-mode/index.ts";
+import { serverLogPath, writeServerMode } from "@projector-ai/core/modules/app-paths/index.ts";
 import type { CliOptions } from "../arguments/index.ts";
 import type { AppOpenRequest, HealthInfo } from "../api/index.ts";
 import type { Output } from "../../common/output.ts";

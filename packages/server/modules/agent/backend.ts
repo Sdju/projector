@@ -13,8 +13,8 @@ export interface AgentCapabilities {
   compact?: { command: string; hintAt: number; autoAt: number };
 }
 
-import type { JudgeOverride } from "@projector/core/modules/agent-judge/index.ts";
-import type { AgentRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
+import type { JudgeOverride } from "@projector-ai/core/modules/agent-judge/index.ts";
+import type { AgentRoleSnapshot } from "@projector-ai/core/modules/agent-role/index.ts";
 import type { AgentHistoryTurn } from "../providers/index.ts";
 import type {
   AgentControl,

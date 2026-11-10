@@ -18,7 +18,7 @@ import {
   createLauncherModel,
   launchSectionTitles,
   type LaunchItem,
-} from "@projector/core/modules/launcher/index.ts";
+} from "@projector-ai/core/modules/launcher/index.ts";
 import { projectIconUrl, useProjects, type ProjectLocation } from "../../project/index.ts";
 import PathBar from "./PathBar.vue";
 import IconChevron from "~icons/lucide/chevron-down";

@@ -3,7 +3,7 @@ import UsageIndicator from "../../_/UsageIndicator.vue";
 import { useAgentUsageIndicator } from "../../_/use-agent-usage-indicator.ts";
 import { USAGE_PERIOD_SECONDS } from "../../_/usage-pace.ts";
 import IconClaude from "~icons/simple-icons/claude";
-import type { ClaudeUsage } from "@projector/core/modules/agents-integration/claude/index.ts";
+import type { ClaudeUsage } from "@projector-ai/core/modules/agents-integration/claude/index.ts";
 
 type WindowName = keyof NonNullable<ClaudeUsage["windows"]>;
 const weekTicks = Array.from({ length: 6 }, (_, day) => ((day + 1) / 7) * 100);

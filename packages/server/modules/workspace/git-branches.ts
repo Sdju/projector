@@ -1,7 +1,7 @@
 import { realpath } from "node:fs/promises";
 import { HttpError } from "../http/index.ts";
 import { git, serializeGitWrite } from "./git.ts";
-import type { GitBranch, GitBranches } from "@projector/core/modules/workspace/index.ts";
+import type { GitBranch, GitBranches } from "@projector-ai/core/modules/workspace/index.ts";
 
 const FIELD = "\x1f";
 const refFormat = [

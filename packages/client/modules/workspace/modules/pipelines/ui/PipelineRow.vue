@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import UiListRow from "../../../../../common/ui/UiListRow.vue";
 import UiStatusDot from "../../../../../common/ui/UiStatusDot.vue";
-import type { Pipeline } from "@projector/core/modules/workspace/index.ts";
+import type { Pipeline } from "@projector-ai/core/modules/workspace/index.ts";
 import { relativeTime, shortHash } from "../../../../../common/utilities/commit-format.ts";
 import {
   durationLabel,
@@ -9,7 +9,7 @@ import {
   PIPELINE_STATUS_TONE,
   refLabel,
   sourceLabel,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 
 /** A pipeline row: ref, status, source, commit and duration; clicks belong to the parent. */
 defineProps<{ pipeline: Pipeline }>();

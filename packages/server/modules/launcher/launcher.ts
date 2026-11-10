@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { promisify } from "node:util";
-import { os } from "@projector/core/modules/os/index.ts";
+import { os } from "@projector-ai/core/modules/os/index.ts";
 import { expandPath, loadProjects, sameLocalPath, type Project } from "../projects/index.ts";
 import { getSnapshot, startProject, stopProject } from "../processes/index.ts";
 import { openBrowser, openWindow, openRoute as openAppRoute } from "../window/index.ts";
@@ -10,8 +10,8 @@ import type {
   LaunchActionId,
   LaunchItem,
   LaunchResult,
-} from "@projector/core/modules/launcher/index.ts";
-import { parseLaunchQuery } from "@projector/core/modules/launcher/index.ts";
+} from "@projector-ai/core/modules/launcher/index.ts";
+import { parseLaunchQuery } from "@projector-ai/core/modules/launcher/index.ts";
 import { browse } from "./browse.ts";
 import { projectItem, workspaceRoute } from "./project-entries.ts";
 import { searchGithub, searchGitlab } from "./hosted-search.ts";
@@ -26,15 +26,15 @@ import {
   setFavoriteDirectory,
 } from "./folders.ts";
 import { parsePotentialId, potentialItems } from "./potential.ts";
-import { appUrl, projectAppUrl } from "@projector/core/modules/app-paths/index.ts";
+import { appUrl, projectAppUrl } from "@projector-ai/core/modules/app-paths/index.ts";
 import { importGitlabProject, gitlabCloneTarget } from "../gitlab/index.ts";
-import { githubProjectRoute } from "@projector/core/modules/github/index.ts";
-import { gitlabProjectRoute } from "@projector/core/modules/gitlab/index.ts";
+import { githubProjectRoute } from "@projector-ai/core/modules/github/index.ts";
+import { gitlabProjectRoute } from "@projector-ai/core/modules/gitlab/index.ts";
 export {
   shortcuts,
   type LaunchItem,
   type InterfaceMode,
-} from "@projector/core/modules/launcher/index.ts";
+} from "@projector-ai/core/modules/launcher/index.ts";
 
 const execute = promisify(execFile);
 

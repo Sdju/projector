@@ -8,7 +8,7 @@ import type {
   AgentRecentChat,
   AgentTurn,
 } from "../../agent-core/index.ts";
-import type { AgentRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
+import type { AgentRoleSnapshot } from "@projector-ai/core/modules/agent-role/index.ts";
 
 /** The part of the IDE command service a branch needs: opening the tab of the new chat. */
 export interface BranchCommands {

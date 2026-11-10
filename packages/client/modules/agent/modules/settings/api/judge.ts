@@ -1,4 +1,4 @@
-import type { JudgeSettings } from "@projector/core/modules/agent-judge/index.ts";
+import type { JudgeSettings } from "@projector-ai/core/modules/agent-judge/index.ts";
 
 async function call<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {

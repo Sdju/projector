@@ -1,4 +1,4 @@
-import { os } from "@projector/core/modules/os/index.ts";
+import { os } from "@projector-ai/core/modules/os/index.ts";
 import { realpath } from "node:fs/promises";
 import { HttpError } from "../http/index.ts";
 import { MAX_BYTES, excludePatterns } from "./paths.ts";
@@ -10,7 +10,7 @@ import {
   type SearchHit,
   type SearchMatch,
   type SearchOptions,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 
 export async function searchProject(root: string, query: string, options: SearchOptions = {}) {
   if (!query.trim()) return { hits: [], truncated: false };

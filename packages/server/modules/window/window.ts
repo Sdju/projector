@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
-import { os } from "@projector/core/modules/os/index.ts";
-import { APP_CLASS, chromeProfileDir } from "@projector/core/modules/app-paths/index.ts";
+import { os } from "@projector-ai/core/modules/os/index.ts";
+import { APP_CLASS, chromeProfileDir } from "@projector-ai/core/modules/app-paths/index.ts";
 import { preferences } from "../preferences/index.ts";
-import type { InterfaceMode } from "@projector/core/modules/launcher/index.ts";
+import type { InterfaceMode } from "@projector-ai/core/modules/launcher/index.ts";
 import { hasNativePalette, nativeArgs } from "./desktop.ts";
 
 const PALETTE_CLASS = "ProjectorLauncher";

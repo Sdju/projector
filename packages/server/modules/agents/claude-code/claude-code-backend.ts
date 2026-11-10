@@ -21,7 +21,7 @@ import { claudeWidgetsMcpServer, WIDGETS_MCP_SERVER } from "../widgets-mcp/index
 import { mcpConfigsForNames, mcpServerConfigs, processMcpConfig } from "../../agent-mcp/index.ts";
 import { roleContext } from "../../agent-roles/index.ts";
 import { trustedProjectWidgets } from "../../project-widgets/index.ts";
-import { renderWidgetGuide } from "@projector/core/modules/widget-catalog/index.ts";
+import { renderWidgetGuide } from "@projector-ai/core/modules/widget-catalog/index.ts";
 import type {
   Options,
   SDKControlGetContextUsageResponse as ContextUsage,

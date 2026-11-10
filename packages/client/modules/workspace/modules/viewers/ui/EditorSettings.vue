@@ -5,7 +5,7 @@ import UiControl from "../../../../../common/ui/UiControl.vue";
 import { computed, defineAsyncComponent, onMounted, ref, useId } from "vue";
 import UiHeading from "../../../../../common/ui/UiHeading.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
-import { editorThemes, type EditorTheme } from "@projector/core/modules/editor-themes/index.ts";
+import { editorThemes, type EditorTheme } from "@projector-ai/core/modules/editor-themes/index.ts";
 import { editorTheme, applyEditorTheme, loadEditorTheme } from "../lib/editor-theme.ts";
 import { useSectionAction } from "../../../../../common/utilities/use-section-action.ts";
 defineProps<{ embedded?: boolean }>();

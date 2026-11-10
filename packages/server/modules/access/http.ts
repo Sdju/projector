@@ -1,7 +1,7 @@
 import { isHubRequest } from "./hub.ts";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { randomBytes } from "node:crypto";
-import { readNetworkMode } from "@projector/core/modules/app-paths/index.ts";
+import { readNetworkMode } from "@projector-ai/core/modules/app-paths/index.ts";
 import {
   accessAllowed,
   isLocalRequest,

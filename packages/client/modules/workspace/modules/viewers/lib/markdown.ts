@@ -1,5 +1,5 @@
 import { workspaceAssetUrl, workspaceScopeAssetUrl } from "../../../../workspace-api/index.ts";
-import type { FileScope } from "@projector/core/modules/workspace/index.ts";
+import type { FileScope } from "@projector-ai/core/modules/workspace/index.ts";
 import { markdownPath } from "../../../../../common/utilities/markdown-path.ts";
 import { splitEmoji, type EmojiMap } from "../../../../../common/utilities/github-emoji.ts";
 import MarkdownIt from "markdown-it";

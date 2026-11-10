@@ -2,7 +2,7 @@ import { isAbsolute } from "node:path";
 import {
   GITLAB_DEFAULT_INSTANCE,
   normalizeGitlabProjectPath,
-} from "@projector/core/modules/gitlab/index.ts";
+} from "@projector-ai/core/modules/gitlab/index.ts";
 import { parseDockerEnvironment, prepareDockerEnvironment } from "../environments/index.ts";
 import { integrationConfig } from "../integration-store/index.ts";
 import { HttpError } from "../http/index.ts";

@@ -10,7 +10,7 @@ import {
   workspaceCapabilities,
   type ImportConflict,
 } from "../../../../workspace-api/index.ts";
-import { isLiveScope } from "@projector/core/modules/workspace/index.ts";
+import { isLiveScope } from "@projector-ai/core/modules/workspace/index.ts";
 import { baseName, topLevelName, type DropSource } from "./drop-entries.ts";
 import { treeDragType } from "./tree-drag.ts";
 import type { TreeContext } from "./tree-operations.ts";

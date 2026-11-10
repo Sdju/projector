@@ -2,7 +2,7 @@ import { readdir, stat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { expandPath } from "../projects/index.ts";
 import { HttpError } from "../http/index.ts";
-import type { DirectoryListing } from "@projector/core/modules/directories/index.ts";
+import type { DirectoryListing } from "@projector-ai/core/modules/directories/index.ts";
 
 export async function listDirectories(input: string, complete = false): Promise<DirectoryListing> {
   if (

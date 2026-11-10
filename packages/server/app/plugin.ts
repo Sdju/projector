@@ -9,11 +9,11 @@ import {
   APP_PORT,
   appUrl,
   startServerLogRotation,
-} from "@projector/core/modules/app-paths/index.ts";
-import { os } from "@projector/core/modules/os/index.ts";
+} from "@projector-ai/core/modules/app-paths/index.ts";
+import { os } from "@projector-ai/core/modules/os/index.ts";
 import { CLAUDE_SESSION_ENV } from "../modules/agents/claude-code/index.ts";
 import { openLauncher, startTray } from "../modules/window/index.ts";
-import type { ServerMode } from "@projector/core/modules/server-mode/index.ts";
+import type { ServerMode } from "@projector-ai/core/modules/server-mode/index.ts";
 import { attachTerminalServer, listTerminalSessions } from "../modules/terminal/index.ts";
 import { pruneRuns, recoverJobs, bindAgentEventStreams } from "../modules/agent/index.ts";
 import { registerBuiltinAgents } from "./agents.ts";

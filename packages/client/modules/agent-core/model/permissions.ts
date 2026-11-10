@@ -1,4 +1,4 @@
-import type { JudgeVerdict } from "@projector/core/modules/agent-judge/index.ts";
+import type { JudgeVerdict } from "@projector-ai/core/modules/agent-judge/index.ts";
 
 /** A sensitive tool call waiting for the user's decision. */
 export interface AgentPermission {

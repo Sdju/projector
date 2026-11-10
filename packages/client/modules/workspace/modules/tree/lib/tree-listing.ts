@@ -8,7 +8,7 @@ import {
   type TreePage,
   type FileEntry,
   type FileScope,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 
 export function createTreePaging() {
   const revealPath = ref("");

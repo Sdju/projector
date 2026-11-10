@@ -1,6 +1,6 @@
 import { agentEnv, assertHostProject, attachHosted, startHosted } from "../../agent/index.ts";
 import type { AgentBackendId, AgentRunHandle } from "../../agent/index.ts";
-import { os } from "@projector/core/modules/os/index.ts";
+import { os } from "@projector-ai/core/modules/os/index.ts";
 import {
   createAcpConnection,
   type AcpConnection,

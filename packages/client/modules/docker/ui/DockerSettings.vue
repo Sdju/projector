@@ -5,7 +5,7 @@ import UiControl from "../../../common/ui/UiControl.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 
 import { onMounted, ref } from "vue";
-import type { DockerSnapshot } from "@projector/core/modules/docker/index.ts";
+import type { DockerSnapshot } from "@projector-ai/core/modules/docker/index.ts";
 import DockerDaemonNotice from "./DockerDaemonNotice.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { useCommandScope, commandArgs } from "../../../common/utilities/commands.ts";

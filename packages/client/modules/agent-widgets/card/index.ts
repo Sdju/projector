@@ -1,4 +1,4 @@
-import { cardWidget } from "@projector/core/modules/agent-widgets/card/index.ts";
+import { cardWidget } from "@projector-ai/core/modules/agent-widgets/card/index.ts";
 import type { WidgetEntry } from "../../widget-runtime/index.ts";
 import Card from "./ui/Card.vue";
 

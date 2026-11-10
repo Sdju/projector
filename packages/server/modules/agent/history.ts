@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { agentTaskSchema } from "@projector/core/modules/agent-task/index.ts";
+import { agentTaskSchema } from "@projector-ai/core/modules/agent-task/index.ts";
 import {
   importLegacyHistory,
   loadHistory,
@@ -9,8 +9,8 @@ import {
 import { saveChatJudge } from "./judge-store.ts";
 import { saveChatQueue } from "./queue-store.ts";
 import { saveChatRole } from "./role-store.ts";
-import { normalizeJudgeOverride } from "@projector/core/modules/agent-judge/index.ts";
-import { normalizeRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
+import { normalizeJudgeOverride } from "@projector-ai/core/modules/agent-judge/index.ts";
+import { normalizeRoleSnapshot } from "@projector-ai/core/modules/agent-role/index.ts";
 import type { ChatIndex } from "./history-store.ts";
 interface StoredTurn {
   id: string;

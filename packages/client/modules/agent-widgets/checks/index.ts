@@ -1,4 +1,4 @@
-import { checksWidget } from "@projector/core/modules/agent-widgets/checks/index.ts";
+import { checksWidget } from "@projector-ai/core/modules/agent-widgets/checks/index.ts";
 import type { WidgetEntry } from "../../widget-runtime/index.ts";
 import Checks from "./ui/Checks.vue";
 

@@ -1,7 +1,7 @@
 import type {
   ProviderPoint,
   ProviderSpend,
-} from "@projector/core/modules/usage-analytics/index.ts";
+} from "@projector-ai/core/modules/usage-analytics/index.ts";
 import { insertProviderSample, readProviderSamples, type ProviderSample } from "./store.ts";
 
 type Payload = Record<string, unknown>;

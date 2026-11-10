@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { GitCommit, GitOverview, GraphRow } from "@projector/core/modules/workspace/index.ts";
+import type {
+  GitCommit,
+  GitOverview,
+  GraphRow,
+} from "@projector-ai/core/modules/workspace/index.ts";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import {
   absoluteTime,

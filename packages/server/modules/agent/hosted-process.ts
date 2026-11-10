@@ -6,7 +6,11 @@ import { join } from "node:path";
 import { PassThrough, Writable } from "node:stream";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
-import { os, type AgentProcess, type AgentProcessSpec } from "@projector/core/modules/os/index.ts";
+import {
+  os,
+  type AgentProcess,
+  type AgentProcessSpec,
+} from "@projector-ai/core/modules/os/index.ts";
 import { rememberHost, runDirectory } from "./agent-runs.ts";
 
 const HOST_SCRIPT = fileURLToPath(new URL("../../../cli/app/agent-host.ts", import.meta.url));

@@ -11,7 +11,7 @@ import { accessAllowed } from "../../modules/access/index.ts";
 import { HttpError } from "../../modules/http/index.ts";
 import { json, readBody } from "../../modules/transport/index.ts";
 import type { RouteDefinition } from "../../modules/transport/index.ts";
-import { isServiceRoleId } from "@projector/core/modules/agent-role/index.ts";
+import { isServiceRoleId } from "@projector-ai/core/modules/agent-role/index.ts";
 
 const pageOnly = (req: Parameters<typeof accessAllowed>[0], change = false) => {
   if (!accessAllowed(req, change))

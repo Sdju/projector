@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Release gate for the two published npm packages. Run after build:distribution.
+ * Release gate for the published npm packages. Run after build:distribution.
  * It checks the public names, versions, publish metadata and that no private
  * workspace specifier or old @projector/ scope leaked into the tarball contents.
  */
@@ -13,6 +13,7 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 const output = join(root, "artifacts/distribution");
 const IDE_PACKAGE = "@projector-ai/ide";
 const NATIVE_PACKAGE = "@projector-ai/native";
+const HUB_PACKAGE = "@projector-ai/hub";
 const failures = [];
 
 const check = (condition, message) => {
@@ -23,43 +24,43 @@ const readJson = async (path) => JSON.parse(await readFile(path, "utf8"));
 const rootManifest = await readJson(join(root, "package.json"));
 const ide = await readJson(join(output, "ide/package.json"));
 const native = await readJson(join(output, "native/package.json"));
+const hub = await readJson(join(output, "hub/package.json"));
 
 check(ide.name === IDE_PACKAGE, `IDE package name is ${ide.name}, expected ${IDE_PACKAGE}`);
 check(
   native.name === NATIVE_PACKAGE,
   `native package name is ${native.name}, expected ${NATIVE_PACKAGE}`,
 );
-check(
-  ide.version === rootManifest.version,
-  `IDE version ${ide.version} != root ${rootManifest.version}`,
-);
-check(
-  native.version === rootManifest.version,
-  `native version ${native.version} != root ${rootManifest.version}`,
-);
-check(ide.private !== true, "IDE package must not be private");
-check(native.private !== true, "native package must not be private");
-check(ide.publishConfig?.access === "public", "IDE publishConfig.access must be public");
-check(native.publishConfig?.access === "public", "native publishConfig.access must be public");
-check(
-  ide.publishConfig?.registry === "https://registry.npmjs.org/",
-  "IDE publishConfig.registry must point to npmjs",
-);
-check(
-  native.publishConfig?.registry === "https://registry.npmjs.org/",
-  "native publishConfig.registry must point to npmjs",
-);
+check(hub.name === HUB_PACKAGE, `hub package name is ${hub.name}, expected ${HUB_PACKAGE}`);
+for (const [label, packageManifest] of [
+  ["IDE", ide],
+  ["native", native],
+  ["hub", hub],
+]) {
+  check(
+    packageManifest.version === rootManifest.version,
+    `${label} version ${packageManifest.version} != root ${rootManifest.version}`,
+  );
+  check(packageManifest.private !== true, `${label} package must not be private`);
+  check(
+    packageManifest.publishConfig?.access === "public",
+    `${label} publishConfig.access must be public`,
+  );
+  check(
+    packageManifest.publishConfig?.registry === "https://registry.npmjs.org/",
+    `${label} publishConfig.registry must point to npmjs`,
+  );
+  check(
+    packageManifest.repository?.url === rootManifest.repository?.url,
+    `${label} repository.url must match the root repository for provenance`,
+  );
+  const text = JSON.stringify(packageManifest);
+  check(!text.includes("workspace:"), `${label} manifest contains workspace:`);
+  check(!text.includes("catalog:"), `${label} manifest contains catalog:`);
+}
 check(
   native.dependencies?.[IDE_PACKAGE] === rootManifest.version,
   `native must depend on ${IDE_PACKAGE}@${rootManifest.version}`,
-);
-check(
-  ide.repository?.url === rootManifest.repository?.url,
-  "IDE repository.url must match the root repository for provenance",
-);
-check(
-  native.repository?.url === rootManifest.repository?.url,
-  "native repository.url must match the root repository for provenance",
 );
 check(
   ide.bin?.projector === "./packages/cli/app/launch.js",
@@ -69,15 +70,10 @@ check(
   ide.bin?.["projector-install-desktop"] === "./packages/cli/app/install-desktop.js",
   "IDE bin.projector-install-desktop must point to install-desktop.js",
 );
-
-for (const [label, manifest] of [
-  ["IDE", ide],
-  ["native", native],
-]) {
-  const text = JSON.stringify(manifest);
-  check(!text.includes("workspace:"), `${label} manifest contains workspace:`);
-  check(!text.includes("catalog:"), `${label} manifest contains catalog:`);
-}
+check(
+  hub.bin?.["projector-hub"] === "./packages/hub/app/main.js",
+  "hub bin.projector-hub must point to main.js",
+);
 
 const required = [
   "ide/dist/index.html",
@@ -92,6 +88,13 @@ const required = [
   "native/packages/native/app/entry.js",
   "native/LICENSE",
   "native/README.md",
+  "hub/dist/index.html",
+  "hub/dist/hub.html",
+  "hub/packages/hub/app/main.js",
+  "hub/packages/hub/modules/gateway/gateway.js",
+  "hub/packages/core/modules/hub/index.js",
+  "hub/LICENSE",
+  "hub/README.md",
 ];
 for (const file of required) {
   try {
@@ -104,6 +107,7 @@ for (const file of required) {
 for (const [label, file] of [
   ["IDE launch", "ide/packages/cli/app/launch.js"],
   ["IDE install-desktop", "ide/packages/cli/app/install-desktop.js"],
+  ["hub main", "hub/packages/hub/app/main.js"],
 ]) {
   const text = await readFile(join(output, file), "utf8").catch(() => "");
   check(text.startsWith("#!/usr/bin/env node\n"), `${label} must start with a Node shebang`);
@@ -126,6 +130,9 @@ for (const file of await walk(output)) {
   if (text.includes("@projector/")) {
     failures.push(`${relative(output, file)} still references private scope @projector/`);
   }
+  if (/@projector-ai\/(?:client|server|cli)\//.test(text)) {
+    failures.push(`${relative(output, file)} references an unpublished workspace package`);
+  }
 }
 
 if (failures.length) {
@@ -134,4 +141,6 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(`Distribution OK: ${IDE_PACKAGE}@${ide.version}, ${NATIVE_PACKAGE}@${native.version}`);
+console.log(
+  `Distribution OK: ${IDE_PACKAGE}@${ide.version}, ${NATIVE_PACKAGE}@${native.version}, ${HUB_PACKAGE}@${hub.version}`,
+);

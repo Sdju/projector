@@ -10,7 +10,7 @@ import {
   fileScopeKey,
   type FileScope,
   type GitCommitDetail,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 
 /** Файлы снимка в боковой панели: то же дерево, но только для чтения. */
 const props = defineProps<{

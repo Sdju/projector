@@ -24,7 +24,7 @@ import {
   worktreeStatus,
 } from "../../modules/agent/index.ts";
 import { readAgentRole } from "../../modules/agent-roles/index.ts";
-import { snapshotOfRole } from "@projector/core/modules/agent-role/index.ts";
+import { snapshotOfRole } from "@projector-ai/core/modules/agent-role/index.ts";
 import { accessAllowed } from "../../modules/access/index.ts";
 import { HttpError } from "../../modules/http/index.ts";
 import { loadProjects } from "../../modules/projects/index.ts";

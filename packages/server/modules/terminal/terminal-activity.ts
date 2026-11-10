@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
-import { os } from "@projector/core/modules/os/index.ts";
-import type { TerminalActivity, TerminalSession } from "@projector/core/modules/terminal/index.ts";
+import { os } from "@projector-ai/core/modules/os/index.ts";
+import type {
+  TerminalActivity,
+  TerminalSession,
+} from "@projector-ai/core/modules/terminal/index.ts";
 
 export const readTerminalProcesses = () => os.processes.snapshot();
 export function terminalActivity(

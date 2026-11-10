@@ -1,4 +1,4 @@
-import { rowWidget } from "@projector/core/modules/agent-widgets/row/index.ts";
+import { rowWidget } from "@projector-ai/core/modules/agent-widgets/row/index.ts";
 import type { WidgetEntry } from "../../widget-runtime/index.ts";
 import Row from "./ui/Row.vue";
 

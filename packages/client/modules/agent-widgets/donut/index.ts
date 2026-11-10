@@ -1,4 +1,4 @@
-import { donutWidget } from "@projector/core/modules/agent-widgets/donut/index.ts";
+import { donutWidget } from "@projector-ai/core/modules/agent-widgets/donut/index.ts";
 import type { WidgetEntry } from "../../widget-runtime/index.ts";
 import Donut from "./ui/Donut.vue";
 

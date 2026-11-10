@@ -13,7 +13,7 @@ import {
   isValidExcludePattern,
   migratePattern,
   type FilesExcludeMap,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 import { useSectionAction } from "../../../../../common/utilities/use-section-action.ts";
 
 defineProps<{ embedded?: boolean }>();

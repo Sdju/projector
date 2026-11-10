@@ -8,10 +8,11 @@ import { compileSfc } from "@zede/vio/compiler";
 const root = fileURLToPath(new URL("..", import.meta.url));
 const output = resolve(root, "artifacts/distribution");
 const manifest = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
-// Internal workspace packages stay private under @projector/*; only these two go to npm.
+// Internal workspace packages stay private under @projector-ai/*; only these three go to npm.
 const PUBLISHED_SCOPE = "@projector-ai";
 const IDE_PACKAGE = `${PUBLISHED_SCOPE}/ide`;
 const NATIVE_PACKAGE = `${PUBLISHED_SCOPE}/native`;
+const HUB_PACKAGE = `${PUBLISHED_SCOPE}/hub`;
 const lock = await readFile(join(root, "pnpm-lock.yaml"), "utf8");
 // Published manifests contain exact installed catalog versions, never catalog:/workspace:.
 const catalog = new Map();
@@ -25,7 +26,7 @@ async function dependencies(names, exclude = []) {
   for (const name of names) {
     const pkg = JSON.parse(await readFile(join(root, "packages", name, "package.json"), "utf8"));
     for (const dependency of Object.keys(pkg.dependencies)) {
-      if (dependency.startsWith("@projector/") || exclude.includes(dependency)) continue;
+      if (dependency.startsWith("@projector-ai/") || exclude.includes(dependency)) continue;
       const version = catalog.get(dependency);
       if (!version) throw new Error(`No locked catalog version for ${dependency}`);
       result[dependency] = version;
@@ -34,27 +35,24 @@ async function dependencies(names, exclude = []) {
   return result;
 }
 
-function rewrite(file, native) {
+/** `externalCore` keeps core imports on the published add-on entrypoint instead of embedding core. */
+function rewrite(file, externalCore) {
   return (context) => {
     const visit = (node) => {
       if (ts.isStringLiteral(node)) {
         let path = node.text;
-        if (path.startsWith("@projector/core/")) {
-          const suffix = path.slice("@projector/core/".length);
-          if (native) path = `${IDE_PACKAGE}/core/${suffix}`;
+        if (path.startsWith("@projector-ai/core/")) {
+          const suffix = path.slice("@projector-ai/core/".length);
+          if (externalCore) path = `${IDE_PACKAGE}/core/${suffix}`;
           else {
             path = relative(dirname(file), join(root, "packages/core", suffix))
               .split(sep)
               .join("/");
             if (!path.startsWith(".")) path = "./" + path;
           }
-        } else if (path.startsWith("@projector/")) {
-          // The add-on is a separate published package: the IDE must resolve its public name.
-          const suffix = path.slice("@projector/".length);
-          path = `${PUBLISHED_SCOPE}/${suffix}`;
         }
         // Only module/helper paths. A file filter such as [".ts", ".vue"] must stay intact.
-        if (/^(\.\.?\/|@projector\/|@projector-ai\/)/.test(path))
+        if (/^(\.\.?\/|@projector-ai\/)/.test(path))
           path = path.replace(/\.ts(?=\?|$)/, ".js").replace(/\.vue$/, ".vue.js");
         if (path !== node.text) return context.factory.createStringLiteral(path);
       }
@@ -64,7 +62,7 @@ function rewrite(file, native) {
   };
 }
 
-async function emit(directory, destination, native = false) {
+async function emit(directory, destination, externalCore = false) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     if (
       entry.name === "node_modules" ||
@@ -78,7 +76,7 @@ async function emit(directory, destination, native = false) {
       entry.name.replace(/\.ts$/, ".js").replace(/\.vue$/, ".vue.js"),
     );
     if (entry.isDirectory()) {
-      await emit(sourcePath, targetPath, native);
+      await emit(sourcePath, targetPath, externalCore);
       continue;
     }
     await mkdir(dirname(targetPath), { recursive: true });
@@ -96,7 +94,7 @@ async function emit(directory, destination, native = false) {
         verbatimModuleSyntax: true,
         allowJs: true,
       },
-      transformers: { before: [rewrite(sourcePath, native)] },
+      transformers: { before: [rewrite(sourcePath, externalCore)] },
     }).outputText;
     await writeFile(targetPath, code);
   }
@@ -106,12 +104,17 @@ await readFile(join(root, "dist/index.html"));
 await rm(output, { recursive: true, force: true });
 const ide = join(output, "ide");
 const native = join(output, "native");
+const hub = join(output, "hub");
 for (const name of ["core", "server", "cli"])
   await emit(join(root, "packages", name), join(ide, "packages", name));
 await emit(join(root, "packages/native"), join(native, "packages/native"), true);
+for (const name of ["core", "hub"])
+  await emit(join(root, "packages", name), join(hub, "packages", name));
 for (const name of ["dist", "resources", "bin", "LICENSE"])
   await cp(join(root, name), join(ide, name), { recursive: true });
+await cp(join(root, "dist"), join(hub, "dist"), { recursive: true });
 await cp(join(root, "LICENSE"), join(native, "LICENSE"));
+await cp(join(root, "LICENSE"), join(hub, "LICENSE"));
 const common = {
   version: manifest.version,
   type: "module",
@@ -180,8 +183,29 @@ Requirements: the IDE package of the same version, GTK4, GObject Introspection, 
 The GTK palette runs in a separate helper process. Without this package Projector opens the browser and keeps the tray/hotkey resident without GTK.
 `;
 
+const hubReadme = `# ${HUB_PACKAGE}
+
+Projector Hub: one web origin for several Projector devices. Hub keeps the shared interface and tunnels browser requests to each connected device, so a browser only needs access to the Hub.
+
+## Install
+
+\`\`\`bash
+npm install -g ${HUB_PACKAGE}
+PROJECTOR_HUB_PASSWORD='<browser password>' \\
+PROJECTOR_HUB_DEVICE_TOKEN='<device token>' \\
+projector-hub
+\`\`\`
+
+The browser password and the device token must differ. Hub listens on \`127.0.0.1:4180\` by default; set \`PROJECTOR_HUB_HOST\`, \`PROJECTOR_HUB_PORT\` and \`PROJECTOR_HUB_ORIGIN\` for a public origin. A remote origin requires HTTPS terminated by a reverse proxy that keeps the original Host and supports WebSocket and SSE.
+
+Then open <http://localhost:4180>, sign in and add the Hub in Projector **Settings → Hub** with the same URL, device id and token. Projects, files, terminals and agents stay on the connected devices.
+
+Requirements: Node.js 24.11–24.x. Hub does not need GTK or a build toolchain.
+`;
+
 await writeFile(join(ide, "README.md"), ideReadme);
 await writeFile(join(native, "README.md"), nativeReadme);
+await writeFile(join(hub, "README.md"), hubReadme);
 await writeFile(
   join(ide, "package.json"),
   JSON.stringify(
@@ -222,12 +246,29 @@ await writeFile(
     2,
   ) + "\n",
 );
+await writeFile(
+  join(hub, "package.json"),
+  JSON.stringify(
+    {
+      ...common,
+      name: HUB_PACKAGE,
+      description: "Projector Hub: one web origin for remote Projector devices",
+      keywords: ["projector", "hub", "remote", "tunnel"],
+      bin: { "projector-hub": "./packages/hub/app/main.js" },
+      files: ["dist", "packages", "LICENSE", "README.md"],
+      dependencies: await dependencies(["hub", "core"]),
+    },
+    null,
+    2,
+  ) + "\n",
+);
 // npm bin requires a shebang; the checkout also invokes these files through node directly.
 for (const [file, mode] of [
   [join(ide, "packages/cli/app/launch.js"), 0o755],
   [join(ide, "packages/cli/app/install-desktop.js"), 0o755],
+  [join(hub, "packages/hub/app/main.js"), 0o755],
 ]) {
   await writeFile(file, "#!/usr/bin/env node\n" + (await readFile(file, "utf8")));
   await chmod(file, mode);
 }
-console.log(`Built ${IDE_PACKAGE} and ${NATIVE_PACKAGE} in ${output}`);
+console.log(`Built ${IDE_PACKAGE}, ${NATIVE_PACKAGE} and ${HUB_PACKAGE} in ${output}`);

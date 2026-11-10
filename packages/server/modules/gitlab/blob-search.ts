@@ -4,7 +4,7 @@ import {
   type SearchHit,
   type SearchMatch,
   type SearchOptions,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 import { gitlabReader } from "./api.ts";
 import { projectId } from "./browser.ts";
 

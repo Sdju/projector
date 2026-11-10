@@ -8,7 +8,7 @@ import type { EventEmitter } from "node:events";
 import type {
   TerminalServerMessage,
   TerminalSession,
-} from "@projector/core/modules/terminal/index.ts";
+} from "@projector-ai/core/modules/terminal/index.ts";
 import { trackMouseEncoding } from "./terminal-mouse.ts";
 
 const { Terminal } = headless;

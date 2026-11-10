@@ -21,7 +21,7 @@ import type {
   TerminalClientMessage,
   TerminalServerMessage,
   TerminalSession,
-} from "@projector/core/modules/terminal/index.ts";
+} from "@projector-ai/core/modules/terminal/index.ts";
 
 function terminalTheme() {
   const styles = getComputedStyle(document.documentElement);

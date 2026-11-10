@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { JudgeVerdict } from "@projector/core/modules/agent-judge/index.ts";
+import type { JudgeVerdict } from "@projector-ai/core/modules/agent-judge/index.ts";
 
 export interface CommandRequest {
   operation: "list" | "describe" | "execute";

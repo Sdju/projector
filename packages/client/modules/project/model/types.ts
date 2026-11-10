@@ -5,7 +5,7 @@ export type {
   Project,
   ProcessSnapshot,
   ProjectDraft,
-} from "@projector/core/modules/project/index.ts";
+} from "@projector-ai/core/modules/project/index.ts";
 
 /** A workspace location can be displayed without registering a runnable local project. */
 export interface ProjectLocation {

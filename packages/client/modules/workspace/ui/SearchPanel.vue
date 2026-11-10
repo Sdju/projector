@@ -4,7 +4,7 @@ import UiControl from "../../../common/ui/UiControl.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 import UiMessage from "../../../common/ui/UiMessage.vue";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import type { FileScope, SearchHit } from "@projector/core/modules/workspace/index.ts";
+import type { FileScope, SearchHit } from "@projector-ai/core/modules/workspace/index.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
 import { searchWorkspace } from "../../workspace-api/index.ts";
 import IconCaseSensitive from "~icons/lucide/case-sensitive";

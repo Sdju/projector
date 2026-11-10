@@ -1,5 +1,5 @@
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import type { AgentTask, AgentTaskPatch } from "@projector/core/modules/agent-task/index.ts";
+import type { AgentTask, AgentTaskPatch } from "@projector-ai/core/modules/agent-task/index.ts";
 import type { AgentEmitter } from "../../agent/index.ts";
 
 export const CLAUDE_LABEL = "Claude Code";

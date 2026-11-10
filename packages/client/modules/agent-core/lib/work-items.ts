@@ -1,4 +1,4 @@
-import type { JudgeVerdict } from "@projector/core/modules/agent-judge/index.ts";
+import type { JudgeVerdict } from "@projector-ai/core/modules/agent-judge/index.ts";
 import type { AgentToolView } from "../model/types.ts";
 
 /** One step of a work group, in the order the answer happened: a thought, a judge note or calls. */

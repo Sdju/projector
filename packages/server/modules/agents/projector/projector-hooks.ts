@@ -3,7 +3,7 @@ import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { join } from "node:path";
 import type { ToolSet } from "ai";
-import { dataDir } from "@projector/core/modules/app-paths/index.ts";
+import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
 import { guardProjectHooks, type GuardOptions } from "./projector-guard.ts";
 
 /** When a hook runs: before a tool (it may forbid the call), after it, and when the turn is over. */

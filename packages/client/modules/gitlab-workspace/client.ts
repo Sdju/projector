@@ -2,7 +2,7 @@ import type {
   GitlabEntry,
   GitlabFile,
   GitlabRepository,
-} from "@projector/core/modules/gitlab/index.ts";
+} from "@projector-ai/core/modules/gitlab/index.ts";
 import type {
   IssueDetail,
   IssueList,
@@ -15,7 +15,7 @@ import type {
   PullRequestList,
   ReleaseDetail,
   ReleaseList,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 
 export class GitlabRequestError extends Error {
   readonly status: number;
@@ -60,7 +60,7 @@ export const searchSnapshots = (
   signal?: AbortSignal,
 ) =>
   readGitlab<{
-    hits: import("@projector/core/modules/workspace/index.ts").SearchHit[];
+    hits: import("@projector-ai/core/modules/workspace/index.ts").SearchHit[];
     truncated: boolean;
   }>("search", { repository, ...params }, signal);
 /** History actions (`log`, `commit`, `commit-diff`); the server decides which parameters it needs. */

@@ -1,5 +1,5 @@
-import { appUrl } from "@projector/core/modules/app-paths/index.ts";
-import { os } from "@projector/core/modules/os/index.ts";
+import { appUrl } from "@projector-ai/core/modules/app-paths/index.ts";
+import { os } from "@projector-ai/core/modules/os/index.ts";
 import { loadProjects } from "../projects/index.ts";
 
 /** Limits shared by the tool, the widget endpoint and the panel event. */

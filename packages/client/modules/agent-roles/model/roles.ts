@@ -12,7 +12,7 @@ import type {
   AgentRole,
   AgentRoleSelection,
   AgentRoleView,
-} from "@projector/core/modules/agent-role/index.ts";
+} from "@projector-ai/core/modules/agent-role/index.ts";
 import { clientAgents } from "../../agents-integration/catalog/index.ts";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import { readProjectRoles } from "../api/project-roles.ts";

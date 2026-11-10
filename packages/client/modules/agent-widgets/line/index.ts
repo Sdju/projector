@@ -1,4 +1,4 @@
-import { lineWidget } from "@projector/core/modules/agent-widgets/line/index.ts";
+import { lineWidget } from "@projector-ai/core/modules/agent-widgets/line/index.ts";
 import type { WidgetEntry } from "../../widget-runtime/index.ts";
 import Line from "./ui/Line.vue";
 

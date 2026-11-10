@@ -1,5 +1,5 @@
 import { deviceUrl } from "../../../common/utilities/device-url.ts";
-import { parseProjectRef } from "@projector/core/modules/project/index.ts";
+import { parseProjectRef } from "@projector-ai/core/modules/project/index.ts";
 import type { Project, ProjectDraft, ProjectCommand, ProjectLocation } from "../model/types.ts";
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
@@ -99,7 +99,7 @@ export async function fetchDirectories(
   path: string,
   complete = false,
   signal?: AbortSignal,
-): Promise<import("@projector/core/modules/directories/index.ts").DirectoryListing> {
+): Promise<import("@projector-ai/core/modules/directories/index.ts").DirectoryListing> {
   if (parseProjectRef(path).kind !== "local") return { path, entries: [], truncated: false };
   return request(`/api/directories?${new URLSearchParams({ path, complete: String(complete) })}`, {
     signal,
@@ -114,11 +114,11 @@ export async function fetchPathSuggestions(path: string, complete: boolean, sign
   const ref = parseProjectRef(path);
   if (ref.kind === "local") return fetchDirectories(path, complete, signal);
   if (ref.kind === "gitlab")
-    return request<import("@projector/core/modules/directories/index.ts").DirectoryListing>(
+    return request<import("@projector-ai/core/modules/directories/index.ts").DirectoryListing>(
       `/api/integrations/gitlab/browse/directories?${new URLSearchParams({ path, complete: String(complete) })}`,
       { signal },
     );
-  return request<import("@projector/core/modules/directories/index.ts").DirectoryListing>(
+  return request<import("@projector-ai/core/modules/directories/index.ts").DirectoryListing>(
     `/api/integrations/github/browse/directories?${new URLSearchParams({ path, complete: String(complete) })}`,
     { signal },
   );

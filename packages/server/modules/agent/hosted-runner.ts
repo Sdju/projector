@@ -21,7 +21,7 @@ import {
   createSecretBridge,
 } from "./command-bridge.ts";
 import { injectMessage } from "./injection.ts";
-import { resolveJudgeSettings } from "@projector/core/modules/agent-judge/index.ts";
+import { resolveJudgeSettings } from "@projector-ai/core/modules/agent-judge/index.ts";
 import { createJudgedApproval, readJudgeSettings } from "../judge/index.ts";
 
 const REQUESTS = new Set([

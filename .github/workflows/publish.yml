@@ -73,3 +73,4 @@ jobs:
           }
           publish_if_missing artifacts/distribution/ide "@projector-ai/ide"
           publish_if_missing artifacts/distribution/native "@projector-ai/native"
+          publish_if_missing artifacts/distribution/hub "@projector-ai/hub"

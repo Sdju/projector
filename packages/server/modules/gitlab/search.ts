@@ -1,6 +1,6 @@
 import { HttpError } from "../http/index.ts";
 import { integrationConfig } from "../integration-store/index.ts";
-import { normalizeGitlabInstance } from "@projector/core/modules/gitlab/index.ts";
+import { normalizeGitlabInstance } from "@projector-ai/core/modules/gitlab/index.ts";
 import { gitlab, gitlabAccessToken, gitlabBaseUrl, gitlabCredentialsTokenType } from "./api.ts";
 
 interface ApiProject {

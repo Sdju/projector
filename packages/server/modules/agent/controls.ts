@@ -1,4 +1,4 @@
-import type { AgentTask } from "@projector/core/modules/agent-task/index.ts";
+import type { AgentTask } from "@projector-ai/core/modules/agent-task/index.ts";
 
 /**
  * What the chat lets the user tune for an external agent. Every agent describes its own knobs

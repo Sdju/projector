@@ -9,7 +9,7 @@ import {
 } from "../../settings/index.ts";
 import { readoutLines } from "../../../common/utilities/tab-readout.ts";
 import type { Project } from "../../project/index.ts";
-import { shortcutKey } from "@projector/core/modules/ide/index.ts";
+import { shortcutKey } from "@projector-ai/core/modules/ide/index.ts";
 import { AgentProjectRoles } from "../../agent-roles/index.ts";
 import { ProjectWidgets } from "../../project-widgets/index.ts";
 import {

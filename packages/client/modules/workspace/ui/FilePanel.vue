@@ -3,7 +3,7 @@ import UiPanel from "../../../common/ui/UiPanel.vue";
 import UiToolbar from "../../../common/ui/UiToolbar.vue";
 import { computed } from "vue";
 import { workspaceSiteUrl } from "../../workspace-api/index.ts";
-import { shortRevision } from "@projector/core/modules/workspace/index.ts";
+import { shortRevision } from "@projector-ai/core/modules/workspace/index.ts";
 import { useTabHost, useWorkspaceTabs } from "../lib/tab-views.ts";
 import { isEditable, isHtml, isLiveFile, isMarkdown, type OpenFile } from "../open-file.ts";
 import TabReadoutScope from "../../../common/ui/TabReadoutScope.vue";

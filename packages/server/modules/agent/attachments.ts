@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import type { IncomingMessage } from "node:http";
 import { join } from "node:path";
-import { dataDir } from "@projector/core/modules/app-paths/index.ts";
+import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
 import { HttpError } from "../http/index.ts";
 
 /** Images pasted or dropped into the chat: kept on disk, referenced from messages by id. */

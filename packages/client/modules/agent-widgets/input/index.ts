@@ -1,4 +1,4 @@
-import { inputWidget } from "@projector/core/modules/agent-widgets/input/index.ts";
+import { inputWidget } from "@projector-ai/core/modules/agent-widgets/input/index.ts";
 import type { WidgetEntry } from "../../widget-runtime/index.ts";
 import Input from "./ui/Input.vue";
 

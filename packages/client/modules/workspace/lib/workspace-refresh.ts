@@ -1,6 +1,6 @@
 import type { Ref } from "vue";
 import { watch } from "vue";
-import { relocatedPath } from "@projector/core/modules/workspace/index.ts";
+import { relocatedPath } from "@projector-ai/core/modules/workspace/index.ts";
 import { replacePanel, type DockLayout } from "../../dock/index.ts";
 import { refreshWorkspace, type WorkspaceCapabilities } from "../../workspace-api/index.ts";
 import { filesExcludeRevision } from "../modules/tree/index.ts";

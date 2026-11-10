@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { GithubRepository } from "@projector/core/modules/github/index.ts";
+import type { GithubRepository } from "@projector-ai/core/modules/github/index.ts";
 import { absoluteTime } from "../../../common/utilities/commit-format.ts";
 import { readoutLines } from "../../../common/utilities/tab-readout.ts";
 import { RepositoryOverview, type RepositoryOverviewModel } from "../../integration-api/index.ts";

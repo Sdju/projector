@@ -14,7 +14,7 @@ import {
 import { isImageFile, skillName } from "../../agent-core/index.ts";
 import { skillCallName, toolLabel } from "../../agent-core/index.ts";
 import { lineCount, relativePath, toolVisual } from "../../agent-core/index.ts";
-import { stripReadLineNumbers } from "@projector/core/modules/agent-read/index.ts";
+import { stripReadLineNumbers } from "@projector-ai/core/modules/agent-read/index.ts";
 import { chatImageSource, chatProjectKey } from "../../chat-images/index.ts";
 import type { AgentToolChip, AgentToolView } from "../../agent-core/index.ts";
 import IconChevron from "~icons/lucide/chevron-right";

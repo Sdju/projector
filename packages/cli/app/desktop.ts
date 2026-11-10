@@ -1,9 +1,9 @@
-import { os, type DesktopAction } from "@projector/core/modules/os/index.ts";
-import { dataDir } from "@projector/core/modules/app-paths/index.ts";
+import { os, type DesktopAction } from "@projector-ai/core/modules/os/index.ts";
+import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
 import {
   createLauncherClient,
   type InterfaceMode,
-} from "@projector/core/modules/launcher/index.ts";
+} from "@projector-ai/core/modules/launcher/index.ts";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 

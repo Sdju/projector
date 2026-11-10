@@ -1,7 +1,7 @@
 import type { Ref } from "vue";
 import { workspaceRequest } from "../../workspace-api/index.ts";
 import { isLiveFile, type OpenFile } from "../open-file.ts";
-import type { FileContent } from "@projector/core/modules/workspace/index.ts";
+import type { FileContent } from "@projector-ai/core/modules/workspace/index.ts";
 import type { useOpenFiles } from "./open-files.ts";
 
 export interface GitChangeSyncContext {

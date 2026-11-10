@@ -4,7 +4,7 @@ import {
   type JudgeConfidence,
   type JudgeScore,
   type JudgeVerdict,
-} from "@projector/core/modules/agent-judge/index.ts";
+} from "@projector-ai/core/modules/agent-judge/index.ts";
 import { serviceRoleSelection } from "../agent-roles/index.ts";
 import { quietChatModel } from "../providers/index.ts";
 import { recordTaskSpend } from "../spend/index.ts";

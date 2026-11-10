@@ -1,13 +1,13 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { os } from "@projector/core/modules/os/index.ts";
+import { os } from "@projector-ai/core/modules/os/index.ts";
 import type {
   GitBranch,
   GitBranches,
   GitSync,
   GitSyncAction,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 import { environmentForPath, runEnvironmentCommand } from "../environments/index.ts";
 import { integrationConfig } from "../integration-store/index.ts";
 import { gitlabAccessToken, gitlabBaseUrl } from "../gitlab/index.ts";

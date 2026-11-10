@@ -6,8 +6,8 @@ import { readFile } from "node:fs/promises";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import type { AgentCommandCall } from "@projector/core/modules/ide/index.ts";
-import { os } from "@projector/core/modules/os/index.ts";
+import type { AgentCommandCall } from "@projector-ai/core/modules/ide/index.ts";
+import { os } from "@projector-ai/core/modules/os/index.ts";
 
 const url = process.env.PROJECTOR_MCP_URL || "http://localhost:4177";
 const tokenFile = process.env.PROJECTOR_MCP_TOKEN_FILE;

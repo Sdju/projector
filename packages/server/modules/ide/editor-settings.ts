@@ -1,8 +1,11 @@
 import { mkdir, readFile, writeFile, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { dataDir } from "@projector/core/modules/app-paths/index.ts";
-import { defaultEditorTheme, isEditorTheme } from "@projector/core/modules/editor-themes/index.ts";
+import { dataDir } from "@projector-ai/core/modules/app-paths/index.ts";
+import {
+  defaultEditorTheme,
+  isEditorTheme,
+} from "@projector-ai/core/modules/editor-themes/index.ts";
 const settingsPath = () => join(dataDir(), "editor.json");
 let pending: Promise<unknown> = Promise.resolve();
 export async function readEditorSettings() {

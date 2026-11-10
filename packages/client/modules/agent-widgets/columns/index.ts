@@ -1,4 +1,4 @@
-import { columnsWidget } from "@projector/core/modules/agent-widgets/columns/index.ts";
+import { columnsWidget } from "@projector-ai/core/modules/agent-widgets/columns/index.ts";
 import type { WidgetEntry } from "../../widget-runtime/index.ts";
 import Columns from "./ui/Columns.vue";
 

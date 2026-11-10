@@ -1,4 +1,4 @@
-import { appUrl } from "@projector/core/modules/app-paths/index.ts";
+import { appUrl } from "@projector-ai/core/modules/app-paths/index.ts";
 
 import { HttpError } from "../../../modules/http/index.ts";
 import { restartProjector } from "../../../modules/restart/index.ts";

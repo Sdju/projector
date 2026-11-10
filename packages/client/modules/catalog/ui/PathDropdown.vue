@@ -2,7 +2,7 @@
 import UiPopupSurface from "../../../common/ui/UiPopupSurface.vue";
 import IconChevronRight from "~icons/lucide/chevron-right";
 import IconFolder from "~icons/lucide/folder";
-import type { DirectoryEntry } from "@projector/core/modules/directories/index.ts";
+import type { DirectoryEntry } from "@projector-ai/core/modules/directories/index.ts";
 defineProps<{
   /** Id of the listbox; option ids are `${id}-${index}`. */
   id: string;

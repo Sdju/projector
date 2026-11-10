@@ -1,7 +1,7 @@
 import { deviceUrl } from "../../common/utilities/device-url.ts";
-import type { GitlabEntry, GitlabRepository } from "@projector/core/modules/gitlab/index.ts";
-import type { FileContent, FileEntry } from "@projector/core/modules/workspace/index.ts";
-import { treePageRange } from "@projector/core/modules/workspace/index.ts";
+import type { GitlabEntry, GitlabRepository } from "@projector-ai/core/modules/gitlab/index.ts";
+import type { FileContent, FileEntry } from "@projector-ai/core/modules/workspace/index.ts";
+import { treePageRange } from "@projector-ai/core/modules/workspace/index.ts";
 import {
   createLocalWorkspaceProfile,
   singletonTab,

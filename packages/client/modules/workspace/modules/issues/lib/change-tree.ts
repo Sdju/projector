@@ -1,4 +1,4 @@
-import type { FileChange, FileChangeKind } from "@projector/core/modules/workspace/index.ts";
+import type { FileChange, FileChangeKind } from "@projector-ai/core/modules/workspace/index.ts";
 
 export const CHANGE_MARK: Record<FileChangeKind, string> = {
   added: "A",

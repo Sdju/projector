@@ -7,7 +7,7 @@ import type {
   PullRequestComparison,
   PullRequestDiffRefs,
   PullRequestFile,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 import { useFileIconTheme } from "../../../../file-icons/index.ts";
 import ChangedFileRow from "./ChangedFileRow.vue";
 import type { ChangedFileItem } from "../lib/changed-files.ts";

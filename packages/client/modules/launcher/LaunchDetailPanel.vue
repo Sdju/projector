@@ -6,7 +6,7 @@ import type {
   LaunchAction,
   LaunchDetail,
   LaunchItem,
-} from "@projector/core/modules/launcher/index.ts";
+} from "@projector-ai/core/modules/launcher/index.ts";
 
 defineProps<{
   item: LaunchItem;

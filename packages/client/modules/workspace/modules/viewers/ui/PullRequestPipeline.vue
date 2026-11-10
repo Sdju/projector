@@ -2,14 +2,14 @@
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import UiStatusDot from "../../../../../common/ui/UiStatusDot.vue";
 import { ref } from "vue";
-import type { Pipeline } from "@projector/core/modules/workspace/index.ts";
+import type { Pipeline } from "@projector-ai/core/modules/workspace/index.ts";
 import { relativeTime } from "../../../../../common/utilities/commit-format.ts";
 import { useCommandRegistrar, useCommandScope } from "../../../../../common/utilities/commands.ts";
 import {
   durationLabel,
   PIPELINE_STATUS_LABEL,
   PIPELINE_STATUS_TONE,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 import PullRequestPipelineStages from "./PullRequestPipelineStages.vue";
 import IconChevronRight from "~icons/lucide/chevron-right";
 

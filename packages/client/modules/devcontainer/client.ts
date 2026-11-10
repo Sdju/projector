@@ -1,7 +1,7 @@
 import type {
   DevcontainerDecision,
   DevcontainerState,
-} from "@projector/core/modules/devcontainer/index.ts";
+} from "@projector-ai/core/modules/devcontainer/index.ts";
 
 async function request(projectId: string, method: string, body?: unknown) {
   const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}/devcontainer`, {

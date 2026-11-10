@@ -8,8 +8,8 @@ export interface AgentCapabilities {
   compact?: { command: string; hintAt: number; autoAt: number };
 }
 
-import type { AgentTask } from "@projector/core/modules/agent-task/index.ts";
-import type { AgentRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
+import type { AgentTask } from "@projector-ai/core/modules/agent-task/index.ts";
+import type { AgentRoleSnapshot } from "@projector-ai/core/modules/agent-role/index.ts";
 import type { JudgeNote } from "./judge-note.ts";
 import type { AgentEvent } from "./events.ts";
 

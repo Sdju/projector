@@ -22,7 +22,7 @@ import {
   PIPELINE_STATUS_TONE,
   refLabel,
   sourceLabel,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 /** Pipeline tab: status, ref and commit, then the jobs of the run grouped by stage. */
 const props = withDefaults(defineProps<{ projectId: string; id: number; host?: string }>(), {
   host: "GitLab",

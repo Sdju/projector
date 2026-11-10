@@ -2,7 +2,7 @@ import { ref } from "vue";
 import {
   defaultFilesExclude,
   type FilesExcludeMap,
-} from "@projector/core/modules/workspace/index.ts";
+} from "@projector-ai/core/modules/workspace/index.ts";
 
 export const filesExcludeRevision = ref(0);
 

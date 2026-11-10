@@ -1,5 +1,5 @@
 import { realpath } from "node:fs/promises";
-import { os } from "@projector/core/modules/os/index.ts";
+import { os } from "@projector-ai/core/modules/os/index.ts";
 import { HttpError } from "../http/index.ts";
 import { MAX_BYTES, excludePatterns } from "./paths.ts";
 

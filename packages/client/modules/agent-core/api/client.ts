@@ -1,5 +1,5 @@
-import type { JudgeOverride } from "@projector/core/modules/agent-judge/index.ts";
-import type { AgentRoleSnapshot } from "@projector/core/modules/agent-role/index.ts";
+import type { JudgeOverride } from "@projector-ai/core/modules/agent-judge/index.ts";
+import type { AgentRoleSnapshot } from "@projector-ai/core/modules/agent-role/index.ts";
 import { answerCommand } from "./commands.ts";
 import { EVENTS_UNAVAILABLE, EventStreamRefused, streamViaEvents } from "./event-stream.ts";
 import { parseSse } from "./sse.ts";

@@ -1,4 +1,4 @@
-import type { NetworkMode } from "@projector/core/modules/network-mode/index.ts";
+import type { NetworkMode } from "@projector-ai/core/modules/network-mode/index.ts";
 
 export interface NetworkState {
   mode: NetworkMode;

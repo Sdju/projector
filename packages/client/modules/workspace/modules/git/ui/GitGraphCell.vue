@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { GraphRow } from "@projector/core/modules/workspace/index.ts";
+import type { GraphRow } from "@projector-ai/core/modules/workspace/index.ts";
 
 const props = defineProps<{
   row: GraphRow;
