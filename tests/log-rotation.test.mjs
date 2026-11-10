@@ -85,6 +85,8 @@ test("a running process rotates the log it writes to and keeps writing to the ne
   expect(statSync(file).size).toBeLessThan(4096);
   const current = readFileSync(file, "utf8");
   expect(current).toContain("[projector] rotated server.log");
-  expect(current).toContain("line 139");
+  // The timer may rotate once more after the last write: the newest line is in the current
+  // file or in the freshest archive, depending on that race.
+  expect(`${current}${readFileSync(`${file}.1`, "utf8")}`).toContain("line 139");
   expect(readFileSync(`${file}.2`, "utf8")).toMatch(/line \d+/);
 });
