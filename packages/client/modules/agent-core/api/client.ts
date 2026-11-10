@@ -1,5 +1,6 @@
 import type { JudgeOverride } from "@ai-projector/core/modules/agent-judge/index.ts";
 import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
+import { deviceUrl } from "../../../common/utilities/device-url.ts";
 import { answerCommand } from "./commands.ts";
 import { EVENTS_UNAVAILABLE, EventStreamRefused, streamViaEvents } from "./event-stream.ts";
 import { parseSse } from "./sse.ts";
@@ -153,8 +154,9 @@ export async function streamAgent(
 export { repairAnswer, repairForm } from "./repair.ts";
 
 /** Stops an answer in progress; closing the page only detaches from it. */
-export async function cancelAgentRun(runId: string): Promise<void> {
-  await fetch("/api/agent/cancel", {
+export async function cancelAgentRun(runId: string, base?: string): Promise<void> {
+  const path = base ? `${base}/agent/cancel` : deviceUrl("/api/agent/cancel");
+  await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ runId }),
@@ -384,8 +386,9 @@ export interface LiveAgentRun {
   startedAt?: number;
 }
 
-export async function fetchLiveRuns(): Promise<LiveAgentRun[]> {
-  const response = await fetch("/api/agent/runs", { cache: "no-store" });
+export async function fetchLiveRuns(base?: string): Promise<LiveAgentRun[]> {
+  const path = base ? `${base}/agent/runs` : deviceUrl("/api/agent/runs");
+  const response = await fetch(path, { cache: "no-store" });
   if (!response.ok) throw new Error("Не удалось получить работающие процессы агентов");
   return (await response.json()).runs ?? [];
 }

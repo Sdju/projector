@@ -38,6 +38,8 @@ const props = defineProps<{
   projectSettings?: boolean;
   /** Название полосы разделов для экранных дикторов. */
   label?: string;
+  /** Separate command scopes for the left sidebar and the right rail on one page. */
+  scopeId?: string;
 }>();
 const emit = defineEmits<{
   "update:section": [section: string];
@@ -56,7 +58,9 @@ const current = computed(() => ordered.value.find((item) => item.id === props.se
 const otherBadges = computed(() =>
   ordered.value.some((item) => item.id !== props.section && item.badge),
 );
-const commands = useCommandScope("sidebar-sections", () => ({ surface: "workbench" }));
+const commands = useCommandScope(props.scopeId ?? "sidebar-sections", () => ({
+  surface: "workbench",
+}));
 commands.scope.registerCommand({
   id: "ide.workbench.section.picker.toggle",
   title: "Открыть или закрыть выбор раздела",

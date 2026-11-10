@@ -369,6 +369,7 @@ export function createGitlabWorkspaceProfile(
   return {
     id: "gitlab",
     layout: "editor",
+    aside: [{ id: "inbox", title: "Работы" }],
     sidebar: [
       { id: "issues", title: "Issues" },
       { id: "merge-requests", title: "Merge requests" },

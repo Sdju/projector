@@ -1,5 +1,6 @@
 import type { AgentBackendId } from "../model/types.ts";
 import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
+import { deviceUrl } from "../../../common/utilities/device-url.ts";
 
 export type AgentJobStatus = "queued" | "running" | "needs-user" | "done" | "error" | "stopped";
 
@@ -75,9 +76,16 @@ async function call<T>(url: string, init?: RequestInit, failure = "Запрос 
 const post = (url: string, body: unknown = {}, failure?: string) =>
   call<{ job: AgentJobView }>(url, { method: "POST", body: JSON.stringify(body) }, failure);
 
-export async function fetchJobs(projectId?: string): Promise<AgentJobView[]> {
+/**
+ * An API path on this page's device or on another device of the Hub. An empty base means this
+ * page's own server: `deviceUrl` keeps it inside the current Hub device.
+ */
+export const deviceApiUrl = (base: string | undefined, path: string) =>
+  base ? `${base}${path.slice(4)}` : deviceUrl(path);
+
+export async function fetchJobs(projectId?: string, base?: string): Promise<AgentJobView[]> {
   const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : "";
-  return (await call<{ jobs: AgentJobView[] }>(`/api/agent/jobs${query}`)).jobs;
+  return (await call<{ jobs: AgentJobView[] }>(deviceApiUrl(base, `/api/agent/jobs${query}`))).jobs;
 }
 
 /** One job with its journal; with `wait` the server holds the answer until `rev` changes. */
@@ -108,8 +116,14 @@ export async function startJob(options: StartJobOptions): Promise<AgentJobView> 
   return (await post("/api/agent/jobs", options, "Не удалось запустить задание")).job;
 }
 
-export async function stopJob(id: string): Promise<AgentJobView> {
-  return (await post(`/api/agent/jobs/${id}/stop`, {}, "Не удалось остановить задание")).job;
+export async function stopJob(id: string, base?: string): Promise<AgentJobView> {
+  return (
+    await post(
+      deviceApiUrl(base, `/api/agent/jobs/${id}/stop`),
+      {},
+      "Не удалось остановить задание",
+    )
+  ).job;
 }
 
 export interface JobAnswerBody {
@@ -139,8 +153,18 @@ export async function fetchJobDiff(id: string, limit = 0): Promise<AgentJobDiff>
   ).diff;
 }
 
-export async function answerJob(id: string, body: JobAnswerBody): Promise<AgentJobView> {
-  return (await post(`/api/agent/jobs/${id}/answer`, body, "Не удалось передать ответ")).job;
+export async function answerJob(
+  id: string,
+  body: JobAnswerBody,
+  base?: string,
+): Promise<AgentJobView> {
+  return (
+    await post(
+      deviceApiUrl(base, `/api/agent/jobs/${id}/answer`),
+      body,
+      "Не удалось передать ответ",
+    )
+  ).job;
 }
 
 export interface JobWorktreeStatus {

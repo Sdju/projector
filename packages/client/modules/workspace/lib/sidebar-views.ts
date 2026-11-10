@@ -24,6 +24,7 @@ import {
 import { PipelinesPanel } from "../modules/pipelines/index.ts";
 import { ReleasesPanel } from "../modules/releases/index.ts";
 import { DockerSidebar } from "../../docker/index.ts";
+import { AgentInbox, inboxAttention } from "../../agent/index.ts";
 import SearchPanel from "../ui/SearchPanel.vue";
 import FilesSection from "../ui/FilesSection.vue";
 import CompareTreeSection from "../ui/CompareTreeSection.vue";
@@ -35,6 +36,7 @@ import IconFiles from "~icons/lucide/files";
 import IconSearch from "~icons/lucide/search";
 import IconGit from "~icons/devicon/git";
 import IconDocker from "~icons/lucide/container";
+import IconBell from "~icons/lucide/bell";
 import IconIssues from "~icons/lucide/circle-dot";
 import IconPulls from "~icons/lucide/git-pull-request";
 import IconMerge from "~icons/lucide/git-merge";
@@ -112,6 +114,12 @@ export interface SidebarView {
 export type SidebarViews = Record<string, SidebarView>;
 
 export const baseSidebarViews: SidebarViews = {
+  inbox: {
+    icon: IconBell,
+    component: AgentInbox,
+    props: () => ({}),
+    badge: () => inboxAttention(),
+  },
   files: {
     icon: IconFiles,
     component: FilesSection,

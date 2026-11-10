@@ -6,11 +6,16 @@ function hidden(): boolean {
   return typeof document !== "undefined" && document.visibilityState === "hidden";
 }
 
-function show(title: string, body: string, tag: string) {
+function show(title: string, body: string, tag: string, href?: string) {
   if (typeof Notification === "undefined" || Notification.permission !== "granted" || !hidden())
     return;
   try {
-    new Notification(title, { body: body.slice(0, 200), tag });
+    const notification = new Notification(title, { body: body.slice(0, 200), tag });
+    if (href)
+      notification.onclick = () => {
+        window.focus();
+        location.assign(href);
+      };
   } catch {
     // Some browsers only allow notifications from a service worker.
   }
@@ -41,4 +46,12 @@ export function notifyPermission(what: string): void {
 /** A background job ended or waits for the user; the tag keeps one notification per job. */
 export function notifyJob(id: string, title: string, body: string): void {
   show(title, body, `agent-job:${id}`);
+}
+
+/**
+ * A work item of the global inbox. `href` opens the device, project and tab where the user can
+ * answer; the tag is unique per job so the browser replaces an older notice instead of stacking.
+ */
+export function notifyInbox(tag: string, title: string, body: string, href?: string): void {
+  show(title, body, `agent-inbox:${tag}`, href);
 }

@@ -182,9 +182,23 @@ gitlabCommands.scope.registerCommand({
 });
 // A project created by this visit gets an agent tab with a suggested initialization request.
 let initProjectId = "";
+/** A notification opens the project together with the job or chat it points at. */
+function openInboxTarget() {
+  const job = typeof route.query.job === "string" ? route.query.job : "";
+  const chat = typeof route.query.chat === "string" ? route.query.chat : "";
+  if (!job && !chat) return;
+  if (job) workspace.value?.openTab("agent-job", { job });
+  else workspace.value?.openTab("agent", { chatId: chat });
+  const query = { ...route.query };
+  delete query.job;
+  delete query.chat;
+  void router.replace({ path: route.path, query });
+}
 function suggestInit(instance: unknown) {
   workspace.value = instance as InstanceType<typeof ProjectWorkspace> | undefined;
-  if (!workspace.value || !initProjectId || initProjectId !== projectId.value) return;
+  if (!workspace.value) return;
+  openInboxTarget();
+  if (!initProjectId || initProjectId !== projectId.value) return;
   const id = initProjectId;
   initProjectId = "";
   const agent = useAgent(id);

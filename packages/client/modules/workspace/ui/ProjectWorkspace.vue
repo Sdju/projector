@@ -481,6 +481,7 @@ onBeforeUnmount(() => overview.cancel());
           :layout-groups="layoutGroups"
           :preset="currentPreset"
           :presets-available="presetsAvailable"
+          :inbox="asideRegistry.has('inbox')"
           @command="(id, args) => editorCommands.run(id, args)"
         >
           <template #terminal-actions><slot name="terminal-actions" /></template>

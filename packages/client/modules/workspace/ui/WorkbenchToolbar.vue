@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { WorkspaceCapabilities } from "../../workspace-api/index.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
+import { AgentInboxBell } from "../../agent/index.ts";
 import LayoutMenu from "./LayoutMenu.vue";
 import type { LayoutPreset } from "../lib/workbench-layout.ts";
 import IconAnalytics from "~icons/lucide/chart-no-axes-column";
@@ -17,6 +18,8 @@ defineProps<{
   layoutGroups: { id: string; role?: string; label: string; hidden: boolean }[];
   preset?: LayoutPreset;
   presetsAvailable: boolean;
+  /** The profile has the global work inbox in its right rail. */
+  inbox?: boolean;
 }>();
 const emit = defineEmits<{
   command: [id: string, args?: unknown];
@@ -31,6 +34,10 @@ const emit = defineEmits<{
     </p>
     <div class="toolbar-spacer" />
     <slot name="terminal-actions" />
+    <AgentInboxBell
+      v-if="inbox"
+      @open="emit('command', 'ide.workbench.aside.section.show', { section: 'inbox' })"
+    />
     <UiButton
       shape="icon"
       size="sm"

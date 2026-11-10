@@ -173,6 +173,7 @@ defineExpose({
       :collapsed="rail && hidden"
       :project-settings="capabilities.settings"
       :label="side === 'right' ? 'Дополнительные панели' : 'Разделы проекта'"
+      :scope-id="side === 'right' ? 'aside-sections' : 'sidebar-sections'"
       @update:section="select"
       @command="(id, args) => emit('command', id, args)"
     />

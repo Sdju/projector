@@ -348,6 +348,7 @@ export function createGithubWorkspaceProfile(
   return {
     id: "github",
     layout: "editor",
+    aside: [{ id: "inbox", title: "Работы" }],
     sidebar: [
       { id: "issues", title: "Issues" },
       { id: "pulls", title: "Pull requests" },
