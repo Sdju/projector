@@ -1,6 +1,6 @@
 # Выпуск в npm
 
-Подготовка поставки `@ai-projector/ide`, `@ai-projector/native` и `@ai-projector/hub` закончена: имена, манифесты, `projector-install-desktop`, `projector-hub`, `verify:distribution` и OIDC-workflow уже в коде. В registry пакетов ещё нет, публикаций не было. Устройство поставки и порядок публикации — в [distribution](../distribution.md); здесь только незакрытые пункты.
+Подготовка поставки `@ai-projector/ide`, `@ai-projector/native` и `@ai-projector/hub` закончена: имена, манифесты, `projector-install-desktop`, `projector-hub`, самопроверка `build:distribution` и OIDC-workflow уже в коде. В registry пакетов ещё нет, публикаций не было. Устройство поставки и порядок публикации — в [distribution](../distribution.md); здесь только незакрытые пункты.
 
 ## Первый выпуск
 

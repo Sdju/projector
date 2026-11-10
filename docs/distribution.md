@@ -2,13 +2,13 @@
 
 Исходники остаются в одном pnpm workspace. Для установки на другую машину собираются три публичных npm-пакета:
 
-| Артефакт               | Содержимое                                             | Требования                                                                     |
+| Пакет                  | Содержимое                                             | Требования                                                                     |
 | ---------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------ |
 | `@ai-projector/ide`    | Сервер, готовый веб-интерфейс, CLI, терминалы и агенты | Node.js 24.11–24.x; Python, make и C++ compiler для сборки `node-pty` на Linux |
 | `@ai-projector/native` | GTK-палитра и каталог приложений GIO                   | IDE той же версии, GTK4, GObject Introspection и зависимости сборки `node-gtk` |
 | `@ai-projector/hub`    | Общий веб-origin Hub и туннели к устройствам с IDE     | Node.js 24.11–24.x; не требует GTK или сборочного окружения                    |
 
-Внутренние workspace-пакеты `@ai-projector/client`, `@ai-projector/server`, `@ai-projector/native`, `@ai-projector/core`, `@ai-projector/cli` и `@ai-projector/hub` остаются `private`; публикуются только собранные артефакты из `artifacts/distribution`. Имена, `bin` и зависимости артефактов задаёт `scripts/build-distribution.mjs`.
+Публикуемые пакеты лежат в workspace: `packages/ide`, `packages/native` и `packages/hub`. Их манифесты, README и `bin`/`exports` статические, а собранное печатается рядом и целиком игнорируется git: `dist/`, `packages/`, `resources/`, `bin/`, `LICENSE`. Сборка каждого пакета живёт в `packages/<name>/scripts/build.mjs`, а `vp run build:distribution` запускает их по порядку после `vp run build`. Внутренние `@ai-projector/client`, `server`, `core` и `cli` остаются `private` и копируются внутрь IDE при сборке.
 
 ## Установка из npm
 
@@ -47,22 +47,21 @@ projector-install-desktop
 ```bash
 vp install
 vp run build:distribution
-vp run verify:distribution
-vp -C artifacts/distribution/ide pm pack --pack-destination ..
-vp -C artifacts/distribution/native pm pack --pack-destination ..
-vp -C artifacts/distribution/hub pm pack --pack-destination ..
+pnpm -C packages/ide pack --pack-destination ../../artifacts
+pnpm -C packages/native pack --pack-destination ../../artifacts
+pnpm -C packages/hub pack --pack-destination ../../artifacts
 
-npm install -g ./artifacts/distribution/projector-ai-ide-0.11.0.tgz
+npm install -g ./artifacts/projector-ai-ide-0.11.0.tgz
 projector --browser
 
-npm install -g ./artifacts/distribution/projector-ai-native-0.11.0.tgz
+npm install -g ./artifacts/projector-ai-native-0.11.0.tgz
 projector --native
 
-npm install -g ./artifacts/distribution/projector-ai-hub-0.11.0.tgz
+npm install -g ./artifacts/projector-ai-hub-0.11.0.tgz
 projector-hub
 ```
 
-`vp run verify:distribution` проверяет имена, версии, `publishConfig`, зависимости, `bin`, обязательные файлы и отсутствие `workspace:`/`catalog:`, старого scope `@projector/` и ссылок на непубликуемые workspace-пакеты в собранных файлах.
+`pnpm pack` разворачивает `workspace:*` в версию релиза, а `catalog:` — в диапазоны из `pnpm-workspace.yaml`: в registry уезжает тот же манифест, что лежит в `packages/`. `vp run build:distribution` заканчивается самопроверкой (`scripts/distribution/verify.mjs`): lockstep версий с корнем, npm-метаданные, обязательные файлы сборки, shebang у `bin`, отсутствие `.ts`-импортов и битых относительных путей в собранном коде, а также сами tarball'ы — отсутствие `workspace:`/`catalog:`, версии зависимостей, исполняемые `bin`, существование целей install-скриптов и отсутствие `.ts` в поставке.
 
 ## Публикация в npm
 
@@ -75,10 +74,9 @@ Trusted publisher настраивается только для уже суще
 ```bash
 vp install
 vp run build:distribution
-vp run verify:distribution
-(cd artifacts/distribution/ide && npm publish --access public)
-(cd artifacts/distribution/native && npm publish --access public)
-(cd artifacts/distribution/hub && npm publish --access public)
+pnpm -C packages/ide publish --access public
+pnpm -C packages/native publish --access public
+pnpm -C packages/hub publish --access public
 ```
 
 После этого на npmjs.com для каждого пакета откройте **Settings → Trusted publishing → GitHub Actions** и укажите:
@@ -105,7 +103,7 @@ Workflow `.github/workflows/publish.yml` запускается на `release: p
 
 - Проверяет, что тег `vX.Y.Z` совпадает с `version` в корневом `package.json`.
 - Собирает и проверяет все три пакета.
-- Публикует `@ai-projector/ide`, затем `@ai-projector/native` и `@ai-projector/hub`.
+- Публикует `pnpm publish` из `packages/ide`, затем `packages/native` и `packages/hub`.
 - Пропускает уже опубликованную версию, поэтому повторный запуск безопасен.
 - Требует `permissions: id-token: write`; provenance создаётся автоматически.
 
@@ -123,15 +121,23 @@ GTK загружается отдельным процессом дополне�
 
 Hub не содержит локального API Projector и не требует доверия к устройству: он отдаёт общий интерфейс и передаёт запросы подключённым устройствам. Версии Hub и устройств обновляйте вместе.
 
-## Устройство артефактов
+## Устройство пакетов
 
-`scripts/build-distribution.mjs` сохраняет структуру `packages/core`, `packages/server`, `packages/cli`, ресурсы и готовый `dist` внутри IDE. TypeScript преобразуется в JavaScript, импорты и пути helper-процессов переписываются для собранных файлов. Node не пытается снимать типы внутри `node_modules`; запускаются также скомпилированные agent-host, раннеры и MCP-серверы.
+В git у IDE остаются только манифест, README и скрипты сборки; у native и hub рядом лежит исходник. Собранное печатает `packages/<name>/scripts/build.mjs`, и эти пути перечислены в `.gitignore`. Каталог пакета совпадает с корнем установки: CLI и сервер отсчитывают его на три уровня вверх от своего модуля и читают оттуда `package.json`, `dist/`, `packages/`, `resources/` и `bin/`. Поэтому `package.json` лежит рядом с собранным деревом, а не в отдельной обёртке.
 
-Native содержит скомпилированный Vue-компонент и зависит от IDE той же версии. Общие модули берёт из экспортов `@ai-projector/ide/core/*`; сервер разрешает entrypoint по package exports, а загрузчик GI — относительно самого дополнения. Корневые devDependencies checkout для этого не нужны.
+- **IDE** содержит `core`, `server` и `cli` физически, поэтому в npm уходит один пакет без внутренних зависимостей и без рассинхрона версий. TypeScript преобразуется в JavaScript: Node не снимает типы внутри `node_modules`, а собранные agent-host, раннеры и MCP-серверы запускаются из этого же дерева.
+- **Native** — обычный пакет со своим `dist/`: `Palette.vue` компилируется, общие модули берутся из `@ai-projector/ide/core/*`. В `dependencies` он держит только `@ai-projector/ide` (через `workspace:*`, pnpm сам подставит версию релиза), `@zede/vio` и `node-gtk`. `@ai-projector/core` нужен лишь для исходников и объявлен в `devDependencies`, поэтому не попадает в установку потребителя. Сервер разрешает entrypoint по package exports, загрузчик GI — относительно самого дополнения.
+- **Hub** собирается отдельным пакетом со своей копией `core` и общего `dist`, поэтому публичный `projector-hub` работает без установленного IDE. Остальные части `core` не загружаются: Hub импортирует только протокол туннеля. Импорты между workspace-пакетами в собранном виде заменяются на относительные пути или на публичный entrypoint IDE.
 
-Hub собирается отдельным пакетом со своей копией `core` и общего `dist`, поэтому публичный `projector-hub` работает без установленного IDE. Остальные части `core` не загружаются: Hub импортирует только протокол туннеля. Внутренние импорты между workspace-пакетами в собранном виде заменяются на относительные пути или на публичный entrypoint IDE.
+Версии внешних runtime-зависимостей заданы в манифестах протоколом `catalog:` и разворачиваются в диапазоны из `pnpm-workspace.yaml` при `pnpm publish`; `workspace:*` превращается в точную версию релиза. `node-gyp` объявлен явно: без него чистая npm-установка может выбрать старую транзитивную версию при сборке `node-pty`. Claude Agent SDK остаётся обычной зависимостью IDE; это разделение не уменьшает его размер и не поставляет собственные prebuilt-бинарники.
 
-Версии внешних runtime-зависимостей берутся из catalog в lockfile. `node-gyp` объявлен явно: без него чистая npm-установка может выбрать старую транзитивную версию при сборке `node-pty`. Claude Agent SDK остаётся обычной зависимостью IDE; это разделение не уменьшает его размер и не поставляет собственные prebuilt-бинарники.
+Версии трёх манифестов должны совпадать с корневой: это проверяет самопроверка `build:distribution`, поэтому при выпуске меняйте `version` в корне и в трёх пакетах.
+
+В свежем checkout `vp install` собирает native сразу (`prepare`), иначе `@ai-projector/native/entry` указывает в ещё не созданный `dist/`. После правок в `packages/native` пересоберите дополнение вручную:
+
+```bash
+node packages/native/scripts/build.mjs
+```
 
 ## Проверки
 

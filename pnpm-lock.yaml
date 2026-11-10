@@ -337,6 +337,9 @@ importers:
 
   .:
     devDependencies:
+      '@ai-projector/native':
+        specifier: workspace:*
+        version: link:packages/native
       '@anthropic-ai/claude-agent-sdk':
         specifier: 'catalog:'
         version: 0.3.291(@anthropic-ai/sdk@0.131.0(zod@4.6.5))(@modelcontextprotocol/sdk@1.32.1(zod@4.6.5))(zod@4.6.5)
@@ -361,9 +364,6 @@ importers:
       '@o-feod/oxlint-structure-plugin':
         specifier: 'catalog:'
         version: 0.1.7(oxlint@1.89.0(oxlint-tsgolint@7.0.2004)(vite-plus@1.4.0(@types/node@26.6.2)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.3.11)(typescript@6.0.3)(unrun@0.2.39)(vue-tsc@3.3.11(typescript@6.0.3))))
-      '@ai-projector/native':
-        specifier: workspace:*
-        version: link:packages/native
       '@types/markdown-it':
         specifier: 'catalog:'
         version: 14.2.0
@@ -433,6 +433,9 @@ importers:
 
   packages/client:
     dependencies:
+      '@ai-projector/core':
+        specifier: workspace:*
+        version: link:../core
       '@codemirror/commands':
         specifier: 'catalog:'
         version: 6.11.1
@@ -466,9 +469,6 @@ importers:
       '@milkdown/kit':
         specifier: 'catalog:'
         version: 7.22.2(@codemirror/language@6.12.4)(@codemirror/state@6.7.6)(@codemirror/view@6.43.13)(typescript@6.0.3)
-      '@ai-projector/core':
-        specifier: workspace:*
-        version: link:../core
       '@tanstack/vue-virtual':
         specifier: 'catalog:'
         version: 3.13.39(vue@3.5.43(typescript@6.0.3))
@@ -523,26 +523,21 @@ importers:
 
   packages/hub:
     dependencies:
-      '@ai-projector/core':
-        specifier: workspace:*
-        version: link:../core
+      dbus-next:
+        specifier: 'catalog:'
+        version: 0.10.2
       ws:
         specifier: 'catalog:'
         version: 8.22.0
-
-  packages/native:
-    dependencies:
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
       '@ai-projector/core':
         specifier: workspace:*
         version: link:../core
-      '@zede/vio':
-        specifier: 'catalog:'
-        version: 0.7.1(node-gtk@4.1.1(encoding@0.1.13))
-      node-gtk:
-        specifier: 'catalog:'
-        version: 4.1.1(encoding@0.1.13)
 
-  packages/server:
+  packages/ide:
     dependencies:
       '@ai-sdk/openai-compatible':
         specifier: 'catalog:'
@@ -556,9 +551,73 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
         version: 1.32.1(zod@4.6.5)
+      '@xterm/addon-serialize':
+        specifier: 'catalog:'
+        version: 0.14.0
+      '@xterm/headless':
+        specifier: 'catalog:'
+        version: 6.0.0
+      ai:
+        specifier: 'catalog:'
+        version: 7.0.112(zod@4.6.5)
+      dbus-next:
+        specifier: 'catalog:'
+        version: 0.10.2
+      jsonc-parser:
+        specifier: 'catalog:'
+        version: 3.3.1
+      node-gyp:
+        specifier: 'catalog:'
+        version: 13.0.2
+      node-pty:
+        specifier: 'catalog:'
+        version: 1.1.0
+      rou3:
+        specifier: 'catalog:'
+        version: 1.0.0
+      tldts:
+        specifier: 'catalog:'
+        version: 7.4.18
+      ws:
+        specifier: 'catalog:'
+        version: 8.22.0
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+
+  packages/native:
+    dependencies:
+      '@ai-projector/ide':
+        specifier: workspace:*
+        version: link:../ide
+      '@zede/vio':
+        specifier: 'catalog:'
+        version: 0.7.1(node-gtk@4.1.1(encoding@0.1.13))
+      node-gtk:
+        specifier: 'catalog:'
+        version: 4.1.1(encoding@0.1.13)
+    devDependencies:
       '@ai-projector/core':
         specifier: workspace:*
         version: link:../core
+
+  packages/server:
+    dependencies:
+      '@ai-projector/core':
+        specifier: workspace:*
+        version: link:../core
+      '@ai-sdk/openai-compatible':
+        specifier: 'catalog:'
+        version: 3.0.54(zod@4.6.5)
+      '@anthropic-ai/claude-agent-sdk':
+        specifier: 'catalog:'
+        version: 0.3.291(@anthropic-ai/sdk@0.131.0(zod@4.6.5))(@modelcontextprotocol/sdk@1.32.1(zod@4.6.5))(zod@4.6.5)
+      '@devcontainers/cli':
+        specifier: 'catalog:'
+        version: 0.89.0
+      '@modelcontextprotocol/sdk':
+        specifier: 'catalog:'
+        version: 1.32.1(zod@4.6.5)
       '@xterm/addon-serialize':
         specifier: 'catalog:'
         version: 0.14.0

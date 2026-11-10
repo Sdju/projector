@@ -58,6 +58,9 @@ export default {
     ignore: [
       "**/node_modules/**",
       "**/package.json",
+      "**/README.md",
+      "**/LICENSE",
+      "**/scripts/**",
       "tests/**",
       "evals/**",
       "scripts/**",
@@ -66,6 +69,11 @@ export default {
       "public/**",
       "resources/**",
       "dist/**",
+      // Generated trees of the published packages.
+      "packages/ide/**",
+      "packages/native/dist/**",
+      "packages/hub/packages/**",
+      "packages/hub/dist/**",
       "**/*.config.*",
       "feod.config.mjs",
     ],

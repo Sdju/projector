@@ -1,0 +1,65 @@
+{
+  "name": "@ai-projector/ide",
+  "version": "0.11.0",
+  "description": "Projector web IDE, terminals and agents without GTK",
+  "keywords": [
+    "agents",
+    "ide",
+    "projector",
+    "terminal",
+    "workspace"
+  ],
+  "homepage": "https://github.com/Sdju/projector#readme",
+  "bugs": {
+    "url": "https://github.com/Sdju/projector/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sdju/projector.git"
+  },
+  "bin": {
+    "projector": "./packages/cli/app/launch.js",
+    "projector-install-desktop": "./packages/cli/app/install-desktop.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "packages",
+    "resources",
+    "scripts/postinstall.mjs",
+    "LICENSE",
+    "README.md"
+  ],
+  "type": "module",
+  "exports": {
+    "./core/*": "./packages/core/*"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "postinstall": "node scripts/postinstall.mjs"
+  },
+  "dependencies": {
+    "@ai-sdk/openai-compatible": "catalog:",
+    "@anthropic-ai/claude-agent-sdk": "catalog:",
+    "@devcontainers/cli": "catalog:",
+    "@modelcontextprotocol/sdk": "catalog:",
+    "@xterm/addon-serialize": "catalog:",
+    "@xterm/headless": "catalog:",
+    "ai": "catalog:",
+    "dbus-next": "catalog:",
+    "jsonc-parser": "catalog:",
+    "node-gyp": "catalog:",
+    "node-pty": "catalog:",
+    "rou3": "catalog:",
+    "tldts": "catalog:",
+    "ws": "catalog:",
+    "zod": "catalog:"
+  },
+  "engines": {
+    "node": ">=24.11.0 <25"
+  }
+}

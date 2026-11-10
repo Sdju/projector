@@ -53,25 +53,25 @@ jobs:
             console.log(`release version ${manifest.version}${ref ? ` (${ref})` : ""}`);
           '
       - name: Build distribution
+        # Ends with the distribution self-check: manifests, built files and tarballs.
         run: vp run build:distribution
-      - name: Verify distribution
-        run: vp run verify:distribution
       - name: Publish packages
         run: |
           set -euo pipefail
-          # Run npm inside the artifact: the checkout root declares pnpm in devEngines,
-          # and npm refuses every command there. publishConfig sets the registry.
+          # pnpm resolves `workspace:` and `catalog:` in the manifest at publish time;
+          # publishConfig in each package sets the registry and public access.
           publish_if_missing() {
             local directory="$1"
             local name="$2"
             local version
             version="$(node -p "require('./${directory}/package.json').version")"
-            if (cd "${directory}" && npm view "${name}@${version}" version >/dev/null 2>&1); then
+            if npm view "${name}@${version}" version >/dev/null 2>&1; then
               echo "${name}@${version} is already published, skipping"
               return
             fi
-            (cd "${directory}" && npm publish --access public --provenance)
+            # Build output is gitignored, so the checkout is clean: no git checks are needed.
+            (cd "${directory}" && pnpm publish --access public --provenance --no-git-checks)
           }
-          publish_if_missing artifacts/distribution/ide "@ai-projector/ide"
-          publish_if_missing artifacts/distribution/native "@ai-projector/native"
-          publish_if_missing artifacts/distribution/hub "@ai-projector/hub"
+          publish_if_missing packages/ide "@ai-projector/ide"
+          publish_if_missing packages/native "@ai-projector/native"
+          publish_if_missing packages/hub "@ai-projector/hub"

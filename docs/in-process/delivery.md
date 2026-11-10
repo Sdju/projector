@@ -51,4 +51,4 @@
 
 - [ ] Чистая машина без Node, GTK и build tools: установка, запуск, обновление.
 - [ ] LAN с телефона: вход, PWA, уведомления, отзыв пароля.
-- [ ] `vp run verify:distribution` и `vp run check` остаются зелёными.
+- [ ] `vp run build:distribution` (с самопроверкой) и `vp run check` остаются зелёными.

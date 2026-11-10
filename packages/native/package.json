@@ -1,15 +1,44 @@
 {
   "name": "@ai-projector/native",
   "version": "0.11.0",
-  "private": true,
+  "description": "Optional GTK palette and GIO application catalog for Projector",
+  "keywords": [
+    "gio",
+    "gtk",
+    "palette",
+    "projector"
+  ],
+  "homepage": "https://github.com/Sdju/projector#readme",
+  "bugs": {
+    "url": "https://github.com/Sdju/projector/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sdju/projector.git"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
   "type": "module",
   "exports": {
-    "./*": "./*",
-    "./entry": "./app/entry.ts"
+    "./entry": "./dist/app/entry.js"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "dependencies": {
-    "@ai-projector/core": "workspace:*",
+    "@ai-projector/ide": "workspace:*",
     "@zede/vio": "catalog:",
     "node-gtk": "catalog:"
+  },
+  "devDependencies": {
+    "@ai-projector/core": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24.11.0 <25"
   }
 }

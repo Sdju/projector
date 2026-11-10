@@ -1,13 +1,45 @@
 {
   "name": "@ai-projector/hub",
   "version": "0.11.0",
-  "private": true,
+  "description": "Projector Hub: one web origin for remote Projector devices",
+  "keywords": [
+    "hub",
+    "projector",
+    "remote",
+    "tunnel"
+  ],
+  "homepage": "https://github.com/Sdju/projector#readme",
+  "bugs": {
+    "url": "https://github.com/Sdju/projector/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sdju/projector.git"
+  },
+  "bin": {
+    "projector-hub": "./packages/hub/app/main.js"
+  },
+  "files": [
+    "dist",
+    "packages",
+    "LICENSE",
+    "README.md"
+  ],
   "type": "module",
-  "scripts": {
-    "start": "node app/main.ts"
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "dependencies": {
-    "@ai-projector/core": "workspace:*",
-    "ws": "catalog:"
+    "dbus-next": "catalog:",
+    "ws": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@ai-projector/core": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24.11.0 <25"
   }
 }

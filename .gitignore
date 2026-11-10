@@ -11,6 +11,19 @@ node_modules
 dist
 dist-ssr
 /artifacts/
+
+# Build output of the published packages (@ai-projector/ide|native|hub).
+# The package directory is the installation root, so generated files sit next to the manifest.
+/packages/ide/dist/
+/packages/ide/packages/
+/packages/ide/resources/
+/packages/ide/bin/
+/packages/ide/LICENSE
+/packages/native/dist/
+/packages/native/LICENSE
+/packages/hub/dist/
+/packages/hub/packages/
+/packages/hub/LICENSE
 __pycache__/
 *.pyc
 *.local
