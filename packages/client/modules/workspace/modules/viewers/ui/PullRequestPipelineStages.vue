@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import UiHint from "../../../../../common/ui/UiHint.vue";
+import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import UiStatusDot from "../../../../../common/ui/UiStatusDot.vue";
 import { computed } from "vue";
 import { durationLabel, PIPELINE_STATUS_TONE } from "@ai-projector/core/modules/workspace/index.ts";
@@ -18,9 +19,7 @@ const groups = computed(() => groupPipelineStages(detail.value?.jobs ?? []));
 
 <template>
   <div class="stages">
-    <UiHint v-if="!detail && !error" size="xs" leading="inherit" class="note" role="status"
-      >загрузка: стадии…</UiHint
-    >
+    <UiLoader v-if="!detail && !error" class="note">загрузка: стадии…</UiLoader>
     <UiHint v-else-if="error" size="xs" leading="inherit" class="note error" role="alert">{{
       error
     }}</UiHint>

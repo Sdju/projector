@@ -5,6 +5,7 @@ import UiControl from "../../common/ui/UiControl.vue";
 import UiStack from "../../common/ui/UiStack.vue";
 import UiInline from "../../common/ui/UiInline.vue";
 import UiHeading from "../../common/ui/UiHeading.vue";
+import UiLoader from "../../common/ui/UiLoader.vue";
 import UiMessage from "../../common/ui/UiMessage.vue";
 import { useId } from "vue";
 import UiButton from "../../common/ui/UiButton.vue";
@@ -79,7 +80,7 @@ commands.scope.registerCommand({
     @pointerdown="commands.scope.activate()"
     @keydown="commands.keydown"
   >
-    <UiMessage v-if="!state" tone="muted" size="sm" class="muted">Загрузка…</UiMessage>
+    <UiLoader v-if="!state" :padding="3">Загрузка…</UiLoader>
     <template v-else>
       <dl class="summary">
         <UiCard as="div" appearance="frame">

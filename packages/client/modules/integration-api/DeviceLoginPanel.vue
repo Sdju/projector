@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import UiButton from "../../common/ui/UiButton.vue";
+import UiLoader from "../../common/ui/UiLoader.vue";
 import type { DeviceLogin } from "./client.ts";
 
 /** Code and link of an active Device Flow login; the owner runs the cancel command. */
@@ -15,7 +16,7 @@ const emit = defineEmits<{ cancel: [] }>();
     <a :href="device.verificationUri" target="_blank" rel="noopener noreferrer"
       >открыть {{ host }} для входа ↗</a
     >
-    <p class="muted">Ожидаем подтверждения…</p>
+    <p class="muted"><UiLoader size="sm">Ожидаем подтверждения…</UiLoader></p>
     <UiButton :data-command="commandId" @click="emit('cancel')">отменить</UiButton>
   </div>
 </template>

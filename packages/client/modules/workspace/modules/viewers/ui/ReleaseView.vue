@@ -4,6 +4,7 @@ import UiAvatar from "../../../../../common/ui/UiAvatar.vue";
 import UiDetailHeader from "../../../../../common/ui/UiDetailHeader.vue";
 import UiViewerPage from "../../../../../common/ui/UiViewerPage.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
+import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import UiInline from "../../../../../common/ui/UiInline.vue";
 import UiMessage from "../../../../../common/ui/UiMessage.vue";
 import { computed } from "vue";
@@ -95,7 +96,7 @@ useTabReadout(() => {
 
 <template>
   <UiViewerPage>
-    <UiHint v-if="loading" size="xs" leading="inherit" role="status">загрузка: релиз…</UiHint>
+    <UiLoader v-if="loading">загрузка: релиз…</UiLoader>
     <UiMessage v-else-if="error" variant="note" tone="danger" size="xs" role="alert">{{
       error
     }}</UiMessage>

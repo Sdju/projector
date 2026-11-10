@@ -2,6 +2,7 @@
 import UiArticle from "../../../../../common/ui/UiArticle.vue";
 import UiDetailHeader from "../../../../../common/ui/UiDetailHeader.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
+import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import UiViewerPage from "../../../../../common/ui/UiViewerPage.vue";
 import type {
   IssueLabel,
@@ -52,9 +53,7 @@ const emit = defineEmits<{ open: [path: string] }>();
 
 <template>
   <UiViewerPage>
-    <UiHint size="xs" leading="inherit" :space-before="2" v-if="loading" class="note" role="status"
-      >загрузка: {{ noun }}…</UiHint
-    >
+    <UiLoader v-if="loading" class="note">загрузка: {{ noun }}…</UiLoader>
     <UiHint
       size="xs"
       leading="inherit"

@@ -4,6 +4,7 @@ import UiButton from "../../../common/ui/UiButton.vue";
 import UiCard from "../../../common/ui/UiCard.vue";
 import UiEmpty from "../../../common/ui/UiEmpty.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
+import UiLoader from "../../../common/ui/UiLoader.vue";
 import UiMessage from "../../../common/ui/UiMessage.vue";
 import UiStack from "../../../common/ui/UiStack.vue";
 import { countRu } from "../../../common/utilities/plural.ts";
@@ -141,7 +142,7 @@ const stats = computed(() => {
     </UiInline>
 
     <UiMessage v-if="error" tone="danger" size="xs">{{ error }}</UiMessage>
-    <UiEmpty v-if="!data && loading" density="compact">Считаю расход…</UiEmpty>
+    <UiLoader v-if="!data && loading" :padding="3">Считаю расход…</UiLoader>
 
     <template v-if="data">
       <div class="stats">
@@ -327,7 +328,7 @@ const stats = computed(() => {
           Лимиты ещё не проверялись. Нажмите «Обновить» — Projector спросит их у настроенных
           агентов.
         </UiEmpty>
-        <UiMessage v-if="probing" tone="muted" size="xs"> Запрашиваю лимиты у агентов… </UiMessage>
+        <UiLoader v-if="probing" size="sm">Запрашиваю лимиты у агентов…</UiLoader>
       </UiCard>
 
       <UiMessage v-if="!priced" tone="muted" size="xs" variant="note">

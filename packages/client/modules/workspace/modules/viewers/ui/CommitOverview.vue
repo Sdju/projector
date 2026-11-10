@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import UiArticle from "../../../../../common/ui/UiArticle.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
+import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import UiViewerPage from "../../../../../common/ui/UiViewerPage.vue";
 import { computed, ref, watch } from "vue";
 import type { GitCommitDetail } from "@ai-projector/core/modules/workspace/index.ts";
@@ -141,9 +142,7 @@ watch(() => [props.projectId, props.hash], load, { immediate: true });
 
 <template>
   <UiViewerPage>
-    <UiHint size="xs" leading="inherit" :space-after="2" v-if="loading" class="note" role="status"
-      >загрузка коммита…</UiHint
-    >
+    <UiLoader v-if="loading" class="note">загрузка коммита…</UiLoader>
     <UiHint
       size="xs"
       leading="inherit"

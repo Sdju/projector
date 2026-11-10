@@ -5,6 +5,7 @@ import UiControl from "../../../common/ui/UiControl.vue";
 import UiField from "../../../common/ui/UiField.vue";
 import UiHint from "../../../common/ui/UiHint.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
+import UiLoader from "../../../common/ui/UiLoader.vue";
 import UiMessage from "../../../common/ui/UiMessage.vue";
 import { onMounted, reactive, ref, watch } from "vue";
 import type { ClientAgent } from "../../agents-integration/catalog/index.ts";
@@ -250,7 +251,7 @@ function remove() {
         <option value="none">Не добавлять</option>
       </UiControl>
     </UiField>
-    <p v-if="resourcesLoading" class="note">Читаю навыки и MCP-серверы…</p>
+    <UiLoader v-if="resourcesLoading" class="note" size="sm">Читаю навыки и MCP-серверы…</UiLoader>
     <div v-else-if="draft.skillsMode === 'some'" class="choices">
       <label v-for="skill in skillChoices()" :key="skill.name" class="choice">
         <UiControl
@@ -297,7 +298,7 @@ function remove() {
       <p v-if="!mcpChoices().length" class="note">MCP-серверы не настроены.</p>
       <p v-else class="note">Ничего не выбрано — роль не подключит MCP.</p>
     </div>
-    <p v-if="loading" class="note">Читаю настройки агента…</p>
+    <UiLoader v-if="loading" class="note" size="sm">Читаю настройки агента…</UiLoader>
     <template v-else>
       <UiField
         v-for="control in controls"

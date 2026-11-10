@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import UiControl from "../../../../../common/ui/UiControl.vue";
 import UiInline from "../../../../../common/ui/UiInline.vue";
+import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import UiMessage from "../../../../../common/ui/UiMessage.vue";
 import { copyWithNotice, toastErrors } from "../../../../../common/utilities/notice.ts";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
@@ -256,15 +257,7 @@ watch(commits, (list) => {
       <UiMessage v-if="log.upstream" class="note" tone="muted" size="xs" flush>
         {{ log.upstream }}<template v-if="!log.ahead && !log.behind"> · синхронизировано</template>
       </UiMessage>
-      <UiMessage
-        v-if="loading && !commits.length"
-        class="note"
-        tone="muted"
-        size="xs"
-        flush
-        role="status"
-        >загрузка истории…</UiMessage
-      >
+      <UiLoader v-if="loading && !commits.length" class="note">загрузка истории…</UiLoader>
       <UiMessage
         v-else-if="log.available && !commits.length"
         class="note"

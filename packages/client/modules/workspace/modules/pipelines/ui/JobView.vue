@@ -3,6 +3,7 @@ import UiArticle from "../../../../../common/ui/UiArticle.vue";
 import UiDetailHeader from "../../../../../common/ui/UiDetailHeader.vue";
 import UiHeading from "../../../../../common/ui/UiHeading.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
+import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import UiViewerPage from "../../../../../common/ui/UiViewerPage.vue";
 import { computed } from "vue";
 import { relativeTime } from "../../../../../common/utilities/commit-format.ts";
@@ -66,9 +67,7 @@ useTabReadout(() => {
 
 <template>
   <UiViewerPage>
-    <UiHint v-if="loading" size="xs" leading="inherit" class="note" role="status"
-      >загрузка: джоб…</UiHint
-    >
+    <UiLoader v-if="loading" class="note">загрузка: джоб…</UiLoader>
     <UiHint v-else-if="error" size="xs" leading="inherit" class="note error" role="alert">{{
       error
     }}</UiHint>

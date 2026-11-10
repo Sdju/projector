@@ -6,6 +6,11 @@
 
 - Публикуемые пакеты переехали в workspace: `@ai-projector/ide`, `@ai-projector/native` и `@ai-projector/hub` теперь лежат в `packages/` со статическими манифестами, `bin` и `exports`. Сборка у каждого пакета своя — `packages/<name>/scripts/build.mjs`, — а `vp run build:distribution` запускает их по порядку. Генерируемые `dist/`, `packages/`, `resources/`, `bin/` и `LICENSE` игнорируются git, поэтому `artifacts/distribution` и генерация манифестов строками больше не нужны. `@ai-projector/native` держит `@ai-projector/core` только в `devDependencies`: в установку потребителя попадает лишь IDE. `build:distribution` заканчивается самопроверкой: версии, собранные файлы, относительные импорты и сами tarball'ы через `pnpm pack`. Workflow публикует `pnpm publish` из каталогов пакетов.
 
+### Интерфейс
+
+- Загрузка сведена в `UiLoader`: спиннер, подпись и live-region вместо самодельных `<p>`, `⋯` и отдельных CSS-анимаций. Общие `UiAsyncContent`, `UiLoadablePanel`, `UiListSection`, списки Git и detail-вью используют его; `UiSpinner` остался глифом для микросостояний, а вкладка сохранения больше не держит свою анимацию.
+- Линейные графики виджетов и аналитики рисует общий `UiLineChart`: одна шкала, `niceMax`, прореживание подписей и ResizeObserver. Виджет включает кисть, миникарту и подсказку, аналитика — линию с заливкой; `UiDonut` и `UiMeter` уже общие. `useChartLayout` переехал в `common/utilities` и обслуживает `UsageBarChart`.
+
 ### Агент
 
 - В постоянной справке по виджетам теперь прямо сказано, что Markdown внутри блока не рендерится: `**`, обратные кавычки, списки, `###` и таблицы видны сырым текстом. Агенту предписано писать внутри виджетов только валидный HTML.

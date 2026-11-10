@@ -11,6 +11,7 @@ import { absoluteTime } from "../../../common/utilities/commit-format.ts";
 import { readoutLines, useTabReadout } from "../../../common/utilities/tab-readout.ts";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiEmpty from "../../../common/ui/UiEmpty.vue";
+import UiLoader from "../../../common/ui/UiLoader.vue";
 import { useDockerState } from "../model.ts";
 const { snapshot, containers, current, selected, all, busy, starting, error, commands } =
   useDockerState();
@@ -121,7 +122,7 @@ const actions = [
       size="sm"
       @start="commands.run('ide.docker.daemon.start')"
     />
-    <UiEmpty v-if="!snapshot && !error">Подключение…</UiEmpty>
+    <UiLoader v-if="!snapshot && !error" :padding="3">Подключение к Docker…</UiLoader>
     <UiEmpty v-else-if="snapshot && !snapshot.enabled"
       >Docker выключен.
       <router-link to="/settings">Открыть настройки интеграций</router-link></UiEmpty

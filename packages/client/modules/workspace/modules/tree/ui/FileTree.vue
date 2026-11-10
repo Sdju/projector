@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { toastErrors } from "../../../../../common/utilities/notice.ts";
+import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import UiSkeleton from "../../../../../common/ui/UiSkeleton.vue";
 import UiActionRow from "../../../../../common/ui/UiActionRow.vue";
 import {
@@ -261,9 +262,11 @@ defineExpose({ reveal });
         height="10px"
       />
     </li>
-    <li v-if="depth === 0 && busy" class="notice" role="status">выполняется…</li>
-    <li v-if="depth === 0 && progress" class="notice" role="status">
-      Загрузка: {{ progress.done }} из {{ progress.total }}
+    <li v-if="depth === 0 && busy" class="notice">
+      <UiLoader size="sm">выполняется…</UiLoader>
+    </li>
+    <li v-if="depth === 0 && progress" class="notice">
+      <UiLoader size="sm">Загрузка: {{ progress.done }} из {{ progress.total }}</UiLoader>
       <UiActionRow
         class="cancel"
         interaction="item"

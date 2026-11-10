@@ -1,4 +1,5 @@
 <script setup lang="ts" generic="T">
+import UiLoader from "./UiLoader.vue";
 import UiMessage from "./UiMessage.vue";
 import { shallowRef, watch } from "vue";
 
@@ -35,14 +36,8 @@ watch(() => props.watchKeys(), run, { immediate: true });
 
 <template>
   <slot v-if="data !== undefined" :data="data" />
-  <UiMessage
-    v-else
-    size="xs"
-    variant="padded"
-    :tone="error ? 'danger' : 'muted'"
-    :padding="4"
-    :role="error ? 'alert' : 'status'"
-  >
-    {{ error || loadingText }}
+  <UiLoader v-else-if="!error" :padding="4">{{ loadingText }}</UiLoader>
+  <UiMessage v-else size="xs" variant="padded" tone="danger" :padding="4" role="alert">
+    {{ error }}
   </UiMessage>
 </template>

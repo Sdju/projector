@@ -3,6 +3,7 @@ import CommitFileDiff from "./CommitFileDiff.vue";
 import { FileIcon } from "../../../../file-icons/index.ts";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
+import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import type { ChangedFileDiff, ChangedFileItem } from "../lib/changed-files.ts";
 import { computed } from "vue";
 import IconChevronRight from "~icons/lucide/chevron-right";
@@ -76,9 +77,7 @@ const note = computed(() => {
       </UiButton>
     </div>
     <div v-if="expanded" class="inline">
-      <UiHint v-if="diff?.loading" size="xs" leading="inherit" class="note" role="status"
-        >загрузка…</UiHint
-      >
+      <UiLoader v-if="diff?.loading" class="note">загрузка…</UiLoader>
       <UiHint v-else-if="diff?.error" size="xs" leading="inherit" class="note error" role="alert">
         {{ diff.error }}
       </UiHint>

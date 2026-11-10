@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiLoader from "../../../common/ui/UiLoader.vue";
 import UiPopupSurface from "../../../common/ui/UiPopupSurface.vue";
 import IconChevronRight from "~icons/lucide/chevron-right";
 import IconFolder from "~icons/lucide/folder";
@@ -21,9 +22,9 @@ defineEmits<{ pick: [path: string] }>();
 <template>
   <UiPopupSurface border="line" radius="md" class="dropdown">
     <div class="dropdown-heading u-truncate">{{ heading }}</div>
-    <p v-if="loading" class="notice" role="status">
-      {{ remote ? "Читаю репозитории…" : "Читаю папки…" }}
-    </p>
+    <UiLoader v-if="loading" class="notice" size="sm">{{
+      remote ? "Читаю репозитории…" : "Читаю папки…"
+    }}</UiLoader>
     <p v-else-if="error" class="notice error" role="alert">{{ error }}</p>
     <p v-else-if="!entries.length" class="notice">
       {{

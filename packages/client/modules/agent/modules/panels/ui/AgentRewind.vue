@@ -3,6 +3,7 @@ import UiControl from "../../../../../common/ui/UiControl.vue";
 import { computed, ref, watch, useId } from "vue";
 import UiCard from "../../../../../common/ui/UiCard.vue";
 import UiInline from "../../../../../common/ui/UiInline.vue";
+import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import type { RewindSummary } from "../../../../agent-core/index.ts";
 import type { RewindScope } from "../../../../agent-core/index.ts";
@@ -87,7 +88,7 @@ const options = computed(
       </UiInline>
       <div v-if="withFiles" class="preview" aria-live="polite">
         <template v-if="previewError">{{ previewError }}</template>
-        <template v-else-if="!preview">Считаю, что изменится…</template>
+        <UiLoader v-else-if="!preview" size="sm">Считаю, что изменится…</UiLoader>
         <template v-else-if="!preview.ok">{{ preview.error || "Вернуть файлы нельзя" }}</template>
         <template v-else-if="!preview.files.length">Файлы уже такие, как на этом шаге.</template>
         <template v-else>

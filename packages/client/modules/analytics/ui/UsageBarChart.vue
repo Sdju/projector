@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useChartLayout } from "../lib/chart-layout.ts";
+import { useChartLayout } from "../../../common/utilities/chart-layout.ts";
 
 const props = withDefaults(
   defineProps<{

@@ -2,6 +2,7 @@
 import UiIsland from "../../../common/ui/UiIsland.vue";
 import { useIslandMenu } from "../../../common/utilities/island-menu.ts";
 import UiInline from "../../../common/ui/UiInline.vue";
+import UiLoader from "../../../common/ui/UiLoader.vue";
 import UiControl, { type UiControlHandle } from "../../../common/ui/UiControl.vue";
 import { computed, nextTick, ref, watch } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
@@ -239,7 +240,7 @@ function age(value?: string): string {
         placeholder="Найти чат"
         aria-label="Найти чат"
       />
-      <p v-if="native.loading && !history.length" class="note">Загружаю…</p>
+      <UiLoader v-if="native.loading && !history.length" class="note" size="sm">Загружаю…</UiLoader>
       <p v-else-if="native.error" class="note error" role="alert">{{ native.error }}</p>
       <p v-else-if="!history.length && !recent.loading" class="note">В истории пока пусто</p>
       <p v-else-if="!visible.length && !recent.loading" class="note">Ничего не найдено</p>
@@ -339,9 +340,9 @@ function age(value?: string): string {
         <span v-else-if="branchesShown">Скрыть ветки субагентов</span>
         <span v-else>Показать ветки субагентов · {{ branchCount }}</span>
       </button>
-      <p v-if="recent.loading && !history.length && !native.loading" class="note">
-        Загружаю историю…
-      </p>
+      <UiLoader v-if="recent.loading && !history.length && !native.loading" class="note" size="sm"
+        >Загружаю историю…</UiLoader
+      >
       <p v-else-if="recent.error" class="note error" role="alert">{{ recent.error }}</p>
     </UiIsland>
   </div>

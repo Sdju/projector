@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import UiActionRow from "../../common/ui/UiActionRow.vue";
+import UiSpinner from "../../common/ui/UiSpinner.vue";
 import { launcherStatusTone } from "./status-tone.ts";
 import UiStatusDot from "../../common/ui/UiStatusDot.vue";
 import type {
@@ -23,7 +24,7 @@ defineEmits<{ launch: [action: LaunchAction] }>();
   <div class="actions-panel" role="listbox" :aria-label="`Действия: ${item.name}`">
     <div class="panel-title">
       <span class="back" aria-hidden="true">←</span> {{ item.name }}
-      <span v-if="loading" aria-hidden="true">⋯</span>
+      <UiSpinner v-if="loading" label="Загрузка" />
     </div>
     <div v-if="info" class="info-card">
       <div class="info-path">{{ info.path }}</div>

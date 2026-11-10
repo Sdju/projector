@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import UiControl from "../../../../../common/ui/UiControl.vue";
+import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import UiMessage from "../../../../../common/ui/UiMessage.vue";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import type { GitBranch } from "@ai-projector/core/modules/workspace/index.ts";
@@ -268,15 +269,7 @@ watch(open, (value) => {
         aria-label="Найти ветку"
         @keydown.stop
       />
-      <UiMessage
-        v-if="loading && !state.branches.length"
-        class="note"
-        tone="muted"
-        size="xs"
-        flush
-        role="status"
-        >загрузка…</UiMessage
-      >
+      <UiLoader v-if="loading && !state.branches.length" class="note">загрузка…</UiLoader>
       <UiMessage v-else-if="!visible.length && !error" class="note" tone="muted" size="xs" flush
         >Веток нет.</UiMessage
       >

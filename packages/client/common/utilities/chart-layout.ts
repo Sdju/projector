@@ -27,23 +27,35 @@ export function useChartLayout(options: {
   height: () => number;
   maxValue: () => number;
   labelsCount: () => number;
+  left?: number | (() => number);
   right?: number;
 }) {
   const width = ref(560);
   const host = options.host;
   let observer: ResizeObserver | undefined;
+  let frame = 0;
   onMounted(() => {
     if (!host.value || typeof ResizeObserver === "undefined") return;
     observer = new ResizeObserver(([entry]) => {
       const next = Math.round(entry?.contentRect.width ?? 0);
-      if (next > 160) width.value = next;
+      if (next <= 160 || next === width.value) return;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        width.value = next;
+      });
     });
     observer.observe(host.value);
   });
-  onBeforeUnmount(() => observer?.disconnect());
+  onBeforeUnmount(() => {
+    observer?.disconnect();
+    cancelAnimationFrame(frame);
+  });
 
   const height = computed(() => options.height());
-  const pad = computed(() => ({ l: 42, r: options.right ?? 12, t: 12, b: 20 }));
+  const left = computed(
+    () => (typeof options.left === "function" ? options.left() : options.left) ?? 42,
+  );
+  const pad = computed(() => ({ l: left.value, r: options.right ?? 12, t: 12, b: 20 }));
   const innerWidth = computed(() => Math.max(20, width.value - pad.value.l - pad.value.r));
   const innerHeight = computed(() => Math.max(20, height.value - pad.value.t - pad.value.b));
   const max = computed(() => niceMax(options.maxValue()));

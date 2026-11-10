@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
-import UiSpinner from "../../../common/ui/UiSpinner.vue";
+import UiLoader from "../../../common/ui/UiLoader.vue";
 import { useElapsedClock } from "../../agent-core/index.ts";
 import { taskElapsed, taskStatusLabel, type AgentTaskDetail } from "../../agent-core/index.ts";
 import { useOptionalIdeCommands } from "../../ide/index.ts";
@@ -153,9 +153,9 @@ const outcome = computed(() => {
           <li v-for="(line, index) in task.log" :key="index">{{ line }}</li>
         </ol>
       </template>
-      <p v-else-if="task.status === 'running'" class="note">
-        <UiSpinner /> Агент работает, подробностей пока нет
-      </p>
+      <UiLoader v-else-if="task.status === 'running'" class="note"
+        >Агент работает, подробностей пока нет</UiLoader
+      >
       <template v-if="outcome">
         <div class="label">Итог</div>
         <AgentCodeBlock :text="outcome" />

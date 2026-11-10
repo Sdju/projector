@@ -3,6 +3,7 @@ import UiScrollArea from "../../../../../common/ui/UiScrollArea.vue";
 import { computed, ref } from "vue";
 import ContextMenu from "../../../../../common/ui/ContextMenu.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
+import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import type { ContextMenuItem } from "../../../../../common/ui/context-menu.ts";
 import { toastErrors } from "../../../../../common/utilities/notice.ts";
 import { commandArgs, useCommandScope } from "../../../../../common/utilities/commands.ts";
@@ -166,7 +167,7 @@ defineExpose({
       :applied="applied"
       :reload="load"
     />
-    <p v-if="gitLoading" class="notice" role="status">загрузка Git…</p>
+    <UiLoader v-if="gitLoading" class="notice">загрузка Git…</UiLoader>
     <p v-if="!gitLoading && !gitError && !git.available" class="notice">
       В этой папке нет Git-репозитория.
     </p>

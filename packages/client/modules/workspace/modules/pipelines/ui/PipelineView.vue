@@ -3,6 +3,7 @@ import UiArticle from "../../../../../common/ui/UiArticle.vue";
 import UiDetailHeader from "../../../../../common/ui/UiDetailHeader.vue";
 import UiHeading from "../../../../../common/ui/UiHeading.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
+import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import UiViewerPage from "../../../../../common/ui/UiViewerPage.vue";
 import UiStatusDot from "../../../../../common/ui/UiStatusDot.vue";
 import { computed, ref } from "vue";
@@ -105,9 +106,7 @@ useTabReadout(() => {
 
 <template>
   <UiViewerPage>
-    <UiHint v-if="loading" size="xs" leading="inherit" class="note" role="status"
-      >загрузка: pipeline…</UiHint
-    >
+    <UiLoader v-if="loading" class="note">загрузка: pipeline…</UiLoader>
     <UiHint v-else-if="error" size="xs" leading="inherit" class="note error" role="alert">{{
       error
     }}</UiHint>

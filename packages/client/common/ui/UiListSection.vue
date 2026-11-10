@@ -1,5 +1,6 @@
 <script setup lang="ts" generic="T extends string">
 import UiEmpty from "./UiEmpty.vue";
+import UiLoader from "./UiLoader.vue";
 import UiMessage from "./UiMessage.vue";
 import UiScrollArea from "./UiScrollArea.vue";
 import IconChevronRight from "~icons/lucide/chevron-right";
@@ -60,9 +61,7 @@ const emit = defineEmits<{ toggle: []; filter: [value: T]; more: [] }>();
           {{ option.label }}
         </button>
       </div>
-      <UiMessage v-if="loading" variant="note" tone="muted" role="status"
-        >загрузка: {{ noun }}…</UiMessage
-      >
+      <UiLoader v-if="loading" class="list-loader">загрузка: {{ noun }}…</UiLoader>
       <UiMessage v-else-if="error" variant="note" tone="danger" role="alert">{{ error }}</UiMessage>
       <UiEmpty v-else-if="!count" density="compact" align="start">Нет: {{ noun }}</UiEmpty>
       <ul v-else class="list">
@@ -85,6 +84,9 @@ const emit = defineEmits<{ toggle: []; filter: [value: T]; more: [] }>();
 .list-section {
   display: flex;
   flex-direction: column;
+}
+.list-loader {
+  padding: var(--sp-2) var(--sp-3);
 }
 .block-toggle {
   display: flex;

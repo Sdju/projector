@@ -5,6 +5,7 @@ import UiPopupSurface from "../common/ui/UiPopupSurface.vue";
 import UiActionRow from "../common/ui/UiActionRow.vue";
 import UiControl, { type UiControlHandle } from "../common/ui/UiControl.vue";
 import UiInline from "../common/ui/UiInline.vue";
+import UiSpinner from "../common/ui/UiSpinner.vue";
 import UiStatusDot from "../common/ui/UiStatusDot.vue";
 import { computed, nextTick, onMounted, onUnmounted, shallowRef, ref, watch } from "vue";
 import { useRouter } from "vue-router";
@@ -213,7 +214,7 @@ onUnmounted(() => {
           :disabled="busy"
           @keydown="key"
         />
-        <span v-if="loading || busy" class="activity" aria-hidden="true">⋯</span>
+        <UiSpinner v-if="loading || busy" class="activity" label="Загрузка" />
       </UiInline>
       <div
         v-show="!focus"

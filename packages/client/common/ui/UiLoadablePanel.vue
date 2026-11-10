@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import UiHint from "./UiHint.vue";
+import UiLoader from "./UiLoader.vue";
 
 /** Column panel that owns the loading/error state and renders its content only when ready. */
 defineProps<{ loading: boolean; error: string; loadingText?: string }>();
@@ -7,9 +8,7 @@ defineProps<{ loading: boolean; error: string; loadingText?: string }>();
 
 <template>
   <div class="loadable-panel">
-    <UiHint v-if="loading" size="xs" leading="inherit" class="note" role="status">{{
-      loadingText ?? "загрузка…"
-    }}</UiHint>
+    <UiLoader v-if="loading" class="note">{{ loadingText ?? "загрузка…" }}</UiLoader>
     <UiHint v-else-if="error" size="xs" leading="inherit" class="note error" role="alert">{{
       error
     }}</UiHint>

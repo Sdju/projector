@@ -6,6 +6,7 @@ import UiDialogActions from "../../common/ui/UiDialogActions.vue";
 import UiHeading from "../../common/ui/UiHeading.vue";
 import UiInline from "../../common/ui/UiInline.vue";
 import UiLabel from "../../common/ui/UiLabel.vue";
+import UiLoader from "../../common/ui/UiLoader.vue";
 import UiMessage from "../../common/ui/UiMessage.vue";
 import { DEFAULT_ENVIRONMENT_IMAGE } from "@ai-projector/core/modules/environment/index.ts";
 import { computed, nextTick, onBeforeUnmount, ref, useId } from "vue";
@@ -299,10 +300,10 @@ function cancel(event: Event) {
             сети она недоступна.
           </p>
         </template>
-        <p v-if="loading" role="status">Читаю настройки…</p>
-        <p v-if="busy" role="status">
+        <UiLoader v-if="loading" size="sm">Читаю настройки…</UiLoader>
+        <UiLoader v-if="busy" size="sm">
           {{ cloned ? "Открываю проект…" : step || "Запускаю…" }}
-        </p>
+        </UiLoader>
         <UiMessage v-if="error" tone="danger" role="alert">{{ error }}</UiMessage>
         <UiDialogActions>
           <UiButton v-if="busy && !cloned" @click="commands.run(`${commandPrefix}.abort`)"

@@ -6,6 +6,7 @@ import type {
   GraphRow,
 } from "@ai-projector/core/modules/workspace/index.ts";
 import UiButton from "../../../../../common/ui/UiButton.vue";
+import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import {
   absoluteTime,
   relativeTime,
@@ -116,7 +117,7 @@ const refs = computed(() =>
     </div>
     <div v-if="expanded" class="details" :style="{ paddingLeft: gutter.width }">
       <i v-for="lane in lanes" :key="lane.column" class="lane" :style="{ left: lane.left }" />
-      <p v-if="state?.loading && !state.detail" class="note" role="status">загрузка…</p>
+      <UiLoader v-if="state?.loading && !state.detail" class="note">загрузка…</UiLoader>
       <p v-else-if="state?.error" class="note error" role="alert">{{ state.error }}</p>
       <template v-else-if="state?.detail">
         <pre v-if="state.detail.body" class="body">{{ state.detail.body }}</pre>

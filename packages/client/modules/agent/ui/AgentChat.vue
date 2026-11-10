@@ -23,7 +23,7 @@ import UiPanel from "../../../common/ui/UiPanel.vue";
 import UiInline from "../../../common/ui/UiInline.vue";
 import UiBadge from "../../../common/ui/UiBadge.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
-import UiSpinner from "../../../common/ui/UiSpinner.vue";
+import UiLoader from "../../../common/ui/UiLoader.vue";
 import AgentWelcome from "./AgentWelcome.vue";
 import { AgentTurn } from "../../agent-turns/index.ts";
 import { AgentComposer } from "../modules/composer/index.ts";
@@ -564,9 +564,8 @@ onBeforeUnmount(() => {
       @update:override="setJudgeOverride"
     />
     <div v-show="!viewed" ref="log" class="chat-log" @scroll.passive="trackScroll">
-      <div v-if="loading" class="chat-loading" role="status">
-        <UiSpinner />
-        <span>Загружаю чат…</span>
+      <div v-if="loading" class="chat-loading">
+        <UiLoader label="Загружаю чат…" align="center" />
       </div>
       <AgentWelcome
         v-else-if="!turns.length"

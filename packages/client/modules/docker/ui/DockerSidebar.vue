@@ -3,6 +3,7 @@ import UiToolbar from "../../../common/ui/UiToolbar.vue";
 import UiScrollArea from "../../../common/ui/UiScrollArea.vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiEmpty from "../../../common/ui/UiEmpty.vue";
+import UiLoader from "../../../common/ui/UiLoader.vue";
 import DockerDaemonNotice from "./DockerDaemonNotice.vue";
 import { useDockerState } from "../model.ts";
 const { snapshot, error, starting, commands, projectContainers: containers } = useDockerState();
@@ -20,7 +21,7 @@ const { snapshot, error, starting, commands, projectContainers: containers } = u
       :starting="starting"
       @start="commands.run('ide.docker.daemon.start')"
     />
-    <UiEmpty v-else-if="!snapshot">Подключение…</UiEmpty>
+    <UiLoader v-else-if="!snapshot" :padding="3">Подключение к Docker…</UiLoader>
     <UiEmpty v-else-if="!snapshot.enabled">Включите Docker в настройках интеграций.</UiEmpty>
     <UiEmpty v-else-if="!snapshot.binding">Откройте Docker и привяжите Compose к проекту.</UiEmpty>
     <UiEmpty v-else-if="!containers.length">Контейнеры ещё не созданы.</UiEmpty>

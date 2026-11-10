@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiLoader from "../../../common/ui/UiLoader.vue";
 import UiResizeHandle from "../../../common/ui/UiResizeHandle.vue";
 import { computed, onBeforeUnmount, ref } from "vue";
 import {
@@ -111,7 +112,6 @@ function entryDeleted(path: string) {
 const overview = useGitOverview(() => props.projectId);
 const history = useGitHistory(() => props.projectId);
 const branches = useGitBranches(() => props.projectId);
-const { gutterRevision } = overview;
 const loadGit = () => (capabilities.git ? overview.load() : Promise.resolve());
 const section = ref("files");
 const extraSections = ref<SidebarType[]>([]);
@@ -580,7 +580,7 @@ onBeforeUnmount(() => overview.cancel());
       @focusin="editorFocus"
       @keydown.capture="editorKeydown"
     >
-      <p v-if="loading" class="loading" role="status">читаю файл…</p>
+      <UiLoader v-if="loading" class="loading">читаю файл…</UiLoader>
       <WorkbenchDock
         :project-id="projectId"
         :workbench="workbench"
@@ -589,7 +589,7 @@ onBeforeUnmount(() => overview.cancel());
         :files="files"
         :tab-actions="tabActions"
         :panel-hosts="panelHosts"
-        :gutter-revision="gutterRevision"
+        :gutter-revision="overview.gutterRevision.value"
         :tabs="tabs"
         :terminals-busy="terminals.busy.value"
         :agent="capabilities.agent"
@@ -651,7 +651,6 @@ onBeforeUnmount(() => overview.cancel());
   background: var(--bg-2);
   padding: 6px var(--sp-3);
   color: var(--muted);
-  font-size: var(--fs-xs);
 }
 @media (max-width: 1050px) and (min-width: 701px) {
   .dock-pane {

@@ -22,6 +22,7 @@ import {
 import { markdownPath, renderMarkdown, stripImageAttributes } from "../lib/markdown.ts";
 import { githubEmojiDecorations } from "../lib/markdown-emoji.ts";
 import { createCrepe, normalizeImageAttributes } from "../lib/crepe-options.ts";
+import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import type { EmojiMap } from "../../../../../common/utilities/github-emoji.ts";
 import { useMarkdownInteractions } from "../lib/markdown-links.ts";
 import { MermaidModal } from "../../../../markdown/index.ts";
@@ -329,7 +330,7 @@ onBeforeUnmount(() => {
     @mousedown.capture="linkMouseDown"
     @click.capture="editorClick"
   >
-    <p v-if="loading" class="editor-loading" role="status">Открываю документ…</p>
+    <UiLoader v-if="loading" class="editor-loading">Открываю документ…</UiLoader>
     <details v-if="frontmatter" class="frontmatter" open>
       <summary>
         <span>Свойства</span>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import UiControl from "../../../common/ui/UiControl.vue";
+import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import { computed, nextTick, ref, useId, watch } from "vue";
 import { useCommandScope } from "../../../common/utilities/commands.ts";
 import { tabDrag } from "../../../common/utilities/tab-drag.ts";
@@ -268,7 +269,9 @@ watch(
           :aria-label="
             tab.saving ? 'Сохраняется' : tab.error ? 'Не удалось сохранить' : 'Не сохранено'
           "
-        />
+        >
+          <UiSpinner v-if="tab.saving" />
+        </span>
         <IconClose
           class="close-icon"
           :class="{ 'has-state': tab.dirty || tab.saving }"
@@ -352,12 +355,15 @@ watch(
   background: var(--err);
 }
 .tab-state.spinning {
+  display: grid;
   width: 12px;
   height: 12px;
   background: transparent;
-  border: 1.5px solid var(--faint);
-  border-top-color: var(--text);
-  animation: tab-spin 0.8s linear infinite;
+  place-items: center;
+}
+.tab-close .tab-state svg {
+  width: 12px;
+  height: 12px;
 }
 .close-icon.has-state {
   visibility: hidden;
@@ -374,11 +380,6 @@ watch(
 .dirty .tab-close,
 .saving .tab-close {
   opacity: 1;
-}
-@keyframes tab-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 .tab-close svg {
   width: 14px;

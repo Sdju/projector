@@ -4,7 +4,7 @@ import { useIdeCommands } from "../../../../ide/index.ts";
 import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab-readout.ts";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import UiDisclosureSummary from "../../../../../common/ui/UiDisclosureSummary.vue";
-import UiSpinner from "../../../../../common/ui/UiSpinner.vue";
+import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import { jobFinished } from "../../../../agent-core/index.ts";
 import { jobDuration, jobStatusLabel } from "../lib/job-labels.ts";
 import { useElapsedClock } from "../../../../agent-core/index.ts";
@@ -173,9 +173,9 @@ useTabReadout(() => ({
         :root="job?.cwd"
         :flags="{ busy: !!job && !finished, last: true, copied: false, readonly: true }"
       />
-      <p v-else-if="job && !finished" class="note">
-        <UiSpinner /> Агент работает, событий пока нет
-      </p>
+      <UiLoader v-else-if="job && !finished" class="note"
+        >Агент работает, событий пока нет</UiLoader
+      >
       <template v-if="outcome">
         <div class="label">Итог</div>
         <AgentCodeBlock :text="outcome" />
