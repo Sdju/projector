@@ -116,6 +116,10 @@ Every service (virtual) tab publishes a **live snapshot** for the agent: its vie
 
 The terminal read is the `{ action: "read", lines }` POST on the terminal control WebSocket. It never writes to the PTY.
 
+## Workspace panels
+
+The workspace has a second rail on the right for owner-specific panels. The base project has no sections there; a profile adds them through `profile.aside`, and the embedding page supplies their views with the `asideViews` prop of `ProjectWorkspace` (the same `SidebarView` contract as the left sidebar). The panel starts collapsed, and the rail itself is hidden on narrow screens. Commands are `ide.workbench.aside.toggle`, `ide.workbench.aside.section.show` `{ section }`, `ide.workbench.aside.refresh` and `ide.workbench.aside.section.close` `{ section }`; they are available only while the workspace has right-rail sections.
+
 ## Reload and server mode
 
 Global `workbench` scope: `ide.workbench.pages.reload` reloads all same-origin pages (BroadcastChannel). `ide.workbench.server.restart` confirms, calls `POST /api/app/restart`, waits for a new PID in `/api/health` (60 s timeout), then reloads; `ide.workbench.server.mode.dev|prod` call `POST /api/app/mode` with `{ mode }` (detached `projector mode <mode>`, see [usage](usage.md)). All of them end terminals and child processes. `ide.workbench.pwa.install` opens the saved browser install prompt, `ide.workbench.fullscreen.toggle` uses the Fullscreen API (also in the mobile surface pill and the scope of every project workspace).

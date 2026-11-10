@@ -36,6 +36,8 @@ const props = defineProps<{
   collapsed?: boolean;
   /** У проекта есть свои настройки: кнопка стоит на полосе разделов. */
   projectSettings?: boolean;
+  /** Название полосы разделов для экранных дикторов. */
+  label?: string;
 }>();
 const emit = defineEmits<{
   "update:section": [section: string];
@@ -94,7 +96,7 @@ function choose(item: SidebarItem) {
 </script>
 
 <template>
-  <nav v-if="!vertical" class="side-tabs picker-bar" aria-label="Разделы проекта">
+  <nav v-if="!vertical" class="side-tabs picker-bar" :aria-label="label ?? 'Разделы проекта'">
     <span :ref="picker.trigger" class="picker">
       <button
         class="current"
@@ -132,7 +134,7 @@ function choose(item: SidebarItem) {
       </UiButton>
     </div>
   </nav>
-  <UiIsland v-if="!vertical" :menu="picker" label="Разделы проекта" :width="260">
+  <UiIsland v-if="!vertical" :menu="picker" :label="label ?? 'Разделы проекта'" :width="260">
     <button
       v-for="item in ordered"
       :key="item.id"
@@ -159,7 +161,7 @@ function choose(item: SidebarItem) {
       <span class="label">Настройки проекта</span>
     </button>
   </UiIsland>
-  <nav v-else class="side-tabs vertical" aria-label="Разделы проекта">
+  <nav v-else class="side-tabs vertical" :aria-label="label ?? 'Разделы проекта'">
     <div
       v-for="group in groups"
       :key="group[0]?.id"

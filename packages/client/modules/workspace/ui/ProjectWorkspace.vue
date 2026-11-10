@@ -5,7 +5,6 @@ import { computed, onBeforeUnmount, ref } from "vue";
 import {
   workspaceProfile,
   profileCapabilities,
-  searchWorkspace,
   extendSidebarRegistry,
   type SidebarType,
   type WorkspaceCapability,
@@ -37,7 +36,9 @@ import {
 import { createPanelHosts } from "../panel-hosts.ts";
 import { TerminalCloseDialog } from "../../terminal/index.ts";
 import { useDocker } from "../../docker/index.ts";
-import { sidebarSections } from "../lib/sidebar-views.ts";
+import { asideSections, sidebarSections, type SidebarViews } from "../lib/sidebar-views.ts";
+import { useWorkspaceAside } from "../lib/aside-panels.ts";
+import { registerTreeCommands } from "../lib/tree-commands.ts";
 import { provideTabHost, useWorkspaceTabTypes, type TabViews } from "../lib/tab-views.ts";
 import { useWorkspaceRefresh } from "../lib/workspace-refresh.ts";
 import { useMobileSurfaces, registerMobileCommands } from "../lib/mobile-surfaces.ts";
@@ -48,6 +49,9 @@ const props = defineProps<{
   beforeCloseProjectSettings?: () => boolean;
   saveProjectSettings?: () => void | Promise<void>;
   tabViews?: TabViews; // views of the kinds the embedding page owns
+  /** Views of the sidebar and right-rail sections the embedding page owns. */
+  sidebarViews?: SidebarViews;
+  asideViews?: SidebarViews;
 }>();
 const profile = workspaceProfile(props.projectId);
 const capabilities = profileCapabilities(profile);
@@ -64,6 +68,7 @@ const { mobile, mobileSurface, mobileSidebarOpen, sidebarInvisible, showSidebar 
   useMobileSurfaces(sidebarHidden);
 const { treeWidth, sizes, resizeTree, resizeTreeKey } = useSidebarResize(workspaceElement);
 const sidebar = ref<InstanceType<typeof WorkspaceSidebar>>();
+const asidePanel = ref<InstanceType<typeof WorkspaceSidebar>>();
 const editorCommands = useCommandScope(`editor:${props.projectId}`, () => ({
   surface: "editor",
   projectId: props.projectId,
@@ -118,6 +123,18 @@ const extraSections = ref<SidebarType[]>([]);
 const sections = computed(() =>
   extendSidebarRegistry(sidebarSections(profile, capabilities), () => extraSections.value),
 );
+/** Правая полоса: разделы приходят из профиля, их виды — от страницы, встроившей workspace. */
+const asideRegistry = asideSections(profile, capabilities);
+const {
+  visible: asideVisible,
+  hidden: asideHidden,
+  section: asideSection,
+} = useWorkspaceAside({
+  registry: asideRegistry,
+  mobile,
+  register: registerEditor,
+  refresh: () => asidePanel.value?.refreshSection(),
+});
 function openTree(scope: FileScope) {
   if (!capabilities.snapshots) throw new Error("Источник не умеет показывать файлы снимка");
   const id = `tree:${fileScopeKey(scope)}`;
@@ -342,72 +359,12 @@ registerEditor(
     arguments: { section: "Идентификатор раздела: files, search, git, docker, issues и т. д." },
   },
 );
-registerEditor(
-  "ide.workbench.tree.search",
-  "Искать в снимке",
-  async (value) => {
-    const args = commandArgs(value);
-    if (typeof args.rev !== "string" || !args.rev) throw new Error("Укажите rev");
-    if (typeof args.q !== "string" || !args.q.trim()) throw new Error("Укажите q");
-    for (const key of ["case", "word", "regex"])
-      if (args[key] !== undefined && typeof args[key] !== "boolean")
-        throw new Error(`${key} должен быть boolean`);
-    return searchWorkspace(
-      props.projectId,
-      args.q,
-      {
-        caseSensitive: args.case === true,
-        wholeWord: args.word === true,
-        regex: args.regex === true,
-      },
-      undefined,
-      { kind: "commit", rev: args.rev },
-    );
-  },
-  () => capabilities.search && capabilities.snapshots,
-  undefined,
-  {
-    description:
-      "Ищет текст в файлах коммита и возвращает совпадения с путями и позициями. Локальный снимок читается через git grep, GitLab — через поиск по blobs с ref; GitHub не поддерживает поиск по произвольному коммиту. Найденные файлы открываются в том же коммите.",
-    arguments: {
-      rev: "Хеш коммита",
-      q: "Строка поиска",
-      case: "true — учитывать регистр",
-      word: "true — искать целое слово",
-      regex: "true — регулярное выражение",
-    },
-  },
-);
-registerEditor(
-  "ide.workbench.tree.open",
-  "Открыть дерево файлов снимка",
-  (value) => {
-    const args = commandArgs(value);
-    const stringArg = (key: string) => {
-      const item = args[key];
-      if (item !== undefined && typeof item !== "string")
-        throw new Error(`${key} должен быть строкой`);
-      return item as string | undefined;
-    };
-    const rev = stringArg("rev");
-    const from = stringArg("from");
-    const to = stringArg("to");
-    if (rev) openTree({ kind: "commit", rev });
-    else if (from && to) openTree({ kind: "compare", from, to });
-    else throw new Error("Укажите rev или пару from/to");
-  },
-  () => capabilities.snapshots || capabilities.compare,
-  undefined,
-  {
-    description:
-      "Открывает в боковой панели read-only дерево файлов коммита или список изменений двух коммитов. Для коммита передайте rev; для сравнения — from и to. Хеши должны быть полными или однозначно разрешаться Git провайдера.",
-    arguments: {
-      rev: "Хеш коммита для дерева файлов",
-      from: "Начальный хеш сравнения",
-      to: "Конечный хеш сравнения",
-    },
-  },
-);
+registerTreeCommands({
+  projectId: props.projectId,
+  capabilities,
+  openTree,
+  register: registerEditor,
+});
 registerEditor(
   "ide.workbench.section.close",
   "Закрыть временный раздел боковой панели",
@@ -505,7 +462,11 @@ onBeforeUnmount(() => overview.cancel());
   <div
     ref="workspaceElement"
     class="workspace"
-    :class="{ 'sidebar-hidden': sidebarInvisible }"
+    :class="{
+      'sidebar-hidden': sidebarInvisible,
+      'has-aside': asideVisible,
+      'aside-hidden': asideHidden,
+    }"
     :data-surface="mobile ? mobileSurface : undefined"
     :style="sizes"
   >
@@ -534,6 +495,7 @@ onBeforeUnmount(() => overview.cancel());
         :project-id="projectId"
         :capabilities="capabilities"
         :sections="sections"
+        :views="sidebarViews"
         :hidden="sidebarInvisible"
         :rail="!mobile"
         :active="active"
@@ -596,6 +558,39 @@ onBeforeUnmount(() => overview.cancel());
         @command="(id, args) => editorCommands.run(id, args)"
       />
     </section>
+    <WorkspaceSidebar
+      v-if="asideVisible"
+      ref="asidePanel"
+      class="aside"
+      v-model:section="asideSection"
+      side="right"
+      :project-id="projectId"
+      :capabilities="capabilities"
+      :sections="asideRegistry"
+      :views="asideViews"
+      :hidden="asideHidden"
+      :rail="true"
+      :active="active"
+      :revision="revision"
+      :overview="overview"
+      :history="history"
+      :branches="branches"
+      :files="files"
+      :git-sync="gitSync"
+      toggle-command="ide.workbench.aside.toggle"
+      refresh-command="ide.workbench.aside.refresh"
+      close-command="ide.workbench.aside.section.close"
+      @command="
+        (id, args) =>
+          (id.startsWith('ide.docker.') ? docker.commands : editorCommands).run(id, args)
+      "
+      @open-commit-tree="openCommitTree"
+      @open-search="openSearch"
+      @refresh="refresh"
+      @changed="treeChanged"
+      @deleted="entryDeleted"
+      @moved="entryMoved"
+    />
     <MobileSurfaces
       v-if="mobile"
       :terminals="capabilities.terminals"
@@ -615,6 +610,7 @@ onBeforeUnmount(() => overview.cancel());
 <style scoped>
 .workspace {
   --rail-w: 40px;
+  --aside-width: clamp(240px, 21vw, 320px);
   display: grid;
   grid-template-columns: var(--tree-width, clamp(240px, 21vw, 320px)) var(--island-gap) minmax(
       0,
@@ -629,6 +625,31 @@ onBeforeUnmount(() => overview.cancel());
 .workspace.sidebar-hidden {
   grid-template-columns: calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr);
   column-gap: 0;
+}
+/* Правая полоса разделов: её колонка остаётся, даже когда панель свёрнута. */
+.workspace.has-aside {
+  grid-template-columns:
+    var(--tree-width, clamp(240px, 21vw, 320px)) var(--island-gap) minmax(0, 1fr)
+    var(--island-gap) var(--aside-width);
+}
+.workspace.sidebar-hidden.has-aside {
+  grid-template-columns:
+    calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr) var(--island-gap)
+    var(--aside-width);
+}
+.workspace.has-aside.aside-hidden {
+  grid-template-columns:
+    var(--tree-width, clamp(240px, 21vw, 320px)) var(--island-gap) minmax(0, 1fr)
+    var(--island-gap) calc(var(--rail-w) - var(--island-gap));
+}
+.workspace.sidebar-hidden.has-aside.aside-hidden {
+  grid-template-columns:
+    calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr) var(--island-gap)
+    calc(var(--rail-w) - var(--island-gap));
+}
+.workspace > .aside {
+  grid-column: 5;
+  grid-row: 3;
 }
 .tree-resize {
   grid-column: 2;
@@ -657,10 +678,31 @@ onBeforeUnmount(() => overview.cancel());
     overflow: auto;
   }
   .workspace {
+    --aside-width: clamp(200px, 24vw, 260px);
     grid-template-columns: 260px var(--island-gap) minmax(0, 1fr);
   }
   .workspace.sidebar-hidden {
     grid-template-columns: calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr);
+  }
+  .workspace.has-aside {
+    grid-template-columns: 260px var(--island-gap) minmax(0, 1fr) var(--island-gap) var(
+        --aside-width
+      );
+  }
+  .workspace.sidebar-hidden.has-aside {
+    grid-template-columns:
+      calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr) var(--island-gap)
+      var(--aside-width);
+  }
+  .workspace.has-aside.aside-hidden {
+    grid-template-columns:
+      260px var(--island-gap) minmax(0, 1fr) var(--island-gap)
+      calc(var(--rail-w) - var(--island-gap));
+  }
+  .workspace.sidebar-hidden.has-aside.aside-hidden {
+    grid-template-columns:
+      calc(var(--rail-w) - var(--island-gap)) var(--island-gap) minmax(0, 1fr) var(--island-gap)
+      calc(var(--rail-w) - var(--island-gap));
   }
 }
 @media (max-width: 700px), (max-width: 1050px) and (max-height: 500px) and (pointer: coarse) {

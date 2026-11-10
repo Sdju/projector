@@ -1,5 +1,6 @@
 export { default as ProjectWorkspace } from "./ui/ProjectWorkspace.vue";
 export type { TabViews, TabView } from "./lib/tab-views.ts";
+export type { SidebarHost, SidebarView, SidebarViews } from "./lib/sidebar-views.ts";
 export {
   EditorSettings,
   IssueView,

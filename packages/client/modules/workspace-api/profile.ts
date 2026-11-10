@@ -101,6 +101,8 @@ export interface WorkspaceProfile {
   tabs?: readonly TabType[];
   /** Sidebar sections this workspace adds to the base set. */
   sidebar?: readonly SidebarType[];
+  /** Sections of the right panel rail: owner-specific panels (for example, Hub tools). */
+  aside?: readonly SidebarType[];
   /** `full` — editor and terminals; `editor` — a single editor group. */
   layout: "full" | "editor";
 }

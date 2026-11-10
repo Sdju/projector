@@ -56,6 +56,16 @@ export const sidebarSections = (profile: WorkspaceProfile, capabilities: Workspa
     profile.sidebar,
   );
 
+/**
+ * Sections of the right rail. The base workspace has none: the owner adds them through
+ * `profile.aside` and supplies their views with `asideViews`.
+ */
+export const asideSections = (profile: WorkspaceProfile, capabilities: WorkspaceCapabilities) =>
+  createSidebarRegistry(
+    (capability) => capabilities[capability as keyof WorkspaceCapabilities],
+    profile.aside,
+  );
+
 /** What a section may ask of the workspace that shows it. */
 export interface SidebarHost {
   readonly projectId: string;
