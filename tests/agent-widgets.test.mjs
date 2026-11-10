@@ -305,6 +305,8 @@ test("the permanent guide spends its space on Field, not on old field aliases", 
   const guide = widgetCatalog.guide();
   expect(guide).toContain("Field — поле формы");
   expect(guide).toContain('<Field type="select"');
+  expect(guide).toContain("Markdown внутри виджета не работает");
+  expect(guide).toContain("только валидный HTML");
   expect(guide).not.toContain("Input —");
   expect(guide).not.toContain("Checks —");
   expect(guide).not.toContain("Slider —");
