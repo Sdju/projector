@@ -9,6 +9,7 @@ import { inferProviderKind } from "../packages/server/modules/providers/kinds.ts
 import { routes } from "../packages/server/routes/api/providers/balance.ts";
 const handleProvidersBalance = createRouteDispatcher(routes);
 import { formatBalance } from "../packages/client/modules/provider/model/format-balance.ts";
+import { closeAnalyticsStore } from "../packages/server/modules/usage-analytics/store.ts";
 
 const payload = {
   is_available: true,
@@ -78,6 +79,7 @@ describe("balance of the active provider", () => {
       else process.env[key] = value;
     }
     globalThis.projectorProviderBalance?.clear();
+    closeAnalyticsStore();
     await rm(directory, { recursive: true, force: true });
   });
 

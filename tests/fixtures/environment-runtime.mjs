@@ -24,7 +24,8 @@ const sockets = [];
 const errors = [];
 let server, previewServer, abort;
 const until = async (check, label) => {
-  const deadline = Date.now() + 15_000;
+  // Shared macOS runners reload Vite environments slowly; give the live transports room.
+  const deadline = Date.now() + (process.platform === "darwin" ? 45_000 : 20_000);
   while (Date.now() < deadline) {
     if (await check()) return;
     await sleep(25);

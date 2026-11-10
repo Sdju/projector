@@ -62,3 +62,32 @@ test("the plain text of a range chip names the file and its lines", () => {
     '@"docs/Мой файл.md":3-3',
   );
 });
+
+test("an attached file outside the project opens read-only from disk", async () => {
+  const opened = [];
+  const { open } = useChipActions(
+    "p",
+    {
+      executeCommand: (_command, args) => {
+        opened.push(args);
+        return Promise.resolve();
+      },
+    },
+    () => {},
+  );
+  open({ type: "file", path: "C:\\data\\projector\\attachments\\abcdef\\заметка.txt" });
+  await Promise.resolve();
+  expect(opened).toEqual([
+    {
+      path: "C:\\data\\projector\\attachments\\abcdef\\заметка.txt",
+      directory: false,
+      external: true,
+    },
+  ]);
+});
+
+test("the plain text of an attached file quotes its absolute path when it has spaces", () => {
+  expect(chipText({ type: "file", path: "C:\\Мои файлы\\заметка.txt" })).toBe(
+    '@"C:\\Мои файлы\\заметка.txt"',
+  );
+});

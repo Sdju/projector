@@ -135,6 +135,7 @@ const READ_DOMAIN: Record<
 > = {
   tree: "files",
   file: "files",
+  external: "files",
   root: "files",
   git: "git",
   branches: "git",

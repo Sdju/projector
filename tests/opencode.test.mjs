@@ -57,6 +57,7 @@ test("Go windows validate percentages and status, normalize resets and exhausted
   ])
     expect(goWindows(value)).toBe(null);
 });
+import { closeAnalyticsStore } from "../packages/server/modules/usage-analytics/store.ts";
 
 describe("Go reads existing auth, bounds and sanitizes requests, shares cached API results", () => {
   let directory, previousFetch, previousEnv, state, calls, authFile;
@@ -81,6 +82,7 @@ describe("Go reads existing auth, bounds and sanitizes requests, shares cached A
       else process.env[name] = value;
     }
     state.value = undefined;
+    closeAnalyticsStore();
     await rm(directory, { recursive: true, force: true });
   });
 

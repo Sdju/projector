@@ -1,4 +1,4 @@
-import { pathsFromDataTransfer } from "../../../../path-drop/index.ts";
+import { pathsFromDataTransfer } from "./drop-paths.ts";
 
 /** Один файл (или пустая папка, если `file` нет) из браузера с путём относительно места бросания. */
 export interface DroppedEntry {

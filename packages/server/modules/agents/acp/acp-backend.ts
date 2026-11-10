@@ -33,7 +33,7 @@ import {
   acpLoadSession,
   acpSessions,
 } from "./acp-tools.ts";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import { os } from "@projector-ai/core/modules/os/index.ts";
 import { pathToFileURL } from "node:url";
 
@@ -54,7 +54,7 @@ function promptBlocks(
 ) {
   const links = (parts ?? []).flatMap((part) => {
     if (part.type !== "file") return [];
-    const name = part.path.split("/").pop() || part.path;
+    const name = basename(part.path.replace(/\\/g, "/"));
     return [
       {
         type: "resource_link",

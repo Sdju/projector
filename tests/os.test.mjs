@@ -224,13 +224,13 @@ test(
     onTestFinished(() => {
       process.env.HOME = previousHome;
     });
-    await mkdir(join(root, "cli", "app"), { recursive: true });
+    await mkdir(join(root, "packages", "cli", "app"), { recursive: true });
     await mkdir(home);
     await cp(new URL("../resources/icons", import.meta.url), join(root, "resources", "icons"), {
       recursive: true,
     });
     await writeFile(join(root, "package.json"), JSON.stringify({ version: "9.9.9" }));
-    await writeFile(join(root, "cli", "app", "launch.ts"), "export {};\n");
+    await writeFile(join(root, "packages", "cli", "app", "launch.ts"), "export {};\n");
     const facade = new URL("../packages/core/modules/os/index.ts", import.meta.url).href;
     execFileSync(
       process.execPath,

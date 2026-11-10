@@ -29,6 +29,18 @@ export function provideChatContext(projectId: string, api?: ChatApi) {
   if (api) provide(chatLinkActionsKey, chatLinkActions(projectId, api));
 }
 
+/** The path relative to the project root, tolerating another separator or drive-letter case. */
+function projectRelative(path: string, base: string): string | undefined {
+  if (!base) return;
+  const drive = /^[a-z]:[\\/]/i.test(base) && /^[a-z]:[\\/]/i.test(path);
+  const normalize = (value: string) => {
+    const slash = value.replace(/\\/g, "/");
+    return drive ? slash.toLowerCase() : slash;
+  };
+  if (!normalize(path).startsWith(`${normalize(base)}/`)) return;
+  return path.slice(base.length + 1);
+}
+
 /** Link actions of one chat; the editor command scope is the project's workspace. */
 export function chatLinkActions(projectId: string, api: ChatApi): ChatLinkActions {
   const scope = `editor:${projectId}`;
@@ -50,10 +62,12 @@ export function chatLinkActions(projectId: string, api: ChatApi): ChatLinkAction
       let path = link.path;
       let external = link.external;
       if (external) {
-        // An absolute path inside the project is a project file: it stays editable.
+        // An absolute path inside the project is a project file: it stays editable. The link and
+        // the project root may spell the separators differently (`C:/` and `C:\`).
         const base = (await projectRoot().catch(() => "")).replace(/[\\/]+$/, "");
-        if (base && (path === base || path.startsWith(`${base}/`))) {
-          path = path.slice(base.length + 1);
+        const relative = projectRelative(path, base);
+        if (relative !== undefined) {
+          path = relative;
           external = false;
         }
       }

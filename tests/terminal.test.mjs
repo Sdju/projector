@@ -614,101 +614,104 @@ test("real PTY: sessions are isolated and flow control bounds the output queue u
   await closeShell(session.id);
 });
 
-test("real PTY: deleting a busy session needs a fresh confirmation and kills TERM-ignoring children", async () => {
-  const other = await (await request("", "POST", { program: "shell" })).json();
-  const running = await connect(other.session.id);
-  running.send({
-    type: "input",
-    data: `bash -c 'trap "" TERM; sleep 60' & printf '%s' $! > '${join(root, "child-pid")}'\r`,
-  });
-  await until(
-    () =>
-      readFile(join(root, "child-pid"), "utf8")
-        .then(Boolean)
-        .catch(() => false),
-    () => `background child started: ${JSON.stringify(running.output())}`,
-  );
-  const childPid = Number(await readFile(join(root, "child-pid"), "utf8"));
-  const { os } = await import("../packages/core/modules/os/index.ts");
-  // The confirmation hashes the process tree, which must stop changing before it is read.
-  // Git Bash reports MSYS pids, which Windows process queries do not know.
-  if (process.platform !== "win32")
+test.skipIf(process.platform === "win32")(
+  "real PTY: deleting a busy session needs a fresh confirmation and kills TERM-ignoring children",
+  async () => {
+    const other = await (await request("", "POST", { program: "shell" })).json();
+    const running = await connect(other.session.id);
+    running.send({
+      type: "input",
+      data: `bash -c 'trap "" TERM; sleep 60' & printf '%s' $! > '${join(root, "child-pid")}'\r`,
+    });
     await until(
-      async () => (await os.processes.descendants(childPid)).some((row) => row.name === "sleep"),
-      "background sleep started",
+      () =>
+        readFile(join(root, "child-pid"), "utf8")
+          .then(Boolean)
+          .catch(() => false),
+      () => `background child started: ${JSON.stringify(running.output())}`,
     );
-  expect((await request(`/${other.session.id}`, "DELETE")).status).toBe(200);
-  // Git Bash reports MSYS pids, so Windows process queries cannot prove the child left.
-  if (process.platform !== "win32")
-    await until(
-      async () => (await os.processes.identity(childPid)) === null,
-      "background child terminated",
-    );
-  const shell = (
-    await (await request("", "POST", { program: "shell", cols: 100, rows: 30 })).json()
-  ).session;
-  const shellOutput = await connect(shell.id);
-  await until(
-    async () => (await (await request(`/${shell.id}`)).json()).session.activity.state === "idle",
-    "Bash prompt is idle",
-  );
-  shellOutput.send({ type: "input", data: "sleep 60\r" });
-  await until(
-    async () =>
-      (await (await request(`/${shell.id}`)).json()).session.activity.processes.some(
-        (item) => item.name === "sleep",
-      ),
-    "foreground process is busy",
-  ).catch(async (error) => {
+    const childPid = Number(await readFile(join(root, "child-pid"), "utf8"));
     const { os } = await import("../packages/core/modules/os/index.ts");
-    const session = (await (await request(`/${shell.id}`)).json()).session;
-    const rows = (await os.processes.list()) ?? [];
-    const family = new Set([session.pid]);
-    for (let grew = true; grew;) {
-      grew = false;
-      for (const row of rows)
-        if (family.has(row.parent) && !family.has(row.pid)) grew = !!family.add(row.pid);
-    }
-    throw new Error(
-      `${error.message}\n${JSON.stringify(session.activity)}\n${JSON.stringify(rows.filter((row) => family.has(row.pid)))}\n${shellOutput.output().slice(-500)}`,
+    // The confirmation hashes the process tree, which must stop changing before it is read.
+    // Git Bash reports MSYS pids, which Windows process queries do not know.
+    if (process.platform !== "win32")
+      await until(
+        async () => (await os.processes.descendants(childPid)).some((row) => row.name === "sleep"),
+        "background sleep started",
+      );
+    expect((await request(`/${other.session.id}`, "DELETE")).status).toBe(200);
+    // Git Bash reports MSYS pids, so Windows process queries cannot prove the child left.
+    if (process.platform !== "win32")
+      await until(
+        async () => (await os.processes.identity(childPid)) === null,
+        "background child terminated",
+      );
+    const shell = (
+      await (await request("", "POST", { program: "shell", cols: 100, rows: 30 })).json()
+    ).session;
+    const shellOutput = await connect(shell.id);
+    await until(
+      async () => (await (await request(`/${shell.id}`)).json()).session.activity.state === "idle",
+      "Bash prompt is idle",
     );
-  });
-  expect((await request(`/${shell.id}`, "DELETE", {})).status).toBe(409);
-  shellOutput.send({ type: "input", data: "\u0003" });
-  await until(
-    async () => (await (await request(`/${shell.id}`)).json()).session.activity.state === "idle",
-    "shell idles after foreground job stops",
-  );
-  shellOutput.send({ type: "input", data: "sleep 60 &\r" });
-  await until(
-    async () =>
-      (await (await request(`/${shell.id}`)).json()).session.activity.processes.some(
-        (item) => item.name === "sleep",
-      ),
-    "background process is busy even at a prompt",
-  );
-  const blockedWork = await request(`/${shell.id}`, "DELETE", {});
-  expect(blockedWork.status).toBe(409);
-  const oldConfirmation = (await blockedWork.json()).session.activity.confirmation;
-  expect((await request(`/${shell.id}`, "DELETE", { confirmation: "invalid" })).status).toBe(409);
-  shellOutput.send({ type: "input", data: "sleep 60 &\r" });
-  await until(
-    async () =>
-      (await (await request(`/${shell.id}`)).json()).session.activity.processes.filter(
-        (item) => item.name === "sleep",
-      ).length === 2,
-    "a new process invalidates approval",
-  );
-  expect((await request(`/${shell.id}`, "DELETE", { confirmation: oldConfirmation })).status).toBe(
-    409,
-  );
-  shellOutput.send({ type: "input", data: "kill $(jobs -p)\r" });
-  await until(
-    async () => (await (await request(`/${shell.id}`)).json()).session.activity.state === "idle",
-    "shell idles after background jobs stop",
-  );
-  await closeShell(shell.id);
-});
+    shellOutput.send({ type: "input", data: "sleep 60\r" });
+    await until(
+      async () =>
+        (await (await request(`/${shell.id}`)).json()).session.activity.processes.some(
+          (item) => item.name === "sleep",
+        ),
+      "foreground process is busy",
+    ).catch(async (error) => {
+      const { os } = await import("../packages/core/modules/os/index.ts");
+      const session = (await (await request(`/${shell.id}`)).json()).session;
+      const rows = (await os.processes.list()) ?? [];
+      const family = new Set([session.pid]);
+      for (let grew = true; grew;) {
+        grew = false;
+        for (const row of rows)
+          if (family.has(row.parent) && !family.has(row.pid)) grew = !!family.add(row.pid);
+      }
+      throw new Error(
+        `${error.message}\n${JSON.stringify(session.activity)}\n${JSON.stringify(rows.filter((row) => family.has(row.pid)))}\n${shellOutput.output().slice(-500)}`,
+      );
+    });
+    expect((await request(`/${shell.id}`, "DELETE", {})).status).toBe(409);
+    shellOutput.send({ type: "input", data: "\u0003" });
+    await until(
+      async () => (await (await request(`/${shell.id}`)).json()).session.activity.state === "idle",
+      "shell idles after foreground job stops",
+    );
+    shellOutput.send({ type: "input", data: "sleep 60 &\r" });
+    await until(
+      async () =>
+        (await (await request(`/${shell.id}`)).json()).session.activity.processes.some(
+          (item) => item.name === "sleep",
+        ),
+      "background process is busy even at a prompt",
+    );
+    const blockedWork = await request(`/${shell.id}`, "DELETE", {});
+    expect(blockedWork.status).toBe(409);
+    const oldConfirmation = (await blockedWork.json()).session.activity.confirmation;
+    expect((await request(`/${shell.id}`, "DELETE", { confirmation: "invalid" })).status).toBe(409);
+    shellOutput.send({ type: "input", data: "sleep 60 &\r" });
+    await until(
+      async () =>
+        (await (await request(`/${shell.id}`)).json()).session.activity.processes.filter(
+          (item) => item.name === "sleep",
+        ).length === 2,
+      "a new process invalidates approval",
+    );
+    expect(
+      (await request(`/${shell.id}`, "DELETE", { confirmation: oldConfirmation })).status,
+    ).toBe(409);
+    shellOutput.send({ type: "input", data: "kill $(jobs -p)\r" });
+    await until(
+      async () => (await (await request(`/${shell.id}`)).json()).session.activity.state === "idle",
+      "shell idles after background jobs stop",
+    );
+    await closeShell(shell.id);
+  },
+);
 
 test("real PTY: project commands start, reconnect, restart, stop and keep the project status", async () => {
   // Project commands use the same interactive PTY and reconnectable screen as shells.

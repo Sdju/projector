@@ -539,3 +539,34 @@ test("a remote GitLab workspace sends the snapshot ref to blob search", async ()
     unregister();
   }
 });
+
+test("external file reads go through the files provider", async () => {
+  const profile = {
+    id: "external-test",
+    layout: "full",
+    features: {
+      terminals: false,
+      docker: false,
+      agent: false,
+      settings: false,
+      persist: false,
+      externalFiles: true,
+    },
+    providers: {
+      files: {
+        assetUrl: () => "",
+        async read(action, params) {
+          return { action, params };
+        },
+      },
+    },
+  };
+  const unregister = registerWorkspaceProfile("external-test", profile);
+  try {
+    expect(
+      await workspaceRequest("external-test", "external", { path: "C:/tmp/report.html" }),
+    ).toStrictEqual({ action: "external", params: { path: "C:/tmp/report.html" } });
+  } finally {
+    unregister();
+  }
+});

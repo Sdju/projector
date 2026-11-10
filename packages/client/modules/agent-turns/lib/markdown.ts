@@ -33,7 +33,9 @@ function chatLinkAttributes(href: string, title?: string | null): Record<string,
   };
   const link = parseChatLink(href);
   if (link.kind === "file") {
-    attributes["data-chat-file"] = "";
+    // The sanitizer drops an `href` whose scheme it does not know (a Windows drive letter or
+    // `file:`), so the original target also lives in a data attribute the click handler reads.
+    attributes["data-chat-file"] = link.href;
     if (!title) {
       const range = link.line
         ? link.endLine

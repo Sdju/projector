@@ -289,7 +289,7 @@ describe("agent roles", () => {
     const context = await roleContext(role, "");
     expect(context).toContain("Роль «Ревьюер»");
     expect(context).toContain("Ищи регрессии.");
-    expect(context).toContain("skills/review/SKILL.md");
+    expect(context.replaceAll("\\", "/")).toContain("skills/review/SKILL.md");
     expect(context).toContain("missing");
     expect(rolePromptText(role)).toContain("Ищи регрессии.");
     expect(rolePromptText({ name: "Пустая", selection: {} })).toBe("");

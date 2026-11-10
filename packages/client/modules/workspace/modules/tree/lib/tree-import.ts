@@ -1,6 +1,11 @@
 import type { Ref } from "vue";
 import { commandArgs, type useCommandScope } from "../../../../../common/utilities/commands.ts";
-import { isFileDrag } from "../../../../path-drop/index.ts";
+import {
+  baseName,
+  isFileDrag,
+  topLevelName,
+  type DropSource,
+} from "../../../../path-drop/index.ts";
 import {
   checkWorkspaceImport,
   clearWorkspaceImport,
@@ -11,7 +16,6 @@ import {
   type ImportConflict,
 } from "../../../../workspace-api/index.ts";
 import { isLiveScope } from "@projector-ai/core/modules/workspace/index.ts";
-import { baseName, topLevelName, type DropSource } from "./drop-entries.ts";
 import { treeDragType } from "./tree-drag.ts";
 import type { TreeContext } from "./tree-operations.ts";
 

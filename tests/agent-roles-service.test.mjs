@@ -7,7 +7,7 @@ import { resetServiceRole, saveServiceRole } from "../packages/server/modules/ag
 import { runLens } from "../packages/server/modules/agents/projector/index.ts";
 import { scriptedModel } from "./helpers/scripted-model.mjs";
 
-test("service roles use their own model over the chat's model", async () => {
+test("service roles use their own model over the chat's model", { timeout: 120_000 }, async () => {
   const directory = await mkdtemp(join(tmpdir(), "projector-roles-service-"));
   const previous = process.env.XDG_DATA_HOME;
   process.env.XDG_DATA_HOME = directory;

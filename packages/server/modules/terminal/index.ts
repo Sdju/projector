@@ -13,7 +13,7 @@ export { trackMouseEncoding } from "./terminal-mouse.ts";
 export { renameTerminalSession } from "./terminal.ts";
 
 export { uploadTerminalFile } from "./terminal.ts";
-export { resolveTerminalFile } from "./terminal.ts";
+export { resolveTerminalFile } from "./terminal-file.ts";
 
 export { onTerminalSessionsChanged } from "./session-state.ts";
 
