@@ -62,6 +62,7 @@ export default {
       "**/LICENSE",
       "**/scripts/**",
       "tests/**",
+      "packages/*/tests/**",
       "evals/**",
       "scripts/**",
       "bin/**",

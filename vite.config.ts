@@ -99,7 +99,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["tests/**/*.test.mjs"],
+    include: ["tests/**/*.{test,cases}.mjs", "packages/*/tests/**/*.{test,cases}.mjs"],
     setupFiles: ["tests/setup.mjs"],
     pool: "forks",
     // Browser tests also start Vite and Chromium processes; leave room for the desktop.
