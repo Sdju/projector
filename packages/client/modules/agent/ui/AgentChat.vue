@@ -318,7 +318,21 @@ const { pendingForm, answerFormFor, submitComposerForm, submitTurnForm } = useAn
   edit,
   projectId: props.projectId,
 });
-useAnswerDoctor({ turns, busy, selection, persist, projectId: props.projectId });
+const {
+  progress: doctorProgress,
+  reportFor: answerDoctorReport,
+  retry: retryAnswerDoctor,
+} = useAnswerDoctor({
+  turns,
+  busy,
+  selection,
+  persist,
+  projectId: props.projectId,
+});
+function retryDoctor(id: string) {
+  const turn = turns.value.find((item) => item.id === id);
+  if (turn) void retryAnswerDoctor(turn);
+}
 const plan = computed(() => shownPlan(turns.value, props.backend));
 const contextShare = computed(() =>
   latestContext.value ? latestContext.value.used / Math.max(1, latestContext.value.size) : 0,
@@ -581,6 +595,8 @@ onBeforeUnmount(() => {
           :root="projectRoot"
           :promoted-form="answerFormFor(turn).promotedForm"
           :lens="turn.role === 'assistant' && turn.id === turns.at(-1)?.id ? lens : undefined"
+          :doctor="answerDoctorReport(turn)"
+          :doctor-live="doctorProgress.get(turn.id)"
           :flags="{
             busy,
             last: firstShown + offset === turns.length - 1,
@@ -601,6 +617,7 @@ onBeforeUnmount(() => {
           @version="showVersion"
           @open-file="(path) => openChip({ type: 'file', path })"
           @revert="(id) => askRewind(precedingUser(id), 'files')"
+          @doctor-retry="retryDoctor"
         />
       </div>
     </div>

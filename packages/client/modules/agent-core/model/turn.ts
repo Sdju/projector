@@ -9,6 +9,36 @@ import type {
   MessagePart,
 } from "./types.ts";
 
+/** What Answer Doctor found and did with a finished answer; saved with the turn. */
+export interface AgentDoctorReport {
+  status: "fixed" | "failed";
+  /** How many repair attempts the doctor used. */
+  attempts: number;
+  /** The first problem the client check found. */
+  problem: string;
+  /** The diagnosis after the last attempt, when the doctor gave up. */
+  remaining?: string;
+  /** Milliseconds spent from the first diagnosis to the last attempt. */
+  took: number;
+  /** FNV-1a hash of the repaired text: an edited or repeated answer hides the old report. */
+  answer: number;
+  /** When the doctor finished (ms since the epoch). */
+  at: number;
+}
+
+/** Answer Doctor's live state on the answer it is repairing; not saved. */
+export interface AgentDoctorProgress {
+  status: "repairing" | "failed";
+  /** The attempt in progress, or the last attempt after a failure. */
+  attempts: number;
+  /** How many attempts the client allows. */
+  limit: number;
+  /** The first problem the client check found. */
+  problem: string;
+  /** What is still wrong after the last attempt. */
+  remaining?: string;
+}
+
 export interface AgentTurn {
   id: string;
   role: "user" | "assistant";
@@ -48,6 +78,8 @@ export interface AgentTurn {
   tail?: string;
   /** The agent's own session cannot go on from this turn (the chat was cut back): replay instead. */
   detached?: boolean;
+  /** What Answer Doctor did with this answer, kept so the mark stays after a reload. */
+  doctor?: AgentDoctorReport;
   /**
    * On a user turn: the other versions of the conversation from this message on, which exist
    * after the message was edited or its answer repeated. Each version starts with a user turn.

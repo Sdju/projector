@@ -9,6 +9,7 @@ export * from "./model/use-chat-task-view.ts";
 export { default as AgentActivity } from "./ui/AgentActivity.vue";
 export { default as AgentChanges } from "./ui/AgentChanges.vue";
 export { default as AgentCodeBlock } from "./ui/AgentCodeBlock.vue";
+export { default as AgentDoctorNote } from "./ui/AgentDoctorNote.vue";
 export { default as AgentFormAnswer } from "./ui/AgentFormAnswer.vue";
 export { default as AgentFormPanel } from "./ui/AgentFormPanel.vue";
 export { default as AgentJudgeNote } from "./ui/AgentJudgeNote.vue";

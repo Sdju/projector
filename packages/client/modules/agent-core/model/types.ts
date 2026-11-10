@@ -14,7 +14,7 @@ import type { JudgeNote } from "./judge-note.ts";
 import type { AgentEvent } from "./events.ts";
 
 export type { AgentPermission } from "./permissions.ts";
-export type { AgentTurn } from "./turn.ts";
+export type { AgentTurn, AgentDoctorProgress, AgentDoctorReport } from "./turn.ts";
 export type { AgentEvent } from "./events.ts";
 
 export type { AgentTask };

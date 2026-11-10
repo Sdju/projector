@@ -8,7 +8,9 @@ import { versionsOf, type ForkMode } from "../../agent-core/index.ts";
 import { legacyParts } from "../../agent-core/index.ts";
 import type { AgentLens } from "../model/lens.ts";
 import type { AgentToolChip, AgentTurn, ChatUsage, MessageChip } from "../../agent-core/index.ts";
+import type { AgentDoctorProgress, AgentDoctorReport } from "../../agent-core/index.ts";
 import AgentMessage from "./AgentMessage.vue";
+import AgentDoctorNote from "./AgentDoctorNote.vue";
 import AgentFormAnswer from "./AgentFormAnswer.vue";
 import AgentLensView from "./AgentLens.vue";
 import type { AgentWorkItem } from "../../agent-core/index.ts";
@@ -36,6 +38,10 @@ const props = defineProps<{
   promotedForm?: string;
   /** The chat's Lens: only the last work group of the last answer shows it. */
   lens?: AgentLens;
+  /** What Answer Doctor did with this answer, when it changed the visible markup. */
+  doctor?: AgentDoctorReport;
+  /** What Answer Doctor is doing right now; absent until the check finds a problem. */
+  doctorLive?: AgentDoctorProgress;
   /** Per-render state of the turn; `busy`, `last` and `copied` default to false. */
   flags?: {
     busy?: boolean;
@@ -66,6 +72,8 @@ const emit = defineEmits<{
   version: [id: string, target: number];
   openFile: [path: string];
   revert: [id: string];
+  /** The doctor mark was clicked: run another repair attempt for this answer. */
+  doctorRetry: [id: string];
 }>();
 
 const flags = computed(() => ({
@@ -437,6 +445,11 @@ const lastWork = computed(
           :chat="chatUsage"
           class="copy-button"
         />
+        <AgentDoctorNote
+          :report="doctor"
+          :live="doctorLive"
+          @retry="emit('doctorRetry', turn.id)"
+        />
         <time
           v-if="stamp"
           class="turn-time footer-time"
@@ -604,6 +617,14 @@ const lastWork = computed(
   opacity: 0;
   color: var(--muted);
   border-color: transparent;
+}
+.doctor {
+  opacity: 0;
+}
+.doctor.active,
+.assistant:hover .doctor,
+.doctor:focus-within {
+  opacity: 1;
 }
 .assistant:hover .copy-button,
 .copy-button:focus-visible,

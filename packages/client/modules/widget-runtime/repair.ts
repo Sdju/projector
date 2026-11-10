@@ -5,6 +5,71 @@ import { isWidgetName, projectWidgetEntries } from "./registry.ts";
 import { splitMessage } from "./split.ts";
 import type { ProjectWidgetDefinition } from "@ai-projector/core/modules/widget-catalog/index.ts";
 
+/** Names of real tags in the template: `<` inside text, attributes or comments is not a tag. */
+function templateTags(template: string): string[] {
+  const names: string[] = [];
+  let at = 0;
+  while (at < template.length) {
+    const open = template.indexOf("<", at);
+    if (open < 0) break;
+    if (template.startsWith("<!--", open)) {
+      const close = template.indexOf("-->", open + 4);
+      at = close < 0 ? template.length : close + 3;
+      continue;
+    }
+    if (!/[A-Za-z/]/.test(template[open + 1] ?? "")) {
+      at = open + 1;
+      continue;
+    }
+    const end = tagEnd(template, open + 1);
+    if (end < 0) break;
+    const name = /^<\s*\/?\s*([A-Za-z][\w-]*)/.exec(template.slice(open, end))?.[1];
+    if (name) names.push(name);
+    at = end;
+  }
+  return names;
+}
+
+const LITERAL_TEXT = new Set(["code", "pre", "script", "style"]);
+
+/** Text nodes of a template; code, pre and scripts render their contents literally. */
+function templateText(template: string): string[] {
+  const nodes: string[] = [];
+  let literal = 0;
+  let at = 0;
+  while (at < template.length) {
+    const open = template.indexOf("<", at);
+    if (open < 0) {
+      if (!literal) nodes.push(template.slice(at));
+      break;
+    }
+    if (open > at && !literal) nodes.push(template.slice(at, open));
+    if (template.startsWith("<!--", open)) {
+      const close = template.indexOf("-->", open + 4);
+      at = close < 0 ? template.length : close + 3;
+      continue;
+    }
+    if (!/[A-Za-z/]/.test(template[open + 1] ?? "")) {
+      if (!literal) nodes.push("<");
+      at = open + 1;
+      continue;
+    }
+    const end = tagEnd(template, open + 1);
+    if (end < 0) {
+      if (!literal) nodes.push(template.slice(open));
+      break;
+    }
+    const raw = template.slice(open, end);
+    const name = /^<\s*\/?\s*([A-Za-z][\w-]*)/.exec(raw)?.[1]?.toLowerCase();
+    if (name && LITERAL_TEXT.has(name) && !/\/\s*>$/.test(raw)) {
+      literal += /^<\s*\//.test(raw) ? -1 : 1;
+      literal = Math.max(0, literal);
+    }
+    at = end;
+  }
+  return nodes;
+}
+
 /** Nothing here executes the widget: valid template and script syntax is enough to show it. */
 async function widgetProblem(
   source: string,
@@ -15,17 +80,16 @@ async function widgetProblem(
   const parsed = parseWidgetSource(source);
   if (parsed.scriptOpen) return "Незакрытый <script>";
   if (!parsed.template.trim()) return empty;
-  const unknown = [...parsed.template.matchAll(/<([A-Z][A-Za-z0-9]*)\b/g)].find(
-    ([, name]) => !isWidgetName(name!, projectId),
-  );
-  if (unknown) return `Неизвестный компонент ${unknown[1]}`;
+  const names = [...new Set(templateTags(parsed.template))];
+  const unknown = names.find((name) => /^[A-Z]/.test(name) && !isWidgetName(name, projectId));
+  if (unknown) return `Неизвестный компонент ${unknown}`;
   try {
     if (parsed.script) compileScript(parsed.script);
     compileTemplate(parsed.template);
     // A project widget's own template is compiled when it mounts; check it here too, so the doctor
     // sees a broken definition before an answer becomes the composer form.
-    for (const [, name] of parsed.template.matchAll(/<([A-Z][A-Za-z0-9]*)\b/g)) {
-      const entry = projectId ? projectWidgetEntries(projectId)[name!] : undefined;
+    for (const name of names.filter((item) => /^[A-Z]/.test(item))) {
+      const entry = projectId ? projectWidgetEntries(projectId)[name] : undefined;
       const definition = entry?.definition as ProjectWidgetDefinition | undefined;
       if (definition?.script) compileScript(definition.script);
       if (definition?.template) compileTemplate(definition.template);
@@ -46,8 +110,9 @@ const MARKDOWN_TEXT =
 /** Markdown in a Vue slot is rendered literally instead of becoming formatted content. */
 function widgetMarkdownProblem(source: string): string | undefined {
   const { template } = parseWidgetSource(source);
-  const text = template.replace(/<!--[\s\S]*?-->/g, "").replace(/<[^>]*>/g, "\n");
-  return MARKDOWN_TEXT.test(text)
+  // Each text node is checked on its own: tags are not line breaks, and code renders literally.
+  const markdown = templateText(template).some((text) => MARKDOWN_TEXT.test(text));
+  return markdown
     ? "Внутри виджета остался Markdown: он показывается как сломанный исходный текст"
     : undefined;
 }

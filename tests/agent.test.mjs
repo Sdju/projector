@@ -1121,6 +1121,38 @@ test("ACP authenticates once when the agent refuses a session", async () => {
   expect(calls).toStrictEqual(["session/new", "authenticate", "session/new"]);
 });
 
+test("chat history keeps the Answer Doctor report of a turn", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "projector-agent-doctor-"));
+  const previous = process.env.XDG_DATA_HOME;
+  process.env.XDG_DATA_HOME = directory;
+  try {
+    const turns = [
+      {
+        id: "1",
+        role: "assistant",
+        text: "<Card><h3>ok</h3></Card>",
+        tools: [],
+        doctor: {
+          status: "fixed",
+          attempts: 2,
+          problem: "Card: внутри виджета остался Markdown",
+          remaining: "Card: всё ещё Markdown",
+          took: 1234,
+          answer: 123456789,
+          at: 1_760_000_000_000,
+        },
+      },
+    ];
+    await writeAgentHistory("p", turns);
+    expect(await readAgentHistory("p")).toStrictEqual(turns);
+  } finally {
+    closeHistoryStore();
+    if (previous === undefined) delete process.env.XDG_DATA_HOME;
+    else process.env.XDG_DATA_HOME = previous;
+    await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  }
+});
+
 test("chat history keeps the native session of a turn", async () => {
   const directory = await mkdtemp(join(tmpdir(), "projector-agent-session-"));
   const previous = process.env.XDG_DATA_HOME;

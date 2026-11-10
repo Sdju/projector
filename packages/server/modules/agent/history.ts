@@ -151,6 +151,18 @@ const turnSchema: z.ZodType<StoredTurn> = z.lazy(() =>
     tail: z.string().optional(),
     /** The native session cannot be continued from this turn: the chat is replayed instead. */
     detached: z.boolean().optional(),
+    /** What Answer Doctor did with this answer, so the mark survives a reload. */
+    doctor: z
+      .object({
+        status: z.enum(["fixed", "failed"]),
+        attempts: z.number().int().min(1),
+        problem: z.string(),
+        remaining: z.string().optional(),
+        took: z.number().min(0),
+        answer: z.number().int(),
+        at: z.number(),
+      })
+      .optional(),
     /** Other versions of the conversation from this message on (it was edited or repeated). */
     variants: z.array(z.array(turnSchema)).optional(),
     /** Where the shown version stands among `variants`. */

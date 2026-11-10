@@ -27,12 +27,23 @@
   ]);
   const busy = ref(false);
   const selection = ref({});
-  useAnswerDoctor({ turns, busy, selection, persist: () => (window.fixture.persisted = true) });
+  const doctor = useAnswerDoctor({
+    turns,
+    busy,
+    selection,
+    persist: () => (window.fixture.persisted = true),
+  });
   createApp({
     setup: () => () =>
       h(AgentTurn, {
         turn: turns.value[0],
         flags: { busy: false, last: true, copied: false },
+        doctor: doctor.reportFor(turns.value[0]),
+        doctorLive: doctor.progress.get("answer"),
+        onDoctorRetry: (id) => {
+          const turn = turns.value.find((item) => item.id === id);
+          if (turn) void doctor.retry(turn);
+        },
       }),
   }).mount("#fixture");
   window.fixture = { ready: true };
