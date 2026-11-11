@@ -7,6 +7,7 @@ import { os } from "@ai-projector/core/modules/os/index.ts";
 import type { JudgeOverride } from "@ai-projector/core/modules/agent-judge/index.ts";
 import type { AgentHistoryTurn } from "../providers/index.ts";
 import type { AgentBackendId, AgentPermissionMode, MessagePart } from "./backend.ts";
+import { runsChanged } from "./change-events.ts";
 import type { AgentSelection } from "./controls.ts";
 import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 
@@ -109,6 +110,7 @@ export async function createRun(record: AgentRunRecord): Promise<string> {
   await writeFile(join(dir, "run.json"), JSON.stringify({ ...record, startedAt: Date.now() }), {
     mode: 0o600,
   });
+  runsChanged();
   return id;
 }
 
@@ -137,6 +139,7 @@ export async function removeRun(id: string): Promise<boolean> {
   await os.tools.removeAgentHostAddress(dir, os.tools.agentHostAddress(dir));
   // A host that was just signalled may still write; retry instead of failing on ENOTEMPTY.
   await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  runsChanged();
   return true;
 }
 

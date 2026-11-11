@@ -11,6 +11,7 @@ export * from "./model/job-follow.ts";
 export * from "./model/job-titles.ts";
 export * from "./model/job-turn.ts";
 export * from "./model/job-view.ts";
+export * from "./model/jobs-feed.ts";
 export * from "./model/project-jobs.ts";
 export { default as ActivityIsland } from "./ui/ActivityIsland.vue";
 export { default as AgentInbox } from "./ui/AgentInbox.vue";

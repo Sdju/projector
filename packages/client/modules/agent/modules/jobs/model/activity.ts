@@ -1,9 +1,12 @@
-import { computed, getCurrentScope, onScopeDispose, ref } from "vue";
-import { fetchLiveRuns, type LiveAgentRun } from "../../../../agent-core/index.ts";
-import { fetchJobs, jobFinished, type AgentJobView } from "../../../../agent-core/index.ts";
-import { openChats } from "../../../../agent-core/index.ts";
+import { computed, getCurrentScope, onScopeDispose } from "vue";
+import {
+  agentLabel,
+  jobFinished,
+  openChats,
+  type AgentJobView,
+} from "../../../../agent-core/index.ts";
 import { announceJobs } from "../lib/job-notify.ts";
-import { agentLabel } from "../../../../agent-core/index.ts";
+import { useJobsFeed } from "./jobs-feed.ts";
 
 /** An open chat that is answering or has subagents and background commands running. */
 export interface AgentActivityItem {
@@ -23,33 +26,6 @@ export interface AgentActivityItem {
   needsUser?: boolean;
 }
 
-const POLL_MS = 4000;
-
-/**
- * Agents at work on the server. A chat opened on another page, or not open at all, is not in
- * this page's registry, but its agent process is still running.
- */
-function useServerRuns() {
-  const runs = ref<LiveAgentRun[]>([]);
-  async function refresh() {
-    if (document.visibilityState !== "visible") return;
-    try {
-      runs.value = await fetchLiveRuns();
-    } catch {
-      // The server is restarting; the next poll finds it.
-    }
-  }
-  void refresh();
-  const timer = setInterval(() => void refresh(), POLL_MS);
-  document.addEventListener("visibilitychange", refresh);
-  if (getCurrentScope())
-    onScopeDispose(() => {
-      clearInterval(timer);
-      document.removeEventListener("visibilitychange", refresh);
-    });
-  return runs;
-}
-
 /** The island's rows for background jobs: the unfinished ones; one that waits for the user is marked. */
 export function jobItems(jobs: AgentJobView[]): AgentActivityItem[] {
   return jobs
@@ -67,29 +43,18 @@ export function jobItems(jobs: AgentJobView[]): AgentActivityItem[] {
     }));
 }
 
-/** Background jobs of all projects; the running ones and those that wait for the user are shown. */
-function useServerJobs() {
-  const jobs = ref<AgentJobView[]>([]);
+/**
+ * Chats that work right now: the open ones of this page, the runs started anywhere else and the
+ * background jobs of the server. The lists come from the page's shared feed, which the server
+ * updates over the event stream instead of keeping a timer per component.
+ */
+export function useAgentActivity() {
+  const feed = useJobsFeed();
   // Statuses seen so far: a change to "needs you" or "ended" notifies a page the user is not on.
   const seen = new Map<string, AgentJobView["status"]>();
-  async function refresh() {
-    try {
-      jobs.value = await fetchJobs();
-      announceJobs(seen, jobs.value);
-    } catch {
-      // The server is restarting; the next poll finds it.
-    }
-  }
-  void refresh();
-  const timer = setInterval(() => void refresh(), POLL_MS);
-  if (getCurrentScope()) onScopeDispose(() => clearInterval(timer));
-  return jobs;
-}
+  const stop = feed.onUpdate(({ jobs }) => announceJobs(seen, jobs));
+  if (getCurrentScope()) onScopeDispose(stop);
 
-/** Chats that work right now: the open ones of this page and the runs started anywhere else. */
-export function useAgentActivity() {
-  const serverRuns = useServerRuns();
-  const serverJobs = useServerJobs();
   const items = computed<AgentActivityItem[]>(() => {
     const local = openChats()
       .map((chat) => ({
@@ -110,7 +75,7 @@ export function useAgentActivity() {
     // The page's own chat knows more (background tasks) than the run on the server.
     // An idle/disconnected view must not hide the server's still-running agent.
     const known = new Set(local.map((chat) => chat.chat));
-    const remote = serverRuns.value
+    const remote = feed.runs.value
       .filter((run) => {
         const key = run.chat || run.id;
         if (known.has(key)) return false;
@@ -126,8 +91,8 @@ export function useAgentActivity() {
         tasks: 0,
         startedAt: run.startedAt,
       }));
-    const jobs = jobItems(serverJobs.value);
+    const jobs = jobItems(feed.jobs.value);
     return [...local, ...remote, ...jobs];
   });
-  return { items, jobs: serverJobs };
+  return { items, jobs: feed.jobs };
 }

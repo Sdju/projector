@@ -161,6 +161,43 @@ test("the jobs API validates what a client sends and runs a job to its answer", 
   expect((await request(`/api/agent/jobs/${created.job.id}`)).status).toBe(404);
 });
 
+test("a job change reaches the page event stream instead of being polled", async () => {
+  const { get } = await import("node:http");
+  const events = [];
+  const stream = await new Promise((resolve) => {
+    get(`${base}/api/events?client=jobs-page`, (res) => {
+      let buffer = "";
+      res.on("data", (chunk) => {
+        buffer += chunk;
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop();
+        for (const part of parts) {
+          const name = /^event: (.*)$/m.exec(part)?.[1];
+          const data = /^data: (.*)$/m.exec(part)?.[1];
+          if (name === "jobs-changed" && data) events.push(JSON.parse(data));
+        }
+      });
+      resolve(res);
+    });
+  });
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  const started = await request("/api/agent/jobs", "POST", {
+    projectId: "p1",
+    backend: "fake-api",
+    task: "hi",
+  });
+  expect(started.status).toBe(201);
+  const { job } = await started.json();
+  await until(() => events.length);
+  expect(events[0]).toMatchObject({ at: expect.any(Number) });
+  await until(async () => {
+    const body = await (await request(`/api/agent/jobs/${job.id}`)).json();
+    return body.job.status === "done";
+  });
+  expect((await request(`/api/agent/jobs/${job.id}`, "DELETE")).status).toBe(200);
+  stream.destroy();
+});
+
 test("a job can start from a chat role and keeps its snapshot", async () => {
   const roleResponse = await request("/api/agent/roles", "POST", {
     role: {

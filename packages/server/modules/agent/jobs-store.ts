@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
+import { jobsChanged } from "./change-events.ts";
 import type { AgentBackendId, AgentPermissionMode } from "./backend.ts";
 import type { AgentSelection } from "./controls.ts";
 import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
@@ -111,6 +112,7 @@ export async function saveJob(job: AgentJob): Promise<void> {
   const dir = jobDirectory(job.id);
   await mkdir(dir, { recursive: true, mode: 0o700 });
   await writeAtomic(join(dir, "job.json"), job);
+  jobsChanged();
 }
 
 export async function saveJournal(id: string, journal: JournalEntry[]): Promise<void> {
@@ -141,4 +143,5 @@ export async function jobIds(): Promise<string[]> {
 
 export async function removeJobFiles(id: string): Promise<void> {
   await rm(jobDirectory(id), { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+  jobsChanged();
 }

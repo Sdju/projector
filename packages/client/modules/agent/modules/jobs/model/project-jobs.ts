@@ -1,9 +1,7 @@
-import { onScopeDispose, ref } from "vue";
-import { fetchJobs, type AgentJobView } from "../../../../agent-core/index.ts";
+import { computed, getCurrentScope, onScopeDispose, ref } from "vue";
+import type { AgentJobView } from "../../../../agent-core/index.ts";
 import { jobShortTitle } from "../lib/job-name.ts";
-
-/** How often an open Projector chat asks for the jobs of its project. */
-const POLL_MS = 2500;
+import { useJobsFeed } from "./jobs-feed.ts";
 
 /** Jobs already continued in this page: a reload or a second watcher must not repeat the turn. */
 export const continued = new Set<string>();
@@ -23,49 +21,44 @@ export function continuationPrompt(job: AgentJobView, name = jobShortTitle(job.t
 }
 
 /**
- * The background jobs of a project as they change. A chat uses it to show what runs, to answer
- * the requests of a job and to continue after a job it started. HMR and closed tabs leave no
- * timers behind: the watcher stops with the component scope.
+ * The background jobs of a project as they change. The page's shared feed holds the lists, which
+ * the server updates over the event stream; this watcher only filters them by project and reports
+ * what changed. A chat uses it to show what runs, to answer job requests and to continue after a
+ * job it started.
  */
 export function useProjectJobs(
   projectId: string,
   onChange?: (job: AgentJobView, before?: AgentJobView) => void,
   enabled: () => boolean = () => true,
 ) {
-  const jobs = ref<AgentJobView[]>([]);
-  const error = ref("");
-  let previous = new Map<string, AgentJobView>();
-  let disposed = false;
-  let timer: ReturnType<typeof setInterval> | undefined;
+  if (!enabled())
+    return {
+      jobs: ref<AgentJobView[]>([]),
+      error: ref(""),
+      refresh: async () => {},
+    };
+
+  const feed = useJobsFeed();
+  const previous = new Map<string, AgentJobView>();
+  const jobs = computed(() => feed.jobs.value.filter((job) => job.projectId === projectId));
+
+  const stop = feed.onUpdate(({ jobs: next }) => {
+    // A hidden page has nobody to answer or continue: compare when it is shown again.
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+    const own = next.filter((job) => job.projectId === projectId);
+    for (const job of own) {
+      const before = previous.get(job.id);
+      if (!before) onChange?.(job);
+      else if (before.status !== job.status) onChange?.(job, before);
+    }
+    previous.clear();
+    for (const job of own) previous.set(job.id, job);
+  });
+  if (getCurrentScope()) onScopeDispose(stop);
 
   async function refresh(): Promise<void> {
-    if (disposed || !enabled()) return;
-    // A hidden page has nobody to answer or continue: resume polling when it is shown again.
-    if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
-    try {
-      const next = await fetchJobs(projectId);
-      if (disposed) return;
-      error.value = "";
-      for (const job of next) {
-        const before = previous.get(job.id);
-        if (!before) onChange?.(job);
-        else if (before.status !== job.status) onChange?.(job, before);
-      }
-      previous = new Map(next.map((job) => [job.id, job]));
-      jobs.value = next;
-    } catch (cause) {
-      error.value = cause instanceof Error ? cause.message : "Не удалось прочитать задания";
-    }
+    if (enabled()) await feed.refresh();
   }
 
-  if (enabled()) {
-    timer = setInterval(() => void refresh(), POLL_MS);
-    void refresh();
-  }
-  onScopeDispose(() => {
-    disposed = true;
-    if (timer) clearInterval(timer);
-  });
-
-  return { jobs, error, refresh };
+  return { jobs, error: feed.error, refresh };
 }

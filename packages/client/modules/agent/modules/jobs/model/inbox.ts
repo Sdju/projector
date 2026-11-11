@@ -21,12 +21,17 @@ import {
   type InboxProject,
   type InboxSource,
 } from "./inbox-view.ts";
+import { feedJobs, feedRuns, onJobsFeedUpdate, useJobsFeed } from "./jobs-feed.ts";
 
 export * from "./inbox-view.ts";
 
-/** How often the whole page asks for work. Hidden pages keep polling so they can notify. */
-const POLL_MS = 5000;
+/**
+ * The server pushes job and run changes over the page event stream. This timer only keeps the
+ * Hub devices and project names fresh and repairs a stream that dropped a change.
+ */
+const POLL_MS = 30_000;
 const PROJECT_TTL_MS = 30_000;
+const SOURCES_TTL_MS = 30_000;
 
 async function json<T>(base: string | undefined, path: string): Promise<T> {
   const response = await fetch(deviceApiUrl(base, path), { cache: "no-store" });
@@ -77,6 +82,14 @@ async function loadSource(source: InboxSource, fresh: boolean): Promise<InboxIte
   ];
 }
 
+/** Jobs and runs of this server come from the shared feed, which the server keeps up to date. */
+function localItems(source: InboxSource, projects: readonly InboxProject[]): InboxItem[] {
+  return [
+    ...feedJobs.value.filter(inboxRelevant).map((job) => inboxJobItem(source, job, projects)),
+    ...feedRuns.value.map((run) => inboxRunItem(source, run, projects)),
+  ];
+}
+
 export async function fetchInboxSources(): Promise<InboxSource[]> {
   const current = currentDeviceId();
   if (!current) return [{ id: "", name: "Это устройство", base: "", current: true }];
@@ -96,18 +109,39 @@ const cache = new Map<string, InboxItem[]>();
 const seen = new Map<string, string>();
 let firstLook = true;
 let timer: ReturnType<typeof setInterval> | undefined;
+let stopFeed: (() => void) | undefined;
 let refreshing: Promise<void> | undefined;
+let rerun = false;
+let sourcesAt = 0;
 let subscribers = 0;
 let disposed = false;
 
-async function refresh(fresh = false): Promise<void> {
-  if (refreshing) return refreshing;
+async function sourcesOf(fresh: boolean): Promise<InboxSource[]> {
+  if (!fresh && sourcesAt && Date.now() - sourcesAt < SOURCES_TTL_MS) return sources.value;
+  sources.value = await fetchInboxSources();
+  sourcesAt = Date.now();
+  return sources.value;
+}
+
+async function refresh(fresh = false, localOnly = false): Promise<void> {
+  if (refreshing) {
+    if (localOnly) rerun = true;
+    return refreshing;
+  }
   refreshing = (async () => {
     try {
-      const list = await fetchInboxSources();
+      const list = await sourcesOf(fresh);
       if (disposed) return;
-      sources.value = list;
-      const results = await Promise.allSettled(list.map((source) => loadSource(source, fresh)));
+      const results = await Promise.allSettled(
+        list.map((source) => {
+          // This page's own server pushes changes: its list comes from the shared feed.
+          if (source.current)
+            return projectsOf(source, fresh).then((projects) => localItems(source, projects));
+          // A change pushed by this server must not read every Hub device again.
+          if (localOnly) return Promise.resolve(cache.get(source.id) ?? []);
+          return loadSource(source, fresh);
+        }),
+      );
       if (disposed) return;
       const next: InboxItem[] = [];
       const failed: string[] = [];
@@ -135,6 +169,10 @@ async function refresh(fresh = false): Promise<void> {
     } finally {
       if (!disposed) loading.value = false;
       refreshing = undefined;
+      if (rerun && !disposed) {
+        rerun = false;
+        void refresh(false, true);
+      }
     }
   })();
   return refreshing;
@@ -143,7 +181,9 @@ async function refresh(fresh = false): Promise<void> {
 function start() {
   disposed = false;
   void refresh();
-  timer = setInterval(() => void refresh(), POLL_MS);
+  timer = setInterval(() => void refresh(true), POLL_MS);
+  // The server pushes job and run changes; only a dropped event waits for the timer.
+  stopFeed = onJobsFeedUpdate(() => void refresh(false, true));
   // A page that became visible catches up at once; a hidden one keeps the slow poll for notices.
   const onVisible = () => {
     if (document.visibilityState === "visible") void refresh(true);
@@ -153,6 +193,10 @@ function start() {
     document.removeEventListener("visibilitychange", onVisible);
     if (timer !== undefined) clearInterval(timer);
     timer = undefined;
+    stopFeed?.();
+    stopFeed = undefined;
+    sourcesAt = 0;
+    rerun = false;
   };
 }
 
@@ -164,6 +208,7 @@ let stopPolling: (() => void) | undefined;
 
 /** The one inbox of the page: the panel and the header bell share its polling and state. */
 export function useAgentInbox() {
+  useJobsFeed();
   if (!subscribers) stopPolling = start();
   subscribers++;
   if (getCurrentScope())

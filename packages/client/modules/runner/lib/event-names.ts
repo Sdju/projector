@@ -5,6 +5,8 @@ export const EVENT_NAMES = [
   "file-changed",
   "dir-changed",
   "watch-error",
+  "jobs-changed",
+  "runs-changed",
   "terminal-started",
   "agent",
   "secret-show",
