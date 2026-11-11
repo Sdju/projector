@@ -8,15 +8,26 @@ import { hubReturnPath } from "../../core/modules/hub/index.ts";
 import { HubAccess } from "../modules/access/index.ts";
 import { createHub } from "../modules/gateway/index.ts";
 import { connectHub } from "../../server/modules/hub/connector.ts";
+import { publishHubActivity } from "../../server/modules/hub/index.ts";
+import { attachSse } from "../../server/modules/events/index.ts";
 import { accessAllowed, isLocalRequest } from "../../server/modules/access/index.ts";
 import { deviceUrl, deviceBase } from "../../client/common/utilities/device-url.ts";
 
 const cleanups = [];
+const until = async (check, timeoutMs = 8000) => {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const value = await check();
+    if (value) return value;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error("condition not met in time");
+};
 afterEach(async () => {
   vi.unstubAllGlobals();
   for (const close of cleanups.splice(0).reverse()) await close();
 });
-async function setup() {
+async function setup({ connector = true } = {}) {
   const root = await mkdtemp(join(tmpdir(), "projector-hub-"));
   cleanups.push(() => rm(root, { recursive: true, force: true }));
   await writeFile(join(root, "index.html"), "<title>Hub owns this interface</title>");
@@ -41,62 +52,68 @@ async function setup() {
   await new Promise((resolve) => active.server.listen(port, "127.0.0.1", resolve));
   cleanups.push(() => active.close());
   let sequence = 0;
-  const stop = connectHub(
-    { url: origin, deviceId: "desk", token: "device-secret" },
-    {
-      handle(req, res) {
-        if (!accessAllowed(req, false)) {
-          res.writeHead(403).end();
-          return;
-        }
-        if (req.url === "/api/local-only") {
-          res.writeHead(isLocalRequest(req) ? 200 : 403).end();
-          return;
-        }
-        if (req.url === "/api/events") {
-          res.writeHead(200, { "Content-Type": "text/event-stream" });
-          res.write("data: first\n\n");
-          const timer = setTimeout(() => res.end("data: second\n\n"), 200);
-          res.once("close", () => clearTimeout(timer));
-          return;
-        }
-        if (req.url === "/api/upload") {
-          let bytes = 0;
-          req.on("data", (chunk) => (bytes += chunk.length));
-          req.on("end", () => res.end(String(bytes)));
-          return;
-        }
-        res.setHeader("Content-Type", "application/json");
-        res.end(
-          JSON.stringify({
-            path: req.url,
-            local: isLocalRequest(req),
-            sequence: ++sequence,
-            forwarded: req.headers["x-forwarded-for"] ?? null,
-            cookie: req.headers.cookie ?? null,
-          }),
-        );
-      },
-      attach(server) {
-        const sockets = new WebSocketServer({ noServer: true });
-        server.on("upgrade", (req, socket, head) => {
-          if (!accessAllowed(req, true)) {
-            socket.end("HTTP/1.1 403 Forbidden\r\n\r\n");
-            return;
-          }
-          sockets.handleUpgrade(req, socket, head, (ws) =>
-            ws.on("message", (data) => ws.send(data)),
-          );
-        });
-        return () => {
-          for (const ws of sockets.clients) ws.terminate();
-          sockets.close();
-        };
-      },
-    },
-    () => {},
-  );
-  cleanups.push(stop);
+  const stop = connector
+    ? connectHub(
+        { url: origin, deviceId: "desk", token: "device-secret" },
+        {
+          handle(req, res) {
+            if (!accessAllowed(req, false)) {
+              res.writeHead(403).end();
+              return;
+            }
+            if (req.url === "/api/local-only") {
+              res.writeHead(isLocalRequest(req) ? 200 : 403).end();
+              return;
+            }
+            if (req.url === "/api/events") {
+              res.writeHead(200, { "Content-Type": "text/event-stream" });
+              res.write("data: first\n\n");
+              const timer = setTimeout(() => res.end("data: second\n\n"), 200);
+              res.once("close", () => clearTimeout(timer));
+              return;
+            }
+            if (req.url === "/api/hub-events") {
+              attachSse(req, res);
+              return;
+            }
+            if (req.url === "/api/upload") {
+              let bytes = 0;
+              req.on("data", (chunk) => (bytes += chunk.length));
+              req.on("end", () => res.end(String(bytes)));
+              return;
+            }
+            res.setHeader("Content-Type", "application/json");
+            res.end(
+              JSON.stringify({
+                path: req.url,
+                local: isLocalRequest(req),
+                sequence: ++sequence,
+                forwarded: req.headers["x-forwarded-for"] ?? null,
+                cookie: req.headers.cookie ?? null,
+              }),
+            );
+          },
+          attach(server) {
+            const sockets = new WebSocketServer({ noServer: true });
+            server.on("upgrade", (req, socket, head) => {
+              if (!accessAllowed(req, true)) {
+                socket.end("HTTP/1.1 403 Forbidden\r\n\r\n");
+                return;
+              }
+              sockets.handleUpgrade(req, socket, head, (ws) =>
+                ws.on("message", (data) => ws.send(data)),
+              );
+            });
+            return () => {
+              for (const ws of sockets.clients) ws.terminate();
+              sockets.close();
+            };
+          },
+        },
+        () => {},
+      )
+    : undefined;
+  if (stop) cleanups.push(stop);
   const login = await fetch(`${origin}/login`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded", Origin: origin },
@@ -104,6 +121,7 @@ async function setup() {
     redirect: "manual",
   });
   const cookie = login.headers.get("set-cookie").split(";")[0];
+  if (!stop) return { origin, cookie, stop };
   for (let i = 0; i < 100; i++) {
     const list = await fetch(`${origin}/api/hub/devices`, { headers: { Cookie: cookie } }).then(
       (res) => res.json(),
@@ -199,6 +217,91 @@ describe("Hub reverse connection", () => {
     expect(
       (await fetch(`${origin}/api/devices/desk/projects`, { headers: { Cookie: cookie } })).status,
     ).toBe(503);
+  });
+  test("pushes the device list and activity over the control channel", async () => {
+    const { origin } = await setup({ connector: false });
+    const connect = async (device) => {
+      const ws = new WebSocket(
+        `${origin.replace("http", "ws")}/api/hub/connect?device=${device}&protocol=1`,
+        { headers: { Authorization: "Bearer device-secret" } },
+      );
+      const messages = [];
+      ws.on("message", (data) => {
+        if (Buffer.isBuffer(data)) messages.push(JSON.parse(data.toString()));
+      });
+      ws.on("error", () => {});
+      cleanups.push(() => ws.terminate());
+      await once(ws, "open");
+      await until(() => messages.some((message) => message.type === "ready"));
+      return { ws, messages };
+    };
+    const desk = await connect("desk");
+    const laptop = await connect("laptop");
+    await until(() =>
+      desk.messages.some((message) => message.event === "devices" && message.devices.length === 2),
+    );
+    laptop.ws.send(JSON.stringify({ type: "activity", at: 42 }));
+    const activity = await until(() =>
+      desk.messages.find((message) => message.event === "activity"),
+    );
+    expect(activity).toMatchObject({ deviceId: "laptop", at: 42 });
+    // The sender already knows its own jobs: no echo.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(laptop.messages.some((message) => message.event === "activity")).toBe(false);
+    const closed = once(laptop.ws, "close");
+    laptop.ws.close();
+    await closed;
+    await until(() =>
+      desk.messages.some(
+        (message) =>
+          message.event === "devices" &&
+          message.devices.some((device) => device.id === "laptop" && !device.online),
+      ),
+    );
+  });
+  test("a device passes Hub events to its pages over SSE", async () => {
+    const { origin, cookie } = await setup();
+    const response = await fetch(`${origin}/api/devices/desk/hub-events`, {
+      headers: { Cookie: cookie },
+    });
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let text = "";
+    const laptop = new WebSocket(
+      `${origin.replace("http", "ws")}/api/hub/connect?device=laptop&protocol=1`,
+      { headers: { Authorization: "Bearer device-secret" } },
+    );
+    laptop.on("error", () => {});
+    cleanups.push(() => laptop.terminate());
+    await once(laptop, "open");
+    while (!text.includes("hub-devices")) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value, { stream: true });
+    }
+    expect(text).toContain("event: hub-devices");
+    expect(text).toContain('"laptop"');
+    await reader.cancel();
+    laptop.close();
+  });
+  test("a device reports its own activity to the Hub", async () => {
+    const { origin } = await setup();
+    const messages = [];
+    const laptop = new WebSocket(
+      `${origin.replace("http", "ws")}/api/hub/connect?device=laptop&protocol=1`,
+      { headers: { Authorization: "Bearer device-secret" } },
+    );
+    laptop.on("message", (data) => {
+      if (Buffer.isBuffer(data)) messages.push(JSON.parse(data.toString()));
+    });
+    laptop.on("error", () => {});
+    cleanups.push(() => laptop.terminate());
+    await once(laptop, "open");
+    await until(() => messages.some((message) => message.type === "ready"));
+    publishHubActivity();
+    await until(() =>
+      messages.some((message) => message.event === "activity" && message.deviceId === "desk"),
+    );
   });
 });
 

@@ -1,4 +1,5 @@
 import { computed, getCurrentScope, onScopeDispose, ref } from "vue";
+import type { HubDevice } from "@ai-projector/core/modules/hub/index.ts";
 import {
   deviceApiUrl,
   fetchJobs,
@@ -112,15 +113,27 @@ let timer: ReturnType<typeof setInterval> | undefined;
 let stopFeed: (() => void) | undefined;
 let refreshing: Promise<void> | undefined;
 let rerun = false;
+let rerunAll = false;
 let sourcesAt = 0;
 let subscribers = 0;
 let disposed = false;
+const refreshingSources = new Set<string>();
 
 async function sourcesOf(fresh: boolean): Promise<InboxSource[]> {
   if (!fresh && sourcesAt && Date.now() - sourcesAt < SOURCES_TTL_MS) return sources.value;
   sources.value = await fetchInboxSources();
   sourcesAt = Date.now();
   return sources.value;
+}
+
+/** Rebuilds the list from the per-source cache; a source that failed keeps its last known items. */
+function publishItems(list: readonly InboxSource[]): void {
+  const next = list.flatMap((source) => cache.get(source.id) ?? []);
+  items.value = next;
+  updatedAt.value = Date.now();
+  const notices = inboxNotices(seen, next, firstLook, (item) => inboxHref(item, list));
+  firstLook = false;
+  for (const notice of notices) notifyInbox(notice.key, notice.title, notice.body, notice.href);
 }
 
 async function refresh(fresh = false, localOnly = false): Promise<void> {
@@ -143,39 +156,77 @@ async function refresh(fresh = false, localOnly = false): Promise<void> {
         }),
       );
       if (disposed) return;
-      const next: InboxItem[] = [];
       const failed: string[] = [];
       results.forEach((result, index) => {
         const source = list[index]!;
-        if (result.status === "fulfilled") {
-          cache.set(source.id, result.value);
-          next.push(...result.value);
-        } else {
-          failed.push(source.name);
-          next.push(...(cache.get(source.id) ?? []));
-        }
+        if (result.status === "fulfilled") cache.set(source.id, result.value);
+        else failed.push(source.name);
       });
-      items.value = next;
       error.value = failed.length
         ? `Нет ответа: ${failed.join(", ")}. Показано последнее известное состояние.`
         : "";
-      updatedAt.value = Date.now();
-      const notices = inboxNotices(seen, next, firstLook, (item) => inboxHref(item, list));
-      firstLook = false;
-      for (const notice of notices) notifyInbox(notice.key, notice.title, notice.body, notice.href);
+      publishItems(list);
     } catch (cause) {
       if (!disposed)
         error.value = cause instanceof Error ? cause.message : "Не удалось прочитать работы";
     } finally {
       if (!disposed) loading.value = false;
       refreshing = undefined;
-      if (rerun && !disposed) {
+      if (!disposed && rerunAll) {
+        rerunAll = false;
+        void refresh(false);
+      } else if (!disposed && rerun) {
         rerun = false;
         void refresh(false, true);
       }
     }
   })();
   return refreshing;
+}
+
+/** A Hub event names one device: read only that source, not every other device. */
+async function refreshSource(id: string): Promise<void> {
+  if (disposed || loading.value) return;
+  const source = sources.value.find((item) => item.id === id && !item.current);
+  if (!source || refreshingSources.has(id)) return;
+  refreshingSources.add(id);
+  try {
+    const items = await loadSource(source, false);
+    if (disposed) return;
+    cache.set(id, items);
+    publishItems(sources.value);
+  } catch {
+    // The timer keeps the last known state; the device may be restarting.
+  } finally {
+    refreshingSources.delete(id);
+  }
+}
+
+/** The Hub pushes its device list; pages behind it update sources without polling. */
+function applyHubDevices(event: Event): void {
+  const devices = (event as CustomEvent<{ devices?: unknown }>).detail?.devices;
+  const current = currentDeviceId();
+  if (!current || !Array.isArray(devices)) return;
+  const online = devices.filter((item): item is HubDevice => {
+    if (!item || typeof item !== "object") return false;
+    const value = item as Record<string, unknown>;
+    return (
+      typeof value.id === "string" &&
+      typeof value.name === "string" &&
+      typeof value.protocol === "number" &&
+      typeof value.online === "boolean"
+    );
+  });
+  sources.value = inboxSourcesFromDevices(online, current);
+  sourcesAt = Date.now();
+  for (const id of Array.from(cache.keys()))
+    if (!sources.value.some((source) => source.id === id)) cache.delete(id);
+  if (refreshing || loading.value) {
+    rerunAll = true;
+    return;
+  }
+  publishItems(sources.value);
+  void refresh(false);
 }
 
 function start() {
@@ -188,15 +239,30 @@ function start() {
   const onVisible = () => {
     if (document.visibilityState === "visible") void refresh(true);
   };
+  const onHubDevices = (event: Event) => applyHubDevices(event);
+  const onHubActivity = (event: Event) => {
+    const deviceId = (event as CustomEvent<{ deviceId?: unknown }>).detail?.deviceId;
+    if (typeof deviceId === "string") void refreshSource(deviceId);
+  };
+  if (typeof window !== "undefined") {
+    window.addEventListener("projector:hub-devices", onHubDevices);
+    window.addEventListener("projector:hub-activity", onHubActivity);
+  }
   document.addEventListener("visibilitychange", onVisible);
   return () => {
     document.removeEventListener("visibilitychange", onVisible);
+    if (typeof window !== "undefined") {
+      window.removeEventListener("projector:hub-devices", onHubDevices);
+      window.removeEventListener("projector:hub-activity", onHubActivity);
+    }
     if (timer !== undefined) clearInterval(timer);
     timer = undefined;
     stopFeed?.();
     stopFeed = undefined;
     sourcesAt = 0;
     rerun = false;
+    rerunAll = false;
+    refreshingSources.clear();
   };
 }
 

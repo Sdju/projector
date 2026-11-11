@@ -22,6 +22,32 @@ export interface HubOpen {
   id: string;
 }
 
+/** Hub tells a device which devices are online; the device passes it to its pages. */
+export interface HubDevicesEvent {
+  type: "hub-event";
+  event: "devices";
+  devices: HubDevice[];
+}
+
+/**
+ * Another device changed its jobs or runs. It carries no job data: the page reads that device
+ * again. `at` is the time of the change on the sending device.
+ */
+export interface HubActivityEvent {
+  type: "hub-event";
+  event: "activity";
+  deviceId: string;
+  at: number;
+}
+
+/** Device to Hub: its own jobs or runs changed. */
+export interface HubActivity {
+  type: "activity";
+  at: number;
+}
+
+export type HubToDevice = HubDevicesEvent | HubActivityEvent;
+
 /** Only a same-origin device page can be resumed after signing in. */
 export function hubReturnPath(value: unknown): string {
   if (typeof value !== "string" || !value.startsWith("/devices/") || value.includes("\\"))

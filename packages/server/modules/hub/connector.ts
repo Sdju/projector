@@ -1,7 +1,42 @@
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from "node:http";
 import { WebSocket, createWebSocketStream } from "ws";
-import { HUB_PROTOCOL, type HubConnection } from "@ai-projector/core/modules/hub/index.ts";
+import {
+  HUB_PROTOCOL,
+  isDeviceId,
+  type HubConnection,
+  type HubDevice,
+} from "@ai-projector/core/modules/hub/index.ts";
 import { markHubSocket } from "../access/index.ts";
+import { broadcastEvent } from "../events/index.ts";
+
+const MAX_DEVICES = 128;
+
+/** The Hub is trusted, but a malformed snapshot must not reach pages as a source list. */
+function hubDevices(value: unknown): HubDevice[] | undefined {
+  if (!Array.isArray(value) || value.length > MAX_DEVICES) return undefined;
+  const devices: HubDevice[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") return undefined;
+    const { id, name, protocol, online } = item as Record<string, unknown>;
+    if (
+      !isDeviceId(id) ||
+      typeof name !== "string" ||
+      typeof protocol !== "number" ||
+      typeof online !== "boolean"
+    )
+      return undefined;
+    devices.push({ id, name, protocol, online });
+  }
+  return devices;
+}
+
+// Vite reloads the module while the Hub connector may stay open: share the publisher.
+const host = globalThis as typeof globalThis & { projectorHubPublisher?: () => void };
+
+/** A one-line signal to the Hub: this device's jobs or runs changed. No-op without a Hub. */
+export function publishHubActivity(): void {
+  host.projectorHubPublisher?.();
+}
 
 export interface HubHandlers {
   handle(req: IncomingMessage, res: ServerResponse): void;
@@ -18,6 +53,7 @@ export function connectHub(
   let disposed = false;
   let retry: ReturnType<typeof setTimeout> | undefined;
   let control: WebSocket | undefined;
+  let publisher: (() => void) | undefined;
   let heartbeat: ReturnType<typeof setTimeout> | undefined;
   let delay = 1000;
   const origin = new URL(config.url).origin;
@@ -40,6 +76,16 @@ export function connectHub(
   const open = () => {
     if (disposed) return;
     const ws = (control = new WebSocket(endpoint(), options));
+    const publish = () => {
+      if (ws.readyState !== WebSocket.OPEN) return;
+      try {
+        ws.send(JSON.stringify({ type: "activity", at: Date.now() }));
+      } catch {
+        // The close handler reconnects; the page fallback reads the jobs meanwhile.
+      }
+    };
+    publisher = publish;
+    host.projectorHubPublisher = publish;
     const arm = () => {
       clearTimeout(heartbeat);
       heartbeat = setTimeout(() => ws.terminate(), 45000);
@@ -72,6 +118,22 @@ export function connectHub(
         if (message.type === "ready" && message.protocol === HUB_PROTOCOL) {
           delay = 1000;
           status(true);
+          // The Hub may have missed changes while the link was down: let other devices read us.
+          publish();
+          return;
+        }
+        if (message.type === "hub-event") {
+          if (message.event === "devices") {
+            const devices = hubDevices(message.devices);
+            if (devices) broadcastEvent("hub-devices", { devices });
+          } else if (
+            message.event === "activity" &&
+            typeof message.deviceId === "string" &&
+            typeof message.at === "number" &&
+            Number.isFinite(message.at)
+          ) {
+            broadcastEvent("hub-activity", { deviceId: message.deviceId, at: message.at });
+          }
           return;
         }
         if (
@@ -97,6 +159,7 @@ export function connectHub(
     });
     ws.once("close", () => {
       clearTimeout(heartbeat);
+      if (host.projectorHubPublisher === publish) host.projectorHubPublisher = undefined;
       status(
         false,
         disposed ? undefined : (failure ?? "Соединение с Hub потеряно, повторяем подключение"),
@@ -112,6 +175,8 @@ export function connectHub(
   open();
   return () => {
     disposed = true;
+    if (host.projectorHubPublisher === publisher) host.projectorHubPublisher = undefined;
+    publisher = undefined;
     clearTimeout(retry);
     clearTimeout(heartbeat);
     control?.terminate();

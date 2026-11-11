@@ -98,8 +98,13 @@ export class Tunnels {
             this.pending.delete(key);
             item.reject(new Error("Устройство отключилось"));
           }
+        this.broadcastDevices();
+      });
+      ws.on("message", (data) => {
+        if (Buffer.isBuffer(data)) this.activity(device, data);
       });
       ws.send(JSON.stringify({ type: "ready", protocol: HUB_PROTOCOL }));
+      this.broadcastDevices();
     });
   }
   open(id: string): Promise<Duplex> {
@@ -119,6 +124,44 @@ export class Tunnels {
       this.pending.set(ticket, { device, resolve, reject, timer });
       device.socket.send(JSON.stringify({ type: "open", id: ticket }));
     });
+  }
+
+  /** Control messages to devices are small JSON; a dead socket must not break the Hub. */
+  private send(device: Device, message: unknown): void {
+    if (device.socket.readyState !== WebSocket.OPEN) return;
+    try {
+      device.socket.send(JSON.stringify(message));
+    } catch {
+      device.socket.terminate();
+    }
+  }
+
+  private broadcast(message: unknown, except?: string): void {
+    for (const device of this.devices.values())
+      if (device.info.id !== except) this.send(device, message);
+  }
+
+  /** Pages update their source list from this snapshot instead of polling the Hub. */
+  private broadcastDevices(): void {
+    this.broadcast({ type: "hub-event", event: "devices", devices: this.list() });
+  }
+
+  /** A device reports its own activity; other devices pass the fact to their pages. */
+  private activity(device: Device, data: Buffer): void {
+    if (data.length > 4096) return;
+    let message: unknown;
+    try {
+      message = JSON.parse(data.toString());
+    } catch {
+      return;
+    }
+    if (!message || typeof message !== "object") return;
+    const { type, at } = message as { type?: unknown; at?: unknown };
+    if (type !== "activity" || typeof at !== "number" || !Number.isFinite(at)) return;
+    this.broadcast(
+      { type: "hub-event", event: "activity", deviceId: device.info.id, at },
+      device.info.id,
+    );
   }
   bind(server: Server): void {
     server.once("close", () => this.close());

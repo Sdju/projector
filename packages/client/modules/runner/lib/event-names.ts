@@ -7,6 +7,8 @@ export const EVENT_NAMES = [
   "watch-error",
   "jobs-changed",
   "runs-changed",
+  "hub-devices",
+  "hub-activity",
   "terminal-started",
   "agent",
   "secret-show",
