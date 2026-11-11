@@ -1,6 +1,8 @@
 import { createAcpBackend } from "../acp/index.ts";
+import type { AgentBackend } from "../../agent/index.ts";
 import { createCodexDialect } from "./dialect.ts";
 import { codexForms } from "./forms.ts";
+import { codexUsageLog } from "./usage-log.ts";
 
 /**
  * Codex through its ACP server. The adapter ships as a package rather than in the CLI, so it prefers
@@ -16,5 +18,8 @@ export const codexProgram = {
   forms: codexForms,
 };
 
-export const codexBackend = createAcpBackend(codexProgram);
-export { codexUsageLog } from "./usage-log.ts";
+export const codexBackend: AgentBackend = {
+  ...createAcpBackend(codexProgram),
+  usageLog: codexUsageLog,
+};
+export { codexUsageLog };

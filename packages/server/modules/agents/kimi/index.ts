@@ -1,5 +1,7 @@
 import { createAcpBackend } from "../acp/index.ts";
+import type { AgentBackend } from "../../agent/index.ts";
 import { createKimiDialect } from "./dialect.ts";
+import { kimiUsageLog } from "./usage-log.ts";
 
 /** Kimi Code CLI through its ACP mode (`kimi acp`). */
 export const kimiProgram = {
@@ -10,5 +12,8 @@ export const kimiProgram = {
   dialect: createKimiDialect,
 };
 
-export const kimiBackend = createAcpBackend(kimiProgram);
-export { kimiUsageLog } from "./usage-log.ts";
+export const kimiBackend: AgentBackend = {
+  ...createAcpBackend(kimiProgram),
+  usageLog: kimiUsageLog,
+};
+export { kimiUsageLog };

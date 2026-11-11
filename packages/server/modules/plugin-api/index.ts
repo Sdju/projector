@@ -28,4 +28,9 @@ export type { PluginCodeApi } from "../agents/plugin/index.ts";
 export type {
   AgentUsage,
   AgentUsageWindowDefinition,
+  UsageCostSource,
+  UsageLogEvent,
+  UsageLogRead,
+  UsageLogReader,
+  UsageTokens,
 } from "@ai-projector/core/modules/usage-analytics/index.ts";

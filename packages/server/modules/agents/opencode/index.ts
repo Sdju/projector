@@ -2,6 +2,7 @@ import { acpSessions, createAcpBackend } from "../acp/index.ts";
 import type { AgentBackend } from "../../agent/index.ts";
 import { createOpencodeDialect } from "./dialect.ts";
 import { withOpenCodeBranches } from "./sessions.ts";
+import { opencodeUsageLog } from "./usage-log.ts";
 
 /** OpenCode through its own ACP mode (`opencode acp`). */
 export const opencodeProgram = {
@@ -21,5 +22,6 @@ export const opencodeProgram = {
 export const opencodeBackend: AgentBackend = {
   ...createAcpBackend(opencodeProgram),
   sessions: (cwd) => acpSessions("opencode", cwd, withOpenCodeBranches),
+  usageLog: opencodeUsageLog,
 };
-export { opencodeUsageLog } from "./usage-log.ts";
+export { opencodeUsageLog };

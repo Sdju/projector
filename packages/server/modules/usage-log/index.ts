@@ -13,6 +13,11 @@ export function registerUsageLogReader(reader: UsageLogReader): void {
   readers.set(reader.agent, reader);
 }
 
+/** Drops one agent's reader when its backend leaves the registry. */
+export function unregisterUsageLogReader(agent: string): void {
+  readers.delete(agent);
+}
+
 /** The readers the running server will scan, sorted by agent id for stable answers. */
 export function usageLogReaders(): UsageLogReader[] {
   return [...readers.values()].sort((a, b) => a.agent.localeCompare(b.agent));

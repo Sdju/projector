@@ -16,7 +16,10 @@ export interface AgentCapabilities {
 import type { JudgeOverride } from "@ai-projector/core/modules/agent-judge/index.ts";
 import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 import type { AgentHistoryTurn } from "../providers/index.ts";
-import type { AgentUsageWindowDefinition } from "@ai-projector/core/modules/usage-analytics/index.ts";
+import type {
+  AgentUsageWindowDefinition,
+  UsageLogReader,
+} from "@ai-projector/core/modules/usage-analytics/index.ts";
 import type {
   AgentControl,
   AgentSelection,
@@ -230,6 +233,8 @@ export interface AgentBackend {
   usage?: AgentUsageProvider;
   /** Labels and pace of the provider's windows; absent uses the generic plugin names. */
   usageWindows?: readonly AgentUsageWindowDefinition[];
+  /** Native journal reader for the analytics page; absent when the agent keeps no token log. */
+  usageLog?: UsageLogReader;
   /** The generic limits endpoint the client polls, when `usage` is present. */
   usageUrl?: string;
 }

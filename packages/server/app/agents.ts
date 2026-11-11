@@ -7,9 +7,9 @@ import {
 import { configureAgentPreferences } from "../modules/preferences/index.ts";
 import { configureTerminalPrograms } from "../modules/terminal/index.ts";
 import { claudeCodeBackend } from "../modules/agents/claude-code/index.ts";
-import { codexBackend, codexUsageLog } from "../modules/agents/codex/index.ts";
-import { kimiBackend, kimiUsageLog } from "../modules/agents/kimi/index.ts";
-import { opencodeBackend, opencodeUsageLog } from "../modules/agents/opencode/index.ts";
+import { codexBackend } from "../modules/agents/codex/index.ts";
+import { kimiBackend } from "../modules/agents/kimi/index.ts";
+import { opencodeBackend } from "../modules/agents/opencode/index.ts";
 import { createPluginAgent, loadCodeAgents } from "../modules/agents/plugin/index.ts";
 import { projectorBackend } from "../modules/agents/projector/index.ts";
 import {
@@ -18,27 +18,35 @@ import {
   type PluginAgentCandidate,
   type PluginAgentDiagnostic,
 } from "../modules/plugins/index.ts";
-import { registerUsageLogReader } from "../modules/usage-log/index.ts";
+import { registerUsageLogReader, unregisterUsageLogReader } from "../modules/usage-log/index.ts";
 import { registerBuiltinAgentFeatures } from "./features.ts";
 
 /** Plugin agent id → package id. Built-ins are everything else in the registry. */
 const pluginAgents = new Map<string, string>();
 let ready: Promise<void> | undefined;
 
+/** A backend that owns a native journal brings its analytics reader with it. */
+function registerBackendUsageLog(backend: AgentBackend): void {
+  if (!backend.usageLog) return;
+  registerUsageLogReader({ ...backend.usageLog, agent: backend.id });
+}
+
 /**
  * The agents this server offers. The composition is the only place that names them: each agent
  * module stays independent and the generic core never imports one. Registering again replaces.
  */
 export function registerBuiltinAgents(): void {
+  const builtins = [
+    projectorBackend,
+    claudeCodeBackend,
+    codexBackend,
+    opencodeBackend,
+    kimiBackend,
+  ];
   registerAgentBackend(projectorBackend, { asDefault: true });
-  registerAgentBackend(claudeCodeBackend);
-  registerAgentBackend(codexBackend);
-  registerAgentBackend(opencodeBackend);
-  registerAgentBackend(kimiBackend);
-  // Native journals: analytics counts what the agents wrote outside the chat as well.
-  registerUsageLogReader(codexUsageLog);
-  registerUsageLogReader(opencodeUsageLog);
-  registerUsageLogReader(kimiUsageLog);
+  for (const backend of builtins.slice(1)) registerAgentBackend(backend);
+  // Native journals live on the backend itself: built-ins and plugin code use one path.
+  for (const backend of builtins) registerBackendUsageLog(backend);
   // The settings ask the live registry instead of keeping their own copy of the list.
   configureAgentPreferences({
     programs: () => listAgentBackends().flatMap(({ program }) => (program ? [program] : [])),
@@ -172,12 +180,15 @@ async function applyPluginAgents(
         agent: id,
         message: error instanceof Error ? error.message : "Не удалось убрать агента",
       });
+    } finally {
+      unregisterUsageLogReader(id);
     }
     pluginAgents.delete(id);
   }
   for (const [id, entry] of accepted) {
     try {
       registerAgentBackend(entry.backend);
+      registerBackendUsageLog(entry.backend);
       pluginAgents.set(id, entry.candidate.plugin);
     } catch (error) {
       diagnostics.push({

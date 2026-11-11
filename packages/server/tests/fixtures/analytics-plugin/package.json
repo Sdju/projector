@@ -1,0 +1,22 @@
+{
+  "name": "@projector-tests/analytics-plugin",
+  "version": "1.0.0",
+  "projector": {
+    "apiVersion": 1,
+    "server": "server.cjs",
+    "contributes": {
+      "agents": [
+        {
+          "id": "fixture-analytics",
+          "title": "Fixture Analytics",
+          "caption": "Плагинный агент с журналом расхода",
+          "program": "fixture-analytics",
+          "command": "node",
+          "args": [
+            "agent.js"
+          ]
+        }
+      ]
+    }
+  }
+}

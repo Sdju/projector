@@ -13,4 +13,9 @@ export type {
   AgentUsage,
   AgentUsageWindowDefinition,
   PluginCodeApi,
+  UsageCostSource,
+  UsageLogEvent,
+  UsageLogRead,
+  UsageLogReader,
+  UsageTokens,
 } from "../../../packages/server/modules/plugin-api/index.ts";
