@@ -10,5 +10,7 @@ export type {
   AgentQuestion,
   AgentRunOptions,
   AgentSelection,
+  AgentUsage,
+  AgentUsageWindowDefinition,
   PluginCodeApi,
 } from "../../../packages/server/modules/plugin-api/index.ts";

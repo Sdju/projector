@@ -25,3 +25,7 @@ export type {
   AcpUpdate,
 } from "../agents/acp/index.ts";
 export type { PluginCodeApi } from "../agents/plugin/index.ts";
+export type {
+  AgentUsage,
+  AgentUsageWindowDefinition,
+} from "@ai-projector/core/modules/usage-analytics/index.ts";

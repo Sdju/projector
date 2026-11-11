@@ -137,6 +137,20 @@ export interface AgentUsageWindow {
   limited: boolean;
 }
 
+/** How a plugin agent labels and paces its limit windows in the status bar. */
+export interface AgentUsageWindowDefinition {
+  /** Stable window key the provider returns, e.g. `total` or `weekly`. */
+  name: string;
+  /** Full label in the tooltip. */
+  label: string;
+  /** Short label beside the meter. */
+  shortLabel: string;
+  /** Cycle length used for the pace estimate; zero disables it. */
+  periodSeconds: number;
+  /** Meter marks in percent; the shared indicator supplies its own when absent. */
+  ticks?: readonly number[];
+}
+
 /** The limits answer a generic `usage.command` provider prints as JSON. */
 export interface AgentUsage {
   status: "ready" | "unavailable";

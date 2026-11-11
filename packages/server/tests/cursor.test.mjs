@@ -1,14 +1,20 @@
 import { createRouteDispatcher } from "../modules/transport/index.ts";
-import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vite-plus/test";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readCursorUsage } from "../modules/agents-integration/cursor/client.ts";
-import { readCursorAccessToken } from "../modules/agents-integration/cursor/credentials.ts";
-import { cursorWindows, cursorUsage } from "../modules/agents-integration/cursor/usage.ts";
-import { NETWORK_CONTEXT_URL } from "../modules/network/index.ts";
-import { routes } from "../routes/api/cursor.ts";
-const handleCursor = createRouteDispatcher(routes);
+import {
+  cursorUsageProvider,
+  cursorWindows,
+  readCursorAccessToken,
+  readCursorUsage,
+} from "../../../plugins/cursor/src/usage.ts";
+import { readAgentUsageLimits, resetAgentUsageCache } from "../modules/agent-usage/index.ts";
+import { registerAgentBackend, unregisterAgentBackend } from "../modules/agent/index.ts";
+import { routes } from "../routes/api/agent-usage.ts";
+
+const agentId = "cursor-usage-fixture";
+const handleUsage = createRouteDispatcher(routes);
 
 const payload = {
   billingCycleEnd: "1792862002000",
@@ -18,6 +24,24 @@ const payload = {
     apiPercentUsed: 45.5,
   },
 };
+
+beforeAll(() => {
+  registerAgentBackend({
+    id: agentId,
+    label: "Cursor usage",
+    run: async () => {},
+    usage: cursorUsageProvider,
+  });
+});
+afterAll(() => {
+  try {
+    unregisterAgentBackend(agentId);
+  } catch {
+    /* The registry may already be cleaned by the test. */
+  }
+  resetAgentUsageCache();
+});
+beforeEach(() => resetAgentUsageCache());
 
 test("Cursor windows normalize percentages, billing reset and exhausted limits", () => {
   const parsed = cursorWindows(payload);
@@ -51,7 +75,7 @@ test("Cursor windows normalize percentages, billing reset and exhausted limits",
 });
 
 describe("Cursor reads existing auth, bounds and sanitizes requests, shares cached API results", () => {
-  let directory, previousFetch, previousEnv, state, calls, authFile;
+  let directory, previousFetch, previousEnv, calls, authFile;
   beforeAll(async () => {
     directory = await mkdtemp(join(tmpdir(), "projector-cursor-"));
     previousFetch = globalThis.fetch;
@@ -59,7 +83,6 @@ describe("Cursor reads existing auth, bounds and sanitizes requests, shares cach
       XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
       CURSOR_AUTH_CONTENT: process.env.CURSOR_AUTH_CONTENT,
     };
-    state = globalThis.projectorCursorUsage;
     calls = 0;
     process.env.XDG_CONFIG_HOME = directory;
     delete process.env.CURSOR_AUTH_CONTENT;
@@ -72,7 +95,6 @@ describe("Cursor reads existing auth, bounds and sanitizes requests, shares cach
       if (value === undefined) delete process.env[name];
       else process.env[name] = value;
     }
-    state.value = undefined;
     await rm(directory, { recursive: true, force: true });
   });
 
@@ -81,7 +103,7 @@ describe("Cursor reads existing auth, bounds and sanitizes requests, shares cach
     globalThis.fetch = () => {
       throw new Error("must not request without access token");
     };
-    const result = await cursorUsage();
+    const result = await readAgentUsageLimits(agentId);
     expect(result.status).toBe("unavailable");
     expect(result.message).toMatch(/Авторизация Cursor недоступна/);
     expect(result.windows).toBe(null);
@@ -97,12 +119,12 @@ describe("Cursor reads existing auth, bounds and sanitizes requests, shares cach
     expect(await readCursorAccessToken()).toBe("env-fixture");
   });
   test("concurrent polls, repeated reads and HTTP route share one request", async () => {
-    state.value = undefined;
+    resetAgentUsageCache();
     calls = 0;
     let cursorCalls = 0;
     globalThis.fetch = async (url, options) => {
       calls++;
-      if (url === NETWORK_CONTEXT_URL) {
+      if (url === "https://ipwho.is/") {
         expect(options.method ?? "GET").toBe("GET");
         expect(options.redirect).toBe("error");
         expect(options.signal instanceof AbortSignal).toBeTruthy();
@@ -116,10 +138,13 @@ describe("Cursor reads existing auth, bounds and sanitizes requests, shares cach
       expect(options.signal instanceof AbortSignal).toBeTruthy();
       return Response.json({ ...payload, account: "SECRET" });
     };
-    const [a, b] = await Promise.all([cursorUsage(), cursorUsage()]);
+    const [a, b] = await Promise.all([
+      readAgentUsageLimits(agentId),
+      readAgentUsageLimits(agentId),
+    ]);
     expect(a).toBe(b);
     expect(a.status).toBe("ready");
-    expect(await cursorUsage()).toBe(a);
+    expect(await readAgentUsageLimits(agentId)).toBe(a);
     const headers = {};
     let body;
     const res = {
@@ -130,21 +155,25 @@ describe("Cursor reads existing auth, bounds and sanitizes requests, shares cach
         body = value;
       },
     };
-    expect(await handleCursor({ res, method: "GET", path: "/api/cursor/usage" })).toBe(true);
+    expect(await handleUsage({ res, method: "GET", path: `/api/agent/usage/${agentId}` })).toBe(
+      true,
+    );
     expect(headers["Cache-Control"]).toBe("no-store");
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(body)).toStrictEqual(a);
     expect(body).not.toMatch(/SECRET|fixture|Authorization|refreshToken/);
     expect(cursorCalls).toBe(1);
     expect(calls).toBe(2);
-    expect(await handleCursor({ res, method: "POST", path: "/api/cursor/usage" })).toBe(false);
-    state.value.checkedAt -= 60001;
-    await cursorUsage();
+    expect(await handleUsage({ res, method: "POST", path: `/api/agent/usage/${agentId}` })).toBe(
+      true,
+    );
+    expect(res.statusCode).toBe(405);
+    resetAgentUsageCache();
+    await readAgentUsageLimits(agentId);
     expect(cursorCalls).toBe(2);
     expect(calls).toBe(4);
   });
   test("failed network probe blocks Cursor usage requests", async () => {
-    state.value = undefined;
     let cursorCalls = 0;
     for (const body of [
       { success: false, is_eu: true, message: "SECRET" },
@@ -152,48 +181,47 @@ describe("Cursor reads existing auth, bounds and sanitizes requests, shares cach
       { success: true, ip: "SECRET" },
     ]) {
       globalThis.fetch = async (url) => {
-        if (url === NETWORK_CONTEXT_URL) return Response.json(body);
+        if (url === "https://ipwho.is/") return Response.json(body);
         cursorCalls++;
         throw new Error("must not request Cursor after failed probe");
       };
-      const result = await cursorUsage();
+      const result = await readAgentUsageLimits(agentId);
       expect(result.status).toBe("unavailable");
       expect(result.windows).toBe(null);
       expect(result.message).toMatch(/сетевой контекст/);
       expect(result.message).not.toMatch(/SECRET|US/);
-      state.value = undefined;
+      resetAgentUsageCache();
     }
     expect(cursorCalls).toBe(0);
   });
   test("auth errors and malformed responses do not expose upstream bodies", async () => {
     for (const status of [401, 403, 429, 500]) {
-      state.value = undefined;
       globalThis.fetch = async (url) => {
-        if (url === NETWORK_CONTEXT_URL) return Response.json({ success: true, is_eu: true });
+        if (url === "https://ipwho.is/") return Response.json({ success: true, is_eu: true });
         return new Response("SECRET upstream details", { status });
       };
-      const result = await cursorUsage();
+      const result = await readAgentUsageLimits(agentId);
       expect(result.status).toBe("unavailable");
       expect(result.windows).toBe(null);
       expect(result.message).not.toMatch(/SECRET|fixture/);
       if (status === 401) expect(result.message).toMatch(/истекла/);
       if (status === 403) expect(result.message).toMatch(/Подписка/);
+      resetAgentUsageCache();
     }
     globalThis.fetch = async (url) => {
-      if (url === NETWORK_CONTEXT_URL) return Response.json({ success: true, is_eu: true });
+      if (url === "https://ipwho.is/") return Response.json({ success: true, is_eu: true });
       return new Response("SECRET invalid JSON");
     };
     await expect(readCursorUsage()).rejects.toThrow(/Некорректный ответ/);
-    state.value = undefined;
     globalThis.fetch = async (url) => {
-      if (url === NETWORK_CONTEXT_URL) return Response.json({ success: true, is_eu: true });
+      if (url === "https://ipwho.is/") return Response.json({ success: true, is_eu: true });
       return Response.json({ planUsage: { totalPercentUsed: 1 } });
     };
-    expect((await cursorUsage()).status).toBe("unavailable");
+    expect((await readAgentUsageLimits(agentId)).status).toBe("unavailable");
   });
   test("hanging requests time out without returning credentials", async () => {
     globalThis.fetch = (url, options) => {
-      if (url === NETWORK_CONTEXT_URL) return Response.json({ success: true, is_eu: true });
+      if (url === "https://ipwho.is/") return Response.json({ success: true, is_eu: true });
       return new Promise((_resolve, reject) => {
         options.signal.addEventListener("abort", () => reject(new Error("SECRET request")), {
           once: true,

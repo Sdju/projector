@@ -72,10 +72,8 @@ function applyDescriptor(backend: AgentBackend, candidate: PluginAgentCandidate)
   const { agent } = candidate;
   if (!backend.caption && agent.caption) backend.caption = agent.caption;
   if (!backend.icon && agent.icon) backend.icon = agent.icon;
-  if (agent.usage?.kind === "command" && !backend.usage) {
-    backend.usage = agent.usage;
-    backend.usageUrl = `/api/agent/usage/${encodeURIComponent(agent.id)}`;
-  }
+  if (agent.usage?.kind === "command" && !backend.usage) backend.usage = agent.usage;
+  if (backend.usage) backend.usageUrl = `/api/agent/usage/${encodeURIComponent(agent.id)}`;
 }
 
 /** Reconciles the registry with the enabled, trusted plugin agents. */

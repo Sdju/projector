@@ -44,6 +44,42 @@ test("a command provider returns normalized windows", async () => {
   });
 });
 
+test("a function provider returns normalized windows and its errors are explicit", async () => {
+  register("usage-function", {
+    kind: "function",
+    read: () => ({
+      status: "ready",
+      windows: { total: { usedPercent: 42, resetsAt: 1700000000, limited: false } },
+    }),
+  });
+  expect(await readAgentUsageLimits("usage-function")).toMatchObject({
+    status: "ready",
+    windows: { total: { usedPercent: 42, resetsAt: 1700000000, limited: false } },
+  });
+
+  register("usage-function-error", {
+    kind: "function",
+    read: () => {
+      throw new Error("quota down");
+    },
+  });
+  expect(await readAgentUsageLimits("usage-function-error")).toMatchObject({
+    status: "unavailable",
+    windows: null,
+    message: "quota down",
+  });
+
+  register("usage-function-slow", {
+    kind: "function",
+    read: () => new Promise(() => {}),
+    timeoutMs: 100,
+  });
+  expect(await readAgentUsageLimits("usage-function-slow")).toMatchObject({
+    status: "unavailable",
+    message: expect.stringMatching(/вовремя/),
+  });
+});
+
 test("a missing provider and a failing command are explicit unavailable answers", async () => {
   register("usage-none", undefined);
   expect(await readAgentUsageLimits("usage-none")).toMatchObject({

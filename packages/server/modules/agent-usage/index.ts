@@ -10,10 +10,12 @@ const CACHE_MS = 60_000;
 const FAILURE_MS = 15_000;
 const MAX_OUTPUT = 1_000_000;
 const cache = new Map<string, { at: number; value: AgentUsage }>();
+const pending = new Map<string, Promise<AgentUsage>>();
 
 /** Drops cached limits; tests use it, HMR loses the map with the module anyway. */
 export function resetAgentUsageCache(): void {
   cache.clear();
+  pending.clear();
 }
 
 interface Payload {
@@ -61,7 +63,34 @@ function normalize(value: unknown, checkedAt: number): AgentUsage {
   };
 }
 
+async function runFunction(
+  provider: Extract<AgentUsageProvider, { kind: "function" }>,
+  checkedAt: number,
+): Promise<AgentUsage> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const value = await Promise.race([
+      Promise.resolve().then(() => provider.read(checkedAt)),
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("Провайдер лимитов не ответил вовремя")),
+          provider.timeoutMs ?? 10_000,
+        );
+      }),
+    ]);
+    return normalize(value, checkedAt);
+  } catch (error) {
+    return unavailable(
+      checkedAt,
+      error instanceof Error ? error.message : "Провайдер лимитов не ответил",
+    );
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 function run(provider: AgentUsageProvider, checkedAt: number): Promise<AgentUsage> {
+  if (provider.kind === "function") return runFunction(provider, checkedAt);
   return new Promise((resolve) => {
     let output = "";
     let error = "";
@@ -121,14 +150,22 @@ function run(provider: AgentUsageProvider, checkedAt: number): Promise<AgentUsag
   });
 }
 
-/** Limits of a plugin agent; `usage.command` runs as an argv process, never through a shell. */
+/** Limits of a plugin agent; `usage` runs a command or the trusted provider function in-process. */
 export async function readAgentUsageLimits(id: string, now = Date.now()): Promise<AgentUsage> {
   const provider = agentUsageProvider(id);
   if (!provider) return unavailable(now, "Агент не сообщает лимиты");
   const cached = cache.get(id);
   if (cached && now - cached.at < (cached.value.status === "ready" ? CACHE_MS : FAILURE_MS))
     return cached.value;
-  const value = await run(provider, now);
-  cache.set(id, { at: now, value });
-  return value;
+  const inFlight = pending.get(id);
+  if (inFlight) return inFlight;
+  const task = run(provider, now).then((value) => {
+    cache.set(id, { at: now, value });
+    return value;
+  });
+  pending.set(id, task);
+  void task.finally(() => {
+    if (pending.get(id) === task) pending.delete(id);
+  });
+  return task;
 }

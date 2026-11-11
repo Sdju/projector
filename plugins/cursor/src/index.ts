@@ -6,6 +6,7 @@ import { askCursorQuestions } from "./questions.ts";
 import { normalizeCursorSelection } from "./selection.ts";
 import { reportCursorTask } from "./task.ts";
 import { updateCursorTodos } from "./todos.ts";
+import { cursorUsageProvider, cursorUsageWindows } from "./usage.ts";
 
 /** Cursor through its ACP mode (`agent acp`), with its own picker flag, questions and plan. */
 export function cursorProgram(api: PluginCodeApi): AcpProgram {
@@ -33,5 +34,8 @@ export function cursorProgram(api: PluginCodeApi): AcpProgram {
 
 /** The agents this plugin adds to Projector; loaded in-process after the user trusts the package. */
 export function createAgents(api: PluginCodeApi): AgentBackend[] {
-  return [api.createAcpBackend(cursorProgram(api))];
+  const backend = api.createAcpBackend(cursorProgram(api));
+  backend.usage = cursorUsageProvider;
+  backend.usageWindows = cursorUsageWindows;
+  return [backend];
 }

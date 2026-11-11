@@ -126,6 +126,8 @@ exports.createAgents = (api) => [
 
 `api` версии `1` даёт `createAcpBackend(program)` и `api.acp` с `createPlainDialect`, `extendPlainDialect`, `inputOf`, `isOver`, `readCompaction`, `shorten` и `uuidV7Time`. Типы для автора лежат в `packages/server/modules/plugin-api`; их импортируют только через `import type`, чтобы собранный плагин не зависел от внутренних путей Projector. Готовый пример — [`plugins/cursor`](../plugins/cursor), сборка — `vp run build:plugin:cursor`.
 
+Доверенный код может сам отдавать лимиты подписки: `backend.usage = { kind: "function", read(checkedAt) }`, а `backend.usageWindows` задаёт подписи и длительность окон (`name`, `label`, `shortLabel`, `periodSeconds`, необязательные `ticks`). Projector выставляет общий маршрут `/api/agent/usage/<id>`, кеширует ответ и рисует его тем же индикатором, что и декларативный `usage.command`; без плагина маршрут отвечает «агент не сообщает лимиты». Так Cursor отдаёт свои окна «Всего / Авто / API» из `plugins/cursor`, а не из встроенного модуля.
+
 Код выполняется **в процессе сервера с его правами**, без песочницы. Поэтому он загружается только после явного доверия и включения пакета, а изменение любого файла пакета снимает доверие. Это не заменяет будущий изолированный runtime: произвольный UI, команды и доступ к внутренним модулям через этот API не выдаются.
 
 ## Токены темы

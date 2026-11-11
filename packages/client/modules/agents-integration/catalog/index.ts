@@ -1,4 +1,5 @@
 import { ref, type Component } from "vue";
+import type { AgentUsageWindowDefinition } from "@ai-projector/core/modules/usage-analytics/index.ts";
 import IconBot from "~icons/lucide/bot";
 import IconCode from "~icons/lucide/code";
 import IconSparkles from "~icons/lucide/sparkles";
@@ -110,6 +111,75 @@ interface RemoteAgent {
   icon?: unknown;
   program?: unknown;
   usageUrl?: unknown;
+  usageWindows?: unknown;
+}
+
+function usageWindowsOf(value: unknown): AgentUsageWindowDefinition[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const windows: AgentUsageWindowDefinition[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const window = item as Record<string, unknown>;
+    if (
+      typeof window.name !== "string" ||
+      !window.name ||
+      typeof window.label !== "string" ||
+      !window.label ||
+      typeof window.shortLabel !== "string" ||
+      !window.shortLabel ||
+      typeof window.periodSeconds !== "number" ||
+      !Number.isFinite(window.periodSeconds)
+    )
+      continue;
+    const ticks = Array.isArray(window.ticks)
+      ? window.ticks.filter(
+          (tick): tick is number => typeof tick === "number" && Number.isFinite(tick),
+        )
+      : [];
+    windows.push({
+      name: window.name,
+      label: window.label,
+      shortLabel: window.shortLabel,
+      periodSeconds: window.periodSeconds,
+      ...(ticks.length ? { ticks } : {}),
+    });
+  }
+  return windows.length ? windows : undefined;
+}
+
+function usagePropsOf(
+  item: RemoteAgent,
+  title: string,
+  icon: Component,
+): Record<string, unknown> | undefined {
+  if (typeof item.usageUrl !== "string" || !item.usageUrl) return undefined;
+  const windows = usageWindowsOf(item.usageWindows);
+  return {
+    usageUrl: item.usageUrl,
+    title,
+    agentId: item.id,
+    icon,
+    ...(windows ? { windows } : {}),
+  };
+}
+
+/** Adds the server's generic limits to a local descriptor without replacing its own indicator. */
+function withRemoteUsage(
+  agent: ClientAgent,
+  item: RemoteAgent,
+  title: string,
+  icon: Component,
+): ClientAgent {
+  if (agent.usage) return agent;
+  const usageProps = usagePropsOf(item, title, icon);
+  if (!usageProps) {
+    if (!agent.usageUrl && !agent.usageProps) return agent;
+    const next = { ...agent };
+    delete next.usageUrl;
+    delete next.usageProps;
+    return next;
+  }
+  return { ...agent, usageUrl: usageProps.usageUrl as string, usageProps };
 }
 
 /**
@@ -134,21 +204,33 @@ export async function refreshClientAgents(): Promise<void> {
   const seen = new Set<string>();
   for (const item of backends) {
     if (!item || typeof item.id !== "string" || !item.id) continue;
+    const label = typeof item.label === "string" && item.label ? item.label : item.id;
     const existing = agents.get(item.id);
-    if (existing && !remote.has(item.id)) {
+    const local = localPlugins.get(item.id);
+    if (local) {
+      // The backend was absent on an earlier refresh; restore the rich local descriptor instead
+      // of a fallback icon/caption when the plugin is enabled later.
+      const next = withRemoteUsage(local, item, local.title, local.icon);
+      if (agents.get(item.id) !== next) {
+        agents.set(item.id, next);
+        revision.value++;
+      }
       seen.add(item.id);
       continue;
     }
-    if (!existing && localPlugins.has(item.id)) {
-      // The backend was absent on an earlier refresh; restore the rich local descriptor instead
-      // of a fallback icon/caption when the plugin is enabled later.
+    if (existing && !remote.has(item.id)) {
+      // Local descriptors keep their icon and plan; the server only fills in missing limits.
+      const next = withRemoteUsage(existing, item, existing.title, existing.icon);
+      if (next !== existing) {
+        agents.set(item.id, next);
+        revision.value++;
+      }
       seen.add(item.id);
-      registerClientAgent(localPlugins.get(item.id)!);
       continue;
     }
     seen.add(item.id);
-    const label = typeof item.label === "string" && item.label ? item.label : item.id;
-    const usageUrl = typeof item.usageUrl === "string" && item.usageUrl ? item.usageUrl : undefined;
+    const icon = iconOf(item.icon);
+    const usageProps = usagePropsOf(item, label, icon);
     registerClientAgent({
       backend: item.id,
       program: typeof item.program === "string" && item.program ? item.program : item.id,
@@ -157,8 +239,8 @@ export async function refreshClientAgents(): Promise<void> {
         typeof item.caption === "string" && item.caption
           ? item.caption
           : `Запустит агента ${label}`,
-      icon: iconOf(item.icon),
-      ...(usageUrl ? { usageUrl, usageProps: { usageUrl, title: label, agentId: item.id } } : {}),
+      icon,
+      ...(usageProps ? { usageUrl: usageProps.usageUrl as string, usageProps } : {}),
     });
   }
   let removed = false;

@@ -1,3 +1,4 @@
+import type { AgentUsageWindowDefinition } from "@ai-projector/core/modules/usage-analytics/index.ts";
 import type {
   AgentBackend,
   AgentBackendId,
@@ -71,12 +72,24 @@ export interface AgentBackendSummary {
   builtin?: boolean;
   capabilities?: AgentCapabilities;
   usageUrl?: string;
+  usageWindows?: readonly AgentUsageWindowDefinition[];
 }
 
 /** Every registered backend in registration order, without its methods. */
 export function listAgentBackends(): AgentBackendSummary[] {
   return [...backends.values()].map(
-    ({ id, label, caption, icon, program, terminal, builtin, capabilities, usageUrl }) => ({
+    ({
+      id,
+      label,
+      caption,
+      icon,
+      program,
+      terminal,
+      builtin,
+      capabilities,
+      usageUrl,
+      usageWindows,
+    }) => ({
       id,
       label,
       ...(caption ? { caption } : {}),
@@ -86,6 +99,7 @@ export function listAgentBackends(): AgentBackendSummary[] {
       ...(builtin ? { builtin } : {}),
       ...(capabilities ? { capabilities } : {}),
       ...(usageUrl ? { usageUrl } : {}),
+      ...(usageWindows?.length ? { usageWindows } : {}),
     }),
   );
 }

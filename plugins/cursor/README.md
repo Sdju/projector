@@ -4,7 +4,10 @@
 агента, а `dist/server.cjs` — доверенный серверный код: он собирает `AcpProgram` Cursor с его
 диалектом, расширениями (`ask_question`, `create_plan`, `update_todos`, `task`,
 `generate_image`), нормализацией выбора модели и клиентскими возможностями
-параметризованного пикера.
+параметризованного пикера. Там же живут лимиты подписки: `backend.usage` читает ConnectRPC и
+`auth.json` Cursor, а `usageWindows` задаёт окна «Всего / Авто / API» для общего индикатора.
+Встроенного маршрута `/api/cursor/usage` больше нет — Projector отдаёт лимиты через
+`/api/agent/usage/cursor`, пока плагин включён.
 
 ## Сборка
 

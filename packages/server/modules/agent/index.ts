@@ -36,6 +36,7 @@ export type {
   AgentRunHandle,
   AgentRunOptions,
   AgentTerminal,
+  AgentUsageCommandProvider,
   AgentUsageProvider,
   McpServerInfo,
   MessagePart,

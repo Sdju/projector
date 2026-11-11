@@ -61,7 +61,6 @@ import { routes as filesExcludeRoutes } from "../routes/api/ide/files-exclude.ts
 import { routes as dockerRoutes } from "../routes/api/docker.ts";
 import { routes as codexRoutes } from "../routes/api/codex.ts";
 import { routes as openCodeRoutes } from "../routes/api/opencode.ts";
-import { routes as cursorRoutes } from "../routes/api/cursor.ts";
 import { routes as kimiRoutes } from "../routes/api/kimi.ts";
 import { routes as claudeRoutes } from "../routes/api/claude.ts";
 import { routes as analyticsRoutes } from "../routes/api/analytics.ts";
@@ -74,7 +73,6 @@ const dispatch = createRouteDispatcher([
   ...browserRoutes,
   ...claudeRoutes,
   ...analyticsRoutes,
-  ...cursorRoutes,
   ...kimiRoutes,
   ...openCodeRoutes,
   ...codexRoutes,

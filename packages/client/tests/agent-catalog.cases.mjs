@@ -97,3 +97,42 @@ test("a local descriptor wins over the same backend from the server", async () =
     "Local Agent",
   );
 });
+
+test("the server fills missing limits and their window labels into a local descriptor", async () => {
+  const original = globalThis.fetch;
+  onTestFinished(() => {
+    globalThis.fetch = original;
+  });
+  registerClientAgent({
+    backend: "local-usage-test",
+    program: "local-usage",
+    title: "Local Usage",
+    caption: "Локальный индикатор",
+    icon: IconBot,
+    plugin: true,
+  });
+  serve([
+    {
+      id: "local-usage-test",
+      label: "Server Usage",
+      program: "local-usage",
+      usageUrl: "/api/agent/usage/local-usage-test",
+      usageWindows: [{ name: "total", label: "Всего", shortLabel: "вс", periodSeconds: 2592000 }],
+    },
+  ]);
+  await refreshClientAgents();
+  const agent = clientAgents().find((item) => item.backend === "local-usage-test");
+  expect(agent).toMatchObject({
+    title: "Local Usage",
+    usageUrl: "/api/agent/usage/local-usage-test",
+  });
+  expect(agent.usage).toBeUndefined();
+  expect(agent.usageProps).toMatchObject({
+    agentId: "local-usage-test",
+    windows: [{ name: "total", label: "Всего", shortLabel: "вс", periodSeconds: 2592000 }],
+  });
+
+  serve([]);
+  await refreshClientAgents();
+  expect(clientAgents().some((item) => item.backend === "local-usage-test")).toBe(false);
+});

@@ -13,8 +13,8 @@ import DockerSidebar from '/packages/client/modules/docker/ui/DockerSidebar.vue'
 import DockerPanel from '/packages/client/modules/docker/ui/DockerPanel.vue';
 import CodexUsageIndicator from '/packages/client/modules/agents-integration/codex/ui/CodexUsageIndicator.vue';
 import ClaudeUsageIndicator from '/packages/client/modules/agents-integration/claude/ui/ClaudeUsageIndicator.vue';
-import CursorUsageIndicator from '/packages/client/modules/agents-integration/cursor/ui/CursorUsageIndicator.vue';
 import OpenCodeUsageIndicator from '/packages/client/modules/agents-integration/opencode/ui/OpenCodeUsageIndicator.vue';
+import PluginUsageIndicator from '/packages/client/modules/agents-integration/usage/PluginUsageIndicator.vue';
 import {agentUsageSummary} from '/packages/client/modules/agents-integration/_/usage-summary.ts';
 import {commandHostKey} from '/packages/client/common/utilities/commands.ts';
 const check=(value,label)=>{if(!value)throw new Error(label);};
@@ -71,7 +71,8 @@ let trackerApp,dockerApp,usageApp,state;
  let scenario='ready';
  const quota=(usedPercent,seconds,limited=false)=>({usedPercent,resetsAt:Date.now()/1000+seconds,limited});
  window.fetch=async(input,options)=>{
-  if(!['codex','claude','cursor','opencode'].some(provider=>input==='/api/'+provider+'/usage'))return originalFetch(input,options);
+  const usageEndpoint=input==='/api/agent/usage/cursor'||['codex','claude','opencode'].some(provider=>input==='/api/'+provider+'/usage');
+  if(!usageEndpoint)return originalFetch(input,options);
   requests.push(input);
   await originalFetch('/__tick');
   if(scenario==='failed')return new Response('',{status:503});
@@ -80,17 +81,21 @@ let trackerApp,dockerApp,usageApp,state;
   if(scenario==='partial')windows.weekly=null;
   return Response.json({status:'ready',windows,weekly:{...quota(30,86400),windowDurationMins:1440}});
  };
- const adapters=[['codex',CodexUsageIndicator,1,null,70],['claude',ClaudeUsageIndicator,2,'rolling',60],['cursor',CursorUsageIndicator,3,'auto',80],['opencode',OpenCodeUsageIndicator,3,'monthly',60]];
+ const cursorWindows=[{name:'total',label:'Всего',shortLabel:'вс',periodSeconds:30*86400},{name:'auto',label:'Авто',shortLabel:'авт',periodSeconds:30*86400},{name:'api',label:'API',shortLabel:'API',periodSeconds:30*86400}];
+ const cursorProps={usageUrl:'/api/agent/usage/cursor',title:'Cursor',agentId:'cursor',windows:cursorWindows};
+ const adapters=[['codex',CodexUsageIndicator,1,null,70],['claude',ClaudeUsageIndicator,2,'rolling',60],['cursor',PluginUsageIndicator,3,'auto',80],['opencode',OpenCodeUsageIndicator,3,'monthly',60]];
  for(const [provider,Component,rowCount,nextWindow,remaining] of adapters){
+  const endpoint=provider==='cursor'?'/api/agent/usage/cursor':'/api/'+provider+'/usage';
+  const commandId=provider==='cursor'?'ide.plugin.cursor.usage.window.cycle':'ide.'+provider+'.usage.window.cycle';
   // Shared failure presentation needs one adapter; retain each provider's ready mapping.
   for(scenario of ['ready',...(provider==='claude'?['unavailable','failed','partial']:[])]){
-   usageApp=createApp(Component);usageApp.provide(commandHostKey,host);usageApp.mount('#usage');
+   usageApp=createApp(Component,provider==='cursor'?cursorProps:{});usageApp.provide(commandHostKey,host);usageApp.mount('#usage');
    const indicator=document.querySelector('#usage .usage-indicator');
    const tooltip=indicator.querySelector('[role="tooltip"]');
    const meter=()=>indicator.querySelector(':scope > .quota-bar');
    check(indicator.getAttribute('aria-describedby')===tooltip.id,provider+' tooltip association');
    check(tooltip.textContent.includes('загрузка')||tooltip.textContent.includes('Загрузка'),provider+' loading text');
-   await wait(()=>requests.at(-1)==='/api/'+provider+'/usage'&&!tooltip.textContent.includes('агрузка'),provider+' polling result');
+   await wait(()=>requests.at(-1)===endpoint&&!tooltip.textContent.includes('агрузка'),provider+' polling result');
    check(indicator.tagName===(provider==='codex'?'SPAN':'BUTTON'),provider+' interaction semantics');
    if(scenario==='ready'){
     check(meter().getAttribute('aria-valuenow')===String(remaining),provider+' remaining');
@@ -102,7 +107,7 @@ let trackerApp,dockerApp,usageApp,state;
     check(agentUsageSummary[provider].remaining===remaining,provider+' shared summary');
     const before=requests.length;
     if(nextWindow){
-     const command=commands.get('ide.'+provider+'.usage.window.cycle');
+     const command=commands.get(commandId);
      check(command.title&&command.description,provider+' command descriptions');
      indicator.click();await nextTick();
      check(indicator.getAttribute('aria-label').includes(provider==='claude'?'5 часов':provider==='cursor'?'Авто':'Месяц'),provider+' click cycles correct window');

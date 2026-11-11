@@ -16,6 +16,7 @@ export interface AgentCapabilities {
 import type { JudgeOverride } from "@ai-projector/core/modules/agent-judge/index.ts";
 import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 import type { AgentHistoryTurn } from "../providers/index.ts";
+import type { AgentUsageWindowDefinition } from "@ai-projector/core/modules/usage-analytics/index.ts";
 import type {
   AgentControl,
   AgentSelection,
@@ -155,13 +156,23 @@ export interface AgentTerminal {
   title: string;
 }
 
-/** A plugin's limits probe: argv, JSON on stdout, a bounded wait. */
-export interface AgentUsageProvider {
+/** Where the status bar asks for subscription limits; absent when the agent has none. */
+export interface AgentUsageCommandProvider {
   kind: "command";
   command: string;
   args?: string[];
   timeoutMs?: number;
 }
+
+/** A trusted plugin may answer limits from its own process instead of a separate argv probe. */
+export interface AgentUsageFunctionProvider {
+  kind: "function";
+  /** Returns the same JSON a command provider would print; errors become an unavailable answer. */
+  read(checkedAt: number): unknown;
+  timeoutMs?: number;
+}
+
+export type AgentUsageProvider = AgentUsageCommandProvider | AgentUsageFunctionProvider;
 
 /**
  * One way of running the chat agent. A backend streams the shared SSE events (`text`, `tool`,
@@ -217,6 +228,8 @@ export interface AgentBackend {
   mcpServers?(cwd: string): Promise<McpServerInfo[]>;
   /** Where the status bar asks for subscription limits; absent when the agent has none. */
   usage?: AgentUsageProvider;
+  /** Labels and pace of the provider's windows; absent uses the generic plugin names. */
+  usageWindows?: readonly AgentUsageWindowDefinition[];
   /** The generic limits endpoint the client polls, when `usage` is present. */
   usageUrl?: string;
 }
