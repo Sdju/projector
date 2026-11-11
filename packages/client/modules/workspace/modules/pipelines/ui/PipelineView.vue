@@ -8,7 +8,11 @@ import UiViewerPage from "../../../../../common/ui/UiViewerPage.vue";
 import UiStatusDot from "../../../../../common/ui/UiStatusDot.vue";
 import { computed, ref } from "vue";
 import { countRu } from "../../../../../common/utilities/plural.ts";
-import { groupPipelineStages, PIPELINE_PROBLEM_STATUSES } from "../../../../workspace-api/index.ts";
+import {
+  groupPipelineStages,
+  PIPELINE_PROBLEM_STATUSES,
+  tabRecordId,
+} from "../../../../workspace-api/index.ts";
 import { relativeTime, shortHash } from "../../../../../common/utilities/commit-format.ts";
 import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab-readout.ts";
 import {
@@ -17,6 +21,7 @@ import {
   useCommandScope,
 } from "../../../../../common/utilities/commands.ts";
 import { usePipelineDetail } from "../lib/detail.ts";
+import PipelineAnnotations from "./PipelineAnnotations.vue";
 import {
   durationLabel,
   PIPELINE_STATUS_LABEL,
@@ -25,14 +30,22 @@ import {
   sourceLabel,
 } from "@ai-projector/core/modules/workspace/index.ts";
 /** Pipeline tab: status, ref and commit, then the jobs of the run grouped by stage. */
-const props = withDefaults(defineProps<{ projectId: string; id: number; host?: string }>(), {
-  host: "GitLab",
-});
-const emit = defineEmits<{ openJob: [job: { id: number; title: string }, pinned?: boolean] }>();
-const { detail, loading, error, reload } = usePipelineDetail(
-  () => props.projectId,
-  () => props.id,
+const props = withDefaults(
+  defineProps<{
+    projectId: string;
+    id?: number | string;
+    number?: number | string;
+    host?: string;
+  }>(),
+  { host: "GitLab" },
 );
+const emit = defineEmits<{
+  openJob: [job: { id: number; title: string }, pinned?: boolean];
+  openFile: [file: { path: string; line?: number }];
+  openPull: [pull: { number: number }];
+}>();
+const recordId = () => tabRecordId({ id: props.id, number: props.number }, "id", "number") ?? 0;
+const { detail, loading, error, reload } = usePipelineDetail(() => props.projectId, recordId);
 const problemsOnly = ref(false);
 const groups = computed(() =>
   groupPipelineStages(detail.value?.jobs ?? [], { problemsOnly: problemsOnly.value }),
@@ -45,14 +58,27 @@ const stateTone = computed(() => {
   const tone = detail.value ? PIPELINE_STATUS_TONE[detail.value.pipeline.status] : "muted";
   return tone === "warning" || tone === "success" || tone === "danger" ? tone : "neutral";
 });
-const commands = useCommandScope(`pipeline:${props.projectId}:${props.id}`, () => ({
+const heading = computed(() => {
+  const pipeline = detail.value?.pipeline;
+  if (!pipeline) return "Pipeline";
+  return pipeline.title || pipeline.name || "Pipeline";
+});
+const subtitle = computed(() => {
+  const pipeline = detail.value?.pipeline;
+  if (!pipeline?.title) return "";
+  return pipeline.name;
+});
+const usageLabel = (milliseconds: number) => durationLabel(Math.round(milliseconds / 1000));
+const commands = useCommandScope(`pipeline:${props.projectId}:${recordId()}`, () => ({
   surface: "pipeline",
   projectId: props.projectId,
-  pipelineId: props.id,
+  pipelineId: recordId(),
 }));
 const register = useCommandRegistrar(commands.scope);
 const openJob = (job: { id: number; name: string }, pinned = false) =>
   commands.run("ide.pipeline.job.open", { id: job.id, title: job.name, pinned });
+const openFile = (file: { path: string; line?: number }) =>
+  commands.run("ide.pipeline.file.open", file);
 register(
   "ide.pipeline.refresh",
   "Обновить pipeline",
@@ -74,9 +100,34 @@ register(
     pinned: "boolean (необязательно): true — постоянная вкладка",
   },
 );
+register(
+  "ide.pipeline.file.open",
+  "Открыть файл pipeline",
+  "Открывает файл workflow или путь из аннотации в вкладке редактора.",
+  (value) => {
+    const { path, line } = commandArgs(value);
+    if (typeof path !== "string" || !path) throw new Error("Укажите путь файла");
+    emit("openFile", { path, line: typeof line === "number" ? line : undefined });
+  },
+  {
+    path: "string: путь файла в репозитории",
+    line: "number (необязательно): строка",
+  },
+);
+register(
+  "ide.pipeline.pull.open",
+  "Открыть pull request pipeline",
+  "Открывает вкладку pull request, из которого запущен этот pipeline.",
+  (value) => {
+    const { number } = commandArgs(value);
+    if (typeof number !== "number") throw new Error("Укажите номер pull request");
+    emit("openPull", { number });
+  },
+  { number: "number: номер pull request" },
+);
 
 useTabReadout(() => {
-  const note = `Pipeline #${props.id}`;
+  const note = recordId() ? `Pipeline #${recordId()}` : "Pipeline";
   if (error.value) return { note, text: `Ошибка: ${error.value}` };
   const data = detail.value;
   if (!data) return { note, text: "Загрузка…" };
@@ -90,12 +141,28 @@ useTabReadout(() => {
     note,
     text: readoutLines(
       `Состояние: ${PIPELINE_STATUS_LABEL[pipeline.status]}`,
+      pipeline.title || pipeline.name ? `Название: ${pipeline.title || pipeline.name}` : "",
       `Ветка: ${refLabel(pipeline.ref) || "нет"}, коммит: ${pipeline.sha || "нет"}`,
+      pipeline.commitMessage ? `Коммит: ${pipeline.commitMessage}` : "",
       `Источник: ${sourceLabel(pipeline.source) || "нет"}`,
+      pipeline.path ? `Workflow: ${pipeline.path}` : "",
+      pipeline.pulls.length ? `PR: ${pipeline.pulls.map((item) => `#${item}`).join(", ")}` : "",
       `Создан: ${pipeline.createdAt}`,
       pipeline.duration !== null ? `Длительность: ${durationLabel(pipeline.duration)}` : "",
+      data.usage.length
+        ? `Usage: ${data.usage.map((item) => `${item.label} ${usageLabel(item.milliseconds)}`).join(", ")}`
+        : "",
       `Джобов: ${data.jobs.length}`,
       shown.length ? `Джобы:\n${shown.join("\n")}` : "Джобов нет",
+      data.annotations.length
+        ? `Аннотации:\n${data.annotations
+            .slice(0, 20)
+            .map(
+              (item) =>
+                `${item.path}${item.startLine ? `:${item.startLine}` : ""}: ${item.message}`,
+            )
+            .join("\n")}`
+        : "",
       data.jobsTruncated
         ? `Показано ${data.jobs.length} джобов, остальные — на ${props.host}.`
         : "",
@@ -114,24 +181,60 @@ useTabReadout(() => {
       <UiDetailHeader
         :state="PIPELINE_STATUS_LABEL[detail.pipeline.status]"
         :tone="stateTone"
-        title="Pipeline"
-        :number="detail.pipeline.id"
-        :subtitle="detail.pipeline.name"
+        :title="heading"
+        :number="detail.pipeline.id || detail.pipeline.number || undefined"
+        :subtitle="subtitle"
         :external-href="detail.pipeline.webUrl"
         :host="host"
       >
         <template #meta>
+          <span v-if="detail.pipeline.number">run #{{ detail.pipeline.number }}</span>
+          <span v-if="detail.pipeline.attempt > 1">попытка {{ detail.pipeline.attempt }}</span>
           <span v-if="detail.pipeline.ref" class="mono">{{ refLabel(detail.pipeline.ref) }}</span>
           <span v-if="detail.pipeline.source">{{ sourceLabel(detail.pipeline.source) }}</span>
           <span v-if="detail.pipeline.sha" class="mono">{{ shortHash(detail.pipeline.sha) }}</span>
+          <span v-if="detail.pipeline.commitMessage" :title="detail.pipeline.commitMessage">{{
+            detail.pipeline.commitMessage
+          }}</span>
+          <button
+            v-if="detail.pipeline.path"
+            type="button"
+            class="file"
+            :title="`Открыть ${detail.pipeline.path}`"
+            data-command="ide.pipeline.file.open"
+            @click="openFile({ path: detail.pipeline.path })"
+          >
+            {{ detail.pipeline.path }}
+          </button>
+          <button
+            v-for="pull in detail.pipeline.pulls"
+            :key="pull"
+            type="button"
+            class="file"
+            :title="`Открыть PR #${pull}`"
+            data-command="ide.pipeline.pull.open"
+            @click="commands.run('ide.pipeline.pull.open', { number: pull })"
+          >
+            PR #{{ pull }}
+          </button>
           <span v-if="detail.pipeline.createdAt" :title="detail.pipeline.createdAt"
             >создан {{ relativeTime(detail.pipeline.createdAt) }}</span
           >
           <span v-if="durationLabel(detail.pipeline.duration)"
             >за {{ durationLabel(detail.pipeline.duration) }}</span
           >
+          <span v-for="item in detail.usage" :key="item.label"
+            >{{ item.label }} {{ usageLabel(item.milliseconds) }}</span
+          >
         </template>
       </UiDetailHeader>
+
+      <PipelineAnnotations
+        :items="detail.annotations"
+        :truncated="detail.annotationsTruncated"
+        :host="host"
+        @open="openFile"
+      />
 
       <div class="jobs-head">
         <UiHeading as="h3" size="sm" tone="secondary" :space-before="4" :space-after="0"
@@ -186,6 +289,7 @@ useTabReadout(() => {
               >
                 <UiStatusDot :tone="PIPELINE_STATUS_TONE[job.status]" shrink />
                 <span class="job-name">{{ job.name || `Job #${job.id}` }}</span>
+                <span v-if="job.labels.length" class="job-labels">{{ job.labels.join(", ") }}</span>
                 <span class="job-status">{{ PIPELINE_STATUS_LABEL[job.status] }}</span>
                 <span v-if="durationLabel(job.duration)" class="job-time">{{
                   durationLabel(job.duration)
@@ -313,14 +417,24 @@ useTabReadout(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.file {
+  color: var(--text-2);
+  font-size: var(--fs-2xs);
+}
+.file:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
 .job-status,
 .job-time,
-.job-number {
+.job-number,
+.job-labels {
   color: var(--muted);
   font-size: var(--fs-2xs);
 }
 .job-time,
-.job-number {
+.job-number,
+.job-labels {
   font-family: var(--mono);
 }
 </style>

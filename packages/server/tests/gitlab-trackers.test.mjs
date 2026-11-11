@@ -511,6 +511,12 @@ test("GitLab merge request exposes its latest pipeline, reviewers and approval q
   expect(detail.pipeline).toStrictEqual({
     id: 99,
     name: "",
+    title: "",
+    number: 0,
+    attempt: 1,
+    path: "",
+    commitMessage: "",
+    pulls: [],
     status: "running",
     source: "merge_request_event",
     ref: "refs/merge-requests/11/merge",

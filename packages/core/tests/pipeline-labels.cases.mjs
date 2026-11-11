@@ -1,5 +1,10 @@
 import { expect, test } from "vite-plus/test";
-import { refLabel, sourceLabel } from "../modules/workspace/pipeline-status.ts";
+import {
+  PIPELINE_ANNOTATION_LEVEL_LABEL,
+  PIPELINE_ANNOTATION_LEVEL_TONE,
+  refLabel,
+  sourceLabel,
+} from "../modules/workspace/pipeline-status.ts";
 import { countRu } from "../../client/common/utilities/plural.ts";
 
 test("pipeline refs drop GitLab prefixes and name merge requests", () => {
@@ -10,6 +15,12 @@ test("pipeline refs drop GitLab prefixes and name merge requests", () => {
   expect(refLabel("refs/tags/v1.2.3")).toBe("v1.2.3");
   expect(refLabel("workloads/abc")).toBe("workloads/abc");
   expect(refLabel("")).toBe("");
+});
+
+test("pipeline annotation levels have labels and tones", () => {
+  expect(PIPELINE_ANNOTATION_LEVEL_LABEL.failure).toBe("ошибка");
+  expect(PIPELINE_ANNOTATION_LEVEL_TONE.warning).toBe("warning");
+  expect(PIPELINE_ANNOTATION_LEVEL_TONE.notice).toBe("info");
 });
 
 test("pipeline sources have short human labels", () => {

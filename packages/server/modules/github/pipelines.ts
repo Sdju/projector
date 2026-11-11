@@ -1,16 +1,25 @@
 import { HttpError } from "../http/index.ts";
 import { integrationConfig } from "../integration-store/index.ts";
 import type {
-  Pipeline,
   PipelineDetail,
-  PipelineJob,
   PipelineJobDetail,
   PipelineList,
-  PipelineStatus,
 } from "@ai-projector/core/modules/workspace/index.ts";
 import { githubResponse, repositoryName } from "./api.ts";
 import { githubReader } from "./browser.ts";
-import { user, type RemoteUser } from "./issues.ts";
+import {
+  collectAnnotations,
+  job,
+  jobAnnotations,
+  optionalGet,
+  pipeline,
+  usage,
+  type ApiTiming,
+  type ApiWorkflowJob,
+  type ApiWorkflowRun,
+} from "./pipeline-map.ts";
+
+export { pipeline } from "./pipeline-map.ts";
 
 const PIPELINE_PAGE = 30;
 const JOB_PAGE = 100;
@@ -29,133 +38,6 @@ const FILTERS: Record<string, string> = {
   skipped: "skipped",
   manual: "action_required",
 };
-
-/** Run and job states GitHub reports before a conclusion exists. */
-const STATUSES: Record<string, PipelineStatus> = {
-  queued: "queued",
-  requested: "queued",
-  waiting: "queued",
-  pending: "queued",
-  in_progress: "running",
-  completed: "unknown",
-  startup_failure: "failed",
-  action_required: "manual",
-  neutral: "success",
-  stale: "skipped",
-};
-
-const CONCLUSIONS: Record<string, PipelineStatus> = {
-  success: "success",
-  failure: "failed",
-  timed_out: "failed",
-  startup_failure: "failed",
-  cancelled: "canceled",
-  skipped: "skipped",
-  action_required: "manual",
-  neutral: "success",
-  stale: "skipped",
-};
-
-export interface ApiWorkflowRun {
-  id: number;
-  name?: string | null;
-  display_title?: string | null;
-  status?: string;
-  conclusion?: string | null;
-  event?: string;
-  head_branch?: string | null;
-  head_sha?: string;
-  html_url?: string;
-  created_at?: string;
-  updated_at?: string;
-  run_started_at?: string;
-  actor?: RemoteUser;
-}
-
-interface ApiStep {
-  name?: string;
-  status?: string;
-  conclusion?: string | null;
-}
-
-interface ApiWorkflowJob {
-  id: number;
-  run_id?: number;
-  name?: string;
-  status?: string;
-  conclusion?: string | null;
-  head_branch?: string | null;
-  html_url?: string;
-  started_at?: string | null;
-  completed_at?: string | null;
-  steps?: ApiStep[];
-}
-
-function pipelineStatus(status?: string, conclusion?: string | null): PipelineStatus {
-  if (status === "completed" || !status) return CONCLUSIONS[conclusion || ""] ?? "unknown";
-  return STATUSES[status] ?? CONCLUSIONS[status] ?? "unknown";
-}
-
-function secondsBetween(start?: string | null, end?: string | null): number | null {
-  if (!start || !end) return null;
-  const from = Date.parse(start);
-  const to = Date.parse(end);
-  if (!Number.isFinite(from) || !Number.isFinite(to) || to < from) return null;
-  return Math.round((to - from) / 1000);
-}
-
-export function pipeline(raw: ApiWorkflowRun): Pipeline {
-  const status = pipelineStatus(raw.status, raw.conclusion);
-  return {
-    id: raw.id,
-    name: raw.name || "",
-    status,
-    source: raw.event || "",
-    ref: raw.head_branch || "",
-    sha: raw.head_sha || "",
-    author: user(raw.actor),
-    webUrl: raw.html_url || "",
-    createdAt: raw.created_at || "",
-    updatedAt: raw.updated_at || "",
-    duration:
-      status === "running" || status === "queued"
-        ? null
-        : secondsBetween(raw.run_started_at || raw.created_at, raw.updated_at),
-  };
-}
-
-function failureReason(raw: ApiWorkflowJob): string {
-  const step = (raw.steps ?? []).find(
-    (item) => item.conclusion === "failure" || item.conclusion === "timed_out",
-  );
-  if (step?.name) return step.name;
-  if (["failure", "timed_out", "startup_failure"].includes(raw.conclusion || ""))
-    return raw.conclusion || "";
-  return "";
-}
-
-function job(raw: ApiWorkflowJob, fallbackPipelineId: number, ref = ""): PipelineJob {
-  const status = pipelineStatus(raw.status, raw.conclusion);
-  return {
-    id: raw.id,
-    pipelineId: raw.run_id ?? fallbackPipelineId,
-    name: raw.name || "",
-    // Actions runs have no stages: every job is a peer of the same run.
-    stage: "",
-    status,
-    ref: raw.head_branch || ref,
-    webUrl: raw.html_url || "",
-    createdAt: raw.started_at || "",
-    startedAt: raw.started_at || "",
-    finishedAt: raw.completed_at || "",
-    duration:
-      status === "running" || status === "queued"
-        ? null
-        : secondsBetween(raw.started_at, raw.completed_at),
-    allowFailure: false,
-    failureReason: failureReason(raw),
-  };
-}
 
 function pageNumber(value?: string | number): number {
   const page = Number(value || 1);
@@ -234,13 +116,21 @@ export async function browseGithubPipeline(
 ): Promise<PipelineDetail> {
   const number = pipelineId(value);
   const get = await githubReader(repository);
-  const raw = await get<ApiWorkflowRun>(`/actions/runs/${number}`);
-  const jobs = await pipelineJobs(get, number);
+  const [raw, jobs, timing] = await Promise.all([
+    get<ApiWorkflowRun>(`/actions/runs/${number}`),
+    pipelineJobs(get, number),
+    optionalGet<ApiTiming>(get, `/actions/runs/${number}/timing`),
+  ]);
   const ref = raw.head_branch || "";
+  const mapped = jobs.jobs.map((item) => job(item, number, ref));
+  const notes = await collectAnnotations(get, mapped);
   return {
     pipeline: pipeline(raw),
-    jobs: jobs.jobs.map((item) => job(item, number, ref)),
+    jobs: mapped,
     jobsTruncated: jobs.truncated,
+    annotations: notes.items,
+    annotationsTruncated: notes.truncated,
+    usage: usage(timing),
   };
 }
 
@@ -318,14 +208,17 @@ export async function browseGithubJob(
 ): Promise<PipelineJobDetail> {
   const number = jobId(value);
   const get = await githubReader(repository);
-  const [raw, response] = await Promise.all([
+  const [raw, response, notes] = await Promise.all([
     get<ApiWorkflowJob>(`/actions/jobs/${number}`),
     jobLogResponse(repository, number),
+    jobAnnotations(get, number),
   ]);
   const trace = response ? await cappedLog(response) : { log: "", truncated: false };
   return {
     job: job(raw, raw.run_id ?? 0),
     log: trace.log,
     logTruncated: trace.truncated,
+    annotations: notes.items,
+    annotationsTruncated: notes.truncated,
   };
 }

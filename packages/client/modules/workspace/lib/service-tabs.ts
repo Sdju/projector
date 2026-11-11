@@ -16,8 +16,13 @@ export function ensureTab(
   const key = type.key(params);
   const existing = tabs.value.find((tab) => tab.key === key);
   const asPreview = opensAsPreview(preview && !!type.preview, existing);
-  if (existing) existing.preview = asPreview;
-  else
+  if (existing) {
+    existing.preview = asPreview;
+    existing.path = type.path(params);
+    existing.params = params;
+    const hint = type.hint?.(params);
+    if (hint) existing.content = hint;
+  } else
     tabs.value.push({
       key,
       path: type.path(params),

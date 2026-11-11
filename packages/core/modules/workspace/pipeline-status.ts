@@ -1,4 +1,4 @@
-import type { PipelineStatus } from "./contract.ts";
+import type { PipelineAnnotationLevel, PipelineStatus } from "./pipelines.ts";
 
 export const PIPELINE_STATUS_LABEL: Record<PipelineStatus, string> = {
   queued: "в очереди",
@@ -22,6 +22,21 @@ export const PIPELINE_STATUS_TONE: Record<PipelineStatus, PipelineTone> = {
   skipped: "faint",
   manual: "warning",
   unknown: "faint",
+};
+
+export const PIPELINE_ANNOTATION_LEVEL_LABEL: Record<PipelineAnnotationLevel, string> = {
+  failure: "ошибка",
+  warning: "предупреждение",
+  notice: "заметка",
+};
+
+export const PIPELINE_ANNOTATION_LEVEL_TONE: Record<
+  PipelineAnnotationLevel,
+  "danger" | "warning" | "info"
+> = {
+  failure: "danger",
+  warning: "warning",
+  notice: "info",
 };
 
 /** Seconds as a compact duration: `42 с`, `3 мин 07 с`, `1 ч 12 мин`. */

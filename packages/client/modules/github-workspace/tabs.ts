@@ -1,24 +1,4 @@
-import { defineTab } from "../workspace-api/index.ts";
-
-const numberedTab = (id: string, label: string) =>
-  defineTab<{ number: number; title?: string }>({
-    id,
-    key: ({ number }) => `${id}:${number}`,
-    path: ({ number }) => `${label} #${number}`,
-    title: ({ number, title }) => `${title ? `${title} · ` : ""}${label} #${number}`,
-    hint: ({ title }) => title ?? "",
-    preview: true,
-  });
-
-const idTab = (kind: string, label: string) =>
-  defineTab<{ id: number; title?: string }>({
-    id: kind,
-    key: ({ id }) => `${kind}:${id}`,
-    path: ({ id }) => `${label} #${id}`,
-    title: ({ id, title }) => `${title ? `${title} · ` : ""}${label} #${id}`,
-    hint: ({ title }) => title ?? "",
-    preview: true,
-  });
+import { defineTab, idTab, numberedTab } from "../workspace-api/index.ts";
 
 export const issueTab = numberedTab("issue", "Issue");
 export const pullTab = numberedTab("pull", "PR");

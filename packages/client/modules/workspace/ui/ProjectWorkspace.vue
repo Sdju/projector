@@ -267,7 +267,7 @@ const files = useOpenFiles({
 const { loading, openFile, openTab, saveFile, toggleMarkdownSource } = files;
 provideTabHost({
   projectId: props.projectId,
-  openFile: (path) => void openFile(path),
+  openFile: (path, line) => void openFile(path, line),
   openTab,
   openCommitDiff: (hash, path) => void files.openCommitFile(hash, path),
   openCommitTree,

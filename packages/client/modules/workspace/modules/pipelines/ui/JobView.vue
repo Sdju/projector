@@ -8,8 +8,15 @@ import UiViewerPage from "../../../../../common/ui/UiViewerPage.vue";
 import { computed } from "vue";
 import { relativeTime } from "../../../../../common/utilities/commit-format.ts";
 import { readoutLines, useTabReadout } from "../../../../../common/utilities/tab-readout.ts";
-import { useCommandRegistrar, useCommandScope } from "../../../../../common/utilities/commands.ts";
+import {
+  commandArgs,
+  useCommandRegistrar,
+  useCommandScope,
+} from "../../../../../common/utilities/commands.ts";
+import { tabRecordId } from "../../../../workspace-api/index.ts";
 import { useJobDetail } from "../lib/detail.ts";
+import JobSteps from "./JobSteps.vue";
+import PipelineAnnotations from "./PipelineAnnotations.vue";
 import {
   durationLabel,
   PIPELINE_STATUS_LABEL,
@@ -18,31 +25,51 @@ import {
 } from "@ai-projector/core/modules/workspace/index.ts";
 
 /** Job tab: status, stage and the readonly trace of one CI job. */
-const props = withDefaults(defineProps<{ projectId: string; id: number; host?: string }>(), {
-  host: "GitLab",
-});
-const { detail, loading, error, reload } = useJobDetail(
-  () => props.projectId,
-  () => props.id,
+const props = withDefaults(
+  defineProps<{
+    projectId: string;
+    id?: number | string;
+    number?: number | string;
+    host?: string;
+  }>(),
+  { host: "GitLab" },
 );
+const emit = defineEmits<{ openFile: [file: { path: string; line?: number }] }>();
+const recordId = () => tabRecordId({ id: props.id, number: props.number }, "id", "number") ?? 0;
+const { detail, loading, error, reload } = useJobDetail(() => props.projectId, recordId);
 const stateTone = computed(() => {
   const status = detail.value?.job.status;
   if (!status) return "neutral";
   const tone = PIPELINE_STATUS_TONE[status];
   return tone === "warning" || tone === "success" || tone === "danger" ? tone : "neutral";
 });
-const commands = useCommandScope(`job:${props.projectId}:${props.id}`, () => ({
+const commands = useCommandScope(`job:${props.projectId}:${recordId()}`, () => ({
   surface: "job",
   projectId: props.projectId,
-  jobId: props.id,
+  jobId: recordId(),
 }));
 const register = useCommandRegistrar(commands.scope);
 register("ide.job.refresh", "Обновить джоб", "Перечитывает статус джоба и его readonly-лог.", () =>
   reload(),
 );
+const openFile = (file: { path: string; line?: number }) => commands.run("ide.job.file.open", file);
+register(
+  "ide.job.file.open",
+  "Открыть файл джоба",
+  "Открывает путь из аннотации джоба в вкладке редактора.",
+  (value) => {
+    const { path, line } = commandArgs(value);
+    if (typeof path !== "string" || !path) throw new Error("Укажите путь файла");
+    emit("openFile", { path, line: typeof line === "number" ? line : undefined });
+  },
+  {
+    path: "string: путь файла в репозитории",
+    line: "number (необязательно): строка",
+  },
+);
 
 useTabReadout(() => {
-  const note = `Job #${props.id}`;
+  const note = recordId() ? `Job #${recordId()}` : "Job";
   if (error.value) return { note, text: `Ошибка: ${error.value}` };
   const data = detail.value;
   if (!data) return { note, text: "Загрузка…" };
@@ -56,8 +83,22 @@ useTabReadout(() => {
       `Ветка: ${job.ref || "нет"}`,
       `Создан: ${job.createdAt}`,
       job.duration !== null ? `Длительность: ${durationLabel(job.duration)}` : "",
+      job.labels.length ? `Метки: ${job.labels.join(", ")}` : "",
+      job.runner ? `Runner: ${job.runner}` : "",
       job.failureReason ? `Причина: ${job.failureReason}` : "",
       job.allowFailure ? "Разрешено падение" : "",
+      job.steps.length
+        ? `Шаги:\n${job.steps.map((step) => `${PIPELINE_STATUS_LABEL[step.status]}: ${step.name}`).join("\n")}`
+        : "",
+      data.annotations.length
+        ? `Аннотации:\n${data.annotations
+            .slice(0, 20)
+            .map(
+              (item) =>
+                `${item.path}${item.startLine ? `:${item.startLine}` : ""}: ${item.message}`,
+            )
+            .join("\n")}`
+        : "",
       data.logTruncated ? "Лог показан не полностью." : "",
       log ? `Лог:\n${log}` : "Лог пуст",
     ),
@@ -76,13 +117,17 @@ useTabReadout(() => {
         :state="PIPELINE_STATUS_LABEL[detail.job.status]"
         :tone="stateTone"
         :title="detail.job.name || 'Job'"
-        :number="detail.job.id"
+        :number="detail.job.id || undefined"
         :external-href="detail.job.webUrl"
         :host="host"
       >
         <template #meta>
           <span v-if="detail.job.stage">{{ detail.job.stage }}</span>
           <span v-if="detail.job.ref" class="mono">{{ refLabel(detail.job.ref) }}</span>
+          <span v-if="detail.job.labels.length" class="mono">{{
+            detail.job.labels.join(", ")
+          }}</span>
+          <span v-if="detail.job.runner">{{ detail.job.runner }}</span>
           <span v-if="detail.job.createdAt" :title="detail.job.createdAt"
             >создан {{ relativeTime(detail.job.createdAt) }}</span
           >
@@ -100,6 +145,14 @@ useTabReadout(() => {
         class="note"
         >Причина: {{ detail.job.failureReason }}</UiHint
       >
+
+      <JobSteps :steps="detail.job.steps" />
+      <PipelineAnnotations
+        :items="detail.annotations"
+        :truncated="detail.annotationsTruncated"
+        :host="host"
+        @open="openFile"
+      />
 
       <UiHeading as="h3" size="sm" tone="secondary" :space-before="4" :space-after="2"
         >Лог</UiHeading

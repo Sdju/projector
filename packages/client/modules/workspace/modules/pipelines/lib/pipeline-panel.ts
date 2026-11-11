@@ -4,13 +4,14 @@ import {
   useCommandRegistrar,
   useCommandScope,
 } from "../../../../../common/utilities/commands.ts";
+import { ciTabParams, tabRecordId } from "../../../../workspace-api/index.ts";
 import { PIPELINE_FILTERS, type PipelineFilter, type usePipelines } from "./pipelines.ts";
 
 export interface PipelinesPanelOptions {
   projectId: () => string;
   active: () => boolean;
   list: ReturnType<typeof usePipelines>;
-  open: (pipeline: { id: number; title?: string }, pinned: boolean) => void;
+  open: (pipeline: { id: number; number?: number; title?: string }, pinned: boolean) => void;
 }
 
 /** Commands `ide.pipelines.*`, block state and lazy first-page loading of the sidebar section. */
@@ -59,12 +60,15 @@ export function usePipelinesPanel(options: PipelinesPanelOptions) {
     "Открыть pipeline",
     "Открывает вкладку выбранного pipeline: статус, ветка, коммит и джобы.",
     (value) => {
-      const { id, title, pinned } = commandArgs(value);
-      if (typeof id !== "number") throw new Error("Укажите номер pipeline");
-      options.open({ id, title: typeof title === "string" ? title : "" }, pinned === true);
+      const given = commandArgs(value);
+      const params = ciTabParams(given);
+      const id = tabRecordId(params, "id", "number");
+      if (id === undefined) throw new Error("Укажите номер pipeline");
+      options.open({ id, number: params.number, title: params.title }, given.pinned === true);
     },
     {
-      id: "number: номер pipeline",
+      id: "number: идентификатор pipeline",
+      number: "number (необязательно): порядковый номер run / iid",
       title: "string (необязательно): заголовок вкладки",
       pinned: "boolean (необязательно): true — постоянная вкладка вместо временной",
     },

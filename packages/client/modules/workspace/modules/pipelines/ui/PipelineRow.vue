@@ -23,11 +23,16 @@ defineProps<{ pipeline: Pipeline }>();
         :title="PIPELINE_STATUS_LABEL[pipeline.status]"
         shrink
       />
-      <span class="name">{{ refLabel(pipeline.ref) || pipeline.name || "Pipeline" }}</span>
-      <span class="number">#{{ pipeline.id }}</span>
+      <span class="name">{{
+        pipeline.title || refLabel(pipeline.ref) || pipeline.name || "Pipeline"
+      }}</span>
+      <span v-if="pipeline.id || pipeline.number" class="number"
+        >#{{ pipeline.id || pipeline.number }}</span
+      >
     </template>
     <template #meta>
       <span>{{ PIPELINE_STATUS_LABEL[pipeline.status] }}</span>
+      <span v-if="pipeline.name && pipeline.title">{{ pipeline.name }}</span>
       <span v-if="pipeline.source">{{ sourceLabel(pipeline.source) }}</span>
       <span v-if="pipeline.sha" class="mono">{{ shortHash(pipeline.sha) }}</span>
       <span v-if="durationLabel(pipeline.duration)">{{ durationLabel(pipeline.duration) }}</span>

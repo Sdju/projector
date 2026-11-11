@@ -8,6 +8,7 @@ import {
   type InjectionKey,
 } from "vue";
 import {
+  ciTabParams,
   createTabRegistry,
   type SidebarType,
   type TabBehavior,
@@ -66,7 +67,7 @@ const agentChat = (backend: string): TabView => ({
 /** What a view may ask of the workspace that shows it. */
 export interface TabHost {
   projectId: string;
-  openFile(path: string): void;
+  openFile(path: string, line?: number): void;
   openTab(id: string, params?: TabParams, options?: { preview?: boolean }): void;
   openCommitDiff(hash: string, path: string): void;
   openCommitTree(hash: string): void;
@@ -155,9 +156,9 @@ export function baseTabViews(): TabViews {
         onOpenSection: host.openSection,
         onOpenPullFile: host.openPullFile,
         onOpenJob: (job: { id: number; title: string }) =>
-          host.openTab("job", job, { preview: false }),
+          host.openTab("job", ciTabParams(job), { preview: false }),
         onOpenPipeline: (pipeline: { id: number; title?: string }) =>
-          host.openTab("pipeline", pipeline, { preview: false }),
+          host.openTab("pipeline", ciTabParams(pipeline), { preview: false }),
       }),
     },
     discussion: {

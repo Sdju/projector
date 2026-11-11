@@ -17,6 +17,7 @@ import { formatProjectRef, projectRoute } from "../project/index.ts";
 import { GithubClone, GithubConnection } from "../github/index.ts";
 import IconGithub from "~icons/simple-icons/github";
 import { GithubRequestError, readRepository } from "./client.ts";
+import { ciTabParams } from "../workspace-api/index.ts";
 import { createGithubConnectionProfile, createGithubWorkspaceProfile } from "./source.ts";
 import GithubRepositoryInfo from "./ui/GithubRepositoryInfo.vue";
 const props = defineProps<{ repository: string }>();
@@ -93,9 +94,12 @@ const tabViews: TabViews = {
     props: (tab, host) => ({
       projectId: host.projectId,
       id: tab.params?.id,
+      number: tab.params?.number,
       host: "GitHub",
       onOpenJob: (job: { id: number; title: string }) =>
-        host.openTab("job", job, { preview: false }),
+        host.openTab("job", ciTabParams(job), { preview: false }),
+      onOpenFile: (file: { path: string; line?: number }) => host.openFile(file.path, file.line),
+      onOpenPull: (pull: { number: number }) => host.openTab("pull", pull, { preview: false }),
     }),
   },
   job: {
@@ -104,7 +108,9 @@ const tabViews: TabViews = {
     props: (tab, host) => ({
       projectId: host.projectId,
       id: tab.params?.id,
+      number: tab.params?.number,
       host: "GitHub",
+      onOpenFile: (file: { path: string; line?: number }) => host.openFile(file.path, file.line),
     }),
   },
   release: {

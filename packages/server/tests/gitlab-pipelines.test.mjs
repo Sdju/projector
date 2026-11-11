@@ -33,6 +33,7 @@ function mockFetch(handler) {
 function pipelineRow(overrides = {}) {
   return {
     id: 42,
+    iid: 3,
     status: "success",
     source: "push",
     ref: "main",
@@ -61,6 +62,8 @@ function jobRow(overrides = {}) {
     duration: 50,
     allow_failure: false,
     failure_reason: "script_failure",
+    tag_list: ["docker"],
+    runner: { description: "shared" },
     pipeline: { id: 42 },
     ...overrides,
   };
@@ -90,6 +93,12 @@ test("GitLab pipelines map statuses, fields and pages", async () => {
   expect(list.pipelines[0]).toStrictEqual({
     id: 42,
     name: "deploy",
+    title: "",
+    number: 3,
+    attempt: 1,
+    path: "",
+    commitMessage: "",
+    pulls: [],
     status: "success",
     source: "push",
     ref: "main",
@@ -162,7 +171,12 @@ test("GitLab pipeline detail maps jobs and reports a truncated list", async () =
     duration: 50,
     allowFailure: false,
     failureReason: "script_failure",
+    labels: ["docker"],
+    runner: "shared",
+    steps: [],
   });
+  expect(detail.annotations).toStrictEqual([]);
+  expect(detail.usage).toStrictEqual([]);
   expect(paths.some((path) => path.includes("/pipelines/42/jobs") && path.includes("page=2"))).toBe(
     true,
   );

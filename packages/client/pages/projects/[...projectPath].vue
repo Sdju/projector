@@ -25,7 +25,7 @@ import {
   JobView,
   type TabViews,
 } from "../../modules/workspace/index.ts";
-import { registerWorkspaceProfile } from "../../modules/workspace-api/index.ts";
+import { ciTabParams, registerWorkspaceProfile } from "../../modules/workspace-api/index.ts";
 import {
   createGithubEnabledLocalProfile,
   GithubRepositoryInfoLoader,
@@ -74,9 +74,9 @@ const tabViews = computed<TabViews>(() => {
               onOpenSection: host.openSection,
               onOpenPullFile: host.openPullFile,
               onOpenJob: (job: { id: number; title: string }) =>
-                host.openTab("job", job, { preview: false }),
+                host.openTab("job", ciTabParams(job), { preview: false }),
               onOpenPipeline: (pipeline: { id: number; title?: string }) =>
-                host.openTab("pipeline", pipeline, { preview: false }),
+                host.openTab("pipeline", ciTabParams(pipeline), { preview: false }),
             }),
           },
           pipeline: {
@@ -85,9 +85,12 @@ const tabViews = computed<TabViews>(() => {
             props: (tab, host) => ({
               projectId: host.projectId,
               id: tab.params?.id,
+              number: tab.params?.number,
               host: "GitLab",
               onOpenJob: (job: { id: number; title: string }, pinned?: boolean) =>
-                host.openTab("job", job, { preview: !pinned }),
+                host.openTab("job", ciTabParams(job), { preview: !pinned }),
+              onOpenFile: (file: { path: string; line?: number }) =>
+                host.openFile(file.path, file.line),
             }),
           },
           job: {
@@ -96,7 +99,10 @@ const tabViews = computed<TabViews>(() => {
             props: (tab, host) => ({
               projectId: host.projectId,
               id: tab.params?.id,
+              number: tab.params?.number,
               host: "GitLab",
+              onOpenFile: (file: { path: string; line?: number }) =>
+                host.openFile(file.path, file.line),
             }),
           },
         }
@@ -108,9 +114,14 @@ const tabViews = computed<TabViews>(() => {
               props: (tab, host) => ({
                 projectId: host.projectId,
                 id: tab.params?.id,
+                number: tab.params?.number,
                 host: "GitHub",
                 onOpenJob: (job: { id: number; title: string }, pinned?: boolean) =>
-                  host.openTab("job", job, { preview: !pinned }),
+                  host.openTab("job", ciTabParams(job), { preview: !pinned }),
+                onOpenFile: (file: { path: string; line?: number }) =>
+                  host.openFile(file.path, file.line),
+                onOpenPull: (pull: { number: number }) =>
+                  host.openTab("pull", pull, { preview: false }),
               }),
             },
             job: {
@@ -119,7 +130,10 @@ const tabViews = computed<TabViews>(() => {
               props: (tab, host) => ({
                 projectId: host.projectId,
                 id: tab.params?.id,
+                number: tab.params?.number,
                 host: "GitHub",
+                onOpenFile: (file: { path: string; line?: number }) =>
+                  host.openFile(file.path, file.line),
               }),
             },
           }

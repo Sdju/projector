@@ -38,9 +38,13 @@ export {
 export { createSidebarRegistry, type SidebarRegistry, type SidebarType } from "./sidebar.ts";
 export { extendSidebarRegistry, groupSidebar } from "./sidebar.ts";
 export {
+  ciTabParams,
   createTabRegistry,
   defineTab,
+  idTab,
+  numberedTab,
   singletonTab,
+  tabRecordId,
   type TabBehavior,
   type TabParams,
   type TabRegistry,

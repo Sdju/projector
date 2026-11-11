@@ -3,9 +3,9 @@ import type {
   IssueComment,
   IssueLabel,
   IssueUser,
-  Pipeline,
   Reaction,
 } from "./contract.ts";
+import type { Pipeline } from "./pipelines.ts";
 
 export type PullRequestState = "open" | "closed" | "merged";
 export interface PullRequest {

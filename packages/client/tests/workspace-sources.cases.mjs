@@ -331,8 +331,16 @@ test("a local project with a GitHub origin keeps local providers and adds issues
   const job = profile.tabs.find((tab) => tab.id === "job");
   expect(pipeline?.key({ id: 42908773281 })).toBe("pipeline:42908773281");
   expect(pipeline?.path({ id: 42908773281 })).toBe("Pipeline #42908773281");
+  expect(pipeline?.path({ number: 12 })).toBe("Pipeline #12");
+  expect(pipeline?.path({ id: 42908773281, number: 12 })).toBe("Pipeline #42908773281");
+  expect(pipeline?.path({ id: "42908773281" })).toBe("Pipeline #42908773281");
+  expect(pipeline?.path({})).toBe("Pipeline");
+  expect(pipeline?.title({ id: 42908773281, title: "Windows" }, "")).toBe(
+    "Windows · Pipeline #42908773281",
+  );
   expect(job?.key({ id: 99 })).toBe("job:99");
   expect(job?.path({ id: 99 })).toBe("Job #99");
+  expect(job?.path({})).toBe("Job");
   const calls = [];
   const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
     calls.push(String(url));

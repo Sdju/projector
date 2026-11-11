@@ -8,7 +8,7 @@ import PipelineRow from "./PipelineRow.vue";
 /** Sidebar pipeline section: status filter, list and the next pages of the project history. */
 const props = defineProps<{ projectId: string; active: boolean }>();
 const emit = defineEmits<{
-  open: [pipeline: { id: number; title?: string }, pinned?: boolean];
+  open: [pipeline: { id: number; number?: number; title?: string }, pinned?: boolean];
 }>();
 const list = usePipelines(() => props.projectId);
 const { commands, open } = usePipelinesPanel({
@@ -19,7 +19,12 @@ const { commands, open } = usePipelinesPanel({
 });
 const run = (action: string, args?: unknown) => commands.run(`ide.pipelines.${action}`, args);
 const openPipeline = (pipeline: Pipeline, pinned = false) =>
-  run("open", { id: pipeline.id, title: pipeline.name || pipeline.ref, pinned });
+  run("open", {
+    id: pipeline.id,
+    number: pipeline.number,
+    title: pipeline.title || pipeline.name || pipeline.ref,
+    pinned,
+  });
 defineExpose({ refresh: () => list.load() });
 </script>
 

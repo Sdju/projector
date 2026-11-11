@@ -43,6 +43,8 @@ export type { GraphRow } from "./git-graph.ts";
 export type { GitBranch, GitBranches, GitSync, GitSyncAction } from "./contract.ts";
 export {
   durationLabel,
+  PIPELINE_ANNOTATION_LEVEL_LABEL,
+  PIPELINE_ANNOTATION_LEVEL_TONE,
   PIPELINE_STATUS_LABEL,
   PIPELINE_STATUS_TONE,
   refLabel,
@@ -62,17 +64,23 @@ export type {
   IssueUser,
   Reaction,
   ReactionKind,
-  Pipeline,
-  PipelineDetail,
-  PipelineJob,
-  PipelineJobDetail,
-  PipelineList,
-  PipelineStatus,
   Release,
   ReleaseAsset,
   ReleaseDetail,
   ReleaseList,
 } from "./contract.ts";
+export type {
+  Pipeline,
+  PipelineAnnotation,
+  PipelineAnnotationLevel,
+  PipelineDetail,
+  PipelineJob,
+  PipelineJobDetail,
+  PipelineJobStep,
+  PipelineList,
+  PipelineStatus,
+  PipelineUsage,
+} from "./pipelines.ts";
 export type {
   PullRequest,
   PullRequestApprovals,

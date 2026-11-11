@@ -1,5 +1,6 @@
 import type { Component } from "vue";
 import {
+  ciTabParams,
   createSidebarRegistry,
   workspaceCapabilities,
   type SidebarType,
@@ -289,8 +290,8 @@ export const baseSidebarViews: SidebarViews = {
     props: (host, selected) => ({
       projectId: host.projectId,
       active: selected,
-      onOpen: (pipeline: { id: number; title?: string }, pinned?: boolean) =>
-        host.openTab("pipeline", pipeline, { preview: !pinned }),
+      onOpen: (pipeline: { id: number; number?: number; title?: string }, pinned?: boolean) =>
+        host.openTab("pipeline", ciTabParams(pipeline), { preview: !pinned }),
     }),
     refresh: (_, panel) => panel?.refresh?.(),
   },

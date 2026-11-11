@@ -18,6 +18,7 @@ import { useCommandScope } from "../../common/utilities/commands.ts";
 import { formatProjectRef, projectRoute } from "../project/index.ts";
 import IconGitlab from "~icons/simple-icons/gitlab";
 import { GitlabRequestError, readRepository } from "./client.ts";
+import { ciTabParams } from "../workspace-api/index.ts";
 import { createGitlabConnectionProfile, createGitlabWorkspaceProfile } from "./source.ts";
 import GitlabClone from "./GitlabClone.vue";
 import GitlabConnection from "./ui/GitlabConnection.vue";
@@ -127,9 +128,9 @@ const tabViews: TabViews = {
       onOpenSection: host.openSection,
       onOpenPullFile: host.openPullFile,
       onOpenJob: (job: { id: number; title: string }) =>
-        host.openTab("job", job, { preview: false }),
+        host.openTab("job", ciTabParams(job), { preview: false }),
       onOpenPipeline: (pipeline: { id: number; title?: string }) =>
-        host.openTab("pipeline", pipeline, { preview: false }),
+        host.openTab("pipeline", ciTabParams(pipeline), { preview: false }),
     }),
   },
   pipeline: {
@@ -138,9 +139,11 @@ const tabViews: TabViews = {
     props: (tab, host) => ({
       projectId: host.projectId,
       id: tab.params?.id,
+      number: tab.params?.number,
       host: "GitLab",
       onOpenJob: (job: { id: number; title: string }) =>
-        host.openTab("job", job, { preview: false }),
+        host.openTab("job", ciTabParams(job), { preview: false }),
+      onOpenFile: (file: { path: string; line?: number }) => host.openFile(file.path, file.line),
     }),
   },
   job: {
@@ -149,7 +152,9 @@ const tabViews: TabViews = {
     props: (tab, host) => ({
       projectId: host.projectId,
       id: tab.params?.id,
+      number: tab.params?.number,
       host: "GitLab",
+      onOpenFile: (file: { path: string; line?: number }) => host.openFile(file.path, file.line),
     }),
   },
   release: {

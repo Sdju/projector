@@ -1,5 +1,31 @@
 export type TabParams = Record<string, unknown>;
 
+/** Numeric identity of a tab: pipelines/jobs pass `id`, issues/PRs pass `number`. */
+export function tabRecordId(params: TabParams, ...keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = params[key];
+    if (typeof value === "number" && Number.isFinite(value) && value > 0) return value;
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number(value);
+      if (Number.isSafeInteger(parsed) && parsed > 0) return parsed;
+    }
+  }
+}
+
+/** Tab params for a CI record: only identity fields, so a full pipeline object cannot overwrite `path`. */
+export function ciTabParams(record: TabParams): { id?: number; number?: number; title?: string } {
+  const id = tabRecordId(record, "id", "number");
+  const number = tabRecordId(record, "number");
+  const title = [record.title, record.name, record.ref].find(
+    (value): value is string => typeof value === "string" && !!value.trim(),
+  );
+  return {
+    ...(id !== undefined ? { id } : {}),
+    ...(number !== undefined && number !== id ? { number } : {}),
+    ...(title ? { title: title.trim() } : {}),
+  };
+}
+
 /**
  * A kind of service tab (settings, an issue, repository info). The provider that owns the
  * feature registers it; the workspace opens tabs by `id` and never branches on a kind itself.
@@ -49,6 +75,33 @@ export interface TabBehavior {
 
 /** Erases the parameter type so kinds with different params share one registry. */
 export const defineTab = <P extends TabParams>(type: TabType<P>) => type as unknown as TabType;
+
+function recordCaption(label: string, params: TabParams, keys: string[]) {
+  const record = tabRecordId(params, ...keys);
+  const title = typeof params.title === "string" ? params.title.trim() : "";
+  const name = title ? `${title} · ` : "";
+  return record === undefined ? `${name}${label}` : `${name}${label} #${record}`;
+}
+
+function recordTab(kind: string, label: string, keys: string[]) {
+  return defineTab<{ id?: number; number?: number; title?: string }>({
+    id: kind,
+    key: (params) => `${kind}:${tabRecordId(params, ...keys) ?? "unknown"}`,
+    path: (params) => {
+      const record = tabRecordId(params, ...keys);
+      return record === undefined ? label : `${label} #${record}`;
+    },
+    title: (params) => recordCaption(label, params, keys),
+    hint: (params) => (typeof params.title === "string" ? params.title : ""),
+    preview: true,
+  });
+}
+
+/** Issue/PR tab: prefers `number`, then `id`. Never interpolates `#undefined`. */
+export const numberedTab = (id: string, label: string) => recordTab(id, label, ["number", "id"]);
+
+/** Pipeline/job tab: prefers API `id`, then sequential `number`. */
+export const idTab = (kind: string, label: string) => recordTab(kind, label, ["id", "number"]);
 
 /** A tab without parameters: one per workspace. */
 export const singletonTab = (

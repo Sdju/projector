@@ -1,5 +1,11 @@
 import { expect, test } from "vite-plus/test";
-import { createTabRegistry, defineTab, singletonTab } from "../modules/workspace-api/tabs.ts";
+import {
+  ciTabParams,
+  createTabRegistry,
+  defineTab,
+  idTab,
+  singletonTab,
+} from "../modules/workspace-api/tabs.ts";
 import { ensureTab } from "../modules/workspace/lib/service-tabs.ts";
 import { baseTabTypes } from "../modules/workspace/lib/virtual-tabs.ts";
 import { workspaceSessionSchema } from "../modules/workspace/session.ts";
@@ -74,4 +80,38 @@ test("a kind that is not a preview kind never opens as a preview", () => {
   const tabs = { value: [] };
   ensureTab(tabs, registry, "issue", { number: 3 }, true);
   expect(tabs.value[0].preview).toBe(false);
+});
+
+test("pipeline tabs never interpolate #undefined and keep only identity params", () => {
+  const pipeline = idTab("pipeline", "Pipeline");
+  expect(pipeline.path({ id: 42908773281 })).toBe("Pipeline #42908773281");
+  expect(pipeline.path({ number: 12 })).toBe("Pipeline #12");
+  expect(pipeline.path({ id: "42908773281" })).toBe("Pipeline #42908773281");
+  expect(pipeline.path({})).toBe("Pipeline");
+  expect(pipeline.key({})).toBe("pipeline:unknown");
+  expect(
+    ciTabParams({
+      id: 42,
+      number: 12,
+      title: "Windows",
+      path: ".github/workflows/windows.yml",
+      name: "CI",
+    }),
+  ).toEqual({ id: 42, number: 12, title: "Windows" });
+});
+
+test("ensureTab refreshes the label of an already open tab", () => {
+  const registry = createTabRegistry([idTab("pipeline", "Pipeline")]);
+  const tabs = { value: [] };
+  ensureTab(tabs, registry, "pipeline", {});
+  expect(tabs.value[0].path).toBe("Pipeline");
+  tabs.value[0].path = "Pipeline #undefined";
+  ensureTab(tabs, registry, "pipeline", { id: 8, title: "Windows" });
+  expect(tabs.value.map((tab) => [tab.key, tab.path])).toStrictEqual([
+    ["pipeline:unknown", "Pipeline #undefined"],
+    ["pipeline:8", "Pipeline #8"],
+  ]);
+  ensureTab(tabs, registry, "pipeline", { id: 8, title: "Linux" });
+  expect(tabs.value[1].path).toBe("Pipeline #8");
+  expect(tabs.value[1].params).toEqual({ id: 8, title: "Linux" });
 });

@@ -53,6 +53,7 @@ const STATUS: Record<string, PipelineStatus> = {
 
 export interface ApiPipeline {
   id: number;
+  iid?: number;
   status?: string;
   source?: string;
   ref?: string;
@@ -78,6 +79,8 @@ interface ApiJob {
   duration?: number | null;
   allow_failure?: boolean;
   failure_reason?: string | null;
+  tag_list?: string[];
+  runner?: { description?: string | null } | null;
   pipeline?: { id?: number };
 }
 
@@ -86,9 +89,17 @@ function pipelineStatus(value?: string): PipelineStatus {
 }
 
 export function pipeline(raw: ApiPipeline): Pipeline {
+  const number =
+    typeof raw.iid === "number" && Number.isSafeInteger(raw.iid) && raw.iid > 0 ? raw.iid : 0;
   return {
     id: raw.id,
     name: raw.name || "",
+    title: "",
+    number,
+    attempt: 1,
+    path: "",
+    commitMessage: "",
+    pulls: [],
     status: pipelineStatus(raw.status),
     source: raw.source || "",
     ref: raw.ref || "",
@@ -116,6 +127,9 @@ function job(raw: ApiJob, fallbackPipelineId: number): PipelineJob {
     duration: typeof raw.duration === "number" ? raw.duration : null,
     allowFailure: raw.allow_failure === true,
     failureReason: raw.failure_reason || "",
+    labels: (raw.tag_list ?? []).filter((label) => !!label),
+    runner: raw.runner?.description || "",
+    steps: [],
   };
 }
 
@@ -200,7 +214,14 @@ export async function browseGitlabPipeline(
     reader.get<ApiPipeline>(`/projects/${id}/pipelines/${number}`),
     pipelineJobs(reader, id, number),
   ]);
-  return { pipeline: pipeline(raw), jobs: jobs.jobs, jobsTruncated: jobs.truncated };
+  return {
+    pipeline: pipeline(raw),
+    jobs: jobs.jobs,
+    jobsTruncated: jobs.truncated,
+    annotations: [],
+    annotationsTruncated: false,
+    usage: [],
+  };
 }
 
 function cleanTrace(value: string) {
@@ -301,5 +322,7 @@ export async function browseGitlabJob(
     job: job(raw, raw.pipeline?.id ?? 0),
     log: trace.log,
     logTruncated: trace.truncated,
+    annotations: [],
+    annotationsTruncated: false,
   };
 }

@@ -23,7 +23,7 @@ const props = withDefaults(
   { host: "GitLab" },
 );
 const emit = defineEmits<{
-  openPipeline: [pipeline: { id: number; title?: string }];
+  openPipeline: [pipeline: { id: number; number?: number; title?: string }];
   openJob: [job: { id: number; title: string }];
 }>();
 const open = ref(false);
@@ -71,7 +71,13 @@ register(
       <UiButton
         size="sm"
         data-command="ide.mergeRequest.pipeline.open"
-        @click="emit('openPipeline', { id: props.pipeline.id, title: props.pipeline.name })"
+        @click="
+          emit('openPipeline', {
+            id: props.pipeline.id,
+            number: props.pipeline.number,
+            title: props.pipeline.title || props.pipeline.name,
+          })
+        "
       >
         Открыть
       </UiButton>
