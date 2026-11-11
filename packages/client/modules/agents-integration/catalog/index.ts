@@ -1,4 +1,8 @@
-import type { Component } from "vue";
+import { ref, type Component } from "vue";
+import IconBot from "~icons/lucide/bot";
+import IconCode from "~icons/lucide/code";
+import IconSparkles from "~icons/lucide/sparkles";
+import IconTerminal from "~icons/lucide/terminal";
 
 /** One item of the agent's own task list, as the chat pins and shows it. */
 export interface AgentPlanItem {
@@ -39,29 +43,51 @@ export interface ClientAgent {
   usage?: Component;
   /** Where a fresh limits answer comes from; the analytics page records it by asking. */
   usageUrl?: string;
+  /** Props of the generic indicator a plugin agent uses; built-ins have their own components. */
+  usageProps?: Record<string, unknown>;
   /** How the agent keeps its task list, if it has one. */
   plan?: AgentPlanReader;
 }
 
+/** The agents a plugin added at runtime; a local descriptor with the same id always wins. */
+const remote = new Set<string>();
+/** Bumped on every catalog change, so menus and settings computed from it stay live. */
+const revision = ref(0);
 const agents = new Map<string, ClientAgent>();
+
+const fallbackIcon = IconTerminal;
+const icons: Record<string, Component> = {
+  bot: IconBot,
+  code: IconCode,
+  sparkles: IconSparkles,
+  terminal: IconTerminal,
+};
+
+function iconOf(name: unknown): Component {
+  return typeof name === "string" && icons[name] ? icons[name] : fallbackIcon;
+}
 
 /** Registers an agent; registering the same backend again replaces it and keeps the order. */
 export function registerClientAgent(agent: ClientAgent): void {
   agents.set(agent.backend, agent);
+  revision.value++;
 }
 
 /** Every registered agent, in registration order. */
 export function clientAgents(): ClientAgent[] {
+  void revision.value;
   return [...agents.values()];
 }
 
 /** The external agent behind a terminal program; the built-in agent has none. */
 export function clientAgentOf(program: string): ClientAgent | undefined {
+  void revision.value;
   return clientAgents().find((agent) => !agent.builtin && agent.program === program);
 }
 
 /** The agent behind a chat backend, built-in included. */
 export function clientAgentByBackend(backend: string): ClientAgent | undefined {
+  void revision.value;
   return agents.get(backend);
 }
 
@@ -70,4 +96,65 @@ export function clientAgentPrograms(): string[] {
   return clientAgents()
     .filter((agent) => !agent.builtin)
     .map((agent) => agent.program);
+}
+
+interface RemoteAgent {
+  id?: unknown;
+  label?: unknown;
+  caption?: unknown;
+  icon?: unknown;
+  program?: unknown;
+  usageUrl?: unknown;
+}
+
+/**
+ * Merges the server's agent catalog into the client one. Local descriptors win: the built-in
+ * agents keep their icons, plans and limits; only agents the client has never seen get a
+ * fallback presentation. A removed plugin agent disappears from every menu on the next refresh.
+ */
+export async function refreshClientAgents(): Promise<void> {
+  if (typeof fetch !== "function") return;
+  let backends: RemoteAgent[];
+  try {
+    const response = await fetch("/api/agent/backends", {
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) return;
+    const body = (await response.json()) as { backends?: unknown };
+    if (!Array.isArray(body.backends)) return;
+    backends = body.backends as RemoteAgent[];
+  } catch {
+    return;
+  }
+  const seen = new Set<string>();
+  for (const item of backends) {
+    if (!item || typeof item.id !== "string" || !item.id) continue;
+    const existing = agents.get(item.id);
+    if (existing && !remote.has(item.id)) continue;
+    seen.add(item.id);
+    const label = typeof item.label === "string" && item.label ? item.label : item.id;
+    const usageUrl = typeof item.usageUrl === "string" && item.usageUrl ? item.usageUrl : undefined;
+    registerClientAgent({
+      backend: item.id,
+      program: typeof item.program === "string" && item.program ? item.program : item.id,
+      title: label,
+      caption:
+        typeof item.caption === "string" && item.caption
+          ? item.caption
+          : `Запустит агента ${label}`,
+      icon: iconOf(item.icon),
+      ...(usageUrl ? { usageUrl, usageProps: { usageUrl, title: label, agentId: item.id } } : {}),
+    });
+  }
+  let removed = false;
+  for (const id of remote) {
+    if (seen.has(id)) continue;
+    if (!agents.get(id)?.builtin) {
+      agents.delete(id);
+      removed = true;
+    }
+  }
+  if (removed) revision.value++;
+  remote.clear();
+  for (const id of seen) remote.add(id);
 }

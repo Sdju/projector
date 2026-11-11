@@ -27,6 +27,8 @@ interface TurnLike {
     cacheRead?: unknown;
     cacheWrite?: unknown;
     cost?: unknown;
+    /** Plugin agents report the model with the usage, without a separate context update. */
+    model?: unknown;
   };
   context?: { model?: unknown };
 }
@@ -85,7 +87,9 @@ export function readAgentUsage(since = 0): AgentUsageRecord[] {
     const model =
       typeof turn.context?.model === "string" && turn.context.model
         ? turn.context.model
-        : undefined;
+        : typeof turn.usage?.model === "string" && turn.usage.model
+          ? turn.usage.model
+          : undefined;
     records.push({
       chat: row.chat,
       backend,

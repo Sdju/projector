@@ -1,4 +1,7 @@
-import type { AvailableTheme } from "@ai-projector/core/modules/plugins/index.ts";
+import type {
+  AvailableTheme,
+  PluginAgentContribution,
+} from "@ai-projector/core/modules/plugins/index.ts";
 
 export type PluginStatus = "enabled" | "disabled" | "error" | "missing";
 
@@ -8,9 +11,11 @@ export interface PluginInfo {
   description?: string;
   status: PluginStatus;
   enabled: boolean;
+  trusted: boolean;
   path?: string;
   diagnostics: { message: string }[];
   themes: AvailableTheme[];
+  agents: PluginAgentContribution[];
 }
 
 export interface PluginCatalog {
@@ -29,15 +34,29 @@ async function request<T>(init?: RequestInit): Promise<T> {
   return data;
 }
 
+/** Older servers and test fixtures omit the agent fields; the screen still needs arrays. */
+function normalizeCatalog(catalog: PluginCatalog): PluginCatalog {
+  return {
+    ...catalog,
+    plugins: catalog.plugins.map((plugin) => ({
+      ...plugin,
+      trusted: plugin.trusted === true,
+      agents: Array.isArray(plugin.agents) ? plugin.agents : [],
+    })),
+  };
+}
+
 export function fetchPlugins(): Promise<PluginCatalog> {
-  return request<PluginCatalog>();
+  return request<PluginCatalog>().then(normalizeCatalog);
 }
 
 export function pluginAction(
-  action: "refresh" | "enable" | "disable" | "install",
+  action: "refresh" | "enable" | "disable" | "install" | "trust" | "remove",
   body: { id?: string; path?: string } = {},
 ): Promise<PluginCatalog> {
-  return request<PluginCatalog>({ method: "POST", body: JSON.stringify({ action, ...body }) });
+  return request<PluginCatalog>({ method: "POST", body: JSON.stringify({ action, ...body }) }).then(
+    normalizeCatalog,
+  );
 }
 
 export async function saveAppearance(choice: string): Promise<void> {

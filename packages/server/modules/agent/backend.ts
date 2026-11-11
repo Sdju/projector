@@ -155,6 +155,14 @@ export interface AgentTerminal {
   title: string;
 }
 
+/** A plugin's limits probe: argv, JSON on stdout, a bounded wait. */
+export interface AgentUsageProvider {
+  kind: "command";
+  command: string;
+  args?: string[];
+  timeoutMs?: number;
+}
+
 /**
  * One way of running the chat agent. A backend streams the shared SSE events (`text`, `tool`,
  * `tool-result`, ...) so the client stays agent-agnostic. To add an agent, extend `AgentBackendId`,
@@ -165,6 +173,10 @@ export interface AgentBackend {
   id: AgentBackendId;
   /** Human label for the chat header, the settings and the feature switches. */
   label: string;
+  /** One line for the new-session menu; a plugin agent carries its own, built-ins keep theirs client-side. */
+  caption?: string;
+  /** Allowlisted icon name; the client maps it to a component. */
+  icon?: string;
   /**
    * Terminal program id that opens this agent, when it has one. The settings key the chat mode by
    * program; the built-in Projector agent has no terminal and leaves this out.
@@ -203,6 +215,10 @@ export interface AgentBackend {
   ): Promise<RewindResult>;
   /** Servers, tools and limits the agent runs with in the project, for the chat to show. */
   mcpServers?(cwd: string): Promise<McpServerInfo[]>;
+  /** Where the status bar asks for subscription limits; absent when the agent has none. */
+  usage?: AgentUsageProvider;
+  /** The generic limits endpoint the client polls, when `usage` is present. */
+  usageUrl?: string;
 }
 
 /** What rewinding files changed (or, for a dry run, would change). */

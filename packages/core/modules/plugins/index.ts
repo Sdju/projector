@@ -43,6 +43,34 @@ export interface PluginThemeContribution {
   tokens: string;
 }
 
+export interface PluginAgentTerminal {
+  program?: string;
+  executable?: string;
+  title?: string;
+}
+
+export interface PluginAgentUsageCommand {
+  kind: "command";
+  command: string;
+  args?: string[];
+  timeoutMs?: number;
+}
+
+export interface PluginAgentContribution {
+  id: string;
+  title: string;
+  caption?: string;
+  icon?: string;
+  program?: string;
+  terminal?: PluginAgentTerminal;
+  command: string;
+  args?: string[];
+  binary?: string;
+  clientCapabilities?: Record<string, unknown>;
+  usage?: PluginAgentUsageCommand | { kind: "none" };
+  usageReporting?: string;
+}
+
 export interface PluginManifest {
   name: string;
   version: string;
@@ -50,7 +78,10 @@ export interface PluginManifest {
   engines?: { projector?: string };
   projector: {
     apiVersion: typeof pluginApiVersion;
-    contributes: { themes: PluginThemeContribution[] };
+    contributes: {
+      themes?: PluginThemeContribution[];
+      agents?: PluginAgentContribution[];
+    };
   };
 }
 
@@ -70,6 +101,11 @@ export interface PluginValidationOptions {
 const optionalTokens = new Set<ThemeTokenName>(["hover", "active"]);
 const packageNamePattern = /^(?:@[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*|[a-z0-9][a-z0-9._-]*)$/;
 const themeIdPattern = /^[a-z0-9][a-z0-9._-]*$/;
+const agentIdPattern = /^[a-z0-9][a-z0-9._-]*$/;
+const agentIconPattern = /^[a-z0-9-]+$/;
+const usageReportingPattern = /^[a-z0-9][a-z0-9/_-]*$/;
+const forbiddenJsonKeys = ["__proto__", "constructor", "prototype"] as const;
+const maxClientCapabilitiesLength = 20000;
 const semverPattern =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 const hexPattern = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
@@ -96,6 +132,102 @@ function assertText(value: unknown, label: string, maxLength = 200): asserts val
   if (typeof value !== "string" || !value.trim() || value.length > maxLength) {
     throw new Error(`${label} должен быть непустой строкой`);
   }
+}
+
+function assertSafeText(value: unknown, label: string, maxLength = 1000): asserts value is string {
+  if (
+    typeof value !== "string" ||
+    !value.trim() ||
+    value.length > maxLength ||
+    value.includes("\n") ||
+    value.includes("\0")
+  ) {
+    throw new Error(
+      `${label}: ожидается непустая строка до ${maxLength} символов без переводов строк и NUL`,
+    );
+  }
+}
+function validateAgentArgs(value: unknown, label: string): void {
+  if (value === undefined) return;
+  if (!Array.isArray(value)) throw new Error(`${label}: ожидается массив строк`);
+  if (value.length > 64) throw new Error(`${label}: не более 64 аргументов`);
+  value.forEach((arg, index) => assertSafeText(arg, `${label}[${index}]`));
+}
+const agentFields =
+  "id title caption icon program terminal command args binary clientCapabilities usage usageReporting".split(
+    " ",
+  );
+function assertPattern(value: unknown, pattern: RegExp, maxLength: number, message: string): void {
+  if (typeof value !== "string" || value.length > maxLength || !pattern.test(value))
+    throw new Error(message);
+}
+function validateAgentClientCapabilities(value: unknown): void {
+  assertRecord(value, "clientCapabilities агента");
+  const forbidden = forbiddenJsonKeys.find((key) => Object.hasOwn(value, key));
+  if (forbidden) throw new Error(`clientCapabilities агента: недопустимое поле ${forbidden}`);
+  let serialized: string | undefined;
+  try {
+    serialized = JSON.stringify(value);
+  } catch {
+    throw new Error("clientCapabilities агента должен быть JSON-объектом");
+  }
+  if (!serialized || serialized.length > maxClientCapabilitiesLength)
+    throw new Error(
+      `clientCapabilities агента: JSON не должен превышать ${maxClientCapabilitiesLength} символов`,
+    );
+}
+function validateAgentUsage(value: unknown): void {
+  assertRecord(value, "usage агента");
+  if (value.kind === "none") {
+    assertAllowedKeys(value, ["kind"], "usage агента");
+    return;
+  }
+  if (value.kind !== "command") throw new Error("usage агента: kind должен быть command или none");
+  assertAllowedKeys(value, ["kind", "command", "args", "timeoutMs"], "usage агента");
+  assertSafeText(value.command, "usage.command агента");
+  validateAgentArgs(value.args, "usage.args агента");
+  const timeoutMs = value.timeoutMs;
+  if (
+    timeoutMs !== undefined &&
+    (typeof timeoutMs !== "number" ||
+      !Number.isInteger(timeoutMs) ||
+      timeoutMs < 100 ||
+      timeoutMs > 60000)
+  )
+    throw new Error("usage.timeoutMs агента должен быть целым числом от 100 до 60000");
+}
+function validateAgentTerminal(value: unknown): void {
+  assertRecord(value, "Терминал агента");
+  assertAllowedKeys(value, ["program", "executable", "title"], "Терминал агента");
+  if (value.program !== undefined) assertSafeText(value.program, "Терминал агента: program");
+  if (value.executable !== undefined)
+    assertSafeText(value.executable, "Терминал агента: executable");
+  if (value.title !== undefined) assertText(value.title, "Название терминала агента", 200);
+}
+function validateAgentContribution(value: unknown, ids: Set<string>): void {
+  assertRecord(value, "Агент плагина");
+  assertAllowedKeys(value, agentFields, "Агент плагина");
+  if (typeof value.id !== "string" || !agentIdPattern.test(value.id))
+    throw new Error("Некорректный идентификатор агента");
+  if (ids.has(value.id)) throw new Error("Повторяющийся идентификатор агента");
+  ids.add(value.id);
+  assertText(value.title, "Название агента", 200);
+  if (value.caption !== undefined) assertText(value.caption, "Подпись агента", 300);
+  if (value.icon !== undefined)
+    assertPattern(value.icon, agentIconPattern, 50, "Некорректная иконка агента");
+  if (value.program !== undefined) {
+    if (typeof value.program !== "string" || !agentIdPattern.test(value.program))
+      throw new Error("Некорректная программа агента");
+  }
+  assertSafeText(value.command, "Команда агента");
+  validateAgentArgs(value.args, "Аргументы агента");
+  if (value.binary !== undefined) assertSafeText(value.binary, "Бинарник агента");
+  if (value.terminal !== undefined) validateAgentTerminal(value.terminal);
+  if (value.clientCapabilities !== undefined)
+    validateAgentClientCapabilities(value.clientCapabilities);
+  if (value.usage !== undefined) validateAgentUsage(value.usage);
+  if (value.usageReporting !== undefined)
+    assertPattern(value.usageReporting, usageReportingPattern, 100, "Некорректный usageReporting");
 }
 
 export function isPluginPackageName(value: unknown): value is string {
@@ -209,31 +341,45 @@ export function validatePluginManifest(
   if (value.projector.apiVersion !== pluginApiVersion)
     throw new Error("Неподдерживаемая версия API плагина");
   assertRecord(value.projector.contributes, "projector.contributes");
-  assertAllowedKeys(value.projector.contributes, ["themes"], "projector.contributes");
-  if (
-    !Array.isArray(value.projector.contributes.themes) ||
-    !value.projector.contributes.themes.length
-  )
-    throw new Error("Плагин должен содержать хотя бы одну тему");
-  const ids = new Set<string>();
-  for (const theme of value.projector.contributes.themes) {
-    assertRecord(theme, "Тема плагина");
-    assertAllowedKeys(theme, ["id", "title", "description", "mode", "tokens"], "Тема плагина");
-    if (typeof theme.id !== "string" || !themeIdPattern.test(theme.id))
-      throw new Error("Некорректный идентификатор темы");
-    if (ids.has(theme.id)) throw new Error("Повторяющийся идентификатор темы");
-    ids.add(theme.id);
-    assertText(theme.title, "Название темы");
-    if (theme.description !== undefined) assertText(theme.description, "Описание темы", 1000);
-    if (theme.mode !== "dark" && theme.mode !== "light") throw new Error("Некорректный режим темы");
-    assertText(theme.tokens, "Путь к токенам темы", 300);
-    if (
-      theme.tokens.startsWith("/") ||
-      theme.tokens.startsWith("\\") ||
-      /(^|[\\/])\.\.?([\\/]|$)/.test(theme.tokens) ||
-      !/^[a-zA-Z0-9._/-]+\.json$/.test(theme.tokens)
-    )
-      throw new Error("Небезопасный путь к токенам темы");
+  const contributes = value.projector.contributes;
+  assertAllowedKeys(contributes, ["themes", "agents"], "projector.contributes");
+  if (contributes.themes !== undefined && !Array.isArray(contributes.themes))
+    throw new Error("projector.contributes.themes должен быть массивом");
+  if (contributes.agents !== undefined && !Array.isArray(contributes.agents))
+    throw new Error("projector.contributes.agents должен быть массивом");
+  const themes = contributes.themes as unknown[] | undefined;
+  const agents = contributes.agents as unknown[] | undefined;
+  if (!themes?.length && !agents?.length) {
+    if (themes && !agents) throw new Error("Плагин должен содержать хотя бы одну тему");
+    if (agents && !themes) throw new Error("Плагин должен содержать хотя бы одного агента");
+    throw new Error("Плагин должен содержать хотя бы одну тему или агента");
+  }
+  if (themes) {
+    const ids = new Set<string>();
+    for (const theme of themes) {
+      assertRecord(theme, "Тема плагина");
+      assertAllowedKeys(theme, ["id", "title", "description", "mode", "tokens"], "Тема плагина");
+      if (typeof theme.id !== "string" || !themeIdPattern.test(theme.id))
+        throw new Error("Некорректный идентификатор темы");
+      if (ids.has(theme.id)) throw new Error("Повторяющийся идентификатор темы");
+      ids.add(theme.id);
+      assertText(theme.title, "Название темы");
+      if (theme.description !== undefined) assertText(theme.description, "Описание темы", 1000);
+      if (theme.mode !== "dark" && theme.mode !== "light")
+        throw new Error("Некорректный режим темы");
+      assertText(theme.tokens, "Путь к токенам темы", 300);
+      if (
+        theme.tokens.startsWith("/") ||
+        theme.tokens.startsWith("\\") ||
+        /(^|[\\/])\.\.?([\\/]|$)/.test(theme.tokens) ||
+        !/^[a-zA-Z0-9._/-]+\.json$/.test(theme.tokens)
+      )
+        throw new Error("Небезопасный путь к токенам темы");
+    }
+  }
+  if (agents) {
+    const ids = new Set<string>();
+    for (const agent of agents) validateAgentContribution(agent, ids);
   }
   return value as unknown as PluginManifest;
 }

@@ -93,16 +93,18 @@ Keys support `Mod`, `Ctrl`, `Meta`, `Alt`, `Shift` and a key name. `Mod` matches
 
 The settings endpoint is `GET /api/ide/keybindings` and same-origin `PUT /api/ide/keybindings` with `{ bindings: [...] }`. GET also returns the settings path. No localStorage is used.
 
-## Theme-only плагины
+## Локальные плагины
 
 Раздел **Настройки → Плагины** создаёт scope `plugins:settings:<uid>` с `{ surface: "plugins", view: "settings", plugin, query, mode, ready, busy }`. Команды действуют только пока раздел смонтирован; изменяющие операции недоступны во время другой операции. Формат пакета и HTTP API описаны в [plugins](plugins.md).
 
-- `ide.plugins.list` — возвращает элементы текущего каталога со статусами, диагностикой и темами.
-- `ide.plugins.refresh` — заново читает пакеты и обновляет доступные темы.
+- `ide.plugins.list` — возвращает элементы текущего каталога со статусами, диагностикой, темами и агентами.
+- `ide.plugins.refresh` — заново читает пакеты и обновляет доступные темы и агентов.
 - `ide.plugin.open` `{ id }` — выбирает пакет и открывает его карточку.
-- `ide.plugin.enable` / `ide.plugin.disable` `{ id }` — включает или выключает пакет. После выключения его темы недоступны, активная внешняя тема временно заменяется тёмной.
+- `ide.plugin.enable` / `ide.plugin.disable` `{ id }` — включает или выключает пакет. После выключения его темы и агент недоступны, активная внешняя тема временно заменяется тёмной.
+- `ide.plugin.trust` `{ id }` — подтверждает доверие к текущему содержимому агентского пакета; без этого агент нельзя включить.
+- `ide.plugin.remove` `{ id }` — удаляет управляемую установку и её состояние.
 - `ide.plugin.theme.apply` `{ id }` либо `{ pluginId, themeId }` — применяет и сохраняет тему включённого пакета; при ошибке сохранения возвращает прежнее оформление.
-- `ide.plugins.install` `{ path? }` — устанавливает и включает проверенный пакет из локальной папки; без `path` использует поле экрана.
+- `ide.plugins.install` `{ path? }` — устанавливает проверенный пакет из локальной папки; без `path` использует поле экрана. Темы включаются сразу, агент ждёт доверия.
 - `ide.plugins.folder.open` — открывает системный выбор папки и устанавливает выбранный пакет.
 
 ## Limits and tests

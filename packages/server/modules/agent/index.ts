@@ -3,11 +3,14 @@
 // names a concrete agent; each agent module (`../acp`, `../claude-code`, ...) registers itself.
 export {
   registerAgentBackend,
+  unregisterAgentBackend,
+  agentCatalogRevision,
   listAgentBackends,
   isAgentBackend,
   resolveAgentBackend,
   isHostedAgent,
   isAgentAvailable,
+  agentUsageProvider,
 } from "./registry.ts";
 export type { AgentBackendSummary } from "./registry.ts";
 export {
@@ -33,6 +36,7 @@ export type {
   AgentRunHandle,
   AgentRunOptions,
   AgentTerminal,
+  AgentUsageProvider,
   McpServerInfo,
   MessagePart,
   RewindResult,

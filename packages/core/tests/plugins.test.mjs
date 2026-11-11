@@ -3,6 +3,7 @@ import { describe, expect, test } from "vite-plus/test";
 import {
   externalThemeId,
   isExternalThemeId,
+  pluginApiVersion,
   serializeThemeTokens,
   themeStyleProperties,
   themeTokenNames,
@@ -92,5 +93,289 @@ describe("theme-only plugin contract", () => {
     expect(themeStyleProperties(tokens)["--bg"]).toBe("#102030");
     expect(serializeThemeTokens(tokens)).toContain("--bg:#102030");
     expect(serializeThemeTokens(tokens)).not.toContain("undefined");
+  });
+});
+
+const agentContribution = {
+  id: "example-agent",
+  title: "Example Agent",
+  caption: "Запустит Example через ACP",
+  icon: "sparkles",
+  program: "example-agent",
+  terminal: { executable: "example-agent", title: "Example" },
+  command: "example-agent",
+  args: ["acp"],
+  binary: "example-agent",
+  clientCapabilities: { mcp: { stdio: true }, nested: { values: [1, 2] } },
+  usage: { kind: "command", command: "example-agent", args: ["usage", "--json"], timeoutMs: 10000 },
+  usageReporting: "projector/usage",
+};
+
+const agentManifest = {
+  name: "@acme/example-agent",
+  version: "1.0.0",
+  engines: { projector: ">=0.12.0" },
+  projector: { apiVersion: 1, contributes: { agents: [agentContribution] } },
+};
+
+function withAgent(agent) {
+  const copy = structuredClone(agentManifest);
+  copy.projector.contributes.agents[0] = agent;
+  return copy;
+}
+
+describe("plugin agent contribution", () => {
+  test("keeps API version 1 and accepts an agent-only manifest", () => {
+    expect(pluginApiVersion).toBe(1);
+    expect(validatePluginManifest(agentManifest)).toEqual(agentManifest);
+    expect(validatePluginManifest(agentManifest).projector.contributes.themes).toBeUndefined();
+    const minimal = structuredClone(agentManifest);
+    minimal.projector.contributes.agents[0] = {
+      id: "minimal",
+      title: "Minimal",
+      command: "minimal",
+      usage: { kind: "none" },
+    };
+    expect(validatePluginManifest(minimal)).toEqual(minimal);
+  });
+
+  test("accepts a mixed manifest and an empty unused contribution list", () => {
+    const mixed = structuredClone(agentManifest);
+    mixed.projector.contributes.themes = [
+      { id: "night", title: "Night", mode: "dark", tokens: "themes/night.json" },
+    ];
+    expect(validatePluginManifest(mixed)).toEqual(mixed);
+    const emptyThemes = structuredClone(agentManifest);
+    emptyThemes.projector.contributes.themes = [];
+    expect(validatePluginManifest(emptyThemes)).toEqual(emptyThemes);
+    const emptyAgents = structuredClone(manifest);
+    emptyAgents.projector.contributes.agents = [];
+    expect(validatePluginManifest(emptyAgents)).toEqual(emptyAgents);
+  });
+
+  test("rejects missing or empty contributions", () => {
+    expect(() =>
+      validatePluginManifest({
+        ...structuredClone(manifest),
+        projector: { apiVersion: 1, contributes: {} },
+      }),
+    ).toThrow(/хотя бы одну тему или агента/);
+    expect(() =>
+      validatePluginManifest({
+        ...structuredClone(manifest),
+        projector: { apiVersion: 1, contributes: { themes: [], agents: [] } },
+      }),
+    ).toThrow(/хотя бы одну тему или агента/);
+    expect(() =>
+      validatePluginManifest({
+        ...structuredClone(manifest),
+        projector: { apiVersion: 1, contributes: { themes: [] } },
+      }),
+    ).toThrow(/хотя бы одну тему/);
+    expect(() =>
+      validatePluginManifest({
+        ...structuredClone(agentManifest),
+        projector: { apiVersion: 1, contributes: { agents: [] } },
+      }),
+    ).toThrow(/хотя бы одного агента/);
+    expect(() =>
+      validatePluginManifest({ ...agentManifest, projector: { apiVersion: 2, contributes: {} } }),
+    ).toThrow(/Неподдерживаемая версия API/);
+  });
+
+  test("rejects duplicate and malformed identifiers", () => {
+    const duplicate = structuredClone(agentManifest);
+    duplicate.projector.contributes.agents.push(structuredClone(agentContribution));
+    expect(() => validatePluginManifest(duplicate)).toThrow(/Повторяющийся идентификатор агента/);
+    for (const id of ["", "Example", "-example", "example agent", "example/agent"]) {
+      expect(() => validatePluginManifest(withAgent({ ...agentContribution, id }))).toThrow(
+        /Некорректный идентификатор агента/,
+      );
+    }
+    for (const program of ["Example", "-example", "example agent", "example/agent"]) {
+      expect(() => validatePluginManifest(withAgent({ ...agentContribution, program }))).toThrow(
+        /Некорректная программа агента/,
+      );
+    }
+  });
+
+  test("rejects unsafe argv and binary values", () => {
+    for (const command of ["", "   ", "agent\necho", "agent\0echo", "x".repeat(1001)]) {
+      expect(() => validatePluginManifest(withAgent({ ...agentContribution, command }))).toThrow(
+        /Команда агента/,
+      );
+    }
+    for (const args of [
+      [""],
+      ["acp\n--exec"],
+      ["acp\0"],
+      ["x".repeat(1001)],
+      Array.from({ length: 65 }, () => "arg"),
+      "acp",
+    ]) {
+      expect(() => validatePluginManifest(withAgent({ ...agentContribution, args }))).toThrow(
+        /Аргументы агента/,
+      );
+    }
+    for (const binary of ["", "agent\necho", "agent\0echo", "x".repeat(1001)]) {
+      expect(() => validatePluginManifest(withAgent({ ...agentContribution, binary }))).toThrow(
+        /Бинарник агента/,
+      );
+    }
+  });
+
+  test("rejects unknown agent, terminal and usage fields", () => {
+    for (const field of [
+      "env",
+      "capabilities",
+      "dialect",
+      "extensions",
+      "plan",
+      "settings",
+      "secrets",
+      "shell",
+    ]) {
+      expect(() =>
+        validatePluginManifest(withAgent({ ...agentContribution, [field]: true })),
+      ).toThrow(/неизвестные поля/);
+    }
+    expect(() =>
+      validatePluginManifest(
+        withAgent({ ...agentContribution, terminal: { executable: "agent", shell: true } }),
+      ),
+    ).toThrow(/Терминал агента: неизвестные поля/);
+    expect(() =>
+      validatePluginManifest(
+        withAgent({
+          ...agentContribution,
+          usage: { kind: "command", command: "agent", env: {} },
+        }),
+      ),
+    ).toThrow(/usage агента: неизвестные поля/);
+    expect(() =>
+      validatePluginManifest(
+        withAgent({ ...agentContribution, usage: { kind: "none", command: "agent" } }),
+      ),
+    ).toThrow(/usage агента: неизвестные поля/);
+  });
+
+  test("validates usage kind and timeout", () => {
+    for (const usage of [
+      { kind: "http", command: "agent" },
+      { kind: "command" },
+      { kind: "command", command: "agent\nusage" },
+      { kind: "command", command: "agent", timeoutMs: 99 },
+      { kind: "command", command: "agent", timeoutMs: 60001 },
+      { kind: "command", command: "agent", timeoutMs: 1000.5 },
+      { kind: "command", command: "agent", timeoutMs: "1000" },
+    ]) {
+      expect(() => validatePluginManifest(withAgent({ ...agentContribution, usage }))).toThrow(
+        /usage/,
+      );
+    }
+    expect(
+      validatePluginManifest(
+        withAgent({
+          ...agentContribution,
+          usage: { kind: "command", command: "agent", timeoutMs: 100 },
+        }),
+      ),
+    ).toBeTruthy();
+    expect(
+      validatePluginManifest(
+        withAgent({
+          ...agentContribution,
+          usage: { kind: "command", command: "agent", timeoutMs: 60000 },
+        }),
+      ),
+    ).toBeTruthy();
+  });
+
+  test("validates icon and usageReporting", () => {
+    for (const icon of ["Sparkles", "../sparkles", "sparkles.svg", "", "x".repeat(51)]) {
+      expect(() => validatePluginManifest(withAgent({ ...agentContribution, icon }))).toThrow(
+        /Некорректная иконка агента/,
+      );
+    }
+    for (const usageReporting of [
+      "Projector/Usage",
+      "/usage",
+      "usage reporting",
+      "x".repeat(101),
+    ]) {
+      expect(() =>
+        validatePluginManifest(withAgent({ ...agentContribution, usageReporting })),
+      ).toThrow(/usageReporting/);
+    }
+    expect(
+      validatePluginManifest(
+        withAgent({ ...agentContribution, icon: "sparkles-2", usageReporting: "acme/usage_v1" }),
+      ),
+    ).toBeTruthy();
+  });
+
+  test("validates clientCapabilities as bounded plain JSON", () => {
+    const withProto = JSON.parse('{"__proto__": {"polluted": true}}');
+    expect(() =>
+      validatePluginManifest(withAgent({ ...agentContribution, clientCapabilities: withProto })),
+    ).toThrow(/недопустимое поле __proto__/);
+    for (const key of ["constructor", "prototype"]) {
+      expect(() =>
+        validatePluginManifest(
+          withAgent({ ...agentContribution, clientCapabilities: { [key]: true } }),
+        ),
+      ).toThrow(/недопустимое поле/);
+    }
+    expect(() =>
+      validatePluginManifest(
+        withAgent({
+          ...agentContribution,
+          clientCapabilities: { data: "x".repeat(20001) },
+        }),
+      ),
+    ).toThrow(/20000/);
+    expect(() =>
+      validatePluginManifest(withAgent({ ...agentContribution, clientCapabilities: [] })),
+    ).toThrow(/объектом/);
+    expect(() =>
+      validatePluginManifest(withAgent({ ...agentContribution, clientCapabilities: null })),
+    ).toThrow(/объектом/);
+    expect(() =>
+      validatePluginManifest(
+        withAgent({
+          ...agentContribution,
+          clientCapabilities: { nested: { list: [true, null, "x"], deep: { ok: 1 } } },
+        }),
+      ),
+    ).toBeTruthy();
+  });
+
+  test("validates terminal and text lengths", () => {
+    for (const terminal of [
+      { program: "agent\necho" },
+      { executable: "" },
+      { executable: "agent\0echo" },
+      { title: "x".repeat(201) },
+      1,
+      null,
+    ]) {
+      expect(() => validatePluginManifest(withAgent({ ...agentContribution, terminal }))).toThrow(
+        /Терминал агента|Название терминала агента/,
+      );
+    }
+    expect(
+      validatePluginManifest(
+        withAgent({ ...agentContribution, terminal: { program: "agent", executable: "agent" } }),
+      ),
+    ).toBeTruthy();
+    expect(() => validatePluginManifest(withAgent({ ...agentContribution, title: "" }))).toThrow(
+      /Название агента/,
+    );
+    expect(() =>
+      validatePluginManifest(withAgent({ ...agentContribution, title: "x".repeat(201) })),
+    ).toThrow(/Название агента/);
+    expect(() =>
+      validatePluginManifest(withAgent({ ...agentContribution, caption: "x".repeat(301) })),
+    ).toThrow(/Подпись агента/);
   });
 });

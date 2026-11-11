@@ -1,0 +1,21 @@
+{
+  "name": "@projector-tests/agent-plugin",
+  "version": "1.0.0",
+  "projector": {
+    "apiVersion": 1,
+    "contributes": {
+      "agents": [
+        {
+          "id": "fixture-acp",
+          "title": "Fixture ACP",
+          "caption": "Плагинный ACP-агент",
+          "program": "fixture-acp",
+          "command": "node",
+          "args": [
+            "agent.js"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -3,6 +3,7 @@ export {
   featureAgents,
   registerAgentFeature,
   registerFeatureAgent,
+  replaceFeatureAgents,
   type AgentFeature,
   type FeatureAgent,
 } from "./catalog.ts";

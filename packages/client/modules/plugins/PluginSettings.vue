@@ -59,7 +59,7 @@ function previewStyle(theme: AvailableTheme) {
     <UiInline class="toolbar" align="center" justify="between" wrap>
       <div>
         <UiHeading as="h2" size="sm">Локальные плагины</UiHeading>
-        <UiHint>Декларативные цветовые схемы без исполняемого кода.</UiHint>
+        <UiHint>Декларативные темы и ACP-агенты без исполняемого кода плагина.</UiHint>
       </div>
       <UiInline wrap>
         <UiButton :disabled="busy" @click="commands.run('ide.plugins.refresh')">Обновить</UiButton>
@@ -140,6 +140,14 @@ function previewStyle(theme: AvailableTheme) {
               >Выключить</UiButton
             >
             <UiButton
+              v-else-if="plugin.agents.length && !plugin.trusted"
+              size="sm"
+              appearance="solid"
+              :disabled="busy"
+              @click="commands.run('ide.plugin.trust', { id: plugin.id })"
+              >Подтвердить доверие</UiButton
+            >
+            <UiButton
               v-else
               size="sm"
               appearance="solid"
@@ -156,12 +164,51 @@ function previewStyle(theme: AvailableTheme) {
       <UiInline align="center" justify="between" wrap>
         <div>
           <UiHeading as="h3" size="sm">{{ selected.id }}</UiHeading>
-          <UiHint>Темы интерфейса · только данные, без кода</UiHint>
+          <UiHint>
+            {{
+              selected.agents.length
+                ? "ACP-агент и темы · только данные, без кода"
+                : "Темы интерфейса · только данные, без кода"
+            }}
+          </UiHint>
         </div>
         <UiBadge :tone="statusTone(selected.status)">{{ statusLabels[selected.status] }}</UiBadge>
       </UiInline>
       <p v-if="selected.description" class="detail-description">{{ selected.description }}</p>
       <code v-if="selected.path" class="plugin-path">{{ selected.path }}</code>
+      <div v-if="selected.agents.length" class="agent-contributions">
+        <strong>Агенты</strong>
+        <div v-for="agent in selected.agents" :key="agent.id" class="agent-row">
+          <UiInline align="center" wrap>
+            <strong>{{ agent.title }}</strong>
+            <UiBadge tone="neutral">{{ agent.id }}</UiBadge>
+          </UiInline>
+          <code>{{ [agent.command, ...(agent.args ?? [])].join(" ") }}</code>
+          <UiHint>{{
+            agent.caption || `Терминальная программа: ${agent.program || agent.id}`
+          }}</UiHint>
+        </div>
+        <UiMessage v-if="!selected.trusted" tone="danger" size="xs" wrap>
+          Команда будет запущена на этой машине. Подтвердите доверие к текущему содержимому пакета;
+          после его изменения доверие потребуется снова.
+        </UiMessage>
+        <UiInline wrap>
+          <UiButton
+            v-if="!selected.trusted"
+            size="sm"
+            appearance="solid"
+            :disabled="busy"
+            @click="commands.run('ide.plugin.trust', { id: selected.id })"
+            >Подтвердить доверие</UiButton
+          >
+          <UiButton
+            size="sm"
+            :disabled="busy"
+            @click="commands.run('ide.plugin.remove', { id: selected.id })"
+            >Удалить плагин</UiButton
+          >
+        </UiInline>
+      </div>
       <div v-if="selected.diagnostics.length" class="diagnostics">
         <strong>Диагностика</strong>
         <UiMessage
@@ -174,10 +221,14 @@ function previewStyle(theme: AvailableTheme) {
           {{ item.message }}
         </UiMessage>
       </div>
-      <UiEmpty v-if="!selected.themes.length" density="compact" align="start">
-        Нет доступных тем. Проверьте диагностику пакета.
+      <UiEmpty
+        v-if="!selected.themes.length && !selected.agents.length"
+        density="compact"
+        align="start"
+      >
+        Нет доступных тем или агентов. Проверьте диагностику пакета.
       </UiEmpty>
-      <div v-else class="theme-grid">
+      <div v-else-if="selected.themes.length" class="theme-grid">
         <article v-for="theme in selected.themes" :key="theme.id" class="theme-card">
           <div class="theme-preview" :style="previewStyle(theme)" aria-hidden="true">
             <div class="preview-sidebar"><i /><i /><i /></div>
@@ -198,6 +249,14 @@ function previewStyle(theme: AvailableTheme) {
           </UiButton>
         </article>
       </div>
+      <UiInline v-if="!selected.agents.length" wrap>
+        <UiButton
+          size="sm"
+          :disabled="busy"
+          @click="commands.run('ide.plugin.remove', { id: selected.id })"
+          >Удалить плагин</UiButton
+        >
+      </UiInline>
     </UiCard>
 
     <form class="install-form" @submit.prevent="commands.run('ide.plugins.install')">
@@ -329,6 +388,21 @@ function previewStyle(theme: AvailableTheme) {
 .diagnostics {
   display: grid;
   gap: var(--sp-2);
+}
+.agent-contributions {
+  display: grid;
+  gap: var(--sp-2);
+}
+.agent-row {
+  display: grid;
+  gap: 2px;
+  padding: var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+.agent-row code {
+  color: var(--muted);
+  overflow-wrap: anywhere;
 }
 .theme-grid {
   display: grid;

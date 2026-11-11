@@ -1,4 +1,4 @@
-import { registerAgentFeature, registerFeatureAgent } from "../modules/agent-features/index.ts";
+import { registerAgentFeature, replaceFeatureAgents } from "../modules/agent-features/index.ts";
 import { listAgentBackends } from "../modules/agent/index.ts";
 import { widgetCatalog } from "../modules/agents/projector/index.ts";
 
@@ -20,7 +20,7 @@ const IDE_INTRO =
  */
 export function registerBuiltinAgentFeatures(): void {
   const backends = listAgentBackends();
-  for (const agent of backends) registerFeatureAgent({ id: agent.id, label: agent.label });
+  replaceFeatureAgents(backends.map(({ id, label }) => ({ id, label })));
   registerAgentFeature({
     id: "widgets",
     title: "Виджеты в ответах",

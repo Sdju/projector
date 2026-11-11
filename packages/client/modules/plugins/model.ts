@@ -6,6 +6,7 @@ import {
 } from "../../common/utilities/commands.ts";
 import { pickFolder } from "../project/index.ts";
 import { applyAppearance, currentAppearance, setAppearanceThemes } from "../appearance/index.ts";
+import { refreshClientAgents } from "../agents-integration/catalog/index.ts";
 import { fetchPlugins, pluginAction, saveAppearance, type PluginCatalog } from "./client.ts";
 
 export function usePluginSettings() {
@@ -30,7 +31,9 @@ export function usePluginSettings() {
         .includes(needle);
       return (
         matchesText &&
-        (mode.value === "all" || plugin.themes.some((theme) => theme.mode === mode.value))
+        (mode.value === "all" ||
+          plugin.agents.length > 0 ||
+          plugin.themes.some((theme) => theme.mode === mode.value))
       );
     });
   });
@@ -49,6 +52,8 @@ export function usePluginSettings() {
     catalog.value = next;
     setAppearanceThemes(next.availableThemes);
     applyAppearance(currentAppearance());
+    // An agent plugin changes the chat catalog too; menus and tabs read it reactively.
+    void refreshClientAgents();
     if (selectedId.value && !next.plugins.some((item) => item.id === selectedId.value))
       selectedId.value = "";
   }
@@ -91,6 +96,18 @@ export function usePluginSettings() {
     );
   }
 
+  function trust(id: string) {
+    const plugin = catalog.value?.plugins.find((item) => item.id === id);
+    if (!plugin) throw new Error("Плагин не найден");
+    return perform(() => pluginAction("trust", { id }), "Доверие к агенту подтверждено");
+  }
+
+  function remove(id: string) {
+    const plugin = catalog.value?.plugins.find((item) => item.id === id);
+    if (!plugin) throw new Error("Плагин не найден");
+    return perform(() => pluginAction("remove", { id }), "Плагин удалён");
+  }
+
   async function applyTheme(id: string) {
     const theme = catalog.value?.availableThemes.find((item) => item.id === id);
     if (!theme) throw new Error("Тема недоступна: включите её плагин и обновите каталог");
@@ -109,7 +126,7 @@ export function usePluginSettings() {
     if (!path.trim()) throw new Error("Укажите путь к папке плагина");
     const next = await perform(
       () => pluginAction("install", { path: path.trim() }),
-      "Плагин установлен и включён",
+      "Плагин установлен",
     );
     if (!disposed) installPath.value = "";
     return next;
@@ -135,13 +152,14 @@ export function usePluginSettings() {
   commands.scope.registerCommand({
     id: "ide.plugins.list",
     title: "Список локальных плагинов",
-    description: "Возвращает локальные theme-only плагины, их статусы, диагностику и темы.",
+    description:
+      "Возвращает локальные плагины, их статусы, диагностику, темы и декларативных агентов.",
     run: () => catalog.value?.plugins ?? [],
   });
   commands.scope.registerCommand({
     id: "ide.plugins.refresh",
     title: "Обновить каталог плагинов",
-    description: "Заново читает локальные пакеты и обновляет доступные темы интерфейса.",
+    description: "Заново читает локальные пакеты и обновляет темы и доступных агентов.",
     enabled: () => !busy.value,
     run: load,
   });
@@ -165,6 +183,24 @@ export function usePluginSettings() {
     });
   }
   commands.scope.registerCommand({
+    id: "ide.plugin.trust",
+    title: "Подтвердить доверие к агенту плагина",
+    description:
+      "Запоминает хеш текущего содержимого пакета. Без этого агент плагина нельзя включить, а после изменения пакета доверие нужно подтвердить снова.",
+    arguments: { id: "string: имя пакета плагина" },
+    enabled: () => !busy.value,
+    run: (value) => trust(optionalStringArg(commandArgs(value), "id") ?? ""),
+  });
+  commands.scope.registerCommand({
+    id: "ide.plugin.remove",
+    title: "Удалить плагин",
+    description:
+      "Удаляет управляемую установку плагина и его состояние. Плагин, установленный вручную, нужно удалить из его папки.",
+    arguments: { id: "string: имя пакета плагина" },
+    enabled: () => !busy.value,
+    run: (value) => remove(optionalStringArg(commandArgs(value), "id") ?? ""),
+  });
+  commands.scope.registerCommand({
     id: "ide.plugin.theme.apply",
     title: "Применить тему плагина",
     description:
@@ -181,7 +217,7 @@ export function usePluginSettings() {
     id: "ide.plugins.install",
     title: "Установить плагин из локальной папки",
     description:
-      "Копирует проверенный theme-only пакет из указанной папки, включает его и обновляет каталог тем.",
+      "Копирует проверенный пакет из указанной папки. Темы включаются сразу, агент ждёт подтверждения доверия.",
     arguments: { path: "string: абсолютный путь к папке с package.json; без него — поле экрана" },
     enabled: () => !busy.value,
     run: (value) => install(optionalStringArg(commandArgs(value), "path") ?? installPath.value),
@@ -189,7 +225,7 @@ export function usePluginSettings() {
   commands.scope.registerCommand({
     id: "ide.plugins.folder.open",
     title: "Выбрать и установить папку плагина",
-    description: "Открывает системный выбор папки и устанавливает выбранный theme-only плагин.",
+    description: "Открывает системный выбор папки и устанавливает выбранный плагин.",
     enabled: () => !busy.value,
     run: chooseFolder,
   });

@@ -29,6 +29,8 @@ export { selectionFrom } from "./controls.ts";
 
 const backends = new Map<AgentBackendId, AgentBackend>();
 let defaultId: AgentBackendId | undefined;
+// Bumped by every successful catalog change, so readers can notice that the set of agents moved.
+let revision = 0;
 
 /**
  * Adds an agent to the chat under the id it declares; registering the same id again replaces it.
@@ -37,28 +39,55 @@ let defaultId: AgentBackendId | undefined;
 export function registerAgentBackend(backend: AgentBackend, options: { asDefault?: boolean } = {}) {
   backends.set(backend.id, backend);
   if (options.asDefault || defaultId === undefined) defaultId = backend.id;
+  revision++;
+}
+
+/**
+ * Removes an agent from the chat. The default backend and the server's own built-ins stay: a chat
+ * that names one of them must never lose its agent without the user asking for it.
+ */
+export function unregisterAgentBackend(id: AgentBackendId): void {
+  const backend = backends.get(id);
+  if (!backend) throw new Error(`Неизвестный агент: ${id}`);
+  if (id === defaultId) throw new Error(`Агент по умолчанию нельзя удалить: ${id}`);
+  if (backend.builtin) throw new Error(`Встроенного агента нельзя удалить: ${id}`);
+  backends.delete(id);
+  revision++;
+}
+
+/** The catalog revision: it grows on every registration, replacement and removal. */
+export function agentCatalogRevision(): number {
+  return revision;
 }
 
 /** A registered backend as the settings, the routes and the client see it. */
 export interface AgentBackendSummary {
   id: AgentBackendId;
   label: string;
+  caption?: string;
+  icon?: string;
   program?: string;
   terminal?: AgentTerminal;
   builtin?: boolean;
   capabilities?: AgentCapabilities;
+  usageUrl?: string;
 }
 
 /** Every registered backend in registration order, without its methods. */
 export function listAgentBackends(): AgentBackendSummary[] {
-  return [...backends.values()].map(({ id, label, program, terminal, builtin, capabilities }) => ({
-    id,
-    label,
-    ...(program ? { program } : {}),
-    ...(terminal ? { terminal } : {}),
-    ...(builtin ? { builtin } : {}),
-    ...(capabilities ? { capabilities } : {}),
-  }));
+  return [...backends.values()].map(
+    ({ id, label, caption, icon, program, terminal, builtin, capabilities, usageUrl }) => ({
+      id,
+      label,
+      ...(caption ? { caption } : {}),
+      ...(icon ? { icon } : {}),
+      ...(program ? { program } : {}),
+      ...(terminal ? { terminal } : {}),
+      ...(builtin ? { builtin } : {}),
+      ...(capabilities ? { capabilities } : {}),
+      ...(usageUrl ? { usageUrl } : {}),
+    }),
+  );
 }
 
 /** Whether a request names an agent this server has registered. */
@@ -66,9 +95,19 @@ export function isAgentBackend(id: unknown): id is AgentBackendId {
   return typeof id === "string" && backends.has(id);
 }
 
-/** The agent a request runs with: the one it names, else the default. */
+/**
+ * The agent a request runs with: the one it names, else the default. A named agent that is not
+ * registered is an error, never the default: an old chat must not silently run another agent.
+ */
 export function resolveAgentBackend(id: unknown): AgentBackendId {
-  if (isAgentBackend(id)) return id;
+  if (id === undefined || id === null || id === "") return defaultAgent();
+  if (typeof id !== "string")
+    throw new Error(`Идентификатор агента должен быть строкой, получено: ${typeof id}`);
+  if (backends.has(id)) return id;
+  throw new Error(`Неизвестный агент: ${id}`);
+}
+
+function defaultAgent(): AgentBackendId {
   if (defaultId === undefined) throw new Error("Ни один агент не зарегистрирован");
   return defaultId;
 }
@@ -144,6 +183,11 @@ export async function deleteAgentSession(
   // The chats that continued the session are the same conversation: remove their copies too.
   if (history?.project)
     removeChatsWithSession(history.project, backend.id, sessionId, history.keep);
+}
+
+/** The plugin's limits provider, when it declared one; an unknown or removed agent has none. */
+export function agentUsageProvider(id: AgentBackendId | undefined) {
+  return backends.get(id ?? defaultId ?? "")?.usage;
 }
 
 export async function agentMcpServers(id: string | undefined, cwd: string) {

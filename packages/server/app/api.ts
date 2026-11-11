@@ -24,6 +24,7 @@ import { routes as providersActiveRoutes } from "../routes/api/providers/active.
 import { routes as providersBalanceRoutes } from "../routes/api/providers/balance.ts";
 import { routes as providersModelsRoutes } from "../routes/api/providers/models.ts";
 import { routes as agentRoutes } from "../routes/api/agent.ts";
+import { routes as agentUsageRoutes } from "../routes/api/agent-usage.ts";
 import { routes as agentFormRepairRoutes } from "../routes/api/agent-form-repair.ts";
 import { routes as agentAnswerRepairRoutes } from "../routes/api/agent-answer-repair.ts";
 import { routes as agentSecretShowRoutes } from "../routes/api/agent-secret-show.ts";
@@ -66,6 +67,7 @@ import { routes as claudeRoutes } from "../routes/api/claude.ts";
 import { routes as analyticsRoutes } from "../routes/api/analytics.ts";
 import { routes as openAiRoutes } from "../routes/api/openai.ts";
 import { routes as browserRoutes } from "../routes/api/browser.ts";
+import { ensureAgentsReady } from "./agents.ts";
 const dispatch = createRouteDispatcher([
   ...hubRoutes,
   ...openAiRoutes,
@@ -114,6 +116,7 @@ const dispatch = createRouteDispatcher([
   ...agentProjectRolesRoutes,
   ...agentProjectWidgetsRoutes,
   ...agentRoutes,
+  ...agentUsageRoutes,
   ...agentFormRepairRoutes,
   ...agentAnswerRepairRoutes,
   ...agentSecretShowRoutes,
@@ -134,6 +137,8 @@ const dispatch = createRouteDispatcher([
 ]);
 
 export async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
+  // Plugin agents are discovered asynchronously; the first request sees the whole catalog.
+  await ensureAgentsReady();
   let url: URL;
   try {
     // Routing does not depend on the untrusted Host header.

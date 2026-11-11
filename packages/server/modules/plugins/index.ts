@@ -1,5 +1,4 @@
-import { randomUUID } from "node:crypto";
-import { lstat, mkdir, readdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import {
@@ -9,36 +8,25 @@ import {
   type AvailableTheme,
   type PluginManifest,
 } from "@ai-projector/core/modules/plugins/index.ts";
+import { deleteState, readState, updateState } from "./state.ts";
+import { hashPackage, isTrusted } from "./trust.ts";
+import type {
+  PluginAgentApply,
+  PluginAgentDiagnostic,
+  PluginCatalog,
+  PluginDiagnostic,
+  PluginInfo,
+} from "./types.ts";
 
-export type PluginStatus = "enabled" | "disabled" | "error" | "missing";
-
-export interface PluginDiagnostic {
-  message: string;
-}
-
-export interface PluginInfo {
-  id: string;
-  version?: string;
-  description?: string;
-  status: PluginStatus;
-  enabled: boolean;
-  path?: string;
-  diagnostics: PluginDiagnostic[];
-  themes: AvailableTheme[];
-}
-
-export interface PluginCatalog {
-  directory: string;
-  plugins: PluginInfo[];
-  availableThemes: AvailableTheme[];
-}
-
-interface StoredPluginState {
-  enabled: boolean;
-  version?: string;
-}
-
-type PluginState = Record<string, StoredPluginState>;
+export type {
+  PluginAgentApply,
+  PluginAgentCandidate,
+  PluginAgentDiagnostic,
+  PluginCatalog,
+  PluginDiagnostic,
+  PluginInfo,
+  PluginStatus,
+} from "./types.ts";
 
 interface Candidate {
   path: string;
@@ -46,7 +34,12 @@ interface Candidate {
 }
 
 const currentProjectorVersion = "0.11.0";
-let pending: Promise<unknown> = Promise.resolve();
+let applyAgentRegistry: PluginAgentApply = () => [];
+
+/** The composition owns the agent registry; discovery only asks it to reconcile the catalog. */
+export function configurePluginAgents(apply: PluginAgentApply): void {
+  applyAgentRegistry = apply;
+}
 
 export function pluginsDirectory(): string {
   return join(dataDir(), "plugins");
@@ -56,58 +49,10 @@ function packagesDirectory(): string {
   return join(pluginsDirectory(), "packages");
 }
 
-function statePath(): string {
-  return join(dataDir(), "plugins.json");
-}
-
 async function readJson(path: string): Promise<unknown> {
   const content = await readFile(path, "utf8");
   if (content.length > 1_000_000) throw new Error("Файл плагина слишком большой");
   return JSON.parse(content);
-}
-
-async function readState(): Promise<PluginState> {
-  try {
-    const value = await readJson(statePath());
-    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-    const source =
-      "plugins" in value && value.plugins && typeof value.plugins === "object"
-        ? value.plugins
-        : value;
-    const state: PluginState = {};
-    for (const [id, entry] of Object.entries(source)) {
-      if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
-      const item = entry as Record<string, unknown>;
-      if (typeof item.enabled === "boolean")
-        state[id] = {
-          enabled: item.enabled,
-          version: typeof item.version === "string" ? item.version : undefined,
-        };
-    }
-    return state;
-  } catch {
-    return {};
-  }
-}
-
-async function updateState(id: string, value: StoredPluginState): Promise<void> {
-  const task = pending.then(async () => {
-    const state = await readState();
-    state[id] = value;
-    await mkdir(dataDir(), { recursive: true });
-    const file = statePath();
-    const temporary = `${file}.${randomUUID()}.tmp`;
-    try {
-      await writeFile(temporary, `${JSON.stringify({ plugins: state }, null, 2)}\n`, {
-        mode: 0o600,
-      });
-      await rename(temporary, file);
-    } finally {
-      await rm(temporary, { force: true });
-    }
-  });
-  pending = task.catch(() => undefined);
-  return task;
 }
 
 async function directoriesAt(path: string): Promise<string[]> {
@@ -156,13 +101,13 @@ async function directCandidates(): Promise<Candidate[]> {
   return result;
 }
 
-async function loadPackage(candidate: Candidate, state: StoredPluginState | undefined) {
+async function loadPackage(candidate: Candidate) {
   const manifest = validatePluginManifest(await readJson(join(candidate.path, "package.json")), {
     projectorVersion: currentProjectorVersion,
   });
   const diagnostics: PluginDiagnostic[] = [];
   const themes: AvailableTheme[] = [];
-  for (const theme of manifest.projector.contributes.themes) {
+  for (const theme of manifest.projector.contributes.themes ?? []) {
     try {
       const path = resolve(candidate.path, theme.tokens);
       if (!path.startsWith(`${resolve(candidate.path)}${sep}`))
@@ -185,7 +130,12 @@ async function loadPackage(candidate: Candidate, state: StoredPluginState | unde
       });
     }
   }
-  return { manifest, diagnostics, themes, state };
+  return {
+    manifest,
+    diagnostics,
+    themes,
+    agents: manifest.projector.contributes.agents ?? [],
+  };
 }
 
 export async function discoverPlugins(): Promise<PluginCatalog> {
@@ -210,8 +160,10 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         path: candidate.path,
         status: "error",
         enabled: false,
+        trusted: false,
         diagnostics: [{ message: error instanceof Error ? error.message : "Некорректный плагин" }],
         themes: [],
+        agents: [],
       });
     }
   }
@@ -230,6 +182,7 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         id,
         status: "error",
         enabled: false,
+        trusted: false,
         diagnostics: [
           {
             message: selected.length
@@ -238,33 +191,49 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
           },
         ],
         themes: [],
+        agents: [],
       });
       continue;
     }
     try {
-      const loaded = await loadPackage(selected[0].candidate, saved);
+      const loaded = await loadPackage(selected[0].candidate);
       const enabled = saved?.enabled ?? false;
+      const agents = loaded.agents;
+      const requiresTrust = agents.length > 0;
+      const currentHash = requiresTrust ? await hashPackage(selected[0].candidate.path) : undefined;
+      const trusted = !requiresTrust || isTrusted(saved?.trustedHash, currentHash);
+      const diagnostics = [...loaded.diagnostics];
+      if (enabled && !trusted)
+        diagnostics.push({
+          message: saved?.trustedHash
+            ? "Содержимое плагина изменилось; подтвердите доверие заново"
+            : "Агенту плагина требуется подтверждение доверия",
+        });
       plugins.push({
         id,
         version: loaded.manifest.version,
         description: loaded.manifest.description,
         path: selected[0].candidate.path,
-        status: loaded.diagnostics.length ? "error" : enabled ? "enabled" : "disabled",
+        status: diagnostics.length ? "error" : enabled ? "enabled" : "disabled",
         enabled,
-        diagnostics: loaded.diagnostics,
+        trusted,
+        diagnostics,
         themes: loaded.themes,
+        agents,
       });
-      if (enabled && !loaded.diagnostics.length) availableThemes.push(...loaded.themes);
+      if (enabled && trusted && !diagnostics.length) availableThemes.push(...loaded.themes);
     } catch (error) {
       plugins.push({
         id,
         status: "error",
         enabled: false,
+        trusted: false,
         path: selected[0].candidate.path,
         diagnostics: [
           { message: error instanceof Error ? error.message : "Ошибка чтения плагина" },
         ],
         themes: [],
+        agents: [],
       });
     }
   }
@@ -275,21 +244,85 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         version: saved.version,
         status: "missing",
         enabled: saved.enabled,
+        trusted: false,
         diagnostics: [{ message: "Пакет плагина отсутствует" }],
         themes: [],
+        agents: [],
       });
   }
+  applyAgentCatalog(plugins, availableThemes);
   plugins.sort((left, right) => left.id.localeCompare(right.id));
   availableThemes.sort((left, right) => left.id.localeCompare(right.id));
   return { directory: pluginsDirectory(), plugins, availableThemes };
 }
 
+/** Registers enabled agents through the composition callback and turns its diagnostics into errors. */
+function applyAgentCatalog(plugins: PluginInfo[], availableThemes: AvailableTheme[]): void {
+  const candidates = plugins
+    .filter((plugin) => plugin.status === "enabled" && plugin.trusted)
+    .flatMap((plugin) => plugin.agents.map((agent) => ({ plugin: plugin.id, agent })));
+  let diagnostics: PluginAgentDiagnostic[] = [];
+  try {
+    diagnostics = applyAgentRegistry(candidates);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Не удалось применить агентов";
+    for (const candidate of candidates)
+      diagnostics.push({ plugin: candidate.plugin, agent: candidate.agent.id, message });
+  }
+  for (const item of diagnostics) {
+    const plugin = plugins.find((entry) => entry.id === item.plugin);
+    if (!plugin) continue;
+    plugin.diagnostics.push({ message: `${item.agent}: ${item.message}` });
+    plugin.status = "error";
+    for (let index = availableThemes.length - 1; index >= 0; index--)
+      if (availableThemes[index]!.packageName === item.plugin) availableThemes.splice(index, 1);
+  }
+}
+
 export async function setPluginEnabled(id: string, enabled: boolean): Promise<PluginCatalog> {
   const catalog = await discoverPlugins();
   const plugin = catalog.plugins.find((item) => item.id === id);
-  if (!plugin || plugin.status === "missing" || plugin.status === "error")
+  if (!plugin || plugin.status === "missing")
     throw new Error("Плагин недоступен для изменения состояния");
-  await updateState(id, { enabled, version: plugin.version });
+  if (enabled && plugin.status === "error")
+    throw new Error("Плагин содержит ошибки; исправьте их перед включением");
+  if (enabled && plugin.agents.length && !plugin.trusted)
+    throw new Error("Сначала подтвердите доверие к агенту плагина");
+  const state = await readState();
+  const current = state[id] ?? { enabled: false };
+  await updateState(id, { ...current, enabled, version: plugin.version });
+  return discoverPlugins();
+}
+
+/** Confirms the exact content of a plugin that contributes agents. */
+export async function trustPlugin(id: string): Promise<PluginCatalog> {
+  const catalog = await discoverPlugins();
+  const plugin = catalog.plugins.find((item) => item.id === id);
+  if (!plugin || plugin.status === "missing" || !plugin.path)
+    throw new Error("Плагин не найден на диске");
+  if (!plugin.agents.length) throw new Error("Плагин не содержит агентов");
+  const trustedHash = await hashPackage(plugin.path);
+  const state = await readState();
+  const current = state[id] ?? { enabled: false };
+  await updateState(id, {
+    ...current,
+    enabled: plugin.enabled,
+    version: plugin.version,
+    trustedHash,
+  });
+  return discoverPlugins();
+}
+
+/** Removes a managed installation; a hand-placed folder stays where the user put it. */
+export async function removePlugin(id: string): Promise<PluginCatalog> {
+  const catalog = await discoverPlugins();
+  const plugin = catalog.plugins.find((item) => item.id === id);
+  if (!plugin || plugin.status === "missing" || !plugin.path)
+    throw new Error("Плагин не найден на диске");
+  if (!resolve(plugin.path).startsWith(`${resolve(packagesDirectory())}${sep}`))
+    throw new Error("Плагин установлен вручную; удалите его папку");
+  await rm(plugin.path, { recursive: true, force: true });
+  await deleteState(id);
   return discoverPlugins();
 }
 
@@ -321,7 +354,7 @@ export async function installPlugin(sourcePath: unknown): Promise<PluginCatalog>
   const manifest = validatePluginManifest(await readJson(join(source, "package.json")), {
     projectorVersion: currentProjectorVersion,
   });
-  const loaded = await loadPackage({ path: source, source: "direct" }, undefined);
+  const loaded = await loadPackage({ path: source, source: "direct" });
   if (loaded.diagnostics.length) throw new Error(loaded.diagnostics[0].message);
   const destination = destinationFor(manifest);
   await mkdir(dirname(destination), { recursive: true });
@@ -340,6 +373,9 @@ export async function installPlugin(sourcePath: unknown): Promise<PluginCatalog>
       throw new Error("Эта версия плагина уже установлена");
     throw error;
   }
-  await updateState(manifest.name, { enabled: true, version: manifest.version });
+  // Theme-only packages are safe to enable at once. An agent runs a process, so it waits for
+  // an explicit trust confirmation before it can be switched on.
+  const hasAgents = (manifest.projector.contributes.agents?.length ?? 0) > 0;
+  await updateState(manifest.name, { enabled: !hasAgents, version: manifest.version });
   return discoverPlugins();
 }

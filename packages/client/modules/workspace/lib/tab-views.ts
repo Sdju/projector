@@ -1,4 +1,12 @@
-import { inject, onBeforeUnmount, provide, type Component, type InjectionKey } from "vue";
+import {
+  inject,
+  onBeforeUnmount,
+  provide,
+  shallowReactive,
+  watchEffect,
+  type Component,
+  type InjectionKey,
+} from "vue";
 import {
   createTabRegistry,
   type SidebarType,
@@ -200,7 +208,12 @@ export function useWorkspaceTabTypes(
   behaviors: Record<string, TabBehavior> = {},
 ) {
   const types = createTabRegistry(baseTabTypes, profile.tabs);
-  provide(workspaceTabsKey, { types, views: { ...baseTabViews(), ...views } });
+  const tabs = shallowReactive<WorkspaceTabs>({ types, views: {} });
+  // A plugin can add an agent after the workspace is mounted; its chat tab must appear too.
+  watchEffect(() => {
+    tabs.views = { ...baseTabViews(), ...views };
+  });
+  provide(workspaceTabsKey, tabs);
   const detach = Object.entries(behaviors).map(([id, behavior]) => types.behave(id, behavior));
   onBeforeUnmount(() => detach.forEach((fn) => fn()));
   return types;

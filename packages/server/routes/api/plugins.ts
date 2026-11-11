@@ -1,4 +1,10 @@
-import { discoverPlugins, installPlugin, setPluginEnabled } from "../../modules/plugins/index.ts";
+import {
+  discoverPlugins,
+  installPlugin,
+  removePlugin,
+  setPluginEnabled,
+  trustPlugin,
+} from "../../modules/plugins/index.ts";
 import { accessAllowed } from "../../modules/access/index.ts";
 import { HttpError } from "../../modules/http/index.ts";
 import { asString, json, readBody, type RouteDefinition } from "../../modules/transport/index.ts";
@@ -28,6 +34,8 @@ export const routes: RouteDefinition[] = [
       else if (action === "disable")
         json(res, 200, await setPluginEnabled(asString(body.id), false));
       else if (action === "install") json(res, 200, await installPlugin(body.path));
+      else if (action === "trust") json(res, 200, await trustPlugin(asString(body.id)));
+      else if (action === "remove") json(res, 200, await removePlugin(asString(body.id)));
       else throw new HttpError(400, "Неизвестное действие с плагином");
     },
   },

@@ -130,6 +130,27 @@ export interface UsageSource {
   message?: string;
 }
 
+/** One subscription window of an agent, normalized across providers. */
+export interface AgentUsageWindow {
+  usedPercent: number;
+  resetsAt: number | null;
+  limited: boolean;
+}
+
+/** The limits answer a generic `usage.command` provider prints as JSON. */
+export interface AgentUsage {
+  status: "ready" | "unavailable";
+  windows: Record<string, AgentUsageWindow> | null;
+  checkedAt: number;
+  message?: string | null;
+}
+
+/** Per-request tokens an agent reports through the `projector/usage` ACP notification. */
+export interface AgentUsageReport extends UsageTokens {
+  model?: string;
+  cost?: number;
+}
+
 /** Tokens, answers and the cost of the answers that had a price. */
 export interface UsageTotals extends UsageTokens {
   /** All four token kinds together. */

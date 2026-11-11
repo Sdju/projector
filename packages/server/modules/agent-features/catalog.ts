@@ -24,6 +24,12 @@ export function registerFeatureAgent(agent: FeatureAgent): void {
   agents.set(agent.id, agent);
 }
 
+/** Replaces the whole list, so an agent that disappeared does not stay in the feature settings. */
+export function replaceFeatureAgents(list: readonly FeatureAgent[]): void {
+  agents.clear();
+  for (const agent of list) agents.set(agent.id, agent);
+}
+
 export function featureAgents(): FeatureAgent[] {
   return [...agents.values()];
 }
