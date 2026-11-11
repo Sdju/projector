@@ -381,6 +381,12 @@ test("a local project with a GitLab origin keeps local providers and adds tracke
   expect(profile.tabs.some((tab) => tab.id === "pipeline")).toBe(true);
   expect(profile.tabs.some((tab) => tab.id === "job")).toBe(true);
   expect(profile.tabs.some((tab) => tab.id === "repository")).toBe(true);
+  const pipeline = profile.tabs.find((tab) => tab.id === "pipeline");
+  const job = profile.tabs.find((tab) => tab.id === "job");
+  expect(pipeline?.key({ id: 42 })).toBe("pipeline:42");
+  expect(pipeline?.path({ id: 42 })).toBe("Pipeline #42");
+  expect(job?.key({ id: 7 })).toBe("job:7");
+  expect(job?.path({ id: 7 })).toBe("Job #7");
 });
 
 test("the GitLab resolver claims gl:/ projects instead of falling back to local files", async () => {

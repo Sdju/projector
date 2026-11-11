@@ -326,6 +326,13 @@ test("a local project with a GitHub origin keeps local providers and adds issues
   expect(profile.tabs.some((tab) => tab.id === "discussion")).toBeTruthy();
   expect(profile.sidebar.some((section) => section.id === "releases")).toBeTruthy();
   expect(profile.tabs.some((tab) => tab.id === "release")).toBeTruthy();
+  expect(profile.sidebar.some((section) => section.id === "pipelines")).toBeTruthy();
+  const pipeline = profile.tabs.find((tab) => tab.id === "pipeline");
+  const job = profile.tabs.find((tab) => tab.id === "job");
+  expect(pipeline?.key({ id: 42908773281 })).toBe("pipeline:42908773281");
+  expect(pipeline?.path({ id: 42908773281 })).toBe("Pipeline #42908773281");
+  expect(job?.key({ id: 99 })).toBe("job:99");
+  expect(job?.path({ id: 99 })).toBe("Job #99");
   const calls = [];
   const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
     calls.push(String(url));
