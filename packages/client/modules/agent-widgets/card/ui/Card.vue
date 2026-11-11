@@ -5,7 +5,7 @@ defineProps<{ title?: string; hint?: string; tone?: "neutral" | "warning" }>();
 </script>
 
 <template>
-  <UiCard :tone="tone">
+  <UiCard class="card" :tone="tone">
     <header v-if="title || hint" class="head">
       <strong v-if="title" class="title">{{ title }}</strong>
       <span v-if="hint" class="hint">{{ hint }}</span>
@@ -15,6 +15,10 @@ defineProps<{ title?: string; hint?: string; tone?: "neutral" | "warning" }>();
 </template>
 
 <style scoped>
+.card {
+  height: 100%;
+  align-content: start;
+}
 .head {
   display: grid;
   gap: 2px;

@@ -24,7 +24,8 @@ defineProps<{ cols?: number; gap?: number }>();
 .grid {
   display: grid;
   grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
-  align-items: start;
+  /* A row of cards shares a height; inner charts keep their own size. */
+  align-items: stretch;
   gap: var(--sp-4);
 }
 @container (max-width: 30em) {

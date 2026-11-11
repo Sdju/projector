@@ -12,7 +12,7 @@ defineProps<{ gap?: number }>();
 .row {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: stretch;
   gap: var(--sp-5);
 }
 </style>

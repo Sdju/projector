@@ -390,6 +390,10 @@ test.concurrent(
     <Line :labels="['a','b','c']" :series="[{name:'s',data:[1,3,2]}]" />
     <Bars :items="[{label:'x',value:2}]" />
   </Columns>
+  <Columns class="pair">
+    <Card class="short-card" title="Короткий">мало</Card>
+    <Card class="tall-card" title="Длинный"><p>один</p><p>два</p><p>три</p><p>четыре</p></Card>
+  </Columns>
   <Tabs>
     <Tab title="Данные"><Input id="typed" label="Заметка" /></Tab>
     <Tab title="График"><Bars :items="[{label:'a',value:1}]" /></Tab>
@@ -416,6 +420,20 @@ test.concurrent(
     let right = await box("#right");
     expect(right.x).toBeGreaterThan(left.x + 50);
     expect(Math.abs(right.y - left.y)).toBeLessThan(2);
+    const pair = await browser.evaluate(`(() => {
+      const short = document.querySelector(".short-card").getBoundingClientRect();
+      const tall = document.querySelector(".tall-card").getBoundingClientRect();
+      return {
+        sideBySide: tall.x > short.x + 50,
+        sameTop: Math.abs(tall.y - short.y) < 2,
+        heightGap: Math.abs(tall.height - short.height),
+        height: tall.height,
+      };
+    })()`);
+    expect(pair.sideBySide).toBe(true);
+    expect(pair.sameTop).toBe(true);
+    expect(pair.height).toBeGreaterThan(80);
+    expect(pair.heightGap).toBeLessThan(1);
     // The chart keeps its natural height (so its text keeps its size) in a half-width column.
     await new Promise((resolve) => setTimeout(resolve, 300));
     const chartHeight = await browser.evaluate(
