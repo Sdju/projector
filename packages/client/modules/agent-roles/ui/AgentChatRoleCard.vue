@@ -9,6 +9,7 @@ import UiLoader from "../../../common/ui/UiLoader.vue";
 import UiMessage from "../../../common/ui/UiMessage.vue";
 import { onMounted, reactive, ref, watch } from "vue";
 import type { ClientAgent } from "../../agents-integration/catalog/index.ts";
+import { focusedRoleId, revealFocusedRole } from "../model/nav.ts";
 import type { RoleControl } from "../model/roles.ts";
 import type { RoleMcpServer, RoleResources, RoleSkill } from "../model/resources.ts";
 import type {
@@ -89,7 +90,13 @@ async function loadResources() {
 }
 
 watch(() => props.role, adopt, { immediate: true });
-onMounted(() => void loadResources());
+watch(focusedRoleId, (id) => {
+  if (id === props.role.id) void revealFocusedRole(id);
+});
+onMounted(() => {
+  void loadResources();
+  void revealFocusedRole(props.role.id);
+});
 
 function chooseAgent(event: Event) {
   const agent = (event.target as HTMLSelectElement).value;
@@ -195,7 +202,7 @@ function remove() {
 </script>
 
 <template>
-  <UiCard as="section" appearance="frame" class="role">
+  <UiCard as="section" appearance="frame" class="role" :data-role-id="role.id">
     <div class="head">
       <span class="kicker">chat-роль</span>
       <span v-if="role.builtin" class="kicker">встроенная</span>

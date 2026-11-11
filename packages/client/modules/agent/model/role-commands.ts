@@ -2,11 +2,13 @@ import { getCurrentInstance } from "vue";
 import { newId } from "../../../common/utilities/new-id.ts";
 import { commandArgs } from "../../../common/utilities/commands.ts";
 import { clientAgentByBackend } from "../../agents-integration/catalog/index.ts";
-import { loadChatRoles } from "../../agent-roles/index.ts";
+import { focusedRoleId, loadChatRoles } from "../../agent-roles/index.ts";
 import { roleParam } from "../../agent-core/index.ts";
 import { useIdeCommands } from "../../ide/index.ts";
 import { snapshotOfRole } from "@ai-projector/core/modules/agent-role/index.ts";
 import type { RegisterCommand } from "../../agent-core/index.ts";
+import { appSettingsSection } from "../../settings/index.ts";
+import { projectSettingsSection } from "../../catalog/index.ts";
 
 /** The part of the IDE command service a role launch needs: opening the chat tab. */
 interface RoleCommands {
@@ -38,6 +40,7 @@ export function registerRoleCommands(
           skills: role.skills,
           mcp: role.mcp,
           inherited: role.inherited,
+          source: role.source,
         })),
       };
     },
@@ -45,7 +48,7 @@ export function registerRoleCommands(
     undefined,
     {
       description:
-        "Возвращает chat-роли, которые можно открыть командой ide.agent.role.open: id, название, агент и выбранные настройки. Служебные роли (Доктор, Lens, Судья) сюда не входят — они не открывают чат.",
+        "Возвращает chat-роли, которые можно открыть командой ide.agent.role.open или править ide.agent.role.edit: id, название, агент, настройки и source (global или project). Служебные роли (Доктор, Lens, Судья) сюда не входят — они не открывают чат.",
     },
   );
   register(
@@ -81,6 +84,46 @@ export function registerRoleCommands(
     {
       description:
         "Открывает новый чат с chat-ролью: агент роли, её модель и настройки применяются к новому разговору и сохраняются в его истории. Правка роли позже не меняет уже открытый чат. Идентификаторы ролей даёт ide.agent.roles.chat.list.",
+      arguments: { role: "id chat-роли из ide.agent.roles.chat.list" },
+    },
+  );
+  register(
+    "ide.agent.role.edit",
+    "Редактировать роль",
+    async (args) => {
+      const id = commandArgs(args).role;
+      if (typeof id !== "string" || !id) throw new Error("role: id chat-роли");
+      const roles = await loadChatRoles(projectId);
+      const role = roles.find((item) => item.id === id);
+      if (!role) throw new Error(`Неизвестная chat-роль: ${id}`);
+      if (!api) throw new Error("Роли открываются только в рабочей области проекта");
+      focusedRoleId.value = role.id;
+      if (role.source === "project") {
+        projectSettingsSection.value = "roles";
+        await api.executeCommand("ide.workbench.project.settings.open", undefined, {
+          scope: `editor:${projectId}`,
+        });
+      } else {
+        appSettingsSection.value = "agent-roles";
+        await api.executeCommand("ide.workbench.settings.open", undefined, {
+          scope: `editor:${projectId}`,
+        });
+      }
+      return {
+        role: role.id,
+        name: role.name,
+        source: role.source,
+        command:
+          role.source === "project"
+            ? "ide.workbench.project.settings.open"
+            : "ide.workbench.settings.open",
+      };
+    },
+    () => true,
+    undefined,
+    {
+      description:
+        "Открывает редактор chat-роли: глобальная роль — раздел «Роли агентов» в настройках Projector, роль проекта — раздел «Роли проекта» в настройках проекта. Правка не меняет уже открытые чаты. Идентификаторы даёт ide.agent.roles.chat.list.",
       arguments: { role: "id chat-роли из ide.agent.roles.chat.list" },
     },
   );

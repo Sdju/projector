@@ -45,7 +45,7 @@ interface AgentRoleSnapshot {
 - ветка чата сохраняет тот же снимок;
 - смена модели внутри ролевого чата меняет только снимок этого чата, а не `agentDefaults` для всех новых чатов.
 
-- Открыть роль можно из меню «+» или командой `ide.agent.role.open`; роль открывает вкладку своего агента с новым `chatId`. В меню и командах видны глобальные роли и доверенные роли текущего проекта.
+- Открыть роль можно из меню «+» или командой `ide.agent.role.open`; роль открывает вкладку своего агента с новым `chatId`. Рядом с ролью в меню «+» кнопка настроек открывает её редактор (`ide.agent.role.edit`): глобальную — в разделе «Роли агентов», проектную — в «Ролях проекта». В меню и командах видны глобальные роли и доверенные роли текущего проекта.
 
 ## Промпт, навыки и MCP
 
@@ -160,8 +160,9 @@ API: `GET /api/agent/project-roles?projectId=`, `POST /api/agent/project-roles`,
 
 Рабочая область проекта:
 
-- `ide.agent.roles.chat.list` — chat-роли, доступные для открытия.
+- `ide.agent.roles.chat.list` — chat-роли, доступные для открытия; у каждой `source`: `global` или `project`.
 - `ide.agent.role.open` `{ role }` — открыть новый чат со снимком роли.
+- `ide.agent.role.edit` `{ role }` — открыть редактор роли в настройках Projector или проекта.
 
 ## Устройство
 
@@ -177,8 +178,8 @@ API: `GET /api/agent/project-roles?projectId=`, `POST /api/agent/project-roles`,
 | `packages/server/modules/judge/verdict.ts`                | Судья получает выбор роли перед `quietChatModel`                                               |
 | `packages/client/modules/agent-roles`                     | API, каталог ролей, настройки и редактор chat-роли                                             |
 | `packages/client/modules/agent-core/model/role-apply.ts`  | Применение снимка к состоянию чата                                                             |
-| `packages/client/modules/agent/model/role-commands.ts`    | `ide.agent.role.open` и `ide.agent.roles.available`                                            |
-| `packages/client/modules/workspace/ui/NewSessionMenu.vue` | Секция «Роли» в меню «+»                                                                       |
+| `packages/client/modules/agent/model/role-commands.ts`    | `ide.agent.role.open`, `ide.agent.role.edit` и `ide.agent.roles.chat.list`                     |
+| `packages/client/modules/workspace/ui/NewSessionMenu.vue` | Секция «Роли» в меню «+»: открытие чата и переход к редактору                                  |
 
 `serviceRoleSelection(id, fallback)` возвращает `{ ...fallback, ...role.selection }`: явный выбор роли побеждает модель чата. Неизвестный провайдер не ломает вызов — `resolveOpenAIProvider` выбирает активного провайдера, как и раньше.
 

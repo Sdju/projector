@@ -19,6 +19,10 @@ import { readProjectRoles } from "../api/project-roles.ts";
 import { firstProjectId, readControls, type RoleControl } from "./controls.ts";
 export type { RoleControl, RoleControlOption } from "./controls.ts";
 
+/** Where a chat role in the launcher came from: user settings or the trusted project file. */
+export type ChatRoleSource = "global" | "project";
+export type ChatRoleListItem = AgentRoleView & { source: ChatRoleSource };
+
 /**
  * The service roles and the user's chat roles. The catalog is shared by the settings, the new
  * session menu and the commands: a role saved in one place is seen by the others without a reload.
@@ -87,16 +91,18 @@ export function applyAgentRoles(data: AgentRoleSettings): void {
 }
 
 /** Chat roles of the current project: trusted project roles override global roles with the same id. */
-export async function loadChatRoles(projectId: string): Promise<AgentRoleView[]> {
+export async function loadChatRoles(projectId: string): Promise<ChatRoleListItem[]> {
   const [data, project] = await Promise.all([
     readAgentRoles(),
     projectId ? readProjectRoles(projectId).catch(() => undefined) : Promise.resolve(undefined),
   ]);
-  const roles = new Map(
-    data.roles.filter((role) => role.kind === "chat").map((role) => [role.id, role] as const),
+  const roles = new Map<string, ChatRoleListItem>(
+    data.roles
+      .filter((role) => role.kind === "chat")
+      .map((role) => [role.id, { ...role, source: "global" as const }]),
   );
   for (const role of project?.trusted ? project.roles : [])
-    if (role.kind === "chat") roles.set(role.id, role);
+    if (role.kind === "chat") roles.set(role.id, { ...role, source: "project" });
   return [...roles.values()];
 }
 

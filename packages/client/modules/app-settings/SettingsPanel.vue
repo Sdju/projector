@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
-import { SettingsWorkbench, type SettingsReadoutState } from "../settings/index.ts";
+import { computed, onMounted, watch } from "vue";
+import {
+  SettingsWorkbench,
+  appSettingsSection,
+  type SettingsReadoutState,
+} from "../settings/index.ts";
 import { readoutLines } from "../../common/utilities/tab-readout.ts";
 import { formatBalance, providerOf, providerSection, useProviders } from "../provider/index.ts";
 import { agentOf, agentSection, useAgentModes } from "../agent/index.ts";
@@ -8,7 +12,6 @@ import { clientAgents } from "../agents-integration/catalog/index.ts";
 import { settingsSections } from "./sections.ts";
 const props = defineProps<{ selected?: string; embedded?: boolean }>();
 const emit = defineEmits<{ select: [id: string] }>();
-const selection = ref("interface");
 // Pages that became one adapter page; old links and restored tabs open the new section.
 const legacySections: Record<string, string> = {
   "agent-integrations": "agents",
@@ -16,11 +19,11 @@ const legacySections: Record<string, string> = {
   "agent-features": "agents",
 };
 const current = computed(() => {
-  const id = props.selected ?? selection.value;
+  const id = props.selected ?? appSettingsSection.value;
   return legacySections[id] ?? id;
 });
 function select(id: string) {
-  selection.value = id;
+  if (props.selected === undefined) appSettingsSection.value = id;
   emit("select", id);
 }
 

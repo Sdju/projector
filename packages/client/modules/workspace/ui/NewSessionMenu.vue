@@ -19,6 +19,7 @@ import { useCompactViewport } from "../../../common/utilities/compact-viewport.t
 import IconPlus from "~icons/lucide/plus";
 import IconMessage from "~icons/lucide/message-square";
 import IconTerminal from "~icons/lucide/terminal";
+import IconSettings from "~icons/lucide/settings-2";
 import { builtinAgent, guiAgents, guiCommand, hasGui, useAgentModes } from "../../agent/index.ts";
 import { loadChatRoles } from "../../agent-roles/index.ts";
 import { clientAgentByBackend } from "../../agents-integration/catalog/index.ts";
@@ -97,6 +98,10 @@ function pickRole(role: string) {
   close();
   emit("command", "ide.agent.role.open", { role });
 }
+function editRole(role: string) {
+  close();
+  emit("command", "ide.agent.role.edit", { role });
+}
 function pick(program: string) {
   if (props.busy) return;
   close();
@@ -150,6 +155,16 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
             <component :is="row.agent.icon" class="row-icon" aria-hidden="true" />
             <UiActionCopy :title="row.title" :description="row.caption" />
           </UiActionRow>
+          <button
+            type="button"
+            class="side"
+            :aria-label="`Редактировать роль ${row.title}`"
+            :title="`Редактировать роль «${row.title}»`"
+            data-command="ide.agent.role.edit"
+            @click="editRole(row.role.id)"
+          >
+            <IconSettings aria-hidden="true" />
+          </button>
         </div>
       </UiStack>
       <UiIslandLabel>Агенты</UiIslandLabel>
@@ -185,7 +200,7 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
         <button
           v-if="canOpenChat(row.program)"
           type="button"
-          class="mode"
+          class="side mode"
           :aria-pressed="modeOf(row.program) === 'gui'"
           :aria-label="`${row.title}: ${modeOf(row.program) === 'gui' ? 'графический чат' : 'терминал'}. Переключить режим`"
           :title="
@@ -244,7 +259,7 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
   min-width: 0;
   width: auto;
 }
-.mode {
+.side {
   display: inline-flex;
   flex-shrink: 0;
   padding: 3px 5px;
@@ -253,12 +268,12 @@ function hintTone(tone: "spare" | "normal" | "hot" | "over" | null | undefined) 
   color: var(--muted);
   font: var(--fs-2xs) var(--mono);
 }
-.mode svg {
+.side svg {
   width: 13px;
   height: 13px;
 }
-.mode:hover,
-.mode:focus-visible {
+.side:hover,
+.side:focus-visible {
   color: var(--text);
   border-color: var(--line-strong);
 }

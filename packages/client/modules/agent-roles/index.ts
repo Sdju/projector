@@ -6,7 +6,10 @@ export {
   loadChatRoles,
   roleControls,
   useAgentRoleSettings,
+  type ChatRoleListItem,
+  type ChatRoleSource,
 } from "./model/roles.ts";
+export { focusedRoleId } from "./model/nav.ts";
 export { useProjectRoleSettings } from "./model/project-roles.ts";
 export {
   roleResources,
