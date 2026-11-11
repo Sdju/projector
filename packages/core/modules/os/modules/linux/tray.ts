@@ -116,7 +116,7 @@ class TrayMenu extends Interface {
       id,
       this.properties(id, names),
       id === 0 && depth !== 0
-        ? [1, 2, 3, 4, 6, 5].map(
+        ? [1, 3, 4, 6, 5].map(
             (child) => new dbus.Variant("(ia{sv}av)", this.layout(child, depth - 1, names)),
           )
         : [],
