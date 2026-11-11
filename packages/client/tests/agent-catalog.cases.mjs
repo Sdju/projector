@@ -1,8 +1,12 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { expect, onTestFinished, test } from "vite-plus/test";
 import IconBot from "~icons/lucide/bot";
 import { registerBuiltinClientAgents } from "../app/agents.ts";
 import {
   clientAgents,
+  iconFromSvg,
+  iconNodesFromSvg,
   registerClientAgent,
   refreshClientAgents,
 } from "../modules/agents-integration/catalog/index.ts";
@@ -45,6 +49,55 @@ test("plugin agents join the client catalog and disappear when the server drops 
   serve([]);
   await refreshClientAgents();
   expect(clientAgents().some((item) => item.backend === "plugin-catalog-test")).toBe(false);
+});
+
+test("a plugin SVG icon and plan tools hydrate into the client catalog", async () => {
+  const original = globalThis.fetch;
+  onTestFinished(() => {
+    globalThis.fetch = original;
+  });
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M1 1h1"/></svg>';
+  serve([
+    {
+      id: "plugin-icon-test",
+      label: "Icon Agent",
+      program: "icon-chat",
+      iconSvg: svg,
+      plan: { tools: ["create_plan", "update_todos"] },
+    },
+  ]);
+  await refreshClientAgents();
+  const agent = clientAgents().find((item) => item.backend === "plugin-icon-test");
+  expect(agent.plan).toBeTypeOf("function");
+  expect(
+    agent.plan({
+      name: "update_todos",
+      input: JSON.stringify({ todos: [{ content: "one", status: "completed" }] }),
+    }),
+  ).toEqual([{ content: "one", status: "completed" }]);
+  expect(agent.icon).not.toBe(IconBot);
+  const nodes = iconNodesFromSvg(svg);
+  expect(nodes.children).toHaveLength(1);
+  expect(nodes.children[0].type).toBe("path");
+  expect(nodes.children[0].props.d).toBe("M1 1h1");
+  expect(iconFromSvg(svg)).toBeTruthy();
+
+  serve([]);
+  await refreshClientAgents();
+  expect(clientAgents().some((item) => item.backend === "plugin-icon-test")).toBe(false);
+});
+
+test("the Cursor plugin SVG keeps a drawable path after sanitizing", () => {
+  const source = readFileSync(
+    fileURLToPath(new URL("../../../plugins/cursor/icons/cursor.svg", import.meta.url)),
+    "utf8",
+  );
+  const nodes = iconNodesFromSvg(source);
+  expect(nodes.viewBox).toBe("0 0 24 24");
+  expect(nodes.children).toHaveLength(1);
+  expect(nodes.children[0].type).toBe("path");
+  expect(nodes.children[0].props.d).toMatch(/^M11\.503/);
 });
 
 test("a plugin agent keeps its local icon, plan and limits when enabled after a refresh", async () => {

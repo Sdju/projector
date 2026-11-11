@@ -4,26 +4,12 @@ import IconBot from "~icons/lucide/bot";
 import IconCode from "~icons/lucide/code";
 import IconSparkles from "~icons/lucide/sparkles";
 import IconTerminal from "~icons/lucide/terminal";
+import { iconFromSvg, iconNodesFromSvg } from "./icon.ts";
+import { readTodosPlan, type AgentPlanReader } from "./plan.ts";
 
-/** One item of the agent's own task list, as the chat pins and shows it. */
-export interface AgentPlanItem {
-  content: string;
-  status: "pending" | "in_progress" | "completed";
-  /** What the agent says while the item is being done. */
-  active?: string;
-}
-
-/** A tool call a plan reader may recognize. */
-export interface AgentPlanCall {
-  name: string;
-  input?: string;
-}
-
-/**
- * Reads one tool call as a task list: `undefined` when the call does not carry one, `[]` when the
- * agent cleared the list. The schema belongs to the agent, so the shared chat only asks this reader.
- */
-export type AgentPlanReader = (call: AgentPlanCall) => AgentPlanItem[] | undefined;
+export { iconFromSvg, iconNodesFromSvg };
+export type { AgentPlanCall, AgentPlanItem, AgentPlanReader } from "./plan.ts";
+export { readTodosPlan } from "./plan.ts";
 
 /**
  * What the client knows about an agent: the backend that answers in the chat, the terminal
@@ -72,6 +58,22 @@ function iconOf(name: unknown): Component {
   return typeof name === "string" && icons[name] ? icons[name] : fallbackIcon;
 }
 
+function iconFromRemote(item: RemoteAgent): Component {
+  return typeof item.iconSvg === "string" && item.iconSvg.includes("<svg")
+    ? iconFromSvg(item.iconSvg)
+    : iconOf(item.icon);
+}
+
+function planFromRemote(item: RemoteAgent): AgentPlanReader | undefined {
+  const tools =
+    item.plan && typeof item.plan === "object"
+      ? (item.plan as { tools?: unknown }).tools
+      : undefined;
+  if (!Array.isArray(tools) || !tools.every((tool) => typeof tool === "string" && tool))
+    return undefined;
+  return readTodosPlan(tools);
+}
+
 /** Registers an agent; registering the same backend again replaces it and keeps the order. */
 export function registerClientAgent(agent: ClientAgent): void {
   if (agent.plugin) localPlugins.set(agent.backend, agent);
@@ -109,6 +111,8 @@ interface RemoteAgent {
   label?: unknown;
   caption?: unknown;
   icon?: unknown;
+  iconSvg?: unknown;
+  plan?: unknown;
   program?: unknown;
   usageUrl?: unknown;
   usageWindows?: unknown;
@@ -229,7 +233,8 @@ export async function refreshClientAgents(): Promise<void> {
       continue;
     }
     seen.add(item.id);
-    const icon = iconOf(item.icon);
+    const icon = iconFromRemote(item);
+    const plan = planFromRemote(item);
     const usageProps = usagePropsOf(item, label, icon);
     registerClientAgent({
       backend: item.id,
@@ -240,6 +245,7 @@ export async function refreshClientAgents(): Promise<void> {
           ? item.caption
           : `Запустит агента ${label}`,
       icon,
+      ...(plan ? { plan } : {}),
       ...(usageProps ? { usageUrl: usageProps.usageUrl as string, usageProps } : {}),
     });
   }

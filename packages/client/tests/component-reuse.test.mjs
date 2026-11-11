@@ -16,6 +16,7 @@ import ClaudeUsageIndicator from '/packages/client/modules/agents-integration/cl
 import OpenCodeUsageIndicator from '/packages/client/modules/agents-integration/opencode/ui/OpenCodeUsageIndicator.vue';
 import PluginUsageIndicator from '/packages/client/modules/agents-integration/usage/PluginUsageIndicator.vue';
 import {agentUsageSummary} from '/packages/client/modules/agents-integration/_/usage-summary.ts';
+import {iconFromSvg} from '/packages/client/modules/agents-integration/catalog/index.ts';
 import {commandHostKey} from '/packages/client/common/utilities/commands.ts';
 const check=(value,label)=>{if(!value)throw new Error(label);};
 const wait=async(condition,label)=>{const until=Date.now()+8000;while(!condition()){if(Date.now()>until)throw new Error(label);await fetch('/__tick');}};
@@ -71,7 +72,7 @@ let trackerApp,dockerApp,usageApp,state;
  let scenario='ready';
  const quota=(usedPercent,seconds,limited=false)=>({usedPercent,resetsAt:Date.now()/1000+seconds,limited});
  window.fetch=async(input,options)=>{
-  const usageEndpoint=input==='/api/agent/usage/cursor'||['codex','claude','opencode'].some(provider=>input==='/api/'+provider+'/usage');
+  const usageEndpoint=input==='/api/agent/usage/plugin'||['codex','claude','opencode'].some(provider=>input==='/api/'+provider+'/usage');
   if(!usageEndpoint)return originalFetch(input,options);
   requests.push(input);
   await originalFetch('/__tick');
@@ -81,15 +82,16 @@ let trackerApp,dockerApp,usageApp,state;
   if(scenario==='partial')windows.weekly=null;
   return Response.json({status:'ready',windows,weekly:{...quota(30,86400),windowDurationMins:1440}});
  };
- const cursorWindows=[{name:'total',label:'Всего',shortLabel:'вс',periodSeconds:30*86400},{name:'auto',label:'Авто',shortLabel:'авт',periodSeconds:30*86400},{name:'api',label:'API',shortLabel:'API',periodSeconds:30*86400}];
- const cursorProps={usageUrl:'/api/agent/usage/cursor',title:'Cursor',agentId:'cursor',windows:cursorWindows};
- const adapters=[['codex',CodexUsageIndicator,1,null,70],['claude',ClaudeUsageIndicator,2,'rolling',60],['cursor',PluginUsageIndicator,3,'auto',80],['opencode',OpenCodeUsageIndicator,3,'monthly',60]];
+ const pluginWindows=[{name:'total',label:'Всего',shortLabel:'вс',periodSeconds:30*86400},{name:'auto',label:'Авто',shortLabel:'авт',periodSeconds:30*86400},{name:'api',label:'API',shortLabel:'API',periodSeconds:30*86400}];
+ const pluginIcon=iconFromSvg('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M1 1h22v22H1z"/></svg>');
+ const pluginProps={usageUrl:'/api/agent/usage/plugin',title:'Plugin',agentId:'plugin',windows:pluginWindows,icon:pluginIcon};
+ const adapters=[['codex',CodexUsageIndicator,1,null,70],['claude',ClaudeUsageIndicator,2,'rolling',60],['plugin',PluginUsageIndicator,3,'auto',80],['opencode',OpenCodeUsageIndicator,3,'monthly',60]];
  for(const [provider,Component,rowCount,nextWindow,remaining] of adapters){
-  const endpoint=provider==='cursor'?'/api/agent/usage/cursor':'/api/'+provider+'/usage';
-  const commandId=provider==='cursor'?'ide.plugin.cursor.usage.window.cycle':'ide.'+provider+'.usage.window.cycle';
+  const endpoint=provider==='plugin'?'/api/agent/usage/plugin':'/api/'+provider+'/usage';
+  const commandId=provider==='plugin'?'ide.plugin.plugin.usage.window.cycle':'ide.'+provider+'.usage.window.cycle';
   // Shared failure presentation needs one adapter; retain each provider's ready mapping.
   for(scenario of ['ready',...(provider==='claude'?['unavailable','failed','partial']:[])]){
-   usageApp=createApp(Component,provider==='cursor'?cursorProps:{});usageApp.provide(commandHostKey,host);usageApp.mount('#usage');
+   usageApp=createApp(Component,provider==='plugin'?pluginProps:{});usageApp.provide(commandHostKey,host);usageApp.mount('#usage');
    const indicator=document.querySelector('#usage .usage-indicator');
    const tooltip=indicator.querySelector('[role="tooltip"]');
    const meter=()=>indicator.querySelector(':scope > .quota-bar');
@@ -110,9 +112,12 @@ let trackerApp,dockerApp,usageApp,state;
      const command=commands.get(commandId);
      check(command.title&&command.description,provider+' command descriptions');
      indicator.click();await nextTick();
-     check(indicator.getAttribute('aria-label').includes(provider==='claude'?'5 часов':provider==='cursor'?'Авто':'Месяц'),provider+' click cycles correct window');
+     check(indicator.getAttribute('aria-label').includes(provider==='claude'?'5 часов':provider==='plugin'?'Авто':'Месяц'),provider+' click cycles correct window');
      check(requests.length===before,provider+' cycle does not refetch');
-     if(provider==='cursor')check(meter().classList.contains('tone-over')&&tooltip.querySelector('.exhausted'),provider+' exhausted window');
+     if(provider==='plugin'){
+     check(meter().classList.contains('tone-over')&&tooltip.querySelector('.exhausted'),provider+' exhausted window');
+     check(indicator.querySelector('.usage-icon svg path'),provider+' svg icon draws a path');
+    }
     }else{
      indicator.click();await nextTick();
      check(requests.length===before&&meter().getAttribute('aria-valuenow')==='70','Codex never cycles');

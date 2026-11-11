@@ -4,6 +4,7 @@ import {
   externalThemeId,
   isExternalThemeId,
   pluginApiVersion,
+  sanitizePluginIconSvg,
   serializeThemeTokens,
   themeStyleProperties,
   themeTokenNames,
@@ -292,11 +293,22 @@ describe("plugin agent contribution", () => {
   });
 
   test("validates icon and usageReporting", () => {
-    for (const icon of ["Sparkles", "../sparkles", "sparkles.svg", "", "x".repeat(51)]) {
+    for (const icon of [
+      "Sparkles",
+      "../sparkles",
+      "/sparkles.svg",
+      "../x.svg",
+      "icons/foo.png",
+      "",
+      "x".repeat(51),
+    ]) {
       expect(() => validatePluginManifest(withAgent({ ...agentContribution, icon }))).toThrow(
         /Некорректная иконка агента/,
       );
     }
+    expect(
+      validatePluginManifest(withAgent({ ...agentContribution, icon: "icons/cursor.svg" })),
+    ).toBeTruthy();
     for (const usageReporting of [
       "Projector/Usage",
       "/usage",
@@ -312,6 +324,20 @@ describe("plugin agent contribution", () => {
         withAgent({ ...agentContribution, icon: "sparkles-2", usageReporting: "acme/usage_v1" }),
       ),
     ).toBeTruthy();
+  });
+
+  test("sanitizes a plugin SVG icon and rejects executable markup", () => {
+    expect(sanitizePluginIconSvg(`<svg viewBox="0 0 24 24"><path d="M1 1h1"/></svg>`)).toBe(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M1 1h1"/></svg>`,
+    );
+    for (const svg of [
+      `<svg><script>alert(1)</script></svg>`,
+      `<svg onload="alert(1)"><path d="M1 1"/></svg>`,
+      `<svg><path d="M1" /><svg><path d="M2"/></svg></svg>`,
+      `<svg><image href="https://evil.test"/></svg>`,
+      "not-svg",
+    ])
+      expect(() => sanitizePluginIconSvg(svg)).toThrow(/Некорректная SVG-иконка агента/);
   });
 
   test("validates clientCapabilities as bounded plain JSON", () => {

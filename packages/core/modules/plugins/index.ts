@@ -11,6 +11,7 @@ export type {
   PluginAgentTerminal,
   PluginAgentUsageCommand,
 } from "./agent.ts";
+export { isPluginIconFile, sanitizePluginIconSvg } from "./icon.ts";
 
 export const pluginApiVersion = 1;
 

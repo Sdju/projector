@@ -1,4 +1,7 @@
-import type { PluginAgentContribution } from "@ai-projector/core/modules/plugins/index.ts";
+import {
+  isPluginIconFile,
+  type PluginAgentContribution,
+} from "@ai-projector/core/modules/plugins/index.ts";
 import type { AgentBackend } from "../../agent/index.ts";
 import { createAcpBackend, usageReportOf, type AcpProgram } from "../acp/index.ts";
 
@@ -35,7 +38,7 @@ export function createPluginAgent(agent: PluginAgentContribution): AgentBackend 
   };
   const backend = createAcpBackend(acp);
   if (agent.caption) backend.caption = agent.caption;
-  if (agent.icon) backend.icon = agent.icon;
+  if (agent.icon && !isPluginIconFile(agent.icon)) backend.icon = agent.icon;
   if (agent.usage?.kind === "command") {
     backend.usage = agent.usage;
     backend.usageUrl = `/api/agent/usage/${encodeURIComponent(agent.id)}`;

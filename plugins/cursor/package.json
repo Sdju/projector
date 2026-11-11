@@ -16,7 +16,7 @@
           "id": "cursor",
           "title": "Cursor",
           "caption": "Запустит агента Cursor",
-          "icon": "code",
+          "icon": "icons/cursor.svg",
           "program": "cursor",
           "terminal": {
             "executable": "agent",

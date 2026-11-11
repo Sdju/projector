@@ -1,3 +1,5 @@
+import { isPluginIconFile } from "./icon.ts";
+
 /**
  * Declarative ACP agents of a local plugin. Every field is allowlisted here so a
  * manifest cannot smuggle shell strings, environment or protocol extensions.
@@ -158,8 +160,11 @@ export function validateAgentContribution(value: unknown, ids: Set<string>): voi
   ids.add(value.id);
   assertText(value.title, "Название агента", 200);
   if (value.caption !== undefined) assertText(value.caption, "Подпись агента", 300);
-  if (value.icon !== undefined)
-    assertPattern(value.icon, agentIconPattern, 50, "Некорректная иконка агента");
+  if (value.icon !== undefined) {
+    if (typeof value.icon !== "string") throw new Error("Некорректная иконка агента");
+    if (!isPluginIconFile(value.icon))
+      assertPattern(value.icon, agentIconPattern, 50, "Некорректная иконка агента");
+  }
   if (value.program !== undefined) {
     if (typeof value.program !== "string" || !agentIdPattern.test(value.program))
       throw new Error("Некорректная программа агента");

@@ -4,14 +4,14 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { expect, test } from "vite-plus/test";
-import { acpControls } from "../modules/agents/acp/acp-tools.ts";
+import { acpControls } from "../../../packages/server/modules/agents/acp/acp-tools.ts";
 import {
   installPlugin,
   removePlugin,
   setPluginEnabled,
   trustPlugin,
-} from "../modules/plugins/index.ts";
-import { registerBuiltinAgents, syncPluginAgents } from "../app/agents.ts";
+} from "../../../packages/server/modules/plugins/index.ts";
+import { registerBuiltinAgents, syncPluginAgents } from "../../../packages/server/app/agents.ts";
 
 const root = fileURLToPath(new URL("../../..", import.meta.url));
 const pluginId = "@projector/cursor-agent";

@@ -10,6 +10,8 @@ import { applyAgentEvent } from "../modules/agent-core/model/turn-events.ts";
 import { latestPlan, shownPlan } from "../modules/agent-core/lib/plan.ts";
 import { chatMarkdown } from "../modules/agent/lib/export.ts";
 import { registerBuiltinClientAgents } from "../app/agents.ts";
+import { readTodosPlan, registerClientAgent } from "../modules/agents-integration/catalog/index.ts";
+import IconBot from "~icons/lucide/bot";
 
 registerBuiltinClientAgents();
 
@@ -140,7 +142,15 @@ test("the plan is the last plan call of the answer", () => {
   expect(latestPlan(turn("u", "user"), "claude-code")).toEqual([]);
 });
 
-test("Cursor's create_plan and update_todos carry the plan too", () => {
+test("a plugin's create_plan and update_todos carry the plan too", () => {
+  registerClientAgent({
+    backend: "plan-plugin",
+    program: "plan-plugin",
+    title: "Plan Plugin",
+    caption: "Fixture",
+    icon: IconBot,
+    plan: readTodosPlan(["create_plan", "update_todos"]),
+  });
   const answer = {
     ...turn("a", "assistant"),
     tools: [
@@ -165,10 +175,9 @@ test("Cursor's create_plan and update_todos carry the plan too", () => {
       },
     ],
   };
-  expect(latestPlan(answer, "cursor").map((item) => `${item.content}:${item.status}`)).toEqual([
-    "one:completed",
-    "two:in_progress",
-  ]);
+  expect(latestPlan(answer, "plan-plugin").map((item) => `${item.content}:${item.status}`)).toEqual(
+    ["one:completed", "two:in_progress"],
+  );
   expect(latestPlan(answer, "claude-code")).toEqual([]);
 });
 

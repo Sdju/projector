@@ -37,5 +37,6 @@ export function createAgents(api: PluginCodeApi): AgentBackend[] {
   const backend = api.createAcpBackend(cursorProgram(api));
   backend.usage = cursorUsageProvider;
   backend.usageWindows = cursorUsageWindows;
+  backend.plan = { tools: ["create_plan", "update_todos"] };
   return [backend];
 }

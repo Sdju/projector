@@ -4,18 +4,21 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, expect, onTestFinished, test } from "vite-plus/test";
-import { dataDir } from "../../core/modules/app-paths/index.ts";
-import { listAgentBackends } from "../modules/agent/index.ts";
-import { readAgentUsageLimits, resetAgentUsageCache } from "../modules/agent-usage/index.ts";
-import { acpProgram } from "../modules/agents/acp/acp-programs.ts";
+import { dataDir } from "../../../packages/core/modules/app-paths/index.ts";
+import { listAgentBackends } from "../../../packages/server/modules/agent/index.ts";
+import {
+  readAgentUsageLimits,
+  resetAgentUsageCache,
+} from "../../../packages/server/modules/agent-usage/index.ts";
+import { acpProgram } from "../../../packages/server/modules/agents/acp/acp-programs.ts";
 import {
   installPlugin,
   pluginsDirectory,
   removePlugin,
   setPluginEnabled,
   trustPlugin,
-} from "../modules/plugins/index.ts";
-import { registerBuiltinAgents, syncPluginAgents } from "../app/agents.ts";
+} from "../../../packages/server/modules/plugins/index.ts";
+import { registerBuiltinAgents, syncPluginAgents } from "../../../packages/server/app/agents.ts";
 
 const root = fileURLToPath(new URL("../../..", import.meta.url));
 const source = join(root, "plugins/cursor");
@@ -61,7 +64,11 @@ test("the Cursor plugin installs, trusts, loads its code entry and disappears wh
     caption: "Запустит агента Cursor",
     program: "cursor",
     usageUrl: "/api/agent/usage/cursor",
+    plan: { tools: ["create_plan", "update_todos"] },
   });
+  expect(backend.icon).toBeUndefined();
+  expect(backend.iconSvg).toMatch(/<svg xmlns="http:\/\/www.w3.org\/2000\/svg"/);
+  expect(backend.iconSvg).toMatch(/viewBox="0 0 24 24"/);
   expect(backend.usageWindows?.map((window) => window.name)).toEqual(["total", "auto", "api"]);
   const program = acpProgram("cursor");
   expect(program.dialect).toBeTypeOf("function");

@@ -191,6 +191,10 @@ export interface AgentBackend {
   caption?: string;
   /** Allowlisted icon name; the client maps it to a component. */
   icon?: string;
+  /** Sanitized SVG from a plugin file; the client mounts it on the + button and usage meter. */
+  iconSvg?: string;
+  /** Tool names whose `{ todos }` payload is the agent's task list, when it has one. */
+  plan?: { tools: string[] };
   /**
    * Terminal program id that opens this agent, when it has one. The settings key the chat mode by
    * program; the built-in Projector agent has no terminal and leaves this out.

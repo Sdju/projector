@@ -12,9 +12,11 @@ import { kimiBackend } from "../modules/agents/kimi/index.ts";
 import { opencodeBackend } from "../modules/agents/opencode/index.ts";
 import { createPluginAgent, loadCodeAgents } from "../modules/agents/plugin/index.ts";
 import { projectorBackend } from "../modules/agents/projector/index.ts";
+import { isPluginIconFile } from "@ai-projector/core/modules/plugins/index.ts";
 import {
   configurePluginAgents,
   discoverPlugins,
+  readPluginIcon,
   type PluginAgentCandidate,
   type PluginAgentDiagnostic,
 } from "../modules/plugins/index.ts";
@@ -76,10 +78,17 @@ function pluginProgram(candidate: PluginAgentCandidate): string {
 }
 
 /** Fills presentation and limits the manifest declared but the code backend may have left out. */
-function applyDescriptor(backend: AgentBackend, candidate: PluginAgentCandidate): void {
+async function applyDescriptor(
+  backend: AgentBackend,
+  candidate: PluginAgentCandidate,
+): Promise<void> {
   const { agent } = candidate;
   if (!backend.caption && agent.caption) backend.caption = agent.caption;
-  if (!backend.icon && agent.icon) backend.icon = agent.icon;
+  if (agent.icon && isPluginIconFile(agent.icon)) {
+    if (!candidate.path) throw new Error("Нет каталога пакета для иконки агента");
+    backend.iconSvg = await readPluginIcon(candidate.path, agent.icon);
+    delete backend.icon;
+  } else if (!backend.icon && agent.icon) backend.icon = agent.icon;
   if (agent.usage?.kind === "command" && !backend.usage) backend.usage = agent.usage;
   if (backend.usage) backend.usageUrl = `/api/agent/usage/${encodeURIComponent(agent.id)}`;
 }
@@ -101,7 +110,9 @@ async function applyPluginAgents(
     if (!server) {
       for (const candidate of list)
         try {
-          resolved.push({ candidate, backend: createPluginAgent(candidate.agent) });
+          const backend = createPluginAgent(candidate.agent);
+          await applyDescriptor(backend, candidate);
+          resolved.push({ candidate, backend });
         } catch (error) {
           diagnostics.push({
             plugin,
@@ -125,7 +136,7 @@ async function applyPluginAgents(
           });
           continue;
         }
-        applyDescriptor(backend, candidate);
+        await applyDescriptor(backend, candidate);
         resolved.push({ candidate, backend });
       }
       for (const candidate of list)

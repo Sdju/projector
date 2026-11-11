@@ -2,7 +2,6 @@ import "../../../tests/helpers/builtins.mjs";
 import { expect, test } from "vite-plus/test";
 import { completeCommandRequest, createQuestionBridge } from "../modules/agent/command-bridge.ts";
 import { askClaudeQuestions } from "../modules/agents/claude-code/questions.ts";
-import { askCursorQuestions } from "../../../plugins/cursor/src/questions.ts";
 import { codexProgram } from "../modules/agents/codex/index.ts";
 
 const claudeInput = {
@@ -56,45 +55,6 @@ test("a skipped or impossible question is denied, never answered with nothing", 
   expect(
     await askClaudeQuestions({ ask: async () => Promise.reject(new Error("x")) }, claudeInput),
   ).toMatchObject({ behavior: "deny" });
-});
-
-test("Cursor's ask_question answers with the chosen option IDs", async () => {
-  const params = {
-    toolCallId: "t",
-    title: "Setup",
-    questions: [
-      {
-        id: "q1",
-        prompt: "Pick",
-        options: [
-          { id: "a", label: "A" },
-          { id: "b", label: "B" },
-        ],
-        allowMultiple: true,
-      },
-    ],
-  };
-  let asked;
-  const answered = await askCursorQuestions(
-    {
-      ask: async (request) => {
-        asked = request;
-        return { q1: ["b", "not-an-option"] };
-      },
-    },
-    params,
-  );
-  expect(asked).toMatchObject({ title: "Setup", custom: false });
-  expect(answered).toEqual({
-    outcome: {
-      outcome: "answered",
-      answers: [{ questionId: "q1", selectedOptionIds: ["b"] }],
-    },
-  });
-  expect(await askCursorQuestions({ ask: async () => null }, params)).toMatchObject({
-    outcome: { outcome: "skipped" },
-  });
-  expect(await askCursorQuestions({}, params)).toEqual({ outcome: { outcome: "cancelled" } });
 });
 
 test("the question bridge delivers the answers of the page and null for a skip", async () => {
@@ -226,36 +186,24 @@ test("a question an ACP agent asks reaches the user through runAgent and the ans
   const { join } = await import("node:path");
   const { fileURLToPath } = await import("node:url");
   const { acpProgram, registerAcpProgram } = await import("../modules/agents/acp/acp-programs.ts");
-  const { createAcpBackend, extendPlainDialect, inputOf, isOver, shorten } =
-    await import("../modules/agents/acp/index.ts");
-  const { registerAgentBackend, runAgent } = await import("../modules/agent/index.ts");
-  const { createAgents } = await import("../../../plugins/cursor/src/index.ts");
+  const { runAgent } = await import("../modules/agent/index.ts");
   const fake = fileURLToPath(
     new URL("../../../tests/fixtures/fake-acp-asker.mjs", import.meta.url),
   );
   const cwd = await mkdtemp(join(tmpdir(), "projector-ask-"));
-  // Cursor now comes from the trusted plugin: build its backend exactly as the loader would.
-  registerAgentBackend(
-    createAgents({
-      version: 1,
-      createAcpBackend,
-      acp: { extendPlainDialect, inputOf, isOver, shorten },
-    })[0],
-  );
-  const saved = { cursor: acpProgram("cursor"), opencode: acpProgram("opencode") };
-  const run = async (backend, kind, answers) => {
-    process.env.FAKE_ACP_ASK = kind;
-    // The fake agent keeps the real program's extensions and dialect; only the command changes.
-    registerAcpProgram({ ...saved[backend], command: process.execPath, args: [fake] });
+  const saved = acpProgram("opencode");
+  process.env.FAKE_ACP_ASK = "form";
+  registerAcpProgram({ ...saved, command: process.execPath, args: [fake] });
+  try {
     const asked = [];
     const events = [];
     await runAgent({
-      backend,
+      backend: "opencode",
       cwd,
       message: "hi",
       ask: async (request) => {
         asked.push(request);
-        return answers;
+        return { q0: ["teal"] };
       },
       emit: (event, data) => events.push([event, data]),
     });
@@ -263,23 +211,11 @@ test("a question an ACP agent asks reaches the user through runAgent and the ans
       .filter(([event]) => event === "text")
       .map(([, data]) => data.text)
       .join("");
-    return { asked, text, events };
-  };
-  try {
-    const cursor = await run("cursor", "cursor", { c: ["g"] });
-    expect(cursor.asked[0].questions[0]).toMatchObject({ id: "c", question: "Which color?" });
-    expect(JSON.parse(cursor.text)).toEqual({
-      outcome: { outcome: "answered", answers: [{ questionId: "c", selectedOptionIds: ["g"] }] },
-    });
-    const skipped = await run("cursor", "cursor", null);
-    expect(JSON.parse(skipped.text).outcome.outcome).toBe("skipped");
-
-    const form = await run("opencode", "form", { q0: ["teal"] });
-    expect(form.asked[0]).toMatchObject({ title: "Questions" });
-    expect(JSON.parse(form.text)).toEqual({ action: "accept", content: { q0_custom: "teal" } });
+    expect(asked[0]).toMatchObject({ title: "Questions" });
+    expect(JSON.parse(text)).toEqual({ action: "accept", content: { q0_custom: "teal" } });
   } finally {
     delete process.env.FAKE_ACP_ASK;
-    for (const program of Object.values(saved)) registerAcpProgram(program);
+    registerAcpProgram(saved);
     await rm(cwd, { recursive: true, force: true });
   }
 });

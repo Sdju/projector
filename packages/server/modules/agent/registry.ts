@@ -67,6 +67,8 @@ export interface AgentBackendSummary {
   label: string;
   caption?: string;
   icon?: string;
+  iconSvg?: string;
+  plan?: { tools: string[] };
   program?: string;
   terminal?: AgentTerminal;
   builtin?: boolean;
@@ -83,6 +85,8 @@ export function listAgentBackends(): AgentBackendSummary[] {
       label,
       caption,
       icon,
+      iconSvg,
+      plan,
       program,
       terminal,
       builtin,
@@ -94,6 +98,8 @@ export function listAgentBackends(): AgentBackendSummary[] {
       label,
       ...(caption ? { caption } : {}),
       ...(icon ? { icon } : {}),
+      ...(iconSvg ? { iconSvg } : {}),
+      ...(plan?.tools.length ? { plan } : {}),
       ...(program ? { program } : {}),
       ...(terminal ? { terminal } : {}),
       ...(builtin ? { builtin } : {}),

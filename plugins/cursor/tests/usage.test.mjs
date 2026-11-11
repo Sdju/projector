@@ -1,4 +1,4 @@
-import { createRouteDispatcher } from "../modules/transport/index.ts";
+import { createRouteDispatcher } from "../../../packages/server/modules/transport/index.ts";
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vite-plus/test";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -8,10 +8,16 @@ import {
   cursorWindows,
   readCursorAccessToken,
   readCursorUsage,
-} from "../../../plugins/cursor/src/usage.ts";
-import { readAgentUsageLimits, resetAgentUsageCache } from "../modules/agent-usage/index.ts";
-import { registerAgentBackend, unregisterAgentBackend } from "../modules/agent/index.ts";
-import { routes } from "../routes/api/agent-usage.ts";
+} from "../src/usage.ts";
+import {
+  readAgentUsageLimits,
+  resetAgentUsageCache,
+} from "../../../packages/server/modules/agent-usage/index.ts";
+import {
+  registerAgentBackend,
+  unregisterAgentBackend,
+} from "../../../packages/server/modules/agent/index.ts";
+import { routes } from "../../../packages/server/routes/api/agent-usage.ts";
 
 const agentId = "cursor-usage-fixture";
 const handleUsage = createRouteDispatcher(routes);

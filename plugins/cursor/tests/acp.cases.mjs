@@ -1,19 +1,17 @@
 import { expect, test } from "vite-plus/test";
-import { createCursorDialect } from "../../../plugins/cursor/src/dialect.ts";
-import { showCursorImage } from "../../../plugins/cursor/src/images.ts";
-import { createAgents, cursorProgram } from "../../../plugins/cursor/src/index.ts";
-import { createCursorPlan } from "../../../plugins/cursor/src/plan.ts";
-import { normalizeCursorSelection } from "../../../plugins/cursor/src/selection.ts";
-import { reportCursorTask } from "../../../plugins/cursor/src/task.ts";
-import { updateCursorTodos } from "../../../plugins/cursor/src/todos.ts";
-import { initializeAcp, mergeClientCapabilities } from "../modules/agents/acp/acp-process.ts";
+import { createCursorDialect } from "../src/dialect.ts";
+import { showCursorImage } from "../src/images.ts";
+import { createAgents, cursorProgram } from "../src/index.ts";
+import { createCursorPlan } from "../src/plan.ts";
+import { normalizeCursorSelection } from "../src/selection.ts";
+import { reportCursorTask } from "../src/task.ts";
+import { updateCursorTodos } from "../src/todos.ts";
 import {
   extendPlainDialect,
   inputOf,
   isOver,
-  registerAcpProgram,
   shorten,
-} from "../modules/agents/acp/index.ts";
+} from "../../../packages/server/modules/agents/acp/index.ts";
 
 /** The runtime a trusted plugin receives: the real ACP helpers, a stub backend factory. */
 const testApi = (createAcpBackend = (program) => program) => ({
@@ -50,38 +48,7 @@ test("the plugin contributes exactly the Cursor backend with its five extensions
   expect(backend.terminal).toEqual({ executable: "agent" });
   expect(backend.dialect).toBeTypeOf("function");
   expect(Object.keys(backend.extensions).sort()).toEqual(extensionNames);
-});
-
-test("shared initialize merges the program's client capabilities one level", async () => {
-  const merged = mergeClientCapabilities(
-    { fs: { readTextFile: false }, elicitation: { form: {} } },
-    { subagents: {}, _meta: { parameterizedModelPicker: true } },
-  );
-  expect(merged).toEqual({
-    fs: { readTextFile: false },
-    elicitation: { form: {} },
-    subagents: {},
-    _meta: { parameterizedModelPicker: true },
-  });
-  registerAcpProgram({
-    id: "caps-agent",
-    label: "Caps",
-    command: "true",
-    args: [],
-    clientCapabilities: { _meta: { parameterizedModelPicker: true } },
-  });
-  const calls = [];
-  await initializeAcp(
-    {
-      request: async (_method, params) => {
-        calls.push(params);
-        return { protocolVersion: 1, agentCapabilities: { sessionCapabilities: {} } };
-      },
-    },
-    "caps-agent",
-  );
-  expect(calls[0].clientCapabilities._meta).toEqual({ parameterizedModelPicker: true });
-  expect(calls[0].clientCapabilities.elicitation).toEqual({ form: {} });
+  expect(backend.plan).toEqual({ tools: ["create_plan", "update_todos"] });
 });
 
 test("an older combined model id splits into knobs once the catalog lists the base id", () => {

@@ -1,15 +1,14 @@
 # @projector/cursor-agent
 
 Плагин Projector, который добавляет агента Cursor через ACP (`agent acp`). Манифест объявляет
-агента, а `dist/server.cjs` — доверенный серверный код: он собирает `AcpProgram` Cursor с его
-диалектом, расширениями (`ask_question`, `create_plan`, `update_todos`, `task`,
-`generate_image`), нормализацией выбора модели и клиентскими возможностями
-параметризованного пикера. Там же живут лимиты подписки: `backend.usage` читает ConnectRPC и
-`auth.json` Cursor, а `usageWindows` задаёт окна «Всего / Авто / API» для общего индикатора.
-Встроенного маршрута `/api/cursor/usage` больше нет — Projector отдаёт лимиты через
-`/api/agent/usage/cursor`, пока плагин включён. Токенного журнала Cursor пока нет, поэтому в
-«Аналитике расхода» он не попадает в токены; когда появится формат, плагин добавит
-`backend.usageLog`.
+агента и SVG-иконку кнопки «+» (`icons/cursor.svg`), а `dist/server.cjs` — доверенный серверный
+код: он собирает `AcpProgram` Cursor с его диалектом, расширениями (`ask_question`,
+`create_plan`, `update_todos`, `task`, `generate_image`), нормализацией выбора модели,
+`backend.plan.tools` для острова задач и клиентскими возможностями параметризованного пикера.
+Там же живут лимиты подписки: `backend.usage` читает ConnectRPC и `auth.json` Cursor, а
+`usageWindows` задаёт окна «Всего / Авто / API» для общего индикатора. Встроенного маршрута
+`/api/cursor/usage` больше нет — Projector отдаёт лимиты через `/api/agent/usage/cursor`, пока
+плагин включён.
 
 ## Сборка
 
@@ -30,7 +29,7 @@ vp run build:plugin:cursor
 ## Проверка
 
 ```bash
-PROJECTOR_TEST_CURSOR=1 vp test run packages/server/tests/plugin-cursor-live.test.mjs
+PROJECTOR_TEST_CURSOR=1 vp test run plugins/cursor/tests/live.test.mjs
 ```
 
 Тест собирает плагин, устанавливает его во временный data-dir, подтверждает доверие, включает,

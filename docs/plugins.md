@@ -76,7 +76,7 @@ Projector поддерживает локальные декларативные
 
 - `id` — уникальный идентификатор агента и backend id; `program` по умолчанию равен `id` и не должен совпадать с другим агентом или терминалом.
 - `command` и `args` — argv-массив без shell-строки, переводов строк и NUL. Команда запускается на машине пользователя.
-- `icon` — имя из короткого allowlist (`bot`, `code`, `sparkles`, `terminal`); неизвестное имя даёт запасную иконку.
+- `icon` — имя из короткого allowlist (`bot`, `code`, `sparkles`, `terminal`) или относительный путь к SVG внутри пакета (`icons/cursor.svg`). Неизвестное имя даёт запасную иконку; SVG проходит санитизацию и рисуется на кнопке «+» и в индикаторе лимитов.
 - `terminal` необязателен: `executable` и `title` по умолчанию берутся из `program` и `title`.
 - `clientCapabilities` необязателен и передаётся в ACP `initialize`.
 - `usage` необязателен: `{"kind":"command","command":"...","args":["usage","--json"],"timeoutMs":10000}`. Projector запускает argv-команду, читает JSON `{status, checkedAt, windows}` и показывает общий индикатор лимитов. Окна: `rolling`, `weekly`, `monthly`, `daily`; каждое — `{usedPercent, resetsAt?, limited?}`. Ошибка, таймаут или неверный JSON дают явное «лимиты недоступны» и не влияют на чат.
@@ -126,7 +126,7 @@ exports.createAgents = (api) => [
 
 `api` версии `1` даёт `createAcpBackend(program)` и `api.acp` с `createPlainDialect`, `extendPlainDialect`, `inputOf`, `isOver`, `readCompaction`, `shorten` и `uuidV7Time`. Типы для автора лежат в `packages/server/modules/plugin-api`; их импортируют только через `import type`, чтобы собранный плагин не зависел от внутренних путей Projector. Готовый пример — [`plugins/cursor`](../plugins/cursor), сборка — `vp run build:plugin:cursor`.
 
-Доверенный код может сам отдавать лимиты подписки: `backend.usage = { kind: "function", read(checkedAt) }`, а `backend.usageWindows` задаёт подписи и длительность окон (`name`, `label`, `shortLabel`, `periodSeconds`, необязательные `ticks`). Projector выставляет общий маршрут `/api/agent/usage/<id>`, кеширует ответ и рисует его тем же индикатором, что и декларативный `usage.command`; без плагина маршрут отвечает «агент не сообщает лимиты». Так Cursor отдаёт свои окна «Всего / Авто / API» из `plugins/cursor`, а не из встроенного модуля.
+Доверенный код может сам отдавать лимиты подписки: `backend.usage = { kind: "function", read(checkedAt) }`, а `backend.usageWindows` задаёт подписи и длительность окон (`name`, `label`, `shortLabel`, `periodSeconds`, необязательные `ticks`). Projector выставляет общий маршрут `/api/agent/usage/<id>`, кеширует ответ и рисует его тем же индикатором, что и декларативный `usage.command`; без плагина маршрут отвечает «агент не сообщает лимиты». Так Cursor отдаёт свои окна «Всего / Авто / API» из `plugins/cursor`, а не из встроенного модуля. Список задач чата задаётся тем же кодом: `backend.plan = { tools: ["create_plan", "update_todos"] }` — клиент читает `{ todos }` этих вызовов общим reader'ом, без модуля агента в `packages/client`.
 
 Токенную аналитику плагин тоже приносит с собой: `backend.usageLog` принимает `UsageLogReader` (`agent`, `label`, `roots()`, `files()`, `read()` и необязательные `append`/`maxBytes`). Projector регистрирует читатель вместе с агентом, сканирует его журналы в общую вкладку «Аналитика расхода» и снимает читатель при выключении плагина. Читатель возвращает метаданные — время, модель, каталог, токены и необязательную стоимость; промпты и вывод инструментов не индексируются. Встроенные Codex, OpenCode и Kimi используют ровно этот путь.
 

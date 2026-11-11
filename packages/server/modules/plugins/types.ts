@@ -39,6 +39,8 @@ export interface PluginCatalog {
 export interface PluginAgentCandidate {
   plugin: string;
   agent: PluginAgentContribution;
+  /** Absolute directory of the installed package; SVG icons are read from here. */
+  path?: string;
   /** Absolute code entry of the package, when the package registers agents itself. */
   server?: string;
   /** Content hash that scopes the loaded code module. */

@@ -19,6 +19,7 @@ import type {
   PluginInfo,
 } from "./types.ts";
 
+export { readPluginIcon } from "./icon.ts";
 export type {
   PluginAgentApply,
   PluginAgentCandidate,
@@ -292,6 +293,7 @@ async function applyAgentCatalog(
       plugin.agents.map((agent) => ({
         plugin: plugin.id,
         agent,
+        ...(plugin.path ? { path: plugin.path } : {}),
         ...(plugin.server ? { server: plugin.server } : {}),
         ...(plugin.hash ? { hash: plugin.hash } : {}),
       })),
