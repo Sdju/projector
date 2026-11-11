@@ -53,7 +53,7 @@ function updateMeta(scheme: ThemeId, mode?: "dark" | "light") {
 export function applyAppearance(value: AppearanceChoice): ThemeId {
   choice.value = value;
   const resolved = resolveScheme(value, media?.matches ?? false);
-  const theme = themes.value.find((item) => item.id === resolved);
+  const theme = themes.value.find((item) => item.id === resolved && item.tokens);
   const scheme = !theme && !["dark", "light", "contrast"].includes(resolved) ? "dark" : resolved;
   const root = document.documentElement;
   clearExternalTokens(root);

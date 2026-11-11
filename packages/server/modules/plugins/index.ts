@@ -1,4 +1,4 @@
-import { lstat, mkdir, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, realpath, rm } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import {
@@ -8,6 +8,7 @@ import {
   type AvailableTheme,
   type PluginManifest,
 } from "@ai-projector/core/modules/plugins/index.ts";
+import { copyPackage, destinationFor } from "./install.ts";
 import { deleteState, readState, updateState } from "./state.ts";
 import { hashPackage, isTrusted } from "./trust.ts";
 import type {
@@ -107,6 +108,22 @@ async function loadPackage(candidate: Candidate) {
   });
   const diagnostics: PluginDiagnostic[] = [];
   const themes: AvailableTheme[] = [];
+  let server: string | undefined;
+  if (manifest.projector.server) {
+    try {
+      const path = resolve(candidate.path, manifest.projector.server);
+      if (!path.startsWith(`${resolve(candidate.path)}${sep}`))
+        throw new Error("Небезопасный путь к server-entry");
+      const stats = await lstat(path);
+      if (!stats.isFile() || stats.isSymbolicLink())
+        throw new Error("server-entry должен быть обычным файлом");
+      server = path;
+    } catch (error) {
+      diagnostics.push({
+        message: `server: ${error instanceof Error ? error.message : "Ошибка чтения server-entry"}`,
+      });
+    }
+  }
   for (const theme of manifest.projector.contributes.themes ?? []) {
     try {
       const path = resolve(candidate.path, theme.tokens);
@@ -135,6 +152,7 @@ async function loadPackage(candidate: Candidate) {
     diagnostics,
     themes,
     agents: manifest.projector.contributes.agents ?? [],
+    server,
   };
 }
 
@@ -161,6 +179,7 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         status: "error",
         enabled: false,
         trusted: false,
+        code: false,
         diagnostics: [{ message: error instanceof Error ? error.message : "Некорректный плагин" }],
         themes: [],
         agents: [],
@@ -183,6 +202,7 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         status: "error",
         enabled: false,
         trusted: false,
+        code: false,
         diagnostics: [
           {
             message: selected.length
@@ -199,7 +219,7 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
       const loaded = await loadPackage(selected[0].candidate);
       const enabled = saved?.enabled ?? false;
       const agents = loaded.agents;
-      const requiresTrust = agents.length > 0;
+      const requiresTrust = agents.length > 0 || !!loaded.server;
       const currentHash = requiresTrust ? await hashPackage(selected[0].candidate.path) : undefined;
       const trusted = !requiresTrust || isTrusted(saved?.trustedHash, currentHash);
       const diagnostics = [...loaded.diagnostics];
@@ -217,6 +237,9 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         status: diagnostics.length ? "error" : enabled ? "enabled" : "disabled",
         enabled,
         trusted,
+        ...(currentHash ? { hash: currentHash } : {}),
+        ...(loaded.server ? { server: loaded.server } : {}),
+        code: !!loaded.server,
         diagnostics,
         themes: loaded.themes,
         agents,
@@ -228,6 +251,7 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         status: "error",
         enabled: false,
         trusted: false,
+        code: false,
         path: selected[0].candidate.path,
         diagnostics: [
           { message: error instanceof Error ? error.message : "Ошибка чтения плагина" },
@@ -245,25 +269,36 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         status: "missing",
         enabled: saved.enabled,
         trusted: false,
+        code: false,
         diagnostics: [{ message: "Пакет плагина отсутствует" }],
         themes: [],
         agents: [],
       });
   }
-  applyAgentCatalog(plugins, availableThemes);
+  await applyAgentCatalog(plugins, availableThemes);
   plugins.sort((left, right) => left.id.localeCompare(right.id));
   availableThemes.sort((left, right) => left.id.localeCompare(right.id));
   return { directory: pluginsDirectory(), plugins, availableThemes };
 }
 
 /** Registers enabled agents through the composition callback and turns its diagnostics into errors. */
-function applyAgentCatalog(plugins: PluginInfo[], availableThemes: AvailableTheme[]): void {
+async function applyAgentCatalog(
+  plugins: PluginInfo[],
+  availableThemes: AvailableTheme[],
+): Promise<void> {
   const candidates = plugins
     .filter((plugin) => plugin.status === "enabled" && plugin.trusted)
-    .flatMap((plugin) => plugin.agents.map((agent) => ({ plugin: plugin.id, agent })));
+    .flatMap((plugin) =>
+      plugin.agents.map((agent) => ({
+        plugin: plugin.id,
+        agent,
+        ...(plugin.server ? { server: plugin.server } : {}),
+        ...(plugin.hash ? { hash: plugin.hash } : {}),
+      })),
+    );
   let diagnostics: PluginAgentDiagnostic[] = [];
   try {
-    diagnostics = applyAgentRegistry(candidates);
+    diagnostics = await applyAgentRegistry(candidates);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Не удалось применить агентов";
     for (const candidate of candidates)
@@ -326,26 +361,6 @@ export async function removePlugin(id: string): Promise<PluginCatalog> {
   return discoverPlugins();
 }
 
-function destinationFor(manifest: PluginManifest): string {
-  const destination = resolve(packagesDirectory(), ...manifest.name.split("/"), manifest.version);
-  if (!destination.startsWith(`${resolve(packagesDirectory())}${sep}`))
-    throw new Error("Небезопасный путь установки");
-  return destination;
-}
-
-async function copyPackage(source: string, destination: string): Promise<void> {
-  const stats = await lstat(source);
-  if (stats.isSymbolicLink()) throw new Error("Символические ссылки в плагинах не поддерживаются");
-  if (stats.isDirectory()) {
-    await mkdir(destination);
-    for (const entry of await readdir(source))
-      await copyPackage(join(source, entry), join(destination, entry));
-    return;
-  }
-  if (!stats.isFile()) throw new Error("Плагин может содержать только обычные файлы и папки");
-  await writeFile(destination, await readFile(source), { flag: "wx" });
-}
-
 export async function installPlugin(sourcePath: unknown): Promise<PluginCatalog> {
   if (typeof sourcePath !== "string" || !sourcePath)
     throw new Error("Укажите путь к папке плагина");
@@ -356,7 +371,7 @@ export async function installPlugin(sourcePath: unknown): Promise<PluginCatalog>
   });
   const loaded = await loadPackage({ path: source, source: "direct" });
   if (loaded.diagnostics.length) throw new Error(loaded.diagnostics[0].message);
-  const destination = destinationFor(manifest);
+  const destination = destinationFor(manifest, packagesDirectory());
   await mkdir(dirname(destination), { recursive: true });
   try {
     await lstat(destination);

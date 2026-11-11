@@ -21,6 +21,7 @@
     "types": "vue-tsc --noEmit",
     "build:prepare": "vp run --cache architecture && vp run gtk:types && vp run --cache types",
     "build:app": "vp build",
+    "build:plugin:cursor": "vp build --config plugins/cursor/vite.config.ts",
     "test": "vp run --cache architecture && vp test run",
     "architecture": "node scripts/check-feod.mjs",
     "test:evals": "vp test run --config vite.evals.config.ts",

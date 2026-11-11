@@ -17,6 +17,12 @@ export interface PluginInfo {
   enabled: boolean;
   /** The user confirmed this exact package content; required before its agents may run. */
   trusted: boolean;
+  /** Current content hash, used to reload a code entry only when the package really changed. */
+  hash?: string;
+  /** Absolute path of the trusted server-side code entry, when the package has one. */
+  server?: string;
+  /** The package runs code in the server process; it is not a declarative-only plugin. */
+  code: boolean;
   path?: string;
   diagnostics: PluginDiagnostic[];
   themes: AvailableTheme[];
@@ -33,6 +39,10 @@ export interface PluginCatalog {
 export interface PluginAgentCandidate {
   plugin: string;
   agent: PluginAgentContribution;
+  /** Absolute code entry of the package, when the package registers agents itself. */
+  server?: string;
+  /** Content hash that scopes the loaded code module. */
+  hash?: string;
 }
 
 /** A collision or an invalid agent found while applying the catalog; shown on the plugin card. */
@@ -42,4 +52,6 @@ export interface PluginAgentDiagnostic {
   message: string;
 }
 
-export type PluginAgentApply = (agents: PluginAgentCandidate[]) => PluginAgentDiagnostic[];
+export type PluginAgentApply = (
+  agents: PluginAgentCandidate[],
+) => PluginAgentDiagnostic[] | Promise<PluginAgentDiagnostic[]>;

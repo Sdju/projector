@@ -12,6 +12,9 @@ export interface PluginInfo {
   status: PluginStatus;
   enabled: boolean;
   trusted: boolean;
+  code?: boolean;
+  hash?: string;
+  server?: string;
   path?: string;
   diagnostics: { message: string }[];
   themes: AvailableTheme[];
@@ -41,6 +44,7 @@ function normalizeCatalog(catalog: PluginCatalog): PluginCatalog {
     plugins: catalog.plugins.map((plugin) => ({
       ...plugin,
       trusted: plugin.trusted === true,
+      code: plugin.code === true,
       agents: Array.isArray(plugin.agents) ? plugin.agents : [],
     })),
   };

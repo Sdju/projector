@@ -2,7 +2,7 @@ import "../../../tests/helpers/builtins.mjs";
 import { expect, test } from "vite-plus/test";
 import { completeCommandRequest, createQuestionBridge } from "../modules/agent/command-bridge.ts";
 import { askClaudeQuestions } from "../modules/agents/claude-code/questions.ts";
-import { askCursorQuestions } from "../modules/agents/cursor/questions.ts";
+import { askCursorQuestions } from "../../../plugins/cursor/src/questions.ts";
 import { codexProgram } from "../modules/agents/codex/index.ts";
 
 const claudeInput = {
@@ -226,11 +226,22 @@ test("a question an ACP agent asks reaches the user through runAgent and the ans
   const { join } = await import("node:path");
   const { fileURLToPath } = await import("node:url");
   const { acpProgram, registerAcpProgram } = await import("../modules/agents/acp/acp-programs.ts");
-  const { runAgent } = await import("../modules/agent/index.ts");
+  const { createAcpBackend, extendPlainDialect, inputOf, isOver, shorten } =
+    await import("../modules/agents/acp/index.ts");
+  const { registerAgentBackend, runAgent } = await import("../modules/agent/index.ts");
+  const { createAgents } = await import("../../../plugins/cursor/src/index.ts");
   const fake = fileURLToPath(
     new URL("../../../tests/fixtures/fake-acp-asker.mjs", import.meta.url),
   );
   const cwd = await mkdtemp(join(tmpdir(), "projector-ask-"));
+  // Cursor now comes from the trusted plugin: build its backend exactly as the loader would.
+  registerAgentBackend(
+    createAgents({
+      version: 1,
+      createAcpBackend,
+      acp: { extendPlainDialect, inputOf, isOver, shorten },
+    })[0],
+  );
   const saved = { cursor: acpProgram("cursor"), opencode: acpProgram("opencode") };
   const run = async (backend, kind, answers) => {
     process.env.FAKE_ACP_ASK = kind;

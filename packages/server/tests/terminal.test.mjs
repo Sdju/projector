@@ -337,7 +337,7 @@ test("agent terminals run their registry program in the project cwd through an i
   const previousPath = process.env.PATH;
   process.env.PATH = `${bin}${delimiter}${previousPath}`;
   try {
-    for (const id of ["opencode", "cursor"]) {
+    for (const id of ["opencode"]) {
       const { terminal } = listAgentBackends().find((backend) => backend.id === id);
       const { program, executable, title } = terminal;
       // Both programs come from the registry: the shim proves the PTY runs it in the project.

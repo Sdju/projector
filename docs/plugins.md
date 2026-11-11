@@ -86,6 +86,48 @@ Projector поддерживает локальные декларативные
 
 Агентский пакет после установки остаётся выключенным. Сначала пользователь подтверждает доверие к текущему содержимому пакета; в `plugins.json` сохраняется хеш. Если файлы изменились, включать агента нужно после повторного подтверждения. Коллизия id или `program` со встроенным агентом не заменяет его, а показывает диагностику.
 
+## Доверенный серверный код
+
+Декларативного ACP достаточно для обычных агентов, но Cursor добавляет свой диалект, extensions и нормализацию выбора. Для таких пакетов есть отдельный, более высокий уровень доверия: поле `projector.server` указывает на собранный CommonJS-модуль внутри пакета, например `dist/server.cjs`.
+
+```json
+{
+  "projector": {
+    "apiVersion": 1,
+    "server": "dist/server.cjs",
+    "contributes": {
+      "agents": [
+        {
+          "id": "cursor",
+          "title": "Cursor",
+          "command": "agent",
+          "args": ["acp"],
+          "program": "cursor"
+        }
+      ]
+    }
+  }
+}
+```
+
+Модуль экспортирует `createAgents(api)` и возвращает массив агентов:
+
+```js
+exports.createAgents = (api) => [
+  api.createAcpBackend({
+    id: "cursor",
+    label: "Cursor",
+    command: "agent",
+    args: ["acp"],
+    dialect: () => api.acp.extendPlainDialect({}),
+  }),
+];
+```
+
+`api` версии `1` даёт `createAcpBackend(program)` и `api.acp` с `createPlainDialect`, `extendPlainDialect`, `inputOf`, `isOver`, `readCompaction`, `shorten` и `uuidV7Time`. Типы для автора лежат в `packages/server/modules/plugin-api`; их импортируют только через `import type`, чтобы собранный плагин не зависел от внутренних путей Projector. Готовый пример — [`plugins/cursor`](../plugins/cursor), сборка — `vp run build:plugin:cursor`.
+
+Код выполняется **в процессе сервера с его правами**, без песочницы. Поэтому он загружается только после явного доверия и включения пакета, а изменение любого файла пакета снимает доверие. Это не заменяет будущий изолированный runtime: произвольный UI, команды и доступ к внутренним модулям через этот API не выдаются.
+
 ## Токены темы
 
 JSON токенов — плоский объект. Обязательны `bg`, `bg-2`, `bg-3`, `bg-4`, `bg-sunken`, `canvas`, `line`, `line-strong`, `text`, `text-2`, `muted`, `faint`, `focus`, `accent`, `run`, `err`, `warn`, `info`, `search`, `selection`, `overlay`, `shadow-popover` и `shadow-modal`; `hover` и `active` необязательны. Других ключей быть не должно.
@@ -159,7 +201,7 @@ JSON токенов — плоский объект. Обязательны `bg`
 
 ## API
 
-Все ответы каталога имеют вид `{ directory, plugins, availableThemes }`. Элемент `plugins` содержит `id`, необязательные `version`, `description`, `path`, `status`, `enabled`, `trusted`, `diagnostics: [{ message }]`, `themes` и `agents`. Элемент `availableThemes` и `themes` содержит полный `id`, `packageName`, `title`, необязательный `description`, `mode` и проверенные `tokens`.
+Все ответы каталога имеют вид `{ directory, plugins, availableThemes }`. Элемент `plugins` содержит `id`, необязательные `version`, `description`, `path`, `status`, `enabled`, `trusted`, `hash`, `server`, `diagnostics: [{ message }]`, `themes`, `agents` и `code`. Элемент `availableThemes` и `themes` содержит полный `id`, `packageName`, `title`, необязательный `description`, `mode` и проверенные `tokens`.
 
 - `GET /api/plugins` — заново обнаруживает и читает локальные пакеты.
 - `POST /api/plugins` с `{"action":"refresh"}` — то же обновление каталога.

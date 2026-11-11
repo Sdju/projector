@@ -1,4 +1,4 @@
-import type { AgentRunOptions } from "../../agent/index.ts";
+import type { AgentRunOptions } from "./api.ts";
 import { cursorTodos, rememberCursorTodos } from "./todos.ts";
 
 const text = (value: unknown, limit: number) =>

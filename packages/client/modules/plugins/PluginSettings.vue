@@ -119,7 +119,10 @@ function previewStyle(theme: AvailableTheme) {
               <strong>{{ plugin.id }}</strong>
               <span v-if="plugin.version">v{{ plugin.version }}</span>
             </button>
-            <UiBadge :tone="statusTone(plugin.status)">{{ statusLabels[plugin.status] }}</UiBadge>
+            <UiInline align="center" :gap="1">
+              <UiBadge v-if="plugin.code" tone="warning">код</UiBadge>
+              <UiBadge :tone="statusTone(plugin.status)">{{ statusLabels[plugin.status] }}</UiBadge>
+            </UiInline>
           </div>
           <p v-if="plugin.description" class="description">{{ plugin.description }}</p>
           <div v-if="plugin.themes.length" class="card-previews" aria-hidden="true">
@@ -166,9 +169,11 @@ function previewStyle(theme: AvailableTheme) {
           <UiHeading as="h3" size="sm">{{ selected.id }}</UiHeading>
           <UiHint>
             {{
-              selected.agents.length
-                ? "ACP-агент и темы · только данные, без кода"
-                : "Темы интерфейса · только данные, без кода"
+              selected.code
+                ? "ACP-агент с доверенным серверным кодом"
+                : selected.agents.length
+                  ? "ACP-агент и темы · только данные, без кода"
+                  : "Темы интерфейса · только данные, без кода"
             }}
           </UiHint>
         </div>

@@ -47,6 +47,32 @@ test("plugin agents join the client catalog and disappear when the server drops 
   expect(clientAgents().some((item) => item.backend === "plugin-catalog-test")).toBe(false);
 });
 
+test("a plugin agent keeps its local icon, plan and limits when enabled after a refresh", async () => {
+  const original = globalThis.fetch;
+  onTestFinished(() => {
+    globalThis.fetch = original;
+  });
+  const plan = () => [{ content: "kept", status: "pending" }];
+  registerClientAgent({
+    backend: "plugin-late-test",
+    program: "plugin-late",
+    title: "Late Agent",
+    caption: "Появится позже",
+    icon: IconBot,
+    plugin: true,
+    plan,
+  });
+  serve([]);
+  await refreshClientAgents();
+  expect(clientAgents().some((item) => item.backend === "plugin-late-test")).toBe(false);
+
+  serve([{ id: "plugin-late-test", label: "Late Agent", program: "plugin-late" }]);
+  await refreshClientAgents();
+  const agent = clientAgents().find((item) => item.backend === "plugin-late-test");
+  expect(agent).toMatchObject({ title: "Late Agent", caption: "Появится позже" });
+  expect(agent.plan).toBe(plan);
+});
+
 test("a local descriptor wins over the same backend from the server", async () => {
   const original = globalThis.fetch;
   onTestFinished(() => {

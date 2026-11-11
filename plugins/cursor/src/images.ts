@@ -1,4 +1,4 @@
-import type { AgentRunOptions } from "../../agent/index.ts";
+import type { AgentRunOptions } from "./api.ts";
 
 const text = (value: unknown, limit: number) =>
   typeof value === "string" ? value.slice(0, limit) : "";

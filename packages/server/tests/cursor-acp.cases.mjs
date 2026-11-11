@@ -1,26 +1,55 @@
 import { expect, test } from "vite-plus/test";
+import { createCursorDialect } from "../../../plugins/cursor/src/dialect.ts";
+import { showCursorImage } from "../../../plugins/cursor/src/images.ts";
+import { createAgents, cursorProgram } from "../../../plugins/cursor/src/index.ts";
+import { createCursorPlan } from "../../../plugins/cursor/src/plan.ts";
+import { normalizeCursorSelection } from "../../../plugins/cursor/src/selection.ts";
+import { reportCursorTask } from "../../../plugins/cursor/src/task.ts";
+import { updateCursorTodos } from "../../../plugins/cursor/src/todos.ts";
 import { initializeAcp, mergeClientCapabilities } from "../modules/agents/acp/acp-process.ts";
-import { registerAcpProgram } from "../modules/agents/acp/acp-programs.ts";
-import { createCursorDialect } from "../modules/agents/cursor/dialect.ts";
-import { showCursorImage } from "../modules/agents/cursor/images.ts";
-import { cursorProgram } from "../modules/agents/cursor/index.ts";
-import { createCursorPlan } from "../modules/agents/cursor/plan.ts";
-import { normalizeCursorSelection } from "../modules/agents/cursor/selection.ts";
-import { reportCursorTask } from "../modules/agents/cursor/task.ts";
-import { updateCursorTodos } from "../modules/agents/cursor/todos.ts";
+import {
+  extendPlainDialect,
+  inputOf,
+  isOver,
+  registerAcpProgram,
+  shorten,
+} from "../modules/agents/acp/index.ts";
+
+/** The runtime a trusted plugin receives: the real ACP helpers, a stub backend factory. */
+const testApi = (createAcpBackend = (program) => program) => ({
+  version: 1,
+  createAcpBackend,
+  acp: { extendPlainDialect, inputOf, isOver, shorten },
+});
+
+const extensionNames = [
+  "cursor/ask_question",
+  "cursor/create_plan",
+  "cursor/generate_image",
+  "cursor/task",
+  "cursor/update_todos",
+];
 
 test("Cursor's ACP program asks for the parameterized picker and keeps guts in the adapter", () => {
-  expect(cursorProgram.clientCapabilities).toEqual({
+  const program = cursorProgram(testApi());
+  expect(program.clientCapabilities).toEqual({
     subagents: {},
     _meta: { parameterizedModelPicker: true },
   });
-  expect(Object.keys(cursorProgram.extensions).sort()).toEqual([
-    "cursor/ask_question",
-    "cursor/create_plan",
-    "cursor/generate_image",
-    "cursor/task",
-    "cursor/update_todos",
-  ]);
+  expect(Object.keys(program.extensions).sort()).toEqual(extensionNames);
+});
+
+test("the plugin contributes exactly the Cursor backend with its five extensions", () => {
+  const backends = createAgents(testApi());
+  expect(backends).toHaveLength(1);
+  const [backend] = backends;
+  expect(backend.id).toBe("cursor");
+  expect(backend.label).toBe("Cursor");
+  expect(backend.command).toBe("agent");
+  expect(backend.args).toEqual(["acp"]);
+  expect(backend.terminal).toEqual({ executable: "agent" });
+  expect(backend.dialect).toBeTypeOf("function");
+  expect(Object.keys(backend.extensions).sort()).toEqual(extensionNames);
 });
 
 test("shared initialize merges the program's client capabilities one level", async () => {
@@ -174,7 +203,7 @@ test("generate_image and task extensions emit chat events, not protocol names ou
 });
 
 test("Cursor's dialect starts a task from a task tool call", () => {
-  const dialect = createCursorDialect();
+  const dialect = createCursorDialect(testApi());
   const patches = dialect.call(
     {
       sessionUpdate: "tool_call",

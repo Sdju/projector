@@ -1,0 +1,39 @@
+{
+  "name": "@projector/cursor-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cursor через ACP для Projector",
+  "type": "module",
+  "engines": {
+    "projector": ">=0.11.0"
+  },
+  "projector": {
+    "apiVersion": 1,
+    "server": "dist/server.cjs",
+    "contributes": {
+      "agents": [
+        {
+          "id": "cursor",
+          "title": "Cursor",
+          "caption": "Запустит агента Cursor",
+          "icon": "code",
+          "program": "cursor",
+          "terminal": {
+            "executable": "agent",
+            "title": "Cursor"
+          },
+          "command": "agent",
+          "args": [
+            "acp"
+          ],
+          "clientCapabilities": {
+            "subagents": {},
+            "_meta": {
+              "parameterizedModelPicker": true
+            }
+          }
+        }
+      ]
+    }
+  }
+}

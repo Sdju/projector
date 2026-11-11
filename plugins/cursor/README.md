@@ -1,0 +1,33 @@
+# @projector/cursor-agent
+
+Плагин Projector, который добавляет агента Cursor через ACP (`agent acp`). Манифест объявляет
+агента, а `dist/server.cjs` — доверенный серверный код: он собирает `AcpProgram` Cursor с его
+диалектом, расширениями (`ask_question`, `create_plan`, `update_todos`, `task`,
+`generate_image`), нормализацией выбора модели и клиентскими возможностями
+параметризованного пикера.
+
+## Сборка
+
+```bash
+vp run build:plugin:cursor
+```
+
+Скрипт запускает `vp build --config plugins/cursor/vite.config.ts` и пишет
+`plugins/cursor/dist/server.cjs`. Исходники импортируют типы сервера только через
+`src/api.ts`; в собранном модуле нет runtime-импортов `@ai-projector/*`, поэтому файл можно
+загрузить в процесс сервера как есть.
+
+## Установка
+
+Положите каталог `plugins/cursor` (с собранным `dist/server.cjs`) в каталог плагинов Projector,
+включите плагин и подтвердите доверие к серверному коду. Без доверия код не выполняется.
+
+## Проверка
+
+```bash
+PROJECTOR_TEST_CURSOR=1 vp test run packages/server/tests/plugin-cursor-live.test.mjs
+```
+
+Тест собирает плагин, устанавливает его во временный data-dir, подтверждает доверие, включает,
+запускает настоящий `agent acp` и проверяет ACP handshake. Без переменной окружения тест
+пропускается, потому что зависит от установленного Cursor CLI и авторизации.

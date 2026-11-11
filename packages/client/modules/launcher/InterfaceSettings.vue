@@ -86,7 +86,11 @@ async function loadAppearance() {
     const response = await fetch("/api/appearance");
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Не удалось загрузить схему");
-    setAppearanceThemes(data.themes ?? []);
+    // `/api/appearance` also lists the built-in schemes, which have no token map. Only external
+    // themes with tokens are applied through the plugin registry.
+    setAppearanceThemes(
+      (data.themes ?? []).filter((theme: { tokens?: unknown }) => theme.tokens !== undefined),
+    );
     if (isAppearanceChoice(data.choice)) appearance.value = data.choice;
     savedAppearance.value = appearance.value;
     applyAppearance(appearance.value);

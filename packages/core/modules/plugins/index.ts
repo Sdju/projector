@@ -1,3 +1,17 @@
+import {
+  assertAllowedKeys,
+  assertRecord,
+  assertText,
+  validateAgentContribution,
+  type PluginAgentContribution,
+} from "./agent.ts";
+
+export type {
+  PluginAgentContribution,
+  PluginAgentTerminal,
+  PluginAgentUsageCommand,
+} from "./agent.ts";
+
 export const pluginApiVersion = 1;
 
 export const themeTokenNames = [
@@ -43,34 +57,6 @@ export interface PluginThemeContribution {
   tokens: string;
 }
 
-export interface PluginAgentTerminal {
-  program?: string;
-  executable?: string;
-  title?: string;
-}
-
-export interface PluginAgentUsageCommand {
-  kind: "command";
-  command: string;
-  args?: string[];
-  timeoutMs?: number;
-}
-
-export interface PluginAgentContribution {
-  id: string;
-  title: string;
-  caption?: string;
-  icon?: string;
-  program?: string;
-  terminal?: PluginAgentTerminal;
-  command: string;
-  args?: string[];
-  binary?: string;
-  clientCapabilities?: Record<string, unknown>;
-  usage?: PluginAgentUsageCommand | { kind: "none" };
-  usageReporting?: string;
-}
-
 export interface PluginManifest {
   name: string;
   version: string;
@@ -78,6 +64,11 @@ export interface PluginManifest {
   engines?: { projector?: string };
   projector: {
     apiVersion: typeof pluginApiVersion;
+    /**
+     * Server-side code entry inside the package, relative and never outside it.
+     * The file runs in the Projector server process, so enabling it requires explicit user trust.
+     */
+    server?: string;
     contributes: {
       themes?: PluginThemeContribution[];
       agents?: PluginAgentContribution[];
@@ -101,11 +92,6 @@ export interface PluginValidationOptions {
 const optionalTokens = new Set<ThemeTokenName>(["hover", "active"]);
 const packageNamePattern = /^(?:@[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*|[a-z0-9][a-z0-9._-]*)$/;
 const themeIdPattern = /^[a-z0-9][a-z0-9._-]*$/;
-const agentIdPattern = /^[a-z0-9][a-z0-9._-]*$/;
-const agentIconPattern = /^[a-z0-9-]+$/;
-const usageReportingPattern = /^[a-z0-9][a-z0-9/_-]*$/;
-const forbiddenJsonKeys = ["__proto__", "constructor", "prototype"] as const;
-const maxClientCapabilitiesLength = 20000;
 const semverPattern =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 const hexPattern = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
@@ -113,121 +99,25 @@ const functionalColorPattern = /^(?:rgba?|hsla?)\([0-9.%+\-,\s/]+\)$/i;
 const colorMixPattern = /^color-mix\(in (?:srgb|srgb-linear|hsl|hwb|lab|lch|oklab|oklch),\s*.+\)$/i;
 const shadowPattern = /^0 \d+(?:\.\d+)?px \d+(?:\.\d+)?px #[0-9a-f]{3,8}$/i;
 
-function assertRecord(value: unknown, label: string): asserts value is Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error(`${label} должен быть объектом`);
-  }
-}
+const maxServerEntryLength = 300;
+const serverEntryPattern = /^[A-Za-z0-9._/-]+\.cjs$/;
 
-function assertAllowedKeys(
-  value: Record<string, unknown>,
-  allowed: readonly string[],
-  label: string,
-): void {
-  const unknown = Object.keys(value).filter((key) => !allowed.includes(key));
-  if (unknown.length) throw new Error(`${label}: неизвестные поля: ${unknown.join(", ")}`);
-}
-
-function assertText(value: unknown, label: string, maxLength = 200): asserts value is string {
-  if (typeof value !== "string" || !value.trim() || value.length > maxLength) {
-    throw new Error(`${label} должен быть непустой строкой`);
-  }
-}
-
-function assertSafeText(value: unknown, label: string, maxLength = 1000): asserts value is string {
-  if (
-    typeof value !== "string" ||
-    !value.trim() ||
-    value.length > maxLength ||
-    value.includes("\n") ||
-    value.includes("\0")
-  ) {
+/**
+ * `projector.server` points to a package-relative code entry executed inside the
+ * Projector server process; enabling such a package requires explicit user trust.
+ */
+function assertServerEntry(value: unknown): void {
+  if (typeof value !== "string" || !value.trim() || value.length > maxServerEntryLength)
     throw new Error(
-      `${label}: ожидается непустая строка до ${maxLength} символов без переводов строк и NUL`,
+      `projector.server: ожидается непустой путь до ${maxServerEntryLength} символов`,
     );
-  }
-}
-function validateAgentArgs(value: unknown, label: string): void {
-  if (value === undefined) return;
-  if (!Array.isArray(value)) throw new Error(`${label}: ожидается массив строк`);
-  if (value.length > 64) throw new Error(`${label}: не более 64 аргументов`);
-  value.forEach((arg, index) => assertSafeText(arg, `${label}[${index}]`));
-}
-const agentFields =
-  "id title caption icon program terminal command args binary clientCapabilities usage usageReporting".split(
-    " ",
-  );
-function assertPattern(value: unknown, pattern: RegExp, maxLength: number, message: string): void {
-  if (typeof value !== "string" || value.length > maxLength || !pattern.test(value))
-    throw new Error(message);
-}
-function validateAgentClientCapabilities(value: unknown): void {
-  assertRecord(value, "clientCapabilities агента");
-  const forbidden = forbiddenJsonKeys.find((key) => Object.hasOwn(value, key));
-  if (forbidden) throw new Error(`clientCapabilities агента: недопустимое поле ${forbidden}`);
-  let serialized: string | undefined;
-  try {
-    serialized = JSON.stringify(value);
-  } catch {
-    throw new Error("clientCapabilities агента должен быть JSON-объектом");
-  }
-  if (!serialized || serialized.length > maxClientCapabilitiesLength)
-    throw new Error(
-      `clientCapabilities агента: JSON не должен превышать ${maxClientCapabilitiesLength} символов`,
-    );
-}
-function validateAgentUsage(value: unknown): void {
-  assertRecord(value, "usage агента");
-  if (value.kind === "none") {
-    assertAllowedKeys(value, ["kind"], "usage агента");
-    return;
-  }
-  if (value.kind !== "command") throw new Error("usage агента: kind должен быть command или none");
-  assertAllowedKeys(value, ["kind", "command", "args", "timeoutMs"], "usage агента");
-  assertSafeText(value.command, "usage.command агента");
-  validateAgentArgs(value.args, "usage.args агента");
-  const timeoutMs = value.timeoutMs;
-  if (
-    timeoutMs !== undefined &&
-    (typeof timeoutMs !== "number" ||
-      !Number.isInteger(timeoutMs) ||
-      timeoutMs < 100 ||
-      timeoutMs > 60000)
-  )
-    throw new Error("usage.timeoutMs агента должен быть целым числом от 100 до 60000");
-}
-function validateAgentTerminal(value: unknown): void {
-  assertRecord(value, "Терминал агента");
-  assertAllowedKeys(value, ["program", "executable", "title"], "Терминал агента");
-  if (value.program !== undefined) assertSafeText(value.program, "Терминал агента: program");
-  if (value.executable !== undefined)
-    assertSafeText(value.executable, "Терминал агента: executable");
-  if (value.title !== undefined) assertText(value.title, "Название терминала агента", 200);
-}
-function validateAgentContribution(value: unknown, ids: Set<string>): void {
-  assertRecord(value, "Агент плагина");
-  assertAllowedKeys(value, agentFields, "Агент плагина");
-  if (typeof value.id !== "string" || !agentIdPattern.test(value.id))
-    throw new Error("Некорректный идентификатор агента");
-  if (ids.has(value.id)) throw new Error("Повторяющийся идентификатор агента");
-  ids.add(value.id);
-  assertText(value.title, "Название агента", 200);
-  if (value.caption !== undefined) assertText(value.caption, "Подпись агента", 300);
-  if (value.icon !== undefined)
-    assertPattern(value.icon, agentIconPattern, 50, "Некорректная иконка агента");
-  if (value.program !== undefined) {
-    if (typeof value.program !== "string" || !agentIdPattern.test(value.program))
-      throw new Error("Некорректная программа агента");
-  }
-  assertSafeText(value.command, "Команда агента");
-  validateAgentArgs(value.args, "Аргументы агента");
-  if (value.binary !== undefined) assertSafeText(value.binary, "Бинарник агента");
-  if (value.terminal !== undefined) validateAgentTerminal(value.terminal);
-  if (value.clientCapabilities !== undefined)
-    validateAgentClientCapabilities(value.clientCapabilities);
-  if (value.usage !== undefined) validateAgentUsage(value.usage);
-  if (value.usageReporting !== undefined)
-    assertPattern(value.usageReporting, usageReportingPattern, 100, "Некорректный usageReporting");
+  if (/^[\\/]/.test(value) || /^[A-Za-z]:/.test(value))
+    throw new Error("projector.server: путь должен быть относительным");
+  if (value.split("/").some((segment) => segment === ".."))
+    throw new Error("projector.server: недопустимы сегменты ..");
+  if (!value.endsWith(".cjs")) throw new Error("projector.server: ожидается CommonJS-файл .cjs");
+  if (!serverEntryPattern.test(value))
+    throw new Error("projector.server: недопустимые символы в пути");
 }
 
 export function isPluginPackageName(value: unknown): value is string {
@@ -317,13 +207,17 @@ export function validatePluginManifest(
   assertRecord(value, "Манифест плагина");
   assertAllowedKeys(
     value,
-    ["name", "version", "description", "engines", "projector"],
+    ["name", "version", "description", "private", "type", "engines", "projector"],
     "Манифест плагина",
   );
   if (!isPluginPackageName(value.name)) throw new Error("Некорректное имя пакета плагина");
   assertText(value.version, "Версия плагина", 100);
   if (!semverPattern.test(value.version)) throw new Error("Версия плагина должна быть semver");
   if (value.description !== undefined) assertText(value.description, "Описание плагина", 1000);
+  if (value.private !== undefined && typeof value.private !== "boolean")
+    throw new Error("private должен быть boolean");
+  if (value.type !== undefined && value.type !== "module")
+    throw new Error("type плагина должен быть module");
   if (value.engines !== undefined) {
     assertRecord(value.engines, "engines");
     assertAllowedKeys(value.engines, ["projector"], "engines");
@@ -337,7 +231,7 @@ export function validatePluginManifest(
       throw new Error("Плагин несовместим с этой версией Projector");
   }
   assertRecord(value.projector, "projector");
-  assertAllowedKeys(value.projector, ["apiVersion", "contributes"], "projector");
+  assertAllowedKeys(value.projector, ["apiVersion", "contributes", "server"], "projector");
   if (value.projector.apiVersion !== pluginApiVersion)
     throw new Error("Неподдерживаемая версия API плагина");
   assertRecord(value.projector.contributes, "projector.contributes");
@@ -349,6 +243,11 @@ export function validatePluginManifest(
     throw new Error("projector.contributes.agents должен быть массивом");
   const themes = contributes.themes as unknown[] | undefined;
   const agents = contributes.agents as unknown[] | undefined;
+  if (value.projector.server !== undefined) {
+    if (!agents?.length)
+      throw new Error("projector.server допустим только вместе с contributes.agents");
+    assertServerEntry(value.projector.server);
+  }
   if (!themes?.length && !agents?.length) {
     if (themes && !agents) throw new Error("Плагин должен содержать хотя бы одну тему");
     if (agents && !themes) throw new Error("Плагин должен содержать хотя бы одного агента");

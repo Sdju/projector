@@ -39,6 +39,8 @@ export interface ClientAgent {
   icon: Component;
   /** The built-in Projector agent: it has a chat but no terminal program. */
   builtin?: boolean;
+  /** A local descriptor for a backend a plugin provides; it disappears when the server drops it. */
+  plugin?: boolean;
   /** The limits indicator of the agent, if it has one. */
   usage?: Component;
   /** Where a fresh limits answer comes from; the analytics page records it by asking. */
@@ -51,6 +53,8 @@ export interface ClientAgent {
 
 /** The agents a plugin added at runtime; a local descriptor with the same id always wins. */
 const remote = new Set<string>();
+/** Local descriptors of plugin agents, kept even while the backend is absent. */
+const localPlugins = new Map<string, ClientAgent>();
 /** Bumped on every catalog change, so menus and settings computed from it stay live. */
 const revision = ref(0);
 const agents = new Map<string, ClientAgent>();
@@ -69,6 +73,7 @@ function iconOf(name: unknown): Component {
 
 /** Registers an agent; registering the same backend again replaces it and keeps the order. */
 export function registerClientAgent(agent: ClientAgent): void {
+  if (agent.plugin) localPlugins.set(agent.backend, agent);
   agents.set(agent.backend, agent);
   revision.value++;
 }
@@ -130,7 +135,17 @@ export async function refreshClientAgents(): Promise<void> {
   for (const item of backends) {
     if (!item || typeof item.id !== "string" || !item.id) continue;
     const existing = agents.get(item.id);
-    if (existing && !remote.has(item.id)) continue;
+    if (existing && !remote.has(item.id)) {
+      seen.add(item.id);
+      continue;
+    }
+    if (!existing && localPlugins.has(item.id)) {
+      // The backend was absent on an earlier refresh; restore the rich local descriptor instead
+      // of a fallback icon/caption when the plugin is enabled later.
+      seen.add(item.id);
+      registerClientAgent(localPlugins.get(item.id)!);
+      continue;
+    }
     seen.add(item.id);
     const label = typeof item.label === "string" && item.label ? item.label : item.id;
     const usageUrl = typeof item.usageUrl === "string" && item.usageUrl ? item.usageUrl : undefined;
@@ -154,6 +169,13 @@ export async function refreshClientAgents(): Promise<void> {
       removed = true;
     }
   }
+  // A local descriptor may keep a plugin agent's icon, plan and limits while the server provides
+  // the backend. When the plugin disappears, the descriptor goes with it.
+  for (const [id, agent] of agents)
+    if (agent.plugin && !seen.has(id)) {
+      agents.delete(id);
+      removed = true;
+    }
   if (removed) revision.value++;
   remote.clear();
   for (const id of seen) remote.add(id);

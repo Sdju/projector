@@ -7,6 +7,8 @@ import { createAcpBackend, usageReportOf, type AcpProgram } from "../acp/index.t
  * adapter only turns it into an `AcpProgram`. No plugin code runs, and nothing beyond plain ACP
  * is added — dialects, forms, extensions and usage reporting stay off.
  */
+export { loadCodeAgents, type PluginCodeApi } from "./code.ts";
+
 export function createPluginAgent(agent: PluginAgentContribution): AgentBackend {
   const program = agent.program ?? agent.id;
   const acp: AcpProgram = {

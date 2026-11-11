@@ -11,7 +11,7 @@ registerBuiltinClientAgents();
 
 test("the server and client agree on agent identity and terminal programs", () => {
   const backends = listAgentBackends();
-  const clients = clientAgents();
+  const clients = clientAgents().filter((agent) => !agent.plugin);
   expect(clients.map(({ backend }) => backend).sort()).toEqual(backends.map(({ id }) => id).sort());
   for (const backend of backends) {
     const client = clients.find((agent) => agent.backend === backend.id);

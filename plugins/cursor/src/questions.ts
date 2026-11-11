@@ -1,3 +1,5 @@
+import type { AgentQuestion, AgentRunOptions } from "./api.ts";
+
 const text = (value: unknown, limit: number) =>
   typeof value === "string" ? value.slice(0, limit) : "";
 
@@ -41,4 +43,3 @@ export async function askCursorQuestions(
     },
   };
 }
-import type { AgentQuestion, AgentRunOptions } from "../../agent/index.ts";

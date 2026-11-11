@@ -1,4 +1,4 @@
-import type { AgentRunOptions } from "../../agent/index.ts";
+import type { AgentRunOptions } from "./api.ts";
 
 const STATUSES = new Set(["pending", "in_progress", "completed"]);
 

@@ -52,7 +52,6 @@ describe("agent features", () => {
       "claude-code",
       "codex",
       "opencode",
-      "cursor",
       "kimi",
     ]);
     expect(agentOf(settings, "projector").enabled).toBe(true);

@@ -11,6 +11,7 @@ export const cursorAgent: ClientAgent = {
   title: "Cursor",
   caption: "Запустит агента Cursor",
   icon: IconCursor,
+  plugin: true,
   usage: CursorUsageIndicator,
   usageUrl: "/api/cursor/usage",
   plan: readCursorPlan,

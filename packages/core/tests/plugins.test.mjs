@@ -379,3 +379,65 @@ describe("plugin agent contribution", () => {
     ).toThrow(/Подпись агента/);
   });
 });
+
+function withServer(server, base = agentManifest) {
+  const copy = structuredClone(base);
+  copy.projector.server = server;
+  return copy;
+}
+
+describe("plugin server entry", () => {
+  test("accepts a package-relative code entry next to agent contributions", () => {
+    for (const server of ["dist/server.cjs", "./dist/server.cjs"]) {
+      expect(validatePluginManifest(withServer(server))).toEqual(withServer(server));
+    }
+  });
+
+  test("accepts npm-style private and type metadata", () => {
+    const copy = structuredClone(withServer("dist/server.cjs"));
+    copy.private = true;
+    copy.type = "module";
+    expect(validatePluginManifest(copy)).toEqual(copy);
+    expect(() => validatePluginManifest({ ...copy, type: "commonjs" })).toThrow(/type/);
+    expect(() => validatePluginManifest({ ...copy, private: "yes" })).toThrow(/private/);
+  });
+
+  test("rejects a server entry without agent contributions", () => {
+    expect(() => validatePluginManifest(withServer("dist/server.cjs", manifest))).toThrow(
+      /contributes\.agents/,
+    );
+    expect(() =>
+      validatePluginManifest({
+        name: manifest.name,
+        version: manifest.version,
+        projector: {
+          apiVersion: 1,
+          server: "dist/server.cjs",
+          contributes: {
+            themes: [{ id: "night", title: "Night", mode: "dark", tokens: "themes/night.json" }],
+          },
+        },
+      }),
+    ).toThrow(/projector\.server/);
+  });
+
+  test("rejects absolute, traversal and non-JavaScript server paths", () => {
+    for (const server of [
+      "/dist/server.cjs",
+      "\\dist\\server.js",
+      "C:\\dist\\server.js",
+      "../server.js",
+      "dist/../../server.js",
+      "dist\\server.js",
+      "dist/server.ts",
+      "dist/server.mjs",
+      "dist/server",
+      "dist/server.cjs\0",
+      "",
+      "x".repeat(301),
+      42,
+    ]) {
+      expect(() => validatePluginManifest(withServer(server))).toThrow(/projector\.server/);
+    }
+  });
+});

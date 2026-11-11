@@ -1,4 +1,4 @@
-import type { AgentControl, AgentSelection } from "../../agent/index.ts";
+import type { AgentControl, AgentSelection } from "./api.ts";
 
 /** A stored model id that still carries parameters: `id[k=v,k=v]`. */
 const VARIANT = /^([^[\]]+)\[(.+)\]$/;
