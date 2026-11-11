@@ -35,7 +35,7 @@ const emit = defineEmits<{ submit: []; open: [chip: MessageChip]; fail: [message
 
 const host = ref<HTMLElement>();
 const view = shallowRef<EditorView>();
-const { acceptsDrag, dropData, pasteImages } = useComposerDrop({
+const { acceptsDrag, dropData, pasteImages, rememberCaret, beginDrag, endDrag } = useComposerDrop({
   projectId: () => props.projectId,
   view,
   onFail: (message) => emit("fail", message),
@@ -130,19 +130,16 @@ onMounted(() => {
         EditorView.domEventHandlers({
           dragover(event) {
             if (!acceptsDrag(event.dataTransfer)) return false;
+            beginDrag();
             event.preventDefault();
             // The dock behind the chat would offer to open the drop as a side panel.
             event.stopPropagation();
             event.dataTransfer!.dropEffect = "copy";
             return true;
           },
-          drop(event, target) {
+          drop(event) {
             const data = event.dataTransfer;
-            if (!data) return false;
-            const at =
-              target.posAtCoords({ x: event.clientX, y: event.clientY }) ??
-              target.state.selection.main.head;
-            if (!dropData(data, at)) return false;
+            if (!data || !dropData(data)) return false;
             event.preventDefault();
             event.stopPropagation();
             return true;
@@ -162,6 +159,7 @@ onMounted(() => {
         }),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) commit(update.state);
+          if (update.selectionSet) rememberCaret();
           if (update.docChanged || update.selectionSet) {
             const next = triggerAt(update.state);
             const same =
@@ -206,6 +204,8 @@ defineExpose({
   },
   acceptsDrag,
   dropData,
+  beginDrag,
+  endDrag,
   /** Puts the cursor behind everything written. */
   end: () =>
     view.value?.dispatch({

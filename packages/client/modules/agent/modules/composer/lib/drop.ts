@@ -24,6 +24,31 @@ export function useComposerDrop(options: {
 }) {
   // The project folder, to show dropped absolute paths relative to it.
   let root = "";
+  // Drop events (especially WebKit) often report (0,0) and contenteditable
+  // may move the caret to the start while dragging. Keep the last typing caret.
+  let caret = 0;
+  let dragging = false;
+
+  function rememberCaret() {
+    const target = options.view.value;
+    // Ignore selection changes while unfocused: blur/dragover can move the
+    // contenteditable caret to 0 without the user having moved it.
+    if (!target || dragging || !target.hasFocus) return;
+    caret = target.state.selection.main.head;
+  }
+
+  function beginDrag() {
+    rememberCaret();
+    dragging = true;
+  }
+
+  function endDrag() {
+    dragging = false;
+  }
+
+  function dropAt(target: EditorView, at?: number) {
+    return Math.min(at ?? caret, target.state.doc.length);
+  }
 
   async function loadRoot() {
     const projectId = options.projectId();
@@ -63,14 +88,11 @@ export function useComposerDrop(options: {
   async function attachFiles(files: File[], at?: number) {
     const target = options.view.value;
     if (!target) return;
-    let position = at;
+    let position = dropAt(target, at);
     for (const file of files) {
       try {
         const chip = await uploadAttachment(file);
-        const head = Math.min(
-          position ?? target.state.selection.main.head,
-          target.state.doc.length,
-        );
+        const head = Math.min(position, target.state.doc.length);
         insertChip(target, head, head, chip);
         position = head + chipText(chip).length + 1;
       } catch (error) {
@@ -121,7 +143,7 @@ export function useComposerDrop(options: {
   function dropData(data: DataTransfer, at?: number): boolean {
     const target = options.view.value;
     if (!target) return false;
-    const position = at ?? target.state.selection.main.head;
+    const position = dropAt(target, at);
     const chips = droppedChips(data);
     if (chips.length) {
       insertDropped(target, chips, position);
@@ -141,5 +163,5 @@ export function useComposerDrop(options: {
     return true;
   }
 
-  return { acceptsDrag, dropData, pasteImages, attachFiles };
+  return { acceptsDrag, dropData, pasteImages, attachFiles, rememberCaret, beginDrag, endDrag };
 }

@@ -33,6 +33,8 @@ const props = defineProps<{
   editing?: boolean;
   /** The last answer failed and the same request can be sent again. */
   retryable?: boolean;
+  /** Files dragged over the chat: highlight this field, not the whole tab. */
+  dropping?: boolean;
 }>();
 const emit = defineEmits<{
   submit: [];
@@ -125,6 +127,8 @@ defineExpose({
   quote,
   acceptsDrag: (data: DataTransfer | null) => !!input.value?.acceptsDrag(data),
   dropData: (data: DataTransfer) => !!input.value?.dropData(data),
+  beginDrag: () => input.value?.beginDrag(),
+  endDrag: () => input.value?.endDrag(),
   showForm: restoreForm,
   hideForm: dismissForm,
 });
@@ -163,9 +167,12 @@ defineExpose({
     <AgentQuote :root="quoteRoot" @quote="quote" />
     <form
       class="composer"
-      :class="{ working: busy, 'form-mode': formOpen }"
+      :class="{ working: busy, 'form-mode': formOpen, dropping }"
       @submit.prevent="submitActive"
     >
+      <div v-if="dropping" class="composer-drop-hint" aria-hidden="true">
+        Бросьте файлы или папки — добавим в сообщение
+      </div>
       <div v-if="activeForm" class="composer-form">
         <AgentFormPanel
           ref="formPanel"
@@ -258,6 +265,7 @@ defineExpose({
   position: relative;
 }
 .composer {
+  position: relative;
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   background: var(--bg-2);
@@ -265,6 +273,25 @@ defineExpose({
   transition:
     border-color var(--t-fast),
     box-shadow var(--t-fast);
+}
+.composer.dropping {
+  border-color: var(--accent, var(--focus));
+  box-shadow: 0 0 0 1px var(--accent, var(--focus));
+}
+.composer-drop-hint {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--accent, currentColor);
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  color: var(--text, inherit);
+  font-size: 14px;
+  text-align: center;
+  padding: var(--sp-2);
+  pointer-events: none;
 }
 .composer:focus-within {
   border-color: var(--focus);

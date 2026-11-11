@@ -492,9 +492,6 @@ onBeforeUnmount(() => {
     @dragleave="chatDrop.dragleave"
     @drop="chatDrop.drop"
   >
-    <div v-if="chatDrop.over.value" class="chat-drop-hint" aria-hidden="true">
-      Бросьте файлы или папки — добавим в сообщение
-    </div>
     <UiInline class="chat-tools" :gap="1" align="normal" justify="end">
       <UiBadge
         v-if="roleSnapshot"
@@ -718,6 +715,7 @@ onBeforeUnmount(() => {
       :form="pendingForm"
       :editing="!!editing"
       :retryable="retryableError"
+      :dropping="chatDrop.over.value"
       @submit="submit"
       @form-submit="submitComposerForm"
       @open="openChip"
@@ -750,19 +748,6 @@ onBeforeUnmount(() => {
   </UiPanel>
 </template>
 <style scoped>
-.chat-drop-hint {
-  position: absolute;
-  inset: 6px;
-  z-index: 20;
-  display: grid;
-  place-items: center;
-  border: 2px dashed var(--accent, currentColor);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--bg) 82%, transparent);
-  color: var(--text, inherit);
-  font-size: 14px;
-  pointer-events: none;
-}
 .agent-chat {
   --chat-width: 680px;
   min-width: 0;
