@@ -1,3 +1,4 @@
+export { projectEntryInfo, type EntryInfo } from "./info.ts";
 export {
   listProjectDirectory,
   readProjectFile,

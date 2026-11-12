@@ -50,6 +50,24 @@ test("later groups replace base kinds and unknown kinds are not opened", () => {
   expect(tabs.value.length).toBe(0);
 });
 
+test("entry info tabs are keyed by path and open the project root without arguments", () => {
+  const registry = createTabRegistry(baseTabTypes);
+  const type = registry.get("entry-info");
+  expect(type.key({ path: "" })).toBe("entry-info:");
+  expect(type.key({ path: "docs" })).toBe("entry-info:docs");
+  expect(type.path({ path: "docs" })).toBe("docs");
+  expect(type.path({ path: "" })).toBe("Корень проекта");
+  expect(type.command.id).toBe("ide.workbench.entryInfo.open");
+  expect(type.command.requires).toBe("entryInfo");
+  const tabs = { value: [] };
+  expect(ensureTab(tabs, registry, "entry-info", { path: "docs" })).toBe("entry-info:docs");
+  expect(tabs.value[0]).toMatchObject({
+    virtual: "entry-info",
+    path: "docs",
+    params: { path: "docs" },
+    content: "docs",
+  });
+});
 test("ensureTab keys a tab by its params and reuses an open one", () => {
   const registry = createTabRegistry([issue]);
   const tabs = { value: [] };

@@ -10,7 +10,7 @@ import {
   relocatedPath,
   type FileEntry,
 } from "@ai-projector/core/modules/workspace/index.ts";
-import type { TreeContext } from "./tree-operations.ts";
+import type { TreeContext } from "./tree-context.ts";
 
 /** Перетаскивание записей дерева: выбор цели, подсветка и перенос. */
 export function useTreeDragDrop(

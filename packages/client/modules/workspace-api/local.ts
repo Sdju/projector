@@ -148,6 +148,7 @@ export function createLocalWorkspaceProfile(projectId: string): WorkspaceProfile
         read,
         snapshots: true,
         compare: true,
+        entryInfo: true,
         watch: localWorkspaceWatch(projectId),
         assetUrl: (path, external = false) =>
           `${base(projectId)}/${external ? "external-asset" : "asset"}?${new URLSearchParams({ path })}`,

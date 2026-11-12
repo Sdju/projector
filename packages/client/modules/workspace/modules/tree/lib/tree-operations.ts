@@ -1,4 +1,4 @@
-import { computed, nextTick, useId, type Ref } from "vue";
+import { computed, nextTick, useId } from "vue";
 import { useCommandScope, commandArgs } from "../../../../../common/utilities/commands.ts";
 import { treeMenuItems } from "./tree-menu.ts";
 import {
@@ -9,55 +9,18 @@ import {
   type WorkspaceCapability,
 } from "../../../../workspace-api/index.ts";
 import { registerTreeReveal } from "./tree-reveal.ts";
-import type { createTreeDrag } from "./tree-drag.ts";
-import { topLevelTreePaths, type createTreeSelection } from "./tree-selection.ts";
+import { registerTreeInfo } from "./tree-info.ts";
+import type { TreeContext } from "./tree-context.ts";
+import { topLevelTreePaths } from "./tree-selection.ts";
 import {
   fileScopeKey,
   isLiveScope,
   parentPath,
   relocatedPath,
   type FileEntry,
-  type FileScope,
 } from "@ai-projector/core/modules/workspace/index.ts";
 import { ref } from "vue";
-import { registerTreePagingCommand, type createTreePaging } from "./tree-listing.ts";
-
-/** What the tree calls on its context menu and entry dialog (their `defineExpose`). */
-export interface TreeMenuHandle {
-  openForElement(element: HTMLElement): unknown;
-}
-export interface TreeDialogHandle {
-  open(options: {
-    title: string;
-    value?: string;
-    description?: string;
-    confirm?: boolean;
-  }): unknown;
-  close(): void;
-  fail(message: string): void;
-}
-export interface TreeEmit {
-  (event: "open", path: string, pinned?: boolean): void;
-  (event: "moved", source: string, destination: string): void;
-  (event: "changed"): void;
-  (event: "deleted", path: string): void;
-}
-export interface TreeContext {
-  props: {
-    projectId: string;
-    path: string;
-    scope: FileScope;
-    beforeChange?: (path: string) => Promise<boolean>;
-  };
-  emit: TreeEmit;
-  selection: ReturnType<typeof createTreeSelection>;
-  drag: ReturnType<typeof createTreeDrag>;
-  tree: Ref<HTMLElement | undefined>;
-  menu: Ref<TreeMenuHandle | undefined>;
-  dialog: Ref<TreeDialogHandle | undefined>;
-  toggle: (path: string) => void;
-  paging: ReturnType<typeof createTreePaging>;
-}
+import { registerTreePagingCommand } from "./tree-listing.ts";
 
 /** Операции корневого дерева: создание, переименование, буфер обмена, удаление и их команды. */
 export function useTreeOperations({
@@ -318,7 +281,23 @@ export function useTreeOperations({
     (args) => emit("open", resolveEntry(args)!.path, commandArgs(args).pinned === true),
     (args) => !!resolveEntry(args) && !resolveEntry(args)!.directory,
   );
+  const infoEntry = (value?: unknown): FileEntry | undefined => {
+    const args = commandArgs(value);
+    if (args.path === undefined && contextEntry.value) return contextEntry.value;
+    if (args.path !== undefined && typeof args.path !== "string")
+      throw new Error("path должен быть строкой");
+    if (args.path) return resolveEntry(value);
+    return { path: "", name: "", directory: true };
+  };
   const revealAvailable = registerTreeReveal(treeCommands.scope, props, drag, resolveEntry);
+  const infoAvailable = registerTreeInfo(
+    treeCommands.scope,
+    props,
+    drag,
+    (entry) => emit("info", entry),
+    infoEntry,
+    capabilities,
+  );
   registerWrite("file.create", "Новый файл…", (args) => requestAction("create-file", "", args));
   registerWrite("directory.create", "Новая папка…", (args) =>
     requestAction("create-directory", "", args),
@@ -383,9 +362,10 @@ export function useTreeOperations({
     treeMenuItems({
       entry: contextEntry.value,
       expanded: expanded.value,
-      item: (id, options) => treeCommands.item(`ide.fileTree.${id}`, undefined, options),
+      item: (id, options) => treeCommands.item(`ide.fileTree.${id}`, options?.args, options),
       allowed: (id) => {
         if (id === "entry.reveal") return revealAvailable();
+        if (id === "entry.info") return infoAvailable();
         const requires = requirements.get(id);
         return !requires || (requires === "write" ? canWrite() : capabilities[requires]);
       },

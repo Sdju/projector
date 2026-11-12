@@ -141,6 +141,12 @@ export const baseSidebarViews: SidebarViews = {
       onDeleted: host.deleted,
       onOpen: (path: string, pinned?: boolean) =>
         host.openFile(path, undefined, undefined, undefined, { preview: !pinned }),
+      onInfo: (entry: { path: string; directory: boolean }) =>
+        host.openTab(
+          "entry-info",
+          { path: entry.path, directory: entry.directory },
+          { preview: false },
+        ),
       onMoved: host.moved,
     }),
   },

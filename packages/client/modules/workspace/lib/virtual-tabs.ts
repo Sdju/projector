@@ -45,6 +45,29 @@ export const baseTabTypes = [
       title: "Показать доступ по локальной сети",
     },
   }),
+  defineTab<{ path: string; directory?: boolean }>({
+    id: "entry-info",
+    key: ({ path }) => `entry-info:${path ?? ""}`,
+    path: ({ path }) => (path ? path.split("/").filter(Boolean).at(-1)! : "Корень проекта"),
+    title: ({ path }) => path || "Корень проекта",
+    subtitle: "информация о записи",
+    hint: ({ path }) => path || "корень проекта",
+    read: ({ path }, content) => ({
+      text: content,
+      note: `Информация о ${path ? `«${path}»` : "корне проекта"}`,
+    }),
+    create: () => ({ path: "" }),
+    command: {
+      id: "ide.workbench.entryInfo.open",
+      title: "Открыть информацию о записи",
+      description:
+        "Открывает вкладку с размером, числом файлов и папок, символическими ссылками и датой последнего изменения файла или папки. Для папки размер считается рекурсивно, без перехода по символическим ссылкам; при превышении лимита времени или числа записей часть содержимого может быть не учтена.",
+      requires: "entryInfo",
+      optional: {
+        path: "Путь файла или папки внутри проекта; без аргумента — корень проекта",
+      },
+    },
+  }),
   defineTab<{ id: string; url?: string; title?: string }>({
     id: "browser",
     key: ({ id }) => `browser:${id}`,

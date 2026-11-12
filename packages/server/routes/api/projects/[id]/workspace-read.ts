@@ -8,6 +8,7 @@ import {
 import { accessAllowed } from "../../../../modules/access/index.ts";
 import {
   listProjectDirectory,
+  projectEntryInfo,
   previewExternalFile,
   readExternalImage,
   previewProjectFile,
@@ -113,6 +114,9 @@ export const routes: RouteDefinition[] = [
         ? await listProjectGitTree(project.path, text(url, "rev"), path, params(url))
         : await listProjectDirectory(project.path, path, params(url)),
     );
+  }),
+  view("/api/projects/:id/workspace/info", async ({ res, url }, project) => {
+    json(res, 200, await projectEntryInfo(project.path, text(url, "path")));
   }),
   view("/api/projects/:id/workspace/file", async ({ res, url }, project) => {
     const path = text(url, "path");

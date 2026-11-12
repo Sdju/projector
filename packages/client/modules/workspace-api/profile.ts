@@ -19,7 +19,8 @@ export type WorkspaceCapability =
   | "externalFiles"
   | "snapshots"
   | "compare"
-  | "reveal";
+  | "reveal"
+  | "entryInfo";
 export type WorkspaceCapabilities = Record<WorkspaceCapability, boolean>;
 
 export type WorkspaceParams = Record<string, string>;
@@ -55,6 +56,8 @@ export interface FilesProvider extends ReadProvider {
   write?(endpoint: FileWrite, body: unknown, failure?: string): Promise<unknown>;
   /** Shows an entry in the OS file manager; present only where the files live on this machine. */
   reveal?(path: string): Promise<unknown>;
+  /** Reads size and contents (`info`); present only where the files have real local stats. */
+  entryInfo?: boolean;
   /** Loads one browser file (or an empty folder when `body` is absent) into the project; present only where uploads are possible. */
   upload?(
     directory: string,
@@ -124,6 +127,7 @@ export function profileCapabilities(profile: WorkspaceProfile): Readonly<Workspa
       snapshots: !!profile.providers.files.snapshots,
       compare: !!profile.providers.files.compare,
       reveal: !!profile.providers.files.reveal,
+      entryInfo: !!profile.providers.files.entryInfo,
     });
     capabilityCache.set(profile, capabilities);
   }
@@ -137,6 +141,7 @@ const READ_DOMAIN: Record<
 > = {
   tree: "files",
   file: "files",
+  info: "files",
   external: "files",
   root: "files",
   git: "git",

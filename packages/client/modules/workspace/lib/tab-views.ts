@@ -25,6 +25,7 @@ import { DockerPanel } from "../../docker/index.ts";
 import { AgentChat, AgentJobTab, AgentTaskTab, roleFromParam } from "../../agent/index.ts";
 import { clientAgents } from "../../agents-integration/catalog/index.ts";
 import { BrowserPanel } from "../../browser/index.ts";
+import { EntryInfoTab } from "../modules/tree/index.ts";
 import {
   CommitOverview,
   DiscussionView,
@@ -88,6 +89,15 @@ export function baseTabViews(): TabViews {
     analytics: { component: AnalyticsSettings, keepAlive: true, scroll: true },
     network: { component: LanInfoPanel, ownKeys: true, keepAlive: true },
     docker: { component: DockerPanel, keepAlive: true },
+    "entry-info": {
+      component: EntryInfoTab,
+      keepAlive: true,
+      props: (tab, host) => ({
+        projectId: host.projectId,
+        path: typeof tab.params?.path === "string" ? tab.params.path : "",
+        directory: typeof tab.params?.directory === "boolean" ? tab.params.directory : undefined,
+      }),
+    },
     browser: {
       component: BrowserPanel,
       keepAlive: true,
