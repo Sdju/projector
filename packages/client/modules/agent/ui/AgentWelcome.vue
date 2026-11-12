@@ -1,15 +1,53 @@
 <script setup lang="ts">
 import UiButton from "../../../common/ui/UiButton.vue";
-import { computed } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { guiAgents, useAgentModes } from "../../agent-core/index.ts";
-withDefaults(defineProps<{ plain?: boolean; agentName?: string; roleName?: string }>(), {
-  plain: false,
-  agentName: "Агент",
-  roleName: undefined,
-});
-const emit = defineEmits<{ suggest: [text: string]; open: [program: string] }>();
+import {
+  AgentPresetsStart,
+  loadStartPresets,
+  type StartPresets,
+} from "../../agent-presets/index.ts";
+import type { AgentPresetView } from "@ai-projector/core/modules/agent-preset/index.ts";
+const props = withDefaults(
+  defineProps<{
+    plain?: boolean;
+    agentName?: string;
+    roleName?: string;
+    projectId: string;
+  }>(),
+  {
+    plain: false,
+    agentName: "Агент",
+    roleName: undefined,
+  },
+);
+const emit = defineEmits<{
+  suggest: [text: string];
+  open: [program: string];
+  form: [preset: AgentPresetView, text: string, data: unknown, summary?: string];
+}>();
 const { isEnabled } = useAgentModes();
 const coders = computed(() => guiAgents().filter((agent) => isEnabled(agent.program)));
+const presets = ref<StartPresets["presets"]>([]);
+const presetError = ref("");
+async function loadPresets() {
+  try {
+    const loaded = await loadStartPresets(props.projectId);
+    presets.value = loaded.presets;
+    presetError.value = loaded.projectProblem ?? "";
+  } catch (error) {
+    presets.value = [];
+    presetError.value = error instanceof Error ? error.message : "Пресеты недоступны";
+  }
+}
+onMounted(() => void loadPresets());
+watch(
+  () => props.projectId,
+  () => void loadPresets(),
+);
+function startPresetForm(preset: AgentPresetView, text: string, data: unknown, summary?: string) {
+  emit("form", preset, text, data, summary);
+}
 const suggestions = [
   {
     title: "Разобраться в проекте",
@@ -31,7 +69,14 @@ const suggestions = [
     <h1>{{ plain ? agentName : "С чего начнём?" }}</h1>
     <p v-if="roleName" class="role">Роль: {{ roleName }}</p>
     <p v-if="plain">Работает в папке проекта, как в терминале.</p>
-    <div v-else class="suggestions">
+    <p v-if="presetError" class="preset-error">{{ presetError }}</p>
+    <AgentPresetsStart
+      :presets="presets"
+      :project-id="projectId"
+      @suggest="emit('suggest', $event)"
+      @form="startPresetForm"
+    />
+    <div v-if="!plain" class="suggestions">
       <UiButton
         appearance="outline"
         tone="muted"
@@ -67,7 +112,7 @@ const suggestions = [
 
 <style scoped>
 .welcome {
-  max-width: 420px;
+  max-width: 560px;
   min-height: 100%;
   margin: auto;
   display: flex;
@@ -89,6 +134,10 @@ h1 {
 }
 .welcome > p.role {
   color: var(--info);
+}
+.welcome > p.preset-error {
+  margin-top: var(--sp-2);
+  color: var(--warn);
 }
 .suggestions {
   display: flex;

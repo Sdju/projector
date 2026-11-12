@@ -19,6 +19,7 @@ import {
   AgentJudgeSettings,
 } from "../agent/index.ts";
 import { AgentRoleSettings } from "../agent-roles/index.ts";
+import { AgentPresetsSettings } from "../agent-presets/index.ts";
 import { type SettingsSection } from "../settings/index.ts";
 
 export const settingsSections: SettingsSection[] = [
@@ -160,6 +161,16 @@ export const settingsSections: SettingsSection[] = [
     keywords:
       "роли agent roles doctor lens judge доктор линза судья модель служебные внутренние вызовы chat роль чата пресет preset",
     component: AgentRoleSettings,
+  },
+  {
+    id: "agent-presets",
+    title: "Пресеты агента",
+    group: "Агент",
+    description:
+      "Готовые первые запросы для любого агента: обычный текст или форма, которую агент написал.",
+    keywords:
+      "пресеты preset старт стартовые чипы chips запросы prompt форма form подсказки suggestions",
+    component: AgentPresetsSettings,
   },
   {
     id: "agent-judge",

@@ -11,6 +11,7 @@ import { readoutLines } from "../../../common/utilities/tab-readout.ts";
 import type { Project } from "../../project/index.ts";
 import { shortcutKey } from "@ai-projector/core/modules/ide/index.ts";
 import { AgentProjectRoles } from "../../agent-roles/index.ts";
+import { AgentPresetsSettings } from "../../agent-presets/index.ts";
 import { ProjectWidgets } from "../../project-widgets/index.ts";
 import {
   projectSettingsSection as selected,
@@ -68,6 +69,16 @@ const sections = computed<SettingsSection[]>(() => [
       "Chat-роли из .projector/roles.json: агент, модель и настройки. Файл действует только после доверия.",
     keywords: "роли agent roles проект чат пресет preset модель доверие trust",
     component: AgentProjectRoles,
+    props: { project: props.project },
+  },
+  {
+    id: "presets",
+    title: "Пресеты проекта",
+    group: "Агент",
+    description:
+      "Стартовые запросы из .projector/presets.json: текст или форма для любого агента. Файл действует после доверия.",
+    keywords: "пресеты preset старт чипы chips запросы форма prompt доверие trust",
+    component: AgentPresetsSettings,
     props: { project: props.project },
   },
   {

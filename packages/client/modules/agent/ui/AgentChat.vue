@@ -66,6 +66,7 @@ import { useRewindPanel } from "../modules/panels/index.ts";
 import { useWorktreePanel } from "../modules/panels/index.ts";
 import { chatUsageByTurn } from "../model/chat-usage.ts";
 import type { AgentBackendId, ChatUsage, RewindScope } from "../../agent-core/index.ts";
+import type { AgentPresetView } from "@ai-projector/core/modules/agent-preset/index.ts";
 import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 import IconArrowDown from "~icons/lucide/arrow-down";
 import IconSquarePen from "~icons/lucide/square-pen";
@@ -215,6 +216,17 @@ const {
 function openAgent(program: string) {
   openAgentChat(api, props.projectId, program, (message) => {
     error.value = message;
+  });
+}
+/** A starter preset with a form: its values go to the agent as the usual form answer. */
+function startPresetForm(preset: AgentPresetView, text: string, data: unknown, summary?: string) {
+  const source = preset.form;
+  if (!source) return;
+  const prompt = preset.prompt.trim();
+  const message = prompt ? `${prompt}\n\n${text}` : text;
+  void toBottom();
+  void send(message, undefined, {
+    form: { source, values: data, ...(summary ? { summary } : {}) },
   });
 }
 attach();
@@ -569,8 +581,10 @@ onBeforeUnmount(() => {
         :plain="plain"
         :agent-name="agentName"
         :role-name="roleSnapshot?.name"
+        :project-id="projectId"
         @suggest="suggest"
         @open="openAgent"
+        @form="startPresetForm"
       />
       <div
         v-else

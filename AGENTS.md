@@ -45,6 +45,6 @@ vp run test:gtk                      # реальные GTK-виджеты; ну
 
 ## Документация
 
-Документация в `docs/` описывает текущее устройство и контракты. Основные разделы: [разработка и диагностика](docs/session-notes.md), [архитектура](docs/architecture.md), [CLI](docs/cli.md), [поведение и ограничения](docs/usage.md), [команды IDE](docs/ide-commands.md), [агенты](docs/agent-features.md), [аналитика расхода](docs/analytics.md) и [фоновые задания](docs/agent-jobs.md). Остальные тематические руководства находятся в том же каталоге.
+Документация в `docs/` описывает текущее устройство и контракты. Основные разделы: [разработка и диагностика](docs/session-notes.md), [архитектура](docs/architecture.md), [CLI](docs/cli.md), [поведение и ограничения](docs/usage.md), [команды IDE](docs/ide-commands.md), [агенты](docs/agent-features.md), [пресеты агента](docs/agent-presets.md), [аналитика расхода](docs/analytics.md) и [фоновые задания](docs/agent-jobs.md). Остальные тематические руководства находятся в том же каталоге.
 
 Рабочие материалы держите в [`docs/in-process/`](docs/in-process/README.md) и удаляйте после завершения. История изменений — в `CHANGELOG.md`, задачи — в issue/PR.
