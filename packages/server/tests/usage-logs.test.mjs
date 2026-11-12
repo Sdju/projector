@@ -16,6 +16,8 @@ import { registerUsageLogReader, resetUsageLogReaders } from "../modules/usage-l
 import { codexUsageLog } from "../modules/agents/codex/index.ts";
 import { opencodeUsageLog } from "../modules/agents/opencode/index.ts";
 import { kimiUsageLog } from "../modules/agents/kimi/index.ts";
+import { closeHistoryStore } from "../modules/agent/index.ts";
+import { closeSpendStore } from "../modules/spend/index.ts";
 import { updateProjects } from "../modules/projects/index.ts";
 
 const now = Date.now();
@@ -218,6 +220,10 @@ beforeAll(async () => {
 afterAll(async () => {
   clearUsageLogStore();
   closeAnalyticsStore();
+  // The analytics read chat answers and task spend through their own SQLite files; on Windows an
+  // open handle makes the temporary directory undeletable.
+  closeHistoryStore();
+  closeSpendStore();
   resetUsageLogReaders();
   resetUsageLogScan();
   if (previousHome === undefined) delete process.env.HOME;
