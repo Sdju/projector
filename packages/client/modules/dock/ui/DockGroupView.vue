@@ -132,7 +132,9 @@ const focus = () => {
     @focusin="focus"
   >
     <header class="dock-header" @dragenter.capture="clearZone" @dragover.capture="clearZone">
-      <DockSlot v-if="dock.slots.leading" :render="dock.slots.leading" :args="{ group }" />
+      <div v-if="dock.slots.leading" class="dock-leading">
+        <DockSlot :render="dock.slots.leading" :args="{ group }" />
+      </div>
       <DockTabs
         v-if="group.panels.length"
         :tabs="tabs"
@@ -226,12 +228,19 @@ const focus = () => {
   flex: 1;
   min-width: 0;
 }
-.dock-header :deep(.new-session:has(+ .workspace-tabs)) {
+.dock-leading {
+  display: flex;
   align-self: stretch;
   align-items: center;
+  flex-shrink: 0;
   padding-inline-end: var(--sp-2);
-  border-right: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
+}
+.dock-leading:not(:has(*)) {
+  display: none;
+}
+.dock-leading:has(+ .workspace-tabs) {
+  border-right: 1px solid var(--line);
 }
 .dock-fill {
   flex: 1;
