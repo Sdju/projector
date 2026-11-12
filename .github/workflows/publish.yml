@@ -60,31 +60,35 @@ jobs:
           set -euo pipefail
           # pnpm resolves `workspace:` and `catalog:` in the manifest at publish time;
           # publishConfig in each package sets the registry and public access.
-          publish_if_missing() {
+          publish_if_missing() (
             local directory="$1"
             local name="$2"
             local version
             local output
+            local flat
             version="$(node -p "require('./${directory}/package.json').version")"
+            # Run from the package: the root manifest forbids npm itself through devEngines.
+            cd "${directory}"
             if npm view "${name}@${version}" version >/dev/null 2>&1; then
               echo "${name}@${version} is already published, skipping"
               return
             fi
             # Build output is gitignored, so the checkout is clean: no git checks are needed.
-            if output="$(cd "${directory}" && pnpm publish --access public --provenance --no-git-checks 2>&1)"; then
+            if output="$(pnpm publish --access public --provenance --no-git-checks 2>&1)"; then
               printf '%s\n' "${output}"
               return
             fi
             printf '%s\n' "${output}"
             # The write side accepts a version at once, while the read side can keep answering 404
             # for minutes. A repeat publish then fails only because the version already exists;
-            # pnpm wraps that sentence between "published" and "versions".
-            if grep -q "cannot publish over the previously published" <<<"${output}"; then
-              echo "${name}@${version} is already on the registry, the read side still lags behind"
+            # pnpm wraps that sentence at the terminal width, so compare it without line breaks.
+            flat="$(printf '%s' "${output}" | sed 's/│//g' | tr '\n' ' ' | tr -s ' ')"
+            if [[ "${flat}" == *"cannot publish over the previously published"* ]]; then
+              echo "${name}@${version} is already on the registry"
               return
             fi
             return 1
-          }
+          )
           publish_if_missing packages/ide "@ai-projector/ide"
           publish_if_missing packages/native "@ai-projector/native"
           publish_if_missing packages/hub "@ai-projector/hub"
