@@ -23,5 +23,5 @@
 - [color-schemes.md](color-schemes.md) — цветовые схемы интерфейса: остались потребители вне CSS (редактор, Markdown, ANSI-палитра терминала, иконки и статика), доводка светлой и контрастной схем и проверки.
 - [file-views.md](file-views.md) — что осталось у файловых снимков: произвольные папки, union-дерево, индекс, поиск по снимку и переименования.
 - [gitlab-client-roadmap.md](gitlab-client-roadmap.md) — что осталось у GitLab после паритета с GitHub: Snippets, Wiki, несколько инстансов и проверки.
-- [npm-release.md](npm-release.md) — что осталось после публикации `0.11.1`: версия в дереве, чистая установка, desktop/hub и 2FA.
+- [npm-release.md](npm-release.md) — что осталось после публикации `0.12.0`: чистая установка, `projector-install-desktop` и 2FA.
 - [opencode-background-subagents.md](opencode-background-subagents.md) — фоновый `subagent` OpenCode не виден как живая задача, поэтому Lens не читает его рассуждения.

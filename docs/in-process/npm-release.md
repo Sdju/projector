@@ -5,23 +5,15 @@
 
 Пакеты `@ai-projector/ide`, `@ai-projector/native` и `@ai-projector/hub` опубликованы
 10.11.2026. `0.11.0` выпущен вручную, `0.11.1` — через OIDC с SLSA provenance: этим trusted
-publisher подтверждён.
+publisher подтверждён. `0.12.0` выпущен 12.11.2026 из GitHub Release тем же OIDC: все три
+пакета с provenance, повторный запуск workflow пропускает уже опубликованные версии.
 
 ## Открыто
 
-- [ ] Версия в дереве (`0.11.0`) ниже опубликованной (`0.11.1`) после revert `9e79d2ce`.
-      Перед следующим релизом поднять `version` во всех пакетах: workflow пропускает уже
-      опубликованную версию и не выпустит её повторно.
 - [ ] `npm install -g` в чистый prefix на npm 11 и npm 12 (`--allow-scripts=node-pty` для IDE,
       `node-pty,node-gtk` для native) ставит пакет, поднимает PTY и prod-сервер.
 - [ ] `projector-install-desktop` из глобального пакета создаёт пункт меню и запускает
       `bin/projector` с ресурсами, иконками и рабочим каталогом.
-- [ ] `projector-hub` из npm открывает страницу входа и туннель к локальному Projector без
-      checkout.
-- [ ] Повторный запуск workflow на уже опубликованной версии пропускает все три пакета и
-      завершается успешно.
-- [ ] В README и `docs/` нет локальных tarball как основного пути установки; версии в примерах
-      совпадают с registry.
 - [ ] После подтверждения OIDC включён режим **Require two-factor authentication and disallow
       tokens** (если ещё не включён).
 
