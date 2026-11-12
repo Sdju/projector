@@ -5,10 +5,11 @@
 код: он собирает `AcpProgram` Cursor с его диалектом, расширениями (`ask_question`,
 `create_plan`, `update_todos`, `task`, `generate_image`), нормализацией выбора модели,
 `backend.plan.tools` для острова задач и клиентскими возможностями параметризованного пикера.
-Там же живут лимиты подписки: `backend.usage` читает ConnectRPC и `auth.json` Cursor, а
-`usageWindows` задаёт окна «Всего / Авто / API» для общего индикатора. Встроенного маршрута
-`/api/cursor/usage` больше нет — Projector отдаёт лимиты через `/api/agent/usage/cursor`, пока
-плагин включён.
+Там же живут лимиты подписки и токенная аналитика: `backend.usage` читает ConnectRPC и
+`auth.json` Cursor, `usageWindows` задаёт окна «Всего / Авто / API», а `backend.usageLog`
+забирает журнал событий дашборда (`get-filtered-usage-events`) — локальные транскрипты токенов
+не пишут. Встроенного маршрута `/api/cursor/usage` больше нет — Projector отдаёт лимиты через
+`/api/agent/usage/cursor`, пока плагин включён.
 
 ## Сборка
 

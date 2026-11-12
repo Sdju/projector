@@ -32,7 +32,7 @@
 ### Читатели журналов
 
 - [ ] Claude Code для терминала: `~/.claude/projects/**/*.jsonl` или OTel; только если нужен расход вне чата Projector; помнить про retention 30 дней.
-- [ ] Cursor: только лимиты из плагина через `/api/agent/usage/cursor`; ACP токенов не даёт, `~/.cursor/projects` и Admin API (`chargedCents`) ещё не читаются.
+- [x] Cursor: журнал дашборда `get-filtered-usage-events` через `backend.usageLog` плагина; локальные транскрипты токенов не содержат.
 - [ ] Gemini/Qwen/Copilot: добавлять только при появлении в каталоге; OTel предпочтительнее собственного парсера.
 
 ### Цена

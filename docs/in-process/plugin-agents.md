@@ -89,7 +89,7 @@ Cursor вынесен из встроенной композиции в `plugins
 
 ### Аналитика
 
-Сейчас `usage` в сохранённых ответах шлют только Projector и Claude. Codex, OpenCode и Kimi попадают в графики через нативные журналы; Cursor — только через лимиты. ACP не передаёт per-request input/output/cache-токены. Подробности и долги по журналам — в [analytics-agent-logs](analytics-agent-logs.md).
+Сейчас `usage` в сохранённых ответах шлют только Projector и Claude. Codex, OpenCode, Kimi и Cursor попадают в графики через нативные журналы (`backend.usageLog`). ACP не передаёт per-request input/output/cache-токены. Подробности и долги по журналам — в [analytics-agent-logs](analytics-agent-logs.md).
 
 Доверенный код может добавить нативный читатель через `backend.usageLog`: композиция регистрирует его вместе с агентом, а при выключении плагина снимает. Встроенные Codex, OpenCode и Kimi теперь используют тот же путь.
 
