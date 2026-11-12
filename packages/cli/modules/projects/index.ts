@@ -3,7 +3,11 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
-import type { Project } from "@ai-projector/core/modules/project/index.ts";
+import {
+  parseProjectScenarios,
+  PROJECT_SCENARIOS_FILE,
+  type Project,
+} from "@ai-projector/core/modules/project/index.ts";
 import type { ProjectorApi } from "../api/index.ts";
 
 const PROJECTS_FILE = () => join(dataDir(), "projects.json");
@@ -62,7 +66,26 @@ export async function readStoredProjects(): Promise<Project[]> {
     const parsed = JSON.parse(await readFile(PROJECTS_FILE(), "utf8")) as {
       projects?: Project[];
     };
-    return Array.isArray(parsed.projects) ? parsed.projects : [];
+    if (!Array.isArray(parsed.projects)) return [];
+    return await Promise.all(
+      parsed.projects.map(async (project) => {
+        const base = {
+          ...project,
+          commands: project.commands ?? [],
+          defaultCommandId: project.defaultCommandId ?? "",
+        };
+        try {
+          const scenarios = parseProjectScenarios(
+            JSON.parse(
+              await readFile(join(project.path, PROJECT_SCENARIOS_FILE), "utf8"),
+            ) as unknown,
+          );
+          return { ...base, ...scenarios };
+        } catch {
+          return base;
+        }
+      }),
+    );
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (code === "ENOENT") return [];

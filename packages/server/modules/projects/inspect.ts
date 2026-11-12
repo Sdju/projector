@@ -3,6 +3,7 @@ import { os } from "@ai-projector/core/modules/os/index.ts";
 import { basename, join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { findFavicon } from "./favicon.ts";
+import { readProjectScenarios } from "./scenarios.ts";
 import type { InspectResult, ProjectCommand } from "./types.ts";
 
 const PREFERRED = ["dev", "start", "preview", "serve"];
@@ -101,6 +102,7 @@ export async function inspectProject(dir: string, allowDirectory = false): Promi
   if (!info?.isDirectory()) {
     throw new Error("Папка не найдена");
   }
+  const scenarios = await readProjectScenarios(path).catch(() => undefined);
 
   const raw = await readFile(resolve(path, "package.json"), "utf8").catch(() => null);
   if (!raw) {
@@ -112,8 +114,8 @@ export async function inspectProject(dir: string, allowDirectory = false): Promi
         url: "",
         icon: "",
         mode: "server",
-        defaultCommandId: command.id,
-        commands: [command],
+        defaultCommandId: scenarios?.commands.length ? scenarios.defaultCommandId : command.id,
+        commands: scenarios?.commands.length ? scenarios.commands : [command],
       };
     }
     throw new Error("В папке нет package.json");
@@ -146,7 +148,7 @@ export async function inspectProject(dir: string, allowDirectory = false): Promi
     url: guessUrl(scripts),
     icon,
     mode: "server",
-    defaultCommandId: commands[0].id,
-    commands,
+    defaultCommandId: scenarios?.commands.length ? scenarios.defaultCommandId : commands[0].id,
+    commands: scenarios?.commands.length ? scenarios.commands : commands,
   };
 }

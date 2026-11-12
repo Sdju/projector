@@ -66,6 +66,7 @@ function remove(command: ProjectCommand) {
       <UiInline :gap="3" justify="between" wrap>
         <UiHint>
           Порядок задаётся перетаскиванием пунктов в навигации слева: он виден в меню запуска.
+          Сценарии хранятся в <code>.projector/scenarios.json</code> в папке проекта.
         </UiHint>
         <UiInline :gap="2">
           <UiButton size="sm" @click="addScenario"

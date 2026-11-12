@@ -8,6 +8,14 @@ export type {
   ProjectDraft,
 } from "./contract.ts";
 export type { ProjectRef } from "./ref.ts";
+export type { ProjectScenarios } from "./scenarios.ts";
+export {
+  PROJECT_SCENARIOS_FILE,
+  parseProjectCommands,
+  parseProjectScenarios,
+  scenarioFolder,
+  scenarioUrl,
+} from "./scenarios.ts";
 export {
   parseProjectRef,
   formatProjectRef,
