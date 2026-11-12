@@ -1,4 +1,6 @@
+import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { os } from "@ai-projector/core/modules/os/index.ts";
 
@@ -14,6 +16,11 @@ function nativeHelper(): string[] | undefined {
     if ((error as NodeJS.ErrnoException).code === "MODULE_NOT_FOUND") return;
     throw error;
   }
+  // The published add-on ships built JavaScript only, but a checkout also has the source entry.
+  // The built copy imports `@ai-projector/ide/core/*`, which exists only after a distribution
+  // build, so a checkout runs its source entry through the vio loader instead.
+  const source = join(dirname(entry), "..", "..", "app", "entry.ts");
+  if (existsSync(source)) entry = source;
   const loader = createRequire(entry).resolve("@zede/vio/register");
   return ["--import", pathToFileURL(loader).href, entry];
 }
