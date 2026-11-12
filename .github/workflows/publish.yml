@@ -77,8 +77,9 @@ jobs:
             fi
             printf '%s\n' "${output}"
             # The write side accepts a version at once, while the read side can keep answering 404
-            # for minutes. A repeat publish then fails only because the version already exists.
-            if grep -q "cannot publish over the previously published versions" <<<"${output}"; then
+            # for minutes. A repeat publish then fails only because the version already exists;
+            # pnpm wraps that sentence between "published" and "versions".
+            if grep -q "cannot publish over the previously published" <<<"${output}"; then
               echo "${name}@${version} is already on the registry, the read side still lags behind"
               return
             fi
