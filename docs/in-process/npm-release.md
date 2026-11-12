@@ -1,25 +1,34 @@
-# Выпуск в npm
+# Выпуск в npm: что осталось
 
-Подготовка поставки `@ai-projector/ide`, `@ai-projector/native` и `@ai-projector/hub` закончена: имена, манифесты, `projector-install-desktop`, `projector-hub`, самопроверка `build:distribution` и OIDC-workflow уже в коде. В registry пакетов ещё нет, публикаций не было. Устройство поставки и порядок публикации — в [distribution](../distribution.md); здесь только незакрытые пункты.
+Рабочий документ: только незакрытые проверки. Устройство поставки и процедура публикации —
+[distribution](../distribution.md); ограничения установки — там же.
 
-## Первый выпуск
+Пакеты `@ai-projector/ide`, `@ai-projector/native` и `@ai-projector/hub` опубликованы
+10.11.2026. `0.11.0` выпущен вручную, `0.11.1` — через OIDC с SLSA provenance: этим trusted
+publisher подтверждён.
 
-- [ ] Опубликовать все три пакета вручную с локальным `npm login` и 2FA — trusted publisher нельзя настроить до появления пакета.
-- [ ] Настроить trusted publisher для каждого пакета: `Sdju/projector`, `publish.yml`, разрешить `npm publish`.
-- [ ] Подтвердить конфигурацию первым успешным OIDC-publish из GitHub Release — на это даётся два дня.
-- [ ] После OIDC включить для пакетов `Require two-factor authentication and disallow tokens`.
+## Открыто
 
-## Открытые ограничения
+- [ ] Версия в дереве (`0.11.0`) ниже опубликованной (`0.11.1`) после revert `9e79d2ce`.
+      Перед следующим релизом поднять `version` во всех пакетах: workflow пропускает уже
+      опубликованную версию и не выпустит её повторно.
+- [ ] `npm install -g` в чистый prefix на npm 11 и npm 12 (`--allow-scripts=node-pty` для IDE,
+      `node-pty,node-gtk` для native) ставит пакет, поднимает PTY и prod-сервер.
+- [ ] `projector-install-desktop` из глобального пакета создаёт пункт меню и запускает
+      `bin/projector` с ресурсами, иконками и рабочим каталогом.
+- [ ] `projector-hub` из npm открывает страницу входа и туннель к локальному Projector без
+      checkout.
+- [ ] Повторный запуск workflow на уже опубликованной версии пропускает все три пакета и
+      завершается успешно.
+- [ ] В README и `docs/` нет локальных tarball как основного пути установки; версии в примерах
+      совпадают с registry.
+- [ ] После подтверждения OIDC включён режим **Require two-factor authentication and disallow
+      tokens** (если ещё не включён).
 
-- [ ] Глобальная установка `@ai-projector/native` на npm 11/12 падает в install-скрипте `node-gtk` (`npx node-pre-gyp`). Workaround описан в [distribution](../distribution.md#известные-ограничения-установки), причина не устранена: нужен либо надёжный install-скрипт, либо отказ от сборки при установке.
-- [ ] `engines` допускает только Node `>=24.11.0 <25`. На Node 26 npm выдаёт `EBADENGINE`; расширять диапазон можно после проверки PTY и сервера на новой версии.
-- [ ] Установка на Windows и macOS не проверялась в этой работе: тесты поставки шли на Linux. Для `node-pty` там нужны свои build tools или prebuilt-бинарники.
-- [ ] `projector-install-desktop` из глобального npm-пакета не запускался вручную: проверено только наличие bin и путей к `bin/projector`, ресурсам и иконкам в артефакте.
-- [ ] Установка `@ai-projector/hub` в чистый prefix и запуск `projector-hub` с реальным устройством ещё не проверялись.
+## Проверки перед закрытием
 
-## Проверить после публикации
+- [ ] Чистая машина без Node, GTK и build tools: установка, запуск, обновление.
+- [ ] `vp run build:distribution` и `vp run check` остаются зелёными.
 
-- [ ] Повторный запуск workflow на уже опубликованной версии пропускает пакеты и завершается успешно.
-- [ ] `npm install -g` в чистый prefix с npm 11 и npm 12 (`--allow-scripts`) ставит IDE, поднимает PTY и prod-сервер.
-- [ ] `projector-hub` из npm открывает страницу входа и туннель к локальному Projector без checkout.
-- [ ] В документации и README нет ссылок на неопубликованные имена и локальные tarball как основной путь установки.
+Когда проверки закрыты, удалите этот файл и пункт из `docs/in-process/README.md`; ограничения,
+которые останутся навсегда, живут в [distribution](../distribution.md#известные-ограничения-установки).

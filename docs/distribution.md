@@ -141,9 +141,11 @@ node packages/native/scripts/build.mjs
 
 ## Проверки
 
-Проверки исходников: `vp run check` и `vp run test:gtk`. `tests/desktop-optional.test.mjs` проверяет отсутствие native/GTK при импорте, команду запуска JS-сервера и передачу команд резиденту на приватной D-Bus-шине без дисплея. Для проверки поставки устанавливайте tarball в отдельный prefix и используйте отдельные `XDG_DATA_HOME`, порт и D-Bus-сессию; пользовательский сервер перезапускать не требуется.
+Проверки исходников: `vp run check` и `vp run test:gtk`. `packages/server/tests/desktop-optional.test.mjs` проверяет отсутствие native/GTK при импорте, команду запуска JS-сервера и передачу команд резиденту на приватной D-Bus-шине без дисплея. Для проверки поставки устанавливайте tarball в отдельный prefix и используйте отдельные `XDG_DATA_HOME`, порт и D-Bus-сессию; пользовательский сервер перезапускать не требуется.
 
 ## Известные ограничения установки
 
 - npm 12 по умолчанию не запускает install-скрипты. Для IDE разрешите `node-pty`, для native — ещё и `node-gtk`: `npm install -g --allow-scripts=node-pty @ai-projector/ide` и `npm install -g --allow-scripts=node-pty,node-gtk @ai-projector/native`. Hub не требует install-скриптов.
 - Глобальная установка `@ai-projector/native` на npm 11/12 может упасть в install-скрипте `node-gtk` (`npx node-pre-gyp`). Если это произошло, установите native с `--ignore-scripts` и соберите `node-gtk` вручную из его каталога через `@mapbox/node-pre-gyp install --fallback-to-build`; установка native в проект вместо глобальной также обходит это ограничение.
+- `engines` допускает Node `>=24.11.0 <25`. На Node 26 npm выдаёт `EBADENGINE`; расширять диапазон можно после проверки PTY и сервера на новой версии.
+- Глобальная установка из npm проверялась на Linux. На Windows и macOS для `node-pty` и `node-gtk` нужны собственные build tools; Projector не поставляет prebuilt-бинарники, сборка идёт при установке.

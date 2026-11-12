@@ -6,16 +6,16 @@
 
 ## P2. Потребители вне CSS
 
-- [ ] CodeMirror: палитра и синтаксис в `viewers/lib/codemirror.ts` захардкожены. Перевести базу на `var(--…)`, для подсветки ввести группу `--syntax-*` либо оставить тему редактора независимой осознанно.
-- [ ] Crepe/Markdown: убрать жёсткий `oneDark` в `viewers/lib/crepe-options.ts` и согласовать оформление кода с настройкой редактора и UI.
-- [ ] xterm: тема читается один раз при создании (`terminal/ui/TerminalView.vue`). Обновлять `terminal.options.theme` при смене схемы; решить, темизировать ли ANSI-палитру или оставить библиотечную.
+- [ ] CodeMirror: палитра и синтаксис в `packages/client/modules/workspace/modules/viewers/lib/codemirror.ts` захардкожены. Перевести базу на `var(--…)`, для подсветки ввести группу `--syntax-*` либо оставить тему редактора независимой осознанно.
+- [ ] Crepe/Markdown: убрать жёсткий `oneDark` в `packages/client/modules/workspace/modules/viewers/lib/crepe-options.ts` и согласовать оформление кода с настройкой редактора и UI.
+- [ ] xterm: базовые цвета уже берутся из токенов при создании (`--bg-2`, `--text-2`, `--line-strong` в `packages/client/modules/terminal/ui/TerminalView.vue`), но `options.theme` не перечитывается при смене схемы, а ANSI-палитра остаётся библиотечной. Решить: обновлять тему на лету или оставить осознанно.
 - [ ] Иконки файлов: решить, следует ли палитра `public/file-icons/theme.json` за схемой (на светлом фоне пастельные цвета теряют контраст) или остаётся независимой.
 - [ ] Статические поверхности: offline-страница `public/sw.js`, страница входа `packages/server/modules/access/http.ts`, заглушка `project-presentation`, `public/manifest.webmanifest`, favicon. Для offline и входа достаточно `prefers-color-scheme`; для остального — решение.
 
 ## P3. Схемы и проверки
 
 - [ ] Довести светлую и контрастную схемы: текст на `--bg` не ниже 4.5:1; отдельно проверить `--muted`, `--faint`, `--selection`, `--focus` и статусные цвета на реальных экранах.
-- [ ] Browser-тест смены схемы на реальных экранах: выставить `data-theme`, проверить computed background/text у чата, дерева, diff, терминала и настроек, отсутствие перезагрузки. Базовый тест токенов и `auto` — `tests/appearance-browser.test.mjs`. Без побайтовых скриншотов.
+- [ ] Browser-тест смены схемы на реальных экранах: выставить `data-theme`, проверить computed background/text у чата, дерева, diff, терминала и настроек, отсутствие перезагрузки. Базовый тест токенов и `auto` — `packages/client/tests/appearance-browser.test.mjs`. Без побайтовых скриншотов.
 - [ ] Ручной прогон: чат, файлы, Git, редактор и Markdown, терминал, настройки, мобильная ширина; нативные `select`/scrollbar/фокус/выделение после смены `color-scheme`.
 - [ ] После закрытия работы удалить этот файл.
 
