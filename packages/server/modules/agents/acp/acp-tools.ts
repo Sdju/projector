@@ -142,7 +142,7 @@ export function acpCommands(
   return commands;
 }
 
-const EMPTY_TITLE = /^(New session - \d{4}-\d\d-\d\dT|untitled|new session)$/i;
+const EMPTY_TITLE = /^(New session - \d{4}-\d\d-\d\dT.*|untitled|new session)$/i;
 
 interface RawSession {
   sessionId?: string;

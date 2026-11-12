@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, expect, test } from "vite-plus/test";
 import { acpAdvertisedDelete } from "../modules/agents/acp/acp-process.ts";
 import { registerAcpProgram } from "../modules/agents/acp/acp-programs.ts";
-import { acpCommands, acpControls } from "../modules/agents/acp/acp-tools.ts";
+import { acpCommands, acpControls, acpSessions } from "../modules/agents/acp/acp-tools.ts";
 
 /** A file, not an `-e` argument: Windows shell quoting would mangle the multi-line script. */
 const SCRIPT = fileURLToPath(
@@ -94,4 +94,12 @@ test("deleteSessions follows the advertised session/delete capability", async ()
   const id = probe("before");
   await acpCommands(id, cwd, 1000);
   expect(acpAdvertisedDelete(id)).toBe(true);
+});
+
+test("sessions that never received a prompt are hidden, including OpenCode's placeholder", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "projector-acp-sessions-"));
+  dirs.push(cwd);
+  expect(await acpSessions(probe("sessions"), cwd)).toStrictEqual([
+    { id: "ses_real", title: "Fix the parser", updatedAt: "2026-11-12T06:00:00.000Z" },
+  ]);
 });

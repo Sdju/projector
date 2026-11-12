@@ -4,12 +4,19 @@ import { createOpencodeDialect } from "./dialect.ts";
 import { withOpenCodeBranches } from "./sessions.ts";
 import { opencodeUsageLog } from "./usage-log.ts";
 
-/** OpenCode through its own ACP mode (`opencode acp`). */
+/**
+ * OpenCode through its own ACP mode (`opencode acp`). Version 2 (`@opencode/cli`) ships the same
+ * executable as `opencode2`, so an older v1 may stay on PATH; the newer binary is preferred when
+ * installed. It advertises `session/delete` and drops probe sessions on close, so history can
+ * remove past sessions instead of leaving the placeholders behind.
+ */
 export const opencodeProgram = {
   id: "opencode",
   label: "OpenCode",
   command: "opencode",
   args: ["acp"],
+  binary: "opencode2",
+  binaryArgs: ["acp"],
   dialect: createOpencodeDialect,
   // ACP v2 compaction updates carry the summary; older builds fall back to `_meta` markers.
   clientCapabilities: { session: { compaction: {} } },

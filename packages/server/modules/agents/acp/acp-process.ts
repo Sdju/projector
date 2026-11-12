@@ -33,7 +33,7 @@ async function resolveLaunch(program: AcpProgram, cwd: string) {
   // Resolve programs the way a terminal session does, not through the server's own PATH.
   const env = await os.tools.agentEnv(agentEnv());
   if (program.binary && os.tools.commandExists(program.binary, env))
-    return { command: program.binary, args: [] as string[], cwd, env };
+    return { command: program.binary, args: program.binaryArgs ?? [], cwd, env };
   if (program.command === "npx")
     return { command: program.command, args: program.args, cwd: os.dataHome(), env };
   return { command: program.command, args: program.args, cwd, env };

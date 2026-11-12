@@ -1091,6 +1091,13 @@ test("the codex npx fallback is pinned to a version", async () => {
   expect(codexProgram.args.at(-1)).toMatch(/^@agentclientprotocol\/codex-acp@\d+\.\d+\.\d+$/);
 });
 
+test("OpenCode prefers the v2 binary and keeps v1 as its fallback", async () => {
+  const { opencodeProgram } = await import("../modules/agents/opencode/index.ts");
+  expect(opencodeProgram.binary).toBe("opencode2");
+  expect(opencodeProgram.binaryArgs).toStrictEqual(["acp"]);
+  expect(opencodeProgram.command).toBe("opencode");
+});
+
 test("ACP authenticates once when the agent refuses a session", async () => {
   const { openSession } = await import("../modules/agents/acp/acp-backend.ts");
   const calls = [];

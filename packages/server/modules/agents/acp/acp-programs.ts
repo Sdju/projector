@@ -46,6 +46,8 @@ export interface AcpProgram {
   args: string[];
   /** A globally installed binary that replaces `command` when present (avoids `npx`). */
   binary?: string;
+  /** Arguments of `binary`; empty when the binary takes none (default). */
+  binaryArgs?: string[];
   /**
    * Overrides of the terminal that opens the agent: the program id defaults to `id`, the
    * executable to `id` and the tab title to `label`.

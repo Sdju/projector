@@ -32,7 +32,8 @@ rl.on("line", (line) => {
       result: {
         protocolVersion: 1,
         agentCapabilities: {
-          sessionCapabilities: mode === "no-delete" ? { list: {} } : { delete: {} },
+          sessionCapabilities:
+            mode === "no-delete" || mode === "sessions" ? { list: {} } : { delete: {} },
         },
       },
     });
@@ -63,6 +64,24 @@ rl.on("line", (line) => {
     } else send({ jsonrpc: "2.0", id: message.id, result: { sessionId: "s1" } });
   } else if (message.method === "session/delete" || message.method === "session/close")
     send({ jsonrpc: "2.0", id: message.id, result: {} });
+  else if (message.method === "session/list")
+    send({
+      jsonrpc: "2.0",
+      id: message.id,
+      result: {
+        sessions: [
+          { sessionId: "ses_timestamp", title: "New session - 2026-11-12T06:03:57.921Z" },
+          { sessionId: "ses_untitled", title: "untitled" },
+          { sessionId: "ses_new", title: "new session" },
+          { sessionId: "ses_blank", title: "   " },
+          {
+            sessionId: "ses_real",
+            title: "Fix the parser",
+            updatedAt: "2026-11-12T06:00:00.000Z",
+          },
+        ],
+      },
+    });
   else
     send({
       jsonrpc: "2.0",
