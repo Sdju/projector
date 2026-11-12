@@ -9,7 +9,7 @@ export function alertHiddenFailure(message: string): void {
   if (process.stdout.isTTY && !fromShortcut) return;
   try {
     runPowerShellSync(
-      "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show($env:PROJECTOR_ALERT, 'Projector', 'OK', [System.Windows.Forms.MessageBoxIcon]::Error, [System.Windows.Forms.MessageBoxDefaultButton]::Button1, [System.Windows.Forms.MessageBoxOptions]::SystemModal) | Out-Null",
+      "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show($env:PROJECTOR_ALERT, 'Projector', [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error, [System.Windows.Forms.MessageBoxDefaultButton]::Button1) | Out-Null",
       {
         sta: true,
         timeout: 120000,
