@@ -49,6 +49,17 @@ test("search reads a committed tree case-insensitively and keeps paths relative"
   });
 });
 
+test("search finds a pasted multiline snippet in a commit", async () => {
+  const { base } = await repository();
+  const run = (...args) => execFileSync("git", ["-C", base, ...args], { encoding: "utf8" });
+  await writeFile(join(base, "block.ts"), "alpha\nbeta\ngamma\n");
+  run("add", "block.ts");
+  run("commit", "-qm", "block");
+  const result = await searchProjectGit(base, run("rev-parse", "HEAD").trim(), "alpha\nbeta");
+  expect(result.hits.map((hit) => [hit.path, hit.line])).toStrictEqual([["block.ts", 1]]);
+  expect(result.hits[0]?.text).toContain("alpha\nbeta");
+});
+
 test("search from a subfolder returns paths of that project", async () => {
   const { base, hash } = await repository();
   const result = await searchProjectGit(join(base, "sub"), hash, "hello");

@@ -111,6 +111,11 @@ export interface SidebarView {
   activate?(host: SidebarHost): void;
   /** Refresh button; the default reloads the whole workspace. */
   refresh?(host: SidebarHost, panel: { refresh?: () => unknown } | undefined): unknown;
+  /**
+   * The panel draws the refresh button in its toolbar. Files and GitHub/GitLab lists leave
+   * this unset — the host overlay sits in an empty corner.
+   */
+  refreshGutter?: boolean;
 }
 export type SidebarViews = Record<string, SidebarView>;
 
@@ -120,6 +125,8 @@ export const baseSidebarViews: SidebarViews = {
     component: AgentInbox,
     props: () => ({}),
     badge: () => inboxAttention(),
+    refreshGutter: true,
+    refresh: (_, panel) => panel?.refresh?.(),
   },
   files: {
     icon: IconFiles,
@@ -140,7 +147,13 @@ export const baseSidebarViews: SidebarViews = {
   search: {
     icon: IconSearch,
     component: SearchPanel,
-    props: (host) => ({ projectId: host.projectId, onOpen: host.openFile }),
+    props: (host) => ({
+      projectId: host.projectId,
+      onOpen: host.openFile,
+      onReveal: (path: string) => host.command("ide.workbench.tree.reveal", { path }),
+    }),
+    refreshGutter: true,
+    refresh: (_, panel) => panel?.refresh?.(),
   },
   "search-scope": {
     icon: IconSearch,
@@ -155,6 +168,7 @@ export const baseSidebarViews: SidebarViews = {
           host.openFile(path, line, column, undefined, { scope, preview: false }),
       };
     },
+    refreshGutter: true,
     refresh: (_, panel) => panel?.refresh?.(),
   },
   git: {
@@ -179,6 +193,7 @@ export const baseSidebarViews: SidebarViews = {
     }),
     badge: (host) => host.overview.git.value.changes.length,
     activate: (host) => void host.overview.load(),
+    refreshGutter: true,
     refresh: (_, panel) => panel?.refresh?.(),
   },
   tree: {
@@ -321,6 +336,7 @@ export const baseSidebarViews: SidebarViews = {
     icon: IconDocker,
     component: DockerSidebar,
     props: () => ({}),
-    refresh: (host) => host.command("ide.docker.refresh"),
+    refreshGutter: true,
+    refresh: (host, panel) => panel?.refresh?.() ?? host.command("ide.docker.refresh"),
   },
 };

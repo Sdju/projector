@@ -12,6 +12,7 @@ import {
   workspaceScopeRequest,
   workspaceScopeAssetUrl,
   searchWorkspace,
+  findWorkspacePaths,
   workspaceAssetUrl,
   saveWorkspaceFile,
   moveWorkspaceEntry,
@@ -425,6 +426,42 @@ test("a profile is a set of replaceable providers and capabilities follow from t
   expect(profileCapabilities(profiles.resolve("/tmp/a")).git).toBe(false);
   expect(workspaceProfile("/tmp/local").id).toBe("local");
   expect(profileCapabilities(workspaceProfile("/tmp/local")).write).toBe(true);
+});
+
+test("path search accepts a committed file scope and a limit", async () => {
+  const calls = [];
+  const unregister = registerWorkspaceProfile("paths-scope-test", {
+    id: "paths-scope",
+    layout: "editor",
+    features: {},
+    providers: {
+      files: {
+        read: async (action, params) => {
+          calls.push({ action, params });
+          return { paths: [{ path: "ui/SearchPanel.vue", directory: false }] };
+        },
+        assetUrl: () => "",
+      },
+    },
+  });
+  try {
+    const result = await findWorkspacePaths(
+      "paths-scope-test",
+      "SearchPanel",
+      undefined,
+      { kind: "commit", rev: "b".repeat(40) },
+      100,
+    );
+    expect(result).toStrictEqual([{ path: "ui/SearchPanel.vue", directory: false }]);
+    expect(calls).toStrictEqual([
+      {
+        action: "paths",
+        params: { q: "SearchPanel", limit: "100", rev: "b".repeat(40) },
+      },
+    ]);
+  } finally {
+    unregister();
+  }
 });
 
 test("search accepts a committed file scope", async () => {

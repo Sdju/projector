@@ -511,6 +511,10 @@ test("workspace tree, bounded reading, traversal and symlink containment, litera
       expect(search.hits.map((hit) => [hit.path, hit.line, hit.column])).toStrictEqual([
         ["src/code.ts", 1, 22],
       ]);
+      await writeFile(join(root, "src/block.ts"), "alpha\nbeta\ngamma\n");
+      const block = await searchProject(root, "alpha\nbeta");
+      expect(block.hits.map((hit) => [hit.path, hit.line])).toStrictEqual([["src/block.ts", 1]]);
+      expect(block.hits[0]?.text).toContain("alpha\nbeta");
     } finally {
       await rm(root, { recursive: true, force: true });
     }

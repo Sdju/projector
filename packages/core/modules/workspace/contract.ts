@@ -39,6 +39,8 @@ export interface SearchOptions {
   wholeWord?: boolean;
   regex?: boolean;
 }
+/** Content search accepts a pasted snippet; path search stays shorter. */
+export const SEARCH_QUERY_MAX = 2000;
 export interface SearchHit {
   path: string;
   line: number;

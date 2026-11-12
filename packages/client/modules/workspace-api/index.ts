@@ -167,13 +167,28 @@ export function searchWorkspace(
 }
 
 /** Files and folders of the project whose path matches the query, best first. */
-export async function findWorkspacePaths(projectId: string, query: string, signal?: AbortSignal) {
-  const { paths } = await workspaceRequest<{ paths: { path: string; directory: boolean }[] }>(
-    projectId,
-    "paths",
-    { q: query },
-    signal,
-  );
+export async function findWorkspacePaths(
+  projectId: string,
+  query: string,
+  signal?: AbortSignal,
+  scope?: FileScope,
+  limit?: number,
+) {
+  const params = { q: query, ...(limit ? { limit: String(limit) } : {}) };
+  const { paths } = scope
+    ? await workspaceScopeRequest<{ paths: { path: string; directory: boolean }[] }>(
+        projectId,
+        scope,
+        "paths",
+        params,
+        signal,
+      )
+    : await workspaceRequest<{ paths: { path: string; directory: boolean }[] }>(
+        projectId,
+        "paths",
+        params,
+        signal,
+      );
   return paths;
 }
 

@@ -165,7 +165,15 @@ export const routes: RouteDefinition[] = [
     );
   }),
   view("/api/projects/:id/workspace/paths", async ({ res, url }, project) => {
-    json(res, 200, { paths: await findProjectPaths(project.path, text(url, "q")) });
+    const limit = Number.parseInt(text(url, "limit"), 10);
+    json(res, 200, {
+      paths: await findProjectPaths(
+        project.path,
+        text(url, "q"),
+        Number.isInteger(limit) ? limit : 30,
+        text(url, "rev") || undefined,
+      ),
+    });
   }),
   view("/api/projects/:id/workspace/git", async ({ res }, project) => {
     json(res, 200, await projectGit(project.path));

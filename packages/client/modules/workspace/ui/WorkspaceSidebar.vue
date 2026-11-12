@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, watch } from "vue";
+import { computed, provide, shallowReactive, ref, watch } from "vue";
+import { sectionRefreshKey } from "../../../common/ui/UiSectionRefresh.vue";
 import type { SidebarRegistry, WorkspaceCapabilities } from "../../workspace-api/index.ts";
 import type { GitBranchesState, GitHistoryState, GitOverviewState } from "../modules/git/index.ts";
 import type { useGitChangeSync } from "../lib/git-change-sync.ts";
@@ -8,8 +9,16 @@ import type { OpenFile } from "../open-file.ts";
 import type { FileScope } from "@ai-projector/core/modules/workspace/index.ts";
 import { baseSidebarViews, type SidebarHost, type SidebarViews } from "../lib/sidebar-views.ts";
 import SidebarTabs from "./SidebarTabs.vue";
+import UiSpinner from "../../../common/ui/UiSpinner.vue";
 import IconRefresh from "~icons/lucide/rotate-cw";
 import IconX from "~icons/lucide/x";
+
+type SidebarPanel = {
+  refresh?: () => unknown;
+  reveal?: (path: string) => void;
+  search?: () => unknown;
+  refreshing?: boolean;
+};
 
 /** Боковая панель проекта: переключатель разделов и панель выбранного раздела. */
 const props = defineProps<{
@@ -49,7 +58,8 @@ const emit = defineEmits<{
   openSearch: [scope: FileScope];
 }>();
 const views = { ...baseSidebarViews, ...props.views };
-const panels = new Map<string, { refresh?: () => unknown; [name: string]: unknown }>();
+const panels = shallowReactive(new Map<string, SidebarPanel>());
+const localRefreshing = ref(false);
 const host: SidebarHost = {
   get projectId() {
     return props.projectId;
@@ -132,11 +142,26 @@ const activeView = computed(() => {
   return type ? views[type.kind ?? type.id] : undefined;
 });
 const setPanel = (id: string, panel: unknown) =>
-  panel ? panels.set(id, panel as never) : panels.delete(id);
-function refresh() {
+  panel ? panels.set(id, panel as SidebarPanel) : panels.delete(id);
+const refreshing = computed(() => localRefreshing.value || !!panels.get(section.value)?.refreshing);
+const refreshCommandId = computed(() => props.refreshCommand ?? "ide.workbench.sidebar.refresh");
+provide(sectionRefreshKey, {
+  refreshing,
+  command: refreshCommandId,
+  run: () => emit("command", refreshCommandId.value),
+});
+async function refresh() {
+  if (localRefreshing.value) return;
   const view = viewOf(section.value);
-  if (view?.refresh) view.refresh(host, panels.get(section.value));
-  else emit("refresh");
+  const result = view?.refresh ? view.refresh(host, panels.get(section.value)) : emit("refresh");
+  if (result && typeof result === "object" && "then" in result) {
+    localRefreshing.value = true;
+    try {
+      await result;
+    } finally {
+      localRefreshing.value = false;
+    }
+  }
 }
 watch(section, (id) => viewOf(id)?.activate?.(host));
 /** Как в WebStorm: клик по активному разделу сворачивает панель, клик при свёрнутой — раскрывает. */
@@ -171,6 +196,7 @@ defineExpose({
       :items="items"
       :vertical="rail"
       :collapsed="rail && hidden"
+      :refreshing="refreshing"
       :project-settings="side !== 'right' && capabilities.settings"
       :label="side === 'right' ? 'Дополнительные панели' : 'Разделы проекта'"
       :scope-id="side === 'right' ? 'aside-sections' : 'sidebar-sections'"
@@ -213,14 +239,18 @@ defineExpose({
         <IconX aria-hidden="true" />
       </button>
       <button
-        v-if="rail"
+        v-if="rail && !activeView?.refreshGutter"
         class="panel-refresh"
+        :class="{ busy: refreshing }"
         title="Обновить раздел"
-        aria-label="Обновить раздел"
-        :data-command="refreshCommand ?? 'ide.workbench.sidebar.refresh'"
-        @click="emit('command', refreshCommand ?? 'ide.workbench.sidebar.refresh')"
+        :aria-label="refreshing ? 'Обновление раздела' : 'Обновить раздел'"
+        :aria-busy="refreshing || undefined"
+        :disabled="refreshing || undefined"
+        :data-command="refreshCommandId"
+        @click="emit('command', refreshCommandId)"
       >
-        <IconRefresh aria-hidden="true" />
+        <UiSpinner v-if="refreshing" />
+        <IconRefresh v-else aria-hidden="true" />
       </button>
       <component
         :is="views[item.kind].component"
@@ -377,10 +407,15 @@ defineExpose({
 }
 .with-rail .panel:hover .panel-refresh,
 .with-rail .panel:focus-within .panel-refresh,
+.with-rail .panel .panel-refresh.busy,
 .with-rail .panel:hover .panel-close,
 .with-rail .panel:focus-within .panel-close {
   opacity: 1;
   pointer-events: auto;
+}
+.panel-refresh:disabled {
+  opacity: 1;
+  color: var(--muted);
 }
 .panel-refresh:hover,
 .panel-close:hover {

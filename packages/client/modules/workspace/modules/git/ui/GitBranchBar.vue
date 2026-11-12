@@ -7,6 +7,7 @@ import type { GitBranch } from "@ai-projector/core/modules/workspace/index.ts";
 import ContextMenu from "../../../../../common/ui/ContextMenu.vue";
 import EntryDialog from "../../../../../common/ui/EntryDialog.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
+import UiSectionRefresh from "../../../../../common/ui/UiSectionRefresh.vue";
 import type { ContextMenuItem } from "../../../../../common/ui/context-menu.ts";
 import { type useCommandScope } from "../../../../../common/utilities/commands.ts";
 import { notify, toastErrors } from "../../../../../common/utilities/notice.ts";
@@ -259,6 +260,7 @@ watch(open, (value) => {
       >
         <IconPlus aria-hidden="true" />
       </UiButton>
+      <UiSectionRefresh />
     </div>
     <div v-if="open" class="picker">
       <UiControl

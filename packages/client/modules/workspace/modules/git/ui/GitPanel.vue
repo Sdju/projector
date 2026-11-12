@@ -3,7 +3,7 @@ import UiScrollArea from "../../../../../common/ui/UiScrollArea.vue";
 import { computed, ref } from "vue";
 import ContextMenu from "../../../../../common/ui/ContextMenu.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
-import UiLoader from "../../../../../common/ui/UiLoader.vue";
+import UiSectionRefresh from "../../../../../common/ui/UiSectionRefresh.vue";
 import type { ContextMenuItem } from "../../../../../common/ui/context-menu.ts";
 import { toastErrors } from "../../../../../common/utilities/notice.ts";
 import { commandArgs, useCommandScope } from "../../../../../common/utilities/commands.ts";
@@ -147,6 +147,7 @@ function gitContext(event: MouseEvent | KeyboardEvent, path: string, staged: boo
 
 defineExpose({
   refresh: () => (gitBusy.value ? undefined : load()),
+  refreshing: gitLoading,
 });
 </script>
 
@@ -167,7 +168,9 @@ defineExpose({
       :applied="applied"
       :reload="load"
     />
-    <UiLoader v-if="gitLoading" class="notice">загрузка Git…</UiLoader>
+    <div v-else class="git-refresh">
+      <UiSectionRefresh />
+    </div>
     <p v-if="!gitLoading && !gitError && !git.available" class="notice">
       В этой папке нет Git-репозитория.
     </p>
@@ -287,6 +290,11 @@ defineExpose({
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+.git-refresh {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px var(--sp-2) 0;
 }
 .git-stack {
   flex: 1;

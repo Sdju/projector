@@ -1,5 +1,5 @@
 import { commandArgs } from "../../../common/utilities/commands.ts";
-import { searchWorkspace } from "../../workspace-api/index.ts";
+import { findWorkspacePaths, searchWorkspace } from "../../workspace-api/index.ts";
 import type { WorkspaceCapabilities, WorkspaceCapability } from "../../workspace-api/index.ts";
 import type { FileScope } from "@ai-projector/core/modules/workspace/index.ts";
 
@@ -47,13 +47,39 @@ export function registerTreeCommands(ctx: TreeCommandsContext) {
     undefined,
     {
       description:
-        "Ищет текст в файлах коммита и возвращает совпадения с путями и позициями. Локальный снимок читается через git grep, GitLab — через поиск по blobs с ref; GitHub не поддерживает поиск по произвольному коммиту. Найденные файлы открываются в том же коммите.",
+        "Ищет текст в файлах коммита и возвращает совпадения с путями и позициями. Несколько строк — вхождение фрагмента целиком. Локальный снимок читается через git grep, GitLab — через поиск по blobs с ref; GitHub не поддерживает поиск по произвольному коммиту. Найденные файлы открываются в том же коммите.",
       arguments: {
         rev: "Хеш коммита",
-        q: "Строка поиска",
+        q: "Текст поиска; несколько строк — вхождение фрагмента целиком",
         case: "true — учитывать регистр",
         word: "true — искать целое слово",
         regex: "true — регулярное выражение",
+      },
+    },
+  );
+  ctx.register(
+    "ide.workbench.paths.find",
+    "Найти файлы по имени",
+    async (value) => {
+      const args = commandArgs(value);
+      if (typeof args.q !== "string") throw new Error("Укажите q");
+      if (args.rev !== undefined && typeof args.rev !== "string")
+        throw new Error("rev должен быть строкой");
+      return findWorkspacePaths(
+        ctx.projectId,
+        args.q,
+        undefined,
+        args.rev ? { kind: "commit", rev: args.rev } : undefined,
+      );
+    },
+    () => true,
+    undefined,
+    {
+      description:
+        "Ищет файлы и папки по имени или фрагменту пути. Без rev — рабочая копия; с rev — дерево коммита. Локальный снимок читается через git ls-tree; тот же поиск, что у поля «Файлы» в разделе Поиск и у @ в чате.",
+      arguments: {
+        q: "Имя или фрагмент пути",
+        rev: "Хеш коммита; без него — рабочая копия",
       },
     },
   );

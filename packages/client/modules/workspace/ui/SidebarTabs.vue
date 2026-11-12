@@ -40,6 +40,8 @@ const props = defineProps<{
   label?: string;
   /** Separate command scopes for the left sidebar and the right rail on one page. */
   scopeId?: string;
+  /** The section is reloading: the mobile refresh button shows a spinner. */
+  refreshing?: boolean;
 }>();
 const emit = defineEmits<{
   "update:section": [section: string];
@@ -130,8 +132,9 @@ function choose(item: SidebarItem) {
         shape="icon"
         size="sm"
         title="Обновить раздел"
-        aria-label="Обновить раздел"
+        :aria-label="refreshing ? 'Обновление раздела' : 'Обновить раздел'"
         data-command="ide.workbench.sidebar.refresh"
+        :busy="refreshing"
         @click="emit('command', 'ide.workbench.sidebar.refresh')"
       >
         <IconRefresh aria-hidden="true" />

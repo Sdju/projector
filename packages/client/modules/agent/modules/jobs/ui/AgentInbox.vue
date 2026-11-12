@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, inject, ref } from "vue";
 import { useRouter } from "vue-router";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
 import UiInline from "../../../../../common/ui/UiInline.vue";
 import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import UiMessage from "../../../../../common/ui/UiMessage.vue";
+import UiSectionRefresh, { sectionRefreshKey } from "../../../../../common/ui/UiSectionRefresh.vue";
 import { useCommandScope, commandArgs } from "../../../../../common/utilities/commands.ts";
 import {
   cancelAgentRun,
@@ -20,7 +21,10 @@ import { currentDeviceId, useAgentInbox, type InboxGroup, type InboxItem } from 
 import AgentInboxRow from "./AgentInboxRow.vue";
 import IconRefresh from "~icons/lucide/rotate-cw";
 
-const props = withDefaults(defineProps<{ scopeId?: string }>(), { scopeId: "agent-inbox" });
+const props = withDefaults(defineProps<{ scopeId?: string }>(), {
+  scopeId: "agent-inbox",
+});
+const hostRefresh = inject(sectionRefreshKey, null);
 const router = useRouter();
 const emit = defineEmits<{ navigate: [] }>();
 const {
@@ -37,7 +41,9 @@ const {
   href,
 } = useAgentInbox();
 const busy = ref("");
+const userRefreshing = ref(false);
 const actionError = ref("");
+const pending = computed(() => loading.value || userRefreshing.value);
 const permission = ref(
   typeof Notification === "undefined" ? "unsupported" : Notification.permission,
 );
@@ -57,6 +63,16 @@ const commands = useCommandScope(props.scopeId, () => ({
   surface: "inbox",
   sources: sources.value.length,
 }));
+async function reload(): Promise<void> {
+  if (userRefreshing.value) return;
+  userRefreshing.value = true;
+  try {
+    await refresh();
+  } finally {
+    userRefreshing.value = false;
+  }
+}
+defineExpose({ refresh: reload, refreshing: pending });
 function find(value: unknown): InboxItem {
   const key = commandArgs(value).key;
   const item = items.value.find((entry) => entry.key === key);
@@ -68,7 +84,7 @@ commands.scope.registerCommand({
   title: "Обновить работы и уведомления",
   description:
     "Перечитывает фоновые задания и живые ходы агентов на этом устройстве и на подключённых устройствах Hub.",
-  run: () => refresh(),
+  run: () => reload(),
 });
 commands.scope.registerCommand({
   id: "ide.inbox.work.open",
@@ -142,13 +158,15 @@ const completed = (group: InboxGroup) => group.items.filter((item) => item.categ
     <header class="head">
       <UiInline justify="between" align="center">
         <strong class="title">Работы</strong>
+        <UiSectionRefresh />
         <UiButton
+          v-if="!hostRefresh"
           shape="icon"
           size="sm"
           title="Обновить работы"
           aria-label="Обновить работы"
           data-command="ide.inbox.refresh"
-          :busy="loading"
+          :busy="pending"
           @click="commands.run('ide.inbox.refresh')"
         >
           <IconRefresh aria-hidden="true" />
@@ -166,7 +184,7 @@ const completed = (group: InboxGroup) => group.items.filter((item) => item.categ
       <p class="updated">{{ updated ? `обновлено в ${updated}` : "" }}</p>
     </header>
 
-    <UiLoader v-if="loading && !items.length" label="Читаю работы…" />
+    <UiLoader v-if="!hostRefresh && loading && !items.length" label="Читаю работы…" />
     <UiMessage v-if="error" tone="danger" size="xs" role="alert" class="message">{{
       error
     }}</UiMessage>

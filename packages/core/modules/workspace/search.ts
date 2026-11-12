@@ -9,7 +9,8 @@ export function searchMatches(
   const matches: SearchMatch[] = [];
   if (!query) return matches;
   if (options.regex) {
-    const expression = new RegExp(query, options.caseSensitive ? "g" : "gi");
+    const flags = `${options.caseSensitive ? "g" : "gi"}${query.includes("\n") ? "s" : ""}`;
+    const expression = new RegExp(query, flags);
     for (const match of text.matchAll(expression)) {
       if (!match[0]) break;
       matches.push({ start: match.index ?? 0, end: (match.index ?? 0) + match[0].length });

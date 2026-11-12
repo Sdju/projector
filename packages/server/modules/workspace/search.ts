@@ -2,19 +2,73 @@ import { os } from "@ai-projector/core/modules/os/index.ts";
 import { realpath } from "node:fs/promises";
 import { HttpError } from "../http/index.ts";
 import { MAX_BYTES, excludePatterns } from "./paths.ts";
-import { git } from "./git.ts";
+import { git, gitText } from "./git.ts";
 import { resolveRevision } from "./git-tree.ts";
 import {
   isExcludedPath,
+  SEARCH_QUERY_MAX,
   searchMatches,
   type SearchHit,
   type SearchMatch,
   type SearchOptions,
 } from "@ai-projector/core/modules/workspace/index.ts";
 
+const multiline = (query: string) => query.includes("\n");
+
+function wordMatches(text: string, query: string, options: SearchOptions) {
+  const matches = searchMatches(text, query, options);
+  if (!options.wholeWord) return matches;
+  return matches.filter((match) => {
+    const before = text[match.start - 1] ?? "";
+    const after = text[match.end] ?? "";
+    return !/\w/.test(before) && !/\w/.test(after);
+  });
+}
+
+function hitsInBlob(path: string, content: string, query: string, options: SearchOptions) {
+  const hits: SearchHit[] = [];
+  for (const match of wordMatches(content, query, options).slice(0, 5)) {
+    const prefix = content.slice(0, match.start);
+    const lineStart = prefix.lastIndexOf("\n") + 1;
+    const lineEnd = content.indexOf("\n", match.end);
+    const text = content.slice(lineStart, lineEnd < 0 ? content.length : lineEnd).slice(0, 500);
+    hits.push({
+      path,
+      line: prefix.split("\n").length,
+      column: match.start - lineStart + 1,
+      text,
+      matches: [
+        { start: match.start - lineStart, end: Math.min(match.end - lineStart, text.length) },
+      ],
+    });
+  }
+  return hits;
+}
+
+async function grepCommit(
+  root: string,
+  commit: string,
+  query: string,
+  options: SearchOptions,
+  extra: string[],
+) {
+  const args = ["grep", ...extra, options.regex ? "-E" : "-F"];
+  if (!options.caseSensitive) args.push("-i");
+  if (options.wholeWord) args.push("-w");
+  args.push("-e", query, commit, "--");
+  try {
+    return await git(root, args, 4 * MAX_BYTES);
+  } catch (error) {
+    const failure = error as { code?: number | string };
+    if (failure.code === 1) return "";
+    throw new HttpError(400, "Поиск по снимку недоступен. Уточните запрос.");
+  }
+}
+
 export async function searchProject(root: string, query: string, options: SearchOptions = {}) {
   if (!query.trim()) return { hits: [], truncated: false };
-  if (query.length > 200) throw new HttpError(400, "Запрос длиннее 200 символов");
+  if (query.length > SEARCH_QUERY_MAX)
+    throw new HttpError(400, `Запрос длиннее ${SEARCH_QUERY_MAX} символов`);
   const base = await realpath(root);
   let output: string;
   try {
@@ -30,6 +84,10 @@ export async function searchProject(root: string, query: string, options: Search
     if (!options.regex) args.push("--fixed-strings");
     args.push(options.caseSensitive ? "--case-sensitive" : "--ignore-case");
     if (options.wholeWord) args.push("--word-regexp");
+    if (multiline(query)) {
+      args.push("--multiline");
+      if (options.regex) args.push("--multiline-dotall");
+    }
     for (const pattern of await excludePatterns()) {
       args.push("--glob", `!${pattern}`);
       if (!pattern.endsWith("/**")) args.push("--glob", `!${pattern}/**`);
@@ -86,20 +144,40 @@ export async function searchProjectGit(
   options: SearchOptions = {},
 ) {
   if (!query.trim()) return { hits: [], truncated: false };
-  if (query.length > 200) throw new HttpError(400, "Запрос длиннее 200 символов");
+  if (query.length > SEARCH_QUERY_MAX)
+    throw new HttpError(400, `Запрос длиннее ${SEARCH_QUERY_MAX} символов`);
   const commit = await resolveRevision(root, rev);
-  const args = ["grep", "-n", "-I", "-z", options.regex ? "-E" : "-F"];
-  if (!options.caseSensitive) args.push("-i");
-  if (options.wholeWord) args.push("-w");
-  args.push("-e", query, commit, "--");
-  let output: string;
-  try {
-    output = await git(root, args, 4 * MAX_BYTES);
-  } catch (error) {
-    const failure = error as { code?: number | string };
-    if (failure.code === 1) return { hits: [], truncated: false };
-    throw new HttpError(400, "Поиск по снимку недоступен. Уточните запрос.");
+  if (multiline(query)) {
+    if (options.regex)
+      throw new HttpError(400, "Многострочное регулярное выражение в снимке не поддерживается");
+    const locator = query.split("\n").find((line) => line.length > 0);
+    if (!locator) return { hits: [], truncated: false };
+    const listed = await grepCommit(root, commit, locator, { ...options, regex: false }, [
+      "-l",
+      "-I",
+      "-z",
+    ]);
+    if (!listed) return { hits: [], truncated: false };
+    const patterns = await excludePatterns();
+    const hits: SearchHit[] = [];
+    let files = 0;
+    for (const row of listed.split("\0")) {
+      const colon = row.indexOf(":");
+      const path = colon < 0 ? "" : row.slice(colon + 1);
+      if (!path || isExcludedPath(path, patterns)) continue;
+      files += 1;
+      if (files > 80) return { hits: hits.slice(0, 200), truncated: true };
+      try {
+        hits.push(...hitsInBlob(path, await gitText(root, commit, path), query, options));
+      } catch {
+        continue;
+      }
+      if (hits.length > 200) break;
+    }
+    return { hits: hits.slice(0, 200), truncated: hits.length > 200 };
   }
+  const output = await grepCommit(root, commit, query, options, ["-n", "-I", "-z"]);
+  if (!output) return { hits: [], truncated: false };
   const patterns = await excludePatterns();
   const hits: SearchHit[] = [];
   for (const row of output.split("\n")) {
