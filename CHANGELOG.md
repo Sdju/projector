@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Hub
+
+- После подключения машины к Hub можно показать QR-код входа: телефон сканирует ссылку и получает сессию без пароля браузера. Код одноразовый, живёт 60 секунд. Генератор есть на странице устройств Hub и в **Настройки → Hub** локального Projector; API — `POST /api/hub/login-link`, вход — `POST /api/hub/session` с `{code}` ([подробно](docs/hub.md)).
+
 ### Поставка
 
 - Публикуемые пакеты переехали в workspace: `@ai-projector/ide`, `@ai-projector/native` и `@ai-projector/hub` теперь лежат в `packages/` со статическими манифестами, `bin` и `exports`. Сборка у каждого пакета своя — `packages/<name>/scripts/build.mjs`, — а `vp run build:distribution` запускает их по порядку. Генерируемые `dist/`, `packages/`, `resources/`, `bin/` и `LICENSE` игнорируются git, поэтому `artifacts/distribution` и генерация манифестов строками больше не нужны. `@ai-projector/native` держит `@ai-projector/core` только в `devDependencies`: в установку потребителя попадает лишь IDE. `build:distribution` заканчивается самопроверкой: версии, собранные файлы, относительные импорты и сами tarball'ы через `pnpm pack`. Workflow публикует `pnpm publish` из каталогов пакетов.

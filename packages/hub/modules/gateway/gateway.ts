@@ -54,6 +54,29 @@ export function createHub(options: HubOptions) {
         else res.writeHead(405, { Allow: "GET, POST, DELETE" }).end();
         return;
       }
+      if (url.pathname === "/api/hub/login-link") {
+        res.setHeader("Cache-Control", "no-store");
+        if (req.method !== "POST") {
+          res.writeHead(405, { Allow: "POST" }).end();
+          return;
+        }
+        const token = req.headers.authorization?.replace(/^Bearer /, "") ?? "";
+        const session = access.allowed(req) && req.headers.origin === options.origin;
+        if (!session && !tunnels.accepts(token)) {
+          res
+            .writeHead(access.allowed(req) ? 403 : 401, { "Content-Type": "application/json" })
+            .end(
+              JSON.stringify({
+                error: access.allowed(req) ? "Нужен Origin Hub" : "Войдите в Projector Hub",
+              }),
+            );
+          return;
+        }
+        res
+          .writeHead(200, { "Content-Type": "application/json" })
+          .end(JSON.stringify(access.issueLoginLink()));
+        return;
+      }
       if (url.pathname === "/login") {
         if (req.method === "POST") await access.login(req, res, true);
         else if (req.method === "GET" || req.method === "HEAD")

@@ -320,6 +320,95 @@ test("device transport isolates page URLs and preserves local/external requests"
   expect(deviceUrl("/api/projects")).toBe("/api/projects");
 });
 
+test("a signed-in session or device token mints a one-time login link for the phone", async () => {
+  const { origin, cookie } = await setup();
+  const endpoint = `${origin}/api/hub/login-link`;
+  const mint = (headers = {}) => fetch(endpoint, { method: "POST", headers });
+  expect((await mint()).status).toBe(401);
+  expect((await mint({ Cookie: cookie })).status).toBe(403);
+  expect((await mint({ Authorization: "Bearer wrong" })).status).toBe(401);
+  const get = await fetch(endpoint, { headers: { Cookie: cookie, Origin: origin } });
+  expect(get.status).toBe(405);
+  expect(get.headers.get("allow")).toBe("POST");
+  const fromDevice = await mint({ Authorization: "Bearer device-secret" });
+  expect(fromDevice.status).toBe(200);
+  expect(fromDevice.headers.get("cache-control")).toBe("no-store");
+  const deviceLink = await fromDevice.json();
+  expect(deviceLink.ttl).toBe(60);
+  expect(deviceLink.url.startsWith(`${origin}/login?code=`)).toBe(true);
+  expect(deviceLink.url).toMatch(/[?&]code=[a-f0-9]{64}$/);
+  expect(JSON.stringify(deviceLink)).not.toContain("browser-secret");
+  expect(JSON.stringify(deviceLink)).not.toContain("device-secret");
+  const page = await fetch(deviceLink.url);
+  expect(page.status).toBe(200);
+  expect(page.headers.get("set-cookie")).toBeNull();
+  expect(await page.text()).toContain("Projector Hub shell");
+  const fromSession = await mint({ Cookie: cookie, Origin: origin });
+  expect(fromSession.status).toBe(200);
+  const sessionLink = await fromSession.json();
+  const code = new URL(sessionLink.url).searchParams.get("code");
+  const login = await fetch(`${origin}/api/hub/session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: origin },
+    body: JSON.stringify({ code }),
+  });
+  expect(login.status).toBe(200);
+  const phoneCookie = login.headers.get("set-cookie").split(";")[0];
+  expect(
+    await fetch(`${origin}/api/hub/session`, { headers: { Cookie: phoneCookie } }).then((r) =>
+      r.json(),
+    ),
+  ).toEqual({ authenticated: true });
+  expect(
+    (
+      await fetch(`${origin}/api/hub/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: origin },
+        body: JSON.stringify({ code }),
+      })
+    ).status,
+  ).toBe(401);
+  const stillValid = await fetch(`${origin}/api/hub/session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: origin },
+    body: JSON.stringify({ code: new URL(deviceLink.url).searchParams.get("code") }),
+  });
+  expect(stillValid.status).toBe(200);
+});
+
+test("expired login links cannot create a session", async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(1_700_000_000_000);
+  const access = new HubAccess("http://localhost:4180", "secret");
+  const { url, ttl } = access.issueLoginLink();
+  expect(ttl).toBe(60);
+  const code = new URL(url).searchParams.get("code");
+  await vi.advanceTimersByTimeAsync(60_001);
+  const response = {
+    headers: {},
+    setHeader(name, value) {
+      this.headers[name] = value;
+    },
+    writeHead() {
+      return this;
+    },
+    end() {},
+  };
+  await access.login(
+    {
+      headers: { host: "localhost:4180", "content-type": "application/json" },
+      socket: { remoteAddress: "127.0.0.1" },
+      async *[Symbol.asyncIterator]() {
+        yield JSON.stringify({ code });
+      },
+    },
+    response,
+  );
+  expect(response.headers["Set-Cookie"]).toBeUndefined();
+  access.close();
+  vi.useRealTimers();
+});
+
 test("only signed-in Hub sessions can explicitly reveal the device token", async () => {
   const { origin, cookie } = await setup();
   const endpoint = `${origin}/api/hub/device-token`;

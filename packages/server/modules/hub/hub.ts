@@ -2,6 +2,7 @@ import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "n
 import { join } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import { isDeviceId, type HubConnection } from "@ai-projector/core/modules/hub/index.ts";
+import { HttpError } from "../http/index.ts";
 import { connectHub, type HubHandlers } from "./connector.ts";
 
 const path = () => join(dataDir(), "hub.json");
@@ -27,6 +28,61 @@ export function hubStatus() {
     connections: state.connections!.map(({ url, deviceId }) => ({ url, deviceId })),
   };
 }
+
+const LOGIN_CODE = /^[a-f0-9]{64}$/;
+
+/** Asks the saved Hub for a one-time browser login URL using the device token. */
+export async function requestHubLoginLink(): Promise<{ url: string; ttl: number }> {
+  const config = state.config;
+  if (!config) throw new HttpError(409, "Сначала подключите Hub");
+  let response: Response;
+  try {
+    response = await fetch(new URL("/api/hub/login-link", config.url), {
+      method: "POST",
+      headers: { Authorization: `Bearer ${config.token}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    throw new HttpError(502, "Не удалось запросить ссылку входа у Hub");
+  }
+  const data: unknown = await response.json().catch(() => ({}));
+  const error =
+    data && typeof data === "object" && "error" in data && typeof data.error === "string"
+      ? data.error
+      : undefined;
+  if (!response.ok)
+    throw new HttpError(
+      response.status === 401 || response.status === 403 ? response.status : 502,
+      error ?? "Hub отклонил ссылку входа",
+    );
+  if (!data || typeof data !== "object")
+    throw new HttpError(502, "Hub вернул некорректную ссылку входа");
+  const { url, ttl } = data as { url?: unknown; ttl?: unknown };
+  if (
+    typeof url !== "string" ||
+    typeof ttl !== "number" ||
+    !Number.isInteger(ttl) ||
+    ttl < 1 ||
+    ttl > 300
+  )
+    throw new HttpError(502, "Hub вернул некорректную ссылку входа");
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new HttpError(502, "Hub вернул некорректную ссылку входа");
+  }
+  if (
+    parsed.origin !== config.url ||
+    parsed.pathname !== "/login" ||
+    parsed.hash ||
+    [...parsed.searchParams.keys()].join() !== "code" ||
+    !LOGIN_CODE.test(parsed.searchParams.get("code") ?? "")
+  )
+    throw new HttpError(502, "Hub вернул некорректную ссылку входа");
+  return { url, ttl };
+}
+
 function connectionConfig(value: unknown): HubConnection | undefined {
   let config: HubConnection | undefined;
   if (value !== null) {

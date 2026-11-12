@@ -99,7 +99,7 @@ export const settingsSections: SettingsSection[] = [
     title: "Hub",
     group: "Подключения",
     description: "Подключение этой машины к общему веб-интерфейсу Projector.",
-    keywords: "hub устройства удалённый доступ туннель токен сервер",
+    keywords: "hub устройства удалённый доступ туннель токен сервер QR телефон вход",
     component: HubSettings,
   },
   {

@@ -1,8 +1,10 @@
 import { afterEach, expect, test, vi } from "vite-plus/test";
-import { readFile, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { bindHub, configureHub, hubStatus } from "../modules/hub/index.ts";
+import { bindHub, configureHub, hubStatus, requestHubLoginLink } from "../modules/hub/index.ts";
 import { dataDir } from "../../core/modules/app-paths/index.ts";
+import { createHub } from "../../hub/modules/gateway/index.ts";
 
 const lifecycle = vi.hoisted(() => ({ events: [] }));
 vi.mock("../modules/hub/connector.ts", () => ({
@@ -104,6 +106,45 @@ test("saved Hubs keep separate secrets and switch a single connector, including 
 function secondWithoutToken({ url, deviceId }) {
   return { url, deviceId };
 }
+
+test("the local machine mints a Hub login link with the saved device token", async () => {
+  const root = await mkdtemp(join(tmpdir(), "projector-hub-link-"));
+  await writeFile(join(root, "index.html"), "<title>hub</title>");
+  await writeFile(join(root, "hub.html"), "<title>hub</title>");
+  const placeholder = createHub({
+    origin: "http://localhost:1",
+    password: "browser-secret",
+    deviceToken: "device-secret",
+    staticRoot: root,
+  });
+  await new Promise((resolve) => placeholder.server.listen(0, "127.0.0.1", resolve));
+  const port = placeholder.server.address().port;
+  placeholder.close();
+  const origin = `http://localhost:${port}`;
+  const hub = createHub({
+    origin,
+    password: "browser-secret",
+    deviceToken: "device-secret",
+    staticRoot: root,
+  });
+  await new Promise((resolve) => hub.server.listen(port, "127.0.0.1", resolve));
+  try {
+    await expect(requestHubLoginLink()).rejects.toMatchObject({
+      status: 409,
+      message: "Сначала подключите Hub",
+    });
+    configureHub({ url: origin, deviceId: "desk", token: "wrong-token" });
+    await expect(requestHubLoginLink()).rejects.toMatchObject({ status: 401 });
+    configureHub({ url: origin, deviceId: "desk", token: "device-secret" });
+    const link = await requestHubLoginLink();
+    expect(link.ttl).toBe(60);
+    expect(link.url.startsWith(`${origin}/login?code=`)).toBe(true);
+  } finally {
+    configureHub(null);
+    hub.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 test("loads legacy single-Hub settings and persists the migrated list on save", async () => {
   configureHub(null);

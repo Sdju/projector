@@ -13,6 +13,7 @@ import UiInline from "../../common/ui/UiInline.vue";
 import UiStatusDot from "../../common/ui/UiStatusDot.vue";
 import UiSpinner from "../../common/ui/UiSpinner.vue";
 import { hubRequest, logoutHub } from "./client.ts";
+import HubLoginLink from "./HubLoginLink.vue";
 import HubToken from "./HubToken.vue";
 
 const authenticated = ref(false);
@@ -25,7 +26,9 @@ const input = ref<UiControlHandle>();
 const devices = ref<HubDevice[]>([]);
 let timer: ReturnType<typeof setInterval> | undefined;
 let disposed = false;
-const next = hubReturnPath(new URLSearchParams(location.search).get("next"));
+const params = new URLSearchParams(location.search);
+const next = hubReturnPath(params.get("next"));
+const invite = params.get("code");
 const commands = useCommandScope("hub", () => ({
   surface: "hub",
   authenticated: authenticated.value,
@@ -116,6 +119,23 @@ commands.scope.registerCommand({
   },
 });
 onMounted(async () => {
+  if (invite) {
+    try {
+      await hubRequest("/api/hub/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: invite }),
+      });
+      if (!disposed) location.replace(next);
+      return;
+    } catch (cause) {
+      if (!disposed) {
+        error.value =
+          cause instanceof Error ? cause.message : "Ссылка входа недействительна или истекла";
+        history.replaceState(null, "", location.pathname);
+      }
+    }
+  }
   await refresh();
   if (disposed) return;
   loading.value = false;
@@ -198,6 +218,7 @@ onBeforeUnmount(() => {
           <UiButton size="sm" :busy="refreshing" @click="commands.run('ide.hub.devices.refresh')"
             >Обновить</UiButton
           >
+          <HubLoginLink />
           <HubToken />
         </template>
       </UiCard>

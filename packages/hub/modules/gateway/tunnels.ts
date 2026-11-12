@@ -45,10 +45,13 @@ export class Tunnels {
     }, 15000);
     this.heartbeat.unref();
   }
+  accepts(token: string): boolean {
+    return timingSafeEqual(hash(token), this.token);
+  }
   upgrade(req: IncomingMessage, socket: Duplex, head: Buffer): void {
     const url = new URL(req.url ?? "/", "http://localhost");
     const token = req.headers.authorization?.replace(/^Bearer /, "") ?? "";
-    if (!timingSafeEqual(hash(token), this.token)) {
+    if (!this.accepts(token)) {
       socket.end("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
       return;
     }

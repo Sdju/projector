@@ -13,6 +13,7 @@ import UiInline from "../../common/ui/UiInline.vue";
 import UiMessage from "../../common/ui/UiMessage.vue";
 import UiStatusDot from "../../common/ui/UiStatusDot.vue";
 import { hubRequest } from "./client.ts";
+import HubLoginLink from "./HubLoginLink.vue";
 interface State {
   connections: { url: string; deviceId: string }[];
   enabled: boolean;
@@ -272,6 +273,7 @@ onBeforeUnmount(() => {
       <UiMessage v-if="error || status" :tone="error ? 'danger' : undefined" role="status">{{
         error || status
       }}</UiMessage>
+      <HubLoginLink :available="!!state?.enabled" />
     </template>
   </section>
 </template>

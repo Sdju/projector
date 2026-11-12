@@ -304,6 +304,8 @@ All chat commands are registered once per workspace (`registerAgentCommands` in 
 ## Hub
 
 - `ide.hub.login` — войти в Hub и вернуться к запрошенному устройству.
+- `ide.hub.loginQr.show` — запросить одноразовую ссылку и показать QR-код входа с телефона.
+- `ide.hub.loginQr.hide` — убрать показанный QR-код и ссылку входа.
 - `ide.hub.logout` — отозвать сессию браузера, включая открытые потоки и WebSocket.
 - `ide.hub.devices.refresh` — перечитать устройства и их доступность.
 - `ide.hub.device.open` с `deviceId` — открыть подключённую машину.

@@ -1,2 +1,2 @@
-export { bindHub, configureHub, hubStatus } from "./hub.ts";
+export { bindHub, configureHub, hubStatus, requestHubLoginLink } from "./hub.ts";
 export { publishHubActivity } from "./connector.ts";
