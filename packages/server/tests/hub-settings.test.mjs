@@ -116,6 +116,7 @@ test("the local machine mints a Hub login link with the saved device token", asy
     password: "browser-secret",
     deviceToken: "device-secret",
     staticRoot: root,
+    dataDir: root,
   });
   await new Promise((resolve) => placeholder.server.listen(0, "127.0.0.1", resolve));
   const port = placeholder.server.address().port;
@@ -126,6 +127,7 @@ test("the local machine mints a Hub login link with the saved device token", asy
     password: "browser-secret",
     deviceToken: "device-secret",
     staticRoot: root,
+    dataDir: root,
   });
   await new Promise((resolve) => hub.server.listen(port, "127.0.0.1", resolve));
   try {

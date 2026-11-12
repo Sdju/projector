@@ -30,7 +30,7 @@ projector-hub
 
 IDE работает в `prod` и не требует Vite+ на целевой машине. `projector mode dev` доступен только из checkout; переключение на `prod` в установленном пакете не запускает сборку. Checkout сохраняет прежние `vp dev`, `./bin/projector` и режимы `dev`/`prod`.
 
-Hub по умолчанию слушает `127.0.0.1:4180`; `PROJECTOR_HUB_HOST`, `PROJECTOR_HUB_PORT` и `PROJECTOR_HUB_ORIGIN` задают адрес. Для удалённого origin нужен HTTPS от reverse proxy, который сохраняет Host и поддерживает WebSocket и SSE. Устройство подключается в **Настройки → Hub** локального Projector. Подробности — в [docs/hub.md](hub.md).
+Hub по умолчанию слушает `127.0.0.1:4180`; `PROJECTOR_HUB_HOST`, `PROJECTOR_HUB_PORT` и `PROJECTOR_HUB_ORIGIN` задают адрес, `PROJECTOR_HUB_DATA` — каталог с хешами refresh. Для удалённого origin нужен HTTPS от reverse proxy, который сохраняет Host и поддерживает WebSocket и SSE. Устройство подключается в **Настройки → Hub** локального Projector. Подробности — в [docs/hub.md](hub.md).
 
 Чтобы добавить пункт меню и команду `projector` после npm-установки:
 

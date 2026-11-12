@@ -1,8 +1,11 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { join } from "node:path";
+import { hubDataDir, RefreshStore } from "./store.ts";
 
 const digest = (value: string) => createHash("sha256").update(value).digest();
 const LIFETIME = 8 * 60 * 60 * 1000;
+const REFRESH_AGE = 30 * 24 * 60 * 60;
 const LINK_TTL = 60_000;
 const LINK_LIMIT = 8;
 const LOGIN_CODE = /^[a-f0-9]{64}$/;
@@ -27,11 +30,14 @@ export class HubAccess {
   private sessions = new Map<string, Session>();
   private attempts = new Map<string, { count: number; until: number }>();
   private tickets = new Map<string, Ticket>();
+  private bound = new WeakMap<IncomingMessage, string>();
+  private store: RefreshStore;
   private password: Buffer;
   readonly origin: string;
-  constructor(origin: string, password: string) {
+  constructor(origin: string, password: string, dataDir = hubDataDir()) {
     this.origin = origin;
     this.password = digest(password);
+    this.store = new RefreshStore(join(dataDir, "refresh.json"), this.password.toString("hex"));
   }
   trusted(req: IncomingMessage): boolean {
     return (
@@ -40,10 +46,26 @@ export class HubAccess {
     );
   }
   private sessionId(req: IncomingMessage): string {
-    return req.headers.cookie?.match(/(?:^|;\s*)projector_hub=([a-f0-9]{64})(?:;|$)/)?.[1] ?? "";
+    return (
+      this.bound.get(req) ??
+      req.headers.cookie?.match(/(?:^|;\s*)projector_hub=([a-f0-9]{64})(?:;|$)/)?.[1] ??
+      ""
+    );
+  }
+  private refreshId(req: IncomingMessage): string {
+    return req.headers.cookie?.match(/(?:^|;\s*)projector_hub_rt=([a-f0-9]{64})(?:;|$)/)?.[1] ?? "";
   }
   allowed(req: IncomingMessage): boolean {
     return this.trusted(req) && (this.sessions.get(this.sessionId(req))?.expires ?? 0) > Date.now();
+  }
+  /** Restores an expired session from a rotating refresh cookie and binds it to this request. */
+  allow(req: IncomingMessage, res: ServerResponse): boolean {
+    if (this.allowed(req)) return true;
+    if (!this.trusted(req)) return false;
+    const rotated = this.store.consume(this.refreshId(req));
+    if (!rotated) return false;
+    this.issue(req, res, rotated);
+    return true;
   }
   track(req: IncomingMessage, connection: Connection): boolean {
     const session = this.sessions.get(this.sessionId(req));
@@ -62,8 +84,14 @@ export class HubAccess {
     this.sessions.delete(id);
     for (const connection of session.connections) connection.destroy();
   }
-  private cookie(id: string): string {
-    return `projector_hub=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${id ? 28800 : 0}${this.origin.startsWith("https:") ? "; Secure" : ""}`;
+  private cookie(name: string, value: string, maxAge: number): string {
+    return `${name}=${value}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${this.origin.startsWith("https:") ? "; Secure" : ""}`;
+  }
+  private setCookies(res: ServerResponse, session: string, refresh: string): void {
+    res.setHeader("Set-Cookie", [
+      this.cookie("projector_hub", session, session ? LIFETIME / 1000 : 0),
+      this.cookie("projector_hub_rt", refresh, refresh ? REFRESH_AGE : 0),
+    ]);
   }
   private dropTicket(id: string): void {
     const ticket = this.tickets.get(id);
@@ -82,16 +110,24 @@ export class HubAccess {
     this.dropTicket(id);
     return true;
   }
-  private establish(req: IncomingMessage, res: ServerResponse, redirect: boolean): void {
+  private issue(
+    req: IncomingMessage,
+    res: ServerResponse,
+    refresh: { token: string; family: string },
+  ): void {
     for (const [id, session] of this.sessions) if (session.expires <= Date.now()) this.revoke(id);
-    // Signing in again replaces the previous session of this browser.
     this.revoke(this.sessionId(req));
     if (this.sessions.size >= 256) this.revoke(this.sessions.keys().next().value!);
     const id = randomBytes(32).toString("hex");
     const timer = setTimeout(() => this.revoke(id), LIFETIME);
     timer.unref();
     this.sessions.set(id, { expires: Date.now() + LIFETIME, connections: new Set(), timer });
-    res.setHeader("Set-Cookie", this.cookie(id));
+    this.bound.set(req, id);
+    this.setCookies(res, id, refresh.token);
+  }
+  private establish(req: IncomingMessage, res: ServerResponse, redirect: boolean): void {
+    this.store.revoke(this.refreshId(req));
+    this.issue(req, res, this.store.issue());
     if (redirect) res.writeHead(303, { Location: "/", "Cache-Control": "no-store" }).end();
     else json(res, 200, { authenticated: true });
   }
@@ -117,7 +153,8 @@ export class HubAccess {
   }
   logout(req: IncomingMessage, res: ServerResponse): void {
     this.revoke(this.sessionId(req));
-    res.setHeader("Set-Cookie", this.cookie(""));
+    this.store.revoke(this.refreshId(req));
+    this.setCookies(res, "", "");
     json(res, 200, { authenticated: false });
   }
   async login(req: IncomingMessage, res: ServerResponse, redirect = false): Promise<void> {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vite-plus/test";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { once } from "node:events";
@@ -24,9 +24,41 @@ const until = async (check, timeoutMs = 8000) => {
   throw new Error("condition not met in time");
 };
 afterEach(async () => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   for (const close of cleanups.splice(0).reverse()) await close();
 });
+function cookies(response) {
+  const list =
+    typeof response.headers.getSetCookie === "function"
+      ? response.headers.getSetCookie()
+      : Array.isArray(response.headers["Set-Cookie"])
+        ? response.headers["Set-Cookie"]
+        : response.headers["Set-Cookie"]
+          ? [response.headers["Set-Cookie"]]
+          : [];
+  return list
+    .map((item) => item.split(";")[0])
+    .filter(Boolean)
+    .join("; ");
+}
+function mockRes() {
+  return {
+    headers: {},
+    setHeader(name, value) {
+      this.headers[name] = value;
+    },
+    writeHead() {
+      return this;
+    },
+    end() {},
+  };
+}
+async function dataDir() {
+  const dir = await mkdtemp(join(tmpdir(), "projector-hub-data-"));
+  cleanups.push(() => rm(dir, { recursive: true, force: true }));
+  return dir;
+}
 async function setup({ connector = true } = {}) {
   const root = await mkdtemp(join(tmpdir(), "projector-hub-"));
   cleanups.push(() => rm(root, { recursive: true, force: true }));
@@ -38,6 +70,7 @@ async function setup({ connector = true } = {}) {
     password: "browser-secret",
     deviceToken: "device-secret",
     staticRoot: root,
+    dataDir: root,
   });
   await new Promise((resolve) => hub.server.listen(0, "127.0.0.1", resolve));
   const port = hub.server.address().port;
@@ -48,6 +81,7 @@ async function setup({ connector = true } = {}) {
     password: "browser-secret",
     deviceToken: "device-secret",
     staticRoot: root,
+    dataDir: root,
   });
   await new Promise((resolve) => active.server.listen(port, "127.0.0.1", resolve));
   cleanups.push(() => active.close());
@@ -120,13 +154,15 @@ async function setup({ connector = true } = {}) {
     body: "password=browser-secret",
     redirect: "manual",
   });
-  const cookie = login.headers.get("set-cookie").split(";")[0];
-  if (!stop) return { origin, cookie, stop };
+  const cookie = cookies(login);
+  expect(cookie).toMatch(/projector_hub=/);
+  expect(cookie).toMatch(/projector_hub_rt=/);
+  if (!stop) return { origin, cookie, hub: active, root, port, stop };
   for (let i = 0; i < 100; i++) {
     const list = await fetch(`${origin}/api/hub/devices`, { headers: { Cookie: cookie } }).then(
       (res) => res.json(),
     );
-    if (list.devices.length) return { origin, cookie, stop };
+    if (list.devices.length) return { origin, cookie, hub: active, root, port, stop };
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
   throw new Error("Connector did not register");
@@ -353,7 +389,8 @@ test("a signed-in session or device token mints a one-time login link for the ph
     body: JSON.stringify({ code }),
   });
   expect(login.status).toBe(200);
-  const phoneCookie = login.headers.get("set-cookie").split(";")[0];
+  const phoneCookie = cookies(login);
+  expect(phoneCookie).toMatch(/projector_hub_rt=/);
   expect(
     await fetch(`${origin}/api/hub/session`, { headers: { Cookie: phoneCookie } }).then((r) =>
       r.json(),
@@ -377,23 +414,15 @@ test("a signed-in session or device token mints a one-time login link for the ph
 });
 
 test("expired login links cannot create a session", async () => {
+  const dir = await dataDir();
   vi.useFakeTimers();
   vi.setSystemTime(1_700_000_000_000);
-  const access = new HubAccess("http://localhost:4180", "secret");
+  const access = new HubAccess("http://localhost:4180", "secret", dir);
   const { url, ttl } = access.issueLoginLink();
   expect(ttl).toBe(60);
   const code = new URL(url).searchParams.get("code");
   await vi.advanceTimersByTimeAsync(60_001);
-  const response = {
-    headers: {},
-    setHeader(name, value) {
-      this.headers[name] = value;
-    },
-    writeHead() {
-      return this;
-    },
-    end() {},
-  };
+  const response = mockRes();
   await access.login(
     {
       headers: { host: "localhost:4180", "content-type": "application/json" },
@@ -478,18 +507,10 @@ test("Hub serves a public Vue shell, returns JSON login errors and revokes live 
 });
 
 test("session expiry closes its live connections and never grants access to other sessions", async () => {
+  const dir = await dataDir();
   vi.useFakeTimers();
-  const access = new HubAccess("http://localhost:4180", "secret");
-  const response = {
-    headers: {},
-    setHeader(name, value) {
-      this.headers[name] = value;
-    },
-    writeHead() {
-      return this;
-    },
-    end() {},
-  };
+  const access = new HubAccess("http://localhost:4180", "secret", dir);
+  const response = mockRes();
   const req = {
     headers: { host: "localhost:4180", "content-type": "application/json" },
     socket: { remoteAddress: "127.0.0.1" },
@@ -498,7 +519,7 @@ test("session expiry closes its live connections and never grants access to othe
     },
   };
   await access.login(req, response);
-  req.headers.cookie = response.headers["Set-Cookie"].split(";")[0];
+  req.headers.cookie = cookies(response);
   const destroy = vi.fn();
   const connection = { destroy, once() {} };
   expect(access.track(req, connection)).toBe(true);
@@ -507,6 +528,144 @@ test("session expiry closes its live connections and never grants access to othe
   expect(access.allowed(req)).toBe(false);
   access.close();
   expect(destroy).toHaveBeenCalledOnce();
+});
+
+test("refresh cookie restores a session after Hub restart without the password", async () => {
+  const { origin, cookie, root } = await setup({ connector: false });
+  const stored = await readFile(join(root, "refresh.json"), "utf8");
+  const refresh = cookie.match(/projector_hub_rt=([a-f0-9]{64})/)[1];
+  expect(stored).not.toContain(refresh);
+  expect(JSON.parse(stored).tokens[0].id).toMatch(/^[a-f0-9]{64}$/);
+  if (process.platform !== "win32")
+    expect((await stat(join(root, "refresh.json"))).mode & 0o777).toBe(0o600);
+  const restored = await fetch(`${origin}/api/hub/session`, {
+    headers: { Cookie: `projector_hub_rt=${refresh}` },
+  });
+  expect(await restored.json()).toEqual({ authenticated: true });
+  const rotated = cookies(restored);
+  expect(rotated).toMatch(/projector_hub=/);
+  expect(rotated).toMatch(/projector_hub_rt=/);
+  expect(rotated).not.toContain(refresh);
+  expect(
+    await fetch(`${origin}/api/hub/devices`, { headers: { Cookie: rotated } }).then((r) =>
+      r.json(),
+    ),
+  ).toEqual({ devices: [] });
+  const dir = await dataDir();
+  const first = new HubAccess("http://localhost:4180", "secret", dir);
+  const login = mockRes();
+  await first.login(
+    {
+      headers: { host: "localhost:4180", "content-type": "application/json" },
+      socket: { remoteAddress: "127.0.0.1" },
+      async *[Symbol.asyncIterator]() {
+        yield JSON.stringify({ password: "secret" });
+      },
+    },
+    login,
+  );
+  const jar = cookies(login);
+  first.close();
+  const again = new HubAccess("http://localhost:4180", "secret", dir);
+  const replay = mockRes();
+  expect(
+    again.allow(
+      { headers: { host: "localhost:4180", cookie: jar }, socket: { remoteAddress: "127.0.0.1" } },
+      replay,
+    ),
+  ).toBe(true);
+  expect(cookies(replay)).toMatch(/projector_hub_rt=/);
+  again.close();
+});
+
+test("expired session is restored from a rotating refresh token until reuse after grace", async () => {
+  const dir = await dataDir();
+  vi.useFakeTimers();
+  vi.setSystemTime(1_700_000_000_000);
+  const access = new HubAccess("http://localhost:4180", "secret", dir);
+  const login = mockRes();
+  const req = {
+    headers: { host: "localhost:4180", "content-type": "application/json" },
+    socket: { remoteAddress: "127.0.0.1" },
+    async *[Symbol.asyncIterator]() {
+      yield JSON.stringify({ password: "secret" });
+    },
+  };
+  await access.login(req, login);
+  const jar = cookies(login);
+  const firstRefresh = jar.match(/projector_hub_rt=([a-f0-9]{64})/)[1];
+  req.headers.cookie = jar;
+  await vi.advanceTimersByTimeAsync(8 * 60 * 60 * 1000 + 1);
+  expect(access.allowed(req)).toBe(false);
+  const first = mockRes();
+  const second = mockRes();
+  expect(access.allow(req, first)).toBe(true);
+  expect(access.allow({ ...req, headers: { ...req.headers } }, second)).toBe(true);
+  expect(cookies(first).match(/projector_hub_rt=([a-f0-9]{64})/)[1]).toBe(
+    cookies(second).match(/projector_hub_rt=([a-f0-9]{64})/)[1],
+  );
+  const rotated = cookies(first);
+  expect(rotated).not.toContain(firstRefresh);
+  await vi.advanceTimersByTimeAsync(30_001);
+  expect(
+    access.allow(
+      { headers: { host: "localhost:4180", cookie: jar }, socket: req.socket },
+      mockRes(),
+    ),
+  ).toBe(false);
+  const refreshOnly = rotated.split("; ").find((part) => part.startsWith("projector_hub_rt="));
+  expect(
+    access.allow(
+      { headers: { host: "localhost:4180", cookie: refreshOnly }, socket: req.socket },
+      mockRes(),
+    ),
+  ).toBe(false);
+  access.close();
+  const restarted = new HubAccess("http://localhost:4180", "secret", dir);
+  expect(
+    restarted.allow(
+      { headers: { host: "localhost:4180", cookie: rotated }, socket: req.socket },
+      mockRes(),
+    ),
+  ).toBe(false);
+  restarted.close();
+});
+
+test("changing the Hub password invalidates persisted refresh tokens", async () => {
+  const dir = await dataDir();
+  const access = new HubAccess("http://localhost:4180", "secret", dir);
+  const login = mockRes();
+  await access.login(
+    {
+      headers: { host: "localhost:4180", "content-type": "application/json" },
+      socket: { remoteAddress: "127.0.0.1" },
+      async *[Symbol.asyncIterator]() {
+        yield JSON.stringify({ password: "secret" });
+      },
+    },
+    login,
+  );
+  const jar = cookies(login);
+  access.close();
+  const changed = new HubAccess("http://localhost:4180", "other", dir);
+  expect(
+    changed.allow(
+      { headers: { host: "localhost:4180", cookie: jar }, socket: { remoteAddress: "127.0.0.1" } },
+      mockRes(),
+    ),
+  ).toBe(false);
+  changed.close();
+});
+
+test("logout revokes the refresh family so the browser cannot restore", async () => {
+  const { origin, cookie } = await setup({ connector: false });
+  await fetch(`${origin}/api/hub/session`, { method: "DELETE", headers: { Cookie: cookie } });
+  expect(
+    await fetch(`${origin}/api/hub/session`, { headers: { Cookie: cookie } }).then((r) => r.json()),
+  ).toEqual({ authenticated: false });
+  expect((await fetch(`${origin}/api/hub/devices`, { headers: { Cookie: cookie } })).status).toBe(
+    401,
+  );
 });
 
 test.each([

@@ -9,6 +9,7 @@ export interface HubOptions {
   password: string;
   deviceToken: string;
   staticRoot: string;
+  dataDir?: string;
 }
 const route = (path: string) => /^\/api\/devices\/([a-z0-9][a-z0-9-]{0,62})(\/.*)$/.exec(path);
 export function createHub(options: HubOptions) {
@@ -21,7 +22,7 @@ export function createHub(options: HubOptions) {
     throw new Error("Для удалённого Hub требуется HTTPS origin");
   if (!options.password || !options.deviceToken || options.password === options.deviceToken)
     throw new Error("Hub требует разные credentials браузера и устройств");
-  const access = new HubAccess(options.origin, options.password);
+  const access = new HubAccess(options.origin, options.password, options.dataDir);
   const tunnels = new Tunnels(options.deviceToken);
   const server = createServer((req, res) => {
     void (async () => {
@@ -45,11 +46,12 @@ export function createHub(options: HubOptions) {
         return;
       }
       if (url.pathname === "/api/hub/session") {
-        if (req.method === "GET")
+        if (req.method === "GET") {
+          const authenticated = access.allow(req, res);
           res
             .writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" })
-            .end(JSON.stringify({ authenticated: access.allowed(req) }));
-        else if (req.method === "POST") await access.login(req, res);
+            .end(JSON.stringify({ authenticated }));
+        } else if (req.method === "POST") await access.login(req, res);
         else if (req.method === "DELETE") access.logout(req, res);
         else res.writeHead(405, { Allow: "GET, POST, DELETE" }).end();
         return;
@@ -61,7 +63,7 @@ export function createHub(options: HubOptions) {
           return;
         }
         const token = req.headers.authorization?.replace(/^Bearer /, "") ?? "";
-        const session = access.allowed(req) && req.headers.origin === options.origin;
+        const session = access.allow(req, res) && req.headers.origin === options.origin;
         if (!session && !tunnels.accepts(token)) {
           res
             .writeHead(access.allowed(req) ? 403 : 401, { "Content-Type": "application/json" })
@@ -84,7 +86,7 @@ export function createHub(options: HubOptions) {
         else res.writeHead(405, { Allow: "GET, HEAD, POST" }).end();
         return;
       }
-      if (!access.allowed(req)) {
+      if (!access.allow(req, res)) {
         if (url.pathname.startsWith("/api/"))
           res
             .writeHead(401, {
