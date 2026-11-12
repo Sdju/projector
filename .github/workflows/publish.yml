@@ -64,13 +64,25 @@ jobs:
             local directory="$1"
             local name="$2"
             local version
+            local output
             version="$(node -p "require('./${directory}/package.json').version")"
             if npm view "${name}@${version}" version >/dev/null 2>&1; then
               echo "${name}@${version} is already published, skipping"
               return
             fi
             # Build output is gitignored, so the checkout is clean: no git checks are needed.
-            (cd "${directory}" && pnpm publish --access public --provenance --no-git-checks)
+            if output="$(cd "${directory}" && pnpm publish --access public --provenance --no-git-checks 2>&1)"; then
+              printf '%s\n' "${output}"
+              return
+            fi
+            printf '%s\n' "${output}"
+            # The write side accepts a version at once, while the read side can keep answering 404
+            # for minutes. A repeat publish then fails only because the version already exists.
+            if grep -q "cannot publish over the previously published versions" <<<"${output}"; then
+              echo "${name}@${version} is already on the registry, the read side still lags behind"
+              return
+            fi
+            return 1
           }
           publish_if_missing packages/ide "@ai-projector/ide"
           publish_if_missing packages/native "@ai-projector/native"
