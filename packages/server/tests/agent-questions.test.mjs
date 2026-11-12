@@ -193,7 +193,12 @@ test("a question an ACP agent asks reaches the user through runAgent and the ans
   const cwd = await mkdtemp(join(tmpdir(), "projector-ask-"));
   const saved = acpProgram("opencode");
   process.env.FAKE_ACP_ASK = "form";
-  registerAcpProgram({ ...saved, command: process.execPath, args: [fake] });
+  registerAcpProgram({
+    ...saved,
+    binary: undefined,
+    command: process.execPath,
+    args: [fake],
+  });
   try {
     const asked = [];
     const events = [];
