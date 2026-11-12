@@ -16,6 +16,9 @@ import { hubRequest, logoutHub } from "./client.ts";
 import HubLoginLink from "./HubLoginLink.vue";
 import HubToken from "./HubToken.vue";
 
+// The icon lives in `public/`: as a bound value it stays a plain URL instead of an asset import,
+// which the Vue compiler would turn into a root-relative module id that Windows cannot resolve.
+const appIcon = "/favicon.svg";
 const authenticated = ref(false);
 const loading = ref(true);
 const busy = ref(false);
@@ -163,7 +166,7 @@ onBeforeUnmount(() => {
   >
     <div class="content">
       <header class="brand">
-        <img src="/favicon.svg" alt="" width="28" height="28" /><span
+        <img :src="appIcon" alt="" width="28" height="28" /><span
           >projector<span class="hub-label">hub</span></span
         >
       </header>
