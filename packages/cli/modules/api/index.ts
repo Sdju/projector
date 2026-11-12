@@ -62,6 +62,8 @@ export interface RequestOptions {
   method?: string;
   body?: unknown;
   timeout?: number;
+  /** Extra attempts after a dropped socket, e.g. while the dev server restarts. */
+  retries?: number;
 }
 
 export interface ProjectorApi {
@@ -77,10 +79,18 @@ export interface ProjectorApi {
   app(action: "restart" | "quit", body?: unknown): Promise<AppActionResult>;
 }
 
-/** Minimal client for the local Projector server. No retries: the CLI already starts it. */
+const sleep = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
+
+/** A socket that never reached the handler: a restarting dev server, not a rejected request. */
+function interrupted(error: unknown): boolean {
+  if (error instanceof TypeError) return true;
+  const name = (error as { name?: unknown } | null)?.name;
+  return name === "TimeoutError" || name === "AbortError";
+}
+
+/** Minimal client for the local Projector server. Opening a window may outlast a dev restart. */
 export function createApi(baseUrl: string): ProjectorApi {
-  async function request<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
-    const { method = "GET", body, timeout = 15_000 } = options;
+  async function send<T>(path: string, method: string, body: unknown, timeout: number): Promise<T> {
     const response = await fetch(baseUrl + path, {
       method,
       headers: body === undefined ? undefined : { "Content-Type": "application/json" },
@@ -108,6 +118,19 @@ export function createApi(baseUrl: string): ProjectorApi {
     return data as T;
   }
 
+  async function request<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
+    const { method = "GET", body, timeout = 15_000, retries = 0 } = options;
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await send<T>(path, method, body, timeout);
+      } catch (error) {
+        // HMR restarts close the socket mid-launch; the next daemon generation answers instead.
+        if (attempt >= retries || !interrupted(error)) throw error;
+        await sleep(Math.min(1000 * 2 ** attempt, 8000));
+      }
+    }
+  }
+
   async function health(): Promise<HealthInfo | null> {
     try {
       const response = await fetch(`${baseUrl}/api/health`, {
@@ -130,7 +153,14 @@ export function createApi(baseUrl: string): ProjectorApi {
     search: (query) =>
       request<SearchResponse>(`/api/launcher/search?${new URLSearchParams({ q: query })}`),
     launch: (body) => request<LaunchResponse>("/api/launcher/launch", { method: "POST", body }),
-    open: (body) => request<AppOpenResult>("/api/app/open", { method: "POST", body }),
+    open: (body) =>
+      // The palette host compiles its shell before answering; the server itself waits up to 45 s.
+      request<AppOpenResult>("/api/app/open", {
+        method: "POST",
+        body,
+        timeout: 60_000,
+        retries: 4,
+      }),
     start: (projectId, body) =>
       request<RuntimeResponse>(`/api/projects/${encodeURIComponent(projectId)}/start`, {
         method: "POST",

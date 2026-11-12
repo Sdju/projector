@@ -119,7 +119,7 @@ export function createServerControl({
     throw new Error("Запуск уже выполняется");
   }
 
-  async function waitUntilReady(timeoutMs = 30000, daemonPid?: number): Promise<void> {
+  async function waitUntilReady(timeoutMs = 90000, daemonPid?: number): Promise<void> {
     const started = Date.now();
     while (Date.now() - started < timeoutMs) {
       if (await health()) return;
@@ -157,7 +157,7 @@ export function createServerControl({
       serverProcesses.assertDevToolchain(vp);
       await serverProcesses.ensureBuilt(vp, launchMode());
       const daemonPid = serverProcesses.startDaemon(vp);
-      await waitUntilReady(30000, daemonPid);
+      await waitUntilReady(90000, daemonPid);
       const info = await serverInfo();
       if (!info) throw new Error(`Сервер не ответил после запуска. См. ${serverLogPath()}`);
       return info;
@@ -249,7 +249,7 @@ export function createServerControl({
       await openApp({}, "quit");
       await os.processes.waitForExit(info.pid, 15000);
       const daemonPid = serverProcesses.startDaemon(vp);
-      await waitUntilReady(30000, daemonPid);
+      await waitUntilReady(90000, daemonPid);
       await openApp({ tray: true });
       const next = await serverInfo();
       if (modeOptions.json)

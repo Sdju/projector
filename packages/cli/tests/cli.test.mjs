@@ -227,3 +227,38 @@ test("CLI reads projects from disk when the server is stopped", async () => {
     projects: [{ id: "offline" }],
   });
 });
+
+test("CLI repeats the palette request when a dev restart drops the socket", async () => {
+  let base = "";
+  let opens = 0;
+  const server = createServer((req, res) => {
+    const reply = (value, status = 200) => {
+      res.writeHead(status, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(value));
+    };
+    if (req.url === "/api/health")
+      return reply({ ok: true, app: "projector", pid: 1, url: base, mode: "dev" });
+    if (req.url === "/api/app/open" && req.method === "POST") {
+      opens += 1;
+      // The first attempt lands in the gap between two server generations.
+      if (opens === 1) return req.socket.destroy();
+      req.resume();
+      return reply({ ok: true, url: base, mode: "browser" });
+    }
+    return reply({ error: "not found" }, 404);
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  base = `http://127.0.0.1:${server.address().port}`;
+  onTestFinished(async () => {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  });
+
+  const { stdout } = await run(process.execPath, [launch, "--json"], {
+    env: { ...process.env, PROJECTOR_URL: base },
+    timeout: 20_000,
+  });
+  expect(opens).toBe(2);
+  expect(JSON.parse(stdout)).toMatchObject({ ok: true, mode: "browser" });
+});
