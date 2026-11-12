@@ -35,7 +35,7 @@ interface Candidate {
   source: "managed" | "direct";
 }
 
-const currentProjectorVersion = "0.11.0";
+const currentProjectorVersion = "0.12.0";
 let applyAgentRegistry: PluginAgentApply = () => [];
 
 /** The composition owns the agent registry; discovery only asks it to reconcile the catalog. */

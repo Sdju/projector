@@ -1,6 +1,6 @@
 {
   "name": "@ai-projector/ide",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Projector web IDE, terminals and agents without GTK",
   "keywords": [
     "agents",
