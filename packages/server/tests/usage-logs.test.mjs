@@ -22,6 +22,7 @@ const now = Date.now();
 const projectPath = "/tmp/projector-usage-logs-project";
 let directory;
 let previousHome;
+let previousProfile;
 let previousData;
 let codexFile;
 
@@ -46,8 +47,11 @@ const tokenCount = (ordinal, at, input, cached, output) =>
 beforeAll(async () => {
   directory = await mkdtemp(join(tmpdir(), "projector-usage-logs-"));
   previousHome = process.env.HOME;
+  previousProfile = process.env.USERPROFILE;
   previousData = process.env.XDG_DATA_HOME;
+  // `os.homedir()` reads HOME on POSIX and USERPROFILE on Windows.
   process.env.HOME = join(directory, "home");
+  process.env.USERPROFILE = process.env.HOME;
   process.env.XDG_DATA_HOME = join(directory, "data");
   await mkdir(process.env.HOME, { recursive: true });
   registerUsageLogReader(codexUsageLog);
@@ -218,6 +222,8 @@ afterAll(async () => {
   resetUsageLogScan();
   if (previousHome === undefined) delete process.env.HOME;
   else process.env.HOME = previousHome;
+  if (previousProfile === undefined) delete process.env.USERPROFILE;
+  else process.env.USERPROFILE = previousProfile;
   if (previousData === undefined) delete process.env.XDG_DATA_HOME;
   else process.env.XDG_DATA_HOME = previousData;
   await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
