@@ -27,9 +27,17 @@ async function withScenarios(project: Project): Promise<Project> {
     // A broken or unsafe file must not make the whole catalog unreadable.
     return project;
   }
-  if (stored) return { ...project, ...stored };
-  if (!Array.isArray(project.commands) || project.commands.length === 0) return project;
-  const legacy = scenariosOf(project);
+  if (stored?.commands.length) return { ...project, ...stored };
+  const legacy =
+    Array.isArray(project.commands) && project.commands.length > 0
+      ? scenariosOf(project)
+      : undefined;
+  if (!legacy) return project;
+  // An empty file cannot describe a runnable project: restore what the catalog still remembers.
+  if (stored) {
+    await writeProjectScenarios(project.path, legacy).catch(() => {});
+    return project;
+  }
   if (!migratedScenarios.has(project.path)) {
     migratedScenarios.add(project.path);
     await writeProjectScenarios(project.path, legacy).catch(() => {});
@@ -120,6 +128,8 @@ export async function updateProjects(update: (projects: Project[]) => void): Pro
         scenariosChanged(previous.scenarios, scenarios);
       if (!(await isDirectory(project.path))) continue;
       if (!changed && (await persistsScenarios(project))) continue;
+      // An empty set never goes to disk: a project without commands keeps no scenarios file.
+      if (scenarios.commands.length === 0) continue;
       await writeProjectScenarios(project.path, scenarios);
     }
     await saveProjects(projects);

@@ -33,6 +33,7 @@ export async function writeProjectScenarios(
   root: string,
   scenarios: ProjectScenarios,
 ): Promise<void> {
+  if (scenarios.commands.length === 0) throw new Error("Нужна хотя бы одна команда");
   const file = join(root, PROJECT_SCENARIOS_FILE);
   const directory = dirname(file);
   const info = await stat(root).catch(() => null);
