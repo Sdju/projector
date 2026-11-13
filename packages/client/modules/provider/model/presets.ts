@@ -1,4 +1,9 @@
-import type { ProviderKind, ThinkingStyle } from "./types.ts";
+import type {
+  BuiltinProviderKind,
+  ProviderKind,
+  ProviderKindInfo,
+  ThinkingStyle,
+} from "./types.ts";
 
 export interface ProviderPreset {
   label: string;
@@ -13,7 +18,7 @@ export interface ProviderPreset {
   hint: string;
 }
 
-export const PROVIDER_PRESETS: Record<ProviderKind, ProviderPreset> = {
+export const PROVIDER_PRESETS: Record<BuiltinProviderKind, ProviderPreset> = {
   deepseek: {
     thinking: "deepseek",
     label: "DeepSeek",
@@ -52,7 +57,22 @@ export const PROVIDER_PRESETS: Record<ProviderKind, ProviderPreset> = {
   },
 };
 
-export const PROVIDER_KINDS = Object.keys(PROVIDER_PRESETS) as ProviderKind[];
+export const BUILTIN_PROVIDER_KINDS = Object.keys(PROVIDER_PRESETS) as BuiltinProviderKind[];
+
+/** A plugin kind gets a plain OpenAI-compatible preset with the URL the plugin named. */
+export function providerPreset(kind: ProviderKind, info?: ProviderKindInfo): ProviderPreset {
+  const preset = PROVIDER_PRESETS[kind as BuiltinProviderKind];
+  if (preset) return preset;
+  return {
+    label: info?.title ?? kind,
+    name: info?.title ?? kind,
+    url: info?.url ?? "",
+    model: info?.model ?? "",
+    keyPlaceholder: "API key",
+    thinking: "none",
+    hint: info?.description ?? "Вид провайдера и его баланс предоставил плагин.",
+  };
+}
 
 /** Names of the thinking dialects in the provider settings. */
 export const THINKING_STYLES: Array<{ value: ThinkingStyle; label: string }> = [

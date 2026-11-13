@@ -1,6 +1,7 @@
 import type {
   AvailableTheme,
   PluginAgentContribution,
+  PluginBalanceContribution,
   PluginBrowserEntry,
   PluginLanguageContribution,
   PluginPanelContribution,
@@ -25,6 +26,7 @@ export interface PluginInfo {
   diagnostics: { message: string }[];
   themes: AvailableTheme[];
   agents: PluginAgentContribution[];
+  balances: PluginBalanceContribution[];
   languages: PluginLanguageContribution[];
   panels: PluginPanelContribution[];
   tabs: PluginTabContribution[];
@@ -57,9 +59,13 @@ function normalizeCatalog(catalog: PluginCatalog): PluginCatalog {
       ...plugin,
       trusted: plugin.trusted === true,
       requiresTrust:
-        plugin.requiresTrust ?? (plugin.code === true || (plugin.agents?.length ?? 0) > 0),
+        plugin.requiresTrust ??
+        (plugin.code === true ||
+          (plugin.agents?.length ?? 0) > 0 ||
+          (plugin.balances?.length ?? 0) > 0),
       code: plugin.code === true,
       agents: Array.isArray(plugin.agents) ? plugin.agents : [],
+      balances: Array.isArray(plugin.balances) ? plugin.balances : [],
       languages: Array.isArray(plugin.languages) ? plugin.languages : [],
       panels: Array.isArray(plugin.panels) ? plugin.panels : [],
       tabs: Array.isArray(plugin.tabs) ? plugin.tabs : [],

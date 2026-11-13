@@ -8,11 +8,23 @@ export { assertKeyStore, useProviderVault } from "./provider-store.ts";
 
 export { listProviderModels } from "./model-list.ts";
 export { pickModel } from "./models.ts";
-export { providerBalance } from "./balance.ts";
-export { inferProviderKind } from "./kinds.ts";
+export { pluginBalanceKinds, registerBalanceResolver } from "./balance-registry.ts";
+export type {
+  ProviderBalanceContext,
+  ProviderBalanceReading,
+  ProviderBalanceResolver,
+} from "./balance-registry.ts";
+export { providerBalance, providerBalances } from "./balance.ts";
+export { inferProviderKind, isBuiltinProviderKind, isProviderKind } from "./kinds.ts";
 
 export type { AgentHistoryTool, AgentHistoryTurn, ProviderModel } from "./types.ts";
-export type { OpenAIProviderWrite, ProviderBalance, ProviderKind } from "./types.ts";
+export type {
+  BuiltinProviderKind,
+  OpenAIProviderWrite,
+  ProviderBalance,
+  ProviderKind,
+  ProviderKindInfo,
+} from "./types.ts";
 
 export {
   defaultThinkingStyle,

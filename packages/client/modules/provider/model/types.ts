@@ -1,4 +1,7 @@
-export type ProviderKind = "custom" | "local" | "deepseek" | "qwencloud";
+export type BuiltinProviderKind = "custom" | "local" | "deepseek" | "qwencloud";
+
+/** Built-in presets plus kinds contributed by trusted balance plugins. */
+export type ProviderKind = BuiltinProviderKind | (string & {});
 
 /** How the provider is asked to think; the server turns the chosen level into its own request fields. */
 export type ThinkingStyle =
@@ -44,9 +47,19 @@ export interface OpenAIProviderPublic {
   hasApiKey: boolean;
 }
 
+export interface ProviderKindInfo {
+  kind: string;
+  title: string;
+  description?: string;
+  url?: string;
+  model?: string;
+  plugin?: string;
+}
+
 export interface OpenAIProvidersPublicState {
   activeProviderId: string | null;
   providers: OpenAIProviderPublic[];
+  balanceKinds: ProviderKindInfo[];
 }
 
 export interface ProviderBalanceEntry {
@@ -64,4 +77,5 @@ export interface ProviderBalance {
   message: string | null;
   providerId?: string;
   providerName?: string;
+  providerKind?: string;
 }

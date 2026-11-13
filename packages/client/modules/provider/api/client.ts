@@ -33,6 +33,14 @@ export function fetchProviderBalance(id?: string): Promise<ProviderBalance> {
   return request(`/api/providers/balance${id ? `?id=${encodeURIComponent(id)}` : ""}`);
 }
 
+/** All enabled wallets in one answer; each entry still carries its provider id and name. */
+export function fetchProviderBalances(): Promise<{
+  wallets: ProviderBalance[];
+  checkedAt: number;
+}> {
+  return request("/api/providers/balances");
+}
+
 /** Model ids the provider offers; a draft passes its own address and key. */
 export async function fetchProviderModels(draft: {
   id: string;

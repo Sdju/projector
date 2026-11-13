@@ -11,11 +11,16 @@ import { createAcpBackend, usageReportOf, type AcpProgram } from "../acp/index.t
  * is added — dialects, forms, extensions and usage reporting stay off.
  */
 export {
+  clearPluginBalances,
   loadCodeAgents,
+  type PluginBalanceDeclaration,
+  type PluginBalanceProvider,
   type PluginCodeApi,
+  type PluginCodeLoadOptions,
   type PluginFeatureApi,
   type PluginHostApi,
   type PluginMcpApi,
+  type PluginProviderApi,
   type PluginRoleApi,
   type PluginWidgetApi,
 } from "./code.ts";

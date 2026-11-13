@@ -2,17 +2,26 @@ import { newId } from "../../../common/utilities/new-id.ts";
 import { computed, reactive } from "vue";
 import {
   fetchProviderBalance,
+  fetchProviderBalances,
   fetchProviderModels,
   fetchProviders,
   saveProviders,
   setActiveProvider,
 } from "../api/client.ts";
-import { PROVIDER_PRESETS } from "./presets.ts";
-import type { ModelPrice, OpenAIProviderPublic, ProviderBalance, ProviderKind } from "./types.ts";
+import { BUILTIN_PROVIDER_KINDS, providerPreset, PROVIDER_PRESETS } from "./presets.ts";
+import type {
+  ModelPrice,
+  OpenAIProviderPublic,
+  ProviderBalance,
+  ProviderKind,
+  ProviderKindInfo,
+} from "./types.ts";
 
 const state = reactive({
   providers: [] as OpenAIProviderPublic[],
   activeProviderId: null as string | null,
+  /** Provider kinds contributed by enabled balance plugins. */
+  balanceKinds: [] as ProviderKindInfo[],
   keyDrafts: {} as Record<string, string>,
   balances: {} as Record<string, ProviderBalance | undefined>,
   /** Ids the provider offers upstream, per provider; not saved, only offered for registering. */
@@ -39,10 +48,31 @@ export function useProviders() {
   const saving = computed(() => state.saving);
   const error = computed(() => state.error);
   const ready = computed(() => Boolean(activeProvider.value?.url));
+  const balanceKinds = computed(() => state.balanceKinds);
+  const kindOptions = computed<ProviderKindInfo[]>(() => [
+    ...BUILTIN_PROVIDER_KINDS.map((kind) => ({
+      kind,
+      title: PROVIDER_PRESETS[kind].label,
+      ...(PROVIDER_PRESETS[kind].hint ? { description: PROVIDER_PRESETS[kind].hint } : {}),
+      ...(PROVIDER_PRESETS[kind].url ? { url: PROVIDER_PRESETS[kind].url } : {}),
+      ...(PROVIDER_PRESETS[kind].model ? { model: PROVIDER_PRESETS[kind].model } : {}),
+    })),
+    ...state.balanceKinds,
+  ]);
+  const kindInfoOf = (kind: string): ProviderKindInfo | undefined =>
+    kindOptions.value.find((item) => item.kind === kind);
+  const presetFor = (kind: string) => providerPreset(kind, kindInfoOf(kind));
+  const hasBalance = (kind: string): boolean =>
+    kind === "deepseek" || state.balanceKinds.some((item) => item.kind === kind);
 
-  function apply(payload: { activeProviderId: string | null; providers: OpenAIProviderPublic[] }) {
+  function apply(payload: {
+    activeProviderId: string | null;
+    providers: OpenAIProviderPublic[];
+    balanceKinds?: ProviderKindInfo[];
+  }) {
     state.providers = payload.providers;
     state.activeProviderId = payload.activeProviderId;
+    state.balanceKinds = payload.balanceKinds ?? [];
     state.keyDrafts = {};
     state.revision++;
   }
@@ -55,12 +85,16 @@ export function useProviders() {
     }
   }
 
-  function loadBalances(): Promise<unknown> {
-    return Promise.all(
-      state.providers
-        .filter((item) => item.kind === "deepseek")
-        .map((item) => loadBalance(item.id)),
-    );
+  /** One request for every enabled wallet; the server skips kinds without a balance reader. */
+  async function loadBalances(): Promise<void> {
+    try {
+      const { wallets } = await fetchProviderBalances();
+      const next: Record<string, ProviderBalance> = {};
+      for (const wallet of wallets) if (wallet.providerId) next[wallet.providerId] = wallet;
+      state.balances = next;
+    } catch {
+      // A balance outage must not erase the balances the settings already show.
+    }
   }
 
   async function load(): Promise<void> {
@@ -106,7 +140,7 @@ export function useProviders() {
 
   function addProvider(kind: ProviderKind = "custom"): string {
     const id = `p${newId().slice(0, 8)}`;
-    const preset = PROVIDER_PRESETS[kind];
+    const preset = presetFor(kind);
     state.providers.push({
       id,
       kind,
@@ -218,6 +252,11 @@ export function useProviders() {
     saving,
     error,
     ready,
+    balanceKinds,
+    kindOptions,
+    kindInfoOf,
+    presetFor,
+    hasBalance,
     revision: computed(() => state.revision),
     balances: computed(() => state.balances),
     loadBalance,

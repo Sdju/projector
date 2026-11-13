@@ -11,20 +11,15 @@ import { copyPackage, destinationFor } from "./install.ts";
 import { loadPluginPackage, readJson } from "./load.ts";
 import { deleteState, readState, updateState } from "./state.ts";
 import { hashPackage, isTrusted } from "./trust.ts";
-import type {
-  PluginAgentApply,
-  PluginAgentDiagnostic,
-  PluginCatalog,
-  PluginInfo,
-} from "./types.ts";
+import type { PluginApply, PluginCatalog, PluginCodeDiagnostic, PluginInfo } from "./types.ts";
 
 export { readPluginIcon } from "./icon.ts";
 export { openPluginAsset, type PluginAsset } from "./assets.ts";
 export type {
-  PluginAgentApply,
-  PluginAgentCandidate,
-  PluginAgentDiagnostic,
+  PluginApply,
+  PluginCandidate,
   PluginCatalog,
+  PluginCodeDiagnostic,
   PluginDiagnostic,
   PluginInfo,
   PluginStatus,
@@ -36,11 +31,11 @@ interface Candidate {
 }
 
 const currentProjectorVersion = "0.12.0";
-let applyAgentRegistry: PluginAgentApply = () => [];
+let applyPluginRegistry: PluginApply = () => [];
 
-/** The composition owns the agent registry; discovery only asks it to reconcile the catalog. */
-export function configurePluginAgents(apply: PluginAgentApply): void {
-  applyAgentRegistry = apply;
+/** The composition owns the agent and balance registries; discovery only asks it to reconcile. */
+export function configurePluginCode(apply: PluginApply): void {
+  applyPluginRegistry = apply;
 }
 
 export function pluginsDirectory(): string {
@@ -125,6 +120,7 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         diagnostics: [{ message: error instanceof Error ? error.message : "Некорректный плагин" }],
         themes: [],
         agents: [],
+        balances: [],
         languages: [],
         panels: [],
         tabs: [],
@@ -158,6 +154,7 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         ],
         themes: [],
         agents: [],
+        balances: [],
         languages: [],
         panels: [],
         tabs: [],
@@ -168,7 +165,9 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
       const loaded = await loadPluginPackage(selected[0].candidate, currentProjectorVersion);
       const enabled = saved?.enabled ?? false;
       const agents = loaded.agents;
-      const requiresTrust = agents.length > 0 || !!loaded.server || !!loaded.browser;
+      const balances = loaded.balances;
+      const requiresTrust =
+        agents.length > 0 || balances.length > 0 || !!loaded.server || !!loaded.browser;
       const currentHash = requiresTrust ? await hashPackage(selected[0].candidate.path) : undefined;
       const trusted = !requiresTrust || isTrusted(saved?.trustedHash, currentHash);
       const diagnostics = [...loaded.diagnostics];
@@ -196,6 +195,7 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         diagnostics,
         themes: loaded.themes,
         agents,
+        balances,
         languages: loaded.languages,
         panels: loaded.panels,
         tabs: loaded.tabs,
@@ -218,6 +218,7 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         ],
         themes: [],
         agents: [],
+        balances: [],
         languages: [],
         panels: [],
         tabs: [],
@@ -237,45 +238,54 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         diagnostics: [{ message: "Пакет плагина отсутствует" }],
         themes: [],
         agents: [],
+        balances: [],
         languages: [],
         panels: [],
         tabs: [],
       });
   }
-  await applyAgentCatalog(plugins, availableThemes);
+  await applyPluginCatalog(plugins, availableThemes);
   plugins.sort((left, right) => left.id.localeCompare(right.id));
   availableThemes.sort((left, right) => left.id.localeCompare(right.id));
   return { directory: pluginsDirectory(), plugins, availableThemes };
 }
 
-/** Registers enabled agents through the composition callback and turns its diagnostics into errors. */
-async function applyAgentCatalog(
+/** Registers enabled code through the composition callback and turns its diagnostics into errors. */
+async function applyPluginCatalog(
   plugins: PluginInfo[],
   availableThemes: AvailableTheme[],
 ): Promise<void> {
   const candidates = plugins
     .filter((plugin) => plugin.status === "enabled" && plugin.trusted)
-    .flatMap((plugin) =>
-      plugin.agents.map((agent) => ({
-        plugin: plugin.id,
-        agent,
-        ...(plugin.path ? { path: plugin.path } : {}),
-        ...(plugin.server ? { server: plugin.server } : {}),
-        ...(plugin.hash ? { hash: plugin.hash } : {}),
-      })),
-    );
-  let diagnostics: PluginAgentDiagnostic[] = [];
+    .filter((plugin) => plugin.agents.length > 0 || plugin.balances.length > 0)
+    .map((plugin) => ({
+      plugin: plugin.id,
+      ...(plugin.path ? { path: plugin.path } : {}),
+      ...(plugin.server ? { server: plugin.server } : {}),
+      ...(plugin.hash ? { hash: plugin.hash } : {}),
+      agents: plugin.agents,
+      balances: plugin.balances,
+    }));
+  let diagnostics: PluginCodeDiagnostic[] = [];
   try {
-    diagnostics = await applyAgentRegistry(candidates);
+    diagnostics = await applyPluginRegistry(candidates);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Не удалось применить агентов";
-    for (const candidate of candidates)
-      diagnostics.push({ plugin: candidate.plugin, agent: candidate.agent.id, message });
+    const message = error instanceof Error ? error.message : "Не удалось применить плагины";
+    for (const candidate of candidates) {
+      const subject = candidate.agents[0]?.id ?? candidate.balances[0]?.kind;
+      diagnostics.push({
+        plugin: candidate.plugin,
+        ...(subject ? { subject } : {}),
+        message,
+      });
+    }
   }
   for (const item of diagnostics) {
     const plugin = plugins.find((entry) => entry.id === item.plugin);
     if (!plugin) continue;
-    plugin.diagnostics.push({ message: `${item.agent}: ${item.message}` });
+    plugin.diagnostics.push({
+      message: item.subject ? `${item.subject}: ${item.message}` : item.message,
+    });
     plugin.status = "error";
     for (let index = availableThemes.length - 1; index >= 0; index--)
       if (availableThemes[index]!.packageName === item.plugin) availableThemes.splice(index, 1);
@@ -368,6 +378,7 @@ export async function installPlugin(sourcePath: unknown): Promise<PluginCatalog>
   // Theme-only packages are safe to enable at once. Browser/server/agent code needs explicit trust.
   const requiresTrust =
     (manifest.projector.contributes.agents?.length ?? 0) > 0 ||
+    (manifest.projector.contributes.balances?.length ?? 0) > 0 ||
     !!manifest.projector.server ||
     !!manifest.projector.browser;
   await updateState(manifest.name, {

@@ -207,6 +207,18 @@ function previewStyle(theme: AvailableTheme) {
           }}</UiHint>
         </div>
       </div>
+      <div v-if="selected.balances.length" class="agent-contributions">
+        <strong>Балансы провайдеров</strong>
+        <div v-for="balance in selected.balances" :key="balance.kind" class="agent-row">
+          <UiInline align="center" wrap>
+            <strong>{{ balance.title }}</strong>
+            <UiBadge tone="neutral">{{ balance.kind }}</UiBadge>
+          </UiInline>
+          <UiHint>{{
+            balance.description || "Плагин читает остаток этого вида провайдера."
+          }}</UiHint>
+        </div>
+      </div>
       <div
         v-if="selected.dependencies && Object.keys(selected.dependencies).length"
         class="agent-contributions"
@@ -286,6 +298,7 @@ function previewStyle(theme: AvailableTheme) {
         v-if="
           !selected.themes.length &&
           !selected.agents.length &&
+          !selected.balances.length &&
           !selected.languages.length &&
           !selected.panels.length &&
           !selected.tabs.length

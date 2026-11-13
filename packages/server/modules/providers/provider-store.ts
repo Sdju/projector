@@ -6,6 +6,7 @@ import { vault as systemVault } from "../secrets/index.ts";
 import { inferProviderKind, isProviderKind } from "./kinds.ts";
 import { resolveModel, sanitizeModels } from "./models.ts";
 import { defaultThinkingStyle, isThinkingStyle } from "./thinking.ts";
+import { pluginBalanceKinds } from "./balance-registry.ts";
 import { DEFAULT_MODEL, ENV_PROVIDER_ID, envProvider, seededConfig } from "./provider-seeds.ts";
 import { DEFAULT_PROVIDERS_SECRET, revealSecret } from "./secret-obfuscation.ts";
 import type {
@@ -152,6 +153,7 @@ export async function loadPublicProviders(
   return {
     activeProviderId: stored.activeProviderId,
     providers: stored.providers.map((item) => toPublic(item, fallback.apiKey)),
+    balanceKinds: pluginBalanceKinds(),
   };
 }
 
@@ -246,7 +248,7 @@ export async function saveProviders(
     if (providers.length === 0) {
       const next = { activeProviderId: null, providers: [] };
       await writeProvidersFile(next);
-      return { activeProviderId: null, providers: [] };
+      return { activeProviderId: null, providers: [], balanceKinds: pluginBalanceKinds() };
     }
     const requestedActive =
       typeof payload.activeProviderId === "string"
@@ -260,6 +262,7 @@ export async function saveProviders(
     return {
       activeProviderId,
       providers: providers.map((item) => toPublic(item, fallback.apiKey)),
+      balanceKinds: pluginBalanceKinds(),
     };
   });
 }
@@ -279,6 +282,7 @@ export async function setActiveProvider(
     return {
       activeProviderId: id,
       providers: stored.providers.map((item) => toPublic(item, fallback.apiKey)),
+      balanceKinds: pluginBalanceKinds(),
     };
   });
 }

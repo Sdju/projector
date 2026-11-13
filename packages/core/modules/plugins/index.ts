@@ -5,6 +5,7 @@ import {
   validateAgentContribution,
   type PluginAgentContribution,
 } from "./agent.ts";
+import { validateBalanceContribution, type PluginBalanceContribution } from "./balance.ts";
 import {
   assertBrowserEntry,
   validateBrowserContributions,
@@ -12,12 +13,14 @@ import {
   type PluginPanelContribution,
   type PluginTabContribution,
 } from "./browser.ts";
+import type { PluginThemeContribution } from "./theme.ts";
 
 export type {
   PluginAgentContribution,
   PluginAgentTerminal,
   PluginAgentUsageCommand,
 } from "./agent.ts";
+export type { PluginBalanceContribution } from "./balance.ts";
 export type {
   PluginBrowserContributions,
   PluginBrowserEntry,
@@ -27,6 +30,18 @@ export type {
 } from "./browser.ts";
 export { isPluginIconFile, sanitizePluginIconSvg } from "./icon.ts";
 export {
+  serializeThemeTokens,
+  themeStyleProperties,
+  themeTokenNames,
+  validateThemeTokens,
+} from "./theme.ts";
+export type {
+  AvailableTheme,
+  PluginThemeContribution,
+  ThemeTokenName,
+  ThemeTokens,
+} from "./theme.ts";
+export {
   isSafePluginPath,
   pluginAssetPath,
   pluginCommandPrefix,
@@ -35,49 +50,6 @@ export {
 } from "./asset.ts";
 
 export const pluginApiVersion = 1;
-
-export const themeTokenNames = [
-  "bg",
-  "bg-2",
-  "bg-3",
-  "bg-4",
-  "bg-sunken",
-  "canvas",
-  "line",
-  "line-strong",
-  "text",
-  "text-2",
-  "muted",
-  "faint",
-  "focus",
-  "accent",
-  "run",
-  "err",
-  "warn",
-  "info",
-  "search",
-  "hover",
-  "active",
-  "selection",
-  "overlay",
-  "shadow-popover",
-  "shadow-modal",
-] as const;
-
-export type ThemeTokenName = (typeof themeTokenNames)[number];
-export type ThemeTokens = {
-  [Name in Exclude<ThemeTokenName, "hover" | "active">]: string;
-} & {
-  [Name in Extract<ThemeTokenName, "hover" | "active">]?: string;
-};
-
-export interface PluginThemeContribution {
-  id: string;
-  title: string;
-  description?: string;
-  mode: "dark" | "light";
-  tokens: string;
-}
 
 export interface PluginManifest {
   name: string;
@@ -101,6 +73,7 @@ export interface PluginManifest {
     contributes: {
       themes?: PluginThemeContribution[];
       agents?: PluginAgentContribution[];
+      balances?: PluginBalanceContribution[];
       languages?: PluginLanguageContribution[];
       panels?: PluginPanelContribution[];
       tabs?: PluginTabContribution[];
@@ -108,29 +81,14 @@ export interface PluginManifest {
   };
 }
 
-export interface AvailableTheme {
-  id: string;
-  packageName: string;
-  title: string;
-  description?: string;
-  mode: "dark" | "light";
-  tokens: ThemeTokens;
-}
-
 export interface PluginValidationOptions {
   projectorVersion?: string;
 }
 
-const optionalTokens = new Set<ThemeTokenName>(["hover", "active"]);
 const packageNamePattern = /^(?:@[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*|[a-z0-9][a-z0-9._-]*)$/;
 const themeIdPattern = /^[a-z0-9][a-z0-9._-]*$/;
 const semverPattern =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
-const hexPattern = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
-const functionalColorPattern = /^(?:rgba?|hsla?)\([0-9.%+\-,\s/]+\)$/i;
-const colorMixPattern = /^color-mix\(in (?:srgb|srgb-linear|hsl|hwb|lab|lch|oklab|oklch),\s*.+\)$/i;
-const shadowPattern = /^0 \d+(?:\.\d+)?px \d+(?:\.\d+)?px #[0-9a-f]{3,8}$/i;
-
 const maxServerEntryLength = 300;
 const serverEntryPattern = /^[A-Za-z0-9._/-]+\.cjs$/;
 
@@ -167,29 +125,6 @@ export function isExternalThemeId(value: unknown): value is string {
 
 export function externalThemeId(packageName: string, id: string): string {
   return `${packageName}/${id}`;
-}
-
-export function validateThemeTokens(value: unknown): ThemeTokens {
-  assertRecord(value, "Токены темы");
-  assertAllowedKeys(value, themeTokenNames, "Токены темы");
-  for (const name of themeTokenNames) {
-    const token = value[name];
-    if (token === undefined && optionalTokens.has(name)) continue;
-    if (typeof token !== "string" || !token) throw new Error(`Токен --${name} обязателен`);
-    if (/url\s*\(|javascript\s*:|[{};]/i.test(token))
-      throw new Error(`Недопустимое значение токена --${name}`);
-    const valid =
-      name === "shadow-popover" || name === "shadow-modal"
-        ? shadowPattern.test(token)
-        : hexPattern.test(token) ||
-          functionalColorPattern.test(token) ||
-          (colorMixPattern.test(token) &&
-            (!token.includes("var(") ||
-              (optionalTokens.has(name) &&
-                /^color-mix\(in srgb, var\(--text\) \d+(?:\.\d+)?%, transparent\)$/.test(token))));
-    if (!valid) throw new Error(`Недопустимое значение токена --${name}`);
-  }
-  return { ...value } as ThemeTokens;
 }
 
 function compareSemver(left: string, right: string): number {
@@ -313,21 +248,30 @@ export function validatePluginManifest(
   const contributes = value.projector.contributes;
   assertAllowedKeys(
     contributes,
-    ["themes", "agents", "languages", "panels", "tabs"],
+    ["themes", "agents", "balances", "languages", "panels", "tabs"],
     "projector.contributes",
   );
   if (contributes.themes !== undefined && !Array.isArray(contributes.themes))
     throw new Error("projector.contributes.themes должен быть массивом");
   if (contributes.agents !== undefined && !Array.isArray(contributes.agents))
     throw new Error("projector.contributes.agents должен быть массивом");
+  if (contributes.balances !== undefined && !Array.isArray(contributes.balances))
+    throw new Error("projector.contributes.balances должен быть массивом");
   const themes = contributes.themes as unknown[] | undefined;
   const agents = contributes.agents as unknown[] | undefined;
+  const balances = contributes.balances as unknown[] | undefined;
   const browserContributions = validateBrowserContributions(contributes);
   if (value.projector.server !== undefined) {
-    if (!agents?.length)
-      throw new Error("projector.server допустим только вместе с contributes.agents");
+    if (!agents?.length && !balances?.length)
+      throw new Error(
+        "projector.server допустим только вместе с contributes.agents или contributes.balances",
+      );
     assertServerEntry(value.projector.server);
   }
+  if (balances?.length && value.projector.server === undefined)
+    throw new Error("Вклады balances требуют projector.server");
+  if (balances && balances.length > 20)
+    throw new Error("projector.contributes.balances: не более 20 видов");
   if (value.projector.browser !== undefined) assertBrowserEntry(value.projector.browser);
   if (
     !value.projector.browser &&
@@ -339,12 +283,17 @@ export function validatePluginManifest(
   if (
     !themes?.length &&
     !agents?.length &&
+    !balances?.length &&
     !browserContributions.languages?.length &&
     !browserContributions.panels?.length &&
     !browserContributions.tabs?.length
   ) {
-    if (themes && !agents) throw new Error("Плагин должен содержать хотя бы одну тему");
-    if (agents && !themes) throw new Error("Плагин должен содержать хотя бы одного агента");
+    if (themes && !agents && !balances)
+      throw new Error("Плагин должен содержать хотя бы одну тему");
+    if (agents && !themes && !balances)
+      throw new Error("Плагин должен содержать хотя бы одного агента");
+    if (balances && !themes && !agents)
+      throw new Error("Плагин должен содержать хотя бы один вид баланса");
     throw new Error("Плагин должен содержать хотя бы одну тему или агента");
   }
   if (themes) {
@@ -375,19 +324,9 @@ export function validatePluginManifest(
     const hasServer = value.projector.server !== undefined;
     for (const agent of agents) validateAgentContribution(agent, ids, { hasServer });
   }
+  if (balances) {
+    const kinds = new Set<string>();
+    for (const balance of balances) validateBalanceContribution(balance, kinds);
+  }
   return value as unknown as PluginManifest;
-}
-
-export function themeStyleProperties(
-  tokens: ThemeTokens,
-): Partial<Record<`--${ThemeTokenName}`, string>> {
-  return Object.fromEntries(
-    themeTokenNames.flatMap((name) => (tokens[name] ? [[`--${name}`, tokens[name]]] : [])),
-  ) as Partial<Record<`--${ThemeTokenName}`, string>>;
-}
-
-export function serializeThemeTokens(tokens: ThemeTokens): string {
-  return Object.entries(themeStyleProperties(tokens))
-    .map(([name, value]) => `${name}:${value}`)
-    .join(";");
 }

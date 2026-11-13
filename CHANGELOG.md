@@ -2,11 +2,20 @@
 
 ## Unreleased
 
+### Провайдеры
+
+- Балансы всех включённых провайдеров теперь читаются одним запросом `GET /api/providers/balances` и показываются совместно и раздельно: общий остаток по каждой валюте, отдельные карточки в аналитике, список кошельков в настройках и агрегированный индикатор в статусной строке. `activeProviderId` по-прежнему задаёт провайдера по умолчанию, но больше не ограничивает, чей баланс виден.
+- Денежные суммы складываются десятичной арифметикой без пересчёта валют: `$` и `¥` остаются отдельными итогами.
+
 ### Агенты
 
-- Claude Code вынесен из основного продукта в доверенный плагин `plugins/claude-code`: бэкенд на Anthropic Agent SDK, поток событий, сессии, откат файлов, лимиты, план, permission modes и hosted-раннер теперь живут в пакете. Встроенные модули `agents/claude-code`, `agents-integration/claude`, клиентский индикатор и маршрут `/api/claude/usage` удалены; агент появляется после установки плагина и доверия к нему, лимиты идут через общий `/api/agent/usage/claude-code`. Плагинный API получил `api.host` (среда, вложения, история, injector, replay, hosted-ход), `api.features`, `api.roles`, `api.widgets`, `api.mcp` и `api.require`; общий hosted-процесс — `server/app/plugin-runner.ts` ([подробно](docs/plugins.md)).
+- Claude Code вынесен из основного продукта в доверенный плагин `plugins/claude-code`: бэкенд на Anthropic Agent SDK, поток событий, сессии, откат файлов, лимиты, план, permission modes и hosted-раннер теперь живут в пакете. Встроенные модули `agents/claude-code`, `agents-integration/claude`, клиентский индикатор и маршрут `/api/claude/usage` удалены; агент появляется после установки плагина и доверия к нему, лимиты идут через общий `/api/agent/usage/claude-code`. Зависимость `@anthropic-ai/claude-agent-sdk` перенесена из продукта в сам плагин, `processMcpConfig` переехал в плагин, хост безусловно чистит `PARENT_SESSION_ENV` при старте и создании терминалов, а плагин поставляет `defaultFeatures: ["widgets"]`, семантику инструментов (`kind`, `label`, `paths`) и браузерный вклад `api.agents` с `activeForm` и индикатором лимитов «Неделя / 5 часов». Плагинный API получил `api.host` (среда, вложения, история, injector, replay, hosted-ход), `api.features`, `api.roles`, `api.widgets`, `api.mcp` и `api.require`; общий hosted-процесс — `server/app/plugin-runner.ts` ([подробно](docs/plugins.md)).
 
 ### Плагины
+
+- Серверный плагин может объявить `contributes.balances` — виды провайдеров, для которых он умеет читать денежный баланс. Код получает `createPlugin(api)` и регистрирует читатель через `api.providers.registerBalance`; вид становится доступен в настройках провайдеров, а его баланс попадает в общий индикатор и аналитику. Встроенный DeepSeek использует тот же контракт, поэтому новые виды не требуют правок серверного ядра ([подробно](docs/plugins.md)).
+- Серверные плагины (`projector.server`) могут объявлять `dependencies`/`optionalDependencies` (ставятся в `node_modules` плагина при подтверждении доверия и резолвятся через `api.require`), не обязаны указывать ACP-поле `command` и могут задавать `defaultFeatures` для возможностей с `allowPluginDefault`.
+- Браузерный `@ai-projector/plugin-api` дополнен `api.agents.register({ id, plan?, mountUsage?, toolLabel? })` для кастомного плана, индикатора лимитов и подписей инструментов плагинного агента; события `"tool"` поддерживают `kind`, `label` и `paths`.
 
 - Добавлен версионированный публичный API `@ai-projector/plugin-api` и независимый browser runtime: пакет собирается отдельным ESM, получает API в `activate(api)` и не дублирует Vue/CodeMirror. Регистрации живут в scope активации; disable, remove, смена хеша и HMR вызывают cleanup, ошибка одного пакета не останавливает остальные ([подробно](docs/plugins.md)).
 - Манифест поддерживает `projector.browser` и метаданные `languages`, `panels`, `tabs`. Пакет только с browser-вкладами валиден; исполняемый код требует явного доверия к текущему хешу, как агенты и `projector.server`.

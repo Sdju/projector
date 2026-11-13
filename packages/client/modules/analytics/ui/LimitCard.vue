@@ -97,9 +97,7 @@ const spark = computed(() => {
       <span>израсходовано {{ formatPercent(used) }}</span>
       <span>{{ pace.text }}</span>
     </div>
-    <p class="hint">
-      {{ pace.hint }}<template v-if="projection"> · {{ projection }}</template>
-    </p>
+    <p class="hint">{{ pace.hint }}<template v-if="projection"> · {{ projection }}</template></p>
     <svg
       v-if="spark"
       class="spark"

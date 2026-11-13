@@ -13,7 +13,7 @@ import { countRu } from "../../../common/utilities/plural.ts";
 import { readUsageAnalytics } from "../api/analytics.ts";
 import { isDayKey, useUsageDay } from "./day.ts";
 import { formatCost, formatDay, formatRange, formatTokens, windowLabel } from "./format.ts";
-import { agentTitle, breakdownRows, taskLabel } from "./rows.ts";
+import { agentTitle, breakdownRows, taskLabel, walletTotals } from "./rows.ts";
 
 export type { BreakdownRow } from "./rows.ts";
 
@@ -59,7 +59,7 @@ export function useUsageAnalytics() {
     probing.value = true;
     try {
       await Promise.allSettled(
-        [...urls, "/api/providers/balance"].map((url) => fetch(url, { cache: "no-store" })),
+        [...urls, "/api/providers/balances"].map((url) => fetch(url, { cache: "no-store" })),
       );
     } finally {
       probing.value = false;
@@ -262,6 +262,7 @@ export function useUsageAnalytics() {
   );
   const today = computed(() => data.value?.daily.at(-1));
   const providerRows = computed(() => data.value?.providers ?? []);
+  const providerTotals = computed(() => walletTotals(providerRows.value));
   /** Dollars first: that is the balance people usually mean, and DeepSeek reports USD. */
   const primaryProvider = computed(
     () =>
@@ -335,6 +336,7 @@ export function useUsageAnalytics() {
     serviceCalls,
     limitCards,
     providerRows,
+    providerTotals,
     primaryProvider,
     today,
     todayLabel,

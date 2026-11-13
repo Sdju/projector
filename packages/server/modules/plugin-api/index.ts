@@ -21,13 +21,21 @@ export type {
   RewindResult,
 } from "../agent/index.ts";
 export type {
+  PluginBalanceProvider,
   PluginCodeApi,
+  PluginCodeLoadOptions,
   PluginFeatureApi,
   PluginHostApi,
   PluginMcpApi,
+  PluginProviderApi,
   PluginRoleApi,
   PluginWidgetApi,
 } from "../agents/plugin/index.ts";
+export type {
+  ProviderBalanceContext,
+  ProviderBalanceReading,
+  ProviderBalanceResolver,
+} from "../providers/index.ts";
 export type { McpServerConfig, McpSource } from "../agent-mcp/index.ts";
 export type {
   AcpCompaction,

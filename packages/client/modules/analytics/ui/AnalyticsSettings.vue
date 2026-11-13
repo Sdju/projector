@@ -59,7 +59,7 @@ const {
   serviceCalls,
   limitCards,
   providerRows,
-  primaryProvider,
+  providerTotals,
   today,
   todayLabel,
   averageTokens,
@@ -98,22 +98,18 @@ const stats = computed(() => {
       value: priced.value ? formatCost(value.cost) : "—",
       hint: priced.value
         ? costNote.value || `${countRu(value.pricedAnswers, "ответ", "ответа", "ответов")} с ценой`
-        : primaryProvider.value
-          ? "цена не задана · ниже баланс"
+        : providerTotals.value.length
+          ? "цена не задана · ниже кошельки"
           : "цена моделей не задана",
     },
-    ...(primaryProvider.value
-      ? [
-          {
-            label: `${primaryProvider.value.label} · расход`,
-            value: formatMoney(primaryProvider.value.spent, primaryProvider.value.currency),
-            hint:
-              primaryProvider.value.total === null
-                ? "баланс неизвестен"
-                : `остаток ${formatMoney(primaryProvider.value.total, primaryProvider.value.currency)}`,
-          },
-        ]
-      : []),
+    ...providerTotals.value.map((total) => ({
+      label: `Кошельки · ${total.currency}`,
+      value: total.total === null ? "—" : formatMoney(total.total, total.currency),
+      hint:
+        total.unknown > 0
+          ? `часть балансов неизвестна · потрачено ${formatMoney(total.spent, total.currency)}`
+          : `потрачено ${formatMoney(total.spent, total.currency)} · ${countRu(total.wallets, "кошелёк", "кошелька", "кошельков")}`,
+    })),
     ...(serviceCalls.value > 0
       ? [
           {
@@ -225,9 +221,22 @@ const stats = computed(() => {
 
         <UiCard v-if="providerRows.length" appearance="frame" class="wide" as="section">
           <header class="card-head">
-            <h4>Баланс провайдера</h4>
-            <span>расход по деньгам, а не по токенам</span>
+            <h4>Кошельки</h4>
+            <span>общий остаток и каждый провайдер отдельно</span>
           </header>
+          <div class="wallet-totals">
+            <div v-for="total in providerTotals" :key="total.currency" class="wallet-total">
+              <span class="wallet-caption">все кошельки · {{ total.currency }}</span>
+              <strong>{{
+                total.total === null ? "—" : formatMoney(total.total, total.currency)
+              }}</strong>
+              <span class="wallet-note"
+                >потрачено {{ formatMoney(total.spent, total.currency) }} ·
+                {{ countRu(total.wallets, "кошелёк", "кошелька", "кошельков")
+                }}<template v-if="total.unknown"> · {{ total.unknown }} без баланса</template></span
+              >
+            </div>
+          </div>
           <div class="providers">
             <ProviderBalanceCard
               v-for="entry in providerRows"
@@ -409,6 +418,29 @@ const stats = computed(() => {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: var(--sp-2);
+}
+.wallet-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--line);
+}
+.wallet-total {
+  display: grid;
+  gap: 2px;
+}
+.wallet-total strong {
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.wallet-caption,
+.wallet-note {
+  color: var(--muted);
+  font-size: var(--fs-2xs);
 }
 .providers {
   display: grid;

@@ -1,6 +1,7 @@
 import type {
   AvailableTheme,
   PluginAgentContribution,
+  PluginBalanceContribution,
   PluginBrowserEntry,
   PluginLanguageContribution,
   PluginPanelContribution,
@@ -36,6 +37,8 @@ export interface PluginInfo {
   diagnostics: PluginDiagnostic[];
   themes: AvailableTheme[];
   agents: PluginAgentContribution[];
+  /** Provider kinds whose money balance the plugin knows how to read. */
+  balances: PluginBalanceContribution[];
   languages: PluginLanguageContribution[];
   panels: PluginPanelContribution[];
   tabs: PluginTabContribution[];
@@ -47,25 +50,27 @@ export interface PluginCatalog {
   availableThemes: AvailableTheme[];
 }
 
-/** One agent a plugin contributes, tagged with the package it came from. */
-export interface PluginAgentCandidate {
+/** One enabled code plugin, tagged with everything its module may register. */
+export interface PluginCandidate {
   plugin: string;
-  agent: PluginAgentContribution;
   /** Absolute directory of the installed package; SVG icons are read from here. */
   path?: string;
-  /** Absolute code entry of the package, when the package registers agents itself. */
+  /** Absolute code entry of the package, when the package runs server code. */
   server?: string;
   /** Content hash that scopes the loaded code module. */
   hash?: string;
+  agents: PluginAgentContribution[];
+  balances: PluginBalanceContribution[];
 }
 
-/** A collision or an invalid agent found while applying the catalog; shown on the plugin card. */
-export interface PluginAgentDiagnostic {
+/** A collision or an invalid contribution found while applying the catalog; shown on the card. */
+export interface PluginCodeDiagnostic {
   plugin: string;
-  agent: string;
+  /** Agent id or balance kind the diagnostic belongs to. */
+  subject?: string;
   message: string;
 }
 
-export type PluginAgentApply = (
-  agents: PluginAgentCandidate[],
-) => PluginAgentDiagnostic[] | Promise<PluginAgentDiagnostic[]>;
+export type PluginApply = (
+  plugins: PluginCandidate[],
+) => PluginCodeDiagnostic[] | Promise<PluginCodeDiagnostic[]>;

@@ -26,6 +26,11 @@ import { clearSessionEnv } from "@ai-projector/core/modules/os/index.ts";
 import { ideMcpServer } from "../ide-mcp/index.ts";
 import { widgetsMcpServer } from "../widgets-mcp/index.ts";
 import {
+  registerBalanceResolver,
+  type ProviderBalanceContext,
+  type ProviderBalanceReading,
+} from "../../providers/index.ts";
+import {
   createAcpBackend,
   createPlainDialect,
   extendPlainDialect,
@@ -111,6 +116,17 @@ export interface PluginMcpApi {
   };
 }
 
+/** One provider kind a plugin brings a money-balance reader for. */
+export interface PluginBalanceProvider {
+  kind: string;
+  read(context: ProviderBalanceContext): Promise<ProviderBalanceReading> | ProviderBalanceReading;
+}
+
+/** Provider services a trusted plugin may register; the kind must be in the manifest. */
+export interface PluginProviderApi {
+  registerBalance(provider: PluginBalanceProvider): void;
+}
+
 /** The narrow runtime a trusted server-side plugin receives; types are its own business. */
 export interface PluginCodeApi {
   version: 1;
@@ -131,20 +147,52 @@ export interface PluginCodeApi {
   roles: PluginRoleApi;
   widgets: PluginWidgetApi;
   mcp: PluginMcpApi;
+  providers: PluginProviderApi;
+}
+
+/** A balance kind declared by the package; the runtime checks registrations against it. */
+export interface PluginBalanceDeclaration {
+  kind: string;
+  title?: string;
+  description?: string;
+  url?: string;
+  model?: string;
+}
+
+export interface PluginCodeLoadOptions {
+  /** Package id; absent in the isolated runner, where balance registration is not used. */
+  plugin?: string;
+  /** `contributes.balances` of the package. */
+  balances?: readonly PluginBalanceDeclaration[];
 }
 
 const requirePlugin = createRequire(import.meta.url);
 const loaded = new Map<string, Promise<Record<string, unknown>>>();
+const balanceDisposers = new Map<string, Set<() => void>>();
 
 /** The generic process that loads a plugin and runs one of its answers without hosting again. */
 const RUNNER = fileURLToPath(new URL("../../../app/plugin-runner.ts", import.meta.url));
 
+/** Removes the balance readers a disabled or reloaded package registered. */
+export function clearPluginBalances(plugin: string): void {
+  const disposers = balanceDisposers.get(plugin);
+  if (!disposers) return;
+  for (const dispose of disposers) dispose();
+  balanceDisposers.delete(plugin);
+}
+
 /**
- * Loads a package's `server.js` and asks it for the agents it contributes. The module is cached by
- * its content hash, so a catalog refresh does not re-run plugin code; a new hash gets a new module.
- * This executes plugin code in the server process and is only reached after trust and enable.
+ * Loads a package's `server.js`, asks it for the agents and balance readers it contributes, and
+ * reconciles both registries. The module import is cached by content hash; the factory runs on
+ * every reconcile so disabling and re-enabling a package re-registers its readers. This executes
+ * plugin code in the server process and is only reached after trust and enable.
  */
-export async function loadCodeAgents(entry: string, hash?: string): Promise<AgentBackend[]> {
+export async function loadCodeAgents(
+  entry: string,
+  hash?: string,
+  options: PluginCodeLoadOptions = {},
+): Promise<AgentBackend[]> {
+  if (options.plugin) clearPluginBalances(options.plugin);
   const key = `${entry}\n${hash ?? ""}`;
   let pending = loaded.get(key);
   if (!pending) {
@@ -156,8 +204,34 @@ export async function loadCodeAgents(entry: string, hash?: string): Promise<Agen
     pending.catch(() => loaded.delete(key));
   }
   const module = await pending;
-  const factory = module.createAgents ?? module.default;
-  if (typeof factory !== "function") throw new Error("Плагин не экспортирует createAgents(api)");
+  const usesCreatePlugin = typeof module.createPlugin === "function";
+  const factory = module.createPlugin ?? module.createAgents ?? module.default;
+  if (typeof factory !== "function")
+    throw new Error("Плагин не экспортирует createPlugin(api) или createAgents(api)");
+  const declared = new Map((options.balances ?? []).map((item) => [item.kind, item]));
+  const registeredKinds = new Set<string>();
+  const registerBalance = (provider: PluginBalanceProvider): void => {
+    if (!provider || typeof provider.kind !== "string" || typeof provider.read !== "function")
+      throw new Error("Плагин вернул некорректный провайдер баланса");
+    const declaration = declared.get(provider.kind);
+    if (options.balances && !declaration)
+      throw new Error(`Вид ${provider.kind} не объявлен в contributes.balances`);
+    registeredKinds.add(provider.kind);
+    const dispose = registerBalanceResolver({
+      kind: provider.kind,
+      read: (context) => provider.read(context),
+      ...(declaration?.title ? { title: declaration.title } : {}),
+      ...(declaration?.description ? { description: declaration.description } : {}),
+      ...(declaration?.url ? { url: declaration.url } : {}),
+      ...(declaration?.model ? { model: declaration.model } : {}),
+      ...(options.plugin ? { plugin: options.plugin } : {}),
+    });
+    if (options.plugin) {
+      const set = balanceDisposers.get(options.plugin) ?? new Set<() => void>();
+      set.add(dispose);
+      balanceDisposers.set(options.plugin, set);
+    }
+  };
   const requireEntry = createRequire(entry);
   const api: PluginCodeApi = {
     version: 1,
@@ -213,10 +287,29 @@ export async function loadCodeAgents(entry: string, hash?: string): Promise<Agen
       ide: ideMcpServer,
       widgets: widgetsMcpServer,
     },
+    providers: { registerBalance },
   };
   const result = (await factory(api)) as unknown;
-  if (!Array.isArray(result)) throw new Error("createAgents(api) должен вернуть массив агентов");
-  for (const item of result) {
+  const moduleResult =
+    result && typeof result === "object" && !Array.isArray(result)
+      ? (result as { agents?: unknown; balances?: unknown })
+      : null;
+  const agents = Array.isArray(result)
+    ? result
+    : usesCreatePlugin && moduleResult
+      ? (moduleResult.agents ?? [])
+      : undefined;
+  const balances = Array.isArray(result) ? [] : moduleResult?.balances;
+  if (!Array.isArray(agents))
+    throw new Error(
+      "createPlugin(api) должен вернуть массив агентов или объект { agents, balances }",
+    );
+  if (Array.isArray(balances))
+    for (const provider of balances) registerBalance(provider as PluginBalanceProvider);
+  const missing = [...declared.keys()].filter((kind) => !registeredKinds.has(kind));
+  if (missing.length)
+    throw new Error(`Плагин не зарегистрировал баланс для видов: ${missing.join(", ")}`);
+  for (const item of agents) {
     const backend = item as Partial<AgentBackend> | null;
     if (
       !backend ||
@@ -225,7 +318,7 @@ export async function loadCodeAgents(entry: string, hash?: string): Promise<Agen
       typeof backend.label !== "string" ||
       typeof backend.run !== "function"
     )
-      throw new Error("createAgents(api) вернул некорректного агента");
+      throw new Error("Плагин вернул некорректного агента");
   }
-  return result as AgentBackend[];
+  return agents as AgentBackend[];
 }

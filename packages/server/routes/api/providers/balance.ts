@@ -1,4 +1,4 @@
-import { providerBalance } from "../../../modules/providers/index.ts";
+import { providerBalance, providerBalances } from "../../../modules/providers/index.ts";
 import { recordProviderBalance } from "../../../modules/usage-analytics/index.ts";
 import { json, type RouteDefinition } from "../../../modules/transport/index.ts";
 
@@ -11,6 +11,16 @@ export const routes: RouteDefinition[] = [
       const value = await providerBalance(url.searchParams.get("id")?.trim() || undefined);
       recordProviderBalance(value);
       json(res, 200, value);
+    },
+  },
+  {
+    method: "GET",
+    path: "/api/providers/balances",
+    handler: async ({ res }) => {
+      res.setHeader("Cache-Control", "no-store");
+      const wallets = await providerBalances();
+      for (const value of wallets) recordProviderBalance(value);
+      json(res, 200, { wallets, checkedAt: Date.now() });
     },
   },
 ];

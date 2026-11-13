@@ -625,3 +625,63 @@ describe("plugin browser contract", () => {
       ).toThrow();
   });
 });
+
+describe("plugin balance contribution", () => {
+  const balanceManifest = {
+    name: "@acme/openrouter",
+    version: "1.0.0",
+    projector: {
+      apiVersion: 1,
+      server: "dist/server.cjs",
+      contributes: {
+        balances: [
+          {
+            kind: "openrouter",
+            title: "OpenRouter",
+            description: "Остаток кредитов OpenRouter",
+            url: "https://openrouter.ai/api/v1",
+            model: "openai/gpt-5",
+          },
+        ],
+      },
+    },
+  };
+
+  test("accepts a server-only package that declares a balance kind", () => {
+    expect(validatePluginManifest(balanceManifest)).toEqual(balanceManifest);
+    expect(validatePluginManifest(balanceManifest).projector.contributes.agents).toBeUndefined();
+  });
+
+  test("requires server code for a balance kind", () => {
+    const noServer = structuredClone(balanceManifest);
+    delete noServer.projector.server;
+    expect(() => validatePluginManifest(noServer)).toThrow(/projector\.server/);
+  });
+
+  test("rejects reserved, repeated and malformed kinds", () => {
+    const reserved = structuredClone(balanceManifest);
+    reserved.projector.contributes.balances[0].kind = "deepseek";
+    expect(() => validatePluginManifest(reserved)).toThrow(/зарезервирован/);
+
+    const duplicate = structuredClone(balanceManifest);
+    duplicate.projector.contributes.balances.push({
+      ...duplicate.projector.contributes.balances[0],
+    });
+    expect(() => validatePluginManifest(duplicate)).toThrow(/Повторяющийся вид/);
+
+    for (const kind of ["", "OpenRouter", "-openrouter", "open router", "x".repeat(65)]) {
+      const broken = structuredClone(balanceManifest);
+      broken.projector.contributes.balances[0].kind = kind;
+      expect(() => validatePluginManifest(broken)).toThrow(/Некорректный вид/);
+    }
+  });
+
+  test("an empty balance list is not a contribution", () => {
+    expect(() =>
+      validatePluginManifest({
+        ...structuredClone(balanceManifest),
+        projector: { apiVersion: 1, contributes: { balances: [] } },
+      }),
+    ).toThrow(/хотя бы один вид баланса/);
+  });
+});

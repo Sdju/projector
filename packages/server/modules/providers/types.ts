@@ -1,7 +1,13 @@
 import type { ThinkingStyle } from "./thinking.ts";
 
-/** Preset of a provider: decides which extras (balance, defaults) Projector offers. */
-export type ProviderKind = "custom" | "local" | "deepseek" | "qwencloud";
+/** Built-in presets of a provider. */
+export type BuiltinProviderKind = "custom" | "local" | "deepseek" | "qwencloud";
+
+/**
+ * Kind of a provider. Besides the built-in presets a trusted plugin may add its own kind and the
+ * balance reader that goes with it; the string form keeps old configs readable and forward-compatible.
+ */
+export type ProviderKind = BuiltinProviderKind | (string & {});
 
 /** A model of a provider that Projector offers: `id` goes upstream, `alias` is the name clients see. */
 /** What a million tokens of the model cost, in the currency of the provider's tariff. */
@@ -59,9 +65,23 @@ export interface OpenAIProviderWrite {
   apiKey?: string;
 }
 
+/** A provider kind the settings may offer; plugin kinds come with their own balance reader. */
+export interface ProviderKindInfo {
+  kind: string;
+  title: string;
+  description?: string;
+  /** URL and model pre-filled for a new provider of this kind. */
+  url?: string;
+  model?: string;
+  /** Package that contributed the kind; absent for built-ins. */
+  plugin?: string;
+}
+
 export interface OpenAIProvidersPublicState {
   activeProviderId: string | null;
   providers: OpenAIProviderPublic[];
+  /** Provider kinds contributed by enabled, trusted plugins with a balance reader. */
+  balanceKinds: ProviderKindInfo[];
 }
 
 export interface OpenAIProvidersWriteState {
@@ -149,7 +169,8 @@ export interface ProviderBalance {
   available: boolean | null;
   checkedAt: number;
   message: string | null;
-  /** Id and name of the provider the balance belongs to, when one was resolved. */
+  /** Id, name and kind of the provider the balance belongs to, when one was resolved. */
   providerId?: string;
   providerName?: string;
+  providerKind?: string;
 }

@@ -8,13 +8,13 @@ import UiScrollArea from "../../../common/ui/UiScrollArea.vue";
 
 import UiHint from "../../../common/ui/UiHint.vue";
 import UiLoader from "../../../common/ui/UiLoader.vue";
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiField from "../../../common/ui/UiField.vue";
 import { commandArgs, useCommandScope } from "../../../common/utilities/commands.ts";
 import { useProviders } from "../model/store.ts";
-import { PROVIDER_KINDS, PROVIDER_PRESETS, THINKING_STYLES } from "../model/presets.ts";
-import { formatAmount } from "../model/format-balance.ts";
+import { THINKING_STYLES } from "../model/presets.ts";
+import { combineBalances, formatAmount, formatBalance } from "../model/format-balance.ts";
 import type { ModelPrice, ProviderKind, ThinkingStyle } from "../model/types.ts";
 
 /** The provider whose page the navigation opened. Without one, the section is the overview. */
@@ -36,6 +36,7 @@ const {
   patchProvider,
   balances,
   loadBalance,
+  loadBalances,
   fetchModels,
   registerModel,
   unregisterModel,
@@ -46,6 +47,9 @@ const {
   remoteModels,
   fetchingModels,
   modelsError,
+  kindOptions,
+  presetFor,
+  hasBalance: kindHasBalance,
 } = useProviders();
 const selected = computed(() => providers.value.find((item) => item.id === props.providerId));
 const enabledCount = computed(() => providers.value.filter((item) => item.enabled).length);
@@ -53,9 +57,25 @@ const modelCount = computed(() =>
   providers.value.reduce((sum, item) => sum + (item.enabled ? item.models.length : 0), 0),
 );
 
-const preset = computed(() => PROVIDER_PRESETS[selected.value?.kind ?? "custom"]);
+const preset = computed(() => presetFor(selected.value?.kind ?? "custom"));
+// A provider saved with a plugin kind stays editable after the plugin is disabled.
+const shownKinds = computed(() => {
+  const list = [...kindOptions.value];
+  const kind = selected.value?.kind;
+  if (kind && !list.some((item) => item.kind === kind))
+    list.push({ kind, title: `${kind} · плагин выключен` });
+  return list;
+});
 const balance = computed(() => (selected.value ? balances.value[selected.value.id] : undefined));
-const hasBalance = computed(() => selected.value?.kind === "deepseek");
+const hasBalance = computed(() => (selected.value ? kindHasBalance(selected.value.kind) : false));
+const walletRows = computed(() =>
+  providers.value.flatMap((provider) => {
+    const value = balances.value[provider.id];
+    return value?.status === "ready" ? [{ provider, value }] : [];
+  }),
+);
+const combined = computed(() => combineBalances(walletRows.value.map((row) => row.value)));
+onMounted(() => void loadBalances());
 
 const PRICE_FIELDS = [
   ["input", "вход"],
@@ -118,7 +138,7 @@ function setContext(id: string, value: string): void {
 /** A new type brings the thinking dialect that suits it; the user can pick another afterwards. */
 function changeKind(kind: ProviderKind): void {
   if (selected.value)
-    patchProvider(selected.value.id, { kind, thinkingStyle: PROVIDER_PRESETS[kind].thinking });
+    patchProvider(selected.value.id, { kind, thinkingStyle: presetFor(kind).thinking });
 }
 
 function toggle(row: ModelRow, on: boolean): void {
@@ -151,13 +171,14 @@ commands.scope.registerCommand({
   id: "ide.providers.add",
   title: "Добавить провайдера",
   description:
-    "Добавляет провайдера из пресета: deepseek, qwencloud, local или custom (по умолчанию custom). Подставляет адрес и модель; ключ вводится в форме, затем «сохранить».",
-  arguments: { kind: "deepseek | qwencloud | local | custom" },
+    "Добавляет провайдера из пресета: deepseek, qwencloud, local или custom (по умолчанию custom), а также вид, объявленный включённым плагином. Подставляет адрес и модель; ключ вводится в форме, затем «сохранить».",
+  arguments: { kind: "deepseek | qwencloud | local | custom | <вид из плагина>" },
   run: (value) => {
-    const kind = commandArgs(value).kind ?? "custom";
-    if (!PROVIDER_KINDS.includes(kind as ProviderKind))
+    const raw = commandArgs(value).kind;
+    const kind = typeof raw === "string" ? raw : "custom";
+    if (!kindOptions.value.some((item) => item.kind === kind))
       throw new Error("Неизвестный тип провайдера");
-    return add(kind as ProviderKind);
+    return add(kind);
   },
 });
 commands.scope.registerCommand({
@@ -200,7 +221,7 @@ commands.scope.registerCommand({
   id: "ide.providers.balance.refresh",
   title: "Обновить баланс провайдера",
   description:
-    "Запрашивает баланс выбранного провайдера (сейчас только DeepSeek; у Qwen Cloud и локальных баланса по ключу нет).",
+    "Запрашивает баланс выбранного провайдера: DeepSeek и виды, для которых включённый плагин зарегистрировал читатель.",
   enabled: () => hasBalance.value,
   run: async () => {
     if (selected.value) await loadBalance(selected.value.id);
@@ -221,14 +242,25 @@ function keyDraft(): string {
         Провайдеры OpenAI-compatible API перечислены слева: у каждого своя страница. Включённых
         может быть сколько угодно, агент выбирает любую их модель.
       </UiHint>
+      <UiStack v-if="walletRows.length" class="wallets" :gap="1">
+        <UiInline wrap justify="between">
+          <span class="kicker">все кошельки</span>
+          <strong>{{ formatBalance(combined) }}</strong>
+        </UiInline>
+        <UiInline v-for="row in walletRows" :key="row.provider.id" wrap :gap="2">
+          <span>{{ row.provider.name }}</span>
+          <span class="wallet-balance">{{ formatBalance(row.value.entries) }}</span>
+          <span v-if="!row.provider.enabled" class="wallet-off">выключен</span>
+        </UiInline>
+      </UiStack>
       <UiInline wrap :gap="2">
         <UiButton
-          v-for="kind in PROVIDER_KINDS"
-          :key="kind"
-          :title="PROVIDER_PRESETS[kind].label"
-          @click="commands.run('ide.providers.add', { kind })"
+          v-for="info in kindOptions"
+          :key="info.kind"
+          :title="info.title"
+          @click="commands.run('ide.providers.add', { kind: info.kind })"
         >
-          + {{ kind === "custom" ? "другой" : PROVIDER_PRESETS[kind].name.split(" ")[0] }}
+          + {{ info.kind === "custom" ? "другой" : info.title.split(" ")[0] }}
         </UiButton>
       </UiInline>
       <UiHint v-if="providers.length">
@@ -255,8 +287,8 @@ function keyDraft(): string {
             :value="selected.kind"
             @change="changeKind(($event.target as HTMLSelectElement).value as ProviderKind)"
           >
-            <option v-for="kind in PROVIDER_KINDS" :key="kind" :value="kind">
-              {{ PROVIDER_PRESETS[kind].label }}
+            <option v-for="info in shownKinds" :key="info.kind" :value="info.kind">
+              {{ info.title }}
             </option>
           </UiControl>
         </UiField>
@@ -586,5 +618,32 @@ function keyDraft(): string {
   align-items: center;
   font-size: var(--fs-xs);
   cursor: pointer;
+}
+
+.wallets {
+  padding: var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.wallets strong,
+.wallet-balance {
+  font-variant-numeric: tabular-nums;
+}
+
+.wallets .kicker {
+  color: var(--muted);
+  font-size: var(--fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.wallet-balance {
+  color: var(--text-2);
+}
+
+.wallet-off {
+  color: var(--muted);
+  font-size: var(--fs-2xs);
 }
 </style>

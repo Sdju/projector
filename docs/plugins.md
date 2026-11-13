@@ -37,9 +37,9 @@ Projector поддерживает локальные плагины: цвето
 - `version` обязателен и должен быть semver `x.y.z`, с необязательными prerelease/build-частями.
 - `description`, `engines.projector`, `dependencies` и `optionalDependencies` необязательны. Для `engines.projector` проверяется совместимость с текущей версией Projector; поддерживаются `*`, `latest`, сравнения, `^`, `~`, пробелы между условиями и `||`. В `dependencies` и `optionalDependencies` запрещены локальные протоколы `workspace:`, `catalog:`, `file:`, `link:`, `portal:`.
 - `projector.apiVersion` обязателен и сейчас равен только `1`; это версия контракта автора.
-- `projector.server` необязателен и указывает на собранный CommonJS-модуль; он допустим только вместе с `contributes.agents`.
+- `projector.server` необязателен и указывает на собранный CommonJS-модуль; он допустим вместе с `contributes.agents` или `contributes.balances`.
 - `projector.browser` необязателен и указывает на собранный ESM-модуль, например `dist/browser.js`. Entry обязан лежать в подкаталоге артефактов (не в корне пакета), а все относительные chunks и ассеты — рядом с ним.
-- `projector.contributes` содержит хотя бы один непустой вклад: `themes`, `agents`, `languages`, `panels` или `tabs`.
+- `projector.contributes` содержит хотя бы один непустой вклад: `themes`, `agents`, `balances`, `languages`, `panels` или `tabs`.
 - `projector.contributes.themes` необязателен; если он есть, каждая тема проверяется по правилам ниже.
 - `projector.contributes.agents` необязателен; агент описывается декларативно и запускается через ACP.
 - `projector.contributes.languages` объявляет метаданные языка без исполнения JS: `id`, `title`, необязательные `description`, `extensions`, `filenames` и `priority` (от -1000 до 1000). Нужен хотя бы один из `extensions`/`filenames`; расширения и имена файлов ограничены безопасным алфавитом.
@@ -159,11 +159,51 @@ exports.createAgents = (api) => [
 ];
 ```
 
-`api` версии `1` даёт `createAcpBackend(program)` и `api.acp` с `createPlainDialect`, `extendPlainDialect`, `inputOf`, `isOver`, `readCompaction`, `shorten` и `uuidV7Time`. Для не-ACP агента есть `api.host` — среда без секретов Projector, проверка проекта, вложения, replay истории, injector, `sessionListLimit` и `runHosted(options, handle, agentId)`; `api.features` отдаёт включённые возможности, `api.roles` — текст роли и пути навыков, `api.widgets` — только доверенные виджеты проекта и их справку, `api.mcp` — типизированные `McpServerConfig` пользователя/проекта и stdio-серверы `projector-ide`/`projector-widgets`. `api.require(specifier)` загружает пакет из собственного `node_modules` плагина: при подтверждении доверия (`trust`) серверный плагин с `dependencies`/`optionalDependencies` ставит их через `npm install --omit=dev --ignore-scripts --no-bin-links` в свою папку версии (либо использует уже собранный `node_modules` без симлинков), поэтому хеш доверия фиксирует и зависимости, а сам продукт не держит `@anthropic-ai/claude-agent-sdk` в своих зависимостях. Типы для автора лежат в `packages/server/modules/plugin-api`; их импортируют только через `import type`, чтобы собранный плагин не зависел от внутренних путей Projector. Готовые примеры — [`plugins/cursor`](../plugins/cursor) (ACP) и [`plugins/claude-code`](../plugins/claude-code) (SDK + браузерный вклад `api.agents`), сборка — `vp run build:plugin:cursor` и `vp run build:plugin:claude-code`.
+`api` версии `1` даёт `createAcpBackend(program)` и `api.acp` с `createPlainDialect`, `extendPlainDialect`, `inputOf`, `isOver`, `readCompaction`, `shorten` и `uuidV7Time`. Для не-ACP агента есть `api.host` — среда без секретов Projector, проверка проекта, вложения, replay истории, injector, `sessionListLimit` и `runHosted(options, handle, agentId)`; `api.features` отдаёт включённые возможности, `api.roles` — текст роли и пути навыков, `api.widgets` — только доверенные виджеты проекта и их справку, `api.mcp` — типизированные `McpServerConfig` пользователя/проекта и stdio-серверы `projector-ide`/`projector-widgets`, `api.providers.registerBalance` — читатель денежного баланса для вида из `contributes.balances`. `api.require(specifier)` загружает пакет из собственного `node_modules` плагина: при подтверждении доверия (`trust`) серверный плагин с `dependencies`/`optionalDependencies` ставит их через `npm install --omit=dev --ignore-scripts --no-bin-links` в свою папку версии (либо использует уже собранный `node_modules` без симлинков), поэтому хеш доверия фиксирует и зависимости, а сам продукт не держит `@anthropic-ai/claude-agent-sdk` в своих зависимостях. Типы для автора лежат в `packages/server/modules/plugin-api`; их импортируют только через `import type`, чтобы собранный плагин не зависел от внутренних путей Projector. Готовые примеры — [`plugins/cursor`](../plugins/cursor) (ACP) и [`plugins/claude-code`](../plugins/claude-code) (SDK + браузерный вклад `api.agents`), сборка — `vp run build:plugin:cursor` и `vp run build:plugin:claude-code`.
 
 Доверенный код может сам отдавать лимиты подписки: `backend.usage = { kind: "function", read(checkedAt) }`, а `backend.usageWindows` задаёт подписи и длительность окон (`name`, `label`, `shortLabel`, `periodSeconds`, необязательные `ticks`). Projector выставляет общий маршрут `/api/agent/usage/<id>`, кеширует ответ и рисует его тем же индикатором, что и декларативный `usage.command`; без плагина маршрут отвечает «агент не сообщает лимиты». Так Cursor отдаёт свои окна «Всего / Авто / API» из `plugins/cursor`, а Claude Code — «Неделя / 5 часов» из `plugins/claude-code` (включая браузерный `mountUsage` через `api.agents`), без встроенных модулей и маршрутов. Список задач чата задаётся декларативно (`backend.plan = { tools: ["create_plan", "update_todos"] }` для общего reader'а с поддержкой `activeForm`/`active`) либо через браузерный вклад `api.agents.register({ id, plan, mountUsage, toolLabel })` в `projector.browser`. В потоке событий `"tool"` серверный код плагина может сразу отдавать `kind`, `label` и `paths`, поэтому общему ядру не нужно знать имена инструментов и поля путей конкретного агента.
 
 Токенную аналитику плагин тоже приносит с собой: `backend.usageLog` принимает `UsageLogReader` (`agent`, `label`, `roots()`, `files()`, `read()` и необязательные `append`/`maxBytes`). Projector регистрирует читатель вместе с агентом, сканирует его журналы в общую вкладку «Аналитика расхода» и снимает читатель при выключении плагина. Читатель возвращает метаданные — время, модель, каталог, токены и необязательную стоимость; промпты и вывод инструментов не индексируются. Встроенные Codex, OpenCode и Kimi и плагины Cursor и Claude Code используют ровно этот путь.
+
+Денежный баланс нового вида провайдера плагин объявляет в `contributes.balances` и регистрирует читатель в `api.providers.registerBalance`:
+
+```json
+{
+  "projector": {
+    "apiVersion": 1,
+    "server": "dist/server.cjs",
+    "contributes": {
+      "balances": [
+        {
+          "kind": "openrouter",
+          "title": "OpenRouter",
+          "url": "https://openrouter.ai/api/v1",
+          "model": "openai/gpt-5"
+        }
+      ]
+    }
+  }
+}
+```
+
+```js
+exports.createPlugin = (api) => ({
+  agents: [],
+  balances: [
+    {
+      kind: "openrouter",
+      read: async ({ url, apiKey, signal }) => ({
+        status: "ready",
+        entries: [{ currency: "USD", total: "12.50", granted: "0", toppedUp: "12.50" }],
+        available: true,
+        message: null,
+      }),
+    },
+  ],
+});
+```
+
+Вид появляется в настройках провайдеров вместе с URL и моделью пресета; баланс входит в общий индикатор и в аналитику, пока плагин включён и доверен. Встроенные виды `deepseek`, `qwencloud`, `local` и `custom` зарезервированы. Читатель получает `signal` с таймаутом 10 секунд; ответ нормализуется, суммы принимаются только как неотрицательные десятичные строки. `createAgents(api)` остаётся совместимым: вместо `createPlugin` можно вернуть массив агентов и вызвать `api.providers.registerBalance` внутри, если пакет объявил вид в манифесте.
 
 Код выполняется **в процессе сервера с его правами**, без песочницы. Поэтому он загружается только после явного доверия и включения пакета, а изменение любого файла пакета снимает доверие. Этот API не выдаёт браузерный UI и внутренние модули клиента: для UI есть отдельный `projector.browser`, а для изоляции всё ещё нужен будущий отдельный runtime/процесс. Hosted-ход плагина идёт отдельным процессом `server/app/plugin-runner.ts`: сервер передаёт в окружении entry и хеш пакета и id агента, раннер загружает тот же плагин, регистрирует его бэкенды и возможности и вызывает прямой `backend.run` без повторного hosting.
 
@@ -306,7 +346,7 @@ JSON токенов — плоский объект. Обязательны `bg`
 
 ## API
 
-Все ответы каталога имеют вид `{ directory, plugins, availableThemes }`. Элемент `plugins` содержит `id`, необязательные `version`, `description`, `path`, `status`, `enabled`, `trusted`, `requiresTrust`, `hash`, `server`, `browser`, `diagnostics: [{ message }]`, `themes`, `agents`, `languages`, `panels` и `tabs`. `browser` — `{ entry, key, hash }`; абсолютных путей к ассетам нет. Элемент `availableThemes` и `themes` содержит полный `id`, `packageName`, `title`, необязательный `description`, `mode` и проверенные `tokens`.
+Все ответы каталога имеют вид `{ directory, plugins, availableThemes }`. Элемент `plugins` содержит `id`, необязательные `version`, `description`, `path`, `status`, `enabled`, `trusted`, `requiresTrust`, `hash`, `server`, `browser`, `diagnostics: [{ message }]`, `themes`, `agents`, `balances`, `languages`, `panels` и `tabs`. `browser` — `{ entry, key, hash }`; абсолютных путей к ассетам нет. Элемент `availableThemes` и `themes` содержит полный `id`, `packageName`, `title`, необязательный `description`, `mode` и проверенные `tokens`.
 
 - `GET /api/plugins` — заново обнаруживает и читает локальные пакеты.
 - `POST /api/plugins` с `{"action":"refresh"}` — то же обновление каталога.
