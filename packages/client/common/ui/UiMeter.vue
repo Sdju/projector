@@ -23,6 +23,14 @@ const parts = computed(() =>
     ? props.segments.map((segment) => ({ ...segment, width: clamp(segment.value) }))
     : [{ tone: props.tone, soft: props.soft, width: clamp(props.value) }],
 );
+const ariaValue = computed(() =>
+  props.segments?.length
+    ? Math.min(
+        100,
+        props.segments.reduce((sum, segment) => sum + segment.value, 0),
+      )
+    : props.value,
+);
 </script>
 
 <template>
@@ -32,7 +40,7 @@ const parts = computed(() =>
     role="meter"
     aria-valuemin="0"
     aria-valuemax="100"
-    :aria-valuenow="value"
+    :aria-valuenow="ariaValue"
     :aria-label="ariaLabel"
   >
     <i

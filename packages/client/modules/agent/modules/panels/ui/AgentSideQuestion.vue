@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, watch } from "vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import UiSpinner from "../../../../../common/ui/UiSpinner.vue";
+import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import { AgentMarkdown } from "../../../../agent-turns/index.ts";
 import type { SideQuestion } from "../model/side-question.ts";
 import IconMessageCircleQuestion from "~icons/lucide/message-circle-question";
@@ -107,7 +108,7 @@ watch(
           </li>
         </ul>
         <AgentMarkdown v-if="state.current" :text="state.current" :streaming="state.busy" />
-        <p v-else-if="state.busy" class="pending"><UiSpinner /> Смотрю состояние чата…</p>
+        <UiLoader v-else-if="state.busy" class="pending">Смотрю состояние чата…</UiLoader>
       </article>
       <p v-if="state.error" class="error" role="alert">{{ state.error }}</p>
     </div>

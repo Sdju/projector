@@ -7,6 +7,7 @@ import UiInline from "../../../common/ui/UiInline.vue";
 import UiLoader from "../../../common/ui/UiLoader.vue";
 import UiMessage from "../../../common/ui/UiMessage.vue";
 import UiStack from "../../../common/ui/UiStack.vue";
+import UiStat from "../../../common/ui/UiStat.vue";
 import { countRu } from "../../../common/utilities/plural.ts";
 import { useUsageAnalytics } from "../model/analytics.ts";
 import { formatCost, formatMoney, formatPercent, formatRange } from "../model/format.ts";
@@ -158,16 +159,8 @@ const stats = computed(() => {
 
     <template v-if="data">
       <div class="stats">
-        <UiCard
-          v-for="stat in stats"
-          :key="stat.label"
-          appearance="frame"
-          density="compact"
-          class="stat"
-        >
-          <span class="stat-label">{{ stat.label }}</span>
-          <strong>{{ stat.value }}</strong>
-          <span class="stat-hint">{{ stat.hint }}</span>
+        <UiCard v-for="stat in stats" :key="stat.label" appearance="frame" density="compact">
+          <UiStat :label="stat.label" :value="stat.value" :hint="stat.hint" />
         </UiCard>
       </div>
 
@@ -387,23 +380,6 @@ const stats = computed(() => {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: var(--sp-2);
-}
-.stat {
-  display: grid;
-  gap: 2px;
-  align-content: start;
-}
-.stat-label,
-.stat-hint {
-  color: var(--muted);
-  font-size: var(--fs-2xs);
-}
-.stat strong {
-  color: var(--text);
-  font-size: var(--fs-md);
-  font-weight: 600;
-  line-height: 1.2;
-  font-variant-numeric: tabular-nums;
 }
 .grid {
   display: grid;

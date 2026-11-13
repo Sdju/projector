@@ -7,6 +7,7 @@ import UiFormGrid from "../../../common/ui/UiFormGrid.vue";
 import UiScrollArea from "../../../common/ui/UiScrollArea.vue";
 
 import UiHint from "../../../common/ui/UiHint.vue";
+import UiLoader from "../../../common/ui/UiLoader.vue";
 import { computed, ref } from "vue";
 import UiButton from "../../../common/ui/UiButton.vue";
 import UiField from "../../../common/ui/UiField.vue";
@@ -452,12 +453,8 @@ function keyDraft(): string {
             Провайдер сообщает, что средств для вызовов недостаточно.
           </UiMessage>
         </template>
-        <UiHint v-else>
-          {{
-            balance?.message ??
-            (selected.hasApiKey ? "загрузка…" : "Сохраните ключ, чтобы увидеть баланс.")
-          }}
-        </UiHint>
+        <UiLoader v-else-if="!balance?.message && selected.hasApiKey" size="sm">загрузка…</UiLoader>
+        <UiHint v-else>{{ balance?.message ?? "Сохраните ключ, чтобы увидеть баланс." }}</UiHint>
       </UiStack>
       <UiInline wrap justify="between">
         <UiInline wrap :gap="2">
