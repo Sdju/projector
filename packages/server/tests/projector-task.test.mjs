@@ -61,7 +61,7 @@ test("Projector task reads files in its own context and reports a task", async (
     expect(done).toMatchObject({ id: "task-1", status: "done" });
     expect(done.summary).toContain("одна строка");
     expect(done.tools).toBe(1);
-    expect(TASK_LIMITS.steps).toBe(6);
+    expect(TASK_LIMITS.steps).toBe(0);
   } finally {
     for (const [key, value] of Object.entries(old)) {
       if (value === undefined) delete process.env[key];

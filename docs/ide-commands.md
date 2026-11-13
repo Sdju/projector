@@ -256,7 +256,7 @@ and refuses a path already used by another project.
 
 `ide.workbench.agent.open` opens one virtual **Агент** tab; switching to a file keeps an active request alive, closing the chat or leaving the project aborts it. The agent has `list_commands`, `describe_command` and `execute_command`: discovery reads the live browser registry, execution requires a prior description in the same request and rechecks availability. `command-request` delegates to the originating browser through SSE, `POST /api/agent/tool-result` answers with a single-use id, requests expire after 60 seconds, other projects and disposed registrations are rejected; agent HTTP routes require loopback and reject foreign origins.
 
-The `bash` tool uses the OS adapter, defaults to the project directory, limits to 30 seconds and 256 KiB combined output, stops the process group on cancellation and excludes env names with KEY, TOKEN, SECRET, PASSWORD or CREDENTIAL. It runs with the user's permissions, not as a sandbox; with a Docker environment it runs inside the container, in a trusted Dev Container — through `devcontainer exec` ([docker](docker.md)).
+The `bash` tool uses the OS adapter, defaults to the project directory, has no time limit by default (`PROJECTOR_AGENT_BASH_SECONDS` sets one, `0` is no limit), limits output to 256 KiB, stops the process group on cancellation and excludes env names with KEY, TOKEN, SECRET, PASSWORD or CREDENTIAL. It runs with the user's permissions, not as a sandbox; with a Docker environment it runs inside the container, in a trusted Dev Container — through `devcontainer exec` ([docker](docker.md)).
 
 ### IDE MCP server for external agents
 

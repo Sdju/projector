@@ -55,7 +55,7 @@ export function runDocker(
   if (options.onOutput)
     return runStreamingProcess("docker", args, {
       cwd: options.cwd,
-      timeout: options.timeout ?? 15000,
+      timeout: options.timeout === 0 ? undefined : (options.timeout ?? 15000),
       signal: options.signal,
       env: dockerEnv(),
       onOutput: options.onOutput,
@@ -63,7 +63,7 @@ export function runDocker(
     });
   return execute("docker", args, {
     cwd: options.cwd,
-    timeout: options.timeout ?? 15000,
+    timeout: options.timeout === 0 ? undefined : (options.timeout ?? 15000),
     signal: options.signal,
     maxBuffer: 4 * 1024 * 1024,
     windowsHide: true,
@@ -91,7 +91,7 @@ export function runNodeScript(
   if (options.onOutput)
     return runStreamingProcess(process.execPath, [script, ...args], {
       cwd: options.cwd,
-      timeout: options.timeout ?? 30000,
+      timeout: options.timeout === 0 ? undefined : (options.timeout ?? 30000),
       signal: options.signal,
       env,
       onOutput: options.onOutput,
@@ -99,7 +99,7 @@ export function runNodeScript(
     });
   return execute(process.execPath, [script, ...args], {
     cwd: options.cwd,
-    timeout: options.timeout ?? 30000,
+    timeout: options.timeout === 0 ? undefined : (options.timeout ?? 30000),
     signal: options.signal,
     maxBuffer: 4 * 1024 * 1024,
     windowsHide: true,

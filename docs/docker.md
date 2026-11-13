@@ -24,7 +24,7 @@
 - `initializeCommand`, `privileged`/`capAdd`/`securityOpt`, `runArgs`, `mounts`/`workspaceMount`, `dockerComposeFile` — на компьютере или с доступом к нему; `build`, `features`, `remoteUser: root` — от root при сборке; lifecycle hooks — в контейнере.
 - Доверие хранится в `devcontainer-trust.json` (0600) по реальному пути и хешу конфига с Dockerfile и Compose-файлами. Изменение любого отзывает доверие. Конфиг, ссылающийся наружу симлинком, игнорируется.
 - Решение принимается только локальным запросом и намеренно не является IDE-командой. Агенту доступны `ide.devcontainer.status`, `ide.devcontainer.review` (решает пользователь), `ide.devcontainer.stop` (`confirm: true`).
-- Доверенный проект: терминалы — `devcontainer up` и `devcontainer exec` через `@devcontainers/cli`, контейнер долгоживущий и общий, Projector его не удаляет. Bash агента — `devcontainer exec` в корне проекта (30 с; прерывание отменяет и сборку). Ссылки `/workspaces/<проект>/…` сопоставляются с проектом, пути вне проекта и `..` отклоняются; DnD файлов хоста отключён. Поддерживается один конфиг, вложенные `.devcontainer/<имя>/` не выбираются.
+- Доверенный проект: терминалы — `devcontainer up` и `devcontainer exec` через `@devcontainers/cli`, контейнер долгоживущий и общий, Projector его не удаляет. Bash агента — `devcontainer exec` в корне проекта (без предела времени по умолчанию, `PROJECTOR_AGENT_BASH_SECONDS`; прерывание отменяет и сборку). Ссылки `/workspaces/<проект>/…` сопоставляются с проектом, пути вне проекта и `..` отклоняются; DnD файлов хоста отключён. Поддерживается один конфиг, вложенные `.devcontainer/<имя>/` не выбираются.
 
 ## Compose
 

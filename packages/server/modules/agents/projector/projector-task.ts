@@ -16,8 +16,13 @@ import {
 } from "../../providers/index.ts";
 import { isForbiddenPath } from "./projector-guard.ts";
 
-/** A task is research, not an endless agent: a few reads and one answer are enough. */
-export const TASK_LIMITS = { steps: 6, seconds: 90, text: 80_000, tokens: 4_000 } as const;
+/** Task research budget; `PROJECTOR_TASK_MAX_STEPS`, `PROJECTOR_TASK_MAX_SECONDS` and `PROJECTOR_TASK_MAX_TOKENS` set it, 0 is no limit. */
+export const TASK_LIMITS = {
+  steps: Number(process.env.PROJECTOR_TASK_MAX_STEPS) || 0,
+  seconds: Number(process.env.PROJECTOR_TASK_MAX_SECONDS) || 0,
+  text: 80_000,
+  tokens: Number(process.env.PROJECTOR_TASK_MAX_TOKENS) || 0,
+} as const;
 
 const TASK_PROMPT = `Ты Projector Task — read-only исследователь внутри проекта. Тебе дают описание и задачу; изучи проект и верни короткую сводку для основного агента.
 
@@ -232,8 +237,13 @@ export async function runProjectorTask(
   const model = provider.chatModel(resolved.model);
   const style = resolved.thinking === false ? "none" : resolved.thinkingStyle;
   const thinking = thinkingBody(style, selection.thinking);
-  const timeout = AbortSignal.timeout(TASK_LIMITS.seconds * 1_000);
-  const signal = request.signal ? AbortSignal.any([request.signal, timeout]) : timeout;
+  const timeout =
+    TASK_LIMITS.seconds > 0 ? AbortSignal.timeout(TASK_LIMITS.seconds * 1_000) : undefined;
+  const signal = request.signal
+    ? timeout
+      ? AbortSignal.any([request.signal, timeout])
+      : request.signal
+    : timeout;
 
   patch({
     id: request.id,
@@ -254,9 +264,9 @@ export async function runProjectorTask(
         : TASK_PROMPT,
       prompt: `Проект: ${request.cwd ?? process.cwd()}\n\n${request.description}\n\n${request.prompt}`,
       tools: taskTools(request.cwd, signal),
-      stopWhen: stepCountIs(TASK_LIMITS.steps),
+      stopWhen: stepCountIs(TASK_LIMITS.steps > 0 ? TASK_LIMITS.steps : Number.POSITIVE_INFINITY),
       maxRetries: 0,
-      maxOutputTokens: TASK_LIMITS.tokens,
+      ...(TASK_LIMITS.tokens > 0 ? { maxOutputTokens: TASK_LIMITS.tokens } : {}),
       abortSignal: signal,
       providerOptions: thinking ? { qwenOpenai: thinking } : undefined,
     });
