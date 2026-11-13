@@ -22,17 +22,21 @@ export function formatCost(value: number): string {
   }).format(value);
 }
 
-/** A provider balance with its currency: `$0,24`, `¥110,00`, or `0,24 XYZ` when unknown. */
+/** A provider balance with its currency: `5,20 $`, `110,00 CN¥`, or `0,24 XYZ` when unknown. */
 export function formatMoney(value: number, currency: string): string {
   if (!Number.isFinite(value)) return "—";
   try {
     return new Intl.NumberFormat("ru", {
       style: "currency",
       currency,
-      maximumFractionDigits: value < 1 ? 4 : 2,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(value);
   } catch {
-    return `${formatCost(value)} ${currency}`;
+    return `${new Intl.NumberFormat("ru", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value)} ${currency}`;
   }
 }
 

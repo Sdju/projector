@@ -5,7 +5,7 @@ import { publishProviderBalance } from "../../_/usage-summary.ts";
 import { useUsagePolling } from "../../_/use-usage-polling.ts";
 import IconWallet from "~icons/lucide/wallet";
 import { useCommandScope } from "../../../../common/utilities/commands.ts";
-import { formatBalances, useProviders } from "../../../provider/index.ts";
+import { formatAmount, formatBalances, useProviders } from "../../../provider/index.ts";
 import type { ProviderBalance } from "../../../provider/index.ts";
 
 const { activeProviderId, revision } = useProviders();
@@ -32,10 +32,12 @@ const tooltip = computed(() => {
     const name = wallet.providerName ?? "Провайдер";
     if (wallet.status !== "ready") return `${name}: ${wallet.message ?? "—"}`;
     const amounts = wallet.entries
-      .map(
-        (entry) =>
-          `${entry.currency}: ${entry.total} (пополнено ${entry.toppedUp}, подарочные ${entry.granted})`,
-      )
+      .map((entry) => {
+        const total = formatAmount(entry.currency, entry.total);
+        const toppedUp = formatAmount(entry.currency, entry.toppedUp);
+        const granted = formatAmount(entry.currency, entry.granted);
+        return `${total} (пополнено ${toppedUp}, подарочные ${granted})`;
+      })
       .join(" · ");
     return `${name}: ${amounts}`;
   });

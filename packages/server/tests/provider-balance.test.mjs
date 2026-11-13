@@ -60,7 +60,13 @@ test("DeepSeek balance payload is validated and kept as decimal strings", () => 
       { currency: "USD", total: "5.20", granted: "0", toppedUp: "5.20" },
       { currency: "EUR", total: "1", granted: "0", toppedUp: "1" },
     ]),
-  ).toBe("$5.20 · 1 EUR");
+  ).toBe("$5.20 · 1.00 EUR");
+  expect(
+    formatBalance([
+      { currency: "USD", total: "5.205", granted: "0", toppedUp: "5.205" },
+      { currency: "CNY", total: "110.004", granted: "0", toppedUp: "110.004" },
+    ]),
+  ).toBe("$5.21 · ¥110.00");
   for (const value of [
     null,
     {},
