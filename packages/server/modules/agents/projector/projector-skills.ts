@@ -64,7 +64,8 @@ export function parseFrontmatter(text: string): { meta: Record<string, string>; 
 
 async function entries(dir: string) {
   try {
-    return await readdir(dir, { withFileTypes: true });
+    const items = await readdir(dir, { withFileTypes: true });
+    return items.sort((a, b) => a.name.localeCompare(b.name));
   } catch {
     return [];
   }

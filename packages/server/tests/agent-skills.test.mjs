@@ -67,9 +67,19 @@ describe("agent skills and commands", () => {
 
   it("ships built-in skills, and the user's own skill wins over one", async () => {
     const skills = await listSkills(project);
-    const builtin = skills.find((item) => item.source === "system");
-    expect(builtin?.name).toBe("add-projects");
-    expect(builtin?.body).toContain("find_projects");
+    const builtin = skills.filter((item) => item.source === "system");
+    expect(builtin.map((item) => item.name)).toEqual([
+      "add-projects",
+      "agent-jobs",
+      "agent-management",
+      "docker",
+      "github-ci",
+      "network-gateway",
+    ]);
+    expect(builtin.find((item) => item.name === "add-projects")?.body).toContain("find_projects");
+    expect(builtin.find((item) => item.name === "agent-jobs")?.body).toContain(
+      "ide.agent.job.start",
+    );
 
     await put(join(data, "projector", "agent"), "skills/add-projects/SKILL.md", "Мой вариант");
     const overridden = await listSkills(project);
@@ -87,11 +97,16 @@ describe("agent skills and commands", () => {
       );
     const section = skillsSection(await listSkills(project));
     expect(section).toContain("- add-projects:");
+    expect(section).toContain("- agent-jobs:");
     expect(section.split("\n").filter((line) => line.startsWith("- own-")).length).toBe(40);
   });
 
   it("leaves the extracted instructions out of the base prompt", () => {
-    expect(buildSystemPrompt("")).not.toContain("Добавление приложений");
+    const base = buildSystemPrompt("");
+    expect(base).not.toContain("Добавление приложений");
+    expect(base).not.toContain("ide.agent.job.worktree");
+    expect(base).not.toContain("ide.openai.gateway.set");
+    expect(base).not.toContain("ide.docker.*");
   });
 
   it("expands /command and /skill, and leaves the rest as typed", async () => {
@@ -110,6 +125,15 @@ describe("agent skills and commands", () => {
   it("offers them as the slash commands of the agent", async () => {
     await put(project, ".projector/commands/review.md", "---\ndescription: Ревью\n---\nтекст");
     const names = (await projectorBackend.commands(project)).map((item) => item.name);
-    expect(names).toEqual(["compact", "review", "add-projects"]);
+    expect(names).toEqual([
+      "compact",
+      "review",
+      "add-projects",
+      "agent-jobs",
+      "agent-management",
+      "docker",
+      "github-ci",
+      "network-gateway",
+    ]);
   });
 });
