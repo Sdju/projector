@@ -84,22 +84,27 @@ export function turnChanges(tools: AgentToolChip[], root = ""): FileChange[] {
     const data = parseObject(tool.input);
     if (!data) continue;
     const name = tool.name.toLowerCase();
-    const path = data.file_path ?? data.filePath ?? data.path;
-    if (name === "write") touch(path, lines(data.content), 0);
-    else if (name === "edit") {
-      const { added, removed } = editLines(
-        data.old_string ?? data.oldString,
-        data.new_string ?? data.newString,
-      );
-      touch(path, added, removed);
-    } else if (name === "multiedit" && Array.isArray(data.edits))
-      for (const edit of data.edits as Record<string, unknown>[]) {
+    const path = data.file_path ?? data.filePath ?? data.path ?? tool.paths?.[0];
+    const isWrite = name === "write" || name === "write_file" || tool.kind === "write";
+    const isEdit = name === "edit" || name === "edit_file" || tool.kind === "edit";
+    if (isWrite) touch(path, lines(data.content), 0);
+    else if (isEdit || Array.isArray(data.edits)) {
+      if (Array.isArray(data.edits))
+        for (const edit of data.edits as Record<string, unknown>[]) {
+          const { added, removed } = editLines(
+            edit.old_string ?? edit.oldString,
+            edit.new_string ?? edit.newString,
+          );
+          touch(path, added, removed);
+        }
+      else {
         const { added, removed } = editLines(
-          edit.old_string ?? edit.oldString,
-          edit.new_string ?? edit.newString,
+          data.old_string ?? data.oldString,
+          data.new_string ?? data.newString,
         );
         touch(path, added, removed);
       }
+    }
   }
   return [...byPath.values()];
 }

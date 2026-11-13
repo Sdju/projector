@@ -1,6 +1,6 @@
 import type { AgentQuestion } from "./command-bridge.ts";
 import type { AgentEventName } from "./backend.ts";
-import { pathsOfCall, type GitSnapshot } from "./jobs-files.ts";
+import { normalizeTouchedPaths, pathsOfCall, type GitSnapshot } from "./jobs-files.ts";
 import {
   JOURNAL_LIMIT,
   saveJob,
@@ -148,7 +148,9 @@ export function onEvent(entry: Live, event: AgentEventName, data: unknown): void
     }
     case "tool": {
       const name = String(body.name ?? "");
-      for (const path of pathsOfCall(name, body.input, job.cwd)) entry.touched.add(path);
+      const explicitPaths = normalizeTouchedPaths(body.paths, job.cwd);
+      const paths = explicitPaths.length ? explicitPaths : pathsOfCall(name, body.input, job.cwd);
+      for (const path of paths) entry.touched.add(path);
       record(entry, event, { ...body, input: shrink(body.input) });
       return;
     }

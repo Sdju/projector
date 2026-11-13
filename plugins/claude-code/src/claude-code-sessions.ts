@@ -14,6 +14,7 @@ import {
   taskOfCall,
 } from "./claude-code-replay.ts";
 import { claudeMessageTimes } from "./claude-code-times.ts";
+import { claudeToolMeta } from "./tools.ts";
 
 /** Claude Code accepts model aliases, so the list does not go stale with every release. */
 const permissionOptions = [
@@ -210,11 +211,14 @@ export async function claudeLoadSession(
         if (block.type === "text" && block.text) replay.text(block.text);
         else if (block.type === "thinking" && block.thinking) replay.thought(block.thinking);
         else if (block.type === "tool_use" && block.id) {
+          const meta = claudeToolMeta(block.name ?? "tool", block.input);
           replay.tool({
             id: block.id,
             name: block.name ?? "tool",
             status: "running",
             detail: stringify(block.input),
+            ...(meta.kind ? { kind: meta.kind } : {}),
+            ...(meta.label ? { label: meta.label } : {}),
           });
           const task = taskOfCall(block.name, block.id, block.input);
           if (task) {

@@ -8,13 +8,16 @@ export {
 } from "./runtime.ts";
 export {
   languageRevision,
+  runtimeAgents,
   runtimeCommands,
   runtimeIssues,
   runtimeLanguages,
   runtimePanels,
   runtimeTabs,
   findLanguage,
+  findRuntimeAgent,
   reportIssue,
+  type ActiveAgent,
   type ActiveCommand,
   type ActiveLanguage,
   type ActivePanel,
@@ -22,6 +25,7 @@ export {
   type PluginRuntimeIssue,
 } from "./store.ts";
 export { default as PluginContributionMount } from "./ui/PluginMount.vue";
+export { default as PluginUsageMount } from "./ui/PluginUsageMount.vue";
 
 export function pluginPanelKind(packageName: string, id: string): string {
   return `plugin:${pluginPackageKey(packageName)}:panel:${id}`;

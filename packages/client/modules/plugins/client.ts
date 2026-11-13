@@ -28,6 +28,7 @@ export interface PluginInfo {
   languages: PluginLanguageContribution[];
   panels: PluginPanelContribution[];
   tabs: PluginTabContribution[];
+  dependencies?: Record<string, string>;
 }
 
 export interface PluginCatalog {

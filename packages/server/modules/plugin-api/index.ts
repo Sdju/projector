@@ -28,6 +28,7 @@ export type {
   PluginRoleApi,
   PluginWidgetApi,
 } from "../agents/plugin/index.ts";
+export type { McpServerConfig, McpSource } from "../agent-mcp/index.ts";
 export type {
   AcpCompaction,
   AcpDialect,

@@ -100,3 +100,15 @@ test("a non-string agent name throws a clear error", () => {
   for (const value of [42, true, {}, []])
     expect(() => resolveAgentBackend(value)).toThrow(/Идентификатор агента должен быть строкой/);
 });
+
+test("listAgentBackends includes defaultFeatures when the backend declares them", () => {
+  const id = "registry-defaults-probe";
+  try {
+    registerAgentBackend({ ...fake(id), defaultFeatures: ["widgets"] });
+    expect(listAgentBackends().find((backend) => backend.id === id)?.defaultFeatures).toEqual([
+      "widgets",
+    ]);
+  } finally {
+    unregisterAgentBackend(id);
+  }
+});

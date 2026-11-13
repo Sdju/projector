@@ -50,7 +50,8 @@ const diffLines = (before: unknown, after: unknown) => [
 ];
 
 /** Edit calls are shown as a diff: a path, an empty line, then `- `/`+ ` lines. */
-export const isEditTool = (name: string) => ["edit", "multiedit"].includes(name.toLowerCase());
+export const isEditTool = (name: string, kind?: string) =>
+  ["edit", "edit_file"].includes(name.toLowerCase()) || kind === "edit";
 
 const text = (value: unknown) => (typeof value === "string" ? value : JSON.stringify(value));
 

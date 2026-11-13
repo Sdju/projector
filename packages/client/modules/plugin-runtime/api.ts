@@ -3,6 +3,7 @@ import { PLUGIN_API_VERSION, type PluginApi } from "@ai-projector/plugin-api";
 import { deviceBase } from "../../common/utilities/device-url.ts";
 import {
   assetUrlFactory,
+  addAgent,
   addCommand,
   addLanguage,
   addPanel,
@@ -18,10 +19,12 @@ export function createApi(plugin: RuntimePluginInfo, scope: Scope): PluginApi {
   const languages = new Set(plugin.languages.map((item) => item.id));
   const panels = new Set(plugin.panels.map((item) => item.id));
   const tabs = new Set(plugin.tabs.map((item) => item.id));
+  const agents = new Set((plugin.agents ?? []).map((item) => item.id));
   const registeredLanguages = new Set<string>();
   const registeredPanels = new Set<string>();
   const registeredTabs = new Set<string>();
   const registeredCommands = new Set<string>();
+  const registeredAgents = new Set<string>();
 
   const assertActive = () => {
     if (scope.disposed) throw new Error("Плагин уже выключен");
@@ -115,6 +118,25 @@ export function createApi(plugin: RuntimePluginInfo, scope: Scope): PluginApi {
           arguments: contribution.arguments,
           run: contribution.run,
         });
+        scope.add(remove);
+        return { dispose: remove };
+      },
+    },
+    agents: {
+      register(contribution) {
+        assertActive();
+        if (!agents.has(contribution.id))
+          throw new Error(`Агент ${contribution.id} не объявлен в манифесте`);
+        if (registeredAgents.has(contribution.id))
+          throw new Error(`Агент ${contribution.id} уже зарегистрирован`);
+        if (contribution.plan !== undefined && typeof contribution.plan !== "function")
+          throw new Error(`Агент ${contribution.id}: plan должен быть функцией`);
+        if (contribution.mountUsage !== undefined && typeof contribution.mountUsage !== "function")
+          throw new Error(`Агент ${contribution.id}: mountUsage должен быть функцией`);
+        if (contribution.toolLabel !== undefined && typeof contribution.toolLabel !== "function")
+          throw new Error(`Агент ${contribution.id}: toolLabel должен быть функцией`);
+        registeredAgents.add(contribution.id);
+        const remove = addAgent(plugin.id, contribution, assetUrl);
         scope.add(remove);
         return { dispose: remove };
       },

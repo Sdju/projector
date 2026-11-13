@@ -2,6 +2,8 @@ import type { SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import type { ClaudeSdk, McpServerInfo, PluginCodeApi, RewindResult } from "./api.ts";
 import { claudeEnv } from "./claude-code-env.ts";
 
+export { processMcpConfig } from "./mcp.ts";
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (value: unknown): value is string =>
   typeof value === "string" && UUID.test(value);

@@ -43,11 +43,21 @@ export function readTodosPlan(tools: readonly string[]): AgentPlanReader {
     if (!Array.isArray(todos)) return undefined;
     return todos.flatMap((item): AgentPlanItem[] => {
       if (!item || typeof item !== "object") return [];
-      const { content, title, status } = item as Record<string, unknown>;
+      const { content, title, status, activeForm, active } = item as Record<string, unknown>;
       const text = typeof content === "string" ? content : typeof title === "string" ? title : "";
       const state = typeof status === "string" ? STATUSES[status] : undefined;
       if (!text.trim() || !state) return [];
-      return [{ content: text, status: state }];
+      return [
+        {
+          content: text,
+          status: state,
+          ...(typeof activeForm === "string"
+            ? { active: activeForm }
+            : typeof active === "string"
+              ? { active }
+              : {}),
+        },
+      ];
     });
   };
 }

@@ -1,5 +1,6 @@
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentEmitter, AgentTask, AgentTaskPatch } from "./api.ts";
+import { claudeToolMeta } from "./tools.ts";
 
 export const CLAUDE_LABEL = "Claude Code";
 
@@ -199,10 +200,14 @@ export function createClaudeEventMapper(emit: AgentEmitter) {
             if (toolNames.has(block.id)) continue;
             const name = block.name;
             toolNames.set(block.id, name);
+            const meta = claudeToolMeta(name, block.input);
             emit("tool", {
               id: block.id,
               name,
               input: block.input,
+              ...(meta.kind ? { kind: meta.kind } : {}),
+              ...(meta.label ? { label: meta.label } : {}),
+              ...(meta.paths?.length ? { paths: meta.paths } : {}),
               ...(message.parent_tool_use_id ? { parent: message.parent_tool_use_id } : {}),
             });
           } else if (

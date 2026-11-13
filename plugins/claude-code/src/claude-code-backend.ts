@@ -29,7 +29,8 @@ import {
   claudeUpdateSession,
 } from "./claude-code-sessions.ts";
 import { askClaudeQuestions } from "./questions.ts";
-import { CLAUDE_SESSION_ENV, claudeEnv } from "./claude-code-env.ts";
+import { claudeEnv } from "./claude-code-env.ts";
+import { processMcpConfig } from "./mcp.ts";
 
 /** What a Claude Code answer needs from the host: the plugin API and the Agent SDK. */
 export interface ClaudeDeps {
@@ -160,9 +161,9 @@ export async function runClaudeCode(deps: ClaudeDeps, options: AgentRunOptions):
   const namedMcp = options.role?.mcp
     ? Object.fromEntries(
         api.mcp
-          .byNames((await api.mcp.configs(cwd)) as { name: string }[], options.role.mcp)
+          .byNames(await api.mcp.configs(cwd), options.role.mcp)
           .filter((config) => !(config.name in extraMcp))
-          .map((config) => [config.name, api.mcp.process(config)]),
+          .map((config) => [config.name, processMcpConfig(config)]),
       )
     : {};
   const mcpServers = { ...namedMcp, ...extraMcp } as unknown as NonNullable<Options["mcpServers"]>;
@@ -397,14 +398,12 @@ const PERMISSION_MODES = ["default", "plan", "acceptEdits", "auto", "bypassPermi
 
 export function createClaudeBackend(api: PluginCodeApi): AgentBackend {
   const deps: ClaudeDeps = { api, sdk: api.require("@anthropic-ai/claude-agent-sdk") as ClaudeSdk };
-  // A server launched from a Claude Code session would leak its session variables to every
-  // terminal and agent it starts; the plugin clears them as soon as it is loaded.
-  api.host.clearEnv(CLAUDE_SESSION_ENV);
   return {
     id: "claude-code",
     label: CLAUDE_LABEL,
     program: "claude",
     terminal: { program: "claude", executable: "claude", title: CLAUDE_LABEL },
+    defaultFeatures: ["widgets"],
     capabilities: {
       hosted: true,
       inject: true,

@@ -29,6 +29,10 @@ export interface AgentToolChip {
   detail: string;
   /** The kind of action the agent named (ACP: read, edit, execute, search, fetch…). */
   kind?: string;
+  /** Host- or plugin-provided label; wins over the built-in name table. */
+  label?: string;
+  /** Paths the call named when the input does not. */
+  paths?: string[];
   /** Output the call has streamed so far, while it is still running. */
   output?: string;
   /** The call of a subagent (`Task`) this call was made inside of. */

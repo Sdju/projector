@@ -34,7 +34,9 @@ export function chatMarkdown(turns: AgentTurn[], title: string): string {
       if (!tool) continue;
       const raw = tool.input ?? "";
       const hint = skillCallName(tool.name, raw) ? "" : inputHint(raw);
-      body.push(`> ${toolLabel(tool.name, raw)}${hint ? `: \`${hint.replace(/`/g, "'")}\`` : ""}`);
+      body.push(
+        `> ${toolLabel(tool.name, raw, { label: tool.label, kind: tool.kind })}${hint ? `: \`${hint.replace(/`/g, "'")}\`` : ""}`,
+      );
     }
     out.push(`## ${title.split(" · ")[0] || "Агент"}\n\n${body.join("\n\n")}`);
   }

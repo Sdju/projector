@@ -10,7 +10,7 @@ import {
   appUrl,
   startServerLogRotation,
 } from "@ai-projector/core/modules/app-paths/index.ts";
-import { os } from "@ai-projector/core/modules/os/index.ts";
+import { os, PARENT_SESSION_ENV } from "@ai-projector/core/modules/os/index.ts";
 import { openLauncher, startTray } from "../modules/window/index.ts";
 import type { ServerMode } from "@ai-projector/core/modules/server-mode/index.ts";
 import { attachTerminalServer, listTerminalSessions } from "../modules/terminal/index.ts";
@@ -54,6 +54,7 @@ export function bindRuntime(
   mode: ServerMode,
   handlers: () => RuntimeHandlers = getRuntimeHandlers,
 ): () => void {
+  os.clearSessionEnv(PARENT_SESSION_ENV);
   // The daemon owns its log file: keep it bounded while dev warnings write megabytes.
   startServerLogRotation();
   // Регистрация при вызове, а не при импорте: импорт конфига Vite не должен трогать агентов.

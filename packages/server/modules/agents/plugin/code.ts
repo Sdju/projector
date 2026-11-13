@@ -15,7 +15,11 @@ import {
 } from "../../agent/index.ts";
 import { featureEnabled, featurePrompt } from "../../agent-features/index.ts";
 import { roleContext } from "../../agent-roles/index.ts";
-import { mcpConfigsForNames, mcpServerConfigs, processMcpConfig } from "../../agent-mcp/index.ts";
+import {
+  mcpConfigsForNames,
+  mcpServerConfigs,
+  type McpServerConfig,
+} from "../../agent-mcp/index.ts";
 import { trustedProjectWidgets } from "../../project-widgets/index.ts";
 import { renderWidgetGuide } from "@ai-projector/core/modules/widget-catalog/index.ts";
 import { clearSessionEnv } from "@ai-projector/core/modules/os/index.ts";
@@ -89,10 +93,8 @@ export interface PluginWidgetApi {
 
 /** MCP servers of the user, the project and Projector itself. */
 export interface PluginMcpApi {
-  configs(cwd?: string): Promise<unknown[]>;
-  byNames(configs: readonly { name: string }[], names?: readonly string[]): { name: string }[];
-  /** The shape the Claude Agent SDK takes in `mcpServers`. */
-  process(config: unknown): unknown;
+  configs(cwd?: string): Promise<McpServerConfig[]>;
+  byNames(configs: readonly McpServerConfig[], names?: readonly string[]): McpServerConfig[];
   /** The stdio server of the IDE command registry. */
   ide(projectId: string): {
     name: string;
@@ -112,7 +114,7 @@ export interface PluginMcpApi {
 /** The narrow runtime a trusted server-side plugin receives; types are its own business. */
 export interface PluginCodeApi {
   version: 1;
-  /** Loads a package installed next to the Projector server (the trusted plugin shares its trust). */
+  /** Loads a package from the plugin's own `node_modules`, not from the IDE's. */
   require(specifier: string): unknown;
   createAcpBackend: typeof createAcpBackend;
   acp: {
@@ -156,9 +158,10 @@ export async function loadCodeAgents(entry: string, hash?: string): Promise<Agen
   const module = await pending;
   const factory = module.createAgents ?? module.default;
   if (typeof factory !== "function") throw new Error("Плагин не экспортирует createAgents(api)");
+  const requireEntry = createRequire(entry);
   const api: PluginCodeApi = {
     version: 1,
-    require: (specifier) => requirePlugin(specifier) as unknown,
+    require: (specifier) => requireEntry(specifier) as unknown,
     createAcpBackend,
     acp: {
       createPlainDialect,
@@ -206,11 +209,7 @@ export async function loadCodeAgents(entry: string, hash?: string): Promise<Agen
     },
     mcp: {
       configs: (cwd) => mcpServerConfigs(cwd),
-      byNames: (configs, names) =>
-        mcpConfigsForNames(configs as Parameters<typeof mcpConfigsForNames>[0], names) as {
-          name: string;
-        }[],
-      process: (config) => processMcpConfig(config as Parameters<typeof processMcpConfig>[0]),
+      byNames: (configs, names) => mcpConfigsForNames(configs, names),
       ide: ideMcpServer,
       widgets: widgetsMcpServer,
     },

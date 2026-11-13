@@ -6,6 +6,7 @@ import {
   type AvailableTheme,
   type PluginManifest,
 } from "@ai-projector/core/modules/plugins/index.ts";
+import { ensurePluginDependencies } from "./deps.ts";
 import { copyPackage, destinationFor } from "./install.ts";
 import { loadPluginPackage, readJson } from "./load.ts";
 import { deleteState, readState, updateState } from "./state.ts";
@@ -198,6 +199,9 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         languages: loaded.languages,
         panels: loaded.panels,
         tabs: loaded.tabs,
+        ...(loaded.manifest.dependencies && Object.keys(loaded.manifest.dependencies).length
+          ? { dependencies: loaded.manifest.dependencies }
+          : {}),
       });
       if (enabled && trusted && !diagnostics.length) availableThemes.push(...loaded.themes);
     } catch (error) {
@@ -300,6 +304,12 @@ export async function trustPlugin(id: string): Promise<PluginCatalog> {
   if (!plugin || plugin.status === "missing" || !plugin.path)
     throw new Error("Плагин не найден на диске");
   if (!plugin.requiresTrust) throw new Error("Плагин не содержит исполняемого кода");
+  if (plugin.server) {
+    const manifest = validatePluginManifest(await readJson(join(plugin.path, "package.json")), {
+      projectorVersion: currentProjectorVersion,
+    });
+    await ensurePluginDependencies(plugin.path, manifest);
+  }
   const trustedHash = await hashPackage(plugin.path);
   const state = await readState();
   const current = state[id] ?? { enabled: false };

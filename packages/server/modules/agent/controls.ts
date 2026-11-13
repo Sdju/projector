@@ -58,6 +58,8 @@ export interface AgentSessionTurn {
     status: "running" | "done" | "error";
     detail: string;
     parent?: string;
+    kind?: string;
+    label?: string;
   }[];
   session?: { backend: string; id: string };
   /** When the message was written, in ms since the epoch; absent when the agent does not tell. */

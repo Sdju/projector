@@ -4,12 +4,16 @@
   "private": true,
   "description": "Claude Code через Anthropic Agent SDK для Projector",
   "type": "module",
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.291"
+  },
   "engines": {
     "projector": ">=0.12.0"
   },
   "projector": {
     "apiVersion": 1,
     "server": "dist/server.cjs",
+    "browser": "dist/browser.js",
     "contributes": {
       "agents": [
         {
@@ -22,7 +26,9 @@
             "executable": "claude",
             "title": "Claude Code"
           },
-          "command": "claude"
+          "defaultFeatures": [
+            "widgets"
+          ]
         }
       ]
     }

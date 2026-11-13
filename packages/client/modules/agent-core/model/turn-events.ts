@@ -214,6 +214,9 @@ export function applyAgentEvent(
         if (again.status === "running") again.detail = summarize(event.data.input);
         again.input = summarize(event.data.input);
         if (event.data.kind) again.kind = event.data.kind;
+        if (event.data.label) again.label = event.data.label;
+        if (Array.isArray(event.data.paths) && event.data.paths.length)
+          again.paths = event.data.paths;
         return false;
       }
       if (assistant.text.trim() && !assistant.text.endsWith("\n\n")) assistant.text += "\n\n";
@@ -228,6 +231,10 @@ export function applyAgentEvent(
         input: summarize(event.data.input),
         detail: summarize(event.data.input),
         ...(event.data.kind ? { kind: event.data.kind } : {}),
+        ...(event.data.label ? { label: event.data.label } : {}),
+        ...(Array.isArray(event.data.paths) && event.data.paths.length
+          ? { paths: event.data.paths }
+          : {}),
         startedAt: known?.startedAt ?? at,
         ...(known?.endedAt !== undefined ? { endedAt: known.endedAt } : {}),
         ...(event.data.parent ? { parent: event.data.parent } : {}),

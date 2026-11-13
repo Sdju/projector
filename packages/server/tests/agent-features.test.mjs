@@ -17,7 +17,12 @@ import {
   setFeatureAgent,
   splitFeaturePrompt,
 } from "../modules/agent-features/index.ts";
-import { readChatFeatures, writeAgentHistory } from "../modules/agent/index.ts";
+import {
+  readChatFeatures,
+  registerAgentBackend,
+  unregisterAgentBackend,
+  writeAgentHistory,
+} from "../modules/agent/index.ts";
 import { promptWithHistory } from "../modules/agent/agent-host.ts";
 import { claudeSystemPrompt } from "../../../plugins/claude-code/src/claude-code-backend.ts";
 import { loadPluginAnswer } from "../app/plugin-runner.ts";
@@ -228,5 +233,48 @@ describe("agent features", () => {
   it("the system prompt names the feature section only when the feature is on", () => {
     expect(buildSystemPrompt("Правило")).toContain("Интерактивные блоки:\nПравило");
     expect(buildSystemPrompt("")).not.toContain("Интерактивные блоки");
+  });
+
+  it("enables widgets by default for a plugin agent even after another agent was toggled", async () => {
+    await setFeatureAgent("widgets", "codex", true);
+    const id = "plugin-widgets-default";
+    registerAgentBackend({
+      id,
+      label: "Plugin Widgets",
+      defaultFeatures: ["widgets"],
+      run: async () => {},
+    });
+    try {
+      registerBuiltinAgentFeatures();
+      const settings = await featureSettings();
+      expect(agentOf(settings, id).enabled).toBe(true);
+      expect(agentOf(settings, "codex").enabled).toBe(true);
+
+      const off = await setFeatureAgent("widgets", id, false);
+      expect(agentOf(off, id).enabled).toBe(false);
+      registerBuiltinAgentFeatures();
+      expect(agentOf(await featureSettings(), id).enabled).toBe(false);
+    } finally {
+      unregisterAgentBackend(id);
+      registerBuiltinAgentFeatures();
+    }
+  });
+
+  it("does not enable ide by default when a plugin agent asks for it", async () => {
+    const id = "plugin-ide-default";
+    registerAgentBackend({
+      id,
+      label: "Plugin IDE",
+      defaultFeatures: ["ide"],
+      run: async () => {},
+    });
+    try {
+      registerBuiltinAgentFeatures();
+      const ide = (await featureSettings()).features.find((feature) => feature.id === "ide");
+      expect(ide.agents.find((agent) => agent.id === id).enabled).toBe(false);
+    } finally {
+      unregisterAgentBackend(id);
+      registerBuiltinAgentFeatures();
+    }
   });
 });

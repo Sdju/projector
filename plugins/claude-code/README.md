@@ -14,11 +14,13 @@
 - `backend.plan.tools = ["TodoWrite"]` для острова задач;
 - hosted-ход в отдельном процессе через `api.host.runHosted` и общий `app/plugin-runner.ts`.
 
-Agent SDK не копируется в bundle: плагин берёт его из зависимостей сервера через
-`api.require("@anthropic-ai/claude-agent-sdk")`, поэтому платформенный бинарник Claude CLI
-продолжает работать. `api.host` даёт среду без секретов Projector, вложения, историю, injector,
-replay и hosted-ход; `api.features`, `api.roles`, `api.widgets` и `api.mcp` — то же, что получали
-встроенные агенты.
+Agent SDK не копируется в bundle: плагин ставит `@anthropic-ai/claude-agent-sdk` в свои
+`dependencies` и грузит его через `api.require(...)` из собственного `node_modules`, поэтому
+платформенный бинарник Claude CLI продолжает работать. `api.host` даёт среду без секретов
+Projector, вложения, историю, injector, replay и hosted-ход; `api.features`, `api.roles`,
+`api.widgets` и `api.mcp` — то же, что получали встроенные агенты. Браузерный вход
+(`dist/browser.js`) регистрирует план `TodoWrite` с `activeForm`, подписи инструментов и
+индикатор лимитов с окном «Неделя» по умолчанию.
 
 ## Сборка
 
@@ -26,8 +28,9 @@ replay и hosted-ход; `api.features`, `api.roles`, `api.widgets` и `api.mcp`
 vp run build:plugin:claude-code
 ```
 
-Скрипт пишет `plugins/claude-code/dist/server.cjs`. Исходники импортируют типы сервера только
-через `src/api.ts`, поэтому в собранном модуле нет runtime-импортов `@ai-projector/*`.
+Скрипт пишет `plugins/claude-code/dist/server.cjs` и `dist/browser.js`. Исходники импортируют
+типы сервера только через `src/api.ts`, поэтому в собранном модуле нет runtime-импортов
+`@ai-projector/*`.
 
 ## Установка
 

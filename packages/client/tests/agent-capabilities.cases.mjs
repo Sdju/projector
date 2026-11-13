@@ -10,7 +10,7 @@ import { createClaudeBackend } from "../../../plugins/claude-code/src/claude-cod
 import { registerAgentBackend } from "../../server/modules/agent/index.ts";
 
 // The plugin backend normally arrives from the installed package; the test registers it directly.
-registerAgentBackend(createClaudeBackend({ require: () => ({}), host: { clearEnv: () => [] } }));
+registerAgentBackend(createClaudeBackend({ require: () => ({}) }));
 
 test("permission policy is the same control for the UI and IDE commands and is saved", async () => {
   const offered = await agentControls("claude-code", "/tmp");
@@ -156,7 +156,6 @@ test("new chats use the latest saved policy and concurrent control saves keep ea
 test("a raw run cannot supply an unsupported permission policy", async () => {
   const backend = createClaudeBackend({
     require: () => ({}),
-    host: { clearEnv: () => [] },
   });
   await expect(
     backend.run({ cwd: "/tmp", selection: { "permission-mode": "unknown" } }),

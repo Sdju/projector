@@ -14,6 +14,8 @@ export interface AgentFeature {
   instruction: () => string;
   /** Agents that have it until the user changes something. */
   defaults?: string[];
+  /** Plugin agents that declare this feature in `defaultFeatures` join `defaults`. */
+  allowPluginDefault?: boolean;
 }
 
 export interface AgentFeatureCatalog {

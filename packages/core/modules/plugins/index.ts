@@ -84,6 +84,8 @@ export interface PluginManifest {
   version: string;
   description?: string;
   engines?: { projector?: string };
+  dependencies?: Record<string, string>;
+  optionalDependencies?: Record<string, string>;
   projector: {
     apiVersion: typeof pluginApiVersion;
     /**
@@ -230,6 +232,32 @@ function satisfiesProjectorRange(version: string, range: string): boolean {
   });
 }
 
+function validateDependencyMap(value: unknown, label: string): void {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new Error(`${label} должен быть объектом`);
+  const forbidden = ["__proto__", "constructor", "prototype"].find((key) =>
+    Object.hasOwn(value, key),
+  );
+  if (forbidden) throw new Error(`${label}: недопустимое поле ${forbidden}`);
+  const entries = Object.entries(value);
+  if (entries.length > 200) throw new Error(`${label}: не более 200 записей`);
+  for (const [key, spec] of entries) {
+    if (!isPluginPackageName(key)) throw new Error(label + ": некорректное имя пакета " + key);
+    if (
+      typeof spec !== "string" ||
+      !spec ||
+      spec.length > 200 ||
+      spec.includes("\n") ||
+      spec.includes("\0")
+    )
+      throw new Error(
+        `${label}: версия ${key} должна быть непустой строкой до 200 символов без переводов строк и NUL`,
+      );
+    if (/^(workspace|catalog|file|link|portal):/.test(spec))
+      throw new Error(`${label}: недопустимый протокол у ${key}`);
+  }
+}
+
 export function validatePluginManifest(
   value: unknown,
   options: PluginValidationOptions = {},
@@ -237,7 +265,17 @@ export function validatePluginManifest(
   assertRecord(value, "Манифест плагина");
   assertAllowedKeys(
     value,
-    ["name", "version", "description", "private", "type", "engines", "projector"],
+    [
+      "name",
+      "version",
+      "description",
+      "private",
+      "type",
+      "engines",
+      "dependencies",
+      "optionalDependencies",
+      "projector",
+    ],
     "Манифест плагина",
   );
   if (!isPluginPackageName(value.name)) throw new Error("Некорректное имя пакета плагина");
@@ -260,6 +298,9 @@ export function validatePluginManifest(
     )
       throw new Error("Плагин несовместим с этой версией Projector");
   }
+  if (value.dependencies !== undefined) validateDependencyMap(value.dependencies, "dependencies");
+  if (value.optionalDependencies !== undefined)
+    validateDependencyMap(value.optionalDependencies, "optionalDependencies");
   assertRecord(value.projector, "projector");
   assertAllowedKeys(
     value.projector,
@@ -331,7 +372,8 @@ export function validatePluginManifest(
   }
   if (agents) {
     const ids = new Set<string>();
-    for (const agent of agents) validateAgentContribution(agent, ids);
+    const hasServer = value.projector.server !== undefined;
+    for (const agent of agents) validateAgentContribution(agent, ids, { hasServer });
   }
   return value as unknown as PluginManifest;
 }

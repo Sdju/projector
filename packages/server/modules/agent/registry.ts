@@ -72,6 +72,7 @@ export interface AgentBackendSummary {
   program?: string;
   terminal?: AgentTerminal;
   builtin?: boolean;
+  defaultFeatures?: readonly string[];
   capabilities?: AgentCapabilities;
   usageUrl?: string;
   usageWindows?: readonly AgentUsageWindowDefinition[];
@@ -90,6 +91,7 @@ export function listAgentBackends(): AgentBackendSummary[] {
       program,
       terminal,
       builtin,
+      defaultFeatures,
       capabilities,
       usageUrl,
       usageWindows,
@@ -103,6 +105,7 @@ export function listAgentBackends(): AgentBackendSummary[] {
       ...(program ? { program } : {}),
       ...(terminal ? { terminal } : {}),
       ...(builtin ? { builtin } : {}),
+      ...(defaultFeatures?.length ? { defaultFeatures } : {}),
       ...(capabilities ? { capabilities } : {}),
       ...(usageUrl ? { usageUrl } : {}),
       ...(usageWindows?.length ? { usageWindows } : {}),

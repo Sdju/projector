@@ -484,7 +484,13 @@ test("Claude Code messages become the shared chat events", async () => {
     cacheWrite: 0,
     first: { input: 5, output: 0, cacheRead: 90, cacheWrite: 5 },
   });
-  expect(events[3][1]).toStrictEqual({ id: "t1", name: "Read", input: { file_path: "x" } });
+  expect(events[3][1]).toStrictEqual({
+    id: "t1",
+    name: "Read",
+    input: { file_path: "x" },
+    kind: "read",
+    label: "Чтение файла",
+  });
   expect(events[4][1]).toStrictEqual({ id: "t1", name: "Read", output: "{}" });
   expect(events[5][1]).toMatchObject({ id: "t2", error: "boom" });
   expect(

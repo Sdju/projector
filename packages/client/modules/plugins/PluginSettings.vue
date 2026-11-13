@@ -201,11 +201,22 @@ function previewStyle(theme: AvailableTheme) {
             <strong>{{ agent.title }}</strong>
             <UiBadge tone="neutral">{{ agent.id }}</UiBadge>
           </UiInline>
-          <code>{{ [agent.command, ...(agent.args ?? [])].join(" ") }}</code>
+          <code v-if="agent.command">{{ [agent.command, ...(agent.args ?? [])].join(" ") }}</code>
           <UiHint>{{
             agent.caption || `Терминальная программа: ${agent.program || agent.id}`
           }}</UiHint>
         </div>
+      </div>
+      <div
+        v-if="selected.dependencies && Object.keys(selected.dependencies).length"
+        class="agent-contributions"
+      >
+        <strong>Зависимости</strong>
+        <UiInline wrap>
+          <UiBadge v-for="(version, name) in selected.dependencies" :key="name" tone="neutral"
+            >{{ name }}@{{ version }}</UiBadge
+          >
+        </UiInline>
       </div>
       <div v-if="selected.requiresTrust" class="agent-contributions">
         <strong>Исполняемый код</strong>

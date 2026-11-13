@@ -17,6 +17,7 @@ export type {
   AgentSessionTurn,
   AgentUsage,
   AgentUsageWindowDefinition,
+  McpServerConfig,
   McpServerInfo,
   PluginCodeApi,
   RewindResult,
@@ -31,5 +32,5 @@ export type { AgentTask, AgentTaskPatch } from "@ai-projector/core/modules/agent
 
 import type * as ClaudeAgentSdk from "@anthropic-ai/claude-agent-sdk";
 
-/** The Agent SDK, loaded from the server's own dependencies at runtime (`api.require`). */
+/** The Agent SDK, loaded from this plugin's own `node_modules` at runtime (`api.require`). */
 export type ClaudeSdk = typeof ClaudeAgentSdk;

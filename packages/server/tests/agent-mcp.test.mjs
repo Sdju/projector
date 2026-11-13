@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import { connectMcp, mcpToolName } from "../modules/agents/projector/projector-mcp.ts";
 import { mcpServerConfigs } from "../modules/agents/projector/projector-mcp-config.ts";
-import { mcpConfigsForNames, processMcpConfig } from "../modules/agent-mcp/index.ts";
+import { mcpConfigsForNames } from "../modules/agent-mcp/index.ts";
 
 const server = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -55,10 +55,6 @@ describe("agent MCP servers", () => {
     expect(mcpConfigsForNames(configs, undefined).map((item) => item.name)).toEqual(["a", "b"]);
     expect(mcpConfigsForNames(configs, ["b"]).map((item) => item.name)).toEqual(["b"]);
     expect(mcpConfigsForNames(configs, [])).toEqual([]);
-    expect(processMcpConfig(configs[0])).toMatchObject({
-      type: "stdio",
-      command: process.execPath,
-    });
   });
 
   it("names tools without clashes or illegal characters", () => {

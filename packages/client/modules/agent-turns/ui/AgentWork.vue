@@ -103,7 +103,10 @@ const failed = computed(() =>
 );
 const step = computed(() => {
   if (running.value)
-    return toolLabel(running.value.name, running.value.input ?? running.value.detail);
+    return toolLabel(running.value.name, running.value.input ?? running.value.detail, {
+      label: running.value.label,
+      kind: running.value.kind,
+    });
   return thinking.value ? "Думает…" : "";
 });
 const hint = computed(() => {

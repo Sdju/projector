@@ -1,5 +1,6 @@
 import { deviceUrl } from "../../common/utilities/device-url.ts";
 import type {
+  PluginAgentContribution,
   PluginBrowserEntry,
   PluginLanguageContribution,
   PluginPanelContribution,
@@ -18,6 +19,7 @@ export interface RuntimePluginInfo {
   languages: PluginLanguageContribution[];
   panels: PluginPanelContribution[];
   tabs: PluginTabContribution[];
+  agents: PluginAgentContribution[];
   diagnostics: { message: string }[];
 }
 
@@ -56,6 +58,7 @@ function normalize(value: unknown): RuntimeCatalog {
             : [],
           panels: Array.isArray(plugin.panels) ? (plugin.panels as PluginPanelContribution[]) : [],
           tabs: Array.isArray(plugin.tabs) ? (plugin.tabs as PluginTabContribution[]) : [],
+          agents: Array.isArray(plugin.agents) ? (plugin.agents as PluginAgentContribution[]) : [],
           diagnostics: Array.isArray(plugin.diagnostics)
             ? (plugin.diagnostics as { message: string }[])
             : [],

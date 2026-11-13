@@ -44,7 +44,6 @@
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "catalog:",
-    "@anthropic-ai/claude-agent-sdk": "catalog:",
     "@devcontainers/cli": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
     "@xterm/addon-serialize": "catalog:",

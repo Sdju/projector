@@ -66,16 +66,14 @@ interface ResolvedAgent {
   backend: AgentBackend;
 }
 
-function pluginProgram(candidate: PluginAgentCandidate): string {
-  return candidate.agent.program ?? candidate.agent.id;
-}
-
 /** Fills presentation and limits the manifest declared but the code backend may have left out. */
 async function applyDescriptor(
   backend: AgentBackend,
   candidate: PluginAgentCandidate,
 ): Promise<void> {
   const { agent } = candidate;
+  if (!backend.defaultFeatures && agent.defaultFeatures?.length)
+    backend.defaultFeatures = [...agent.defaultFeatures];
   if (!backend.caption && agent.caption) backend.caption = agent.caption;
   if (agent.icon && isPluginIconFile(agent.icon)) {
     if (!candidate.path) throw new Error("Нет каталога пакета для иконки агента");
@@ -152,7 +150,10 @@ async function applyPluginAgents(
   const accepted = new Map<string, ResolvedAgent>();
   for (const entry of resolved) {
     const id = entry.backend.id;
-    const program = entry.backend.program ?? pluginProgram(entry.candidate);
+    const program =
+      entry.backend.program ??
+      entry.candidate.agent.program ??
+      entry.candidate.agent.terminal?.program;
     if (usedIds.has(id)) {
       diagnostics.push({
         plugin: entry.candidate.plugin,
@@ -161,7 +162,7 @@ async function applyPluginAgents(
       });
       continue;
     }
-    if (usedPrograms.has(program)) {
+    if (program !== undefined && usedPrograms.has(program)) {
       diagnostics.push({
         plugin: entry.candidate.plugin,
         agent: id,
@@ -170,7 +171,7 @@ async function applyPluginAgents(
       continue;
     }
     usedIds.add(id);
-    usedPrograms.add(program);
+    if (program !== undefined) usedPrograms.add(program);
     accepted.set(id, entry);
   }
 

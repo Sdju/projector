@@ -82,7 +82,13 @@ test("the edited files of an answer are counted per file and failed calls are sk
     [
       tool("Write", { file_path: "/p/a.txt", content: "1\n2\n3" }),
       tool("Edit", { file_path: "/p/a.txt", old_string: "1", new_string: "x\ny" }),
-      tool("MultiEdit", { file_path: "/p/b.txt", edits: [{ old_string: "a", new_string: "b" }] }),
+      {
+        ...tool("MultiEdit", {
+          file_path: "/p/b.txt",
+          edits: [{ old_string: "a", new_string: "b" }],
+        }),
+        kind: "edit",
+      },
       tool("Edit", { file_path: "/p/c.txt", old_string: "a", new_string: "b" }, "error"),
       tool("Bash", { command: "ls" }),
     ],

@@ -135,6 +135,60 @@ export interface CommandApi {
   register(contribution: CommandRegistration): Disposable;
 }
 
+/** One item of the agent's own task list, as the chat pins and shows it. */
+export interface AgentPlanItem {
+  content: string;
+  status: "pending" | "in_progress" | "completed";
+  active?: string;
+}
+
+/** A tool call a plan reader may recognize. */
+export interface AgentPlanCall {
+  name: string;
+  input?: string;
+}
+
+/**
+ * Reads one tool call as a task list: `undefined` when the call does not carry one, `[]` when the
+ * agent cleared the list.
+ */
+export type AgentPlanReader = (call: AgentPlanCall) => AgentPlanItem[] | undefined;
+
+export interface AgentToolCallInfo {
+  name: string;
+  input?: string;
+  kind?: string;
+}
+
+export type AgentUsageTone = "spare" | "normal" | "hot" | "over";
+
+export interface AgentUsageMountContext {
+  agentId: string;
+  title: string;
+  usageUrl?: string;
+  device: string;
+  signal: AbortSignal;
+  assetUrl(relative: string): string;
+  commands: {
+    run(id: string, args?: unknown): Promise<unknown>;
+  };
+  publishSummary(remaining: number | null, tone?: AgentUsageTone | null): void;
+}
+
+export interface AgentClientRegistration {
+  id: string;
+  plan?: AgentPlanReader;
+  mountUsage?(
+    container: HTMLElement,
+    context: AgentUsageMountContext,
+  ): DisposableLike | Promise<DisposableLike>;
+  toolLabel?(call: AgentToolCallInfo): string | undefined;
+}
+
+export interface AgentClientApi {
+  register(contribution: AgentClientRegistration): Disposable;
+}
+
 export interface PluginApi {
   readonly apiVersion: PluginApiVersion;
   readonly packageName: string;
@@ -146,6 +200,7 @@ export interface PluginApi {
   readonly panels: PanelApi;
   readonly tabs: TabApi;
   readonly commands: CommandApi;
+  readonly agents: AgentClientApi;
   /** Registers cleanup of this activation scope. */
   onDispose(dispose: PluginDisposer): void;
   readonly signal: AbortSignal;

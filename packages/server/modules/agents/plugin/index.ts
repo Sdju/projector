@@ -21,6 +21,7 @@ export {
 } from "./code.ts";
 
 export function createPluginAgent(agent: PluginAgentContribution): AgentBackend {
+  if (!agent.command) throw new Error("Декларативный агент плагина должен указать command");
   const program = agent.program ?? agent.id;
   const acp: AcpProgram = {
     id: agent.id,
@@ -51,5 +52,6 @@ export function createPluginAgent(agent: PluginAgentContribution): AgentBackend 
     backend.usage = agent.usage;
     backend.usageUrl = `/api/agent/usage/${encodeURIComponent(agent.id)}`;
   }
+  if (agent.defaultFeatures?.length) backend.defaultFeatures = [...agent.defaultFeatures];
   return backend;
 }

@@ -98,22 +98,6 @@ export function mcpConfigsForNames(
   return configs.filter((config) => wanted.has(config.name));
 }
 
-/** The shape Claude Code's SDK takes in `mcpServers` for an explicit server. */
-export function processMcpConfig(config: McpServerConfig) {
-  if ("command" in config)
-    return {
-      type: "stdio" as const,
-      command: config.command,
-      args: config.args,
-      env: config.env,
-    };
-  return {
-    type: config.sse ? ("sse" as const) : ("http" as const),
-    url: config.url,
-    headers: config.headers,
-  };
-}
-
 /** The user's server list as written, for the settings page; empty when there is none yet. */
 export async function readUserMcp(): Promise<string> {
   try {

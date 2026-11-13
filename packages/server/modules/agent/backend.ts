@@ -204,6 +204,8 @@ export interface AgentBackend {
   terminal?: AgentTerminal;
   /** The server's own agent: always on, never listed as an external integration. */
   builtin?: true;
+  /** Feature ids this agent should have on until the user changes them. */
+  defaultFeatures?: readonly string[];
   capabilities?: AgentCapabilities;
   run(options: AgentRunOptions): Promise<void>;
   /** The program the agent needs is installed; absent when the backend cannot tell beforehand. */

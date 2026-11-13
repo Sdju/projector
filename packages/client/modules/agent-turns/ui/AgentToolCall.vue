@@ -109,7 +109,9 @@ const view = computed(() => {
   // The skill being loaded is named in the row itself, so the hint has nothing to add.
   const loaded = skillCallName(tool.name, raw);
   return {
-    label: skill.value ? "Чтение навыка" : toolLabel(tool.name, raw),
+    label: skill.value
+      ? "Чтение навыка"
+      : toolLabel(tool.name, raw, { label: tool.label, kind: tool.kind }),
     hint:
       skill.value ||
       (loaded ? "" : path.value ? shownPath.value : command.value || inputHint(raw) || result.hint),
@@ -119,7 +121,7 @@ const view = computed(() => {
     resultHint: running ? "" : result.hint,
     live: running ? (tool.output ?? "") : "",
     input: raw ? formatToolInput(tool.name, raw) : "",
-    diff: isEditTool(tool.name),
+    diff: isEditTool(tool.name, tool.kind),
     running,
     // A read has no input worth showing: the content is the result.
     showInput: Boolean(raw) && kind !== "read",

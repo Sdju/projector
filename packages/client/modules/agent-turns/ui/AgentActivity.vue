@@ -38,11 +38,14 @@ const currentTime = computed(() => {
 // A finished group of one kind of call reads as "Запись файла ×2"; a mixed one, as a count.
 const title = computed(() => {
   if (current.value)
-    return toolLabel(current.value.name, current.value.input ?? current.value.detail);
+    return toolLabel(current.value.name, current.value.input ?? current.value.detail, {
+      label: current.value.label,
+      kind: current.value.kind,
+    });
   const names = new Set(props.tools.map((tool) => tool.name));
   const first = props.tools[0]!;
   return names.size === 1
-    ? `${toolLabel(first.name, first.input ?? first.detail)} ×${props.tools.length}`
+    ? `${toolLabel(first.name, first.input ?? first.detail, { label: first.label, kind: first.kind })} ×${props.tools.length}`
     : "Действия";
 });
 </script>

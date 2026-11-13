@@ -46,7 +46,15 @@ export type AgentEvent =
   | { event: "text"; data: { text: string } }
   | {
       event: "tool";
-      data: { id: string; name: string; input: unknown; kind?: string; parent?: string };
+      data: {
+        id: string;
+        name: string;
+        input: unknown;
+        kind?: string;
+        label?: string;
+        paths?: string[];
+        parent?: string;
+      };
     }
   | { event: "tool-output"; data: { id: string; chunk: string } }
   | { event: "tool-result"; data: { id: string; name: string; output?: unknown; error?: string } }

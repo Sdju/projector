@@ -61,13 +61,22 @@ export async function changedSince(
   }
 }
 
-const WRITING = new Set(["write", "edit", "multiedit", "notebookedit"]);
+const WRITING = new Set(["write", "edit", "write_file", "edit_file", "apply_patch"]);
 
-/** Paths a Claude-style write or edit call touched, relative to `root` when inside it. */
+/** Converts string paths to root-relative paths, dropping empty and non-string values. */
+export function normalizeTouchedPaths(paths: unknown, root: string): string[] {
+  if (!Array.isArray(paths)) return [];
+  const result: string[] = [];
+  for (const path of paths) {
+    if (typeof path !== "string" || !path) continue;
+    result.push(root && path.startsWith(`${root}/`) ? path.slice(root.length + 1) : path);
+  }
+  return result;
+}
+
+/** Paths a write or edit call touched, relative to `root` when inside it. */
 export function pathsOfCall(name: string, input: unknown, root: string): string[] {
   if (!WRITING.has(name.toLowerCase()) || !input || typeof input !== "object") return [];
   const data = input as Record<string, unknown>;
-  const path = data.file_path ?? data.filePath ?? data.path ?? data.notebook_path;
-  if (typeof path !== "string" || !path) return [];
-  return [root && path.startsWith(`${root}/`) ? path.slice(root.length + 1) : path];
+  return normalizeTouchedPaths([data.path ?? data.filePath], root);
 }

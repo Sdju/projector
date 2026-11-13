@@ -408,6 +408,33 @@ describe("plugin agent contribution", () => {
       validatePluginManifest(withAgent({ ...agentContribution, caption: "x".repeat(301) })),
     ).toThrow(/Подпись агента/);
   });
+
+  test("requires command without projector.server and validates defaultFeatures", () => {
+    const noCommand = { ...agentContribution };
+    delete noCommand.command;
+    expect(() => validatePluginManifest(withAgent(noCommand))).toThrow(/Команда агента/);
+    expect(
+      validatePluginManifest(
+        withAgent({ ...agentContribution, defaultFeatures: ["widgets", "a.b_c-1"] }),
+      ),
+    ).toBeTruthy();
+    expect(
+      validatePluginManifest(withAgent({ ...agentContribution, defaultFeatures: [] })),
+    ).toBeTruthy();
+    for (const defaultFeatures of [
+      "widgets",
+      ["Widgets"],
+      ["-bad"],
+      [""],
+      ["x".repeat(65)],
+      Array.from({ length: 21 }, (_, index) => `f${index}`),
+      [1],
+    ]) {
+      expect(() =>
+        validatePluginManifest(withAgent({ ...agentContribution, defaultFeatures })),
+      ).toThrow(/Некорректный defaultFeatures агента/);
+    }
+  });
 });
 
 function withServer(server, base = agentManifest) {
@@ -421,6 +448,14 @@ describe("plugin server entry", () => {
     for (const server of ["dist/server.cjs", "./dist/server.cjs"]) {
       expect(validatePluginManifest(withServer(server))).toEqual(withServer(server));
     }
+  });
+
+  test("makes command optional when projector.server is present", () => {
+    const copy = withServer("dist/server.cjs");
+    delete copy.projector.contributes.agents[0].command;
+    expect(validatePluginManifest(copy)).toEqual(copy);
+    copy.projector.contributes.agents[0].command = "agent\necho";
+    expect(() => validatePluginManifest(copy)).toThrow(/Команда агента/);
   });
 
   test("accepts npm-style private and type metadata", () => {
@@ -468,6 +503,46 @@ describe("plugin server entry", () => {
       42,
     ]) {
       expect(() => validatePluginManifest(withServer(server))).toThrow(/projector\.server/);
+    }
+  });
+});
+
+describe("plugin package dependencies", () => {
+  test("accepts npm dependency maps and rejects unsafe protocols and keys", () => {
+    const copy = structuredClone(agentManifest);
+    copy.dependencies = { leftpad: "^1.0.0", "@scope/pkg": "1.2.3" };
+    copy.optionalDependencies = { extra: "2.0.0" };
+    expect(validatePluginManifest(copy)).toEqual(copy);
+    expect(() => validatePluginManifest({ ...copy, dependencies: [] })).toThrow(/объектом/);
+    expect(() => validatePluginManifest({ ...copy, dependencies: null })).toThrow(/объектом/);
+    const withProto = JSON.parse('{"__proto__": "1.0.0"}');
+    expect(() => validatePluginManifest({ ...copy, dependencies: withProto })).toThrow(
+      /недопустимое поле __proto__/,
+    );
+    for (const key of ["constructor", "prototype"]) {
+      expect(() => validatePluginManifest({ ...copy, dependencies: { [key]: "1.0.0" } })).toThrow(
+        /недопустимое поле/,
+      );
+    }
+    expect(() => validatePluginManifest({ ...copy, dependencies: { Foo: "1.0.0" } })).toThrow(
+      /некорректное имя пакета/,
+    );
+    const tooMany = Object.fromEntries(
+      Array.from({ length: 201 }, (_, index) => [`pkg${index}`, "1.0.0"]),
+    );
+    expect(() => validatePluginManifest({ ...copy, dependencies: tooMany })).toThrow(/200/);
+    for (const spec of ["", "x".repeat(201), "1.0.0\n", "1.0.0\0"]) {
+      expect(() => validatePluginManifest({ ...copy, dependencies: { leftpad: spec } })).toThrow(
+        /версия leftpad/,
+      );
+    }
+    for (const spec of ["workspace:*", "catalog:", "file:../x", "link:../x", "portal:../x"]) {
+      expect(() => validatePluginManifest({ ...copy, dependencies: { leftpad: spec } })).toThrow(
+        /недопустимый протокол/,
+      );
+      expect(() =>
+        validatePluginManifest({ ...copy, optionalDependencies: { extra: spec } }),
+      ).toThrow(/недопустимый протокол/);
     }
   });
 });

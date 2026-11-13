@@ -4,6 +4,7 @@ import { expect, onTestFinished, test, vi } from "vite-plus/test";
 vi.mock("../app/api.ts", () => ({ handleApi: vi.fn() }));
 vi.mock("../../core/modules/os/index.ts", () => ({
   os: { capabilities: { nativeDesktop: false }, clearSessionEnv: vi.fn() },
+  PARENT_SESSION_ENV: [],
 }));
 vi.mock("../modules/ide/index.ts", () => ({
   ensureIdeMcpToken: vi.fn().mockResolvedValue(undefined),

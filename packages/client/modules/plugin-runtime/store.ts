@@ -6,7 +6,12 @@ import type {
   PluginTabContribution,
 } from "@ai-projector/core/modules/plugins/index.ts";
 import { deviceUrl } from "../../common/utilities/device-url.ts";
-import type { LanguageRule, LanguageToken } from "@ai-projector/plugin-api";
+import type {
+  AgentClientRegistration,
+  AgentPlanReader,
+  LanguageRule,
+  LanguageToken,
+} from "@ai-projector/plugin-api";
 
 export interface ActiveLanguage {
   packageName: string;
@@ -43,6 +48,17 @@ export interface ActiveCommand {
   run(args?: unknown): unknown;
 }
 
+export interface ActiveAgent {
+  instance: number;
+  key: string;
+  packageName: string;
+  id: string;
+  plan?: AgentPlanReader;
+  mountUsage?: AgentClientRegistration["mountUsage"];
+  toolLabel?: AgentClientRegistration["toolLabel"];
+  assetUrl(relative: string): string;
+}
+
 export interface PluginRuntimeIssue {
   plugin: string;
   phase: "load" | "activate" | "contribution" | "cleanup";
@@ -53,6 +69,7 @@ export const runtimeLanguages = shallowRef<ActiveLanguage[]>([]);
 export const runtimePanels = shallowRef<ActivePanel[]>([]);
 export const runtimeTabs = shallowRef<ActiveTab[]>([]);
 export const runtimeCommands = shallowRef<ActiveCommand[]>([]);
+export const runtimeAgents = shallowRef<ActiveAgent[]>([]);
 export const runtimeIssues = shallowRef<PluginRuntimeIssue[]>([]);
 /** Bumped whenever language contributions change so editors and the status line re-resolve. */
 export const languageRevision = ref(0);
@@ -205,6 +222,27 @@ export function addCommand(
   };
 }
 
+export function addAgent(
+  packageName: string,
+  contribution: AgentClientRegistration,
+  assetUrl: (relative: string) => string,
+): () => void {
+  const entry: ActiveAgent = {
+    instance: ++nextViewInstance,
+    key: keyOf(packageName, contribution.id),
+    packageName,
+    id: contribution.id,
+    ...(contribution.plan ? { plan: contribution.plan } : {}),
+    ...(contribution.mountUsage ? { mountUsage: contribution.mountUsage } : {}),
+    ...(contribution.toolLabel ? { toolLabel: contribution.toolLabel } : {}),
+    assetUrl,
+  };
+  runtimeAgents.value = replace(runtimeAgents.value, (item) => item.key, entry);
+  return () => {
+    runtimeAgents.value = runtimeAgents.value.filter((item) => item !== entry);
+  };
+}
+
 export function reportIssue(issue: PluginRuntimeIssue): void {
   runtimeIssues.value = [...runtimeIssues.value, issue];
 }
@@ -244,18 +282,17 @@ export function findTab(key: string): ActiveTab | undefined {
   return runtimeTabs.value.find((item) => item.key === key);
 }
 
-/** Invokes a panel/tab mount and returns a disposer that also tolerates async cleanup. */
-export function mountContribution(
-  kind: "panel" | "tab",
+export function findRuntimeAgent(id: string): ActiveAgent | undefined {
+  return runtimeAgents.value.find((item) => item.id === id);
+}
+
+function runMount(
   packageName: string,
-  id: string,
+  mount: (container: HTMLElement, context: unknown) => unknown,
   container: HTMLElement,
   context: Record<string, unknown>,
   onError?: (message: string) => void,
 ): () => void {
-  const entry =
-    kind === "panel" ? findPanel(keyOf(packageName, id)) : findTab(keyOf(packageName, id));
-  if (!entry) throw new Error("Плагин не зарегистрировал этот вклад");
   let disposed = false;
   let cleaned = false;
   let settled = false;
@@ -279,12 +316,7 @@ export function mountContribution(
     disposed = true;
     cleanResult();
   };
-  Promise.resolve(
-    entry.mount(container, {
-      ...context,
-      assetUrl: entry.assetUrl,
-    }),
-  )
+  Promise.resolve(mount(container, context))
     .then((value) => {
       result = value;
       settled = true;
@@ -294,11 +326,46 @@ export function mountContribution(
       if (disposed) return;
       const message = error instanceof Error ? error.message : "Ошибка отрисовки UI плагина";
       onError?.(message);
-      reportIssue({
-        plugin: packageName,
-        phase: "activate",
-        message,
-      });
+      reportIssue({ plugin: packageName, phase: "activate", message });
     });
   return cleanup;
+}
+
+/** Invokes a panel/tab mount and returns a disposer that also tolerates async cleanup. */
+export function mountContribution(
+  kind: "panel" | "tab",
+  packageName: string,
+  id: string,
+  container: HTMLElement,
+  context: Record<string, unknown>,
+  onError?: (message: string) => void,
+): () => void {
+  const entry =
+    kind === "panel" ? findPanel(keyOf(packageName, id)) : findTab(keyOf(packageName, id));
+  if (!entry) throw new Error("Плагин не зарегистрировал этот вклад");
+  return runMount(
+    packageName,
+    entry.mount,
+    container,
+    { ...context, assetUrl: entry.assetUrl },
+    onError,
+  );
+}
+
+/** Invokes an agent usage mount and returns a disposer that also tolerates async cleanup. */
+export function mountAgentUsage(
+  agentId: string,
+  container: HTMLElement,
+  context: Record<string, unknown>,
+  onError?: (message: string) => void,
+): () => void {
+  const entry = findRuntimeAgent(agentId);
+  if (!entry?.mountUsage) throw new Error("Плагин не зарегистрировал индикатор лимитов");
+  return runMount(
+    entry.packageName,
+    entry.mountUsage as never,
+    container,
+    { ...context, assetUrl: entry.assetUrl },
+    onError,
+  );
 }

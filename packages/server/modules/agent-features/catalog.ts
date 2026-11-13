@@ -13,9 +13,14 @@ export interface FeatureAgent {
   /** Backend id (`projector`, `claude-code`, `codex`, …). */
   id: string;
   label: string;
+  builtin?: boolean;
 }
 
 const agents = new Map<string, FeatureAgent>();
+
+export function featureAgentIsBuiltin(id: string): boolean {
+  return agents.get(id)?.builtin === true;
+}
 
 export const registerAgentFeature = (feature: AgentFeature): void =>
   agentFeatureCatalog.register(feature);

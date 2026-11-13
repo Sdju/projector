@@ -32,6 +32,7 @@ export interface PluginInfo {
   /** The package runs code in the server or the page; it is not a declarative-only plugin. */
   code: boolean;
   path?: string;
+  dependencies?: Record<string, string>;
   diagnostics: PluginDiagnostic[];
   themes: AvailableTheme[];
   agents: PluginAgentContribution[];
