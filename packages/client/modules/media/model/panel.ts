@@ -7,23 +7,16 @@ import type {
 } from "@ai-projector/core/modules/media/index.ts";
 import { mediaCapabilityTitle } from "@ai-projector/core/modules/media/index.ts";
 import { computed, onBeforeUnmount, onMounted, ref, useId } from "vue";
-import {
-  commandArgs,
-  optionalStringArg,
-  useCommandScope,
-} from "../../../common/utilities/commands.ts";
-import {
-  cancelMediaJob,
-  fetchMediaJob,
-  fetchMediaModels,
-  fetchMediaState,
-  generateMedia,
-} from "../api/client.ts";
+import { useCommandScope } from "../../../common/utilities/commands.ts";
+import { useIdeCommands } from "../../ide/index.ts";
+import type { MediaModelsResult } from "./commands.ts";
 
 const RUNNING = new Set(["queued", "running"]);
+const MEDIA_SCOPE = "media";
 
 /** Состояние раздела «Медиа»: провайдеры, модели, форма и одна активная задача. */
 export function useMediaPanel() {
+  const ide = useIdeCommands();
   const state = ref<MediaState | null>(null);
   const models = ref<MediaModel[]>([]);
   const loading = ref(false);
@@ -133,15 +126,23 @@ export function useMediaPanel() {
     applyDefaults();
   }
 
+  function readModels(): Promise<MediaModelsResult> {
+    return ide.api.executeCommand<MediaModelsResult>(
+      "ide.media.models.refresh",
+      {},
+      { scope: MEDIA_SCOPE },
+    );
+  }
+
   async function load(): Promise<void> {
     if (dispose) return;
     loading.value = true;
     error.value = "";
     try {
-      const [nextState, nextModels] = await Promise.all([fetchMediaState(), fetchMediaModels()]);
+      const result = await readModels();
       if (dispose) return;
-      state.value = nextState;
-      models.value = nextModels;
+      state.value = result.state;
+      models.value = result.models;
       syncSelection();
     } catch (err) {
       if (!dispose)
@@ -156,10 +157,10 @@ export function useMediaPanel() {
     refreshing.value = true;
     error.value = "";
     try {
-      const [nextState, nextModels] = await Promise.all([fetchMediaState(), fetchMediaModels()]);
+      const result = await readModels();
       if (dispose) return;
-      state.value = nextState;
-      models.value = nextModels;
+      state.value = result.state;
+      models.value = result.models;
       syncSelection();
     } catch (err) {
       if (!dispose) error.value = err instanceof Error ? err.message : "Не удалось обновить модели";
@@ -182,7 +183,11 @@ export function useMediaPanel() {
   async function pollJob(): Promise<void> {
     if (dispose || !job.value) return;
     try {
-      const next = await fetchMediaJob(job.value.id);
+      const next = await ide.api.executeCommand<MediaJob>(
+        "ide.media.job.refresh",
+        { id: job.value.id },
+        { scope: MEDIA_SCOPE },
+      );
       if (dispose) return;
       job.value = next;
       error.value = "";
@@ -230,43 +235,15 @@ export function useMediaPanel() {
     };
   }
 
-  async function generate(override?: Record<string, unknown>): Promise<void> {
+  async function generate(): Promise<void> {
     if (dispose) throw new Error("Раздел медиа закрыт");
-    if (override && Object.keys(override).length) {
-      const nextCapability = optionalStringArg(override, "capability");
-      if (nextCapability) {
-        if (!capabilityOptions.value.some((item) => item.value === nextCapability))
-          throw new Error("Неизвестная медиа-возможность");
-        setCapability(nextCapability);
-      }
-      const nextProvider = optionalStringArg(override, "providerId");
-      if (nextProvider) setProvider(nextProvider);
-      const nextModel = optionalStringArg(override, "model");
-      if (nextModel) setModel(nextModel);
-      const nextPrompt = optionalStringArg(override, "prompt");
-      if (nextPrompt !== undefined) prompt.value = nextPrompt;
-      const nextImage = optionalStringArg(override, "imageUrl");
-      if (nextImage !== undefined) imageUrl.value = nextImage;
-      const nextAudio = optionalStringArg(override, "audioUrl");
-      if (nextAudio !== undefined) audioUrl.value = nextAudio;
-      const nextOptions = override.options;
-      if (nextOptions !== undefined) {
-        if (!nextOptions || typeof nextOptions !== "object" || Array.isArray(nextOptions))
-          throw new Error("options: объект");
-        const values = nextOptions as Record<string, unknown>;
-        if (typeof values.size === "string") size.value = values.size;
-        if (typeof values.resolution === "string") resolution.value = values.resolution;
-        if (typeof values.ratio === "string") ratio.value = values.ratio;
-        if (typeof values.voice === "string") voice.value = values.voice;
-        if (typeof values.duration === "number") duration.value = values.duration;
-      }
-      syncSelection();
-    }
     if (!canGenerate.value) throw new Error("Заполните форму или выберите модель");
     submitting.value = true;
     error.value = "";
     try {
-      const next = await generateMedia(requestBody());
+      const next = await ide.api.executeCommand<MediaJob>("ide.media.generate", requestBody(), {
+        scope: MEDIA_SCOPE,
+      });
       if (dispose) return;
       job.value = next;
       startPolling();
@@ -279,10 +256,19 @@ export function useMediaPanel() {
     }
   }
 
+  /** The form button reports the rejection here; the agent sees the same error from the command. */
+  async function submit(): Promise<void> {
+    await generate().catch(() => undefined);
+  }
+
   async function cancel(): Promise<void> {
     if (!job.value || !running.value) return;
     try {
-      job.value = await cancelMediaJob(job.value.id);
+      job.value = await ide.api.executeCommand<MediaJob>(
+        "ide.media.job.cancel",
+        { id: job.value.id },
+        { scope: MEDIA_SCOPE },
+      );
       stopPolling();
     } catch (err) {
       error.value = err instanceof Error ? err.message : "Не удалось отменить задачу";
@@ -297,53 +283,10 @@ export function useMediaPanel() {
 
   const commands = useCommandScope(`media-panel:${useId()}`, () => ({
     surface: "mediaPanel",
-    capability: capability.value,
-    provider: providerId.value,
-    model: modelId.value,
     status: job.value?.status ?? null,
-    ready: ready.value,
-    busy: busy.value,
   }));
 
-  commands.scope.registerCommand({
-    id: "ide.media.models.refresh",
-    title: "Обновить медиа-модели",
-    description:
-      "Перечитывает провайдеров с медиа-адаптером и их модели: изображения, синтез речи, распознавание и видео.",
-    enabled: () => !loading.value && !refreshing.value,
-    run: () => refreshModels(),
-  });
-  commands.scope.registerCommand({
-    id: "ide.media.generate",
-    title: "Сгенерировать медиа",
-    description:
-      "Запускает выбранную медиа-модель. Без аргументов берёт форму экрана; capability — image.generate, speech.synthesize, speech.transcribe или video.generate, model — id модели, prompt — текст, audioUrl — публичная ссылка на аудио, options — параметры провайдера (size, voice, duration). Видео и async-изображения возвращают задачу, раздел сам опрашивает её.",
-    arguments: {
-      capability: "image.generate | speech.synthesize | speech.transcribe | video.generate",
-      providerId: "id провайдера (необязательно)",
-      model: "id модели у провайдера",
-      prompt: "текст запроса",
-      imageUrl: "публичная ссылка на исходное изображение (необязательно)",
-      audioUrl: "публичная ссылка на аудио для распознавания",
-      options: "объект параметров, например { size, resolution, ratio, voice, duration }",
-    },
-    enabled: () => ready.value && !busy.value,
-    run: (value) => generate(commandArgs(value)),
-  });
-  commands.scope.registerCommand({
-    id: "ide.media.job.refresh",
-    title: "Обновить медиа-задачу",
-    description: "Перечитывает состояние текущей задачи и её артефакты.",
-    enabled: () => job.value !== null,
-    run: () => pollJob(),
-  });
-  commands.scope.registerCommand({
-    id: "ide.media.job.cancel",
-    title: "Отменить медиа-задачу",
-    description: "Отменяет текущую задачу у провайдера. Уже скачанные файлы остаются.",
-    enabled: () => running.value,
-    run: () => cancel(),
-  });
+  // The other media commands are registered once at app level; only the local result is here.
   commands.scope.registerCommand({
     id: "ide.media.result.clear",
     title: "Очистить результат медиа",
@@ -393,6 +336,7 @@ export function useMediaPanel() {
     setProvider,
     setModel,
     generate,
+    submit,
     cancel,
     clear,
     pollJob,

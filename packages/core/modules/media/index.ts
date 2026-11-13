@@ -99,6 +99,44 @@ export interface MediaJob {
   updatedAt: number;
 }
 
+/** Артефакт в ответе агента: та же ссылка файла, но уже готовая для виджета и markdown. */
+export interface MediaArtifactView extends MediaArtifact {
+  /** Ссылка `/api/media/files/{fileId}`; с `baseUrl` — абсолютная. */
+  fileUrl?: string;
+}
+
+/** Задача в ответе агента: к артефактам добавлена ссылка и готовый тег виджета. */
+export interface MediaJobView extends Omit<MediaJob, "artifacts"> {
+  artifacts: MediaArtifactView[];
+  /** `<Media jobId="…" />` для завершённой задачи; описание виджета — через `describe_widget`. */
+  widget?: string;
+}
+
+export interface MediaJobViewOptions {
+  /** Абсолютный адрес Projector, когда ответ уходит внешнему агенту. */
+  baseUrl?: string;
+}
+
+/** Одна форма для инструментов агента и MCP: ссылки на файлы и тег, который прочитает виджет. */
+export function mediaJobView(job: MediaJob, options: MediaJobViewOptions = {}): MediaJobView {
+  const base = options.baseUrl?.replace(/\/+$/, "") ?? "";
+  const artifacts = job.artifacts.map((artifact) =>
+    artifact.fileId
+      ? {
+          ...artifact,
+          fileUrl: `${base}/api/media/files/${encodeURIComponent(artifact.fileId)}`,
+        }
+      : artifact,
+  );
+  return {
+    ...job,
+    artifacts,
+    ...(job.status === "succeeded" && artifacts.length
+      ? { widget: `<Media jobId="${job.id}" />` }
+      : {}),
+  };
+}
+
 /** Состояние медиа-подсистемы для настроек и клиента. */
 export interface MediaProviderState {
   id: string;

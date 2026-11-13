@@ -1,7 +1,7 @@
 import { createReadStream } from "node:fs";
 import type { ServerResponse } from "node:http";
 import type { MediaCapability } from "@ai-projector/core/modules/media/index.ts";
-import { isMediaCapability } from "@ai-projector/core/modules/media/index.ts";
+import { isMediaCapability, mediaJobView } from "@ai-projector/core/modules/media/index.ts";
 import { isLocalRequest } from "../../modules/access/index.ts";
 import { HttpError } from "../../modules/http/index.ts";
 import {
@@ -57,7 +57,7 @@ export const routes: RouteDefinition[] = [
       noStore(res);
       const job = await generateMedia(await readBody(req, MEDIA_BODY_LIMIT));
       if (job.status !== "succeeded") res.setHeader("Location", `/api/media/jobs/${job.id}`);
-      json(res, job.status === "succeeded" ? 200 : 202, job);
+      json(res, job.status === "succeeded" ? 200 : 202, mediaJobView(job));
     },
   },
   {
@@ -65,7 +65,7 @@ export const routes: RouteDefinition[] = [
     path: "/api/media/jobs/:id",
     handler: async ({ res, params }) => {
       noStore(res);
-      json(res, 200, await mediaJob(decode(params.id)));
+      json(res, 200, mediaJobView(await mediaJob(decode(params.id))));
     },
   },
   {
@@ -73,7 +73,7 @@ export const routes: RouteDefinition[] = [
     path: "/api/media/jobs/:id/cancel",
     handler: async ({ res, params }) => {
       noStore(res);
-      json(res, 200, await cancelMediaJob(decode(params.id)));
+      json(res, 200, mediaJobView(await cancelMediaJob(decode(params.id))));
     },
   },
   {

@@ -2,6 +2,7 @@ import { readFile, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vite-plus/test";
+import { mediaJobView } from "@ai-projector/core/modules/media/index.ts";
 import { createRouteDispatcher, readBody } from "../modules/transport/index.ts";
 import { routes } from "../routes/api/media.ts";
 import { saveProviders, useProviderVault } from "../modules/providers/index.ts";
@@ -127,6 +128,40 @@ describe("QwenCloud parsing", () => {
       }).error,
     ).toMatch(/InvalidParameter: bad size/);
     expect(qwencloudModels().some((model) => model.id === "qwen-image-3.0-pro")).toBe(true);
+  });
+});
+
+describe("agent media view", () => {
+  const job = {
+    id: "job-1",
+    status: "succeeded",
+    capability: "image.generate",
+    providerId: "p1",
+    providerName: "Provider",
+    adapter: "custom",
+    model: "m1",
+    artifacts: [
+      { kind: "image", mime: "image/png", fileId: "abc.png", url: "https://cdn.example/a.png" },
+      { kind: "text", mime: "text/plain", text: "привет" },
+    ],
+    createdAt: 1,
+    updatedAt: 2,
+  };
+
+  test("adds file links and a ready widget tag", () => {
+    const view = mediaJobView(job);
+    expect(view.artifacts[0].fileUrl).toBe("/api/media/files/abc.png");
+    expect(view.artifacts[1].fileUrl).toBeUndefined();
+    expect(view.widget).toBe('<Media jobId="job-1" />');
+    expect(mediaJobView(job, { baseUrl: "http://localhost:4177/" }).artifacts[0].fileUrl).toBe(
+      "http://localhost:4177/api/media/files/abc.png",
+    );
+  });
+
+  test("leaves a running job without a widget", () => {
+    const view = mediaJobView({ ...job, status: "running", artifacts: [] });
+    expect(view.widget).toBeUndefined();
+    expect(view.artifacts).toStrictEqual([]);
   });
 });
 

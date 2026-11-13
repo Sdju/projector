@@ -188,5 +188,5 @@ export function provideIdeCommands() {
     workbench.dispose();
     if (browser.projector?.ide === api) browser.projector.ide = previous;
   });
-  return { error };
+  return { error, api };
 }

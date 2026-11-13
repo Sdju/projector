@@ -38,6 +38,9 @@ const {
   canGenerate,
   ready,
   commands,
+  refreshModels,
+  submit,
+  cancel,
   setCapability,
   setProvider,
   setModel,
@@ -91,9 +94,7 @@ function statusLabel(): string {
         провайдеры» — встроенные адаптеры подключаются по виду провайдера.
       </UiHint>
       <UiInline :gap="2">
-        <UiButton :disabled="refreshing" @click="commands.run('ide.media.models.refresh')">
-          Проверить снова
-        </UiButton>
+        <UiButton :disabled="refreshing" @click="refreshModels">Проверить снова</UiButton>
       </UiInline>
     </UiStack>
 
@@ -227,20 +228,11 @@ function statusLabel(): string {
       </div>
 
       <UiInline class="actions" wrap :gap="2">
-        <UiButton
-          appearance="solid"
-          :disabled="!canGenerate || busy"
-          @click="commands.run('ide.media.generate')"
-        >
+        <UiButton appearance="solid" :disabled="!canGenerate || busy" @click="submit">
           {{ submitting ? "Запуск…" : running ? "Задача выполняется…" : "Сгенерировать" }}
         </UiButton>
-        <UiButton v-if="running" @click="commands.run('ide.media.job.cancel')">Отменить</UiButton>
-        <UiButton
-          appearance="outline"
-          tone="muted"
-          :disabled="refreshing"
-          @click="commands.run('ide.media.models.refresh')"
-        >
+        <UiButton v-if="running" @click="cancel">Отменить</UiButton>
+        <UiButton appearance="outline" tone="muted" :disabled="refreshing" @click="refreshModels">
           Обновить модели
         </UiButton>
         <UiButton v-if="job" @click="commands.run('ide.media.result.clear')">Очистить</UiButton>
