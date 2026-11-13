@@ -628,7 +628,7 @@ describe("plugin browser contract", () => {
 
 describe("plugin balance contribution", () => {
   const balanceManifest = {
-    name: "@acme/openrouter",
+    name: "@acme/router",
     version: "1.0.0",
     projector: {
       apiVersion: 1,
@@ -636,11 +636,11 @@ describe("plugin balance contribution", () => {
       contributes: {
         balances: [
           {
-            kind: "openrouter",
-            title: "OpenRouter",
-            description: "Остаток кредитов OpenRouter",
-            url: "https://openrouter.ai/api/v1",
-            model: "openai/gpt-5",
+            kind: "acme-router",
+            title: "Acme Router",
+            description: "Остаток кредитов Acme Router",
+            url: "https://router.example.com/v1",
+            model: "acme/chat",
           },
         ],
       },
@@ -659,9 +659,11 @@ describe("plugin balance contribution", () => {
   });
 
   test("rejects reserved, repeated and malformed kinds", () => {
-    const reserved = structuredClone(balanceManifest);
-    reserved.projector.contributes.balances[0].kind = "deepseek";
-    expect(() => validatePluginManifest(reserved)).toThrow(/зарезервирован/);
+    for (const kind of ["deepseek", "openrouter"]) {
+      const reserved = structuredClone(balanceManifest);
+      reserved.projector.contributes.balances[0].kind = kind;
+      expect(() => validatePluginManifest(reserved)).toThrow(/зарезервирован/);
+    }
 
     const duplicate = structuredClone(balanceManifest);
     duplicate.projector.contributes.balances.push({

@@ -3,10 +3,18 @@ import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { providerBalance, providerBalances } from "../modules/providers/balance.ts";
-import { deepseekEntries } from "../modules/providers/balance.ts";
+import {
+  deepseekEntries,
+  openrouterEntries,
+  providerBalance,
+  providerBalances,
+} from "../modules/providers/balance.ts";
 import { inferProviderKind } from "../modules/providers/kinds.ts";
-import { saveProviders, useProviderVault } from "../modules/providers/index.ts";
+import {
+  resolveOpenAIProvider,
+  saveProviders,
+  useProviderVault,
+} from "../modules/providers/index.ts";
 import { createVault } from "../modules/secrets/index.ts";
 import { routes } from "../routes/api/providers/balance.ts";
 const handleProvidersBalance = createRouteDispatcher(routes);
@@ -32,6 +40,7 @@ const payload = {
 
 test("kind is inferred from the provider URL", () => {
   expect(inferProviderKind("https://api.deepseek.com")).toBe("deepseek");
+  expect(inferProviderKind("https://openrouter.ai/api/v1")).toBe("openrouter");
   expect(inferProviderKind("https://dashscope-intl.aliyuncs.com/compatible-mode/v1")).toBe(
     "qwencloud",
   );
@@ -64,6 +73,26 @@ test("DeepSeek balance payload is validated and kept as decimal strings", () => 
     { balance_infos: [{ total_balance: "1", granted_balance: "0", topped_up_balance: "0" }] },
   ])
     expect(deepseekEntries(value)).toBe(null);
+});
+
+test("OpenRouter balance is credits minus usage with exact decimal arithmetic", () => {
+  const entries = openrouterEntries({ data: { total_credits: 100.5, total_usage: 25.75 } });
+  expect(entries).toStrictEqual([
+    { currency: "USD", total: "74.75", granted: "0", toppedUp: "100.5" },
+  ]);
+  expect(formatBalance(entries)).toBe("$74.75");
+  expect(
+    openrouterEntries({ data: { total_credits: "0.30", total_usage: "0.1" } })?.[0].total,
+  ).toBe("0.20");
+  for (const value of [
+    null,
+    {},
+    { data: {} },
+    { data: { total_credits: "abc", total_usage: 1 } },
+    { data: { total_credits: -1, total_usage: 0 } },
+    { data: { total_credits: 1, total_usage: 2 } },
+  ])
+    expect(openrouterEntries(value)).toBe(null);
 });
 
 describe("balance of the active provider", () => {
@@ -122,6 +151,32 @@ describe("balance of the active provider", () => {
     expect(await handleProvidersBalance({ res, url, method: "POST", path: url.pathname })).toBe(
       false,
     );
+  });
+
+  test("reads the OpenRouter wallet with the management key", async () => {
+    process.env.OPENAI_URL = "https://openrouter.ai/api/v1";
+    globalThis.projectorProviderBalance?.clear();
+    try {
+      globalThis.fetch = async (url, options) => {
+        expect(url).toBe("https://openrouter.ai/api/v1/credits");
+        expect(options.headers.Authorization).toBe("Bearer sk-fixture");
+        expect(options.redirect).toBe("error");
+        return Response.json({ data: { total_credits: 100.5, total_usage: 25.75 } });
+      };
+      const result = await providerBalance();
+      expect(result.status).toBe("ready");
+      expect(result.providerKind).toBe("openrouter");
+      expect(result.entries).toStrictEqual([
+        { currency: "USD", total: "74.75", granted: "0", toppedUp: "100.5" },
+      ]);
+      expect(JSON.stringify(result)).not.toMatch(/sk-fixture/);
+
+      globalThis.projectorProviderBalance?.clear();
+      globalThis.fetch = async () => new Response("SECRET", { status: 403 });
+      expect((await providerBalance()).message).toMatch(/management key/);
+    } finally {
+      process.env.OPENAI_URL = "https://api.deepseek.com";
+    }
   });
 
   test("errors are explicit and never echo upstream bodies", async () => {
@@ -298,6 +353,41 @@ describe("balances of every enabled wallet", () => {
     expect(wallets).toHaveLength(1);
     expect(wallets[0].providerId).toBe("a");
     expect(calls).toBe(1);
+  });
+
+  test("OpenRouter management key is separate from the model API key", async () => {
+    globalThis.projectorProviderBalance?.clear();
+    const state = await saveProviders(
+      {
+        activeProviderId: "router",
+        providers: [
+          {
+            id: "router",
+            name: "OpenRouter",
+            kind: "openrouter",
+            url: "https://openrouter.ai/api/v1",
+            models: [{ id: "openrouter/auto" }],
+            apiKey: "sk-chat",
+            balanceApiKey: "sk-management",
+          },
+        ],
+      },
+      {},
+    );
+    expect(state.providers[0].hasApiKey).toBe(true);
+    expect(state.providers[0].hasBalanceApiKey).toBe(true);
+    expect(JSON.stringify(state)).not.toMatch(/sk-chat|sk-management/);
+
+    const resolved = await resolveOpenAIProvider({ providerId: "router", fallback: {} });
+    expect(resolved.apiKey).toBe("sk-chat");
+    expect(resolved.balanceApiKey).toBe("sk-management");
+    globalThis.fetch = async (_url, options) => {
+      expect(options.headers.Authorization).toBe("Bearer sk-management");
+      return Response.json({ data: { total_credits: 10, total_usage: 2.5 } });
+    };
+    const balance = await providerBalance("router");
+    expect(balance.status).toBe("ready");
+    expect(balance.entries[0].total).toBe("7.5");
   });
 
   test("decimal money is combined without binary fractions", () => {

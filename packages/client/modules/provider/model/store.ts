@@ -26,6 +26,7 @@ const state = reactive({
   balanceKinds: [] as ProviderKindInfo[],
   usageKinds: [] as ProviderKindInfo[],
   keyDrafts: {} as Record<string, string>,
+  balanceKeyDrafts: {} as Record<string, string>,
   balances: {} as Record<string, ProviderBalance | undefined>,
   usage: {} as Record<string, ProviderUsage | undefined>,
   usageBusy: {} as Record<string, boolean | undefined>,
@@ -68,7 +69,9 @@ export function useProviders() {
     kindOptions.value.find((item) => item.kind === kind);
   const presetFor = (kind: string) => providerPreset(kind, kindInfoOf(kind));
   const hasBalance = (kind: string): boolean =>
-    kind === "deepseek" || state.balanceKinds.some((item) => item.kind === kind);
+    kind === "deepseek" ||
+    kind === "openrouter" ||
+    state.balanceKinds.some((item) => item.kind === kind);
   const hasUsage = (kind: string): boolean => state.usageKinds.some((item) => item.kind === kind);
 
   function apply(payload: {
@@ -82,6 +85,7 @@ export function useProviders() {
     state.balanceKinds = payload.balanceKinds ?? [];
     state.usageKinds = payload.usageKinds ?? [];
     state.keyDrafts = {};
+    state.balanceKeyDrafts = {};
     state.revision++;
   }
 
@@ -150,6 +154,7 @@ export function useProviders() {
           providers: state.providers.map((item) => ({
             ...item,
             apiKey: state.keyDrafts[item.id],
+            balanceApiKey: state.balanceKeyDrafts[item.id],
           })),
         }),
       );
@@ -189,6 +194,7 @@ export function useProviders() {
   function removeProvider(id: string): void {
     state.providers = state.providers.filter((item) => item.id !== id);
     delete state.keyDrafts[id];
+    delete state.balanceKeyDrafts[id];
     if (state.activeProviderId === id) {
       state.activeProviderId = state.providers[0]?.id ?? null;
     }
@@ -197,6 +203,10 @@ export function useProviders() {
 
   function setKeyDraft(id: string, value: string): void {
     state.keyDrafts[id] = value;
+  }
+
+  function setBalanceKeyDraft(id: string, value: string): void {
+    state.balanceKeyDrafts[id] = value;
   }
 
   function patchProvider(id: string, patch: Partial<OpenAIProviderPublic>): void {
@@ -298,12 +308,14 @@ export function useProviders() {
     loadBalances,
     loadUsage,
     keyDrafts: computed(() => state.keyDrafts),
+    balanceKeyDrafts: computed(() => state.balanceKeyDrafts),
     load,
     save,
     setActive,
     addProvider,
     removeProvider,
     setKeyDraft,
+    setBalanceKeyDraft,
     patchProvider,
   };
 }

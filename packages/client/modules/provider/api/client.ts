@@ -21,7 +21,7 @@ export function fetchProviders(): Promise<OpenAIProvidersPublicState> {
 
 export function saveProviders(payload: {
   activeProviderId: string | null;
-  providers: Array<OpenAIProviderPublic & { apiKey?: string }>;
+  providers: Array<OpenAIProviderPublic & { apiKey?: string; balanceApiKey?: string }>;
 }): Promise<OpenAIProvidersPublicState> {
   return request("/api/providers", { method: "PUT", body: JSON.stringify(payload) });
 }

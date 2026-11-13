@@ -28,11 +28,13 @@ const {
   error,
   saving,
   keyDrafts,
+  balanceKeyDrafts,
   save,
   setActive,
   addProvider,
   removeProvider,
   setKeyDraft,
+  setBalanceKeyDraft,
   patchProvider,
   balances,
   usage,
@@ -180,8 +182,8 @@ commands.scope.registerCommand({
   id: "ide.providers.add",
   title: "Добавить провайдера",
   description:
-    "Добавляет провайдера из пресета: deepseek, qwencloud, local или custom (по умолчанию custom), а также вид, объявленный включённым плагином. Подставляет адрес и модель; ключ вводится в форме, затем «сохранить».",
-  arguments: { kind: "deepseek | qwencloud | local | custom | <вид из плагина>" },
+    "Добавляет провайдера из пресета: deepseek, openrouter, qwencloud, local или custom (по умолчанию custom), а также вид, объявленный включённым плагином. Подставляет адрес и модель; ключ вводится в форме, затем «сохранить».",
+  arguments: { kind: "deepseek | openrouter | qwencloud | local | custom | <вид из плагина>" },
   run: (value) => {
     const raw = commandArgs(value).kind;
     const kind = typeof raw === "string" ? raw : "custom";
@@ -230,7 +232,7 @@ commands.scope.registerCommand({
   id: "ide.providers.balance.refresh",
   title: "Обновить баланс провайдера",
   description:
-    "Запрашивает баланс выбранного провайдера: DeepSeek и виды, для которых включённый плагин зарегистрировал читатель.",
+    "Запрашивает баланс выбранного провайдера: DeepSeek, OpenRouter и виды, для которых включённый плагин зарегистрировал читатель.",
   enabled: () => hasBalance.value,
   run: async () => {
     if (selected.value) await loadBalance(selected.value.id);
@@ -250,6 +252,11 @@ commands.scope.registerCommand({
 function keyDraft(): string {
   if (!selected.value) return "";
   return keyDrafts.value[selected.value.id] ?? "";
+}
+
+function balanceKeyDraft(): string {
+  if (!selected.value) return "";
+  return balanceKeyDrafts.value[selected.value.id] ?? "";
 }
 </script>
 
@@ -367,6 +374,19 @@ function keyDraft(): string {
             autocomplete="off"
             :placeholder="selected.hasApiKey ? 'сохранён — введите новый' : preset.keyPlaceholder"
             @input="setKeyDraft(selected.id, ($event.target as HTMLInputElement).value)"
+          />
+        </UiField>
+        <UiField v-if="selected.kind === 'openrouter'" v-slot="{ control }" label="management key">
+          <UiControl
+            v-bind="control"
+            aria-label="OpenRouter management key"
+            :value="balanceKeyDraft()"
+            type="password"
+            autocomplete="off"
+            :placeholder="
+              selected.hasBalanceApiKey ? 'сохранён — введите новый' : 'для просмотра баланса'
+            "
+            @input="setBalanceKeyDraft(selected.id, ($event.target as HTMLInputElement).value)"
           />
         </UiField>
       </UiFormGrid>
@@ -504,7 +524,11 @@ function keyDraft(): string {
             Провайдер сообщает, что средств для вызовов недостаточно.
           </UiMessage>
         </template>
-        <UiLoader v-else-if="!balance?.message && selected.hasApiKey" size="sm">загрузка…</UiLoader>
+        <UiLoader
+          v-else-if="!balance?.message && (selected.hasApiKey || selected.hasBalanceApiKey)"
+          size="sm"
+          >загрузка…</UiLoader
+        >
         <UiHint v-else>{{ balance?.message ?? "Сохраните ключ, чтобы увидеть баланс." }}</UiHint>
       </UiStack>
       <UiStack v-if="hasUsage" class="balance" :gap="1">

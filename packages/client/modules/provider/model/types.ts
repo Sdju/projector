@@ -1,4 +1,4 @@
-export type BuiltinProviderKind = "custom" | "local" | "deepseek" | "qwencloud";
+export type BuiltinProviderKind = "custom" | "local" | "deepseek" | "openrouter" | "qwencloud";
 
 /** Built-in presets plus kinds contributed by trusted balance plugins. */
 export type ProviderKind = BuiltinProviderKind | (string & {});
@@ -45,6 +45,7 @@ export interface OpenAIProviderPublic {
   enabled: boolean;
   models: ProviderModel[];
   hasApiKey: boolean;
+  hasBalanceApiKey?: boolean;
 }
 
 export interface ProviderKindInfo {

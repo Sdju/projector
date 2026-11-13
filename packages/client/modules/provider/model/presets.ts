@@ -28,6 +28,15 @@ export const PROVIDER_PRESETS: Record<BuiltinProviderKind, ProviderPreset> = {
     keyPlaceholder: "sk-… с platform.deepseek.com",
     hint: "Баланс аккаунта показывается в статусной строке и обновляется раз в минуту.",
   },
+  openrouter: {
+    thinking: "openrouter",
+    label: "OpenRouter",
+    name: "OpenRouter",
+    url: "https://openrouter.ai/api/v1",
+    model: "openrouter/auto",
+    keyPlaceholder: "sk-or-… с openrouter.ai/settings/keys",
+    hint: "API key используется для моделей, отдельный management key — для остатка кредитов. Баланс обновляется раз в минуту.",
+  },
   qwencloud: {
     thinking: "qwen",
     label: "Qwen Cloud",

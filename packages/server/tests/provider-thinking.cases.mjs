@@ -47,6 +47,7 @@ describe("thinking adapter", () => {
   it("picks a dialect by provider kind", () => {
     expect(defaultThinkingStyle("qwencloud")).toBe("qwen");
     expect(defaultThinkingStyle("deepseek")).toBe("deepseek");
+    expect(defaultThinkingStyle("openrouter")).toBe("openrouter");
     expect(defaultThinkingStyle("custom")).toBe("none");
   });
 });

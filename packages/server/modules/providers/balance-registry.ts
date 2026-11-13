@@ -19,7 +19,7 @@ export interface ProviderBalanceReading {
 }
 
 /**
- * A balance reader for one provider kind. Built-in DeepSeek uses the same contract as a trusted
+ * A balance reader for one provider kind. Built-in readers use the same contract as a trusted
  * plugin, so a new kind only has to register its own reader.
  */
 export interface ProviderBalanceResolver {

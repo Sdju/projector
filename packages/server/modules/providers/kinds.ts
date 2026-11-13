@@ -4,6 +4,7 @@ export const BUILTIN_PROVIDER_KINDS: readonly BuiltinProviderKind[] = [
   "custom",
   "local",
   "deepseek",
+  "openrouter",
   "qwencloud",
 ];
 
@@ -26,6 +27,7 @@ export function inferProviderKind(url: string): ProviderKind {
   const value = url.trim().toLowerCase();
   if (!value) return "custom";
   if (value.includes("deepseek.com")) return "deepseek";
+  if (value.includes("openrouter.ai")) return "openrouter";
   if (value.includes("dashscope") || value.includes("aliyuncs.com") || value.includes("qwencloud"))
     return "qwencloud";
   try {

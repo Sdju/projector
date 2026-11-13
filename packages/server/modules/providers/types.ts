@@ -1,7 +1,7 @@
 import type { ThinkingStyle } from "./thinking.ts";
 
 /** Built-in presets of a provider. */
-export type BuiltinProviderKind = "custom" | "local" | "deepseek" | "qwencloud";
+export type BuiltinProviderKind = "custom" | "local" | "deepseek" | "openrouter" | "qwencloud";
 
 /**
  * Kind of a provider. Besides the built-in presets a trusted plugin may add its own kind and the
@@ -43,6 +43,8 @@ export interface OpenAIProviderPublic {
   enabled: boolean;
   models: ProviderModel[];
   hasApiKey: boolean;
+  /** OpenRouter can use a separate management key for its wallet. */
+  hasBalanceApiKey?: boolean;
 }
 
 export interface OpenAIProviderWrite {
@@ -63,6 +65,7 @@ export interface OpenAIProviderWrite {
   /** Shorthand for a single model, for callers that only know one. */
   model?: string;
   apiKey?: string;
+  balanceApiKey?: string;
 }
 
 /** A provider kind the settings may offer; plugin kinds come with their own balance reader. */
@@ -104,6 +107,9 @@ export interface StoredOpenAIProvider {
   apiKey: string;
   /** On disk, `keyring` means the key is in the OS keyring under the provider's account. */
   vault?: "keyring";
+  /** Optional second secret, used only by the balance reader. */
+  balanceApiKey?: string;
+  balanceVault?: "keyring";
 }
 
 export interface StoredProvidersConfig {
@@ -135,6 +141,7 @@ export interface ResolvedOpenAIProvider {
   thinking?: boolean;
   price?: ModelPrice;
   apiKey: string;
+  balanceApiKey?: string;
 }
 
 /** A tool call an earlier answer made; kept so the model still sees what it did and found. */

@@ -113,6 +113,78 @@ const deepseekResolver: ProviderBalanceResolver = {
 };
 registerBalanceResolver(deepseekResolver);
 
+function openrouterAmount(value: unknown): string | null {
+  const text =
+    typeof value === "number" && Number.isFinite(value)
+      ? String(value)
+      : typeof value === "string"
+        ? value.trim()
+        : "";
+  return /^\d+(?:\.\d+)?$/.test(text) && Number.isFinite(Number(text)) ? text : null;
+}
+
+function subtractDecimal(left: string, right: string): string | null {
+  const [leftInteger, leftFraction = ""] = left.split(".");
+  const [rightInteger, rightFraction = ""] = right.split(".");
+  const scale = Math.max(leftFraction.length, rightFraction.length);
+  const leftWhole = BigInt(`${leftInteger}${leftFraction.padEnd(scale, "0")}`);
+  const rightWhole = BigInt(`${rightInteger}${rightFraction.padEnd(scale, "0")}`);
+  const difference = leftWhole - rightWhole;
+  if (difference < 0) return null;
+  const text = difference.toString().padStart(scale + 1, "0");
+  return scale ? `${text.slice(0, -scale)}.${text.slice(-scale)}` : text;
+}
+
+/** OpenRouter `GET /api/v1/credits`: the wallet is purchased credits minus usage. */
+export function openrouterEntries(payload: unknown): ProviderBalanceEntry[] | null {
+  const data = record(record(payload)?.data);
+  const credits = openrouterAmount(data?.total_credits);
+  const usage = openrouterAmount(data?.total_usage);
+  if (!credits || !usage) return null;
+  const total = subtractDecimal(credits, usage);
+  if (total === null) return null;
+  return [{ currency: "USD", total, granted: "0", toppedUp: credits }];
+}
+
+async function readOpenRouter(context: ProviderBalanceContext): Promise<ProviderBalanceReading> {
+  if (!context.apiKey) return unavailable("Нет ключа API");
+  const endpoint = `${new URL(normalizeOpenAiBaseUrl(context.url)).origin}/api/v1/credits`;
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
+      headers: { Authorization: `Bearer ${context.apiKey}`, Accept: "application/json" },
+      signal: context.signal,
+      redirect: "error",
+    });
+  } catch {
+    return unavailable("Не удалось получить баланс OpenRouter");
+  }
+  if (!response.ok) {
+    await response.body?.cancel();
+    if (response.status === 401 || response.status === 403)
+      return unavailable("OpenRouter отклонил ключ: для баланса нужен management key");
+    return unavailable(`OpenRouter: ошибка HTTP ${response.status}`);
+  }
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    return unavailable("Некорректный ответ OpenRouter");
+  }
+  const entries = openrouterEntries(payload);
+  if (!entries) return unavailable("Некорректный ответ OpenRouter");
+  return { status: "ready", entries, available: null, message: null };
+}
+
+const openrouterResolver: ProviderBalanceResolver = {
+  kind: "openrouter",
+  title: "OpenRouter",
+  url: "https://openrouter.ai/api/v1",
+  model: "openrouter/auto",
+  read: readOpenRouter,
+};
+registerBalanceResolver(openrouterResolver);
+
 /** A plugin reader may return only part of the shape; everything unsafe is dropped here. */
 function normalizeReading(value: unknown): ProviderBalanceReading {
   const payload = record(value);
@@ -158,7 +230,7 @@ async function load(provider: ResolvedOpenAIProvider): Promise<ProviderBalance> 
     name: provider.name,
     kind: provider.kind,
     url: provider.url,
-    apiKey: provider.apiKey,
+    apiKey: provider.balanceApiKey || provider.apiKey,
     signal: AbortSignal.timeout(READ_TIMEOUT_MS),
   };
   let reading: ProviderBalanceReading;
@@ -186,7 +258,9 @@ export async function providerBalance(providerId?: string): Promise<ProviderBala
     providerKind: provider.kind,
   });
   const key = createHash("sha256")
-    .update(`${provider.id}\n${provider.kind}\n${provider.url}\n${provider.apiKey}`)
+    .update(
+      `${provider.id}\n${provider.kind}\n${provider.url}\n${provider.balanceApiKey || provider.apiKey}`,
+    )
     .digest("hex");
   const entry = cache.get(key) ?? {};
   if (!cache.has(key) && cache.size >= 32) cache.delete(cache.keys().next().value as string);

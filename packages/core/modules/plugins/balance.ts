@@ -17,7 +17,7 @@ export interface PluginBalanceContribution {
 }
 
 const providerKindPattern = /^[a-z][a-z0-9._-]{0,63}$/;
-const builtinProviderKinds = new Set(["custom", "local", "deepseek", "qwencloud"]);
+const builtinProviderKinds = new Set(["custom", "local", "deepseek", "openrouter", "qwencloud"]);
 
 /** A provider kind a plugin brings its own balance reader for; built-ins stay Projector's. */
 export function validateBalanceContribution(

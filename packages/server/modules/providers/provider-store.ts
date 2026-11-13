@@ -9,9 +9,17 @@ import { defaultThinkingStyle, isThinkingStyle } from "./thinking.ts";
 import { providerReaderKinds } from "./reader-kinds.ts";
 import { DEFAULT_MODEL, ENV_PROVIDER_ID, envProvider, seededConfig } from "./provider-seeds.ts";
 import { DEFAULT_PROVIDERS_SECRET, revealSecret } from "./secret-obfuscation.ts";
+import {
+  fallbackModelOf,
+  fallbackOf,
+  normalizeStoredProvider,
+  sanitizeName,
+  sanitizeProviderId,
+  sanitizeUrl,
+  toPublic,
+} from "./provider-normalize.ts";
 import type {
   EnvOpenAIFallback,
-  OpenAIProviderPublic,
   OpenAIProviderWrite,
   OpenAIProvidersPublicState,
   OpenAIProvidersWriteState,
@@ -26,7 +34,7 @@ let providerVault = systemVault;
 export const useProviderVault = (next: typeof systemVault) => {
   providerVault = next;
 };
-const keyAccount = (id: string) => `provider:${id}`;
+const keyAccount = (id: string, balance = false) => `provider:${id}${balance ? ":balance" : ""}`;
 
 function withWriteLock<T>(fn: () => Promise<T>): Promise<T> {
   const next = writeChain.then(fn, fn);
@@ -35,75 +43,6 @@ function withWriteLock<T>(fn: () => Promise<T>): Promise<T> {
     () => undefined,
   );
   return next;
-}
-
-export function sanitizeProviderId(value: string): string {
-  const cleaned = value.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 80);
-  if (!cleaned) throw new HttpError(400, "Некорректный id провайдера");
-  return cleaned;
-}
-
-function sanitizeName(value: unknown, fallback: string): string {
-  if (typeof value !== "string") return fallback;
-  return value.replace(/\s+/g, " ").trim().slice(0, 80) || fallback;
-}
-
-const sanitizeUrl = (value: unknown): string =>
-  typeof value === "string" ? value.trim().slice(0, 500) : "";
-
-function toPublic(provider: StoredOpenAIProvider, envKey = ""): OpenAIProviderPublic {
-  const fromEnv = provider.id === ENV_PROVIDER_ID && envKey.trim() !== "";
-  return {
-    id: provider.id,
-    name: provider.name,
-    kind: provider.kind,
-    thinkingStyle: provider.thinkingStyle,
-    ...(provider.fallbackModel ? { fallbackModel: provider.fallbackModel } : {}),
-    url: provider.url,
-    enabled: provider.enabled,
-    models: provider.models,
-    hasApiKey: provider.vault === "keyring" || Boolean(provider.apiKey.trim()) || fromEnv,
-  };
-}
-
-const fallbackOf = (value: unknown) =>
-  typeof value === "string" && value.trim() ? { fallbackModel: value.trim().slice(0, 200) } : {};
-
-/** The fallback model of a provider, when it is still one of the registered models. */
-function fallbackModelOf(provider: StoredOpenAIProvider): ResolvedOpenAIProvider["fallback"] {
-  const chosen = provider.models.find((item) => item.alias === provider.fallbackModel);
-  return chosen
-    ? { model: chosen.id, modelName: chosen.alias, thinking: chosen.thinking, price: chosen.price }
-    : undefined;
-}
-
-function normalizeStoredProvider(value: unknown, index: number): StoredOpenAIProvider | null {
-  if (!value || typeof value !== "object") return null;
-  const record = value as Record<string, unknown>;
-  try {
-    const id =
-      typeof record.id === "string" && record.id.trim()
-        ? sanitizeProviderId(record.id)
-        : `provider-${index + 1}`;
-    const url = sanitizeUrl(record.url);
-    const kind = isProviderKind(record.kind) ? record.kind : inferProviderKind(url);
-    return {
-      id,
-      name: sanitizeName(record.name, `Провайдер ${index + 1}`),
-      kind,
-      thinkingStyle: isThinkingStyle(record.thinkingStyle)
-        ? record.thinkingStyle
-        : defaultThinkingStyle(kind),
-      ...fallbackOf(record.fallbackModel),
-      url,
-      enabled: record.enabled !== false,
-      models: sanitizeModels(record.models, record.model),
-      apiKey: typeof record.apiKey === "string" ? record.apiKey : "",
-      ...(record.vault === "keyring" ? { vault: "keyring" as const } : {}),
-    };
-  } catch {
-    return null;
-  }
 }
 
 export async function loadStoredProviders(
@@ -173,13 +112,9 @@ export async function assertKeyStore(): Promise<void> {
     );
 }
 
-async function storeKey(
-  id: string,
-  plain: string,
-): Promise<Pick<StoredOpenAIProvider, "apiKey" | "vault">> {
+async function storeKey(id: string, plain: string, balance = false): Promise<void> {
   await assertKeyStore();
-  await providerVault.set(keyAccount(id), `Projector: провайдер ${id}`, plain);
-  return { apiKey: "", vault: "keyring" };
+  await providerVault.set(keyAccount(id, balance), `Projector: провайдер ${id}`, plain);
 }
 
 async function mergeProviderWrite(
@@ -209,16 +144,36 @@ async function mergeProviderWrite(
         ? (previous?.models ?? [])
         : sanitizeModels(item.models, item.model),
   };
-  if (typeof item.apiKey === "string") {
-    const plain = item.apiKey.trim();
-    return { ...base, ...(plain ? await storeKey(id, plain) : { apiKey: "" }) };
-  }
-  // No key in the payload: keep the one already stored, wherever it lives.
-  return {
+  const stored: StoredOpenAIProvider = {
     ...base,
     apiKey: previous?.apiKey ?? "",
     ...(previous?.vault ? { vault: previous.vault } : {}),
+    ...(previous?.balanceApiKey ? { balanceApiKey: previous.balanceApiKey } : {}),
+    ...(previous?.balanceVault ? { balanceVault: previous.balanceVault } : {}),
   };
+  if (typeof item.apiKey === "string") {
+    const plain = item.apiKey.trim();
+    if (plain) {
+      await storeKey(id, plain);
+      stored.apiKey = "";
+      stored.vault = "keyring";
+    } else {
+      stored.apiKey = "";
+      delete stored.vault;
+    }
+  }
+  if (typeof item.balanceApiKey === "string") {
+    const plain = item.balanceApiKey.trim();
+    if (plain) {
+      await storeKey(id, plain, true);
+      stored.balanceApiKey = "";
+      stored.balanceVault = "keyring";
+    } else {
+      stored.balanceApiKey = "";
+      delete stored.balanceVault;
+    }
+  }
+  return stored;
 }
 
 /** Removes keyring entries of providers that were deleted or whose key was cleared. */
@@ -227,9 +182,16 @@ async function dropRetiredKeys(
   after: StoredOpenAIProvider[],
 ): Promise<void> {
   for (const old of before) {
-    if (old.vault !== "keyring") continue;
-    if (after.some((item) => item.id === old.id && item.vault === "keyring")) continue;
-    await providerVault.delete(keyAccount(old.id));
+    if (
+      old.vault === "keyring" &&
+      !after.some((item) => item.id === old.id && item.vault === "keyring")
+    )
+      await providerVault.delete(keyAccount(old.id));
+    if (
+      old.balanceVault === "keyring" &&
+      !after.some((item) => item.id === old.id && item.balanceVault === "keyring")
+    )
+      await providerVault.delete(keyAccount(old.id, true));
   }
 }
 
@@ -304,11 +266,14 @@ async function revealProviderKey(
   provider: StoredOpenAIProvider,
   secret: string,
   envKey: string,
+  balance = false,
 ): Promise<string> {
-  if (provider.id === ENV_PROVIDER_ID && !provider.apiKey.trim()) return envKey.trim();
-  if (provider.vault !== "keyring") return revealFileKey(provider.apiKey, secret);
+  const storedKey = balance ? (provider.balanceApiKey ?? "") : provider.apiKey;
+  const storedVault = balance ? provider.balanceVault : provider.vault;
+  if (!balance && provider.id === ENV_PROVIDER_ID && !storedKey.trim()) return envKey.trim();
+  if (storedVault !== "keyring") return revealFileKey(storedKey, secret);
   try {
-    return (await providerVault.get(keyAccount(provider.id))) ?? "";
+    return (await providerVault.get(keyAccount(provider.id, balance))) ?? "";
   } catch (error) {
     console.error(`Провайдер ${provider.id}: ключ недоступен: ${(error as Error).message}`);
     return "";
@@ -330,6 +295,7 @@ async function toResolved(
     ...resolveModel(provider.models, modelName, DEFAULT_MODEL),
     fallback: fallbackModelOf(provider),
     apiKey: await revealProviderKey(provider, secret, envKey),
+    balanceApiKey: await revealProviderKey(provider, secret, envKey, true),
   };
 }
 
@@ -345,16 +311,26 @@ export function migrateProviderKeys(fallback: EnvOpenAIFallback = {}): Promise<v
     let moved = false;
     const providers: StoredOpenAIProvider[] = [];
     for (const item of stored.providers) {
-      const plain = item.vault || !item.apiKey.trim() ? "" : revealFileKey(item.apiKey, secret);
-      if (!plain) {
-        providers.push(item);
-        continue;
+      const next = { ...item };
+      for (const balance of [false, true]) {
+        const storedKey = balance ? (item.balanceApiKey ?? "") : item.apiKey;
+        const storedVault = balance ? item.balanceVault : item.vault;
+        const plain = storedVault || !storedKey.trim() ? "" : revealFileKey(storedKey, secret);
+        if (!plain) continue;
+        const account = keyAccount(item.id, balance);
+        await providerVault.set(account, `Projector: провайдер ${item.id}`, plain);
+        if ((await providerVault.get(account)) !== plain)
+          throw new Error(`Не удалось проверить ключ провайдера ${item.id}`);
+        if (balance) {
+          next.balanceApiKey = "";
+          next.balanceVault = "keyring";
+        } else {
+          next.apiKey = "";
+          next.vault = "keyring";
+        }
+        moved = true;
       }
-      await providerVault.set(keyAccount(item.id), `Projector: провайдер ${item.id}`, plain);
-      if ((await providerVault.get(keyAccount(item.id))) !== plain)
-        throw new Error(`Не удалось проверить ключ провайдера ${item.id}`);
-      providers.push({ ...item, apiKey: "", vault: "keyring" });
-      moved = true;
+      providers.push(next);
     }
     if (moved) await writeProvidersFile({ activeProviderId: stored.activeProviderId, providers });
   });
