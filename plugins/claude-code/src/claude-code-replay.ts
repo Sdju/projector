@@ -1,5 +1,4 @@
-import type { AgentTask } from "@ai-projector/core/modules/agent-task/index.ts";
-import type { AgentSessionTurn } from "../../agent/index.ts";
+import type { AgentSessionTurn, AgentTask } from "./api.ts";
 
 /** Records Claude Code writes into the user's side of a transcript that the user never wrote. */
 const SERVICE_BLOCK =

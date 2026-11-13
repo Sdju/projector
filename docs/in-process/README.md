@@ -18,6 +18,7 @@
 - [cursor-acp.md](cursor-acp.md) — оставшиеся пункты ACP Cursor: форк и подпись модели; ограничения CLI (`--trust`, Team MCP) описаны в [usage](../usage.md).
 - [agent-roadmap.md](agent-roadmap.md) — открытые пункты штатного агента Projector и проверки Судьи в браузере.
 - [plugin-agents.md](plugin-agents.md) — что осталось у агентов-плагинов: hosted-жизненный цикл, статусы исчезнувшего агента, пресеты диалектов и изолированный runtime.
+- [claude-plugin-followups.md](claude-plugin-followups.md) — что осталось в ядре после выноса Claude Code: SDK в зависимостях, ACP-поля манифеста, MCP-конвертер, feature-defaults, клиентские вклады и очистка session-env.
 - [plugin-concept/concept.md](plugin-concept/concept.md) — будущее плагинов: npm-поставка, browser runtime, UI и Node capabilities; текущие вклады и доверие — [plugins](../plugins.md).
 - [analytics-agent-logs.md](analytics-agent-logs.md) — расход по нативным журналам Codex, OpenCode, Kimi и Cursor: читатели журналов, нормализация, дедупликация, цена и покрытие.
 - [color-schemes.md](color-schemes.md) — цветовые схемы интерфейса: остались потребители вне CSS (редактор, Markdown, ANSI-палитра терминала, иконки и статика), доводка светлой и контрастной схем и проверки.

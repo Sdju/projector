@@ -22,6 +22,7 @@
     "build:prepare": "vp run --cache architecture && vp run gtk:types && vp run --cache types",
     "build:app": "vp build",
     "build:plugin:cursor": "vp build --config plugins/cursor/vite.config.ts",
+    "build:plugin:claude-code": "vp build --config plugins/claude-code/vite.config.ts",
     "build:plugin:example-ui": "vp build --config plugins/example-ui/vite.config.ts",
     "test": "vp run --cache architecture && vp test run",
     "architecture": "node scripts/check-feod.mjs",

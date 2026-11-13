@@ -1,27 +1,12 @@
-import {
-  agentEnv,
-  assertHostProject,
-  attachedImages,
-  promptWithHistory,
-  registerInjector,
-  runHostedAgent,
-} from "../../agent/index.ts";
 import type {
   AgentBackend,
   AgentCommand,
+  AgentControl,
   AgentRunHandle,
   AgentRunOptions,
-  AgentControl,
-} from "../../agent/index.ts";
-import { fileURLToPath } from "node:url";
-import { query } from "@anthropic-ai/claude-agent-sdk";
-import { featureEnabled, featurePrompt } from "../../agent-features/index.ts";
-import { claudeIdeMcpServer, IDE_MCP_SERVER } from "../ide-mcp/index.ts";
-import { claudeWidgetsMcpServer, WIDGETS_MCP_SERVER } from "../widgets-mcp/index.ts";
-import { mcpConfigsForNames, mcpServerConfigs, processMcpConfig } from "../../agent-mcp/index.ts";
-import { roleContext } from "../../agent-roles/index.ts";
-import { trustedProjectWidgets } from "../../project-widgets/index.ts";
-import { renderWidgetGuide } from "@ai-projector/core/modules/widget-catalog/index.ts";
+  ClaudeSdk,
+  PluginCodeApi,
+} from "./api.ts";
 import type {
   Options,
   SDKControlGetContextUsageResponse as ContextUsage,
@@ -44,7 +29,13 @@ import {
   claudeUpdateSession,
 } from "./claude-code-sessions.ts";
 import { askClaudeQuestions } from "./questions.ts";
-import { claudeEnv } from "./claude-code-env.ts";
+import { CLAUDE_SESSION_ENV, claudeEnv } from "./claude-code-env.ts";
+
+/** What a Claude Code answer needs from the host: the plugin API and the Agent SDK. */
+export interface ClaudeDeps {
+  api: PluginCodeApi;
+  sdk: ClaudeSdk;
+}
 
 /** Claude Code takes the choice natively; `default` leaves the model and effort to its settings. */
 function chosen(options: AgentRunOptions) {
@@ -64,34 +55,40 @@ function chosen(options: AgentRunOptions) {
   };
 }
 
-/** The runner process of a hosted answer (see `server/app/claude-runner.ts`). */
-const RUNNER = fileURLToPath(new URL("../../../app/claude-runner.ts", import.meta.url));
-
-/** The answer of a hosted run: followed through its runner (see `server/app/claude-runner.ts`). */
-async function runHosted(options: AgentRunOptions, handle: AgentRunHandle): Promise<void> {
+/** The answer of a hosted run: followed through the generic plugin runner. */
+async function runHosted(
+  deps: ClaudeDeps,
+  options: AgentRunOptions,
+  handle: AgentRunHandle,
+): Promise<void> {
   if (!options.cwd) throw new Error("Claude Code работает внутри проекта: откройте чат в проекте");
-  await assertHostProject(options.cwd, CLAUDE_LABEL);
-  await runHostedAgent(
+  await deps.api.host.assertProject(options.cwd, CLAUDE_LABEL);
+  await deps.api.host.runHosted(
     options,
     handle,
-    { runner: RUNNER, cwd: options.cwd, env: agentEnv() },
+    "claude-code",
     isUuid(options.messageId) ? options.messageId : undefined,
   );
 }
 
 /** The run: held by its own process when the route gave it one, otherwise in this process. */
-async function run(options: AgentRunOptions): Promise<void> {
-  if (options.run) return runHosted(options, options.run);
-  return runClaudeCode(options);
+async function run(deps: ClaudeDeps, options: AgentRunOptions): Promise<void> {
+  if (options.run) return runHosted(deps, options, options.run);
+  return runClaudeCode(deps, options);
 }
 
 /** The prompt of a Claude Code session: its own preset plus the abilities and role switched on for the chat. */
 export async function claudeSystemPrompt(
+  api: PluginCodeApi,
   features?: string[],
   role = "",
   projectWidgets = "",
 ): Promise<Options["systemPrompt"]> {
-  const text = [role.trim(), await featurePrompt("claude-code", features), projectWidgets.trim()]
+  const text = [
+    role.trim(),
+    await api.features.prompt("claude-code", features),
+    projectWidgets.trim(),
+  ]
     .filter(Boolean)
     .join("\n\n");
   return {
@@ -107,17 +104,18 @@ export async function claudeSystemPrompt(
 /**
  * Plain Claude Code behind a chat UI instead of the TUI: its own prompt, tools, login, `CLAUDE.md`
  * and settings. Nothing about Projector is added to the model's context except the abilities the
- * user switched on. Runs in the runner process (`server/app/claude-runner.ts`) for a hosted answer,
+ * user switched on. Runs in the generic plugin runner (`server/app/plugin-runner.ts`) for a hosted answer,
  * and in the server process otherwise.
  */
-export async function runClaudeCode(options: AgentRunOptions): Promise<void> {
+export async function runClaudeCode(deps: ClaudeDeps, options: AgentRunOptions): Promise<void> {
+  const { api, sdk } = deps;
   if (!options.cwd) throw new Error("Claude Code работает внутри проекта: откройте чат в проекте");
   const requestedMode =
     options.selection?.["permission-mode"] ?? options.permissionMode ?? "default";
   const mode = PERMISSION_MODES.find((value) => value === requestedMode);
   if (!mode) throw new Error("Неизвестный режим разрешений агента");
   const cwd = options.cwd;
-  await assertHostProject(cwd, CLAUDE_LABEL);
+  await api.host.assertProject(cwd, CLAUDE_LABEL);
 
   const abortController = new AbortController();
   const forwardAbort = () => abortController.abort();
@@ -126,30 +124,52 @@ export async function runClaudeCode(options: AgentRunOptions): Promise<void> {
 
   const selected = chosen(options);
   const [ideEnabled, widgetsEnabled, roleText] = await Promise.all([
-    featureEnabled("claude-code", "ide", options.features),
-    featureEnabled("claude-code", "widgets", options.features),
-    roleContext(options.role, cwd),
+    api.features.enabled("claude-code", "ide", options.features),
+    api.features.enabled("claude-code", "widgets", options.features),
+    api.roles.context(options.role, cwd),
   ]);
-  const projectWidgets = widgetsEnabled ? await trustedProjectWidgets(options.projectId) : [];
+  const projectWidgets = widgetsEnabled ? await api.widgets.trustedProject(options.projectId) : [];
+  const ideServer = options.projectId ? api.mcp.ide(options.projectId) : undefined;
+  const widgetsServer = api.mcp.widgets(options.projectId);
+  // The SDK takes an explicit server inline; `alwaysLoad` keeps its tools out of tool search.
   const extraMcp = {
-    ...(options.projectId && ideEnabled
-      ? { [IDE_MCP_SERVER]: claudeIdeMcpServer(options.projectId) }
+    ...(ideEnabled && ideServer
+      ? {
+          [ideServer.name]: {
+            type: "stdio" as const,
+            command: ideServer.command,
+            args: ideServer.args,
+            env: ideServer.env,
+            alwaysLoad: true,
+          },
+        }
       : {}),
-    ...(widgetsEnabled ? { [WIDGETS_MCP_SERVER]: claudeWidgetsMcpServer(options.projectId) } : {}),
+    ...(widgetsEnabled
+      ? {
+          [widgetsServer.name]: {
+            type: "stdio" as const,
+            command: widgetsServer.command,
+            args: widgetsServer.args,
+            env: widgetsServer.env,
+            alwaysLoad: true,
+          },
+        }
+      : {}),
   };
   // A role with its own MCP list gets exactly those servers: Claude Code must not add the rest.
   const namedMcp = options.role?.mcp
     ? Object.fromEntries(
-        mcpConfigsForNames(await mcpServerConfigs(cwd), options.role.mcp)
+        api.mcp
+          .byNames((await api.mcp.configs(cwd)) as { name: string }[], options.role.mcp)
           .filter((config) => !(config.name in extraMcp))
-          .map((config) => [config.name, processMcpConfig(config)]),
+          .map((config) => [config.name, api.mcp.process(config)]),
       )
     : {};
-  const mcpServers = { ...namedMcp, ...extraMcp };
+  const mcpServers = { ...namedMcp, ...extraMcp } as unknown as NonNullable<Options["mcpServers"]>;
   const base: Options = {
     cwd,
     abortController,
-    env: claudeEnv(),
+    env: claudeEnv(api),
     ...(Object.keys(mcpServers).length ? { mcpServers } : {}),
     ...(options.role?.mcp ? { strictMcpConfig: true } : {}),
     includePartialMessages: true,
@@ -157,11 +177,12 @@ export async function runClaudeCode(options: AgentRunOptions): Promise<void> {
     agentProgressSummaries: true,
     settingSources: ["user", "project", "local"],
     systemPrompt: await claudeSystemPrompt(
+      api,
       options.features,
       roleText,
-      projectWidgets.length ? renderWidgetGuide(projectWidgets) : "",
+      projectWidgets.length ? api.widgets.guide(projectWidgets) : "",
     ),
-    ...(widgetsEnabled ? { allowedTools: [`mcp__${WIDGETS_MCP_SERVER}__describe_widget`] } : {}),
+    ...(widgetsEnabled ? { allowedTools: [`mcp__${widgetsServer.name}__describe_widget`] } : {}),
     permissionMode: mode,
     // Files are backed up before the agent changes them, so a step can be taken back later.
     enableFileCheckpointing: true,
@@ -211,18 +232,18 @@ export async function runClaudeCode(options: AgentRunOptions): Promise<void> {
     const mapper = createClaudeEventMapper(emit);
     const prompt = resume
       ? options.message
-      : promptWithHistory(options.message, options.history ?? []);
-    const images = await attachedImages(options.parts);
+      : api.host.promptWithHistory(options.message, options.history ?? []);
+    const images = await api.host.attachedImages(options.parts);
     const messageId = isUuid(options.messageId) ? options.messageId : undefined;
     const input = createInput(userMessage(prompt, images, messageId));
     const unregister = messageId
-      ? registerInjector(messageId, (text, inputId) => {
+      ? api.host.registerInjector(messageId, (text, inputId) => {
           const accepted = input.push(text);
           if (accepted) emit("input", { text, ...(inputId ? { inputId } : {}) });
           return accepted;
         })
       : undefined;
-    const conversation = query({
+    const conversation = sdk.query({
       prompt: input.stream,
       options: { ...base, ...(resume ? { resume } : {}) },
     });
@@ -249,7 +270,7 @@ export async function runClaudeCode(options: AgentRunOptions): Promise<void> {
     }
     // Where this answer ends in the transcript: the next message can branch off here.
     if (!mapper.failed && mapper.sessionId) {
-      const tail = await chainTail(cwd, mapper.sessionId);
+      const tail = await chainTail(cwd, mapper.sessionId, sdk);
       if (tail) options.emit("checkpoint", { tail });
     }
     // The session may be gone (project moved, transcript pruned): start over from the history.
@@ -262,7 +283,7 @@ export async function runClaudeCode(options: AgentRunOptions): Promise<void> {
     options.emit("controls", { controls: claudeControls(options.selection ?? {}) });
     options.emit("status", { phase: "thinking", provider: CLAUDE_LABEL, model: "" });
     const resume = options.sessionId
-      ? await sessionAt(cwd, options.sessionId, options.tail)
+      ? await sessionAt(cwd, options.sessionId, options.tail, sdk)
       : undefined;
     await attempt(resume);
   } finally {
@@ -310,16 +331,20 @@ const commandCache = new Map<string, { at: number; commands: Promise<AgentComman
  * folder. They are only known to a running session, so one is started without a prompt, asked and
  * closed; the answer is kept for a minute.
  */
-function claudeCommands(cwd: string): Promise<AgentCommand[]> {
+function claudeCommands(cwd: string, deps: ClaudeDeps): Promise<AgentCommand[]> {
   const cached = commandCache.get(cwd);
   if (cached && Date.now() - cached.at < COMMANDS_TTL_MS) return cached.commands;
   const commands = (async () => {
     const idle = (async function* (): AsyncGenerator<SDKUserMessage> {
       await new Promise<never>(() => {});
     })();
-    const session = query({
+    const session = deps.sdk.query({
       prompt: idle,
-      options: { cwd, env: claudeEnv(), settingSources: ["user", "project", "local"] },
+      options: {
+        cwd,
+        env: claudeEnv(deps.api),
+        settingSources: ["user", "project", "local"],
+      },
     });
     try {
       return (await session.supportedCommands()).map((item) => ({
@@ -370,25 +395,32 @@ function claudeControls(selection: Record<string, string>): AgentControl[] {
 /** Claude Code's permission policy: `default` asks in the chat before edits and shell commands. */
 const PERMISSION_MODES = ["default", "plan", "acceptEdits", "auto", "bypassPermissions"] as const;
 
-export const claudeCodeBackend: AgentBackend = {
-  id: "claude-code",
-  label: CLAUDE_LABEL,
-  program: "claude",
-  terminal: { program: "claude", executable: "claude", title: CLAUDE_LABEL },
-  capabilities: {
-    hosted: true,
-    inject: true,
-    branchSession: true,
-    compact: { command: "/compact", hintAt: 0.8, autoAt: 0.9 },
-  },
-  run,
-  controls: async () => CLAUDE_CONTROLS,
-  commands: claudeCommands,
-  sessions: claudeSessions,
-  loadSession: claudeLoadSession,
-  updateSession: claudeUpdateSession,
-  deleteSession: claudeDeleteSession,
-  rewindFiles: (cwd, sessionId, messageId, dryRun) =>
-    rewindClaudeFiles(cwd, sessionId, messageId, dryRun),
-  mcpServers: claudeMcpServers,
-};
+export function createClaudeBackend(api: PluginCodeApi): AgentBackend {
+  const deps: ClaudeDeps = { api, sdk: api.require("@anthropic-ai/claude-agent-sdk") as ClaudeSdk };
+  // A server launched from a Claude Code session would leak its session variables to every
+  // terminal and agent it starts; the plugin clears them as soon as it is loaded.
+  api.host.clearEnv(CLAUDE_SESSION_ENV);
+  return {
+    id: "claude-code",
+    label: CLAUDE_LABEL,
+    program: "claude",
+    terminal: { program: "claude", executable: "claude", title: CLAUDE_LABEL },
+    capabilities: {
+      hosted: true,
+      inject: true,
+      branchSession: true,
+      compact: { command: "/compact", hintAt: 0.8, autoAt: 0.9 },
+    },
+    run: (options) => run(deps, options),
+    controls: async () => CLAUDE_CONTROLS,
+    commands: (cwd) => claudeCommands(cwd, deps),
+    sessions: (cwd) => claudeSessions(cwd, deps),
+    loadSession: (cwd, sessionId) => claudeLoadSession(cwd, sessionId, deps),
+    updateSession: (cwd, sessionId, change) =>
+      claudeUpdateSession(cwd, sessionId, change, deps.sdk),
+    deleteSession: (cwd, sessionId) => claudeDeleteSession(cwd, sessionId, deps.sdk),
+    rewindFiles: (cwd, sessionId, messageId, dryRun) =>
+      rewindClaudeFiles(cwd, sessionId, messageId, dryRun, deps),
+    mcpServers: (cwd) => claudeMcpServers(cwd, deps),
+  };
+}

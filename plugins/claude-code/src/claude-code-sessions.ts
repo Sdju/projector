@@ -1,12 +1,10 @@
-import {
-  deleteSession,
-  getSessionMessages,
-  listSessions,
-  renameSession,
-  tagSession,
-} from "@anthropic-ai/claude-agent-sdk";
-import type { AgentControl, AgentSessionInfo, AgentSessionTurn } from "../../agent/index.ts";
-import { createReplay, SESSION_LIST_LIMIT } from "../../agent/index.ts";
+import type {
+  AgentControl,
+  AgentSessionInfo,
+  AgentSessionTurn,
+  ClaudeSdk,
+  PluginCodeApi,
+} from "./api.ts";
 import {
   applyTaskReport,
   isCompactSummary,
@@ -112,8 +110,14 @@ export const CLAUDE_CONTROLS: AgentControl[] = [
   },
 ];
 
-export async function claudeSessions(cwd: string): Promise<AgentSessionInfo[]> {
-  const sessions = await listSessions({ dir: cwd, limit: SESSION_LIST_LIMIT });
+export async function claudeSessions(
+  cwd: string,
+  deps: { api: PluginCodeApi; sdk: ClaudeSdk },
+): Promise<AgentSessionInfo[]> {
+  const sessions = await deps.sdk.listSessions({
+    dir: cwd,
+    limit: deps.api.host.sessionListLimit,
+  });
   return sessions
     .map((session) => ({
       id: session.sessionId,
@@ -137,19 +141,24 @@ export async function claudeUpdateSession(
   cwd: string,
   sessionId: string,
   change: { title?: string; pinned?: boolean },
+  sdk: ClaudeSdk,
 ): Promise<void> {
   if (change.title !== undefined) {
     const title = change.title.trim();
     if (!title) throw new Error("Название не может быть пустым");
-    await renameSession(sessionId, title.slice(0, 200), { dir: cwd });
+    await sdk.renameSession(sessionId, title.slice(0, 200), { dir: cwd });
   }
   if (change.pinned !== undefined)
-    await tagSession(sessionId, change.pinned ? PINNED_TAG : null, { dir: cwd });
+    await sdk.tagSession(sessionId, change.pinned ? PINNED_TAG : null, { dir: cwd });
 }
 
 /** Removes the session's transcript from Claude Code's own storage. */
-export async function claudeDeleteSession(cwd: string, sessionId: string): Promise<void> {
-  await deleteSession(sessionId, { dir: cwd });
+export async function claudeDeleteSession(
+  cwd: string,
+  sessionId: string,
+  sdk: ClaudeSdk,
+): Promise<void> {
+  await sdk.deleteSession(sessionId, { dir: cwd });
 }
 
 interface Block {
@@ -185,12 +194,13 @@ function stringify(value: unknown): string {
 export async function claudeLoadSession(
   cwd: string,
   sessionId: string,
+  deps: { api: PluginCodeApi; sdk: ClaudeSdk },
 ): Promise<AgentSessionTurn[]> {
   const [messages, times] = await Promise.all([
-    getSessionMessages(sessionId, { dir: cwd }),
+    deps.sdk.getSessionMessages(sessionId, { dir: cwd }),
     claudeMessageTimes(cwd, sessionId),
   ]);
-  const replay = createReplay("claude-code", sessionId);
+  const replay = deps.api.host.createReplay("claude-code", sessionId);
   for (const message of messages) {
     if (message.type === "system" || message.parent_tool_use_id) continue;
     replay.mark(times.get(message.uuid));

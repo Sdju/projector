@@ -10,7 +10,7 @@ registerBuiltinClientAgents();
 
 const job = (id, status, extra = {}) => ({
   id,
-  backend: "claude-code",
+  backend: "codex",
   task: ` задание ${id} `,
   projectId: "p1",
   status,
@@ -29,7 +29,7 @@ test("the island lists unfinished jobs and marks the ones that wait for the user
     job("f", "queued"),
   ]);
   expect(items.map((item) => item.job.id)).toEqual(["a", "b", "f"]);
-  expect(items[0]).toMatchObject({ agent: "Claude Code", topic: "задание a", busy: true });
+  expect(items[0]).toMatchObject({ agent: "Codex", topic: "задание a", busy: true });
   expect(items[1]).toMatchObject({ busy: false, needsUser: true, chat: "job:b" });
 });
 
@@ -97,7 +97,7 @@ test("a page hears about a job that waits for the user or ended, once", async ()
   const waiting = jobNotices(known, [
     job("a", "needs-user", { pending: [{ id: "r", kind: "permission", title: "Write" }] }),
   ]);
-  expect(waiting).toMatchObject([{ id: "a", title: "Claude Code ждёт вашего ответа" }]);
+  expect(waiting).toMatchObject([{ id: "a", title: "Codex ждёт вашего ответа" }]);
   expect(waiting[0].body).toContain("Write");
   expect(jobNotices(known, [job("a", "needs-user")])).toEqual([]);
   expect(jobNotices(known, [job("a", "error", { error: "boom" })])).toMatchObject([
@@ -106,6 +106,6 @@ test("a page hears about a job that waits for the user or ended, once", async ()
   // A job that started and ended between two polls is still announced.
   expect(jobNotices(known, [job("b", "running"), job("a", "error")])).toEqual([]);
   expect(jobNotices(known, [job("b", "done")])).toMatchObject([
-    { id: "b", title: "Claude Code закончил задание" },
+    { id: "b", title: "Codex закончил задание" },
   ]);
 });

@@ -1,7 +1,7 @@
 import "../../../tests/helpers/builtins.mjs";
 import { expect, test } from "vite-plus/test";
 import { completeCommandRequest, createQuestionBridge } from "../modules/agent/command-bridge.ts";
-import { askClaudeQuestions } from "../modules/agents/claude-code/questions.ts";
+import { askClaudeQuestions } from "../../../plugins/claude-code/src/questions.ts";
 import { codexProgram } from "../modules/agents/codex/index.ts";
 
 const claudeInput = {

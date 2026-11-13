@@ -14,11 +14,7 @@ import {
   ideMcpTokenMatches,
   requestIdeCommand,
 } from "../modules/ide/index.ts";
-import {
-  ideMcpServer,
-  claudeIdeMcpServer,
-  acpIdeMcpServer,
-} from "../modules/agents/ide-mcp/index.ts";
+import { ideMcpServer, acpIdeMcpServer } from "../modules/agents/ide-mcp/index.ts";
 import { sessionMcpServers } from "../modules/agents/acp/acp-backend.ts";
 
 const entry = fileURLToPath(new URL("../modules/agents/ide-mcp/server.ts", import.meta.url));
@@ -54,18 +50,12 @@ describe("IDE MCP bridge", () => {
     ).rejects.toThrow("не ответил");
   });
 
-  it("builds the same server for Claude Code and ACP", () => {
+  it("builds the same server for the agent SDK and ACP", () => {
     const server = ideMcpServer("project-1");
     expect(server.name).toBe("projector-ide");
     expect(server.args).toEqual([entry]);
     expect(server.env.PROJECTOR_PROJECT_ID).toBe("project-1");
     expect(server.env.PROJECTOR_MCP_TOKEN_FILE).toContain("ide-mcp.token");
-    expect(claudeIdeMcpServer("project-1")).toMatchObject({
-      type: "stdio",
-      command: server.command,
-      args: server.args,
-      env: server.env,
-    });
     expect(acpIdeMcpServer("project-1")).toMatchObject({
       name: server.name,
       command: server.command,

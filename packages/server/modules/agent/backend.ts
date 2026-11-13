@@ -171,7 +171,7 @@ export interface AgentUsageCommandProvider {
 export interface AgentUsageFunctionProvider {
   kind: "function";
   /** Returns the same JSON a command provider would print; errors become an unavailable answer. */
-  read(checkedAt: number): unknown;
+  read(checkedAt: number): unknown | Promise<unknown>;
   timeoutMs?: number;
 }
 

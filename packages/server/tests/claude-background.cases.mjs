@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from "vite-plus/test";
-import { createClaudeEventMapper } from "../modules/agents/claude-code/claude-code-events.ts";
-import { createInput } from "../modules/agents/claude-code/claude-code-input.ts";
+import { createClaudeEventMapper } from "../../../plugins/claude-code/src/claude-code-events.ts";
+import { createInput } from "../../../plugins/claude-code/src/claude-code-input.ts";
 import { loadHistory } from "../../client/modules/agent-core/model/load-history.ts";
 
 const system = (subtype, extra) => ({

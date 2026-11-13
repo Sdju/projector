@@ -14,7 +14,7 @@ registerBuiltinClientAgents();
 
 const job = (id, status, extra = {}) => ({
   id,
-  backend: "claude-code",
+  backend: "codex",
   task: ` задание ${id} `,
   projectId: "p1",
   status,
@@ -123,12 +123,12 @@ test("a notice about a request is sent once, even after the page is hidden and s
     [project],
   );
   expect(inboxNotices(known, [next], false)).toMatchObject([
-    { key: "desk|job|wait", title: "Claude Code ждёт вашего ответа" },
+    { key: "desk|job|wait", title: "Codex ждёт вашего ответа" },
   ]);
   const error = inboxJobItem(source("desk", "Desktop"), job("wait", "error", { error: "boom" }), [
     project,
   ]);
   expect(inboxNotices(known, [error], false)).toMatchObject([
-    { title: "Claude Code: задание завершилось ошибкой", body: "boom" },
+    { title: "Codex: задание завершилось ошибкой", body: "boom" },
   ]);
 });

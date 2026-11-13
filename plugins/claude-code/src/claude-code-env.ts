@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { agentEnv } from "../../agent/index.ts";
+import type { PluginCodeApi } from "./api.ts";
 
 /**
  * Variables a running Claude Code session exports to everything it starts. A server launched from
@@ -40,8 +40,8 @@ function chromeEnabledByDefault(): boolean {
  * it is enabled by default; a session started through the SDK does so only when asked, so the same
  * setting is passed on as `CLAUDE_CODE_ENABLE_CFC`.
  */
-export function claudeEnv(): Record<string, string | undefined> {
-  const env = agentEnv();
+export function claudeEnv(api: PluginCodeApi): Record<string, string | undefined> {
+  const env = api.host.env();
   if (env.CLAUDE_CODE_ENABLE_CFC === undefined && chromeEnabledByDefault())
     env.CLAUDE_CODE_ENABLE_CFC = "1";
   return env;

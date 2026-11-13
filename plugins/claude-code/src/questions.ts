@@ -1,4 +1,4 @@
-import type { AgentQuestion, AgentRunOptions } from "../../agent/index.ts";
+import type { AgentQuestion, AgentRunOptions } from "./api.ts";
 import type { PermissionResult } from "@anthropic-ai/claude-agent-sdk";
 
 const text = (value: unknown, limit: number) =>

@@ -405,7 +405,7 @@ test("approval bridge resolves only an explicit allow and cancels with the reque
 
 test("Claude Code messages become the shared chat events", async () => {
   const { createClaudeEventMapper } =
-    await import("../modules/agents/claude-code/claude-code-events.ts");
+    await import("../../../plugins/claude-code/src/claude-code-events.ts");
   const events = [];
   const mapper = createClaudeEventMapper((event, data) => events.push([event, data]));
   const stream = (event, parent = null) => ({
@@ -1182,18 +1182,18 @@ test("agent session modes default to the terminal and persist only a GUI choice"
   process.env.XDG_DATA_HOME = directory;
   try {
     expect((await preferences()).agentModes).toStrictEqual({});
-    await setAgentMode("claude", "gui");
-    expect((await preferences()).agentModes).toStrictEqual({ claude: "gui" });
+    await setAgentMode("opencode", "gui");
+    expect((await preferences()).agentModes).toStrictEqual({ opencode: "gui" });
     await setAgentMode("codex", "gui");
-    expect((await preferences()).agentModes).toStrictEqual({ claude: "gui", codex: "gui" });
+    expect((await preferences()).agentModes).toStrictEqual({ opencode: "gui", codex: "gui" });
     await setAgentMode("kimi", "gui");
     expect((await preferences()).agentModes).toStrictEqual({
-      claude: "gui",
+      opencode: "gui",
       codex: "gui",
       kimi: "gui",
     });
     await expect(setAgentMode("shell", "gui")).rejects.toThrow(/графическ/);
-    await setAgentMode("claude", "tui");
+    await setAgentMode("opencode", "tui");
     expect((await preferences()).agentModes).toStrictEqual({ codex: "gui", kimi: "gui" });
     await setAgentMode("kimi", "tui");
     expect((await preferences()).agentModes).toStrictEqual({ codex: "gui" });

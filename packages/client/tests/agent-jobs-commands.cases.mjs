@@ -38,13 +38,13 @@ test("start sends the task of the project to the API and reports the job", async
   await expect(commands.get("ide.agent.job.start").run({ agent: "codex" })).rejects.toThrow(/task/);
   const result = await commands
     .get("ide.agent.job.start")
-    .run({ agent: "claude", task: "fix it", isolate: true });
+    .run({ agent: "kimi", task: "fix it", isolate: true });
   expect(result).toMatchObject({ job: "aaaaaaaaaaaa", status: "queued" });
   const [url, init] = fetchMock.mock.calls[0];
   expect(url).toBe("/api/agent/jobs");
   expect(JSON.parse(init.body)).toMatchObject({
     projectId: "p1",
-    backend: "claude-code",
+    backend: "kimi",
     task: "fix it",
     isolate: true,
   });
@@ -92,7 +92,7 @@ test("start can use a chat role instead of an agent", async () => {
     commands.get("ide.agent.job.start").run({ role: "doctor", task: "x" }),
   ).rejects.toThrow(/Неизвестная chat-роль/);
   await expect(
-    commands.get("ide.agent.job.start").run({ role: "role-1", agent: "claude", task: "x" }),
+    commands.get("ide.agent.job.start").run({ role: "role-1", agent: "kimi", task: "x" }),
   ).rejects.toThrow(/принадлежит/);
 });
 

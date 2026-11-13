@@ -7,12 +7,15 @@ import { uuidV7Time } from "../modules/agents/acp/acp-dialect.ts";
 import { createCodexDialect } from "../modules/agents/codex/dialect.ts";
 import { createOpencodeDialect, opencodeIdTime } from "../modules/agents/opencode/dialect.ts";
 
-const transcript = vi.hoisted(() => []);
-vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
-  getSessionMessages: async () => transcript,
-}));
-vi.resetModules();
-const { claudeLoadSession } = await import("../modules/agents/claude-code/claude-code-sessions.ts");
+import { createReplay, SESSION_LIST_LIMIT } from "../modules/agent/index.ts";
+
+const transcript = [];
+const deps = {
+  api: { host: { createReplay, sessionListLimit: SESSION_LIST_LIMIT } },
+  sdk: { getSessionMessages: async () => transcript },
+};
+const { claudeLoadSession } =
+  await import("../../../plugins/claude-code/src/claude-code-sessions.ts");
 
 test("a UUIDv7 carries its time, any other id does not", () => {
   expect(uuidV7Time("01a13e17-a880-7962-b3f2-6e1a5433545a")).toBe(
@@ -88,14 +91,14 @@ test("a reopened Claude Code chat takes message times from the stored transcript
       parent_tool_use_id: null,
     },
   );
-  const turns = await claudeLoadSession(cwd, "s1");
+  const turns = await claudeLoadSession(cwd, "s1", deps);
   expect(turns.map((turn) => new Date(turn.at).toISOString())).toStrictEqual([
     "2026-10-19T13:43:48.109Z",
     "2026-10-19T13:44:10.000Z",
   ]);
   // A session without a stored transcript still opens, just without times.
   transcript[0].uuid = "unknown";
-  const [first] = await claudeLoadSession(cwd, "missing");
+  const [first] = await claudeLoadSession(cwd, "missing", deps);
   expect(first.at).toBeUndefined();
   vi.unstubAllEnvs();
 });

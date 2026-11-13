@@ -1,0 +1,30 @@
+{
+  "name": "@projector/claude-code-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Claude Code через Anthropic Agent SDK для Projector",
+  "type": "module",
+  "engines": {
+    "projector": ">=0.12.0"
+  },
+  "projector": {
+    "apiVersion": 1,
+    "server": "dist/server.cjs",
+    "contributes": {
+      "agents": [
+        {
+          "id": "claude-code",
+          "title": "Claude Code",
+          "caption": "Запустит агента Anthropic",
+          "icon": "icons/claude.svg",
+          "program": "claude",
+          "terminal": {
+            "executable": "claude",
+            "title": "Claude Code"
+          },
+          "command": "claude"
+        }
+      ]
+    }
+  }
+}

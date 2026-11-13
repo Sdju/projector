@@ -1,17 +1,19 @@
-import { forkSession, getSessionMessages, query } from "@anthropic-ai/claude-agent-sdk";
 import type { SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
-import { agentEnv } from "../../agent/index.ts";
+import type { ClaudeSdk, McpServerInfo, PluginCodeApi, RewindResult } from "./api.ts";
 import { claudeEnv } from "./claude-code-env.ts";
-import type { McpServerInfo, RewindResult } from "../../agent/index.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (value: unknown): value is string =>
   typeof value === "string" && UUID.test(value);
 
 /** The last entry of the conversation a session holds now: where the next message would attach. */
-export async function chainTail(cwd: string, sessionId: string): Promise<string | undefined> {
+export async function chainTail(
+  cwd: string,
+  sessionId: string,
+  sdk: ClaudeSdk,
+): Promise<string | undefined> {
   try {
-    return (await getSessionMessages(sessionId, { dir: cwd })).at(-1)?.uuid;
+    return (await sdk.getSessionMessages(sessionId, { dir: cwd })).at(-1)?.uuid;
   } catch {
     return undefined;
   }
@@ -26,13 +28,14 @@ export async function sessionAt(
   cwd: string,
   sessionId: string,
   tail: string | undefined,
+  sdk: ClaudeSdk,
 ): Promise<string> {
   if (!tail || !isUuid(tail)) return sessionId;
   try {
-    const chain = await getSessionMessages(sessionId, { dir: cwd });
+    const chain = await sdk.getSessionMessages(sessionId, { dir: cwd });
     if (chain.at(-1)?.uuid === tail || !chain.some((message) => message.uuid === tail))
       return sessionId;
-    return (await forkSession(sessionId, { dir: cwd, upToMessageId: tail })).sessionId;
+    return (await sdk.forkSession(sessionId, { dir: cwd, upToMessageId: tail })).sessionId;
   } catch {
     // The transcript is unreadable: the caller's own fallback (a replay from the history) decides.
     return sessionId;
@@ -40,11 +43,11 @@ export async function sessionAt(
 }
 
 /** A session that stays open without a prompt, to ask it things; `close` ends it. */
-function idleSession(options: Parameters<typeof query>[0]["options"]) {
+function idleSession(options: Parameters<ClaudeSdk["query"]>[0]["options"], sdk: ClaudeSdk) {
   const idle = (async function* (): AsyncGenerator<SDKUserMessage> {
     await new Promise<never>(() => {});
   })();
-  return query({ prompt: idle, options });
+  return sdk.query({ prompt: idle, options });
 }
 
 /** Puts the project's files back to how they were before the message `messageId` was sent. */
@@ -53,15 +56,19 @@ export async function rewindClaudeFiles(
   sessionId: string,
   messageId: string,
   dryRun: boolean,
+  deps: { api: PluginCodeApi; sdk: ClaudeSdk },
 ): Promise<RewindResult> {
   if (!isUuid(messageId) || !isUuid(sessionId)) throw new Error("Некорректный шаг для отката");
-  const session = idleSession({
-    cwd,
-    env: agentEnv(),
-    resume: sessionId,
-    enableFileCheckpointing: true,
-    settingSources: [],
-  });
+  const session = idleSession(
+    {
+      cwd,
+      env: deps.api.host.env(),
+      resume: sessionId,
+      enableFileCheckpointing: true,
+      settingSources: [],
+    },
+    deps.sdk,
+  );
   try {
     const result = await session.rewindFiles(messageId, { dryRun });
     return {
@@ -80,15 +87,21 @@ const MCP_TTL_MS = 30_000;
 const mcpCache = new Map<string, { at: number; servers: Promise<McpServerInfo[]> }>();
 
 /** MCP servers Claude Code would start in the folder (user, project and local settings). */
-export function claudeMcpServers(cwd: string): Promise<McpServerInfo[]> {
+export function claudeMcpServers(
+  cwd: string,
+  deps: { api: PluginCodeApi; sdk: ClaudeSdk },
+): Promise<McpServerInfo[]> {
   const cached = mcpCache.get(cwd);
   if (cached && Date.now() - cached.at < MCP_TTL_MS) return cached.servers;
   const servers = (async () => {
-    const session = idleSession({
-      cwd,
-      env: claudeEnv(),
-      settingSources: ["user", "project", "local"],
-    });
+    const session = idleSession(
+      {
+        cwd,
+        env: claudeEnv(deps.api),
+        settingSources: ["user", "project", "local"],
+      },
+      deps.sdk,
+    );
     try {
       // Servers connect in the background: give the slow ones a moment before reporting.
       await session.initializationResult();

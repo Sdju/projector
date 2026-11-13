@@ -23,7 +23,7 @@
 | Агент                               | Куда попадает текст                                                        | Когда действует         |
 | ----------------------------------- | -------------------------------------------------------------------------- | ----------------------- |
 | Projector                           | системный промпт, раздел «Интерактивные блоки»                             | со следующего сообщения |
-| Claude Code                         | `systemPrompt.append` рядом со штатным промптом `claude_code`              | со следующего сообщения |
+| Claude Code (плагин)                | `systemPrompt.append` рядом со штатным промптом `claude_code`              | со следующего сообщения |
 | Codex, OpenCode, Cursor, Kimi (ACP) | первое сообщение новой сессии, перед вопросом пользователя и после истории | в новой сессии          |
 
 - ACP-сессия, продолженная через `session/load`, уже содержит прежний контекст: новая настройка применится в следующей сессии, а не задним числом.
@@ -34,7 +34,7 @@
 
 Текст виджетов собирается из живого каталога (`widgetCatalog.guide()`), как и промпт Projector: описание компонентов не может разойтись с тем, что умеет рисовать клиент. Обычные виджеты описаны целиком, специальные (`special: true`) — только именем и условием использования. Их свойства и пример выдаёт `describe_widget`: у штатного Projector это встроенный инструмент, внешним агентам при включённых виджетах передаётся stdio-сервер `projector-widgets`.
 
-Hosted-ход — отдельный процесс со своей композицией. `packages/server/app/plugin.ts` регистрирует возможности для сервера, `projector-runner.ts` и `claude-runner.ts` — для ответов Projector и Claude Code; новый раннер обязан сделать те же вызовы, иначе каталог в нём пуст и включённая галочка ничего не добавит. Это проверяет тест, который запускает раннер отдельным процессом.
+Hosted-ход — отдельный процесс со своей композицией. `packages/server/app/plugin.ts` регистрирует возможности для сервера, `projector-runner.ts` — для ответов Projector, `plugin-runner.ts` — для ответов доверенных плагинов (он загружает пакет и вызывает `loadPluginAnswer`, которая регистрирует виджеты и возможности); новый раннер обязан сделать те же вызовы, иначе каталог в нём пуст и включённая галочка ничего не добавит. Это проверяет тест, который загружает плагин в отдельной композиции.
 
 ## Команды IDE через MCP
 
@@ -58,10 +58,10 @@ Hosted-ход — отдельный процесс со своей композ
 | `packages/server/app/features.ts`                                     | Единственное место, где возможности названы: `widgets` и `ide`                         |
 | `packages/server/app/plugin.ts`                                       | Регистрация при старте сервера                                                         |
 | `packages/server/app/projector-runner.ts`                             | Регистрация в процессе ответа Projector                                                |
-| `packages/server/app/claude-runner.ts`                                | Регистрация в процессе ответа Claude Code                                              |
+| `packages/server/app/plugin-runner.ts`                                | Регистрация в процессе ответа агента-плагина (Claude Code, …)                          |
 | `packages/server/routes/api/agent-features.ts`                        | `GET` умолчаний и `PUT` одного переключателя                                           |
-| `packages/server/modules/agents/ide-mcp`                              | Stdio-сервер `projector-ide` и его конфиги для Claude Code и ACP                       |
-| `packages/server/modules/agents/widgets-mcp`                          | Конфиги stdio-сервера `projector-widgets` для Claude Code и ACP                        |
+| `packages/server/modules/agents/ide-mcp`                              | Stdio-сервер `projector-ide` и его конфиги для ACP и плагинов                          |
+| `packages/server/modules/agents/widgets-mcp`                          | Конфиги stdio-сервера `projector-widgets` для ACP и плагинов                           |
 | `packages/server/app/widgets-mcp.ts`                                  | Точка входа сервера: регистрирует виджеты и отдаёт `describe_widget`                   |
 | `packages/server/modules/ide/mcp-bridge.ts`                           | Ключ, ожидание ответа страницы, claim и результат                                      |
 | `packages/server/routes/api/ide/commands.ts`                          | `POST /api/ide/command-request`, `/claim` и `/result`                                  |
@@ -75,8 +75,8 @@ Hosted-ход — отдельный процесс со своей композ
 
 1. `packages/server/app/features.ts`: `registerAgentFeature({ id, title, summary, defaults, instruction: () => "…" })`. `instruction` вызывается при каждом ходе, поэтому может читать актуальный каталог.
 2. Если возможность умеет только часть агентов, ограничьте `defaults` и проверяйте id в своём бэкенде.
-3. Добавьте доставку в бэкенды, где она нужна: Projector — в `buildSystemPrompt`, Claude Code — в `claudeSystemPrompt` (`systemPrompt.append`), ACP — в `featurePrompt` первого сообщения. `featurePrompt` фильтрует по включённым возможностям и принимает выбор чата.
-4. Для нового hosted-раннера вызовите `registerBuiltinWidgetDefinitions()` и `registerBuiltinAgentFeatures()` до `runHostedRunner`, как в `projector-runner.ts` и `claude-runner.ts`.
+3. Добавьте доставку в бэкенды, где она нужна: Projector — в `buildSystemPrompt`, Claude Code — в `claudeSystemPrompt` плагина (`systemPrompt.append`), ACP — в `featurePrompt` первого сообщения. `featurePrompt` фильтрует по включённым возможностям и принимает выбор чата.
+4. Для нового hosted-раннера вызовите `registerBuiltinWidgetDefinitions()` и `registerBuiltinAgentFeatures()` до `runHostedRunner`, как в `projector-runner.ts` и `plugin-runner.ts`.
 5. `vp test run tests/agent-features.test.mjs`.
 
 ## API и команды

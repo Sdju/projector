@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Агенты
+
+- Claude Code вынесен из основного продукта в доверенный плагин `plugins/claude-code`: бэкенд на Anthropic Agent SDK, поток событий, сессии, откат файлов, лимиты, план, permission modes и hosted-раннер теперь живут в пакете. Встроенные модули `agents/claude-code`, `agents-integration/claude`, клиентский индикатор и маршрут `/api/claude/usage` удалены; агент появляется после установки плагина и доверия к нему, лимиты идут через общий `/api/agent/usage/claude-code`. Плагинный API получил `api.host` (среда, вложения, история, injector, replay, hosted-ход), `api.features`, `api.roles`, `api.widgets`, `api.mcp` и `api.require`; общий hosted-процесс — `server/app/plugin-runner.ts` ([подробно](docs/plugins.md)).
+
 ### Плагины
 
 - Добавлен версионированный публичный API `@ai-projector/plugin-api` и независимый browser runtime: пакет собирается отдельным ESM, получает API в `activate(api)` и не дублирует Vue/CodeMirror. Регистрации живут в scope активации; disable, remove, смена хеша и HMR вызывают cleanup, ошибка одного пакета не останавливает остальные ([подробно](docs/plugins.md)).

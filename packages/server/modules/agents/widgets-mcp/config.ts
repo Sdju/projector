@@ -20,19 +20,6 @@ export function widgetsMcpServer(projectId?: string): WidgetsMcpServer {
   };
 }
 
-/** The Claude Agent SDK takes a server object inline with the same fields. */
-export function claudeWidgetsMcpServer(projectId?: string) {
-  const server = widgetsMcpServer(projectId);
-  return {
-    type: "stdio" as const,
-    command: server.command,
-    args: server.args,
-    env: server.env,
-    // The one tool must be visible immediately instead of hiding behind tool search.
-    alwaysLoad: true,
-  };
-}
-
 /** ACP passes environment variables as a list of names and values. */
 export function acpWidgetsMcpServer(projectId?: string) {
   const server = widgetsMcpServer(projectId);
