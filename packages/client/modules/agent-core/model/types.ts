@@ -43,7 +43,11 @@ export interface AgentToolChip {
 }
 
 /** A call with the calls a subagent made inside of it, for showing. */
-export type AgentToolView = AgentToolChip & { children?: AgentToolChip[] };
+export type AgentToolView = AgentToolChip & {
+  children?: AgentToolChip[];
+  /** The task this call started, when the agent reports it: its agent kind and model. */
+  task?: AgentTask;
+};
 
 /** The answer in the order it happened: text and tool calls interleave. */
 export type AgentPart =

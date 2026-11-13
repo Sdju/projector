@@ -28,7 +28,8 @@ const duration = computed(() => taskElapsed(props.task, now.value));
 function note() {
   const task = props.task;
   const parts = [
-    task.subagent,
+    task.subagent ? `агент: ${task.subagent}` : "",
+    task.model ? `модель: ${task.model}` : "",
     task.tools ? `вызовов: ${task.tools}` : "",
     duration.value,
     task.status === "running" && task.lastTool
@@ -80,7 +81,7 @@ const { lens, lensNote, toggleLens } = useTaskLens({
         <span class="lens-label">Lens</span>
         {{ lensNote }}
       </span>
-      <span v-else class="note u-truncate">{{ note() }}</span>
+      <span v-else class="note u-truncate" :title="note()">{{ note() }}</span>
     </button>
     <template v-if="task.kind === 'agent'">
       <UiButton

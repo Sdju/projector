@@ -78,6 +78,19 @@ const path = computed(() => toolFilePath(props.tool.input ?? ""));
 const shownPath = computed(() => relativePath(path.value, props.root));
 const command = computed(() => (typeof data.value?.command === "string" ? data.value.command : ""));
 const written = computed(() => (typeof data.value?.content === "string" ? data.value.content : ""));
+// A task call names what it was asked and, once the task reports, the agent and model inside it.
+const taskNote = computed(() => {
+  if (visual.value !== "task") return "";
+  const description = typeof data.value?.description === "string" ? data.value.description : "";
+  const task = props.tool.task;
+  return [
+    description,
+    task?.subagent ? `агент: ${task.subagent}` : "",
+    task?.model ? `модель: ${task.model}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+});
 // A read of `SKILL.md` is the skill being loaded: its folder names it in the row.
 const skill = computed(() => skillName(path.value));
 // A picture read by the agent is shown as the picture itself, with the shared zoom viewer.
@@ -114,7 +127,11 @@ const view = computed(() => {
       : toolLabel(tool.name, raw, { label: tool.label, kind: tool.kind }),
     hint:
       skill.value ||
-      (loaded ? "" : path.value ? shownPath.value : command.value || inputHint(raw) || result.hint),
+      (loaded
+        ? ""
+        : path.value
+          ? shownPath.value
+          : command.value || taskNote.value || inputHint(raw) || result.hint),
     path: path.value ? shownPath.value : "",
     status: result.status ?? tool.status,
     result: running ? "" : shown,

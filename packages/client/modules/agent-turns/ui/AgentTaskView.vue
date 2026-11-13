@@ -36,7 +36,8 @@ const now = useElapsedClock();
 const meta = computed(() =>
   [
     taskStatusLabel[task.value.status],
-    task.value.subagent,
+    task.value.subagent ? `агент: ${task.value.subagent}` : "",
+    task.value.model ? `модель: ${task.value.model}` : "",
     task.value.background ? "в фоне" : "",
     task.value.tools ? `вызовов: ${task.value.tools}` : "",
     taskElapsed(task.value, now.value),

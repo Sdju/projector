@@ -3,7 +3,7 @@ import { jobItems } from "../modules/agent/modules/jobs/model/activity.ts";
 import { jobTurn } from "../modules/agent/modules/jobs/model/job-turn.ts";
 import { canContinueInChat } from "../modules/agent/modules/jobs/model/job-continue.ts";
 import { jobBarSections } from "../modules/agent/modules/jobs/lib/job-bar.ts";
-import { taskSummaryLine } from "../modules/agent-core/lib/task-detail.ts";
+import { taskReadout, taskSummaryLine } from "../modules/agent-core/lib/task-detail.ts";
 import { registerBuiltinClientAgents } from "../app/agents.ts";
 
 registerBuiltinClientAgents();
@@ -86,6 +86,23 @@ test("a task summary loses markdown before it reaches the compact row", () => {
   );
   expect(taskSummaryLine("## Итог\n\nСм. [отчёт](https://example.com)")).toBe("Итог См. отчёт");
   expect(taskSummaryLine(undefined)).toBe("");
+});
+
+test("a task readout names the agent and the model that worked on it", () => {
+  const readout = taskReadout({
+    task: {
+      id: "t1",
+      kind: "agent",
+      title: "Разбор",
+      status: "done",
+      background: false,
+      subagent: "Исследователь",
+      model: "deepseek-v4",
+    },
+    calls: [],
+  });
+  expect(readout).toContain("Субагент: Исследователь");
+  expect(readout).toContain("Модель: deepseek-v4");
 });
 
 test("a page hears about a job that waits for the user or ended, once", async () => {

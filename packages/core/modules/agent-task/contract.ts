@@ -13,6 +13,8 @@ export const agentTaskSchema = z.object({
   background: z.boolean(),
   /** Kind of the subagent (`Explore`, `general-purpose`, ...). */
   subagent: z.string().optional(),
+  /** The model that answers the task, as the agent names it, when the agent knows it. */
+  model: z.string().optional(),
   /** The agent's own session of the subagent: its whole conversation can be read from there. */
   session: z.string().optional(),
   /** What it was asked to do, as the agent gave it. */

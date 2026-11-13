@@ -252,6 +252,7 @@ export async function runProjectorTask(
     status: "running",
     background: false,
     subagent: role.name ?? "Projector task",
+    model: resolved.modelName,
     prompt: request.prompt.slice(0, 2_000),
     tool: "task",
     startedAt,

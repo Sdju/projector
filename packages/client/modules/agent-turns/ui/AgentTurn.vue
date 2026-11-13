@@ -128,10 +128,21 @@ const segments = computed(() => {
   for (const tool of props.turn.tools)
     if (tool.parent && known.has(tool.parent))
       children.set(tool.parent, [...(children.get(tool.parent) ?? []), tool]);
+  // A task call names the agent and model that work inside it, as the task event reported them.
+  const startedTasks = new Map(
+    (props.turn.tasks ?? []).flatMap((task) => (task.tool ? [[task.tool, task] as const] : [])),
+  );
   const byId = new Map(
     props.turn.tools
       .filter((tool) => !tool.parent || !known.has(tool.parent))
-      .map((tool) => [tool.id, { ...tool, children: children.get(tool.id) }]),
+      .map((tool) => [
+        tool.id,
+        {
+          ...tool,
+          children: children.get(tool.id),
+          ...(startedTasks.has(tool.id) ? { task: startedTasks.get(tool.id) } : {}),
+        },
+      ]),
   );
   const addWork = (index: number, item: AgentWorkItem) => {
     const last = result.at(-1);

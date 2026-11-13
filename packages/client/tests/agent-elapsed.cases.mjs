@@ -30,11 +30,20 @@ test("a task is timed from the first patch and ends when it stops", () => {
   const event = (name, data, at) =>
     applyAgentEvent(state, assistant, { event: name, data }, () => {}, at);
 
-  event("task", { id: "x", kind: "agent", title: "Разбор", status: "running" }, 2_000);
-  expect(assistant.tasks[0]).toMatchObject({ status: "running", startedAt: 2_000 });
+  event(
+    "task",
+    { id: "x", kind: "agent", title: "Разбор", status: "running", model: "test-model" },
+    2_000,
+  );
+  expect(assistant.tasks[0]).toMatchObject({
+    status: "running",
+    model: "test-model",
+    startedAt: 2_000,
+  });
   event("task", { id: "x", status: "done", summary: "готово" }, 12_000);
   expect(assistant.tasks[0]).toMatchObject({
     status: "done",
+    model: "test-model",
     startedAt: 2_000,
     endedAt: 12_000,
   });

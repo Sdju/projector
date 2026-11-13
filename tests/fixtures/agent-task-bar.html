@@ -16,6 +16,7 @@
     status,
     background: true,
     summary: status === "done" ? "завершено" : undefined,
+    ...(n % 2 ? {} : { subagent: "Projector task", model: "test-model" }),
   });
   const tasks = ref([
     ...Array.from({ length: 22 }, (_, i) => task(i + 1, "done")),
@@ -86,6 +87,37 @@
     finishCommands() {
       for (const tool of turns.value[0].tools) if (tool.status === "running") tool.status = "done";
       for (const task of tasks.value) if (task.status === "running") task.status = "done";
+    },
+    showProjectorTask() {
+      const task = {
+        id: "ptask",
+        kind: "agent",
+        title: "Разбор проекта",
+        status: "done",
+        background: false,
+        subagent: "Projector task",
+        model: "test-model",
+        tool: "ptask",
+        summary: "готово",
+      };
+      turns.value = [
+        {
+          id: "answer-projector",
+          role: "assistant",
+          text: "",
+          tools: [
+            {
+              id: "ptask",
+              name: "task",
+              status: "done",
+              input: JSON.stringify({ description: "Разбор проекта", prompt: "Найди код" }),
+              detail: "готово",
+            },
+          ],
+          tasks: [task],
+        },
+      ];
+      viewing.value = task.id;
     },
     settle: () => {
       tasks.value = tasks.value.map((item) =>

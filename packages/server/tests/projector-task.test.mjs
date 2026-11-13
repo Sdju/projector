@@ -55,6 +55,7 @@ test("Projector task reads files in its own context and reports a task", async (
       kind: "agent",
       status: "running",
       background: false,
+      model: "test",
       tool: "task",
     });
     const done = events.filter((item) => item.event === "task").at(-1).data;
