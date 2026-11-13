@@ -6,7 +6,7 @@ export {
   formatBalances,
 } from "./model/format-balance.ts";
 export { providerOf, providerSection } from "./model/nav.ts";
-export { fetchProviderBalance, fetchProviderBalances } from "./api/client.ts";
+export { fetchProviderBalance, fetchProviderBalances, fetchProviderUsage } from "./api/client.ts";
 export type {
   BuiltinProviderKind,
   OpenAIProviderPublic,
@@ -14,5 +14,7 @@ export type {
   ProviderKind,
   ProviderKindInfo,
   ProviderModel,
+  ProviderUsage,
+  ProviderUsageQuota,
 } from "./model/types.ts";
 export { default as ProviderPanel } from "./ui/ProviderPanel.vue";

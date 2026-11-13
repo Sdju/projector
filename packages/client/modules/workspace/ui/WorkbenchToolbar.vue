@@ -5,6 +5,7 @@ import { AgentInboxBell } from "../../agent/index.ts";
 import LayoutMenu from "./LayoutMenu.vue";
 import type { LayoutPreset } from "../lib/workbench-layout.ts";
 import IconAnalytics from "~icons/lucide/chart-no-axes-column";
+import IconMedia from "~icons/lucide/sparkles";
 import IconSettings from "~icons/lucide/settings-2";
 
 defineProps<{
@@ -38,6 +39,16 @@ const emit = defineEmits<{
       v-if="inbox"
       @open="emit('command', 'ide.workbench.aside.section.show', { section: 'inbox' })"
     />
+    <UiButton
+      shape="icon"
+      size="sm"
+      title="Генерация медиа"
+      aria-label="Генерация медиа"
+      data-command="ide.media.open"
+      @click="emit('command', 'ide.media.open')"
+    >
+      <IconMedia aria-hidden="true" />
+    </UiButton>
     <UiButton
       shape="icon"
       size="sm"

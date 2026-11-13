@@ -150,7 +150,7 @@ describe("balance of the active provider", () => {
     };
     const qwen = await providerBalance("qwen-dashscope");
     expect(qwen.status).toBe("unsupported");
-    expect(qwen.message).toMatch(/Qwen/);
+    expect(qwen.message).toMatch(/баланс недоступен/);
   });
 });
 

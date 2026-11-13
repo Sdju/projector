@@ -60,6 +60,8 @@ export interface OpenAIProvidersPublicState {
   activeProviderId: string | null;
   providers: OpenAIProviderPublic[];
   balanceKinds: ProviderKindInfo[];
+  /** Виды провайдеров с читателем расхода. */
+  usageKinds: ProviderKindInfo[];
 }
 
 export interface ProviderBalanceEntry {
@@ -78,4 +80,26 @@ export interface ProviderBalance {
   providerId?: string;
   providerName?: string;
   providerKind?: string;
+}
+
+export interface ProviderUsageQuota {
+  modelId: string;
+  remaining: string | null;
+  total: string | null;
+  unit: string | null;
+  percent: number | null;
+  status: string | null;
+}
+
+/** Расход и квоты провайдера; это не остаток кошелька. */
+export interface ProviderUsage {
+  status: "ready" | "unavailable";
+  period: { from: string; to: string } | null;
+  currency: string | null;
+  spend: string | null;
+  quotas: ProviderUsageQuota[];
+  plan: string | null;
+  credits: { total: number; remaining: number } | null;
+  checkedAt: number;
+  message: string | null;
 }

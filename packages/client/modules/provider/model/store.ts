@@ -5,6 +5,7 @@ import {
   fetchProviderBalances,
   fetchProviderModels,
   fetchProviders,
+  fetchProviderUsage,
   saveProviders,
   setActiveProvider,
 } from "../api/client.ts";
@@ -15,6 +16,7 @@ import type {
   ProviderBalance,
   ProviderKind,
   ProviderKindInfo,
+  ProviderUsage,
 } from "./types.ts";
 
 const state = reactive({
@@ -22,8 +24,11 @@ const state = reactive({
   activeProviderId: null as string | null,
   /** Provider kinds contributed by enabled balance plugins. */
   balanceKinds: [] as ProviderKindInfo[],
+  usageKinds: [] as ProviderKindInfo[],
   keyDrafts: {} as Record<string, string>,
   balances: {} as Record<string, ProviderBalance | undefined>,
+  usage: {} as Record<string, ProviderUsage | undefined>,
+  usageBusy: {} as Record<string, boolean | undefined>,
   /** Ids the provider offers upstream, per provider; not saved, only offered for registering. */
   remoteModels: {} as Record<string, string[] | undefined>,
   fetchingModels: {} as Record<string, boolean | undefined>,
@@ -64,15 +69,18 @@ export function useProviders() {
   const presetFor = (kind: string) => providerPreset(kind, kindInfoOf(kind));
   const hasBalance = (kind: string): boolean =>
     kind === "deepseek" || state.balanceKinds.some((item) => item.kind === kind);
+  const hasUsage = (kind: string): boolean => state.usageKinds.some((item) => item.kind === kind);
 
   function apply(payload: {
     activeProviderId: string | null;
     providers: OpenAIProviderPublic[];
     balanceKinds?: ProviderKindInfo[];
+    usageKinds?: ProviderKindInfo[];
   }) {
     state.providers = payload.providers;
     state.activeProviderId = payload.activeProviderId;
     state.balanceKinds = payload.balanceKinds ?? [];
+    state.usageKinds = payload.usageKinds ?? [];
     state.keyDrafts = {};
     state.revision++;
   }
@@ -94,6 +102,29 @@ export function useProviders() {
       state.balances = next;
     } catch {
       // A balance outage must not erase the balances the settings already show.
+    }
+  }
+
+  /** Расход провайдера зависит от внешнего читателя, поэтому запрос явный и с индикатором. */
+  async function loadUsage(id: string): Promise<void> {
+    if (state.usageBusy[id]) return;
+    state.usageBusy[id] = true;
+    try {
+      state.usage[id] = await fetchProviderUsage(id);
+    } catch (error) {
+      state.usage[id] = {
+        status: "unavailable",
+        period: null,
+        currency: null,
+        spend: null,
+        quotas: [],
+        plan: null,
+        credits: null,
+        checkedAt: Date.now(),
+        message: error instanceof Error ? error.message : "Не удалось прочитать расход",
+      };
+    } finally {
+      state.usageBusy[id] = false;
     }
   }
 
@@ -253,14 +284,19 @@ export function useProviders() {
     error,
     ready,
     balanceKinds,
+    usageKinds: computed(() => state.usageKinds),
     kindOptions,
     kindInfoOf,
     presetFor,
     hasBalance,
+    hasUsage,
     revision: computed(() => state.revision),
     balances: computed(() => state.balances),
+    usage: computed(() => state.usage),
+    usageBusy: computed(() => state.usageBusy),
     loadBalance,
     loadBalances,
+    loadUsage,
     keyDrafts: computed(() => state.keyDrafts),
     load,
     save,

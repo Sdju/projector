@@ -244,7 +244,7 @@ projector-install-desktop     # пункт меню и команда из npm-�
 
 Настройки, избранное и список проектов сохраняются в `~/.local/share/projector` или `$XDG_DATA_HOME/projector`, если эта переменная задана.
 
-Подробнее: [поведение и ограничения](docs/usage.md) и [интеграции](docs/integrations.md). Инструкции для разработки находятся в [AGENTS.md](AGENTS.md).
+Подробнее: [поведение и ограничения](docs/usage.md), [интеграции](docs/integrations.md) и [медиа-модели](docs/media.md). Инструкции для разработки находятся в [AGENTS.md](AGENTS.md).
 
 ## Разработка и лицензия
 

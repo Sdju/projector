@@ -2,6 +2,7 @@ import type {
   OpenAIProviderPublic,
   OpenAIProvidersPublicState,
   ProviderBalance,
+  ProviderUsage,
 } from "../model/types.ts";
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
@@ -31,6 +32,11 @@ export function setActiveProvider(id: string): Promise<OpenAIProvidersPublicStat
 
 export function fetchProviderBalance(id?: string): Promise<ProviderBalance> {
   return request(`/api/providers/balance${id ? `?id=${encodeURIComponent(id)}` : ""}`);
+}
+
+/** Расход и квоты провайдера; не путать с денежным балансом. */
+export function fetchProviderUsage(id?: string): Promise<ProviderUsage> {
+  return request(`/api/providers/usage${id ? `?id=${encodeURIComponent(id)}` : ""}`);
 }
 
 /** All enabled wallets in one answer; each entry still carries its provider id and name. */

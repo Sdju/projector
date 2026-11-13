@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { HttpError } from "../http/index.ts";
 
 export function json(res: ServerResponse, status: number, body: unknown): void {
   res.statusCode = status;
@@ -6,9 +7,18 @@ export function json(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
-export async function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
+export async function readBody(
+  req: IncomingMessage,
+  maxBytes = Number.POSITIVE_INFINITY,
+): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(chunk as Buffer);
+  let size = 0;
+  for await (const chunk of req) {
+    const bytes = chunk as Buffer;
+    size += bytes.length;
+    if (size > maxBytes) throw new HttpError(413, "Тело запроса слишком большое");
+    chunks.push(bytes);
+  }
   const raw = Buffer.concat(chunks).toString("utf8").trim();
   if (!raw) return {};
   return JSON.parse(raw) as Record<string, unknown>;

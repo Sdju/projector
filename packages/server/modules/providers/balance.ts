@@ -148,11 +148,9 @@ async function load(provider: ResolvedOpenAIProvider): Promise<ProviderBalance> 
   const resolver = balanceResolver(provider.kind);
   if (!resolver) {
     const message =
-      provider.kind === "qwencloud"
-        ? "Qwen Cloud не отдаёт баланс по ключу API"
-        : provider.kind === "local"
-          ? "Локальному провайдеру баланс не нужен"
-          : "Для этого провайдера баланс недоступен";
+      provider.kind === "local"
+        ? "Локальному провайдеру баланс не нужен"
+        : "Для этого провайдера баланс недоступен";
     return { ...unsupported(message), checkedAt: Date.now() };
   }
   const context: ProviderBalanceContext = {

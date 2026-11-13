@@ -25,3 +25,4 @@
 - [gitlab-client-roadmap.md](gitlab-client-roadmap.md) — что осталось у GitLab после паритета с GitHub: Snippets, Wiki, несколько инстансов и проверки.
 - [npm-release.md](npm-release.md) — что осталось после публикации `0.12.0`: чистая установка, `projector-install-desktop` и 2FA.
 - [opencode-background-subagents.md](opencode-background-subagents.md) — фоновый `subagent` OpenCode не виден как живая задача, поэтому Lens не читает его рассуждения.
+- [qwencloud-media-integration.md](qwencloud-media-integration.md) — медиа-API и баланс QwenCloud: проверенные эндпоинты, адаптеры, временный ключ и открытые решения по интеграции.

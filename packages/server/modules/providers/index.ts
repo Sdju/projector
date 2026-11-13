@@ -15,6 +15,18 @@ export type {
   ProviderBalanceResolver,
 } from "./balance-registry.ts";
 export { providerBalance, providerBalances } from "./balance.ts";
+export { providerUsage } from "./usage.ts";
+export {
+  providerUsageKinds,
+  providerUsageResolver,
+  registerProviderUsage,
+} from "./usage-registry.ts";
+export type {
+  ProviderUsage,
+  ProviderUsageContext,
+  ProviderUsageQuota,
+  ProviderUsageResolver,
+} from "./usage-registry.ts";
 export { inferProviderKind, isBuiltinProviderKind, isProviderKind } from "./kinds.ts";
 
 export type { AgentHistoryTool, AgentHistoryTurn, ProviderModel } from "./types.ts";

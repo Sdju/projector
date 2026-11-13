@@ -1,4 +1,5 @@
 import { defineTab, singletonTab } from "../../workspace-api/index.ts";
+import { mediaTab } from "../../media/index.ts";
 
 const hostOf = (url?: string) => {
   try {
@@ -86,6 +87,7 @@ export const baseTabTypes = [
         "Открывает новую вкладку-псевдобраузер: адресная строка, история, страницы из интернета (через прокси Projector) и dev-серверы проекта. Для перехода по адресу используйте ide.workbench.browser.navigate.",
     },
   }),
+  mediaTab,
   defineTab<{ hash: string; subject?: string }>({
     id: "commit",
     key: ({ hash }) => `commit:${hash}`,

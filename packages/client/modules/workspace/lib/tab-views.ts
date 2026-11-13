@@ -34,6 +34,7 @@ import {
   ReleaseView,
 } from "../modules/viewers/index.ts";
 import { PluginContributionMount, pluginTabKind, runtimeTabs } from "../../plugin-runtime/index.ts";
+import { MediaPanel } from "../../media/index.ts";
 
 /** How a tab kind is drawn; the owner of the kind supplies it, the workspace only mounts it. */
 export interface TabView {
@@ -89,6 +90,7 @@ export interface TabHost {
 export function baseTabViews(): TabViews {
   return {
     keybindings: { component: KeybindingsEditor, ownKeys: true, keepAlive: true },
+    media: { component: MediaPanel, keepAlive: true, scroll: true },
     analytics: { component: AnalyticsSettings, keepAlive: true, scroll: true },
     network: { component: LanInfoPanel, ownKeys: true, keepAlive: true },
     docker: { component: DockerPanel, keepAlive: true },

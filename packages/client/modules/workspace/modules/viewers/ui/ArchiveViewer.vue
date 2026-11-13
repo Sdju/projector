@@ -62,8 +62,7 @@ function date(value?: string) {
         <tbody>
           <tr v-for="(entry, index) in entries" :key="index">
             <td class="entry-path">
-              <span>{{ entry.path }}</span
-              ><small v-if="entry.link">→ {{ entry.link }}</small>
+              <span>{{ entry.path }}</span><small v-if="entry.link">→ {{ entry.link }}</small>
             </td>
             <td>{{ types[entry.type] }}</td>
             <td class="entry-size">

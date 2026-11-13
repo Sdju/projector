@@ -82,6 +82,8 @@ export interface OpenAIProvidersPublicState {
   providers: OpenAIProviderPublic[];
   /** Provider kinds contributed by enabled, trusted plugins with a balance reader. */
   balanceKinds: ProviderKindInfo[];
+  /** Provider kinds with a registered usage reader (spend, quotas, credits). */
+  usageKinds: ProviderKindInfo[];
 }
 
 export interface OpenAIProvidersWriteState {
