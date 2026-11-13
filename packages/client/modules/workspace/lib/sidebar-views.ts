@@ -92,6 +92,8 @@ export interface SidebarHost {
   openSearch(scope: FileScope): void;
   openPullFile(number: number, path: string, head?: string, pinned?: boolean): void;
   command(id: string, args?: unknown): void;
+  /** Awaits a command of the editor scope; plugin panels get its real result and errors. */
+  executeCommand?(id: string, args?: unknown): Promise<unknown>;
   refreshWorkspace(): void;
   changed(): void;
   deleted(path: string): void;

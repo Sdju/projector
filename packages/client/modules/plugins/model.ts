@@ -7,6 +7,7 @@ import {
 import { pickFolder } from "../project/index.ts";
 import { applyAppearance, currentAppearance, setAppearanceThemes } from "../appearance/index.ts";
 import { refreshClientAgents } from "../agents-integration/catalog/index.ts";
+import { applyRuntimeCatalog, runtimeIssues } from "../plugin-runtime/index.ts";
 import { fetchPlugins, pluginAction, saveAppearance, type PluginCatalog } from "./client.ts";
 
 export function usePluginSettings() {
@@ -22,6 +23,11 @@ export function usePluginSettings() {
 
   const selected = computed(() =>
     catalog.value?.plugins.find((item) => item.id === selectedId.value),
+  );
+  const runtimeDiagnostics = computed(() =>
+    selectedId.value
+      ? runtimeIssues.value.filter((issue) => issue.plugin === selectedId.value)
+      : [],
   );
   const filtered = computed(() => {
     const needle = query.value.trim().toLocaleLowerCase();
@@ -54,6 +60,8 @@ export function usePluginSettings() {
     applyAppearance(currentAppearance());
     // An agent plugin changes the chat catalog too; menus and tabs read it reactively.
     void refreshClientAgents();
+    // Browser runtime follows the same catalog: trust, disable and hash changes take effect.
+    void applyRuntimeCatalog(next);
     if (selectedId.value && !next.plugins.some((item) => item.id === selectedId.value))
       selectedId.value = "";
   }
@@ -99,7 +107,7 @@ export function usePluginSettings() {
   function trust(id: string) {
     const plugin = catalog.value?.plugins.find((item) => item.id === id);
     if (!plugin) throw new Error("Плагин не найден");
-    return perform(() => pluginAction("trust", { id }), "Доверие к агенту подтверждено");
+    return perform(() => pluginAction("trust", { id }), "Доверие к коду плагина подтверждено");
   }
 
   function remove(id: string) {
@@ -184,9 +192,9 @@ export function usePluginSettings() {
   }
   commands.scope.registerCommand({
     id: "ide.plugin.trust",
-    title: "Подтвердить доверие к агенту плагина",
+    title: "Подтвердить доверие к коду плагина",
     description:
-      "Запоминает хеш текущего содержимого пакета. Без этого агент плагина нельзя включить, а после изменения пакета доверие нужно подтвердить снова.",
+      "Запоминает хеш текущего содержимого пакета. Без этого браузерный или серверный код и агенты плагина не запускаются; после изменения пакета доверие нужно подтвердить снова.",
     arguments: { id: "string: имя пакета плагина" },
     enabled: () => !busy.value,
     run: (value) => trust(optionalStringArg(commandArgs(value), "id") ?? ""),
@@ -243,6 +251,7 @@ export function usePluginSettings() {
     selected,
     selectedId,
     filtered,
+    runtimeDiagnostics,
     query,
     mode,
     installPath,

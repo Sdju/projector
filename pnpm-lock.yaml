@@ -343,6 +343,9 @@ importers:
       '@ai-projector/native':
         specifier: workspace:*
         version: link:packages/native
+      '@ai-projector/plugin-api':
+        specifier: workspace:*
+        version: link:packages/plugin-api
       '@anthropic-ai/claude-agent-sdk':
         specifier: 'catalog:'
         version: 0.3.291(@anthropic-ai/sdk@0.131.0(zod@4.6.5))(@modelcontextprotocol/sdk@1.32.1(zod@4.6.5))(zod@4.6.5)
@@ -439,6 +442,9 @@ importers:
       '@ai-projector/core':
         specifier: workspace:*
         version: link:../core
+      '@ai-projector/plugin-api':
+        specifier: workspace:*
+        version: link:../plugin-api
       '@codemirror/commands':
         specifier: 'catalog:'
         version: 6.11.1
@@ -606,6 +612,8 @@ importers:
       '@ai-projector/core':
         specifier: workspace:*
         version: link:../core
+
+  packages/plugin-api: {}
 
   packages/server:
     dependencies:

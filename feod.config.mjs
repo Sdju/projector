@@ -86,6 +86,7 @@ export default {
       "@ai-projector/core": "packages/core",
       "@ai-projector/cli": "packages/cli",
       "@ai-projector/hub": "packages/hub",
+      "@ai-projector/plugin-api": "packages/plugin-api/modules/api",
     },
     imports: { computed: "forbid", unresolved: "forbid" },
     cycles: { modules: true, types: "include" },
@@ -120,7 +121,7 @@ export default {
   },
   roots: {
     "packages/client": {
-      dependencies: ["packages/core"],
+      dependencies: ["packages/core", "packages/plugin-api"],
       transitModules: ["agents-integration", "agent-widgets"],
       extra: { confine: [...nodeOnly, ...adapters] },
     },
@@ -137,5 +138,6 @@ export default {
       extra: { confine: [...nodeOnly, ...adapters] },
     },
     "packages/cli": { layers: cliLayers, dependencies: ["packages/core"] },
+    "packages/plugin-api": { dependencies: [] },
   },
 };

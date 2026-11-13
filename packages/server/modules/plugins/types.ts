@@ -1,6 +1,10 @@
 import type {
   AvailableTheme,
   PluginAgentContribution,
+  PluginBrowserEntry,
+  PluginLanguageContribution,
+  PluginPanelContribution,
+  PluginTabContribution,
 } from "@ai-projector/core/modules/plugins/index.ts";
 
 export type PluginStatus = "enabled" | "disabled" | "error" | "missing";
@@ -15,18 +19,25 @@ export interface PluginInfo {
   description?: string;
   status: PluginStatus;
   enabled: boolean;
-  /** The user confirmed this exact package content; required before its agents may run. */
+  /** The user confirmed this exact package content; required before any code may run. */
   trusted: boolean;
-  /** Current content hash, used to reload a code entry only when the package really changed. */
+  /** The package contributes browser, server or agent code and therefore needs trust. */
+  requiresTrust: boolean;
+  /** Current content hash, used to reload code only when the package really changed. */
   hash?: string;
   /** Absolute path of the trusted server-side code entry, when the package has one. */
   server?: string;
-  /** The package runs code in the server process; it is not a declarative-only plugin. */
+  /** Package-relative browser ESM entry, its asset key and the content hash. */
+  browser?: PluginBrowserEntry & { hash: string };
+  /** The package runs code in the server or the page; it is not a declarative-only plugin. */
   code: boolean;
   path?: string;
   diagnostics: PluginDiagnostic[];
   themes: AvailableTheme[];
   agents: PluginAgentContribution[];
+  languages: PluginLanguageContribution[];
+  panels: PluginPanelContribution[];
+  tabs: PluginTabContribution[];
 }
 
 export interface PluginCatalog {

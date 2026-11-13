@@ -5,13 +5,34 @@ import {
   validateAgentContribution,
   type PluginAgentContribution,
 } from "./agent.ts";
+import {
+  assertBrowserEntry,
+  validateBrowserContributions,
+  type PluginLanguageContribution,
+  type PluginPanelContribution,
+  type PluginTabContribution,
+} from "./browser.ts";
 
 export type {
   PluginAgentContribution,
   PluginAgentTerminal,
   PluginAgentUsageCommand,
 } from "./agent.ts";
+export type {
+  PluginBrowserContributions,
+  PluginBrowserEntry,
+  PluginLanguageContribution,
+  PluginPanelContribution,
+  PluginTabContribution,
+} from "./browser.ts";
 export { isPluginIconFile, sanitizePluginIconSvg } from "./icon.ts";
+export {
+  isSafePluginPath,
+  pluginAssetPath,
+  pluginCommandPrefix,
+  pluginPackageKey,
+  pluginPackageName,
+} from "./asset.ts";
 
 export const pluginApiVersion = 1;
 
@@ -70,9 +91,17 @@ export interface PluginManifest {
      * The file runs in the Projector server process, so enabling it requires explicit user trust.
      */
     server?: string;
+    /**
+     * Browser ESM entry inside the package. It runs on the Projector/Hub page origin and therefore
+     * requires the same explicit trust as server code; it is not a sandbox.
+     */
+    browser?: string;
     contributes: {
       themes?: PluginThemeContribution[];
       agents?: PluginAgentContribution[];
+      languages?: PluginLanguageContribution[];
+      panels?: PluginPanelContribution[];
+      tabs?: PluginTabContribution[];
     };
   };
 }
@@ -232,24 +261,47 @@ export function validatePluginManifest(
       throw new Error("Плагин несовместим с этой версией Projector");
   }
   assertRecord(value.projector, "projector");
-  assertAllowedKeys(value.projector, ["apiVersion", "contributes", "server"], "projector");
+  assertAllowedKeys(
+    value.projector,
+    ["apiVersion", "contributes", "server", "browser"],
+    "projector",
+  );
   if (value.projector.apiVersion !== pluginApiVersion)
     throw new Error("Неподдерживаемая версия API плагина");
   assertRecord(value.projector.contributes, "projector.contributes");
   const contributes = value.projector.contributes;
-  assertAllowedKeys(contributes, ["themes", "agents"], "projector.contributes");
+  assertAllowedKeys(
+    contributes,
+    ["themes", "agents", "languages", "panels", "tabs"],
+    "projector.contributes",
+  );
   if (contributes.themes !== undefined && !Array.isArray(contributes.themes))
     throw new Error("projector.contributes.themes должен быть массивом");
   if (contributes.agents !== undefined && !Array.isArray(contributes.agents))
     throw new Error("projector.contributes.agents должен быть массивом");
   const themes = contributes.themes as unknown[] | undefined;
   const agents = contributes.agents as unknown[] | undefined;
+  const browserContributions = validateBrowserContributions(contributes);
   if (value.projector.server !== undefined) {
     if (!agents?.length)
       throw new Error("projector.server допустим только вместе с contributes.agents");
     assertServerEntry(value.projector.server);
   }
-  if (!themes?.length && !agents?.length) {
+  if (value.projector.browser !== undefined) assertBrowserEntry(value.projector.browser);
+  if (
+    !value.projector.browser &&
+    (browserContributions.languages?.length ||
+      browserContributions.panels?.length ||
+      browserContributions.tabs?.length)
+  )
+    throw new Error("Вклады languages, panels и tabs требуют projector.browser");
+  if (
+    !themes?.length &&
+    !agents?.length &&
+    !browserContributions.languages?.length &&
+    !browserContributions.panels?.length &&
+    !browserContributions.tabs?.length
+  ) {
     if (themes && !agents) throw new Error("Плагин должен содержать хотя бы одну тему");
     if (agents && !themes) throw new Error("Плагин должен содержать хотя бы одного агента");
     throw new Error("Плагин должен содержать хотя бы одну тему или агента");

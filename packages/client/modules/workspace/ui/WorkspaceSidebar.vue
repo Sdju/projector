@@ -35,6 +35,8 @@ const props = defineProps<{
   gitSync: ReturnType<typeof useGitChangeSync>;
   /** Panels of the sections the embedding page owns. */
   views?: SidebarViews;
+  /** Awaits commands in the editor scope; plugin panels receive the real result. */
+  executeCommand?: (id: string, args?: unknown) => Promise<unknown>;
   /** Разделы — вертикальная полоса-остров слева; иначе вкладки сверху панели (мобильный вид). */
   rail?: boolean;
   /** Сторона рабочей области: полоса и панель разворачиваются зеркально. */
@@ -57,7 +59,7 @@ const emit = defineEmits<{
   openCommitTree: [hash: string];
   openSearch: [scope: FileScope];
 }>();
-const views = { ...baseSidebarViews, ...props.views };
+const views = computed<SidebarViews>(() => ({ ...baseSidebarViews, ...props.views }));
 const panels = shallowReactive(new Map<string, SidebarPanel>());
 const localRefreshing = ref(false);
 const host: SidebarHost = {
@@ -99,6 +101,10 @@ const host: SidebarHost = {
   openPullFile: (number, path, head, pinned) =>
     props.files.openPullFile(number, path, head, !pinned),
   command: (id, args) => emit("command", id, args),
+  executeCommand: (id, args) =>
+    props.executeCommand
+      ? props.executeCommand(id, args)
+      : Promise.resolve().then(() => emit("command", id, args)),
   refreshWorkspace: () => emit("refresh"),
   changed: () => emit("changed"),
   deleted: (path) => emit("deleted", path),
@@ -117,7 +123,7 @@ const items = computed(() => {
   }> = [];
   for (const type of props.sections.list()) {
     const kind = type.kind ?? type.id;
-    const view = views[kind];
+    const view = views.value[kind];
     if (!view) continue;
     result.push({
       id: type.id,
@@ -134,12 +140,12 @@ const items = computed(() => {
 });
 const viewOf = (id: string) => {
   const type = props.sections.get(id);
-  return views[type?.kind ?? id];
+  return views.value[type?.kind ?? id];
 };
 const activeType = computed(() => props.sections.get(section.value));
 const activeView = computed(() => {
   const type = activeType.value;
-  return type ? views[type.kind ?? type.id] : undefined;
+  return type ? views.value[type.kind ?? type.id] : undefined;
 });
 const setPanel = (id: string, panel: unknown) =>
   panel ? panels.set(id, panel as SidebarPanel) : panels.delete(id);

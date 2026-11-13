@@ -116,6 +116,8 @@ export interface TabRegistry {
   has(id: string): boolean;
   get(id: string): TabType | undefined;
   list(): TabType[];
+  /** Adds a runtime kind (a plugin contribution); returns a detaching function. */
+  register(type: TabType): () => void;
   /** Key of a parameterless tab; for panels that live outside the dock. */
   keyOf(id: string): string;
   /** Attaches host behavior to a kind; returns a function that detaches it. */
@@ -132,6 +134,13 @@ export function createTabRegistry(...groups: ReadonlyArray<readonly TabType[] | 
     has: (id) => types.has(id),
     get: (id) => types.get(id),
     list: () => [...types.values()],
+    register(type) {
+      if (types.has(type.id)) throw new Error(`Тип вкладки ${type.id} уже зарегистрирован`);
+      types.set(type.id, type);
+      return () => {
+        if (types.get(type.id) === type) types.delete(type.id);
+      };
+    },
     keyOf(id) {
       const type = types.get(id);
       if (!type) throw new Error(`Неизвестный тип вкладки: ${id}`);

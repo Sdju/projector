@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@ai-projector/core": "workspace:*",
+    "@ai-projector/plugin-api": "workspace:*",
     "@codemirror/commands": "catalog:",
     "@codemirror/language": "catalog:",
     "@codemirror/language-data": "catalog:",

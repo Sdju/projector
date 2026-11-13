@@ -33,6 +33,7 @@ import {
   PullRequestView,
   ReleaseView,
 } from "../modules/viewers/index.ts";
+import { PluginContributionMount, pluginTabKind, runtimeTabs } from "../../plugin-runtime/index.ts";
 
 /** How a tab kind is drawn; the owner of the kind supplies it, the workspace only mounts it. */
 export interface TabView {
@@ -80,6 +81,8 @@ export interface TabHost {
   openSection(type: SidebarType): void;
   /** Runs an editor command of this workspace (a button of a view is a command too). */
   run(command: string, args?: unknown): void;
+  /** Awaits a command of the editor scope; plugin views get its real result and errors. */
+  executeCommand?(command: string, args?: unknown): Promise<unknown>;
 }
 
 /** Base views of a workspace; agent chats come from the catalog registered before mounting. */
@@ -204,6 +207,32 @@ export function baseTabViews(): TabViews {
   };
 }
 
+/** Runtime views of plugin tabs; they are comounted by id and disposed when the tab closes. */
+export function pluginTabViews(): TabViews {
+  return Object.fromEntries(
+    runtimeTabs.value.map((contribution) => [
+      pluginTabKind(contribution.packageName, contribution.declaration.id),
+      {
+        component: PluginContributionMount,
+        keepAlive: true,
+        props: (tab, host) => ({
+          kind: "tab",
+          instance: contribution.instance,
+          plugin: contribution.packageName,
+          contributionId: contribution.declaration.id,
+          projectId: host.projectId,
+          params: tab.params,
+          onCommand: (id: string, args?: unknown) =>
+            host.executeCommand?.(id, args) ?? Promise.resolve().then(() => host.run(id, args)),
+          onOpenFile: (path: string, options?: { line?: number; column?: number }) =>
+            host.openFile(path, options?.line),
+          onOpenTab: (id: string, params?: TabParams) => host.openTab(id, params),
+        }),
+      } satisfies TabView,
+    ]),
+  );
+}
+
 interface WorkspaceTabs {
   types: TabRegistry;
   views: TabViews;
@@ -220,10 +249,13 @@ export function useWorkspaceTabTypes(
 ) {
   const types = createTabRegistry(baseTabTypes, profile.tabs);
   const tabs = shallowReactive<WorkspaceTabs>({ types, views: {} });
-  // A plugin can add an agent after the workspace is mounted; its chat tab must appear too.
-  watchEffect(() => {
-    tabs.views = { ...baseTabViews(), ...views };
-  });
+  // A plugin can add an agent, a chat tab or a browser contribution after the workspace is mounted.
+  watchEffect(
+    () => {
+      tabs.views = { ...baseTabViews(), ...views, ...pluginTabViews() };
+    },
+    { flush: "sync" },
+  );
   provide(workspaceTabsKey, tabs);
   const detach = Object.entries(behaviors).map(([id, behavior]) => types.behave(id, behavior));
   onBeforeUnmount(() => detach.forEach((fn) => fn()));

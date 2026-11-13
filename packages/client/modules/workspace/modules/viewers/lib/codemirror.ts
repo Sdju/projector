@@ -10,15 +10,15 @@ import {
 } from "@codemirror/state";
 import {
   HighlightStyle,
-  LanguageDescription,
   highlightingFor,
   language,
   syntaxHighlighting,
 } from "@codemirror/language";
-import { languages } from "@codemirror/language-data";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { Chunk } from "@codemirror/merge";
 import { highlightTree, tags as t } from "@lezer/highlight";
+import { findLanguage } from "../../../../plugin-runtime/index.ts";
+import { fallbackLanguageOf, pluginLanguageExtension } from "./plugin-language.ts";
 import type { EditorTheme } from "@ai-projector/core/modules/editor-themes/index.ts";
 
 const palette = {
@@ -88,16 +88,12 @@ export function themeExtension(theme: EditorTheme): Extension {
 export const themeCompartment = new Compartment();
 export const languageCompartment = new Compartment();
 
-const languageOf = (path: string) =>
-  LanguageDescription.matchFilename(languages, path.split("/").at(-1) ?? path);
-
-/** Язык подсветки, определённый по имени файла, или `null`, если он неизвестен. */
-export function languageLabel(path: string): string | null {
-  return languageOf(path)?.name ?? null;
-}
+export { languageLabel } from "./plugin-language.ts";
 
 export async function languageExtension(path: string): Promise<Extension> {
-  const description = languageOf(path);
+  const plugin = findLanguage(path);
+  if (plugin) return pluginLanguageExtension(plugin);
+  const description = fallbackLanguageOf(path);
   return description ? await description.load() : [];
 }
 

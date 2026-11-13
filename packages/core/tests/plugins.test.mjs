@@ -3,7 +3,11 @@ import { describe, expect, test } from "vite-plus/test";
 import {
   externalThemeId,
   isExternalThemeId,
+  isSafePluginPath,
   pluginApiVersion,
+  pluginAssetPath,
+  pluginPackageKey,
+  pluginPackageName,
   sanitizePluginIconSvg,
   serializeThemeTokens,
   themeStyleProperties,
@@ -465,5 +469,84 @@ describe("plugin server entry", () => {
     ]) {
       expect(() => validatePluginManifest(withServer(server))).toThrow(/projector\.server/);
     }
+  });
+});
+
+const browserManifest = {
+  name: "@acme/fict",
+  version: "1.0.0",
+  type: "module",
+  projector: {
+    apiVersion: 1,
+    browser: "dist/browser.js",
+    contributes: {
+      languages: [
+        {
+          id: "fict",
+          title: "Fict",
+          extensions: [".fict"],
+          filenames: ["fictfile"],
+          priority: 10,
+        },
+      ],
+      panels: [{ id: "inspector", title: "Inspector", placement: "aside" }],
+      tabs: [{ id: "overview", title: "Overview", description: "Service tab" }],
+    },
+  },
+};
+
+describe("plugin browser contract", () => {
+  test("accepts a browser-only package with declared language, panel and tab metadata", () => {
+    expect(validatePluginManifest(browserManifest)).toEqual(browserManifest);
+    expect(pluginPackageName(pluginPackageKey(browserManifest.name))).toBe(browserManifest.name);
+    expect(pluginAssetPath("@acme/fict", "a".repeat(64), "dist/chunk.js")).toBe(
+      `/api/plugins/assets/${pluginPackageKey("@acme/fict")}/${"a".repeat(64)}/dist/chunk.js`,
+    );
+    expect(isSafePluginPath("dist/chunks/a.js")).toBe(true);
+    for (const path of ["../a.js", "/a.js", "dist/../../a.js", "dist\\a.js", "dist//a.js", ""])
+      expect(isSafePluginPath(path)).toBe(false);
+  });
+
+  test("rejects unsafe entries, undeclared matching data and malformed contributions", () => {
+    for (const browser of [
+      "/dist/browser.js",
+      "../browser.js",
+      "dist/../browser.js",
+      "dist\\browser.js",
+      "dist/browser.ts",
+      "browser.js",
+      "dist/browser.cjs",
+      "",
+      42,
+    ])
+      expect(() =>
+        validatePluginManifest({
+          ...browserManifest,
+          projector: { ...browserManifest.projector, browser },
+        }),
+      ).toThrow(/projector\.browser/);
+    for (const contributions of [
+      { languages: [{ id: "fict", title: "Fict", extensions: [] }] },
+      { languages: [{ id: "Fict", title: "Fict", extensions: [".fict"] }] },
+      { languages: [{ id: "fict", title: "Fict", extensions: ["../fict"] }] },
+      {
+        languages: [
+          { id: "fict", title: "Fict", extensions: [".fict"] },
+          { id: "fict", title: "Again", extensions: [".f"] },
+        ],
+      },
+      { panels: [{ id: "inspector", title: "Inspector", placement: "dock" }] },
+      { tabs: [{ id: "overview", title: "Overview", mount: "src/x.ts" }] },
+    ])
+      expect(() =>
+        validatePluginManifest({
+          ...browserManifest,
+          projector: {
+            apiVersion: 1,
+            browser: "dist/browser.js",
+            contributes: contributions,
+          },
+        }),
+      ).toThrow();
   });
 });

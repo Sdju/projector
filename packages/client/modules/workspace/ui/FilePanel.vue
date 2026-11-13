@@ -90,6 +90,10 @@ const hasStatusLine = computed(
       <TabReadoutScope v-if="view" :tab-key="file.key">
         <component :is="view.component" v-bind="view.props?.(file, host)" />
       </TabReadoutScope>
+      <p v-else-if="file.virtual?.startsWith('plugin:')" class="file-note" role="status">
+        Плагин вкладки недоступен: он выключен, удалён или требует повторного доверия. Вкладку можно
+        закрыть.
+      </p>
       <p v-else-if="file.binary && !file.image" class="file-error">
         Бинарный файл · {{ file.size }} байт
       </p>

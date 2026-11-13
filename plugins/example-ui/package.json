@@ -1,0 +1,45 @@
+{
+  "name": "@projector/example-ui",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Example projector plugin: a language, a panel and a tab",
+  "type": "module",
+  "engines": {
+    "projector": ">=0.12.0"
+  },
+  "projector": {
+    "apiVersion": 1,
+    "browser": "dist/browser.js",
+    "contributes": {
+      "languages": [
+        {
+          "id": "fict",
+          "title": "Fict",
+          "description": "Вымышленный формат для проверки внешней подсветки",
+          "extensions": [
+            ".fict"
+          ],
+          "filenames": [
+            "fictfile"
+          ],
+          "priority": 10
+        }
+      ],
+      "panels": [
+        {
+          "id": "inspector",
+          "title": "Fict Inspector",
+          "description": "Счётчик строк и подсказка о формате",
+          "placement": "aside"
+        }
+      ],
+      "tabs": [
+        {
+          "id": "overview",
+          "title": "Fict Overview",
+          "description": "Служебная вкладка примера плагина"
+        }
+      ]
+    }
+  }
+}

@@ -1,15 +1,63 @@
+import { pipeline } from "node:stream/promises";
 import {
   discoverPlugins,
   installPlugin,
+  openPluginAsset,
   removePlugin,
   setPluginEnabled,
   trustPlugin,
 } from "../../modules/plugins/index.ts";
+import { pluginPackageName } from "@ai-projector/core/modules/plugins/index.ts";
 import { accessAllowed } from "../../modules/access/index.ts";
 import { HttpError } from "../../modules/http/index.ts";
 import { asString, json, readBody, type RouteDefinition } from "../../modules/transport/index.ts";
 
+const assetPath = "/api/plugins/assets/:key/:hash/**";
+
 export const routes: RouteDefinition[] = [
+  {
+    method: ["GET", "HEAD"],
+    path: assetPath,
+    handler: async ({ req, res, method, params }) => {
+      if (!accessAllowed(req, false))
+        throw new HttpError(403, "Плагины доступны только со страницы Projector");
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      const name = pluginPackageName(params.key ?? "");
+      let relative: string;
+      try {
+        relative = (params["0"] ?? "").split("/").map(decodeURIComponent).join("/");
+      } catch {
+        throw new HttpError(400, "Некорректный путь ассета");
+      }
+      const catalog = await discoverPlugins();
+      const plugin = name ? catalog.plugins.find((item) => item.id === name) : undefined;
+      const asset = await openPluginAsset(plugin, params.hash ?? "", relative);
+      if (!asset) {
+        json(res, 404, { error: "Ассет плагина недоступен" });
+        return;
+      }
+      res.setHeader("Content-Type", asset.type);
+      res.setHeader("Content-Length", asset.size);
+      res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+      if (method === "HEAD") {
+        asset.stream.destroy();
+        res.end();
+        return;
+      }
+      await pipeline(asset.stream, res).catch(() => res.destroy());
+    },
+  },
+  {
+    method: "",
+    path: assetPath,
+    handler: ({ req, res }) => {
+      if (!accessAllowed(req, false))
+        throw new HttpError(403, "Плагины доступны только со страницы Projector");
+      res.setHeader("Cache-Control", "no-store");
+      json(res, 405, { error: "Допустим только GET" });
+    },
+  },
   {
     method: "GET",
     path: "/api/plugins",

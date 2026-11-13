@@ -1,25 +1,24 @@
-import { lstat, mkdir, readdir, readFile, realpath, rm } from "node:fs/promises";
+import { lstat, mkdir, readdir, realpath, rm } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import {
-  externalThemeId,
   validatePluginManifest,
-  validateThemeTokens,
   type AvailableTheme,
   type PluginManifest,
 } from "@ai-projector/core/modules/plugins/index.ts";
 import { copyPackage, destinationFor } from "./install.ts";
+import { loadPluginPackage, readJson } from "./load.ts";
 import { deleteState, readState, updateState } from "./state.ts";
 import { hashPackage, isTrusted } from "./trust.ts";
 import type {
   PluginAgentApply,
   PluginAgentDiagnostic,
   PluginCatalog,
-  PluginDiagnostic,
   PluginInfo,
 } from "./types.ts";
 
 export { readPluginIcon } from "./icon.ts";
+export { openPluginAsset, type PluginAsset } from "./assets.ts";
 export type {
   PluginAgentApply,
   PluginAgentCandidate,
@@ -49,12 +48,6 @@ export function pluginsDirectory(): string {
 
 function packagesDirectory(): string {
   return join(pluginsDirectory(), "packages");
-}
-
-async function readJson(path: string): Promise<unknown> {
-  const content = await readFile(path, "utf8");
-  if (content.length > 1_000_000) throw new Error("Файл плагина слишком большой");
-  return JSON.parse(content);
 }
 
 async function directoriesAt(path: string): Promise<string[]> {
@@ -103,60 +96,6 @@ async function directCandidates(): Promise<Candidate[]> {
   return result;
 }
 
-async function loadPackage(candidate: Candidate) {
-  const manifest = validatePluginManifest(await readJson(join(candidate.path, "package.json")), {
-    projectorVersion: currentProjectorVersion,
-  });
-  const diagnostics: PluginDiagnostic[] = [];
-  const themes: AvailableTheme[] = [];
-  let server: string | undefined;
-  if (manifest.projector.server) {
-    try {
-      const path = resolve(candidate.path, manifest.projector.server);
-      if (!path.startsWith(`${resolve(candidate.path)}${sep}`))
-        throw new Error("Небезопасный путь к server-entry");
-      const stats = await lstat(path);
-      if (!stats.isFile() || stats.isSymbolicLink())
-        throw new Error("server-entry должен быть обычным файлом");
-      server = path;
-    } catch (error) {
-      diagnostics.push({
-        message: `server: ${error instanceof Error ? error.message : "Ошибка чтения server-entry"}`,
-      });
-    }
-  }
-  for (const theme of manifest.projector.contributes.themes ?? []) {
-    try {
-      const path = resolve(candidate.path, theme.tokens);
-      if (!path.startsWith(`${resolve(candidate.path)}${sep}`))
-        throw new Error("Небезопасный путь к токенам");
-      const stats = await lstat(path);
-      if (!stats.isFile() || stats.isSymbolicLink())
-        throw new Error("Файл токенов должен быть обычным файлом");
-      const tokens = validateThemeTokens(await readJson(path));
-      themes.push({
-        id: externalThemeId(manifest.name, theme.id),
-        packageName: manifest.name,
-        title: theme.title,
-        description: theme.description,
-        mode: theme.mode,
-        tokens,
-      });
-    } catch (error) {
-      diagnostics.push({
-        message: `${theme.id}: ${error instanceof Error ? error.message : "Ошибка чтения темы"}`,
-      });
-    }
-  }
-  return {
-    manifest,
-    diagnostics,
-    themes,
-    agents: manifest.projector.contributes.agents ?? [],
-    server,
-  };
-}
-
 export async function discoverPlugins(): Promise<PluginCatalog> {
   const state = await readState();
   const candidates = [...(await managedCandidates()), ...(await directCandidates())];
@@ -180,10 +119,14 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         status: "error",
         enabled: false,
         trusted: false,
+        requiresTrust: false,
         code: false,
         diagnostics: [{ message: error instanceof Error ? error.message : "Некорректный плагин" }],
         themes: [],
         agents: [],
+        languages: [],
+        panels: [],
+        tabs: [],
       });
     }
   }
@@ -203,6 +146,7 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         status: "error",
         enabled: false,
         trusted: false,
+        requiresTrust: false,
         code: false,
         diagnostics: [
           {
@@ -213,14 +157,17 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         ],
         themes: [],
         agents: [],
+        languages: [],
+        panels: [],
+        tabs: [],
       });
       continue;
     }
     try {
-      const loaded = await loadPackage(selected[0].candidate);
+      const loaded = await loadPluginPackage(selected[0].candidate, currentProjectorVersion);
       const enabled = saved?.enabled ?? false;
       const agents = loaded.agents;
-      const requiresTrust = agents.length > 0 || !!loaded.server;
+      const requiresTrust = agents.length > 0 || !!loaded.server || !!loaded.browser;
       const currentHash = requiresTrust ? await hashPackage(selected[0].candidate.path) : undefined;
       const trusted = !requiresTrust || isTrusted(saved?.trustedHash, currentHash);
       const diagnostics = [...loaded.diagnostics];
@@ -228,7 +175,7 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         diagnostics.push({
           message: saved?.trustedHash
             ? "Содержимое плагина изменилось; подтвердите доверие заново"
-            : "Агенту плагина требуется подтверждение доверия",
+            : "Плагину требуется подтверждение доверия",
         });
       plugins.push({
         id,
@@ -238,12 +185,19 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         status: diagnostics.length ? "error" : enabled ? "enabled" : "disabled",
         enabled,
         trusted,
+        requiresTrust,
         ...(currentHash ? { hash: currentHash } : {}),
         ...(loaded.server ? { server: loaded.server } : {}),
-        code: !!loaded.server,
+        ...(loaded.browser && currentHash
+          ? { browser: { ...loaded.browser, hash: currentHash } }
+          : {}),
+        code: !!loaded.server || !!loaded.browser,
         diagnostics,
         themes: loaded.themes,
         agents,
+        languages: loaded.languages,
+        panels: loaded.panels,
+        tabs: loaded.tabs,
       });
       if (enabled && trusted && !diagnostics.length) availableThemes.push(...loaded.themes);
     } catch (error) {
@@ -252,6 +206,7 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         status: "error",
         enabled: false,
         trusted: false,
+        requiresTrust: false,
         code: false,
         path: selected[0].candidate.path,
         diagnostics: [
@@ -259,6 +214,9 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         ],
         themes: [],
         agents: [],
+        languages: [],
+        panels: [],
+        tabs: [],
       });
     }
   }
@@ -270,10 +228,14 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         status: "missing",
         enabled: saved.enabled,
         trusted: false,
+        requiresTrust: false,
         code: false,
         diagnostics: [{ message: "Пакет плагина отсутствует" }],
         themes: [],
         agents: [],
+        languages: [],
+        panels: [],
+        tabs: [],
       });
   }
   await applyAgentCatalog(plugins, availableThemes);
@@ -323,21 +285,21 @@ export async function setPluginEnabled(id: string, enabled: boolean): Promise<Pl
     throw new Error("Плагин недоступен для изменения состояния");
   if (enabled && plugin.status === "error")
     throw new Error("Плагин содержит ошибки; исправьте их перед включением");
-  if (enabled && plugin.agents.length && !plugin.trusted)
-    throw new Error("Сначала подтвердите доверие к агенту плагина");
+  if (enabled && plugin.requiresTrust && !plugin.trusted)
+    throw new Error("Сначала подтвердите доверие к исполняемому коду плагина");
   const state = await readState();
   const current = state[id] ?? { enabled: false };
   await updateState(id, { ...current, enabled, version: plugin.version });
   return discoverPlugins();
 }
 
-/** Confirms the exact content of a plugin that contributes agents. */
+/** Confirms the exact content of a plugin that contributes code. */
 export async function trustPlugin(id: string): Promise<PluginCatalog> {
   const catalog = await discoverPlugins();
   const plugin = catalog.plugins.find((item) => item.id === id);
   if (!plugin || plugin.status === "missing" || !plugin.path)
     throw new Error("Плагин не найден на диске");
-  if (!plugin.agents.length) throw new Error("Плагин не содержит агентов");
+  if (!plugin.requiresTrust) throw new Error("Плагин не содержит исполняемого кода");
   const trustedHash = await hashPackage(plugin.path);
   const state = await readState();
   const current = state[id] ?? { enabled: false };
@@ -371,7 +333,10 @@ export async function installPlugin(sourcePath: unknown): Promise<PluginCatalog>
   const manifest = validatePluginManifest(await readJson(join(source, "package.json")), {
     projectorVersion: currentProjectorVersion,
   });
-  const loaded = await loadPackage({ path: source, source: "direct" });
+  const loaded = await loadPluginPackage(
+    { path: source, source: "direct" },
+    currentProjectorVersion,
+  );
   if (loaded.diagnostics.length) throw new Error(loaded.diagnostics[0].message);
   const destination = destinationFor(manifest, packagesDirectory());
   await mkdir(dirname(destination), { recursive: true });
@@ -390,9 +355,14 @@ export async function installPlugin(sourcePath: unknown): Promise<PluginCatalog>
       throw new Error("Эта версия плагина уже установлена");
     throw error;
   }
-  // Theme-only packages are safe to enable at once. An agent runs a process, so it waits for
-  // an explicit trust confirmation before it can be switched on.
-  const hasAgents = (manifest.projector.contributes.agents?.length ?? 0) > 0;
-  await updateState(manifest.name, { enabled: !hasAgents, version: manifest.version });
+  // Theme-only packages are safe to enable at once. Browser/server/agent code needs explicit trust.
+  const requiresTrust =
+    (manifest.projector.contributes.agents?.length ?? 0) > 0 ||
+    !!manifest.projector.server ||
+    !!manifest.projector.browser;
+  await updateState(manifest.name, {
+    enabled: !requiresTrust,
+    version: manifest.version,
+  });
   return discoverPlugins();
 }

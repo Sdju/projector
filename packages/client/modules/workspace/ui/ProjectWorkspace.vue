@@ -40,6 +40,10 @@ import { asideSections, sidebarSections, type SidebarViews } from "../lib/sideba
 import { useWorkspaceAside } from "../lib/aside-panels.ts";
 import { registerTreeCommands } from "../lib/tree-commands.ts";
 import { provideTabHost, useWorkspaceTabTypes, type TabViews } from "../lib/tab-views.ts";
+import {
+  registerPluginWorkspaceCommands,
+  usePluginWorkspaceViews,
+} from "../lib/plugin-workspace.ts";
 import { useWorkspaceRefresh } from "../lib/workspace-refresh.ts";
 import { useMobileSurfaces, registerMobileCommands } from "../lib/mobile-surfaces.ts";
 import { useSurfaceSwipe } from "../lib/surface-swipe.ts";
@@ -120,11 +124,18 @@ const branches = useGitBranches(() => props.projectId);
 const loadGit = () => (capabilities.git ? overview.load() : Promise.resolve());
 const section = ref("files");
 const extraSections = ref<SidebarType[]>([]);
+const { pluginSidebarSections, pluginAsideSections, mergedSidebarViews, mergedAsideViews } =
+  usePluginWorkspaceViews(props.sidebarViews, props.asideViews);
 const sections = computed(() =>
-  extendSidebarRegistry(sidebarSections(profile, capabilities), () => extraSections.value),
+  extendSidebarRegistry(sidebarSections(profile, capabilities), () => [
+    ...extraSections.value,
+    ...pluginSidebarSections.value,
+  ]),
 );
 /** Правая полоса: разделы приходят из профиля, их виды — от страницы, встроившей workspace. */
-const asideRegistry = asideSections(profile, capabilities);
+const asideRegistry = extendSidebarRegistry(asideSections(profile, capabilities), () => [
+  ...pluginAsideSections.value,
+]);
 const {
   visible: asideVisible,
   hidden: asideHidden,
@@ -282,6 +293,7 @@ provideTabHost({
   },
   openSection,
   run: (command, args) => editorCommands.run(command, args),
+  executeCommand: (command, args) => editorCommands.scope.executeCommand(command, args),
 });
 const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
   projectId: props.projectId,
@@ -317,6 +329,17 @@ const { tabActions, editorKeydown, editorFocus } = registerEditorCommands({
   },
   tabTypes,
 });
+registerPluginWorkspaceCommands({
+  tabTypes,
+  registerEditor,
+  openTab,
+  section,
+  showSidebar,
+  asideSection,
+  asideHidden,
+});
+// The workspace is the default surface: its commands work even before the first focus.
+editorCommands.scope.activate();
 const docker = useDocker(props.projectId, {
   enabled: capabilities.docker,
   sidebar: () => {
@@ -496,7 +519,7 @@ onBeforeUnmount(() => overview.cancel());
         :project-id="projectId"
         :capabilities="capabilities"
         :sections="sections"
-        :views="sidebarViews"
+        :views="mergedSidebarViews"
         :hidden="sidebarInvisible"
         :rail="!mobile"
         :active="active"
@@ -506,6 +529,7 @@ onBeforeUnmount(() => overview.cancel());
         :branches="branches"
         :files="files"
         :git-sync="gitSync"
+        :execute-command="(id, args) => editorCommands.scope.executeCommand(id, args)"
         @command="
           (id, args) =>
             (id.startsWith('ide.docker.') ? docker.commands : editorCommands).run(id, args)
@@ -568,7 +592,7 @@ onBeforeUnmount(() => overview.cancel());
       :project-id="projectId"
       :capabilities="capabilities"
       :sections="asideRegistry"
-      :views="asideViews"
+      :views="mergedAsideViews"
       :hidden="asideHidden"
       :rail="true"
       :active="active"
@@ -578,6 +602,7 @@ onBeforeUnmount(() => overview.cancel());
       :branches="branches"
       :files="files"
       :git-sync="gitSync"
+      :execute-command="(id, args) => editorCommands.scope.executeCommand(id, args)"
       toggle-command="ide.workbench.aside.toggle"
       refresh-command="ide.workbench.aside.refresh"
       close-command="ide.workbench.aside.section.close"

@@ -33,6 +33,7 @@ import {
   themeExtension,
 } from "../lib/codemirror.ts";
 import { useEditorStatusStore } from "../lib/editor-status.ts";
+import { languageRevision } from "../../../../plugin-runtime/index.ts";
 const props = defineProps<{
   path: string;
   content: string;
@@ -54,6 +55,7 @@ let merge: MergeView | undefined;
 const sideBySide = ref(false);
 const collapseUnchanged = ref(true);
 let gutterToken = 0;
+let languageToken = 0;
 const states = new Map<string, EditorState>();
 let activePath = "";
 const statusStore = useEditorStatusStore();
@@ -282,6 +284,17 @@ function extensions(mode: "inline" | "side" = "inline") {
     }),
   ];
 }
+function applyLanguage(target: EditorView) {
+  const token = ++languageToken;
+  const mergeA = merge?.a;
+  void languageExtension(props.path).then((ext) => {
+    if (token !== languageToken || view !== target) return;
+    const effects = { effects: languageCompartment.reconfigure(ext) };
+    // A stale async load (a plugin was disabled or the file changed) never wins the race.
+    mergeA?.dispatch(effects);
+    target.dispatch(effects);
+  });
+}
 function render() {
   if (!container.value) return;
   if (view) states.set(activePath, view.state);
@@ -316,12 +329,7 @@ function render() {
   }
   const target = view;
   statusStore.activate(statusId, reportCursor(target.state));
-  void languageExtension(props.path).then((ext) => {
-    if (view !== target) return;
-    const effects = { effects: languageCompartment.reconfigure(ext) };
-    merge?.a.dispatch(effects);
-    target.dispatch(effects);
-  });
+  applyLanguage(target);
   void loadGutter();
   reveal();
 }
@@ -362,6 +370,9 @@ watch(editorTheme, (theme) => {
   const effects = { effects: themeCompartment.reconfigure(themeExtension(theme)) };
   merge?.a.dispatch(effects);
   view?.dispatch(effects);
+});
+watch(languageRevision, () => {
+  if (view) applyLanguage(view);
 });
 watch(
   () => props.content,
