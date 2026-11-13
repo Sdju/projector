@@ -29,6 +29,9 @@ const emit = defineEmits<{ save: [value: Partial<AgentRole>]; remove: [] }>();
 
 type ResourceMode = "all" | "some" | "none";
 
+const SOURCE_LABELS = { user: "личный", project: "проект", system: "встроенный" } as const;
+const sourceLabel = (source: RoleSkill["source"]) => SOURCE_LABELS[source];
+
 const draft = reactive({
   name: "",
   description: "",
@@ -271,7 +274,8 @@ function remove() {
         <span>
           <strong>{{ skill.name }}</strong>
           <small
-            >{{ skill.kind === "command" ? "команда" : "навык" }} · {{ skill.description }}</small
+            >{{ skill.kind === "command" ? "команда" : "навык" }} ·
+            {{ sourceLabel(skill.source) }} · {{ skill.description }}</small
           >
         </span>
       </label>

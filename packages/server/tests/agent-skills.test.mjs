@@ -9,6 +9,7 @@ import {
   parseFrontmatter,
   skillsSection,
 } from "../modules/agents/projector/projector-skills.ts";
+import { buildSystemPrompt } from "../modules/agents/projector/prompts.ts";
 import { projectorBackend } from "../modules/agents/projector/index.ts";
 
 let previous;
@@ -51,16 +52,46 @@ describe("agent skills and commands", () => {
     );
     await put(project, ".projector/skills/bad name/SKILL.md", "не попадёт");
     const skills = await listSkills(project);
-    expect(skills.map((item) => `${item.source}:${item.kind}:${item.name}`).sort()).toEqual([
-      "project:command:review",
-      "project:skill:lint",
-      "user:skill:release",
-    ]);
+    expect(
+      skills
+        .filter((item) => item.source !== "system")
+        .map((item) => `${item.source}:${item.kind}:${item.name}`)
+        .sort(),
+    ).toEqual(["project:command:review", "project:skill:lint", "user:skill:release"]);
     expect(findSkill(skills, "release").body).toBe("Шаги выпуска");
     expect(skills.find((item) => item.name === "lint").description).toBe("Чистит код линтером");
     expect(skillsSection(skills)).toContain("- release: Выпуск версии");
     expect(skillsSection(skills)).not.toContain("review");
     expect(skillsSection([])).toBe("");
+  });
+
+  it("ships built-in skills, and the user's own skill wins over one", async () => {
+    const skills = await listSkills(project);
+    const builtin = skills.find((item) => item.source === "system");
+    expect(builtin?.name).toBe("add-projects");
+    expect(builtin?.body).toContain("find_projects");
+
+    await put(join(data, "projector", "agent"), "skills/add-projects/SKILL.md", "Мой вариант");
+    const overridden = await listSkills(project);
+    expect(
+      overridden.filter((item) => item.name === "add-projects").map((item) => item.source),
+    ).toEqual(["user"]);
+  });
+
+  it("keeps built-in skills in the prompt when user skills fill the list", async () => {
+    for (let index = 0; index < 45; index++)
+      await put(
+        join(data, "projector", "agent"),
+        `skills/own-${index}/SKILL.md`,
+        `---\ndescription: Свой ${index}\n---\nТекст`,
+      );
+    const section = skillsSection(await listSkills(project));
+    expect(section).toContain("- add-projects:");
+    expect(section.split("\n").filter((line) => line.startsWith("- own-")).length).toBe(40);
+  });
+
+  it("leaves the extracted instructions out of the base prompt", () => {
+    expect(buildSystemPrompt("")).not.toContain("Добавление приложений");
   });
 
   it("expands /command and /skill, and leaves the rest as typed", async () => {
@@ -79,6 +110,6 @@ describe("agent skills and commands", () => {
   it("offers them as the slash commands of the agent", async () => {
     await put(project, ".projector/commands/review.md", "---\ndescription: Ревью\n---\nтекст");
     const names = (await projectorBackend.commands(project)).map((item) => item.name);
-    expect(names).toEqual(["compact", "review"]);
+    expect(names).toEqual(["compact", "review", "add-projects"]);
   });
 });

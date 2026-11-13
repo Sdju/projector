@@ -295,6 +295,11 @@ describe("agent roles", () => {
     expect(rolePromptText({ name: "Пустая", selection: {} })).toBe("");
     expect(await roleContext({ ...role, skills: [] })).toContain("отключены");
     expect(await roleContext({ roleId: "r", name: "Без навыков", selection: {} })).toBe("");
+    const builtin = await roleContext(
+      { roleId: "r", name: "Встроенный", selection: {}, skills: ["add-projects"] },
+      "",
+    );
+    expect(builtin.replaceAll("\\", "/")).toContain("system-skills/add-projects/SKILL.md");
   });
 
   it("passes a role snapshot from the chat request to the backend", async () => {

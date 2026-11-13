@@ -1,16 +1,20 @@
 import { access } from "node:fs/promises";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 
 /** The same spelling the Projector skill loader accepts; a role name must not escape its folder. */
 const RESOURCE_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+/** Built-in skills ship beside the Projector agent module; the path survives the packaged build. */
+const SYSTEM_SKILLS = fileURLToPath(new URL("../agents/projector/system-skills", import.meta.url));
 
-/** Where a skill or command may live: the user's folder, then the project's two conventions. */
+/** Where a skill or command may live: the user's folder, the project's two conventions, then the built-in ones. */
 function resourceRoots(cwd?: string): string[] {
   return [
     join(dataDir(), "agent"),
     ...(cwd ? [join(cwd, ".projector"), join(cwd, ".claude")] : []),
+    SYSTEM_SKILLS,
   ];
 }
 
@@ -18,10 +22,11 @@ function resourceRoots(cwd?: string): string[] {
 async function resourceFile(name: string, cwd?: string): Promise<string | undefined> {
   if (!RESOURCE_NAME.test(name)) return undefined;
   for (const root of resourceRoots(cwd)) {
-    for (const file of [
-      join(root, "skills", name, "SKILL.md"),
-      join(root, "commands", `${name}.md`),
-    ]) {
+    const files =
+      root === SYSTEM_SKILLS
+        ? [join(root, name, "SKILL.md")]
+        : [join(root, "skills", name, "SKILL.md"), join(root, "commands", `${name}.md`)];
+    for (const file of files) {
       if (
         await access(file).then(
           () => true,

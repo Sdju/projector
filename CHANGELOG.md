@@ -20,6 +20,8 @@
 
 ### Агенты
 
+- У Projector появились встроенные навыки: папка `system-skills` рядом с модулем агента попадает в поставку, описания всегда видны в промпте, а текст загружается `use_skill` по необходимости. Первым вынесен `add-projects`, так что базовый промпт больше не держит правила добавления приложений. Личный или проектный навык с тем же именем заменяет встроенный; роли и внешние агенты видят источник `system` ([подробно](docs/agent-skills.md)).
+
 - Claude Code вынесен из основного продукта в доверенный плагин `plugins/claude-code`: бэкенд на Anthropic Agent SDK, поток событий, сессии, откат файлов, лимиты, план, permission modes и hosted-раннер теперь живут в пакете. Встроенные модули `agents/claude-code`, `agents-integration/claude`, клиентский индикатор и маршрут `/api/claude/usage` удалены; агент появляется после установки плагина и доверия к нему, лимиты идут через общий `/api/agent/usage/claude-code`. Зависимость `@anthropic-ai/claude-agent-sdk` перенесена из продукта в сам плагин, `processMcpConfig` переехал в плагин, хост безусловно чистит `PARENT_SESSION_ENV` при старте и создании терминалов, а плагин поставляет `defaultFeatures: ["widgets"]`, семантику инструментов (`kind`, `label`, `paths`) и браузерный вклад `api.agents` с `activeForm` и индикатором лимитов «Неделя / 5 часов». Плагинный API получил `api.host` (среда, вложения, история, injector, replay, hosted-ход), `api.features`, `api.roles`, `api.widgets`, `api.mcp` и `api.require`; общий hosted-процесс — `server/app/plugin-runner.ts` ([подробно](docs/plugins.md)).
 
 ### Плагины
