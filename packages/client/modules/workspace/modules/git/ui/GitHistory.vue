@@ -22,6 +22,7 @@ import IconRefresh from "~icons/lucide/refresh-cw";
 
 const props = defineProps<{
   history: GitHistoryState;
+  projectId: string;
   allBranches?: boolean;
   snapshots?: boolean;
   commands: ReturnType<typeof useCommandScope>;
@@ -278,6 +279,7 @@ watch(commits, (list) => {
           v-for="(commit, index) in commits"
           :key="commit.hash"
           :commit="commit"
+          :project-id="projectId"
           :row="rows[index]!"
           :columns="columns"
           :expanded="expanded.has(commit.hash)"

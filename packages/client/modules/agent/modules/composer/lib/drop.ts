@@ -2,8 +2,10 @@ import { onMounted, type Ref } from "vue";
 import type { EditorView } from "@codemirror/view";
 import {
   isFileDrag,
+  isProjectorDrag,
   pathsFromDataTransfer,
   readDrop,
+  readProjectorDrag,
   type DropSource,
 } from "../../../../path-drop/index.ts";
 import {
@@ -68,18 +70,10 @@ export function useComposerDrop(options: {
 
   function droppedChips(data: DataTransfer): MessageChip[] {
     const projectId = options.projectId();
-    const entry = data.getData("application/x-projector-tree-entry");
+    const entry = readProjectorDrag(data);
     if (entry) {
-      try {
-        const value = JSON.parse(entry) as { projectId?: unknown; path?: unknown; paths?: unknown };
-        if (value.projectId !== projectId) return [];
-        const paths = Array.isArray(value.paths) && value.paths.length ? value.paths : [value.path];
-        return paths
-          .filter((path): path is string => typeof path === "string" && !!path)
-          .map((path): MessageChip => ({ type: "file", path }));
-      } catch {
-        return [];
-      }
+      if (entry.projectId !== projectId) return [];
+      return entry.paths.map((path): MessageChip => ({ type: "file", path }));
     }
     return pathsFromDataTransfer(data).map(chipForPath);
   }
@@ -113,9 +107,7 @@ export function useComposerDrop(options: {
   }
 
   function acceptsDrag(data: DataTransfer | null): data is DataTransfer {
-    return (
-      !!data && (isFileDrag(data) || data.types.includes("application/x-projector-tree-entry"))
-    );
+    return !!data && (isFileDrag(data) || isProjectorDrag(data));
   }
 
   /** Папку нельзя вложить одним файлом: кладём её дерево в проект и ссылаемся как на `@path`. */

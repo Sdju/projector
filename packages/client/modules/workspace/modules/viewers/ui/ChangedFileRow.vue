@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CommitFileDiff from "./CommitFileDiff.vue";
 import { FileIcon } from "../../../../file-icons/index.ts";
+import { setProjectorDrag } from "../../../../path-drop/index.ts";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import UiHint from "../../../../../common/ui/UiHint.vue";
 import UiLoader from "../../../../../common/ui/UiLoader.vue";
@@ -19,8 +20,21 @@ const props = defineProps<{
   openCommand?: string;
   /** Host shown in the "too large" note. */
   host?: string;
+  /** Проект и коммит: с ними строку можно перетащить в вкладку, терминал или чат. */
+  projectId?: string;
+  commit?: string;
 }>();
 const emit = defineEmits<{ toggle: [open?: boolean]; open: []; resize: [height: number] }>();
+function startDrag(event: DragEvent) {
+  if (!props.projectId || !props.commit || !event.dataTransfer) return;
+  event.dataTransfer.effectAllowed = "copy";
+  setProjectorDrag(event.dataTransfer, {
+    projectId: props.projectId,
+    path: props.file.path,
+    paths: [props.file.path],
+    commit: props.commit,
+  });
+}
 const note = computed(() => {
   const data = props.diff?.data;
   if (!data) return "";
@@ -41,7 +55,10 @@ const note = computed(() => {
         :aria-expanded="file.expandable ? expanded : undefined"
         :title="file.disabledTitle"
         :data-command="toggleCommand"
+        :draggable="!!projectId && !!commit"
         @click="emit('toggle')"
+        @dragstart.stop="startDrag"
+        @dragend.stop
       >
         <span class="glyph" aria-hidden="true">
           <IconChevronRight v-if="file.expandable" :class="{ open: expanded }" />

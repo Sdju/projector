@@ -174,6 +174,7 @@ watch(() => [props.projectId, props.hash], load, { immediate: true });
       </div>
       <CommitFiles
         :detail="detail"
+        :project-id="projectId"
         :expanded="expanded"
         :heights="heights"
         :diffs="diffs"

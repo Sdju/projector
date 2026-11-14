@@ -21,6 +21,7 @@ import IconCopy from "~icons/lucide/copy";
 
 const props = defineProps<{
   commit: GitCommit;
+  projectId: string;
   row: GraphRow;
   columns: number;
   expanded: boolean;
@@ -142,6 +143,8 @@ const refs = computed(() =>
         <GitChangesTree
           v-else
           :changes="changes"
+          :project-id="projectId"
+          :commit="commit.hash"
           staged
           readonly
           :label="`Изменения коммита ${shortHash(commit.hash)}`"

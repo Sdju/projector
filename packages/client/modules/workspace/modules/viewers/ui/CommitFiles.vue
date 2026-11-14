@@ -13,6 +13,7 @@ import type { ChangedFileItem } from "../lib/changed-files.ts";
 /** Файлы коммита с числом строк; текстовые раскрываются в код изменений. */
 const props = defineProps<{
   detail: GitCommitDetail;
+  projectId?: string;
   expanded: Set<string>;
   heights: Record<string, number>;
   diffs: Record<string, { loading: boolean; error: string; data?: CommitComparison }>;
@@ -82,6 +83,8 @@ const files = computed<ChangedFileItem[]>(() =>
         v-for="file in files"
         :key="file.path"
         :file="file"
+        :project-id="projectId"
+        :commit="detail.hash"
         :expanded="expanded.has(file.path)"
         :diff="diffs[file.path]"
         :height="heights[file.path]"

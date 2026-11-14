@@ -233,6 +233,7 @@ defineExpose({
             :key="`${projectId}:${group.staged}`"
             :changes="group.rows"
             :staged="group.staged"
+            :project-id="projectId"
             :disabled="gitBusy"
             :can-toggle="
               (path) =>
@@ -268,6 +269,7 @@ defineExpose({
         <GitHistory
           v-model:open="historyOpen"
           v-model:target="commitTarget"
+          :project-id="projectId"
           :history="history"
           :all-branches="gitProvider?.allBranches !== false"
           :snapshots="snapshots"

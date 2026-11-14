@@ -5,6 +5,7 @@ import IconPlus from "~icons/lucide/plus";
 import IconMinus from "~icons/lucide/minus";
 import IconChevronRight from "~icons/lucide/chevron-right";
 import { FileIcon, useFileIconTheme } from "../../../../file-icons/index.ts";
+import { setProjectorDrag } from "../../../../path-drop/index.ts";
 import type { GitOverview } from "@ai-projector/core/modules/workspace/index.ts";
 
 type Change = GitOverview["changes"][number];
@@ -20,6 +21,10 @@ const props = withDefaults(
     /** Дерево коммита: без кнопок Staged. */
     readonly?: boolean;
     label?: string;
+    /** Проект записи: без него строку нельзя перетащить. */
+    projectId?: string;
+    /** Хеш коммита: перетаскивание открывает diff именно этого коммита. */
+    commit?: string;
   }>(),
   { path: "", depth: 0 },
 );
@@ -100,6 +105,17 @@ function toggle(path: string) {
   if (collapsed.value.has(path)) collapsed.value.delete(path);
   else collapsed.value.add(path);
 }
+/** Файл из изменений или истории можно перетащить во вкладку, терминал или чат. */
+function startDrag(event: DragEvent, path: string) {
+  if (!props.projectId || !event.dataTransfer) return;
+  event.dataTransfer.effectAllowed = "copy";
+  setProjectorDrag(event.dataTransfer, {
+    projectId: props.projectId,
+    path,
+    paths: [path],
+    ...(props.commit ? { commit: props.commit } : props.readonly ? {} : { staged: props.staged }),
+  });
+}
 </script>
 
 <template>
@@ -136,10 +152,13 @@ function toggle(path: string) {
           "
           :aria-expanded="entry.directory ? !collapsed.has(entry.path) : undefined"
           :aria-current="!entry.directory && selected === entry.path ? 'true' : undefined"
+          :draggable="!entry.directory && !!projectId && !disabled"
           @focus="emit('target', entry.path)"
           @click="
             entry.directory ? toggle(entry.path) : emit('open', entry.path, $event.detail >= 2)
           "
+          @dragstart.stop="startDrag($event, entry.path)"
+          @dragend.stop
         >
           <span class="glyph" aria-hidden="true">
             <IconChevronRight
@@ -175,6 +194,8 @@ function toggle(path: string) {
         :disabled="disabled"
         :can-toggle="canToggle"
         :readonly="readonly"
+        :project-id="projectId"
+        :commit="commit"
         :selected="selected"
         @change="emit('change', $event)"
         @open="(path, pinned) => emit('open', path, pinned)"
