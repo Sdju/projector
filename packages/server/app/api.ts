@@ -54,6 +54,7 @@ import { routes as projectWorkspaceReadRoutes } from "../routes/api/projects/[id
 import { routes as projectSiteRoutes } from "../routes/api/projects/[id]/site.ts";
 import { routes as projectTerminalsRoutes } from "../routes/api/projects/[id]/terminals.ts";
 import { routes as projectActionsRoutes } from "../routes/api/projects/[id]/index.ts";
+import { routes as projectAppearanceRoutes } from "../routes/api/projects/[id]/appearance.ts";
 import { routes as ideKeybindingsRoutes } from "../routes/api/ide/keybindings.ts";
 import { routes as ideCommandsRoutes } from "../routes/api/ide/commands.ts";
 import { routes as editorSettingsRoutes } from "../routes/api/ide/editor.ts";
@@ -137,9 +138,9 @@ const dispatch = createRouteDispatcher([
   ...projectWorkspaceRoutes,
   ...projectWorkspaceReadRoutes,
   ...projectTerminalsRoutes,
+  ...projectAppearanceRoutes,
   ...projectActionsRoutes,
 ]);
-
 export async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
   // Plugin agents are discovered asynchronously; the first request sees the whole catalog.
   await ensureAgentsReady();

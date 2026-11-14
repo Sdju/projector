@@ -42,8 +42,25 @@ test("appearance is stored on disk and invalid values are rejected", async () =>
   expect(await readAppearanceChoice()).toBe("auto");
 });
 
-test("appearance API reads and writes the saved choice", async () => {
+test("appearance fonts are stored beside the colour scheme", async () => {
+  const { writeAppearance, readAppearance } = await import("../modules/appearance/index.ts");
   await writeAppearanceChoice("dark");
+  const saved = await writeAppearance({ fonts: { chat: 16 } });
+  expect(saved.choice).toBe("dark");
+  expect(saved.fonts).toStrictEqual({ chat: 16, editor: 13, terminal: 13 });
+  await writeAppearanceChoice("light");
+  expect(await readAppearance()).toStrictEqual({
+    choice: "light",
+    fonts: { chat: 16, editor: 13, terminal: 13 },
+  });
+});
+
+test("appearance API reads and writes the saved choice", async () => {
+  const { writeAppearance } = await import("../modules/appearance/index.ts");
+  await writeAppearance({
+    choice: "dark",
+    fonts: { chat: 13, editor: 13, terminal: 13 },
+  });
   const server = createServer((req, res) => {
     void handleApi(req, res);
   });
@@ -56,6 +73,7 @@ test("appearance API reads and writes the saved choice", async () => {
   expect(initial.status).toBe(200);
   const initialBody = await initial.json();
   expect(initialBody.choice).toBe("dark");
+  expect(initialBody.fonts).toStrictEqual({ chat: 13, editor: 13, terminal: 13 });
   expect(initialBody.themes.map((theme) => theme.id)).toStrictEqual(["dark", "light", "contrast"]);
 
   const saved = await fetch(`${base}/api/appearance`, {
@@ -64,8 +82,21 @@ test("appearance API reads and writes the saved choice", async () => {
     body: JSON.stringify({ choice: "light" }),
   });
   expect(saved.status).toBe(200);
-  expect(await saved.json()).toStrictEqual({ choice: "light" });
+  const savedBody = await saved.json();
+  expect(savedBody.choice).toBe("light");
+  expect(savedBody.fonts).toStrictEqual({ chat: 13, editor: 13, terminal: 13 });
   expect(await readAppearanceChoice()).toBe("light");
+
+  const fonts = await fetch(`${base}/api/appearance`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Origin: base },
+    body: JSON.stringify({ fonts: { terminal: 18 } }),
+  });
+  expect(fonts.status).toBe(200);
+  expect(await fonts.json()).toStrictEqual({
+    choice: "light",
+    fonts: { chat: 13, editor: 13, terminal: 18 },
+  });
 
   const invalid = await fetch(`${base}/api/appearance`, {
     method: "PUT",
@@ -94,6 +125,7 @@ test("bootstrap script follows the saved choice on every request", async () => {
   expect(script).toContain('const choice = "auto"');
   expect(script).toContain('matchMedia("(prefers-color-scheme: light)")');
   expect(script).toContain("root.dataset.theme = scheme");
+  expect(script).toContain('root.style.setProperty("--chat-fs", "13px")');
 
   await writeAppearanceChoice("light");
   const changed = await (await fetch(`${base}/api/appearance/bootstrap.js`)).text();

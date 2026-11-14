@@ -13,6 +13,7 @@ import { shortcutKey } from "@ai-projector/core/modules/ide/index.ts";
 import { AgentProjectRoles } from "../../agent-roles/index.ts";
 import { AgentPresetsSettings } from "../../agent-presets/index.ts";
 import { ProjectWidgets } from "../../project-widgets/index.ts";
+import { ProjectAppearanceSettings } from "../../appearance/index.ts";
 import {
   projectSettingsSection as selected,
   scenarioSection,
@@ -60,6 +61,16 @@ const sections = computed<SettingsSection[]>(() => [
       hint: command.id === form.draft.value.defaultCommandId ? "основной" : undefined,
       problem: !!form.problemOf(command.id),
     })),
+  },
+  {
+    id: "appearance",
+    title: "Оформление",
+    group: "Проект",
+    description:
+      "Цветовая схема и размеры шрифта из .projector/appearance.json. Файл действует только после доверия.",
+    keywords: "оформление appearance схема тема шрифт размер чат редактор терминал доверие trust",
+    component: ProjectAppearanceSettings,
+    props: { project: props.project },
   },
   {
     id: "roles",

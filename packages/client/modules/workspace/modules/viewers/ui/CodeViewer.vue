@@ -34,6 +34,7 @@ import {
 } from "../lib/codemirror.ts";
 import { useEditorStatusStore } from "../lib/editor-status.ts";
 import { languageRevision } from "../../../../plugin-runtime/index.ts";
+import { appearanceFonts, loadAppearanceFonts } from "../../../../appearance/index.ts";
 const props = defineProps<{
   path: string;
   content: string;
@@ -252,7 +253,7 @@ function extensions(mode: "inline" | "side" = "inline") {
     EditorView.editable.of(!!props.editable),
     props.editable ? EditorView.lineWrapping : [],
     ...(tracksSelection() ? selectionChatTooltip() : []),
-    themeCompartment.of(themeExtension(editorTheme.value)),
+    themeCompartment.of(themeExtension(editorTheme.value, appearanceFonts.value.editor)),
     languageCompartment.of([]),
     EditorState.phrases.of({
       "Revert this chunk": "Откатить изменение",
@@ -361,13 +362,14 @@ function focusOut(event: FocusEvent) {
 onMounted(() => {
   render();
   void loadEditorTheme().catch(() => undefined);
+  void loadAppearanceFonts().catch(() => undefined);
 });
 watch(
   () => [props.path, props.original, props.editable, sideBySide.value, collapseUnchanged.value],
   render,
 );
-watch(editorTheme, (theme) => {
-  const effects = { effects: themeCompartment.reconfigure(themeExtension(theme)) };
+watch([editorTheme, () => appearanceFonts.value.editor], ([theme, fontSize]) => {
+  const effects = { effects: themeCompartment.reconfigure(themeExtension(theme, fontSize)) };
   merge?.a.dispatch(effects);
   view?.dispatch(effects);
 });

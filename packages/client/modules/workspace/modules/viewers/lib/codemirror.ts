@@ -29,7 +29,7 @@ const palette = {
   selection: "#3a3934",
   gutter: "#73736b",
 };
-function projectorTheme(soft: boolean): Extension {
+function projectorTheme(soft: boolean, fontSize: number): Extension {
   const base = EditorView.theme(
     {
       "&": { backgroundColor: palette.bg, color: palette.fg, height: "100%" },
@@ -46,12 +46,19 @@ function projectorTheme(soft: boolean): Extension {
       ".cm-searchMatch": { backgroundColor: "#61533b70" },
       ".cm-searchMatch-selected": { backgroundColor: "#61533b" },
       "&.cm-focused": { outline: "none" },
-      ".cm-scroller": { fontFamily: '"Noto Sans Mono", monospace', fontSize: "13px" },
+      ".cm-scroller": {
+        fontFamily: '"Noto Sans Mono", monospace',
+        fontSize: `${fontSize}px`,
+      },
     },
     { dark: true },
   );
   if (!soft) return [base, syntaxHighlighting(classic)];
   return [base, syntaxHighlighting(softStyle)];
+}
+
+function editorFontSizeTheme(fontSize: number): Extension {
+  return EditorView.theme({ ".cm-scroller": { fontSize: `${fontSize}px` } });
 }
 const classic = HighlightStyle.define([
   { tag: [t.keyword, t.operatorKeyword], color: "#c678dd" },
@@ -80,10 +87,10 @@ const softStyle = HighlightStyle.define([
   { tag: t.link, color: "#a0b7aa", textDecoration: "underline" },
 ]);
 
-export function themeExtension(theme: EditorTheme): Extension {
-  if (theme === "projector-soft") return projectorTheme(true);
-  if (theme === "projector") return projectorTheme(false);
-  return oneDark;
+export function themeExtension(theme: EditorTheme, fontSize: number): Extension {
+  if (theme === "projector-soft") return projectorTheme(true, fontSize);
+  if (theme === "projector") return projectorTheme(false, fontSize);
+  return [oneDark, editorFontSizeTheme(fontSize)];
 }
 export const themeCompartment = new Compartment();
 export const languageCompartment = new Compartment();

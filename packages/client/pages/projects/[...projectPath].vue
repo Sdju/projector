@@ -35,6 +35,7 @@ import {
   GitlabRepositoryInfoLoader,
 } from "../../modules/gitlab-workspace/index.ts";
 import { useCommandScope } from "../../common/utilities/commands.ts";
+import { bindProjectAppearance } from "../../modules/appearance/index.ts";
 import UiButton from "../../common/ui/UiButton.vue";
 import IconGithub from "~icons/simple-icons/github";
 import IconGitlab from "~icons/simple-icons/gitlab";
@@ -243,6 +244,7 @@ watch(
     onCleanup(() => {
       active = false;
       dispose?.();
+      void bindProjectAppearance(null).catch(() => undefined);
     });
     projectId.value = "";
     githubRepository.value = null;
@@ -280,6 +282,7 @@ watch(
         projectId.value = item.id;
         initProjectId = created && !gone ? item.id : "";
         missing.value = gone;
+        void bindProjectAppearance(item.id).catch(() => undefined);
         const canonical = projectRoute(item.path);
         if (route.path !== canonical) await router.replace(canonical);
       }

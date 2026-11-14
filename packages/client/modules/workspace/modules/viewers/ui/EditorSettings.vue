@@ -7,13 +7,26 @@ import UiHeading from "../../../../../common/ui/UiHeading.vue";
 import UiButton from "../../../../../common/ui/UiButton.vue";
 import { editorThemes, type EditorTheme } from "@ai-projector/core/modules/editor-themes/index.ts";
 import { editorTheme, applyEditorTheme, loadEditorTheme } from "../lib/editor-theme.ts";
+import { useAppearanceFontSettings } from "../../../../appearance/index.ts";
 import { useSectionAction } from "../../../../../common/utilities/use-section-action.ts";
 defineProps<{ embedded?: boolean }>();
 const titleId = useId();
 const themeId = useId();
+const fontSizeId = useId();
 const CodeViewer = defineAsyncComponent(() => import("./CodeViewer.vue"));
 const selected = ref<EditorTheme>(editorTheme.value);
 const { ready, busy, error, status, load: loadSection, perform } = useSectionAction();
+const {
+  draft: fontDraft,
+  ready: fontsReady,
+  busy: fontsBusy,
+  error: fontsError,
+  status: fontsStatus,
+  min: fontMin,
+  max: fontMax,
+  preview: previewFont,
+  commit: commitFont,
+} = useAppearanceFontSettings(["editor"]);
 const description = computed(
   () => editorThemes.find((theme) => theme.id === selected.value)?.description,
 );
@@ -77,6 +90,24 @@ async function save() {
       </option>
     </UiControl>
     <p class="hint">{{ description }}</p>
+    <UiLabel :for="fontSizeId" :space-before="4" :space-after="2"
+      >Размер шрифта · {{ fontDraft.editor }}px</UiLabel
+    >
+    <UiControl
+      :id="fontSizeId"
+      type="range"
+      :min="fontMin"
+      :max="fontMax"
+      :step="1"
+      :model-value="fontDraft.editor"
+      :disabled="!fontsReady || fontsBusy"
+      @update:model-value="previewFont('editor', Number($event))"
+      @change="commitFont('editor')"
+    />
+    <p class="hint">
+      Кегль кода в редакторе, не масштаб интерфейса. Меняется сразу и сохраняется отдельно от
+      размера текста в чате и терминале.
+    </p>
     <div class="preview"><CodeViewer path="theme-preview.ts" :content="example" /></div>
     <p class="hint">
       Тема применяется к коду и сравнению изменений во всех проектах. Выбор сохраняется
@@ -85,6 +116,12 @@ async function save() {
     <UiMessage v-if="error || status" role="status" :tone="error ? 'danger' : undefined">{{
       error || status
     }}</UiMessage>
+    <UiMessage
+      v-if="fontsError || fontsStatus"
+      role="status"
+      :tone="fontsError ? 'danger' : undefined"
+      >{{ fontsError || fontsStatus }}</UiMessage
+    >
     <UiButton v-if="!ready && error" @click="load">Повторить загрузку</UiButton>
   </section>
 </template>
@@ -93,7 +130,8 @@ async function save() {
 .editor-settings {
   margin-bottom: var(--ui-section-margin, var(--sp-6));
 }
-select {
+select,
+input[type="range"] {
   max-width: 420px;
 }
 .hint {

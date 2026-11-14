@@ -85,8 +85,14 @@ useMessageScope(
   color: var(--text-2);
 }
 .agent-message {
+  /* Scale markdown/code tokens from --chat-fs; chrome outside the message keeps global --fs-*. */
+  --fs-2xs: calc(var(--chat-fs) * 11 / 13);
+  --fs-xs: calc(var(--chat-fs) * 12 / 13);
+  --fs-sm: var(--chat-fs);
+  --fs-md: calc(var(--chat-fs) * 15 / 13);
+  --fs-lg: calc(var(--chat-fs) * 20 / 13);
   color: var(--text);
-  font-size: var(--fs-sm);
+  font-size: var(--chat-fs);
   line-height: 1.7;
   overflow-wrap: anywhere;
 }

@@ -514,7 +514,7 @@ const lastWork = computed(
   border-radius: var(--r-lg);
   background: var(--bg-3);
   color: var(--text);
-  font-size: var(--fs-sm);
+  font-size: var(--chat-fs);
   line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;

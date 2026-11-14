@@ -27,9 +27,9 @@ export const settingsSections: SettingsSection[] = [
     id: "interface",
     title: "Интерфейс",
     group: "Среда",
-    description: "Режим запуска, системная горячая клавиша и цветовая схема.",
+    description: "Режим запуска, системная горячая клавиша, цветовая схема и размер текста.",
     keywords:
-      "окно браузер GTK трей хоткей shortcut запуск цвет тема схема светлая тёмная appearance",
+      "окно браузер GTK трей хоткей shortcut запуск цвет тема схема светлая тёмная appearance шрифт размер текст чат терминал font",
     component: InterfaceSettings,
   },
   {
@@ -63,8 +63,8 @@ export const settingsSections: SettingsSection[] = [
     id: "editor",
     title: "Редактор",
     group: "Среда",
-    description: "Тема кода и сравнения изменений во всех проектах.",
-    keywords: "цвет тема подсветка код diff",
+    description: "Тема и размер шрифта кода во всех проектах.",
+    keywords: "цвет тема подсветка код diff шрифт размер font size appearance",
     component: EditorSettings,
     props: { embedded: true },
   },

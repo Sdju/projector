@@ -9,6 +9,12 @@ import {
 } from "@ai-projector/core/modules/ide/index.ts";
 import { commandHostKey } from "../../common/utilities/commands.ts";
 import { fullscreenAvailable, installApp, toggleFullscreen, usePwa } from "../pwa/index.ts";
+import { appearanceFonts, applyAppearanceFonts, saveAppearanceFonts } from "../appearance/index.ts";
+import { commandArgs } from "../../common/utilities/commands.ts";
+import {
+  clampAppearanceFont,
+  type AppearanceFonts,
+} from "@ai-projector/core/modules/appearance/index.ts";
 import { listenIdeCommands } from "./command-bridge.ts";
 import { createPageReload } from "./reload.ts";
 interface PaletteSession {
@@ -124,6 +130,35 @@ export function provideIdeCommands() {
         commands: paletteCommands(sdk.getCommands(), sdk.getScopes(), sdk.getActiveScope()),
         trigger: document.activeElement instanceof HTMLElement ? document.activeElement : null,
       };
+    },
+  });
+  workbench.registerCommand({
+    id: "ide.appearance.fonts.set",
+    title: "Задать размер шрифта контента",
+    description:
+      "Меняет базовый кегль текста в чате агента, редакторе кода или терминале в оформлении. Это не масштаб интерфейса: передайте одно или несколько полей chat, editor, terminal — целые px от 11 до 20.",
+    arguments: {
+      chat: "number?: размер текста сообщений чата",
+      editor: "number?: размер шрифта редактора кода",
+      terminal: "number?: размер шрифта терминала",
+    },
+    run: async (value) => {
+      const args = commandArgs(value);
+      const patch: Partial<AppearanceFonts> = {};
+      for (const key of ["chat", "editor", "terminal"] as const) {
+        if (args[key] === undefined) continue;
+        patch[key] = clampAppearanceFont(args[key], appearanceFonts.value[key]);
+      }
+      if (!Object.keys(patch).length)
+        throw new Error("Укажите chat, editor или terminal (11–20 px)");
+      const previous = { ...appearanceFonts.value };
+      applyAppearanceFonts({ ...appearanceFonts.value, ...patch });
+      try {
+        return await saveAppearanceFonts(patch);
+      } catch (error) {
+        applyAppearanceFonts(previous);
+        throw error;
+      }
     },
   });
   function globalKeydown(event: KeyboardEvent) {

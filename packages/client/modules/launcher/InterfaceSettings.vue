@@ -17,13 +17,28 @@ import {
 } from "@ai-projector/core/modules/appearance/index.ts";
 import {
   appearanceThemes,
-  applyAppearance,
   currentAppearance,
   setAppearanceThemes,
+  setGlobalAppearanceChoice,
+  setGlobalAppearanceFonts,
+  useAppearanceFontSettings,
 } from "../appearance/index.ts";
 import { useSectionAction } from "../../common/utilities/use-section-action.ts";
 const shortcutId = useId();
 const appearanceId = useId();
+const chatSizeId = useId();
+const terminalSizeId = useId();
+const {
+  draft: fontDraft,
+  ready: fontsReady,
+  busy: fontsBusy,
+  error: fontsError,
+  status: fontsStatus,
+  min: fontMin,
+  max: fontMax,
+  preview: previewFont,
+  commit: commitFont,
+} = useAppearanceFontSettings(["chat", "terminal"]);
 const mode = ref("native");
 const saved = ref("native");
 const shortcut = ref("Ctrl+Alt+Space");
@@ -93,14 +108,15 @@ async function loadAppearance() {
     );
     if (isAppearanceChoice(data.choice)) appearance.value = data.choice;
     savedAppearance.value = appearance.value;
-    applyAppearance(appearance.value);
+    setGlobalAppearanceChoice(appearance.value);
+    if (data.fonts) setGlobalAppearanceFonts(data.fonts);
   }, "Не удалось загрузить схему");
 }
 async function saveAppearance() {
   const next = appearance.value;
   if (next === savedAppearance.value) return;
   const previous = savedAppearance.value;
-  applyAppearance(next);
+  setGlobalAppearanceChoice(next);
   await performAppearance(
     async () => {
       const response = await fetch("/api/appearance", {
@@ -111,13 +127,14 @@ async function saveAppearance() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Не удалось сохранить схему");
       savedAppearance.value = next;
+      if (data.fonts) setGlobalAppearanceFonts(data.fonts);
     },
     {
       errorFallback: "Не удалось сохранить схему",
       success: "Схема сохранена",
       rollback: () => {
         appearance.value = previous;
-        applyAppearance(previous);
+        setGlobalAppearanceChoice(previous);
       },
     },
   );
@@ -223,6 +240,45 @@ async function open() {
       :tone="appearanceError ? 'danger' : undefined"
       >{{ appearanceError || appearanceStatus }}</UiMessage
     >
+    <UiHeading as="h2" size="sm" :space-before="4">Размер текста</UiHeading>
+    <UiHint class="hint">
+      Кегль содержимого чата и терминала, не масштаб всего интерфейса. Применяется сразу и
+      сохраняется.
+    </UiHint>
+    <UiLabel :for="chatSizeId" :space-before="3" :space-after="2"
+      >Чат агента · {{ fontDraft.chat }}px</UiLabel
+    >
+    <UiControl
+      :id="chatSizeId"
+      type="range"
+      :min="fontMin"
+      :max="fontMax"
+      :step="1"
+      :model-value="fontDraft.chat"
+      :disabled="!fontsReady || fontsBusy"
+      @update:model-value="previewFont('chat', Number($event))"
+      @change="commitFont('chat')"
+    />
+    <UiLabel :for="terminalSizeId" :space-before="3" :space-after="2"
+      >Терминал · {{ fontDraft.terminal }}px</UiLabel
+    >
+    <UiControl
+      :id="terminalSizeId"
+      type="range"
+      :min="fontMin"
+      :max="fontMax"
+      :step="1"
+      :model-value="fontDraft.terminal"
+      :disabled="!fontsReady || fontsBusy"
+      @update:model-value="previewFont('terminal', Number($event))"
+      @change="commitFont('terminal')"
+    />
+    <UiMessage
+      v-if="fontsError || fontsStatus"
+      role="status"
+      :tone="fontsError ? 'danger' : undefined"
+      >{{ fontsError || fontsStatus }}</UiMessage
+    >
   </section>
 </template>
 
@@ -237,7 +293,8 @@ async function open() {
   margin-top: var(--sp-4);
   font-size: var(--fs-xs);
 }
-select {
+select,
+input[type="range"] {
   max-width: 320px;
 }
 details {
