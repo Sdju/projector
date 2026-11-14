@@ -21,6 +21,7 @@ import {
   validatePath,
 } from "./paths.ts";
 import { isExcludedPath } from "@ai-projector/core/modules/workspace/index.ts";
+import { recordTrashEntry, trashEntryId } from "./trash.ts";
 
 const archiveHelper = fileURLToPath(new URL("./archive.py", import.meta.url));
 import type { FileContent, ArchiveContent } from "@ai-projector/core/modules/workspace/index.ts";
@@ -311,7 +312,15 @@ export async function trashProjectEntry(root: string, path: string) {
   const trash = resolve(base, ".projector-trash");
   await mkdir(trash, { recursive: true, mode: 0o700 });
   if ((await realpath(trash)) !== trash) throw new HttpError(403, "Некорректная папка корзины");
-  await rename(source, resolve(trash, `${randomUUID()}-${path.split("/").at(-1)}`));
+  const id = trashEntryId(path);
+  const info = await lstat(source);
+  // The record is written first: a rename that fails leaves only an unreferenced file behind.
+  await recordTrashEntry(trash, id, {
+    path,
+    deletedAt: new Date().toISOString(),
+  }).catch(() => undefined);
+  await rename(source, resolve(trash, id));
+  return { id, directory: info.isDirectory() };
 }
 export async function mutateProjectEntry(
   root: string,

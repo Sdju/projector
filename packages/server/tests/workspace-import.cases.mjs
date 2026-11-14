@@ -7,6 +7,7 @@ import {
   checkImportNames,
   clearImportNames,
   importProjectEntries,
+  listProjectTrash,
   uploadProjectEntry,
 } from "../modules/workspace/index.ts";
 
@@ -116,9 +117,10 @@ test("clear moves taken names to the trash so replacing is recoverable", async (
   try {
     await clearImportNames(base, "docs", ["a.txt", "missing.txt"]);
     expect(await readdir(join(base, "docs"))).not.toContain("a.txt");
-    const trash = await readdir(join(base, ".projector-trash"));
-    expect(trash).toHaveLength(1);
-    expect(await readFile(join(base, ".projector-trash", trash[0]), "utf8")).toBe("old");
+    const { entries } = await listProjectTrash(base);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ path: "docs/a.txt", name: "a.txt", directory: false });
+    expect(await readFile(join(base, ".projector-trash", entries[0].id), "utf8")).toBe("old");
   } finally {
     await cleanup();
   }

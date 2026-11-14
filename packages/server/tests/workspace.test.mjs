@@ -222,7 +222,9 @@ test("entry trash moves deletions aside and refuses a symlinked trash directory"
       }
       execFileSync("git", ["-C", base, "init", "-q"]);
       await mutateProjectEntry(base, "delete", "folder");
-      const trashed = await readdir(join(base, ".projector-trash"));
+      const trashed = (await readdir(join(base, ".projector-trash"))).filter(
+        (name) => name !== ".projector-meta",
+      );
       expect(trashed.length).toBe(1);
       expect(
         (await projectGit(base)).changes.every(

@@ -211,6 +211,41 @@ Commit contents are immutable, so the client caches them by hash; the list is re
 the loaded extent. Merge commits are shown against their first parent, and files are limited to the project folder.
 Commit diff tabs are history: staging, discarding or moving files never closes them.
 
+## Корзина проекта
+
+The `trash` section of the right rail exists for writable profiles. Its scope is
+`trash:<projectId>` with `{ surface: 'trash', projectId, count, busy }`. The panel shows a tree of
+`.projector-trash`: top-level entries keep their original base name, folders expand to any depth,
+file sizes are immediate and folder sizes are recursive; the badge is the entry count and the header
+sums the trash size. It is added by `workspaceAside`, starts collapsed with the other right-rail panels
+and is shown with `ide.workbench.aside.section.show` `{ section: 'trash' }` (or
+`ide.workbench.aside.toggle`); the rail itself is hidden on narrow screens.
+
+- `ide.trash.list` returns `{ entries }` with every top-level entry (`id`, `path`, `name`, `directory`,
+  `deletedAt`, `size`) and re-reads the trash.
+- `ide.trash.tree` `{ path }` returns one level inside a trashed folder: `{ path, entries, truncated }`,
+  where each node has `key`, `name`, `directory` and `size` (`null` for folders). `path` is an entry
+  `id` from `ide.trash.list` or a `key` from a previous level.
+- `ide.trash.sizes` `{ path? }` returns recursive sizes for the direct children of a folder:
+  `{ path, sizes: [{ key, size, files, truncated }], truncated }`. Without `path` it measures the
+  top-level entries. `truncated` means the answer is a lower bound: one request is limited to 8 seconds
+  and 500 000 visited entries, complete measurements are cached, and a partial one is retried.
+- `ide.trash.refresh` re-reads the trash and returns the same `{ entries }` list.
+- `ide.trash.restore` `{ ids?, paths?, all? }` moves entries back to their original paths and returns
+  `{ restored: [{ id, path }], entries }`. Missing parent folders are created; a taken name becomes
+  `name (2).ext` instead of being overwritten.
+- `ide.trash.delete` `{ ids?, paths?, all?, confirm? }` erases entries for good. Without `confirm` it opens
+  the confirmation dialog; the SDK passes `confirm: true`.
+- `ide.trash.empty` `{ confirm? }` clears the whole trash; permanent like `delete`.
+
+`ids` or `paths` select entries, `all` selects every entry. Permanent deletion requires confirmation on
+both the UI and the HTTP route. Reads use `GET /api/projects/:id/workspace/trash?path=` (without `path` —
+top-level entries; with `path` — one level) and `GET /api/projects/:id/workspace/trash-sizes?path=`;
+mutations use `POST /api/projects/:id/workspace/trash` with `{ action, ids, confirm }`. Records live in
+`.projector-trash/.projector-meta`; entries without a record (written by older versions) still list and
+restore by their stored base name. Symlinked trash folders, foreign identifiers and metadata that points
+outside the project or into excluded paths are rejected.
+
 ## Project settings commands
 
 The page registers scope `project:settings` with `{ surface: 'project', projectId, name, icon, url, mode, defaultCommandId, dirty }`.

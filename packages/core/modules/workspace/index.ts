@@ -11,6 +11,20 @@ export { LARGE_FILE_BYTES, MAX_TEXT_BYTES, largeFileQuestion } from "./file-size
 export { searchMatches } from "./search.ts";
 export { rankPaths, type ProjectPath } from "./path-search.ts";
 export { parentPath, moveDestination, relocatedPath } from "./paths.ts";
+export {
+  TRASH_DIR,
+  TRASH_META_DIR,
+  trashEntryName,
+  restoredName,
+  type TrashEntry,
+  type TrashList,
+  type TrashNode,
+  type TrashDirectory,
+  type TrashSize,
+  type TrashSizes,
+  type TrashRestore,
+  type TrashMutation,
+} from "./trash.ts";
 export { gitTreeDecorations } from "./git-decorations.ts";
 export type { GitDecoration } from "./git-decorations.ts";
 export {

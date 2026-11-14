@@ -28,6 +28,9 @@ import {
   compareProjectChanges,
   compareProjectFile,
   readProjectImage,
+  listProjectTrash,
+  listProjectTrashDirectory,
+  listProjectTrashSizes,
 } from "../../../../modules/workspace/index.ts";
 
 type Project = NonNullable<Awaited<ReturnType<typeof findProject>>>;
@@ -117,6 +120,19 @@ export const routes: RouteDefinition[] = [
   }),
   view("/api/projects/:id/workspace/info", async ({ res, url }, project) => {
     json(res, 200, await projectEntryInfo(project.path, text(url, "path")));
+  }),
+  view("/api/projects/:id/workspace/trash", async ({ res, url }, project) => {
+    const path = text(url, "path");
+    json(
+      res,
+      200,
+      path
+        ? await listProjectTrashDirectory(project.path, path)
+        : await listProjectTrash(project.path),
+    );
+  }),
+  view("/api/projects/:id/workspace/trash-sizes", async ({ res, url }, project) => {
+    json(res, 200, await listProjectTrashSizes(project.path, text(url, "path")));
   }),
   view("/api/projects/:id/workspace/file", async ({ res, url }, project) => {
     const path = text(url, "path");

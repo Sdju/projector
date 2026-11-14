@@ -20,6 +20,9 @@ import {
   uploadProjectEntry,
   revealProjectEntry,
   watchProject,
+  deleteProjectTrash,
+  emptyProjectTrash,
+  restoreProjectTrash,
 } from "../../../../modules/workspace/index.ts";
 
 type Project = NonNullable<Awaited<ReturnType<typeof findProject>>>;
@@ -236,6 +239,36 @@ export const routes: RouteDefinition[] = [
         throw new HttpError(400, "Укажите действие синхронизации");
       res.setHeader("Cache-Control", "no-store");
       json(res, 200, await mutateProjectSync(project.path, body.action));
+    },
+  ),
+  mutation(
+    "POST",
+    "/api/projects/:id/workspace/trash",
+    "Операции с корзиной доступны только со страницы Projector",
+    async ({ req, res }, project) => {
+      const body = await readBody(req);
+      if (typeof body.action !== "string" || !["restore", "delete", "empty"].includes(body.action))
+        throw new HttpError(400, "Неизвестное действие корзины");
+      const ids = body.ids ?? (typeof body.id === "string" ? [body.id] : []);
+      if (
+        !Array.isArray(ids) ||
+        !ids.every((id) => typeof id === "string" && !!id) ||
+        (body.action !== "empty" && !ids.length)
+      )
+        throw new HttpError(400, "Выберите записи корзины");
+      // Permanent deletion is irreversible, so it never happens without an explicit confirmation.
+      if (body.action !== "restore" && body.confirm !== true)
+        throw new HttpError(400, "Подтвердите удаление из корзины");
+      res.setHeader("Cache-Control", "no-store");
+      json(
+        res,
+        200,
+        body.action === "restore"
+          ? await restoreProjectTrash(project.path, ids as string[])
+          : body.action === "delete"
+            ? await deleteProjectTrash(project.path, ids as string[])
+            : await emptyProjectTrash(project.path),
+      );
     },
   ),
   mutation(

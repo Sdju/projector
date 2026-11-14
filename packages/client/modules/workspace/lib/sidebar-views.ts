@@ -31,6 +31,7 @@ import SearchPanel from "../ui/SearchPanel.vue";
 import FilesSection from "../ui/FilesSection.vue";
 import CompareTreeSection from "../ui/CompareTreeSection.vue";
 import { ScopeTreeSection } from "../modules/tree/index.ts";
+import { TrashPanel, trashCount } from "../modules/trash/index.ts";
 import type { OpenFile, OpenFileOptions } from "../open-file.ts";
 import type { useGitChangeSync } from "./git-change-sync.ts";
 import type { useOpenFiles } from "./open-files.ts";
@@ -46,6 +47,7 @@ import IconMerge from "~icons/lucide/git-merge";
 import IconDiscussions from "~icons/lucide/messages-square";
 import IconPipelines from "~icons/lucide/workflow";
 import IconReleases from "~icons/lucide/tag";
+import IconTrash from "~icons/lucide/trash-2";
 
 /** Sections every workspace has; profiles add their own through `profile.sidebar`. */
 export const baseSidebarTypes: SidebarType[] = [
@@ -211,6 +213,20 @@ export const baseSidebarViews: SidebarViews = {
     }),
     badge: (host) => host.overview.git.value.changes.length,
     activate: (host) => void host.overview.load(),
+    refreshGutter: true,
+    refresh: (_, panel) => panel?.refresh?.(),
+  },
+  // Right-rail section from `workspaceAside`: .projector-trash is not a left-sidebar section.
+  trash: {
+    icon: IconTrash,
+    component: TrashPanel,
+    props: (host, selected) => ({
+      projectId: host.projectId,
+      revision: host.revision,
+      active: selected,
+      onChanged: () => host.changed(),
+    }),
+    badge: (host) => trashCount(host.projectId),
     refreshGutter: true,
     refresh: (_, panel) => panel?.refresh?.(),
   },

@@ -289,6 +289,49 @@ export async function mutateWorkspaceEntry(
   )) as { source?: string; destination?: string };
 }
 
+export function listWorkspaceTrash(projectId: string, signal?: AbortSignal) {
+  return workspaceRequest<import("@ai-projector/core/modules/workspace/index.ts").TrashList>(
+    projectId,
+    "trash",
+    {},
+    signal,
+  );
+}
+
+/** One level of a trashed folder, fetched when the tree row is expanded. */
+export function listWorkspaceTrashDirectory(projectId: string, path: string, signal?: AbortSignal) {
+  return workspaceRequest<import("@ai-projector/core/modules/workspace/index.ts").TrashDirectory>(
+    projectId,
+    "trash",
+    { path },
+    signal,
+  );
+}
+
+/** Recursive sizes of the direct children of a trash folder; `""` means the trash root. */
+export function workspaceTrashSizes(projectId: string, path = "", signal?: AbortSignal) {
+  return workspaceRequest<import("@ai-projector/core/modules/workspace/index.ts").TrashSizes>(
+    projectId,
+    "trash-sizes",
+    { path },
+    signal,
+  );
+}
+
+/** Restores or permanently deletes trash entries; permanent deletion needs `confirm`. */
+export async function mutateWorkspaceTrash(
+  projectId: string,
+  action: "restore" | "delete" | "empty",
+  ids: string[] = [],
+  confirm = false,
+) {
+  return (await fileWriter(projectId)(
+    "trash",
+    { action, ids, confirm },
+    "Не удалось выполнить действие с корзиной",
+  )) as import("@ai-projector/core/modules/workspace/index.ts").TrashMutation;
+}
+
 export async function mutateWorkspaceGit(
   projectId: string,
   action: string,

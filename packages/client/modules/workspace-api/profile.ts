@@ -27,7 +27,7 @@ export type WorkspaceParams = Record<string, string>;
 export interface ReadProvider {
   read(action: string, params: WorkspaceParams, signal?: AbortSignal): Promise<unknown>;
 }
-export type FileWrite = "file" | "move" | "entry" | "import";
+export type FileWrite = "file" | "move" | "entry" | "import" | "trash";
 export interface WorkspaceWatchPatch {
   paths?: string[];
   directories?: string[];
@@ -142,6 +142,8 @@ const READ_DOMAIN: Record<
   tree: "files",
   file: "files",
   info: "files",
+  trash: "files",
+  "trash-sizes": "files",
   external: "files",
   root: "files",
   git: "git",
