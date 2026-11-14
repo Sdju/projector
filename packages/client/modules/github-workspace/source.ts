@@ -5,6 +5,7 @@ import { treePageRange } from "@ai-projector/core/modules/workspace/index.ts";
 import {
   createLocalWorkspaceProfile,
   singletonTab,
+  workspaceAside,
   type WorkspaceProfile,
 } from "../workspace-api/index.ts";
 import { formatProjectRef } from "../project/index.ts";
@@ -348,7 +349,7 @@ export function createGithubWorkspaceProfile(
   return {
     id: "github",
     layout: "editor",
-    aside: [{ id: "inbox", title: "Работы" }],
+    aside: workspaceAside,
     sidebar: [
       { id: "issues", title: "Issues" },
       { id: "pulls", title: "Pull requests" },

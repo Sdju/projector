@@ -1,9 +1,27 @@
-import { isLocalRequest } from "../../modules/access/index.ts";
-import { configureHub, hubStatus, requestHubLoginLink } from "../../modules/hub/index.ts";
+import { accessAllowed, isLocalRequest } from "../../modules/access/index.ts";
+import {
+  configureHub,
+  hubPresence,
+  hubStatus,
+  requestHubLoginLink,
+} from "../../modules/hub/index.ts";
 import { HttpError } from "../../modules/http/index.ts";
 import { json, readBody, type RouteDefinition } from "../../modules/transport/index.ts";
 
 export const routes: RouteDefinition[] = [
+  {
+    // Hub serves the same path to pages outside this machine. Locally the connector answers
+    // from its last snapshot, so a page on this machine can list the other devices too.
+    method: "GET",
+    path: "/api/hub/devices",
+    handler: ({ req, res }) => {
+      if (!accessAllowed(req, true))
+        throw new HttpError(403, "Доступно только со страницы Projector");
+      const { enabled, online, url, deviceId, error } = hubStatus();
+      res.setHeader("Cache-Control", "no-store");
+      json(res, 200, { enabled, online, url, deviceId, error, ...hubPresence() });
+    },
+  },
   {
     method: "GET",
     path: "/api/hub",

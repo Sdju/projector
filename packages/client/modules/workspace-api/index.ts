@@ -35,7 +35,12 @@ export {
   type PipelineStageGroup,
   type PipelineStageTone,
 } from "./pipeline-stages.ts";
-export { createSidebarRegistry, type SidebarRegistry, type SidebarType } from "./sidebar.ts";
+export {
+  createSidebarRegistry,
+  workspaceAside,
+  type SidebarRegistry,
+  type SidebarType,
+} from "./sidebar.ts";
 export { extendSidebarRegistry, groupSidebar } from "./sidebar.ts";
 export {
   ciTabParams,

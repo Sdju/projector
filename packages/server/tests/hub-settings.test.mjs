@@ -3,6 +3,8 @@ import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { bindHub, configureHub, hubStatus, requestHubLoginLink } from "../modules/hub/index.ts";
+import { noteHubActivity, resetHubPresence, setHubDevices } from "../modules/hub/presence.ts";
+import { routes } from "../routes/api/hub.ts";
 import { dataDir } from "../../core/modules/app-paths/index.ts";
 import { createHub } from "../../hub/modules/gateway/index.ts";
 
@@ -15,6 +17,7 @@ vi.mock("../modules/hub/connector.ts", () => ({
 }));
 afterEach(() => {
   configureHub(null);
+  resetHubPresence();
   lifecycle.events.length = 0;
 });
 test("local settings retain a hidden credential only for the same Hub and remove it on disconnect", async () => {
@@ -176,4 +179,57 @@ test("loads legacy single-Hub settings and persists the migrated list on save", 
   } finally {
     stopReloaded();
   }
+});
+
+test("local pages read the connector roster and remote activity", () => {
+  const route = routes.find((item) => item.method === "GET" && item.path === "/api/hub/devices");
+  const response = {
+    statusCode: 0,
+    headers: {},
+    body: "",
+    setHeader(name, value) {
+      this.headers[name] = value;
+    },
+    end(body) {
+      this.body = body;
+    },
+  };
+  const request = (origin = "http://localhost:4177") => ({
+    socket: { remoteAddress: "127.0.0.1" },
+    headers: { host: "localhost:4177", origin },
+    url: "/api/hub/devices",
+  });
+  setHubDevices([
+    { id: "desk", name: "Desk", protocol: 1, online: true },
+    { id: "laptop", name: "Laptop", protocol: 1, online: true },
+  ]);
+  noteHubActivity("laptop", 42);
+  void route.handler({
+    req: request(),
+    res: response,
+    url: new URL("http://localhost/api/hub/devices"),
+    method: "GET",
+    path: "/api/hub/devices",
+    params: {},
+  });
+  expect(response.statusCode).toBe(200);
+  expect(response.headers["Cache-Control"]).toBe("no-store");
+  expect(JSON.parse(response.body)).toMatchObject({
+    devices: [
+      { id: "desk", name: "Desk", protocol: 1, online: true },
+      { id: "laptop", name: "Laptop", protocol: 1, online: true },
+    ],
+    activity: { laptop: 42 },
+  });
+  expect(
+    () =>
+      void route.handler({
+        req: request("https://evil.example"),
+        res: response,
+        url: new URL("http://localhost/api/hub/devices"),
+        method: "GET",
+        path: "/api/hub/devices",
+        params: {},
+      }),
+  ).toThrow("Projector");
 });

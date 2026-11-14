@@ -28,6 +28,12 @@ export interface SidebarRegistry {
   list(): SidebarType[];
 }
 
+/** Standard right rail of a Projector workspace: own/other work and the Hub devices. */
+export const workspaceAside: readonly SidebarType[] = [
+  { id: "inbox", title: "Работы" },
+  { id: "hub", title: "Hub" },
+];
+
 /** Later groups win by id; sections whose capability is off are left out. */
 export function createSidebarRegistry(
   available: (capability: string) => boolean,

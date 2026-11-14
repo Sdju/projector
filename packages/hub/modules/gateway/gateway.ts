@@ -140,9 +140,12 @@ export function createHub(options: HubOptions) {
         return;
       }
       if (url.pathname === "/api/hub/devices") {
-        res
-          .writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" })
-          .end(JSON.stringify({ devices: tunnels.list() }));
+        res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" }).end(
+          JSON.stringify({
+            devices: tunnels.list(),
+            activity: tunnels.activitySnapshot(),
+          }),
+        );
         return;
       }
       if (url.pathname.startsWith("/api/")) {

@@ -25,7 +25,8 @@ import {
 import { PipelinesPanel } from "../modules/pipelines/index.ts";
 import { ReleasesPanel } from "../modules/releases/index.ts";
 import { DockerSidebar } from "../../docker/index.ts";
-import { AgentInbox, inboxBadge } from "../../agent/index.ts";
+import { AgentInbox, inboxBadge, inboxRemoteAttention } from "../../agent/index.ts";
+import HubPanel from "../ui/HubPanel.vue";
 import SearchPanel from "../ui/SearchPanel.vue";
 import FilesSection from "../ui/FilesSection.vue";
 import CompareTreeSection from "../ui/CompareTreeSection.vue";
@@ -38,6 +39,7 @@ import IconSearch from "~icons/lucide/search";
 import IconGit from "~icons/devicon/git";
 import IconDocker from "~icons/lucide/container";
 import IconBell from "~icons/lucide/bell";
+import IconHub from "~icons/lucide/network";
 import IconIssues from "~icons/lucide/circle-dot";
 import IconPulls from "~icons/lucide/git-pull-request";
 import IconMerge from "~icons/lucide/git-merge";
@@ -127,6 +129,14 @@ export const baseSidebarViews: SidebarViews = {
     component: AgentInbox,
     props: () => ({}),
     badge: () => inboxBadge(),
+    refreshGutter: true,
+    refresh: (_, panel) => panel?.refresh?.(),
+  },
+  hub: {
+    icon: IconHub,
+    component: HubPanel,
+    props: () => ({}),
+    badge: () => inboxRemoteAttention(),
     refreshGutter: true,
     refresh: (_, panel) => panel?.refresh?.(),
   },

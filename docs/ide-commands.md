@@ -310,10 +310,19 @@ All chat commands are registered once per workspace (`registerAgentCommands` in 
 - `ide.hub.logout` — отозвать сессию браузера, включая открытые потоки и WebSocket.
 - `ide.hub.devices.refresh` — перечитать устройства и их доступность.
 - `ide.hub.device.open` с `deviceId` — открыть подключённую машину.
+- `ide.hub.device.notify` с `deviceId` и `enabled` — включить или выключить браузерные
+  уведомления от другой машины; собственное устройство не отключается.
+- `ide.hub.notifications.allow` — запросить у браузера разрешение на уведомления Hub.
 - `ide.hub.devices.open` — вернуться из устройства к списку Hub.
 - `ide.hub.connection.save` — сохранить поля локальной формы подключения и обновить туннель.
 - `ide.hub.connection.disconnect` — отключить туннель и удалить credentials.
-- `ide.hub.open` — открыть настроенный Hub в новой вкладке.
+- `ide.hub.open` — открыть настроенный Hub в новой вкладке; на странице Hub — к списку
+  устройств.
+
+Раздел **Hub** правой полосы workspace регистрирует `ide.hub.devices.refresh`,
+`ide.hub.device.open`, `ide.hub.device.notify`, `ide.hub.notifications.allow` и `ide.hub.open`
+в собственной области страницы, чтобы те же действия были доступны агенту без открытия
+настроек.
 
 Публичная оболочка Hub использует отдельный реестр команд без запуска runner устройства.
 Подключение меняется только на самой машине, из **Настройки → Hub**; через туннель

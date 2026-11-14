@@ -8,6 +8,12 @@ import {
 } from "@ai-projector/core/modules/hub/index.ts";
 import { markHubSocket } from "../access/index.ts";
 import { broadcastEvent } from "../events/index.ts";
+import {
+  markHubDevicesOffline,
+  noteHubActivity,
+  resetHubPresence,
+  setHubDevices,
+} from "./presence.ts";
 
 const MAX_DEVICES = 128;
 
@@ -125,13 +131,17 @@ export function connectHub(
         if (message.type === "hub-event") {
           if (message.event === "devices") {
             const devices = hubDevices(message.devices);
-            if (devices) broadcastEvent("hub-devices", { devices });
+            if (devices) {
+              setHubDevices(devices);
+              broadcastEvent("hub-devices", { devices });
+            }
           } else if (
             message.event === "activity" &&
             typeof message.deviceId === "string" &&
             typeof message.at === "number" &&
             Number.isFinite(message.at)
           ) {
+            noteHubActivity(message.deviceId, message.at);
             broadcastEvent("hub-activity", { deviceId: message.deviceId, at: message.at });
           }
           return;
@@ -160,6 +170,8 @@ export function connectHub(
     ws.once("close", () => {
       clearTimeout(heartbeat);
       if (host.projectorHubPublisher === publish) host.projectorHubPublisher = undefined;
+      if (disposed) resetHubPresence();
+      else markHubDevicesOffline();
       status(
         false,
         disposed ? undefined : (failure ?? "Соединение с Hub потеряно, повторяем подключение"),

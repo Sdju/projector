@@ -8,7 +8,8 @@ import { hubReturnPath } from "../../core/modules/hub/index.ts";
 import { HubAccess } from "../modules/access/index.ts";
 import { createHub } from "../modules/gateway/index.ts";
 import { connectHub } from "../../server/modules/hub/connector.ts";
-import { publishHubActivity } from "../../server/modules/hub/index.ts";
+import { hubPresence, publishHubActivity } from "../../server/modules/hub/index.ts";
+import { resetHubPresence } from "../../server/modules/hub/presence.ts";
 import { attachSse } from "../../server/modules/events/index.ts";
 import { accessAllowed, isLocalRequest } from "../../server/modules/access/index.ts";
 import { deviceUrl, deviceBase } from "../../client/common/utilities/device-url.ts";
@@ -27,6 +28,7 @@ afterEach(async () => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   for (const close of cleanups.splice(0).reverse()) await close();
+  resetHubPresence();
 });
 function cookies(response) {
   const list =
@@ -255,7 +257,7 @@ describe("Hub reverse connection", () => {
     ).toBe(503);
   });
   test("pushes the device list and activity over the control channel", async () => {
-    const { origin } = await setup({ connector: false });
+    const { origin, cookie } = await setup({ connector: false });
     const connect = async (device) => {
       const ws = new WebSocket(
         `${origin.replace("http", "ws")}/api/hub/connect?device=${device}&protocol=1`,
@@ -281,6 +283,10 @@ describe("Hub reverse connection", () => {
       desk.messages.find((message) => message.event === "activity"),
     );
     expect(activity).toMatchObject({ deviceId: "laptop", at: 42 });
+    const presence = await fetch(`${origin}/api/hub/devices`, {
+      headers: { Cookie: cookie },
+    }).then((response) => response.json());
+    expect(presence.activity).toMatchObject({ laptop: 42 });
     // The sender already knows its own jobs: no echo.
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(laptop.messages.some((message) => message.event === "activity")).toBe(false);
@@ -293,6 +299,28 @@ describe("Hub reverse connection", () => {
           message.event === "devices" &&
           message.devices.some((device) => device.id === "laptop" && !device.online),
       ),
+    );
+  });
+  test("the connector keeps a local roster and remote activity for its pages", async () => {
+    resetHubPresence();
+    const { origin } = await setup();
+    const laptop = new WebSocket(
+      `${origin.replace("http", "ws")}/api/hub/connect?device=laptop&protocol=1`,
+      { headers: { Authorization: "Bearer device-secret" } },
+    );
+    laptop.on("error", () => {});
+    cleanups.push(() => laptop.terminate());
+    await once(laptop, "open");
+    await until(() =>
+      hubPresence().devices.some((device) => device.id === "laptop" && device.online),
+    );
+    laptop.send(JSON.stringify({ type: "activity", at: 42 }));
+    await until(() => hubPresence().activity.laptop === 42);
+    const closed = once(laptop, "close");
+    laptop.close();
+    await closed;
+    await until(() =>
+      hubPresence().devices.some((device) => device.id === "laptop" && !device.online),
     );
   });
   test("a device passes Hub events to its pages over SSE", async () => {
@@ -550,7 +578,7 @@ test("refresh cookie restores a session after Hub restart without the password",
     await fetch(`${origin}/api/hub/devices`, { headers: { Cookie: rotated } }).then((r) =>
       r.json(),
     ),
-  ).toEqual({ devices: [] });
+  ).toMatchObject({ devices: [] });
   const dir = await dataDir();
   const first = new HubAccess("http://localhost:4180", "secret", dir);
   const login = mockRes();

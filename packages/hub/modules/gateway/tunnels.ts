@@ -19,8 +19,13 @@ const hash = (value: string) => createHash("sha256").update(value).digest();
 export class Tunnels {
   readonly devices = new Map<string, Device>();
   private known = new Map<string, HubDevice>();
+  private lastActivity = new Map<string, number>();
   list(): HubDevice[] {
     return [...this.known.values()];
+  }
+  /** Last activity signal each device sent; pages show it without reading every device. */
+  activitySnapshot(): Record<string, number> {
+    return Object.fromEntries(this.lastActivity);
   }
   private pending = new Map<string, Pending>();
   private sockets = new WebSocketServer({
@@ -161,6 +166,7 @@ export class Tunnels {
     if (!message || typeof message !== "object") return;
     const { type, at } = message as { type?: unknown; at?: unknown };
     if (type !== "activity" || typeof at !== "number" || !Number.isFinite(at)) return;
+    this.lastActivity.set(device.info.id, at);
     this.broadcast(
       { type: "hub-event", event: "activity", deviceId: device.info.id, at },
       device.info.id,

@@ -72,3 +72,53 @@ test("a Hub activity signal reads only that device, and the device list removes 
   expect(inbox.sources.value.map((source) => source.id)).toEqual(["desk"]);
   scope.stop();
 });
+
+test("a local page lists Hub devices but keeps reading only its own work", async () => {
+  const page = new EventTarget();
+  const document = Object.assign(new EventTarget(), { visibilityState: "visible" });
+  vi.stubGlobal("window", page);
+  vi.stubGlobal("document", document);
+  vi.stubGlobal("location", new URL("http://localhost:4177/settings"));
+  const urls = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url) => {
+      const path = String(url);
+      urls.push(path);
+      const body = (() => {
+        if (path.endsWith("/api/hub/devices"))
+          return {
+            enabled: true,
+            online: true,
+            url: "https://hub.example",
+            deviceId: "desk",
+            devices: devices(true),
+            activity: { laptop: 42 },
+          };
+        if (path.endsWith("/api/projects")) return { projects: [] };
+        if (path.includes("/agent/runs")) return { runs: [], recent: [] };
+        return { jobs: [] };
+      })();
+      return { ok: true, json: async () => body };
+    }),
+  );
+
+  const scope = effectScope();
+  const inbox = scope.run(() => useAgentInbox());
+  await vi.waitFor(() => expect(inbox.loading.value).toBe(false));
+  await inbox.refresh();
+  expect(inbox.sources.value.map((source) => source.id)).toEqual([""]);
+  expect(inbox.hub.value).toMatchObject({
+    url: "https://hub.example",
+    deviceId: "desk",
+    activity: { laptop: 42 },
+  });
+  expect(inbox.hub.value.devices.map((device) => device.id)).toEqual(["desk", "laptop"]);
+  page.dispatchEvent(
+    new CustomEvent("projector:hub-activity", { detail: { deviceId: "laptop", at: 43 } }),
+  );
+  await vi.waitFor(() => expect(inbox.hub.value.activity.laptop).toBe(43));
+  // The local server has no proxy to other machines: no remote request is made.
+  expect(urls.some((url) => url.includes("/devices/laptop/agent/jobs"))).toBe(false);
+  scope.stop();
+});
