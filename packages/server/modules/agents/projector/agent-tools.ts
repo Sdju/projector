@@ -17,8 +17,6 @@ import { readMemory, writeMemory } from "./projector-memory.ts";
 import { fetchPage, PAGE_CHARS } from "./projector-web.ts";
 import { findSkill, listSkills, type Skill } from "./projector-skills.ts";
 import { webSearch } from "./projector-web-search.ts";
-import { widgetCatalog } from "./widgets.ts";
-import { trustedProjectWidgets } from "../../project-widgets/index.ts";
 import { showSecretOnPage } from "./secrets/secret-show.ts";
 
 /** Milliseconds a bash call may run in a Docker environment; `PROJECTOR_AGENT_BASH_SECONDS`, 0 is no limit. */
@@ -26,7 +24,6 @@ const BASH_TIMEOUT = (Number(process.env.PROJECTOR_AGENT_BASH_SECONDS) || 0) * 1
 
 export interface AgentToolContext extends ToolSpecContext {
   cwd?: string;
-  /** The project whose trusted widgets `describe_widget` may describe. */
   projectId?: string;
   signal?: AbortSignal;
   guard: GuardOptions;
@@ -122,14 +119,6 @@ export function createAgentTools(context: AgentToolContext) {
         await guardMemory(context.guard, { scope, mode, text });
         return { text: await writeMemory(scope, context.cwd, text, mode) };
       },
-    }),
-    describe_widget: tool({
-      description:
-        "Полное описание виджета: свойства, ограничения и пример. Для специальных виджетов и виджетов проекта обязательно вызывай перед первым использованием; для обычных описание уже есть в промпте.",
-      inputSchema: z.object({ name: z.string().describe("Имя виджета") }),
-      execute: async ({ name }) => ({
-        description: widgetCatalog.describe(name, await trustedProjectWidgets(context.projectId)),
-      }),
     }),
     ...(context.runTask
       ? {

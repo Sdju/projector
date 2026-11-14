@@ -286,7 +286,7 @@ test("special widgets stay in the guide as a name and use case, with details on 
   );
   const guide = catalog.guide();
   expect(guide).toContain("Trace — редкая трассировка");
-  expect(guide).toContain("describe_widget");
+  expect(guide).toContain("ide.chat.widgets.describe");
   expect(guide).not.toContain("<Trace");
   expect(guide).not.toContain("id: string; обязательное");
   expect(guide).toContain("Stat — показатель");
@@ -295,6 +295,88 @@ test("special widgets stay in the guide as a name and use case, with details on 
   expect(catalog.describeSpecial("Trace")).toContain('<Trace id="abc" />');
   expect(() => catalog.describeSpecial("Stat")).toThrow("не специальный");
   expect(() => catalog.describeSpecial("Nope")).toThrow("Нет компонента");
+});
+
+test("widget catalog commands use the common agent command channel", async () => {
+  const { createCommandService, agentCommandHandler } =
+    await import("../../core/modules/ide/index.ts");
+  const { registerBuiltinWidgets } = await import("../app/widgets.ts");
+  const { registerWidgetCommands } = await import("../modules/widget-runtime/index.ts");
+  registerBuiltinWidgets();
+  const sdk = createCommandService();
+  const scope = sdk.createScope("workbench", () => ({ surface: "workbench" }));
+  registerWidgetCommands(scope);
+  const commands = agentCommandHandler(sdk, "p1");
+
+  const found = await commands({ operation: "list", query: "ide.chat.widgets" });
+  expect(found.commands.map((command) => command.id)).toEqual([
+    "ide.chat.widgets.list",
+    "ide.chat.widgets.describe",
+  ]);
+  const listed = await commands({
+    operation: "execute",
+    scope: "workbench",
+    command: "ide.chat.widgets.list",
+  });
+  expect(listed.widgets.map((widget) => widget.name)).toContain("Card");
+  const described = await commands({
+    operation: "execute",
+    scope: "workbench",
+    command: "ide.chat.widgets.describe",
+    args: { name: "GitInfo" },
+  });
+  expect(described.description).toContain("branch: string");
+  expect(described.description).toContain("<GitInfo");
+});
+
+test("project widget descriptions use a persistent project command scope", async () => {
+  const { createCommandService, agentCommandHandler } =
+    await import("../../core/modules/ide/index.ts");
+  const { registerProjectWidgetCommands } = await import("../modules/project-widgets/index.ts");
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    Response.json({
+      projectId: "p1",
+      path: "/p1",
+      file: "/p1/.projector/widgets.json",
+      exists: true,
+      trusted: true,
+      widgets: [
+        {
+          name: "ProjectTrace",
+          group: "project",
+          summary: "трассировка проекта",
+          template: "<div />",
+          script: "return {};",
+          styles: ".row { gap: 4px }",
+          example: "<ProjectTrace />",
+        },
+      ],
+    });
+  try {
+    const sdk = createCommandService();
+    const scope = sdk.createScope("editor:p1", () => ({
+      surface: "editor",
+      projectId: "p1",
+    }));
+    registerProjectWidgetCommands(scope, () => "p1");
+    const commands = agentCommandHandler(sdk, "p1");
+    const result = await commands({
+      operation: "execute",
+      scope: "editor:p1",
+      command: "ide.project.widgets.list",
+    });
+    expect(result.widgets).toEqual([
+      {
+        name: "ProjectTrace",
+        group: "project",
+        summary: "трассировка проекта",
+        example: "<ProjectTrace />",
+      },
+    ]);
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
 });
 
 test("the permanent guide spends its space on Field, not on old field aliases", async () => {

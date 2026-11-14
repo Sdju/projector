@@ -47,6 +47,7 @@ import {
 import { useWorkspaceRefresh } from "../lib/workspace-refresh.ts";
 import { useMobileSurfaces, registerMobileCommands } from "../lib/mobile-surfaces.ts";
 import { useSurfaceSwipe } from "../lib/surface-swipe.ts";
+import { registerProjectWidgetCommands } from "../../project-widgets/index.ts";
 const props = defineProps<{
   projectId: string;
   projectSettingsDirty?: boolean;
@@ -101,6 +102,7 @@ const registerEditor = (
   });
 // The agent chats are tabs that come and go; their commands live as long as this workspace.
 registerAgentCommands(registerEditor, props.projectId);
+registerProjectWidgetCommands(editorCommands.scope, () => props.projectId);
 function treeChanged() {
   revision.value++;
   void loadGit();

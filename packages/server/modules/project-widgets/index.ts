@@ -177,7 +177,7 @@ export async function setProjectWidgetTrust(
   return task;
 }
 
-/** Only the trusted definitions of a project reach the prompt, the client and describe_widget. */
+/** Only the trusted definitions of a project reach the prompt and the client. */
 export async function trustedProjectWidgets(
   projectId: string | undefined,
 ): Promise<ProjectWidgetDefinition[]> {

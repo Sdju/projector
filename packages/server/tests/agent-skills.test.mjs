@@ -76,6 +76,7 @@ describe("agent skills and commands", () => {
       "docker",
       "github-ci",
       "network-gateway",
+      "widgets",
     ]);
     expect(builtin.find((item) => item.name === "add-projects")?.body).toContain("find_projects");
     expect(builtin.find((item) => item.name === "agent-jobs")?.body).toContain(
@@ -136,6 +137,7 @@ describe("agent skills and commands", () => {
       "docker",
       "github-ci",
       "network-gateway",
+      "widgets",
     ]);
   });
 });

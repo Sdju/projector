@@ -131,10 +131,9 @@ export async function runClaudeCode(deps: ClaudeDeps, options: AgentRunOptions):
   ]);
   const projectWidgets = widgetsEnabled ? await api.widgets.trustedProject(options.projectId) : [];
   const ideServer = options.projectId ? api.mcp.ide(options.projectId) : undefined;
-  const widgetsServer = api.mcp.widgets(options.projectId);
   // The SDK takes an explicit server inline; `alwaysLoad` keeps its tools out of tool search.
-  const extraMcp = {
-    ...(ideEnabled && ideServer
+  const extraMcp =
+    ideEnabled && ideServer
       ? {
           [ideServer.name]: {
             type: "stdio" as const,
@@ -144,19 +143,7 @@ export async function runClaudeCode(deps: ClaudeDeps, options: AgentRunOptions):
             alwaysLoad: true,
           },
         }
-      : {}),
-    ...(widgetsEnabled
-      ? {
-          [widgetsServer.name]: {
-            type: "stdio" as const,
-            command: widgetsServer.command,
-            args: widgetsServer.args,
-            env: widgetsServer.env,
-            alwaysLoad: true,
-          },
-        }
-      : {}),
-  };
+      : {};
   // A role with its own MCP list gets exactly those servers: Claude Code must not add the rest.
   const namedMcp = options.role?.mcp
     ? Object.fromEntries(
@@ -183,7 +170,6 @@ export async function runClaudeCode(deps: ClaudeDeps, options: AgentRunOptions):
       roleText,
       projectWidgets.length ? api.widgets.guide(projectWidgets) : "",
     ),
-    ...(widgetsEnabled ? { allowedTools: [`mcp__${widgetsServer.name}__describe_widget`] } : {}),
     permissionMode: mode,
     // Files are backed up before the agent changes them, so a step can be taken back later.
     enableFileCheckpointing: true,

@@ -2,7 +2,6 @@ import { acpProgram, type AcpProgram, registerAcpProgram } from "./acp-programs.
 import { attachedImages, promptWithHistory } from "../../agent/index.ts";
 import { featureEnabled, featurePrompt } from "../../agent-features/index.ts";
 import { acpIdeMcpServer } from "../ide-mcp/index.ts";
-import { acpWidgetsMcpServer } from "../widgets-mcp/index.ts";
 import { roleContext } from "../../agent-roles/index.ts";
 import { trustedProjectWidgets } from "../../project-widgets/index.ts";
 import { renderWidgetGuide } from "@ai-projector/core/modules/widget-catalog/index.ts";
@@ -162,7 +161,6 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
       .join("\n\n");
     const extraMcp = [
       ...(options.projectId && ideEnabled ? [acpIdeMcpServer(options.projectId)] : []),
-      ...(widgetsEnabled ? [acpWidgetsMcpServer(options.projectId)] : []),
       ...(options.role?.mcp
         ? await userMcpServers(
             options.cwd,

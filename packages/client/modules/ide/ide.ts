@@ -17,6 +17,7 @@ import {
 } from "@ai-projector/core/modules/appearance/index.ts";
 import { listenIdeCommands } from "./command-bridge.ts";
 import { createPageReload } from "./reload.ts";
+import { registerWidgetCommands } from "../widget-runtime/index.ts";
 interface PaletteSession {
   commands: PaletteCommand[];
   trigger: HTMLElement | null;
@@ -51,6 +52,7 @@ export function provideIdeCommands() {
     error.value = value instanceof Error ? value.message : "Не удалось выполнить команду";
   };
   const workbench = sdk.createScope("workbench", () => ({ surface: "workbench" }));
+  registerWidgetCommands(workbench);
   const { canInstall } = usePwa();
   const pageReload = createPageReload(reportError, () => revision.value++);
   workbench.registerCommand({

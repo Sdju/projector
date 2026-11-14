@@ -5,7 +5,6 @@ export const toolLabels: Record<string, string> = {
   list_commands: "Поиск команд",
   describe_command: "Описание команды",
   execute_command: "Вызов команды",
-  describe_widget: "Описание виджета",
   use_skill: "Загрузка навыка",
   Skill: "Загрузка навыка",
   skill: "Загрузка навыка",

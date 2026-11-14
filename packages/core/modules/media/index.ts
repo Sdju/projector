@@ -108,7 +108,7 @@ export interface MediaArtifactView extends MediaArtifact {
 /** Задача в ответе агента: к артефактам добавлена ссылка и готовый тег виджета. */
 export interface MediaJobView extends Omit<MediaJob, "artifacts"> {
   artifacts: MediaArtifactView[];
-  /** `<Media jobId="…" />` для завершённой задачи; описание виджета — через `describe_widget`. */
+  /** `<Media jobId="…" />`; описание — через `ide.chat.widgets.describe`. */
   widget?: string;
 }
 

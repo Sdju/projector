@@ -73,12 +73,13 @@ export function groupSections(definitions: readonly WidgetDefinition[]): string[
 export function specialSection(
   definitions: readonly WidgetDefinition[],
   title = "Специальные виджеты",
+  command = "ide.chat.widgets.describe",
 ): string {
   const special = definitions.filter((definition) => definition.special && !definition.hidden);
   return special.length
     ? [
         `${title}:`,
-        "Их свойства и примеры не загружены. Когда специальный виджет уместен, сначала вызови describe_widget с его именем; не угадывай свойства.",
+        `Их свойства и примеры не загружены. Когда специальный виджет уместен, сначала получи его описание через ${command} и общий execute_command; не угадывай свойства. Если команды IDE недоступны, не используй специальный виджет.`,
         ...special.map((definition) => `${definition.name} — ${definition.summary}`),
       ].join("\n")
     : "";
@@ -89,7 +90,10 @@ export function renderWidgetGuide(
   definitions: readonly WidgetDefinition[],
   specialTitle = "Специальные виджеты проекта",
 ): string {
-  return [...groupSections(definitions), specialSection(definitions, specialTitle)]
+  return [
+    ...groupSections(definitions),
+    specialSection(definitions, specialTitle, "ide.project.widgets.list"),
+  ]
     .filter(Boolean)
     .join("\n");
 }

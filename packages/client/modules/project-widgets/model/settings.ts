@@ -58,30 +58,6 @@ export function useProjectWidgetSettings(projectId: () => string) {
   }
 
   commands.scope.registerCommand({
-    id: "ide.project.widgets.list",
-    palette: false,
-    title: "Виджеты проекта",
-    description:
-      "Возвращает виджеты из .projector/widgets.json, путь к файлу, признак доверия и ошибку чтения. Недоверенный файл не попадает ни в промпт, ни в ответы.",
-    run: async () => {
-      await load();
-      const state = data.value ?? {
-        projectId: projectId(),
-        path: "",
-        file: "",
-        exists: false,
-        trusted: false,
-        widgets: [],
-      };
-      return {
-        ...state,
-        widgets: state.widgets.map(
-          ({ template: _template, script: _script, styles: _styles, ...widget }) => widget,
-        ),
-      };
-    },
-  });
-  commands.scope.registerCommand({
     id: "ide.project.widgets.trust",
     palette: false,
     title: "Доверять виджетам проекта",

@@ -12,6 +12,7 @@ export {
   projectWidgetsVersion,
   type WidgetEntry,
 } from "./registry.ts";
+export { registerWidgetCommands } from "./commands.ts";
 export { ensureProjectWidgets, refreshProjectWidgets } from "./project.ts";
 export {
   readProjectWidgets,

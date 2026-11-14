@@ -24,7 +24,6 @@ import { trustedProjectWidgets } from "../../project-widgets/index.ts";
 import { renderWidgetGuide } from "@ai-projector/core/modules/widget-catalog/index.ts";
 import { clearSessionEnv } from "@ai-projector/core/modules/os/index.ts";
 import { ideMcpServer } from "../ide-mcp/index.ts";
-import { widgetsMcpServer } from "../widgets-mcp/index.ts";
 import {
   registerBalanceResolver,
   type ProviderBalanceContext,
@@ -102,13 +101,6 @@ export interface PluginMcpApi {
   byNames(configs: readonly McpServerConfig[], names?: readonly string[]): McpServerConfig[];
   /** The stdio server of the IDE command registry. */
   ide(projectId: string): {
-    name: string;
-    command: string;
-    args: string[];
-    env: Record<string, string>;
-  };
-  /** The stdio server of the on-demand widget descriptions. */
-  widgets(projectId?: string): {
     name: string;
     command: string;
     args: string[];
@@ -285,7 +277,6 @@ export async function loadCodeAgents(
       configs: (cwd) => mcpServerConfigs(cwd),
       byNames: (configs, names) => mcpConfigsForNames(configs, names),
       ide: ideMcpServer,
-      widgets: widgetsMcpServer,
     },
     providers: { registerBalance },
   };
