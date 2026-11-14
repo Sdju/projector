@@ -20,6 +20,11 @@ import { registerBuiltinWidgetDefinitions } from "./widgets.ts";
 import { registerBuiltinAgentFeatures } from "./features.ts";
 import { ensureIdeMcpToken, bindIdeCommandEvents } from "../modules/ide/index.ts";
 import { reconcileOnStartup } from "../modules/environments/index.ts";
+import {
+  discoverPlugins,
+  pluginsDirectory,
+  watchPluginDirectory,
+} from "../modules/plugins/index.ts";
 
 import {
   attachSharedTerminalServer,
@@ -65,7 +70,12 @@ export function bindRuntime(
     console.error("Ключ IDE MCP:", error instanceof Error ? error.message : error),
   );
   runtime.projectorRuntimeMode = mode;
-  const subscriptions = [bindAgentEventStreams(), bindIdeCommandEvents(), bindWorkspaceEvents()];
+  const subscriptions = [
+    bindAgentEventStreams(),
+    bindIdeCommandEvents(),
+    bindWorkspaceEvents(),
+    watchPluginDirectory(pluginsDirectory, discoverPlugins),
+  ];
   const deactivate = () => subscriptions.forEach((off) => off());
   if (!httpServer) return deactivate;
   const allowed: typeof accessAllowed = (...args) => handlers().accessAllowed(...args);

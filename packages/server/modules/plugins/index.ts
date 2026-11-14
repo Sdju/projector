@@ -9,11 +9,13 @@ import {
 import { ensurePluginDependencies } from "./deps.ts";
 import { copyPackage, destinationFor } from "./install.ts";
 import { loadPluginPackage, readJson } from "./load.ts";
+import { syncPluginTrustNotices, type RevokedPlugin } from "../trust-notices/index.ts";
 import { deleteState, readState, updateState } from "./state.ts";
 import { hashPackage, isTrusted } from "./trust.ts";
 import type { PluginApply, PluginCatalog, PluginCodeDiagnostic, PluginInfo } from "./types.ts";
 
 export { readPluginIcon } from "./icon.ts";
+export { watchPluginDirectory } from "./watch.ts";
 export { openPluginAsset, type PluginAsset } from "./assets.ts";
 export type {
   PluginApply,
@@ -129,6 +131,7 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
   }
   const plugins: PluginInfo[] = [...malformed];
   const availableThemes: AvailableTheme[] = [];
+  const revoked: RevokedPlugin[] = [];
   for (const [id, versions] of grouped) {
     const saved = state[id];
     const selected = saved?.version
@@ -176,6 +179,13 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
           message: saved?.trustedHash
             ? "Содержимое плагина изменилось; подтвердите доверие заново"
             : "Плагину требуется подтверждение доверия",
+        });
+      if (enabled && saved?.trustedHash && !trusted)
+        revoked.push({
+          plugin: id,
+          name: agents[0]?.title ?? balances[0]?.title ?? id,
+          agents: agents.length > 0,
+          hash: currentHash,
         });
       plugins.push({
         id,
@@ -244,6 +254,7 @@ export async function discoverPlugins(): Promise<PluginCatalog> {
         tabs: [],
       });
   }
+  await syncPluginTrustNotices(revoked);
   await applyPluginCatalog(plugins, availableThemes);
   plugins.sort((left, right) => left.id.localeCompare(right.id));
   availableThemes.sort((left, right) => left.id.localeCompare(right.id));

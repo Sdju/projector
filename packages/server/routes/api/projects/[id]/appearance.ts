@@ -4,6 +4,7 @@ import {
   writeProjectAppearance,
 } from "../../../../modules/project-appearance/index.ts";
 import { accessAllowed } from "../../../../modules/access/index.ts";
+import { auditProjectTrust } from "../../../../modules/project-trust/index.ts";
 import { HttpError } from "../../../../modules/http/index.ts";
 import {
   json,
@@ -40,7 +41,9 @@ export const routes: RouteDefinition[] = [
       res.setHeader("Cache-Control", "no-store");
       const body = await readBody(req);
       try {
-        json(res, 200, await writeProjectAppearance(params.id, body));
+        const state = await writeProjectAppearance(params.id, body);
+        void auditProjectTrust(params.id);
+        json(res, 200, state);
       } catch (error) {
         if (error instanceof HttpError) throw error;
         throw new HttpError(400, error instanceof Error ? error.message : "Не удалось сохранить");
@@ -57,7 +60,9 @@ export const routes: RouteDefinition[] = [
       if (typeof body.trusted !== "boolean")
         throw new HttpError(400, "trusted должен быть boolean");
       try {
-        json(res, 200, await setProjectAppearanceTrust(params.id, body.trusted));
+        const state = await setProjectAppearanceTrust(params.id, body.trusted);
+        void auditProjectTrust(params.id);
+        json(res, 200, state);
       } catch (error) {
         if (error instanceof HttpError) throw error;
         throw new HttpError(400, error instanceof Error ? error.message : "Неверное доверие");

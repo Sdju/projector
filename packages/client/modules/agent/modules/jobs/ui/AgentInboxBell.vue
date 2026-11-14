@@ -11,7 +11,7 @@ import IconBell from "~icons/lucide/bell";
 /** The one counter of work that waits for the user on every project and connected device. */
 const props = withDefaults(defineProps<{ scopeId?: string }>(), { scopeId: "inbox" });
 const emit = defineEmits<{ open: [] }>();
-const { attention, unread, badgeCount, working } = useAgentInbox();
+const { attention, unread, badgeCount, working, noticeUnread } = useAgentInbox();
 const compact = useCompactViewport();
 const dialog = ref<InstanceType<typeof UiDialog>>();
 const open = ref(false);
@@ -41,7 +41,9 @@ function close() {
 }
 const summary = () => {
   const parts: string[] = [];
-  if (attention.value) parts.push(`${attention.value} ждут вашего ответа`);
+  const waiting = Math.max(0, attention.value - noticeUnread.value);
+  if (waiting) parts.push(`${waiting} ждут вашего ответа`);
+  if (noticeUnread.value) parts.push(`${noticeUnread.value} по доверию`);
   if (unread.value) parts.push(`${unread.value} завершили работу`);
   if (working.value) parts.push(`${working.value} работают`);
   return parts.length

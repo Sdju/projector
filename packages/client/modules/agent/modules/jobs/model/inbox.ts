@@ -31,6 +31,7 @@ import {
   markOldFinishedAsRead,
 } from "./inbox-read.ts";
 import { feedJobs, feedRecentRuns, feedRuns, onJobsFeedUpdate, useJobsFeed } from "./jobs-feed.ts";
+import { trustNoticeUnread, useTrustNotices } from "./trust-notices.ts";
 
 export * from "./inbox-view.ts";
 export {
@@ -287,7 +288,8 @@ function start() {
 export const markAllInboxRead = (): void => markAllInboxItemsRead(items.value);
 
 /** The header and the rail icon ask for the same number without starting a second poll. */
-export const inboxAttention = () => items.value.filter(isItemAttention).length;
+export const inboxAttention = () =>
+  items.value.filter(isItemAttention).length + trustNoticeUnread();
 export const inboxUnread = () => items.value.filter(isItemUnread).length;
 export const inboxBadge = () => inboxAttention() + inboxUnread();
 
@@ -296,6 +298,7 @@ let stopPolling: (() => void) | undefined;
 /** The one inbox of the page: the panel and the header bell share its polling and state. */
 export function useAgentInbox() {
   useJobsFeed();
+  const trust = useTrustNotices();
   if (!subscribers) stopPolling = start();
   subscribers++;
   if (getCurrentScope())
@@ -308,7 +311,7 @@ export function useAgentInbox() {
       }
     });
   const groups = computed(() => inboxGroups(items.value));
-  const attention = computed(() => items.value.filter(isItemAttention).length);
+  const attention = computed(() => items.value.filter(isItemAttention).length + trust.unread.value);
   const unread = computed(() => items.value.filter(isItemUnread).length);
   const badgeCount = computed(() => attention.value + unread.value);
   const working = computed(() => items.value.filter((item) => item.category === "working").length);
@@ -327,6 +330,13 @@ export function useAgentInbox() {
     badgeCount,
     working,
     finished,
+    notices: trust.notices,
+    noticeUnread: trust.unread,
+    isNoticeRead: trust.isRead,
+    noticeHref: trust.noticeHref,
+    markNoticeRead: trust.markRead,
+    markAllNoticesRead: trust.markAllRead,
+    restoreNotice: trust.restore,
     isUnread: isItemUnread,
     isAttention: isItemAttention,
     markRead: markInboxItemRead,

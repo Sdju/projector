@@ -7,6 +7,7 @@ import {
 } from "../../modules/agent-roles/index.ts";
 import { isAgentBackend } from "../../modules/agent/index.ts";
 import { accessAllowed } from "../../modules/access/index.ts";
+import { auditProjectTrust } from "../../modules/project-trust/index.ts";
 import { HttpError } from "../../modules/http/index.ts";
 import { asString, json, readBody } from "../../modules/transport/index.ts";
 import type { RouteContext, RouteDefinition } from "../../modules/transport/index.ts";
@@ -56,8 +57,11 @@ export const routes: RouteDefinition[] = [
       pageOnly(req, true);
       res.setHeader("Cache-Control", "no-store");
       const body = await readBody(req);
+      const projectId = projectIdOf(body.projectId);
       try {
-        json(res, 201, await createProjectRole(projectIdOf(body.projectId), roleFrom(body)));
+        const state = await createProjectRole(projectId, roleFrom(body));
+        void auditProjectTrust(projectId);
+        json(res, 201, state);
       } catch (error) {
         if (error instanceof HttpError) throw error;
         throw new HttpError(400, error instanceof Error ? error.message : "Неверная роль");
@@ -73,8 +77,11 @@ export const routes: RouteDefinition[] = [
       const body = await readBody(req);
       if (typeof body.trusted !== "boolean")
         throw new HttpError(400, "trusted должен быть boolean");
+      const projectId = projectIdOf(body.projectId);
       try {
-        json(res, 200, await setProjectRoleTrust(projectIdOf(body.projectId), body.trusted));
+        const state = await setProjectRoleTrust(projectId, body.trusted);
+        void auditProjectTrust(projectId);
+        json(res, 200, state);
       } catch (error) {
         if (error instanceof HttpError) throw error;
         throw new HttpError(400, error instanceof Error ? error.message : "Неверное доверие");
@@ -89,8 +96,11 @@ export const routes: RouteDefinition[] = [
       res.setHeader("Cache-Control", "no-store");
       const body = await readBody(req);
       const id = decodeURIComponent(params.id ?? "");
+      const projectId = projectIdOf(body.projectId);
       try {
-        json(res, 200, await saveProjectRole(projectIdOf(body.projectId), id, roleFrom(body)));
+        const state = await saveProjectRole(projectId, id, roleFrom(body));
+        void auditProjectTrust(projectId);
+        json(res, 200, state);
       } catch (error) {
         if (error instanceof HttpError) throw error;
         throw new HttpError(400, error instanceof Error ? error.message : "Неверная роль");
@@ -104,8 +114,11 @@ export const routes: RouteDefinition[] = [
       pageOnly(req, true);
       res.setHeader("Cache-Control", "no-store");
       const id = decodeURIComponent(params.id ?? "");
+      const projectId = projectIdOf(url.searchParams.get("projectId"));
       try {
-        json(res, 200, await deleteProjectRole(projectIdOf(url.searchParams.get("projectId")), id));
+        const state = await deleteProjectRole(projectId, id);
+        void auditProjectTrust(projectId);
+        json(res, 200, state);
       } catch (error) {
         throw new HttpError(400, error instanceof Error ? error.message : "Неверная роль");
       }

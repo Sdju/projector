@@ -9,6 +9,7 @@ import {
   setProjectPresetTrust,
 } from "../../modules/agent-presets/index.ts";
 import { accessAllowed } from "../../modules/access/index.ts";
+import { auditProjectTrust } from "../../modules/project-trust/index.ts";
 import { HttpError } from "../../modules/http/index.ts";
 import { asString, json, readBody } from "../../modules/transport/index.ts";
 import type { RouteContext, RouteDefinition } from "../../modules/transport/index.ts";
@@ -56,6 +57,7 @@ export const routes: RouteDefinition[] = [
       try {
         if (projectId) await createProjectPreset(projectId, presetFrom(body));
         else await createPreset(presetFrom(body));
+        if (projectId) void auditProjectTrust(projectId);
         json(res, 201, await presetBundle(projectId || undefined));
       } catch (error) {
         if (error instanceof HttpError) throw error;
@@ -76,6 +78,7 @@ export const routes: RouteDefinition[] = [
         throw new HttpError(400, "trusted должен быть boolean");
       try {
         await setProjectPresetTrust(projectId, body.trusted);
+        void auditProjectTrust(projectId);
         json(res, 200, await presetBundle(projectId));
       } catch (error) {
         if (error instanceof HttpError) throw error;
@@ -95,6 +98,7 @@ export const routes: RouteDefinition[] = [
       try {
         if (projectId) await saveProjectPreset(projectId, id, presetFrom(body));
         else await savePreset(id, presetFrom(body));
+        if (projectId) void auditProjectTrust(projectId);
         json(res, 200, await presetBundle(projectId || undefined));
       } catch (error) {
         if (error instanceof HttpError) throw error;
@@ -113,6 +117,7 @@ export const routes: RouteDefinition[] = [
       try {
         if (projectId) await deleteProjectPreset(projectId, id);
         else await deletePreset(id);
+        if (projectId) void auditProjectTrust(projectId);
         json(res, 200, await presetBundle(projectId || undefined));
       } catch (error) {
         throw new HttpError(400, error instanceof Error ? error.message : "Неверный пресет");

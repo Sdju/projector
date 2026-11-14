@@ -14,6 +14,7 @@ import type { Project } from "../../modules/project/index.ts";
 import {
   ProjectMissing,
   ProjectSettings,
+  projectSettingsSection,
   useProjectCommands,
 } from "../../modules/catalog/index.ts";
 import { RunMenu, useRunner } from "../../modules/runner/index.ts";
@@ -197,17 +198,23 @@ gitlabCommands.scope.registerCommand({
 });
 // A project created by this visit gets an agent tab with a suggested initialization request.
 let initProjectId = "";
-/** A notification opens the project together with the job or chat it points at. */
+/** A notification opens the project together with the job, chat or settings section it points at. */
 function openInboxTarget() {
   const job = typeof route.query.job === "string" ? route.query.job : "";
   const chat = typeof route.query.chat === "string" ? route.query.chat : "";
-  if (!job && !chat) return;
+  const section = typeof route.query.settings === "string" ? route.query.settings : "";
+  if (!job && !chat && !section) return;
   if (job) workspace.value?.openTab("agent-job", { job });
-  else if (!requestChatTab(projectId.value, chat))
-    workspace.value?.openTab("agent", { chatId: chat });
+  else if (chat) {
+    if (!requestChatTab(projectId.value, chat)) workspace.value?.openTab("agent", { chatId: chat });
+  } else if (section) {
+    projectSettingsSection.value = section;
+    workspace.value?.openTab("project");
+  }
   const query = { ...route.query };
   delete query.job;
   delete query.chat;
+  delete query.settings;
   void router.replace({ path: route.path, query });
 }
 function suggestInit(instance: unknown) {
@@ -221,6 +228,13 @@ function suggestInit(instance: unknown) {
   if (!agent.draft.value.trim() && !agent.turns.value.length) agent.draft.value = projectInitPrompt;
   workspace.value.openTab("agent");
 }
+// The inbox may link to settings of the project that is already open; the page is not remounted then.
+watch(
+  () => [route.query.job, route.query.chat, route.query.settings] as const,
+  () => {
+    if (workspace.value) openInboxTarget();
+  },
+);
 const missing = ref(false);
 const opening = ref(false);
 const openError = ref("");

@@ -8,6 +8,7 @@ import UiLoader from "../../../../../common/ui/UiLoader.vue";
 import UiMessage from "../../../../../common/ui/UiMessage.vue";
 import UiSectionRefresh, { sectionRefreshKey } from "../../../../../common/ui/UiSectionRefresh.vue";
 import { useCommandScope, commandArgs } from "../../../../../common/utilities/commands.ts";
+import { notify, reportError } from "../../../../../common/utilities/notice.ts";
 import {
   cancelAgentRun,
   requestChatTab,
@@ -18,6 +19,7 @@ import {
 import { deviceBase } from "../../../../../common/utilities/device-url.ts";
 import { projectRoute } from "../../../../project/index.ts";
 import { currentDeviceId, useAgentInbox, type InboxGroup, type InboxItem } from "../model/inbox.ts";
+import AgentInboxNotice from "./AgentInboxNotice.vue";
 import AgentInboxRow from "./AgentInboxRow.vue";
 import IconRefresh from "~icons/lucide/rotate-cw";
 
@@ -38,6 +40,12 @@ const {
   unread,
   working,
   finished,
+  notices,
+  noticeUnread,
+  isNoticeRead,
+  markNoticeRead,
+  markAllNoticesRead,
+  restoreNotice,
   isUnread,
   isAttention,
   markRead,
@@ -46,6 +54,7 @@ const {
   href,
 } = useAgentInbox();
 const busy = ref("");
+const busyNotice = ref("");
 const userRefreshing = ref(false);
 const actionError = ref("");
 const pending = computed(() => loading.value || userRefreshing.value);
@@ -84,6 +93,18 @@ function find(value: unknown): InboxItem {
   if (!item) throw new Error("Работа не найдена");
   return item;
 }
+function findNotice(value: unknown) {
+  const key = commandArgs(value).key;
+  const notice = notices.value.find((entry) => entry.id === key);
+  if (!notice) throw new Error("Уведомление не найдено");
+  return notice;
+}
+/** Page-relative route; vue-router adds the current Hub device prefix itself. */
+function noticeRoute(notice: (typeof notices.value)[number]): string {
+  if (!notice.projectPath) return notice.href ?? "/settings?section=plugins";
+  const section = notice.section ? `?settings=${encodeURIComponent(notice.section)}` : "";
+  return `${projectRoute(notice.projectPath)}${section}`;
+}
 commands.scope.registerCommand({
   id: "ide.inbox.refresh",
   title: "Обновить работы и уведомления",
@@ -114,11 +135,44 @@ commands.scope.registerCommand({
   run: (value) => markRead(find(value)),
 });
 commands.scope.registerCommand({
+  id: "ide.inbox.notice.open",
+  title: "Открыть настройки доверия",
+  description:
+    "Открывает раздел плагинов или настройки проекта, где можно подтвердить доверие к изменившемуся файлу или отключить его.",
+  arguments: { key: "string: ключ уведомления доверия" },
+  run: (value) => {
+    const notice = findNotice(value);
+    markNoticeRead(notice.id);
+    void router.push(noticeRoute(notice));
+  },
+});
+commands.scope.registerCommand({
+  id: "ide.inbox.notice.trust",
+  palette: false,
+  title: "Вернуть доверие из уведомления",
+  description:
+    "Подтверждает текущее содержимое плагина или проектного файла из уведомления и снова включает его.",
+  arguments: { key: "string: ключ уведомления доверия" },
+  enabled: () => !busyNotice.value,
+  run: (value) => trustNotice(findNotice(value)),
+});
+commands.scope.registerCommand({
+  id: "ide.inbox.notice.read",
+  title: "Отметить уведомление доверия прочитанным",
+  description: "Снимает пометку непрочитанного с уведомления об отозванном доверии.",
+  arguments: { key: "string: ключ уведомления доверия" },
+  run: (value) => markNoticeRead(findNotice(value).id),
+});
+commands.scope.registerCommand({
   id: "ide.inbox.read.all",
   title: "Отметить все уведомления прочитанными",
-  description: "Снимает пометку непрочитанного со всех завершённых работ агентов.",
+  description:
+    "Снимает пометку непрочитанного со всех завершённых работ агентов и уведомлений плагинов.",
   enabled: () => hasAcknowledgeable.value,
-  run: () => markAllRead(),
+  run: () => {
+    markAllRead();
+    markAllNoticesRead();
+  },
 });
 commands.scope.registerCommand({
   id: "ide.inbox.notifications.allow",
@@ -128,6 +182,30 @@ commands.scope.registerCommand({
   enabled: () => permission.value === "default",
   run: allowNotifications,
 });
+
+async function trustNotice(notice: (typeof notices.value)[number]): Promise<void> {
+  if (busyNotice.value) return;
+  busyNotice.value = notice.id;
+  try {
+    await restoreNotice(notice.id);
+    notify(null, "Доверие восстановлено");
+  } catch (cause) {
+    reportError(cause instanceof Error ? cause.message : "Не удалось вернуть доверие");
+  } finally {
+    busyNotice.value = "";
+  }
+}
+
+function confirmTrust(notice: (typeof notices.value)[number]): void {
+  let question: string;
+  if (notice.scope === "plugin")
+    question = `Доверять новому содержимому плагина «${notice.name}»? Его код снова будет выполняться.`;
+  else if (notice.kind === "devcontainer")
+    question = `Доверять изменённому devcontainer.json проекта «${notice.name}»? Команды контейнера снова будут выполняться.`;
+  else
+    question = `Доверять изменённому файлу проекта «${notice.name}»? Прежнее подтверждение будет заменено текущим содержимым.`;
+  if (window.confirm(question)) commands.run("ide.inbox.notice.trust", { key: notice.id });
+}
 
 function sameDevice(item: InboxItem): boolean {
   return !item.sourceId || item.sourceId === current;
@@ -172,7 +250,9 @@ async function allowNotifications(): Promise<void> {
 const canAcknowledge = (item: InboxItem) =>
   isUnread(item) ||
   (item.category === "attention" && item.pending.length === 0 && isAttention(item));
-const hasAcknowledgeable = computed(() => items.value.some(canAcknowledge));
+const hasAcknowledgeable = computed(
+  () => noticeUnread.value > 0 || items.value.some(canAcknowledge),
+);
 const shown = (group: InboxGroup) =>
   group.items.filter((item) => item.category === "working" || isAttention(item) || isUnread(item));
 const completed = (group: InboxGroup) =>
@@ -216,6 +296,7 @@ const groupBadge = (group: InboxGroup) =>
         <span :class="{ alive: attention }">{{ attention }} ждут вас</span>
         <span>·</span>
         <span>{{ working }} работают</span>
+        <span v-if="noticeUnread" class="alive">· {{ noticeUnread }} по доверию</span>
         <span v-if="unread">· <span class="done-alive">{{ unread }} завершили</span></span>
         <span v-else-if="finished">· {{ finished }} завершились</span>
       </p>
@@ -225,7 +306,10 @@ const groupBadge = (group: InboxGroup) =>
       <p class="updated">{{ updated ? `обновлено в ${updated}` : "" }}</p>
     </header>
 
-    <UiLoader v-if="!hostRefresh && loading && !items.length" label="Читаю работы…" />
+    <UiLoader
+      v-if="!hostRefresh && loading && !items.length && !notices.length"
+      label="Читаю работы…"
+    />
     <UiMessage v-if="error" tone="danger" size="xs" role="alert" class="message">{{
       error
     }}</UiMessage>
@@ -245,10 +329,27 @@ const groupBadge = (group: InboxGroup) =>
       Уведомления запрещены в настройках браузера. Запросы останутся в этом списке.
     </UiHint>
 
-    <p v-if="!loading && !items.length" class="empty">
+    <p v-if="!loading && !items.length && !notices.length" class="empty">
       Ничего не работает и не ждёт ответа. Задания и чаты появятся здесь для всех проектов и
       устройств.
     </p>
+
+    <section v-if="notices.length" class="group">
+      <header class="group-head">
+        <span class="project">Доверие</span>
+        <span v-if="noticeUnread" class="group-alert">{{ noticeUnread }}</span>
+      </header>
+      <AgentInboxNotice
+        v-for="notice in notices"
+        :key="notice.id"
+        :notice="notice"
+        :unread="!isNoticeRead(notice)"
+        :busy="busyNotice === notice.id"
+        @open="commands.run('ide.inbox.notice.open', { key: notice.id })"
+        @trust="confirmTrust(notice)"
+        @read="commands.run('ide.inbox.notice.read', { key: notice.id })"
+      />
+    </section>
 
     <section v-for="group in groups" :key="group.key" class="group">
       <header class="group-head">
