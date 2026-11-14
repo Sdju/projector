@@ -1,33 +1,31 @@
 # Фоновые сабагенты OpenCode
 
-Рабочий материал: найденное при проверке Lens поведение фонового `subagent` в чате OpenCode. Нужно решить, как показывать такого сабагента живой задачей, а не мгновенно завершённым вызовом. Текущее поведение Lens — [agent-lens.md](../agent-lens.md).
+Рабочий материал. Связано с [acp-background-lifecycle](acp-background-lifecycle.md) и UI Lens — [agent-lens.md](../agent-lens.md).
 
-## Что наблюдается
+## Факт из сессии `a5f7310ac7ae` (2026-11-15)
 
-- `subagent` возвращает ответ сразу: «The subagent is working in the background (sessionID: ses_…). You will be notified…». Дочерняя сессия продолжает работу отдельно.
-- `dialect.end` ищет JSON вида `{"sessionID": …, "status": "running"}`; текст такого формата не даёт. Задача создаётся с `background: false`, без `session`, и закрывается как `done`.
-- Дочерняя сессия не присылает в родительский ACP-поток обновления с `_meta["opencode/child-session"]`: в trace есть только один `tool_call_update` с результатом, дальше событий ребёнка нет.
-- Поэтому у строки задачи нет живой сессии: Lens может прочитать только текст задания, но не рассуждения и вызовы сабагента. Кнопка Lens на строке работает, но подпись получается по постановке задачи.
-- Остров фоновой работы показывает задачи последнего ответа и всё ещё выполняющиеся. После начала следующего ответа завершённые задачи предыдущего исчезают из острова, хотя остаются в истории ответа как карточка «Субагент».
+Три `subagent` с `rawInput.background: true` вернули текст:
 
-## Где смотреть
+`The subagent is working in the background (sessionID: ses_…). You will be notified…`
 
-- `packages/server/modules/agents/acp/acp-events.ts` — `finishTool` отдаёт диалекту `content` инструмента, а при его отсутствии — сериализованный `rawOutput`; в фоновом ответе `sessionID` приходит текстом, а не в `metadata`.
-- `packages/server/modules/agents/opencode/dialect.ts` — `end()` распознаёт только JSON с `"sessionID"` и `"status":"running"`.
-- `packages/client/modules/agent-core/model/turn-events.ts` — на `done` задача с `untracked` переводится в `stopped`, иначе жила бы вечно.
-- `packages/client/modules/agent-core/lib/task-detail.ts` — `barTasks()` оставляет задачи последнего ответа и выполняющиеся.
-- `packages/client/modules/agent-turns/model/task-turns.ts` — читает дочернюю сессию по `task.session`, пока задача `running`.
+Дочерние сессии продолжали слать `session/update` с `_meta["opencode/child-session"]` до `stopReason: end_turn`, затем процесс вышел с кодом 130 (убийство хоста). `keep-alive` не писался.
 
-## Варианты
+## Причины
 
-1. **Диалект разбирает результат целиком.** `rawOutput` уже доходит до `end()`; нужно принять сессию и из текста вида `(sessionID: ses_…)`, создавать задачу с `session`, `background: true` и не закрывать её по завершении вызова. Тогда Lens сразу получит доступ к дочерней сессии.
-2. **Завершение задачи.** Нужен источник окончания: либо обновление того же вызова от OpenCode, либо чтение статуса дочерней сессии, либо уведомление родителя. Без него задача останется «выполняется» после того, как ребёнок закончил.
-3. **`_meta` от harness.** Правильнее, чтобы инструмент `subagent` помечал дочерние обновления так же, как нативный `task` OpenCode: `_meta["opencode/child-session"]` с id и заголовком. Тогда работают и прогресс, и `session`, и Lens без специального разбора текста.
-4. **История задач в острове.** Решить, показывать ли завершённые задачи прошлых ответов до явного скрытия. Сейчас они пропадают из острова при следующем ответе, хотя остаются в чате.
+1. **`dialect.end` не разбирал prose-receipt** — только JSON `{"sessionID","status":"running"}`. Задача закрывалась как `done` без `session` / `background`.
+2. **JSON-путь ставил `untracked: true`** — soft keep-alive и `settleAnswerTasks` не держали процесс и строку задачи.
+3. Хост после `end_turn` + `connection.close()` слал SIGTERM дереву OpenCode → обрыв детей.
 
-## Критерий готовности
+## Сделано
 
-- Фоновый сабагент появляется в острове как выполняющаяся задача с идентификатором сессии.
-- Lens в строке задачи читает рассуждения и вызовы сабагента, а не только постановку.
-- Задача получает корректный итоговый статус, когда ребёнок закончил.
-- Завершённую задачу можно открыть и посмотреть её Lens после ответа, пока она не скрыта пользователем.
+- [x] Разбор prose `sessionID: ses_…` и JSON.
+- [x] Патч: `background: true`, `hold: false`, **без** `untracked`; `session` из receipt.
+- [x] Старт с `rawInput.background: true` сразу помечает soft hold.
+- [x] Тест в `acp-events.cases.mjs`.
+- [ ] Уведомление о завершении ребёнка → финальный статус задачи (следующий ход / notification).
+- [ ] Lens по `task.session` для фонового сабагента (после появления session в патче уже возможно).
+
+## Критерий
+
+- После `end_turn` в trace нет немедленного `! {"exit":…}` при живых background-сабагентах (есть `keep-alive`, host → `armIdle`).
+- В острове задача `running` с `session`, а не мгновенный `done`.

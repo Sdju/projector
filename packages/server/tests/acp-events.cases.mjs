@@ -447,6 +447,63 @@ test("opencode replay stores the cleaned read result", () => {
   expect(collector.turns[0].tools[0]).toMatchObject({ status: "done", detail: "const a = 1;" });
 });
 
+test("opencode background subagent text receipt is a soft keep-alive task", async () => {
+  const events = [];
+  const mapper = createAcpEventMapper(
+    (type, data) => events.push([type, data]),
+    "OpenCode",
+    createOpencodeDialect(),
+  );
+  mapper.handleUpdate("s", {
+    sessionUpdate: "tool_call",
+    toolCallId: "sub",
+    title: "subagent",
+    kind: "think",
+    status: "pending",
+    rawInput: {},
+  });
+  mapper.handleUpdate("s", {
+    sessionUpdate: "tool_call_update",
+    toolCallId: "sub",
+    status: "in_progress",
+    rawInput: {
+      agent: "general",
+      background: true,
+      description: "Fix trust",
+      prompt: "do it",
+    },
+  });
+  expect(mapper.pendingBackground).toBe(0);
+  expect(mapper.keepsProcess).toBe(true);
+  mapper.handleUpdate(
+    "s",
+    readResult(
+      "sub",
+      "The subagent is working in the background (sessionID: ses_child1). You will be notified automatically when it finishes.\n",
+    ),
+  );
+  expect(mapper.pendingBackground).toBe(0);
+  expect(mapper.keepsProcess).toBe(true);
+  await mapper.waitBackground();
+  const tasks = events.filter(([type]) => type === "task").map(([, data]) => data);
+  expect(tasks[0]).toMatchObject({
+    id: "sub",
+    kind: "agent",
+    title: "Fix trust",
+    status: "running",
+    background: true,
+    subagent: "general",
+    prompt: "do it",
+  });
+  expect(tasks.at(-1)).toMatchObject({
+    id: "sub",
+    status: "running",
+    background: true,
+    session: "ses_child1",
+  });
+  expect(tasks.at(-1).untracked).toBeUndefined();
+});
+
 test("opencode background command is a task that its call does not end", () => {
   const events = [];
   const mapper = createAcpEventMapper(

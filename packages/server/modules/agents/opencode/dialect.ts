@@ -12,8 +12,9 @@ import { cleanReadOutput } from "./read.ts";
 
 /**
  * OpenCode runs a subagent as a `subagent` tool call and marks everything the subagent does
- * (calls and messages) with the id and title of its child session in `_meta`. A command moved to
- * the background answers at once (`rawInput.background`) and never reports its end.
+ * (calls and messages) with the id and title of its child session in `_meta`. A background
+ * subagent answers at once with a session id (JSON or prose) and keeps working after `end_turn`;
+ * a shell moved to the background (`rawInput.background` + command) never reports its end.
  */
 interface ChildSession {
   id: string;
@@ -105,11 +106,12 @@ function compactionOf(update: AcpUpdate): AcpCompaction | undefined {
 
 /** The input of the call that starts a subagent; it arrives with a later update, not the first. */
 function subagentOf(update: AcpUpdate) {
-  const { agent, description, prompt } = inputOf(update);
+  const { agent, description, prompt, background } = inputOf(update);
   if (typeof agent !== "string") return undefined;
   return {
     agent,
     description: typeof description === "string" ? description : agent,
+    background: background === true,
     ...(typeof prompt === "string" && prompt ? { prompt } : {}),
   };
 }
@@ -120,6 +122,20 @@ const unwrap = (text: string) => text.replace(/<\/?subagent[^>]*>/g, "");
 function backgroundOf(update: AcpUpdate) {
   const { background, command } = inputOf(update);
   return background === true && typeof command === "string" ? command : undefined;
+}
+
+/**
+ * Background `subagent` receipt: JSON `{"sessionID","status":"running"}` or the prose
+ * `working in the background (sessionID: ses_…)`.
+ */
+function backgroundSession(output: string): string | undefined {
+  const trimmed = output.trimStart();
+  const json = /"sessionID"\s*:\s*"([^"]+)"/.exec(trimmed)?.[1];
+  if (json && /^\{[^]*"status"\s*:\s*"running"/.test(trimmed)) return json;
+  return (
+    /working in the background\s*\(\s*sessionID:\s*(ses_[^\s)]+)/i.exec(output)?.[1] ??
+    /(?:^|\n)\s*sessionID:\s*(ses_\S+)/i.exec(output)?.[1]
+  );
 }
 
 /** A call that reads a file: its result is a framed file body, not raw tool text. */
@@ -203,7 +219,9 @@ export function createOpencodeDialect(): AcpDialect {
           kind: "agent",
           title: agent.description,
           status: "running",
-          background: false,
+          background: agent.background,
+          // Soft hold: children keep streaming after end_turn; do not block close, keep process.
+          ...(agent.background ? { hold: false } : {}),
           subagent: agent.agent,
           ...(agent.prompt ? { prompt: agent.prompt } : {}),
           tool: id,
@@ -230,17 +248,17 @@ export function createOpencodeDialect(): AcpDialect {
     end(update, id, output) {
       const index = open.findIndex((item) => item.call === id);
       if (index < 0) return [];
-      // A subagent started in the background answers at once with its session and keeps working:
-      // its call stays open so its later calls and messages still find the task.
-      const session = /"sessionID"\s*:\s*"([^"]+)"/.exec(output)?.[1];
-      if (session && /^\{[^]*"status"\s*:\s*"running"/.test(output.trimStart())) {
+      // Background subagent: immediate receipt with session; child keeps working on this process.
+      // Tracked + soft hold → keep-alive (not untracked: settleAnswerTasks would stop the row).
+      const session = backgroundSession(output);
+      if (session) {
         bound.set(session, id);
         return [
           {
             id,
             status: "running",
             background: true,
-            untracked: true,
+            hold: false,
             session,
           },
         ];
