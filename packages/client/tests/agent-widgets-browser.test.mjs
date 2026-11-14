@@ -190,7 +190,7 @@ test.concurrent(
 );
 
 test.concurrent(
-  "Field covers text, number, select, checks, switch and segmented controls",
+  "Field covers text, number, select, checks, switch, segmented and radio controls",
   { skip: !chromium, timeout: 30000, retry: 1 },
   async ({ onTestFinished }) => {
     const html = await readFile(
@@ -215,6 +215,7 @@ test.concurrent(
   <Field type="number" name="port" label="Порт" :min="1" :max="65535" :initial="4177" />
   <Field type="select" name="mode" label="Режим" :options="[{value:'server',label:'Сервер'},{value:'window',label:'Окно'}]" initial="server" />
   <Field type="checks" name="scripts" :options="['start','test','lint']" :initial="['test']" />
+  <Field type="radio" name="frame" :options="['strong','wide']" initial="wide" />
   <Field type="switch" name="watch" label="Следить" :initial="false" />
   <Field type="segmented" name="target" :options="['local','remote']" initial="local" />
   <Button id="send-field" submit summary="Field">Отправить</Button>
@@ -233,6 +234,11 @@ test.concurrent(
         '[...document.querySelectorAll("input[name=scripts]")].filter((i) => i.checked).length',
       ),
     ).toBe(1);
+    expect(
+      await browser.evaluate(
+        '[...document.querySelectorAll("input[name=frame]")].map((input) => input.checked)',
+      ),
+    ).toEqual([false, true]);
     await browser.evaluate(`(() => {
       const set = (selector, value, event = "input") => {
         const input = document.querySelector(selector);
@@ -243,6 +249,7 @@ test.concurrent(
       set("input[name=port]", "8080");
       set("select[name=mode]", "window", "change");
       document.querySelector("input[name=scripts]").click();
+      document.querySelector("input[name=frame][value=strong]").click();
       document.querySelector("input[name=watch]").click();
       [...document.querySelectorAll(".segmented button")].find((b) => b.textContent.trim() === "remote").click();
     })()`);
@@ -255,6 +262,7 @@ test.concurrent(
       port: 8080,
       mode: "window",
       scripts: ["test", "start"],
+      frame: "strong",
       watch: true,
       target: "remote",
     });
@@ -288,6 +296,61 @@ test.concurrent(
     ).toEqual({
       name: "Ада",
     });
+  },
+);
+
+test.concurrent(
+  "an answered radio Field keeps the option the user picked",
+  { skip: !chromium, timeout: 30000, retry: 1 },
+  async ({ onTestFinished }) => {
+    const html = await readFile(
+      new URL("../../../tests/fixtures/agent-form-answer.html", import.meta.url),
+      "utf8",
+    );
+    const fixture = await createBrowserFixture({ pages: { "/answer": html } });
+    onTestFinished(() => fixture.close());
+    const browser = await createChromium(fixture.directory);
+    onTestFinished(() => browser.close());
+    await browser.open(fixture.url("/answer"));
+    await browser.viewport(600, 500);
+    const wait = async (expression, ms = 8000) => {
+      for (let waited = 0; waited < ms; waited += 50) {
+        if (await browser.evaluate(expression)) return;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      expect(await browser.evaluate(expression)).toBeTruthy();
+    };
+
+    const source =
+      '<IntelligentForm summary="Что сделать" submit="Применить"><Field type="radio" name="choice" label="Что сделать" :options="[\'Работа\',\'Отпуск\',\'Другое\']" /></IntelligentForm>';
+    const values = JSON.stringify({ choice: "Отпуск" });
+    await browser.evaluate(`window.fixture.set(${JSON.stringify(source)}, ${values}, true)`);
+    await wait('document.querySelectorAll("input[type=radio]").length === 3');
+    expect(
+      await browser.evaluate(
+        '[...document.querySelectorAll("input[type=radio]")].map((input) => input.checked)',
+      ),
+    ).toEqual([false, true, false]);
+    expect(
+      await browser.evaluate('document.querySelector("input[type=radio]").matches(":disabled")'),
+    ).toBe(true);
+
+    // Editing the snapshot unlocks the same form without losing the answer it shows.
+    await browser.evaluate(`window.fixture.set(${JSON.stringify(source)}, ${values}, false)`);
+    await wait('document.querySelector("input[type=radio]").matches(":disabled") === false');
+    expect(
+      await browser.evaluate(
+        '[...document.querySelectorAll("input[type=radio]")].map((input) => input.checked)',
+      ),
+    ).toEqual([false, true, false]);
+
+    expect(
+      await browser.evaluate('document.querySelector(".intelligent-form .btn").textContent.trim()'),
+    ).toBe("Применить");
+    await browser.click('input[value="Работа"]');
+    await browser.click(".intelligent-form .btn");
+    await wait("window.fixture.replies.length === 1");
+    expect(await browser.evaluate("window.fixture.replies[0].data")).toEqual({ choice: "Работа" });
   },
 );
 

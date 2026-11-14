@@ -86,7 +86,12 @@ const fallback = computed<FieldValue>(() => {
     return items.value[0]?.value ?? "";
   return "";
 });
-const selected = computed(() => (Array.isArray(model.value) ? model.value.map(String) : []));
+/** `checks` keeps an array; a radio group keeps one scalar value. */
+const selected = computed(() => {
+  const value = model.value;
+  if (Array.isArray(value)) return value.map(String);
+  return value == null || value === "" ? [] : [String(value)];
+});
 const form = inject(formKey, null);
 const error = computed(() => (props.name && form ? (form.errors[props.name] ?? "") : ""));
 
