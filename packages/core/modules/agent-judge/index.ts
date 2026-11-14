@@ -63,6 +63,18 @@ export function isJudgeScore(value: unknown): value is JudgeScore {
   return value === 1 || value === 2 || value === 3 || value === 4 || value === 5;
 }
 
+export function isJudgeVerdict(value: unknown): value is JudgeVerdict {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const row = value as Record<string, unknown>;
+  return (
+    isJudgeScore(row.score) &&
+    typeof row.label === "string" &&
+    typeof row.reason === "string" &&
+    (row.confidence === "high" || row.confidence === "medium" || row.confidence === "low") &&
+    (row.effect === undefined || typeof row.effect === "string")
+  );
+}
+
 /** The settings a request should use: the chat's override over the global value. */
 export function resolveJudgeSettings(
   global: JudgeSettings,

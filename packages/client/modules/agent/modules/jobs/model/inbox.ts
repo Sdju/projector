@@ -3,10 +3,11 @@ import type { HubDevice } from "@ai-projector/core/modules/hub/index.ts";
 import {
   deviceApiUrl,
   fetchJobs,
-  fetchLiveRuns,
+  fetchRunsFeed,
   notifyInbox,
   type AgentJobView,
   type LiveAgentRun,
+  type RecentAgentRun,
 } from "../../../../agent-core/index.ts";
 import { fetchHubDevices } from "../../../../hub/index.ts";
 import {
@@ -15,16 +16,29 @@ import {
   inboxHref,
   inboxJobItem,
   inboxNotices,
-  inboxRunItem,
   inboxSourcesFromDevices,
+  mergeRunItems,
   currentDeviceId,
   type InboxItem,
   type InboxProject,
   type InboxSource,
 } from "./inbox-view.ts";
-import { feedJobs, feedRuns, onJobsFeedUpdate, useJobsFeed } from "./jobs-feed.ts";
+import {
+  isItemAttention,
+  isItemUnread,
+  markAllInboxItemsRead,
+  markInboxItemRead,
+  markOldFinishedAsRead,
+} from "./inbox-read.ts";
+import { feedJobs, feedRecentRuns, feedRuns, onJobsFeedUpdate, useJobsFeed } from "./jobs-feed.ts";
 
 export * from "./inbox-view.ts";
+export {
+  isItemAcknowledgeable,
+  isItemAttention,
+  isItemUnread,
+  markInboxItemRead,
+} from "./inbox-read.ts";
 
 /**
  * The server pushes job and run changes over the page event stream. This timer only keeps the
@@ -72,14 +86,17 @@ const inboxRelevant = (job: AgentJobView) =>
 
 async function loadSource(source: InboxSource, fresh: boolean): Promise<InboxItem[]> {
   const base = source.base || undefined;
-  const [jobs, runs, projects] = await Promise.all([
+  const [jobs, runsFeed, projects] = await Promise.all([
     fetchJobs(undefined, base),
-    fetchLiveRuns(base).catch(() => [] as LiveAgentRun[]),
+    fetchRunsFeed(base).catch(() => ({
+      runs: [] as LiveAgentRun[],
+      recent: [] as RecentAgentRun[],
+    })),
     projectsOf(source, fresh),
   ]);
   return [
     ...jobs.filter(inboxRelevant).map((job) => inboxJobItem(source, job, projects)),
-    ...runs.map((run) => inboxRunItem(source, run, projects)),
+    ...mergeRunItems(source, runsFeed.runs, runsFeed.recent, projects),
   ];
 }
 
@@ -87,7 +104,7 @@ async function loadSource(source: InboxSource, fresh: boolean): Promise<InboxIte
 function localItems(source: InboxSource, projects: readonly InboxProject[]): InboxItem[] {
   return [
     ...feedJobs.value.filter(inboxRelevant).map((job) => inboxJobItem(source, job, projects)),
-    ...feedRuns.value.map((run) => inboxRunItem(source, run, projects)),
+    ...mergeRunItems(source, feedRuns.value, feedRecentRuns.value, projects),
   ];
 }
 
@@ -129,6 +146,7 @@ async function sourcesOf(fresh: boolean): Promise<InboxSource[]> {
 /** Rebuilds the list from the per-source cache; a source that failed keeps its last known items. */
 function publishItems(list: readonly InboxSource[]): void {
   const next = list.flatMap((source) => cache.get(source.id) ?? []);
+  if (firstLook) markOldFinishedAsRead(next);
   items.value = next;
   updatedAt.value = Date.now();
   const notices = inboxNotices(seen, next, firstLook, (item) => inboxHref(item, list));
@@ -266,9 +284,12 @@ function start() {
   };
 }
 
+export const markAllInboxRead = (): void => markAllInboxItemsRead(items.value);
+
 /** The header and the rail icon ask for the same number without starting a second poll. */
-export const inboxAttention = () =>
-  items.value.filter((item) => item.category === "attention").length;
+export const inboxAttention = () => items.value.filter(isItemAttention).length;
+export const inboxUnread = () => items.value.filter(isItemUnread).length;
+export const inboxBadge = () => inboxAttention() + inboxUnread();
 
 let stopPolling: (() => void) | undefined;
 
@@ -287,9 +308,9 @@ export function useAgentInbox() {
       }
     });
   const groups = computed(() => inboxGroups(items.value));
-  const attention = computed(
-    () => items.value.filter((item) => item.category === "attention").length,
-  );
+  const attention = computed(() => items.value.filter(isItemAttention).length);
+  const unread = computed(() => items.value.filter(isItemUnread).length);
+  const badgeCount = computed(() => attention.value + unread.value);
   const working = computed(() => items.value.filter((item) => item.category === "working").length);
   const finished = computed(
     () => items.value.filter((item) => item.category === "finished").length,
@@ -302,8 +323,14 @@ export function useAgentInbox() {
     error,
     updatedAt,
     attention,
+    unread,
+    badgeCount,
     working,
     finished,
+    isUnread: isItemUnread,
+    isAttention: isItemAttention,
+    markRead: markInboxItemRead,
+    markAllRead: markAllInboxRead,
     refresh: () => refresh(true),
     href: (item: InboxItem) => inboxHref(item, sources.value),
   };

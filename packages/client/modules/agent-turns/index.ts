@@ -18,6 +18,7 @@ export { default as AgentMarkdown } from "./ui/AgentMarkdown.vue";
 export { default as AgentMessage } from "./ui/AgentMessage.vue";
 export { default as AgentPermissions } from "./ui/AgentPermissions.vue";
 export { default as AgentQuestions } from "./ui/AgentQuestions.vue";
+export { default as AgentSecrets } from "./ui/AgentSecrets.vue";
 export { default as AgentStatusIcon } from "./ui/AgentStatusIcon.vue";
 export { default as AgentTaskFrame } from "./ui/AgentTaskFrame.vue";
 export { default as AgentTaskTab } from "./ui/AgentTaskTab.vue";

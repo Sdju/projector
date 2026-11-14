@@ -17,6 +17,8 @@ import {
   completeCommandRequest,
   cancelRun,
   listLiveRuns,
+  listRecentRuns,
+  runsChanged,
   agentCatalogRevision,
   listAgentBackends,
   injectMessage,
@@ -310,6 +312,7 @@ export const routes: RouteDefinition[] = [
       output: body.output,
       error: asString(body.error) || undefined,
     });
+    if (accepted) runsChanged();
     json(res, accepted ? 200 : 410, { accepted });
   }),
   route("POST", "/api/agent/inject", async ({ req, res }) => {
@@ -326,7 +329,8 @@ export const routes: RouteDefinition[] = [
     json(res, accepted ? 200 : 410, { accepted });
   }),
   route("GET", "/api/agent/runs", async ({ res }) => {
-    json(res, 200, { runs: await listLiveRuns() });
+    const [runs, recent] = await Promise.all([listLiveRuns(), listRecentRuns()]);
+    json(res, 200, { runs, recent });
   }),
   route("POST", "/api/agent/cancel", async ({ req, res }) => {
     const body = await readBody(req);

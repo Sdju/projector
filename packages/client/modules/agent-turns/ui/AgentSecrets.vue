@@ -46,8 +46,7 @@ function decline(id: string) {
         <span v-if="request.destination.replaces">, заменит текущее</span>. Агент его не увидит.
       </p>
       <p v-else-if="request.destination.kind === 'ai_provider'" class="destination">
-        Ключ провайдера <strong>{{ request.destination.name }}</strong
-        >, адрес
+        Ключ провайдера <strong>{{ request.destination.name }}</strong>, адрес
         <code class="address">{{ request.destination.url }}</code>
         <span v-if="request.destination.model"
           >, модель <code>{{ request.destination.model }}</code></span

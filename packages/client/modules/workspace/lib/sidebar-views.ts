@@ -25,7 +25,7 @@ import {
 import { PipelinesPanel } from "../modules/pipelines/index.ts";
 import { ReleasesPanel } from "../modules/releases/index.ts";
 import { DockerSidebar } from "../../docker/index.ts";
-import { AgentInbox, inboxAttention } from "../../agent/index.ts";
+import { AgentInbox, inboxBadge } from "../../agent/index.ts";
 import SearchPanel from "../ui/SearchPanel.vue";
 import FilesSection from "../ui/FilesSection.vue";
 import CompareTreeSection from "../ui/CompareTreeSection.vue";
@@ -126,7 +126,7 @@ export const baseSidebarViews: SidebarViews = {
     icon: IconBell,
     component: AgentInbox,
     props: () => ({}),
-    badge: () => inboxAttention(),
+    badge: () => inboxBadge(),
     refreshGutter: true,
     refresh: (_, panel) => panel?.refresh?.(),
   },

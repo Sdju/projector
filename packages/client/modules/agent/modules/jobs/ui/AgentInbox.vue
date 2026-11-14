@@ -35,8 +35,13 @@ const {
   error,
   updatedAt,
   attention,
+  unread,
   working,
   finished,
+  isUnread,
+  isAttention,
+  markRead,
+  markAllRead,
   refresh,
   href,
 } = useAgentInbox();
@@ -102,6 +107,20 @@ commands.scope.registerCommand({
   run: (value) => stop(find(value)),
 });
 commands.scope.registerCommand({
+  id: "ide.inbox.work.read",
+  title: "Отметить уведомление прочитанным",
+  description: "Отмечает завершённое задание или ответ агента прочитанным в центре работ.",
+  arguments: { key: "string: ключ работы из центра работ" },
+  run: (value) => markRead(find(value)),
+});
+commands.scope.registerCommand({
+  id: "ide.inbox.read.all",
+  title: "Отметить все уведомления прочитанными",
+  description: "Снимает пометку непрочитанного со всех завершённых работ агентов.",
+  enabled: () => hasAcknowledgeable.value,
+  run: () => markAllRead(),
+});
+commands.scope.registerCommand({
   id: "ide.inbox.notifications.allow",
   title: "Включить уведомления",
   description:
@@ -115,6 +134,7 @@ function sameDevice(item: InboxItem): boolean {
 }
 function open(item: InboxItem): void {
   if (!item.projectPath) return;
+  markRead(item);
   if (!sameDevice(item)) {
     const link = href(item);
     if (link) location.assign(link);
@@ -149,8 +169,18 @@ async function allowNotifications(): Promise<void> {
   permission.value = typeof Notification === "undefined" ? "unsupported" : Notification.permission;
 }
 
-const shown = (group: InboxGroup) => group.items.filter((item) => item.category !== "finished");
-const completed = (group: InboxGroup) => group.items.filter((item) => item.category === "finished");
+const canAcknowledge = (item: InboxItem) =>
+  isUnread(item) ||
+  (item.category === "attention" && item.pending.length === 0 && isAttention(item));
+const hasAcknowledgeable = computed(() => items.value.some(canAcknowledge));
+const shown = (group: InboxGroup) =>
+  group.items.filter((item) => item.category === "working" || isAttention(item) || isUnread(item));
+const completed = (group: InboxGroup) =>
+  group.items.filter(
+    (item) => item.category !== "working" && !isAttention(item) && !isUnread(item),
+  );
+const groupBadge = (group: InboxGroup) =>
+  group.items.filter((item) => isAttention(item) || isUnread(item)).length;
 </script>
 
 <template>
@@ -158,25 +188,36 @@ const completed = (group: InboxGroup) => group.items.filter((item) => item.categ
     <header class="head">
       <UiInline justify="between" align="center">
         <strong class="title">Работы</strong>
-        <UiSectionRefresh />
-        <UiButton
-          v-if="!hostRefresh"
-          shape="icon"
-          size="sm"
-          title="Обновить работы"
-          aria-label="Обновить работы"
-          data-command="ide.inbox.refresh"
-          :busy="pending"
-          @click="commands.run('ide.inbox.refresh')"
-        >
-          <IconRefresh aria-hidden="true" />
-        </UiButton>
+        <UiInline :gap="1" align="center">
+          <UiButton
+            v-if="hasAcknowledgeable"
+            size="sm"
+            data-command="ide.inbox.read.all"
+            @click="commands.run('ide.inbox.read.all')"
+          >
+            Прочитать всё
+          </UiButton>
+          <UiSectionRefresh />
+          <UiButton
+            v-if="!hostRefresh"
+            shape="icon"
+            size="sm"
+            title="Обновить работы"
+            aria-label="Обновить работы"
+            data-command="ide.inbox.refresh"
+            :busy="pending"
+            @click="commands.run('ide.inbox.refresh')"
+          >
+            <IconRefresh aria-hidden="true" />
+          </UiButton>
+        </UiInline>
       </UiInline>
       <p class="counts">
         <span :class="{ alive: attention }">{{ attention }} ждут вас</span>
         <span>·</span>
         <span>{{ working }} работают</span>
-        <span v-if="finished">· {{ finished }} завершились</span>
+        <span v-if="unread">· <span class="done-alive">{{ unread }} завершили</span></span>
+        <span v-else-if="finished">· {{ finished }} завершились</span>
       </p>
       <p v-if="hubDevices" class="hub">
         Hub: {{ hubDevices + 1 }} {{ hubDevices + 1 === 1 ? "устройство" : "устройства" }}
@@ -215,19 +256,22 @@ const completed = (group: InboxGroup) => group.items.filter((item) => item.categ
         <span v-if="group.sourceName && group.sourceName !== 'Это устройство'" class="source">{{
           group.sourceName
         }}</span>
-        <span v-if="group.attention" class="group-alert">{{ group.attention }}</span>
+        <span v-if="groupBadge(group)" class="group-alert">{{ groupBadge(group) }}</span>
       </header>
       <AgentInboxRow
         v-for="item in shown(group)"
         :key="item.key"
         :item="item"
         :busy="busy === item.key"
+        :unread="isUnread(item)"
+        :acknowledgeable="canAcknowledge(item)"
         @open="commands.run('ide.inbox.work.open', { key: item.key })"
         @stop="commands.run('ide.inbox.work.stop', { key: item.key })"
+        @read="commands.run('ide.inbox.work.read', { key: item.key })"
         @answered="refresh"
       />
       <details v-if="completed(group).length" class="done">
-        <summary>Завершилось за сутки · {{ completed(group).length }}</summary>
+        <summary>Прочитанные за сутки · {{ completed(group).length }}</summary>
         <AgentInboxRow
           v-for="item in completed(group)"
           :key="item.key"
@@ -271,6 +315,9 @@ const completed = (group: InboxGroup) => group.items.filter((item) => item.categ
 }
 .alive {
   color: var(--warn);
+}
+.done-alive {
+  color: var(--info);
 }
 .hub,
 .updated {

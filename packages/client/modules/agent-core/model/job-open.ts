@@ -14,8 +14,15 @@ export function requestJobTab(projectId: string, job: string): void {
 /** Asks for the tab of an agent chat; `false` when the chat has no tab of its own to show. */
 export function requestChatTab(projectId: string, chat: string): boolean {
   const tab = chatTabCommand(projectId, chat);
-  if (tab) request.value = { projectId, command: tab.command, args: tab.args };
-  return !!tab;
+  if (tab) {
+    request.value = { projectId, command: tab.command, args: tab.args };
+    return true;
+  }
+  if (chat === projectId && projectId) {
+    request.value = { projectId, command: "ide.workbench.agent.open", args: {} };
+    return true;
+  }
+  return false;
 }
 
 const RETRIES = 20;

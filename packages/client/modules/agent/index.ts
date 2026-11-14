@@ -5,7 +5,7 @@ export { AgentJobTab } from "./modules/jobs/index.ts";
 export { ActivityIsland } from "./modules/jobs/index.ts";
 export { AgentInbox } from "./modules/jobs/index.ts";
 export { AgentInboxBell } from "./modules/jobs/index.ts";
-export { inboxAttention } from "./modules/jobs/index.ts";
+export { inboxAttention, inboxBadge } from "./modules/jobs/index.ts";
 export { requestChatTab, requestJobTab } from "../agent-core/index.ts";
 export { projectInitPrompt } from "../agent-core/index.ts";
 export { useAgent } from "../agent-core/index.ts";

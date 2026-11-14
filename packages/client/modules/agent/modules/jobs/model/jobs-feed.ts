@@ -1,9 +1,10 @@
 import { getCurrentScope, onScopeDispose, ref, shallowRef } from "vue";
 import {
   fetchJobs,
-  fetchLiveRuns,
+  fetchRunsFeed,
   type AgentJobView,
   type LiveAgentRun,
+  type RecentAgentRun,
 } from "../../../../agent-core/index.ts";
 
 /** The server pushes changes over the page event stream; the timer only repairs a lost stream. */
@@ -13,6 +14,7 @@ const GAP_MS = 300;
 
 export const feedJobs = shallowRef<AgentJobView[]>([]);
 export const feedRuns = shallowRef<LiveAgentRun[]>([]);
+export const feedRecentRuns = shallowRef<RecentAgentRun[]>([]);
 export const feedError = ref("");
 export const feedLoading = ref(true);
 export const feedUpdatedAt = ref(0);
@@ -20,6 +22,7 @@ export const feedUpdatedAt = ref(0);
 export interface JobsFeedUpdate {
   jobs: AgentJobView[];
   runs: LiveAgentRun[];
+  recent: RecentAgentRun[];
 }
 
 type Listener = (update: JobsFeedUpdate) => void;
@@ -34,7 +37,11 @@ let stopTransport: (() => void) | undefined;
 let lastReadAt = 0;
 
 function emit(): void {
-  const update = { jobs: feedJobs.value, runs: feedRuns.value };
+  const update = {
+    jobs: feedJobs.value,
+    runs: feedRuns.value,
+    recent: feedRecentRuns.value,
+  };
   for (const listener of Array.from(listeners)) listener(update);
 }
 
@@ -45,16 +52,19 @@ async function read(): Promise<void> {
   }
   refreshing = (async () => {
     try {
-      const [jobList, runList] = await Promise.allSettled([fetchJobs(), fetchLiveRuns()]);
+      const [jobList, runFeed] = await Promise.allSettled([fetchJobs(), fetchRunsFeed()]);
       if (!subscribers) return;
       const failure =
         jobList.status === "rejected"
           ? jobList.reason
-          : runList.status === "rejected"
-            ? runList.reason
+          : runFeed.status === "rejected"
+            ? runFeed.reason
             : undefined;
       if (jobList.status === "fulfilled") feedJobs.value = jobList.value;
-      if (runList.status === "fulfilled") feedRuns.value = runList.value;
+      if (runFeed.status === "fulfilled") {
+        feedRuns.value = runFeed.value.runs;
+        feedRecentRuns.value = runFeed.value.recent;
+      }
       feedError.value = failure
         ? failure instanceof Error
           ? failure.message
@@ -102,6 +112,7 @@ function stopFeed(): void {
   listeners.clear();
   feedJobs.value = [];
   feedRuns.value = [];
+  feedRecentRuns.value = [];
   feedError.value = "";
   feedUpdatedAt.value = 0;
   feedLoading.value = true;
@@ -150,6 +161,7 @@ export function useJobsFeed() {
   return {
     jobs: feedJobs,
     runs: feedRuns,
+    recent: feedRecentRuns,
     error: feedError,
     loading: feedLoading,
     updatedAt: feedUpdatedAt,
@@ -161,7 +173,8 @@ export function useJobsFeed() {
 /** Calls the listener after every read; a listener joining a loaded feed gets the state at once. */
 export function onJobsFeedUpdate(listener: Listener): () => void {
   listeners.add(listener);
-  if (!feedLoading.value) listener({ jobs: feedJobs.value, runs: feedRuns.value });
+  if (!feedLoading.value)
+    listener({ jobs: feedJobs.value, runs: feedRuns.value, recent: feedRecentRuns.value });
   return () => listeners.delete(listener);
 }
 

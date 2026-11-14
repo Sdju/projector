@@ -1,3 +1,4 @@
+import { isJudgeVerdict } from "@ai-projector/core/modules/agent-judge/index.ts";
 import type { AgentQuestion } from "./command-bridge.ts";
 import type { AgentEventName } from "./backend.ts";
 import { normalizeTouchedPaths, pathsOfCall, type GitSnapshot } from "./jobs-files.ts";
@@ -173,9 +174,13 @@ export function onEvent(entry: Live, event: AgentEventName, data: unknown): void
         title: String(body.title || body.tool || "Разрешение"),
         detail: typeof body.detail === "string" ? body.detail : undefined,
         persistent: body.persistent === true,
+        ...(isJudgeVerdict(body.judge) ? { judge: body.judge } : {}),
       });
       return;
     }
+    case "judge":
+      record(entry, event, body);
+      return;
     case "question-request": {
       const id = String(body.id ?? "");
       const questions = Array.isArray(body.questions) ? (body.questions as AgentQuestion[]) : [];

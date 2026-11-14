@@ -5,6 +5,7 @@ import { dataDir } from "@ai-projector/core/modules/app-paths/index.ts";
 import { jobsChanged } from "./change-events.ts";
 import type { AgentBackendId, AgentPermissionMode } from "./backend.ts";
 import type { AgentSelection } from "./controls.ts";
+import type { JudgeVerdict } from "@ai-projector/core/modules/agent-judge/index.ts";
 import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 import type { AgentHistoryTurn } from "../providers/index.ts";
 
@@ -20,6 +21,8 @@ export interface JobPending {
   detail?: string;
   /** Permission: the backend can remember the decision. */
   persistent?: boolean;
+  /** Permission: Projector Judge's verdict, when evaluated. */
+  judge?: JudgeVerdict;
   /** Question: what is asked and the options offered. */
   questions?: {
     id: string;

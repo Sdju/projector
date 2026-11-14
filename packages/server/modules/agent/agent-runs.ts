@@ -9,6 +9,8 @@ import type { AgentHistoryTurn } from "../providers/index.ts";
 import type { AgentBackendId, AgentPermissionMode, MessagePart } from "./backend.ts";
 import { runsChanged } from "./change-events.ts";
 import type { AgentSelection } from "./controls.ts";
+import { recordRecentRun } from "./recent-runs.ts";
+import { pendingRunRequests, type RunPending } from "./run-hub.ts";
 import type { AgentRoleSnapshot } from "@ai-projector/core/modules/agent-role/index.ts";
 
 /** What a restarted server needs to repeat a run and so rejoin its answer in progress. */
@@ -50,6 +52,8 @@ export interface LiveRun {
   projectId: string;
   chat: string;
   topic: string;
+  status: "running" | "needs-user";
+  pending: RunPending[];
   /** The agent's own session, if it reported it already. */
   session?: string;
   /** When the run started (ms since the epoch). */
@@ -71,12 +75,15 @@ export async function listLiveRuns(): Promise<LiveRun[]> {
         const startedAt =
           record.startedAt ??
           (await stat(join(runDirectory(id), "run.json")).catch(() => null))?.mtimeMs;
+        const pending = pendingRunRequests(id);
         return {
           id,
           backend: record.backend,
           projectId: record.projectId ?? "",
           chat: record.chat ?? "",
           topic: record.message.trim().slice(0, 120),
+          status: pending.length ? "needs-user" : "running",
+          pending,
           ...(record.session ? { session: record.session } : {}),
           ...(startedAt !== undefined ? { startedAt } : {}),
         };
@@ -220,6 +227,20 @@ export function trackRun(id: string, cancel: () => void): () => void {
 export async function cancelRun(id: string): Promise<void> {
   const cancel = active.get(id);
   if (cancel) return cancel();
+  const record = await readRun(id);
   await stopRun(id);
+  if (record && !record.chat?.startsWith(JOB_CHAT)) {
+    await recordRecentRun({
+      id,
+      backend: record.backend,
+      projectId: record.projectId ?? "",
+      chat: record.chat ?? "",
+      topic: record.message.trim().slice(0, 120),
+      status: "stopped",
+      ...(record.session ? { session: record.session } : {}),
+      startedAt: record.startedAt ?? Date.now(),
+      endedAt: Date.now(),
+    }).catch(() => {});
+  }
   await removeRun(id);
 }

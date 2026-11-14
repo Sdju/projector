@@ -7,6 +7,7 @@ import {
 } from "./command-bridge.ts";
 import {
   createRun,
+  JOB_CHAT,
   pruneRuns,
   readRun,
   rememberSession,
@@ -14,6 +15,7 @@ import {
   schedulePrune,
   trackRun,
 } from "./agent-runs.ts";
+import { clearRecentRunForChat, hasAnswerForm, recordRecentRun } from "./recent-runs.ts";
 import { trackEventStream } from "./event-streams.ts";
 import { requestFrom } from "./request.ts";
 import { isHostedAgent, runAgent } from "./registry.ts";
@@ -53,10 +55,15 @@ export async function handleAgentRun({
   };
   const backend = request.backend;
   const hosted = isHostedAgent(backend);
+  const startedAt = Date.now();
   const run = hosted
     ? { id: attachId || (await createRun(request)), attach: !!attachId }
     : undefined;
-  if (hosted && !attachId) void pruneRuns().catch(() => {});
+  if (hosted && !attachId) {
+    void pruneRuns().catch(() => {});
+    if (request.chat && !request.chat.startsWith(JOB_CHAT))
+      void clearRecentRunForChat(request.chat).catch(() => {});
+  }
 
   // A page with its own events stream asks for the answer there: the request returns at once and
   // holds no connection (a browser allows few per origin for all its tabs). Others get an SSE body.
@@ -150,7 +157,16 @@ export async function handleAgentRun({
   untrackStream = viaEvents ? trackEventStream(stream, client, detach) : undefined;
   if (!viaEvents) res.on("close", detach);
   const untrack = run ? trackRun(run.id, () => abort.abort()) : undefined;
+  let lastSession = request.session;
+  let collectedText = "";
+  let finalText: string | undefined;
+  let failure: string | undefined;
   const emit = (event: string, data: unknown) => {
+    const body = (data ?? {}) as Record<string, unknown>;
+    if (event === "session" && typeof body.id === "string") lastSession = body.id;
+    else if (event === "text" && typeof body.text === "string") collectedText += body.text;
+    else if (event === "done" && typeof body.text === "string" && body.text) finalText = body.text;
+    else if (event === "error" && typeof body.error === "string") failure = body.error;
     // Noted even after the page left: the run goes on, and its session is how it is found again.
     if (event === "session" && run && !run.attach)
       void rememberSession(run.id, (data as { id: string }).id).catch(() => {});
@@ -186,10 +202,30 @@ export async function handleAgentRun({
     });
   } catch (error) {
     const text = error instanceof Error ? error.message : "Ошибка агента";
+    failure ??= text;
     emit("error", { error: text });
   }
   driver?.finish();
   untrack?.();
+  if (run && !request.chat?.startsWith(JOB_CHAT)) {
+    const status = abort.signal.aborted ? "stopped" : failure !== undefined ? "error" : "done";
+    const answerText = (finalText ?? collectedText).trim();
+    const session = lastSession ?? request.sessionId;
+    await recordRecentRun({
+      id: run.id,
+      backend,
+      projectId: request.projectId ?? "",
+      chat: request.chat ?? "",
+      topic: request.message.trim().slice(0, 120),
+      status,
+      ...(status === "error" && failure ? { error: failure } : {}),
+      ...(answerText ? { resultPreview: answerText.slice(0, 300) } : {}),
+      ...(status === "done" && hasAnswerForm(answerText) ? { awaitingReply: true } : {}),
+      ...(session ? { session } : {}),
+      startedAt: stored?.startedAt ?? startedAt,
+      endedAt: Date.now(),
+    }).catch(() => {});
+  }
   // The answer reached a page, or the user cancelled it: nothing is left to rejoin.
   if (run) {
     const removed =

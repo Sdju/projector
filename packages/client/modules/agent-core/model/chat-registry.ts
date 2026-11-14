@@ -26,6 +26,7 @@ export interface ChatController {
   backend: AgentBackendId;
   label: string;
   busy(): boolean;
+  needsUser?(): boolean;
   /** The chat is on screen: its tab is the shown one. */
   visible(): boolean;
   turns(): AgentTurn[];

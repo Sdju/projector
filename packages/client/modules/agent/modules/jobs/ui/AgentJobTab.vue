@@ -60,6 +60,7 @@ const permissions = computed<AgentPermission[]>(() =>
       title: card.title,
       detail: card.detail ?? "",
       persistent: card.persistent === true,
+      ...(card.judge ? { judge: card.judge } : {}),
     })),
 );
 const questions = computed<AgentQuestionRequest[]>(() =>

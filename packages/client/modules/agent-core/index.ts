@@ -4,6 +4,7 @@ export * from "./api/commands.ts";
 export * from "./api/event-stream.ts";
 export * from "./api/jobs.ts";
 export * from "./api/lens.ts";
+export * from "./api/runs.ts";
 export * from "./api/sessions.ts";
 export * from "./api/sse.ts";
 export * from "./lib/chat-links.ts";

@@ -29,8 +29,7 @@ import { AgentTurn } from "../../agent-turns/index.ts";
 import { AgentComposer } from "../modules/composer/index.ts";
 import { AgentActivityDock } from "../modules/jobs/index.ts";
 import { AgentJobRequests } from "../modules/jobs/index.ts";
-import { AgentQuestions } from "../../agent-turns/index.ts";
-import AgentSecrets from "./AgentSecrets.vue";
+import { AgentQuestions, AgentSecrets } from "../../agent-turns/index.ts";
 import { AgentPermissions } from "../../agent-turns/index.ts";
 import AgentContextMeter from "./AgentContextMeter.vue";
 import AgentChipPreview from "./AgentChipPreview.vue";
@@ -394,6 +393,8 @@ const controller: ChatController = {
   backend: props.backend,
   label: agentName.value,
   busy: () => busy.value,
+  needsUser: () =>
+    permissions.value.length > 0 || questions.value.length > 0 || secrets.value.length > 0,
   visible: () => !!root.value && root.value.getClientRects().length > 0,
   turns: () => turns.value,
   tasks: () => chatTasks(turns.value),

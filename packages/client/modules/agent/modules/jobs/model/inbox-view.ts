@@ -2,18 +2,22 @@ import type { HubDevice } from "@ai-projector/core/modules/hub/index.ts";
 import {
   agentLabel,
   type AgentBackendId,
-  type AgentJobPending,
   type AgentJobStatus,
   type AgentJobView,
+  type AgentRunPending,
   type LiveAgentRun,
+  type RecentAgentRun,
 } from "../../../../agent-core/index.ts";
 import { deviceBase } from "../../../../../common/utilities/device-url.ts";
 import { projectRoute } from "../../../../project/index.ts";
 
 /** Finished work older than this is history, not a notification. */
 export const FINISHED_TTL_MS = 24 * 60 * 60 * 1000;
+/** Unseen completions within this window are treated as fresh when a page first loads. */
+export const RECENT_UNREAD_MS = 10 * 60 * 1000;
 
 export type InboxCategory = "attention" | "working" | "finished";
+export type InboxPending = AgentRunPending;
 
 /** One Projector instance: this page's device or a connected device of the Hub. */
 export interface InboxSource {
@@ -44,10 +48,12 @@ export interface InboxItem {
   backend: AgentBackendId;
   agent: string;
   topic: string;
-  status: AgentJobStatus | "running";
+  status: AgentJobStatus;
   category: InboxCategory;
-  pending: AgentJobPending[];
+  pending: InboxPending[];
   error?: string;
+  resultPreview?: string;
+  awaitingReply?: boolean;
   createdAt: number;
   startedAt?: number;
   endedAt?: number;
@@ -113,6 +119,7 @@ export function inboxJobItem(
   projects: readonly InboxProject[] = [],
 ): InboxItem {
   const project = projectOf(projects, job.projectId);
+  const resultPreview = (job.resultPreview ?? job.result ?? "").trim().slice(0, 300);
   return {
     key: `${source.id}|job|${job.id}`,
     kind: "job",
@@ -130,6 +137,7 @@ export function inboxJobItem(
     category: jobCategory(job),
     pending: job.pending,
     error: job.error,
+    ...(resultPreview ? { resultPreview } : {}),
     createdAt: job.createdAt,
     startedAt: job.startedAt,
     endedAt: job.endedAt,
@@ -143,6 +151,8 @@ export function inboxRunItem(
   projects: readonly InboxProject[] = [],
 ): InboxItem {
   const project = projectOf(projects, run.projectId);
+  const pending = run.pending ?? [];
+  const waiting = run.status === "needs-user" || pending.length > 0;
   return {
     key: `${source.id}|run|${run.id}`,
     kind: "run",
@@ -156,13 +166,66 @@ export function inboxRunItem(
     backend: run.backend,
     agent: agentLabel(run.backend),
     topic: run.topic.trim().slice(0, 120),
-    status: "running",
-    category: "working",
-    pending: [],
+    status: waiting ? "needs-user" : "running",
+    category: waiting ? "attention" : "working",
+    pending,
     createdAt: run.startedAt ?? Date.now(),
     startedAt: run.startedAt,
     chat: run.chat,
   };
+}
+
+export function inboxRecentRunItem(
+  source: InboxSource,
+  run: RecentAgentRun,
+  projects: readonly InboxProject[] = [],
+): InboxItem {
+  const project = projectOf(projects, run.projectId);
+  const attention = run.status === "error" || run.awaitingReply === true;
+  return {
+    key: `${source.id}|run|${run.id}`,
+    kind: "run",
+    id: run.id,
+    sourceId: source.id,
+    sourceName: source.name,
+    sourceBase: source.base,
+    projectId: run.projectId,
+    projectPath: project?.path,
+    projectName: project?.name ?? run.projectId,
+    backend: run.backend,
+    agent: agentLabel(run.backend),
+    topic: run.topic.trim().slice(0, 120),
+    status: run.awaitingReply ? "needs-user" : run.status,
+    category: attention ? "attention" : "finished",
+    pending: [],
+    error: run.error,
+    resultPreview: run.resultPreview,
+    awaitingReply: run.awaitingReply,
+    createdAt: run.startedAt,
+    startedAt: run.startedAt,
+    endedAt: run.endedAt,
+    chat: run.chat,
+  };
+}
+
+/** Merges live and recently finished chat runs, keeping live state when both overlap. */
+export function mergeRunItems(
+  source: InboxSource,
+  runs: readonly LiveAgentRun[],
+  recent: readonly RecentAgentRun[],
+  projects: readonly InboxProject[] = [],
+): InboxItem[] {
+  const activeIds = new Set(runs.map((run) => run.id));
+  const activeChats = new Set(runs.map((run) => run.chat).filter(Boolean));
+  const finished = recent
+    .filter(
+      (run) =>
+        Date.now() - run.endedAt < FINISHED_TTL_MS &&
+        !activeIds.has(run.id) &&
+        (!run.chat || !activeChats.has(run.chat)),
+    )
+    .map((run) => inboxRecentRunItem(source, run, projects));
+  return [...runs.map((run) => inboxRunItem(source, run, projects)), ...finished];
 }
 
 const categoryOrder: Record<InboxCategory, number> = { attention: 0, working: 1, finished: 2 };
@@ -218,17 +281,25 @@ export function inboxHref(item: InboxItem, sources: readonly InboxSource[]): str
   return `${prefix}${projectRoute(item.projectPath)}${query}`;
 }
 
+function pendingBody(card: InboxPending, topic: string): string {
+  if (card.kind === "permission" && card.judge)
+    return `Судья ${card.judge.score}/5 (${card.judge.label}) — ${card.judge.reason}: ${card.title}`;
+  if (card.kind === "question") return `${card.questions?.[0]?.question || card.title}: ${topic}`;
+  if (card.kind === "secret") return `Секрет «${card.title}»: ${topic}`;
+  return `${card.title}: ${topic}`;
+}
+
 function noticeOf(item: InboxItem): InboxNotice | undefined {
   const who = item.agent;
   const title =
     item.status === "needs-user" || item.pending.length
       ? `${who} ждёт вашего ответа`
       : item.status === "error"
-        ? `${who}: задание завершилось ошибкой`
+        ? `${who}: ${item.kind === "job" ? "задание завершилось ошибкой" : "ошибка агента"}`
         : item.status === "done"
-          ? `${who} закончил задание`
+          ? `${who} ${item.kind === "job" ? "закончил задание" : "закончил работу"}`
           : item.status === "stopped"
-            ? `${who}: задание остановлено`
+            ? `${who}: ${item.kind === "job" ? "задание остановлено" : "работа остановлена"}`
             : "";
   if (!title) return undefined;
   const card = item.pending[0];
@@ -236,10 +307,12 @@ function noticeOf(item: InboxItem): InboxNotice | undefined {
     key: item.key,
     title,
     body: card
-      ? `${card.title}: ${item.topic}`
-      : item.status === "error" && item.error
-        ? item.error
-        : item.topic,
+      ? pendingBody(card, item.topic)
+      : item.awaitingReply
+        ? `Форма ответа: ${item.topic}`
+        : item.status === "error" && item.error
+          ? item.error
+          : item.resultPreview || item.topic,
   };
 }
 
@@ -256,7 +329,7 @@ export function inboxNotices(
 ): InboxNotice[] {
   const notices: InboxNotice[] = [];
   for (const item of items) {
-    const signature = `${item.status}|${item.pending.map((card) => card.id).join(",")}`;
+    const signature = `${item.status}|${item.awaitingReply ? "reply" : ""}|${item.pending.map((card) => card.id).join(",")}`;
     const before = known.get(item.key);
     known.set(item.key, signature);
     if (before === signature) continue;

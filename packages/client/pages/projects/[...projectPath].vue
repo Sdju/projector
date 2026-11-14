@@ -38,7 +38,7 @@ import { useCommandScope } from "../../common/utilities/commands.ts";
 import UiButton from "../../common/ui/UiButton.vue";
 import IconGithub from "~icons/simple-icons/github";
 import IconGitlab from "~icons/simple-icons/gitlab";
-import { projectInitPrompt, useAgent } from "../../modules/agent/index.ts";
+import { projectInitPrompt, requestChatTab, useAgent } from "../../modules/agent/index.ts";
 import { settingsTabViews } from "../../modules/app-settings/index.ts";
 
 const route = useRoute();
@@ -202,7 +202,8 @@ function openInboxTarget() {
   const chat = typeof route.query.chat === "string" ? route.query.chat : "";
   if (!job && !chat) return;
   if (job) workspace.value?.openTab("agent-job", { job });
-  else workspace.value?.openTab("agent", { chatId: chat });
+  else if (!requestChatTab(projectId.value, chat))
+    workspace.value?.openTab("agent", { chatId: chat });
   const query = { ...route.query };
   delete query.job;
   delete query.chat;

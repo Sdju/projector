@@ -40,6 +40,17 @@ test("the journal of a job reads as one answer of the agent", () => {
       { at: 2, event: "text", data: { text: "привет" } },
       { at: 3, event: "tool", data: { id: "t", name: "Write", input: { file_path: "a" } } },
       { at: 4, event: "tool-result", data: { id: "t", name: "Write", output: "ok" } },
+      {
+        at: 4,
+        event: "judge",
+        data: {
+          tool: "Read",
+          title: "Read file",
+          verdict: { score: 1, label: "безопасно", reason: "Только чтение", confidence: "high" },
+          decision: "auto",
+          at: 4,
+        },
+      },
       { at: 5, event: "answer", data: { summary: "разрешено" } },
     ],
     "job-x",
@@ -47,6 +58,7 @@ test("the journal of a job reads as one answer of the agent", () => {
   );
   expect(turn.text.trim()).toBe("привет");
   expect(turn.tools).toMatchObject([{ id: "t", status: "done" }]);
+  expect(turn.parts.some((part) => part.type === "judge")).toBe(true);
   expect(turn.parts.at(-1)).toEqual({ type: "note", text: "Ответ на запрос: разрешено" });
 });
 
