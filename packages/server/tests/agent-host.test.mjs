@@ -162,6 +162,77 @@ test.skipIf(process.platform === "win32")("an agent run survives its server and 
   }
 }, 30000);
 
+const QUICK_AGENT = `
+const send = (message) => process.stdout.write(JSON.stringify(message) + "\\n");
+let buffer = "";
+process.stdin.on("data", (chunk) => {
+  buffer += chunk;
+  let end;
+  while ((end = buffer.indexOf("\\n")) !== -1) {
+    const line = buffer.slice(0, end);
+    buffer = buffer.slice(end + 1);
+    if (!line) continue;
+    const message = JSON.parse(line);
+    if (message.method === "initialize") send({ jsonrpc: "2.0", id: message.id, result: {} });
+    else if (message.method === "session/new")
+      send({ jsonrpc: "2.0", id: message.id, result: { sessionId: "s1" } });
+    else if (message.method === "session/prompt")
+      send({ jsonrpc: "2.0", id: message.id, result: { stopReason: "end_turn" } });
+  }
+});
+setInterval(() => {}, 1000);
+`;
+
+// oxfmt-ignore
+test.skipIf(process.platform === "win32")("keep-alive after end_turn leaves the agent until idle, not SIGTERM", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "projector-host-"));
+  const previous = process.env.XDG_DATA_HOME;
+  const previousIdle = process.env.PROJECTOR_AGENT_IDLE_MS;
+  process.env.XDG_DATA_HOME = directory;
+  process.env.PROJECTOR_AGENT_IDLE_MS = "500";
+  try {
+    const { createRun } = await import("../modules/agent/agent-runs.ts");
+    const { startHosted } = await import("../modules/agent/hosted-process.ts");
+    const { createAcpConnection, NO_TIMEOUT } =
+      await import("../modules/agents/acp/acp-client.ts");
+    const { os } = await import("../../core/modules/os/index.ts");
+    const script = join(directory, "quick-agent.cjs");
+    await writeFile(script, QUICK_AGENT);
+    const runId = await createRun({ backend: "codex", message: "hi", history: [] });
+    const child = await startHosted(runId, {
+      command: process.execPath,
+      args: [script],
+      cwd: directory,
+      env: process.env,
+    });
+    const { pid, identity } = JSON.parse(
+      await readFile(join(directory, "projector/agent/runs", runId, "process.json"), "utf8"),
+    );
+    await writeFile(join(directory, "projector/agent/runs", runId, "keep-alive"), "1\n");
+    const connection = createAcpConnection(child, { onNotification() {}, onRequest: () => ({}) });
+    await connection.request("initialize", { protocolVersion: 1 });
+    await connection.request("session/new", { cwd: directory, mcpServers: [] });
+    expect(
+      await connection.request(
+        "session/prompt",
+        { sessionId: "s1", prompt: [{ type: "text", text: "hi" }] },
+        NO_TIMEOUT,
+      ),
+    ).toStrictEqual({ stopReason: "end_turn" });
+    // Detach like acp-backend when keepsProcess: do not terminate the hosted tree.
+    await connection.close({ stop: false });
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(await os.processes.identity(pid), "keep-alive must defer SIGTERM").toBe(identity);
+    await until(async () => (await os.processes.identity(pid)) === null, 5000);
+  } finally {
+    if (previous === undefined) delete process.env.XDG_DATA_HOME;
+    else process.env.XDG_DATA_HOME = previous;
+    if (previousIdle === undefined) delete process.env.PROJECTOR_AGENT_IDLE_MS;
+    else process.env.PROJECTOR_AGENT_IDLE_MS = previousIdle;
+    await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
+}, 15000);
+
 // oxfmt-ignore
 test.skipIf(process.platform === "win32")("stopping a hosted run kills the agent and everything it started", async () => {
   const directory = await mkdtemp(join(tmpdir(), "projector-host-"));

@@ -9,7 +9,7 @@
 // One server at a time connects to the socket: it gets the whole trace, then `! {"live":true}`,
 // then new agent lines as they arrive; lines it writes go to the agent's stdin.
 import { spawn } from "node:child_process";
-import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import { join } from "node:path";
 
@@ -53,8 +53,22 @@ function rpcMessage(message: string): RpcMessage | undefined {
   }
 }
 
+/** Soft background (e.g. Kimi Agent): keep the process for IDLE_MS instead of releasing the lock now. */
+function keepAliveAfterTurn(): boolean {
+  try {
+    return existsSync(join(dir, "keep-alive"));
+  } catch {
+    return false;
+  }
+}
+
+function endTurnProcess(): void {
+  if (keepAliveAfterTurn()) armIdle();
+  else child.kill("SIGTERM");
+}
+
 // ACP servers stay alive after a turn. Once nobody is listening, a finished turn must release
-// the native session lock; its trace remains available for the next server to replay.
+// the native session lock unless a keep-alive marker asks for idle instead (background work).
 function observe(message: string, outgoing: boolean): void {
   const rpc = rpcMessage(message);
   if (!rpc) return;
@@ -68,7 +82,7 @@ function observe(message: string, outgoing: boolean): void {
     prompts.delete(JSON.stringify(rpc.id))
   ) {
     turnFinished = true;
-    if (!client || client.destroyed) child.kill("SIGTERM");
+    if (!client || client.destroyed) endTurnProcess();
   }
 }
 
@@ -169,7 +183,7 @@ const server = net.createServer((socket) => {
     if (client !== socket) return;
     client = null;
     if (!finished) {
-      if (turnFinished) child.kill("SIGTERM");
+      if (turnFinished) endTurnProcess();
       else armIdle();
     }
   });

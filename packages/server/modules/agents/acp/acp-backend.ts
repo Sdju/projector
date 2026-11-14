@@ -24,6 +24,7 @@ import { type AcpConnection, type AcpError, NO_TIMEOUT } from "./acp-client.ts";
 import { applySelection, controlsFromSession, shownModel } from "./acp-controls.ts";
 import { isCompactCommand } from "./acp-dialect.ts";
 import { contentText, createAcpEventMapper, stopReasonError } from "./acp-events.ts";
+import { markAcpKeepAlive } from "./acp-keep-alive.ts";
 import { acpAdvertisedDelete, initializeAcp, startAcp } from "./acp-process.ts";
 import {
   acpCommands,
@@ -148,6 +149,7 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
   if (options.abort?.aborted) abort();
 
   options.emit("status", { phase: "thinking", provider: program.label, model: "" });
+  let keepProcess = false;
   try {
     const init = await initializeAcp(connection, id);
     const [ideEnabled, widgetsEnabled, roleText] = await Promise.all([
@@ -226,6 +228,9 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
     if (stopReason === "end_turn" || stopReason === "cancelled") {
       mapper.finish();
       options.emit("done", { text: mapper.text.trim(), added: [] });
+      await mapper.waitBackground(options.abort);
+      keepProcess = mapper.keepsProcess;
+      if (options.run && keepProcess) await markAcpKeepAlive(options.run.id);
     } else options.emit("error", { error: stopReasonError(stopReason) });
   } catch (error) {
     if (!options.abort?.aborted)
@@ -234,7 +239,7 @@ async function run(options: AgentRunOptions, id: AgentBackendId): Promise<void> 
       });
   } finally {
     options.abort?.removeEventListener("abort", abort);
-    await connection.close();
+    await connection.close({ stop: !keepProcess || !!options.abort?.aborted });
   }
 }
 
@@ -349,11 +354,7 @@ function diffText(block: {
   return [`--- ${path}`, `+++ ${path}`, ...removed, ...added].join("\n");
 }
 
-/**
- * Maps the ACP permission options onto the chat's prompt. A one-time allow/reject is always
- * preferred: `allow_always` is used only when the user chose "always" (or no one-time option
- * exists), so a plain "Разрешить" never silently widens the agent's rights.
- */
+/** Prefer one-time allow/reject; `allow_always` only when the user chose "always". */
 export async function decidePermission(
   options: AgentRunOptions,
   params: Record<string, unknown>,

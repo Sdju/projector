@@ -3,10 +3,40 @@ import {
   createAcpEventMapper,
   createAcpReplayCollector,
 } from "../modules/agents/acp/acp-events.ts";
-import { isCompactCommand } from "../modules/agents/acp/acp-dialect.ts";
+import { extendPlainDialect, isCompactCommand } from "../modules/agents/acp/acp-dialect.ts";
 import { createCodexDialect } from "../modules/agents/codex/dialect.ts";
 import { createKimiDialect } from "../modules/agents/kimi/dialect.ts";
 import { createOpencodeDialect } from "../modules/agents/opencode/dialect.ts";
+
+/** A dialect that marks one tool as a tracked background agent until a later end patch. */
+function createBackgroundHoldDialect() {
+  const open = new Set();
+  return extendPlainDialect({
+    call(update, id) {
+      if (update.title !== "Agent" || open.has(id)) return [];
+      open.add(id);
+      return [
+        {
+          id,
+          kind: "agent",
+          title: "hold",
+          status: "running",
+          background: true,
+          tool: id,
+        },
+      ];
+    },
+    end(update, id) {
+      if (!open.delete(id)) return [];
+      return [
+        {
+          id,
+          status: update.status === "failed" ? "error" : "done",
+        },
+      ];
+    },
+  });
+}
 
 const delta = (data) => ({
   sessionUpdate: "tool_call_update",
@@ -225,6 +255,101 @@ test("kimi leaves text that is not a numbered read untouched", () => {
     "tool-result",
     { id: "b1", name: "Running tests", output: "1\tnot a file\nplain line" },
   ]);
+});
+
+test("kimi background Agent is a soft keep-alive task, not a connection hold", async () => {
+  const events = [];
+  const mapper = createAcpEventMapper(
+    (type, data) => events.push([type, data]),
+    "Kimi",
+    createKimiDialect(),
+  );
+  mapper.handleUpdate("s", {
+    sessionUpdate: "tool_call",
+    toolCallId: "a1",
+    title: "Agent",
+    kind: "other",
+    status: "in_progress",
+    rawInput: {
+      description: "Fix trust",
+      subagent_type: "coder",
+      run_in_background: true,
+      prompt: "do it",
+    },
+  });
+  expect(events).toContainEqual([
+    "task",
+    {
+      id: "a1",
+      kind: "agent",
+      title: "Fix trust",
+      status: "running",
+      background: true,
+      subagent: "coder",
+      prompt: "do it",
+      tool: "a1",
+    },
+  ]);
+  expect(mapper.pendingBackground).toBe(0);
+  expect(mapper.keepsProcess).toBe(true);
+  mapper.handleUpdate(
+    "s",
+    readResult(
+      "a1",
+      "task_id: agent-x\nstatus: running\nagent_id: agent-0\nactual_subagent_type: coder\nautomatic_notification: true\n\ndescription: Fix trust\n",
+    ),
+  );
+  expect(mapper.pendingBackground).toBe(0);
+  expect(mapper.keepsProcess).toBe(true);
+  await mapper.waitBackground();
+  const tasks = events.filter(([type]) => type === "task").map(([, data]) => data);
+  expect(tasks.at(-1)).toMatchObject({
+    id: "a1",
+    status: "running",
+    background: true,
+    session: "agent-0",
+    subagent: "coder",
+  });
+});
+
+test("kimi background Agent terminal receipt clears the soft keep-alive task", async () => {
+  const events = [];
+  const mapper = createAcpEventMapper(
+    (type, data) => events.push([type, data]),
+    "Kimi",
+    createKimiDialect(),
+  );
+  mapper.handleUpdate("s", {
+    sessionUpdate: "tool_call",
+    toolCallId: "a2",
+    title: "Agent",
+    kind: "other",
+    status: "in_progress",
+    rawInput: {
+      description: "Fix trust",
+      subagent_type: "coder",
+      run_in_background: true,
+      prompt: "do it",
+    },
+  });
+  expect(mapper.keepsProcess).toBe(true);
+  mapper.handleUpdate(
+    "s",
+    readResult(
+      "a2",
+      "agent_id: agent-0\nactual_subagent_type: coder\nstatus: failed\nstop_reason: provider_error\n\nsubagent error: quota\n",
+    ),
+  );
+  expect(mapper.pendingBackground).toBe(0);
+  expect(mapper.keepsProcess).toBe(false);
+  const tasks = events.filter(([type]) => type === "task").map(([, data]) => data);
+  expect(tasks.at(-1)).toMatchObject({
+    id: "a2",
+    status: "error",
+    background: true,
+    session: "agent-0",
+    subagent: "coder",
+  });
 });
 
 test("opencode read result loses its frame and line numbers", () => {
@@ -752,4 +877,76 @@ test("replaying a compacted session marks where the context was compacted", () =
     summary: [{ type: "text", text: "long summary" }],
   });
   expect(collector.turns.at(-1).parts).toContainEqual({ type: "note", text: "Контекст сжат" });
+});
+
+test("tracked background tasks hold waitBackground until they end", async () => {
+  const mapper = createAcpEventMapper(() => {}, "Test", createBackgroundHoldDialect());
+  expect(mapper.pendingBackground).toBe(0);
+  mapper.handleUpdate("s", {
+    sessionUpdate: "tool_call",
+    toolCallId: "bg1",
+    title: "Agent",
+    status: "pending",
+  });
+  expect(mapper.pendingBackground).toBe(1);
+  mapper.finish();
+  expect(mapper.pendingBackground).toBe(1);
+  let released = false;
+  const waiting = mapper.waitBackground().then(() => {
+    released = true;
+  });
+  await Promise.resolve();
+  expect(released).toBe(false);
+  mapper.handleUpdate("s", {
+    sessionUpdate: "tool_call_update",
+    toolCallId: "bg1",
+    title: "Agent",
+    status: "completed",
+    content: [{ type: "content", content: { type: "text", text: "ok" } }],
+  });
+  expect(mapper.pendingBackground).toBe(0);
+  await waiting;
+  expect(released).toBe(true);
+});
+
+test("untracked background tasks do not hold the ACP connection", async () => {
+  const dialect = extendPlainDialect({
+    call(_update, id) {
+      return [
+        {
+          id,
+          kind: "shell",
+          title: "sleep",
+          status: "running",
+          background: true,
+          untracked: true,
+          tool: id,
+        },
+      ];
+    },
+  });
+  const mapper = createAcpEventMapper(() => {}, "Test", dialect);
+  mapper.handleUpdate("s", {
+    sessionUpdate: "tool_call",
+    toolCallId: "u1",
+    title: "shell",
+    status: "pending",
+  });
+  expect(mapper.pendingBackground).toBe(0);
+  await mapper.waitBackground();
+});
+
+test("waitBackground resolves immediately when abort fires", async () => {
+  const mapper = createAcpEventMapper(() => {}, "Test", createBackgroundHoldDialect());
+  mapper.handleUpdate("s", {
+    sessionUpdate: "tool_call",
+    toolCallId: "bg2",
+    title: "Agent",
+    status: "pending",
+  });
+  const abort = new AbortController();
+  const waiting = mapper.waitBackground(abort.signal);
+  abort.abort();
+  await waiting;
+  expect(mapper.pendingBackground).toBe(1);
 });

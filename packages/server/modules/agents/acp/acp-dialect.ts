@@ -1,6 +1,11 @@
 import type { AgentTaskPatch } from "@ai-projector/core/modules/agent-task/index.ts";
 
-export type AcpTaskPatch = AgentTaskPatch;
+/**
+ * A task patch for the ACP mapper. `hold` is server-only: when `false`, a background task is
+ * shown in the chat but must not block `connection.close` (completion arrives on a later turn);
+ * the hosted process is kept alive via `keep-alive` instead.
+ */
+export type AcpTaskPatch = AgentTaskPatch & { hold?: boolean };
 
 export type AcpUpdate = Record<string, unknown>;
 

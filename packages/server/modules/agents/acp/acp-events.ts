@@ -1,4 +1,5 @@
 import { createReplay, type AgentCommand, type AgentEmitter } from "../../agent/index.ts";
+import { createBackgroundHold } from "./acp-background-hold.ts";
 import {
   createPlainDialect,
   isOver,
@@ -104,8 +105,14 @@ export function createAcpEventMapper(
   let text = "";
   let model = "";
   const toolNames = new Map<string, string>();
+  const background = createBackgroundHold();
   const emitTasks = (patches: AcpTaskPatch[]) => {
-    for (const patch of patches) emit("task", patch);
+    for (const patch of patches) {
+      background.track(patch);
+      // `hold` is only for the hosted process; the chat contract does not carry it.
+      const { hold: _hold, ...rest } = patch;
+      emit("task", rest);
+    }
   };
   /** A compaction took the context away: show its progress and keep its result in the chat. */
   function applyCompaction(compaction: AcpCompaction): void {
@@ -271,6 +278,21 @@ export function createAcpEventMapper(
     },
     get text() {
       return text;
+    },
+    /** Count of background tasks that still block `connection.close` after the answer. */
+    get pendingBackground() {
+      return background.size;
+    },
+    /** Whether the hosted ACP process must outlive this connection (wait and/or keep-alive). */
+    get keepsProcess() {
+      return background.keepsProcess;
+    },
+    /**
+     * Resolves when every holding background task has ended, or when `signal` aborts. The
+     * connection must stay open so later `session/update` can clear the set.
+     */
+    waitBackground(signal?: AbortSignal): Promise<void> {
+      return background.wait(signal);
     },
   };
 }
